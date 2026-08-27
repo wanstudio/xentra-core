@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xentra KDS — Kitchen Display System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #b6ff00;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --font: 'Plus Jakarta Sans', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); }
+    body { background: var(--bg); color: var(--text); padding: 20px; }
+    .kds-header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    .kds-title { font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+    .kds-badge { background: var(--primary); color: #000; font-size: 13px; font-weight: 800; padding: 4px 10px; border-radius: 20px; }
+    .kds-branch-select { background: #334155; color: #fff; border: 1px solid #475569; padding: 8px 14px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+    .kds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+    .order-card { background: var(--card-bg); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
+    .order-card.status-confirmed { border-left: 6px solid #eab308; }
+    .order-card.status-preparing { border-left: 6px solid var(--primary); }
+    .order-card.status-ready { border-left: 6px solid #22c55e; }
+    .order-card-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .order-num { font-size: 16px; font-weight: 800; }
+    .order-time { font-size: 12px; color: var(--text-muted); }
+    .order-card-body { padding: 16px; flex: 1; }
+    .order-item-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+    .item-qty { font-weight: 800; color: var(--primary); margin-right: 8px; }
+    .item-note { font-size: 12px; color: #fbbf24; margin-top: 2px; }
+    .order-card-footer { padding: 14px 16px; border-top: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+    .btn-action { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: 800; font-size: 14px; cursor: pointer; }
+    .btn-cook { background: var(--primary); color: #000; }
+    .btn-ready { background: #22c55e; color: #000; }
+    .btn-complete { background: #64748b; color: #fff; }
+    .empty-state { grid-column: 1 / -1; text-align: center; padding: 60px; color: var(--text-muted); font-size: 18px; }
+  </style>
+</head>
+<body>
+  <header class="kds-header">
+    <div class="kds-title">
+      <span>🍳 Xentra KDS (Layar Antrean Dapur)</span>
+      <span class="kds-badge" id="kds-active-count">0 Antrean</span>
+    </div>
+    <div>
+      <select class="kds-branch-select" id="kds-branch-select">
+        <option value="">Semua Cabang</option>
+        <option value="branch_bangjo_barat" selected>Bangjo Surabaya Barat</option>
+        <option value="branch_bangjo_timur">Bangjo Surabaya Timur</option>
+      </select>
+    </div>
+  </header>
+
+  <main class="kds-grid" id="kds-grid">
+    <div class="empty-state">Memuat antrean dapur...</div>
+  </main>
+
+  <script>
+    const gridEl = document.getElementById('kds-grid');
+    const branchSelectEl = document.getElementById('kds-branch-select');
+    const activeCountEl = document.getElementById('kds-active-count');
+
+    async function fetchQueue() {
+      const branchId = branchSelectEl.value;
+      const url = `/api/v1/kitchen/queue${branchId ? '?branch_id=' + branchId : ''}`;
+      
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.success) {
+          renderOrders(data.orders || []);
+        }
+      } catch (err) {
+        console.error('[KDS] Fetch error:', err);
+      }
+    }
+
+    function renderOrders(orders) {
+      activeCountEl.textContent = `${orders.length} Antrean`;
+      gridEl.innerHTML = '';
+
+      if (orders.length === 0) {
+        gridEl.innerHTML = '<div class="empty-state">🎉 Tidak ada pesanan menunggu di dapur saat ini.</div>';
+        return;
+      }
+
+      orders.forEach((ord) => {
+        const card = document.createElement('div');
+        card.className = `order-card status-${ord.status}`;
+
+        let actionButtonHtml = '';
+        if (ord.status === 'confirmed') {
+          actionButtonHtml = `<button class="btn-action btn-cook" onclick="updateStatus('${ord.id}', 'preparing')">🍳 Mulai Masak</button>`;
+        } else if (ord.status === 'preparing') {
+          actionButtonHtml = `<button class="btn-action btn-ready" onclick="updateStatus('${ord.id}', 'ready')">✅ Makanan Siap (Panggil Kurir)</button>`;
+        } else if (ord.status === 'ready') {
+          actionButtonHtml = `<button class="btn-action btn-complete" onclick="updateStatus('${ord.id}', 'out_for_delivery')">🛵 Serahkan ke Kurir</button>`;
+        }
+
+        const itemsHtml = (ord.items || []).map((i) => `
+          <div class="order-item-row">
+            <div>
+              <span class="item-qty">${i.quantity}x</span>
+              <span>${i.product_name}</span>
+              ${i.item_note ? `<div class="item-note">📝 ${i.item_note}</div>` : ''}
+            </div>
+          </div>
+        `).join('');
+
+        card.innerHTML = `
+          <div class="order-card-header">
+            <div>
+              <div class="order-num">${ord.order_number}</div>
+              <div class="order-time">${ord.branch_name} • ${ord.order_type.toUpperCase()}</div>
+            </div>
+            <div style="font-size:12px; font-weight:700; text-transform:uppercase;">${ord.status}</div>
+          </div>
+          <div class="order-card-body">
+            ${itemsHtml}
+            ${ord.order_note ? `<div style="margin-top:12px; padding:8px; background:rgba(0,0,0,0.3); border-radius:6px; font-size:12px; color:#fbbf24;">Catatan Pesanan: ${ord.order_note}</div>` : ''}
+          </div>
+          <div class="order-card-footer">
+            ${actionButtonHtml}
+          </div>
+        `;
+
+        gridEl.appendChild(card);
+      });
+    }
+
+    async function updateStatus(orderId, newStatus) {
+      try {
+        const res = await fetch(`/api/v1/kitchen/orders/${orderId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: newStatus, actor_type: 'kitchen' })
+        });
+        const d = await res.json();
+        if (d.success) {
+          fetchQueue();
+        } else {
+          alert(d.error || 'Gagal mengubah status pesanan.');
+        }
+      } catch (err) {
+        console.error('[KDS] Update error:', err);
+      }
+    }
+
+    branchSelectEl.onchange = fetchQueue;
+    setInterval(fetchQueue, 4000);
+    fetchQueue();
+  </script>
+</body>
+</html>

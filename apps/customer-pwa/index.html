@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MyBangjo — Official Online Ordering</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS for Mapbox/OSM Map View -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <link rel="stylesheet" href="/assets/css/app.css">
+  
+  <!-- Midtrans Snap JS Sandbox/Prod -->
+  <script type="text/javascript" src="https://app.sandbox.midtrans.com/snap/snap.js" data-client-key="SB-Mid-client-TEST"></script>
+</head>
+<body>
+  <div id="xentra-app">
+    <!-- 1. Header & Delivery Address Bar -->
+    <header class="x-header">
+      <div class="x-header-brand">
+        <h1 class="x-brand-title" id="x-brand-name">MyBangjo</h1>
+        <span class="x-brand-badge">Official Store</span>
+      </div>
+      
+      <!-- Delivery Address Trigger -->
+      <div class="x-delivery-selector" id="x-btn-select-location">
+        <div class="x-delivery-icon">📍</div>
+        <div class="x-delivery-info">
+          <div class="x-delivery-label">Diantar ke:</div>
+          <div class="x-delivery-address" id="x-current-address">Pilih Alamat Pengantaran...</div>
+        </div>
+        <div class="x-delivery-arrow">❯</div>
+      </div>
+
+      <!-- Active Branch Indicator -->
+      <div class="x-branch-badge-bar" id="x-branch-badge-bar" style="display: none;">
+        <span class="x-dot"></span>
+        <span id="x-active-branch-name">Mencari cabang terdekat...</span>
+      </div>
+    </header>
+
+    <!-- 2. Category Navigation Tabs -->
+    <nav class="x-category-nav" id="x-category-nav">
+      <!-- Injected via JS -->
+    </nav>
+
+    <!-- 3. Main Menu Catalog -->
+    <main class="x-menu-container">
+      <div class="x-menu-list" id="x-menu-list">
+        <!-- Products Injected via JS -->
+      </div>
+    </main>
+
+    <!-- 4. Floating Cart Bottom Dock -->
+    <div class="x-cart-dock" id="x-cart-dock">
+      <div class="x-cart-dock-inner">
+        <div class="x-cart-dock-left" id="x-btn-open-cart-sheet">
+          <div class="x-cart-dock-badge" id="x-cart-dock-qty">0</div>
+          <div class="x-cart-dock-price-group">
+            <span class="x-cart-dock-count-label" id="x-cart-dock-items-label">0 Item</span>
+            <span class="x-cart-dock-total" id="x-cart-dock-total">Rp 0</span>
+          </div>
+        </div>
+        <button class="x-btn-checkout-cta" id="x-btn-go-checkout">
+          Lanjut Checkout ❯
+        </button>
+      </div>
+    </div>
+
+    <!-- 5. Dynamic Overlay / Sheet Container -->
+    <div id="x-overlay-container"></div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
+  <!-- Core Logic Scripts -->
+  <script src="/assets/js/store.js"></script>
+  <script src="/assets/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "name": "xentra-core",
+  "version": "2.0.0",
+  "description": "Standalone Multi-Tenant & Multi-Branch Restaurant Operations & Digital Ordering Platform",
+  "main": "server/app.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/app.js",
+    "test": "node --test tests/**/*.test.js"
+  },
+  "keywords": [
+    "xentra",
+    "restaurant-saas",
+    "multi-tenant",
+    "multi-branch",
+    "food-ordering",
+    "midtrans",
+    "kds"
+  ],
+  "author": "Xentra Engineering Team",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "sql.js": "^1.14.2"
+  }
+}
