@@ -1,0 +1,57 @@
+/* ==========================================================================
+   XENTRA SHARED LAYOUT
+   Page container, header, scrollable body, safe-area handling
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap');
+
+/* ── Reset ── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: var(--x-font);
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  font-family: var(--x-font);
+  background: var(--x-white);
+  color: var(--x-text);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* ── Page Container (mobile-first, centered) ── */
+.x-page {
+  width: 100%;
+  max-width: var(--x-page-max);
+  min-height: 100vh;
+  margin: 0 auto;
+  position: relative;
+  background: var(--x-white);
+}
+
+/* ── Scrollbar Hide (for horizontal scrolling areas) ── */
+.x-scroll-hide {
+  scrollbar-width: none;
+}
+
+.x-scroll-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Visually Hidden (screen reader only) ── */
+.x-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

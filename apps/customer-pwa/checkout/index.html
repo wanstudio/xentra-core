@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Bangjo — Spesial Ayam Tulang Lunak</title>
+  <meta name="description" content="Pesan ayam tulang lunak spesial Bangjo langsung dari HP. Delivery & Pick-up tersedia!">
+  <meta name="theme-color" content="#b6ff00">
+
+  <!-- ══════════════════════════════════════════════════════════════
+       PWA VERSION SENTINEL & AUTO-PURGE GUARD (Industry Standard)
+       Executes immediately before CSS/JS to eliminate stale cache white screens.
+       ══════════════════════════════════════════════════════════════ -->
+  <script>
+    (function () {
+      var PWA_VERSION = 'v2_1_3';
+      try {
+        if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
+          localStorage.setItem('__xentra_rel', PWA_VERSION);
+          if ('caches' in window) {
+            caches.keys().then(function (names) {
+              return Promise.all(names.map(function (n) { return caches.delete(n); }));
+            }).catch(function () {});
+          }
+        }
+      } catch (_) {}
+    })();
+  </script>
+
+  <!-- PWA Manifest & Icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Bangjo">
+  <link rel="apple-touch-icon" href="/assets/pwa/icon-192.png">
+  <link rel="manifest" href="/manifest.json?v=2.1.3">
+
+  <!-- CSS (version-hashed for instant cache-busting) -->
+  <link rel="stylesheet" href="/assets/css/tokens.css?v=2.1.3">
+  <link rel="stylesheet" href="/assets/css/layout.css?v=2.1.3">
+  <link rel="stylesheet" href="/assets/css/components.css?v=2.1.3">
+  <link rel="stylesheet" href="/assets/css/home.css?v=2.1.3">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=2.1.3">
+  <link rel="stylesheet" href="/assets/css/order-received.css?v=2.1.3">
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════
+       1. HOME VIEW (MENU KATALOG)
+       ═══════════════════════════════════════════════════ -->
+  <div id="xentra-home-view" class="x-page">
+
+    <!-- HERO HEADER -->
+    <header class="x-hero-header">
+      <div class="x-hero-top-row">
+        <button class="x-hero-btn-join" id="x-btn-join">Yuk, join!</button>
+        <div class="x-hero-action-icons">
+          <button class="x-hero-icon-btn" id="x-btn-notif" aria-label="Notifikasi">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+          </button>
+          <button class="x-hero-icon-btn" id="x-btn-search" aria-label="Cari">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.3-4.3"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="x-hero-clock-wrap">
+        <div class="x-hero-time" id="x-hero-time"></div>
+        <div class="x-hero-date" id="x-hero-date"></div>
+      </div>
+    </header>
+
+    <!-- CAROUSEL BANNER -->
+    <div class="x-carousel-container">
+      <div class="x-carousel-track x-scroll-hide" id="x-carousel-track">
+        <div class="x-carousel-slide">
+          <img src="https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-1.png" alt="Promo Bangjo" loading="eager">
+        </div>
+        <div class="x-carousel-slide">
+          <img src="https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-1.png" alt="Promo Bangjo" loading="lazy">
+        </div>
+      </div>
+      <div class="x-carousel-dots" id="x-carousel-dots"></div>
+    </div>
+
+    <!-- CATEGORY TABS -->
+    <div class="x-cat-wrap">
+      <div class="x-cat-track x-scroll-hide" id="x-cat-track">
+        <!-- Rendered dynamically by home.js -->
+      </div>
+    </div>
+
+    <!-- PRODUCT LIST -->
+    <div class="x-products" id="x-products">
+      <div class="x-loading">Memuat menu...</div>
+    </div>
+
+    <!-- CART DOCK (Floating Bottom Bar) -->
+    <div class="x-cart-dock" id="x-cart-dock">
+      <!-- Promo progress bar -->
+      <div class="x-promo" id="x-promo" style="display:none">
+        <div class="x-promo-icon">
+          <img class="x-promo-icon-img" id="x-promo-icon-img" src="" alt="">
+        </div>
+        <div class="x-promo-body">
+          <div id="x-promo-text"></div>
+          <div class="x-progress"><div id="x-progress-fill"></div></div>
+        </div>
+      </div>
+
+      <!-- Cart bar -->
+      <div class="x-bottom-cart" id="x-bottom-cart">
+        <a href="#checkout" class="x-cart-checkout-link" id="x-cart-checkout-link">
+          <div class="x-cart-summary">
+            <strong id="x-cart-count">0 Item</strong>
+            <span>Lihat pesanan kamu</span>
+          </div>
+          <div id="x-cart-total">0</div>
+        </a>
+        <button id="x-cart-button" aria-label="Keranjang">
+          <img class="x-cart-icon" src="/assets/icons/cart.svg" width="35" height="35" alt="Keranjang">
+          <span id="x-cart-badge" style="display:none">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- CART SHEET (Bottom Sheet) -->
+    <div class="x-backdrop" id="x-backdrop"></div>
+    <div class="x-sheet" id="x-sheet">
+      <div class="x-sheet-handle"></div>
+      <div class="x-sheet-content">
+        <h2>Keranjang</h2>
+        <div id="x-sheet-items"></div>
+        <div class="x-sheet-total">
+          <div class="x-sheet-summary-title">Ringkasan Pesanan</div>
+          <div id="x-sheet-summary"></div>
+        </div>
+        <button class="x-sheet-checkout" id="x-sheet-checkout">Lanjut ke Checkout</button>
+      </div>
+    </div>
+
+  </div><!-- /#xentra-home-view -->
+
+  <!-- ═══════════════════════════════════════════════════
+       2. CHECKOUT VIEW (SLIDE-UP / INSTANT SPA VIEW)
+       ═══════════════════════════════════════════════════ -->
+  <div id="xentra-checkout-view" class="x-page" style="display:none;"></div>
+
+  <!-- ═══════════════════════════════════════════════════
+       3. ORDER RECEIVED VIEW (LIVE TRACKER SPA VIEW)
+       ═══════════════════════════════════════════════════ -->
+  <div id="xentra-order-view" class="x-page" style="display:none;"></div>
+
+  <!-- PWA INSTALL BANNER -->
+  <div class="x-pwa-banner" id="x-pwa-banner">
+    <div class="x-pwa-banner-card">
+      <div class="x-pwa-banner-left">
+        <img class="x-pwa-banner-icon" src="/assets/pwa/icon-192.png" alt="Bangjo">
+        <div class="x-pwa-banner-text">
+          <strong>Bangjo App</strong>
+          <span>Install untuk pengalaman terbaik</span>
+        </div>
+      </div>
+      <div class="x-pwa-banner-right">
+        <button class="x-pwa-btn-install" id="x-pwa-install">Install</button>
+        <button class="x-pwa-btn-dismiss" id="x-pwa-dismiss">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       JS CORE & CONTROLLERS (Version Hashed v2.1.3)
+       ═══════════════════════════════════════════════════ -->
+  <script src="/assets/js/core/store.js?v=2.1.3"></script>
+  <script src="/assets/js/core/ui.js?v=2.1.3"></script>
+  <script src="/assets/js/core/api.js?v=2.1.3"></script>
+  <script src="/assets/js/core/nav.js?v=2.1.3"></script>
+  <script src="/assets/js/core/router.js?v=2.1.3"></script>
+
+  <!-- Page Controllers -->
+  <script src="/assets/js/pages/home.js?v=2.1.3"></script>
+  <script src="/assets/js/pages/checkout.js?v=2.1.3"></script>
+  <script src="/assets/js/pages/order-received.js?v=2.1.3"></script>
+
+  <!-- ═══════════════════════════════════════════════════
+       SPA ROUTER & VIEW COORDINATOR
+       ═══════════════════════════════════════════════════ -->
+  <script>
+    (function () {
+      var Router = window.Xentra && window.Xentra.Router;
+      var Checkout = window.Xentra && window.Xentra.Checkout;
+      var OrderReceived = window.Xentra && window.Xentra.OrderReceived;
+
+      if (!Router) return;
+
+      function updateViews(view, params) {
+        var homeEl = document.getElementById('xentra-home-view');
+        var checkoutEl = document.getElementById('xentra-checkout-view');
+        var orderEl = document.getElementById('xentra-order-view');
+
+        if (view === 'checkout') {
+          if (homeEl) homeEl.style.display = 'none';
+          if (orderEl) orderEl.style.display = 'none';
+          if (checkoutEl) {
+            checkoutEl.style.display = 'block';
+            if (Checkout) Checkout.mount(checkoutEl);
+            window.scrollTo(0, 0);
+          }
+        } else if (view === 'order-received') {
+          if (homeEl) homeEl.style.display = 'none';
+          if (checkoutEl) checkoutEl.style.display = 'none';
+          if (orderEl) {
+            orderEl.style.display = 'block';
+            if (OrderReceived) OrderReceived.mount(orderEl, params && params.orderId);
+            window.scrollTo(0, 0);
+          }
+        } else {
+          // Home
+          if (checkoutEl) checkoutEl.style.display = 'none';
+          if (orderEl) orderEl.style.display = 'none';
+          if (homeEl) {
+            homeEl.style.display = 'block';
+            if (window.XentraHome && typeof window.XentraHome.refresh === 'function') {
+              window.XentraHome.refresh();
+            }
+            window.scrollTo(0, 0);
+          }
+        }
+      }
+
+      Router.subscribe(updateViews);
+
+      // Initial route
+      var initialView = Router.getViewFromUrl();
+      var initialOrderId = Router.getOrderIdFromUrl();
+      if (initialView !== 'home') {
+        updateViews(initialView, { orderId: initialOrderId });
+      }
+
+      // Intercept Cart Link click
+      var cartLink = document.getElementById('x-cart-checkout-link');
+      if (cartLink) {
+        cartLink.onclick = function (e) {
+          e.preventDefault();
+          Router.navigate('checkout');
+        };
+      }
+    })();
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════
+       SERVICE WORKER ENGINE (Gojek / Twitter PWA Pattern)
+       ═══════════════════════════════════════════════════ -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js?v=2.1.3').then(function (reg) {
+        // Trigger immediate background update check on app launch
+        reg.update();
+
+        // Check on tab focus / app reopen
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') {
+            reg.update();
+          }
+        });
+
+        // Listen for new worker installation
+        reg.addEventListener('updatefound', function () {
+          var newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', function () {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('[PWA] New version ready. Applying update...');
+                window.location.reload();
+              }
+            });
+          }
+        });
+      }).catch(function (err) {
+        console.warn('[PWA] Registration warn:', err);
+      });
+
+      // Reload when new worker takes active control
+      var hasRefreshed = false;
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        if (!hasRefreshed) {
+          hasRefreshed = true;
+          window.location.reload();
+        }
+      });
+    }
+
+    // Global Self-Healing Fallback
+    window.addEventListener('error', function (e) {
+      console.error('[PWA Catch]:', e);
+      if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+        if (sessionStorage.getItem('__auto_recovered') !== '1') {
+          sessionStorage.setItem('__auto_recovered', '1');
+          if ('caches' in window) {
+            caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            }).then(function () {
+              window.location.reload();
+            });
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>

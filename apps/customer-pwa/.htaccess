@@ -1,0 +1,28 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Allow direct access to existing static files and assets
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Route Checkout and Order Received
+    RewriteRule ^checkout/?$ checkout.html [L]
+    RewriteRule ^order-received/?([0-9a-zA-Z_-]+)?$ order-received.html [L]
+
+    # Route PWA files
+    RewriteRule ^manifest\.json$ assets/pwa/manifest.json [L]
+    RewriteRule ^service-worker\.js$ assets/pwa/service-worker.js [L]
+    RewriteRule ^sw\.js$ assets/pwa/service-worker.js [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "manifest\.json$">
+        Header set Content-Type "application/manifest+json; charset=utf-8"
+    </FilesMatch>
+    <FilesMatch "(service-worker|sw)\.js$">
+        Header set Content-Type "application/javascript; charset=utf-8"
+        Header set Service-Worker-Allowed "/"
+    </FilesMatch>
+</IfModule>

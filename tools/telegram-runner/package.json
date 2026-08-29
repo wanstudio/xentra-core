@@ -1,0 +1,13 @@
+{
+  "name": "xentra-telegram-runner",
+  "version": "1.0.0",
+  "description": "24/7 Telegram AI Agent Runner for Xentra Core Remote Development",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "xentra-whatsapp-runner",
+  "version": "1.0.0",
+  "description": "24/7 WhatsApp AI Agent Runner for Xentra Core Remote Development",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "pino": "^9.6.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

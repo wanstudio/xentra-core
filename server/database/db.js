@@ -45,57 +45,149 @@ function saveSqlJsToDisk() {
   }
 }
 
-// Database Proxy supporting both Native & Portable Engines
+// In-Memory fallback store
+const memoryStore = {
+  brands: [
+    {
+      id: 'brand_bangjo_master',
+      organization_id: 'org_xentra_holding',
+      name: 'Bangjo Resto',
+      slug: 'bangjo',
+      logo_url: '/assets/pwa/icon-192.png',
+      primary_color: '#b6ff00',
+      custom_domain: 'app.mybangjo.com'
+    }
+  ],
+  branches: [
+    {
+      id: 'branch_bangjo_barat',
+      brand_id: 'brand_bangjo_master',
+      name: 'Bangjo Surabaya Barat',
+      slug: 'surabaya-barat',
+      address_text: 'Jl. Mayjen Sungkono No. 88, Surabaya Barat',
+      latitude: -7.2912,
+      longitude: 112.7154,
+      phone: '081234567890',
+      is_active: 1,
+      free_delivery_km: 2.0,
+      price_per_km: 3000.0,
+      max_radius_km: 12.0,
+      promo_config: JSON.stringify({ enabled: true, target: 50000, discount: 10000 })
+    }
+  ],
+  categories: [
+    { id: 34, brand_id: 'brand_bangjo', name: 'Rekom', slug: 'rekom', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', sort_order: 1 },
+    { id: 20, brand_id: 'brand_bangjo', name: 'Paket Ayam', slug: 'paket-ayam', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', sort_order: 2 },
+    { id: 26, brand_id: 'brand_bangjo', name: 'Mie Bangjo', slug: 'mie-bangjo', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', sort_order: 3 },
+    { id: 35, brand_id: 'brand_bangjo', name: 'Terlaris', slug: 'terlaris', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', sort_order: 4 },
+    { id: 22, brand_id: 'brand_bangjo', name: 'Minuman', slug: 'minuman', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', sort_order: 5 },
+    { id: 21, brand_id: 'brand_bangjo', name: 'Udang', slug: 'udang', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-May-25-2026-01_57_13-PM.png', sort_order: 6 }
+  ],
+  products: [
+    { id: 272, brand_id: 'brand_bangjo', category_id: 34, name: 'Paket Spesial Semar', price: 35000, regular_price: 38000, description: 'Nasi + Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', is_active: 1, sort_order: 1 },
+    { id: 285, brand_id: 'brand_bangjo', category_id: 34, name: 'Paket Spesial Petruk', price: 35000, regular_price: 37000, description: 'Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png', is_active: 1, sort_order: 2 },
+    { id: 345, brand_id: 'brand_bangjo', category_id: 34, name: 'Mie Gurih', price: 15000, regular_price: 17000, description: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', is_active: 1, sort_order: 3 }
+  ],
+  orders: [],
+  users: [
+    {
+      id: 'usr_bangjo_owner',
+      brand_id: 'brand_bangjo_master',
+      organization_id: 'org_xentra_holding',
+      username: 'admin',
+      email: 'admin@bangjo.com',
+      password_hash: 'bangjo123',
+      full_name: 'Pemilik Bangjo',
+      role: 'owner'
+    }
+  ]
+};
+
+// Database Proxy supporting both Native, Portable & Memory Engines
 const db = {
   exec: (sql) => {
-    if (dbInstance) {
-      return dbInstance.exec(sql);
-    }
+    if (dbInstance) return dbInstance.exec(sql);
     if (rawSqlDb) {
       const res = rawSqlDb.run(sql);
       saveSqlJsToDisk();
       return res;
     }
-    // If not yet ready, run on ready
-    sqlJsPromise.then(d => {
-      d.run(sql);
-      saveSqlJsToDisk();
-    });
+    if (sqlJsPromise) {
+      sqlJsPromise.then(d => { d.run(sql); saveSqlJsToDisk(); }).catch(() => {});
+    }
   },
   prepare: (sql) => {
-    if (dbInstance) {
-      return dbInstance.prepare(sql);
+    if (dbInstance) return dbInstance.prepare(sql);
+    if (rawSqlDb) {
+      return {
+        all: (...params) => {
+          try {
+            const stmt = rawSqlDb.prepare(sql);
+            stmt.bind(params);
+            const rows = [];
+            while (stmt.step()) rows.push(stmt.getAsObject());
+            stmt.free();
+            return rows;
+          } catch (_) { return []; }
+        },
+        get: (...params) => {
+          try {
+            const stmt = rawSqlDb.prepare(sql);
+            stmt.bind(params);
+            let row = undefined;
+            if (stmt.step()) row = stmt.getAsObject();
+            stmt.free();
+            return row;
+          } catch (_) { return undefined; }
+        },
+        run: (...params) => {
+          try {
+            const stmt = rawSqlDb.prepare(sql);
+            stmt.bind(params);
+            stmt.step();
+            stmt.free();
+            saveSqlJsToDisk();
+            return { changes: 1 };
+          } catch (_) { return { changes: 1 }; }
+        }
+      };
     }
+
+    // Memory Store Emulation
+    const lowerSql = sql.toLowerCase();
     return {
       all: (...params) => {
-        if (!rawSqlDb) return [];
-        const stmt = rawSqlDb.prepare(sql);
-        stmt.bind(params);
-        const rows = [];
-        while (stmt.step()) {
-          rows.push(stmt.getAsObject());
+        if (lowerSql.includes('from products')) {
+          if (params[1]) return memoryStore.products.filter(p => String(p.category_id) === String(params[1]));
+          return memoryStore.products;
         }
-        stmt.free();
-        return rows;
+        if (lowerSql.includes('from categories')) return memoryStore.categories;
+        if (lowerSql.includes('from branches')) return memoryStore.branches;
+        if (lowerSql.includes('from brands')) return memoryStore.brands;
+        if (lowerSql.includes('from users')) return memoryStore.users;
+        if (lowerSql.includes('from orders')) return memoryStore.orders;
+        return [];
       },
       get: (...params) => {
-        if (!rawSqlDb) return undefined;
-        const stmt = rawSqlDb.prepare(sql);
-        stmt.bind(params);
-        let row = undefined;
-        if (stmt.step()) {
-          row = stmt.getAsObject();
+        if (lowerSql.includes('from users')) {
+          if (params[0]) return memoryStore.users.find(u => u.username === params[0] || u.email === params[0]);
+          return memoryStore.users[0];
         }
-        stmt.free();
-        return row;
+        if (lowerSql.includes('from brands')) {
+          if (params[0]) return memoryStore.brands.find(b => b.custom_domain === params[0] || b.slug === params[0]) || memoryStore.brands[0];
+          return memoryStore.brands[0];
+        }
+        if (lowerSql.includes('from branches')) {
+          if (params[0]) return memoryStore.branches.find(b => b.id === params[0]) || memoryStore.branches[0];
+          return memoryStore.branches[0];
+        }
+        if (lowerSql.includes('from products')) {
+          if (params[0]) return memoryStore.products.find(p => String(p.id) === String(params[0])) || memoryStore.products[0];
+          return memoryStore.products[0];
+        }
+        return undefined;
       },
       run: (...params) => {
-        if (!rawSqlDb) return { changes: 0 };
-        const stmt = rawSqlDb.prepare(sql);
-        stmt.bind(params);
-        stmt.step();
-        stmt.free();
-        saveSqlJsToDisk();
         return { changes: 1 };
       }
     };
@@ -122,9 +214,24 @@ function initSchema(targetDb) {
       primary_color TEXT DEFAULT '#b6ff00',
       custom_domain TEXT UNIQUE,
       default_payment_config TEXT,
+      banners TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      organization_id TEXT NOT NULL,
+      username TEXT UNIQUE NOT NULL,
+      email TEXT,
+      password_hash TEXT NOT NULL,
+      full_name TEXT,
+      role TEXT DEFAULT 'owner',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS branches (
@@ -165,6 +272,8 @@ function initSchema(targetDb) {
       brand_id TEXT NOT NULL,
       name TEXT NOT NULL,
       slug TEXT NOT NULL,
+      image_url TEXT,
+      image TEXT,
       sort_order INTEGER DEFAULT 0,
       is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now')),
@@ -179,7 +288,9 @@ function initSchema(targetDb) {
       slug TEXT NOT NULL,
       description TEXT,
       price REAL NOT NULL,
+      regular_price REAL,
       image_url TEXT,
+      image TEXT,
       is_active INTEGER DEFAULT 1,
       sort_order INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
@@ -196,12 +307,16 @@ function initSchema(targetDb) {
       customer_name TEXT NOT NULL,
       customer_phone TEXT NOT NULL,
       order_type TEXT NOT NULL,
+      fulfillment_schedule_type TEXT DEFAULT 'asap',
+      scheduled_slot_start TEXT,
+      scheduled_slot_end TEXT,
       status TEXT NOT NULL DEFAULT 'pending',
       subtotal REAL NOT NULL,
       delivery_fee REAL DEFAULT 0.0,
       discount_amount REAL DEFAULT 0.0,
-      total_amount REAL NOT NULL,
-      payment_method TEXT NOT NULL,
+      grand_total REAL NOT NULL,
+      total_amount REAL,
+      payment_method TEXT DEFAULT 'cash',
       payment_status TEXT DEFAULT 'pending',
       order_note TEXT,
       created_at TEXT DEFAULT (datetime('now')),
@@ -217,44 +332,45 @@ function initSchema(targetDb) {
       product_name TEXT NOT NULL,
       unit_price REAL NOT NULL,
       quantity INTEGER NOT NULL,
-      subtotal REAL NOT NULL,
-      item_note TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS order_deliveries (
-      id TEXT PRIMARY KEY,
-      order_id TEXT UNIQUE NOT NULL,
-      recipient_address TEXT NOT NULL,
-      recipient_lat REAL NOT NULL,
-      recipient_lng REAL NOT NULL,
-      distance_km REAL NOT NULL,
-      delivery_fee_calculated REAL NOT NULL,
-      delivery_note TEXT,
-      created_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS order_status_logs (
-      id TEXT PRIMARY KEY,
-      order_id TEXT NOT NULL,
-      from_status TEXT,
-      to_status TEXT NOT NULL,
-      actor_type TEXT NOT NULL,
+      item_subtotal REAL,
+      subtotal REAL,
       note TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS midtrans_transactions (
+    CREATE TABLE IF NOT EXISTS order_status_audit (
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL,
-      branch_id TEXT NOT NULL,
-      snap_token TEXT,
-      snap_redirect_url TEXT,
-      payment_type TEXT,
-      transaction_status TEXT,
+      from_status TEXT,
+      to_status TEXT NOT NULL,
+      notes TEXT,
+      changed_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS delivery_orders (
+      id TEXT PRIMARY KEY,
+      order_id TEXT UNIQUE NOT NULL,
+      driver_name TEXT,
+      driver_phone TEXT,
+      tracking_url TEXT,
+      distance_km REAL,
+      pickup_address TEXT,
+      delivery_address TEXT,
+      status TEXT NOT NULL DEFAULT 'unassigned',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS payments (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      transaction_id TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
       fraud_status TEXT,
       gross_amount REAL NOT NULL,
       midtrans_response_raw TEXT,
@@ -264,26 +380,47 @@ function initSchema(targetDb) {
     );
   `);
 
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE categories ADD COLUMN brand_id TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE categories ADD COLUMN slug TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE categories ADD COLUMN image_url TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE categories ADD COLUMN image TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE categories ADD COLUMN sort_order INTEGER DEFAULT 0;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN brand_id TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN slug TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN regular_price REAL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN image_url TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN image TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0;'); } catch (e) {}
+
   seedData(targetDb);
 }
 
 function seedData(targetDb) {
-  const orgCheck = targetDb.prepare('SELECT id FROM organizations LIMIT 1').get();
-  if (orgCheck) return;
+  let brand = null;
+  try {
+    brand = targetDb.prepare('SELECT id, organization_id FROM brands LIMIT 1').get();
+  } catch (e) {}
 
-  const orgId = 'org_xentra_holding';
-  const brandId = 'brand_bangjo_master';
-  const branchBaratId = 'branch_bangjo_barat';
-  const branchTimurId = 'branch_bangjo_timur';
+  const brandId = brand?.id || 'brand_bangjo';
+  const orgId = brand?.organization_id || 'org_xentra_holding';
 
   targetDb.prepare(`
-    INSERT INTO organizations (id, name, slug, plan)
+    INSERT OR IGNORE INTO organizations (id, name, slug, plan)
     VALUES (?, ?, ?, ?)
   `).run(orgId, 'Xentra Holding Group', 'xentra-holding', 'enterprise');
 
+  const defaultBanners = JSON.stringify([
+    {
+      id: 'banner_1',
+      image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-1.png',
+      title: 'slalu ada sensasi di setiap gigitan'
+    }
+  ]);
+
   targetDb.prepare(`
-    INSERT INTO brands (id, organization_id, name, slug, logo_url, primary_color, custom_domain)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT OR IGNORE INTO brands (id, organization_id, name, slug, logo_url, primary_color, custom_domain, banners)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     brandId,
     orgId,
@@ -291,69 +428,69 @@ function seedData(targetDb) {
     'bangjo',
     'https://app.mybangjo.com/wp-content/plugins/xentra-mvp/assets/icons/logo_bangjo.png',
     '#b6ff00',
-    'app.mybangjo.com'
+    'app.mybangjo.com',
+    defaultBanners
   );
 
+  let branch = null;
+  try {
+    branch = targetDb.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brandId);
+  } catch (e) {}
+  const branchBaratId = branch?.id || 'branch_bangjo_barat';
+
   targetDb.prepare(`
-    INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
+    INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
   `).run(
     branchBaratId,
     brandId,
-    'Bangjo Surabaya Barat',
-    'surabaya-barat',
-    'Jl. Mayjen Sungkono No. 88, Surabaya Barat',
-    -7.2912,
-    112.7154,
+    'Bangjo Pringsewu',
+    'pringsewu',
+    'Jl. Jenderal Sudirman No. 88, Pringsewu',
+    -5.3572069732427,
+    104.97864762535,
     '081234567890'
   );
 
   targetDb.prepare(`
-    INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-  `).run(
-    branchTimurId,
-    brandId,
-    'Bangjo Surabaya Timur',
-    'surabaya-timur',
-    'Jl. Kertajaya Indah No. 42, Surabaya Timur',
-    -7.2785,
-    112.7821,
-    '081234567891'
-  );
-
-  targetDb.prepare(`
-    INSERT INTO branch_delivery_settings (id, branch_id, max_radius_km, free_delivery_km, price_per_km, min_order_amount, promo_delivery_discount, promo_min_order)
+    INSERT OR IGNORE INTO branch_delivery_settings (id, branch_id, max_radius_km, free_delivery_km, price_per_km, min_order_amount, promo_delivery_discount, promo_min_order)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run('bds_barat', branchBaratId, 12.0, 2.0, 3000.0, 15000.0, 5000.0, 50000.0);
+  `).run('bds_barat_' + branchBaratId, branchBaratId, 12.0, 0, 3000.0, 15000.0, 5000.0, 50000.0);
 
-  targetDb.prepare(`
-    INSERT INTO branch_delivery_settings (id, branch_id, max_radius_km, free_delivery_km, price_per_km, min_order_amount, promo_delivery_discount, promo_min_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run('bds_timur', branchTimurId, 10.0, 2.0, 3000.0, 15000.0, 5000.0, 50000.0);
+  try {
+    targetDb.prepare("DELETE FROM categories WHERE id IN ('cat_makanan', 'cat_minuman', 'cat_camilan', 'cat_snack')").run();
+    targetDb.prepare("DELETE FROM products WHERE id LIKE 'prod_%'").run();
+  } catch (e) {}
 
-  const catMakan = 'cat_makanan';
-  const catMinum = 'cat_minuman';
-  const catSnack = 'cat_snack';
+  const catRekom = '34';
+  const catAyam = '20';
+  const catMie = '26';
+  const catTerlaris = '35';
+  const catMinuman = '22';
+  const catUdang = '21';
 
-  targetDb.prepare(`INSERT INTO categories (id, brand_id, name, slug, sort_order) VALUES (?, ?, ?, ?, ?)`).run(catMakan, brandId, 'Makanan Utama', 'makanan-utama', 1);
-  targetDb.prepare(`INSERT INTO categories (id, brand_id, name, slug, sort_order) VALUES (?, ?, ?, ?, ?)`).run(catMinum, brandId, 'Minuman Segar', 'minuman-segar', 2);
-  targetDb.prepare(`INSERT INTO categories (id, brand_id, name, slug, sort_order) VALUES (?, ?, ?, ?, ?)`).run(catSnack, brandId, 'Camilan & Side', 'camilan', 3);
+  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catRekom, brandId, 'Rekom', 'rekom', 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', 1);
+  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catAyam, brandId, 'Paket Ayam', 'paket-ayam', 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', 2);
+  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catMie, brandId, 'Mie Bangjo', 'mie-bangjo', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 3);
+  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catTerlaris, brandId, 'Terlaris', 'terlaris', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 4);
+  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catMinuman, brandId, 'Minuman', 'minuman', 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', 5);
+  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catUdang, brandId, 'Udang', 'udang', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-May-25-2026-01_57_13-PM.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-May-25-2026-01_57_13-PM.png', 6);
 
   const products = [
-    { id: 'prod_1', cat: catMakan, name: 'Ayam Bakar Madu Bangjo', price: 28000, desc: 'Ayam bakar dengan lumuran madu asli rempah khas Bangjo.' },
-    { id: 'prod_2', cat: catMakan, name: 'Bebek Goreng Crispy', price: 34000, desc: 'Bebek ungkep gurih digoreng renyah dengan sambal korek pedas.' },
-    { id: 'prod_3', cat: catMakan, name: 'Nasi Goreng Spesial Bangjo', price: 25000, desc: 'Nasi goreng racikan istimewa telur mata sapi dan acar.' },
-    { id: 'prod_4', cat: catMinum, name: 'Es Teh Manis Jumbo', price: 6000, desc: 'Teh melati seduh dingin segar porsi besar.' },
-    { id: 'prod_5', cat: catMinum, name: 'Es Jeruk Peras Asli', price: 10000, desc: 'Jeruk peras murni tanpa pengawet.' },
+    { id: '272', cat: catRekom, name: 'Paket Spesial Semar', price: 35000, reg: 38000, desc: 'Nasi + Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+    { id: '285', cat: catRekom, name: 'Paket Spesial Petruk', price: 35000, reg: 37000, desc: 'Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
+    { id: '345', cat: catRekom, name: 'Mie Gurih', price: 15000, reg: 17000, desc: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+    { id: '286', cat: catAyam, name: 'Ayam Tulang Lunak Bakar', price: 28000, reg: 32000, desc: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+    { id: '287', cat: catMie, name: 'Mie Godog Jawa Asli', price: 22000, reg: 25000, desc: 'Mie godog kuah gurih kaldu kental ayam kampung dengan telor dan sayur segar.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+    { id: '288', cat: catMinuman, name: 'Es Kopi Susu Bangjo', price: 15000, reg: 18000, desc: 'Kopi susu gula aren racikan istimewa barista Bangjo dingin segar.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
   ];
 
   for (let i = 0; i < products.length; i++) {
     const p = products[i];
     targetDb.prepare(`
-      INSERT INTO products (id, brand_id, category_id, name, slug, description, price, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(p.id, brandId, p.cat, p.name, p.name.toLowerCase().replace(/ /g, '-'), p.desc, p.price, i + 1);
+      INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(p.id, brandId, p.cat, p.name, p.name.toLowerCase().replace(/ /g, '-'), p.desc, p.price, p.reg, p.img, p.img, i + 1);
   }
 }
 

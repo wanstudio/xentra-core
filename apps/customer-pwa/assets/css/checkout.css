@@ -1,0 +1,3283 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* =========================================================
+   Xentra Checkout
+   Full checkout / address / fulfillment UI
+   ========================================================= */
+
+.xentra-checkout,
+.x-sheet,
+.x-sheet-inner,
+.x-del-sheet,
+.x-note-sheet,
+.x-overlay,
+.x-checkout-overlay,
+.x-address-picker-overlay,
+.x-address-detail-overlay,
+.x-checkout-note-overlay,
+#xentra-checkout-state,
+#xentra-checkout-app {
+	font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+.xentra-checkout{
+	background:#f5f5f5;
+	min-height:100vh;
+	padding-bottom:calc(14px + env(safe-area-inset-bottom));
+	color:#1c1c1c;
+	max-width:480px;
+	margin:0 auto;
+}
+
+.xentra-checkout *{
+	box-sizing:border-box;
+}
+
+.xentra-checkout button,
+.xentra-checkout input,
+.xentra-checkout textarea{
+	font-family:inherit;
+}
+
+.xentra-checkout button{
+	-webkit-tap-highlight-color:transparent;
+}
+
+.xentra-checkout button:focus-visible,
+.xentra-checkout input:focus-visible,
+.xentra-checkout textarea:focus-visible{
+	outline:2px solid #1c1c1c;
+	outline-offset:2px;
+}
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
+
+.x-header{
+	background:#fff;
+	padding:18px 16px;
+	font-weight:700;
+	font-size:16px;
+	line-height:22px;
+	display:flex;
+	gap:12px;
+	align-items:center;
+	position:sticky;
+	top:0;
+	z-index:20;
+	border-bottom:1px solid #eee;
+	margin-bottom:14px;
+}
+
+.x-header a,
+.x-header button{
+	color:#222;
+	text-decoration:none;
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	width:24px;
+	height:24px;
+	padding:0;
+	border:0;
+	background:transparent;
+	cursor:pointer;
+	flex:0 0 24px;
+}
+
+.x-header a img,
+.x-header button img,
+.x-header .x-back-icon{
+	width:20px;
+	height:20px;
+	object-fit:contain;
+	display:block;
+}
+
+
+/* =========================================================
+   PWA INSTALL INCENTIVE BANNER (PROMO GRATIS ES TEH)
+   ========================================================= */
+
+.x-pwa-banner{
+	background:#e5e7eb !important;
+	padding:10px 16px !important;
+	display:flex !important;
+	align-items:center !important;
+	justify-content:space-between !important;
+	gap:12px !important;
+	margin:0 0 12px 0 !important;
+	box-sizing:border-box !important;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+	transition:all 0.25s ease !important;
+}
+
+.x-pwa-banner-left{
+	display:flex !important;
+	align-items:center !important;
+	gap:10px !important;
+	flex:1 !important;
+	min-width:0 !important;
+}
+
+.x-pwa-banner-img{
+	width:44px !important;
+	height:44px !important;
+	object-fit:contain !important;
+	flex-shrink:0 !important;
+	display:block !important;
+}
+
+.x-pwa-banner-text{
+	flex:1 !important;
+	min-width:0 !important;
+}
+
+.x-pwa-banner-title{
+	font-size:13.5px !important;
+	font-weight:700 !important;
+	color:#1f2937 !important;
+	line-height:1.25 !important;
+	margin:0 !important;
+}
+
+.x-pwa-banner-sub{
+	font-size:11px !important;
+	color:#6b7280 !important;
+	font-style:italic !important;
+	margin-top:2px !important;
+	line-height:1.2 !important;
+}
+
+.x-pwa-install-btn{
+	background:#ff3838 !important;
+	color:#ffffff !important;
+	font-size:13px !important;
+	font-weight:700 !important;
+	padding:7px 18px !important;
+	border-radius:999px !important;
+	border:none !important;
+	cursor:pointer !important;
+	box-shadow:0 2px 8px rgba(255, 56, 56, 0.35) !important;
+	flex-shrink:0 !important;
+	outline:none !important;
+	transition:transform 0.15s ease, background 0.15s ease !important;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+	-webkit-tap-highlight-color:transparent !important;
+}
+
+.x-pwa-install-btn:active{
+	transform:scale(0.95) !important;
+	background:#e02e2e !important;
+}
+
+/* iOS Sheet Guide Modal */
+.x-ios-install-sheet{
+	background:#ffffff !important;
+	border-top-left-radius:24px !important;
+	border-top-right-radius:24px !important;
+	padding:24px 20px 32px !important;
+	max-width:480px !important;
+	margin:0 auto !important;
+	box-sizing:border-box !important;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+}
+
+.x-ios-install-sheet h3{
+	font-size:18px !important;
+	font-weight:800 !important;
+	color:#111827 !important;
+	margin:0 0 16px !important;
+	text-align:center !important;
+}
+
+.x-ios-step{
+	display:flex !important;
+	align-items:flex-start !important;
+	gap:14px !important;
+	margin-bottom:14px !important;
+	padding:12px !important;
+	background:#f9fafb !important;
+	border-radius:14px !important;
+}
+
+.x-ios-step-num{
+	width:26px !important;
+	height:26px !important;
+	border-radius:50% !important;
+	background:#111827 !important;
+	color:#ffffff !important;
+	font-size:13px !important;
+	font-weight:700 !important;
+	display:flex !important;
+	align-items:center !important;
+	justify-content:center !important;
+	flex-shrink:0 !important;
+}
+
+.x-ios-step-text{
+	font-size:13.5px !important;
+	color:#374151 !important;
+	line-height:1.4 !important;
+}
+
+.x-ios-step-text strong{
+	color:#111827 !important;
+}
+
+.x-ios-dismiss-btn{
+	width:100% !important;
+	height:48px !important;
+	background:#111827 !important;
+	color:#ffffff !important;
+	font-size:15px !important;
+	font-weight:700 !important;
+	border-radius:999px !important;
+	border:none !important;
+	margin-top:16px !important;
+	cursor:pointer !important;
+}
+
+
+/* =========================================================
+   CARDS
+   ========================================================= */
+
+.x-card{
+	background:#fff;
+	margin:0 16px 12px;
+	padding:16px;
+	border-radius:20px;
+	overflow-wrap:anywhere;
+	word-break:break-word;
+}
+
+.x-address-card,
+.x-address-top-row,
+.x-address-main-info,
+.x-address-title,
+.x-address-formatted,
+.x-address-extra-full,
+.x-address-patokan,
+.x-address-note,
+.x-product-note-inline{
+	overflow-wrap:anywhere;
+	word-break:break-word;
+}
+
+#x-items-card{
+	margin-top:14px;
+}
+
+.x-row-card{
+	display:flex;
+	justify-content:space-between;
+	align-items:center;
+	gap:12px;
+}
+
+.x-row-left{
+	min-width:0;
+	display:flex;
+	align-items:center;
+	gap:12px;
+	flex:1;
+}
+
+.x-fulfillment-info{
+	display:flex;
+	flex-direction:column;
+	gap:1px;
+}
+
+#x-fulfillment-label{
+	font-size:15px;
+	line-height:20px;
+	font-weight:700;
+	color:#111;
+}
+
+.x-fulfillment-sub{
+	font-size:11px;
+	line-height:15px;
+	color:#888;
+	font-weight:400;
+}
+
+.x-fulfillment-schedule{
+	font-size:12px;
+	line-height:16px;
+	color:#111;
+	font-weight:700;
+	margin-top:2px;
+}
+
+#x-fulfillment-icon{
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	width:38px;
+	height:38px;
+	flex:0 0 38px;
+}
+
+#x-fulfillment-icon img{
+	width:38px;
+	height:38px;
+	object-fit:contain;
+	display:block;
+}
+
+.x-pill-btn,
+#x-fulfillment-change{
+	width:auto !important;
+	min-width:auto !important;
+	height:32px !important;
+	min-height:32px !important;
+	margin:0 !important;
+	padding:0 18px !important;
+	border:0 !important;
+	border-radius:20px !important;
+	background:#b6ff00 !important;
+	color:#111 !important;
+	font-size:13px !important;
+	line-height:32px !important;
+	font-weight:700 !important;
+	font-family:inherit !important;
+	cursor:pointer;
+	white-space:nowrap;
+	box-shadow:none !important;
+	display:inline-flex !important;
+	align-items:center !important;
+	justify-content:center !important;
+	flex:0 0 auto !important;
+}
+
+.x-pill-btn:disabled,
+#x-fulfillment-change:disabled{
+	opacity:.5 !important;
+	cursor:not-allowed !important;
+}
+
+
+/* =========================================================
+   ERRORS
+   ========================================================= */
+
+.x-error{
+	margin:0 16px 12px;
+	padding:12px 14px;
+	border-radius:14px;
+	background:#fff0f0;
+	color:#a40000;
+	font-size:13px;
+	font-weight:600;
+	border:1px solid #ffd0d0;
+	white-space:pre-line;
+}
+
+
+/* =========================================================
+   EMPTY STATE
+   ========================================================= */
+
+.x-empty-state{
+	background:#fff;
+	margin:16px;
+	padding:28px 20px;
+	border-radius:20px;
+	text-align:center;
+}
+
+.x-empty-state p{
+	margin:0 0 10px;
+}
+
+.x-empty-state .x-btn{
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	min-height:44px;
+	padding:0 18px;
+	background:#b6ff00;
+	color:#111;
+	border-radius:14px;
+	font-weight:700;
+	text-decoration:none;
+}
+
+.x-fulfillment-sheet{
+	padding:10px 20px calc(18px + env(safe-area-inset-bottom));
+	max-height:94vh;
+}
+
+.x-fulfillment-title{
+	font-size:16px;
+	line-height:22px;
+	font-weight:700;
+	margin:4px 0 16px;
+}
+
+.x-fulfillment-types{
+	display:grid;
+	grid-template-columns:repeat(3,1fr);
+	gap:8px;
+}
+
+.x-fulfillment-type{
+	position:relative;
+	min-height:74px;
+	padding:8px 6px;
+	border:1px solid #d8d8d8;
+	border-radius:16px;
+	background:#fff;
+	display:flex;
+	flex-direction:column;
+	align-items:center;
+	justify-content:center;
+	gap:4px;
+	font-size:12px;
+	color:#222;
+}
+
+.x-fulfillment-type img{
+	width:32px;
+	height:32px;
+	object-fit:contain;
+}
+
+.x-fulfillment-type.active{
+	background:#b6ff00;
+	border-color:#b6ff00;
+}
+
+.x-fulfillment-type.disabled{
+	background:#e7e7e7;
+	color:#999;
+	cursor:not-allowed;
+}
+
+.x-fulfillment-type small{
+	font-size:8px;
+	color:#888;
+}
+
+.x-fulfillment-divider{
+	height:1px;
+	background:#eee;
+	margin:14px 0;
+}
+
+.x-fulfillment-schedule-head{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	font-size:13px;
+	color:#444;
+	margin-bottom:12px;
+}
+
+.x-payment-sheet{
+	padding:10px 20px calc(18px + env(safe-area-inset-bottom));
+}
+
+.x-payment-title{
+	font-size:18px;
+	font-weight:800;
+	color:#111;
+	margin:4px 0 14px;
+}
+
+.x-payment-subheader{
+	display:flex;
+	flex-direction:column;
+	gap:2px;
+	margin-bottom:12px;
+}
+
+.x-payment-subheader strong{
+	font-size:14px;
+	color:#222;
+}
+
+.x-payment-subheader span{
+	font-size:12px;
+	color:#999;
+}
+
+.x-payment-options{
+	display:flex;
+	flex-direction:column;
+	gap:0;
+	margin-bottom:12px;
+}
+
+.x-payment-option{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	gap:14px;
+	padding:14px 0;
+	border:0;
+	border-bottom:1px solid #f2f2f2;
+	background:transparent;
+	text-align:left;
+	cursor:pointer;
+	width:100%;
+}
+
+.x-payment-option:last-child{
+	border-bottom:0;
+}
+
+.x-payment-option.active{
+	border-color:#f2f2f2;
+	background:transparent;
+}
+
+.x-payment-option-icon{
+	width:40px;
+	height:40px;
+	flex:0 0 40px;
+	border-radius:12px;
+	background:#effde6;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+}
+
+.x-payment-option-icon img{
+	width:22px;
+	height:22px;
+	object-fit:contain;
+}
+
+.x-payment-option-text{
+	display:flex;
+	flex-direction:column;
+	gap:2px;
+	flex:1 1 auto;
+	min-width:0;
+}
+
+.x-payment-option-text strong{
+	font-size:15px;
+	line-height:20px;
+	font-weight:700;
+	color:#222;
+}
+
+.x-payment-option-text small{
+	font-size:12px;
+	line-height:17px;
+	color:#777;
+}
+
+.x-payment-option-check{
+	width:22px;
+	height:22px;
+	min-width:22px;
+	border-radius:50%;
+	border:2px solid #ddd;
+	position:relative;
+	box-sizing:border-box;
+	background:#fff;
+}
+
+.x-payment-option-check.active{
+	border:6px solid #00a637;
+	background:#fff;
+}
+
+.x-payment-option-check.active::after{
+	display:none;
+}
+
+.x-payment-footer{
+	display:flex;
+	flex-direction:column;
+	align-items:center;
+	text-align:center;
+	gap:2px;
+	padding-top:6px;
+}
+
+.x-payment-footer strong{
+	font-size:12px;
+	color:#333;
+}
+
+.x-payment-footer span{
+	font-size:11px;
+	color:#999;
+}
+
+.x-payment-footer b{
+	color:#555;
+}
+
+.x-fulfillment-toggle{
+	width:38px;
+	height:22px;
+	border:0;
+	border-radius:999px;
+	background:#ddd;
+	padding:2px;
+}
+
+.x-fulfillment-toggle span{
+	display:block;
+	width:18px;
+	height:18px;
+	border-radius:50%;
+	background:#fff;
+	transition:transform .18s ease;
+}
+
+.x-fulfillment-toggle.on{
+	background:#b6ff00;
+}
+
+.x-fulfillment-toggle.on span{
+	transform:translateX(16px);
+}
+
+.x-fulfillment-schedule-picker{
+	border:1px solid #e5e5e5;
+	background:#fafafa;
+	border-radius:16px;
+	padding:6px 12px;
+	margin-bottom:12px;
+	overflow:hidden;
+}
+
+.x-fulfillment-picker-row{
+	position:relative;
+	display:grid;
+	grid-template-columns:1fr 1fr;
+	height:132px;
+}
+
+/*
+ * Shared selection band sitting behind whichever row is centered in
+ * both wheels at once - same visual language as a native iOS
+ * UIDatePicker with two linked wheels.
+ */
+.x-wheel-highlight{
+	position:absolute;
+	left:0;
+	right:0;
+	top:50%;
+	height:44px;
+	transform:translateY(-50%);
+	background:#fff;
+	border-radius:10px;
+	box-shadow:0 1px 3px rgba(0,0,0,.06);
+	pointer-events:none;
+	z-index:0;
+}
+
+.x-wheel-divider{
+	position:absolute;
+	left:50%;
+	top:10px;
+	bottom:10px;
+	width:1px;
+	background:#e8e8e8;
+	pointer-events:none;
+	z-index:1;
+}
+
+.x-wheel-col{
+	position:relative;
+	z-index:2;
+	height:132px;
+	overflow-y:auto;
+	overflow-x:hidden;
+	scroll-snap-type:y mandatory;
+	-webkit-overflow-scrolling:touch;
+	scrollbar-width:none;
+	-ms-overflow-style:none;
+}
+
+.x-wheel-col::-webkit-scrollbar{
+	display:none;
+	width:0;
+	height:0;
+}
+
+.x-wheel-pad{
+	scroll-snap-align:none;
+}
+
+.x-wheel-item{
+	height:44px;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	scroll-snap-align:center;
+	scroll-snap-stop:always;
+	font-size:14px;
+	color:#333;
+	font-weight:600;
+	text-align:center;
+	padding:0 8px;
+	white-space:nowrap;
+	overflow:hidden;
+	text-overflow:ellipsis;
+	cursor:pointer;
+	transition:opacity .15s ease, transform .15s ease;
+}
+
+.x-wheel-item.active{
+	color:#111;
+	font-weight:800;
+}
+
+.x-sheet-schedule-loading,
+.x-sheet-schedule-empty{
+	font-size:12px;
+	color:#999;
+	text-align:center;
+	position:absolute;
+	inset:0;
+	z-index:2;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	padding:0 10px;
+}
+
+.x-fulfillment-selected-summary{
+	background:#f7f7f7;
+	border-radius:14px;
+	padding:9px 12px;
+	margin-bottom:12px;
+	text-align:center;
+	font-size:11px;
+	color:#777;
+}
+
+.x-fulfillment-selected-summary strong{
+	display:block;
+	margin-top:2px;
+	font-size:13px;
+	color:#222;
+}
+
+.x-fulfillment-promo{
+	display:flex;
+	align-items:center;
+	gap:8px;
+	background:#eaffaa;
+	border-radius:10px;
+	padding:9px 12px;
+	margin-bottom:14px;
+	font-size:10px;
+	color:#129326;
+}
+
+.x-fulfillment-actions{
+	display:grid;
+	grid-template-columns:1fr 1fr;
+	gap:12px;
+}
+
+.x-fulfillment-cancel,
+.x-fulfillment-confirm{
+	height:46px;
+	border-radius:24px;
+	font-size:14px;
+	font-weight:700;
+}
+
+.x-fulfillment-cancel{
+	border:1px solid #ddd;
+	background:#f2f2f2;
+	color:#333;
+}
+
+.x-fulfillment-confirm{
+	border:0;
+	background:#b6ff00;
+	color:#111;
+}
+
+
+/* =========================================================
+   ITEMS
+   ========================================================= */
+
+/* =========================================================
+   ITEMS (matched to mockup: individual white cards, top space)
+   ========================================================= */
+
+.x-checkout-items{
+	display:flex;
+	flex-direction:column;
+	gap:16px;
+	margin:0;
+	padding:0;
+}
+
+.x-product.x-checkout-item{
+	width:100%;
+	display:grid;
+	grid-template-columns:minmax(0,1fr) 105px;
+	gap:12px;
+	padding:0 0 16px;
+	background:transparent;
+	border-radius:0;
+	box-shadow:none;
+	border:0;
+	border-bottom:1px solid #f0f0f0;
+	box-sizing:border-box;
+}
+
+.x-checkout-items .x-product.x-checkout-item:last-child{
+	border-bottom:0;
+	padding-bottom:0;
+}
+
+.x-product-info{
+	min-width:0;
+}
+
+.x-product-name{
+	font-size:16px;
+	line-height:21px;
+	font-weight:700;
+	color:#111;
+}
+
+.x-product-note-inline{
+	margin-top:4px;
+	color:#777;
+	font-size:12px;
+	line-height:17px;
+	display:-webkit-box;
+	-webkit-box-orient:vertical;
+	-webkit-line-clamp:2;
+	line-clamp:2;
+	overflow:hidden;
+}
+
+.x-price{
+	margin-top:8px;
+}
+
+.x-old-price{
+	color:#999;
+	font-size:13px;
+	text-decoration:line-through;
+}
+
+.x-current-price{
+	font-size:17px;
+	margin-top:1px;
+	font-weight:700;
+	color:#111;
+}
+
+.x-product-discount{
+	display:flex;
+	align-items:center;
+	gap:5px;
+	margin-top:6px;
+	color:#fa3e3e;
+	font-size:12px;
+	font-weight:600;
+}
+
+.x-product-discount-icon{
+	width:14px;
+	height:14px;
+	object-fit:contain;
+}
+
+.x-product-right{
+	width:105px;
+	display:flex;
+	flex-direction:column;
+	align-items:stretch;
+}
+
+.x-product-image{
+	width:105px !important;
+	height:105px !important;
+	object-fit:contain !important;
+	border-radius:15px !important;
+	display:block;
+	background:#fafafa;
+	overflow:hidden;
+}
+
+.x-quantity{
+	width:100% !important;
+	height:34px !important;
+	margin-top:7px !important;
+	display:grid !important;
+	grid-template-columns:28px 1fr 28px !important;
+	align-items:center !important;
+	background:#b6ff00 !important;
+	border-radius:18px !important;
+}
+
+.x-quantity button{
+	width:28px !important;
+	height:30px !important;
+	padding:0 !important;
+	margin:0 !important;
+	border:0 !important;
+	background:transparent !important;
+	display:flex !important;
+	align-items:center !important;
+	justify-content:center !important;
+	cursor:pointer !important;
+	font-size:16px !important;
+	font-weight:800 !important;
+	color:#111 !important;
+}
+
+.x-quantity button img{
+	width:13px;
+	height:13px;
+}
+
+.x-quantity-value{
+	text-align:center !important;
+	font-size:14px !important;
+	line-height:30px !important;
+	font-weight:700 !important;
+	color:#111 !important;
+}
+
+.x-note-button{
+	width:100% !important;
+	height:34px !important;
+	margin-top:7px !important;
+	border:1px solid #ddd !important;
+	border-radius:18px !important;
+	background:#fff !important;
+	color:#555 !important;
+	font-size:12px !important;
+	cursor:pointer !important;
+	display:flex !important;
+	align-items:center !important;
+	justify-content:center !important;
+	gap:6px !important;
+	padding:0 12px !important;
+}
+
+.x-note-button.has-note{
+	background:#f7ffd9 !important;
+	border-color:#b6ff00 !important;
+}
+
+.x-note-button .x-note-icon{
+	width:15px;
+	height:15px;
+	flex:0 0 15px;
+	object-fit:contain;
+	display:block;
+}
+
+
+/* =========================================================
+   "TAMBAH INI UNTUK MELENGKAPI PESANANMU" (complement upsell)
+   ========================================================= */
+
+.x-complement-section{
+	margin:20px -16px 0;
+	padding:18px 16px 0;
+	border-top:1px solid #f0f0f0;
+}
+
+.x-complement-section .x-section-title,
+.x-section-title{
+	font-size:16px;
+	line-height:22px;
+	font-weight:700;
+	color:#111827;
+	margin:0 0 14px;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif;
+}
+
+.x-section-subtitle{
+	margin-top:2px;
+	font-size:12px;
+	color:#888;
+}
+
+.x-complement-track{
+	display:flex;
+	gap:12px;
+	margin:0 -16px;
+	padding:2px 16px 14px;
+	overflow-x:auto;
+	-webkit-overflow-scrolling:touch;
+	scrollbar-width:none;
+}
+
+.x-complement-track::-webkit-scrollbar{
+	display:none;
+}
+
+.x-loading-inline{
+	font-size:12px;
+	color:#999;
+	padding:8px 0;
+}
+
+.x-complement-card{
+	flex:0 0 142px !important;
+	width:142px !important;
+	min-width:142px !important;
+	max-width:142px !important;
+	background:#ffffff !important;
+	border:1px solid #e5e7eb !important;
+	border-radius:18px !important;
+	padding:10px 10px 12px !important;
+	display:flex !important;
+	flex-direction:column !important;
+	box-sizing:border-box !important;
+	position:relative !important;
+	box-shadow:0 1px 3px rgba(0,0,0,0.02) !important;
+}
+
+.x-complement-img-wrap{
+	width:100% !important;
+	height:122px !important;
+	border-radius:14px !important;
+	overflow:hidden !important;
+	background:#f3f4f6 !important;
+	flex-shrink:0 !important;
+}
+
+.x-complement-img-wrap img{
+	width:100% !important;
+	height:122px !important;
+	object-fit:cover !important;
+	display:block !important;
+	background:#f9fafb !important;
+}
+
+.x-complement-img-placeholder{
+	width:100% !important;
+	height:122px !important;
+	background:#f3f4f6 !important;
+	border-radius:14px !important;
+}
+
+.x-complement-name{
+	margin-top:10px !important;
+	font-size:15px !important;
+	font-weight:700 !important;
+	color:#111827 !important;
+	line-height:1.25 !important;
+	white-space:nowrap !important;
+	overflow:hidden !important;
+	text-overflow:ellipsis !important;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+}
+
+.x-complement-bottom{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	margin-top:6px;
+	min-height:36px;
+}
+
+.x-complement-price{
+	font-size:14px;
+	font-weight:600;
+	color:#1f2937;
+	line-height:1.2;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif;
+}
+
+.x-upsell-add-btn{
+	width:36px !important;
+	height:36px !important;
+	min-width:36px !important;
+	min-height:36px !important;
+	border-radius:50% !important;
+	background:#b6ff00 !important;
+	border:none !important;
+	padding:0 !important;
+	margin:0 !important;
+	display:inline-flex !important;
+	align-items:center !important;
+	justify-content:center !important;
+	cursor:pointer !important;
+	box-shadow:0 2px 8px rgba(182,255,0,0.3) !important;
+	transition:transform 0.15s ease, background-color 0.15s ease !important;
+	flex-shrink:0 !important;
+	outline:none !important;
+	-webkit-tap-highlight-color:transparent;
+}
+
+.x-upsell-add-btn:active{
+	transform:scale(0.9);
+	background:#a3e600 !important;
+}
+
+.x-upsell-plus-icon{
+	width:18px;
+	height:18px;
+	display:block;
+	filter:brightness(0);
+	pointer-events:none;
+}
+
+
+/* =========================================================
+   "ADA LAGI YANG MAU DIBELI?" (category browse rail)
+   ========================================================= */
+
+.x-browse-section{
+	display:none !important;
+	margin-top:16px;
+	padding-top:16px;
+	border-top:1px solid #f0f0f0;
+}
+
+.x-browse-section .x-section-title{
+	font-size:14px;
+	font-weight:700;
+	color:#161616;
+	margin-bottom:2px;
+}
+
+.x-browse-section .x-section-subtitle{
+	font-size:12px;
+	color:#888;
+	margin-bottom:12px;
+}
+
+.x-browse-section .x-cat-track{
+	display:flex;
+	gap:18px;
+	margin-top:12px;
+	overflow-x:auto;
+	-webkit-overflow-scrolling:touch;
+	scrollbar-width:none;
+	padding:0 var(--x-page-pad, 18px) 10px;
+}
+
+.x-browse-section .x-cat-track::-webkit-scrollbar{
+	display:none;
+}
+
+.x-browse-section .x-cat{
+	flex:0 0 92px;
+	width:92px;
+	border:0;
+	padding:0;
+	background:transparent;
+	cursor:pointer;
+	text-align:center;
+}
+
+.x-browse-section .x-cat-image{
+	width:92px;
+	height:92px;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+}
+
+.x-browse-section .x-cat-image img{
+	width:92px;
+	height:92px;
+	object-fit:contain;
+	display:block;
+}
+
+.x-browse-section .x-cat-name{
+	color:#222 !important;
+	font-weight:700;
+	font-size:12px;
+	line-height:16px;
+	margin-top:4px;
+	text-align:center;
+	display:block;
+}
+
+
+/* =========================================================
+   CUSTOMER / ADDRESS
+   ========================================================= */
+
+#x-customer-card h3{
+	margin:0 0 2px;
+	font-size:15px;
+	font-weight:700;
+	color:#111;
+}
+
+.x-customer-sub{
+	font-size:12px;
+	color:#888;
+	margin:0 0 12px;
+}
+
+#x-customer-card input,
+#x-customer-card textarea{
+	width:100%;
+	border:1px solid #ddd;
+	border-radius:14px;
+	background:#fff;
+	padding:13px 14px;
+	margin-bottom:10px;
+	color:#1c1c1c;
+}
+
+#x-customer-card input::placeholder,
+#x-customer-card textarea::placeholder{
+	color:#999;
+}
+
+#x-customer-card .x-customer-field-label{
+	display:block;
+	margin:0 0 6px;
+	font-size:11px;
+	line-height:15px;
+	font-weight:600;
+	color:#777;
+}
+
+#x-customer-card .x-customer-input{
+	margin-bottom:10px;
+}
+
+#x-customer-card textarea{
+	min-height:92px;
+	resize:vertical;
+}
+
+#x-address-block{
+	margin-top:2px;
+}
+
+.x-address-warning{
+	display:flex;
+	align-items:flex-start;
+	gap:8px;
+	padding:10px 12px;
+	border-radius:12px;
+	background:#fffdf0;
+	border:1px solid #ffe58f;
+	color:#d46b08;
+	font-size:12px;
+	line-height:1.45;
+	margin-bottom:12px;
+	cursor:pointer;
+}
+
+.x-address-warning-icon,
+.x-address-warning > strong{
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	width:16px;
+	height:16px;
+	border-radius:50%;
+	background:#ff4d4f;
+	color:#fff;
+	font-size:11px;
+	font-weight:800;
+	flex:0 0 16px;
+	margin-top:1px;
+}
+
+.x-address-detail-trigger{
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	margin-top:10px;
+	min-height:42px;
+	padding:0 14px;
+	border-radius:13px;
+	border:1px solid #ddd;
+	background:#fff;
+	color:#222;
+	font-weight:700;
+	cursor:pointer;
+}
+
+.x-address-summary{
+	background:#f7f7f7;
+	border-radius:16px;
+	padding:12px 14px;
+	line-height:1.45;
+	font-size:13px;
+	margin-bottom:10px;
+}
+
+.x-address-summary-label{
+	font-size:11px;
+	color:#777;
+	margin-bottom:4px;
+}
+
+.x-address-summary strong{
+	display:block;
+	font-size:13px;
+}
+
+.x-address-actions{
+	display:flex;
+	align-items:center;
+	gap:8px;
+	margin-top:8px;
+}
+
+.x-address-detail-btn{
+	height:36px;
+	padding:0 16px;
+	border-radius:18px;
+	background:#f2f2f2;
+	border:1px solid #e0e0e0;
+	color:#222;
+	font-size:12px;
+	font-weight:600;
+	display:inline-flex;
+	align-items:center;
+	gap:6px;
+	cursor:pointer;
+}
+
+.x-driver-note-btn{
+	height:36px;
+	padding:0 16px;
+	border-radius:18px;
+	background:#b6ff00;
+	border:0;
+	color:#111;
+	font-size:12px;
+	font-weight:700;
+	display:inline-flex;
+	align-items:center;
+	gap:6px;
+	cursor:pointer;
+}
+
+
+/* =========================================================
+   PAYMENT SUMMARY (REDESIGNED WITH DIRECT PAYMENT OPTIONS)
+   ========================================================= */
+
+#x-payment-summary-card,
+.x-summary-card{
+	background:#ffffff !important;
+	border-radius:24px !important;
+	padding:22px 20px 16px !important;
+	border:1px solid #eef0f2 !important;
+	box-shadow:0 4px 24px rgba(0,0,0,0.04) !important;
+	margin-top:16px !important;
+	margin-bottom:0 !important;
+}
+
+#x-payment-summary-card h3,
+.x-summary-card h3{
+	font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+	font-size:18px !important;
+	line-height:24px !important;
+	font-weight:700 !important;
+	color:#111827 !important;
+	margin:0 0 16px !important;
+}
+
+#x-payment-summary-card .x-sum-row,
+.x-summary-card .x-sum-row,
+.x-sum-row{
+	display:flex !important;
+	justify-content:space-between !important;
+	align-items:center !important;
+	gap:16px;
+	padding:4px 0 !important;
+	margin-bottom:8px !important;
+	border:none !important;
+	border-top:none !important;
+	border-bottom:none !important;
+	font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+	font-size:15px !important;
+	line-height:20px !important;
+}
+
+#x-payment-summary-card .x-sum-row span:first-child,
+.x-summary-card .x-sum-row span:first-child,
+.x-sum-row span:first-child{
+	color:#6b7280 !important;
+	font-size:15px !important;
+	font-weight:500 !important;
+}
+
+#x-payment-summary-card .x-sum-row span:last-child,
+.x-summary-card .x-sum-row span:last-child,
+.x-sum-row span:last-child{
+	font-weight:500 !important;
+	text-align:right !important;
+	color:#6b7280 !important;
+	font-size:15px !important;
+}
+
+.x-discount-label,
+#x-sum-discount-row span:first-child{
+	color:#ef4444 !important;
+	font-weight:600 !important;
+}
+
+.x-discount-value,
+#x-sum-discount-row span:last-child,
+#x-sum-discount{
+	color:#ef4444 !important;
+	font-weight:600 !important;
+}
+
+.x-summary-divider{
+	border:0 !important;
+	border-top:1px solid #e5e7eb !important;
+	margin:14px 0 !important;
+}
+
+#x-payment-summary-card .x-sum-total-row,
+.x-summary-card .x-sum-total-row,
+.x-sum-total-row{
+	margin-top:0 !important;
+	padding:6px 0 !important;
+	border-top:0 !important;
+	display:flex !important;
+	justify-content:space-between !important;
+	align-items:center !important;
+	margin-bottom:0 !important;
+}
+
+.x-total-label,
+#x-payment-summary-card .x-sum-total-row span:first-child,
+.x-summary-card .x-sum-total-row span:first-child,
+.x-sum-total-row span:first-child{
+	font-size:16px !important;
+	font-weight:700 !important;
+	color:#111827 !important;
+}
+
+.x-total-amount-wrap,
+#x-payment-summary-card .x-sum-total-row span:last-child,
+.x-summary-card .x-sum-total-row span:last-child,
+.x-sum-total-row span:last-child,
+.x-sum-total-row #x-sum-total{
+	display:flex !important;
+	align-items:baseline !important;
+	justify-content:flex-end !important;
+	gap:8px !important;
+}
+
+.x-total-strike{
+	font-size:15px !important;
+	font-weight:500 !important;
+	color:#6b7280 !important;
+	text-decoration:line-through !important;
+	margin-right:2px !important;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+}
+
+.x-total-final{
+	font-size:22px !important;
+	font-weight:800 !important;
+	color:#111827 !important;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+}
+
+/* 2 Direct Action Pill Buttons: Bayar Cash & Online Pay */
+.x-summary-payment-actions{
+	display:grid !important;
+	grid-template-columns:1fr 1fr !important;
+	gap:12px !important;
+	margin-top:40px !important;
+	margin-bottom:18px !important;
+}
+
+.x-btn-pay-direct{
+	background:#ffffff !important;
+	border:1.5px solid #d1d5db !important;
+	border-radius:999px !important;
+	height:48px !important;
+	display:flex !important;
+	align-items:center !important;
+	justify-content:center !important;
+	gap:8px !important;
+	cursor:pointer !important;
+	padding:0 12px !important;
+	transition:all 0.18s ease !important;
+	outline:none !important;
+	-webkit-tap-highlight-color:transparent !important;
+	box-shadow:0 2px 8px rgba(0,0,0,0.03) !important;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+}
+
+.x-btn-pay-direct:hover{
+	border-color:#9ca3af !important;
+	background:#fafafa !important;
+}
+
+.x-btn-pay-direct:active{
+	transform:scale(0.96) !important;
+	background:#f3f4f6 !important;
+}
+
+.x-btn-pay-direct.is-active{
+	border-color:#111827 !important;
+	box-shadow:0 2px 10px rgba(0,0,0,0.08) !important;
+}
+
+.x-pay-icon-box{
+	display:flex !important;
+	align-items:center !important;
+	justify-content:center !important;
+	flex-shrink:0 !important;
+}
+
+.x-pay-action-icon{
+	width:20px !important;
+	height:20px !important;
+	object-fit:contain !important;
+	display:block !important;
+}
+
+.x-pay-action-label{
+	font-size:14.5px !important;
+	font-weight:700 !important;
+	color:#111827 !important;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+	white-space:nowrap !important;
+}
+
+/* Security Trust & Midtrans Footer */
+.x-summary-trust-footer{
+	display:flex !important;
+	flex-direction:column !important;
+	align-items:center !important;
+	justify-content:center !important;
+	gap:4px !important;
+	margin-top:4px !important;
+	margin-bottom:0 !important;
+	text-align:center !important;
+}
+
+.x-trust-line-1{
+	display:flex !important;
+	align-items:center !important;
+	justify-content:center !important;
+	gap:5px !important;
+	font-size:12px !important;
+	font-weight:600 !important;
+	color:#6b7280 !important;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+}
+
+.x-trust-lock{
+	font-size:13px !important;
+	line-height:1 !important;
+}
+
+.x-trust-line-2{
+	display:flex !important;
+	align-items:center !important;
+	justify-content:center !important;
+	gap:6px !important;
+	font-size:12px !important;
+	color:#9ca3af !important;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+}
+
+.x-midtrans-logo-badge{
+	height:13px !important;
+	width:auto !important;
+	object-fit:contain !important;
+	display:inline-block !important;
+	vertical-align:middle !important;
+}
+
+
+/* ==============================================================================
+   CATATAN / KETERANGAN:
+   Card bar pembayaran lama (Gambar 1) di bawah ini DI-HIDDEN (BUKAN DIHAPUS)
+   karena suatu saat nanti mungkin ingin digunakan kembali oleh pemilik produk.
+   ============================================================================== */
+
+.bottom,
+.x-payment-bar{
+	display:none !important;
+}
+
+.x-payment-compact{
+	flex:1 1 auto;
+	min-height:auto;
+	padding:0;
+	border:0;
+	background:transparent;
+	cursor:pointer;
+	display:flex;
+	align-items:center;
+	gap:10px;
+	text-align:left;
+}
+
+.x-payment-compact-icon{
+	width:28px;
+	height:28px;
+	flex:0 0 28px;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+}
+
+.x-payment-compact-icon img{
+	width:24px;
+	height:24px;
+	object-fit:contain;
+	display:block;
+}
+
+.x-payment-compact-text{
+	display:flex;
+	flex-direction:column;
+	min-width:0;
+	line-height:1.2;
+}
+
+.x-payment-compact-label{
+	font-size:11px;
+	font-weight:500;
+	color:#777;
+}
+
+.x-payment-compact-amount{
+	font-size:17px;
+	font-weight:800;
+	color:#111;
+	margin-top:1px;
+}
+
+.x-payment-compact-more{
+	width:28px;
+	height:28px;
+	flex:0 0 28px;
+	border-radius:50%;
+	background:#333 !important;
+	color:#fff !important;
+	border:0 !important;
+	display:flex !important;
+	align-items:center !important;
+	justify-content:center !important;
+	cursor:pointer !important;
+	padding:0 !important;
+	line-height:0 !important;
+}
+
+.x-payment-compact-more svg{
+	display:block;
+	width:12px;
+	height:3px;
+	pointer-events:none;
+}
+
+#x-submit-order{
+	min-height:50px;
+	width:100%;
+	padding:0 20px;
+	border:0;
+	border-radius:25px;
+	background:#b6ff00;
+	color:#111;
+	font-size:15px;
+	font-weight:700;
+	cursor:pointer;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+}
+
+#x-submit-order:disabled{
+	background:#d8d8d8;
+	color:#888;
+	cursor:not-allowed;
+}
+
+
+/* =========================================================
+   OVERLAYS / BOTTOM SHEETS
+
+   Same interaction language as the Home Cart sheet, per the
+   state/overlay architecture decision: the overlay is appended
+   closed, then gets an `.open` class to transition in, and loses
+   it to transition out (tap-outside, swipe-down, Back/gesture all
+   go through the same closeDynamicOverlay()/__xentraClose path in
+   checkout.js). See assets/js/checkout.js openDynamicOverlay().
+   ========================================================= */
+
+.x-overlay{
+	position:fixed;
+	inset:0;
+	background:rgba(0,0,0,0);
+	display:flex;
+	align-items:flex-end;
+	justify-content:center;
+	z-index:1000000;
+	pointer-events:none;
+	transition:background .35s ease;
+}
+
+.x-overlay.open{
+	background:rgba(0,0,0,.45);
+	pointer-events:auto;
+}
+
+.x-sheet-inner{
+	background:#fff;
+	width:100%;
+	max-width:480px;
+	margin:0 auto;
+	max-height:88vh;
+	overflow-y:auto;
+	border-radius:22px 22px 0 0;
+	padding:14px 18px calc(20px + env(safe-area-inset-bottom));
+	box-shadow:0 -10px 35px rgba(0,0,0,.15);
+	transform:translateY(105%);
+	transition:transform .38s cubic-bezier(.22,.61,.36,1);
+	touch-action:pan-y;
+}
+
+.x-overlay.open .x-sheet-inner{
+	transform:translateY(0);
+}
+
+.x-sheet-handle{
+	width:42px;
+	height:5px;
+	border-radius:999px;
+	background:#d5d5d5;
+	margin:0 auto 14px;
+}
+
+.x-sheet-header{
+	display:grid;
+	grid-template-columns:42px 1fr 42px;
+	align-items:center;
+	gap:8px;
+	margin-bottom:14px;
+}
+
+.x-sheet-header h3{
+	margin:0;
+	font-size:17px;
+	text-align:center;
+}
+
+.x-sheet-back{
+	width:42px;
+	height:42px;
+	border:0;
+	border-radius:12px;
+	background:#f5f5f5;
+	cursor:pointer;
+	font-size:20px;
+}
+
+.x-sheet-header::after{
+	content:'';
+	display:block;
+	width:42px;
+	height:42px;
+}
+
+
+/* =========================================================
+   ADDRESS SEARCH SHEET
+   Reference-locked to supplied address picker screenshot.
+   ========================================================= */
+
+.x-address-picker-overlay{
+	align-items:flex-end;
+	background:rgba(0,0,0,.18);
+	z-index:9999;
+}
+
+.x-address-picker-overlay .x-address-picker-sheet{
+	width:100%;
+	max-width:480px;
+	height:92vh;
+	max-height:92vh;
+	margin:0 auto;
+	background:#fff;
+	border-radius:28px 28px 0 0;
+	box-shadow:0 -8px 30px rgba(0,0,0,.12);
+	overflow-y:auto;
+	-webkit-overflow-scrolling:touch;
+	padding:12px 28px calc(28px + env(safe-area-inset-bottom));
+}
+
+.x-address-picker-handle{
+	width:42px;
+	height:4px;
+	margin:0 auto 22px;
+	border-radius:999px;
+	background:#bdbdbd;
+}
+
+.x-address-picker-title{
+	margin:0 0 42px;
+	font-size:22px;
+	line-height:28px;
+	font-weight:800;
+	color:#171717;
+}
+
+.x-address-search-box{
+	display:flex;
+	align-items:center;
+	gap:10px;
+	height:70px;
+	border:2px solid #e5e5e5;
+	border-radius:35px;
+	padding:0 18px;
+	background:#fafafa;
+}
+
+.x-address-search-pin{
+	width:30px;
+	height:30px;
+	flex:0 0 30px;
+	object-fit:contain;
+}
+
+.x-address-search-box input{
+	flex:1;
+	min-width:0;
+	border:0;
+	outline:0;
+	padding:0;
+	background:transparent;
+	font-size:20px;
+	line-height:26px;
+	color:#333;
+}
+
+.x-address-search-box input::placeholder{
+	color:#9a9a9a;
+}
+
+.x-address-search-box button{
+	width:40px;
+	height:40px;
+	border:0;
+	border-radius:50%;
+	background:transparent;
+	color:#b8b8b8;
+	cursor:pointer;
+	font-size:30px;
+	line-height:1;
+	padding:0;
+}
+
+.x-address-shortcuts{
+	display:grid;
+	grid-template-columns:1fr 1fr;
+	gap:14px;
+	margin:16px 0 18px;
+}
+
+.x-address-shortcuts button{
+	min-height:56px;
+	border:1px solid #e3e3e3;
+	border-radius:29px;
+	background:#fff;
+	font-size:16px;
+	font-weight:500;
+	color:#555;
+	cursor:pointer;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	gap:9px;
+	white-space:nowrap;
+}
+
+.x-address-shortcut-icon{
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	font-size:22px;
+	line-height:1;
+}
+
+.x-current-icon{color:#dfa500;}
+.x-map-icon{color:#008e25;}
+
+.x-address-picker-divider{
+	height:1px;
+	margin:0 -28px;
+	background:#e6e6e6;
+}
+
+.x-address-favorite-section{padding-top:46px;}
+
+.x-address-favorite-section h4{
+	margin:0 0 34px;
+	font-size:21px;
+	line-height:27px;
+	font-weight:800;
+	color:#171717;
+}
+
+.x-address-empty-favorites{
+	display:grid;
+	grid-template-columns:124px minmax(0,1fr);
+	align-items:center;
+	gap:24px;
+	margin-bottom:62px;
+}
+
+.x-address-favorite-empty-image{
+	width:124px;
+	height:124px;
+	border-radius:24px;
+	display:block;
+	object-fit:cover;
+}
+
+.x-address-favorite-empty-copy strong{
+	display:block;
+	font-size:18px;
+	line-height:26px;
+	font-weight:800;
+	color:#222;
+}
+
+.x-address-favorite-empty-copy p{
+	margin:10px 0 0;
+	font-size:17px;
+	line-height:24px;
+	font-weight:400;
+	color:#666;
+}
+
+.x-address-add-favorite{
+	width:100%;
+	height:58px;
+	border:2px solid #0a8f20;
+	border-radius:30px;
+	background:#fff;
+	color:#0a8f20;
+	font-size:18px;
+	font-weight:800;
+	cursor:pointer;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	gap:12px;
+}
+
+.x-address-add-icon{
+	width:24px;
+	height:24px;
+	border-radius:50%;
+	background:#079220;
+	color:#fff;
+	display:inline-flex;
+	align-items:center;
+	justify-content:center;
+	font-size:22px;
+	line-height:24px;
+	font-weight:700;
+}
+
+.x-address-favorite-list{
+	display:flex;
+	flex-direction:column;
+	gap:12px;
+	margin-bottom:28px;
+}
+
+.x-address-favorite-row{
+	width:100%;
+	display:grid;
+	grid-template-columns:56px minmax(0,1fr);
+	align-items:center;
+	gap:12px;
+	padding:12px 0;
+	border:0;
+	border-bottom:1px solid #eee;
+	background:#fff;
+	text-align:left;
+	cursor:pointer;
+}
+
+.x-address-favorite-row-icon{
+	width:56px;
+	height:56px;
+	border-radius:18px;
+	background:#f4f4f4;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	font-size:11px;
+	font-weight:700;
+	color:#666;
+}
+
+.x-address-favorite-row-copy strong{
+	display:block;
+	font-size:15px;
+	line-height:20px;
+	color:#222;
+}
+
+.x-address-favorite-row-copy small{
+	display:block;
+	margin-top:3px;
+	font-size:12px;
+	line-height:17px;
+	color:#777;
+}
+
+.x-address-results{
+	display:flex;
+	flex-direction:column;
+	margin-top:18px;
+}
+
+.x-address-result{
+	width:100%;
+	display:grid;
+	grid-template-columns:34px minmax(0,1fr);
+	align-items:center;
+	gap:10px;
+	padding:14px 0;
+	border:0;
+	border-bottom:1px solid #eee;
+	background:#fff;
+	text-align:left;
+	cursor:pointer;
+}
+
+.x-address-result-icon{
+	width:30px;
+	height:30px;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	border-radius:50%;
+	background:#f2f2f2;
+	color:#666;
+	font-size:10px;
+}
+
+.x-address-result strong{
+	display:block;
+	font-size:14px;
+	line-height:19px;
+	margin-bottom:4px;
+	color:#222;
+}
+
+.x-address-result small{
+	display:block;
+	color:#777;
+	font-size:12px;
+	line-height:17px;
+}
+
+.x-address-loading,
+.x-address-empty-result{
+	padding:24px 8px;
+	text-align:center;
+	color:#777;
+	font-size:13px;
+}
+
+.x-address-empty-result strong{
+	display:block;
+	color:#222;
+	margin-bottom:6px;
+}
+
+.x-address-empty-result p{
+	margin:0;
+	line-height:1.45;
+}
+
+
+/* =========================================================
+   ADDRESS DETAIL SHEET
+   ========================================================= */
+
+.x-address-detail-sheet{
+	height:100vh !important;
+	max-height:100vh !important;
+	border-radius:0 !important;
+	top:0 !important;
+	padding:0 !important;
+	overflow:hidden !important;
+}
+
+.x-address-detail-sheet > .x-pill-btn{
+	margin-bottom:16px;
+}
+
+.x-address-detail-selected{
+	padding:13px;
+	border-radius:16px;
+	background:#f7f7f7;
+	margin-bottom:10px;
+	line-height:1.45;
+}
+
+.x-address-detail-selected strong{
+	display:block;
+	font-size:14px;
+	margin-bottom:4px;
+}
+
+.x-address-detail-selected div{
+	font-size:12px;
+	color:#666;
+}
+
+.x-field-label{
+	display:block;
+	margin:12px 0 6px;
+	font-size:12px;
+	font-weight:700;
+}
+
+.x-field-label span{
+	font-weight:400;
+	color:#999;
+}
+
+.x-address-detail-sheet input[type="text"]{
+	width:100%;
+	height:46px;
+	border:1px solid #ddd;
+	border-radius:13px;
+	padding:0 13px;
+	background:#fff;
+}
+
+.x-address-favorite-check{
+	display:flex;
+	align-items:center;
+	gap:8px;
+	margin-top:12px;
+	font-size:12px;
+	color:#555;
+}
+
+.x-address-favorite-check input{
+	margin:0;
+}
+
+.x-address-labels{
+	display:flex;
+	flex-wrap:wrap;
+	gap:8px;
+	margin:12px 0 16px;
+}
+
+.x-address-label{
+	min-height:38px;
+	padding:0 12px;
+	border:1px solid #ddd;
+	border-radius:12px;
+	background:#fff;
+	font-size:12px;
+	font-weight:700;
+	cursor:pointer;
+}
+
+.x-address-label.active{
+	background:#b6ff00;
+	border-color:#b6ff00;
+}
+
+.x-address-confirm{
+	width:100%;
+	min-height:48px;
+	border:0;
+	border-radius:14px;
+	background:#b6ff00;
+	color:#111;
+	font-weight:800;
+	cursor:pointer;
+}
+
+.x-address-confirm:disabled{
+	background:#d8d8d8;
+	color:#888;
+	cursor:not-allowed;
+}
+
+
+/* =========================================================
+   MAP SHEET
+   ========================================================= */
+
+.x-map-sheet{
+	padding-left:0;
+	padding-right:0;
+	padding-bottom:0;
+	overflow:hidden;
+}
+
+.x-map-floating-search{
+	position:absolute;
+	top:calc(14px + env(safe-area-inset-top, 14px));
+	left:16px;
+	right:16px;
+	z-index:1003;
+}
+
+.x-map-search-bar{
+	background:rgba(255,255,255,0.96);
+	backdrop-filter:blur(10px);
+	-webkit-backdrop-filter:blur(10px);
+	border-radius:999px;
+	height:44px;
+	box-shadow:0 4px 18px rgba(0,0,0,0.14);
+	border:1px solid rgba(0,0,0,0.06);
+	display:flex;
+	align-items:center;
+	padding:0 14px;
+	gap:10px;
+}
+
+.x-map-search-bar input{
+	flex:1;
+	border:0;
+	outline:none;
+	background:transparent;
+	font-size:14px;
+	color:#111;
+	font-family:'Plus Jakarta Sans',-apple-system,sans-serif;
+	font-weight:600;
+}
+
+.x-map-search-bar input::placeholder{
+	color:#888;
+	font-weight:500;
+}
+
+.x-map-search-results{
+	position:absolute;
+	top:calc(100% + 8px);
+	left:0;
+	right:0;
+	background:#ffffff;
+	border-radius:16px;
+	box-shadow:0 8px 30px rgba(0,0,0,0.18);
+	max-height:280px;
+	overflow-y:auto;
+	z-index:1004;
+	padding:6px 0;
+	border:1px solid rgba(0,0,0,0.06);
+}
+
+.x-map-search-item{
+	display:flex;
+	align-items:flex-start;
+	gap:12px;
+	padding:10px 16px;
+	cursor:pointer;
+	border-bottom:1px solid #f2f2f2;
+	transition:background 0.15s ease;
+}
+
+.x-map-search-item:last-child{
+	border-bottom:0;
+}
+
+.x-map-search-item:hover,
+.x-map-search-item:active{
+	background:#f8f9fa;
+}
+
+.x-map-search-item-icon{
+	width:18px;
+	height:18px;
+	flex:0 0 18px;
+	margin-top:2px;
+	color:#e53e3e;
+}
+
+.x-map-search-item-main{
+	font-size:14px;
+	font-weight:700;
+	color:#111;
+	line-height:1.3;
+}
+
+.x-map-search-item-sub{
+	font-size:12px;
+	color:#666;
+	line-height:1.3;
+	margin-top:2px;
+}
+
+.x-map-sheet .mapboxgl-ctrl-top-right,
+#x-address-map-canvas .mapboxgl-ctrl-top-right{
+	top:calc(70px + env(safe-area-inset-top, 14px)) !important;
+	right:14px !important;
+	z-index:1001 !important;
+}
+
+.x-map-sheet .mapboxgl-ctrl-group,
+#x-address-map-canvas .mapboxgl-ctrl-group{
+	border-radius:12px !important;
+	overflow:hidden !important;
+	box-shadow:0 3px 12px rgba(0,0,0,0.15) !important;
+	border:0 !important;
+}
+
+.x-map-sheet .x-sheet-handle,
+.x-map-sheet .x-sheet-header{
+	margin-left:18px;
+	margin-right:18px;
+}
+
+.x-address-map-canvas{
+	height:48vh;
+	min-height:300px;
+	background:#e9e9e9;
+}
+
+.x-map-selected-address{
+	padding:12px 18px;
+	background:#fff;
+	border-top:1px solid #eee;
+	font-size:12px;
+	line-height:1.45;
+}
+
+.x-map-selected-address span{
+	color:#777;
+}
+
+.x-map-actions{
+	padding:12px 18px calc(18px + env(safe-area-inset-bottom));
+	background:#fff;
+}
+
+.x-map-error{
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	height:100%;
+	padding:20px;
+	text-align:center;
+	color:#a40000;
+	font-size:13px;
+}
+
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width:380px){
+
+	.x-card{
+		margin-left:12px;
+		margin-right:12px;
+		padding:14px;
+	}
+
+	.x-header{
+		padding-left:12px;
+		padding-right:12px;
+	}
+
+	.x-error{
+		margin-left:12px;
+		margin-right:12px;
+	}
+
+	.bottom{
+		padding-left:12px;
+		padding-right:12px;
+	}
+
+	.x-address-shortcuts{
+		grid-template-columns:1fr;
+	}
+
+}
+
+
+/* =========================================================
+   SAFETY FOR JS-INJECTED CONTENT
+   ========================================================= */
+
+.xentra-dynamic-overlay{
+	font-family:'Plus Jakarta Sans',Arial,sans-serif;
+}
+
+.xentra-dynamic-overlay,
+.xentra-dynamic-overlay *{
+	box-sizing:border-box;
+}
+
+body.xentra-lock-scroll{
+	overflow:hidden;
+}
+
+
+/* =========================================================
+   XENTRA CHECKOUT — LOCKED ADDRESS CARD
+   Reference: supplied address-card screenshot.
+   This block only styles the address/customer card.
+   It does not alter product cards, summary, or bottom bar.
+   ========================================================= */
+
+#x-customer-card{
+    overflow:visible;
+}
+
+#x-customer-card > h3,
+#x-customer-card > .x-customer-sub{
+    display:none !important;
+}
+
+#x-customer-card .x-customer-profile{
+    margin:0 0 8px;
+}
+
+#x-customer-card .x-customer-name{
+    margin:0;
+    font-size:15px;
+    line-height:20px;
+    font-weight:700;
+    color:#222;
+}
+
+#x-customer-card .x-customer-phone{
+    margin:1px 0 0;
+    font-size:13px;
+    line-height:18px;
+    color:#8b8b8b;
+}
+
+#x-address-block{
+    width:100%;
+    margin:0;
+}
+
+/* Top half: LEFT detail / RIGHT Ganti */
+#x-address-block .x-checkout-address-main{
+    width:100%;
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto !important;
+    column-gap:14px;
+    align-items:start !important;
+}
+
+#x-address-block .x-checkout-address-left{
+    min-width:0;
+}
+
+#x-address-block .x-checkout-address-right{
+    display:flex !important;
+    align-items:flex-start !important;
+    align-self:flex-start !important;
+    justify-content:flex-end !important;
+    margin-top:0 !important;
+    padding-top:0 !important;
+    min-width:auto !important;
+}
+
+#x-address-block .x-address-summary{
+    margin:0 !important;
+    padding:0 !important;
+    border:0 !important;
+    background:transparent !important;
+    border-radius:0 !important;
+}
+
+#x-address-block .x-address-summary-label{
+    margin:0 0 3px;
+    font-size:11px;
+    line-height:15px;
+    font-weight:500;
+    color:#777;
+}
+
+#x-address-block .x-checkout-address-name{
+    margin:0;
+    font-size:15px;
+    line-height:20px;
+    font-weight:700;
+    color:#222;
+}
+
+#x-address-block .x-checkout-address-phone{
+    margin:1px 0 0;
+    font-size:13px;
+    line-height:18px;
+    color:#8b8b8b;
+}
+
+#x-address-block .x-checkout-address-text{
+    margin:3px 0 0;
+    font-size:13px;
+    line-height:18px;
+    color:#666;
+    font-weight:400;
+    word-break:break-word;
+}
+
+#x-address-block .x-checkout-address-detail,
+#x-address-block .x-checkout-address-landmark{
+    margin:2px 0 0;
+    font-size:12px;
+    line-height:17px;
+    color:#777;
+}
+
+/* Only one control lives on the right side. */
+#x-address-block .x-address-change-btn{
+    width:auto !important;
+    min-width:auto !important;
+    height:32px !important;
+    min-height:32px !important;
+    margin:0 !important;
+    padding:0 18px !important;
+    border:0 !important;
+    border-radius:20px !important;
+    background:#b6ff00 !important;
+    color:#111 !important;
+    font-size:13px !important;
+    line-height:32px !important;
+    font-weight:700 !important;
+    font-family:inherit !important;
+    cursor:pointer;
+    white-space:nowrap;
+    box-shadow:none !important;
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+    align-self:flex-start !important;
+    flex:0 0 auto !important;
+}
+
+/* Warning full width under the two-column header. */
+#x-address-block .x-address-warning{
+    width:100%;
+    margin:14px 0 0;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 14px;
+    border:1px solid #ffd599;
+    border-radius:14px;
+    background:#fff8ea;
+    color:#ff4a3d;
+    font-size:12px;
+    line-height:17px;
+    box-sizing:border-box;
+}
+
+#x-address-block .x-address-warning > strong{
+    width:18px;
+    height:18px;
+    flex:0 0 18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-top:0;
+    border-radius:50%;
+    background:#ff4a3d;
+    color:#fff;
+    font-size:11px;
+    font-weight:700;
+    line-height:18px;
+    font-style:normal;
+    font-family:inherit;
+}
+
+/* Action buttons hidden from UI per request. */
+#x-address-block .x-address-actions,
+#x-address-actions{
+    display:none !important;
+}
+
+#x-address-block .x-checkout-action-btn{
+    height:34px !important;
+    min-height:34px !important;
+    margin:0 !important;
+    padding:0 12px !important;
+    border:1px solid #ddd !important;
+    border-radius:18px !important;
+    display:inline-flex !important;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    background:#f4f4f4 !important;
+    color:#555 !important;
+    font-size:12px !important;
+    line-height:34px !important;
+    font-weight:500 !important;
+    box-shadow:none !important;
+    cursor:pointer;
+    white-space:nowrap;
+}
+
+#x-address-block .x-note-button{
+    background:#fff !important;
+}
+
+#x-address-block .x-note-button.has-note{
+    border-color:#b6ff00 !important;
+    background:#f7ffd9 !important;
+}
+
+#x-address-block .x-checkout-action-icon{
+    width:15px;
+    height:15px;
+    min-width:15px;
+    flex:0 0 15px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+#x-address-block .x-checkout-action-icon img{
+    width:15px;
+    height:15px;
+    display:block;
+    object-fit:contain;
+}
+
+/* Inline note: directly under the address detail. */
+#x-address-block .x-order-note-inline{
+    margin:5px 0 0;
+    font-size:11px;
+    line-height:15px;
+    color:#777;
+}
+
+#x-address-block .x-order-note-inline strong{
+    color:#555;
+    font-weight:600;
+}
+
+@media (max-width:380px){
+    #x-address-block .x-checkout-address-main{
+        column-gap:10px;
+    }
+
+    #x-address-block .x-checkout-address-right{
+        min-width:72px;
+    }
+
+    #x-address-block .x-address-change-btn{
+        padding-left:14px !important;
+        padding-right:14px !important;
+    }
+
+    #x-address-block .x-checkout-action-btn{
+        padding-left:10px !important;
+        padding-right:10px !important;
+    }
+}
+
+/* =========================================================
+   CUSTOM CHECKBOX (Simpan sebagai favorit)
+   ========================================================= */
+.x-custom-checkbox{
+    display:inline-flex !important;
+    align-items:center !important;
+    gap:8px !important;
+    cursor:pointer !important;
+    user-select:none;
+    font-size:13px !important;
+    color:#333 !important;
+    font-weight:500 !important;
+}
+
+.x-custom-checkbox input[type="checkbox"]{
+    position:absolute !important;
+    opacity:0 !important;
+    width:0 !important;
+    height:0 !important;
+    pointer-events:none !important;
+}
+
+.x-custom-checkbox .x-checkbox-box{
+    width:19px;
+    height:19px;
+    border:1.8px solid #bbb;
+    border-radius:4px;
+    background:#fff;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    transition:all .15s ease;
+    flex:0 0 19px;
+    box-sizing:border-box;
+}
+
+.x-custom-checkbox input[type="checkbox"]:checked + .x-checkbox-box{
+    background:#00A637 !important;
+    border-color:#00A637 !important;
+}
+
+.x-custom-checkbox .x-checkbox-box svg{
+    display:none;
+    width:12px;
+    height:12px;
+    stroke:#fff;
+    stroke-width:2.4;
+    fill:none;
+}
+
+.x-custom-checkbox input[type="checkbox"]:checked + .x-checkbox-box svg{
+    display:block;
+}
+
+/* =========================================================
+   FAVORITE ADDRESS CARDS (Design Image 2 & 3)
+   ========================================================= */
+.x-address-favorite-card{
+    position:relative;
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 16px;
+    margin-bottom:12px;
+    border:1px solid #e1e1e1;
+    border-radius:16px;
+    background:#fff;
+    cursor:pointer;
+    font-family:'Plus Jakarta Sans',sans-serif;
+    transition:border-color .15s ease;
+}
+
+.x-address-favorite-card:hover{
+    border-color:#ccc;
+}
+
+.x-fav-card-body{
+    flex:1;
+    min-width:0;
+}
+
+.x-fav-title{
+    display:block;
+    font-size:15px;
+    line-height:20px;
+    font-weight:700;
+    color:#222;
+}
+
+.x-fav-address{
+    margin-top:3px;
+    font-size:13px;
+    line-height:18px;
+    color:#666;
+}
+
+.x-fav-detail{
+    margin-top:6px;
+    padding-left:8px;
+    border-left:2px solid #ccc;
+    font-style:italic;
+    font-size:12px;
+    line-height:17px;
+    color:#777;
+}
+
+.x-fav-note{
+    margin-top:6px;
+    font-size:12px;
+    line-height:17px;
+}
+
+.x-fav-note strong{
+    color:#222;
+    font-weight:700;
+}
+
+.x-fav-note span{
+    color:#666;
+    font-weight:400;
+}
+
+.x-fav-menu-btn{
+    width:34px;
+    height:34px;
+    flex:0 0 34px;
+    border:0;
+    border-radius:50%;
+    background:#f4f4f4;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:16px;
+    color:#666;
+    cursor:pointer;
+    transition:background .15s ease;
+}
+
+.x-fav-menu-btn:hover{
+    background:#e8e8e8;
+}
+
+
+/* =========================================================
+   HOMEV NOTE SHEET — ADD ONLY
+   Existing checkout CSS above is preserved unchanged.
+   ========================================================= */
+
+#x-note-overlay,
+.x-note-overlay{
+	position:fixed !important;
+	inset:0 !important;
+	width:100vw !important;
+	height:100vh !important;
+	height:100dvh !important;
+	z-index:2147483000 !important;
+	display:flex !important;
+	align-items:flex-end;
+	margin:0 !important;
+	padding:0 !important;
+	background:rgba(0,0,0,.45);
+	opacity:0;
+	visibility:hidden;
+	pointer-events:none;
+	transition:opacity .35s ease, visibility .35s ease;
+	isolation:isolate;
+}
+
+#x-note-overlay.open,
+.x-note-overlay.open{
+	opacity:1;
+	visibility:visible;
+	pointer-events:auto;
+}
+
+#x-note-sheet,
+.x-note-sheet{
+	position:absolute !important;
+	left:0 !important;
+	right:0 !important;
+	bottom:var(--x-note-keyboard,0px) !important;
+	width:100% !important;
+	height:min(75dvh,var(--x-note-visible-height,75dvh)) !important;
+	max-height:none !important;
+	margin:0 !important;
+	background:#fff;
+	border-radius:22px 22px 0 0;
+	padding:8px 26px max(12px,env(safe-area-inset-bottom));
+	transform:translateY(105%);
+	transition:transform .38s cubic-bezier(.22,.61,.36,1);
+	display:flex !important;
+	flex-direction:column;
+	overflow:hidden;
+	touch-action:pan-y;
+	box-sizing:border-box !important;
+}
+
+#x-note-overlay.open #x-note-sheet,
+.x-note-overlay.open .x-note-sheet{
+	transform:translateY(0);
+}
+
+.x-note-handle{
+	width:42px;
+	height:3px;
+	margin:0 auto 20px;
+	background:#aeb4c0;
+	border-radius:10px;
+	flex:0 0 auto;
+}
+
+.x-note-header{
+	padding-bottom:13px;
+	border-bottom:1px solid #dedede;
+	flex:0 0 auto;
+}
+
+.x-note-header h3{
+	margin:0;
+	color:#161616;
+	font-size:16px;
+	line-height:22px;
+	font-weight:700;
+}
+
+#x-note-input{
+	width:100%;
+	min-height:0;
+	padding:12px 0;
+	border:0;
+	outline:0;
+	resize:none;
+	background:transparent;
+	color:#333;
+	font-family:'Plus Jakarta Sans',Arial,sans-serif;
+	font-size:14px;
+	line-height:21px;
+	flex:1 1 auto;
+	box-sizing:border-box;
+}
+
+#x-note-input::placeholder{
+	color:#999;
+}
+
+.x-note-footer{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	padding-top:10px;
+	border-top:1px solid #dedede;
+	flex:0 0 auto;
+}
+
+#x-note-counter{
+	font-size:12px;
+	color:#777;
+}
+
+#x-note-save{
+	width:86px;
+	height:34px;
+	border:0;
+	border-radius:18px;
+	background:#b6ff00;
+	color:#111;
+	font-family:'Plus Jakarta Sans',Arial,sans-serif;
+	font-size:13px;
+	font-weight:600;
+	cursor:pointer;
+}
+
+body:has(#x-note-overlay.open),
+body:has(.x-note-overlay.open){
+	overflow:hidden;
+}
+
+/* =========================================================
+   Checkout's own order-note sheet uses unique IDs (renamed
+   from the original x-note-* set) so it can never collide with
+   Home's identical note-sheet IDs now that both live on one
+   merged page. Same visual rules, just non-clashing selectors.
+   ========================================================= */
+
+#x-checkout-note-overlay{
+	position:fixed !important;
+	inset:0 !important;
+	width:100vw !important;
+	height:100vh !important;
+	height:100dvh !important;
+	z-index:2147483000 !important;
+	display:flex !important;
+	align-items:flex-end;
+	margin:0 !important;
+	padding:0 !important;
+	background:rgba(0,0,0,.45);
+	opacity:0;
+	visibility:hidden;
+	pointer-events:none;
+	transition:opacity .35s ease, visibility .35s ease;
+	isolation:isolate;
+}
+
+#x-checkout-note-overlay.open{
+	opacity:1;
+	visibility:visible;
+	pointer-events:auto;
+}
+
+#x-checkout-note-sheet{
+	position:absolute !important;
+	left:0 !important;
+	right:0 !important;
+	bottom:var(--x-note-keyboard,0px) !important;
+	width:100% !important;
+	height:min(75dvh,var(--x-note-visible-height,75dvh)) !important;
+	max-height:none !important;
+	margin:0 !important;
+	background:#fff;
+	border-radius:22px 22px 0 0;
+	padding:8px 26px max(12px,env(safe-area-inset-bottom));
+	transform:translateY(105%);
+	transition:transform .38s cubic-bezier(.22,.61,.36,1);
+	display:flex !important;
+	flex-direction:column;
+	overflow:hidden;
+	touch-action:pan-y;
+	box-sizing:border-box !important;
+}
+
+#x-checkout-note-overlay.open #x-checkout-note-sheet{
+	transform:translateY(0);
+}
+
+#x-checkout-note-sheet .x-note-handle{
+	width:42px;
+	height:3px;
+	margin:0 auto 20px;
+	background:#aeb4c0;
+	border-radius:10px;
+	flex:0 0 auto;
+}
+
+#x-checkout-note-sheet .x-note-header{
+	padding-bottom:13px;
+	border-bottom:1px solid #dedede;
+	flex:0 0 auto;
+}
+
+#x-checkout-note-sheet .x-note-header h3{
+	margin:0;
+	color:#161616;
+	font-size:16px;
+	line-height:22px;
+	font-weight:700;
+}
+
+#x-checkout-note-input{
+	width:100%;
+	min-height:0;
+	padding:12px 0;
+	border:0;
+	outline:0;
+	resize:none;
+	background:transparent;
+	color:#333;
+	font-family:'Plus Jakarta Sans',Arial,sans-serif;
+	font-size:14px;
+	line-height:21px;
+	flex:1 1 auto;
+	box-sizing:border-box;
+}
+
+#x-checkout-note-input::placeholder{
+	color:#999;
+}
+
+#x-checkout-note-sheet .x-note-footer{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	padding-top:10px;
+	border-top:1px solid #dedede;
+	flex:0 0 auto;
+}
+
+#x-checkout-note-counter{
+	font-size:12px;
+	color:#777;
+}
+
+#x-checkout-note-save{
+	width:86px;
+	height:34px;
+	border:0;
+	border-radius:18px;
+	background:#b6ff00;
+	color:#111;
+	font-family:'Plus Jakarta Sans',Arial,sans-serif;
+	font-size:13px;
+	font-weight:600;
+	cursor:pointer;
+}
+
+body:has(#x-checkout-note-overlay.open){
+	overflow:hidden;
+}
+/* =========================================================
+   PASSWORDLESS WHATSAPP AUTH SHEETS
+   ========================================================= */
+
+.x-auth-sheet{
+	padding:22px 20px calc(24px + env(safe-area-inset-bottom));
+	border-radius:24px 24px 0 0;
+	background:#fff;
+	font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.x-auth-sheet h3{
+	margin:0 0 4px;
+	font-size:18px;
+	line-height:24px;
+	font-weight:700;
+	color:#111;
+	font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.x-auth-sheet .x-auth-subtitle{
+	margin:0 0 16px;
+	font-size:13px;
+	line-height:19px;
+	color:#777;
+	font-weight:400;
+}
+
+.x-auth-field{
+	display:flex;
+	flex-direction:column;
+	gap:6px;
+	margin-bottom:14px;
+	text-align:left;
+}
+
+.x-auth-label{
+	font-size:13px;
+	font-weight:700;
+	color:#222;
+}
+
+.x-auth-input{
+	width:100%;
+	height:48px;
+	padding:0 16px;
+	border:1px solid #e0e0e0;
+	border-radius:14px;
+	background:#fafafa;
+	color:#111;
+	font-size:14px;
+	font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+	font-weight:500;
+	letter-spacing:normal;
+	text-align:left;
+	box-sizing:border-box;
+	transition:border-color 0.2s, background-color 0.2s, box-shadow 0.2s;
+}
+
+.x-auth-input:focus{
+	outline:none;
+	border-color:#b6ff00;
+	background:#fff;
+	box-shadow:0 0 0 3px rgba(182,255,0,.25);
+}
+
+#x-auth-otp{
+	width:100%;
+	height:50px;
+	padding:0 14px;
+	border:1px solid #ddd;
+	border-radius:14px;
+	background:#fff;
+	color:#222;
+	font-size:20px;
+	font-weight:700;
+	letter-spacing:.22em;
+	text-align:center;
+}
+
+#x-auth-otp:focus{
+	outline:none;
+	border-color:#222;
+	box-shadow:0 0 0 3px rgba(183,255,0,.24);
+}
+
+.x-auth-primary{
+	width:100%;
+	min-height:50px;
+	margin-top:16px;
+	border:0;
+	border-radius:25px;
+	background:#b6ff00;
+	color:#111;
+	font-size:15px;
+	font-weight:700;
+	font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+	cursor:pointer;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+}
+
+.x-auth-primary:disabled{
+	opacity:.55;
+	cursor:default;
+}
+
+.x-auth-link{
+	display:block;
+	width:100%;
+	margin-top:10px;
+	padding:7px 0;
+	border:0;
+	background:transparent;
+	color:#555;
+	font-size:12px;
+	font-weight:600;
+	cursor:pointer;
+	text-align:center;
+}
+
+.x-auth-link:disabled{
+	color:#aaa;
+	cursor:default;
+}
+
+.x-auth-error{
+	margin-top:10px;
+	padding:10px 12px;
+	border-radius:12px;
+	background:#fff1f1;
+	color:#b30000;
+	font-size:12px;
+	line-height:17px;
+	border:1px solid #ffd0d0;
+}
+
+/* =========================================================
+   TOAST POP-UP LAYER NOTIFICATION (2s auto fade-out)
+   ========================================================= */
+
+.x-toast-notification{
+	position:fixed;
+	top:50%;
+	left:50%;
+	transform:translate(-50%, -50%) scale(0.92);
+	opacity:0;
+	z-index:2147483600;
+	pointer-events:none;
+	transition:opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+	max-width:calc(100% - 48px);
+	width:max-content;
+}
+
+.x-toast-notification.show{
+	opacity:1;
+	transform:translate(-50%, -50%) scale(1);
+}
+
+.x-toast-notification.hide{
+	opacity:0;
+	transform:translate(-50%, -50%) scale(0.94);
+}
+
+.x-toast-inner{
+	background:#fff0f2;
+	border:1px solid #ffd4d8;
+	color:#1f1f1f;
+	font-family:'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+	font-size:14px;
+	font-weight:600;
+	line-height:20px;
+	padding:18px 28px;
+	border-radius:18px;
+	box-shadow:0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
+	text-align:center;
+}

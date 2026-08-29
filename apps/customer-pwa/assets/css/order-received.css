@@ -1,0 +1,469 @@
+/**
+ * Xentra MVP — Order Received & Live Status CSS
+ *
+ * Design:
+ * - Mobile-first container max-width: 520px
+ * - Modern typography: Plus Jakarta Sans / system-ui
+ * - Palette: #111 (Dark primary), #b6ff00 (Lime accent), #16a34a (Green success), #f59e0b (Orange pending), #ef4444 (Red error)
+ */
+
+.x-order-status-screen {
+	font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+	max-width: 480px;
+	margin: 0 auto;
+	padding: 16px 16px 60px;
+	background: #f8fafc;
+	min-height: 100vh;
+	box-sizing: border-box;
+	color: #0f172a;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* =========================================================
+ * STATUS CARDS
+ * ========================================================= */
+.x-order-header-wrapper {
+	margin-bottom: 16px;
+}
+
+.x-status-card {
+	background: #ffffff;
+	border-radius: 20px;
+	padding: 24px 20px 20px;
+	text-align: center;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+	border: 1px solid #f1f5f9;
+	position: relative;
+	overflow: hidden;
+}
+
+.x-status-badge-icon {
+	width: 68px;
+	height: 68px;
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: 16px;
+	animation: xPulseBadge 2s infinite ease-in-out;
+}
+
+@keyframes xPulseBadge {
+	0%, 100% { transform: scale(1); }
+	50% { transform: scale(1.05); }
+}
+
+.x-badge-success {
+	background: #dcfce7;
+	color: #16a34a;
+}
+
+.x-badge-pending {
+	background: #fef3c7;
+	color: #d97706;
+}
+
+.x-badge-failed {
+	background: #fee2e2;
+	color: #ef4444;
+}
+
+.x-status-title {
+	font-size: 20px;
+	font-weight: 800;
+	margin: 0 0 6px;
+	color: #0f172a;
+	letter-spacing: -0.02em;
+}
+
+.x-status-desc {
+	font-size: 13.5px;
+	line-height: 1.45;
+	color: #64748b;
+	margin: 0 0 18px;
+}
+
+/* Highlight Box */
+.x-status-highlight-box {
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 14px;
+	padding: 12px 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	text-align: left;
+}
+
+.x-highlight-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 13px;
+}
+
+.x-hl-label {
+	color: #64748b;
+	font-weight: 500;
+}
+
+.x-hl-value {
+	font-weight: 700;
+	color: #0f172a;
+}
+
+.x-hl-total {
+	font-size: 16px;
+	color: #0f172a;
+	font-weight: 800;
+}
+
+.x-badge-tag {
+	background: #e2e8f0;
+	color: #334155;
+	font-size: 11px;
+	font-weight: 700;
+	padding: 3px 8px;
+	border-radius: 6px;
+	text-transform: uppercase;
+	letter-spacing: 0.03em;
+}
+
+.x-tag-online {
+	background: #e0e7ff;
+	color: #3730a3;
+}
+
+.x-pending-action-box,
+.x-failed-action-box {
+	margin-top: 16px;
+}
+
+/* =========================================================
+ * STEPPER / LIVE TRACKER
+ * ========================================================= */
+.x-card {
+	background: #ffffff;
+	border-radius: 18px;
+	padding: 18px 16px;
+	margin-bottom: 14px;
+	box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+	border: 1px solid #f1f5f9;
+}
+
+.x-card-title {
+	font-size: 15px;
+	font-weight: 700;
+	margin: 0 0 14px;
+	color: #0f172a;
+}
+
+.x-stepper {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	position: relative;
+	padding-left: 8px;
+}
+
+.x-step-item {
+	display: flex;
+	gap: 14px;
+	position: relative;
+	padding-bottom: 20px;
+}
+
+.x-step-item:last-child {
+	padding-bottom: 0;
+}
+
+.x-step-item::before {
+	content: '';
+	position: absolute;
+	left: 13px;
+	top: 26px;
+	bottom: -4px;
+	width: 2px;
+	background: #e2e8f0;
+}
+
+.x-step-item:last-child::before {
+	display: none;
+}
+
+.x-step-marker {
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 12px;
+	font-weight: 700;
+	flex-shrink: 0;
+	z-index: 2;
+}
+
+.x-step-done .x-step-marker {
+	background: #16a34a;
+	color: #ffffff;
+}
+
+.x-step-done::before {
+	background: #16a34a;
+}
+
+.x-step-active .x-step-marker {
+	background: #b6ff00;
+	color: #0f172a;
+	box-shadow: 0 0 0 4px rgba(182, 255, 0, 0.25);
+	animation: xPulseStep 1.8s infinite ease-in-out;
+}
+
+@keyframes xPulseStep {
+	0%, 100% { box-shadow: 0 0 0 4px rgba(182, 255, 0, 0.3); }
+	50% { box-shadow: 0 0 0 8px rgba(182, 255, 0, 0.1); }
+}
+
+.x-step-waiting .x-step-marker {
+	background: #f1f5f9;
+	color: #94a3b8;
+	border: 1px solid #cbd5e1;
+}
+
+.x-step-content {
+	display: flex;
+	flex-direction: column;
+	padding-top: 2px;
+}
+
+.x-step-content strong {
+	font-size: 13.5px;
+	font-weight: 700;
+	color: #0f172a;
+}
+
+.x-step-content small {
+	font-size: 12px;
+	color: #64748b;
+	margin-top: 2px;
+}
+
+/* =========================================================
+ * INFO CARD & ADDRESS
+ * ========================================================= */
+.x-info-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.x-info-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	font-size: 13px;
+}
+
+.x-info-label {
+	color: #64748b;
+	font-weight: 500;
+	flex-shrink: 0;
+	width: 130px;
+}
+
+.x-info-val {
+	color: #0f172a;
+	font-weight: 600;
+	text-align: right;
+}
+
+.x-type-pill {
+	background: #f1f5f9;
+	padding: 4px 10px;
+	border-radius: 8px;
+	font-size: 12px;
+	font-weight: 700;
+}
+
+.x-info-address .x-info-val {
+	text-align: left;
+	flex: 1;
+}
+
+.x-address-main {
+	font-size: 13px;
+	font-weight: 600;
+	color: #0f172a;
+	line-height: 1.4;
+}
+
+.x-address-sub {
+	display: block;
+	font-size: 11.5px;
+	color: #64748b;
+	margin-top: 3px;
+	background: #f8fafc;
+	padding: 3px 6px;
+	border-radius: 4px;
+}
+
+/* =========================================================
+ * SUMMARY CARD
+ * ========================================================= */
+.x-items-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.x-order-item-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	font-size: 13px;
+}
+
+.x-item-qty-badge {
+	background: #f1f5f9;
+	color: #334155;
+	font-size: 11.5px;
+	font-weight: 700;
+	padding: 2px 7px;
+	border-radius: 6px;
+	flex-shrink: 0;
+	margin-top: 1px;
+}
+
+.x-item-details {
+	flex: 1;
+}
+
+.x-item-name {
+	font-weight: 600;
+	color: #0f172a;
+	line-height: 1.35;
+}
+
+.x-item-note {
+	font-size: 11.5px;
+	color: #64748b;
+	font-style: italic;
+	margin-top: 2px;
+}
+
+.x-item-price {
+	font-weight: 700;
+	color: #0f172a;
+	flex-shrink: 0;
+}
+
+.x-divider {
+	height: 1px;
+	background: #f1f5f9;
+	margin: 14px 0;
+}
+
+.x-cost-breakdown {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.x-cost-row {
+	display: flex;
+	justify-content: space-between;
+	font-size: 13px;
+	color: #475569;
+}
+
+.x-discount-row {
+	color: #16a34a;
+	font-weight: 600;
+}
+
+.x-cost-total {
+	font-size: 15px;
+	color: #0f172a;
+	padding-top: 8px;
+	border-top: 1px dashed #e2e8f0;
+	margin-top: 4px;
+}
+
+.x-total-amount {
+	font-size: 17px;
+	font-weight: 800;
+	color: #0f172a;
+}
+
+/* =========================================================
+ * BUTTONS & ACTIONS
+ * ========================================================= */
+.x-bottom-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-top: 20px;
+}
+
+.x-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	padding: 14px 18px;
+	border-radius: 14px;
+	font-size: 14px;
+	font-weight: 700;
+	text-decoration: none;
+	text-align: center;
+	border: none;
+	cursor: pointer;
+	box-sizing: border-box;
+	transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.x-btn:active {
+	transform: scale(0.98);
+}
+
+.x-btn-primary {
+	background: #0f172a;
+	color: #ffffff;
+}
+
+.x-btn-primary:hover {
+	background: #1e293b;
+}
+
+.x-btn-wa {
+	background: #25d366;
+	color: #ffffff;
+	box-shadow: 0 4px 14px rgba(37, 211, 102, 0.25);
+}
+
+.x-btn-wa:hover {
+	background: #20ba5a;
+}
+
+.x-btn-outline {
+	background: #ffffff;
+	color: #334155;
+	border: 1.5px solid #e2e8f0;
+}
+
+.x-btn-outline:hover {
+	background: #f8fafc;
+	border-color: #cbd5e1;
+}
+
+.x-state-empty {
+	padding: 40px 20px;
+	text-align: center;
+}
+
+.x-icon-error {
+	color: #ef4444;
+	margin-bottom: 16px;
+}

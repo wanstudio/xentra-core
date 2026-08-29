@@ -92,6 +92,42 @@ class RouteService {
       return [];
     }
   }
+
+  /**
+   * Reverse geocodes coordinates into human-readable address using Nominatim.
+   * 
+   * @param {number} lat
+   * @param {number} lon
+   * @returns {Promise<{ address: string, display_name: string }>}
+   */
+  static async reverseGeocode(lat, lon) {
+    if (!lat || !lon) return { address: '', display_name: '' };
+
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+
+    try {
+      const response = await axios.get(url, {
+        timeout: 3500,
+        headers: { 'User-Agent': 'Xentra-Food-Ordering-Engine/2.0' }
+      });
+      const data = response.data || {};
+      const addr = data.address || {};
+      const road = addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood || '';
+      const city = addr.city || addr.town || addr.municipality || addr.county || '';
+      const shortAddr = [road, city].filter(Boolean).join(', ') || data.display_name || 'Lokasi Terpilih';
+
+      return {
+        address: shortAddr,
+        display_name: data.display_name || shortAddr
+      };
+    } catch (err) {
+      console.error('[RouteService] Reverse geocoding failed:', err.message);
+      return {
+        address: `Titik Peta (${Number(lat).toFixed(4)}, ${Number(lon).toFixed(4)})`,
+        display_name: `Titik Peta (${Number(lat).toFixed(4)}, ${Number(lon).toFixed(4)})`
+      };
+    }
+  }
 }
 
 module.exports = RouteService;
