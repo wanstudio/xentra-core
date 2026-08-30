@@ -7,9 +7,10 @@ package-lock.json
 .env.local
 
 # Database runtime files
-*.db-journal
-*.db-wal
+*.db
 *.db-shm
+*.db-wal
+*.db-journal
 
 # Logs
 logs/

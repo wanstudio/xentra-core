@@ -63,11 +63,12 @@ async function syncCatalog() {
     const desc = (p.description || p.short_description || '').replace(/<[^>]*>?/gm, '').trim();
 
     const primaryCatId = p.categories && p.categories[0] ? Number(p.categories[0].id) : categories[0].id;
+    const slug = (p.slug || p.name || ('prod-' + p.id)).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
     db.prepare(`
-      INSERT OR REPLACE INTO products (id, brand_id, category_id, name, price, regular_price, description, image_url, is_active, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(p.id, brandId, primaryCatId, p.name, price, regPrice, desc, img, 1, idx + 1);
+      INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, regular_price, description, image_url, is_active, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(p.id, brandId, primaryCatId, p.name, slug, price, regPrice, desc, img, 1, idx + 1);
 
     if (p.categories && p.categories.length > 0) {
       for (const cat of p.categories) {

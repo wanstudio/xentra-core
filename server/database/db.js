@@ -1,7 +1,15 @@
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'xentra.db');
+const DB_PATH = (() => {
+  if (process.env.NODE_ENV === 'test') {
+    const os = require('os');
+    const crypto = require('crypto');
+    // isolated temp file per test process (avoids WAL lock when --test spawns workers)
+    return process.env.DB_PATH || path.join(os.tmpdir(), `xentra_test_${process.pid}_${crypto.randomBytes(4).toString('hex')}.db`);
+  }
+  return process.env.DB_PATH || path.join(__dirname, 'xentra.db');
+})();
 
 // Ensure db directory exists
 const dbDir = path.dirname(DB_PATH);
@@ -459,11 +467,11 @@ function seedData(targetDb) {
   `).run(
     branchBaratId,
     brandId,
-    'Bangjo Pringsewu',
-    'pringsewu',
-    'Jl. Jenderal Sudirman No. 88, Pringsewu',
-    -5.3572069732427,
-    104.97864762535,
+    'Bangjo Surabaya Barat',
+    'surabaya-barat',
+    'Jl. Mayjen Sungkono No. 88, Surabaya Barat',
+    -7.2912,
+    112.7154,
     '081234567890'
   );
 

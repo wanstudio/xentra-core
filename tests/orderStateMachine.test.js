@@ -20,8 +20,8 @@ test('OrderStateMachine: transitions order and inserts audit log', () => {
   
   // Insert test order
   db.prepare(`
-    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_phone, order_type, status, subtotal, grand_total)
-    VALUES (?, ?, 'brand_bangjo', 'branch_bangjo_barat', '081234567890', 'delivery', 'pending', 50000, 50000)
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, status, subtotal, grand_total)
+    VALUES (?, ?, 'brand_bangjo', 'branch_bangjo_barat', 'Pelanggan Test', '081234567890', 'delivery', 'pending', 50000, 50000)
   `).run(orderId, orderNum);
 
   // Transition to confirmed

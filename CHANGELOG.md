@@ -1,5 +1,42 @@
 # Changelog — Xentra Core
 
+## [2.2.0] — 2026-08-30
+
+### 🔵 Checkout Alternative 2 — Wiring ke flow xentra-core existing (no mock)
+
+Checkout `apps/customer-pwa` sekarang replica pixel **Checkout Bangjo** tapi 100%% lewat service existing:
+
+| Aspek | Sebelum | Sesudah |
+|-------|---------|---------|
+| Ongkir/diskon | `state.deliveryFee/state.discount` hardcode 12000/7000 | `POST /delivery/match-branch` via `BranchMatcher` + `RouteService` (OSRM/Haversine) + `DeliveryCalculator.calculate()` — single source of truth |
+| Upsell rail | `fallback-1/2/3 Es Jeruk` statis + try `/catalog/upsell` | `GET /catalog/menu` (reuse catalog service), filter cart, fallback `/catalog/upsell` |
+| Submit | `POST /checkout/submit` mock `customer_name/customer_phone` + `product_id` + `price` | `POST /checkout/create-order` kontrak existing `{branch_id, customer:{name,phone}, order_type, fulfillment, delivery/address, items:[{id,quantity,note}], payment_method}` — immutable snapshot, `branch_delivery_settings` + `order_deliveries/order_payments` |
+| State | `fulfillment.scheduled` hilang | `scheduled` + `scheduled_slot_start` |
+| Empty cart | kosong | seed demo Mie Gurith x5 + Es Teh x1 untuk preview desainer |
+
+Visual: `assets/css/checkout.css` append scoped `.x-checkout-alt2` 278 baris (banner dark Install/es teh, card Mie Gurith 17k→15k + Es Teh, rail Es Jeruk, card delivery/pickup, alamat Rumah Gw, ringkasan strike 42k→35k, COD/Online, trust midtrans, sticky Pesan sekarang).
+
+### 🟢 Backend & Test Fixes
+
+| Fix | File | Sebab |
+|-----|------|-------|
+| `order_items.item_note → note` | `server/routes/api.js` | schema kolom `note`, sebelumnya 500 |
+| `products.slug` NOT NULL | `server/database/syncWoo.js` | live sync Woo tanpa slug |
+| `DeliveryCalculator` ineligible return `free_km/price_per_km/discount_label` | `server/services/DeliveryCalculator.js` | `order_deliveries.rate_per_km_applied` jadi null → SQLite param 9 error |
+| branch seed balik `Surabaya Barat -7.2912,112.7154` | `server/database/db.js` | test payload dekat branch, Pringsewu bikin out-of-radius |
+| `orders.customer_name` fixture | `tests/orderStateMachine.test.js` | NOT NULL constraint |
+| `NODE_ENV=test` isolasi DB per pid + skip `syncWoo` + guard `app.listen` | `server/database/db.js`, `server/app.js` | WAL `database is locked` saat `node --test` parallel |
+
+Tests: `13/13 pass` (`deliveryCalculator 4 + orderStateMachine 2 + apiEndpoints 7`). Midtrans sandbox error `Access denied` expected (dummy key) → fallback `sim_snap_*`, order tetap 201.
+
+### Ops
+
+- `package.json` `2.0.0 → 2.2.0`, `server/app.js` `/health` version `2.2.0`
+- `.gitignore` tambah `*.db` (xentra.db runtime tidak ikut deploy)
+- Deploy: `deploy-core.sh` `target=core` ke `/home/mybangjo/xentra-core` via `app.mybangjo.com/wp-json/xentra/v1/deploy`
+
+---
+
 ## [2.1.0] — 2026-08-30
 
 ### 🔴 Database Schema Fixes (BREAKING — DB direset)

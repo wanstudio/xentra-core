@@ -8,13 +8,15 @@ dotenv.config();
 // Initialize Database (Native or Portable)
 require('./database/db');
 
-// Auto-sync real WooCommerce catalog from app.mybangjo.com
-try {
-  const syncCatalog = require('./database/syncWoo');
-  syncCatalog()
-    .then(() => console.log('[Catalog Sync] Auto-synced real WooCommerce categories & products.'))
-    .catch((e) => console.warn('[Catalog Sync]', e.message));
-} catch (e) {}
+// Auto-sync real WooCommerce catalog from app.mybangjo.com (skip during tests)
+if (process.env.NODE_ENV !== 'test' && !process.env.DB_PATH) {
+  try {
+    const syncCatalog = require('./database/syncWoo');
+    syncCatalog()
+      .then(() => console.log('[Catalog Sync] Auto-synced real WooCommerce categories & products.'))
+      .catch((e) => console.warn('[Catalog Sync]', e.message));
+  } catch (e) {}
+}
 
 const tenantResolver = require('./middleware/tenantResolver');
 const apiRoutes = require('./routes/api');
@@ -59,7 +61,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     system: 'Xentra Core Standalone Engine',
-    version: '2.0.0',
+    version: '2.2.0',
     timestamp: new Date().toISOString()
   });
 });
@@ -111,16 +113,18 @@ app.use((err, req, res, next) => {
   });
 });
 
-const server = app.listen(PORT, () => {
-  console.log(`[Xentra Core] Standalone SaaS Engine running on http://localhost:${PORT}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+  const server = app.listen(PORT, () => {
+    console.log(`[Xentra Core] Standalone SaaS Engine running on http://localhost:${PORT}`);
+  });
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.log(`[Xentra Core] Port ${PORT} is currently active.`);
-  } else {
-    console.error('[Xentra Core Server Error]:', err);
-  }
-});
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`[Xentra Core] Port ${PORT} is currently active.`);
+    } else {
+      console.error('[Xentra Core Server Error]:', err);
+    }
+  });
+}
 
 module.exports = app;

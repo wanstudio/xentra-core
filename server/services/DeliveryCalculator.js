@@ -36,9 +36,12 @@ class DeliveryCalculator {
         reason: `Alamat pengantaran (${distance_km} km) di luar jangkauan maksimal (${max_radius_km} km).`,
         distance_meters: meters,
         distance_km,
+        free_km,
+        price_per_km,
         chargeable_distance_km: 0,
         base_delivery_fee: 0,
         discount_amount: 0,
+        discount_label: '',
         final_delivery_fee: 0
       };
     }

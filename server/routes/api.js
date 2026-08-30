@@ -536,7 +536,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
 
     // Save order items
     const insertItem = db.prepare(`
-      INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, item_note)
+      INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const it of validatedItems) {

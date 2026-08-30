@@ -3281,3 +3281,281 @@ body:has(#x-checkout-note-overlay.open){
 	box-shadow:0 12px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
 	text-align:center;
 }
+
+/* ========================================================================
+   CHECKOUT ALTERNATIVE 2 — Mobile replica "Checkout Bangjo"
+   Sections: header → promo dark banner → item cards → addon rail
+             → delivery card → address card → summary → CTA
+   Scoped to .x-checkout-alt2 so existing checkout v2 styles untouched.
+   ======================================================================== */
+
+.x-checkout-alt2{
+  background:#f2f2f2 !important;
+  min-height:100vh;
+  padding-bottom:96px !important;
+  max-width:480px;
+  margin:0 auto;
+  font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+}
+.x-checkout-alt2 *{ box-sizing:border-box; }
+
+/* — Header — */
+.x-alt-header{
+  background:#fff;
+  display:flex; align-items:center; gap:12px;
+  padding:14px 16px;
+  font-size:16px; font-weight:800; color:#111;
+  position:sticky; top:0; z-index:20;
+  border-bottom:1px solid #eee;
+}
+.x-alt-back{
+  width:28px; height:28px; flex:0 0 28px;
+  border:0; background:transparent; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.x-alt-back img{ width:20px; height:20px; object-fit:contain; display:block; }
+
+/* — Promo banner (dark) — */
+.x-alt-promo-banner{
+  margin:10px 14px 10px;
+  background:#1f2428;
+  border-radius:14px;
+  padding:10px 12px 8px;
+  display:grid;
+  grid-template-columns:64px 1fr auto;
+  gap:10px; align-items:center;
+  overflow:hidden;
+}
+.x-alt-promo-img{
+  width:64px; height:48px; border-radius:10px;
+  object-fit:cover; display:block; background:#2a3036;
+}
+.x-alt-promo-copy{ min-width:0; }
+.x-alt-promo-title{
+  color:#fff; font-size:13px; font-weight:700;
+  line-height:1.25; white-space:normal;
+}
+.x-alt-promo-snk{
+  margin-top:3px; color:#9aa3af; font-size:10px; font-style:italic; line-height:1;
+}
+.x-alt-promo-install{
+  background:#ff3b30; color:#fff; border:0; border-radius:999px;
+  padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer;
+  align-self:center; white-space:nowrap;
+  box-shadow:0 2px 8px rgba(255,59,48,.35);
+}
+
+/* — Items stack — */
+.x-alt-items-stack{
+  display:flex; flex-direction:column; gap:10px;
+  padding:0 14px;
+}
+.x-alt-card{
+  background:#fff; border-radius:18px;
+  padding:14px 14px;
+  box-shadow:0 2px 12px rgba(0,0,0,.04);
+  border:1px solid rgba(0,0,0,.02);
+}
+.x-alt-item-card{
+  display:grid; grid-template-columns:minmax(0,1fr) 96px;
+  gap:12px; align-items:start;
+}
+.x-alt-item-left{ min-width:0; }
+.x-alt-item-name{ font-size:15px; font-weight:800; color:#111; line-height:1.25; }
+.x-alt-item-note{
+  margin-top:4px; font-size:12px; color:#6b7280; line-height:1.35;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden; word-break:break-word;
+}
+.x-alt-item-price{ margin-top:8px; font-size:15px; color:#111; }
+.x-alt-item-price s.x-alt-old{
+  font-size:12px; color:#9ca3af; text-decoration:line-through; margin-right:6px; font-weight:500;
+}
+.x-alt-item-price b{ font-weight:800; font-size:15px; color:#111; }
+.x-alt-item-tag{
+  margin-top:6px; display:inline-flex; align-items:center; gap:6px;
+  font-size:11px; font-weight:600; color:#111;
+}
+.x-alt-item-tag img{ width:14px; height:14px; object-fit:contain; }
+.x-alt-item-actions{
+  margin-top:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+.x-alt-note-btn{
+  height:32px; padding:0 12px; border-radius:999px;
+  border:1.5px solid #e5e7eb; background:#fff; color:#374151;
+  font-size:12px; font-weight:600; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px; white-space:nowrap;
+}
+.x-alt-note-btn img{ width:14px; height:14px; object-fit:contain; }
+.x-alt-qty{
+  display:inline-flex; align-items:center; justify-content:space-between;
+  height:32px; min-width:88px; border-radius:999px;
+  background:#e6ffb3; border:1px solid #d9f99d;
+  padding:2px; gap:2px;
+}
+.x-alt-qty-btn{
+  width:28px; height:26px; border:0; border-radius:999px;
+  background:transparent; font-size:16px; font-weight:800; color:#111;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  line-height:1;
+}
+.x-alt-qty-val{ font-size:13px; font-weight:800; color:#111; min-width:16px; text-align:center; }
+.x-alt-item-right{ display:flex; align-items:flex-start; justify-content:flex-end; }
+.x-alt-item-img-wrap{
+  width:96px; height:96px; border-radius:14px; overflow:hidden;
+  background:#f3f4f6; flex-shrink:0;
+}
+.x-alt-item-img-wrap img{ width:100%; height:100%; object-fit:cover; display:block; }
+.x-alt-img-ph{ width:100%; height:100%; background:linear-gradient(135deg,#f3f4f6,#e5e7eb); }
+.x-alt-empty{ padding:18px; text-align:center; color:#6b7280; font-size:13px; }
+
+/* — Add-on rail — */
+.x-alt-addon-card{ margin-top:2px; }
+.x-alt-addon-head{
+  font-size:12px; font-weight:500; color:#9ca3af; margin-bottom:10px;
+}
+.x-alt-addon-track{
+  display:flex; gap:12px; overflow-x:auto; scrollbar-width:none;
+  padding-bottom:6px; margin:0 -2px;
+}
+.x-alt-addon-track::-webkit-scrollbar{ display:none; }
+.x-alt-addon-loading{ font-size:12px; color:#9ca3af; padding:8px 0; }
+.x-alt-addon-item{
+  flex:0 0 118px; width:118px;
+  display:flex; flex-direction:column; gap:6px;
+}
+.x-alt-addon-img{
+  width:118px; height:86px; border-radius:14px; overflow:hidden;
+  background:#f3f4f6; display:flex; align-items:center; justify-content:center;
+}
+.x-alt-addon-img img{ width:100%; height:100%; object-fit:cover; display:block; }
+.x-alt-addon-ph{ width:40px; height:40px; border-radius:50%; background:#e5e7eb; }
+.x-alt-addon-name{ font-size:13px; font-weight:700; color:#111; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.x-alt-addon-price{ font-size:13px; font-weight:800; color:#111; }
+.x-alt-addon-add{
+  margin-top:4px; width:32px; height:32px; border-radius:50%;
+  border:0; background:#e6ffb3; color:#111; font-size:18px; font-weight:800;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 6px rgba(0,0,0,.06);
+}
+
+/* — Delivery & Address cards — */
+.x-alt-delivery-card .x-alt-card-top{
+  display:grid; grid-template-columns:38px 1fr auto; gap:10px; align-items:start;
+}
+.x-alt-icon-wrap{
+  width:38px; height:38px; border-radius:10px; background:#f3f4f6;
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.x-alt-icon-wrap img{ width:26px; height:26px; object-fit:contain; }
+.x-alt-delivery-type{ font-size:11px; font-weight:700; color:#6b7280; letter-spacing:.02em; }
+.x-alt-delivery-time{ margin-top:2px; font-size:13px; font-weight:700; color:#111; }
+.x-alt-delivery-note{
+  margin-top:4px; font-size:11.5px; color:#6b7280; line-height:1.35;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.x-alt-pill{
+  height:30px; padding:0 14px; border-radius:999px; border:0;
+  background:#e6ffb3; color:#111; font-size:12px; font-weight:800; cursor:pointer;
+  white-space:nowrap; align-self:start;
+}
+.x-alt-delivery-card .x-alt-note-btn{ margin-top:10px; }
+
+.x-alt-address-card .x-alt-address-head{
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  font-size:13px; font-weight:800; color:#111; margin-bottom:8px;
+}
+.x-alt-addr-label{ font-size:13px; font-weight:800; color:#111; }
+.x-alt-addr-text{ margin-top:4px; font-size:12.5px; color:#374151; line-height:1.4; word-break:break-word; }
+.x-alt-addr-note{
+  margin-top:6px; font-size:11.5px; color:#6b7280; line-height:1.35;
+  font-style:italic; word-break:break-word;
+}
+
+/* — Summary — */
+.x-alt-summary-title{ font-size:15px; font-weight:800; color:#111; margin-bottom:12px; }
+.x-alt-sum-row{ display:flex; justify-content:space-between; gap:12px; font-size:13px; line-height:1.4; padding:4px 0; }
+.x-alt-sum-row span:first-child{ color:#6b7280; font-weight:500; }
+.x-alt-sum-row span:last-child{ color:#111; font-weight:700; }
+.x-alt-discount-row span:last-child{ color:#ff3b30 !important; }
+.x-alt-discount{ color:#ff3b30; }
+.x-alt-sum-divider{ height:1px; background:#e5e7eb; margin:10px 0; }
+.x-alt-sum-total{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:6px 0 10px; }
+.x-alt-sum-total span:first-child{ font-size:15px; font-weight:800; color:#111; }
+.x-alt-sum-total s.x-alt-strike{ font-size:12px; color:#9ca3af; text-decoration:line-through; margin-right:8px; font-weight:500; }
+.x-alt-sum-total b{ font-size:16px; font-weight:800; color:#111; }
+.x-alt-pay-methods{ display:grid; gap:10px; margin-top:4px; }
+.x-alt-pay-opt{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:12px 14px; border-radius:14px; border:1.5px solid #e5e7eb;
+  background:#fff; text-align:left; cursor:pointer;
+  font-size:13px; font-weight:700; color:#111;
+  transition:border-color .15s, background .15s;
+}
+.x-alt-pay-opt--muted{ background:#f9fafb; }
+.x-alt-pay-opt.is-active{ border-color:#22c55e; background:#f7ffd9; }
+.x-alt-pay-opt-icon{
+  width:28px; height:28px; border-radius:8px; background:#e6ffb3;
+  display:flex; align-items:center; justify-content:center; font-size:14px; flex:0 0 28px;
+}
+.x-alt-pay-opt--muted .x-alt-pay-opt-icon{ background:#e5e7eb; }
+.x-alt-trust{
+  margin-top:12px; display:flex; flex-wrap:wrap; align-items:center; justify-content:center;
+  gap:6px; font-size:11px; color:#9ca3af; text-align:center;
+}
+.x-alt-trust b{ color:#6b7280; font-weight:800; }
+.x-alt-trust-sep{ color:#d1d5db; }
+
+/* — CTA bar — */
+.x-alt-cta-spacer{ height:14px; }
+.x-alt-cta-bar{
+  position:fixed; left:0; right:0; bottom:0;
+  max-width:480px; margin:0 auto;
+  background:#fff; padding:12px 14px max(12px, env(safe-area-inset-bottom));
+  box-shadow:0 -4px 18px rgba(0,0,0,.08);
+  z-index:40;
+}
+.x-alt-submit-btn{
+  width:100%; height:48px; border:0; border-radius:999px;
+  background:#d6ff00; color:#111; font-size:15px; font-weight:800;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 4px 12px rgba(214,255,0,.35);
+}
+.x-alt-submit-btn:active{ transform:scale(.98); }
+.x-alt-submit-btn:disabled{ background:#e5e7eb; color:#9ca3af; box-shadow:none; cursor:not-allowed; }
+
+/* — Alt sheets (fulfillment/note/address) — */
+.x-alt-sheet{ padding:14px 16px calc(18px + env(safe-area-inset-bottom)) !important; }
+.x-alt-sheet-title{ font-size:16px; font-weight:800; color:#111; text-align:center; margin:6px 0 16px; }
+.x-alt-fulfillment-grid{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.x-alt-fulfill-opt{
+  border:1.5px solid #e5e7eb; border-radius:16px; background:#fff;
+  padding:10px 6px; display:flex; flex-direction:column; align-items:center; gap:6px;
+  cursor:pointer; font-size:12px; font-weight:700; color:#111; text-align:center;
+}
+.x-alt-fulfill-opt img{ width:34px; height:34px; object-fit:contain; }
+.x-alt-fulfill-opt.is-active{ border-color:#d6ff00; background:#f7ffd9; }
+.x-alt-sheet-divider{ height:1px; background:#eee; margin:16px 0; }
+.x-alt-sheet-label{ font-size:12px; font-weight:700; color:#374151; margin-bottom:8px; }
+.x-alt-time-options{ display:flex; flex-direction:column; gap:8px; }
+.x-alt-radio{
+  display:flex; align-items:center; gap:10px; padding:10px 12px;
+  background:#f9fafb; border:1px solid #e5e7eb; border-radius:12px; cursor:pointer;
+  font-size:13px; font-weight:600; color:#111;
+}
+.x-alt-radio input{ accent-color:#111; }
+.x-alt-input, .x-alt-textarea{
+  width:100%; border:1.5px solid #e5e7eb; border-radius:12px;
+  padding:12px 14px; font-size:14px; color:#111; background:#fff;
+  font-family:inherit; outline:none;
+}
+.x-alt-input:focus, .x-alt-textarea:focus{ border-color:#111; }
+.x-alt-textarea{ resize:vertical; min-height:96px; }
+.x-alt-input + .x-alt-input, .x-alt-input + .x-alt-textarea, .x-alt-textarea + .x-alt-input{ margin-top:10px; }
+
+@media (max-width:380px){
+  .x-alt-item-card{ grid-template-columns:1fr 84px; }
+  .x-alt-item-img-wrap{ width:84px; height:84px; }
+  .x-alt-addon-item{ flex-basis:108px; width:108px; }
+  .x-alt-addon-img{ width:108px; }
+}
