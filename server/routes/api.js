@@ -401,9 +401,9 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       branch = db.prepare(`
         SELECT 
           b.id, b.brand_id, b.name, b.latitude, b.longitude,
-          s.free_delivery_km, s.price_per_km, s.max_delivery_radius_km, s.promo_config
+          s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order
         FROM branches b 
-        LEFT JOIN branch_settings s ON s.branch_id = b.id 
+        LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id 
         WHERE b.id = ?
       `).get(branch_id);
     }
@@ -411,9 +411,9 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       branch = db.prepare(`
         SELECT 
           b.id, b.brand_id, b.name, b.latitude, b.longitude,
-          s.free_delivery_km, s.price_per_km, s.max_delivery_radius_km, s.promo_config
+          s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order
         FROM branches b 
-        LEFT JOIN branch_settings s ON s.branch_id = b.id 
+        LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id 
         WHERE b.brand_id = ?
         LIMIT 1
       `).get(req.brand_id);
@@ -473,13 +473,15 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         custLng
       );
 
-      const promoConfig = branch.promo_config ? JSON.parse(branch.promo_config) : { enabled: true, target: 50000, discount: 10000 };
+      const promoConfig = (branch.promo_delivery_discount && branch.promo_min_order)
+        ? { enabled: true, target: branch.promo_min_order, discount: branch.promo_delivery_discount }
+        : { enabled: true, target: 50000, discount: 10000 };
 
       const feeCalc = DeliveryCalculator.calculate({
         distance_meters: road.distance_meters,
         free_km: branch.free_delivery_km || 0,
         price_per_km: branch.price_per_km || 3000,
-        max_radius_km: branch.max_delivery_radius_km || 30,
+        max_radius_km: branch.max_radius_km || 30,
         subtotal,
         promo_config: promoConfig
       });
@@ -538,7 +540,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const it of validatedItems) {
-      insertItem.run(it.id, orderId, it.product_id, it.product_name, it.unit_price, it.quantity, it.item_subtotal, it.item_note);
+      insertItem.run(it.id, orderId, it.product_id, it.product_name, it.unit_price, it.quantity, it.item_subtotal, it.item_note || '');
     }
 
     // Save delivery record

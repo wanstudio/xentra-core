@@ -22,11 +22,11 @@ class BranchMatcher {
         SELECT 
           b.id, b.brand_id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone,
           b.is_active, b.is_open_override,
-          s.delivery_enabled, s.pickup_enabled, s.free_delivery_km, s.price_per_km, 
-          s.max_delivery_radius_km, s.min_order_amount, s.promo_config
+          s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, 
+          s.max_radius_km, s.min_order_amount, s.promo_delivery_discount, s.promo_min_order
         FROM branches b
-        LEFT JOIN branch_settings s ON s.branch_id = b.id
-        WHERE b.brand_id = ? AND b.is_active = 1 AND b.is_open_override = 1 AND s.delivery_enabled = 1
+        LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
+        WHERE b.brand_id = ? AND b.is_active = 1 AND b.is_open_override = 1 AND s.is_delivery_active = 1
       `)
       .all(brand_id);
 
@@ -52,7 +52,10 @@ class BranchMatcher {
           ...branch,
           straight_distance_meters: straightMeters,
           straight_distance_km: straightMeters / 1000,
-          promo_config: branch.promo_config ? JSON.parse(branch.promo_config) : null
+          max_delivery_radius_km: branch.max_radius_km || 30,
+          promo_config: (branch.promo_delivery_discount && branch.promo_min_order)
+            ? { enabled: true, target: branch.promo_min_order, discount: branch.promo_delivery_discount }
+            : null
         };
       })
       // Pre-filter out branches whose straight-line distance exceeds 1.5x max radius

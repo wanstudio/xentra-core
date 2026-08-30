@@ -31,7 +31,7 @@ function tenantResolver(req, res, next) {
 
     if (!brand) {
       brand = {
-        id: 'brand_bangjo_master',
+        id: 'brand_bangjo',
         organization_id: 'org_xentra_holding',
         name: 'Bangjo Resto',
         slug: 'bangjo',
@@ -48,7 +48,7 @@ function tenantResolver(req, res, next) {
   } catch (err) {
     console.error('[TenantResolver Error]:', err);
     req.brand = {
-      id: 'brand_bangjo_master',
+      id: 'brand_bangjo',
       organization_id: 'org_xentra_holding',
       name: 'Bangjo Resto',
       slug: 'bangjo',

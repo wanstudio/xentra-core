@@ -49,7 +49,7 @@ function saveSqlJsToDisk() {
 const memoryStore = {
   brands: [
     {
-      id: 'brand_bangjo_master',
+      id: 'brand_bangjo',
       organization_id: 'org_xentra_holding',
       name: 'Bangjo Resto',
       slug: 'bangjo',
@@ -61,7 +61,7 @@ const memoryStore = {
   branches: [
     {
       id: 'branch_bangjo_barat',
-      brand_id: 'brand_bangjo_master',
+      brand_id: 'brand_bangjo',
       name: 'Bangjo Surabaya Barat',
       slug: 'surabaya-barat',
       address_text: 'Jl. Mayjen Sungkono No. 88, Surabaya Barat',
@@ -339,44 +339,59 @@ function initSchema(targetDb) {
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS order_status_audit (
+    CREATE TABLE IF NOT EXISTS order_status_logs (
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL,
-      from_status TEXT,
-      to_status TEXT NOT NULL,
-      notes TEXT,
-      changed_by TEXT,
+      previous_status TEXT,
+      new_status TEXT NOT NULL,
+      actor_type TEXT,
+      actor_id TEXT,
+      note TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS delivery_orders (
+    CREATE TABLE IF NOT EXISTS order_deliveries (
       id TEXT PRIMARY KEY,
       order_id TEXT UNIQUE NOT NULL,
+      destination_address TEXT,
+      destination_latitude REAL,
+      destination_longitude REAL,
+      actual_road_distance_meters REAL,
+      actual_duration_seconds REAL,
+      chargeable_distance_km REAL,
+      free_km_applied REAL,
+      rate_per_km_applied REAL,
+      delivery_fee_calculated REAL,
       driver_name TEXT,
       driver_phone TEXT,
       tracking_url TEXT,
-      distance_km REAL,
-      pickup_address TEXT,
-      delivery_address TEXT,
       status TEXT NOT NULL DEFAULT 'unassigned',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS payments (
+    CREATE TABLE IF NOT EXISTS order_payments (
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL,
       provider TEXT NOT NULL,
-      transaction_id TEXT,
-      status TEXT NOT NULL DEFAULT 'pending',
-      fraud_status TEXT,
-      gross_amount REAL NOT NULL,
-      midtrans_response_raw TEXT,
+      merchant_id TEXT,
+      snap_token TEXT,
+      payment_method TEXT,
+      payment_status TEXT NOT NULL DEFAULT 'pending',
+      amount REAL NOT NULL,
+      raw_webhook_response TEXT,
+      settled_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (order_id) REFERENCES orders(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS product_categories (
+      product_id TEXT NOT NULL,
+      category_id TEXT NOT NULL,
+      PRIMARY KEY (product_id, category_id)
     );
   `);
 
