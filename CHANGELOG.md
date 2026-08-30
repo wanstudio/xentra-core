@@ -1,3 +1,10 @@
+## [2.2.3] - 2026-08-30
+### Added
+- Endpoint deploy terpisah untuk dev.mybangjo.com: POST /wp-json/xentra/v1/deploy dan /api/v1/deploy di Node (multer + adm-zip) — dev tidak lagi lewat WP receiver app.mybangjo.com, token X-Deploy-Token sama, extract + touch tmp/restart.txt + npm install.
+### Fixed
+- Pisah total deploy dev vs app: deploy-core.sh HANYA ke https://dev.mybangjo.com (target=core), deploy-xentra.sh HANYA ke https://app.mybangjo.com — tidak ada copy service-worker lintas domain.
+- Tambah multer/adm-zip ke dependencies agar deploy multipart zip 50MB berfungsi tanpa fallback shell.
+
 ## [2.2.2] — 2026-08-30
 
 ### Banner Promo + PWA Install (cache-bust)
