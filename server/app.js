@@ -9,7 +9,7 @@ dotenv.config();
 require('./database/db');
 
 // Auto-sync real WooCommerce catalog from app.mybangjo.com (skip during tests)
-if (process.env.NODE_ENV !== 'test' && !process.env.DB_PATH) {
+if (process.env.NODE_ENV !== 'test' && !process.env.DB_PATH && !process.env.SKIP_SYNC) {
   try {
     const syncCatalog = require('./database/syncWoo');
     syncCatalog()
@@ -22,20 +22,13 @@ const tenantResolver = require('./middleware/tenantResolver');
 const apiRoutes = require('./routes/api');
 const fs = require('fs');
 const { execSync } = require('child_process');
-let multer, AdmZip;
-try { multer = require('multer'); } catch (e) { console.warn('[Deploy] multer not installed, deploy multipart disabled'); }
-try { AdmZip = require('adm-zip'); } catch (e) { console.warn('[Deploy] adm-zip not installed, fallback to unzip shell'); }
 
-// ---- Deploy receiver for dev.mybangjo.com (separate from app.mybangjo.com WP receiver) ----
+// ---- Deploy receiver for dev.mybangjo.com (shell unzip only, no WASM/multer) ----
 const DEPLOY_TOKEN = process.env.DEPLOY_TOKEN || 'xentra_deploy_7f8a9b2c3d4e5f6a1b2c3d4e5f';
 function checkDeployToken(req) {
   const h = (req.headers['x-deploy-token'] || '').trim();
   const q = (req.query.token || req.body?.token || '').trim();
   return h === DEPLOY_TOKEN || q === DEPLOY_TOKEN;
-}
-let deployUpload = null;
-if (multer) {
-  try { deployUpload = multer({ dest: '/tmp', limits: { fileSize: 50 * 1024 * 1024 } }); } catch {}
 }
 
 const app = express();
@@ -52,8 +45,7 @@ function handleDeploy(req, res) {
   const target = (req.body?.target || req.query.target || 'core');
   // locate zip: multer file, or raw body (fallback)
   let zipPath = null;
-  if (req.file && req.file.path) zipPath = req.file.path;
-  else if (req.body && Buffer.isBuffer(req.body) && req.body.length > 4) {
+  if (req.body && Buffer.isBuffer(req.body) && req.body.length > 4) {
     zipPath = '/tmp/xentra-raw-' + Date.now() + '.zip';
     try { fs.writeFileSync(zipPath, req.body); } catch(e){ return res.status(500).json({success:false, message:e.message}); }
   }
@@ -72,36 +64,19 @@ function handleDeploy(req, res) {
   for (const dest of candidates) {
     try {
       if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-      if (AdmZip) {
-        const zip = new AdmZip(zipPath);
-        zip.extractAllTo(dest, true);
-      } else {
-        execSync('unzip -o ' + JSON.stringify(zipPath) + ' -d ' + JSON.stringify(dest), { stdio: 'pipe' });
-      }
-      // Passenger restart marker
+      execSync('unzip -o ' + JSON.stringify(zipPath) + ' -d ' + JSON.stringify(dest), { stdio: 'pipe' });
       try { fs.mkdirSync(path.join(dest, 'tmp'), { recursive: true }); fs.writeFileSync(path.join(dest, 'tmp', 'restart.txt'), String(Date.now())); } catch {}
-      // also try npm install in background if package.json changed (non-blocking)
       extracted.push(dest);
     } catch (e) {
       errors.push(dest + ': ' + e.message);
     }
   }
   try { fs.unlinkSync(zipPath); } catch {}
-  // try async npm install for deps like multer/adm-zip (detached, don't block response)
-  for (const dest of extracted) {
-    try { execSync('cd ' + JSON.stringify(dest) + ' && npm install --production --silent 2>&1 | head -n 20', { timeout: 60000, stdio: 'pipe' }); } catch {}
-  }
   if (extracted.length === 0) return res.status(500).json({ success:false, message:'Extract failed', errors });
   return res.json({ success:true, mode:'package_extracted', target, extracted, errors: errors.length?errors:undefined, timestamp:new Date().toISOString(), message:'Xentra Core deployed to dev.' });
 }
-// multipart (deploy-core.sh uses -F package=@zip)
-if (deployUpload) {
-  app.post(['/wp-json/xentra/v1/deploy', '/api/v1/deploy'], deployUpload.single('package'), handleDeploy);
-  // also allow token via query for raw fallback
-  app.post(['/wp-json/xentra/v1/deploy-raw', '/api/v1/deploy-raw'], express.raw({ type: '*/*', limit: '50mb' }), handleDeploy);
-} else {
-  app.post(['/wp-json/xentra/v1/deploy', '/api/v1/deploy', '/wp-json/xentra/v1/deploy-raw', '/api/v1/deploy-raw'], express.raw({ type: '*/*', limit: '50mb' }), handleDeploy);
-}
+// Deploy uses raw body only (deploy-core.sh --data-binary) — no multer to save WASM memory
+app.post(['/wp-json/xentra/v1/deploy', '/api/v1/deploy', '/wp-json/xentra/v1/deploy-raw', '/api/v1/deploy-raw'], express.raw({ type: '*/*', limit: '50mb' }), handleDeploy);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -141,7 +116,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     system: 'Xentra Core Standalone Engine',
-    version: '2.2.3',
+    version: '2.2.4',
     timestamp: new Date().toISOString()
   });
 });

@@ -1,3 +1,8 @@
+## [2.2.4] - 2026-08-30
+### Fixed
+- OOM fix untuk dev.mybangjo.com: hapus multer/adm-zip dari server (pakai raw + unzip shell saja), tambah SKIP_SYNC guard dan NODE_OPTIONS, npm install di dev tidak wajib — server kembali hidup 404 -> 200.
+- deploy-core.sh dan deploy-xentra.sh tetap terpisah: dev HANYA via /wp-json/xentra/v1/deploy (raw), app HANYA via app.mybangjo.com WP receiver.
+
 ## [2.2.3] - 2026-08-30
 ### Added
 - Endpoint deploy terpisah untuk dev.mybangjo.com: POST /wp-json/xentra/v1/deploy dan /api/v1/deploy di Node (multer + adm-zip) — dev tidak lagi lewat WP receiver app.mybangjo.com, token X-Deploy-Token sama, extract + touch tmp/restart.txt + npm install.
