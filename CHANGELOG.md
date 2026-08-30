@@ -1,3 +1,17 @@
+## [2.2.2] — 2026-08-30
+
+### Banner Promo + PWA Install (cache-bust)
+
+- Cache-bust semua HTML: `PWA_VERSION` `v2_1_3/v2_1_4` → `v2_2_2`, `?v=...` → `?v=2.2.2`, `CACHE_NAME` `bangjo-core-v2xx` → `bangjo-core-v222` — perbaiki "tidak tampak perubahan" karena SW/HTML masih cached v2.1.3.
+- Checkout banner abu-abu muda + `iced-tea.png` sudah ada (v2.2.1) — tidak diubah lagi.
+- Tombol **Install** di banner checkout sekarang fungsional:
+  - Android: pakai `beforeinstallprompt` (`deferredPrompt.prompt()`) → dialog install PWA native.
+  - iOS: tampilkan sheet panduan 3 langkah Share → Tambah ke Layar Utama → Tambah.
+  - Saat klik **Install**, otomatis tambah item **Es Teh Rp0** (`promo-es-teh-gratis`, `price:0`, `regular_price:5000`, `image_url:/assets/img/iced-tea.png`) ke cart via `Store.addItem`, render ulang list + `calculateTotals` — gratis tetap saat submit (backend validasi `price` dari produk jika ada, tapi untuk promo ini `price:0` ikut `validatedItems`).
+  - Sudah terpasang / `appinstalled` juga dapat gratis.
+
+---
+
 ## [2.2.1] — 2026-08-30
 
 ### Promo Banner — abu-abu muda + asset lokal iced-tea

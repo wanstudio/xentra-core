@@ -43,6 +43,72 @@
     isSubmitting: false
   };
 
+  // — PWA Install (Android / iOS) + gratis Es Teh Rp0 —
+  var deferredPrompt = null;
+  var isIosPwa = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+  var isStandalonePwa = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferredPrompt = e; });
+  window.addEventListener('appinstalled', function(){ addFreeIcedTea(); deferredPrompt = null; try{ localStorage.setItem('xentra_pwa_installed','1'); }catch(_){} });
+
+  function hasFreeIcedTea(){
+    var cart = Store.getState().cart.items || [];
+    for(var i=0;i<cart.length;i++){ if(String(cart[i].id)==='promo-es-teh-gratis') return true; }
+    return false;
+  }
+  function addFreeIcedTea(){
+    if(hasFreeIcedTea()) return;
+    Store.addItem({ id: 'promo-es-teh-gratis', name: 'Es Teh', price: 0, regular_price: 5000, image_url: '/assets/img/iced-tea.png', description: 'Gratis karena install aplikasi' }, 1);
+    try{ localStorage.setItem('xentra_free_esteh_claimed','1'); }catch(_){}
+    UI.toast('Es Teh gratis ditambahkan!');
+    var listEl = $('x-checkout-items-list');
+    if(listEl){ listEl.innerHTML = renderItemsHtml(getCheckoutItems()); bindItemEvents(); }
+    calculateTotals();
+  }
+  function showPwaGuideSheet(platform){
+    if(document.getElementById('x-pwa-guide-overlay')) return;
+    var isIos = platform === 'ios';
+    var steps = isIos ? (
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">1</div><div class="x-pwa-step-body"><strong>Ketuk tombol Bagikan</strong><span>Cari ikon Share di menu bawah Safari.</span></div></div>' +
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">2</div><div class="x-pwa-step-body"><strong>Pilih "Tambah ke Layar Utama"</strong><span>Geser ke bawah lalu pilih <b>Tambahkan ke Layar Utama</b>.</span></div></div>' +
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">3</div><div class="x-pwa-step-body"><strong>Ketuk "Tambah"</strong><span>Tekan <b>Tambah</b> di pojok kanan atas.</span></div></div>'
+    ) : (
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">1</div><div class="x-pwa-step-body"><strong>Buka Menu Browser</strong><span>Ketuk titik tiga (⋮) di Chrome.</span></div></div>' +
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">2</div><div class="x-pwa-step-body"><strong>Pilih "Install Aplikasi"</strong><span>Pilih <b>Install Aplikasi</b> atau <b>Tambahkan ke Layar Utama</b>.</span></div></div>' +
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">3</div><div class="x-pwa-step-body"><strong>Konfirmasi Install</strong><span>Tekan <b>Install</b> saat pop-up muncul.</span></div></div>'
+    );
+    var icon = '/assets/pwa/icon-192.png';
+    var html = '<div class="x-pwa-guide-backdrop"></div><div class="x-pwa-guide-sheet"><div class="x-sheet-handle"></div><div class="x-pwa-guide-head"><img src="'+icon+'" alt="Bangjo" class="x-pwa-guide-icon"><div><h3>Pasang Aplikasi Bangjo</h3><p>Nikmati pemesanan instan tanpa buka browser</p></div></div><div class="x-pwa-guide-steps">'+steps+'</div><button type="button" id="x-pwa-guide-close" class="x-pwa-guide-close-btn">Mengerti, Saya Coba</button></div>';
+    var overlay = document.createElement('div');
+    overlay.id = 'x-pwa-guide-overlay';
+    overlay.className = 'x-pwa-guide-overlay open';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(function(){ overlay.classList.add('open'); });
+    function closeGuide(){ overlay.classList.remove('open'); setTimeout(function(){ if(overlay.parentNode) overlay.remove(); }, 260); }
+    var bg = overlay.querySelector('.x-pwa-guide-backdrop');
+    var btn = overlay.querySelector('#x-pwa-guide-close');
+    if(bg) bg.addEventListener('click', closeGuide);
+    if(btn) btn.addEventListener('click', function(){ closeGuide(); });
+  }
+  function handleInstallClick(){
+    // beri hadiah langsung saat klik Install (sesuai spec: auto muncul Es Teh Rp0)
+    addFreeIcedTea();
+    if(isStandalonePwa){ UI.toast('Aplikasi sudah terpasang — Es Teh gratis sudah di keranjang'); return; }
+    if(deferredPrompt){
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(choice){
+        if(choice.outcome === 'accepted'){
+          try{ localStorage.setItem('xentra_pwa_installed','1'); }catch(_){}
+          UI.toast('Terima kasih — Es Teh gratis sudah ditambahkan');
+        }
+        deferredPrompt = null;
+      }).catch(function(){});
+      return;
+    }
+    // iOS atau Android tanpa prompt -> tampilkan panduan
+    showPwaGuideSheet(isIosPwa ? 'ios' : 'android');
+  }
+
   function $(id) { return document.getElementById(id); }
 
   function fmt(n) {
@@ -235,7 +301,7 @@
         '  <div class="x-alt-item-left">' +
         '    <div class="x-alt-item-name">' + UI.escape(item.name) + '</div>' +
         (note ? '<div class="x-alt-item-note">Catatan: ' + UI.escape(note) + '</div>' : '') +
-        '    <div class="x-alt-item-price">' + (hasOld ? '<s class="x-alt-old">' + fmtIDR(item.regular_price) + '</s> ' : '') + '<b>' + fmtIDR(item.price) + '</b></div>' +
+        '    <div class="x-alt-item-price">' + (Number(item.price)===0 ? '<s class="x-alt-old">' + fmtIDR(item.regular_price || 5000) + '</s> <b style="color:#16a34a">Gratis</b>' : (hasOld ? '<s class="x-alt-old">' + fmtIDR(item.regular_price) + '</s> ' : '') + '<b>' + fmtIDR(item.price) + '</b>') + '</div>' +
         (idx===0 ? '<div class="x-alt-item-tag"><img src="/assets/icons/diskon.svg" alt="" onerror="this.style.display=\'none\'"> Discount ongkir 7rb</div>' : '') +
         '    <div class="x-alt-item-actions">' +
         '      <button type="button" class="x-alt-note-btn" data-note-item="' + item.id + '"><img src="/assets/icons/write.svg" alt="">Catatan</button>' +
@@ -333,7 +399,7 @@
   // ── Events ──
   function bindEvents() {
     var back = $('x-checkout-back'); if (back) back.onclick = function(){ Router.navigate('home'); };
-    var promoBtn = $('x-btn-promo-install'); if (promoBtn) promoBtn.onclick = function(){ UI.toast('Install PWA: gunakan menu browser → Install'); };
+    var promoBtn = $('x-btn-promo-install'); if (promoBtn) promoBtn.onclick = handleInstallClick;
 
     bindItemEvents();
 

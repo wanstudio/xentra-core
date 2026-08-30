@@ -436,12 +436,13 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     const validatedItems = [];
 
     for (const item of items) {
-      const prod = db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(item.id, req.brand_id)
-        || db.prepare('SELECT * FROM products WHERE id = ?').get(item.id);
+      const isPromoFree = String(item.id) === 'promo-es-teh-gratis';
+      const prod = isPromoFree ? null : (db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(item.id, req.brand_id)
+        || db.prepare('SELECT * FROM products WHERE id = ?').get(item.id));
 
-      const unitPrice = prod ? Number(prod.price) : Number(item.price || 25000);
-      const prodName = prod ? prod.name : (item.name || 'Menu Pilihan');
-      const prodId = prod ? prod.id : String(item.id || 'prod_1');
+      const unitPrice = isPromoFree ? 0 : (prod ? Number(prod.price) : Number(item.price || 25000));
+      const prodName = isPromoFree ? 'Es Teh (Gratis Install)' : (prod ? prod.name : (item.name || 'Menu Pilihan'));
+      const prodId = isPromoFree ? 'promo-es-teh-gratis' : (prod ? prod.id : String(item.id || 'prod_1'));
       const qty = Math.max(1, Number(item.quantity || item.qty) || 1);
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
