@@ -95,3 +95,37 @@ Akses di browser:
 * 📱 **Customer PWA:** `http://localhost:3000/`
 * 🍳 **Kitchen Display:** `http://localhost:3000/kitchen/`
 * 🩺 **Health Check:** `http://localhost:3000/health`
+
+
+
+# Xentra Agent Rules
+
+## Before every coding task
+
+1. Check current git status.
+2. Read recent commits:
+   git log -10 --oneline
+3. Check uncommitted changes:
+   git diff --stat
+   git diff
+4. Identify recent work made by other agents/developers.
+5. Do not overwrite or revert existing changes without understanding them.
+
+## Architecture
+
+- Inspect existing implementation before creating new files.
+- Reuse existing framework/components/state/routing.
+- Never recreate UI as hardcoded HTML/JS just to match a screenshot.
+- Screenshot is a visual reference, not an instruction to replace architecture.
+
+## After coding
+
+1. Run relevant validation/tests.
+2. Show git diff.
+3. Commit changes with WHAT + WHY.
+4. Never commit secrets.
+
+## Important
+
+Git history is the source of truth for what changed.
+Uncommitted changes must also be inspected.
