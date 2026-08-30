@@ -1,3 +1,14 @@
+## [2.2.1] — 2026-08-30
+
+### Promo Banner — abu-abu muda + asset lokal iced-tea
+
+- Banner checkout `x-alt-promo-banner` dari `background:#1f2428` (dark) → `#ececec` (abu-abu muda) sesuai Image 2 target — headline `color:#111`, sub `syarat & ketentuan berlaku` di bawah headline.
+- Layout `display:grid` 3-kolom → `display:flex` (iced-tea kiri `56px`, copy tengah flex, tombol Install kanan) — `gap:12px`, `padding:10px 14px`, `border-radius:14px`, responsive `max-width:380px` `48px`.
+- Asset `iced_tea.png` (72x65 PNG 7.5K) → `apps/customer-pwa/assets/img/iced-tea.png`, `checkout.js` `src` dari `https://images.unsplash.com/...` → `/assets/img/iced-tea.png` (`object-fit:contain`, `background:transparent`).
+- Tidak ada rewrite/mock/preview HTML — hanya patch CSS/JS existing (`checkout.css`, `checkout.js`) + asset.
+
+---
+
 # Changelog — Xentra Core
 
 ## [2.2.0] — 2026-08-30

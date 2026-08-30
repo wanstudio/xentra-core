@@ -159,7 +159,7 @@
 
       // 2. Install Promo Banner
       '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
-      '    <img class="x-alt-promo-img" src="https://images.unsplash.com/photo-1544148103-082857188a3c?w=200&q=80&auto=format&fit=crop" alt="Es Teh" onerror="this.style.display=\'none\'">' +
+      '    <img class="x-alt-promo-img" src="/assets/img/iced-tea.png" alt="Es Teh" onerror="this.style.display=\'none\'">' +
       '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">Install sekarang &amp; dapatkan gratis es teh</div><div class="x-alt-promo-snk">syarat &amp; ketentuan berlaku</div></div>' +
       '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-install">Install</button>' +
       '  </div>' +
