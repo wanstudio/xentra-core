@@ -94,6 +94,32 @@ function handleDeploy(req, res) {
   }
   let extracted = [];
   let errors = [];
+
+  // P1 SECURITY HARDENING: Validate ZIP archive contents against path traversal and malicious paths
+  try {
+    const listOutput = execSync('unzip -Z -1 ' + JSON.stringify(zipPath), { stdio: 'pipe' }).toString();
+    const files = listOutput.split('\n').map(f => f.trim()).filter(Boolean);
+
+    for (const f of files) {
+      // Reject directory traversal (../ or ..\), leading slash / absolute paths, or invalid control characters
+      if (f.includes('..') || f.startsWith('/') || f.startsWith('\\')) {
+        try { fs.unlinkSync(zipPath); } catch (_) {}
+        return res.status(400).json({
+          success: false,
+          error: 'MALICIOUS_ARCHIVE_REJECTED',
+          message: `File path tidak aman ditemukan dalam archive: "${f}" (Path traversal prohibited).`
+        });
+      }
+    }
+  } catch (inspectErr) {
+    try { fs.unlinkSync(zipPath); } catch (_) {}
+    return res.status(400).json({
+      success: false,
+      error: 'INVALID_ARCHIVE',
+      message: 'Gagal memvalidasi isi file ZIP: ' + inspectErr.message
+    });
+  }
+
   for (const dest of candidates) {
     try {
       if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
@@ -196,7 +222,7 @@ app.get('*', (req, res) => {
   res.sendFile(pwaIndex, (err) => {
     if (err) {
       res.json({
-        system: 'Xentra Core Engine v2.0',
+        system: 'Xentra Core Standalone Engine v2.2.5',
         message: 'Customer PWA is initializing. API is ready at /api/v1'
       });
     }

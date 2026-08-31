@@ -1046,14 +1046,16 @@ router.put('/admin/products/:id', (req, res) => {
 
 router.patch('/admin/products/:id/toggle', (req, res) => {
   try {
-    try {
-      db.prepare(`
-        UPDATE products 
-        SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END,
-            updated_at = datetime('now')
-        WHERE id = ? AND brand_id = ?
-      `).run(req.params.id, req.brand_id);
-    } catch (_) {}
+    const stmt = db.prepare(`
+      UPDATE products 
+      SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END,
+          updated_at = datetime('now')
+      WHERE id = ? AND brand_id = ?
+    `).run(req.params.id, req.brand_id);
+
+    if (!stmt || stmt.changes === 0) {
+      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan atau tidak berubah.' });
+    }
 
     res.json({ success: true, message: 'Status ketersediaan menu berhasil diubah.' });
   } catch (err) {
@@ -1063,9 +1065,10 @@ router.patch('/admin/products/:id/toggle', (req, res) => {
 
 router.delete('/admin/products/:id', (req, res) => {
   try {
-    try {
-      db.prepare('DELETE FROM products WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
-    } catch (_) {}
+    const stmt = db.prepare('DELETE FROM products WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
+    if (!stmt || stmt.changes === 0) {
+      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+    }
     res.json({ success: true, message: 'Menu berhasil dihapus.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
