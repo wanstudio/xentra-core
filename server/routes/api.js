@@ -241,17 +241,6 @@ router.post('/auth/otp/trust', (req, res) => {
   res.json({ success: true, trusted: true });
 });
 
-// 4.9 Manual / Webhook Catalog Sync from WooCommerce (Protected by requireAuth)
-router.all(['/catalog/sync', '/catalog/refresh'], requireAuth(['owner', 'brand_manager']), async (req, res) => {
-  try {
-    const syncCatalog = require('../database/syncWoo');
-    await syncCatalog(req.brand_id);
-    res.json({ success: true, message: `Catalog synced successfully for brand "${req.brand_id}".` });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 // 5. Menu Catalog & Home
 router.get(['/catalog/menu', '/home'], (req, res) => {
   try {

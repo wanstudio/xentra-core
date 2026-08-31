@@ -8,16 +8,6 @@ dotenv.config();
 // Initialize Database (Native or Portable)
 const db = require('./database/db');
 
-// Auto-sync real WooCommerce catalog from app.mybangjo.com (skip during tests)
-if (process.env.NODE_ENV !== 'test' && !process.env.DB_PATH && !process.env.SKIP_SYNC) {
-  try {
-    const syncCatalog = require('./database/syncWoo');
-    syncCatalog()
-      .then(() => console.log('[Catalog Sync] Auto-synced real WooCommerce categories & products.'))
-      .catch((e) => console.warn('[Catalog Sync]', e.message));
-  } catch (e) {}
-}
-
 const tenantResolver = require('./middleware/tenantResolver');
 const apiRoutes = require('./routes/api');
 const fs = require('fs');
