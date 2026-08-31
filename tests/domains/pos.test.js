@@ -247,7 +247,7 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
   const stockAfterBooking = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
   assert.strictEqual(stockAfterBooking, 48, 'Live stock must not be deducted upon reservation booking');
 
-  // 4. Guest Arrival Lifecycle: POS Check-in converts Reservation into active Dine-In Table Bill
+  // 4. Guest Arrival Lifecycle: POS Check-in converts EXACT SAME ORDER: reservation -> dine_in
   const checkInResult = PosOrderService.checkInReservation({
     reservation_order_id: futurePosResult.order.id,
     table_number: 'Meja 8'
@@ -255,9 +255,16 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
 
   assert.strictEqual(checkInResult.success, true);
   assert.strictEqual(checkInResult.status, 'CHECKED_IN');
-  assert.strictEqual(checkInResult.held_bill.table_number, 'Meja 8');
-  assert.strictEqual(checkInResult.held_bill.status, 'held');
-  assert.strictEqual(checkInResult.held_bill.items.length, 1);
+  assert.strictEqual(checkInResult.order.id, futurePosResult.order.id, 'Must be the exact same order ID');
+  assert.strictEqual(checkInResult.order.order_type, 'dine_in', 'Order type converted in-place to dine_in');
+  assert.strictEqual(checkInResult.order.table_number, 'Meja 8');
+  assert.strictEqual(checkInResult.order.status, 'active_table');
+
+  // Verify in database: Order record was mutated in-place
+  const dbOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(futurePosResult.order.id);
+  assert.strictEqual(dbOrder.order_type, 'dine_in');
+  assert.strictEqual(dbOrder.table_number, 'Meja 8');
+  assert.strictEqual(dbOrder.status, 'active_table');
 });
 
 // ==============================================================================

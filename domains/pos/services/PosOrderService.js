@@ -114,13 +114,13 @@ class PosOrderService {
   }
 
   /**
-   * Checks in a guest reservation upon arrival and opens an active Dine-in table bill.
-   * State Transition: reservation -> checked_in (active dine_in)
+   * Checks in a guest reservation upon arrival and converts the exact same order in-place into active dine_in.
+   * Locked Rule: Must mutate the same order record (order_type: reservation -> dine_in) without creating secondary orders.
    * 
    * @param {Object} params
    * @param {string} params.reservation_order_id - Order ID from original reservation booking
    * @param {string} params.table_number - Allocated dining table
-   * @returns {Object} Active dine_in held table bill
+   * @returns {Object} Active converted dine_in order
    */
   static checkInReservation({ reservation_order_id, table_number }) {
     if (!reservation_order_id || !table_number) {
@@ -136,55 +136,42 @@ class PosOrderService {
       throw new Error(`[PosOrderService] Order ${reservation_order_id} bukan tipe reservation.`);
     }
 
-    const orderItems = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(reservation_order_id);
+    const now = new Date().toISOString();
 
-    // Map order_items to items payload
-    const items = orderItems.map(it => ({
-      product_id: it.product_id,
-      name: it.product_name,
-      quantity: it.quantity,
-      price: it.unit_price,
-      subtotal: it.subtotal
-    }));
-
-    // Open active Dine-In Table Bill on POS
-    const held = PosOrderService.holdOrder({
-      branch_id: order.branch_id,
-      table_number: String(table_number),
-      customer_name: order.customer_name || 'Tamu Reservasi',
-      items: items.length > 0 ? items : [{ product_id: 'dummy', name: 'Alokasi Meja Reservasi', quantity: 1, price: 0 }],
-      order_type: 'dine_in'
-    });
-
-    // Update reservation order status to checked_in
+    // In-place conversion of the SAME order: reservation -> dine_in
     db.prepare(`
       UPDATE orders
-      SET status = 'checked_in', table_number = ?, updated_at = datetime('now')
+      SET order_type = 'dine_in', status = 'active_table', table_number = ?, updated_at = ?
       WHERE id = ?
-    `).run(String(table_number), reservation_order_id);
+    `).run(String(table_number), now, reservation_order_id);
+
+    const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(reservation_order_id);
+    const orderItems = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(reservation_order_id);
 
     // Emit event: pos.reservation.checked_in
     events.EventBus.publish({
       type: 'pos.reservation.checked_in',
       producer: 'pos',
       payload: {
-        reservation_order_id,
-        held_order_id: held.id,
-        branch_id: order.branch_id,
+        order_id: reservation_order_id,
+        order_number: updatedOrder.order_number,
+        branch_id: updatedOrder.branch_id,
         table_number: String(table_number),
-        customer_name: order.customer_name
+        customer_name: updatedOrder.customer_name,
+        order_type: 'dine_in',
+        status: 'active_table'
       }
     }).catch(() => {});
 
     return {
       success: true,
       status: 'CHECKED_IN',
-      held_bill: held,
-      reservation: {
-        id: order.id,
-        order_number: order.order_number,
+      order: {
+        ...updatedOrder,
+        order_type: 'dine_in',
         table_number: String(table_number),
-        status: 'checked_in'
+        status: 'active_table',
+        items: orderItems
       }
     };
   }
