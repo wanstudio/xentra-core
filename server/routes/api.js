@@ -556,17 +556,32 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     for (const item of items) {
       const isPromoFree = String(item.id) === 'promo-es-teh-gratis';
       
-      // P1 TENANT ISOLATION HARDENING: Product lookup MUST be strictly scoped to req.brand_id (NO fallback to global product ID)
-      const prod = isPromoFree ? null : db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(item.id, req.brand_id);
+      // P1 TENANT & BRANCH ISOLATION HARDENING: Product lookup MUST be strictly scoped to req.brand_id AND branch allocation
+      let prod = null;
+      let branchProd = null;
 
-      if (!isPromoFree && !prod) {
-        return res.status(400).json({
-          success: false,
-          error: `Produk "${item.id}" tidak ditemukan pada menu brand ini.`
-        });
+      if (!isPromoFree) {
+        prod = db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(item.id, req.brand_id);
+        if (!prod) {
+          return res.status(400).json({
+            success: false,
+            error: `Produk "${item.id}" tidak ditemukan pada menu brand ini.`
+          });
+        }
+
+        // Check Branch Allocation & Availability
+        branchProd = db.prepare('SELECT * FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch.id, item.id);
+        if (branchProd) {
+          if (branchProd.is_available === 0) {
+            return res.status(400).json({
+              success: false,
+              error: `Produk "${prod.name}" saat ini dinonaktifkan di cabang ${branch.name}.`
+            });
+          }
+        }
       }
 
-      const unitPrice = isPromoFree ? 0 : Number(prod.price);
+      const unitPrice = isPromoFree ? 0 : (branchProd && branchProd.price != null ? Number(branchProd.price) : Number(prod.price));
       const prodName = isPromoFree ? 'Es Teh (Gratis Install)' : prod.name;
       const prodId = isPromoFree ? 'promo-es-teh-gratis' : prod.id;
       
@@ -578,6 +593,17 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           success: false,
           error: `Jumlah pesanan (quantity) untuk produk "${prodName}" harus berupa bilangan bulat positif (> 0).`
         });
+      }
+
+      // Check Realtime Stock at Branch
+      if (!isPromoFree && branchProd && branchProd.stock != null) {
+        const availableStock = Number(branchProd.stock);
+        if (availableStock < qty) {
+          return res.status(400).json({
+            success: false,
+            error: `Stok produk "${prodName}" di cabang ${branch.name} tidak mencukupi (tersedia: ${availableStock}, diminta: ${qty}).`
+          });
+        }
       }
 
       const lineTotal = unitPrice * qty;
