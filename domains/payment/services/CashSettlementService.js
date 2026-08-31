@@ -49,23 +49,20 @@ class CashSettlementService {
     const paymentId = `pay_cash_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
 
-    const existingPayment = db.prepare('SELECT id FROM order_payments WHERE order_id = ?').get(order_id);
-    if (existingPayment) {
-      db.prepare(`
-        UPDATE order_payments
-        SET payment_status = 'settlement',
-            payment_method = 'cash',
-            amount = ?,
-            settled_at = ?,
-            raw_webhook_response = ?,
-            updated_at = ?
-        WHERE order_id = ?
-      `).run(amount, now, JSON.stringify({ amount_tendered: tendered, change, cashier_id, shift_id }), now, order_id);
-    } else {
+    // P1 ATOMIC CONCURRENCY: Execute Cash Settlement in exclusive transaction with atomic UPSERT
+    db.exec('BEGIN IMMEDIATE;');
+    try {
       db.prepare(`
         INSERT INTO order_payments (
           id, order_id, provider, payment_method, amount, payment_status, settled_at, raw_webhook_response, created_at, updated_at
         ) VALUES (?, ?, 'cash', 'cash', ?, 'settlement', ?, ?, ?, ?)
+        ON CONFLICT(order_id) DO UPDATE SET
+          payment_status = 'settlement',
+          payment_method = 'cash',
+          amount = excluded.amount,
+          settled_at = excluded.settled_at,
+          raw_webhook_response = excluded.raw_webhook_response,
+          updated_at = excluded.updated_at
       `).run(
         paymentId,
         order_id,
@@ -75,14 +72,19 @@ class CashSettlementService {
         now,
         now
       );
-    }
 
-    // 2. Update order payment details & status
-    db.prepare(`
-      UPDATE orders
-      SET payment_method = 'cash', status = 'confirmed', updated_at = ?
-      WHERE id = ?
-    `).run(now, order_id);
+      // 2. Update order payment details & status
+      db.prepare(`
+        UPDATE orders
+        SET payment_method = 'cash', status = 'confirmed', updated_at = ?
+        WHERE id = ?
+      `).run(now, order_id);
+
+      db.exec('COMMIT;');
+    } catch (err) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw new Error(`[CashSettlementService] Gagal menyelesaikan pembayaran tunai secara atomik: ${err.message}`);
+    }
 
     // 3. Emit Domain Event: payment.settled
     events.EventBus.publish({

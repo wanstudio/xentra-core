@@ -369,7 +369,7 @@ function initSchema(targetDb) {
 
     CREATE TABLE IF NOT EXISTS order_payments (
       id TEXT PRIMARY KEY,
-      order_id TEXT NOT NULL,
+      order_id TEXT UNIQUE NOT NULL,
       provider TEXT NOT NULL,
       merchant_id TEXT,
       snap_token TEXT,
