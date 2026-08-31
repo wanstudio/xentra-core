@@ -612,11 +612,97 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
   }
 });
 
-// 7. Get Order Details & Live Status
+// In-Memory Token & Session Store with TTL
+const TokenSessionStore = {
+  sessions: new Map(),
+  createSession(user, brand_id, ttlSeconds = 86400) {
+    const token = 'xnt_auth_' + crypto.randomBytes(24).toString('hex');
+    const expiresAt = Date.now() + ttlSeconds * 1000;
+    this.sessions.set(token, {
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+      fullName: user.full_name,
+      role: user.role,
+      brandId: brand_id,
+      expiresAt
+    });
+    return { token, expiresAt };
+  },
+  getSession(token) {
+    if (!token) return null;
+    const session = this.sessions.get(token);
+    if (!session) return null;
+    if (Date.now() > session.expiresAt) {
+      this.sessions.delete(token);
+      return null;
+    }
+    return session;
+  },
+  destroySession(token) {
+    if (token) this.sessions.delete(token);
+  }
+};
+
+// Middleware: Require Authenticated Token
+function requireAuth(allowedRoles = []) {
+  return (req, res, next) => {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : (req.headers['x-auth-token'] || req.query.auth_token);
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Token otentikasi tidak ditemukan. Silakan login terlebih dahulu.'
+      });
+    }
+
+    const session = TokenSessionStore.getSession(token);
+    if (!session) {
+      return res.status(401).json({
+        success: false,
+        error: 'INVALID_OR_EXPIRED_TOKEN',
+        message: 'Sesi Anda telah kedaluwarsa atau token tidak valid. Silakan login kembali.'
+      });
+    }
+
+    // Strict Tenant Isolation: Ensure token brand matches incoming tenant
+    if (session.brandId !== req.brand_id && session.role !== 'owner') {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN_TENANT_ACCESS',
+        message: 'Anda tidak memiliki akses ke tenant brand ini.'
+      });
+    }
+
+    // Role check if specified
+    if (allowedRoles.length > 0 && !allowedRoles.includes(session.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'INSUFFICIENT_PERMISSIONS',
+        message: 'Role Anda tidak memiliki izin untuk mengakses resource ini.'
+      });
+    }
+
+    req.session = session;
+    req.user = session;
+    next();
+  };
+}
+
+// 7. Get Order Details & Live Status (Tenant-Scoped to req.brand_id)
 router.get('/orders/:id', (req, res) => {
-  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
+  // P1 TENANT ISOLATION: Join branches to strictly verify brand ownership
+  const order = db.prepare(`
+    SELECT o.*, b.brand_id 
+    FROM orders o
+    JOIN branches b ON b.id = o.branch_id
+    WHERE o.id = ? AND b.brand_id = ?
+  `).get(req.params.id, req.brand_id);
+
   if (!order) {
-    return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
+    return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan pada brand ini.' });
   }
 
   const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
@@ -634,16 +720,16 @@ router.get('/orders/:id', (req, res) => {
   });
 });
 
-// 8. Kitchen Display Queue
-router.get('/kitchen/queue', (req, res) => {
+// 8. Kitchen Display Queue (Strictly Tenant-Scoped to req.brand_id)
+router.get('/kitchen/queue', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
   const branch_id = req.query.branch_id;
   let sql = `
-    SELECT o.*, b.name as branch_name 
+    SELECT o.*, b.name as branch_name, b.brand_id
     FROM orders o
     JOIN branches b ON b.id = o.branch_id
-    WHERE o.status IN ('confirmed', 'preparing', 'ready')
+    WHERE b.brand_id = ? AND o.status IN ('confirmed', 'preparing', 'ready')
   `;
-  const params = [];
+  const params = [req.brand_id];
 
   if (branch_id) {
     sql += ' AND o.branch_id = ?';
@@ -663,10 +749,27 @@ router.get('/kitchen/queue', (req, res) => {
   res.json({ success: true, orders: enriched });
 });
 
-// 9. Update Order Status (Kitchen / Operator)
-router.patch('/kitchen/orders/:id/status', (req, res) => {
+// 9. Update Order Status (Kitchen / Operator with Auth Binding)
+router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager', 'branch_manager', 'kitchen']), (req, res) => {
   try {
-    const { status, actor_type = 'kitchen', actor_id = 'staff_1', note = '' } = req.body;
+    const { status, note = '' } = req.body;
+    
+    // P1 AUTH BINDING: Use authoritative actor identity from authenticated session
+    const actor_type = req.user.role === 'kitchen' ? 'kitchen' : 'staff';
+    const actor_id = req.user.userId || req.user.username;
+
+    // Verify order exists and belongs to current brand before transition
+    const existingOrder = db.prepare(`
+      SELECT o.id, b.brand_id 
+      FROM orders o
+      JOIN branches b ON b.id = o.branch_id
+      WHERE o.id = ? AND b.brand_id = ?
+    `).get(req.params.id, req.brand_id);
+
+    if (!existingOrder) {
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan pada brand ini.' });
+    }
+
     const result = OrderStateMachine.transition({
       order_id: req.params.id,
       target_status: status,
@@ -705,33 +808,25 @@ router.post('/auth/merchant/login', (req, res) => {
       user = db.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id = ?').get(username, username, req.brand_id);
     } catch (_) {}
 
-    // Fallback default admin if first time
-    if (!user && (username === 'admin' || username === 'admin@bangjo.com')) {
-      user = {
-        id: 'usr_bangjo_owner',
-        brand_id: req.brand_id,
-        username: 'admin',
-        email: 'admin@bangjo.com',
-        password_hash: 'bangjo123',
-        full_name: 'Pemilik Toko',
-        role: 'owner'
-      };
-    }
-
     if (!user) {
       return res.status(401).json({ success: false, error: 'Username atau password salah.' });
     }
 
-    // Validate password
-    const valid = user.password_hash === password || user.password_hash === crypto.createHash('sha256').update(password).digest('hex') || password === 'bangjo123';
-    if (!valid) {
-      return res.status(401).json({ success: false, error: 'Password yang Anda masukkan salah.' });
+    // P1 SECURE PASSWORD VERIFICATION: Hash compare against database password_hash (NO bypass passwords)
+    const hashedInput = crypto.createHash('sha256').update(password).digest('hex');
+    const isValid = user.password_hash === password || user.password_hash === hashedInput;
+
+    if (!isValid) {
+      return res.status(401).json({ success: false, error: 'Username atau password salah.' });
     }
 
-    const token = 'xnt_auth_' + crypto.randomBytes(16).toString('hex');
+    // Register active session in TokenSessionStore
+    const { token, expiresAt } = TokenSessionStore.createSession(user, req.brand_id);
+
     res.json({
       success: true,
       token,
+      expires_at: new Date(expiresAt).toISOString(),
       user: {
         id: user.id,
         username: user.username,
@@ -743,19 +838,20 @@ router.post('/auth/merchant/login', (req, res) => {
     });
   } catch (err) {
     console.error('[Merchant Auth Error]:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: 'Terjadi kesalahan sistem saat autentikasi.' });
   }
 });
 
-router.get('/auth/merchant/me', (req, res) => {
+// P1 SECURE ME ENDPOINT: Strictly verifies Bearer token session
+router.get('/auth/merchant/me', requireAuth(), (req, res) => {
   res.json({
     success: true,
     user: {
-      id: 'usr_bangjo_owner',
-      username: 'admin',
-      email: 'admin@bangjo.com',
-      full_name: 'Pemilik Toko',
-      role: 'owner',
+      id: req.user.userId,
+      username: req.user.username,
+      email: req.user.email,
+      full_name: req.user.fullName,
+      role: req.user.role,
       brand_name: req.brand.name
     },
     brand: req.brand
@@ -763,7 +859,7 @@ router.get('/auth/merchant/me', (req, res) => {
 });
 
 /* =========================================================================
-   ADMIN & OWNER DASHBOARD API ENDPOINTS
+   ADMIN & OWNER DASHBOARD API ENDPOINTS (Protected by requireAuth)
    ========================================================================= */
 
 // 11. Admin Brand Profile & Theme

@@ -546,6 +546,17 @@ function seedData(targetDb) {
     defaultBanners
   );
 
+  // Seed default initial merchant owner if users table is empty (SHA-256 hashed)
+  const userCount = targetDb.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ?').get(brandId)?.cnt || 0;
+  if (userCount === 0) {
+    const crypto = require('crypto');
+    const defaultPasswordHash = crypto.createHash('sha256').update('bangjo123').digest('hex');
+    targetDb.prepare(`
+      INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('usr_bangjo_owner', brandId, orgId, 'admin', 'admin@bangjo.com', defaultPasswordHash, 'Pemilik Bangjo', 'owner');
+  }
+
   let branch = null;
   try {
     branch = targetDb.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brandId);

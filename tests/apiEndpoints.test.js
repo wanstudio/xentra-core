@@ -168,6 +168,20 @@ test('API Merchant Auth: POST /api/v1/auth/merchant/login authenticates owner', 
   assert.ok(goodData.token.startsWith('xnt_auth_'));
   assert.strictEqual(goodData.user.username, 'admin');
   assert.strictEqual(goodData.user.role, 'owner');
+
+  // Test /auth/merchant/me with valid Bearer token
+  const meRes = await mockFetch('/api/v1/auth/merchant/me', {
+    headers: { authorization: 'Bearer ' + goodData.token }
+  });
+  assert.strictEqual(meRes.status, 200);
+  const meData = await meRes.json();
+  assert.strictEqual(meData.success, true);
+  assert.strictEqual(meData.user.username, 'admin');
+  assert.strictEqual(meData.user.role, 'owner');
+
+  // Test /auth/merchant/me without token -> 401 Unauthorized
+  const unauthRes = await mockFetch('/api/v1/auth/merchant/me');
+  assert.strictEqual(unauthRes.status, 401);
 });
 
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
