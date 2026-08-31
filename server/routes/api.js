@@ -841,23 +841,26 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       });
     }
 
-    // 5. Payment Resolution
-    let snapResult = { snap_token: null, redirect_url: null, merchant_id: 'midtrans_default' };
-    try {
-      snapResult = await PaymentService.createSnapTransaction(
-        { id: orderId, grand_total: grandTotal, branch_id: branch.id, brand_id: req.brand_id, delivery_fee: deliveryFee, discount_amount: discountAmount },
-        validatedItems,
-        customer
-      );
-    } catch (payErr) {
-      console.warn('[Payment Snap Warn]:', payErr.message);
+    // 5. Payment Resolution (Strictly Isolated by payment_method)
+    let snapResult = { snap_token: null, redirect_url: null, merchant_id: payment_method === 'cash' ? 'cash' : 'midtrans_default' };
+
+    if (payment_method === 'midtrans') {
+      try {
+        snapResult = await PaymentService.createSnapTransaction(
+          { id: orderId, grand_total: grandTotal, branch_id: branch.id, brand_id: req.brand_id, delivery_fee: deliveryFee, discount_amount: discountAmount },
+          validatedItems,
+          customer
+        );
+      } catch (payErr) {
+        console.warn('[Payment Snap Warn]:', payErr.message);
+      }
     }
 
     const paymentId = 'pay_' + crypto.randomBytes(6).toString('hex');
     db.prepare(`
       INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
       VALUES (?, ?, ?, ?, ?, 'pending', ?)
-    `).run(paymentId, orderId, payment_method, snapResult.merchant_id || 'manual', snapResult.snap_token || null, grandTotal);
+    `).run(paymentId, orderId, payment_method, snapResult.merchant_id || (payment_method === 'cash' ? 'cash' : 'manual'), snapResult.snap_token || null, grandTotal);
 
     res.status(201).json({
       success: true,

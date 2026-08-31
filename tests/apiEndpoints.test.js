@@ -73,9 +73,10 @@ test('API GET /api/v1/catalog/menu: returns categories and active menu items', a
   assert.ok(data.all_products.length >= 5);
 });
 
-test('API POST /api/v1/checkout/create-order: validates items and creates order snapshot', async () => {
+test('API POST /api/v1/checkout/create-order: validates items and creates order snapshot (Online Midtrans)', async () => {
   const payload = {
     branch_id: 'branch_bangjo_barat',
+    payment_method: 'midtrans',
     customer: {
       name: 'Budi Santoso',
       phone: '081234567890'
@@ -104,7 +105,39 @@ test('API POST /api/v1/checkout/create-order: validates items and creates order 
   assert.ok(data.order_number.startsWith('XN-'));
   // Subtotal = (35000 * 2) + (15000 * 2) = 70000 + 30000 = 100000
   assert.strictEqual(data.subtotal, 100000);
+  assert.strictEqual(data.payment.method, 'midtrans');
   assert.ok(data.snap_token);
+});
+
+test('API POST /api/v1/checkout/create-order: creates cash order without Midtrans snap token', async () => {
+  const payload = {
+    branch_id: 'branch_bangjo_barat',
+    payment_method: 'cash',
+    customer: {
+      name: 'Budi Santoso',
+      phone: '081234567890'
+    },
+    order_type: 'delivery',
+    delivery: {
+      address: 'Jl. Darmo Permai Selatan No. 12',
+      latitude: -7.291230,
+      longitude: 112.716750
+    },
+    items: [
+      { id: '272', quantity: 1 }
+    ]
+  };
+
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+
+  assert.strictEqual(res.status, 201);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(data.payment.method, 'cash');
+  assert.strictEqual(data.snap_token, null);
 });
 
 test('API Admin: GET & PUT /api/v1/admin/brand updates theme color and logo', async () => {
