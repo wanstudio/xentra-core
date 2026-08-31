@@ -990,58 +990,7 @@ router.get('/auth/merchant/me', requireAuth(), (req, res) => {
   });
 });
 
-/* =========================================================================
-   ADMIN & OWNER DASHBOARD API ENDPOINTS (Protected by requireAuth)
-   ========================================================================= */
 
-// 11. Admin Brand Profile & Theme
-router.get('/admin/brand', (req, res) => {
-  try {
-    let brand = db.prepare('SELECT * FROM brands WHERE id = ?').get(req.brand_id);
-    if (!brand) brand = req.brand;
-    let banners = [];
-    try {
-      banners = brand.banners ? (typeof brand.banners === 'string' ? JSON.parse(brand.banners) : brand.banners) : [];
-    } catch(e) {}
-    if (!Array.isArray(banners) || banners.length === 0) {
-      banners = [
-        {
-          id: 'banner_1',
-          image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80',
-          title: 'Slalu ada sensasi di setiap gigitan',
-          link: '#'
-        },
-        {
-          id: 'banner_2',
-          image_url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80',
-          title: 'Paket Spesial Diskon 20%',
-          link: '#'
-        },
-        {
-          id: 'banner_3',
-          image_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80',
-          title: 'Ayam Tulang Lunak Khas Bangjo',
-          link: '#'
-        }
-      ];
-    }
-    res.json({
-      success: true,
-      brand: {
-        id: brand.id,
-        name: brand.name,
-        slug: brand.slug,
-        logo_url: brand.logo_url || '/assets/pwa/icon-192.png',
-        primary_color: brand.primary_color || '#b6ff00',
-        custom_domain: brand.custom_domain || 'dev.mybangjo.com',
-        tagline: brand.tagline || 'Official Online Food Ordering',
-        banners
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 /* =========================================================================
    ADMIN & OWNER DASHBOARD API ENDPOINTS (Protected by requireAuth)
