@@ -387,12 +387,31 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       };
     }
 
+    // P1 SECURE PAYMENT METHOD VALIDATION: Whitelist only officially supported payment methods
+    const allowedPaymentMethods = ['cash', 'midtrans'];
+    if (!allowedPaymentMethods.includes(payment_method)) {
+      return res.status(400).json({
+        success: false,
+        error: `Metode pembayaran "${payment_method}" tidak valid. Pilihan yang didukung: ${allowedPaymentMethods.join(', ')}.`
+      });
+    }
+
     // Locked Decision: Customer information must be valid
     if (!customer.phone || !customer.phone.trim()) {
       return res.status(400).json({ success: false, error: 'Nomor telepon customer wajib diisi.' });
     }
     if (!customer.name || !customer.name.trim()) {
       return res.status(400).json({ success: false, error: 'Nama customer wajib diisi.' });
+    }
+
+    // P1 LOGIC VALIDATION: For delivery orders, coordinates must be explicitly provided (no silent default location)
+    if (order_type === 'delivery') {
+      if (!delivery || delivery.latitude == null || delivery.longitude == null || isNaN(Number(delivery.latitude)) || isNaN(Number(delivery.longitude))) {
+        return res.status(400).json({
+          success: false,
+          error: 'Titik koordinat pengantaran (latitude & longitude) wajib disertakan untuk pesanan delivery.'
+        });
+      }
     }
 
     // 1. Resolve Branch (Scoped strictly to current brand)
