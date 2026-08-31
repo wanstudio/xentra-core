@@ -5,7 +5,7 @@
  * Performs atomic verification:
  * 1. Final Price Verification: Checks if prices changed since cart was added.
  * 2. Final Stock Verification: Ensures requested quantity is still in stock.
- * 3. Final Availability: Ensures item has not been deactivated by branch.
+ * 3. Final Availability: Strictly enforces branch product assignment & active status (No 999 fake fallback).
  * 4. Branch Low-Stock Threshold: Captures branch manager configured threshold.
  */
 const db = require('../../../server/database/db');
@@ -46,10 +46,11 @@ class PrePaymentVerificationGate {
       const requestedQty = Number(item.quantity) || 1;
       const expectedPrice = Number(item.expected_price ?? item.price);
 
-      // Query raw product and branch record with branch threshold
+      // Query master product joined with branch_products
       const masterProduct = db.prepare(`
         SELECT 
           p.*, 
+          bp.branch_id as bp_branch_id,
           bp.price as branch_raw_price, 
           bp.stock as branch_stock, 
           bp.is_available as branch_availability,
@@ -64,15 +65,21 @@ class PrePaymentVerificationGate {
         continue;
       }
 
-      // Check Master & Branch active status
-      const isAvailable = masterProduct.is_active === 1 && (masterProduct.branch_availability !== 0);
-      if (!isAvailable) {
-        errors.push(`Produk "${masterProduct.name}" saat ini tidak tersedia di cabang ini.`);
+      // STRICT CHECK: Product MUST be explicitly assigned to branch
+      if (!masterProduct.bp_branch_id) {
+        errors.push(`Produk "${masterProduct.name}" belum dialokasikan untuk cabang ini.`);
         continue;
       }
 
-      // 1. Stock Check
-      const currentStock = masterProduct.branch_stock != null ? masterProduct.branch_stock : 999;
+      // Check Master & Branch active status
+      const isAvailable = masterProduct.is_active === 1 && (masterProduct.branch_availability !== 0);
+      if (!isAvailable) {
+        errors.push(`Produk "${masterProduct.name}" saat ini dinonaktifkan di cabang ini.`);
+        continue;
+      }
+
+      // 1. STRICT Stock Check: No 999 fallback! If branch stock is null/undefined, stock is 0.
+      const currentStock = masterProduct.branch_stock != null ? Number(masterProduct.branch_stock) : 0;
       if (currentStock < requestedQty) {
         errors.push(`Stok produk "${masterProduct.name}" tidak mencukupi (Tersedia: ${currentStock}, Diminta: ${requestedQty}).`);
         continue;

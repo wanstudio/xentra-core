@@ -25,7 +25,8 @@ test.before(() => {
       VALUES 
         ('prod_lock', 'brand_test', 'cat_test', 'Ayam Goreng Lock', 'ayam-lock', 25000, 'lock', NULL, NULL, 1),
         ('prod_range', 'brand_test', 'cat_test', 'Bebek Bakar Range', 'bebek-range', 30000, 'range', 28000, 35000, 1),
-        ('prod_limited', 'brand_test', 'cat_test', 'Menu Terbatas', 'menu-terbatas', 50000, 'lock', NULL, NULL, 1)
+        ('prod_limited', 'brand_test', 'cat_test', 'Menu Terbatas', 'menu-terbatas', 50000, 'lock', NULL, NULL, 1),
+        ('prod_unassigned', 'brand_test', 'cat_test', 'Menu Belum Masuk Cabang', 'menu-unassigned', 20000, 'lock', NULL, NULL, 1)
     `).run();
 
     db.prepare(`
@@ -87,9 +88,9 @@ test('Commerce 4 — Catalog Service: formats active menu for UX display', () =>
 });
 
 // ==============================================================================
-// Commerce 5 — Pre-Payment Final Verification Gate (Atomic Stock & Price Check)
+// Commerce 5 — Pre-Payment Final Verification Gate (No 999 fake stock & Price Check)
 // ==============================================================================
-test('Commerce 5 — Pre-Payment Gate: verifies stock, active status, and detects price change', () => {
+test('Commerce 5 — Pre-Payment Gate: verifies stock, rejects unassigned branch products, and detects price change', () => {
   // 1. Valid items pass verification
   const validVerification = PrePaymentVerificationGate.verify({
     brand_id: 'brand_test',
@@ -103,7 +104,19 @@ test('Commerce 5 — Pre-Payment Gate: verifies stock, active status, and detect
   assert.strictEqual(validVerification.status, 'VERIFIED');
   assert.strictEqual(validVerification.verified_items.length, 2);
 
-  // 2. Price change detection (e.g. customer cart had stale 30000 instead of 32000)
+  // 2. Unassigned product rejection (No 999 fake fallback!)
+  const unassignedVerification = PrePaymentVerificationGate.verify({
+    brand_id: 'brand_test',
+    branch_id: 'branch_test',
+    items: [
+      { product_id: 'prod_unassigned', quantity: 1, expected_price: 20000 }
+    ]
+  });
+  assert.strictEqual(unassignedVerification.is_valid, false);
+  assert.strictEqual(unassignedVerification.status, 'PRODUCT_UNAVAILABLE');
+  assert.ok(unassignedVerification.errors[0].includes('belum dialokasikan'));
+
+  // 3. Price change detection (e.g. customer cart had stale 30000 instead of 32000)
   const stalePriceVerification = PrePaymentVerificationGate.verify({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
@@ -116,7 +129,7 @@ test('Commerce 5 — Pre-Payment Gate: verifies stock, active status, and detect
   assert.strictEqual(stalePriceVerification.price_diffs.length, 1);
   assert.strictEqual(stalePriceVerification.price_diffs[0].difference, 2000);
 
-  // 3. Out of stock detection (requested 10 when stock is 4)
+  // 4. Out of stock detection (requested 10 when stock is 4)
   const outOfStockVerification = PrePaymentVerificationGate.verify({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
@@ -129,9 +142,9 @@ test('Commerce 5 — Pre-Payment Gate: verifies stock, active status, and detect
 });
 
 // ==============================================================================
-// Commerce 6 — Order Placement: Atomic Stock Deduction & Branch Dynamic Threshold Warning
+// Commerce 6 — Order Placement: Guarded Stock Deduction, Rollback & Dynamic Threshold
 // ==============================================================================
-test('Commerce 6 — Order Placement: deducts live stock and uses branch manager threshold for warnings', async () => {
+test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell prevention, and dynamic warning', async () => {
   let lowStockEventReceived = null;
   let orderPlacedEventReceived = null;
 
@@ -147,7 +160,7 @@ test('Commerce 6 — Order Placement: deducts live stock and uses branch manager
   const initialBranchRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
   assert.strictEqual(initialBranchRow.stock, 4);
 
-  // Customer places order of 2 items
+  // Customer A places order of 2 items
   const orderResult = await OrderPlacementService.submitOrder({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
@@ -163,21 +176,27 @@ test('Commerce 6 — Order Placement: deducts live stock and uses branch manager
   assert.strictEqual(orderResult.success, true);
   assert.strictEqual(orderResult.order.grand_total, 110000);
 
-  // 1. Verify Stock actually decremented in database
+  // 1. Verify Stock actually decremented in database to 2
   const updatedBranchRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
   assert.strictEqual(updatedBranchRow.stock, 2, 'Live stock must be decremented from 4 to 2');
 
-  // 2. Verify subsequent order exceeding remaining stock fails (Overselling prevention)
-  const subsequentOrder = PrePaymentVerificationGate.verify({
+  // 2. Concurrency Guard verification: Simulating race condition where stock is depleted
+  // If another concurrent request tries to deduct 3 when only 2 remain, transaction fails and rolls back
+  const raceResult = await OrderPlacementService.submitOrder({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
-    items: [{ product_id: 'prod_limited', quantity: 3, expected_price: 50000 }] // requested 3 when only 2 remain
+    customer: { name: 'Customer Race', phone: '6288888888' },
+    items: [{ product_id: 'prod_limited', quantity: 3, expected_price: 50000 }]
   });
-  assert.strictEqual(subsequentOrder.is_valid, false);
-  assert.strictEqual(subsequentOrder.status, 'OUT_OF_STOCK');
+  assert.strictEqual(raceResult.success, false);
+  assert.strictEqual(raceResult.status, 'OUT_OF_STOCK');
+
+  // Stock remains untampered at 2 after failed attempt
+  const finalStockRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
+  assert.strictEqual(finalStockRow.stock, 2);
 
   // 3. Verify Branch Manager Configured Threshold (8) was used for warning
   assert.ok(lowStockEventReceived);
   assert.strictEqual(lowStockEventReceived.payload.remaining_stock, 2);
-  assert.strictEqual(lowStockEventReceived.payload.threshold, 8, 'Must use branch manager threshold (8), not hardcoded 5');
+  assert.strictEqual(lowStockEventReceived.payload.threshold, 8, 'Must use branch manager threshold (8)');
 });

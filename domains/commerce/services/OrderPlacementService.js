@@ -1,7 +1,7 @@
 /**
  * Xentra Commerce Order Placement Service
- * Handles customer order submission, pre-payment verification, atomic stock deduction,
- * order snapshot creation, and distributed event dispatching.
+ * Handles customer order submission with ACID database transactions, optimistic concurrency guards,
+ * dynamic branch low-stock thresholds, and distributed event dispatching.
  */
 const crypto = require('crypto');
 const db = require('../../../server/database/db');
@@ -11,7 +11,7 @@ const LowStockThresholdModel = require('../models/LowStockThresholdModel');
 
 class OrderPlacementService {
   /**
-   * Submits a customer order with strict pre-payment verification and atomic stock deduction.
+   * Submits a customer order with strict pre-payment verification, ACID transaction, and concurrency guard.
    * 
    * @param {Object} params
    * @param {string} params.brand_id
@@ -58,64 +58,86 @@ class OrderPlacementService {
     const now = new Date().toISOString();
     const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`;
 
-    // 2. Atomic Database Transaction: Order Snapshot + Order Items + Stock Deduction
-    const insertOrder = db.prepare(`
+    // 2. Prepared Statements for Transaction
+    const insertOrderStmt = db.prepare(`
       INSERT INTO orders (
         id, order_number, brand_id, branch_id, customer_name, customer_phone,
         order_type, subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, 'delivery', ?, ?, ?, ?, 'pending', ?, ?, ?)
     `);
 
-    const insertOrderItem = db.prepare(`
+    const insertOrderItemStmt = db.prepare(`
       INSERT INTO order_items (
         id, order_id, product_id, product_name, unit_price, quantity, subtotal
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
-    const deductStock = db.prepare(`
+    // Guarded Conditional Deduction: WHERE stock >= ? prevents overselling even under high concurrency
+    const guardedDeductStockStmt = db.prepare(`
       UPDATE branch_products
       SET stock = stock - ?, updated_at = datetime('now')
-      WHERE branch_id = ? AND product_id = ?
+      WHERE branch_id = ? AND product_id = ? AND stock >= ?
     `);
 
-    insertOrder.run(
-      orderId,
-      orderNumber,
-      brand_id,
-      branch_id,
-      customer.name || 'Pelanggan',
-      customer.phone || '',
-      subtotal,
-      delivery_fee,
-      grandTotal,
-      payment_method,
-      notes,
-      now,
-      now
-    );
+    // 3. Execute Transaction
+    try {
+      db.exec('BEGIN TRANSACTION;');
 
-    for (const item of verifiedItems) {
-      const itemId = `item_${crypto.randomBytes(6).toString('hex')}`;
-      insertOrderItem.run(
-        itemId,
+      insertOrderStmt.run(
         orderId,
-        item.product_id,
-        item.name,
-        item.unit_price,
-        item.quantity,
-        item.subtotal
+        orderNumber,
+        brand_id,
+        branch_id,
+        customer.name || 'Pelanggan',
+        customer.phone || '',
+        subtotal,
+        delivery_fee,
+        grandTotal,
+        payment_method,
+        notes,
+        now,
+        now
       );
 
-      // Deduct stock in branch_products atomically
-      deductStock.run(item.quantity, branch_id, item.product_id);
+      for (const item of verifiedItems) {
+        const itemId = `item_${crypto.randomBytes(6).toString('hex')}`;
+        insertOrderItemStmt.run(
+          itemId,
+          orderId,
+          item.product_id,
+          item.name,
+          item.unit_price,
+          item.quantity,
+          item.subtotal
+        );
 
-      // Evaluate Low-Stock Warning using Branch Manager's actual configured threshold
+        // Optimistic concurrency guard: Ensure stock is still available at exact deduction execution
+        const deductResult = guardedDeductStockStmt.run(item.quantity, branch_id, item.product_id, item.quantity);
+        if (!deductResult || deductResult.changes === 0) {
+          throw new Error(`[CONCURRENCY_RACE] Stok untuk produk "${item.name}" baru saja habis atau tidak mencukupi.`);
+        }
+      }
+
+      db.exec('COMMIT;');
+    } catch (txErr) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      return {
+        success: false,
+        status: 'OUT_OF_STOCK',
+        errors: [txErr.message || 'Terjadi kegagalan pemesanan karena perubahan ketersediaan stok.'],
+        price_diffs: []
+      };
+    }
+
+    // 4. Low-stock evaluation & Event Dispatching (After Transaction Commit)
+    for (const item of verifiedItems) {
       const remainingStock = item.current_stock - item.quantity;
-      const branchThreshold = item.branch_low_stock_threshold != null ? item.branch_low_stock_threshold : LowStockThresholdModel.DEFAULT_THRESHOLD;
+      const branchThreshold = item.branch_low_stock_threshold != null 
+        ? item.branch_low_stock_threshold 
+        : LowStockThresholdModel.DEFAULT_THRESHOLD;
       const stockEval = LowStockThresholdModel.evaluate(remainingStock, branchThreshold);
 
       if (stockEval.is_low || stockEval.is_out_of_stock) {
-        // Publish decoupled warning event for Inventory / Branch Manager
         events.EventBus.publish({
           type: 'inventory.low_stock_warning',
           producer: 'commerce',
@@ -135,7 +157,7 @@ class OrderPlacementService {
       }
     }
 
-    // 3. Publish Core Event: commerce.order.placed
+    // 5. Publish Core Event: commerce.order.placed
     await events.EventBus.publish({
       type: 'commerce.order.placed',
       producer: 'commerce',
