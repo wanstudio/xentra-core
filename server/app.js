@@ -34,7 +34,7 @@ function checkDeployToken(req) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Standard Middlewares: CORS with explicit origin checks
+// Standard Middlewares: CORS with strict explicit origin checks (No wildcard endsWith)
 const allowedOrigins = [
   'https://app.mybangjo.com',
   'https://dev.mybangjo.com',
@@ -48,8 +48,8 @@ app.use(cors({
     // Allow non-browser / internal server requests (null origin like curl, mobile app webview or SSR)
     if (!origin) return callback(null, true);
     
-    // Check against allowed explicit origins or *.mybangjo.com subdomains
-    if (allowedOrigins.includes(origin) || origin.endsWith('.mybangjo.com')) {
+    // P1 HARDENING: Check against strictly allowed explicit origins only
+    if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     
@@ -95,10 +95,20 @@ function handleDeploy(req, res) {
   let extracted = [];
   let errors = [];
 
-  // P1 SECURITY HARDENING: Validate ZIP archive contents against path traversal and malicious paths
+  // P1 SECURITY HARDENING: Validate ZIP archive contents against path traversal, symlinks, and zip bombs
   try {
     const listOutput = execSync('unzip -Z -1 ' + JSON.stringify(zipPath), { stdio: 'pipe' }).toString();
     const files = listOutput.split('\n').map(f => f.trim()).filter(Boolean);
+
+    // Limit maximum files to prevent decompression resource exhaustion (ZIP Bomb)
+    if (files.length > 5000) {
+      try { fs.unlinkSync(zipPath); } catch (_) {}
+      return res.status(400).json({
+        success: false,
+        error: 'ARCHIVE_TOO_LARGE',
+        message: 'Archive berisi terlalu banyak file (>5000 entries).'
+      });
+    }
 
     for (const f of files) {
       // Reject directory traversal (../ or ..\), leading slash / absolute paths, or invalid control characters

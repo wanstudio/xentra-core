@@ -25,7 +25,12 @@ function tenantResolver(req, res, next) {
           brand = db.prepare('SELECT * FROM brands ORDER BY created_at ASC LIMIT 1').get();
         }
       } catch (dbErr) {
-        console.warn('[TenantResolver DB lookup warn]:', dbErr.message);
+        console.error('[TenantResolver DB lookup failure]:', dbErr.message);
+        return res.status(503).json({
+          success: false,
+          error: 'DATABASE_UNAVAILABLE',
+          message: 'Layanan database tidak tersedia saat menyelesaikan tenant.'
+        });
       }
     }
 
