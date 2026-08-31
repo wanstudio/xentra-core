@@ -178,7 +178,7 @@ test('POS 4 — Held Orders: supports Hold Table, Customer App Item Addition, Sp
 // ==============================================================================
 // POS 5 — Order Settlement (Dine-in, Reservation) & Stock Delegation
 // ==============================================================================
-test('POS 5 — Order Settle: supports dine_in & reservation with exact Commerce stock deduction', async () => {
+test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day rejection & future date acceptance', async () => {
   // Initial stock for prod_pos_1 is 50
   const initialStock = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
   assert.strictEqual(initialStock, 50);
@@ -204,21 +204,44 @@ test('POS 5 — Order Settle: supports dine_in & reservation with exact Commerce
   const stockAfterDineIn = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
   assert.strictEqual(stockAfterDineIn, 48);
 
-  // 2. Settle Table Reservation order
-  const reservationResult = await PosOrderService.settleOrder({
+  // 2. Same-Day Reservation via POS -> STRICTLY REJECTED
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const sameDayPosResult = await PosOrderService.settleOrder({
     brand_id: 'brand_pos',
     branch_id: 'branch_pos',
     order_type: PosOrderService.ORDER_TYPES.RESERVATION,
+    reservation_date: todayStr,
+    guest_count: 4,
     payment_method: 'cash',
     amount_tendered: 20000,
     items: [
-      { product_id: 'prod_pos_1', quantity: 1, expected_price: 20000 } // Rp 20.000
+      { product_id: 'prod_pos_1', quantity: 1, expected_price: 20000 }
+    ]
+  });
+  assert.strictEqual(sameDayPosResult.success, false);
+  assert.strictEqual(sameDayPosResult.status, 'SAME_DAY_RESERVATION_REJECTED');
+
+  // 3. Future-Day Reservation via POS (Tomorrow) -> ACCEPTED
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+
+  const futurePosResult = await PosOrderService.settleOrder({
+    brand_id: 'brand_pos',
+    branch_id: 'branch_pos',
+    order_type: PosOrderService.ORDER_TYPES.RESERVATION,
+    reservation_date: tomorrowStr,
+    guest_count: 4,
+    payment_method: 'cash',
+    amount_tendered: 20000,
+    items: [
+      { product_id: 'prod_pos_1', quantity: 1, expected_price: 20000 }
     ]
   });
 
-  assert.strictEqual(reservationResult.success, true);
-  assert.strictEqual(reservationResult.order.order_type, 'reservation');
-  assert.strictEqual(reservationResult.order.grand_total, 20000);
+  assert.strictEqual(futurePosResult.success, true);
+  assert.strictEqual(futurePosResult.order.order_type, 'reservation');
+  assert.strictEqual(futurePosResult.order.reservation_date, tomorrowStr);
 
   const stockAfterReservation = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
   assert.strictEqual(stockAfterReservation, 47);

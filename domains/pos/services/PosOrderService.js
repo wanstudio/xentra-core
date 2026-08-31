@@ -213,6 +213,8 @@ class PosOrderService {
     order_type = 'dine_in',
     payment_method = 'cash',
     amount_tendered = null,
+    reservation_date = null,
+    guest_count = null,
     customer = {},
     items = []
   }) {
@@ -241,8 +243,11 @@ class PosOrderService {
       delivery_fee: 0,
       payment_method,
       order_channel: 'pos_cashier',
+      order_type,
       fulfillment_type: order_type,
       table_number: tableNumber,
+      reservation_date,
+      guest_count,
       notes: `POS Cashier Order [${order_type}]`,
       trace_context: {
         correlation_id: client_transaction_id || `pos_tx_${Date.now()}`
