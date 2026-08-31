@@ -16,16 +16,21 @@ class PosShiftReportService {
     let whereClauses = [];
     const params = [];
 
+    // P1 MULTI-TENANT ISOLATION: Strictly enforce brand_id scoping
+    if (filter.brand_id) {
+      whereClauses.push('s.branch_id IN (SELECT id FROM branches WHERE brand_id = ?)');
+      params.push(filter.brand_id);
+    }
     if (filter.branch_id) {
-      whereClauses.push('branch_id = ?');
+      whereClauses.push('s.branch_id = ?');
       params.push(filter.branch_id);
     }
     if (filter.start_date) {
-      whereClauses.push('opened_at >= ?');
+      whereClauses.push('s.opened_at >= ?');
       params.push(filter.start_date);
     }
     if (filter.end_date) {
-      whereClauses.push('opened_at <= ?');
+      whereClauses.push('s.opened_at <= ?');
       params.push(filter.end_date);
     }
 
@@ -34,11 +39,11 @@ class PosShiftReportService {
     const summary = db.prepare(`
       SELECT 
         COUNT(*) as total_shifts,
-        COALESCE(SUM(total_cash_sales), 0) as total_cash_sales,
-        COALESCE(SUM(total_cash_in), 0) as total_cash_in,
-        COALESCE(SUM(total_cash_out), 0) as total_cash_out,
-        COALESCE(SUM(variance), 0) as total_variance
-      FROM pos_shifts
+        COALESCE(SUM(s.total_cash_sales), 0) as total_cash_sales,
+        COALESCE(SUM(s.total_cash_in), 0) as total_cash_in,
+        COALESCE(SUM(s.total_cash_out), 0) as total_cash_out,
+        COALESCE(SUM(s.variance), 0) as total_variance
+      FROM pos_shifts s
       ${whereSql}
     `).get(...params);
 

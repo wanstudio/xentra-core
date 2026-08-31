@@ -117,21 +117,36 @@ test('Reporting 3 — Payment Report: aggregates settled funds per provider', ()
 });
 
 // ==============================================================================
-// Reporting 4 — Inventory Report Service (Low-Stock Alerting)
+// Reporting 4 — Inventory Report Service (Low-Stock Alerting & Multi-Tenant Scoping - NEW-01)
 // ==============================================================================
-test('Reporting 4 — Inventory Report: detects low stock items below threshold', () => {
-  const inv = InventoryReportService.getInventoryReport({ branch_id: 'branch_rep_1' });
-  assert.strictEqual(inv.low_stock_alerts.length, 1);
-  assert.strictEqual(inv.low_stock_alerts[0].product_id, 'prod_rep_1');
-  assert.strictEqual(inv.low_stock_alerts[0].current_stock, 3);
-  assert.strictEqual(inv.low_stock_alerts[0].low_stock_threshold, 5);
+test('Reporting 4 — Inventory Report: detects low stock items below threshold with strict brand_id multi-tenant isolation (NEW-01)', () => {
+  // Seed a second brand with low stock to test cross-tenant isolation
+  db.prepare(`INSERT OR IGNORE INTO brands (id, organization_id, name, slug) VALUES ('brand_rep_other', 'org_rep', 'Other Brand', 'other-brand')`).run();
+  db.prepare(`INSERT OR IGNORE INTO branches (id, brand_id, name, slug, whatsapp_number, address_text, latitude, longitude) VALUES ('branch_other_1', 'brand_rep_other', 'Other Branch', 'other-br', '62899999999', 'Jl. Lain', 0, 0)`).run();
+  db.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug) VALUES ('cat_other', 'brand_rep_other', 'Kategori Lain', 'kat-lain')`).run();
+  db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, pricing_mode, is_active) VALUES ('prod_other_1', 'brand_rep_other', 'cat_other', 'Other Product', 'other-p', 20000, 'lock', 1)`).run();
+  db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, low_stock_threshold) VALUES ('branch_other_1', 'prod_other_1', 1, 10)`).run();
+
+  // Query inventory report for brand_rep (without branch_id)
+  const invBrand = InventoryReportService.getInventoryReport({ brand_id: 'brand_rep' });
+  
+  // Must ONLY return low stock items belonging to brand_rep, zero items from brand_rep_other
+  assert.strictEqual(invBrand.low_stock_alerts.length, 1);
+  assert.strictEqual(invBrand.low_stock_alerts[0].product_id, 'prod_rep_1');
+  assert.strictEqual(invBrand.low_stock_alerts[0].current_stock, 3);
+  assert.strictEqual(invBrand.low_stock_alerts[0].low_stock_threshold, 5);
+
+  // Query for branch_rep_1 explicitly
+  const invBranch = InventoryReportService.getInventoryReport({ brand_id: 'brand_rep', branch_id: 'branch_rep_1' });
+  assert.strictEqual(invBranch.low_stock_alerts.length, 1);
+  assert.strictEqual(invBranch.low_stock_alerts[0].product_id, 'prod_rep_1');
 });
 
 // ==============================================================================
-// Reporting 5 — POS Shift Report Service (Cashier Accuracy & Variance)
+// Reporting 5 — POS Shift Report Service (Cashier Accuracy & Multi-Tenant Scoping)
 // ==============================================================================
-test('Reporting 5 — Shift Report: aggregates shift performance and variance', () => {
-  const shiftReport = PosShiftReportService.getShiftReport({ branch_id: 'branch_rep_1' });
+test('Reporting 5 — Shift Report: aggregates shift performance and variance with brand_id scoping', () => {
+  const shiftReport = PosShiftReportService.getShiftReport({ brand_id: 'brand_rep', branch_id: 'branch_rep_1' });
   assert.strictEqual(shiftReport.summary.total_shifts, 1);
   assert.strictEqual(shiftReport.summary.total_cash_sales, 60000);
   assert.strictEqual(shiftReport.summary.total_variance, 0);
