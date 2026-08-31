@@ -105,6 +105,15 @@ class PaymentGatewayService {
       };
     } catch (err) {
       console.error('[PaymentGatewayService] Midtrans Snap error:', err.response?.data || err.message);
+      
+      // P1 PAYMENT GATEWAY HARDENING (FINDING 05): Fail-Closed in Production & Explicit Testing
+      // In production mode, NEVER issue fake simulation tokens on payment gateway exceptions
+      if (isProd || process.env.NODE_ENV === 'production') {
+        const errorDetail = err.response?.data?.error_messages?.join(', ') || err.message;
+        throw new Error(`[Midtrans Gateway Error]: Gagal membuat transaksi pembayaran online (${errorDetail}).`);
+      }
+
+      // Explicit Mock/Sandbox Simulation fallback for local development only
       const simToken = 'sim_snap_' + Date.now();
       return {
         snap_token: simToken,
