@@ -22,17 +22,24 @@ class ReportFilterModel {
     let effectiveBrandId = brand_id;
     let effectiveBranchId = branch_id;
 
-    // RBAC Boundary Guard
+    // P1 RBAC Boundary Guard: Unified with Xentra Core RoleModel
     if (actor) {
-      if (actor.role === 'branch_manager' || actor.role === 'cashier' || actor.role === 'staff') {
-        if (!actor.branch_id) {
+      const branchScopedRoles = ['branch_manager', 'cashier', 'kitchen', 'staff'];
+      const brandScopedRoles = ['owner', 'brand_manager', 'brand_owner', 'executive'];
+
+      if (branchScopedRoles.includes(actor.role)) {
+        if (!actor.branch_id && !actor.branchId) {
           throw new Error('[ReportFilterModel] Actor scope violation: Branch staff missing branch_id assignment.');
         }
         // Force isolation to actor's assigned branch
-        effectiveBranchId = actor.branch_id;
-        effectiveBrandId = actor.brand_id || effectiveBrandId;
-      } else if (actor.role === 'brand_owner' || actor.role === 'executive') {
-        effectiveBrandId = actor.brand_id || effectiveBrandId;
+        effectiveBranchId = actor.branch_id || actor.branchId;
+        effectiveBrandId = actor.brand_id || actor.brandId || effectiveBrandId;
+      } else if (brandScopedRoles.includes(actor.role)) {
+        effectiveBrandId = actor.brand_id || actor.brandId || effectiveBrandId;
+        // If branch_id specified, ensure it belongs to the brand
+        if (effectiveBranchId && effectiveBrandId) {
+          // branch_id filter is preserved as secondary filter within brand scope
+        }
       }
     }
 

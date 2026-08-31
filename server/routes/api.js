@@ -1842,9 +1842,9 @@ router.get('/admin/analytics/summary', requireAuth(['owner', 'brand_manager']), 
   }
 });
 
-// 16. Reporting Domain Single-Entrypoint API
+// 16. Reporting Domain Single-Entrypoint API (Protected with unified Actor RBAC context)
 const { ReportingEngine } = require('../../domains/reporting');
-router.get('/reports/:report_type', requireAuth(['owner', 'brand_manager']), (req, res) => {
+router.get('/reports/:report_type', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
     const { report_type } = req.params;
     const { branch_id, start_date, end_date } = req.query;
@@ -1853,7 +1853,8 @@ router.get('/reports/:report_type', requireAuth(['owner', 'brand_manager']), (re
       brand_id: req.brand_id,
       branch_id: branch_id || req.query.branchId,
       start_date,
-      end_date
+      end_date,
+      actor: req.user
     });
 
     res.json({
