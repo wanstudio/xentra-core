@@ -220,6 +220,7 @@ function initSchema(targetDb) {
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
       organization_id TEXT NOT NULL,
+      branch_id TEXT,
       username TEXT UNIQUE NOT NULL,
       email TEXT,
       password_hash TEXT NOT NULL,
@@ -227,7 +228,8 @@ function initSchema(targetDb) {
       role TEXT DEFAULT 'owner',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS branches (
@@ -506,6 +508,7 @@ function initSchema(targetDb) {
     );
   `);
 
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN branch_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN whatsapp_number TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN brand_id TEXT;'); } catch (e) {}

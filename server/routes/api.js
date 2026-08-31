@@ -922,6 +922,7 @@ const TokenSessionStore = {
       role: user.role,
       brandId: brand_id,
       organizationId: user.organization_id || null,
+      branchId: user.branch_id || null,
       expiresAt
     });
     return { token, expiresAt };
@@ -991,6 +992,20 @@ function requireAuth(allowedRoles = []) {
       });
     }
 
+    // P1 BRANCH SCOPE BOUNDARY ENFORCEMENT (FINDING-01)
+    // Branch-level roles (branch_manager, cashier, kitchen) MUST NOT access branches outside their assigned branch
+    const branchScopedRoles = ['branch_manager', 'cashier', 'kitchen'];
+    if (branchScopedRoles.includes(session.role) && session.branchId) {
+      const requestedBranchId = req.query.branch_id || req.body?.branch_id || req.params?.branch_id;
+      if (requestedBranchId && requestedBranchId !== session.branchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_ACCESS',
+          message: 'Akses ditolak: Anda hanya memiliki izin untuk mengakses cabang yang ditugaskan.'
+        });
+      }
+    }
+
     req.session = session;
     req.user = session;
     next();
@@ -1026,9 +1041,13 @@ router.get('/orders/:id', (req, res) => {
   });
 });
 
-// 8. Kitchen Display Queue (Strictly Tenant-Scoped to req.brand_id)
+// 8. Kitchen Display Queue (Strictly Tenant-Scoped & Branch-Scoped for Operator Roles)
 router.get('/kitchen/queue', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
-  const branch_id = req.query.branch_id;
+  // If user is a branch-level operator, strictly enforce their assigned branch
+  const effectiveBranchId = (['branch_manager', 'cashier', 'kitchen'].includes(req.user.role) && req.user.branchId)
+    ? req.user.branchId
+    : req.query.branch_id;
+
   let sql = `
     SELECT o.*, b.name as branch_name, b.brand_id
     FROM orders o
@@ -1037,9 +1056,9 @@ router.get('/kitchen/queue', requireAuth(['owner', 'brand_manager', 'branch_mana
   `;
   const params = [req.brand_id];
 
-  if (branch_id) {
+  if (effectiveBranchId) {
     sql += ' AND o.branch_id = ?';
-    params.push(branch_id);
+    params.push(effectiveBranchId);
   }
 
   sql += ' ORDER BY o.created_at ASC';
@@ -1055,7 +1074,7 @@ router.get('/kitchen/queue', requireAuth(['owner', 'brand_manager', 'branch_mana
   res.json({ success: true, orders: enriched });
 });
 
-// 9. Update Order Status (Kitchen / Operator with Auth Binding)
+// 9. Update Order Status (Kitchen / Operator with Auth Binding & Branch Guard)
 router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager', 'branch_manager', 'kitchen']), (req, res) => {
   try {
     const { status, note = '' } = req.body;
@@ -1065,15 +1084,24 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
     const actor_id = req.user.userId || req.user.username;
 
     // Verify order exists and belongs to current brand before transition
-    const existingOrder = db.prepare(`
-      SELECT o.id, b.brand_id 
+    let verifySql = `
+      SELECT o.id, o.branch_id, b.brand_id 
       FROM orders o
       JOIN branches b ON b.id = o.branch_id
       WHERE o.id = ? AND b.brand_id = ?
-    `).get(req.params.id, req.brand_id);
+    `;
+    const verifyParams = [req.params.id, req.brand_id];
+
+    // If branch operator, ensure order belongs to their assigned branch
+    if (['branch_manager', 'cashier', 'kitchen'].includes(req.user.role) && req.user.branchId) {
+      verifySql += ' AND o.branch_id = ?';
+      verifyParams.push(req.user.branchId);
+    }
+
+    const existingOrder = db.prepare(verifySql).get(...verifyParams);
 
     if (!existingOrder) {
-      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan pada brand ini.' });
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan pada kewenangan cabang Anda.' });
     }
 
     const result = OrderStateMachine.transition({
@@ -1139,6 +1167,7 @@ router.post('/auth/merchant/login', (req, res) => {
         email: user.email,
         full_name: user.full_name,
         role: user.role,
+        branch_id: user.branch_id || null,
         brand_name: (req.brand && req.brand.name) ? req.brand.name : 'Bangjo Resto'
       }
     });
@@ -1201,6 +1230,7 @@ router.get('/auth/merchant/me', requireAuth(), (req, res) => {
       email: req.user.email,
       full_name: req.user.fullName,
       role: req.user.role,
+      branch_id: req.user.branchId || null,
       brand_name: req.brand ? req.brand.name : 'Bangjo Resto'
     },
     brand: serializePublicBrand(req.brand)
