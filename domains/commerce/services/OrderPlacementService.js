@@ -33,14 +33,13 @@ class OrderPlacementService {
     payment_method = 'qris',
     order_channel = 'customer_app',
     order_type = 'delivery',
-    fulfillment_type = null,
     table_number = null,
     reservation_date = null,
     guest_count = null,
     notes = '',
     trace_context = {}
   }) {
-    const effectiveOrderType = order_type || fulfillment_type || 'delivery';
+    const effectiveOrderType = order_type || 'delivery';
 
     // Strict Validation: Same-Day Reservation Restriction (Operational Risk Control)
     if (effectiveOrderType === 'reservation') {
@@ -95,9 +94,9 @@ class OrderPlacementService {
     const insertOrderStmt = db.prepare(`
       INSERT INTO orders (
         id, order_number, brand_id, branch_id, customer_name, customer_phone,
-        order_type, order_channel, fulfillment_type, table_number,
+        order_type, order_channel, table_number,
         subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
     `);
 
     const insertOrderItemStmt = db.prepare(`
@@ -126,7 +125,6 @@ class OrderPlacementService {
         customer.phone || '',
         effectiveOrderType,
         order_channel,
-        effectiveOrderType,
         table_number,
         subtotal,
         delivery_fee,

@@ -273,7 +273,7 @@ test('POS 6 — Hardware & KDS Router: formats receipt and routes kitchen ticket
     id: 'ord_pos_123',
     order_number: 'ORD-POS-1001',
     grand_total: 40000,
-    fulfillment_type: 'dine_in',
+    order_type: 'dine_in',
     table_number: '12',
     payment_method: 'cash',
     amount_tendered: 50000,

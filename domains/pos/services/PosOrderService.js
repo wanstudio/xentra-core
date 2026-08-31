@@ -320,7 +320,6 @@ class PosOrderService {
       payment_method,
       order_channel: 'pos_cashier',
       order_type,
-      fulfillment_type: order_type,
       table_number: tableNumber,
       reservation_date,
       guest_count,
