@@ -895,6 +895,7 @@ const TokenSessionStore = {
       fullName: user.full_name,
       role: user.role,
       brandId: brand_id,
+      organizationId: user.organization_id || null,
       expiresAt
     });
     return { token, expiresAt };
@@ -937,8 +938,17 @@ function requireAuth(allowedRoles = []) {
       });
     }
 
-    // Strict Tenant Isolation: Ensure token brand matches incoming tenant
-    if (session.brandId !== req.brand_id && session.role !== 'owner') {
+    // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT (SEC-05)
+    // 1. Direct brand match is always allowed
+    // 2. Owner role is only allowed across brands within the SAME organization
+    let isTenantAuthorized = session.brandId === req.brand_id;
+    if (!isTenantAuthorized && session.role === 'owner') {
+      if (session.organizationId && req.brand && req.brand.organization_id) {
+        isTenantAuthorized = session.organizationId === req.brand.organization_id;
+      }
+    }
+
+    if (!isTenantAuthorized) {
       return res.status(403).json({
         success: false,
         error: 'FORBIDDEN_TENANT_ACCESS',
