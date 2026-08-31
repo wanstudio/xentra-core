@@ -390,9 +390,24 @@ function initSchema(targetDb) {
       category_id TEXT NOT NULL,
       PRIMARY KEY (product_id, category_id)
     );
+
+    CREATE TABLE IF NOT EXISTS branch_products (
+      branch_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      price REAL,
+      stock INTEGER DEFAULT 100,
+      is_available INTEGER DEFAULT 1,
+      low_stock_threshold INTEGER DEFAULT 5,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (branch_id, product_id),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
   `);
 
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branches ADD COLUMN whatsapp_number TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN brand_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN slug TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN image_url TEXT;'); } catch (e) {}
@@ -404,6 +419,9 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE products ADD COLUMN image_url TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE products ADD COLUMN image TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE products ADD COLUMN sort_order INTEGER DEFAULT 0;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN pricing_mode TEXT DEFAULT "lock";'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN min_price REAL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN max_price REAL;'); } catch (e) {}
 
   seedData(targetDb);
 }

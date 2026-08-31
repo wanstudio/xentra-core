@@ -1,10 +1,12 @@
 /**
- * Xentra Commerce Domain Entry Point & Self-Registration
- * Self-registers to core/domain DomainRegistry upon initialization.
+ * Xentra Commerce Domain Unified Module Entry
  */
-const { domain, events } = require('../../core');
+const { domain } = require('../../core');
 const PricingPolicyModel = require('./models/PricingPolicyModel');
+const LowStockThresholdModel = require('./models/LowStockThresholdModel');
 const CatalogService = require('./services/CatalogService');
+const PrePaymentVerificationGate = require('./services/PrePaymentVerificationGate');
+const OrderPlacementService = require('./services/OrderPlacementService');
 
 const COMMERCE_IDENTITY = {
   name: 'commerce',
@@ -17,7 +19,8 @@ const COMMERCE_CAPABILITIES = {
   events_produced: [
     'commerce.order.created',
     'commerce.order.placed',
-    'commerce.order.status_changed'
+    'commerce.order.status_changed',
+    'inventory.low_stock_warning'
   ],
   events_consumed: [
     'payment.transaction.settled',
@@ -31,7 +34,9 @@ const COMMERCE_CAPABILITIES = {
   features_provided: [
     'digital_ordering_pwa',
     'branch_catalog_mapping',
-    'pricing_policy_lock_range'
+    'pricing_policy_lock_range',
+    'pre_payment_verification_gate',
+    'low_stock_alert'
   ]
 };
 
@@ -43,7 +48,6 @@ try {
     capabilities: COMMERCE_CAPABILITIES
   });
 } catch (e) {
-  // Graceful fallback if already registered in current process
   registration = domain.DomainRegistry.getDomain('commerce');
 }
 
@@ -52,5 +56,8 @@ module.exports = {
   capabilities: COMMERCE_CAPABILITIES,
   registration,
   PricingPolicyModel,
-  CatalogService
+  LowStockThresholdModel,
+  CatalogService,
+  PrePaymentVerificationGate,
+  OrderPlacementService
 };
