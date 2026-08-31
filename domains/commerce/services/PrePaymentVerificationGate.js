@@ -57,7 +57,15 @@ class PrePaymentVerificationGate {
 
     for (const item of items) {
       const productId = item.product_id || item.id;
-      const requestedQty = Number(item.quantity) || 1;
+      const rawQty = item.quantity != null ? item.quantity : item.qty;
+      const requestedQty = Number(rawQty);
+
+      // P1 DOMAIN INVARIANT GUARD (LOGIC-03): Strictly validate quantity as positive integer > 0
+      if (!Number.isInteger(requestedQty) || requestedQty <= 0) {
+        errors.push(`Kuantitas untuk produk "${item.name || productId}" harus berupa bilangan bulat positif (> 0).`);
+        continue;
+      }
+
       const expectedPrice = Number(item.expected_price ?? item.price);
 
       // Query master product joined with branch_products
