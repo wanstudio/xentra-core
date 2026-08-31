@@ -1077,10 +1077,24 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       if (bannersJson) req.brand.banners = bannersJson;
     }
 
+    let parsedBanners = [];
+    try {
+      parsedBanners = bannersJson ? JSON.parse(bannersJson) : (typeof req.brand.banners === 'string' ? JSON.parse(req.brand.banners) : req.brand.banners);
+    } catch (_) {}
+
     res.json({
       success: true,
       message: 'Pengaturan brand dan tema berhasil diperbarui.',
-      brand: req.brand
+      brand: {
+        id: req.brand.id,
+        name: req.brand.name,
+        slug: req.brand.slug,
+        logo_url: req.brand.logo_url || '/assets/pwa/icon-192.png',
+        primary_color: req.brand.primary_color || '#b6ff00',
+        custom_domain: req.brand.custom_domain || 'dev.mybangjo.com',
+        tagline: req.brand.tagline || 'Official Online Food Ordering',
+        banners: Array.isArray(parsedBanners) ? parsedBanners : []
+      }
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
