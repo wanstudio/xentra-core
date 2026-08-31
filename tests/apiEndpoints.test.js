@@ -233,3 +233,12 @@ test('API Admin Branch Creation: OWNER_WHATSAPP_NUMBER in env does not act as fa
   delete process.env.OWNER_WHATSAPP_NUMBER;
 });
 
+test('API GET /health: returns 200 OK and ready persistence status', async () => {
+  const res = await mockFetch('/health');
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.status, 'ok');
+  assert.strictEqual(data.persistence, 'ready');
+  assert.strictEqual(data.version, '2.2.5');
+});
+

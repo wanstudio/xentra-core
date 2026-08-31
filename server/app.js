@@ -6,7 +6,7 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 // Initialize Database (Native or Portable)
-require('./database/db');
+const db = require('./database/db');
 
 // Auto-sync real WooCommerce catalog from app.mybangjo.com (skip during tests)
 if (process.env.NODE_ENV !== 'test' && !process.env.DB_PATH && !process.env.SKIP_SYNC) {
