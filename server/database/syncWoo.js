@@ -4,14 +4,17 @@
 const axios = require('axios');
 const db = require('./db');
 
-async function syncCatalog() {
+async function syncCatalog(targetBrandId = null) {
   console.log('==> Mengambil kategori & produk live dari app.mybangjo.com...');
 
   const catRes = await axios.get('https://app.mybangjo.com/wp-json/wc/store/v1/products/categories?per_page=100');
   const prodRes = await axios.get('https://app.mybangjo.com/wp-json/wc/store/v1/products?per_page=100');
 
-  const brand = db.prepare("SELECT * FROM brands LIMIT 1").get();
-  const brandId = brand ? brand.id : 'brand_bangjo';
+  let brandId = targetBrandId;
+  if (!brandId) {
+    const brand = db.prepare("SELECT * FROM brands LIMIT 1").get();
+    brandId = brand ? brand.id : 'brand_bangjo';
+  }
 
   console.log('Using Brand ID:', brandId);
 
@@ -34,8 +37,8 @@ async function syncCatalog() {
     sort_order: idx + 1
   }));
 
-  // 3. Clear existing relations
-  db.prepare('DELETE FROM product_categories').run();
+  // 3. Clear existing relations strictly scoped to target brand
+  db.prepare('DELETE FROM product_categories WHERE product_id IN (SELECT id FROM products WHERE brand_id = ?)').run(brandId);
   db.prepare('DELETE FROM products WHERE brand_id = ?').run(brandId);
   db.prepare('DELETE FROM categories WHERE brand_id = ?').run(brandId);
 

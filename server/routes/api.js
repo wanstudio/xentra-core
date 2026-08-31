@@ -149,12 +149,12 @@ router.post('/auth/otp/verify', (req, res) => {
   res.json({ success: true, verified: true });
 });
 
-// 4.9 Manual / Webhook Catalog Sync from WooCommerce
-router.all(['/catalog/sync', '/catalog/refresh'], async (req, res) => {
+// 4.9 Manual / Webhook Catalog Sync from WooCommerce (Protected by requireAuth)
+router.all(['/catalog/sync', '/catalog/refresh'], requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
     const syncCatalog = require('../database/syncWoo');
-    await syncCatalog();
-    res.json({ success: true, message: 'Catalog synced successfully from WooCommerce.' });
+    await syncCatalog(req.brand_id);
+    res.json({ success: true, message: `Catalog synced successfully for brand "${req.brand_id}".` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
