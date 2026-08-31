@@ -177,6 +177,60 @@ class PosOrderService {
   }
 
   /**
+   * Cancels an overdue reservation when guest does not arrive within the configured grace period (No-Show).
+   * Locked Rule: Reservation is cancelled without automatic stock mutation.
+   * 
+   * @param {Object} params
+   * @param {string} params.reservation_order_id
+   * @param {string} [params.actor_id] - Manager or staff who executes the cancellation
+   * @param {string} [params.reason='No-Show: Melewati batas toleransi kedatangan']
+   * @returns {Object} Cancelled reservation order result
+   */
+  static cancelNoShowReservation({ reservation_order_id, actor_id = 'branch_manager', reason = 'No-Show: Melewati batas toleransi kedatangan' }) {
+    if (!reservation_order_id) {
+      throw new Error('[PosOrderService] "reservation_order_id" is required.');
+    }
+
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(reservation_order_id);
+    if (!order) {
+      throw new Error(`[PosOrderService] Data reservasi dengan ID ${reservation_order_id} tidak ditemukan.`);
+    }
+
+    if (order.order_type !== 'reservation') {
+      throw new Error(`[PosOrderService] Order ${reservation_order_id} bukan tipe reservation.`);
+    }
+
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE orders
+      SET status = 'cancelled', order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ?
+      WHERE id = ?
+    `).run(reason, now, reservation_order_id);
+
+    // Emit event: pos.reservation.no_show_cancelled
+    events.EventBus.publish({
+      type: 'pos.reservation.no_show_cancelled',
+      producer: 'pos',
+      payload: {
+        order_id: reservation_order_id,
+        order_number: order.order_number,
+        branch_id: order.branch_id,
+        actor_id,
+        reason
+      }
+    }).catch(() => {});
+
+    return {
+      success: true,
+      status: 'CANCELLED_NO_SHOW',
+      order_id: reservation_order_id,
+      order_number: order.order_number,
+      reason
+    };
+  }
+
+  /**
    * Splits a held bill into two separate bills.
    * 
    * @param {Object} params

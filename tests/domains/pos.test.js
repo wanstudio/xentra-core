@@ -250,21 +250,45 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
   // 4. Guest Arrival Lifecycle: POS Check-in converts EXACT SAME ORDER: reservation -> dine_in
   const checkInResult = PosOrderService.checkInReservation({
     reservation_order_id: futurePosResult.order.id,
-    table_number: 'Meja 8'
+    table_number: '12'
   });
 
   assert.strictEqual(checkInResult.success, true);
   assert.strictEqual(checkInResult.status, 'CHECKED_IN');
-  assert.strictEqual(checkInResult.order.id, futurePosResult.order.id, 'Must be the exact same order ID');
-  assert.strictEqual(checkInResult.order.order_type, 'dine_in', 'Order type converted in-place to dine_in');
-  assert.strictEqual(checkInResult.order.table_number, 'Meja 8');
-  assert.strictEqual(checkInResult.order.status, 'active_table');
+  assert.strictEqual(checkInResult.order.id, futurePosResult.order.id, 'Must keep the exact same order ID');
+  assert.strictEqual(checkInResult.order.order_type, 'dine_in');
+  assert.strictEqual(checkInResult.order.table_number, '12');
 
-  // Verify in database: Order record was mutated in-place
+  // Verify database record has been mutated in-place
   const dbOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(futurePosResult.order.id);
   assert.strictEqual(dbOrder.order_type, 'dine_in');
-  assert.strictEqual(dbOrder.table_number, 'Meja 8');
+  assert.strictEqual(dbOrder.table_number, '12');
   assert.strictEqual(dbOrder.status, 'active_table');
+
+  // 5. No-Show Grace Period Exceeded: Manager Cancels Overdue Reservation
+  const overdueRes = await PosOrderService.settleOrder({
+    brand_id: 'brand_pos',
+    branch_id: 'branch_pos',
+    order_type: PosOrderService.ORDER_TYPES.RESERVATION,
+    reservation_date: tomorrowStr,
+    guest_count: 2,
+    payment_method: 'cash',
+    amount_tendered: 20000,
+    items: [{ product_id: 'prod_pos_1', quantity: 1, expected_price: 20000 }]
+  });
+
+  const cancelResult = PosOrderService.cancelNoShowReservation({
+    reservation_order_id: overdueRes.order.id,
+    actor_id: 'manager_branch_pos',
+    reason: 'Toleransi 60 menit terlewat tanpa check-in (No-Show)'
+  });
+
+  assert.strictEqual(cancelResult.success, true);
+  assert.strictEqual(cancelResult.status, 'CANCELLED_NO_SHOW');
+
+  const cancelledDbOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(overdueRes.order.id);
+  assert.strictEqual(cancelledDbOrder.status, 'cancelled');
+  assert.ok(cancelledDbOrder.order_note.includes('No-Show'));
 });
 
 // ==============================================================================
