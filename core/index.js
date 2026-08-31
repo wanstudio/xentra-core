@@ -12,11 +12,13 @@ const identity = require('./identity');
 const config = require('./config');
 const integration = require('./integration');
 const audit = require('./audit');
+const domain = require('./domain');
 
 module.exports = {
   events,
   identity,
   config,
   integration,
-  audit
+  audit,
+  domain
 };
