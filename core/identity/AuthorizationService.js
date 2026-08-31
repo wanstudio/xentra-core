@@ -63,26 +63,45 @@ class AuthorizationService {
   /**
    * Evaluates whether a role assignment's scope strictly covers the target resource context.
    */
-  static _matchesScope(assignment, target, orgHierarchy = null) {
-    // 1. Global scope allows access everywhere
-    if (assignment.scope_type === 'global' || !assignment.scope_type) {
+  static _matchesScope(assignment, target = {}, orgHierarchy = null) {
+    if (!assignment || !assignment.scope_type) {
+      // P1 SECURITY HARDENING: Fail-Closed. Missing scope_type is strictly DENIED (never assumed global)
+      return false;
+    }
+
+    // 1. Explicit Global Scope allows access everywhere
+    if (assignment.scope_type === 'global') {
       return true;
     }
 
-    // 2. Organization Scope
+    // 2. Organization Scope: Must match organization_id or child brand/branch via verified hierarchy
     if (assignment.scope_type === 'organization') {
-      // Must match organization_id if specified, or if hierarchy exists verify brand/branch belongs to this org
+      if (!assignment.scope_id) return false;
+
+      // Direct organization match
       if (target.organization_id) {
         return target.organization_id === assignment.scope_id;
       }
+      // Child brand match via hierarchy
       if (target.brand_id && orgHierarchy) {
         return orgHierarchy.isBrandInOrganization(target.brand_id, assignment.scope_id);
       }
-      return Boolean(assignment.scope_id);
+      // Child branch match via hierarchy (branch belongs to a brand in this org)
+      if (target.branch_id && orgHierarchy) {
+        const branchBrand = orgHierarchy.getBranchBrandId ? orgHierarchy.getBranchBrandId(target.branch_id) : null;
+        if (branchBrand) {
+          return orgHierarchy.isBrandInOrganization(branchBrand, assignment.scope_id);
+        }
+      }
+
+      // P1 SECURITY HARDENING: Fail-Closed. If target context is empty or unverifiable, strictly DENY
+      return false;
     }
 
     // 3. Brand Scope
     if (assignment.scope_type === 'brand') {
+      if (!assignment.scope_id) return false;
+
       // Direct brand match
       if (target.brand_id && target.brand_id === assignment.scope_id) {
         return true;
@@ -95,13 +114,14 @@ class AuthorizationService {
       if (target.branch_id && !target.brand_id && !orgHierarchy) {
         return false;
       }
-      return target.brand_id === assignment.scope_id;
+      return Boolean(target.brand_id && target.brand_id === assignment.scope_id);
     }
 
     // 4. Branch Scope
     if (assignment.scope_type === 'branch') {
+      if (!assignment.scope_id) return false;
       // Strictly requires target.branch_id and must match assignment.scope_id
-      return target.branch_id ? target.branch_id === assignment.scope_id : false;
+      return Boolean(target.branch_id && target.branch_id === assignment.scope_id);
     }
 
     return false;

@@ -252,6 +252,38 @@ test('B5 — Authorization Service: strict decision matrix (same scope, child sc
     target_context: { branch_id: 'branch_surabaya' }
   });
   assert.strictEqual(noPerm.allowed, false);
+
+  // 7. P1 SECURITY TEST: Organization Scope with empty/unverifiable target context -> MUST FAIL-CLOSED (DENY)
+  const orgUser = new IdentityModel({ username: 'org_admin', status: 'active' });
+  const orgAssignments = [{
+    user_id: orgUser.id,
+    role: 'owner',
+    scope_type: 'organization',
+    scope_id: 'org_bangjo'
+  }];
+
+  const orgEmptyContext = AuthorizationService.authorize({
+    identity: orgUser,
+    assignments: orgAssignments,
+    required_permission: 'org:manage',
+    target_context: {} // Empty target context without organization_id or verifiable brand
+  });
+  assert.strictEqual(orgEmptyContext.allowed, false, 'Organization scope with empty target context must fail-closed (DENY)');
+
+  // 8. Missing/Undefined scope_type in assignment -> MUST FAIL-CLOSED (DENY, never assumed global)
+  const invalidScopeAssignment = [{
+    user_id: orgUser.id,
+    role: 'owner',
+    scope_type: undefined,
+    scope_id: 'org_bangjo'
+  }];
+  const invalidScopeResult = AuthorizationService.authorize({
+    identity: orgUser,
+    assignments: invalidScopeAssignment,
+    required_permission: 'org:manage',
+    target_context: { organization_id: 'org_bangjo' }
+  });
+  assert.strictEqual(invalidScopeResult.allowed, false, 'Missing scope_type must fail-closed (DENY)');
 });
 
 // ==============================================================================
