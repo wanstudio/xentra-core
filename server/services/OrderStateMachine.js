@@ -48,19 +48,28 @@ class OrderStateMachine {
       );
     }
 
-    // 1. Update order status
-    db.prepare(`
-      UPDATE orders 
-      SET status = ?, updated_at = datetime('now')
-      WHERE id = ?
-    `).run(target_status, order_id);
+    // P1 ATOMIC DATA-INTEGRITY: Execute status mutation and audit logging in a single ACID transaction
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      // 1. Update order status
+      db.prepare(`
+        UPDATE orders 
+        SET status = ?, updated_at = datetime('now')
+        WHERE id = ?
+      `).run(target_status, order_id);
 
-    // 2. Insert audit log
-    const logId = 'log_' + crypto.randomBytes(8).toString('hex');
-    db.prepare(`
-      INSERT INTO order_status_logs (id, order_id, previous_status, new_status, actor_type, actor_id, note)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(logId, order_id, currentStatus, target_status, actor_type, actor_id, note);
+      // 2. Insert audit log
+      const logId = 'log_' + crypto.randomBytes(8).toString('hex');
+      db.prepare(`
+        INSERT INTO order_status_logs (id, order_id, previous_status, new_status, actor_type, actor_id, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(logId, order_id, currentStatus, target_status, actor_type, actor_id, note);
+
+      db.exec('COMMIT;');
+    } catch (txErr) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw new Error(`Gagal memperbarui status pesanan secara atomik: ${txErr.message}`);
+    }
 
     return {
       success: true,
