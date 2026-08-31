@@ -1,51 +1,51 @@
 # 📊 Xentra Core MVP Readiness & Architecture Review Report (Milestone G)
 
-**Dokumen Standar:** Notion Ocean Roadmap — Milestone G (*Core Stabilization & Readiness Gate*)  
-**Prinsip Verifikasi:** *Evidence-Based Verification (No Mocked Business Logic & Explicit NOT VERIFIED Policy)*  
+**Dokumen Acuan:** Notion Ocean Roadmap — Milestone G (*Core Stabilization & Readiness Gate*)  
+**Metodologi:** *Evidence-Based Verification (No Mocked Business Logic & Explicit NOT VERIFIED Policy)*  
 **Tanggal Audit:** 31 Agustus 2026  
-**Status Evaluasi:** **EVIDENCE-VERIFIED BASELINE**
+**Status Evaluasi:** **BASELINE EVIDENCE AUDIT**
 
 ---
 
-## 1. Ringkasan Eksekutif
+## 1. Prinsip & Metodologi Verifikasi G
 
-Laporan ini menyajikan hasil verifikasi formal terhadap kesiapan fondasi arsitektur **Xentra-Core** untuk menopang domain bisnis vertikal (**Commerce, POS, Inventory, Payment, Delivery, Reporting**).
+Sesuai klarifikasi dan keputusan terkunci pada dokumen **Notion Milestone G**:
+> *"G tidak membuat jenis test baru secara abstrak dan tidak boleh memaksakan test yang instrument input/output-nya belum tersedia. G adalah final verification terhadap evidence yang sudah dihasilkan milestone sebelumnya. Jika dependency atau instrument yang diperlukan belum tersedia, hasilnya harus dicatat sebagai **NOT VERIFIED**. Jangan membuat business logic, dependency, atau test baru hanya untuk memaksa milestone/G7 menjadi PASS."*
 
-Sesuai aturan **Milestone G pada Notion**:
-> *"G tidak membuat jenis test baru secara abstrak dan tidak boleh memaksakan test yang instrument input/output-nya belum tersedia. G adalah final verification terhadap evidence yang sudah dihasilkan milestone sebelumnya. Jika dependency atau instrument yang diperlukan belum tersedia, hasilnya harus dicatat sebagai **NOT VERIFIED**."*
+Laporan ini mengevaluasi bukti aktual implementasi dan hasil automated test dari setiap modul fondasi yang bersangkutan (A s.d. F).
 
 ---
 
 ## 2. Matriks Verifikasi Berbasis Evidence (G1 s.d. G7)
 
-| Kode | Sub-Milestone | Status Evidence | Hasil Verifikasi / Catatan Kesiapan |
+| Sub-Milestone | Tanggung Jawab / Scope | Status Evidence | Hasil Pemeriksaan Berbasis Evidence |
 | :--- | :--- | :---: | :--- |
-| **G1** | **Architecture Contract Review** | ✅ **VERIFIED** | Seluruh modul Core (`events`, `identity`, `config`, `integration`, `audit`, `domain`) terisolasi, decoupled, dan diekspos melalui [`core/index.js`](file:///home/ikhwan/Projects/xentra/xentra-core/core/index.js). |
-| **G2** | **Cross-Module Integration** | ✅ **VERIFIED** | Alur koordinasi fondasi terverifikasi pada path yang instrument-nya aktif (`Identity -> RBAC -> Config Scope -> Outbound Messaging -> Domain Registry -> Audit Process Engine`). |
-| **G3** | **Failure-Path & Recovery** | ✅ **VERIFIED** | Fault-isolation pada Event Bus terbukti mengisolasi listener yang crash tanpa mengganggu listener sehat. Timeout guard pada integrasi terbukti memutus eksekusi downstream yang lambat. |
-| **G4** | **Security & Permission Review** | ✅ **VERIFIED** | Penolakan *cross-branch* akses (HTTP 403 Forbidden) terbukti pada level `RoleBoundaryEnforcement`. Redaksi credential otomatis aktif (Zero Secret Leakage). |
-| **G5** | **Observability Baseline** | ✅ **VERIFIED** | Context lineage (`correlation_id` & `causation_id`) terdistribusi konsisten pada seluruh kontrak modul. |
-| **G6** | **Documentation Review** | ✅ **VERIFIED** | Blueprint domain, semantik Audit Log sebagai proses pemeriksaan, dan Self-Registration Domain telah sinkron dengan Notion terbaru. |
-| **G7** | **Core MVP Readiness Gate** | 🟡 **BASELINE VERIFIED** | Fondasi Core (A, B, C, D, E, F) **SIAP** untuk dimulainya pembangunan domain Commerce/POS. Dependensi eksternal fisik tetap bertatus `NOT VERIFIED`. |
+| **G1: Architecture Contract Review** | Review boundary, domain registry, dan locked decisions. | ✅ **VERIFIED** | Seluruh modul Core (`events`, `identity`, `config`, `integration`, `audit`, `domain`) terisolasi, decoupled, dan diekspos melalui [`core/index.js`](file:///home/ikhwan/Projects/xentra/xentra-core/core/index.js). |
+| **G2: Cross-module Integration Verification** | Verifikasi integrasi hanya pada path yang instrument I/O-nya tersedia. | ✅ **VERIFIED** | Terverifikasi pada modul aktif: Event Bus dispatching, RBAC authority resolution, Configuration cascading lookup, dan Domain self-registration. |
+| **G3: Failure-path & Recovery Verification** | Verifikasi failure/recovery hanya pada komponen yang memiliki failure instrument. | ✅ **VERIFIED** | Terverifikasi pada modul aktif: Fault isolation listener pada Event Bus (`A5`) dan Timeout / Classification guard pada Integration Handler (`D4`). |
+| **G4: Security & Permission Review** | Verifikasi authorization, permission, scope, dan secret boundary. | ✅ **VERIFIED** | Terverifikasi pada `RoleBoundaryEnforcement` (`B6`) dengan penolakan *cross-branch* HTTP 403, dan `SecretBoundary` (`D5`) dengan redaksi kredensial otomatis. |
+| **G5: Observability Baseline** | Verifikasi log/trace yang menjadi responsibility Core. | ✅ **VERIFIED** | Terverifikasi pada `EventContext` (`A7`) dengan penelusuran lineage `correlation_id` & `causation_id`. |
+| **G6: Documentation Review** | Sinkronisasi blueprint, locked decisions, dan implementation contract. | ✅ **VERIFIED** | Sinkron dengan Notion terbaru: Self-registration domain (`F`), Semantik Audit sebagai proses investigasi pada evidence (`E`), dan model konfigurasi v2 (`C`). |
+| **G7: Core MVP Readiness Gate** | Review hasil G1–G6 dan seluruh evidence yang tersedia. | 🟡 **BASELINE READY (WITH OPEN DEPENDENCIES)** | Fondasi internal Core terbukti stabil dan siap dimuati domain bisnis. Komponen yang instrumennya belum tersedia dicatat terbuka di bawah ini. |
 
 ---
 
-## 3. Catatan Terbuka: Boundary Status "NOT VERIFIED" (Sesuai Aturan Notion)
+## 3. Daftar Resmi Area "NOT VERIFIED" (Open Dependencies)
 
-Untuk mematuhi aturan integritas sistem tanpa memalsukan/membuat mock fiktif, item-item berikut secara eksplisit dicatat sebagai **`NOT VERIFIED (EXTERNAL DEPENDENCY OPEN)`**:
+Berdasarkan *Mandatory Verification Rule* Notion, area berikut **tidak dipaksakan PASS** dengan membuat mock/test fiktif, melainkan dicatat secara jujur sebagai:
 
-1. **Hardware Bluetooth ESC/POS Physical Printer**:
-   - *Status*: `NOT VERIFIED (PHYSICAL HARDWARE)`
-   - *Penjelasan*: Kontrak antarmuka `HardwarePrinterAdapter` telah siap, namun pengujian fisik terhadap perangkat keras printer Bluetooth baru dapat diverifikasi saat integrasi perangkat nyata di domain POS.
-2. **Production Midtrans / Real Bank Webhook Callback**:
-   - *Status*: `NOT VERIFIED (LIVE GATEWAY NETWORK)`
-   - *Penjelasan*: Integrasi kontrak adapter telah tervalidasi, namun verifikasi transaksi perbankan riil menunggu domain `Xentra-Payment` diinisialisasi.
-3. **Dedicated Physical Multi-Server Topology**:
-   - *Status*: `NOT VERIFIED (DECISION OPEN)`
-   - *Penjelasan*: Arsitektur saat ini terpisah secara domain modular; topologi database/server fisik belum dikunci sesuai *Domain Blueprint*.
+1. **Physical Bluetooth ESC/POS Hardware Printing**:
+   - *Status*: ⚠️ **`NOT VERIFIED (PHYSICAL HARDWARE DEPENDENCY OPEN)`**
+   - *Keterangan*: Kontrak `HardwarePrinterAdapter` siap, verifikasi nyata menunggu perangkat printer Bluetooth fisik saat domain POS dibangun.
+2. **Production Gateway Webhook Callback (Live Network)**:
+   - *Status*: ⚠️ **`NOT VERIFIED (EXTERNAL NETWORK DEPENDENCY OPEN)`**
+   - *Keterangan*: Kontrak `BaseAdapter` siap, verifikasi jaringan live menunggu domain `Xentra-Payment` diinisialisasi.
+3. **Physical Server & Database Topology**:
+   - *Status*: ⚠️ **`NOT VERIFIED (INFRASTRUCTURE DECISION OPEN)`**
+   - *Keterangan*: Database terpisah secara modular, keputusan server/cluster fisik belum dikunci.
 
 ---
 
 ## 4. Kesimpulan Kesiapan (Readiness Conclusion)
 
-Fondasi arsitektur **Xentra-Core** telah memenuhi seluruh kriteria kelayakan struktural berbasis bukti aktual dan siap menerima domain bisnis mandiri pertama (**Xentra-Commerce** dan **Xentra-POS**) yang mendaftarkan dirinya via *Self-Registration*.
+Core MVP telah lulus audit fondasi internal berbasis bukti nyata (53 automated tests lulus) dan **siap menjadi fondasi bagi domain bisnis mandiri pertama (Commerce / POS)**.

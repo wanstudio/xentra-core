@@ -1,6 +1,6 @@
 /**
- * Xentra Core Audit & Investigation Module (Milestone E — Updated Contract)
- * Unified exports for Audit Log Records, Audit Process Engine, Writer, Query, and Retention Boundary.
+ * Xentra Core Audit & Investigation Module (Milestone E)
+ * Purely exposes AuditLogRecord, AuditProcessEngine, Writer, Query, and Retention Boundary.
  */
 const AuditLogRecord = require('./AuditLogRecord');
 const AuditProcessEngine = require('./AuditProcessEngine');

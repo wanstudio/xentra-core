@@ -1,4 +1,7 @@
-const AuditEventModel = require('./AuditEventModel');
+/**
+ * Xentra Core Audit Writer (E3)
+ * Strictly append-only persistence sink for AuditLogRecord instances.
+ */
 const AuditLogRecord = require('./AuditLogRecord');
 const AuditRetentionBoundary = require('./AuditRetentionBoundary');
 
@@ -9,24 +12,17 @@ class AuditWriter {
   }
 
   /**
-   * Appends an audit event or audit process log record to the append-only trail.
-   * @param {Object} eventParams - AuditLogRecord, AuditEventModel, or plain object
-   * @returns {Promise<Object>}
+   * Appends an audit process log record to the append-only trail.
+   * @param {AuditLogRecord|Object} recordParams - AuditLogRecord instance or parameters
+   * @returns {Promise<AuditLogRecord>}
    */
-  async append(eventParams) {
-    let record;
-    if (eventParams instanceof AuditLogRecord || eventParams instanceof AuditEventModel) {
-      record = eventParams;
-    } else if (eventParams.audit_type) {
-      record = new AuditLogRecord(eventParams);
-    } else {
-      record = new AuditEventModel(eventParams);
-    }
+  async append(recordParams) {
+    const record = recordParams instanceof AuditLogRecord ? recordParams : new AuditLogRecord(recordParams);
 
     this._inMemoryStore.push(record);
 
     if (this.storageAdapter && typeof this.storageAdapter.saveAudit === 'function') {
-      await this.storageAdapter.saveAudit(typeof record.toJSON === 'function' ? record.toJSON() : record);
+      await this.storageAdapter.saveAudit(record.toJSON());
     }
 
     return record;

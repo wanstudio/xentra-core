@@ -4,30 +4,27 @@ const assert = require('node:assert');
 const {
   AuditLogRecord,
   AuditProcessEngine,
-  AuditWriter,
-  AuditQueryFoundation,
-  AuditRetentionBoundary,
   createAuditWriter,
   createAuditEngine,
-  createAuditQuery
+  createAuditQuery,
+  AuditRetentionBoundary
 } = require('../../core/audit');
 
 // ==============================================================================
-// E1 — Audit Log Record Model Test (Level: Context & Schema Completeness)
-// Requirement: Audit Log records the investigation process, auditor, audited period, branch, and evidence
+// E1 — Audit Log Record Model Test (Investigation Record Schema & Context)
 // ==============================================================================
 test('E1 — Audit Log Record Model: creates comprehensive audit process record and redacts secrets', () => {
   const auditRecord = new AuditLogRecord({
     audit_type: 'revenue_reconciliation',
-    auditor: { auditor_id: 'usr_internal_auditor_01', name: 'Internal Auditor A', role: 'internal_auditor' },
+    auditor: { auditor_id: 'usr_auditor_01', name: 'Compliance Auditor', role: 'internal_auditor' },
     audit_period: { start_time: '2026-08-01T00:00:00Z', end_time: '2026-08-31T23:59:59Z' },
     target: {
       organization_id: 'org_bangjo',
       branch_id: 'branch_surabaya',
       branch_manager_in_charge: 'usr_mgr_surabaya'
     },
-    inspected_area: 'Cash & QRIS Transaction Settlements',
-    evidence_references: ['tx_settle_101', 'tx_settle_102', 'syslog_batch_99'],
+    inspected_area: 'Shift Settlement & Revenue Variance',
+    evidence_references: ['tx_101', 'tx_102', 'syslog_batch_99'],
     status: 'discrepancy_found',
     findings: 'Found Rp 50,000 variance between POS totals and payment gateway receipts.',
     metadata: {
@@ -38,7 +35,7 @@ test('E1 — Audit Log Record Model: creates comprehensive audit process record 
 
   assert.ok(auditRecord.audit_id.startsWith('aud_'));
   assert.strictEqual(auditRecord.audit_type, 'revenue_reconciliation');
-  assert.strictEqual(auditRecord.auditor.name, 'Internal Auditor A');
+  assert.strictEqual(auditRecord.auditor.name, 'Compliance Auditor');
   assert.strictEqual(auditRecord.target.branch_manager_in_charge, 'usr_mgr_surabaya');
   assert.strictEqual(auditRecord.evidence_references.length, 3);
   assert.strictEqual(auditRecord.status, 'discrepancy_found');
@@ -48,14 +45,13 @@ test('E1 — Audit Log Record Model: creates comprehensive audit process record 
   assert.strictEqual(auditRecord.metadata.gateway_secret, '********');
   assert.strictEqual(auditRecord.metadata.notes, 'Investigated by request of Owner');
 
-  // Negative test: Missing audit_type or auditor throws error
+  // Negative test: Missing required fields throws error
   assert.throws(() => new AuditLogRecord({ audit_type: '', auditor: { auditor_id: 'u1' }, inspected_area: 'Test' }), /"audit_type" is required/);
   assert.throws(() => new AuditLogRecord({ audit_type: 'tax_audit', auditor: null, inspected_area: 'Test' }), /"auditor" context/);
 });
 
 // ==============================================================================
-// E2 — Audit Process on Evidence Test (Level: Investigation Process Execution)
-// Requirement: Audit Process examines Business/System Log evidence and generates Audit Log
+// E2 — Audit Process Engine Test (Examination of Business/System Evidence Pool)
 // ==============================================================================
 test('E2 — Audit Process Engine: examines evidence pool (Business Logs & System Records) into Audit Log', async () => {
   const writer = createAuditWriter();
@@ -94,10 +90,9 @@ test('E2 — Audit Process Engine: examines evidence pool (Business Logs & Syste
 });
 
 // ==============================================================================
-// E3 — Audit Writer Test (Level: Append-Only Integrity)
-// Requirement: appends audit process logs and strictly rejects mutations (update/delete)
+// E3 — Audit Writer Test (Append-Only Persistence & Mutation Prevention)
 // ==============================================================================
-test('E3 — Audit Writer: append-only persistence and mutation prevention', async () => {
+test('E3 — Audit Writer: append-only persistence and strict rejection of mutations', async () => {
   const writer = createAuditWriter();
 
   const auditRecord = new AuditLogRecord({
@@ -118,8 +113,7 @@ test('E3 — Audit Writer: append-only persistence and mutation prevention', asy
 });
 
 // ==============================================================================
-// E4 — Audit Query Foundation Test (Level: Query & Retrieval by Audit Context)
-// Requirement: filter audit records by auditor, branch, audit_type, or status
+// E4 — Audit Query Foundation Test (Filtering by Auditor, Branch, Audit Type)
 // ==============================================================================
 test('E4 — Audit Query Foundation: filters audit process records by context', async () => {
   const writer = createAuditWriter();
@@ -151,8 +145,7 @@ test('E4 — Audit Query Foundation: filters audit process records by context', 
 });
 
 // ==============================================================================
-// E5 — Retention / Data Boundary Test (Level: Pruning Policy)
-// Requirement: time-based pruning without breaking immutability
+// E5 — Retention / Data Boundary Test (Time-Based Pruning)
 // ==============================================================================
 test('E5 — Retention Boundary: prunes expired audit records based on retention days', () => {
   const oldDate = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(); // 100 days ago
