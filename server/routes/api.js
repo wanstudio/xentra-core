@@ -1204,6 +1204,7 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
           primary_color = COALESCE(?, primary_color),
           logo_url = COALESCE(?, logo_url),
           custom_domain = COALESCE(?, custom_domain),
+          tagline = COALESCE(?, tagline),
           banners = COALESCE(?, banners),
           updated_at = datetime('now')
       WHERE id = ?
@@ -1212,6 +1213,7 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       primary_color !== undefined ? primary_color : null,
       logo_url !== undefined ? logo_url : null,
       custom_domain !== undefined ? custom_domain : null,
+      tagline !== undefined ? tagline : null,
       bannersJson,
       req.brand_id
     );
