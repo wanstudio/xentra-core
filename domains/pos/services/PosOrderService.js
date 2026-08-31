@@ -173,6 +173,9 @@ class PosOrderService {
       items: orderItems,
       delivery_fee: 0,
       payment_method,
+      order_channel: 'pos_cashier',
+      fulfillment_type: order_type,
+      table_number: customer.table_number || null,
       notes: `POS Cashier Order [${order_type}]`,
       trace_context: {
         correlation_id: client_transaction_id || `pos_tx_${Date.now()}`

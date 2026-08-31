@@ -31,6 +31,9 @@ class OrderPlacementService {
     items = [],
     delivery_fee = 0,
     payment_method = 'qris',
+    order_channel = 'customer_app',
+    fulfillment_type = 'delivery',
+    table_number = null,
     notes = '',
     trace_context = {}
   }) {
@@ -62,8 +65,9 @@ class OrderPlacementService {
     const insertOrderStmt = db.prepare(`
       INSERT INTO orders (
         id, order_number, brand_id, branch_id, customer_name, customer_phone,
-        order_type, subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'delivery', ?, ?, ?, ?, 'pending', ?, ?, ?)
+        order_type, order_channel, fulfillment_type, table_number,
+        subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
     `);
 
     const insertOrderItemStmt = db.prepare(`
@@ -90,6 +94,10 @@ class OrderPlacementService {
         branch_id,
         customer.name || 'Pelanggan',
         customer.phone || '',
+        fulfillment_type,
+        order_channel,
+        fulfillment_type,
+        table_number,
         subtotal,
         delivery_fee,
         grandTotal,
