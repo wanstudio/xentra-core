@@ -180,6 +180,14 @@ test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell pre
   const updatedBranchRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
   assert.strictEqual(updatedBranchRow.stock, 2, 'Live stock must be decremented from 4 to 2');
 
+  // Verify Cross-Domain Ledger Entry (Commerce -> Inventory)
+  const ledgerMovement = db.prepare('SELECT * FROM inventory_movements WHERE reference_id = ?').get(orderResult.order.order_number);
+  assert.ok(ledgerMovement, 'Inventory ledger must have an immutable entry for sale_deduction');
+  assert.strictEqual(ledgerMovement.movement_type, 'sale_deduction');
+  assert.strictEqual(ledgerMovement.quantity, -2);
+  assert.strictEqual(ledgerMovement.previous_stock, 4);
+  assert.strictEqual(ledgerMovement.current_stock, 2);
+
   // 2. Concurrency Guard verification: Simulating race condition where stock is depleted
   // If another concurrent request tries to deduct 3 when only 2 remain, transaction fails and rolls back
   const raceResult = await OrderPlacementService.submitOrder({

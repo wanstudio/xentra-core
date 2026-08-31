@@ -152,10 +152,34 @@ class OrderPlacementService {
         // Optimistic concurrency guard: Only deduct live inventory for immediate fulfillment types
         // (For future reservation, stock will be deducted when guest arrives and checks in to active dine-in table)
         if (effectiveOrderType !== 'reservation') {
+          const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch_id, item.product_id);
+          const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
+
           const deductResult = guardedDeductStockStmt.run(item.quantity, branch_id, item.product_id, item.quantity);
           if (!deductResult || deductResult.changes === 0) {
             throw new Error(`[CONCURRENCY_RACE] Stok untuk produk "${item.name}" baru saja habis atau tidak mencukupi.`);
           }
+
+          const currentStock = prevStock - Number(item.quantity);
+          const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
+
+          // Authoritative Cross-Domain Integration: Write immutable ledger record in Inventory domain table
+          db.prepare(`
+            INSERT INTO inventory_movements (
+              id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
+            ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            movementId,
+            branch_id,
+            item.product_id,
+            -Number(item.quantity),
+            prevStock,
+            currentStock,
+            orderNumber,
+            customer.phone || 'customer_order',
+            `Pemotongan stok otomatis pesanan ${orderNumber} (${effectiveOrderType}/${order_channel})`,
+            now
+          );
         }
       }
 
