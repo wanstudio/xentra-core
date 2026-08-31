@@ -550,6 +550,12 @@ function seedData(targetDb) {
   const userCount = targetDb.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ?').get(brandId)?.cnt || 0;
   if (userCount === 0) {
     const crypto = require('crypto');
+    
+    // P1 SECURE CREDENTIAL PROVISIONING: Mandatory INITIAL_ADMIN_PASSWORD in production
+    if (process.env.NODE_ENV === 'production' && !process.env.INITIAL_ADMIN_PASSWORD) {
+      throw new Error('[Security Hardening]: INITIAL_ADMIN_PASSWORD environment variable wajib diset untuk menginisialisasi kredensial owner pertama kali di environment production.');
+    }
+
     const initPassword = process.env.INITIAL_ADMIN_PASSWORD || 'bangjo123';
     const defaultPasswordHash = crypto.createHash('sha256').update(initPassword).digest('hex');
     targetDb.prepare(`
