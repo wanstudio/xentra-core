@@ -24,7 +24,7 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 
 // ---- Deploy receiver for dev.mybangjo.com (shell unzip only, no WASM/multer) ----
-const DEPLOY_TOKEN = process.env.DEPLOY_TOKEN || 'xentra_deploy_7f8a9b2c3d4e5f6a1b2c3d4e5f';
+const DEPLOY_TOKEN = process.env.DEPLOY_TOKEN;
 function checkDeployToken(req) {
   const h = (req.headers['x-deploy-token'] || '').trim();
   const q = (req.query.token || req.body?.token || '').trim();
