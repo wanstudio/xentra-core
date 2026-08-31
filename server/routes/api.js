@@ -1257,4 +1257,28 @@ router.get('/admin/analytics/summary', (req, res) => {
   }
 });
 
+// 16. Reporting Domain Single-Entrypoint API
+const { ReportingEngine } = require('../../domains/reporting');
+router.get('/reports/:report_type', (req, res) => {
+  try {
+    const { report_type } = req.params;
+    const { branch_id, start_date, end_date } = req.query;
+
+    const report = ReportingEngine.generateReport(report_type, {
+      brand_id: req.brand_id,
+      branch_id: branch_id || req.query.branchId,
+      start_date,
+      end_date
+    });
+
+    res.json({
+      success: true,
+      data: report
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
+
