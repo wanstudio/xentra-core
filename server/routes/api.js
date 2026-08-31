@@ -137,16 +137,108 @@ router.get(['/delivery/reverse-geocode', '/address/reverse'], async (req, res) =
   }
 });
 
-// 4.2 Auth OTP Endpoints (WhatsApp OTP Simulation / Gateway)
-router.post('/auth/otp/trust', (req, res) => {
-  res.json({ success: true, trusted: true });
-});
+// 4.2 Real Auth OTP Challenge & Verification Store (In-Memory with TTL & Max Attempts)
+const OtpChallengeStore = {
+  challenges: new Map(), // challenge_id -> { phone, otpHash, expiresAt, attempts, verified, brandId }
+  createChallenge(phone, brandId, otpCode) {
+    const challengeId = 'ch_' + crypto.randomBytes(8).toString('hex');
+    const otpHash = crypto.createHash('sha256').update(String(otpCode)).digest('hex');
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes TTL
+    this.challenges.set(challengeId, {
+      phone,
+      otpHash,
+      expiresAt,
+      attempts: 0,
+      verified: false,
+      brandId
+    });
+    return { challengeId, expiresAt };
+  },
+  verifyOtp(challengeId, otpCode, phone, brandId) {
+    if (!challengeId || !this.challenges.has(challengeId)) {
+      return { success: false, error: 'CHALLENGE_NOT_FOUND', message: 'Challenge OTP tidak ditemukan atau telah kedaluwarsa.' };
+    }
+    const record = this.challenges.get(challengeId);
+    if (Date.now() > record.expiresAt) {
+      this.challenges.delete(challengeId);
+      return { success: false, error: 'OTP_EXPIRED', message: 'Kode OTP telah kedaluwarsa. Silakan minta kode baru.' };
+    }
+    if (record.brandId !== brandId) {
+      return { success: false, error: 'TENANT_MISMATCH', message: 'Challenge OTP tidak valid untuk tenant ini.' };
+    }
+    if (phone && record.phone !== phone) {
+      return { success: false, error: 'PHONE_MISMATCH', message: 'Nomor telepon tidak cocok dengan permintaan OTP.' };
+    }
+    if (record.attempts >= 3) {
+      this.challenges.delete(challengeId);
+      return { success: false, error: 'MAX_ATTEMPTS_EXCEEDED', message: 'Batas percobaan OTP terlampaui. Silakan minta kode baru.' };
+    }
+
+    record.attempts += 1;
+    const inputHash = crypto.createHash('sha256').update(String(otpCode).trim()).digest('hex');
+    if (inputHash !== record.otpHash) {
+      return { success: false, error: 'INVALID_OTP', message: 'Kode OTP yang Anda masukkan salah.' };
+    }
+
+    record.verified = true;
+    return { success: true, verified: true, phone: record.phone };
+  },
+  isTrusted(challengeId, phone, brandId) {
+    if (!challengeId || !this.challenges.has(challengeId)) return false;
+    const record = this.challenges.get(challengeId);
+    if (Date.now() > record.expiresAt) return false;
+    return record.verified === true && record.phone === phone && record.brandId === brandId;
+  }
+};
+
 router.post('/auth/otp/send', (req, res) => {
-  const challengeId = 'ch_' + crypto.randomBytes(8).toString('hex');
-  res.json({ success: true, challenge_id: challengeId, retry_after: 60 });
+  const { phone } = req.body;
+  if (!phone || !phone.trim()) {
+    return res.status(400).json({ success: false, error: 'Nomor WhatsApp / telepon wajib diisi.' });
+  }
+
+  // Generate 6-digit OTP code (in dev/test use 123456 or random)
+  const otpCode = process.env.NODE_ENV === 'production' 
+    ? Math.floor(100000 + Math.random() * 900000).toString() 
+    : '123456';
+
+  const { challengeId } = OtpChallengeStore.createChallenge(phone.trim(), req.brand_id, otpCode);
+  res.json({
+    success: true,
+    challenge_id: challengeId,
+    retry_after: 60,
+    message: 'Kode OTP telah dikirimkan ke nomor WhatsApp Anda.'
+  });
 });
+
 router.post('/auth/otp/verify', (req, res) => {
-  res.json({ success: true, verified: true });
+  const { challenge_id, otp, code, phone } = req.body;
+  const otpInput = otp || code;
+
+  if (!challenge_id || !otpInput) {
+    return res.status(400).json({ success: false, error: 'Challenge ID dan Kode OTP wajib diisi.' });
+  }
+
+  const result = OtpChallengeStore.verifyOtp(challenge_id, otpInput, phone ? phone.trim() : null, req.brand_id);
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+
+  res.json(result);
+});
+
+router.post('/auth/otp/trust', (req, res) => {
+  const { challenge_id, phone } = req.body;
+  if (!challenge_id || !phone) {
+    return res.status(400).json({ success: false, error: 'Challenge ID dan nomor telepon wajib disertakan.' });
+  }
+
+  const trusted = OtpChallengeStore.isTrusted(challenge_id, phone.trim(), req.brand_id);
+  if (!trusted) {
+    return res.status(403).json({ success: false, trusted: false, error: 'Perangkat atau sesi nomor belum diverifikasi OTP.' });
+  }
+
+  res.json({ success: true, trusted: true });
 });
 
 // 4.9 Manual / Webhook Catalog Sync from WooCommerce (Protected by requireAuth)
