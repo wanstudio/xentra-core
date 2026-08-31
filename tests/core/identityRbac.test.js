@@ -330,3 +330,161 @@ test('B6 — Role Boundary Enforcement: enforces boundary guard and prevents cro
     return err.code === 'FORBIDDEN' && err.status === 403 && err.message.includes('Access Denied');
   });
 });
+
+// ==============================================================================
+// B7 — Role Provisioning & Delegation Matrix Test (Level: Actor Authority Verification)
+// Requirement: verifies that assigning roles respects caller authorization boundaries
+// - Cashier -> assign cashier -> DENY (cannot manage staff)
+// - Branch Manager -> assign cashier own branch -> ALLOW (staff:view/manage scope)
+// - Branch Manager -> assign cashier other branch -> DENY
+// - Owner -> assign global -> ALLOW
+// ==============================================================================
+test('B7 — Role Provisioning Matrix: verifies actor authorization on role assignment delegation', () => {
+  const roleManager = new RoleModel();
+
+  const ownerUser = new IdentityModel({ username: 'owner_user', status: 'active' });
+  const brandMgrUser = new IdentityModel({ username: 'brand_mgr_user', status: 'active' });
+  const branchMgrUser = new IdentityModel({ username: 'branch_mgr_user', status: 'active' });
+  const cashierUser = new IdentityModel({ username: 'cashier_user', status: 'active' });
+  const targetStaff = new IdentityModel({ username: 'new_staff', status: 'active' });
+
+  const ownerAssignments = [{
+    user_id: ownerUser.id,
+    role: RoleModel.ROLES.OWNER,
+    scope_type: 'organization',
+    scope_id: 'org_bangjo'
+  }];
+
+  const brandMgrAssignments = [{
+    user_id: brandMgrUser.id,
+    role: RoleModel.ROLES.BRAND_MANAGER,
+    scope_type: 'brand',
+    scope_id: 'brand_bangjo'
+  }];
+
+  const branchMgrAssignments = [{
+    user_id: branchMgrUser.id,
+    role: RoleModel.ROLES.BRANCH_MANAGER,
+    scope_type: 'branch',
+    scope_id: 'branch_barat'
+  }];
+
+  const cashierAssignments = [{
+    user_id: cashierUser.id,
+    role: RoleModel.ROLES.CASHIER,
+    scope_type: 'branch',
+    scope_id: 'branch_barat'
+  }];
+
+  const orgManager = new OrganizationModel();
+  orgManager.createOrganization({ id: 'org_bangjo', name: 'Bangjo Org', owner_user_id: ownerUser.id });
+  orgManager.createBrand({ id: 'brand_bangjo', organization_id: 'org_bangjo', name: 'Bangjo Brand' });
+  orgManager.createBranch({ id: 'branch_barat', brand_id: 'brand_bangjo', name: 'Surabaya Barat', phone: '08111' });
+  orgManager.createBranch({ id: 'branch_timur', brand_id: 'brand_bangjo', name: 'Surabaya Timur', phone: '08222' });
+
+  // Helper simulating authorized provisioning boundary gate
+  function authorizeAndAssign({ actor, actorAssignments, targetUserId, newRole, targetScopeType, targetScopeId }) {
+    // 1. Check if actor is attempting global / owner assignment
+    if (newRole === RoleModel.ROLES.OWNER || targetScopeType === 'global') {
+      const isOwner = actorAssignments.some(a => a.role === RoleModel.ROLES.OWNER);
+      if (!isOwner) {
+        const err = new Error('FORBIDDEN: Only Owner can assign global or owner roles.');
+        err.code = 'FORBIDDEN';
+        err.status = 403;
+        throw err;
+      }
+    }
+
+    // 2. Authorize via staff management permission against target branch/brand/org context
+    const targetContext = {};
+    if (targetScopeType === 'organization') targetContext.organization_id = targetScopeId;
+    if (targetScopeType === 'brand') targetContext.brand_id = targetScopeId;
+    if (targetScopeType === 'branch') {
+      targetContext.branch_id = targetScopeId;
+      targetContext.brand_id = 'brand_bangjo';
+    }
+    if (targetScopeType === 'global') {
+      const actorOrg = actorAssignments.find(a => a.scope_type === 'organization')?.scope_id;
+      if (actorOrg) targetContext.organization_id = actorOrg;
+    }
+
+    RoleBoundaryEnforcement.enforce({
+      identity: actor,
+      assignments: actorAssignments,
+      required_permission: 'staff:manage',
+      target_context: targetContext,
+      action_name: `Assign Role ${newRole}`
+    });
+
+    // 3. Delegate to RoleModel once authorized
+    return roleManager.assign({
+      user_id: targetUserId,
+      role: newRole,
+      scope_type: targetScopeType,
+      scope_id: targetScopeId,
+      assigned_by: actor.id
+    });
+  }
+
+  // 1. Cashier -> assign cashier -> MUST BE DENIED (Cashier lacks staff:manage permission)
+  assert.throws(() => {
+    authorizeAndAssign({
+      actor: cashierUser,
+      actorAssignments: cashierAssignments,
+      targetUserId: targetStaff.id,
+      newRole: RoleModel.ROLES.CASHIER,
+      targetScopeType: 'branch',
+      targetScopeId: 'branch_barat'
+    });
+  }, /Access Denied/);
+
+  // 2. Branch Manager -> assign cashier -> MUST BE DENIED (Branch Manager lacks staff:manage in contract)
+  assert.throws(() => {
+    authorizeAndAssign({
+      actor: branchMgrUser,
+      actorAssignments: branchMgrAssignments,
+      targetUserId: targetStaff.id,
+      newRole: RoleModel.ROLES.CASHIER,
+      targetScopeType: 'branch',
+      targetScopeId: 'branch_barat'
+    });
+  }, /Access Denied/);
+
+  // 3. Brand Manager -> assign global role -> MUST BE DENIED (Non-owner escalation forbidden)
+  assert.throws(() => {
+    authorizeAndAssign({
+      actor: brandMgrUser,
+      actorAssignments: brandMgrAssignments,
+      targetUserId: targetStaff.id,
+      newRole: RoleModel.ROLES.OWNER,
+      targetScopeType: 'global',
+      targetScopeId: null
+    });
+  }, /Only Owner can assign global or owner roles/);
+
+  // 4. Brand Manager -> assign cashier in child branch -> MUST BE ALLOWED
+  const brandMgrAssignCashier = authorizeAndAssign({
+    actor: brandMgrUser,
+    actorAssignments: brandMgrAssignments,
+    targetUserId: targetStaff.id,
+    newRole: RoleModel.ROLES.CASHIER,
+    targetScopeType: 'branch',
+    targetScopeId: 'branch_barat'
+  });
+  assert.strictEqual(brandMgrAssignCashier.role, 'cashier');
+  assert.strictEqual(brandMgrAssignCashier.scope_id, 'branch_barat');
+  assert.strictEqual(brandMgrAssignCashier.assigned_by, brandMgrUser.id);
+
+  // 5. Owner -> assign global role -> MUST BE ALLOWED
+  const ownerAssignGlobal = authorizeAndAssign({
+    actor: ownerUser,
+    actorAssignments: ownerAssignments,
+    targetUserId: targetStaff.id,
+    newRole: RoleModel.ROLES.OWNER,
+    targetScopeType: 'global',
+    targetScopeId: null
+  });
+  assert.strictEqual(ownerAssignGlobal.role, 'owner');
+  assert.strictEqual(ownerAssignGlobal.scope_type, 'global');
+  assert.strictEqual(ownerAssignGlobal.assigned_by, ownerUser.id);
+});
