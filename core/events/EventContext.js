@@ -43,13 +43,19 @@ class EventContext {
   static deriveChild(parentContext, parentEventId, overrides = {}) {
     return new EventContext({
       correlation_id: parentContext?.correlation_id || EventContext.generateId('corr'),
-      causation_id: parentEventId,
-      actor_id: overrides.actor_id || parentContext?.actor_id,
-      actor_type: overrides.actor_type || parentContext?.actor_type,
-      tenant_id: overrides.tenant_id || parentContext?.tenant_id,
-      branch_id: overrides.branch_id || parentContext?.branch_id,
-      ...overrides
+      causation_id: parentEventId || null,
+      actor_id: overrides.actor_id || parentContext?.actor_id || 'system',
+      actor_type: overrides.actor_type || parentContext?.actor_type || 'system',
+      tenant_id: overrides.tenant_id || parentContext?.tenant_id || null,
+      branch_id: overrides.branch_id || parentContext?.branch_id || null
     });
+  }
+
+  /**
+   * Instance helper to derive a child context.
+   */
+  deriveChild(parentEventId, overrides = {}) {
+    return EventContext.deriveChild(this, parentEventId, overrides);
   }
 
   toJSON() {

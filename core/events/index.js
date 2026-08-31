@@ -1,7 +1,3 @@
-/**
- * Xentra Core Event Infrastructure Module (Milestone A)
- * Unified exports for Event Bus, Contract, Publisher, Subscriber, Registry, Context, and Logger.
- */
 const EventContract = require('./EventContract');
 const EventContext = require('./EventContext');
 const EventBus = require('./EventBus');
@@ -22,7 +18,9 @@ module.exports = {
   EventLogger,
 
   // Convenience Factory Methods
+  createEventBus: () => new (EventBus.EventBus || EventBus.constructor || EventBus)(),
   createPublisher: (domain, customBus) => new EventPublisher(domain, customBus),
   createSubscriber: (domain, customBus) => new EventSubscriber(domain, customBus),
-  createContext: (params) => new EventContext(params)
+  createContext: (params) => new EventContext(params),
+  createLogger: (storage) => new EventLogger(storage)
 };
