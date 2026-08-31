@@ -194,18 +194,18 @@ class PaymentGatewayService {
 
     const now = new Date().toISOString();
 
-    // Update order_payments table
+    // Update order_payments table: Provider & Payment Method are strictly 'midtrans'
     db.prepare(`
       UPDATE order_payments 
-      SET payment_status = ?, payment_method = ?, raw_webhook_response = ?, settled_at = CASE WHEN ? = 'settlement' THEN ? ELSE settled_at END
+      SET payment_status = ?, payment_method = 'midtrans', raw_webhook_response = ?, settled_at = CASE WHEN ? = 'settlement' THEN ? ELSE settled_at END
       WHERE order_id = ?
-    `).run(newPaymentStatus, payment_type || payment.payment_method, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
+    `).run(newPaymentStatus, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
 
     // If settled, advance order status and emit event
     if (shouldConfirmOrder) {
       db.prepare(`
         UPDATE orders
-        SET status = 'confirmed', updated_at = ?
+        SET status = 'confirmed', payment_method = 'midtrans', updated_at = ?
         WHERE id = ?
       `).run(now, order_id);
 
@@ -218,7 +218,7 @@ class PaymentGatewayService {
           branch_id: order?.branch_id,
           brand_id: order?.brand_id,
           provider: 'midtrans',
-          payment_method: payment_type || 'qris',
+          payment_method: 'midtrans',
           amount: Number(gross_amount || payment.amount),
           settled_at: now
         }

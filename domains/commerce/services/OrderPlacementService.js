@@ -19,7 +19,7 @@ class OrderPlacementService {
    * @param {Object} params.customer - { name, phone, address, coordinates }
    * @param {Array<Object>} params.items - Cart items { product_id, quantity, expected_price }
    * @param {number} [params.delivery_fee=0]
-   * @param {string} [params.payment_method='qris']
+   * @param {'cash'|'midtrans'} [params.payment_method='midtrans']
    * @param {string} [params.notes='']
    * @param {Object} [params.trace_context] - { correlation_id, causation_id }
    * @returns {Promise<Object>} Created order snapshot & payment readiness
@@ -30,7 +30,7 @@ class OrderPlacementService {
     customer,
     items = [],
     delivery_fee = 0,
-    payment_method = 'qris',
+    payment_method = 'midtrans',
     order_channel = 'customer_app',
     order_type = 'delivery',
     table_number = null,
@@ -39,6 +39,8 @@ class OrderPlacementService {
     notes = '',
     trace_context = {}
   }) {
+    // Strict Payment Method Scope Alignment (Xentra Payment = Cash or Midtrans)
+    const effectivePaymentMethod = (payment_method === 'cash') ? 'cash' : 'midtrans';
     const effectiveOrderType = order_type || 'delivery';
 
     // Strict Validation: Same-Day Reservation Restriction (Operational Risk Control)
@@ -129,7 +131,7 @@ class OrderPlacementService {
         subtotal,
         delivery_fee,
         grandTotal,
-        payment_method,
+        effectivePaymentMethod,
         notes,
         now,
         now

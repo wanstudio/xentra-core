@@ -83,7 +83,7 @@ test('Payment 3 — Midtrans Webhook: verifies SHA512 signature, advances status
   const orderId = `ord_test_mid_${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, 'ORD-MID-1', 'brand_pay', 'branch_pay', 'Siti Online', '62812345678', 'delivery', 'customer_app', 75000, 75000, 'qris', 'pending')
+    VALUES (?, 'ORD-MID-1', 'brand_pay', 'branch_pay', 'Siti Online', '62812345678', 'delivery', 'customer_app', 75000, 75000, 'midtrans', 'pending')
   `).run(orderId);
 
   db.prepare(`
@@ -115,10 +115,11 @@ test('Payment 3 — Midtrans Webhook: verifies SHA512 signature, advances status
   // Verify order and payment status
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
   assert.strictEqual(order.status, 'confirmed');
+  assert.strictEqual(order.payment_method, 'midtrans');
 
   const payRecord = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(orderId);
   assert.strictEqual(payRecord.payment_status, 'settlement');
-  assert.strictEqual(payRecord.payment_method, 'qris');
+  assert.strictEqual(payRecord.payment_method, 'midtrans');
 
   // 3. Idempotent Test: Same webhook again
   const duplicateResult = PaymentGatewayService.handleWebhook(webhookPayload);

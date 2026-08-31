@@ -169,7 +169,7 @@ test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell pre
       { product_id: 'prod_limited', quantity: 2, expected_price: 50000 }
     ],
     delivery_fee: 10000,
-    payment_method: 'qris',
+    payment_method: 'midtrans',
     trace_context: { correlation_id: 'corr_test_order_flow' }
   });
 
