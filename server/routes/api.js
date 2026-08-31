@@ -644,11 +644,11 @@ const TokenSessionStore = {
   }
 };
 
-// Middleware: Require Authenticated Token
+// Middleware: Require Authenticated Token (Header-Only: Bearer token or x-auth-token)
 function requireAuth(allowedRoles = []) {
   return (req, res, next) => {
     const authHeader = req.headers['authorization'] || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : (req.headers['x-auth-token'] || req.query.auth_token);
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || '').trim();
 
     if (!token) {
       return res.status(401).json({
@@ -812,9 +812,9 @@ router.post('/auth/merchant/login', (req, res) => {
       return res.status(401).json({ success: false, error: 'Username atau password salah.' });
     }
 
-    // P1 SECURE PASSWORD VERIFICATION: Hash compare against database password_hash (NO bypass passwords)
+    // P1 SECURE PASSWORD VERIFICATION: Strictly hash-only verification against database password_hash
     const hashedInput = crypto.createHash('sha256').update(password).digest('hex');
-    const isValid = user.password_hash === password || user.password_hash === hashedInput;
+    const isValid = user.password_hash === hashedInput;
 
     if (!isValid) {
       return res.status(401).json({ success: false, error: 'Username atau password salah.' });

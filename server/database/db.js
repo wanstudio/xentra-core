@@ -550,7 +550,8 @@ function seedData(targetDb) {
   const userCount = targetDb.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ?').get(brandId)?.cnt || 0;
   if (userCount === 0) {
     const crypto = require('crypto');
-    const defaultPasswordHash = crypto.createHash('sha256').update('bangjo123').digest('hex');
+    const initPassword = process.env.INITIAL_ADMIN_PASSWORD || 'bangjo123';
+    const defaultPasswordHash = crypto.createHash('sha256').update(initPassword).digest('hex');
     targetDb.prepare(`
       INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
