@@ -242,3 +242,13 @@ test('API GET /health: returns 200 OK and ready persistence status', async () =>
   assert.strictEqual(data.version, '2.2.5');
 });
 
+test('API GET /api/v1/brand/info with unknown tenant host: returns 404 TENANT_NOT_FOUND', async () => {
+  const res = await mockFetch('/api/v1/brand/info', {
+    headers: { host: 'unknown-tenant.com' }
+  });
+  assert.strictEqual(res.status, 404);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.strictEqual(data.error, 'TENANT_NOT_FOUND');
+});
+
