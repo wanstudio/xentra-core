@@ -1604,7 +1604,7 @@ router.get('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, res
   try {
     const branches = db.prepare(`
       SELECT 
-        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.is_active,
+        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active,
         s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order
       FROM branches b
       LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
@@ -1617,7 +1617,7 @@ router.get('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, res
   }
 });
 
-// 14.1 Create Branch (Mandatory Branch WhatsApp Number)
+// 14.1 Create Branch (Mandatory Branch WhatsApp Business Number - FINDING-03)
 router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const {
@@ -1634,12 +1634,23 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
       promo_delivery_discount
     } = req.body;
 
-    const branchPhone = (phone || whatsapp_number || '').trim();
+    const rawWa = (whatsapp_number || phone || '').trim();
 
-    if (!branchPhone) {
+    // P1 BUSINESS INVARIANT (FINDING-03): Branch WhatsApp Business identity is mandatory & must be a valid mobile WA number
+    if (!rawWa) {
       return res.status(400).json({
         success: false,
-        error: 'Nomor WhatsApp / telepon cabang wajib diisi saat pendaftaran cabang.'
+        error: 'Nomor WhatsApp Business cabang wajib diisi saat pendaftaran cabang.'
+      });
+    }
+
+    // Validate standard Indonesian WhatsApp mobile format (e.g. 08..., 628..., +628...)
+    const cleanDigits = rawWa.replace(/[^0-9]/g, '');
+    const isIndoMobile = cleanDigits.startsWith('08') || cleanDigits.startsWith('628') || cleanDigits.startsWith('8');
+    if (!isIndoMobile || cleanDigits.length < 9 || cleanDigits.length > 15) {
+      return res.status(400).json({
+        success: false,
+        error: 'Format nomor WhatsApp cabang tidak valid. Harap gunakan format nomor ponsel WhatsApp aktif (contoh: 081234567890 atau 6281234567890).'
       });
     }
 
@@ -1652,10 +1663,12 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
 
     const branchId = 'branch_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const branchPhone = (phone || rawWa).trim();
+    const branchWa = rawWa;
 
     db.prepare(`
-      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, whatsapp_number, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
     `).run(
       branchId,
       req.brand_id,
@@ -1664,7 +1677,8 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
       address_text ? address_text.trim() : '',
       latitude !== undefined ? latitude : 0,
       longitude !== undefined ? longitude : 0,
-      branchPhone
+      branchPhone,
+      branchWa
     );
 
     const deliverySettingsId = 'bds_' + branchId;
@@ -1691,6 +1705,7 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
         name: name.trim(),
         slug,
         phone: branchPhone,
+        whatsapp_number: branchWa,
         address_text: address_text || ''
       }
     });
@@ -1702,13 +1717,18 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
 router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
-    const targetPhone = phone !== undefined ? phone : whatsapp_number;
+    const targetPhone = phone !== undefined ? phone : null;
+    const targetWa = whatsapp_number !== undefined ? whatsapp_number : null;
 
-    if (targetPhone !== undefined && targetPhone !== null && String(targetPhone).trim() === '') {
-      return res.status(400).json({
-        success: false,
-        error: 'Nomor WhatsApp / telepon cabang tidak boleh dikosongkan.'
-      });
+    if (targetWa !== null && targetWa !== undefined) {
+      const cleanWaDigits = String(targetWa).replace(/[^0-9]/g, '');
+      const isIndoMobile = cleanWaDigits.startsWith('08') || cleanWaDigits.startsWith('628') || cleanWaDigits.startsWith('8');
+      if (String(targetWa).trim() === '' || !isIndoMobile || cleanWaDigits.length < 9) {
+        return res.status(400).json({
+          success: false,
+          error: 'Format nomor WhatsApp cabang tidak valid. Harap gunakan format nomor ponsel WhatsApp aktif.'
+        });
+      }
     }
 
     // P1 TENANT WRITE BOUNDARY GUARD (FINDING 01): Verify branch ownership before ANY mutation
@@ -1729,6 +1749,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (req,
             latitude = COALESCE(?, latitude),
             longitude = COALESCE(?, longitude),
             phone = COALESCE(?, phone),
+            whatsapp_number = COALESCE(?, whatsapp_number),
             is_active = COALESCE(?, is_active),
             updated_at = datetime('now')
         WHERE id = ? AND brand_id = ?
@@ -1738,6 +1759,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (req,
         latitude !== undefined ? latitude : null,
         longitude !== undefined ? longitude : null,
         targetPhone !== undefined ? targetPhone : null,
+        targetWa !== undefined ? targetWa : null,
         is_active !== undefined ? is_active : null,
         req.params.id,
         req.brand_id
