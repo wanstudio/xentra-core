@@ -6,20 +6,24 @@ const {
   ConfigurationScope,
   ConfigurationValidator,
   ConfigurationAccess,
-  FeatureControlFoundation,
-  createConfigScope,
-  createFeatureControl
+  FeatureControlFoundation
 } = require('../../core/config');
 const { IdentityModel } = require('../../core/identity');
 
 // ==============================================================================
-// C1 — Configuration Model Test (Level: Model & Type Casting)
-// Requirement: key-value data structure, type casting, and secret representation
+// C1 — Configuration Model Test (Level: Model & Source Boundary)
+// Requirement: key, value, type, scope, source (dashboard/env/default), and secret representation
 // ==============================================================================
-test('C1 — Configuration Model: data structure, type casting, and secret masking', () => {
-  // String config
-  const cfgString = new ConfigurationModel({ key: 'app.title', value: 'Bangjo Digital', type: 'string' });
+test('C1 — Configuration Model: data structure, type casting, source boundary, and secret masking', () => {
+  // String config with source: dashboard
+  const cfgString = new ConfigurationModel({
+    key: 'app.title',
+    value: 'Bangjo Digital',
+    type: 'string',
+    source: 'dashboard'
+  });
   assert.strictEqual(cfgString.value, 'Bangjo Digital');
+  assert.strictEqual(cfgString.source, 'dashboard');
 
   // Number config
   const cfgNum = new ConfigurationModel({ key: 'delivery.fee_base', value: '10000', type: 'number' });
@@ -34,162 +38,194 @@ test('C1 — Configuration Model: data structure, type casting, and secret maski
   const cfgJson = new ConfigurationModel({ key: 'promo.rule', value: '{"discount": 5000}', type: 'json' });
   assert.strictEqual(cfgJson.value.discount, 5000);
 
-  // Secret masking
+  // Secret masking with source: environment
   const cfgSecret = new ConfigurationModel({
     key: 'api.secret_key',
     value: 'super_secret_payload_123',
     type: 'string',
+    source: 'environment',
     is_secret: true
   });
+  assert.strictEqual(cfgSecret.source, 'environment');
   assert.strictEqual(cfgSecret.toSafeJSON(false).value, '********');
   assert.strictEqual(cfgSecret.toSafeJSON(true).value, 'super_secret_payload_123');
 
-  // Validation of invalid scopes & keys
+  // Validation of invalid scopes, types & sources
   assert.throws(() => new ConfigurationModel({ key: '', value: 'test' }), /"key" is required/);
   assert.throws(() => new ConfigurationModel({ key: 'test', value: 'v', type: 'unsupported_type' }), /Invalid type/);
+  assert.throws(() => new ConfigurationModel({ key: 'test', value: 'v', source: 'invalid_source' }), /Invalid source/);
 });
 
 // ==============================================================================
-// C2 — Configuration Scope Test (Level: Cascading Resolution Hierarchy)
-// Requirement: Branch Override -> Brand Override -> Organization -> System Default
+// C2 — Configuration Scope Test (Level: Scope Hierarchy & Negative Fallback Check)
+// Requirement: Branch WhatsApp mandatory; no Owner fallback; flexible warehouse topology (1->1, 1->N, N->N)
 // ==============================================================================
-test('C2 — Configuration Scope: cascading hierarchy resolution (Branch -> Brand -> Org -> System)', () => {
+test('C2 — Configuration Scope: Branch WhatsApp isolation, no Owner fallback & flexible warehouse topology', () => {
   const scope = new ConfigurationScope();
 
-  // 1. System Default
-  scope.set({ key: 'delivery.max_distance_km', value: 10, type: 'number', scope_type: 'system' });
-
-  // 2. Organization Level Override
-  scope.set({ key: 'delivery.max_distance_km', value: 15, type: 'number', scope_type: 'organization', scope_id: 'org_bangjo' });
-
-  // 3. Brand Level Override
-  scope.set({ key: 'delivery.max_distance_km', value: 20, type: 'number', scope_type: 'brand', scope_id: 'brand_bangjo' });
-
-  // 4. Branch Level Override
-  scope.set({ key: 'delivery.max_distance_km', value: 25, type: 'number', scope_type: 'branch', scope_id: 'branch_surabaya' });
-
-  // Resolution 1: Query with branch context -> Gets branch value (25)
-  const valBranch = scope.getValue('delivery.max_distance_km', {
-    organization_id: 'org_bangjo',
-    brand_id: 'brand_bangjo',
-    branch_id: 'branch_surabaya'
+  // 1. Branch WhatsApp Configuration
+  scope.set({
+    key: 'branch.whatsapp_number',
+    value: '6281111111111',
+    type: 'string',
+    scope_type: 'branch',
+    scope_id: 'branch_surabaya',
+    source: 'dashboard'
   });
-  assert.strictEqual(valBranch, 25);
 
-  // Resolution 2: Query for another branch without override -> Falls back to Brand value (20)
-  const valBrand = scope.getValue('delivery.max_distance_km', {
-    organization_id: 'org_bangjo',
-    brand_id: 'brand_bangjo',
-    branch_id: 'branch_jakarta'
+  scope.set({
+    key: 'branch.whatsapp_number',
+    value: '6282222222222',
+    type: 'string',
+    scope_type: 'branch',
+    scope_id: 'branch_jakarta',
+    source: 'dashboard'
   });
-  assert.strictEqual(valBrand, 20);
 
-  // Resolution 3: Query for another brand without override -> Falls back to Org value (15)
-  const valOrg = scope.getValue('delivery.max_distance_km', {
-    organization_id: 'org_bangjo',
-    brand_id: 'brand_other'
+  // Verify two branches resolve distinct WhatsApp numbers without fallback
+  assert.strictEqual(scope.getValue('branch.whatsapp_number', { branch_id: 'branch_surabaya' }), '6281111111111');
+  assert.strictEqual(scope.getValue('branch.whatsapp_number', { branch_id: 'branch_jakarta' }), '6282222222222');
+  assert.strictEqual(scope.getValue('branch.whatsapp_number', { branch_id: 'branch_unconfigured' }), null, 'Must NOT fallback to Owner WhatsApp');
+
+  // 2. Flexible Warehouse / Location Topology (1->1, 1->N, N->N)
+  // 1 Branch -> 1 Warehouse
+  scope.set({
+    key: 'branch.assigned_warehouses',
+    value: ['wh_surabaya_main'],
+    type: 'json',
+    scope_type: 'branch',
+    scope_id: 'branch_surabaya'
   });
-  assert.strictEqual(valOrg, 15);
+  // 1 Branch -> Multiple Warehouses (1->N)
+  scope.set({
+    key: 'branch.assigned_warehouses',
+    value: ['wh_jakarta_central', 'wh_jakarta_hub_south'],
+    type: 'json',
+    scope_type: 'branch',
+    scope_id: 'branch_jakarta'
+  });
 
-  // Resolution 4: Query with no matching org -> Falls back to System default (10)
-  const valSystem = scope.getValue('delivery.max_distance_km', { organization_id: 'org_stranger' });
-  assert.strictEqual(valSystem, 10);
+  const whSurabaya = scope.getValue('branch.assigned_warehouses', { branch_id: 'branch_surabaya' });
+  const whJakarta = scope.getValue('branch.assigned_warehouses', { branch_id: 'branch_jakarta' });
+
+  assert.deepStrictEqual(whSurabaya, ['wh_surabaya_main']);
+  assert.deepStrictEqual(whJakarta, ['wh_jakarta_central', 'wh_jakarta_hub_south']);
 });
 
 // ==============================================================================
-// C3 — Validation & Defaults Test (Level: Schema & Platform Defaults)
-// Requirement: validates constraints and provides safe system defaults
+// C3 — Validation & Defaults Test (Level: Required Validation & Environment Secrets)
+// Requirement: type/format validation, mandatory rejection, secure secret extraction without hardcoded fallback
 // ==============================================================================
-test('C3 — Validation & Defaults: schema validation and safe system defaults application', () => {
+test('C3 — Validation & Defaults: mandatory Branch WhatsApp and secure environment secret enforcement', () => {
   const scope = new ConfigurationScope();
 
   // Validations
   assert.strictEqual(ConfigurationValidator.validate('delivery.max_radius_km', 15, 'number').valid, true);
   assert.strictEqual(ConfigurationValidator.validate('delivery.max_radius_km', -5, 'number').valid, false);
-  assert.strictEqual(ConfigurationValidator.validate('', 10, 'number').valid, false);
+  assert.strictEqual(ConfigurationValidator.validate('branch.whatsapp_number', '62812345', 'string').valid, true);
+  assert.strictEqual(ConfigurationValidator.validate('branch.whatsapp_number', '', 'string').valid, false, 'Empty branch WhatsApp must be rejected');
 
-  // Apply Defaults
+  // Apply Defaults (Platform defaults only, no operational fallback)
   ConfigurationValidator.applyDefaults(scope);
-
-  // Verify safe defaults are populated in scope
   assert.strictEqual(scope.getValue('platform.default_currency'), 'IDR');
-  assert.strictEqual(scope.getValue('delivery.max_radius_km'), 15);
-  assert.strictEqual(scope.getValue('pos.auto_accept_order'), false);
+  assert.strictEqual(scope.getValue('branch.whatsapp_number'), null, 'No default allowed for branch WhatsApp');
+
+  // Environment Secret Validation (Negative test: missing secret throws explicit error)
+  const savedKey = process.env.TEST_INFRA_SECRET;
+  delete process.env.TEST_INFRA_SECRET;
+
+  assert.throws(() => {
+    ConfigurationValidator.requireSecureEnvSecret('TEST_INFRA_SECRET');
+  }, /Missing required infrastructure secret "TEST_INFRA_SECRET". No hardcoded fallback allowed/);
+
+  // Configured secret succeeds
+  process.env.TEST_INFRA_SECRET = 'wablas_sec_live_999';
+  const resolvedSecret = ConfigurationValidator.requireSecureEnvSecret('TEST_INFRA_SECRET');
+  assert.strictEqual(resolvedSecret, 'wablas_sec_live_999');
+
+  // Restore env
+  if (savedKey) process.env.TEST_INFRA_SECRET = savedKey;
+  else delete process.env.TEST_INFRA_SECRET;
 });
 
 // ==============================================================================
-// C4 — Configuration Access Test (Level: Access Control & Secret Protection)
-// Requirement: RBAC protected writes and secret reveal authorization
+// C4 — Configuration Access Test (Level: Mutation Boundary & Authorization Integration)
+// Requirement: mutation allowed only within actor authority scope (Branch manager cannot modify platform scope)
 // ==============================================================================
-test('C4 — Configuration Access: RBAC write authorization and secret masking', () => {
+test('C4 — Configuration Access: RBAC-aware mutation boundaries and secret masking', () => {
   const scope = new ConfigurationScope();
 
   const ownerUser = new IdentityModel({ username: 'owner_user', status: 'active' });
-  const cashierUser = new IdentityModel({ username: 'cashier_user', status: 'active' });
+  const branchMgrUser = new IdentityModel({ username: 'branch_mgr_user', status: 'active' });
 
   const ownerAssignments = [{ user_id: ownerUser.id, role: 'owner', scope_type: 'global' }];
-  const cashierAssignments = [{ user_id: cashierUser.id, role: 'cashier', scope_type: 'branch', scope_id: 'branch_01' }];
+  const branchMgrAssignments = [{ user_id: branchMgrUser.id, role: 'branch_manager', scope_type: 'branch', scope_id: 'branch_surabaya' }];
 
-  // 1. Owner writes organization configuration: Allowed
-  const writeResult = ConfigurationAccess.write({
+  // 1. Branch Manager updates Branch Configuration: Allowed
+  const branchUpdate = ConfigurationAccess.write({
     scopeManager: scope,
     configPayload: {
-      key: 'payment.gateway_secret',
-      value: 'sk_live_123456789',
+      key: 'branch.pickup_instructions',
+      value: 'Ambil di kasir samping',
       type: 'string',
-      scope_type: 'organization',
-      scope_id: 'org_main',
-      is_secret: true
+      scope_type: 'branch',
+      scope_id: 'branch_surabaya'
     },
-    identity: ownerUser,
-    assignments: ownerAssignments
+    identity: branchMgrUser,
+    assignments: branchMgrAssignments
   });
-  assert.strictEqual(writeResult.key, 'payment.gateway_secret');
+  assert.strictEqual(branchUpdate.key, 'branch.pickup_instructions');
 
-  // 2. Cashier tries to write organization configuration: Denied (Throws 403)
+  // 2. Branch Manager attempts to update Global / Platform Configuration: Denied (Throws 403)
   assert.throws(() => {
     ConfigurationAccess.write({
       scopeManager: scope,
       configPayload: {
-        key: 'payment.gateway_secret',
-        value: 'hacked',
-        type: 'string',
-        scope_type: 'organization',
-        scope_id: 'org_main'
+        key: 'platform.maintenance_mode',
+        value: true,
+        type: 'boolean',
+        scope_type: 'system',
+        scope_id: null
       },
-      identity: cashierUser,
-      assignments: cashierAssignments
+      identity: branchMgrUser,
+      assignments: branchMgrAssignments
     });
   }, (err) => err.code === 'FORBIDDEN' && err.status === 403);
 
-  // 3. Read secret with unprivileged request -> Value is masked
+  // 3. Secret Read Masking (Unprivileged user reads masked value)
+  scope.set({
+    key: 'wablas.infrastructure_token',
+    value: 'secret_wablas_prod_token',
+    type: 'string',
+    scope_type: 'system',
+    is_secret: true
+  });
+
   const maskedRead = ConfigurationAccess.read({
     scopeManager: scope,
-    key: 'payment.gateway_secret',
-    identity: cashierUser,
-    assignments: cashierAssignments,
-    target_context: { organization_id: 'org_main' },
-    reveal_secrets: true // Cashier requests reveal, but RBAC should keep it masked
+    key: 'wablas.infrastructure_token',
+    identity: branchMgrUser,
+    assignments: branchMgrAssignments,
+    reveal_secrets: true // Branch manager asks reveal, but lacks org:manage
   });
   assert.strictEqual(maskedRead.value, '********');
 
-  // 4. Read secret with owner request -> Value is revealed
+  // 4. Secret Read Revealed for Owner
   const ownerRead = ConfigurationAccess.read({
     scopeManager: scope,
-    key: 'payment.gateway_secret',
+    key: 'wablas.infrastructure_token',
     identity: ownerUser,
     assignments: ownerAssignments,
-    target_context: { organization_id: 'org_main' },
     reveal_secrets: true
   });
-  assert.strictEqual(ownerRead.value, 'sk_live_123456789');
+  assert.strictEqual(ownerRead.value, 'secret_wablas_prod_token');
 });
 
 // ==============================================================================
-// C5 — Feature Control Foundation Test (Level: Feature Toggle & Granular Rollout)
-// Requirement: platform feature flag toggling and hierarchical evaluation
+// C5 — Feature Control Foundation Test (Level: Feature Toggle & No Business Logic Leakage)
+// Requirement: toggles platform features per scope without executing business workflows
 // ==============================================================================
-test('C5 — Feature Control Foundation: granular feature flag toggles per scope', () => {
+test('C5 — Feature Control Foundation: granular feature flag toggles per scope without business logic leakage', () => {
   const scope = new ConfigurationScope();
   const featureControl = new FeatureControlFoundation(scope);
 

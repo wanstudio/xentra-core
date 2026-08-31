@@ -17,6 +17,13 @@ class ConfigurationValidator {
   };
 
   /**
+   * Mandatory configurations that must never fallback to owner/code constants.
+   */
+  static MANDATORY_CONFIGS = [
+    'branch.whatsapp_number'
+  ];
+
+  /**
    * Validates a configuration key-value pair against recognized schemas.
    * @param {string} key
    * @param {*} value
@@ -45,11 +52,19 @@ class ConfigurationValidator {
       }
     }
 
+    // Branch WhatsApp validation
+    if (key === 'branch.whatsapp_number') {
+      if (!value || typeof value !== 'string' || !value.trim()) {
+        return { valid: false, error: 'Branch WhatsApp number is mandatory and cannot be empty.' };
+      }
+    }
+
     return { valid: true };
   }
 
   /**
    * Applies system safe defaults to a ConfigurationScope instance.
+   * Note: Never creates Owner WhatsApp or operational fallback defaults.
    * @param {Object} configScope - ConfigurationScope instance
    */
   static applyDefaults(configScope) {
@@ -60,9 +75,23 @@ class ConfigurationValidator {
         type: def.type,
         scope_type: 'system',
         scope_id: null,
+        source: 'system_default',
         description: 'Core platform safe default'
       });
     }
+  }
+
+  /**
+   * Validates environment secret presence without fallback.
+   * @param {string} secretKey - e.g., 'WABLAS_API_KEY', 'MIDTRANS_SERVER_KEY'
+   * @returns {string} The resolved secret value or throws explicit error.
+   */
+  static requireSecureEnvSecret(secretKey) {
+    const val = process.env[secretKey];
+    if (!val || !val.trim()) {
+      throw new Error(`[ConfigurationValidator] Missing required infrastructure secret "${secretKey}". No hardcoded fallback allowed.`);
+    }
+    return val.trim();
   }
 }
 

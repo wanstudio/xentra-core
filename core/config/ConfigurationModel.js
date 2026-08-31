@@ -1,11 +1,12 @@
 /**
  * Xentra Core Configuration Model (C1)
- * Represents a configuration entry with typed values, scopes, and secret flags.
+ * Represents a configuration entry distinguishing key, value, type, scope, source, and is_secret.
  */
 class ConfigurationModel {
   /**
    * Allowed Types: 'string' | 'number' | 'boolean' | 'json'
    * Allowed Scopes: 'system' | 'organization' | 'brand' | 'branch'
+   * Allowed Sources: 'dashboard' | 'environment' | 'system_default'
    */
   constructor({
     key,
@@ -13,6 +14,7 @@ class ConfigurationModel {
     type = 'string',
     scope_type = 'system',
     scope_id = null,
+    source = 'dashboard',
     is_secret = false,
     description = ''
   }) {
@@ -30,10 +32,16 @@ class ConfigurationModel {
       throw new Error(`[ConfigurationModel] Invalid scope_type "${scope_type}". Allowed: ${validScopes.join(', ')}`);
     }
 
+    const validSources = ['dashboard', 'environment', 'system_default'];
+    if (!validSources.includes(source)) {
+      throw new Error(`[ConfigurationModel] Invalid source "${source}". Allowed: ${validSources.join(', ')}`);
+    }
+
     this.key = key.trim();
     this.type = type;
     this.scope_type = scope_type;
     this.scope_id = scope_id ? String(scope_id).trim() : null;
+    this.source = source;
     this.is_secret = Boolean(is_secret);
     this.description = description ? String(description).trim() : '';
     this.value = ConfigurationModel.castValue(value, type);
@@ -81,6 +89,7 @@ class ConfigurationModel {
       type: this.type,
       scope_type: this.scope_type,
       scope_id: this.scope_id,
+      source: this.source,
       is_secret: this.is_secret,
       description: this.description,
       updated_at: this.updated_at
