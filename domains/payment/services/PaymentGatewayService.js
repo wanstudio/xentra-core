@@ -153,14 +153,19 @@ class PaymentGatewayService {
 
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
 
-    // Verify signature if server key is configured and not explicitly skipped
+    // P1 SECURE WEBHOOK VERIFICATION: Strictly fail-closed signature verification (mandatory valid server_key & signature_key)
     if (!skipSignatureCheck) {
       const config = this.resolvePaymentConfig(order?.branch_id, order?.brand_id);
-      if (config.server_key && webhookData.signature_key) {
-        const isValid = this.verifySignature(webhookData, config.server_key);
-        if (!isValid) {
-          throw new Error(`[PaymentGatewayService] Signature webhook Midtrans tidak valid untuk order "${order_id}".`);
-        }
+      if (!config.server_key) {
+        throw new Error(`[PaymentGatewayService] Server Key Midtrans belum dikonfigurasi untuk brand/cabang order "${order_id}". Webhook ditolak demi keamanan.`);
+      }
+      if (!webhookData.signature_key) {
+        throw new Error(`[PaymentGatewayService] Signature key tidak disertakan pada webhook payload untuk order "${order_id}". Webhook ditolak.`);
+      }
+
+      const isValid = this.verifySignature(webhookData, config.server_key);
+      if (!isValid) {
+        throw new Error(`[PaymentGatewayService] Signature webhook Midtrans tidak valid untuk order "${order_id}".`);
       }
     }
 
