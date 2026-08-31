@@ -42,7 +42,7 @@ function saveSqlJsToDisk() {
   }
 }
 
-// In-Memory fallback store
+// In-Memory test/mock store
 const memoryStore = {
   brands: [
     {
@@ -86,18 +86,7 @@ const memoryStore = {
     { id: 345, brand_id: 'brand_bangjo', category_id: 34, name: 'Mie Gurih', price: 15000, regular_price: 17000, description: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', is_active: 1, sort_order: 3 }
   ],
   orders: [],
-  users: [
-    {
-      id: 'usr_bangjo_owner',
-      brand_id: 'brand_bangjo_master',
-      organization_id: 'org_xentra_holding',
-      username: 'admin',
-      email: 'admin@bangjo.com',
-      password_hash: 'bangjo123',
-      full_name: 'Pemilik Bangjo',
-      role: 'owner'
-    }
-  ]
+  users: []
 };
 
 // Database Proxy supporting both Native, Portable & Memory Engines
@@ -150,7 +139,7 @@ const db = {
       };
     }
 
-    // Memory Store Emulation
+    // Memory Store Emulation (FAIL-CLOSED: Never default to first brand / first user if query param mismatch)
     const lowerSql = sql.toLowerCase();
     return {
       all: (...params) => {
@@ -159,28 +148,37 @@ const db = {
           return memoryStore.products;
         }
         if (lowerSql.includes('from categories')) return memoryStore.categories;
-        if (lowerSql.includes('from branches')) return memoryStore.branches;
-        if (lowerSql.includes('from brands')) return memoryStore.brands;
+        if (lowerSql.includes('from branches')) {
+          if (params[0]) return memoryStore.branches.filter(b => b.brand_id === params[0]);
+          return memoryStore.branches;
+        }
+        if (lowerSql.includes('from brands')) {
+          if (params[0]) return memoryStore.brands.filter(b => b.id === params[0]);
+          return memoryStore.brands;
+        }
         if (lowerSql.includes('from users')) return memoryStore.users;
         if (lowerSql.includes('from orders')) return memoryStore.orders;
         return [];
       },
       get: (...params) => {
+        if (lowerSql.includes('select 1 as alive')) {
+          return { alive: 1 };
+        }
         if (lowerSql.includes('from users')) {
           if (params[0]) return memoryStore.users.find(u => u.username === params[0] || u.email === params[0]);
-          return memoryStore.users[0];
+          return undefined; // P1 Fail-Closed: Never return memoryStore.users[0]
         }
         if (lowerSql.includes('from brands')) {
-          if (params[0]) return memoryStore.brands.find(b => b.custom_domain === params[0] || b.slug === params[0]) || memoryStore.brands[0];
-          return memoryStore.brands[0];
+          if (params[0]) return memoryStore.brands.find(b => b.custom_domain === params[0] || b.slug === params[0]);
+          return undefined; // P1 Fail-Closed: Never fallback to memoryStore.brands[0]
         }
         if (lowerSql.includes('from branches')) {
-          if (params[0]) return memoryStore.branches.find(b => b.id === params[0]) || memoryStore.branches[0];
-          return memoryStore.branches[0];
+          if (params[0]) return memoryStore.branches.find(b => b.id === params[0]);
+          return undefined; // P1 Fail-Closed: Never fallback to memoryStore.branches[0]
         }
         if (lowerSql.includes('from products')) {
-          if (params[0]) return memoryStore.products.find(p => String(p.id) === String(params[0])) || memoryStore.products[0];
-          return memoryStore.products[0];
+          if (params[0]) return memoryStore.products.find(p => String(p.id) === String(params[0]));
+          return undefined;
         }
         return undefined;
       },
