@@ -16,7 +16,7 @@ const {
 } = require('../../core/events');
 
 // ==============================================================================
-// A1 — Event Contract Test (Level: Component/Contract)
+// A1 — Event Contract Test (Level: Component / Contract)
 // Requirement: input -> validation/transformation -> expected event output
 // ==============================================================================
 test('A1 — Event Contract: validates schema, immutability, serialization & invalid inputs', () => {
@@ -27,7 +27,9 @@ test('A1 — Event Contract: validates schema, immutability, serialization & inv
     payload: { ping: true, counter: 42 },
     context: {
       actor_id: 'usr_test_01',
-      tenant_id: 'brand_bangjo'
+      actor_type: 'merchant',
+      tenant_id: 'brand_bangjo',
+      branch_id: 'branch_surabaya'
     }
   };
 
@@ -42,6 +44,9 @@ test('A1 — Event Contract: validates schema, immutability, serialization & inv
   assert.strictEqual(event.payload.counter, 42);
   assert.ok(event.timestamp, 'Event must have timestamp');
   assert.strictEqual(event.context.actor_id, 'usr_test_01');
+  assert.strictEqual(event.context.actor_type, 'merchant');
+  assert.strictEqual(event.context.tenant_id, 'brand_bangjo');
+  assert.strictEqual(event.context.branch_id, 'branch_surabaya');
 
   // Assert Immutability
   assert.throws(() => {
@@ -64,6 +69,7 @@ test('A1 — Event Contract: validates schema, immutability, serialization & inv
   assert.strictEqual(rehydrated.id, event.id);
   assert.strictEqual(rehydrated.type, event.type);
   assert.deepStrictEqual(rehydrated.payload, event.payload);
+  assert.deepStrictEqual(rehydrated.context, event.context);
 });
 
 // ==============================================================================
@@ -90,17 +96,21 @@ test('A2 — Event Publisher: domain-scoped emit creates valid contract and publ
 
 // ==============================================================================
 // A3 — Event Bus Test (Level: Channel / Handoff)
-// Requirement: event handoff/routing at the bus boundary without direct domain calling
+// Requirement: proves boundary handoff, uncoupled delivery, and wildcard dispatch
 // ==============================================================================
-test('A3 — Event Bus: central asynchronous routing & wildcard delivery', async () => {
+test('A3 — Event Bus: boundary handoff without direct domain coupling & wildcard distribution', async () => {
   const bus = new (require('../../core/events/EventBus').EventBus)();
   const receivedExact = [];
   const receivedWildcard = [];
+  let uncoupledInvocation = false;
 
+  // Domain A registers handler to Bus
   bus.subscribe('inventory.stock.depleted', (event) => {
     receivedExact.push(event);
+    uncoupledInvocation = true;
   });
 
+  // Domain B registers wildcard monitor
   bus.subscribe('*', (event) => {
     receivedWildcard.push(event);
   });
@@ -111,8 +121,12 @@ test('A3 — Event Bus: central asynchronous routing & wildcard delivery', async
     payload: { sku: 'SKU_AYAM_GORENG', remaining: 0 }
   });
 
-  await bus.publish(event);
+  // Bus handoff verification: publishing into bus boundary executes registered subscribers
+  const publishSummary = await bus.publish(event);
 
+  assert.strictEqual(publishSummary.success, true);
+  assert.strictEqual(publishSummary.delivered, 2, 'Must deliver to exact match + wildcard');
+  assert.strictEqual(uncoupledInvocation, true, 'Handoff must happen through Bus boundary');
   assert.strictEqual(receivedExact.length, 1);
   assert.strictEqual(receivedExact[0].payload.sku, 'SKU_AYAM_GORENG');
   assert.strictEqual(receivedWildcard.length, 1);
@@ -160,51 +174,56 @@ test('A4 — Subscriber: lifecycle management (on, once, off, clear)', async () 
 
 // ==============================================================================
 // A5 — Event Dispatcher Test (Level: Deterministic Routing & Error Isolation)
-// Requirement: deterministic execution and subscriber failure isolation
+// Requirement: proves deterministic order of execution & isolated error boundaries
 // ==============================================================================
-test('A5 — Event Dispatcher: failure isolation prevents one error from blocking other subscribers', async () => {
+test('A5 — Event Dispatcher: deterministic execution order & failure isolation', async () => {
   const dummyEvent = new EventContract({
     type: 'payment.webhook.received',
     producer: 'payment',
     payload: { transaction_status: 'settlement' }
   });
 
-  let healthyExecuted1 = false;
-  let healthyExecuted2 = false;
+  const executionSequence = [];
 
   const subscribers = [
     {
-      id: 'sub_1',
+      id: 'sub_first',
       domain: 'pos',
-      handler: () => { healthyExecuted1 = true; }
+      handler: () => { executionSequence.push('pos_handler'); }
     },
     {
       id: 'sub_faulty',
       domain: 'external_webhook',
-      handler: () => { throw new Error('Simulated network timeout in webhook handler'); }
+      handler: () => {
+        executionSequence.push('faulty_handler');
+        throw new Error('Simulated network timeout in webhook handler');
+      }
     },
     {
-      id: 'sub_2',
+      id: 'sub_last',
       domain: 'reporting',
-      handler: () => { healthyExecuted2 = true; }
+      handler: () => { executionSequence.push('reporting_handler'); }
     }
   ];
 
   const result = await EventDispatcher.dispatch(dummyEvent, subscribers);
 
-  assert.strictEqual(healthyExecuted1, true, 'Subscriber 1 must execute');
-  assert.strictEqual(healthyExecuted2, true, 'Subscriber 2 must execute despite faulty subscriber');
+  // 1. Assert deterministic sequence
+  assert.deepStrictEqual(executionSequence, ['pos_handler', 'faulty_handler', 'reporting_handler'], 'Dispatch must execute in deterministic sequential order');
+
+  // 2. Assert error isolation
   assert.strictEqual(result.delivered, 2);
   assert.strictEqual(result.failed, 1);
   assert.strictEqual(result.errors.length, 1);
   assert.strictEqual(result.errors[0].domain, 'external_webhook');
+  assert.ok(result.errors[0].error.includes('Simulated network timeout'));
 });
 
 // ==============================================================================
 // A6 — Event Registry Test (Level: Catalog & Schema Lookup)
-// Requirement: registration, lookup, duplicate/invalid cases
+// Requirement: registration, lookup, duplicate/overwrite behavior & invalid schemas
 // ==============================================================================
-test('A6 — Event Registry: registration, inspection, and invalid schema detection', () => {
+test('A6 — Event Registry: registration, duplicate overwrite behavior, and invalid schema detection', () => {
   const registry = new (require('../../core/events/EventRegistry').EventRegistry)();
 
   // Valid Registration
@@ -212,16 +231,26 @@ test('A6 — Event Registry: registration, inspection, and invalid schema detect
     type: 'commerce.cart.item_added',
     version: '1.0.0',
     producer: 'commerce',
-    description: 'Triggered when a customer adds an item to cart'
+    description: 'Initial schema description'
   });
 
   assert.strictEqual(registry.isRegistered('commerce.cart.item_added', '1.0.0'), true);
   assert.strictEqual(registry.isRegistered('commerce.cart.item_added', '2.0.0'), false);
   assert.strictEqual(registry.isRegistered('unregistered.event'), false);
 
-  const def = registry.get('commerce.cart.item_added', '1.0.0');
-  assert.strictEqual(def.type, 'commerce.cart.item_added');
-  assert.strictEqual(def.producer, 'commerce');
+  const initialDef = registry.get('commerce.cart.item_added', '1.0.0');
+  assert.strictEqual(initialDef.description, 'Initial schema description');
+
+  // Duplicate / Overwrite Behavior
+  registry.register({
+    type: 'commerce.cart.item_added',
+    version: '1.0.0',
+    producer: 'commerce',
+    description: 'Updated schema description'
+  });
+
+  const updatedDef = registry.get('commerce.cart.item_added', '1.0.0');
+  assert.strictEqual(updatedDef.description, 'Updated schema description', 'Duplicate registration should deterministically update definition');
 
   // Invalid Registration Cases
   assert.throws(() => registry.register({ type: '', producer: 'commerce' }), /"type" must be a non-empty string/);
@@ -230,9 +259,9 @@ test('A6 — Event Registry: registration, inspection, and invalid schema detect
 
 // ==============================================================================
 // A7 — Event Context & Metadata Test (Level: Tracing & Causality)
-// Requirement: identity, correlation/causation propagation, child relationships
+// Requirement: identity, correlation/causation propagation, full metadata consistency
 // ==============================================================================
-test('A7 — Event Context & Metadata: correlation & causation chaining across lineage', () => {
+test('A7 — Event Context & Metadata: full metadata consistency & causation chaining across lineage', () => {
   const rootContext = new EventContext({
     actor_id: 'usr_customer_88',
     actor_type: 'customer',
@@ -240,10 +269,13 @@ test('A7 — Event Context & Metadata: correlation & causation chaining across l
     branch_id: 'branch_surabaya'
   });
 
+  // Check full metadata attributes
   assert.ok(rootContext.correlation_id.startsWith('corr_'));
   assert.strictEqual(rootContext.causation_id, null);
   assert.strictEqual(rootContext.actor_id, 'usr_customer_88');
+  assert.strictEqual(rootContext.actor_type, 'customer');
   assert.strictEqual(rootContext.tenant_id, 'brand_bangjo');
+  assert.strictEqual(rootContext.branch_id, 'branch_surabaya');
 
   const rootEvent = new EventContract({
     type: 'commerce.order.created',
@@ -252,29 +284,38 @@ test('A7 — Event Context & Metadata: correlation & causation chaining across l
     context: rootContext
   });
 
-  // Derive child context (Preserves correlation_id, sets causation_id to parent event ID)
+  // Derive child context: preserves correlation_id, tenant_id, branch_id; sets causation_id; allows actor override
   const childContext = EventContext.deriveChild(rootEvent.context, rootEvent.id, {
-    actor_id: 'system_router'
+    actor_id: 'system_router',
+    actor_type: 'system'
   });
 
   assert.strictEqual(childContext.correlation_id, rootContext.correlation_id, 'Correlation ID must be preserved');
   assert.strictEqual(childContext.causation_id, rootEvent.id, 'Causation ID must be parent event ID');
-  assert.strictEqual(childContext.actor_id, 'system_router', 'Actor ID can be overridden in child context');
+  assert.strictEqual(childContext.actor_id, 'system_router');
+  assert.strictEqual(childContext.actor_type, 'system');
   assert.strictEqual(childContext.tenant_id, 'brand_bangjo');
+  assert.strictEqual(childContext.branch_id, 'branch_surabaya');
 });
 
 // ==============================================================================
 // A8 — Event Logging / Audit Foundation Test (Level: Observability)
-// Requirement: observable lifecycle/audit records retain event identity & metadata
+// Requirement: observable lifecycle/audit records retain event identity, correlation, & details
 // ==============================================================================
-test('A8 — Event Logging: records lifecycle stages (published, dispatched, error) without business coupling', () => {
+test('A8 — Event Logging: records lifecycle stages and retains full tracing metadata', () => {
   const logger = new (require('../../core/events/EventLogger').EventLogger)();
+
+  const context = new EventContext({
+    correlation_id: 'corr_test_tracing_123',
+    actor_id: 'auditor_service',
+    tenant_id: 'tenant_audit_demo'
+  });
 
   const event = new EventContract({
     type: 'core.audit.test',
     producer: 'core',
     payload: { action: 'ping' },
-    context: { actor_id: 'auditor', tenant_id: 'tenant_main' }
+    context
   });
 
   logger.log('published', event);
@@ -286,22 +327,30 @@ test('A8 — Event Logging: records lifecycle stages (published, dispatched, err
   assert.strictEqual(logs[0].stage, 'published');
   assert.strictEqual(logs[1].stage, 'dispatched');
   assert.strictEqual(logs[2].stage, 'error');
+
+  // Verify tracing coherence in audit logs
   assert.strictEqual(logs[0].event_id, event.id);
+  assert.strictEqual(logs[0].event_type, 'core.audit.test');
   assert.strictEqual(logs[0].producer, 'core');
+  assert.strictEqual(logs[0].correlation_id, 'corr_test_tracing_123');
   assert.ok(logs[2].details.error.includes('CRM Down'));
 });
 
 // ==============================================================================
-// A9 — Unit Test & Reference Event Test (Level: End-to-End Coherence)
-// Requirement: input -> EventContract -> EventPublisher -> EventBus -> EventDispatcher -> EventSubscriber -> observable output
+// A9 — Unit Test & Reference Event Test (Level: End-to-End Coherence Policy)
+// Requirement: input -> EventRegistry -> EventContract -> EventPublisher -> EventBus -> EventDispatcher -> EventSubscriber -> observable output
 // ==============================================================================
-test('A9 — Unit Test & Reference Event: full end-to-end coherent pipeline verification', async () => {
+test('A9 — Unit Test & Reference Event: full end-to-end coherent pipeline verification with registry and tracing audit', async () => {
   EventBus.clear();
   EventLogger.clear();
 
-  const publisher = createPublisher('core');
-  const subscriber = createSubscriber('reporting');
+  // 1. Verify Event Schema is officially registered in EventRegistry
+  assert.strictEqual(EventRegistry.isRegistered('core.reference.ping', '1.0.0'), true, 'Reference event must be registered in EventRegistry');
+  const eventDef = EventRegistry.get('core.reference.ping', '1.0.0');
+  assert.strictEqual(eventDef.producer, 'core');
 
+  // 2. Setup domain subscriber
+  const subscriber = createSubscriber('reporting');
   let pipelineCompleted = false;
   let receivedEvent = null;
 
@@ -310,19 +359,27 @@ test('A9 — Unit Test & Reference Event: full end-to-end coherent pipeline veri
     pipelineCompleted = true;
   });
 
+  // 3. Prepare structured input & context metadata
   const rootContext = createContext({
     actor_id: 'agent_runner_1',
     actor_type: 'system',
-    tenant_id: 'org_xentra'
+    tenant_id: 'org_xentra',
+    branch_id: 'branch_pusat'
   });
 
-  // Execute full pipeline: Publisher -> Bus -> Dispatcher -> Subscriber
-  const publishResult = await publisher.emit('core.reference.ping', {
-    ping_token: 'XENTRA_E2E_TOKEN_999',
+  const rawPayload = {
+    sequence_number: 101,
+    status: 'operational',
     timestamp: Date.now()
-  }, rootContext);
+  };
 
-  // Assertions for end-to-end coherence
+  // 4. Create Contract & Publisher
+  const publisher = createPublisher('core');
+
+  // 5. Execute full pipeline: Publisher -> Bus -> Dispatcher -> Subscriber
+  const publishResult = await publisher.emit('core.reference.ping', rawPayload, rootContext);
+
+  // 6. Assertions for end-to-end coherence & observable output
   assert.strictEqual(publishResult.success, true);
   assert.strictEqual(publishResult.delivered, 1);
   assert.strictEqual(publishResult.failed, 0);
@@ -330,14 +387,23 @@ test('A9 — Unit Test & Reference Event: full end-to-end coherent pipeline veri
   assert.strictEqual(pipelineCompleted, true, 'Reference subscriber must have executed');
   assert.ok(receivedEvent, 'Event must reach subscriber intact');
   assert.strictEqual(receivedEvent.type, 'core.reference.ping');
+  assert.strictEqual(receivedEvent.version, '1.0.0');
   assert.strictEqual(receivedEvent.producer, 'core');
-  assert.strictEqual(receivedEvent.payload.ping_token, 'XENTRA_E2E_TOKEN_999');
-  assert.strictEqual(receivedEvent.context.actor_id, 'agent_runner_1');
-  assert.strictEqual(receivedEvent.context.tenant_id, 'org_xentra');
+  assert.strictEqual(receivedEvent.payload.sequence_number, 101);
+  assert.strictEqual(receivedEvent.payload.status, 'operational');
 
-  // Verify Audit Log trail captured through entire lifecycle
+  // 7. Verify full Context & Tracing metadata coherence across pipeline
+  assert.strictEqual(receivedEvent.context.actor_id, 'agent_runner_1');
+  assert.strictEqual(receivedEvent.context.actor_type, 'system');
+  assert.strictEqual(receivedEvent.context.tenant_id, 'org_xentra');
+  assert.strictEqual(receivedEvent.context.branch_id, 'branch_pusat');
+  assert.strictEqual(receivedEvent.context.correlation_id, rootContext.correlation_id);
+
+  // 8. Verify Audit Logging captures exact lifecycle stages with correlation ID
   const eventLogs = EventLogger.getLogs(publishResult.event_id);
-  assert.ok(eventLogs.length >= 2);
+  assert.ok(eventLogs.length >= 2, 'Audit logs must capture published and dispatched stages');
   assert.strictEqual(eventLogs[0].stage, 'published');
   assert.strictEqual(eventLogs[1].stage, 'dispatched');
+  assert.strictEqual(eventLogs[0].correlation_id, rootContext.correlation_id);
+  assert.strictEqual(eventLogs[1].correlation_id, rootContext.correlation_id);
 });
