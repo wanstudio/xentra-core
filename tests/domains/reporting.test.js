@@ -143,13 +143,33 @@ test('Reporting 4 — Inventory Report: detects low stock items below threshold 
 });
 
 // ==============================================================================
-// Reporting 5 — POS Shift Report Service (Cashier Accuracy & Multi-Tenant Scoping)
+// Reporting 5 — POS Shift Report Service (Cashier Accuracy & Multi-Tenant Scoping - NEW-02)
 // ==============================================================================
-test('Reporting 5 — Shift Report: aggregates shift performance and variance with brand_id scoping', () => {
-  const shiftReport = PosShiftReportService.getShiftReport({ brand_id: 'brand_rep', branch_id: 'branch_rep_1' });
-  assert.strictEqual(shiftReport.summary.total_shifts, 1);
-  assert.strictEqual(shiftReport.summary.total_cash_sales, 60000);
-  assert.strictEqual(shiftReport.summary.total_variance, 0);
+test('Reporting 5 — Shift Report: aggregates shift performance and variance with strict brand_id scoping (NEW-02)', () => {
+  // Seed pos_shifts for brand_rep (branch_rep_1)
+  db.prepare(`
+    INSERT OR REPLACE INTO pos_shifts (id, branch_id, cashier_id, starting_float, total_cash_sales, total_cash_in, total_cash_out, expected_cash, actual_cash, variance, status, opened_at, closed_at)
+    VALUES ('shift_rep_1', 'branch_rep_1', 'cashier_1', 100000, 60000, 0, 0, 160000, 160000, 0, 'closed', '2026-08-31 08:00:00', '2026-08-31 16:00:00')
+  `).run();
+
+  // Seed pos_shifts for OTHER brand (branch_other_1)
+  db.prepare(`
+    INSERT OR REPLACE INTO pos_shifts (id, branch_id, cashier_id, starting_float, total_cash_sales, total_cash_in, total_cash_out, expected_cash, actual_cash, variance, status, opened_at, closed_at)
+    VALUES ('shift_other_1', 'branch_other_1', 'cashier_other', 500000, 999000, 0, 0, 1499000, 1499000, 0, 'closed', '2026-08-31 08:00:00', '2026-08-31 16:00:00')
+  `).run();
+
+  // 1. Query for brand_rep without branch_id
+  const shiftReportAll = PosShiftReportService.getShiftReport({ brand_id: 'brand_rep' });
+  assert.strictEqual(shiftReportAll.summary.total_shifts, 1);
+  assert.strictEqual(shiftReportAll.summary.total_cash_sales, 60000);
+  assert.strictEqual(shiftReportAll.shifts.length, 1);
+  assert.strictEqual(shiftReportAll.shifts[0].id, 'shift_rep_1');
+
+  // 2. Targeted cross-branch query: brand_rep attempts to query branch_other_1 -> MUST RETURN 0 RECORDS
+  const shiftReportCross = PosShiftReportService.getShiftReport({ brand_id: 'brand_rep', branch_id: 'branch_other_1' });
+  assert.strictEqual(shiftReportCross.summary.total_shifts, 0);
+  assert.strictEqual(shiftReportCross.summary.total_cash_sales, 0);
+  assert.strictEqual(shiftReportCross.shifts.length, 0);
 });
 
 // ==============================================================================
