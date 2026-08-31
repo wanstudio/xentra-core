@@ -428,37 +428,96 @@ router.post(['/cart/sync', '/checkout/session'], (req, res) => {
   });
 });
 
-// 5.3 Addresses
-let savedAddressesMemory = [];
+// 5.3 Addresses (Customer & Tenant-Scoped Database Persistence)
 router.get('/addresses', (req, res) => {
-  res.json({ success: true, addresses: savedAddressesMemory });
-});
-router.post('/addresses', (req, res) => {
-  const { label = 'Rumah', address = '', detail = '', note = '', latitude, longitude } = req.body;
-  
-  if (latitude == null || longitude == null || isNaN(Number(latitude)) || isNaN(Number(longitude))) {
-    return res.status(400).json({
-      success: false,
-      error: 'Titik koordinat (latitude & longitude) wajib diisi dengan angka yang valid.'
-    });
-  }
+  try {
+    const phone = (req.query.phone || req.headers['x-customer-phone'] || '').trim();
+    if (!phone) {
+      return res.json({ success: true, addresses: [] });
+    }
+    const addresses = db.prepare(`
+      SELECT * FROM customer_addresses 
+      WHERE brand_id = ? AND customer_phone = ? 
+      ORDER BY is_primary DESC, created_at DESC
+    `).all(req.brand_id, phone);
 
-  const addr = {
-    id: 'addr_' + Date.now(),
-    label,
-    address,
-    detail,
-    note,
-    latitude: Number(latitude),
-    longitude: Number(longitude),
-    is_primary: savedAddressesMemory.length === 0 ? 1 : 0
-  };
-  savedAddressesMemory.unshift(addr);
-  res.json({ success: true, address: addr });
+    res.json({ success: true, addresses: addresses || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
+
+router.post('/addresses', (req, res) => {
+  try {
+    const { label = 'Rumah', address = '', detail = '', note = '', latitude, longitude, phone } = req.body;
+    const customerPhone = (phone || req.headers['x-customer-phone'] || '').trim();
+
+    if (latitude == null || longitude == null || isNaN(Number(latitude)) || isNaN(Number(longitude))) {
+      return res.status(400).json({
+        success: false,
+        error: 'Titik koordinat (latitude & longitude) wajib diisi dengan angka yang valid.'
+      });
+    }
+
+    if (!customerPhone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nomor telepon customer wajib disertakan untuk menyimpan alamat.'
+      });
+    }
+
+    const addrId = 'addr_' + crypto.randomBytes(6).toString('hex');
+    const existingCount = db.prepare('SELECT COUNT(*) as cnt FROM customer_addresses WHERE brand_id = ? AND customer_phone = ?').get(req.brand_id, customerPhone);
+    const isPrimary = (!existingCount || existingCount.cnt === 0) ? 1 : 0;
+
+    db.prepare(`
+      INSERT INTO customer_addresses (
+        id, brand_id, customer_phone, label, address, detail, note, latitude, longitude, is_primary
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      addrId,
+      req.brand_id,
+      customerPhone,
+      label,
+      address,
+      detail || '',
+      note || '',
+      Number(latitude),
+      Number(longitude),
+      isPrimary
+    );
+
+    const created = {
+      id: addrId,
+      brand_id: req.brand_id,
+      customer_phone: customerPhone,
+      label,
+      address,
+      detail,
+      note,
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      is_primary: isPrimary
+    };
+
+    res.status(201).json({ success: true, address: created });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.delete('/addresses/:id', (req, res) => {
-  savedAddressesMemory = savedAddressesMemory.filter(a => String(a.id) !== String(req.params.id));
-  res.json({ success: true });
+  try {
+    const phone = (req.query.phone || req.headers['x-customer-phone'] || '').trim();
+    if (phone) {
+      db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').run(req.params.id, req.brand_id, phone);
+    } else {
+      db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
+    }
+    res.json({ success: true, message: 'Alamat berhasil dihapus.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // 6. Create Order & Submit Checkout

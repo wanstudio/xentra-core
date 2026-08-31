@@ -387,7 +387,25 @@ function initSchema(targetDb) {
     CREATE TABLE IF NOT EXISTS product_categories (
       product_id TEXT NOT NULL,
       category_id TEXT NOT NULL,
-      PRIMARY KEY (product_id, category_id)
+      PRIMARY KEY (product_id, category_id),
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS customer_addresses (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      customer_phone TEXT NOT NULL,
+      label TEXT DEFAULT 'Rumah',
+      address TEXT NOT NULL,
+      detail TEXT,
+      note TEXT,
+      latitude REAL NOT NULL,
+      longitude REAL NOT NULL,
+      is_primary INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS branch_products (

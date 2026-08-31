@@ -14,10 +14,10 @@ class BranchMatcher {
    * @returns {Promise<Object>} Nearest branch match result
    */
   static async matchNearestBranch(params) {
-    const { brand_id, customer_lat, customer_lng, subtotal = 0 } = params;
+    const { brand_id, customer_lat, customer_lng, subtotal = 0, items = [] } = params;
 
     // 1. Fetch active branches for brand
-    const branches = db
+    let branches = db
       .prepare(`
         SELECT 
           b.id, b.brand_id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone,
@@ -37,6 +37,26 @@ class BranchMatcher {
         branch: null,
         delivery: null
       };
+    }
+
+    // P1 FULFILLMENT INTELLIGENCE (LOGIC-02): Filter branches capable of fulfilling 100% cart items
+    if (Array.isArray(items) && items.length > 0) {
+      const eligibleStockBranches = branches.filter((br) => {
+        for (const item of items) {
+          const prodId = item.id || item.product_id;
+          if (String(prodId) === 'promo-es-teh-gratis') continue;
+          const bp = db.prepare('SELECT stock, is_available FROM branch_products WHERE branch_id = ? AND product_id = ?').get(br.id, prodId);
+          if (!bp || bp.is_available === 0) return false;
+          const reqQty = Number(item.quantity || item.qty || 1);
+          if (bp.stock != null && Number(bp.stock) < reqQty) return false;
+        }
+        return true;
+      });
+
+      // If at least one branch can fulfill all items, narrow candidates to them
+      if (eligibleStockBranches.length > 0) {
+        branches = eligibleStockBranches;
+      }
     }
 
     // 2. Spatial Pre-Filtering (Haversine straight-line filter)

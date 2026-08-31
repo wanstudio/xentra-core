@@ -37,6 +37,20 @@ class PrePaymentVerificationGate {
       throw new Error('[PrePaymentVerificationGate] "items" array must not be empty.');
     }
 
+    // P1 RELATIONAL INTEGRITY (DB-01): Verify that branch belongs strictly to brand
+    if (brand_id) {
+      const branchBelongs = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, brand_id);
+      if (!branchBelongs) {
+        return {
+          status: 'BRANCH_BRAND_MISMATCH',
+          is_valid: false,
+          verified_items: [],
+          price_diffs: [],
+          errors: [`Cabang "${branch_id}" bukan merupakan cabang resmi dari brand "${brand_id}".`]
+        };
+      }
+    }
+
     const priceDiffs = [];
     const errors = [];
     const verifiedItems = [];
