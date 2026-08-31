@@ -628,12 +628,24 @@
     // Load catalog
     API.get('/catalog/menu')
       .then(function (data) {
-        if (data.success && data.categories) {
+        if (data.success && data.categories && data.categories.length > 0) {
           categories = data.categories;
-          products = categories.length > 0 ? (categories[0].products || []) : [];
-          activeCategory = categories.length > 0 ? categories[0].id : null;
+          
+          // Determine active category (Rekom first, fallback to first category)
+          var rekom = categories.find(function (c) {
+            return String(c.name).trim().toLowerCase() === 'rekom';
+          });
+          var initialCat = rekom || categories[0];
+          activeCategory = initialCat.id;
+          products = (initialCat.products && initialCat.products.length > 0) ? initialCat.products : [];
+
           renderCategories();
-          renderProducts();
+          
+          if (products.length > 0) {
+            renderProducts();
+          } else {
+            loadProducts(activeCategory);
+          }
         }
       })
       .catch(function (err) {
