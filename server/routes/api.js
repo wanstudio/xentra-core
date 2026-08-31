@@ -368,10 +368,12 @@ router.get('/products', (req, res) => {
         products = db.prepare(`
           SELECT DISTINCT p.* FROM products p
           LEFT JOIN product_categories pc ON pc.product_id = p.id
-          LEFT JOIN categories c ON c.id = pc.category_id
-          WHERE (c.id = ? OR c.slug = ? OR p.category_id = ?) AND p.is_active = 1
+          LEFT JOIN categories c ON c.id = pc.category_id AND c.brand_id = p.brand_id
+          WHERE p.brand_id = ?
+            AND (c.id = ? OR c.slug = ? OR p.category_id = ?)
+            AND p.is_active = 1
           ORDER BY p.sort_order ASC
-        `).all(cat, cat, cat);
+        `).all(req.brand_id, cat, cat, cat);
       } else {
         products = db.prepare('SELECT * FROM products WHERE brand_id = ? AND is_active = 1 ORDER BY sort_order ASC').all(req.brand_id);
       }
