@@ -1,5 +1,5 @@
 {
-  "name": "xentra-core",
+  "name": "xentra",
   "version": "2.2.4",
   "description": "Standalone Multi-Tenant & Multi-Branch Restaurant Operations & Digital Ordering Platform",
   "main": "server/app.js",
