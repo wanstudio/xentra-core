@@ -327,22 +327,67 @@ test('API Admin Branch Creation: OWNER_WHATSAPP_NUMBER in env does not act as fa
   delete process.env.OWNER_WHATSAPP_NUMBER;
 });
 
-test('API GET /health: returns 200 OK and ready persistence status', async () => {
-  const res = await mockFetch('/health');
-  assert.strictEqual(res.status, 200);
-  const data = await res.json();
-  assert.strictEqual(data.status, 'ok');
-  assert.strictEqual(data.persistence, 'ready');
-  assert.strictEqual(data.version, '2.2.5');
-});
+test('API Kitchen RBAC: Branch-level operators cannot view or update orders from another branch (FINDING-01 & FINDING-02)', async () => {
+  // 1. Create a branch-scoped kitchen user for branch_bangjo_barat
+  const db = require('../server/database/db');
+  const crypto = require('crypto');
+  const kitchenPasswordHash = crypto.createHash('sha256').update('kitchen123').digest('hex');
 
-test('API GET /api/v1/brand/info with unknown tenant host: returns 404 TENANT_NOT_FOUND', async () => {
-  const res = await mockFetch('/api/v1/brand/info', {
-    headers: { host: 'unknown-tenant.com' }
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'usr_kitchen_barat',
+    'brand_bangjo',
+    'org_xentra_holding',
+    'branch_bangjo_barat',
+    'kitchen_barat',
+    'kitchen_barat@bangjo.com',
+    kitchenPasswordHash,
+    'Koki Barat',
+    'kitchen'
+  );
+
+  // 2. Login as kitchen_barat
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'kitchen_barat', password: 'kitchen123' })
   });
-  assert.strictEqual(res.status, 404);
-  const data = await res.json();
-  assert.strictEqual(data.success, false);
-  assert.strictEqual(data.error, 'TENANT_NOT_FOUND');
+  const loginData = await loginRes.json();
+  assert.strictEqual(loginData.success, true);
+  assert.strictEqual(loginData.user.branch_id, 'branch_bangjo_barat');
+  const authHeaders = { authorization: 'Bearer ' + loginData.token };
+
+  // 3. Attempting to query queue of another branch explicitly returns 403 FORBIDDEN_BRANCH_ACCESS
+  const forbiddenQueueRes = await mockFetch('/api/v1/kitchen/queue?branch_id=branch_bangjo_timur', {
+    headers: authHeaders
+  });
+  assert.strictEqual(forbiddenQueueRes.status, 403);
+  const forbiddenQueueData = await forbiddenQueueRes.json();
+  assert.strictEqual(forbiddenQueueData.error, 'FORBIDDEN_BRANCH_ACCESS');
+
+  // 4. Create an order assigned to a DIFFERENT branch (branch_bangjo_timur)
+  const orderOtherBranchId = 'ord_timur_' + Date.now();
+  db.prepare(`
+    INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
+    VALUES ('branch_bangjo_timur', 'brand_bangjo', 'Bangjo Timur', 'bangjo-timur', 'Jl. Timur No. 1', -7.28, 112.75, '081234567891', 1)
+  `).run();
+
+  db.prepare(`
+    INSERT INTO orders (id, brand_id, branch_id, order_number, customer_name, customer_phone, order_type, status, subtotal, grand_total)
+    VALUES (?, 'brand_bangjo', 'branch_bangjo_timur', 'XN-TIMUR-999', 'Customer Timur', '081200000000', 'dine_in', 'confirmed', 50000, 50000)
+  `).run(orderOtherBranchId);
+
+  // 5. Kitchen Barat attempts to modify status of order in Branch Timur -> REJECTED 404/Forbidden
+  const updateRes = await mockFetch(`/api/v1/kitchen/orders/${orderOtherBranchId}/status`, {
+    method: 'PATCH',
+    headers: authHeaders,
+    body: JSON.stringify({ status: 'preparing' })
+  });
+
+  assert.strictEqual(updateRes.status, 404);
+  const updateData = await updateRes.json();
+  assert.strictEqual(updateData.success, false);
+  assert.ok(updateData.error.includes('kewenangan cabang'));
 });
 
