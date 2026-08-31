@@ -30,17 +30,9 @@ try {
   dbInstance.exec('PRAGMA busy_timeout = 5000;');
   console.log('[Database] Native node:sqlite initialized successfully.');
 } catch (e) {
-  console.log('[Database] node:sqlite unavailable. Initializing portable sql.js engine for Node 20...');
-  const initSqlJs = require('sql.js/dist/sql-asm.js');
-  sqlJsPromise = initSqlJs().then(SQL => {
-    if (fs.existsSync(DB_PATH) && fs.statSync(DB_PATH).size > 0) {
-      const fileBuffer = fs.readFileSync(DB_PATH);
-      rawSqlDb = new SQL.Database(fileBuffer);
-    } else {
-      rawSqlDb = new SQL.Database();
-    }
-    return rawSqlDb;
-  });
+  console.log('[Database] node:sqlite unavailable. Using memoryStore fallback (sql.js disabled to save WASM memory).');
+  // sql.js disabled on Node 20 due to CloudLinux 2GB vmem limit + undici WASM OOM — memoryStore is sufficient for health/deploy
+  sqlJsPromise = null; rawSqlDb = null;
 }
 
 function saveSqlJsToDisk() {
