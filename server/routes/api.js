@@ -51,7 +51,7 @@ router.get('/brand/info', (req, res) => {
     });
   } catch (err) {
     console.error('[API Error /brand/info]:', err);
-    res.status(500).json({ success: false, error: err.message, stack: err.stack });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -76,7 +76,7 @@ router.get('/brand/branches', (req, res) => {
     });
   } catch (err) {
     console.error('[API Error /brand/branches]:', err);
-    res.status(500).json({ success: false, error: err.message, stack: err.stack });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -262,7 +262,7 @@ router.get(['/catalog/menu', '/home'], (req, res) => {
     });
   } catch (err) {
     console.error('[API Error /catalog/menu]:', err);
-    res.status(500).json({ success: false, error: err.message, stack: err.stack });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
