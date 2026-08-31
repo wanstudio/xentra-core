@@ -13,23 +13,27 @@ class BranchCompareService {
   static getBranchComparisonReport(filterParams = {}) {
     const filter = ReportFilterModel.normalize(filterParams);
 
-    let whereClauses = ["o.status IN ('confirmed', 'completed', 'delivered', 'ready_for_pickup')"];
-    const params = [];
+    const joinConditions = ["o.status IN ('confirmed', 'completed', 'delivered', 'ready_for_pickup')"];
+    const queryParams = [];
 
     if (filter.brand_id) {
-      whereClauses.push('o.brand_id = ?');
-      params.push(filter.brand_id);
+      joinConditions.push('o.brand_id = ?');
+      queryParams.push(filter.brand_id);
     }
     if (filter.start_date) {
-      whereClauses.push('o.created_at >= ?');
-      params.push(filter.start_date);
+      joinConditions.push('o.created_at >= ?');
+      queryParams.push(filter.start_date);
     }
     if (filter.end_date) {
-      whereClauses.push('o.created_at <= ?');
-      params.push(filter.end_date);
+      joinConditions.push('o.created_at <= ?');
+      queryParams.push(filter.end_date);
     }
 
-    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    let whereClause = '';
+    if (filter.brand_id) {
+      whereClause = 'WHERE b.brand_id = ?';
+      queryParams.push(filter.brand_id);
+    }
 
     const branchesComparison = db.prepare(`
       SELECT 
@@ -40,11 +44,11 @@ class BranchCompareService {
         COALESCE(SUM(o.grand_total), 0) as total_revenue,
         COALESCE(AVG(o.grand_total), 0) as average_order_value
       FROM branches b
-      LEFT JOIN orders o ON b.id = o.branch_id AND ${whereClauses.join(' AND ')}
-      ${filter.brand_id ? 'WHERE b.brand_id = ?' : ''}
+      LEFT JOIN orders o ON b.id = o.branch_id AND ${joinConditions.join(' AND ')}
+      ${whereClause}
       GROUP BY b.id, b.name, b.slug
       ORDER BY total_revenue DESC
-    `).all(...(filter.brand_id ? [...params, filter.brand_id] : params));
+    `).all(...queryParams);
 
     return {
       report_type: 'branch_comparison',
