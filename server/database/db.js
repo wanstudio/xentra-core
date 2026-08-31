@@ -404,6 +404,45 @@ function initSchema(targetDb) {
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS pos_shifts (
+      id TEXT PRIMARY KEY,
+      branch_id TEXT NOT NULL,
+      cashier_id TEXT NOT NULL,
+      starting_float REAL NOT NULL DEFAULT 0.0,
+      total_cash_sales REAL NOT NULL DEFAULT 0.0,
+      total_cash_in REAL NOT NULL DEFAULT 0.0,
+      total_cash_out REAL NOT NULL DEFAULT 0.0,
+      expected_cash REAL NOT NULL DEFAULT 0.0,
+      actual_cash REAL,
+      variance REAL,
+      status TEXT NOT NULL DEFAULT 'open',
+      opened_at TEXT DEFAULT (datetime('now')),
+      closed_at TEXT,
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS pos_cash_movements (
+      id TEXT PRIMARY KEY,
+      shift_id TEXT NOT NULL,
+      type TEXT NOT NULL, -- 'in' | 'out'
+      amount REAL NOT NULL,
+      reason TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (shift_id) REFERENCES pos_shifts(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS pos_held_orders (
+      id TEXT PRIMARY KEY,
+      branch_id TEXT NOT NULL,
+      table_number TEXT,
+      customer_name TEXT,
+      items_payload TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'held', -- 'held', 'settled', 'cancelled'
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
   `);
 
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
