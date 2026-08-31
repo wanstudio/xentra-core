@@ -1390,6 +1390,17 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
     const { name, category_id, price, regular_price, description, image } = req.body;
     if (!name || !price) return res.status(400).json({ success: false, error: 'Nama dan harga menu wajib diisi.' });
 
+    // P1 TENANT CATEGORY INTEGRITY GUARD (FINDING 02)
+    if (category_id) {
+      const validCategory = db.prepare('SELECT id FROM categories WHERE id = ? AND brand_id = ?').get(category_id, req.brand_id);
+      if (!validCategory) {
+        return res.status(400).json({
+          success: false,
+          error: 'Kategori produk tidak ditemukan atau bukan milik brand ini.'
+        });
+      }
+    }
+
     const id = 'prod_' + Date.now();
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
@@ -1428,7 +1439,19 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
 router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, category_id, price, regular_price, description, image, is_active } = req.body;
-    db.prepare(`
+
+    // P1 TENANT CATEGORY INTEGRITY GUARD (FINDING 02)
+    if (category_id !== undefined && category_id !== null) {
+      const validCategory = db.prepare('SELECT id FROM categories WHERE id = ? AND brand_id = ?').get(category_id, req.brand_id);
+      if (!validCategory) {
+        return res.status(400).json({
+          success: false,
+          error: 'Kategori produk tidak ditemukan atau bukan milik brand ini.'
+        });
+      }
+    }
+
+    const stmt = db.prepare(`
       UPDATE products 
       SET name = COALESCE(?, name),
           category_id = COALESCE(?, category_id),
@@ -1446,6 +1469,10 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       req.params.id,
       req.brand_id
     );
+
+    if (!stmt || stmt.changes === 0) {
+      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan atau tidak berubah.' });
+    }
 
     res.json({ success: true, message: 'Menu produk berhasil diperbarui.' });
   } catch (err) {
