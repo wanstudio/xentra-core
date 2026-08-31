@@ -644,13 +644,14 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     const randSuffix = Math.floor(1000 + Math.random() * 9000);
     const orderNumber = `XN-${today}-${randSuffix}`;
 
-    // 4. Save to Database
+    // 4. Save to Database (Status: 'pending' for online payment requiring gateway completion, 'confirmed' for cash)
+    const initialOrderStatus = payment_method === 'cash' ? 'confirmed' : 'pending';
     db.prepare(`
       INSERT INTO orders (
         id, order_number, brand_id, branch_id, customer_phone, customer_name,
         order_type, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
         status, subtotal, discount_amount, delivery_fee, grand_total, order_note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       orderId,
       orderNumber,
@@ -662,6 +663,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       schedule_type,
       scheduled_slot_start || null,
       scheduled_slot_end || null,
+      initialOrderStatus,
       subtotal,
       discountAmount,
       deliveryFee,
