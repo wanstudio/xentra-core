@@ -323,13 +323,28 @@ class PosOrderService {
     const order = placementResult.order;
     const grandTotal = order.grand_total;
 
-    // 3. Calculate Change (Kembalian) if cash payment
+    // 3. Calculate Change (Kembalian) if cash payment and Record Cash Payment Lifecycle
     let changeAmount = 0;
-    if (payment_method === 'cash' && typeof amount_tendered === 'number') {
-      if (amount_tendered < grandTotal) {
-        throw new Error(`[PosOrderService] Uang yang diterima (Rp ${amount_tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${grandTotal.toLocaleString('id-ID')}).`);
+    if (payment_method === 'cash') {
+      if (typeof amount_tendered === 'number') {
+        if (amount_tendered < grandTotal) {
+          throw new Error(`[PosOrderService] Uang yang diterima (Rp ${amount_tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${grandTotal.toLocaleString('id-ID')}).`);
+        }
+        changeAmount = amount_tendered - grandTotal;
       }
-      changeAmount = amount_tendered - grandTotal;
+
+      // Record authoritative cash payment lifecycle in order_payments and emit event
+      try {
+        const { CashSettlementService } = require('../../payment');
+        CashSettlementService.settleCashPayment({
+          order_id: order.id,
+          amount: grandTotal,
+          amount_tendered: amount_tendered || grandTotal,
+          shift_id
+        });
+      } catch (e) {
+        console.warn('[PosOrderService] Cash settlement record warning:', e.message);
+      }
     }
 
     // 4. Update Shift Total Cash Sales if shift_id provided and payment is cash
