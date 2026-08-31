@@ -32,11 +32,41 @@ class OrderPlacementService {
     delivery_fee = 0,
     payment_method = 'qris',
     order_channel = 'customer_app',
-    fulfillment_type = 'delivery',
+    order_type = 'delivery',
+    fulfillment_type = null,
     table_number = null,
+    reservation_date = null,
+    guest_count = null,
     notes = '',
     trace_context = {}
   }) {
+    const effectiveOrderType = order_type || fulfillment_type || 'delivery';
+
+    // Strict Validation: Same-Day Reservation Restriction (Operational Risk Control)
+    if (effectiveOrderType === 'reservation') {
+      if (!reservation_date) {
+        return {
+          success: false,
+          status: 'VALIDATION_ERROR',
+          errors: ['Tanggal reservasi wajib diisi untuk tipe pesanan reservation.']
+        };
+      }
+
+      const resDate = new Date(reservation_date);
+      const today = new Date();
+      // Compare only YYYY-MM-DD
+      const resDateStr = resDate.toISOString().slice(0, 10);
+      const todayStr = today.toISOString().slice(0, 10);
+
+      if (resDateStr <= todayStr) {
+        return {
+          success: false,
+          status: 'SAME_DAY_RESERVATION_REJECTED',
+          errors: ['Reservasi hari yang sama tidak diperbolehkan. Minimum reservasi adalah untuk besok atau tanggal setelahnya.']
+        };
+      }
+    }
+
     // 1. Execute Atomic Pre-Payment Verification Gate
     const verification = PrePaymentVerificationGate.verify({
       branch_id,
@@ -94,9 +124,9 @@ class OrderPlacementService {
         branch_id,
         customer.name || 'Pelanggan',
         customer.phone || '',
-        fulfillment_type,
+        effectiveOrderType,
         order_channel,
-        fulfillment_type,
+        effectiveOrderType,
         table_number,
         subtotal,
         delivery_fee,
@@ -194,6 +224,11 @@ class OrderPlacementService {
         order_number: orderNumber,
         brand_id,
         branch_id,
+        order_type: effectiveOrderType,
+        order_channel,
+        table_number,
+        reservation_date,
+        guest_count,
         subtotal,
         delivery_fee,
         grand_total: grandTotal,

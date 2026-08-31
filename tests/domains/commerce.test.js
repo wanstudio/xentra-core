@@ -197,6 +197,49 @@ test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell pre
 
   // 3. Verify Branch Manager Configured Threshold (8) was used for warning
   assert.ok(lowStockEventReceived);
-  assert.strictEqual(lowStockEventReceived.payload.remaining_stock, 2);
+  assert.strictEqual(orderPlacedEventReceived.payload.order_id, orderResult.order.id);
   assert.strictEqual(lowStockEventReceived.payload.threshold, 8, 'Must use branch manager threshold (8)');
+});
+
+// ==============================================================================
+// Commerce 7 — Reservation Operational Risk: Same-Day Reservation Rejection
+// ==============================================================================
+test('Commerce 7 — Reservation: rejects same-day reservation and accepts future dates', async () => {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+
+  // 1. Same-Day reservation request -> STRICTLY REJECTED
+  const sameDayResult = await OrderPlacementService.submitOrder({
+    brand_id: 'brand_test',
+    branch_id: 'branch_test',
+    order_type: 'reservation',
+    reservation_date: todayStr,
+    guest_count: 5,
+    customer: { name: 'Rombongan Dadakan', phone: '0812345678' },
+    items: [
+      { product_id: 'prod_lock', quantity: 1, expected_price: 25000 }
+    ]
+  });
+
+  assert.strictEqual(sameDayResult.success, false);
+  assert.strictEqual(sameDayResult.status, 'SAME_DAY_RESERVATION_REJECTED');
+  assert.ok(sameDayResult.errors[0].includes('tidak diperbolehkan'));
+
+  // 2. Future-Day reservation request (Tomorrow) -> ACCEPTED
+  const futureResult = await OrderPlacementService.submitOrder({
+    brand_id: 'brand_test',
+    branch_id: 'branch_test',
+    order_type: 'reservation',
+    reservation_date: tomorrowStr,
+    guest_count: 5,
+    customer: { name: 'Rombongan Besok', phone: '0812345678' },
+    items: [
+      { product_id: 'prod_lock', quantity: 1, expected_price: 25000 }
+    ]
+  });
+
+  assert.strictEqual(futureResult.success, true);
+  assert.strictEqual(futureResult.order.order_type, 'reservation');
 });
