@@ -21,3 +21,7 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 tmp/
+
+# WhatsApp authentication/session runtime artifacts
+tools/whatsapp-runner/auth_session/*
+!tools/whatsapp-runner/auth_session/.gitkeep
