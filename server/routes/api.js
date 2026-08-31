@@ -1074,11 +1074,33 @@ router.get('/kitchen/queue', requireAuth(['owner', 'brand_manager', 'branch_mana
   res.json({ success: true, orders: enriched });
 });
 
-// 9. Update Order Status (Kitchen / Operator with Auth Binding & Branch Guard)
+// 9. Update Order Status (Kitchen / Operator with Auth Binding, Branch Guard & Role-Based Status Transitions)
 router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager', 'branch_manager', 'kitchen']), (req, res) => {
   try {
     const { status, note = '' } = req.body;
-    
+    if (!status) {
+      return res.status(400).json({ success: false, error: 'Status target wajib diisi.' });
+    }
+
+    // P1 ROLE-BASED TRANSITION AUTHORITY (FINDING-02A)
+    // Kitchen role can ONLY advance operational cooking stages ('preparing', 'ready')
+    // Financial/Governance actions ('cancelled', 'refunded') strictly require manager/owner authority
+    const ROLE_ALLOWED_TARGET_STATUSES = {
+      kitchen: ['preparing', 'ready'],
+      branch_manager: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled', 'refunded'],
+      brand_manager: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled', 'refunded'],
+      owner: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled', 'refunded']
+    };
+
+    const allowedTargetStatuses = ROLE_ALLOWED_TARGET_STATUSES[req.user.role] || [];
+    if (!allowedTargetStatuses.includes(status)) {
+      return res.status(403).json({
+        success: false,
+        error: 'INSUFFICIENT_ROLE_AUTHORITY',
+        message: `Role "${req.user.role}" tidak memiliki wewenang untuk mengubah status pesanan menjadi "${status}".`
+      });
+    }
+
     // P1 AUTH BINDING: Use authoritative actor identity from authenticated session
     const actor_type = req.user.role === 'kitchen' ? 'kitchen' : 'staff';
     const actor_id = req.user.userId || req.user.username;

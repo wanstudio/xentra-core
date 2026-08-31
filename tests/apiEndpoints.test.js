@@ -389,5 +389,33 @@ test('API Kitchen RBAC: Branch-level operators cannot view or update orders from
   const updateData = await updateRes.json();
   assert.strictEqual(updateData.success, false);
   assert.ok(updateData.error.includes('kewenangan cabang'));
+
+  // 6. Create an order in Barat branch to test role transition whitelist (FINDING-02A)
+  const orderBaratId = 'ord_barat_' + Date.now();
+  db.prepare(`
+    INSERT INTO orders (id, brand_id, branch_id, order_number, customer_name, customer_phone, order_type, status, subtotal, grand_total)
+    VALUES (?, 'brand_bangjo', 'branch_bangjo_barat', 'XN-BARAT-111', 'Customer Barat', '081200000001', 'dine_in', 'confirmed', 35000, 35000)
+  `).run(orderBaratId);
+
+  // Kitchen role attempts governance action ('cancelled' / 'refunded') -> REJECTED 403 INSUFFICIENT_ROLE_AUTHORITY
+  const kitchenCancelRes = await mockFetch(`/api/v1/kitchen/orders/${orderBaratId}/status`, {
+    method: 'PATCH',
+    headers: authHeaders,
+    body: JSON.stringify({ status: 'cancelled' })
+  });
+  assert.strictEqual(kitchenCancelRes.status, 403);
+  const kitchenCancelData = await kitchenCancelRes.json();
+  assert.strictEqual(kitchenCancelData.error, 'INSUFFICIENT_ROLE_AUTHORITY');
+
+  // Kitchen role advances operational cooking state ('preparing') -> ALLOWED 200 OK
+  const kitchenCookRes = await mockFetch(`/api/v1/kitchen/orders/${orderBaratId}/status`, {
+    method: 'PATCH',
+    headers: authHeaders,
+    body: JSON.stringify({ status: 'preparing' })
+  });
+  assert.strictEqual(kitchenCookRes.status, 200);
+  const kitchenCookData = await kitchenCookRes.json();
+  assert.strictEqual(kitchenCookData.success, true);
+  assert.strictEqual(kitchenCookData.new_status, 'preparing');
 });
 
