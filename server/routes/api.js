@@ -1596,42 +1596,65 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (req,
       });
     }
 
-    db.prepare(`
-      UPDATE branches 
-      SET name = COALESCE(?, name),
-          address_text = COALESCE(?, address_text),
-          latitude = COALESCE(?, latitude),
-          longitude = COALESCE(?, longitude),
-          phone = COALESCE(?, phone),
-          is_active = COALESCE(?, is_active)
-      WHERE id = ? AND brand_id = ?
-    `).run(
-      name !== undefined ? name : null,
-      address_text !== undefined ? address_text : null,
-      latitude !== undefined ? latitude : null,
-      longitude !== undefined ? longitude : null,
-      targetPhone !== undefined ? targetPhone : null,
-      is_active !== undefined ? is_active : null,
-      req.params.id,
-      req.brand_id
-    );
+    // P1 TENANT WRITE BOUNDARY GUARD (FINDING 01): Verify branch ownership before ANY mutation
+    const existingBranch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!existingBranch) {
+      return res.status(404).json({
+        success: false,
+        error: 'Cabang tidak ditemukan pada brand ini.'
+      });
+    }
 
-    db.prepare(`
-      UPDATE branch_delivery_settings
-      SET free_delivery_km = COALESCE(?, free_delivery_km),
-          price_per_km = COALESCE(?, price_per_km),
-          max_radius_km = COALESCE(?, max_radius_km),
-          promo_min_order = COALESCE(?, promo_min_order),
-          promo_delivery_discount = COALESCE(?, promo_delivery_discount)
-      WHERE branch_id = ?
-    `).run(
-      free_delivery_km !== undefined ? free_delivery_km : null,
-      price_per_km !== undefined ? price_per_km : null,
-      max_radius_km !== undefined ? max_radius_km : null,
-      promo_min_order !== undefined ? promo_min_order : null,
-      promo_delivery_discount !== undefined ? promo_delivery_discount : null,
-      req.params.id
-    );
+    db.exec('BEGIN TRANSACTION;');
+    try {
+      db.prepare(`
+        UPDATE branches 
+        SET name = COALESCE(?, name),
+            address_text = COALESCE(?, address_text),
+            latitude = COALESCE(?, latitude),
+            longitude = COALESCE(?, longitude),
+            phone = COALESCE(?, phone),
+            is_active = COALESCE(?, is_active),
+            updated_at = datetime('now')
+        WHERE id = ? AND brand_id = ?
+      `).run(
+        name !== undefined ? name : null,
+        address_text !== undefined ? address_text : null,
+        latitude !== undefined ? latitude : null,
+        longitude !== undefined ? longitude : null,
+        targetPhone !== undefined ? targetPhone : null,
+        is_active !== undefined ? is_active : null,
+        req.params.id,
+        req.brand_id
+      );
+
+      // Scoped update with explicit tenant subquery guard
+      db.prepare(`
+        UPDATE branch_delivery_settings
+        SET free_delivery_km = COALESCE(?, free_delivery_km),
+            price_per_km = COALESCE(?, price_per_km),
+            max_radius_km = COALESCE(?, max_radius_km),
+            promo_min_order = COALESCE(?, promo_min_order),
+            promo_delivery_discount = COALESCE(?, promo_delivery_discount)
+        WHERE branch_id = ? AND branch_id IN (
+          SELECT id FROM branches WHERE id = ? AND brand_id = ?
+        )
+      `).run(
+        free_delivery_km !== undefined ? free_delivery_km : null,
+        price_per_km !== undefined ? price_per_km : null,
+        max_radius_km !== undefined ? max_radius_km : null,
+        promo_min_order !== undefined ? promo_min_order : null,
+        promo_delivery_discount !== undefined ? promo_delivery_discount : null,
+        req.params.id,
+        req.params.id,
+        req.brand_id
+      );
+
+      db.exec('COMMIT;');
+    } catch (txErr) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw txErr;
+    }
 
     res.json({ success: true, message: 'Pengaturan cabang & ongkir berhasil disimpan.' });
   } catch (err) {
