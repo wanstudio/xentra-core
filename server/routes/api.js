@@ -139,11 +139,32 @@ router.get(['/delivery/reverse-geocode', '/address/reverse'], async (req, res) =
 
 // 4.2 Real Auth OTP Challenge & Verification Store (In-Memory with TTL & Max Attempts)
 const OtpChallengeStore = {
-  challenges: new Map(), // challenge_id -> { phone, otpHash, expiresAt, attempts, verified, brandId }
-  createChallenge(phone, brandId, otpCode) {
-    const challengeId = 'ch_' + crypto.randomBytes(8).toString('hex');
-    const otpHash = crypto.createHash('sha256').update(String(otpCode)).digest('hex');
-    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes TTL
+  challenges: new Map(),
+  rateLimits: new Map(), // key: brandId:phone -> lastSentTimestamp
+  
+  checkRateLimit(phone, brandId, minIntervalSeconds = 60) {
+    const key = `${brandId}:${phone}`;
+    const lastSent = this.rateLimits.get(key);
+    if (lastSent) {
+      const elapsedSeconds = Math.floor((Date.now() - lastSent) / 1000);
+      if (elapsedSeconds < minIntervalSeconds) {
+        return {
+          allowed: false,
+          retryAfter: minIntervalSeconds - elapsedSeconds
+        };
+      }
+    }
+    return { allowed: true, retryAfter: 0 };
+  },
+
+  createChallenge(phone, brandId, otpCode, ttlSeconds = 300) {
+    const challengeId = 'chk_' + crypto.randomBytes(16).toString('hex');
+    const otpHash = crypto.createHash('sha256').update(String(otpCode).trim()).digest('hex');
+    const expiresAt = Date.now() + ttlSeconds * 1000;
+
+    // Record rate limit timestamp
+    this.rateLimits.set(`${brandId}:${phone}`, Date.now());
+
     this.challenges.set(challengeId, {
       phone,
       otpHash,
@@ -197,12 +218,25 @@ router.post('/auth/otp/send', (req, res) => {
     return res.status(400).json({ success: false, error: 'Nomor WhatsApp / telepon wajib diisi.' });
   }
 
-  // Generate 6-digit OTP code (in dev/test use 123456 or random)
+  const cleanPhone = phone.trim();
+
+  // P1 HARDENING (FINDING 09): Enforce strict Rate Limiting (60s cooldown per phone & tenant)
+  const rateLimitCheck = OtpChallengeStore.checkRateLimit(cleanPhone, req.brand_id, 60);
+  if (!rateLimitCheck.allowed) {
+    return res.status(429).json({
+      success: false,
+      error: 'TOO_MANY_REQUESTS',
+      retry_after: rateLimitCheck.retryAfter,
+      message: `Harap tunggu ${rateLimitCheck.retryAfter} detik sebelum meminta kode OTP kembali.`
+    });
+  }
+
+  // P1 HARDENING (FINDING 09): CSPRNG Cryptographically Secure Random Number Generator
   const otpCode = process.env.NODE_ENV === 'production' 
-    ? Math.floor(100000 + Math.random() * 900000).toString() 
+    ? crypto.randomInt(100000, 1000000).toString() 
     : '123456';
 
-  const { challengeId } = OtpChallengeStore.createChallenge(phone.trim(), req.brand_id, otpCode);
+  const { challengeId } = OtpChallengeStore.createChallenge(cleanPhone, req.brand_id, otpCode);
   res.json({
     success: true,
     challenge_id: challengeId,
