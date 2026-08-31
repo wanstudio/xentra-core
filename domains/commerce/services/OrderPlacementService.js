@@ -149,10 +149,13 @@ class OrderPlacementService {
           item.subtotal
         );
 
-        // Optimistic concurrency guard: Ensure stock is still available at exact deduction execution
-        const deductResult = guardedDeductStockStmt.run(item.quantity, branch_id, item.product_id, item.quantity);
-        if (!deductResult || deductResult.changes === 0) {
-          throw new Error(`[CONCURRENCY_RACE] Stok untuk produk "${item.name}" baru saja habis atau tidak mencukupi.`);
+        // Optimistic concurrency guard: Only deduct live inventory for immediate fulfillment types
+        // (For future reservation, stock will be deducted when guest arrives and checks in to active dine-in table)
+        if (effectiveOrderType !== 'reservation') {
+          const deductResult = guardedDeductStockStmt.run(item.quantity, branch_id, item.product_id, item.quantity);
+          if (!deductResult || deductResult.changes === 0) {
+            throw new Error(`[CONCURRENCY_RACE] Stok untuk produk "${item.name}" baru saja habis atau tidak mencukupi.`);
+          }
         }
       }
 

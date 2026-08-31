@@ -221,7 +221,7 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
   assert.strictEqual(sameDayPosResult.success, false);
   assert.strictEqual(sameDayPosResult.status, 'SAME_DAY_RESERVATION_REJECTED');
 
-  // 3. Future-Day Reservation via POS (Tomorrow) -> ACCEPTED
+  // 3. Future-Day Reservation via POS (Tomorrow) -> ACCEPTED without immediate stock deduction
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().slice(0, 10);
@@ -243,8 +243,21 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
   assert.strictEqual(futurePosResult.order.order_type, 'reservation');
   assert.strictEqual(futurePosResult.order.reservation_date, tomorrowStr);
 
-  const stockAfterReservation = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
-  assert.strictEqual(stockAfterReservation, 47);
+  // IMPORTANT: Live stock remains UNTOUCHED at 48 upon booking (no premature deduction for future dates)
+  const stockAfterBooking = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
+  assert.strictEqual(stockAfterBooking, 48, 'Live stock must not be deducted upon reservation booking');
+
+  // 4. Guest Arrival Lifecycle: POS Check-in converts Reservation into active Dine-In Table Bill
+  const checkInResult = PosOrderService.checkInReservation({
+    reservation_order_id: futurePosResult.order.id,
+    table_number: 'Meja 8'
+  });
+
+  assert.strictEqual(checkInResult.success, true);
+  assert.strictEqual(checkInResult.status, 'CHECKED_IN');
+  assert.strictEqual(checkInResult.held_bill.table_number, 'Meja 8');
+  assert.strictEqual(checkInResult.held_bill.status, 'held');
+  assert.strictEqual(checkInResult.held_bill.items.length, 1);
 });
 
 // ==============================================================================

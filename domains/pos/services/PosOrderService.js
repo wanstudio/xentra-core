@@ -114,6 +114,82 @@ class PosOrderService {
   }
 
   /**
+   * Checks in a guest reservation upon arrival and opens an active Dine-in table bill.
+   * State Transition: reservation -> checked_in (active dine_in)
+   * 
+   * @param {Object} params
+   * @param {string} params.reservation_order_id - Order ID from original reservation booking
+   * @param {string} params.table_number - Allocated dining table
+   * @returns {Object} Active dine_in held table bill
+   */
+  static checkInReservation({ reservation_order_id, table_number }) {
+    if (!reservation_order_id || !table_number) {
+      throw new Error('[PosOrderService] "reservation_order_id" and "table_number" are required for reservation check-in.');
+    }
+
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(reservation_order_id);
+    if (!order) {
+      throw new Error(`[PosOrderService] Data reservasi dengan ID ${reservation_order_id} tidak ditemukan.`);
+    }
+
+    if (order.order_type !== 'reservation') {
+      throw new Error(`[PosOrderService] Order ${reservation_order_id} bukan tipe reservation.`);
+    }
+
+    const orderItems = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(reservation_order_id);
+
+    // Map order_items to items payload
+    const items = orderItems.map(it => ({
+      product_id: it.product_id,
+      name: it.product_name,
+      quantity: it.quantity,
+      price: it.unit_price,
+      subtotal: it.subtotal
+    }));
+
+    // Open active Dine-In Table Bill on POS
+    const held = PosOrderService.holdOrder({
+      branch_id: order.branch_id,
+      table_number: String(table_number),
+      customer_name: order.customer_name || 'Tamu Reservasi',
+      items: items.length > 0 ? items : [{ product_id: 'dummy', name: 'Alokasi Meja Reservasi', quantity: 1, price: 0 }],
+      order_type: 'dine_in'
+    });
+
+    // Update reservation order status to checked_in
+    db.prepare(`
+      UPDATE orders
+      SET status = 'checked_in', table_number = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(String(table_number), reservation_order_id);
+
+    // Emit event: pos.reservation.checked_in
+    events.EventBus.publish({
+      type: 'pos.reservation.checked_in',
+      producer: 'pos',
+      payload: {
+        reservation_order_id,
+        held_order_id: held.id,
+        branch_id: order.branch_id,
+        table_number: String(table_number),
+        customer_name: order.customer_name
+      }
+    }).catch(() => {});
+
+    return {
+      success: true,
+      status: 'CHECKED_IN',
+      held_bill: held,
+      reservation: {
+        id: order.id,
+        order_number: order.order_number,
+        table_number: String(table_number),
+        status: 'checked_in'
+      }
+    };
+  }
+
+  /**
    * Splits a held bill into two separate bills.
    * 
    * @param {Object} params
