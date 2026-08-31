@@ -16,7 +16,12 @@ class PaymentGatewayService {
    */
   static resolvePaymentConfig(branch_id, brand_id) {
     if (branch_id) {
-      const branch = db.prepare('SELECT payment_config_override FROM branches WHERE id = ?').get(branch_id);
+      let branch = null;
+      if (brand_id) {
+        branch = db.prepare('SELECT payment_config_override FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, brand_id);
+      } else {
+        branch = db.prepare('SELECT payment_config_override FROM branches WHERE id = ?').get(branch_id);
+      }
       if (branch && branch.payment_config_override) {
         try {
           const cfg = JSON.parse(branch.payment_config_override);
