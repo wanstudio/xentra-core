@@ -1,6 +1,6 @@
 /**
  * Xentra Core Authorization Service (B5)
- * Central decision engine evaluating identity, roles, permissions, and organizational boundaries.
+ * Central decision engine evaluating identity, roles, permissions, and strict organizational boundaries.
  */
 const PermissionModel = require('./PermissionModel');
 
@@ -13,9 +13,16 @@ class AuthorizationService {
    * @param {Array<Object>} params.assignments - Array of role assignments for this user
    * @param {string} params.required_permission - The permission required (e.g. 'order:create', 'branch:update')
    * @param {Object} [params.target_context] - Target resource context { organization_id, brand_id, branch_id }
+   * @param {Object} [params.orgHierarchy] - Optional OrganizationModel to verify parent-child brand/branch relations
    * @returns {{ allowed: boolean, reason?: string, granted_by_role?: string }}
    */
-  static authorize({ identity, assignments = [], required_permission, target_context = {} }) {
+  static authorize({
+    identity,
+    assignments = [],
+    required_permission,
+    target_context = {},
+    orgHierarchy = null
+  }) {
     if (!identity) {
       return { allowed: false, reason: 'Identity is missing or unauthenticated.' };
     }
@@ -38,7 +45,7 @@ class AuthorizationService {
       if (!hasPerm) continue;
 
       // Check Scope Match
-      const scopeMatch = AuthorizationService._matchesScope(assignment, target_context);
+      const scopeMatch = AuthorizationService._matchesScope(assignment, target_context, orgHierarchy);
       if (scopeMatch) {
         return {
           allowed: true,
@@ -54,27 +61,47 @@ class AuthorizationService {
   }
 
   /**
-   * Evaluates whether a role assignment's scope covers the target resource context.
+   * Evaluates whether a role assignment's scope strictly covers the target resource context.
    */
-  static _matchesScope(assignment, target) {
-    // Global scope allows access across all targets
+  static _matchesScope(assignment, target, orgHierarchy = null) {
+    // 1. Global scope allows access everywhere
     if (assignment.scope_type === 'global' || !assignment.scope_type) {
       return true;
     }
 
-    // Organization scope matches matching organization or any child brands/branches under it
+    // 2. Organization Scope
     if (assignment.scope_type === 'organization') {
-      return !target.organization_id || target.organization_id === assignment.scope_id;
+      // Must match organization_id if specified, or if hierarchy exists verify brand/branch belongs to this org
+      if (target.organization_id) {
+        return target.organization_id === assignment.scope_id;
+      }
+      if (target.brand_id && orgHierarchy) {
+        return orgHierarchy.isBrandInOrganization(target.brand_id, assignment.scope_id);
+      }
+      return Boolean(assignment.scope_id);
     }
 
-    // Brand scope matches matching brand or child branches of that brand
+    // 3. Brand Scope
     if (assignment.scope_type === 'brand') {
-      return !target.brand_id || target.brand_id === assignment.scope_id;
+      // Direct brand match
+      if (target.brand_id && target.brand_id === assignment.scope_id) {
+        return true;
+      }
+      // Child branch match via hierarchy
+      if (target.branch_id && orgHierarchy) {
+        return orgHierarchy.isBranchInBrand(target.branch_id, assignment.scope_id);
+      }
+      // If only branch_id provided without hierarchy, reject to maintain strict boundary
+      if (target.branch_id && !target.brand_id && !orgHierarchy) {
+        return false;
+      }
+      return target.brand_id === assignment.scope_id;
     }
 
-    // Branch scope strictly matches matching branch_id
+    // 4. Branch Scope
     if (assignment.scope_type === 'branch') {
-      return target.branch_id === assignment.scope_id;
+      // Strictly requires target.branch_id and must match assignment.scope_id
+      return target.branch_id ? target.branch_id === assignment.scope_id : false;
     }
 
     return false;

@@ -18,6 +18,10 @@ class PermissionModel {
     BRANCH_READ: 'branch:read',
     BRANCH_UPDATE: 'branch:update',
     
+    // Staff & Operational User Management
+    STAFF_MANAGE: 'staff:manage',
+    STAFF_VIEW: 'staff:view',
+
     // Catalog & Menu
     MENU_MANAGE: 'menu:manage',
     MENU_VIEW: 'menu:view',
@@ -28,39 +32,82 @@ class PermissionModel {
     ORDER_PREPARE: 'order:prepare',
     ORDER_COMPLETE: 'order:complete',
     ORDER_CANCEL: 'order:cancel',
+    ORDER_REFUND: 'order:refund',
     ORDER_VIEW: 'order:view',
     
+    // Inventory / Warehouse
+    INVENTORY_MANAGE: 'inventory:manage',
+    INVENTORY_VIEW: 'inventory:view',
+
+    // Delivery Operations
+    DELIVERY_MANAGE: 'delivery:manage',
+    DELIVERY_VIEW: 'delivery:view',
+
     // Reports & Analytics
     ANALYTICS_VIEW: 'analytics:view'
   };
 
   /**
-   * Authoritative Role -> Permissions Matrix
+   * Authoritative Role -> Permissions Matrix (Aligned with Locked Decisions)
    */
   static ROLE_PERMISSIONS_MATRIX = {
     [RoleModel.ROLES.OWNER]: [
-      '*' // Full administrative access across the organization
-    ],
-    [RoleModel.ROLES.BRAND_MANAGER]: [
+      'org:manage',
       'brand:manage',
       'branch:create',
       'branch:read',
       'branch:update',
+      'staff:manage',
+      'staff:view',
       'menu:manage',
-      'menu:view',
-      'order:view',
-      'analytics:view'
-    ],
-    [RoleModel.ROLES.BRANCH_MANAGER]: [
-      'branch:read',
-      'branch:update',
       'menu:view',
       'order:create',
       'order:accept',
       'order:prepare',
       'order:complete',
       'order:cancel',
+      'order:refund',
       'order:view',
+      'inventory:manage',
+      'inventory:view',
+      'delivery:manage',
+      'delivery:view',
+      'analytics:view'
+    ],
+    [RoleModel.ROLES.BRAND_MANAGER]: [
+      'brand:manage',
+      'branch:create',
+      'branch:read',
+      'branch:update',
+      'staff:manage',
+      'staff:view',
+      'menu:manage',
+      'menu:view',
+      'order:view',
+      'order:cancel',
+      'order:refund',
+      'inventory:manage',
+      'inventory:view',
+      'delivery:manage',
+      'delivery:view',
+      'analytics:view'
+    ],
+    [RoleModel.ROLES.BRANCH_MANAGER]: [
+      'branch:read',
+      'branch:update',
+      'staff:view',
+      'menu:view',
+      'order:create',
+      'order:accept',
+      'order:prepare',
+      'order:complete',
+      'order:cancel',
+      'order:refund',
+      'order:view',
+      'inventory:manage',
+      'inventory:view',
+      'delivery:manage',
+      'delivery:view',
       'analytics:view'
     ],
     [RoleModel.ROLES.CASHIER]: [
@@ -68,7 +115,8 @@ class PermissionModel {
       'order:create',
       'order:accept',
       'order:cancel',
-      'order:view'
+      'order:view',
+      'delivery:view'
     ],
     [RoleModel.ROLES.KITCHEN]: [
       'order:view',
@@ -90,7 +138,6 @@ class PermissionModel {
    */
   static hasPermission(role, permission) {
     const list = PermissionModel.ROLE_PERMISSIONS_MATRIX[role] || [];
-    if (list.includes('*')) return true;
     return list.includes(permission);
   }
 

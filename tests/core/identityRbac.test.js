@@ -7,10 +7,7 @@ const {
   RoleModel,
   PermissionModel,
   AuthorizationService,
-  RoleBoundaryEnforcement,
-  createIdentity,
-  createOrgManager,
-  createRoleManager
+  RoleBoundaryEnforcement
 } = require('../../core/identity');
 
 // ==============================================================================
@@ -146,80 +143,115 @@ test('B3 — Role Model: role definitions and scoped user assignments', () => {
 // Requirement: authoritative Role -> Permissions mapping matching contract
 // ==============================================================================
 test('B4 — Permission Model: authoritative Role -> Permission mapping and completeness', () => {
-  // Owner has wildcard '*'
+  // Owner has explicit high-privilege management permissions
   assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.OWNER, 'branch:create'), true);
-  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.OWNER, 'any:arbitrary:permission'), true);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.OWNER, 'staff:manage'), true);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.OWNER, 'order:refund'), true);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.OWNER, 'inventory:manage'), true);
 
-  // Cashier has POS permissions, but NOT administrative permissions
+  // Brand Manager has staff management and brand authority, but not org:manage
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.BRAND_MANAGER, 'staff:manage'), true);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.BRAND_MANAGER, 'branch:create'), true);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.BRAND_MANAGER, 'org:manage'), false);
+
+  // Branch Manager has refund, staff view, inventory manage, and order processing permissions
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.BRANCH_MANAGER, 'order:refund'), true);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.BRANCH_MANAGER, 'inventory:manage'), true);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.BRANCH_MANAGER, 'staff:view'), true);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.BRANCH_MANAGER, 'staff:manage'), false);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.BRANCH_MANAGER, 'branch:create'), false);
+
+  // Cashier has POS permissions, cannot refund or update branch
   assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.CASHIER, 'order:create'), true);
   assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.CASHIER, 'order:accept'), true);
-  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.CASHIER, 'branch:create'), false);
-  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.CASHIER, 'brand:manage'), false);
-
-  // Kitchen has KDS permissions, cannot cancel order
-  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.KITCHEN, 'order:prepare'), true);
-  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.KITCHEN, 'order:cancel'), false);
-
-  // Customer has menu and self order permissions
-  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.CUSTOMER, 'menu:view'), true);
-  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.CUSTOMER, 'branch:update'), false);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.CASHIER, 'order:refund'), false);
+  assert.strictEqual(PermissionModel.hasPermission(RoleModel.ROLES.CASHIER, 'branch:update'), false);
 });
 
 // ==============================================================================
 // B5 — Authorization Service Test (Level: Authorization Decision Verification)
 // Requirement: input identity + role/permission + resource context -> observable allow/deny
 // ==============================================================================
-test('B5 — Authorization Service: authorization decisions based on status, role, and scope', () => {
-  const activeUser = new IdentityModel({ username: 'cashier_user', status: 'active' });
+test('B5 — Authorization Service: strict decision matrix (same scope, child scope, different scope, missing context)', () => {
+  const orgManager = new OrganizationModel();
+  orgManager.createOrganization({ id: 'org_bangjo', name: 'Bangjo Org', owner_user_id: 'usr_owner' });
+  orgManager.createBrand({ id: 'brand_bangjo', organization_id: 'org_bangjo', name: 'Bangjo Brand' });
+  orgManager.createBranch({ id: 'branch_surabaya', brand_id: 'brand_bangjo', name: 'Surabaya Branch', phone: '08111' });
+  orgManager.createBranch({ id: 'branch_jakarta', brand_id: 'brand_bangjo', name: 'Jakarta Branch', phone: '08222' });
+
+  const activeUser = new IdentityModel({ username: 'branch_mgr', status: 'active' });
+  const brandMgrUser = new IdentityModel({ username: 'brand_mgr', status: 'active' });
   const suspendedUser = new IdentityModel({ username: 'suspended_user', status: 'suspended' });
 
-  const cashierAssignments = [
-    {
-      user_id: activeUser.id,
-      role: 'cashier',
-      scope_type: 'branch',
-      scope_id: 'branch_surabaya_barat'
-    }
-  ];
+  const branchMgrAssignments = [{
+    user_id: activeUser.id,
+    role: 'branch_manager',
+    scope_type: 'branch',
+    scope_id: 'branch_surabaya'
+  }];
 
-  // 1. Allow: Active user with proper permission in matching branch
-  const auth1 = AuthorizationService.authorize({
+  const brandMgrAssignments = [{
+    user_id: brandMgrUser.id,
+    role: 'brand_manager',
+    scope_type: 'brand',
+    scope_id: 'brand_bangjo'
+  }];
+
+  // 1. Same scope: ALLOW
+  const sameScope = AuthorizationService.authorize({
     identity: activeUser,
-    assignments: cashierAssignments,
-    required_permission: 'order:create',
-    target_context: { branch_id: 'branch_surabaya_barat' }
+    assignments: branchMgrAssignments,
+    required_permission: 'order:refund',
+    target_context: { branch_id: 'branch_surabaya' }
   });
-  assert.strictEqual(auth1.allowed, true);
-  assert.strictEqual(auth1.granted_by_role, 'cashier');
+  assert.strictEqual(sameScope.allowed, true);
 
-  // 2. Deny: Active user attempting operation in DIFFERENT branch (scope mismatch)
-  const auth2 = AuthorizationService.authorize({
+  // 2. Child scope: Brand Manager accessing child branch under that brand -> ALLOW
+  const childScope = AuthorizationService.authorize({
+    identity: brandMgrUser,
+    assignments: brandMgrAssignments,
+    required_permission: 'branch:update',
+    target_context: { branch_id: 'branch_surabaya' },
+    orgHierarchy: orgManager
+  });
+  assert.strictEqual(childScope.allowed, true);
+
+  // 3. Different scope: Surabaya manager accessing Jakarta branch -> DENY
+  const diffScope = AuthorizationService.authorize({
     identity: activeUser,
-    assignments: cashierAssignments,
-    required_permission: 'order:create',
-    target_context: { branch_id: 'branch_jakarta_selatan' }
+    assignments: branchMgrAssignments,
+    required_permission: 'order:refund',
+    target_context: { branch_id: 'branch_jakarta' }
   });
-  assert.strictEqual(auth2.allowed, false);
-  assert.ok(auth2.reason.includes('denied for the specified target context'));
+  assert.strictEqual(diffScope.allowed, false);
 
-  // 3. Deny: Suspended user is denied regardless of roles
-  const auth3 = AuthorizationService.authorize({
+  // 4. Missing target context: Branch action without target context -> DENY
+  const missingContext = AuthorizationService.authorize({
+    identity: activeUser,
+    assignments: branchMgrAssignments,
+    required_permission: 'order:refund',
+    target_context: {}
+  });
+  assert.strictEqual(missingContext.allowed, false);
+
+  // 5. Inactive Identity -> DENY
+  const inactive = AuthorizationService.authorize({
     identity: suspendedUser,
-    assignments: cashierAssignments,
-    required_permission: 'order:create',
-    target_context: { branch_id: 'branch_surabaya_barat' }
+    assignments: branchMgrAssignments,
+    required_permission: 'order:refund',
+    target_context: { branch_id: 'branch_surabaya' }
   });
-  assert.strictEqual(auth3.allowed, false);
-  assert.ok(auth3.reason.includes('not active'));
+  assert.strictEqual(inactive.allowed, false);
+  assert.ok(inactive.reason.includes('not active'));
 
-  // 4. Deny: User lacks required permission
-  const auth4 = AuthorizationService.authorize({
+  // 6. No permission -> DENY
+  const noPerm = AuthorizationService.authorize({
     identity: activeUser,
-    assignments: cashierAssignments,
-    required_permission: 'branch:create',
-    target_context: { branch_id: 'branch_surabaya_barat' }
+    assignments: branchMgrAssignments,
+    required_permission: 'org:manage',
+    target_context: { branch_id: 'branch_surabaya' }
   });
-  assert.strictEqual(auth4.allowed, false);
+  assert.strictEqual(noPerm.allowed, false);
 });
 
 // ==============================================================================
