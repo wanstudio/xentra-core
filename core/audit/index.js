@@ -1,21 +1,22 @@
 /**
- * Xentra Core Audit & Activity Module (Milestone E)
- * Unified exports for Audit Event Model, Contexts, Writer, Query, and Retention Boundary.
+ * Xentra Core Audit & Investigation Module (Milestone E — Updated Contract)
+ * Unified exports for Audit Log Records, Audit Process Engine, Writer, Query, and Retention Boundary.
  */
-const AuditEventModel = require('./AuditEventModel');
-const ActorTargetContext = require('./ActorTargetContext');
+const AuditLogRecord = require('./AuditLogRecord');
+const AuditProcessEngine = require('./AuditProcessEngine');
 const AuditWriter = require('./AuditWriter');
 const AuditQueryFoundation = require('./AuditQueryFoundation');
 const AuditRetentionBoundary = require('./AuditRetentionBoundary');
 
 module.exports = {
-  AuditEventModel,
-  ActorTargetContext,
+  AuditLogRecord,
+  AuditProcessEngine,
   AuditWriter,
   AuditQueryFoundation,
   AuditRetentionBoundary,
 
   // Factory Helpers
   createAuditWriter: (storageAdapter) => new AuditWriter(storageAdapter),
+  createAuditEngine: (auditWriter) => new AuditProcessEngine(auditWriter),
   createAuditQuery: (auditWriter) => new AuditQueryFoundation(auditWriter)
 };

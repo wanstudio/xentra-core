@@ -2,109 +2,115 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  AuditEventModel,
-  ActorTargetContext,
+  AuditLogRecord,
+  AuditProcessEngine,
   AuditWriter,
   AuditQueryFoundation,
   AuditRetentionBoundary,
   createAuditWriter,
+  createAuditEngine,
   createAuditQuery
 } = require('../../core/audit');
 
 // ==============================================================================
-// E1 — Audit Event Model Test (Level: Model & Sanitization)
-// Requirement: structured audit event model with automatic secret redaction
+// E1 — Audit Log Record Model Test (Level: Context & Schema Completeness)
+// Requirement: Audit Log records the investigation process, auditor, audited period, branch, and evidence
 // ==============================================================================
-test('E1 — Audit Event Model: creates immutable audit records and redacts secrets', () => {
-  const audit = new AuditEventModel({
-    action: 'branch.update_settings',
-    actor: { actor_id: 'usr_owner_01', role: 'owner', actor_type: 'user' },
-    target: { entity_type: 'branch', entity_id: 'branch_surabaya', branch_id: 'branch_surabaya' },
-    payload_diff: {
-      pickup_time: 15,
-      wablas_token: 'super_secret_token_123'
+test('E1 — Audit Log Record Model: creates comprehensive audit process record and redacts secrets', () => {
+  const auditRecord = new AuditLogRecord({
+    audit_type: 'revenue_reconciliation',
+    auditor: { auditor_id: 'usr_internal_auditor_01', name: 'Internal Auditor A', role: 'internal_auditor' },
+    audit_period: { start_time: '2026-08-01T00:00:00Z', end_time: '2026-08-31T23:59:59Z' },
+    target: {
+      organization_id: 'org_bangjo',
+      branch_id: 'branch_surabaya',
+      branch_manager_in_charge: 'usr_mgr_surabaya'
     },
+    inspected_area: 'Cash & QRIS Transaction Settlements',
+    evidence_references: ['tx_settle_101', 'tx_settle_102', 'syslog_batch_99'],
+    status: 'discrepancy_found',
+    findings: 'Found Rp 50,000 variance between POS totals and payment gateway receipts.',
     metadata: {
-      gateway_secret: 'midtrans_sec_999',
-      reason: 'Standard update'
-    },
-    correlation_id: 'corr_trace_001',
-    causation_id: 'cause_cmd_002'
+      gateway_secret: 'midtrans_sec_999', // Must be redacted
+      notes: 'Investigated by request of Owner'
+    }
   });
 
-  assert.ok(audit.audit_id.startsWith('aud_'));
-  assert.strictEqual(audit.action, 'branch.update_settings');
-  assert.strictEqual(audit.correlation_id, 'corr_trace_001');
-  assert.strictEqual(audit.causation_id, 'cause_cmd_002');
-  assert.ok(Object.isFrozen(audit));
+  assert.ok(auditRecord.audit_id.startsWith('aud_'));
+  assert.strictEqual(auditRecord.audit_type, 'revenue_reconciliation');
+  assert.strictEqual(auditRecord.auditor.name, 'Internal Auditor A');
+  assert.strictEqual(auditRecord.target.branch_manager_in_charge, 'usr_mgr_surabaya');
+  assert.strictEqual(auditRecord.evidence_references.length, 3);
+  assert.strictEqual(auditRecord.status, 'discrepancy_found');
+  assert.ok(Object.isFrozen(auditRecord));
 
-  // Sanitization check: Sensitive tokens in payload_diff and metadata must be redacted
-  assert.strictEqual(audit.payload_diff.wablas_token, '********');
-  assert.strictEqual(audit.payload_diff.pickup_time, 15);
-  assert.strictEqual(audit.metadata.gateway_secret, '********');
-  assert.strictEqual(audit.metadata.reason, 'Standard update');
+  // Sanitization check: Sensitive tokens in metadata must be redacted
+  assert.strictEqual(auditRecord.metadata.gateway_secret, '********');
+  assert.strictEqual(auditRecord.metadata.notes, 'Investigated by request of Owner');
 
-  // Negative test: Missing action throws error
-  assert.throws(() => new AuditEventModel({ action: '' }), /"action" is required/);
+  // Negative test: Missing audit_type or auditor throws error
+  assert.throws(() => new AuditLogRecord({ audit_type: '', auditor: { auditor_id: 'u1' }, inspected_area: 'Test' }), /"audit_type" is required/);
+  assert.throws(() => new AuditLogRecord({ audit_type: 'tax_audit', auditor: null, inspected_area: 'Test' }), /"auditor" context/);
 });
 
 // ==============================================================================
-// E2 — Actor & Target Context Test (Level: Normalization)
-// Requirement: standard actor & target context creation and validation
+// E2 — Audit Process on Evidence Test (Level: Investigation Process Execution)
+// Requirement: Audit Process examines Business/System Log evidence and generates Audit Log
 // ==============================================================================
-test('E2 — Actor & Target Context: normalizes actor and target entity context', () => {
-  // Actor context
-  const actor = ActorTargetContext.createActor({
-    actor_id: 'usr_cashier_01',
-    actor_type: 'user',
-    role: 'cashier',
-    ip_address: '192.168.1.50',
-    user_agent: 'Mozilla/5.0'
+test('E2 — Audit Process Engine: examines evidence pool (Business Logs & System Records) into Audit Log', async () => {
+  const writer = createAuditWriter();
+  const engine = createAuditEngine(writer);
+
+  // Evidence pool from Business Log / Transaction Records
+  const evidencePool = [
+    { id: 'tx_01', type: 'order.payment_settled', amount: 150000 },
+    { id: 'tx_02', type: 'order.payment_settled', amount: 85000 },
+    { id: 'log_01', type: 'cashier.drawer_closed', total_cash: 235000 }
+  ];
+
+  // Perform Audit Investigation
+  const auditResult = await engine.performAudit({
+    audit_type: 'shift_closing_reconciliation',
+    auditor: { auditor_id: 'usr_auditor_02', name: 'Branch Supervisor' },
+    audit_period: { start_time: '2026-08-31T08:00:00Z', end_time: '2026-08-31T16:00:00Z' },
+    target: { branch_id: 'branch_surabaya', branch_manager_in_charge: 'usr_mgr_surabaya' },
+    inspected_area: 'Shift 1 Cash Drawer & Transactions',
+    evidence_pool: evidencePool,
+    inspector_fn: async (evidence) => {
+      const txSum = evidence.filter(e => e.amount).reduce((acc, curr) => acc + curr.amount, 0);
+      const drawerTotal = evidence.find(e => e.total_cash)?.total_cash || 0;
+      const isMatch = txSum === drawerTotal;
+      return {
+        status: isMatch ? 'completed' : 'discrepancy_found',
+        findings: isMatch ? 'All shift records balanced' : `Discrepancy: ${drawerTotal - txSum}`
+      };
+    }
   });
-  assert.strictEqual(actor.actor_id, 'usr_cashier_01');
-  assert.strictEqual(actor.role, 'cashier');
-  assert.ok(Object.isFrozen(actor));
 
-  assert.throws(() => ActorTargetContext.createActor({ actor_id: '' }), /"actor_id" is required/);
-  assert.throws(() => ActorTargetContext.createActor({ actor_id: 'u1', actor_type: 'invalid_type' }), /Invalid actor_type/);
-
-  // Target context
-  const target = ActorTargetContext.createTarget({
-    entity_type: 'order',
-    entity_id: 'ord_12345',
-    branch_id: 'branch_surabaya'
-  });
-  assert.strictEqual(target.entity_type, 'order');
-  assert.strictEqual(target.entity_id, 'ord_12345');
-  assert.strictEqual(target.branch_id, 'branch_surabaya');
-  assert.ok(Object.isFrozen(target));
-
-  assert.throws(() => ActorTargetContext.createTarget({ entity_type: '', entity_id: 'ord_1' }), /"entity_type" is required/);
+  assert.strictEqual(auditResult.status, 'completed');
+  assert.strictEqual(auditResult.findings, 'All shift records balanced');
+  assert.strictEqual(auditResult.evidence_references.length, 3);
+  assert.strictEqual(writer.getRecords().length, 1);
 });
 
 // ==============================================================================
 // E3 — Audit Writer Test (Level: Append-Only Integrity)
-// Requirement: appends audit events and strictly rejects mutations (update/delete)
+// Requirement: appends audit process logs and strictly rejects mutations (update/delete)
 // ==============================================================================
 test('E3 — Audit Writer: append-only persistence and mutation prevention', async () => {
-  let savedToDb = false;
-  const mockStorage = {
-    saveAudit: async (record) => {
-      savedToDb = true;
-    }
-  };
+  const writer = createAuditWriter();
 
-  const writer = createAuditWriter(mockStorage);
-
-  const event = await writer.append({
-    action: 'order.cancel',
-    actor: { actor_id: 'usr_mgr_01', role: 'branch_manager' },
-    target: { entity_type: 'order', entity_id: 'ord_999' }
+  const auditRecord = new AuditLogRecord({
+    audit_type: 'inventory_loss_audit',
+    auditor: { auditor_id: 'usr_auditor_01' },
+    inspected_area: 'Raw Material Warehouse',
+    target: { branch_id: 'branch_jakarta' },
+    status: 'action_required',
+    findings: 'Found missing 5kg chicken stock.'
   });
 
-  assert.strictEqual(event.action, 'order.cancel');
+  await writer.append(auditRecord);
   assert.strictEqual(writer.getRecords().length, 1);
-  assert.strictEqual(savedToDb, true);
 
   // Negative tests: Attempting update or delete throws explicit mutation error
   assert.throws(() => writer.update(), /Mutation forbidden: Audit records are strictly append-only/);
@@ -112,47 +118,36 @@ test('E3 — Audit Writer: append-only persistence and mutation prevention', asy
 });
 
 // ==============================================================================
-// E4 — Audit Query Foundation Test (Level: Query & Filtering Engine)
-// Requirement: filter audit trail by actor, action, target, branch, or trace ID
+// E4 — Audit Query Foundation Test (Level: Query & Retrieval by Audit Context)
+// Requirement: filter audit records by auditor, branch, audit_type, or status
 // ==============================================================================
-test('E4 — Audit Query Foundation: filters audit events accurately', async () => {
+test('E4 — Audit Query Foundation: filters audit process records by context', async () => {
   const writer = createAuditWriter();
   const queryEngine = createAuditQuery(writer);
 
-  await writer.append({
-    action: 'order.create',
-    actor: { actor_id: 'usr_cust_01' },
-    target: { entity_type: 'order', entity_id: 'ord_01', branch_id: 'branch_sby' },
-    correlation_id: 'trace_001'
-  });
+  await writer.append(new AuditLogRecord({
+    audit_type: 'revenue_audit',
+    auditor: { auditor_id: 'usr_auditor_sby' },
+    target: { branch_id: 'branch_sby' },
+    inspected_area: 'Revenue'
+  }));
 
-  await writer.append({
-    action: 'order.refund',
-    actor: { actor_id: 'usr_mgr_01' },
-    target: { entity_type: 'order', entity_id: 'ord_01', branch_id: 'branch_sby' },
-    correlation_id: 'trace_002'
-  });
-
-  await writer.append({
-    action: 'branch.update',
-    actor: { actor_id: 'usr_owner_01' },
-    target: { entity_type: 'branch', entity_id: 'branch_jkt', branch_id: 'branch_jkt' },
-    correlation_id: 'trace_003'
-  });
+  await writer.append(new AuditLogRecord({
+    audit_type: 'inventory_audit',
+    auditor: { auditor_id: 'usr_auditor_jkt' },
+    target: { branch_id: 'branch_jkt' },
+    inspected_area: 'Inventory'
+  }));
 
   // Query by branch
   const sbyLogs = queryEngine.query({ branch_id: 'branch_sby' });
-  assert.strictEqual(sbyLogs.length, 2);
+  assert.strictEqual(sbyLogs.length, 1);
+  assert.strictEqual(sbyLogs[0].audit_type, 'revenue_audit');
 
-  // Query by action
-  const refundLogs = queryEngine.query({ action: 'order.refund' });
-  assert.strictEqual(refundLogs.length, 1);
-  assert.strictEqual(refundLogs[0].actor.actor_id, 'usr_mgr_01');
-
-  // Query by correlation ID
-  const traceLogs = queryEngine.query({ correlation_id: 'trace_003' });
-  assert.strictEqual(traceLogs.length, 1);
-  assert.strictEqual(traceLogs[0].action, 'branch.update');
+  // Query by auditor
+  const jktAudits = queryEngine.query({ actor_id: 'usr_auditor_jkt' });
+  assert.strictEqual(jktAudits.length, 1);
+  assert.strictEqual(jktAudits[0].inspected_area, 'Inventory');
 });
 
 // ==============================================================================

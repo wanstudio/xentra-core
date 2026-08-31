@@ -1,41 +1,51 @@
-# 🏁 Xentra Core MVP Readiness Gate Report (G6 & G7)
+# 📊 Xentra Core MVP Readiness & Architecture Review Report (Milestone G)
 
-Dokumen ini merupakan verifikasi kesiapan platform **Xentra-Core** sebelum domain bisnis vertikal (Commerce, POS, Inventory, KDS) diintegrasikan.
-
----
-
-## 1. Status Evaluasi per Milestone
-
-| Milestone | Fondasi Platform | Status di Notion | Status di Git (`main`) | Hasil Verifikasi Automated Tests |
-| :--- | :--- | :---: | :---: | :---: |
-| **Milestone A** | Core Event Infrastructure (A1–A9) | **LOCKED** | `COMPLETED` | ✅ **9/9 Tests Passed (100%)** |
-| **Milestone B** | Identity & RBAC (B1–B7) | **LOCKED** | `COMPLETED` | ✅ **6/6 Tests Passed (100%)** |
-| **Milestone C** | Configuration & Feature Control (C1–C6) | **LOCKED v2** | `COMPLETED` | ✅ **5/5 Tests Passed (100%)** |
-| **Milestone D** | Integration Foundation (D1–D9) | **LOCKED v2** | `COMPLETED` | ✅ **7/7 Tests Passed (100%)** |
-| **Milestone E** | Audit & Activity (E1–E6) | **LOCKED** | `COMPLETED` | ✅ **5/5 Tests Passed (100%)** |
-| **Milestone G** | Core Stabilization & Readiness (G1–G7) | **LOCKED** | `COMPLETED` | ✅ **5/5 Tests Passed (100%)** |
+**Dokumen Standar:** Notion Ocean Roadmap — Milestone G (*Core Stabilization & Readiness Gate*)  
+**Prinsip Verifikasi:** *Evidence-Based Verification (No Mocked Business Logic & Explicit NOT VERIFIED Policy)*  
+**Tanggal Audit:** 31 Agustus 2026  
+**Status Evaluasi:** **EVIDENCE-VERIFIED BASELINE**
 
 ---
 
-## 2. Kepatuhan Kunci terhadap Locked Decisions Notion
+## 1. Ringkasan Eksekutif
 
-1. **Strict Boundary & No Business Coupling**:
-   - Modul `core/*` murni menjadi platform backbone (Events, Identity, Config, Integration, Audit) tanpa mencampurkan business workflow Commerce/POS.
-2. **Deterministic RBAC & Zero Ambiguity**:
-   - Menghilangkan asumsi wildcard implisit. Matriks permission eksplisit dan penegakan wewenang berjenjang (`Global ➔ Organization ➔ Brand ➔ Branch`).
-3. **Branch WhatsApp & Infrastructure Secret Isolation**:
-   - Nomor WhatsApp Branch bersifat wajib (`mandatory`) saat branch dibuat.
-   - Tidak pernah fallback ke `OWNER_WHATSAPP_NUMBER`.
-   - Wablas credential adalah server-side secret murni dan terlindung dari kebocoran (Zero Secret Leakage).
-4. **Resilience & Fault Isolation**:
-   - Kesalahan listener pada Event Bus atau timeout downstream eksternal tidak menggagalkan proses utama (Failure Isolation).
-5. **Observability & Tracing Baseline**:
-   - `correlation_id` dan `causation_id` diteruskan secara utuh dari inbound request hingga event audit log.
+Laporan ini menyajikan hasil verifikasi formal terhadap kesiapan fondasi arsitektur **Xentra-Core** untuk menopang domain bisnis vertikal (**Commerce, POS, Inventory, Payment, Delivery, Reporting**).
+
+Sesuai aturan **Milestone G pada Notion**:
+> *"G tidak membuat jenis test baru secara abstrak dan tidak boleh memaksakan test yang instrument input/output-nya belum tersedia. G adalah final verification terhadap evidence yang sudah dihasilkan milestone sebelumnya. Jika dependency atau instrument yang diperlukan belum tersedia, hasilnya harus dicatat sebagai **NOT VERIFIED**."*
 
 ---
 
-## 3. Kesimpulan & Status Akhir
+## 2. Matriks Verifikasi Berbasis Evidence (G1 s.d. G7)
 
-> **CORE MVP READINESS GATE (G7): APPROVED & PASSED (READY FOR COMMERCE & POS DOMAINS)**
+| Kode | Sub-Milestone | Status Evidence | Hasil Verifikasi / Catatan Kesiapan |
+| :--- | :--- | :---: | :--- |
+| **G1** | **Architecture Contract Review** | ✅ **VERIFIED** | Seluruh modul Core (`events`, `identity`, `config`, `integration`, `audit`, `domain`) terisolasi, decoupled, dan diekspos melalui [`core/index.js`](file:///home/ikhwan/Projects/xentra/xentra-core/core/index.js). |
+| **G2** | **Cross-Module Integration** | ✅ **VERIFIED** | Alur koordinasi fondasi terverifikasi pada path yang instrument-nya aktif (`Identity -> RBAC -> Config Scope -> Outbound Messaging -> Domain Registry -> Audit Process Engine`). |
+| **G3** | **Failure-Path & Recovery** | ✅ **VERIFIED** | Fault-isolation pada Event Bus terbukti mengisolasi listener yang crash tanpa mengganggu listener sehat. Timeout guard pada integrasi terbukti memutus eksekusi downstream yang lambat. |
+| **G4** | **Security & Permission Review** | ✅ **VERIFIED** | Penolakan *cross-branch* akses (HTTP 403 Forbidden) terbukti pada level `RoleBoundaryEnforcement`. Redaksi credential otomatis aktif (Zero Secret Leakage). |
+| **G5** | **Observability Baseline** | ✅ **VERIFIED** | Context lineage (`correlation_id` & `causation_id`) terdistribusi konsisten pada seluruh kontrak modul. |
+| **G6** | **Documentation Review** | ✅ **VERIFIED** | Blueprint domain, semantik Audit Log sebagai proses pemeriksaan, dan Self-Registration Domain telah sinkron dengan Notion terbaru. |
+| **G7** | **Core MVP Readiness Gate** | 🟡 **BASELINE VERIFIED** | Fondasi Core (A, B, C, D, E, F) **SIAP** untuk dimulainya pembangunan domain Commerce/POS. Dependensi eksternal fisik tetap bertatus `NOT VERIFIED`. |
 
-Platform **Xentra-Core** telah memenuhi seluruh kriteria Definition of Done (DoD) dan siap menjadi fondasi operasional multi-tenant & multi-branch.
+---
+
+## 3. Catatan Terbuka: Boundary Status "NOT VERIFIED" (Sesuai Aturan Notion)
+
+Untuk mematuhi aturan integritas sistem tanpa memalsukan/membuat mock fiktif, item-item berikut secara eksplisit dicatat sebagai **`NOT VERIFIED (EXTERNAL DEPENDENCY OPEN)`**:
+
+1. **Hardware Bluetooth ESC/POS Physical Printer**:
+   - *Status*: `NOT VERIFIED (PHYSICAL HARDWARE)`
+   - *Penjelasan*: Kontrak antarmuka `HardwarePrinterAdapter` telah siap, namun pengujian fisik terhadap perangkat keras printer Bluetooth baru dapat diverifikasi saat integrasi perangkat nyata di domain POS.
+2. **Production Midtrans / Real Bank Webhook Callback**:
+   - *Status*: `NOT VERIFIED (LIVE GATEWAY NETWORK)`
+   - *Penjelasan*: Integrasi kontrak adapter telah tervalidasi, namun verifikasi transaksi perbankan riil menunggu domain `Xentra-Payment` diinisialisasi.
+3. **Dedicated Physical Multi-Server Topology**:
+   - *Status*: `NOT VERIFIED (DECISION OPEN)`
+   - *Penjelasan*: Arsitektur saat ini terpisah secara domain modular; topologi database/server fisik belum dikunci sesuai *Domain Blueprint*.
+
+---
+
+## 4. Kesimpulan Kesiapan (Readiness Conclusion)
+
+Fondasi arsitektur **Xentra-Core** telah memenuhi seluruh kriteria kelayakan struktural berbasis bukti aktual dan siap menerima domain bisnis mandiri pertama (**Xentra-Commerce** dan **Xentra-POS**) yang mendaftarkan dirinya via *Self-Registration*.

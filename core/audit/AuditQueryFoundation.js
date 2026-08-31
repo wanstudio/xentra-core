@@ -26,10 +26,16 @@ class AuditQueryFoundation {
     const all = this.auditWriter.getRecords();
 
     const filtered = all.filter(record => {
-      if (filters.actor_id && (!record.actor || record.actor.actor_id !== filters.actor_id)) {
-        return false;
+      // Actor filter (supports actor.actor_id or auditor.auditor_id)
+      if (filters.actor_id) {
+        const matchesActor = record.actor && record.actor.actor_id === filters.actor_id;
+        const matchesAuditor = record.auditor && record.auditor.auditor_id === filters.actor_id;
+        if (!matchesActor && !matchesAuditor) return false;
       }
       if (filters.action && record.action !== filters.action) {
+        return false;
+      }
+      if (filters.audit_type && record.audit_type !== filters.audit_type) {
         return false;
       }
       if (filters.entity_type && (!record.target || record.target.entity_type !== filters.entity_type)) {
