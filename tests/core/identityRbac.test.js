@@ -132,10 +132,15 @@ test('B3 — Role Model: role definitions and scoped user assignments', () => {
   assert.strictEqual(userAssignments.length, 1);
   assert.strictEqual(userAssignments[0].role, 'cashier');
 
-  // Invalid role rejection
+  // Invalid role rejection (with explicit scope_type)
   assert.throws(() => {
-    roleManager.assign({ user_id: 'usr_cashier_01', role: 'super_admin_unauthorized' });
+    roleManager.assign({ user_id: 'usr_cashier_01', role: 'super_admin_unauthorized', scope_type: 'branch', scope_id: 'branch_surabaya_barat' });
   }, /Invalid role/);
+
+  // Mandatory scope_type rejection
+  assert.throws(() => {
+    roleManager.assign({ user_id: 'usr_cashier_01', role: 'cashier' });
+  }, /"scope_type" is mandatory/);
 });
 
 // ==============================================================================

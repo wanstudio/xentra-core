@@ -573,40 +573,39 @@ function seedData(targetDb) {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `).run('bds_barat_' + branchBaratId, branchBaratId, 12.0, 0, 3000.0, 15000.0, 5000.0, 50000.0);
 
-  try {
-    targetDb.prepare("DELETE FROM categories WHERE id IN ('cat_makanan', 'cat_minuman', 'cat_camilan', 'cat_snack')").run();
-    targetDb.prepare("DELETE FROM products WHERE id LIKE 'prod_%'").run();
-  } catch (e) {}
+  // P1 DATA-LOSS GUARD: NEVER run destructive DELETE statements on startup in seedData
+  const catCount = targetDb.prepare('SELECT COUNT(*) as cnt FROM categories WHERE brand_id = ?').get(brandId)?.cnt || 0;
+  if (catCount === 0) {
+    const catRekom = '34';
+    const catAyam = '20';
+    const catMie = '26';
+    const catTerlaris = '35';
+    const catMinuman = '22';
+    const catUdang = '21';
 
-  const catRekom = '34';
-  const catAyam = '20';
-  const catMie = '26';
-  const catTerlaris = '35';
-  const catMinuman = '22';
-  const catUdang = '21';
+    targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catRekom, brandId, 'Rekom', 'rekom', 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', 1);
+    targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catAyam, brandId, 'Paket Ayam', 'paket-ayam', 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', 2);
+    targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catMie, brandId, 'Mie Bangjo', 'mie-bangjo', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 3);
+    targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catTerlaris, brandId, 'Terlaris', 'terlaris', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 4);
+    targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catMinuman, brandId, 'Minuman', 'minuman', 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', 5);
+    targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catUdang, brandId, 'Udang', 'udang', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-May-25-2026-01_57_13-PM.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-May-25-2026-01_57_13-PM.png', 6);
 
-  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catRekom, brandId, 'Rekom', 'rekom', 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', 1);
-  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catAyam, brandId, 'Paket Ayam', 'paket-ayam', 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', 2);
-  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catMie, brandId, 'Mie Bangjo', 'mie-bangjo', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 3);
-  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catTerlaris, brandId, 'Terlaris', 'terlaris', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', 4);
-  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catMinuman, brandId, 'Minuman', 'minuman', 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', 5);
-  targetDb.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catUdang, brandId, 'Udang', 'udang', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-May-25-2026-01_57_13-PM.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-May-25-2026-01_57_13-PM.png', 6);
+    const products = [
+      { id: '272', cat: catRekom, name: 'Paket Spesial Semar', price: 35000, reg: 38000, desc: 'Nasi + Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+      { id: '285', cat: catRekom, name: 'Paket Spesial Petruk', price: 35000, reg: 37000, desc: 'Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
+      { id: '345', cat: catRekom, name: 'Mie Gurih', price: 15000, reg: 17000, desc: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+      { id: '286', cat: catAyam, name: 'Ayam Tulang Lunak Bakar', price: 28000, reg: 32000, desc: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+      { id: '287', cat: catMie, name: 'Mie Godog Jawa Asli', price: 22000, reg: 25000, desc: 'Mie godog kuah gurih kaldu kental ayam kampung dengan telor dan sayur segar.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+      { id: '288', cat: catMinuman, name: 'Es Kopi Susu Bangjo', price: 15000, reg: 18000, desc: 'Kopi susu gula aren racikan istimewa barista Bangjo dingin segar.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
+    ];
 
-  const products = [
-    { id: '272', cat: catRekom, name: 'Paket Spesial Semar', price: 35000, reg: 38000, desc: 'Nasi + Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-    { id: '285', cat: catRekom, name: 'Paket Spesial Petruk', price: 35000, reg: 37000, desc: 'Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
-    { id: '345', cat: catRekom, name: 'Mie Gurih', price: 15000, reg: 17000, desc: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-    { id: '286', cat: catAyam, name: 'Ayam Tulang Lunak Bakar', price: 28000, reg: 32000, desc: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-    { id: '287', cat: catMie, name: 'Mie Godog Jawa Asli', price: 22000, reg: 25000, desc: 'Mie godog kuah gurih kaldu kental ayam kampung dengan telor dan sayur segar.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-    { id: '288', cat: catMinuman, name: 'Es Kopi Susu Bangjo', price: 15000, reg: 18000, desc: 'Kopi susu gula aren racikan istimewa barista Bangjo dingin segar.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-  ];
-
-  for (let i = 0; i < products.length; i++) {
-    const p = products[i];
-    targetDb.prepare(`
-      INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(p.id, brandId, p.cat, p.name, p.name.toLowerCase().replace(/ /g, '-'), p.desc, p.price, p.reg, p.img, p.img, i + 1);
+    for (let i = 0; i < products.length; i++) {
+      const p = products[i];
+      targetDb.prepare(`
+        INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(p.id, brandId, p.cat, p.name, p.name.toLowerCase().replace(/ /g, '-'), p.desc, p.price, p.reg, p.img, p.img, i + 1);
+    }
   }
 }
 
