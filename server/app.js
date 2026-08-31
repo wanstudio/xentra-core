@@ -45,16 +45,21 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow non-browser / internal server requests (null origin)
+    // Allow non-browser / internal server requests (null origin like curl, mobile app webview or SSR)
     if (!origin) return callback(null, true);
+    
+    // Check against allowed explicit origins or *.mybangjo.com subdomains
     if (allowedOrigins.includes(origin) || origin.endsWith('.mybangjo.com')) {
       return callback(null, true);
     }
-    // Allow local development ports
-    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    
+    // Allow local development ports if non-production
+    if (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
       return callback(null, true);
     }
-    return callback(null, true); // Permissive in dev, but explicit check configured
+
+    // P1 HARDENING: Strictly reject all other origins
+    return callback(new Error('CORS policy: Origin not allowed.'));
   },
   credentials: true
 }));
@@ -139,12 +144,24 @@ app.get(/^\/dashboard(\/.*)?$/, (req, res) => {
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
 });
 
-// Health Check
+// Health Check with Persistence & DB Readiness Verification
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
+  let dbStatus = 'unhealthy';
+  try {
+    const testRow = db.prepare('SELECT 1 as alive').get();
+    if (testRow && testRow.alive === 1) {
+      dbStatus = 'ready';
+    }
+  } catch (err) {
+    dbStatus = 'disconnected: ' + err.message;
+  }
+
+  const isHealthy = dbStatus === 'ready';
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'ok' : 'degraded',
     system: 'Xentra Core Standalone Engine',
     version: '2.2.5',
+    persistence: dbStatus,
     timestamp: new Date().toISOString()
   });
 });
