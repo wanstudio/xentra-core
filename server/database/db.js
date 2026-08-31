@@ -3,10 +3,7 @@ const fs = require('fs');
 
 const DB_PATH = (() => {
   if (process.env.NODE_ENV === 'test') {
-    const os = require('os');
-    const crypto = require('crypto');
-    // isolated temp file per test process (avoids WAL lock when --test spawns workers)
-    return process.env.DB_PATH || path.join(os.tmpdir(), `xentra_test_${process.pid}_${crypto.randomBytes(4).toString('hex')}.db`);
+    return ':memory:';
   }
   return process.env.DB_PATH || path.join(__dirname, 'xentra.db');
 })();
