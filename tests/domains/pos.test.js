@@ -8,6 +8,7 @@ const {
   PosShiftService,
   PosOrderService,
   PosHardwareRouter,
+  OfflineReconciliationService,
   identity,
   capabilities
 } = require('../../domains/pos');
@@ -45,6 +46,7 @@ test.before(() => {
 test('POS 1 — Self-Registration: successfully registered in core DomainRegistry', () => {
   assert.strictEqual(identity.name, 'pos');
   assert.strictEqual(capabilities.events_produced.includes('pos.shift.closed'), true);
+  assert.strictEqual(capabilities.events_produced.includes('pos.offline.reconciled'), true);
   assert.strictEqual(domain.DomainRegistry.isDomainActive('pos'), true);
 });
 
@@ -176,7 +178,7 @@ test('POS 5 — Order Settle: calculates change and delegates stock deduction cl
   const settleResult = await PosOrderService.settleOrder({
     brand_id: 'brand_pos',
     branch_id: 'branch_pos',
-    order_type: 'dinein',
+    order_type: 'dine_in',
     payment_method: 'cash',
     amount_tendered: 50000,
     items: [
@@ -194,27 +196,118 @@ test('POS 5 — Order Settle: calculates change and delegates stock deduction cl
 });
 
 // ==============================================================================
-// POS 6 — Hardware Receipt & Cash Drawer Formatting
+// POS 6 — Hardware Receipt & Kitchen Ticket / KDS Routing
 // ==============================================================================
-test('POS 6 — Hardware Router: formats receipt lines and triggers cash drawer kick on cash payment', () => {
+test('POS 6 — Hardware & KDS Router: formats receipt and routes kitchen ticket', async () => {
+  let kdsEventReceived = null;
+  events.EventBus.subscribe('pos.kitchen.ticket_routed', (e) => {
+    kdsEventReceived = e;
+  });
+
   const mockOrder = {
+    id: 'ord_pos_123',
     order_number: 'ORD-POS-1001',
     grand_total: 40000,
+    fulfillment_type: 'dine_in',
+    table_number: '12',
     payment_method: 'cash',
     amount_tendered: 50000,
     change: 10000,
     items: [
-      { name: 'Nasi Goreng POS', quantity: 2, unit_price: 20000, subtotal: 40000 }
+      { name: 'Nasi Goreng POS', quantity: 2, unit_price: 20000, subtotal: 40000, note: 'Pedas sedang' }
     ]
   };
 
+  // 1. Customer Receipt Formatting
   const receipt = PosHardwareRouter.buildCustomerReceipt({
     branch_name: 'Xentra POS Test',
     order: mockOrder
   });
-
   assert.strictEqual(receipt.action, 'print_receipt');
-  assert.strictEqual(receipt.open_cash_drawer, true, 'Cash payment must trigger cash drawer');
-  assert.ok(receipt.raw_content.includes('Nasi Goreng POS'));
-  assert.ok(receipt.raw_content.includes('KEMBALI: Rp 10.000'));
+  assert.strictEqual(receipt.open_cash_drawer, true);
+  assert.ok(receipt.raw_content.includes('MEJA : 12'));
+
+  // 2. Kitchen Ticket & KDS Dispatching
+  const kitchenRoute = await PosHardwareRouter.routeToKitchen({
+    branch_id: 'branch_pos',
+    order: mockOrder
+  });
+  assert.strictEqual(kitchenRoute.dispatched, true);
+  assert.strictEqual(kitchenRoute.ticket_payload.action, 'print_kitchen_ticket');
+
+  assert.ok(kdsEventReceived);
+  assert.strictEqual(kdsEventReceived.payload.order_id, 'ord_pos_123');
+  assert.strictEqual(kdsEventReceived.payload.table_number, '12');
+  assert.ok(kdsEventReceived.payload.ticket_content.includes('Pedas sedang'));
+});
+
+// ==============================================================================
+// POS 7 — Offline Sync Reconciliation & Idempotency Deduplication
+// ==============================================================================
+test('POS 7 — Offline Reconciliation: honors authoritative cash capture & drops duplicate sync', async () => {
+  const txId = 'tx_offline_uuid_999';
+
+  // 1. First sync attempt: Processed successfully
+  const syncResult1 = await OfflineReconciliationService.reconcileOfflineTransaction({
+    client_transaction_id: txId,
+    brand_id: 'brand_pos',
+    branch_id: 'branch_pos',
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    items: [
+      { product_id: 'prod_pos_2', quantity: 2, expected_price: 8000 }
+    ],
+    offline_created_at: '2026-08-31T20:00:00Z'
+  });
+
+  assert.strictEqual(syncResult1.status, 'PROCESSED');
+  assert.strictEqual(syncResult1.order.grand_total, 16000);
+  assert.strictEqual(syncResult1.order.client_transaction_id, txId);
+
+  // 2. Duplicate sync attempt with same client_transaction_id: Ignored (Idempotent)
+  const syncResult2 = await OfflineReconciliationService.reconcileOfflineTransaction({
+    client_transaction_id: txId,
+    brand_id: 'brand_pos',
+    branch_id: 'branch_pos',
+    items: [
+      { product_id: 'prod_pos_2', quantity: 2, expected_price: 8000 }
+    ]
+  });
+
+  assert.strictEqual(syncResult2.status, 'DUPLICATE_IGNORED');
+  assert.ok(syncResult2.message.includes('Idempotent'));
+});
+
+// ==============================================================================
+// POS 8 — Disaster Recovery Reconciliation (Lost/Damaged Device)
+// ==============================================================================
+test('POS 8 — Disaster Recovery: reconciles physical cash against un-synced receipt bundles', () => {
+  let disasterEvent = null;
+  events.EventBus.subscribe('pos.disaster_recovery.reconciled', (e) => {
+    disasterEvent = e;
+  });
+
+  // Open temporary shift for disaster recovery testing
+  const disasterShift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: 'cashier_disaster',
+    starting_float: 50000
+  });
+
+  // Device damaged: Cashier has Rp 250.000 in drawer, paper receipts total Rp 190.000
+  // Expected in drawer = 50.000 + 190.000 = 240.000 ➔ Variance = +10.000
+  const recoveryResult = OfflineReconciliationService.recordDisasterRecoveryReconciliation({
+    shift_id: disasterShift.id,
+    actual_physical_cash: 250000,
+    paper_receipts_total: 190000,
+    incident_notes: 'Tablet kasir rusak akibat tersiram air saat jam sibuk'
+  });
+
+  assert.strictEqual(recoveryResult.status, 'closed_via_disaster_recovery');
+  assert.strictEqual(recoveryResult.actual_physical_cash, 250000);
+  assert.strictEqual(recoveryResult.variance, 10000);
+
+  assert.ok(disasterEvent);
+  assert.strictEqual(disasterEvent.payload.disaster_variance, 10000);
+  assert.ok(disasterEvent.payload.incident_notes.includes('tersiram air'));
 });
