@@ -9,7 +9,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const GeminiAgent = require('./geminiAgent');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const OWNER_NUMBERS = (process.env.OWNER_WHATSAPP_NUMBER || '')
+const ALLOWED_NUMBERS = (process.env.ALLOWED_WHATSAPP_NUMBERS || process.env.OWNER_WHATSAPP_NUMBER || '')
   .split(',')
   .map(num => num.replace(/[^0-9]/g, ''))
   .filter(Boolean);
@@ -79,7 +79,7 @@ async function connectToWhatsApp() {
       }
     } else if (connection === 'open') {
       console.log('✅ [WhatsApp Connected] Bot BERHASIL TERHUBUNG dan siap menerima perintah!');
-      console.log('🔒 Whitelisted Numbers:', OWNER_NUMBERS.length ? OWNER_NUMBERS : '(Semua nomor diizinkan)');
+      console.log('🔒 Whitelisted Numbers:', ALLOWED_NUMBERS.length ? ALLOWED_NUMBERS : '(Semua nomor diizinkan)');
     }
   });
 
@@ -123,24 +123,20 @@ async function connectToWhatsApp() {
 
       console.log(`[Incoming WA Message]: "${trimmedText}" | fromMe: ${isFromMe} | JID: ${remoteJid}`);
 
-      // Security check
-      const isOwner = isFromMe || OWNER_NUMBERS.some(num => senderPhone.includes(num)) || senderPhone.includes('83175265457') || senderPhone.includes('119207555530972');
+      // Security check: Only allow messages from verified sender or whitelisted numbers
+      const isAuthorized = isFromMe || (ALLOWED_NUMBERS.length > 0 && ALLOWED_NUMBERS.some(num => senderPhone.includes(num)));
 
-      if (OWNER_NUMBERS.length > 0 && !isOwner) {
+      if (ALLOWED_NUMBERS.length > 0 && !isAuthorized) {
         console.warn(`[Security Blocked] Pesan dari pengirim tidak terdaftar: ${senderPhone}`);
         return;
       }
 
-      console.log(`🚀 [Memproses Tugas dari Owner]: ${trimmedText}`);
+      console.log(`🚀 [Memproses Tugas]: ${trimmedText}`);
 
       const reply = async (messageText) => {
         try {
-          const targetJid = remoteJid.endsWith('@lid') ? '6283175265457@s.whatsapp.net' : remoteJid;
-          console.log(`[Mengirim Balasan WA ke ${targetJid}]: ${messageText.slice(0, 60)}...`);
-          await sock.sendMessage(targetJid, { text: messageText });
-          if (targetJid !== remoteJid) {
-            try { await sock.sendMessage(remoteJid, { text: messageText }); } catch (_) {}
-          }
+          console.log(`[Mengirim Balasan WA ke ${remoteJid}]: ${messageText.slice(0, 60)}...`);
+          await sock.sendMessage(remoteJid, { text: messageText });
         } catch (err) {
           console.error('[Error Mengirim Balasan WA]:', err);
         }

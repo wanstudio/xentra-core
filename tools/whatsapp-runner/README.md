@@ -12,7 +12,7 @@ Daemon mandiri berbasis **Node.js**, **Baileys (WhatsApp Web Multi-Device)**, da
 2. **Kirim Instruksi via Chat WA Sehari-hari:**
    - Cukup kirim chat biasa dari HP Anda (misal: *"Ubah diskon ongkir jadi 10rb untuk minimal belanja 50rb di cabang Surabaya Barat, jalankan test, lalu deploy ke cPanel"*).
 3. **Whitelist Keamanan Nomor HP:**
-   - Hanya nomor WhatsApp Anda yang terdaftar di `OWNER_WHATSAPP_NUMBER` yang dapat memerintah bot. Pesan dari orang lain otomatis diabaikan.
+   - Hanya nomor WhatsApp operator yang terdaftar di `ALLOWED_WHATSAPP_NUMBERS` yang dapat memerintah bot. Pesan dari orang lain otomatis diabaikan.
 4. **Automated Testing & Auto-Deploy:**
    - Bot otomatis memverifikasi kode dengan `node --test tests/**/*.test.js` sebelum melakukan `git push` dan upload paket ke cPanel (`dev.mybangjo.com`).
 
@@ -26,9 +26,10 @@ Di folder `xentra-core/tools/whatsapp-runner/`:
 cp .env.example .env
 nano .env
 ```
-Isi nomor WhatsApp Anda dan Gemini API Key:
+Isi whitelist nomor WhatsApp dan Gemini API Key:
 ```ini
-OWNER_WHATSAPP_NUMBER=6281234567890
+ALLOWED_WHATSAPP_NUMBERS=628xxxxxxxxxx
+
 GEMINI_API_KEY=AIzaSyD...your-gemini-key
 GEMINI_MODEL=gemini-2.5-flash
 ```

@@ -25,3 +25,8 @@ tmp/
 # WhatsApp authentication/session runtime artifacts
 tools/whatsapp-runner/auth_session/*
 !tools/whatsapp-runner/auth_session/.gitkeep
+tools/**/.env
+tools/**/.env.local
+auth_session/
+*.session
+

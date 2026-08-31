@@ -33,13 +33,13 @@ class PaymentService {
       }
     }
 
-    // 3. Fallback dummy sandbox
+    // 3. Environment Config (No hardcoded credential fallback)
     return {
       provider: 'midtrans',
-      is_production: false,
-      server_key: process.env.MIDTRANS_SERVER_KEY || 'SB-Mid-server-TEST_KEY',
-      client_key: process.env.MIDTRANS_CLIENT_KEY || 'SB-Mid-client-TEST_KEY',
-      merchant_id: 'G_XENTRA_TEST'
+      is_production: process.env.MIDTRANS_IS_PRODUCTION === 'true',
+      server_key: process.env.MIDTRANS_SERVER_KEY || '',
+      client_key: process.env.MIDTRANS_CLIENT_KEY || '',
+      merchant_id: process.env.MIDTRANS_MERCHANT_ID || ''
     };
   }
 
