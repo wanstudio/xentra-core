@@ -208,6 +208,7 @@ function initSchema(targetDb) {
       logo_url TEXT,
       primary_color TEXT DEFAULT '#b6ff00',
       custom_domain TEXT UNIQUE,
+      tagline TEXT,
       default_payment_config TEXT,
       banners TEXT,
       created_at TEXT DEFAULT (datetime('now')),

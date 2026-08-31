@@ -1043,32 +1043,90 @@ router.get('/admin/brand', (req, res) => {
   }
 });
 
-router.put('/admin/brand', (req, res) => {
+/* =========================================================================
+   ADMIN & OWNER DASHBOARD API ENDPOINTS (Protected by requireAuth)
+   ========================================================================= */
+
+// 11. Admin Brand Profile & Theme
+router.get('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    let brand = db.prepare('SELECT * FROM brands WHERE id = ?').get(req.brand_id);
+    if (!brand) brand = req.brand;
+    let banners = [];
+    try {
+      banners = brand.banners ? (typeof brand.banners === 'string' ? JSON.parse(brand.banners) : brand.banners) : [];
+    } catch(e) {}
+    if (!Array.isArray(banners) || banners.length === 0) {
+      banners = [
+        {
+          id: 'banner_1',
+          image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80',
+          title: 'Slalu ada sensasi di setiap gigitan',
+          link: '#'
+        },
+        {
+          id: 'banner_2',
+          image_url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80',
+          title: 'Paket Spesial Diskon 20%',
+          link: '#'
+        },
+        {
+          id: 'banner_3',
+          image_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80',
+          title: 'Ayam Tulang Lunak Khas Bangjo',
+          link: '#'
+        }
+      ];
+    }
+    res.json({
+      success: true,
+      brand: {
+        id: brand.id,
+        name: brand.name,
+        slug: brand.slug,
+        logo_url: brand.logo_url || '/assets/pwa/icon-192.png',
+        primary_color: brand.primary_color || '#b6ff00',
+        custom_domain: brand.custom_domain || 'dev.mybangjo.com',
+        tagline: brand.tagline || 'Official Online Food Ordering',
+        banners
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, primary_color, logo_url, custom_domain, tagline, banners } = req.body;
     const bannersJson = banners ? (typeof banners === 'string' ? banners : JSON.stringify(banners)) : null;
 
-    // Update Database if available
-    try {
-      db.prepare(`
-        UPDATE brands 
-        SET name = COALESCE(?, name),
-            primary_color = COALESCE(?, primary_color),
-            logo_url = COALESCE(?, logo_url),
-            custom_domain = COALESCE(?, custom_domain),
-            banners = COALESCE(?, banners),
-            updated_at = datetime('now')
-        WHERE id = ?
-      `).run(name, primary_color, logo_url, custom_domain, bannersJson, req.brand_id);
-    } catch (_) {}
+    db.prepare(`
+      UPDATE brands 
+      SET name = COALESCE(?, name),
+          primary_color = COALESCE(?, primary_color),
+          logo_url = COALESCE(?, logo_url),
+          custom_domain = COALESCE(?, custom_domain),
+          banners = COALESCE(?, banners),
+          updated_at = datetime('now')
+      WHERE id = ?
+    `).run(
+      name !== undefined ? name : null,
+      primary_color !== undefined ? primary_color : null,
+      logo_url !== undefined ? logo_url : null,
+      custom_domain !== undefined ? custom_domain : null,
+      bannersJson,
+      req.brand_id
+    );
 
-    // Update active memory
-    req.brand.name = name || req.brand.name;
-    req.brand.primary_color = primary_color || req.brand.primary_color;
-    req.brand.logo_url = logo_url || req.brand.logo_url;
-    req.brand.custom_domain = custom_domain || req.brand.custom_domain;
-    req.brand.tagline = tagline || req.brand.tagline;
-    if (bannersJson) req.brand.banners = bannersJson;
+    if (req.brand) {
+      req.brand.name = name || req.brand.name;
+      req.brand.primary_color = primary_color || req.brand.primary_color;
+      req.brand.logo_url = logo_url || req.brand.logo_url;
+      req.brand.custom_domain = custom_domain || req.brand.custom_domain;
+      req.brand.tagline = tagline || req.brand.tagline;
+      if (bannersJson) req.brand.banners = bannersJson;
+    }
 
     res.json({
       success: true,
@@ -1081,7 +1139,7 @@ router.put('/admin/brand', (req, res) => {
 });
 
 // 11.1 Add/Delete Banners
-router.post('/admin/banners', (req, res) => {
+router.post('/admin/banners', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { image_url, title = '', link = '#' } = req.body;
     if (!image_url) {
@@ -1103,17 +1161,15 @@ router.post('/admin/banners', (req, res) => {
     };
     banners.push(newBanner);
     const bannersJson = JSON.stringify(banners);
-    try {
-      db.prepare('UPDATE brands SET banners = ?, updated_at = datetime(\'now\') WHERE id = ?').run(bannersJson, req.brand_id);
-    } catch (_) {}
-    req.brand.banners = bannersJson;
+    db.prepare('UPDATE brands SET banners = ?, updated_at = datetime(\'now\') WHERE id = ?').run(bannersJson, req.brand_id);
+    if (req.brand) req.brand.banners = bannersJson;
     res.json({ success: true, message: 'Banner berhasil ditambahkan.', banners });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-router.delete('/admin/banners/:id', (req, res) => {
+router.delete('/admin/banners/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     let banners = [];
     try {
@@ -1122,10 +1178,8 @@ router.delete('/admin/banners/:id', (req, res) => {
     if (!Array.isArray(banners)) banners = [];
     banners = banners.filter(b => b.id !== req.params.id);
     const bannersJson = JSON.stringify(banners);
-    try {
-      db.prepare('UPDATE brands SET banners = ?, updated_at = datetime(\'now\') WHERE id = ?').run(bannersJson, req.brand_id);
-    } catch (_) {}
-    req.brand.banners = bannersJson;
+    db.prepare('UPDATE brands SET banners = ?, updated_at = datetime(\'now\') WHERE id = ?').run(bannersJson, req.brand_id);
+    if (req.brand) req.brand.banners = bannersJson;
     res.json({ success: true, message: 'Banner berhasil dihapus.', banners });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -1133,7 +1187,7 @@ router.delete('/admin/banners/:id', (req, res) => {
 });
 
 // 12. Admin Categories CRUD
-router.get('/admin/categories', (req, res) => {
+router.get('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     let categories = db.prepare('SELECT * FROM categories WHERE brand_id = ? ORDER BY sort_order ASC').all(req.brand_id);
     if (!categories || categories.length === 0) {
@@ -1149,7 +1203,7 @@ router.get('/admin/categories', (req, res) => {
   }
 });
 
-router.post('/admin/categories', (req, res) => {
+router.post('/admin/categories', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, image } = req.body;
     if (!name) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
@@ -1157,12 +1211,10 @@ router.post('/admin/categories', (req, res) => {
     const id = 'cat_' + Date.now();
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     
-    try {
-      db.prepare(`
-        INSERT INTO categories (id, brand_id, name, slug, sort_order)
-        VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM categories WHERE brand_id = ?))
-      `).run(id, req.brand_id, name, slug, req.brand_id);
-    } catch (_) {}
+    db.prepare(`
+      INSERT INTO categories (id, brand_id, name, slug, sort_order)
+      VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM categories WHERE brand_id = ?))
+    `).run(id, req.brand_id, name, slug, req.brand_id);
 
     res.status(201).json({
       success: true,
@@ -1173,17 +1225,20 @@ router.post('/admin/categories', (req, res) => {
   }
 });
 
-router.put('/admin/categories/:id', (req, res) => {
+router.put('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, image, sort_order } = req.body;
-    try {
-      db.prepare(`
-        UPDATE categories 
-        SET name = COALESCE(?, name),
-            sort_order = COALESCE(?, sort_order)
-        WHERE id = ? AND brand_id = ?
-      `).run(name, sort_order, req.params.id, req.brand_id);
-    } catch (_) {}
+    db.prepare(`
+      UPDATE categories 
+      SET name = COALESCE(?, name),
+          sort_order = COALESCE(?, sort_order)
+      WHERE id = ? AND brand_id = ?
+    `).run(
+      name !== undefined ? name : null,
+      sort_order !== undefined ? sort_order : null,
+      req.params.id,
+      req.brand_id
+    );
 
     res.json({ success: true, message: 'Kategori berhasil diperbarui.' });
   } catch (err) {
@@ -1191,11 +1246,9 @@ router.put('/admin/categories/:id', (req, res) => {
   }
 });
 
-router.delete('/admin/categories/:id', (req, res) => {
+router.delete('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    try {
-      db.prepare('DELETE FROM categories WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
-    } catch (_) {}
+    db.prepare('DELETE FROM categories WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
     res.json({ success: true, message: 'Kategori berhasil dihapus.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -1203,7 +1256,7 @@ router.delete('/admin/categories/:id', (req, res) => {
 });
 
 // 13. Admin Products CRUD
-router.get('/admin/products', (req, res) => {
+router.get('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     let products = db.prepare('SELECT * FROM products WHERE brand_id = ? ORDER BY sort_order ASC').all(req.brand_id);
     if (!products || products.length === 0) {
@@ -1221,7 +1274,7 @@ router.get('/admin/products', (req, res) => {
   }
 });
 
-router.post('/admin/products', (req, res) => {
+router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, category_id, price, regular_price, description, image } = req.body;
     if (!name || !price) return res.status(400).json({ success: false, error: 'Nama dan harga menu wajib diisi.' });
@@ -1229,12 +1282,19 @@ router.post('/admin/products', (req, res) => {
     const id = 'prod_' + Date.now();
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    try {
-      db.prepare(`
-        INSERT INTO products (id, brand_id, category_id, name, slug, description, price, is_active, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products WHERE brand_id = ?))
-      `).run(id, req.brand_id, category_id, name, slug, description || '', Number(price), req.brand_id);
-    } catch (_) {}
+    db.prepare(`
+      INSERT INTO products (id, brand_id, category_id, name, slug, description, price, is_active, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products WHERE brand_id = ?))
+    `).run(
+      id,
+      req.brand_id,
+      category_id !== undefined ? category_id : null,
+      name,
+      slug,
+      description !== undefined ? description : '',
+      Number(price),
+      req.brand_id
+    );
 
     res.status(201).json({
       success: true,
@@ -1254,21 +1314,27 @@ router.post('/admin/products', (req, res) => {
   }
 });
 
-router.put('/admin/products/:id', (req, res) => {
+router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, category_id, price, regular_price, description, image, is_active } = req.body;
-    try {
-      db.prepare(`
-        UPDATE products 
-        SET name = COALESCE(?, name),
-            category_id = COALESCE(?, category_id),
-            price = COALESCE(?, price),
-            description = COALESCE(?, description),
-            is_active = COALESCE(?, is_active),
-            updated_at = datetime('now')
-        WHERE id = ? AND brand_id = ?
-      `).run(name, category_id, price, description, is_active, req.params.id, req.brand_id);
-    } catch (_) {}
+    db.prepare(`
+      UPDATE products 
+      SET name = COALESCE(?, name),
+          category_id = COALESCE(?, category_id),
+          price = COALESCE(?, price),
+          description = COALESCE(?, description),
+          is_active = COALESCE(?, is_active),
+          updated_at = datetime('now')
+      WHERE id = ? AND brand_id = ?
+    `).run(
+      name !== undefined ? name : null,
+      category_id !== undefined ? category_id : null,
+      price !== undefined ? price : null,
+      description !== undefined ? description : null,
+      is_active !== undefined ? is_active : null,
+      req.params.id,
+      req.brand_id
+    );
 
     res.json({ success: true, message: 'Menu produk berhasil diperbarui.' });
   } catch (err) {
@@ -1276,7 +1342,7 @@ router.put('/admin/products/:id', (req, res) => {
   }
 });
 
-router.patch('/admin/products/:id/toggle', (req, res) => {
+router.patch('/admin/products/:id/toggle', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const stmt = db.prepare(`
       UPDATE products 
@@ -1295,7 +1361,7 @@ router.patch('/admin/products/:id/toggle', (req, res) => {
   }
 });
 
-router.delete('/admin/products/:id', (req, res) => {
+router.delete('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const stmt = db.prepare('DELETE FROM products WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
     if (!stmt || stmt.changes === 0) {
@@ -1308,7 +1374,7 @@ router.delete('/admin/products/:id', (req, res) => {
 });
 
 // 14. Admin Branches & Delivery Settings
-router.get('/admin/branches', (req, res) => {
+router.get('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const branches = db.prepare(`
       SELECT 
@@ -1326,7 +1392,7 @@ router.get('/admin/branches', (req, res) => {
 });
 
 // 14.1 Create Branch (Mandatory Branch WhatsApp Number)
-router.post('/admin/branches', (req, res) => {
+router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const {
       name,
@@ -1344,7 +1410,6 @@ router.post('/admin/branches', (req, res) => {
 
     const branchPhone = (phone || whatsapp_number || '').trim();
 
-    // Locked Decision: Branch WhatsApp / Phone is strictly required. No fallback to Owner or hardcode.
     if (!branchPhone) {
       return res.status(400).json({
         success: false,
@@ -1371,8 +1436,8 @@ router.post('/admin/branches', (req, res) => {
       name.trim(),
       slug,
       address_text ? address_text.trim() : '',
-      latitude || 0,
-      longitude || 0,
+      latitude !== undefined ? latitude : 0,
+      longitude !== undefined ? longitude : 0,
       branchPhone
     );
 
@@ -1383,11 +1448,11 @@ router.post('/admin/branches', (req, res) => {
     `).run(
       deliverySettingsId,
       branchId,
-      free_delivery_km || 0,
-      price_per_km || 3000,
-      max_radius_km || 10,
-      promo_min_order || 50000,
-      promo_delivery_discount || 0
+      free_delivery_km !== undefined ? free_delivery_km : 0,
+      price_per_km !== undefined ? price_per_km : 3000,
+      max_radius_km !== undefined ? max_radius_km : 10,
+      promo_min_order !== undefined ? promo_min_order : 50000,
+      promo_delivery_discount !== undefined ? promo_delivery_discount : 0
     );
 
     res.status(201).json({
@@ -1408,7 +1473,7 @@ router.post('/admin/branches', (req, res) => {
   }
 });
 
-router.put('/admin/branches/:id', (req, res) => {
+router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
     const targetPhone = phone !== undefined ? phone : whatsapp_number;
@@ -1420,28 +1485,42 @@ router.put('/admin/branches/:id', (req, res) => {
       });
     }
 
-    try {
-      db.prepare(`
-        UPDATE branches 
-        SET name = COALESCE(?, name),
-            address_text = COALESCE(?, address_text),
-            latitude = COALESCE(?, latitude),
-            longitude = COALESCE(?, longitude),
-            phone = COALESCE(?, phone),
-            is_active = COALESCE(?, is_active)
-        WHERE id = ? AND brand_id = ?
-      `).run(name, address_text, latitude, longitude, targetPhone, is_active, req.params.id, req.brand_id);
+    db.prepare(`
+      UPDATE branches 
+      SET name = COALESCE(?, name),
+          address_text = COALESCE(?, address_text),
+          latitude = COALESCE(?, latitude),
+          longitude = COALESCE(?, longitude),
+          phone = COALESCE(?, phone),
+          is_active = COALESCE(?, is_active)
+      WHERE id = ? AND brand_id = ?
+    `).run(
+      name !== undefined ? name : null,
+      address_text !== undefined ? address_text : null,
+      latitude !== undefined ? latitude : null,
+      longitude !== undefined ? longitude : null,
+      targetPhone !== undefined ? targetPhone : null,
+      is_active !== undefined ? is_active : null,
+      req.params.id,
+      req.brand_id
+    );
 
-      db.prepare(`
-        UPDATE branch_delivery_settings
-        SET free_delivery_km = COALESCE(?, free_delivery_km),
-            price_per_km = COALESCE(?, price_per_km),
-            max_radius_km = COALESCE(?, max_radius_km),
-            promo_min_order = COALESCE(?, promo_min_order),
-            promo_delivery_discount = COALESCE(?, promo_delivery_discount)
-        WHERE branch_id = ?
-      `).run(free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount, req.params.id);
-    } catch (_) {}
+    db.prepare(`
+      UPDATE branch_delivery_settings
+      SET free_delivery_km = COALESCE(?, free_delivery_km),
+          price_per_km = COALESCE(?, price_per_km),
+          max_radius_km = COALESCE(?, max_radius_km),
+          promo_min_order = COALESCE(?, promo_min_order),
+          promo_delivery_discount = COALESCE(?, promo_delivery_discount)
+      WHERE branch_id = ?
+    `).run(
+      free_delivery_km !== undefined ? free_delivery_km : null,
+      price_per_km !== undefined ? price_per_km : null,
+      max_radius_km !== undefined ? max_radius_km : null,
+      promo_min_order !== undefined ? promo_min_order : null,
+      promo_delivery_discount !== undefined ? promo_delivery_discount : null,
+      req.params.id
+    );
 
     res.json({ success: true, message: 'Pengaturan cabang & ongkir berhasil disimpan.' });
   } catch (err) {
@@ -1450,7 +1529,7 @@ router.put('/admin/branches/:id', (req, res) => {
 });
 
 // 15. Admin Orders List & Analytics Summary
-router.get('/admin/orders', (req, res) => {
+router.get('/admin/orders', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const orders = db.prepare(`
       SELECT o.*, b.name as branch_name 
@@ -1473,7 +1552,7 @@ router.get('/admin/orders', (req, res) => {
   }
 });
 
-router.get('/admin/analytics/summary', (req, res) => {
+router.get('/admin/analytics/summary', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const totalOrders = db.prepare('SELECT COUNT(*) as count FROM orders WHERE brand_id = ?').get(req.brand_id);
     const totalOmzet = db.prepare('SELECT SUM(grand_total) as sum FROM orders WHERE brand_id = ?').get(req.brand_id);
@@ -1494,7 +1573,7 @@ router.get('/admin/analytics/summary', (req, res) => {
 
 // 16. Reporting Domain Single-Entrypoint API
 const { ReportingEngine } = require('../../domains/reporting');
-router.get('/reports/:report_type', (req, res) => {
+router.get('/reports/:report_type', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const { report_type } = req.params;
     const { branch_id, start_date, end_date } = req.query;

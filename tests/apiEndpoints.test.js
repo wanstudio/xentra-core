@@ -108,13 +108,22 @@ test('API POST /api/v1/checkout/create-order: validates items and creates order 
 });
 
 test('API Admin: GET & PUT /api/v1/admin/brand updates theme color and logo', async () => {
-  const getRes = await mockFetch('/api/v1/admin/brand');
+  // Login first to get admin session token
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'admin', password: 'bangjo123' })
+  });
+  const loginData = await loginRes.json();
+  const authHeaders = { authorization: 'Bearer ' + loginData.token };
+
+  const getRes = await mockFetch('/api/v1/admin/brand', { headers: authHeaders });
   assert.strictEqual(getRes.status, 200);
   const getData = await getRes.json();
   assert.strictEqual(getData.success, true);
 
   const putRes = await mockFetch('/api/v1/admin/brand', {
     method: 'PUT',
+    headers: authHeaders,
     body: JSON.stringify({
       name: 'Bangjo Express Resto',
       primary_color: '#ff4d4f',
@@ -129,13 +138,20 @@ test('API Admin: GET & PUT /api/v1/admin/brand updates theme color and logo', as
 });
 
 test('API Admin: GET /api/v1/admin/products & GET /api/v1/admin/branches', async () => {
-  const prodRes = await mockFetch('/api/v1/admin/products');
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'admin', password: 'bangjo123' })
+  });
+  const loginData = await loginRes.json();
+  const authHeaders = { authorization: 'Bearer ' + loginData.token };
+
+  const prodRes = await mockFetch('/api/v1/admin/products', { headers: authHeaders });
   assert.strictEqual(prodRes.status, 200);
   const prodData = await prodRes.json();
   assert.strictEqual(prodData.success, true);
   assert.ok(prodData.products.length >= 5);
 
-  const branchRes = await mockFetch('/api/v1/admin/branches');
+  const branchRes = await mockFetch('/api/v1/admin/branches', { headers: authHeaders });
   assert.strictEqual(branchRes.status, 200);
   const branchData = await branchRes.json();
   assert.strictEqual(branchData.success, true);
@@ -143,7 +159,14 @@ test('API Admin: GET /api/v1/admin/products & GET /api/v1/admin/branches', async
 });
 
 test('API Admin: GET /api/v1/admin/analytics/summary returns metrics', async () => {
-  const res = await mockFetch('/api/v1/admin/analytics/summary');
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'admin', password: 'bangjo123' })
+  });
+  const loginData = await loginRes.json();
+  const authHeaders = { authorization: 'Bearer ' + loginData.token };
+
+  const res = await mockFetch('/api/v1/admin/analytics/summary', { headers: authHeaders });
   assert.strictEqual(res.status, 200);
   const data = await res.json();
   assert.strictEqual(data.success, true);
@@ -185,6 +208,13 @@ test('API Merchant Auth: POST /api/v1/auth/merchant/login authenticates owner', 
 });
 
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'admin', password: 'bangjo123' })
+  });
+  const loginData = await loginRes.json();
+  const authHeaders = { authorization: 'Bearer ' + loginData.token };
+
   const payload = {
     name: 'Bangjo Surabaya Timur',
     phone: '081987654321',
@@ -195,6 +225,7 @@ test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () 
 
   const res = await mockFetch('/api/v1/admin/branches', {
     method: 'POST',
+    headers: authHeaders,
     body: JSON.stringify(payload)
   });
 
@@ -207,6 +238,13 @@ test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () 
 });
 
 test('API Admin Branch Creation: Missing WhatsApp number is REJECTED', async () => {
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'admin', password: 'bangjo123' })
+  });
+  const loginData = await loginRes.json();
+  const authHeaders = { authorization: 'Bearer ' + loginData.token };
+
   const payloadWithoutPhone = {
     name: 'Bangjo Cabang Tanpa WA',
     address_text: 'Jl. Rungkut No. 12',
@@ -215,6 +253,7 @@ test('API Admin Branch Creation: Missing WhatsApp number is REJECTED', async () 
 
   const res = await mockFetch('/api/v1/admin/branches', {
     method: 'POST',
+    headers: authHeaders,
     body: JSON.stringify(payloadWithoutPhone)
   });
 
@@ -225,6 +264,13 @@ test('API Admin Branch Creation: Missing WhatsApp number is REJECTED', async () 
 });
 
 test('API Admin Branch Creation: OWNER_WHATSAPP_NUMBER in env does not act as fallback', async () => {
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'admin', password: 'bangjo123' })
+  });
+  const loginData = await loginRes.json();
+  const authHeaders = { authorization: 'Bearer ' + loginData.token };
+
   process.env.OWNER_WHATSAPP_NUMBER = '628999999999';
 
   const payload = {
@@ -235,6 +281,7 @@ test('API Admin Branch Creation: OWNER_WHATSAPP_NUMBER in env does not act as fa
 
   const res = await mockFetch('/api/v1/admin/branches', {
     method: 'POST',
+    headers: authHeaders,
     body: JSON.stringify(payload)
   });
 
