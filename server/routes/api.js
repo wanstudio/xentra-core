@@ -1090,9 +1090,100 @@ router.get('/admin/branches', (req, res) => {
   }
 });
 
+// 14.1 Create Branch (Mandatory Branch WhatsApp Number)
+router.post('/admin/branches', (req, res) => {
+  try {
+    const {
+      name,
+      address_text,
+      latitude,
+      longitude,
+      phone,
+      whatsapp_number,
+      free_delivery_km,
+      price_per_km,
+      max_radius_km,
+      promo_min_order,
+      promo_delivery_discount
+    } = req.body;
+
+    const branchPhone = (phone || whatsapp_number || '').trim();
+
+    // Locked Decision: Branch WhatsApp / Phone is strictly required. No fallback to Owner or hardcode.
+    if (!branchPhone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nomor WhatsApp / telepon cabang wajib diisi saat pendaftaran cabang.'
+      });
+    }
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nama cabang wajib diisi.'
+      });
+    }
+
+    const branchId = 'branch_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+    const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+    db.prepare(`
+      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).run(
+      branchId,
+      req.brand_id,
+      name.trim(),
+      slug,
+      address_text ? address_text.trim() : '',
+      latitude || 0,
+      longitude || 0,
+      branchPhone
+    );
+
+    const deliverySettingsId = 'bds_' + branchId;
+    db.prepare(`
+      INSERT OR REPLACE INTO branch_delivery_settings (id, branch_id, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      deliverySettingsId,
+      branchId,
+      free_delivery_km || 0,
+      price_per_km || 3000,
+      max_radius_km || 10,
+      promo_min_order || 50000,
+      promo_delivery_discount || 0
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Cabang berhasil didaftarkan.',
+      branch_id: branchId,
+      branch: {
+        id: branchId,
+        brand_id: req.brand_id,
+        name: name.trim(),
+        slug,
+        phone: branchPhone,
+        address_text: address_text || ''
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.put('/admin/branches/:id', (req, res) => {
   try {
-    const { name, address_text, latitude, longitude, phone, is_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
+    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
+    const targetPhone = phone !== undefined ? phone : whatsapp_number;
+
+    if (targetPhone !== undefined && targetPhone !== null && String(targetPhone).trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Nomor WhatsApp / telepon cabang tidak boleh dikosongkan.'
+      });
+    }
 
     try {
       db.prepare(`
@@ -1104,7 +1195,7 @@ router.put('/admin/branches/:id', (req, res) => {
             phone = COALESCE(?, phone),
             is_active = COALESCE(?, is_active)
         WHERE id = ? AND brand_id = ?
-      `).run(name, address_text, latitude, longitude, phone, is_active, req.params.id, req.brand_id);
+      `).run(name, address_text, latitude, longitude, targetPhone, is_active, req.params.id, req.brand_id);
 
       db.prepare(`
         UPDATE branch_delivery_settings

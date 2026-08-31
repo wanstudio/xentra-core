@@ -167,7 +167,7 @@
     categories.forEach(function (cat) {
       var btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'x-cat' + (Number(cat.id) === Number(activeCategory) ? ' active' : '');
+      btn.className = 'x-cat' + (String(cat.id) === String(activeCategory) ? ' active' : '');
       btn.setAttribute('data-cat-id', String(cat.id));
 
       var imgHtml = cat.image
@@ -180,7 +180,7 @@
         '<span class="x-cat-line"></span>';
 
       btn.onclick = function () {
-        activeCategory = Number(cat.id);
+        activeCategory = cat.id;
         track.querySelectorAll('.x-cat').forEach(function (el) { el.classList.remove('active'); });
         btn.classList.add('active');
         var targetLeft = btn.offsetLeft - (track.clientWidth - btn.clientWidth) / 2;
@@ -199,7 +199,7 @@
     var container = $('x-products');
     if (!container) return;
 
-    var found = categories.find(function (c) { return Number(c.id) === Number(categoryId); });
+    var found = categories.find(function (c) { return String(c.id) === String(categoryId); });
     if (found && Array.isArray(found.products) && found.products.length > 0) {
       products = found.products;
       renderProducts();

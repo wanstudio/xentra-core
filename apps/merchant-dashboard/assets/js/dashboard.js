@@ -559,13 +559,15 @@
             '<span class="x-badge ' + (b.is_active ? 'x-badge-success' : 'x-badge-danger') + '">' + (b.is_active ? '● Buka' : '✕ Tutup') + '</span>',
           '</div>',
           '<p class="text-muted" style="font-size:13px;">📍 ' + b.address_text + '</p>',
+          '<div class="x-branch-detail-row"><span>📱 WhatsApp Cabang:</span><span style="font-weight:600;color:var(--x-primary);">' + (b.phone || '<span style="color:#ef4444;">(Wajib diisi)</span>') + '</span></div>',
           '<div class="x-branch-detail-row"><span>Koordinat GPS:</span><span>' + b.latitude + ', ' + b.longitude + '</span></div>',
-          '<div class="x-branch-detail-row"><span>Gratis Ongkir:</span><span style="color:#10b981;">' + (b.free_delivery_km || 2) + ' KM Pertama Gratis</span></div>',
+          '<div class="x-branch-detail-row"><span>Gratis Ongkir:</span><span style="color:#10b981;">' + (b.free_delivery_km || 0) + ' KM Pertama Gratis</span></div>',
           '<div class="x-branch-detail-row"><span>Tarif per KM:</span><span>' + formatMoney(b.price_per_km || 3000) + ' / km</span></div>',
           '<div class="x-branch-detail-row"><span>Radius Maksimal:</span><span>' + (b.max_radius_km || 12) + ' KM</span></div>',
           '<div class="x-branch-detail-row"><span>Promo Diskon Ongkir:</span><span>Diskon ' + formatMoney(b.promo_delivery_discount || 10000) + ' (Min. ' + formatMoney(b.promo_min_order || 50000) + ')</span></div>',
-          '<div style="margin-top:10px;text-align:right;">',
-            '<button type="button" class="x-btn-secondary" style="font-size:12px;" onclick="editBranchSettings(\'' + b.id + '\')">⚙️ Atur Ongkir & Radius</button>',
+          '<div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">',
+            '<button type="button" class="x-btn-secondary" style="font-size:12px;" onclick="editBranchPhone(\'' + b.id + '\')">📱 Ubah No. WA</button>',
+            '<button type="button" class="x-btn-secondary" style="font-size:12px;" onclick="editBranchSettings(\'' + b.id + '\')">⚙️ Atur Ongkir</button>',
           '</div>',
         '</div>'
       ].join('');
@@ -574,9 +576,34 @@
     container.innerHTML = html.join('');
   }
 
+  window.editBranchPhone = function (id) {
+    var b = state.branches.find(function (x) { return x.id === id; }) || state.branches[0];
+    var newPhone = prompt('Nomor WhatsApp Resmi Cabang (Wajib, format 08xxx atau 62xxx):', b.phone || '');
+    if (newPhone === null) return;
+    newPhone = newPhone.trim();
+    if (!newPhone) {
+      alert('❌ Nomor WhatsApp Cabang wajib diisi dan tidak boleh kosong!');
+      return;
+    }
+
+    fetch(API_BASE + '/admin/branches/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: newPhone })
+    }).then(function (res) {
+      if (!res.ok) throw new Error('Gagal memperbarui nomor WhatsApp cabang.');
+      return res.json();
+    }).then(function () {
+      showToast('✅ Nomor WhatsApp cabang berhasil disimpan!');
+      loadBranches();
+    }).catch(function (err) {
+      alert(err.message);
+    });
+  };
+
   window.editBranchSettings = function (id) {
     var b = state.branches.find(function (x) { return x.id === id; }) || state.branches[0];
-    var newFreeKm = prompt('Berapa KM pertama yang gratis ongkir?', b.free_delivery_km || 2);
+    var newFreeKm = prompt('Berapa KM pertama yang gratis ongkir?', b.free_delivery_km || 0);
     if (newFreeKm === null) return;
     var newPriceKm = prompt('Tarif ongkir per KM berikutnya (Rp):', b.price_per_km || 3000);
     if (newPriceKm === null) return;

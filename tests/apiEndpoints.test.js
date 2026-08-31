@@ -169,3 +169,67 @@ test('API Merchant Auth: POST /api/v1/auth/merchant/login authenticates owner', 
   assert.strictEqual(goodData.user.username, 'admin');
   assert.strictEqual(goodData.user.role, 'owner');
 });
+
+test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
+  const payload = {
+    name: 'Bangjo Surabaya Timur',
+    phone: '081987654321',
+    address_text: 'Jl. Kertajaya No. 99, Surabaya',
+    latitude: -7.2801,
+    longitude: 112.7562
+  };
+
+  const res = await mockFetch('/api/v1/admin/branches', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+
+  assert.strictEqual(res.status, 201);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.ok(data.branch_id.startsWith('branch_'));
+  assert.strictEqual(data.branch.phone, '081987654321');
+  assert.strictEqual(data.branch.name, 'Bangjo Surabaya Timur');
+});
+
+test('API Admin Branch Creation: Missing WhatsApp number is REJECTED', async () => {
+  const payloadWithoutPhone = {
+    name: 'Bangjo Cabang Tanpa WA',
+    address_text: 'Jl. Rungkut No. 12',
+    phone: '' // Missing phone
+  };
+
+  const res = await mockFetch('/api/v1/admin/branches', {
+    method: 'POST',
+    body: JSON.stringify(payloadWithoutPhone)
+  });
+
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.ok(data.error.includes('WhatsApp'));
+});
+
+test('API Admin Branch Creation: OWNER_WHATSAPP_NUMBER in env does not act as fallback', async () => {
+  process.env.OWNER_WHATSAPP_NUMBER = '628999999999';
+
+  const payload = {
+    name: 'Bangjo Cabang Bypass Attempt',
+    address_text: 'Jl. Manyar No. 44'
+    // phone omitted completely
+  };
+
+  const res = await mockFetch('/api/v1/admin/branches', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+
+  // Must still be rejected even if OWNER_WHATSAPP_NUMBER is present
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.ok(data.error.includes('WhatsApp'));
+
+  delete process.env.OWNER_WHATSAPP_NUMBER;
+});
+

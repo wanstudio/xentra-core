@@ -9,7 +9,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const GeminiAgent = require('./geminiAgent');
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const ALLOWED_NUMBERS = (process.env.ALLOWED_WHATSAPP_NUMBERS || process.env.OWNER_WHATSAPP_NUMBER || '')
+const ALLOWED_NUMBERS = (process.env.ALLOWED_WHATSAPP_NUMBERS || '')
   .split(',')
   .map(num => num.replace(/[^0-9]/g, ''))
   .filter(Boolean);
