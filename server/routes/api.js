@@ -340,14 +340,23 @@ router.get('/addresses', (req, res) => {
   res.json({ success: true, addresses: savedAddressesMemory });
 });
 router.post('/addresses', (req, res) => {
+  const { label = 'Rumah', address = '', detail = '', note = '', latitude, longitude } = req.body;
+  
+  if (latitude == null || longitude == null || isNaN(Number(latitude)) || isNaN(Number(longitude))) {
+    return res.status(400).json({
+      success: false,
+      error: 'Titik koordinat (latitude & longitude) wajib diisi dengan angka yang valid.'
+    });
+  }
+
   const addr = {
     id: 'addr_' + Date.now(),
-    label: req.body.label || 'Rumah',
-    address: req.body.address || '',
-    detail: req.body.detail || '',
-    note: req.body.note || '',
-    latitude: Number(req.body.latitude || -7.2912),
-    longitude: Number(req.body.longitude || 112.7167),
+    label,
+    address,
+    detail,
+    note,
+    latitude: Number(latitude),
+    longitude: Number(longitude),
     is_primary: savedAddressesMemory.length === 0 ? 1 : 0
   };
   savedAddressesMemory.unshift(addr);
@@ -466,7 +475,17 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       const unitPrice = isPromoFree ? 0 : Number(prod.price);
       const prodName = isPromoFree ? 'Es Teh (Gratis Install)' : prod.name;
       const prodId = isPromoFree ? 'promo-es-teh-gratis' : prod.id;
-      const qty = Math.max(1, Number(item.quantity || item.qty) || 1);
+      
+      // P1 DATA-INTEGRITY: Strictly validate quantity as positive integer (NO silent clamping to 1)
+      const rawQty = item.quantity != null ? item.quantity : item.qty;
+      const qty = Number(rawQty);
+      if (!Number.isInteger(qty) || qty <= 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Jumlah pesanan (quantity) untuk produk "${prodName}" harus berupa bilangan bulat positif (> 0).`
+        });
+      }
+
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
 
