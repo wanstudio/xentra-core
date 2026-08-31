@@ -1,7 +1,16 @@
 /**
  * Xentra POS Order Service
- * Handles Cashier Order Taking, Dine-in Table Holding (Open Bill), Split/Merge Bill,
- * and delegates stock deduction/snapshot execution cleanly to Commerce OrderPlacementService.
+ * 
+ * Handles Cashier Order Taking across all 4 official Xentra order types:
+ * - 'dine_in'
+ * - 'pickup'
+ * - 'delivery'
+ * - 'reservation'
+ * 
+ * Supports Table Holding (Open Bill), Split/Merge Bill, and Cross-Channel Table Integration:
+ * - Customer App Cash Addition: Automatically appends to existing POS table held bill.
+ * - Customer App Online Addition: Settled immediately without double-billing POS cashier.
+ * - Clean Stock Delegation: Delegated to Commerce OrderPlacementService (ACID transaction).
  */
 const crypto = require('crypto');
 const db = require('../../../server/database/db');
@@ -9,17 +18,25 @@ const { events } = require('../../../core');
 const { OrderPlacementService } = require('../../commerce');
 
 class PosOrderService {
+  static ORDER_TYPES = {
+    DINE_IN: 'dine_in',
+    PICKUP: 'pickup',
+    DELIVERY: 'delivery',
+    RESERVATION: 'reservation'
+  };
+
   /**
-   * Holds an open order / table bill for dine-in.
+   * Holds an open order / table bill for dine-in or table reservation.
    * 
    * @param {Object} params
    * @param {string} params.branch_id
    * @param {string} [params.table_number]
    * @param {string} [params.customer_name]
    * @param {Array<Object>} params.items
+   * @param {string} [params.order_type='dine_in'] - 'dine_in' | 'reservation'
    * @returns {Object} Held order record
    */
-  static holdOrder({ branch_id, table_number = '', customer_name = 'Tamu Meja', items = [] }) {
+  static holdOrder({ branch_id, table_number = '', customer_name = 'Tamu Meja', items = [], order_type = 'dine_in' }) {
     if (!branch_id || !Array.isArray(items) || items.length === 0) {
       throw new Error('[PosOrderService] "branch_id" and non-empty "items" are required to hold an order.');
     }
@@ -31,16 +48,68 @@ class PosOrderService {
     db.prepare(`
       INSERT INTO pos_held_orders (id, branch_id, table_number, customer_name, items_payload, status, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, 'held', ?, ?)
-    `).run(heldId, branch_id, table_number, customer_name, payloadJson, now, now);
+    `).run(heldId, branch_id, String(table_number), customer_name, payloadJson, now, now);
 
     return {
       id: heldId,
       branch_id,
-      table_number,
+      table_number: String(table_number),
       customer_name,
+      order_type,
       items,
       status: 'held',
       created_at: now
+    };
+  }
+
+  /**
+   * Appends items to an existing open table bill (used for additional orders from Customer App or Kasir).
+   * 
+   * @param {Object} params
+   * @param {string} params.branch_id
+   * @param {string} params.table_number
+   * @param {Array<Object>} params.additional_items
+   * @returns {Object} Updated held order bill
+   */
+  static appendItemsToTableBill({ branch_id, table_number, additional_items = [] }) {
+    if (!branch_id || !table_number || !Array.isArray(additional_items) || additional_items.length === 0) {
+      throw new Error('[PosOrderService] branch_id, table_number, and additional_items are required.');
+    }
+
+    // Find active held bill for this table
+    const held = db.prepare(`
+      SELECT * FROM pos_held_orders 
+      WHERE branch_id = ? AND table_number = ? AND status = 'held'
+      ORDER BY created_at DESC LIMIT 1
+    `).get(branch_id, String(table_number));
+
+    if (!held) {
+      // If no bill exists yet, open new held bill
+      return PosOrderService.holdOrder({
+        branch_id,
+        table_number,
+        items: additional_items
+      });
+    }
+
+    const currentItems = JSON.parse(held.items_payload);
+    const updatedItems = [...currentItems, ...additional_items];
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE pos_held_orders
+      SET items_payload = ?, updated_at = ?
+      WHERE id = ?
+    `).run(JSON.stringify(updatedItems), now, held.id);
+
+    return {
+      id: held.id,
+      branch_id,
+      table_number: String(table_number),
+      customer_name: held.customer_name,
+      items: updatedItems,
+      status: 'held',
+      updated_at: now
     };
   }
 
@@ -59,7 +128,6 @@ class PosOrderService {
     }
 
     const originalItems = JSON.parse(original.items_payload);
-    // Filter remaining items for original bill
     const splitProductIds = new Set(split_items.map(it => it.product_id || it.id));
     const remainingItems = originalItems.filter(it => !splitProductIds.has(it.product_id || it.id));
 
@@ -68,11 +136,9 @@ class PosOrderService {
     }
 
     const now = new Date().toISOString();
-    // Update original bill
     db.prepare('UPDATE pos_held_orders SET items_payload = ?, updated_at = ? WHERE id = ?')
       .run(JSON.stringify(remainingItems), now, held_order_id);
 
-    // Create new split bill
     const newHeld = PosOrderService.holdOrder({
       branch_id: original.branch_id,
       table_number: `${original.table_number || ''}-B`,
@@ -110,7 +176,6 @@ class PosOrderService {
     db.prepare('UPDATE pos_held_orders SET items_payload = ?, updated_at = ? WHERE id = ?')
       .run(JSON.stringify(mergedItems), now, target_held_id);
 
-    // Cancel source bill
     db.prepare("UPDATE pos_held_orders SET status = 'cancelled', updated_at = ? WHERE id = ?")
       .run(now, source_held_id);
 
@@ -125,8 +190,7 @@ class PosOrderService {
   }
 
   /**
-   * Settles a POS order (either direct quick-pay or from held bill).
-   * Delegates stock deduction and order snapshot creation to Commerce OrderPlacementService.
+   * Settles a POS order (direct settlement, reservation, or from held bill).
    * 
    * @param {Object} params
    * @param {string} params.brand_id
@@ -134,9 +198,9 @@ class PosOrderService {
    * @param {string} [params.shift_id]
    * @param {string} [params.held_order_id]
    * @param {string} [params.client_transaction_id] - Idempotency Key for offline sync
-   * @param {string} [params.order_type='dinein'] - 'dinein' | 'pickup' | 'delivery'
+   * @param {'dine_in'|'pickup'|'delivery'|'reservation'} [params.order_type='dine_in']
    * @param {string} [params.payment_method='cash']
-   * @param {number} [params.amount_tendered] - Cash handed by customer for change calculation
+   * @param {number} [params.amount_tendered]
    * @param {Array<Object>} params.items
    * @returns {Promise<Object>} Settled order with change calculation
    */
@@ -146,20 +210,23 @@ class PosOrderService {
     shift_id = null,
     held_order_id = null,
     client_transaction_id = null,
-    order_type = 'dinein',
+    order_type = 'dine_in',
     payment_method = 'cash',
     amount_tendered = null,
     customer = {},
     items = []
   }) {
-    // 1. If settling from held order, load items from DB if not passed
+    // 1. If settling from held order, load items and table from DB if not passed
     let orderItems = items;
+    let tableNumber = customer.table_number || null;
+
     if (held_order_id && (!orderItems || orderItems.length === 0)) {
       const held = db.prepare('SELECT * FROM pos_held_orders WHERE id = ?').get(held_order_id);
       if (!held || held.status !== 'held') {
         throw new Error('[PosOrderService] Held order tidak ditemukan atau sudah selesai.');
       }
       orderItems = JSON.parse(held.items_payload);
+      tableNumber = held.table_number || tableNumber;
     }
 
     // 2. Delegate Cleanly to Commerce Order Placement Service (ACID + Concurrency Guard)
@@ -175,7 +242,7 @@ class PosOrderService {
       payment_method,
       order_channel: 'pos_cashier',
       fulfillment_type: order_type,
-      table_number: customer.table_number || null,
+      table_number: tableNumber,
       notes: `POS Cashier Order [${order_type}]`,
       trace_context: {
         correlation_id: client_transaction_id || `pos_tx_${Date.now()}`
@@ -222,6 +289,8 @@ class PosOrderService {
         order_number: order.order_number,
         branch_id,
         shift_id,
+        order_type,
+        table_number: tableNumber,
         payment_method,
         grand_total: grandTotal,
         amount_tendered,
@@ -235,6 +304,8 @@ class PosOrderService {
       status: 'SETTLED',
       order: {
         ...order,
+        order_type,
+        table_number: tableNumber,
         amount_tendered,
         change: changeAmount,
         payment_method

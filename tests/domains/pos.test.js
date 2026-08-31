@@ -134,23 +134,32 @@ test('POS 3 — Offline Risk Limit: validates valid limit and strictly rejects l
 });
 
 // ==============================================================================
-// POS 4 — Dine-in Order Holding, Split Bill & Merge Bill
+// POS 4 — Dine-in Order Holding, Split Bill, Merge Bill, & Customer App Addition
 // ==============================================================================
-test('POS 4 — Held Orders: supports Hold Table, Split Bill, and Merge Bill', () => {
+test('POS 4 — Held Orders: supports Hold Table, Customer App Item Addition, Split, and Merge Bill', () => {
   // 1. Hold Dine-in Order for Table 5
   const held = PosOrderService.holdOrder({
     branch_id: 'branch_pos',
-    table_number: 'Meja 5',
+    table_number: '5',
     customer_name: 'Budi Santoso',
     items: [
-      { product_id: 'prod_pos_1', name: 'Nasi Goreng POS', quantity: 2, price: 20000 },
-      { product_id: 'prod_pos_2', name: 'Es Jeruk POS', quantity: 2, price: 8000 }
+      { product_id: 'prod_pos_1', name: 'Nasi Goreng POS', quantity: 2, price: 20000 }
     ]
   });
   assert.strictEqual(held.status, 'held');
-  assert.strictEqual(held.items.length, 2);
+  assert.strictEqual(held.items.length, 1);
 
-  // 2. Split Bill (Pisahkan Es Jeruk ke tagihan baru)
+  // 2. Customer App Addition: Tamu menambah Es Jeruk via scan QR Meja 5 (Cash/Pay at Cashier)
+  const updatedTableBill = PosOrderService.appendItemsToTableBill({
+    branch_id: 'branch_pos',
+    table_number: '5',
+    additional_items: [
+      { product_id: 'prod_pos_2', name: 'Es Jeruk POS', quantity: 2, price: 8000 }
+    ]
+  });
+  assert.strictEqual(updatedTableBill.items.length, 2); // Nasgor + Es Jeruk tergabung otomatis!
+
+  // 3. Split Bill (Pisahkan Es Jeruk ke tagihan baru)
   const splitResult = PosOrderService.splitBill({
     held_order_id: held.id,
     split_items: [{ product_id: 'prod_pos_2', name: 'Es Jeruk POS', quantity: 2, price: 8000 }]
@@ -158,7 +167,7 @@ test('POS 4 — Held Orders: supports Hold Table, Split Bill, and Merge Bill', (
   assert.strictEqual(splitResult.original_bill.items.length, 1); // Nasi Goreng
   assert.strictEqual(splitResult.new_bill.items.length, 1);      // Es Jeruk
 
-  // 3. Merge Bill back
+  // 4. Merge Bill back
   const merged = PosOrderService.mergeBill({
     target_held_id: splitResult.original_bill.id,
     source_held_id: splitResult.new_bill.id
@@ -167,18 +176,18 @@ test('POS 4 — Held Orders: supports Hold Table, Split Bill, and Merge Bill', (
 });
 
 // ==============================================================================
-// POS 5 — Order Settlement & Commerce Stock Deduction Delegation
+// POS 5 — Order Settlement (Dine-in, Reservation) & Stock Delegation
 // ==============================================================================
-test('POS 5 — Order Settle: calculates change and delegates stock deduction cleanly to Commerce', async () => {
+test('POS 5 — Order Settle: supports dine_in & reservation with exact Commerce stock deduction', async () => {
   // Initial stock for prod_pos_1 is 50
   const initialStock = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
   assert.strictEqual(initialStock, 50);
 
-  // Settle direct order with Cash payment (Total Rp 40.000, tender Rp 50.000, change Rp 10.000)
+  // 1. Settle direct Dine-In order
   const settleResult = await PosOrderService.settleOrder({
     brand_id: 'brand_pos',
     branch_id: 'branch_pos',
-    order_type: 'dine_in',
+    order_type: PosOrderService.ORDER_TYPES.DINE_IN,
     payment_method: 'cash',
     amount_tendered: 50000,
     items: [
@@ -187,12 +196,32 @@ test('POS 5 — Order Settle: calculates change and delegates stock deduction cl
   });
 
   assert.strictEqual(settleResult.success, true);
+  assert.strictEqual(settleResult.order.order_type, 'dine_in');
   assert.strictEqual(settleResult.order.grand_total, 40000);
   assert.strictEqual(settleResult.order.change, 10000); // Rp 10.000 kembalian
 
   // Verify stock was deducted via Commerce (50 - 2 = 48)
-  const updatedStock = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
-  assert.strictEqual(updatedStock, 48);
+  const stockAfterDineIn = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
+  assert.strictEqual(stockAfterDineIn, 48);
+
+  // 2. Settle Table Reservation order
+  const reservationResult = await PosOrderService.settleOrder({
+    brand_id: 'brand_pos',
+    branch_id: 'branch_pos',
+    order_type: PosOrderService.ORDER_TYPES.RESERVATION,
+    payment_method: 'cash',
+    amount_tendered: 20000,
+    items: [
+      { product_id: 'prod_pos_1', quantity: 1, expected_price: 20000 } // Rp 20.000
+    ]
+  });
+
+  assert.strictEqual(reservationResult.success, true);
+  assert.strictEqual(reservationResult.order.order_type, 'reservation');
+  assert.strictEqual(reservationResult.order.grand_total, 20000);
+
+  const stockAfterReservation = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
+  assert.strictEqual(stockAfterReservation, 47);
 });
 
 // ==============================================================================
