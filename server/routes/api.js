@@ -1842,12 +1842,33 @@ router.get('/admin/analytics/summary', requireAuth(['owner', 'brand_manager']), 
   }
 });
 
-// 16. Reporting Domain Single-Entrypoint API (Protected with unified Actor RBAC context)
+// 16. Reporting Domain Single-Entrypoint API (Protected with Granular Per-Report RBAC Matrix)
 const { ReportingEngine } = require('../../domains/reporting');
 router.get('/reports/:report_type', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
     const { report_type } = req.params;
     const { branch_id, start_date, end_date } = req.query;
+
+    // P1 GRANULAR REPORT AUTHORIZATION MATRIX
+    // Multi-branch comparison / leaderboard is strictly reserved for Owner & Brand Executive scope
+    const REPORT_ALLOWED_ROLES = {
+      sales: ['owner', 'brand_manager', 'branch_manager'],
+      payment: ['owner', 'brand_manager', 'branch_manager'],
+      inventory: ['owner', 'brand_manager', 'branch_manager'],
+      pos_shifts: ['owner', 'brand_manager', 'branch_manager'],
+      products: ['owner', 'brand_manager', 'branch_manager'],
+      branches: ['owner', 'brand_manager'],
+      branch_comparison: ['owner', 'brand_manager']
+    };
+
+    const allowedRoles = REPORT_ALLOWED_ROLES[report_type];
+    if (allowedRoles && !allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        error: 'INSUFFICIENT_REPORT_AUTHORITY',
+        message: `Role "${req.user.role}" tidak memiliki wewenang untuk mengakses laporan multi-cabang "${report_type}". Laporan ini khusus untuk wewenang Owner / Brand Manager.`
+      });
+    }
 
     const report = ReportingEngine.generateReport(report_type, {
       brand_id: req.brand_id,

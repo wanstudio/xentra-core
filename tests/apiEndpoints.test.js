@@ -419,3 +419,49 @@ test('API Kitchen RBAC: Branch-level operators cannot view or update orders from
   assert.strictEqual(kitchenCookData.new_status, 'preparing');
 });
 
+test('API Reporting RBAC: Branch manager cannot access multi-branch comparison report (NEW-01/Pass4)', async () => {
+  const db = require('../server/database/db');
+  const crypto = require('crypto');
+  const bmPasswordHash = crypto.createHash('sha256').update('bm123').digest('hex');
+
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    'usr_bm_barat',
+    'brand_bangjo',
+    'org_xentra_holding',
+    'branch_bangjo_barat',
+    'bm_barat',
+    'bm_barat@bangjo.com',
+    bmPasswordHash,
+    'Branch Manager Barat',
+    'branch_manager'
+  );
+
+  // Login as branch_manager
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'bm_barat', password: 'bm123' })
+  });
+  const loginData = await loginRes.json();
+  const authHeaders = { authorization: 'Bearer ' + loginData.token };
+
+  // 1. Branch manager can access branch-scoped sales report -> 200 OK
+  const salesRes = await mockFetch('/api/v1/reports/sales', { headers: authHeaders });
+  assert.strictEqual(salesRes.status, 200);
+  const salesData = await salesRes.json();
+  assert.strictEqual(salesData.success, true);
+
+  // 2. Branch manager attempts to access multi-branch comparison / branches report -> STRICTLY FORBIDDEN 403
+  const comparisonRes = await mockFetch('/api/v1/reports/branch_comparison', { headers: authHeaders });
+  assert.strictEqual(comparisonRes.status, 403);
+  const comparisonData = await comparisonRes.json();
+  assert.strictEqual(comparisonData.error, 'INSUFFICIENT_REPORT_AUTHORITY');
+
+  const branchesRes = await mockFetch('/api/v1/reports/branches', { headers: authHeaders });
+  assert.strictEqual(branchesRes.status, 403);
+  const branchesData = await branchesRes.json();
+  assert.strictEqual(branchesData.error, 'INSUFFICIENT_REPORT_AUTHORITY');
+});
+
