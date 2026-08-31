@@ -443,6 +443,50 @@ function initSchema(targetDb) {
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS inventory_purchase_orders (
+      id TEXT PRIMARY KEY,
+      po_number TEXT NOT NULL UNIQUE,
+      brand_id TEXT NOT NULL,
+      branch_id TEXT NOT NULL,
+      supplier_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'received' | 'cancelled'
+      created_by TEXT,
+      received_by TEXT,
+      notes TEXT,
+      ordered_at TEXT DEFAULT (datetime('now')),
+      received_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS inventory_po_items (
+      id TEXT PRIMARY KEY,
+      po_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      quantity INTEGER NOT NULL,
+      unit_cost REAL DEFAULT 0,
+      received_quantity INTEGER DEFAULT 0,
+      FOREIGN KEY (po_id) REFERENCES inventory_purchase_orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS inventory_movements (
+      id TEXT PRIMARY KEY,
+      branch_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      movement_type TEXT NOT NULL, -- 'purchase_in', 'transfer_in', 'return_in', 'sale_deduction', 'transfer_out', 'waste_spoilage', 'audit_adjustment'
+      quantity INTEGER NOT NULL, -- signed: positive or negative
+      previous_stock INTEGER NOT NULL,
+      current_stock INTEGER NOT NULL,
+      reference_id TEXT, -- PO ID, Order ID, Transfer ID, etc.
+      actor_id TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+    );
   `);
 
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
