@@ -116,7 +116,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     system: 'Xentra Core Standalone Engine',
-    version: '2.2.4',
+    version: '2.2.5',
     timestamp: new Date().toISOString()
   });
 });
