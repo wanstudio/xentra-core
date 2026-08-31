@@ -95,38 +95,60 @@ function handleDeploy(req, res) {
   let extracted = [];
   let errors = [];
 
-  // P1 SECURITY HARDENING: Validate ZIP archive contents against path traversal, symlinks, and zip bombs
+  // P1 SECURITY HARDENING: Validate ZIP archive contents against path traversal, symlinks, extreme compression, and zip bombs
   try {
-    const listOutput = execSync('unzip -Z -1 ' + JSON.stringify(zipPath), { stdio: 'pipe' }).toString();
-    const files = listOutput.split('\n').map(f => f.trim()).filter(Boolean);
+    const pyValidateScript = `
+import zipfile, stat, sys
+zip_path = sys.argv[1]
+max_files = 5000
+max_uncompressed_bytes = 250 * 1024 * 1024 # 250 MB ceiling
 
-    // Limit maximum files to prevent decompression resource exhaustion (ZIP Bomb)
-    if (files.length > 5000) {
+try:
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        infolist = zf.infolist()
+        if len(infolist) > max_files:
+            print(f'ARCHIVE_TOO_LARGE: Too many entries ({len(infolist)} > {max_files})')
+            sys.exit(2)
+        
+        total_uncompressed = 0
+        for info in infolist:
+            total_uncompressed += info.file_size
+            if total_uncompressed > max_uncompressed_bytes:
+                print(f'ARCHIVE_TOO_LARGE: Decompressed size exceeded limit ({total_uncompressed} > {max_uncompressed_bytes} bytes)')
+                sys.exit(2)
+            
+            # P1 SECURITY: Inspect Unix file attributes for symlinks (S_IFLNK = 0o120000)
+            mode = info.external_attr >> 16
+            if stat.S_ISLNK(mode):
+                print(f'SYMLINK_REJECTED: Symlink entry prohibited: {info.filename}')
+                sys.exit(3)
+            
+            fn = info.filename
+            if '..' in fn or fn.startswith('/') or fn.startswith('\\\\'):
+                print(f'TRAVERSAL_REJECTED: Path traversal prohibited: {fn}')
+                sys.exit(4)
+    print('VALID')
+    sys.exit(0)
+except Exception as e:
+    print('INVALID_ZIP: ' + str(e))
+    sys.exit(1)
+`;
+    const checkResult = execSync(`python3 -c ${JSON.stringify(pyValidateScript)} ${JSON.stringify(zipPath)}`, { stdio: 'pipe' }).toString().trim();
+    if (!checkResult.includes('VALID')) {
       try { fs.unlinkSync(zipPath); } catch (_) {}
       return res.status(400).json({
         success: false,
-        error: 'ARCHIVE_TOO_LARGE',
-        message: 'Archive berisi terlalu banyak file (>5000 entries).'
+        error: 'ARCHIVE_VALIDATION_FAILED',
+        message: 'Validasi paket ZIP gagal: ' + checkResult
       });
-    }
-
-    for (const f of files) {
-      // Reject directory traversal (../ or ..\), leading slash / absolute paths, or invalid control characters
-      if (f.includes('..') || f.startsWith('/') || f.startsWith('\\')) {
-        try { fs.unlinkSync(zipPath); } catch (_) {}
-        return res.status(400).json({
-          success: false,
-          error: 'MALICIOUS_ARCHIVE_REJECTED',
-          message: `File path tidak aman ditemukan dalam archive: "${f}" (Path traversal prohibited).`
-        });
-      }
     }
   } catch (inspectErr) {
     try { fs.unlinkSync(zipPath); } catch (_) {}
+    const output = inspectErr.stdout ? inspectErr.stdout.toString().trim() : inspectErr.message;
     return res.status(400).json({
       success: false,
-      error: 'INVALID_ARCHIVE',
-      message: 'Gagal memvalidasi isi file ZIP: ' + inspectErr.message
+      error: 'MALICIOUS_OR_INVALID_ARCHIVE',
+      message: 'Paket ZIP ditolak: ' + output
     });
   }
 
@@ -182,22 +204,21 @@ app.get(/^\/dashboard(\/.*)?$/, (req, res) => {
 
 // Health Check with Persistence & DB Readiness Verification
 app.get('/health', (req, res) => {
-  let dbStatus = 'unhealthy';
+  let isDbReady = false;
   try {
     const testRow = db.prepare('SELECT 1 as alive').get();
     if (testRow && testRow.alive === 1) {
-      dbStatus = 'ready';
+      isDbReady = true;
     }
   } catch (err) {
-    dbStatus = 'disconnected: ' + err.message;
+    console.error('[Health Check DB Error]:', err.message);
   }
 
-  const isHealthy = dbStatus === 'ready';
-  res.status(isHealthy ? 200 : 503).json({
-    status: isHealthy ? 'ok' : 'degraded',
+  res.status(isDbReady ? 200 : 503).json({
+    status: isDbReady ? 'ok' : 'degraded',
     system: 'Xentra Core Standalone Engine',
     version: '2.2.5',
-    persistence: dbStatus,
+    persistence: isDbReady ? 'ready' : 'unavailable',
     timestamp: new Date().toISOString()
   });
 });
