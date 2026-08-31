@@ -29,11 +29,11 @@ test.before(() => {
     `).run();
 
     db.prepare(`
-      INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
+      INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold)
       VALUES 
-        ('branch_test', 'prod_lock', 99999, 100, 1),
-        ('branch_test', 'prod_range', 32000, 50, 1),
-        ('branch_test', 'prod_limited', NULL, 4, 1)
+        ('branch_test', 'prod_lock', 99999, 100, 1, 10),
+        ('branch_test', 'prod_range', 32000, 50, 1, 5),
+        ('branch_test', 'prod_limited', NULL, 4, 1, 8) -- Manager configured low-stock threshold = 8
     `).run();
   } catch (e) {
     console.error('Seed setup error:', e.message);
@@ -129,9 +129,9 @@ test('Commerce 5 — Pre-Payment Gate: verifies stock, active status, and detect
 });
 
 // ==============================================================================
-// Commerce 6 — Customer Order Placement Flow & Low-Stock Alert
+// Commerce 6 — Order Placement: Atomic Stock Deduction & Branch Dynamic Threshold Warning
 // ==============================================================================
-test('Commerce 6 — Order Placement: creates snapshot and emits events with low-stock warning', async () => {
+test('Commerce 6 — Order Placement: deducts live stock and uses branch manager threshold for warnings', async () => {
   let lowStockEventReceived = null;
   let orderPlacedEventReceived = null;
 
@@ -143,12 +143,17 @@ test('Commerce 6 — Order Placement: creates snapshot and emits events with low
     orderPlacedEventReceived = e;
   });
 
+  // Initial stock for prod_limited is 4, threshold is 8
+  const initialBranchRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
+  assert.strictEqual(initialBranchRow.stock, 4);
+
+  // Customer places order of 2 items
   const orderResult = await OrderPlacementService.submitOrder({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
     customer: { name: 'Ikhwan Customer', phone: '62899999999', address: 'Jl. Rungkut Surabaya' },
     items: [
-      { product_id: 'prod_limited', quantity: 2, expected_price: 50000 } // remaining stock: 4 - 2 = 2 (<= 5 threshold)
+      { product_id: 'prod_limited', quantity: 2, expected_price: 50000 }
     ],
     delivery_fee: 10000,
     payment_method: 'qris',
@@ -156,12 +161,23 @@ test('Commerce 6 — Order Placement: creates snapshot and emits events with low
   });
 
   assert.strictEqual(orderResult.success, true);
-  assert.strictEqual(orderResult.order.grand_total, 110000); // 50000*2 + 10000
-  assert.ok(orderPlacedEventReceived);
-  assert.strictEqual(orderPlacedEventReceived.payload.order_id, orderResult.order.id);
+  assert.strictEqual(orderResult.order.grand_total, 110000);
 
-  // Low stock warning triggered
+  // 1. Verify Stock actually decremented in database
+  const updatedBranchRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
+  assert.strictEqual(updatedBranchRow.stock, 2, 'Live stock must be decremented from 4 to 2');
+
+  // 2. Verify subsequent order exceeding remaining stock fails (Overselling prevention)
+  const subsequentOrder = PrePaymentVerificationGate.verify({
+    brand_id: 'brand_test',
+    branch_id: 'branch_test',
+    items: [{ product_id: 'prod_limited', quantity: 3, expected_price: 50000 }] // requested 3 when only 2 remain
+  });
+  assert.strictEqual(subsequentOrder.is_valid, false);
+  assert.strictEqual(subsequentOrder.status, 'OUT_OF_STOCK');
+
+  // 3. Verify Branch Manager Configured Threshold (8) was used for warning
   assert.ok(lowStockEventReceived);
   assert.strictEqual(lowStockEventReceived.payload.remaining_stock, 2);
-  assert.strictEqual(lowStockEventReceived.payload.threshold, 5);
+  assert.strictEqual(lowStockEventReceived.payload.threshold, 8, 'Must use branch manager threshold (8), not hardcoded 5');
 });

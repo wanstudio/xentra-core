@@ -3,7 +3,7 @@ const fs = require('fs');
 
 const DB_PATH = (() => {
   if (process.env.NODE_ENV === 'test') {
-    return ':memory:';
+    return `:memory:`;
   }
   return process.env.DB_PATH || path.join(__dirname, 'xentra.db');
 })();

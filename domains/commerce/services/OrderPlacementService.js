@@ -1,7 +1,7 @@
 /**
  * Xentra Commerce Order Placement Service
- * Handles customer order submission, pre-payment verification, order snapshot creation,
- * and distributed event dispatching across domains.
+ * Handles customer order submission, pre-payment verification, atomic stock deduction,
+ * order snapshot creation, and distributed event dispatching.
  */
 const crypto = require('crypto');
 const db = require('../../../server/database/db');
@@ -11,7 +11,7 @@ const LowStockThresholdModel = require('../models/LowStockThresholdModel');
 
 class OrderPlacementService {
   /**
-   * Submits a customer order with strict pre-payment verification.
+   * Submits a customer order with strict pre-payment verification and atomic stock deduction.
    * 
    * @param {Object} params
    * @param {string} params.brand_id
@@ -56,9 +56,9 @@ class OrderPlacementService {
 
     const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
-
-    // 2. Persist Order Snapshot (Database Transaction)
     const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`;
+
+    // 2. Atomic Database Transaction: Order Snapshot + Order Items + Stock Deduction
     const insertOrder = db.prepare(`
       INSERT INTO orders (
         id, order_number, brand_id, branch_id, customer_name, customer_phone,
@@ -70,6 +70,12 @@ class OrderPlacementService {
       INSERT INTO order_items (
         id, order_id, product_id, product_name, unit_price, quantity, subtotal
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const deductStock = db.prepare(`
+      UPDATE branch_products
+      SET stock = stock - ?, updated_at = datetime('now')
+      WHERE branch_id = ? AND product_id = ?
     `);
 
     insertOrder.run(
@@ -95,17 +101,21 @@ class OrderPlacementService {
         orderId,
         item.product_id,
         item.name,
-        item.quantity,
         item.unit_price,
+        item.quantity,
         item.subtotal
       );
 
-      // Evaluate Low-Stock Warning
+      // Deduct stock in branch_products atomically
+      deductStock.run(item.quantity, branch_id, item.product_id);
+
+      // Evaluate Low-Stock Warning using Branch Manager's actual configured threshold
       const remainingStock = item.current_stock - item.quantity;
-      const stockEval = LowStockThresholdModel.evaluate(remainingStock);
+      const branchThreshold = item.branch_low_stock_threshold != null ? item.branch_low_stock_threshold : LowStockThresholdModel.DEFAULT_THRESHOLD;
+      const stockEval = LowStockThresholdModel.evaluate(remainingStock, branchThreshold);
 
       if (stockEval.is_low || stockEval.is_out_of_stock) {
-        // Publish decoupled warning event for Inventory/Branch Manager
+        // Publish decoupled warning event for Inventory / Branch Manager
         events.EventBus.publish({
           type: 'inventory.low_stock_warning',
           producer: 'commerce',
@@ -131,6 +141,7 @@ class OrderPlacementService {
       producer: 'commerce',
       payload: {
         order_id: orderId,
+        order_number: orderNumber,
         brand_id,
         branch_id,
         subtotal,
@@ -150,6 +161,7 @@ class OrderPlacementService {
       status: 'VERIFIED',
       order: {
         id: orderId,
+        order_number: orderNumber,
         brand_id,
         branch_id,
         subtotal,

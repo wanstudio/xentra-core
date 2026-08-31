@@ -6,6 +6,7 @@
  * 1. Final Price Verification: Checks if prices changed since cart was added.
  * 2. Final Stock Verification: Ensures requested quantity is still in stock.
  * 3. Final Availability: Ensures item has not been deactivated by branch.
+ * 4. Branch Low-Stock Threshold: Captures branch manager configured threshold.
  */
 const db = require('../../../server/database/db');
 const PricingPolicyModel = require('../models/PricingPolicyModel');
@@ -45,9 +46,14 @@ class PrePaymentVerificationGate {
       const requestedQty = Number(item.quantity) || 1;
       const expectedPrice = Number(item.expected_price ?? item.price);
 
-      // Query raw product and branch record
+      // Query raw product and branch record with branch threshold
       const masterProduct = db.prepare(`
-        SELECT p.*, bp.price as branch_raw_price, bp.stock as branch_stock, bp.is_available as branch_availability
+        SELECT 
+          p.*, 
+          bp.price as branch_raw_price, 
+          bp.stock as branch_stock, 
+          bp.is_available as branch_availability,
+          bp.low_stock_threshold as branch_low_stock_threshold
         FROM products p
         LEFT JOIN branch_products bp ON p.id = bp.product_id AND bp.branch_id = ?
         WHERE p.id = ? AND p.brand_id = ?
@@ -65,7 +71,7 @@ class PrePaymentVerificationGate {
         continue;
       }
 
-      // 1. Stock Check (if branch tracks stock)
+      // 1. Stock Check
       const currentStock = masterProduct.branch_stock != null ? masterProduct.branch_stock : 999;
       if (currentStock < requestedQty) {
         errors.push(`Stok produk "${masterProduct.name}" tidak mencukupi (Tersedia: ${currentStock}, Diminta: ${requestedQty}).`);
@@ -100,7 +106,8 @@ class PrePaymentVerificationGate {
         quantity: requestedQty,
         unit_price: actualPrice,
         subtotal: actualPrice * requestedQty,
-        current_stock: currentStock
+        current_stock: currentStock,
+        branch_low_stock_threshold: masterProduct.branch_low_stock_threshold
       });
     }
 
