@@ -387,15 +387,15 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       };
     }
 
-    // Default sample customer if empty
-    if (!customer.phone) {
-      customer.phone = '081234567890';
+    // Locked Decision: Customer information must be valid
+    if (!customer.phone || !customer.phone.trim()) {
+      return res.status(400).json({ success: false, error: 'Nomor telepon customer wajib diisi.' });
     }
-    if (!customer.name) {
-      customer.name = 'Pelanggan Bangjo';
+    if (!customer.name || !customer.name.trim()) {
+      return res.status(400).json({ success: false, error: 'Nama customer wajib diisi.' });
     }
 
-    // 1. Resolve Branch
+    // 1. Resolve Branch (Scoped strictly to current brand)
     let branch = null;
     if (branch_id) {
       branch = db.prepare(`
@@ -404,8 +404,8 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order
         FROM branches b 
         LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id 
-        WHERE b.id = ?
-      `).get(branch_id);
+        WHERE b.id = ? AND b.brand_id = ?
+      `).get(branch_id, req.brand_id);
     }
     if (!branch) {
       branch = db.prepare(`
@@ -420,16 +420,12 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     }
 
     if (!branch) {
-      return res.status(404).json({ success: false, error: 'Cabang restoran tidak ditemukan.' });
+      return res.status(404).json({ success: false, error: 'Cabang restoran tidak ditemukan untuk brand ini.' });
     }
 
-    // 2. Validate Items
-    if (!items || !items.length) {
-      // Default sample item if checkout test
-      const sampleProd = db.prepare('SELECT * FROM products WHERE brand_id = ? LIMIT 1').get(req.brand_id);
-      if (sampleProd) {
-        items = [{ id: sampleProd.id, quantity: 1, name: sampleProd.name, price: sampleProd.price }];
-      }
+    // 2. Validate Items: Strictly require items payload and isolate products to current brand
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: 'Keranjang pesanan tidak boleh kosong.' });
     }
 
     let subtotal = 0;
@@ -437,12 +433,20 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
 
     for (const item of items) {
       const isPromoFree = String(item.id) === 'promo-es-teh-gratis';
-      const prod = isPromoFree ? null : (db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(item.id, req.brand_id)
-        || db.prepare('SELECT * FROM products WHERE id = ?').get(item.id));
+      
+      // P1 TENANT ISOLATION HARDENING: Product lookup MUST be strictly scoped to req.brand_id (NO fallback to global product ID)
+      const prod = isPromoFree ? null : db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(item.id, req.brand_id);
 
-      const unitPrice = isPromoFree ? 0 : (prod ? Number(prod.price) : Number(item.price || 25000));
-      const prodName = isPromoFree ? 'Es Teh (Gratis Install)' : (prod ? prod.name : (item.name || 'Menu Pilihan'));
-      const prodId = isPromoFree ? 'promo-es-teh-gratis' : (prod ? prod.id : String(item.id || 'prod_1'));
+      if (!isPromoFree && !prod) {
+        return res.status(400).json({
+          success: false,
+          error: `Produk "${item.id}" tidak ditemukan pada menu brand ini.`
+        });
+      }
+
+      const unitPrice = isPromoFree ? 0 : Number(prod.price);
+      const prodName = isPromoFree ? 'Es Teh (Gratis Install)' : prod.name;
+      const prodId = isPromoFree ? 'promo-es-teh-gratis' : prod.id;
       const qty = Math.max(1, Number(item.quantity || item.qty) || 1);
       const lineTotal = unitPrice * qty;
       subtotal += lineTotal;
