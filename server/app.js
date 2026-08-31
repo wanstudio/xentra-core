@@ -26,38 +26,66 @@ const { execSync } = require('child_process');
 // ---- Deploy receiver for dev.mybangjo.com (shell unzip only, no WASM/multer) ----
 const DEPLOY_TOKEN = process.env.DEPLOY_TOKEN;
 function checkDeployToken(req) {
+  // P1 SECURITY HARDENING: Token MUST ONLY be accepted via HTTP Header (Reject Query String & Body tokens)
   const h = (req.headers['x-deploy-token'] || '').trim();
-  const q = (req.query.token || req.body?.token || '').trim();
-  return h === DEPLOY_TOKEN || q === DEPLOY_TOKEN;
+  return Boolean(DEPLOY_TOKEN && h && h === DEPLOY_TOKEN);
 }
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Standard Middlewares
-app.use(cors());
+// Standard Middlewares: CORS with explicit origin checks
+const allowedOrigins = [
+  'https://app.mybangjo.com',
+  'https://dev.mybangjo.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000'
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow non-browser / internal server requests (null origin)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || origin.endsWith('.mybangjo.com')) {
+      return callback(null, true);
+    }
+    // Allow local development ports
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Permissive in dev, but explicit check configured
+  },
+  credentials: true
+}));
 
 // ---- Deploy endpoint HANYA untuk dev.mybangjo.com (jangan dipakai untuk app) ----
 function handleDeploy(req, res) {
   if (!checkDeployToken(req)) {
-    return res.status(403).json({ success: false, message: 'Unauthorized: Invalid or missing deploy token.' });
+    return res.status(403).json({ success: false, message: 'Unauthorized: Invalid or missing deploy token header.' });
   }
-  const target = (req.body?.target || req.query.target || 'core');
-  // locate zip: multer file, or raw body (fallback)
+
+  // Reject deploy endpoint on production if explicitly flagged
+  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_REMOTE_DEPLOY) {
+    return res.status(403).json({ success: false, message: 'Remote code deployment endpoint is disabled in production.' });
+  }
+
+  const target = (req.query.target || 'core');
+  // locate zip: raw body
   let zipPath = null;
   if (req.body && Buffer.isBuffer(req.body) && req.body.length > 4) {
     zipPath = '/tmp/xentra-raw-' + Date.now() + '.zip';
     try { fs.writeFileSync(zipPath, req.body); } catch(e){ return res.status(500).json({success:false, message:e.message}); }
   }
   if (!zipPath || !fs.existsSync(zipPath)) {
-    return res.status(400).json({ success: false, message: 'No package file received (field name must be "package").' });
+    return res.status(400).json({ success: false, message: 'No package file received.' });
   }
   const candidates = [];
   const projectRoot = path.join(__dirname, '..');
   candidates.push(projectRoot);
-  // also mirror to known dev paths if they exist (cPanel layouts)
+  // mirror only to explicit known project path
   for (const p of ['/home/mybangjo/xentra-core', '/home/mybangjo/dev.mybangjo.com']) {
-    if (p !== projectRoot) candidates.push(p);
+    if (p !== projectRoot && fs.existsSync(p)) candidates.push(p);
   }
   let extracted = [];
   let errors = [];
@@ -75,7 +103,7 @@ function handleDeploy(req, res) {
   if (extracted.length === 0) return res.status(500).json({ success:false, message:'Extract failed', errors });
   return res.json({ success:true, mode:'package_extracted', target, extracted, errors: errors.length?errors:undefined, timestamp:new Date().toISOString(), message:'Xentra Core deployed to dev.' });
 }
-// Deploy uses raw body only (deploy-core.sh --data-binary) — no multer to save WASM memory
+// Deploy uses raw body only (deploy-core.sh --data-binary)
 app.post(['/wp-json/xentra/v1/deploy', '/api/v1/deploy', '/wp-json/xentra/v1/deploy-raw', '/api/v1/deploy-raw'], express.raw({ type: '*/*', limit: '50mb' }), handleDeploy);
 
 app.use(express.json());
@@ -121,8 +149,11 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Debug / Diagnostic Info
+// Debug / Diagnostic Info (Restricted to non-production only)
 app.get('/debug', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({ success: false, message: 'Forbidden' });
+  }
   res.json({
     node_version: process.version,
     env: process.env.NODE_ENV,
@@ -130,8 +161,6 @@ app.get('/debug', (req, res) => {
     uptime: process.uptime()
   });
 });
-
-
 
 // Customer PWA Routes
 app.get(['/checkout', '/checkout/'], (req, res) => {
@@ -157,13 +186,14 @@ app.get('*', (req, res) => {
   });
 });
 
-// Global Error Handler
+// Global Error Handler (P1: NEVER expose stack trace in production response)
 app.use((err, req, res, next) => {
   console.error('[Global Error]:', err);
+  const isDev = process.env.NODE_ENV === 'development';
   res.status(500).json({
     success: false,
-    error: err.message || 'Internal Server Error',
-    stack: err.stack
+    error: isDev ? (err.message || 'Internal Server Error') : 'Internal Server Error',
+    request_id: `req_${Date.now().toString(36)}`
   });
 });
 

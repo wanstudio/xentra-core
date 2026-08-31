@@ -15,13 +15,13 @@ function tenantResolver(req, res, next) {
           brand = db.prepare('SELECT * FROM brands WHERE custom_domain = ?').get(cleanHost);
         }
 
-        // 2. Try match by brand slug parameter (for local/testing/subdomain)
+        // 2. Try match by brand slug parameter (for local/testing/subdomain/header)
         if (!brand && brandParam) {
           brand = db.prepare('SELECT * FROM brands WHERE slug = ?').get(brandParam);
         }
 
-        // 3. Default fallback to first active brand (e.g. Bangjo)
-        if (!brand) {
+        // 3. For public/local testing without brand slug, check if single brand in development
+        if (!brand && (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development')) {
           brand = db.prepare('SELECT * FROM brands ORDER BY created_at ASC LIMIT 1').get();
         }
       } catch (dbErr) {
@@ -29,15 +29,23 @@ function tenantResolver(req, res, next) {
       }
     }
 
+    // STRICT MULTI-TENANT SECURITY BOUNDARY: Fail-Fast if tenant cannot be resolved
     if (!brand) {
-      brand = {
-        id: 'brand_bangjo',
-        organization_id: 'org_xentra_holding',
-        name: 'Bangjo Resto',
-        slug: 'bangjo',
-        logo_url: 'https://app.mybangjo.com/wp-content/plugins/xentra-mvp/assets/icons/logo_bangjo.png',
-        primary_color: '#b6ff00'
-      };
+      // In test/dev environment, provide fallback only if explicitly permitted
+      if (process.env.NODE_ENV === 'test') {
+        brand = {
+          id: 'brand_test_default',
+          organization_id: 'org_test_default',
+          name: 'Test Brand',
+          slug: 'test-default'
+        };
+      } else {
+        return res.status(404).json({
+          success: false,
+          error: 'TENANT_NOT_FOUND',
+          message: 'Brand/Tenant tidak ditemukan untuk host atau parameter yang diberikan.'
+        });
+      }
     }
 
     req.brand = brand;
@@ -47,18 +55,13 @@ function tenantResolver(req, res, next) {
     next();
   } catch (err) {
     console.error('[TenantResolver Error]:', err);
-    req.brand = {
-      id: 'brand_bangjo',
-      organization_id: 'org_xentra_holding',
-      name: 'Bangjo Resto',
-      slug: 'bangjo',
-      logo_url: 'https://app.mybangjo.com/wp-content/plugins/xentra-mvp/assets/icons/logo_bangjo.png',
-      primary_color: '#b6ff00'
-    };
-    req.brand_id = req.brand.id;
-    req.organization_id = req.brand.organization_id;
-    next();
+    return res.status(500).json({
+      success: false,
+      error: 'TENANT_RESOLUTION_ERROR',
+      message: 'Gagal menyelesaikan tenant.'
+    });
   }
 }
 
 module.exports = tenantResolver;
+
