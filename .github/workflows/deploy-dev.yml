@@ -1,0 +1,25 @@
+name: Auto Deploy Xentra Core to dev.mybangjo.com
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Package Xentra Core
+        run: |
+          zip -r xentra-core-deploy.zip . -x "node_modules/*" ".git/*" "tmp/*"
+
+      - name: Deploy to dev.mybangjo.com
+        run: |
+          curl -s -X POST \
+            -H "X-Deploy-Token: xentra_deploy_7f8a9b2c3d4e5f6a1b2c3d4e5f" \
+            -H "Content-Type: application/zip" \
+            --data-binary "@xentra-core-deploy.zip" \
+            "https://dev.mybangjo.com/wp-json/xentra/v1/deploy-raw?target=core"

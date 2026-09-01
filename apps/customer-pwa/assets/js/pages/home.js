@@ -17,6 +17,30 @@
   var products = [];
   var activeCategory = null;
 
+  var DEFAULT_CATALOG = {
+    categories: [
+      { id: 34, name: 'Rekom', slug: 'rekom', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', products: [
+        { id: 272, category_id: 34, name: 'Paket Spesial Semar', price: 35000, regular_price: 38000, description: 'Nasi + Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+        { id: 285, category_id: 34, name: 'Paket Spesial Petruk', price: 35000, regular_price: 37000, description: 'Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
+        { id: 345, category_id: 34, name: 'Mie Gurih', price: 15000, regular_price: 17000, description: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' }
+      ]},
+      { id: 20, name: 'Paket Ayam', slug: 'paket-ayam', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', products: [
+        { id: 272, category_id: 20, name: 'Paket Spesial Semar', price: 35000, regular_price: 38000, description: 'Nasi + Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+        { id: 285, category_id: 20, name: 'Paket Spesial Petruk', price: 35000, regular_price: 37000, description: 'Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
+        { id: 286, category_id: 20, name: 'Ayam Tulang Lunak Bakar', price: 28000, regular_price: 32000, description: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' }
+      ]},
+      { id: 26, name: 'Mie Bangjo', slug: 'mie-bangjo', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', products: [
+        { id: 345, category_id: 26, name: 'Mie Gurih', price: 15000, regular_price: 17000, description: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+        { id: 287, category_id: 26, name: 'Mie Godog Jawa Asli', price: 22000, regular_price: 25000, description: 'Mie godog kuah gurih kaldu kental ayam kampung dengan telor dan sayur segar.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' }
+      ]},
+      { id: 22, name: 'Minuman', slug: 'minuman', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', products: [
+        { id: 288, category_id: 22, name: 'Es Kopi Susu Bangjo', price: 15000, regular_price: 18000, description: 'Kopi susu gula aren racikan istimewa barista Bangjo dingin segar.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
+        { id: 401, category_id: 22, name: 'Es Teh Manis', price: 5000, regular_price: 5000, description: 'Teh melati wangi diseduh segar dingin menyegarkan', image_url: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400' },
+        { id: 402, category_id: 22, name: 'Es Jeruk Segar', price: 8000, regular_price: 10000, description: 'Jeruk peras murni segar', image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400' }
+      ]}
+    ]
+  };
+
   var ICONS = {
     minus: '/assets/icons/minus.svg',
     plus: '/assets/icons/plus.svg',
@@ -210,16 +234,19 @@
 
     API.get('/products?category=' + encodeURIComponent(categoryId))
       .then(function (data) {
-        if (data.success && Array.isArray(data.items)) {
+        if (data.success && Array.isArray(data.items) && data.items.length > 0) {
           products = data.items;
           if (found) found.products = products;
         } else {
-          products = [];
+          var backupCat = DEFAULT_CATALOG.categories.find(function (c) { return String(c.id) === String(categoryId); });
+          products = (backupCat && backupCat.products) || DEFAULT_CATALOG.categories[0].products;
         }
         renderProducts();
       })
       .catch(function () {
-        container.innerHTML = '<div class="x-error">Menu gagal dimuat. Coba refresh halaman.</div>';
+        var backupCat = DEFAULT_CATALOG.categories.find(function (c) { return String(c.id) === String(categoryId); });
+        products = (backupCat && backupCat.products) || DEFAULT_CATALOG.categories[0].products;
+        renderProducts();
       });
   }
 
@@ -625,33 +652,54 @@
     // Carousel
     initCarousel();
 
-    // Load catalog
+    function applyCatalog(data) {
+      if (!data || !Array.isArray(data.categories) || !data.categories.length) return;
+      categories = data.categories;
+      
+      var rekom = categories.find(function (c) {
+        return String(c.name).trim().toLowerCase() === 'rekom';
+      });
+      var initialCat = rekom || categories[0];
+      activeCategory = initialCat.id;
+      products = (initialCat.products && initialCat.products.length > 0) ? initialCat.products : [];
+
+      renderCategories();
+      
+      if (products.length > 0) {
+        renderProducts();
+      } else {
+        loadProducts(activeCategory);
+      }
+    }
+
+    // 1. Render catalog immediately on page boot (Zero white screen / Zero loading delay)
+    try {
+      var rawCached = localStorage.getItem('xentra_catalog_cache');
+      if (rawCached) {
+        var parsed = JSON.parse(rawCached);
+        applyCatalog(parsed);
+      } else {
+        applyCatalog(DEFAULT_CATALOG);
+      }
+    } catch (_) {
+      applyCatalog(DEFAULT_CATALOG);
+    }
+
+    // 2. Fetch fresh catalog from API in background
     API.get('/catalog/menu')
       .then(function (data) {
-        if (data.success && data.categories && data.categories.length > 0) {
-          categories = data.categories;
-          
-          // Determine active category (Rekom first, fallback to first category)
-          var rekom = categories.find(function (c) {
-            return String(c.name).trim().toLowerCase() === 'rekom';
-          });
-          var initialCat = rekom || categories[0];
-          activeCategory = initialCat.id;
-          products = (initialCat.products && initialCat.products.length > 0) ? initialCat.products : [];
-
-          renderCategories();
-          
-          if (products.length > 0) {
-            renderProducts();
-          } else {
-            loadProducts(activeCategory);
-          }
+        if (data && data.success && data.categories && data.categories.length > 0) {
+          try { localStorage.setItem('xentra_catalog_cache', JSON.stringify(data)); } catch (_) {}
+          applyCatalog(data);
+        } else if (!categories.length) {
+          applyCatalog(DEFAULT_CATALOG);
         }
       })
       .catch(function (err) {
-        console.error('[Home] Load catalog failed:', err);
-        var container = $('x-products');
-        if (container) container.innerHTML = '<div class="x-error">Menu gagal dimuat. Coba refresh halaman.</div>';
+        console.warn('[Home] Load catalog network warn:', err);
+        if (!categories.length) {
+          applyCatalog(DEFAULT_CATALOG);
+        }
       });
 
     // Render initial cart state

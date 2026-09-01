@@ -1,12 +1,12 @@
 /**
  * Xentra API Client
- * Centralized fetch wrapper with timeout, error handling, auth headers, and base URL.
+ * Centralized fetch wrapper with timeout, error handling, auth headers, brand slug, and base URL.
  */
 (function () {
   'use strict';
 
-  var BASE = window.location.origin + '/api/v1';
-  var TIMEOUT = 8000;
+  var BASE = '/api/v1';
+  var TIMEOUT = 10000;
 
   /**
    * Make an API request.
@@ -17,10 +17,13 @@
    */
   function request(method, path, body) {
     var url = BASE + path;
-    var controller = new AbortController();
-    var timer = setTimeout(function () { controller.abort(); }, TIMEOUT);
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, TIMEOUT) : null;
 
-    var headers = { 'Content-Type': 'application/json' };
+    var headers = {
+      'Content-Type': 'application/json',
+      'x-brand-slug': 'bangjo'
+    };
 
     // Attach Customer Session Token if available
     try {
@@ -37,9 +40,12 @@
 
     var opts = {
       method: method,
-      headers: headers,
-      signal: controller.signal
+      headers: headers
     };
+
+    if (controller) {
+      opts.signal = controller.signal;
+    }
 
     if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
       opts.body = JSON.stringify(body);
@@ -47,7 +53,7 @@
 
     return fetch(url, opts)
       .then(function (res) {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         if (!res.ok) {
           return res.json().catch(function () { return { error: 'HTTP ' + res.status }; }).then(function (errBody) {
             var err = new Error(errBody.error || errBody.message || ('HTTP ' + res.status));
@@ -59,7 +65,7 @@
         return res.json();
       })
       .catch(function (err) {
-        clearTimeout(timer);
+        if (timer) clearTimeout(timer);
         console.error('[API] ' + method + ' ' + path, err);
         throw err;
       });

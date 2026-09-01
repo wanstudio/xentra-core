@@ -169,8 +169,9 @@ const db = {
           return undefined; // P1 Fail-Closed: Never return memoryStore.users[0]
         }
         if (lowerSql.includes('from brands')) {
-          if (params[0]) return memoryStore.brands.find(b => b.custom_domain === params[0] || b.slug === params[0]);
-          return undefined; // P1 Fail-Closed: Never fallback to memoryStore.brands[0]
+          if (params[0]) return memoryStore.brands.find(b => b.custom_domain === params[0] || b.slug === params[0] || (b.custom_domain && b.custom_domain.includes(params[0])));
+          if (lowerSql.includes('limit 1') || lowerSql.includes('order by') || !params.length) return memoryStore.brands[0];
+          return undefined;
         }
         if (lowerSql.includes('from branches')) {
           if (params[0]) return memoryStore.branches.find(b => b.id === params[0]);

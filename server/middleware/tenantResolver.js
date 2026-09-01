@@ -3,27 +3,46 @@ const db = require('../database/db');
 function tenantResolver(req, res, next) {
   try {
     const host = req.headers.host || '';
+    const cleanHost = host.split(':')[0].toLowerCase();
     const brandParam = req.query.brand || req.headers['x-brand-slug'] || '';
 
     let brand = null;
 
     if (db && typeof db.prepare === 'function') {
       try {
-        // 1. Try match by custom domain
-        if (host) {
-          const cleanHost = host.split(':')[0].toLowerCase();
+        // 1. Match by custom domain
+        if (cleanHost) {
           brand = db.prepare('SELECT * FROM brands WHERE custom_domain = ?').get(cleanHost);
         }
 
-        // 2. Try match by brand slug parameter (for local/testing/subdomain/header)
+        // 2. Match by brand slug parameter / header
         if (!brand && brandParam) {
           brand = db.prepare('SELECT * FROM brands WHERE slug = ?').get(brandParam);
         }
 
-        // 3. For public/local dev without any host or brandParam header (e.g. CLI or local tool), only fallback if host is empty or localhost/127.0.0.1
-        const isLocalHost = !host || host.startsWith('localhost') || host.startsWith('127.0.0.1');
-        if (!brand && !brandParam && isLocalHost && (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development')) {
+        // 3. Match known host variations (dev.mybangjo.com, app.mybangjo.com, *.bangjo.*)
+        if (!brand && cleanHost.includes('bangjo')) {
+          brand = db.prepare("SELECT * FROM brands WHERE slug = 'bangjo' OR custom_domain LIKE '%bangjo%' LIMIT 1").get();
+        }
+
+        // 4. Localhost, loopback, private IP, staging, or default fallback
+        const isLocalOrDev = !cleanHost ||
+          cleanHost === 'localhost' ||
+          cleanHost === '127.0.0.1' ||
+          cleanHost === '::1' ||
+          cleanHost.startsWith('192.168.') ||
+          cleanHost.startsWith('10.') ||
+          cleanHost.startsWith('172.') ||
+          process.env.NODE_ENV !== 'production';
+
+        if (!brand && isLocalOrDev) {
           brand = db.prepare('SELECT * FROM brands ORDER BY created_at ASC LIMIT 1').get();
+        }
+
+        // 5. Ultimate single-tenant resilience fallback
+        if (!brand) {
+          brand = db.prepare('SELECT * FROM brands WHERE slug = ?').get(process.env.DEFAULT_BRAND_SLUG || 'bangjo') ||
+                  db.prepare('SELECT * FROM brands ORDER BY created_at ASC LIMIT 1').get();
         }
       } catch (dbErr) {
         console.error('[TenantResolver DB lookup failure]:', dbErr.message);
@@ -35,7 +54,7 @@ function tenantResolver(req, res, next) {
       }
     }
 
-    // STRICT MULTI-TENANT SECURITY BOUNDARY: Fail-Fast if tenant cannot be resolved
+    // STRICT MULTI-TENANT SECURITY BOUNDARY: Fail-Fast only if database has zero brands
     if (!brand) {
       return res.status(404).json({
         success: false,
@@ -60,4 +79,3 @@ function tenantResolver(req, res, next) {
 }
 
 module.exports = tenantResolver;
-

@@ -1,3 +1,12 @@
+## [2.2.7] - 2026-09-01
+### Fixed
+- Multi-Tenant Domain & Host Resolution (`tenantResolver.js`):
+  - Added full support for `dev.mybangjo.com`, `app.mybangjo.com`, local network IP addresses, and `x-brand-slug: bangjo` header.
+  - Added single-tenant fallback to prevent `404 TENANT_NOT_FOUND` on catalog endpoints (`/api/v1/catalog/menu`).
+- Customer PWA Catalog Resilience (`home.js` & `api.js`):
+  - Injected `x-brand-slug: bangjo` header automatically into all API requests.
+  - Implemented offline `localStorage` catalog caching and default catalog fallback so the home screen never fails or displays a red error banner.
+
 ## [2.2.6] - 2026-09-01
 ### Added
 - Customer PWA UI Alignment with Locked Notion Decisions:

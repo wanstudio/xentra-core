@@ -207,7 +207,7 @@ app.get('/health', (req, res) => {
   res.status(isDbReady ? 200 : 503).json({
     status: isDbReady ? 'ok' : 'degraded',
     system: 'Xentra Core Standalone Engine',
-    version: '2.2.5',
+    version: '2.2.7',
     persistence: isDbReady ? 'ready' : 'unavailable',
     timestamp: new Date().toISOString()
   });
@@ -243,7 +243,7 @@ app.get('*', (req, res) => {
   res.sendFile(pwaIndex, (err) => {
     if (err) {
       res.json({
-        system: 'Xentra Core Standalone Engine v2.2.5',
+        system: 'Xentra Core Standalone Engine v2.2.7',
         message: 'Customer PWA is initializing. API is ready at /api/v1'
       });
     }
