@@ -624,29 +624,6 @@
   }
 
   // ── Upsell Recommendation Rail (Dynamic API/Catalog Integration) ──
-  function renderUpsellCard(product) {
-    if (!product || !product.id) return '';
-    var img = product.image_url || product.image || '';
-    var price = Number(product.price || 0);
-    return (
-      '<div class="x-complement-card" data-card-id="' + product.id + '">' +
-      '  <div class="x-complement-img-wrap">' +
-      (img
-        ? '<img src="' + UI.escape(img) + '" alt="' + UI.escape(product.name || '') + '" onerror="this.parentElement.innerHTML=\'<div class=\\\'x-complement-img-placeholder\\\'></div>\'">'
-        : '<div class="x-complement-img-placeholder"></div>'
-      ) +
-      '  </div>' +
-      '  <div class="x-complement-name">' + UI.escape(product.name || '') + '</div>' +
-      '  <div class="x-complement-bottom">' +
-      '    <div class="x-complement-price">' + fmtIDR(price) + '</div>' +
-      '    <button type="button" class="x-upsell-add-btn" data-add-upsell="' + product.id + '" aria-label="Tambah ' + UI.escape(product.name || '') + '">' +
-      '      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;display:block;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
-      '    </button>' +
-      '  </div>' +
-      '</div>'
-    );
-  }
-
   function extractCatalogProducts(data) {
     var list = [];
     if (!data) return list;
@@ -670,11 +647,9 @@
 
   function renderUpsellTrack(container, items) {
     if (!container) return;
-    var html = '';
-    (items || []).forEach(function (p) {
-      html += renderUpsellCard(p);
-    });
-    container.innerHTML = html;
+    container.innerHTML = (items || []).map(function (p) {
+      return (UI && UI.upsellCard) ? UI.upsellCard(p) : '';
+    }).join('');
 
     var buttons = container.querySelectorAll('.x-upsell-add-btn');
     for (var b = 0; b < buttons.length; b++) {

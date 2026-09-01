@@ -93,12 +93,39 @@
     };
   }
 
+  /**
+   * Render reusable Upsell Product Card HTML.
+   */
+  function upsellCard(product) {
+    if (!product || !product.id) return '';
+    var img = product.image_url || product.image || '';
+    var price = Number(product.price || 0);
+    return (
+      '<div class="x-complement-card" data-card-id="' + product.id + '">' +
+      '  <div class="x-complement-img-wrap">' +
+      (img
+        ? '<img src="' + escape(img) + '" alt="' + escape(product.name || '') + '" onerror="this.parentElement.innerHTML=\'<div class=\\\'x-complement-img-placeholder\\\'></div>\'">'
+        : '<div class="x-complement-img-placeholder"></div>'
+      ) +
+      '  </div>' +
+      '  <div class="x-complement-name">' + escape(product.name || '') + '</div>' +
+      '  <div class="x-complement-bottom">' +
+      '    <div class="x-complement-price">' + money(price) + '</div>' +
+      '    <button type="button" class="x-upsell-add-btn" data-add-upsell="' + product.id + '" aria-label="Tambah ' + escape(product.name || '') + '">' +
+      '      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;display:block;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+      '    </button>' +
+      '  </div>' +
+      '</div>'
+    );
+  }
+
   // ── Export ──
   window.Xentra = window.Xentra || {};
   window.Xentra.UI = {
     money: money,
     escape: escape,
     toast: toast,
-    debounce: debounce
+    debounce: debounce,
+    upsellCard: upsellCard
   };
 })();
