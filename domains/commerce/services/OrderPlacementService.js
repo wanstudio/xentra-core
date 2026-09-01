@@ -30,6 +30,11 @@ class OrderPlacementService {
     customer,
     items = [],
     delivery_fee = 0,
+    discount_amount = 0,
+    delivery_record = null,
+    fulfillment_schedule_type = 'asap',
+    scheduled_slot_start = null,
+    scheduled_slot_end = null,
     payment_method = 'midtrans',
     order_channel = 'customer_app',
     order_type = 'delivery',
@@ -176,25 +181,27 @@ class OrderPlacementService {
 
     const verifiedItems = verification.verified_items;
     const subtotal = verifiedItems.reduce((acc, it) => acc + it.subtotal, 0);
-    const grandTotal = subtotal + Number(delivery_fee || 0);
+    const grandTotal = Math.max(0, subtotal + Number(delivery_fee || 0) - Number(discount_amount || 0));
 
     const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
-    const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}`;
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randSuffix = Math.floor(1000 + Math.random() * 9000);
+    const orderNumber = `XN-${today}-${randSuffix}`;
 
     // 2. Prepared Statements for Transaction
     const insertOrderStmt = db.prepare(`
       INSERT INTO orders (
         id, order_number, brand_id, branch_id, customer_name, customer_phone,
-        order_type, order_channel, table_number,
-        subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+        order_type, order_channel, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
+        subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
     `);
 
     const insertOrderItemStmt = db.prepare(`
       INSERT INTO order_items (
-        id, order_id, product_id, product_name, unit_price, quantity, subtotal
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // Guarded Conditional Deduction: WHERE stock >= ? prevents overselling even under high concurrency
@@ -218,8 +225,12 @@ class OrderPlacementService {
         effectiveOrderType,
         order_channel,
         table_number,
+        fulfillment_schedule_type,
+        scheduled_slot_start,
+        scheduled_slot_end,
         subtotal,
-        delivery_fee,
+        Number(discount_amount || 0),
+        Number(delivery_fee || 0),
         grandTotal,
         effectivePaymentMethod,
         notes,
@@ -236,7 +247,8 @@ class OrderPlacementService {
           item.name,
           item.unit_price,
           item.quantity,
-          item.subtotal
+          item.subtotal,
+          item.note || ''
         );
 
         // Optimistic concurrency guard: Deduct live inventory for active fulfillment
@@ -267,6 +279,29 @@ class OrderPlacementService {
           customer.phone || 'customer_order',
           `Pemotongan stok otomatis pesanan ${orderNumber} (${effectiveOrderType}/${order_channel})`,
           now
+        );
+      }
+
+      // Save delivery record if provided (e.g. online delivery checkout)
+      if (delivery_record) {
+        db.prepare(`
+          INSERT INTO order_deliveries (
+            id, order_id, destination_address, destination_latitude, destination_longitude,
+            actual_road_distance_meters, actual_duration_seconds, chargeable_distance_km,
+            free_km_applied, rate_per_km_applied, delivery_fee_calculated
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          delivery_record.id || ('del_' + crypto.randomBytes(6).toString('hex')),
+          orderId,
+          delivery_record.destination_address || 'Alamat Customer',
+          delivery_record.destination_latitude || 0,
+          delivery_record.destination_longitude || 0,
+          delivery_record.actual_road_distance_meters || 0,
+          delivery_record.actual_duration_seconds || 0,
+          delivery_record.chargeable_distance_km || 0,
+          delivery_record.free_km_applied || 0,
+          delivery_record.rate_per_km_applied || 0,
+          delivery_record.delivery_fee_calculated || 0
         );
       }
 

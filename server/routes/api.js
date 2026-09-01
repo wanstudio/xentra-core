@@ -653,84 +653,14 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       return res.status(404).json({ success: false, error: 'Cabang restoran tidak ditemukan untuk brand ini.' });
     }
 
-    // 2. Validate Items: Strictly require items payload and isolate products to current brand
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, error: 'Keranjang pesanan tidak boleh kosong.' });
-    }
-
-    let subtotal = 0;
-    const validatedItems = [];
-
-    for (const item of items) {
-      // P1 TENANT & BRANCH ISOLATION HARDENING: Product lookup MUST be strictly scoped to req.brand_id AND branch allocation
-      const prod = db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(item.id, req.brand_id);
-      if (!prod) {
-        return res.status(400).json({
-          success: false,
-          error: `Produk "${item.id}" tidak ditemukan pada menu brand ini.`
-        });
-      }
-
-      // Check Branch Allocation & Availability (P1 STRICT ISOLATION GUARD)
-      const branchProd = db.prepare('SELECT * FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch.id, item.id);
-      if (!branchProd) {
-        return res.status(400).json({
-          success: false,
-          error: `Produk "${prod.name}" belum dialokasikan untuk cabang ${branch.name}.`
-        });
-      }
-      if (branchProd.is_available === 0) {
-        return res.status(400).json({
-          success: false,
-          error: `Produk "${prod.name}" saat ini dinonaktifkan di cabang ${branch.name}.`
-        });
-      }
-
-      const unitPrice = branchProd.price != null ? Number(branchProd.price) : Number(prod.price);
-      const prodName = prod.name;
-      const prodId = prod.id;
-      
-      // P1 DATA-INTEGRITY: Strictly validate quantity as positive integer (NO silent clamping to 1)
-      const rawQty = item.quantity != null ? item.quantity : item.qty;
-      const qty = Number(rawQty);
-      if (!Number.isInteger(qty) || qty <= 0) {
-        return res.status(400).json({
-          success: false,
-          error: `Jumlah pesanan (quantity) untuk produk "${prodName}" harus berupa bilangan bulat positif (> 0).`
-        });
-      }
-
-      // Check Realtime Stock at Branch (No 999 fallback)
-      const availableStock = branchProd.stock != null ? Number(branchProd.stock) : 0;
-      if (availableStock < qty) {
-        return res.status(400).json({
-          success: false,
-          error: `Stok produk "${prodName}" di cabang ${branch.name} tidak mencukupi (tersedia: ${availableStock}, diminta: ${qty}).`
-        });
-      }
-
-      const lineTotal = unitPrice * qty;
-      subtotal += lineTotal;
-
-      validatedItems.push({
-        id: 'item_' + crypto.randomBytes(6).toString('hex'),
-        product_id: prodId,
-        product_name: prodName,
-        unit_price: unitPrice,
-        quantity: qty,
-        item_subtotal: lineTotal,
-        item_note: item.note || ''
-      });
-    }
-
-    // 3. Compute Delivery Fee
+    // 2. Compute Delivery Fee (if order_type === 'delivery')
     let deliveryFee = 0;
     let discountAmount = 0;
     let deliveryRecord = null;
 
     if (order_type === 'delivery') {
-      const custLat = (delivery && delivery.latitude != null) ? Number(delivery.latitude) : -7.2912;
-      const custLng = (delivery && delivery.longitude != null) ? Number(delivery.longitude) : 112.7167;
+      const custLat = Number(delivery.latitude);
+      const custLng = Number(delivery.longitude);
 
       const road = await RouteService.getRoadDistance(
         branch.latitude,
@@ -743,12 +673,15 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         ? { enabled: true, target: branch.promo_min_order, discount: branch.promo_delivery_discount }
         : { enabled: true, target: 50000, discount: 10000 };
 
+      // Calculate approximate subtotal for promo evaluation
+      const approxSubtotal = items.reduce((acc, it) => acc + (Number(it.price || it.expected_price || 0) * Number(it.quantity || it.qty || 1)), 0);
+
       const feeCalc = DeliveryCalculator.calculate({
         distance_meters: road.distance_meters,
         free_km: branch.free_delivery_km || 0,
         price_per_km: branch.price_per_km || 3000,
         max_radius_km: branch.max_radius_km || 30,
-        subtotal,
+        subtotal: approxSubtotal,
         promo_config: promoConfig
       });
 
@@ -769,128 +702,57 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       };
     }
 
-    const grandTotal = Math.max(0, subtotal + deliveryFee - discountAmount);
-    const orderId = 'ord_' + crypto.randomBytes(8).toString('hex');
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const randSuffix = Math.floor(1000 + Math.random() * 9000);
-    const orderNumber = `XN-${today}-${randSuffix}`;
-
-    // 4. Save to Database within Atomic ACID Transaction (Guarded Stock Deduction & Ledger Recording)
-    const initialOrderStatus = payment_method === 'cash' ? 'confirmed' : 'pending';
-    const now = new Date().toISOString();
-
-    db.exec('BEGIN TRANSACTION;');
-    try {
-      db.prepare(`
-        INSERT INTO orders (
-          id, order_number, brand_id, branch_id, customer_phone, customer_name,
-          order_type, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
-          status, subtotal, discount_amount, delivery_fee, grand_total, order_note
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        orderId,
-        orderNumber,
-        req.brand_id,
-        branch.id,
-        customer.phone,
-        customer.name || '',
-        order_type,
-        schedule_type,
-        scheduled_slot_start || null,
-        scheduled_slot_end || null,
-        initialOrderStatus,
-        subtotal,
-        discountAmount,
-        deliveryFee,
-        grandTotal,
-        order_note
-      );
-
-      // Save order items
-      const insertItem = db.prepare(`
-        INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `);
-
-      // Guarded Stock Deduction & Inventory Movement Ledger
-      const guardedDeductStock = db.prepare(`
-        UPDATE branch_products
-        SET stock = stock - ?, updated_at = datetime('now')
-        WHERE branch_id = ? AND product_id = ? AND stock >= ?
-      `);
-
-      for (const it of validatedItems) {
-        insertItem.run(it.id, orderId, it.product_id, it.product_name, it.unit_price, it.quantity, it.item_subtotal, it.item_note || '');
-
-        // Deduct branch stock for catalog products
-        const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch.id, it.product_id);
-        if (bpBefore) {
-          const prevStock = Number(bpBefore.stock || 0);
-          const deductResult = guardedDeductStock.run(it.quantity, branch.id, it.product_id, it.quantity);
-          if (!deductResult || deductResult.changes === 0) {
-            throw new Error(`Stok untuk produk "${it.product_name}" di cabang ini tidak mencukupi (sisa: ${prevStock}).`);
-          }
-          const currentStock = prevStock - Number(it.quantity);
-          const movementId = 'mov_' + crypto.randomBytes(6).toString('hex');
-          db.prepare(`
-            INSERT INTO inventory_movements (
-              id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
-            ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            movementId,
-            branch.id,
-            it.product_id,
-            -Number(it.quantity),
-            prevStock,
-            currentStock,
-            orderNumber,
-            customer.phone || 'customer_checkout',
-            `Pemotongan stok otomatis pesanan online ${orderNumber} (${order_type})`,
-            now
-          );
-        }
+    // 3. Delegate Cleanly to OrderPlacementService (Architectural Authority & PrePaymentVerificationGate)
+    const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
+    const placementResult = await OrderPlacementService.submitOrder({
+      brand_id: req.brand_id,
+      branch_id: branch.id,
+      customer: {
+        name: customer.name.trim(),
+        phone: customer.phone.trim()
+      },
+      items,
+      delivery_fee: deliveryFee,
+      discount_amount: discountAmount,
+      delivery_record: deliveryRecord,
+      fulfillment_schedule_type: schedule_type,
+      scheduled_slot_start: scheduled_slot_start || null,
+      scheduled_slot_end: scheduled_slot_end || null,
+      payment_method,
+      order_channel: 'customer_app',
+      order_type,
+      table_number: null,
+      notes: order_note,
+      trace_context: {
+        correlation_id: `chk_${Date.now()}`
       }
+    });
 
-      // Save delivery record
-      if (deliveryRecord) {
-        db.prepare(`
-          INSERT INTO order_deliveries (
-            id, order_id, destination_address, destination_latitude, destination_longitude,
-            actual_road_distance_meters, actual_duration_seconds, chargeable_distance_km,
-            free_km_applied, rate_per_km_applied, delivery_fee_calculated
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          deliveryRecord.id,
-          orderId,
-          deliveryRecord.destination_address,
-          deliveryRecord.destination_latitude,
-          deliveryRecord.destination_longitude,
-          deliveryRecord.actual_road_distance_meters,
-          deliveryRecord.actual_duration_seconds,
-          deliveryRecord.chargeable_distance_km,
-          deliveryRecord.free_km_applied,
-          deliveryRecord.rate_per_km_applied,
-          deliveryRecord.delivery_fee_calculated
-        );
-      }
-
-      db.exec('COMMIT;');
-    } catch (orderTxErr) {
-      try { db.exec('ROLLBACK;'); } catch (_) {}
+    if (!placementResult.success) {
+      const primaryError = (placementResult.errors && placementResult.errors[0]) || 'Gagal memproses pesanan.';
       return res.status(400).json({
         success: false,
-        error: orderTxErr.message || 'Gagal memproses pesanan karena perubahan ketersediaan stok.'
+        status: placementResult.status,
+        error: primaryError,
+        errors: placementResult.errors,
+        price_diffs: placementResult.price_diffs
       });
     }
 
-    // 5. Payment Resolution (Strictly Isolated by payment_method)
+    const order = placementResult.order;
+    const grandTotal = order.grand_total;
+    const orderId = order.id;
+    const orderNumber = order.order_number;
+    const subtotal = order.subtotal;
+
+    // 4. Payment Gateway Resolution (Midtrans Snap or Cash)
     let snapResult = { snap_token: null, redirect_url: null, merchant_id: payment_method === 'cash' ? 'cash' : 'midtrans_default' };
 
     if (payment_method === 'midtrans') {
       try {
         snapResult = await PaymentService.createSnapTransaction(
           { id: orderId, grand_total: grandTotal, branch_id: branch.id, brand_id: req.brand_id, delivery_fee: deliveryFee, discount_amount: discountAmount },
-          validatedItems,
+          order.items,
           customer
         );
       } catch (payErr) {

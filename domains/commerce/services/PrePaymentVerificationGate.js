@@ -119,7 +119,10 @@ class PrePaymentVerificationGate {
       );
 
       const actualPrice = pricing.effective_price;
-      if (expectedPrice !== actualPrice) {
+      const hasExplicitExpectedPrice = item.expected_price !== undefined && item.expected_price !== null && !isNaN(Number(item.expected_price));
+      const hasExplicitItemPrice = item.price !== undefined && item.price !== null && !isNaN(Number(item.price));
+
+      if ((hasExplicitExpectedPrice || hasExplicitItemPrice) && expectedPrice !== actualPrice) {
         priceDiffs.push({
           product_id: productId,
           name: masterProduct.name,
