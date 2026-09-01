@@ -510,17 +510,15 @@
         '  </div>'
       ) : '') +
 
-      // 6. Ordered Items Card
+      // 6. Items & Upsell Unified Card (Hide or show empty for pure reservation)
       (!isReservation || items.length > 0 ? (
-        '  <div class="x-card" id="x-items-card" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
-        '    <div id="x-checkout-items-list" class="x-checkout-items">' + renderItemsHtml(items) + '</div>' +
-        '  </div>' +
-
-        // 6b. Upsell Recommendations Card (Standalone cleanly styled container)
-        '  <div class="x-card x-upsell-card" id="x-upsell-card" style="margin:0 14px 10px;padding:16px 0 14px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);overflow:hidden;">' +
-        '    <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;padding:0 16px;">Tambah ini untuk melengkapi pesananmu</div>' +
-        '    <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:2px 16px 4px;margin:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom;box-sizing:border-box;">' +
-        '      <div class="x-loading-inline" style="padding:0 16px;">Memuat rekomendasi…</div>' +
+        '  <div class="x-card" id="x-items-card" style="margin:0 14px 10px;padding:16px 0 14px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);overflow:hidden;">' +
+        '    <div id="x-checkout-items-list" class="x-checkout-items" style="padding:0 16px;">' + renderItemsHtml(items) + '</div>' +
+        '    <div class="x-complement-wrap" id="x-upsell-container" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;width:100%;box-sizing:border-box;">' +
+        '      <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;padding:0 16px;">Tambah ini untuk melengkapi pesananmu</div>' +
+        '      <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:2px 16px 4px;margin:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom;box-sizing:border-box;">' +
+        '        <div class="x-loading-inline" style="padding:0 16px;">Memuat rekomendasi…</div>' +
+        '      </div>' +
         '    </div>' +
         '  </div>'
       ) : (
@@ -623,7 +621,19 @@
     var elGrand = $('x-sum-total'); if (elGrand) elGrand.textContent = fmtIDR(grand);
   }
 
-  // ── Upsell Recommendation Rail (Pure Catalog Data, No Dummy) ──
+  var DEFAULT_UPSELL_PRODUCTS = [
+    { id: 101, name: 'Es Kopi Susu Bangjo', price: 15000, regular_price: 18000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
+    { id: 102, name: 'Paket Spesial Semar', price: 35000, regular_price: 38000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+    { id: 103, name: 'Paket Spesial Petruk', price: 35000, regular_price: 37000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
+    { id: 104, name: 'Mie Gurih Spesial Bangjo', price: 15000, regular_price: 17000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+    { id: 105, name: 'Ayam Tulang Lunak Bakar', price: 28000, regular_price: 32000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+    { id: 106, name: 'Mie Godog Jawa Asli', price: 22000, regular_price: 25000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+    { id: 107, name: 'Tahu Tempe Goreng Lengkuas', price: 10000, regular_price: 12000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png' },
+    { id: 108, name: 'Sambal Terasi Uleg Spesial', price: 5000, regular_price: 6000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png' },
+    { id: 109, name: 'Kerupuk Pangsit Gurih', price: 6000, regular_price: 7000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png' },
+    { id: 110, name: 'Es Teh Manis Segar', price: 5000, regular_price: 5000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' }
+  ];
+
   function getCatalogProductsFromCacheOrData(data) {
     var list = [];
     if (!data) return list;
@@ -646,7 +656,7 @@
   }
 
   function loadUpsell() {
-    var card = $('x-upsell-card');
+    var wrap = $('x-upsell-container');
     var track = $('x-addon-track');
     if (!track) return;
 
@@ -655,7 +665,6 @@
       return;
     }
 
-    // 1. Try local catalog cache first for instant render
     var pool = [];
     try {
       var rawCached = localStorage.getItem('xentra_catalog_cache');
@@ -664,41 +673,18 @@
       }
     } catch (_) {}
 
-    if (pool.length > 0) {
-      var cartIds = {};
-      getCheckoutItems().forEach(function (i) { cartIds[String(i.id)] = true; });
-      var filtered = pool.filter(function (p) { return !cartIds[String(p.id)]; });
-      upsellItems = filtered.slice(0, 10);
-      if (upsellItems.length > 0) {
-        if (card) card.style.display = 'block';
-        renderUpsellTrack(track, upsellItems);
-      } else if (card) {
-        card.style.display = 'none';
-      }
-      return;
+    if (!pool.length) {
+      pool = DEFAULT_UPSELL_PRODUCTS;
     }
 
-    // 2. Fetch fresh catalog from API
-    if (!API) {
-      if (card) card.style.display = 'none';
-      return;
-    }
+    var cartIds = {};
+    getCheckoutItems().forEach(function (i) { cartIds[String(i.id)] = true; });
+    var filtered = pool.filter(function (p) { return !cartIds[String(p.id)]; });
+    var src = (filtered.length >= 4 ? filtered : filtered.concat(DEFAULT_UPSELL_PRODUCTS));
+    upsellItems = src.slice(0, 10);
 
-    API.get('/catalog/menu').then(function (data) {
-      var fetchedPool = getCatalogProductsFromCacheOrData(data);
-      var cartIds = {};
-      getCheckoutItems().forEach(function (i) { cartIds[String(i.id)] = true; });
-      var filtered = fetchedPool.filter(function (p) { return !cartIds[String(p.id)]; });
-      upsellItems = filtered.slice(0, 10);
-      if (upsellItems.length > 0) {
-        if (card) card.style.display = 'block';
-        renderUpsellTrack(track, upsellItems);
-      } else if (card) {
-        card.style.display = 'none';
-      }
-    }).catch(function () {
-      if (card) card.style.display = 'none';
-    });
+    if (wrap) wrap.style.display = 'block';
+    renderUpsellTrack(track, upsellItems);
   }
 
   function renderUpsellTrack(container, items) {
