@@ -289,25 +289,19 @@
     // Load available branches & active promotions
     loadBranches();
     loadActivePromotions().then(function () {
-      var appliedPromo = getAppliedRewardPromo();
-      if (appliedPromo && appliedPromo.reward) {
-        var r = appliedPromo.reward;
-        var cartItems = Store.getState().cart.items || [];
-        var rewardItemId = 'reward_' + (r.promo_id || appliedPromo.promo_id);
-        var hasRewardInCart = cartItems.some(function (i) { return String(i.id) === rewardItemId; });
-        if (!hasRewardInCart) {
-          Store.addItem({
-            id: rewardItemId,
-            name: (appliedPromo.display && appliedPromo.display.reward_title) || 'Hadiah Promo',
-            price: Number(r.reward_price || 0),
-            regular_price: 5000,
-            image_url: (appliedPromo.display && appliedPromo.display.icon_url) || '/assets/pwa/icon-192.png',
-            description: (appliedPromo.display && appliedPromo.display.reward_title) || 'Hadiah Promo'
-          }, 1);
-        }
-      }
       renderLayout();
       bindEvents();
+    });
+
+    // Subscribe to Store updates (Reactivity on cart item changes/deletions)
+    Store.subscribe(function () {
+      var activeItems = getCheckoutItems();
+      if (!activeItems.length && state.fulfillment.type !== 'reservation') {
+        renderEmpty();
+        return;
+      }
+      renderLayout();
+      calculateTotals();
     });
 
     var items = getCheckoutItems();
@@ -452,7 +446,12 @@
         } else if (rewardPromo && rewardPromo.display) {
           var r = rewardPromo.display;
           var rewardItemId = 'reward_' + (rewardPromo.reward ? (rewardPromo.reward.promo_id || rewardPromo.promo_id) : rewardPromo.promo_id);
-          var hasRewardInCart = items.some(function (i) { return String(i.id) === rewardItemId || String(i.id) === 'promo-es-teh-gratis'; });
+          var hasRewardInCart = items.some(function (i) {
+            return String(i.id) === rewardItemId ||
+                   String(i.id) === 'promo-es-teh-gratis' ||
+                   String(i.id).indexOf('reward_') === 0 ||
+                   Number(i.price || 0) === 0;
+          });
 
           if (hasRewardInCart) {
             return (
