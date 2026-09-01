@@ -1,6 +1,6 @@
 /**
  * Xentra API Client
- * Centralized fetch wrapper with timeout, error handling, and base URL.
+ * Centralized fetch wrapper with timeout, error handling, auth headers, and base URL.
  */
 (function () {
   'use strict';
@@ -20,9 +20,24 @@
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, TIMEOUT);
 
+    var headers = { 'Content-Type': 'application/json' };
+
+    // Attach Customer Session Token if available
+    try {
+      var session = window.Xentra && window.Xentra.Store && window.Xentra.Store.getState().customerSession;
+      if (!session) {
+        var raw = localStorage.getItem('xentra_v2_customer_session');
+        session = raw ? JSON.parse(raw) : null;
+      }
+      if (session && session.token) {
+        headers['Authorization'] = 'Bearer ' + session.token;
+        headers['x-customer-token'] = session.token;
+      }
+    } catch (_) {}
+
     var opts = {
       method: method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       signal: controller.signal
     };
 
@@ -33,7 +48,14 @@
     return fetch(url, opts)
       .then(function (res) {
         clearTimeout(timer);
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        if (!res.ok) {
+          return res.json().catch(function () { return { error: 'HTTP ' + res.status }; }).then(function (errBody) {
+            var err = new Error(errBody.error || errBody.message || ('HTTP ' + res.status));
+            err.status = res.status;
+            err.data = errBody;
+            throw err;
+          });
+        }
         return res.json();
       })
       .catch(function (err) {

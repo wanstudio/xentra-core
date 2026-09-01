@@ -3550,18 +3550,34 @@ body:has(#x-checkout-note-overlay.open){
   font-size:13px; font-weight:600; color:#111;
 }
 .x-alt-radio input{ accent-color:#111; }
-.x-alt-input, .x-alt-textarea{
+.x-alt-input, .x-alt-textarea, select.x-alt-input{
   width:100%; border:1.5px solid #e5e7eb; border-radius:12px;
   padding:12px 14px; font-size:14px; color:#111; background:#fff;
   font-family:inherit; outline:none;
 }
-.x-alt-input:focus, .x-alt-textarea:focus{ border-color:#111; }
+.x-alt-input:focus, .x-alt-textarea:focus, select.x-alt-input:focus{ border-color:#111; }
 .x-alt-textarea{ resize:vertical; min-height:96px; }
 .x-alt-input + .x-alt-input, .x-alt-input + .x-alt-textarea, .x-alt-textarea + .x-alt-input{ margin-top:10px; }
+
+/* — Customer card — */
+.x-alt-customer-card{
+  display:flex; flex-direction:column;
+}
+
+/* — Pre-payment Verification Modal Dialog — */
+.x-alt-verify-dialog{
+  text-align:center;
+}
+.x-alt-verify-diff-list{
+  background:#f9fafb; border-radius:14px;
+  padding:12px 14px; margin:14px 0;
+  text-align:left;
+}
 
 @media (max-width:380px){
   .x-alt-item-card{ grid-template-columns:1fr 84px; }
   .x-alt-item-img-wrap{ width:84px; height:84px; }
   .x-alt-addon-item{ flex-basis:108px; width:108px; }
   .x-alt-addon-img{ width:108px; }
+  .x-alt-fulfillment-grid{ grid-template-columns:1fr 1fr !important; }
 }

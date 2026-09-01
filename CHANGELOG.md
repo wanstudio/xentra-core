@@ -1,3 +1,13 @@
+## [2.2.6] - 2026-09-01
+### Added
+- Customer PWA UI Alignment with Locked Notion Decisions:
+  - 4 `order_type` support: `delivery` (asap/scheduled), `pickup` (outlet selector), `dine_in` (table number context), and `reservation` (H+1 restriction, date/time/guest count).
+  - WhatsApp Customer Session binding (`Store.setCustomerSession`) and automatic `Authorization: Bearer <token>` in `API` client.
+  - Realtime Pre-Payment Verification Gate dialog: *"Ada perubahan di pesananmu, cek dulu yuk"* when live prices or stock mutate right before payment.
+  - Dedicated endpoint `POST /api/v1/checkout/verify` and graceful pre-payment bypass for pure table reservations.
+  - Live Tracking Screen (`order-received.js`) enhanced for 4 order types, payment status badges, and official branch WhatsApp button.
+- Version bump to `v2.2.6` for automated PWA cache busting.
+
 ## [2.2.4] - 2026-08-30
 ### Fixed
 - OOM fix untuk dev.mybangjo.com: hapus multer/adm-zip dari server (pakai raw + unzip shell saja), tambah SKIP_SYNC guard dan NODE_OPTIONS, npm install di dev tidak wajib — server kembali hidup 404 -> 200.

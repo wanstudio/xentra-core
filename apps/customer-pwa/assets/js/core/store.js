@@ -10,11 +10,22 @@
   var NOTES_KEY = PREFIX + 'notes';
   var LOCATION_KEY = PREFIX + 'location';
   var BRANCH_KEY = PREFIX + 'branch';
+  var SESSION_KEY = PREFIX + 'customer_session';
+  var ORDER_TYPE_KEY = PREFIX + 'order_type';
+  var ORDER_CTX_KEY = PREFIX + 'order_context';
 
   var listeners = [];
 
   var state = {
     brand: null,
+    customerSession: load(SESSION_KEY, null),
+    orderType: load(ORDER_TYPE_KEY, 'delivery'),
+    orderContext: load(ORDER_CTX_KEY, {
+      delivery: { scheduled: false, date: 'Hari Ini', timeSlot: '12.00 - 12.30', note: '' },
+      pickup: { branchId: null, branchName: null, pickupTime: 'Sekarang' },
+      dine_in: { tableNumber: '', note: '' },
+      reservation: { reservationDate: '', reservationTime: '12:00', guestCount: 2, note: '' }
+    }),
     location: load(LOCATION_KEY, null),
     matchedBranch: load(BRANCH_KEY, null),
     cart: load(CART_KEY, { items: [] }),
@@ -59,6 +70,31 @@
 
   function setBrand(brand) {
     state.brand = brand;
+    notify();
+  }
+
+  function setCustomerSession(session) {
+    state.customerSession = session;
+    save(SESSION_KEY, session);
+    notify();
+  }
+
+  function clearCustomerSession() {
+    state.customerSession = null;
+    try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
+    notify();
+  }
+
+  function setOrderType(type) {
+    state.orderType = type;
+    save(ORDER_TYPE_KEY, type);
+    notify();
+  }
+
+  function setOrderContext(type, ctx) {
+    state.orderContext = state.orderContext || {};
+    state.orderContext[type] = Object.assign({}, state.orderContext[type] || {}, ctx);
+    save(ORDER_CTX_KEY, state.orderContext);
     notify();
   }
 
@@ -188,6 +224,10 @@
     getState: getState,
     subscribe: subscribe,
     setBrand: setBrand,
+    setCustomerSession: setCustomerSession,
+    clearCustomerSession: clearCustomerSession,
+    setOrderType: setOrderType,
+    setOrderContext: setOrderContext,
     setLocation: setLocation,
     setMatchedBranch: setMatchedBranch,
     setPromo: setPromo,

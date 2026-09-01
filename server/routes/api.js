@@ -543,6 +543,31 @@ router.delete('/addresses/:id', requireCustomerAuth(), (req, res) => {
   }
 });
 
+// 5.4 Pre-Payment Verification Gate Endpoint
+router.post('/checkout/verify', (req, res) => {
+  try {
+    const { branch_id, items = [], order_type = 'delivery' } = req.body;
+    if (order_type === 'reservation') {
+      return res.json({ success: true, is_valid: true, status: 'VERIFIED', verified_items: [], price_diffs: [], errors: [] });
+    }
+    if (!branch_id) {
+      return res.status(400).json({ success: false, error: 'Cabang pemesanan (branch_id) wajib dipilih.' });
+    }
+    const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
+    const verification = PrePaymentVerificationGate.verify({
+      branch_id,
+      brand_id: req.brand_id,
+      items
+    });
+    return res.json({
+      success: verification.is_valid,
+      ...verification
+    });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // 6. Create Order & Submit Checkout
 router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => {
   try {
@@ -554,6 +579,9 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       schedule_type = 'asap',
       scheduled_slot_start,
       scheduled_slot_end,
+      table_number,
+      reservation_date,
+      guest_count,
       delivery,
       address,
       items = [],
@@ -564,6 +592,10 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
 
     order_type = order_type || fulfillment.type || 'delivery';
     order_note = order_note || note || '';
+    table_number = table_number || fulfillment.table_number || null;
+    reservation_date = reservation_date || fulfillment.reservation_date || null;
+    guest_count = guest_count || fulfillment.guest_count || null;
+
     if (address && !delivery) {
       delivery = {
         latitude: address.latitude,
@@ -662,26 +694,31 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     }
 
     // 2. Authoritative Pre-Payment Verification Gate (Single Source of Truth for Product Pricing & Stock)
-    const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
-    const verification = PrePaymentVerificationGate.verify({
-      branch_id: branch.id,
-      brand_id: req.brand_id,
-      items
-    });
+    let verifiedItems = [];
+    let verifiedSubtotal = 0;
 
-    if (!verification.is_valid) {
-      const primaryError = (verification.errors && verification.errors[0]) || 'Gagal memverifikasi produk atau harga pesanan.';
-      return res.status(400).json({
-        success: false,
-        status: verification.status,
-        error: primaryError,
-        errors: verification.errors,
-        price_diffs: verification.price_diffs
+    if (order_type !== 'reservation') {
+      const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
+      const verification = PrePaymentVerificationGate.verify({
+        branch_id: branch.id,
+        brand_id: req.brand_id,
+        items
       });
-    }
 
-    const verifiedItems = verification.verified_items;
-    const verifiedSubtotal = verifiedItems.reduce((acc, it) => acc + it.subtotal, 0);
+      if (!verification.is_valid) {
+        const primaryError = (verification.errors && verification.errors[0]) || 'Gagal memverifikasi produk atau harga pesanan.';
+        return res.status(400).json({
+          success: false,
+          status: verification.status,
+          error: primaryError,
+          errors: verification.errors,
+          price_diffs: verification.price_diffs
+        });
+      }
+
+      verifiedItems = verification.verified_items;
+      verifiedSubtotal = verifiedItems.reduce((acc, it) => acc + it.subtotal, 0);
+    }
 
     // 3. Compute Delivery Fee using Authoritative Verified Subtotal
     let deliveryFee = 0;
@@ -749,7 +786,9 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       payment_method,
       order_channel: 'customer_app',
       order_type,
-      table_number: null,
+      table_number,
+      reservation_date,
+      guest_count,
       notes: order_note,
       trace_context: {
         correlation_id: `chk_${Date.now()}`
@@ -785,8 +824,10 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         );
       } catch (payErr) {
         console.error('[Payment Gateway Error]:', payErr.message);
-        // P1 FAIL-CLOSED PAYMENT HARDENING: Mark order as payment_failed and return error to customer
-        db.prepare('UPDATE orders SET status = \'payment_failed\', updated_at = datetime(\'now\') WHERE id = ?').run(orderId);
+        // P1 DOMAIN BOUNDARY HARDENING (NEW-02 & NEW-03):
+        // Update financial state in order_payments to 'failed' and cancel uninitialized operational order
+        db.prepare("UPDATE order_payments SET payment_status = 'failed', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
+        db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(orderId);
         return res.status(502).json({
           success: false,
           error: 'PAYMENT_GATEWAY_ERROR',
@@ -966,10 +1007,17 @@ function requireAuth(allowedRoles = []) {
       });
     }
 
-    // P1 BRANCH SCOPE BOUNDARY ENFORCEMENT (FINDING-01)
-    // Branch-level roles (branch_manager, cashier, kitchen) MUST NOT access branches outside their assigned branch
+    // P1 BRANCH SCOPE BOUNDARY ENFORCEMENT (FINDING-01 & NEW-05)
+    // Branch-level roles (branch_manager, cashier, kitchen) MUST be assigned to a branch and cannot access outside it
     const branchScopedRoles = ['branch_manager', 'cashier', 'kitchen'];
-    if (branchScopedRoles.includes(session.role) && session.branchId) {
+    if (branchScopedRoles.includes(session.role)) {
+      if (!session.branchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_UNASSIGNED_BRANCH',
+          message: 'Akses ditolak: Akun operator Anda belum ditugaskan ke cabang tertentu.'
+        });
+      }
       const requestedBranchId = req.query.branch_id || req.body?.branch_id || req.params?.branch_id;
       if (requestedBranchId && requestedBranchId !== session.branchId) {
         return res.status(403).json({
@@ -1049,7 +1097,7 @@ router.get('/orders/:id', (req, res) => {
   const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order.id);
   const logs = db.prepare('SELECT previous_status, new_status, note, created_at FROM order_status_logs WHERE order_id = ? ORDER BY created_at ASC').all(order.id);
 
-  // P1 INFORMATION HIDING & PRIVACY (NEW-01 & NEW-02):
+  // P1 INFORMATION HIDING & PRIVACY (NEW-01 & NEW-09):
   // Return clean DTO projection to prevent internal data/GPS leakage
   const safeOrder = {
     id: order.id,
@@ -1068,6 +1116,16 @@ router.get('/orders/:id', (req, res) => {
     updated_at: order.updated_at
   };
 
+  const safeItems = (items || []).map(it => ({
+    id: it.id,
+    product_id: it.product_id,
+    product_name: it.product_name || it.name,
+    unit_price: it.unit_price,
+    quantity: it.quantity,
+    item_subtotal: it.item_subtotal,
+    note: it.note || ''
+  }));
+
   const safeDelivery = delivery ? {
     destination_address: delivery.destination_address,
     actual_road_distance_meters: delivery.actual_road_distance_meters,
@@ -1085,7 +1143,7 @@ router.get('/orders/:id', (req, res) => {
   res.json({
     success: true,
     order: safeOrder,
-    items,
+    items: safeItems,
     delivery: safeDelivery,
     payment: safePayment,
     logs
@@ -1219,11 +1277,12 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
       });
     }
 
-    let effectiveShiftId = shift_id || null;
+    let effectiveShiftId = null;
 
-    // Smart Active Shift Auto-Resolution: Cashier MUST have an open shift to accept cash payments
-    // (Anchored authoritatively to order.branch_id from database)
-    if (!effectiveShiftId && req.user && req.user.role === 'cashier') {
+    // P1 SHIFT RESOLUTION & OVERRIDE POLICY (NEW-04):
+    // Cashier MUST use their own active shift on the order's branch.
+    // Branch manager / Owner can supply explicit shift_id if it belongs to the same branch.
+    if (req.user.role === 'cashier') {
       const activeShift = db.prepare(`
         SELECT id FROM pos_shifts 
         WHERE cashier_id = ? AND branch_id = ? AND status = 'open' 
@@ -1237,6 +1296,17 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
           success: false,
           error: 'Kasir belum membuka shift aktif. Harap buka shift kasir terlebih dahulu sebelum menerima pembayaran tunai.'
         });
+      }
+    } else {
+      if (shift_id) {
+        const checkShift = db.prepare('SELECT id, branch_id FROM pos_shifts WHERE id = ?').get(shift_id);
+        if (!checkShift || checkShift.branch_id !== order.branch_id) {
+          return res.status(400).json({
+            success: false,
+            error: 'Shift yang ditentukan tidak valid atau tidak cocok dengan cabang pesanan ini.'
+          });
+        }
+        effectiveShiftId = shift_id;
       }
     }
 
@@ -1274,7 +1344,9 @@ router.get('/pos/shifts/current', requireAuth(['owner', 'brand_manager', 'branch
   try {
     const cashierId = req.user.id || req.user.userId;
     const userRole = req.user.role;
-    const userBranchId = req.user.branch_id || req.user.branchId || req.query.branch_id;
+    const userBranchId = (['cashier', 'branch_manager'].includes(userRole))
+      ? (req.user.branch_id || req.user.branchId)
+      : (req.user.branch_id || req.user.branchId || req.query.branch_id);
     const targetCashierId = (['owner', 'brand_manager', 'branch_manager'].includes(userRole) && req.query.cashier_id)
       ? req.query.cashier_id
       : cashierId;
