@@ -86,7 +86,29 @@ const memoryStore = {
     { id: 345, brand_id: 'brand_bangjo', category_id: 34, name: 'Mie Gurih', price: 15000, regular_price: 17000, description: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', is_active: 1, sort_order: 3 }
   ],
   orders: [],
-  users: []
+  users: [],
+  promotions: [
+    {
+      id: 'promo_bangjo_pwa_install',
+      brand_id: 'brand_bangjo',
+      branch_id: null,
+      promo_type: 'install_incentive',
+      name: 'Promo Install Es Teh',
+      banner_title: 'Install sekarang & dapatkan gratis es teh',
+      banner_subtitle: 'syarat & ketentuan berlaku',
+      reward_title: 'Selamat! Es Teh Gratis untuk pesanan pertamamu!',
+      reward_badge_text: '✓ Bonus PWA Aktif (Rp0)',
+      icon_url: '/assets/img/iced-tea.png',
+      reward_type: 'freebie_product',
+      target_product_id: '288',
+      reward_price: 0,
+      min_spend: 0,
+      target_audience: 'new_user',
+      requires_pwa_installed: 1,
+      max_claims_per_user: 1,
+      is_active: 1
+    }
+  ]
 };
 
 // Database Proxy supporting both Native, Portable & Memory Engines
@@ -158,6 +180,10 @@ const db = {
         }
         if (lowerSql.includes('from users')) return memoryStore.users;
         if (lowerSql.includes('from orders')) return memoryStore.orders;
+        if (lowerSql.includes('from promotions')) {
+          if (params[0]) return memoryStore.promotions.filter(p => p.brand_id === params[0] && p.is_active === 1);
+          return memoryStore.promotions;
+        }
         return [];
       },
       get: (...params) => {
