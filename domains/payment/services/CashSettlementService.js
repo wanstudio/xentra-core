@@ -87,10 +87,9 @@ class CashSettlementService {
       }
     }
 
-    // P1 SHIFT BOUNDARY VALIDATION: Ensure shift belongs to same branch and cashier (if provided)
-    let shiftRecord = null;
+    // P1 SHIFT BOUNDARY PRE-VALIDATION: Ensure shift belongs to same branch and cashier (if provided)
     if (shift_id) {
-      shiftRecord = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      const shiftRecord = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
       if (!shiftRecord) {
         throw new Error(`[CashSettlementService] Shift kasir dengan ID "${shift_id}" tidak ditemukan.`);
       }
@@ -112,6 +111,26 @@ class CashSettlementService {
     // P1 ATOMIC CONCURRENCY & RECONCILIATION: Execute Payment + Shift Mutation in single exclusive transaction
     db.exec('BEGIN IMMEDIATE;');
     try {
+      // 1. In-Transaction Guard: Verify shift is STILL open at the exact moment of transaction commit
+      if (shift_id) {
+        const shiftInTx = db.prepare('SELECT status FROM pos_shifts WHERE id = ?').get(shift_id);
+        if (!shiftInTx || shiftInTx.status !== 'open') {
+          throw new Error(`[SHIFT_ALREADY_CLOSED]: Shift kasir "${shift_id}" sudah ditutup dan tidak dapat menerima transaksi kas.`);
+        }
+
+        // Atomically Update Shift Cash Register within the SAME transaction with strict WHERE status = 'open'
+        const shiftUpdateRes = db.prepare(`
+          UPDATE pos_shifts
+          SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
+          WHERE id = ? AND status = 'open'
+        `).run(amount, amount, shift_id);
+
+        if (shiftUpdateRes.changes !== 1) {
+          throw new Error(`[SHIFT_ALREADY_CLOSED]: Gagal memperbarui kas shift "${shift_id}" karena shift telah ditutup secara bersamaan.`);
+        }
+      }
+
+      // 2. Insert/Update order_payments
       db.prepare(`
         INSERT INTO order_payments (
           id, order_id, provider, payment_method, amount, payment_status, settled_at, raw_webhook_response, created_at, updated_at
@@ -133,26 +152,17 @@ class CashSettlementService {
         now
       );
 
-      // 2. Update order payment details & status
+      // 3. Update order payment details & status
       db.prepare(`
         UPDATE orders
         SET payment_method = 'cash', status = 'confirmed', updated_at = ?
         WHERE id = ?
       `).run(now, order_id);
 
-      // 3. Atomically Update Shift Cash Register within the SAME transaction
-      if (shift_id) {
-        db.prepare(`
-          UPDATE pos_shifts
-          SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
-          WHERE id = ?
-        `).run(amount, amount, shift_id);
-      }
-
       db.exec('COMMIT;');
     } catch (err) {
       try { db.exec('ROLLBACK;'); } catch (_) {}
-      throw new Error(`[CashSettlementService] Gagal menyelesaikan pembayaran tunai secara atomik: ${err.message}`);
+      throw err;
     }
 
     // 3. Emit Domain Event: payment.settled

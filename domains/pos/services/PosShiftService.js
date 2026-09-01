@@ -123,18 +123,23 @@ class PosShiftService {
       VALUES (?, ?, ?, ?, ?, ?)
     `).run(movementId, shift_id, type, moveAmount, reason, now);
 
+    let updateRes;
     if (type === 'in') {
-      db.prepare(`
+      updateRes = db.prepare(`
         UPDATE pos_shifts
         SET total_cash_in = total_cash_in + ?, expected_cash = expected_cash + ?
-        WHERE id = ?
+        WHERE id = ? AND status = 'open'
       `).run(moveAmount, moveAmount, shift_id);
     } else {
-      db.prepare(`
+      updateRes = db.prepare(`
         UPDATE pos_shifts
         SET total_cash_out = total_cash_out + ?, expected_cash = expected_cash - ?
-        WHERE id = ?
+        WHERE id = ? AND status = 'open'
       `).run(moveAmount, moveAmount, shift_id);
+    }
+
+    if (updateRes.changes !== 1) {
+      throw new Error('[PosShiftService] Gagal mencatat mutasi kas: shift sudah ditutup atau tidak aktif.');
     }
 
     return db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
@@ -165,26 +170,49 @@ class PosShiftService {
       throw new Error(`[PosShiftService Authorization Breach]: Kasir "${actor_id}" tidak berwenang menutup shift milik kasir lain ("${shift.cashier_id}").`);
     }
 
-    const expectedCash = PosShiftModel.calculateExpectedCash({
-      starting_float: shift.starting_float,
-      total_cash_sales: shift.total_cash_sales,
-      total_cash_in: shift.total_cash_in,
-      total_cash_out: shift.total_cash_out
-    });
-
-    const varianceCalc = PosShiftModel.calculateVariance(expectedCash, actual_cash);
+    let closedShiftRecord = null;
     const now = new Date().toISOString();
+    let varianceCalc = null;
+    let expectedCash = 0;
 
-    db.prepare(`
-      UPDATE pos_shifts
-      SET 
-        expected_cash = ?,
-        actual_cash = ?,
-        variance = ?,
-        status = 'closed',
-        closed_at = ?
-      WHERE id = ?
-    `).run(expectedCash, Number(actual_cash), varianceCalc.variance, now, shift_id);
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      // Re-fetch under exclusive lock to guarantee atomic snapshot
+      const currentShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      if (!currentShift || currentShift.status !== 'open') {
+        throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup oleh transaksi lain.');
+      }
+
+      expectedCash = PosShiftModel.calculateExpectedCash({
+        starting_float: currentShift.starting_float,
+        total_cash_sales: currentShift.total_cash_sales,
+        total_cash_in: currentShift.total_cash_in,
+        total_cash_out: currentShift.total_cash_out
+      });
+
+      varianceCalc = PosShiftModel.calculateVariance(expectedCash, actual_cash);
+
+      const closeRes = db.prepare(`
+        UPDATE pos_shifts
+        SET 
+          expected_cash = ?,
+          actual_cash = ?,
+          variance = ?,
+          status = 'closed',
+          closed_at = ?
+        WHERE id = ? AND status = 'open'
+      `).run(expectedCash, Number(actual_cash), varianceCalc.variance, now, shift_id);
+
+      if (closeRes.changes !== 1) {
+        throw new Error('[PosShiftService] Gagal menutup shift: status shift telah berubah.');
+      }
+
+      closedShiftRecord = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      db.exec('COMMIT;');
+    } catch (err) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw err;
+    }
 
     // Emit event: pos.shift.closed (Recorded in Evidence Pool)
     events.EventBus.publish({

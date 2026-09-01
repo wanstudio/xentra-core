@@ -137,6 +137,34 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
     });
   }, /bukan milik kasir yang sedang login/);
 
+  // 3.1 Concurrency Race Guard (NEW-01): Settlement strictly fails if shift closed concurrently
+  const raceOrderId = `ord_test_race_close_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Race Close', '62812345678', 'dine_in', 'pos_cashier', 15000, 15000, 'cash', 'pending')
+  `).run(raceOrderId, `ORD-RACE-CLOSE-${Date.now()}`);
+
+  // Create temporary shift and close it immediately
+  const tempShiftId = `shift_temp_race_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO pos_shifts (id, branch_id, cashier_id, starting_float, status)
+    VALUES (?, 'branch_pay', 'cashier_pay_race', 50000, 'closed')
+  `).run(tempShiftId);
+
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: raceOrderId,
+      amount: 15000,
+      amount_tendered: 15000,
+      cashier_id: 'cashier_pay_race',
+      shift_id: tempShiftId
+    });
+  }, /SHIFT_ALREADY_CLOSED|sudah ditutup/);
+
+  // Assert order remains pending and NOT confirmed
+  const pendingOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(raceOrderId);
+  assert.strictEqual(pendingOrder.status, 'pending');
+
   // 4. Online Payment (Midtrans) Order Rejected for Cash Settlement (NEW-01)
   const onlineOrderId = `ord_test_online_${Date.now()}`;
   db.prepare(`
