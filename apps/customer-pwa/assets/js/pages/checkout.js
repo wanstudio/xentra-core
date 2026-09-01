@@ -683,7 +683,6 @@
         var found = items.find(function (x) { return String(x.id) === String(pid); });
         if (found) {
           Store.addItem(found, 1);
-          if (UI && UI.toast) UI.toast((found.name || 'Item') + ' ditambahkan');
           var listEl = $('x-checkout-items-list');
           if (listEl) {
             listEl.innerHTML = renderItemsHtml(getCheckoutItems());
@@ -716,7 +715,6 @@
             image_url: (rewardPromo.display && rewardPromo.display.icon_url) || '/assets/pwa/icon-192.png',
             description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo'
           }, 1);
-          if (UI && UI.toast) UI.toast(((rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah') + ' berhasil diklaim!');
           renderLayout();
           bindEvents();
           calculateTotals();
