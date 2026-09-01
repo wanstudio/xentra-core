@@ -190,3 +190,71 @@ test('Payment 4 — Midtrans Webhook: strictly rejects invalid SHA512 signature 
     PaymentGatewayService.handleWebhook(fakeWebhookPayload);
   }, /Signature webhook Midtrans tidak valid/);
 });
+
+// ==============================================================================
+// Payment 5 — Concurrency Race: Stock Depleted on Settlement -> fulfillment_exception
+// ==============================================================================
+test('Payment 5 — Concurrency Race: Stock Depleted on Settlement marks fulfillment_exception without ledger corruption', () => {
+  const orderId = `ord_test_race_${Date.now()}`;
+  const orderNumber = `XN-RACE-${Date.now()}`;
+
+  // Seed product and branch stock to ONLY 1
+  db.prepare(`
+    INSERT OR REPLACE INTO products (id, brand_id, name, slug, price)
+    VALUES ('prod_race_1', 'brand_pay', 'Bebek Goreng Langka', 'bebek-langka', 50000)
+  `).run();
+
+  db.prepare(`
+    INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, is_available)
+    VALUES ('branch_pay', 'prod_race_1', 1, 1)
+  `).run();
+
+  // Order demands 3 items (stock is only 1)
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Race', '62812345678', 'delivery', 'customer_app', 150000, 150000, 'midtrans', 'pending')
+  `).run(orderId, orderNumber);
+
+  db.prepare(`
+    INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal)
+    VALUES ('item_race_1', ?, 'prod_race_1', 'Bebek Goreng Langka', 50000, 3, 150000)
+  `).run(orderId);
+
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
+    VALUES ('pay_race_123', ?, 'midtrans', 'M12345', 'snap_token_race', 'pending', 150000)
+  `).run(orderId);
+
+  const serverKey = 'SB-Mid-server-test12345';
+  const statusCode = '200';
+  const grossAmount = '150000.00';
+  const rawSignature = `${orderId}${statusCode}${grossAmount}${serverKey}`;
+  const validSignature = crypto.createHash('sha512').update(rawSignature).digest('hex');
+
+  const webhookPayload = {
+    order_id: orderId,
+    status_code: statusCode,
+    gross_amount: grossAmount,
+    signature_key: validSignature,
+    transaction_status: 'settlement',
+    payment_type: 'qris'
+  };
+
+  const result = PaymentGatewayService.handleWebhook(webhookPayload);
+  assert.strictEqual(result.success, true);
+  assert.strictEqual(result.payment_status, 'settlement');
+  assert.strictEqual(result.order_status, 'fulfillment_exception');
+
+  // Verify DB state: order is fulfillment_exception, payment is settlement
+  const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(order.status, 'fulfillment_exception');
+  assert.ok(order.order_note.includes('[Kendala Stok / Perlu Refund]'));
+
+  // Verify stock was NOT corrupted (remains 1)
+  const stockRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pay', 'prod_race_1');
+  assert.strictEqual(stockRow.stock, 1, 'Stock must not be subtracted or set to 0 when race condition occurs');
+
+  // Verify NO invalid inventory ledger entry was created
+  const movements = db.prepare('SELECT * FROM inventory_movements WHERE reference_id = ?').all(orderNumber);
+  assert.strictEqual(movements.length, 0, 'No false sale_deduction ledger entry allowed on out-of-stock race');
+});

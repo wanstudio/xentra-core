@@ -224,14 +224,7 @@ class PaymentGatewayService {
       `).run(newPaymentStatus, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
 
       if (shouldConfirmOrder) {
-        // 1. Confirm Order Record
-        db.prepare(`
-          UPDATE orders
-          SET status = 'confirmed', payment_method = 'midtrans', updated_at = ?
-          WHERE id = ?
-        `).run(now, order_id);
-
-        // 2. Atomic Stock Deduction & Inventory Movement Ledger
+        // 1. Atomic Stock Deduction & Inventory Movement Ledger
         const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order_id);
         const existingMovement = db.prepare('SELECT id FROM inventory_movements WHERE reference_id = ? AND movement_type = \'sale_deduction\' LIMIT 1').get(order.order_number);
 
@@ -248,10 +241,11 @@ class PaymentGatewayService {
 
             const deductResult = guardedDeductStockStmt.run(item.quantity, order.branch_id, item.product_id, item.quantity);
             if (!deductResult || deductResult.changes === 0) {
-              db.prepare('UPDATE branch_products SET stock = 0, updated_at = datetime(\'now\') WHERE branch_id = ? AND product_id = ?').run(order.branch_id, item.product_id);
+              // P1 CRITICAL CONCURRENCY RACE GUARD: Stock was depleted between checkout and settlement
+              throw new Error(`[OUT_OF_STOCK_RACE] Stok untuk produk "${item.product_name || item.product_id}" tidak mencukupi saat pembayaran diselesaikan (tersisa ${prevStock}, diminta ${item.quantity}).`);
             }
 
-            const currentStock = Math.max(0, prevStock - Number(item.quantity));
+            const currentStock = prevStock - Number(item.quantity);
             const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
 
             db.prepare(`
@@ -272,6 +266,13 @@ class PaymentGatewayService {
             );
           }
         }
+
+        // 2. Confirm Order Record if all items were deducted successfully
+        db.prepare(`
+          UPDATE orders
+          SET status = 'confirmed', payment_method = 'midtrans', updated_at = ?
+          WHERE id = ?
+        `).run(now, order_id);
       } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
         // P1 FAILED PAYMENT INVARIANT: Mark order as cancelled with ZERO inventory mutation
         db.prepare(`
@@ -284,7 +285,54 @@ class PaymentGatewayService {
       db.exec('COMMIT;');
     } catch (err) {
       try { db.exec('ROLLBACK;'); } catch (_) {}
-      console.error('[PaymentGatewayService] Webhook processing failed, transaction rolled back:', err.message);
+      console.error('[PaymentGatewayService] Settlement transaction error:', err.message);
+
+      // P1 FULFILLMENT EXCEPTION (Race Condition between checkout and settlement):
+      // Money has been settled by gateway but inventory was depleted by concurrent orders.
+      // Record payment as settlement, mark order as fulfillment_exception for refund/manual intervention.
+      if (err.message && err.message.includes('[OUT_OF_STOCK_RACE]')) {
+        try {
+          db.exec('BEGIN TRANSACTION;');
+          db.prepare(`
+            UPDATE order_payments 
+            SET payment_status = 'settlement', payment_method = 'midtrans', raw_webhook_response = ?, settled_at = ?
+            WHERE order_id = ?
+          `).run(JSON.stringify(webhookData), now, order_id);
+
+          db.prepare(`
+            UPDATE orders
+            SET status = 'fulfillment_exception', payment_method = 'midtrans', order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ?
+            WHERE id = ?
+          `).run(`[Kendala Stok / Perlu Refund]: ${err.message}`, now, order_id);
+          db.exec('COMMIT;');
+
+          events.EventBus.publish({
+            type: 'payment.fulfillment_exception',
+            producer: 'payment',
+            payload: {
+              payment_id: payment.id,
+              order_id,
+              branch_id: order?.branch_id,
+              brand_id: order?.brand_id,
+              provider: 'midtrans',
+              amount: Number(gross_amount || payment.amount),
+              error: err.message,
+              settled_at: now
+            }
+          }).catch(() => {});
+
+          return {
+            success: true,
+            order_id,
+            payment_status: 'settlement',
+            order_status: 'fulfillment_exception',
+            message: 'Pembayaran berhasil diselesaikan namun stok habis. Pesanan dialihkan ke antrean fulfillment exception untuk tindak lanjut refund.'
+          };
+        } catch (innerErr) {
+          try { db.exec('ROLLBACK;'); } catch (_) {}
+        }
+      }
+
       throw new Error(`[PaymentGatewayService Transaction Error]: ${err.message}`);
     }
 
