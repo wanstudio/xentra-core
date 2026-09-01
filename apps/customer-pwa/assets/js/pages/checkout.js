@@ -337,12 +337,14 @@
         '  </div>'
       ) : '') +
 
-      // 6. Items Stack (Hide or show empty for pure reservation)
+      // 6. Items & Upsell Unified Card (Hide or show empty for pure reservation)
       (!isReservation || items.length > 0 ? (
-        '  <div id="x-checkout-items-list" class="x-alt-items-stack">' + renderItemsHtml(items) + '</div>' +
-        '  <div class="x-alt-addon-card" id="x-upsell-container" style="padding:0 14px;margin-top:10px;">' +
-        '    <div class="x-alt-addon-head">Tambah ini untuk melengkapi pesananmu</div>' +
-        '    <div class="x-alt-addon-track" id="x-addon-track"><div class="x-alt-addon-loading">Memuat rekomendasi…</div></div>' +
+        '  <div class="x-card" id="x-items-card" style="margin:0 14px 10px;padding:16px;border-radius:20px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
+        '    <div id="x-checkout-items-list" class="x-checkout-items">' + renderItemsHtml(items) + '</div>' +
+        '    <div class="x-complement-section" id="x-upsell-container">' +
+        '      <div class="x-section-title">Tambah ini untuk melengkapi pesananmu</div>' +
+        '      <div class="x-complement-track" id="x-addon-track"><div class="x-loading-inline">Memuat rekomendasi…</div></div>' +
+        '    </div>' +
         '  </div>'
       ) : (
         '  <div class="x-alt-card" style="margin:0 14px 10px;text-align:center;padding:24px 16px;">' +
@@ -383,7 +385,7 @@
 
   function renderItemsHtml(items) {
     if (!items.length) return '<div class="x-empty-state"><p>Keranjang kosong</p></div>';
-    var html = '<div class="x-card x-checkout-items" id="x-items-card" style="margin:0 14px 10px;padding:16px;border-radius:20px;background:#fff;">';
+    var html = '';
     items.forEach(function (item) {
       var hasOld = item.regular_price && Number(item.regular_price) > Number(item.price);
       var img = item.image_url || item.image || '';
@@ -395,32 +397,35 @@
         '<div class="x-product x-checkout-item" data-item-id="' + item.id + '">' +
         '  <div class="x-product-info">' +
         '    <div class="x-product-name">' + UI.escape(item.name) + '</div>' +
-        (note ? '<div class="x-product-note-inline">Catatan : ' + UI.escape(note) + '</div>' : '') +
+        (note ? '<div class="x-product-note-inline">Catatan : <span style="color:#6b7280;">' + UI.escape(note) + '</span></div>' : '') +
         '    <div class="x-price">' +
         (isPromoFreebie
           ? '<div class="x-old-price">' + fmtIDR(item.regular_price || 5000) + '</div><div class="x-current-price" style="color:#16a34a;">Gratis</div>'
           : (hasOld ? '<div class="x-old-price">' + fmtIDR(item.regular_price) + '</div>' : '') + '<div class="x-current-price">' + fmtIDR(item.price) + '</div>'
         ) +
         '    </div>' +
+        (state.discount > 0 && state.fulfillment.type === 'delivery'
+          ? '<div class="x-product-discount"><img src="/assets/icons/diskon.svg" alt="" class="x-product-discount-icon" onerror="this.style.display=\'none\'"><span>Discount ongkir ' + fmtIDR(state.discount) + '</span></div>'
+          : ''
+        ) +
+        '    <button type="button" class="x-note-button' + (note ? ' has-note' : '') + '" data-note-item="' + item.id + '" style="margin-top:14px;">' +
+        '      <img src="/assets/icons/write.svg" alt="" class="x-note-icon">' +
+        '      <span>Catatan</span>' +
+        '    </button>' +
         '  </div>' +
         '  <div class="x-product-right">' +
         (img
           ? '<img class="x-product-image" src="' + UI.escape(img) + '" alt="' + UI.escape(item.name) + '" loading="lazy" onerror="this.src=\'/assets/icons/food-default.png\'">'
           : '<div class="x-product-image" style="background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:24px;">🍱</div>'
         ) +
-        '    <div class="x-quantity">' +
+        '    <div class="x-quantity" style="margin-top:auto;">' +
         '      <button type="button" data-minus-item="' + item.id + '" aria-label="Kurang">−</button>' +
         '      <span class="x-quantity-value">' + qty + '</span>' +
         '      <button type="button" data-plus-item="' + item.id + '" aria-label="Tambah">+</button>' +
         '    </div>' +
-        '    <button type="button" class="x-note-button' + (note ? ' has-note' : '') + '" data-note-item="' + item.id + '">' +
-        '      <img src="/assets/icons/write.svg" alt="" class="x-note-icon">' +
-        '      <span>Catatan</span>' +
-        '    </button>' +
         '  </div>' +
         '</div>';
     });
-    html += '</div>';
     return html;
   }
 
@@ -466,11 +471,18 @@
     items.forEach(function (p) {
       var img = p.image_url || p.image || '';
       html +=
-        '<div class="x-alt-addon-item">' +
-        '  <div class="x-alt-addon-img">' + (img ? '<img src="' + UI.escape(img) + '" alt="" onerror="this.style.display=\'none\'">' : '<div class="x-alt-addon-ph"></div>') + '</div>' +
-        '  <div class="x-alt-addon-name">' + UI.escape(p.name || 'Menu Tambahan') + '</div>' +
-        '  <div class="x-alt-addon-price">' + fmtIDR(p.price || 5000) + '</div>' +
-        '  <button type="button" class="x-alt-addon-add" data-add-upsell="' + p.id + '" aria-label="Tambah">+</button>' +
+        '<div class="x-complement-card">' +
+        '  <div class="x-complement-img-wrap">' +
+        (img
+          ? '<img src="' + UI.escape(img) + '" alt="' + UI.escape(p.name || '') + '" onerror="this.parentElement.innerHTML=\'<div class=\\\'x-complement-img-placeholder\\\'></div>\'">'
+          : '<div class="x-complement-img-placeholder"></div>'
+        ) +
+        '  </div>' +
+        '  <div class="x-complement-name">' + UI.escape(p.name || 'Menu Tambahan') + '</div>' +
+        '  <div class="x-complement-bottom">' +
+        '    <div class="x-complement-price">' + fmtIDR(p.price || 5000) + '</div>' +
+        '    <button type="button" class="x-upsell-add-btn" data-add-upsell="' + p.id + '" aria-label="Tambah">+</button>' +
+        '  </div>' +
         '</div>';
     });
     container.innerHTML = html;
