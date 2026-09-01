@@ -509,20 +509,20 @@
   }
 
   function renderItemsHtml(items) {
-    if (!items.length) return '<div class="x-empty-state"><p>Keranjang kosong</p></div>';
+    if (!items.length) return '<div class="x-empty-state"><p>Keranjang kosong.</p></div>';
     var html = '';
     items.forEach(function (item) {
       var hasOld = item.regular_price && Number(item.regular_price) > Number(item.price);
       var img = item.image_url || item.image || '';
       var qty = Number(item.quantity || 1);
-      var note = item.note || '';
+      var note = (state.notes && state.notes[item.id]) || item.note || '';
       var isPromoFreebie = String(item.id) === 'promo-es-teh-gratis' || Number(item.price) === 0;
 
       html +=
         '<div class="x-product x-checkout-item" data-item-id="' + item.id + '">' +
         '  <div class="x-product-info">' +
-        '    <div class="x-product-name">' + UI.escape(item.name) + '</div>' +
-        (note ? '<div class="x-product-note-inline">Catatan : <span style="color:#6b7280;">' + UI.escape(note) + '</span></div>' : '') +
+        '    <div class="x-product-name">' + UI.escape(item.name || '') + '</div>' +
+        (note ? '<div class="x-product-note-inline">Catatan : ' + UI.escape(note) + '</div>' : '') +
         '    <div class="x-price">' +
         (isPromoFreebie
           ? '<div class="x-old-price">' + fmtIDR(item.regular_price || 5000) + '</div><div class="x-current-price" style="color:#16a34a;">Gratis</div>'
@@ -533,21 +533,21 @@
           ? '<div class="x-product-discount"><img src="/assets/icons/diskon.svg" alt="" class="x-product-discount-icon" onerror="this.style.display=\'none\'"><span>Discount ongkir ' + fmtIDR(state.discount) + '</span></div>'
           : ''
         ) +
-        '    <button type="button" class="x-note-button' + (note ? ' has-note' : '') + '" data-note-item="' + item.id + '" style="margin-top:14px;">' +
-        '      <img src="/assets/icons/write.svg" alt="" class="x-note-icon">' +
-        '      <span>Catatan</span>' +
-        '    </button>' +
         '  </div>' +
         '  <div class="x-product-right">' +
         (img
-          ? '<img class="x-product-image" src="' + UI.escape(img) + '" alt="' + UI.escape(item.name) + '" loading="lazy" onerror="this.src=\'/assets/icons/food-default.png\'">'
+          ? '<img class="x-product-image" src="' + UI.escape(img) + '" alt="' + UI.escape(item.name || '') + '" loading="lazy" onerror="this.src=\'/assets/icons/food-default.png\'">'
           : '<div class="x-product-image" style="background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:24px;">🍱</div>'
         ) +
-        '    <div class="x-quantity" style="margin-top:auto;">' +
-        '      <button type="button" data-minus-item="' + item.id + '" aria-label="Kurang">−</button>' +
+        '    <div class="x-quantity">' +
+        '      <button type="button" data-minus-item="' + item.id + '" data-item-minus="' + item.id + '" aria-label="Kurang">−</button>' +
         '      <span class="x-quantity-value">' + qty + '</span>' +
-        '      <button type="button" data-plus-item="' + item.id + '" aria-label="Tambah">+</button>' +
+        '      <button type="button" data-plus-item="' + item.id + '" data-item-plus="' + item.id + '" aria-label="Tambah">+</button>' +
         '    </div>' +
+        '    <button type="button" class="x-note-button' + (note ? ' has-note' : '') + '" data-note-item="' + item.id + '" data-item-note="' + item.id + '">' +
+        '      <img src="/assets/icons/write.svg" alt="" class="x-note-icon">' +
+        '      <span>Catatan</span>' +
+        '    </button>' +
         '  </div>' +
         '</div>';
     });
