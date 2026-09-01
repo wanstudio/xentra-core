@@ -1134,7 +1134,11 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
 router.get('/pos/shifts/current', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
     const cashierId = req.user.id || req.user.userId;
+    const userRole = req.user.role;
     const userBranchId = req.user.branch_id || req.user.branchId || req.query.branch_id;
+    const targetCashierId = (['owner', 'brand_manager', 'branch_manager'].includes(userRole) && req.query.cashier_id)
+      ? req.query.cashier_id
+      : cashierId;
 
     if (!userBranchId) {
       return res.status(400).json({ success: false, error: 'Parameter branch_id wajib disertakan.' });
@@ -1144,7 +1148,7 @@ router.get('/pos/shifts/current', requireAuth(['owner', 'brand_manager', 'branch
       SELECT * FROM pos_shifts 
       WHERE cashier_id = ? AND branch_id = ? AND status = 'open'
       ORDER BY opened_at DESC LIMIT 1
-    `).get(cashierId, userBranchId);
+    `).get(targetCashierId, userBranchId);
 
     res.json({
       success: true,
@@ -1184,10 +1188,26 @@ router.post('/pos/shifts/open', requireAuth(['owner', 'brand_manager', 'branch_m
         });
       }
       targetBranchId = userBranchId || requestedBranchId;
-      targetCashierId = requestedCashierId || cashierId;
+      if (requestedCashierId) {
+        targetCashierId = requestedCashierId;
+      } else {
+        const branchCashier = db.prepare('SELECT id FROM users WHERE branch_id = ? AND role = "cashier" LIMIT 1').get(targetBranchId);
+        if (!branchCashier) {
+          return res.status(400).json({ success: false, error: 'Parameter cashier_id (user dengan role "cashier") wajib disertakan untuk membuka shift.' });
+        }
+        targetCashierId = branchCashier.id;
+      }
     } else if (['owner', 'brand_manager'].includes(userRole)) {
       targetBranchId = requestedBranchId || userBranchId;
-      targetCashierId = requestedCashierId || cashierId;
+      if (requestedCashierId) {
+        targetCashierId = requestedCashierId;
+      } else {
+        const branchCashier = db.prepare('SELECT id FROM users WHERE branch_id = ? AND role = "cashier" LIMIT 1').get(targetBranchId);
+        if (!branchCashier) {
+          return res.status(400).json({ success: false, error: 'Parameter cashier_id (user dengan role "cashier") wajib disertakan untuk membuka shift.' });
+        }
+        targetCashierId = branchCashier.id;
+      }
     }
 
     if (!targetBranchId) {

@@ -612,7 +612,16 @@ test('API POS Cash Settlement: POST /api/v1/pos/orders/:id/settle-cash completes
 });
 
 test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close)', async () => {
-  // 1. Login as authorized merchant staff
+  // 1. Seed dedicated cashier in branch barat
+  const crypto = require('crypto');
+  const passHash = crypto.createHash('sha256').update('kasir123').digest('hex');
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, organization_id, username, password_hash, role, brand_id, branch_id)
+    VALUES ('usr_cashier_barat_main', 'org_xentra_holding', 'kasir_barat_main', ?, 'cashier', 'brand_bangjo', 'branch_bangjo_barat')
+  `).run(passHash);
+  db.prepare("DELETE FROM pos_shifts WHERE cashier_id = 'usr_cashier_barat_main'").run();
+
+  // Login as authorized merchant staff
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
     method: 'POST',
     body: JSON.stringify({ username: 'admin', password: 'bangjo123' })
@@ -625,7 +634,7 @@ test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close
   const openRes = await mockFetch('/api/v1/pos/shifts/open', {
     method: 'POST',
     headers: authHeaders,
-    body: JSON.stringify({ branch_id: 'branch_bangjo_barat', starting_float: 200000 })
+    body: JSON.stringify({ branch_id: 'branch_bangjo_barat', cashier_id: 'usr_cashier_barat_main', starting_float: 200000 })
   });
   assert.strictEqual(openRes.status, 201);
   const openData = await openRes.json();
@@ -634,7 +643,7 @@ test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close
   const shiftId = openData.shift.id;
 
   // 3. Get Current Shift
-  const currentRes = await mockFetch('/api/v1/pos/shifts/current?branch_id=branch_bangjo_barat', {
+  const currentRes = await mockFetch('/api/v1/pos/shifts/current?branch_id=branch_bangjo_barat&cashier_id=usr_cashier_barat_main', {
     headers: authHeaders
   });
   assert.strictEqual(currentRes.status, 200);
@@ -675,14 +684,13 @@ test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close
 
   // 6. Cross-Cashier / Cross-Branch Ownership Guard Verification (NEW-01)
   // Seed Cashier A and Cashier B
-  const crypto = require('crypto');
-  const passHash = crypto.createHash('sha256').update('kasir123').digest('hex');
+  const passHash2 = crypto.createHash('sha256').update('kasir123').digest('hex');
   db.prepare(`
     INSERT OR REPLACE INTO users (id, organization_id, username, password_hash, role, brand_id, branch_id)
     VALUES 
       ('usr_cashier_a', 'org_xentra_holding', 'kasir_a', ?, 'cashier', 'brand_bangjo', 'branch_bangjo_barat'),
       ('usr_cashier_b', 'org_xentra_holding', 'kasir_b', ?, 'cashier', 'brand_bangjo', 'branch_bangjo_barat')
-  `).run(passHash, passHash);
+  `).run(passHash2, passHash2);
 
   // Cashier B opens a shift
   const { PosShiftService } = require('../domains/pos');

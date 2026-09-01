@@ -22,14 +22,19 @@ class PosShiftService {
       throw new Error('[PosShiftService] "branch_id" and "cashier_id" are required to open a shift.');
     }
 
-    // 1. P1 Cashier Branch Assignment Verification (NEW-03)
+    // 1. P1 Cashier Role & Branch Assignment Verification (NEW-03 & NEW-05)
     try {
       const user = db.prepare('SELECT * FROM users WHERE id = ?').get(cashier_id);
-      if (user && user.role === 'cashier' && user.branch_id && user.branch_id !== branch_id) {
-        throw new Error(`[PosShiftService Authorization Breach]: Kasir "${cashier_id}" ditugaskan di cabang "${user.branch_id}" dan tidak berwenang membuka shift di cabang "${branch_id}".`);
+      if (user) {
+        if (user.role !== 'cashier') {
+          throw new Error(`[PosShiftService Role Violation]: User "${cashier_id}" memiliki role "${user.role}". Shift kasir hanya dapat dibuka untuk user dengan role "cashier".`);
+        }
+        if (user.branch_id && user.branch_id !== branch_id) {
+          throw new Error(`[PosShiftService Authorization Breach]: Kasir "${cashier_id}" ditugaskan di cabang "${user.branch_id}" dan tidak berwenang membuka shift di cabang "${branch_id}".`);
+        }
       }
     } catch (e) {
-      if (e.message.includes('Authorization Breach')) throw e;
+      if (e.message.includes('Role Violation') || e.message.includes('Authorization Breach')) throw e;
     }
 
     // 2. P1 Global Active Shift Invariant: 1 Cashier = Max 1 Open Shift across all branches

@@ -164,6 +164,20 @@ test('POS 2 — Cashier Shift: handles Open, Cash In/Out, and Close with exact v
     actor_id: 'cashier_race_test',
     actor_role: 'cashier'
   });
+
+  // 8. Non-Cashier User Shift Creation Rejection (NEW-05 Role Segregation Guard)
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, organization_id, username, password_hash, role, brand_id, branch_id)
+    VALUES ('mgr_pos_dummy', 'org_pos', 'mgr_dummy', 'hash123', 'branch_manager', 'brand_pos', 'branch_pos')
+  `).run();
+
+  assert.throws(() => {
+    PosShiftService.openShift({
+      branch_id: 'branch_pos',
+      cashier_id: 'mgr_pos_dummy',
+      starting_float: 50000
+    });
+  }, /Shift kasir hanya dapat dibuka untuk user dengan role "cashier"/);
 });
 
 // ==============================================================================
