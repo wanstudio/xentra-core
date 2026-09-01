@@ -905,7 +905,7 @@
 	border-radius: 22px 22px 0 0;
 	padding: 8px 26px max(12px, env(safe-area-inset-bottom));
 	transform: translateY(105%);
-	transition: transform 0.38s cubic-bezier(0.22, 0.61, 0.36, 1);
+	transition: transform 0.38s cubic-bezier(0.22, 0.61, 0.36, 1), bottom 0.28s cubic-bezier(0.22, 0.61, 0.36, 1), height 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
 	display: flex !important;
 	flex-direction: column;
 	overflow: hidden;

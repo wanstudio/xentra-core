@@ -449,10 +449,11 @@
     // Animate in
     requestAnimationFrame(function () {
       overlay.classList.add('open');
+      // Trigger focus early so mobile keyboard glides up in sync with the sheet slide-up
       setTimeout(function () {
         if (input) input.focus();
         updateViewport();
-      }, 350);
+      }, 100);
     });
 
     input.addEventListener('input', function () {
