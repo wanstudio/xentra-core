@@ -6,14 +6,15 @@
   <title>Bangjo — Spesial Ayam Tulang Lunak</title>
   <meta name="description" content="Pesan ayam tulang lunak spesial Bangjo langsung dari HP. Delivery & Pick-up tersedia!">
   <meta name="theme-color" content="#b6ff00">
+  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline' https:; img-src * data: blob: https: http:; connect-src * https: http: ws: wss:;">
 
   <!-- ══════════════════════════════════════════════════════════════
-       PWA VERSION SENTINEL & AUTO-PURGE GUARD (Industry Standard)
-       Executes immediately before CSS/JS to eliminate stale cache white screens.
+       PWA VERSION SENTINEL & EARLY INSTALL PROMPT CAPTURE
+       Executes immediately in <head> to capture beforeinstallprompt on Android
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v2_2_4';
+      var PWA_VERSION = 'v_d4f6b8c';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -24,6 +25,11 @@
           }
         }
       } catch (_) {}
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__xentra_deferred_prompt = e;
+      });
     })();
   </script>
 
@@ -33,15 +39,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Bangjo">
   <link rel="apple-touch-icon" href="/assets/pwa/icon-192.png">
-  <link rel="manifest" href="/manifest.json?v=2.2.4">
+  <link rel="manifest" href="/manifest.json">
 
   <!-- CSS (version-hashed for instant cache-busting) -->
-  <link rel="stylesheet" href="/assets/css/tokens.css?v=2.2.4">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=2.2.4">
-  <link rel="stylesheet" href="/assets/css/components.css?v=2.2.4">
-  <link rel="stylesheet" href="/assets/css/home.css?v=2.2.4">
-  <link rel="stylesheet" href="/assets/css/checkout.css?v=2.2.4">
-  <link rel="stylesheet" href="/assets/css/order-received.css?v=2.2.4">
+  <link rel="stylesheet" href="/assets/css/tokens.css?v=d4f6b8c">
+  <link rel="stylesheet" href="/assets/css/layout.css?v=d4f6b8c">
+  <link rel="stylesheet" href="/assets/css/components.css?v=d4f6b8c">
+  <link rel="stylesheet" href="/assets/css/home.css?v=d4f6b8c">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=d4f6b8c">
+  <link rel="stylesheet" href="/assets/css/order-received.css?v=d4f6b8c">
 </head>
 <body>
 
@@ -63,7 +69,7 @@
           </button>
           <button class="x-hero-icon-btn" id="x-btn-search" aria-label="Cari">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"/>
+              <circle cx="11" r="8"/>
               <path d="m21 21-4.3-4.3"/>
             </svg>
           </button>
@@ -156,6 +162,21 @@
        ═══════════════════════════════════════════════════ -->
   <div id="xentra-order-view" class="x-page" style="display:none;"></div>
 
+  <!-- NOTE SHEET (EXACT XENTRA-MVP PORTAL) -->
+  <div id="x-note-overlay" class="x-note-overlay" style="display:none;">
+    <div id="x-note-sheet" class="x-note-sheet">
+      <div class="x-note-handle"></div>
+      <div class="x-note-header">
+        <h3>Tambah catatan untuk pembelian</h3>
+      </div>
+      <textarea id="x-note-input" maxlength="200" placeholder="Tambahkan catatan..."></textarea>
+      <div class="x-note-footer">
+        <span id="x-note-counter">0/200</span>
+        <button id="x-note-save" type="button">Simpan</button>
+      </div>
+    </div>
+  </div>
+
   <!-- PWA INSTALL BANNER -->
   <div class="x-pwa-banner" id="x-pwa-banner">
     <div class="x-pwa-banner-card">
@@ -174,18 +195,18 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════
-       JS CORE & CONTROLLERS (Version Hashed v2.2.4)
+       JS CORE & CONTROLLERS (Version Hashed v2.3.6)
        ═══════════════════════════════════════════════════ -->
-  <script src="/assets/js/core/store.js?v=2.2.4"></script>
-  <script src="/assets/js/core/ui.js?v=2.2.4"></script>
-  <script src="/assets/js/core/api.js?v=2.2.4"></script>
-  <script src="/assets/js/core/nav.js?v=2.2.4"></script>
-  <script src="/assets/js/core/router.js?v=2.2.4"></script>
+  <script src="/assets/js/core/store.js?v=d4f6b8c"></script>
+  <script src="/assets/js/core/ui.js?v=d4f6b8c"></script>
+  <script src="/assets/js/core/api.js?v=d4f6b8c"></script>
+  <script src="/assets/js/core/nav.js?v=d4f6b8c"></script>
+  <script src="/assets/js/core/router.js?v=d4f6b8c"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=2.2.4"></script>
-  <script src="/assets/js/pages/checkout.js?v=2.2.4"></script>
-  <script src="/assets/js/pages/order-received.js?v=2.2.4"></script>
+  <script src="/assets/js/pages/home.js?v=d4f6b8c"></script>
+  <script src="/assets/js/pages/checkout.js?v=d4f6b8c"></script>
+  <script src="/assets/js/pages/order-received.js?v=d4f6b8c"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -208,7 +229,7 @@
           if (orderEl) orderEl.style.display = 'none';
           if (checkoutEl) {
             checkoutEl.style.display = 'block';
-            if (Checkout) Checkout.mount(checkoutEl);
+            if (Checkout) Checkout.mount(checkoutEl, params);
             window.scrollTo(0, 0);
           }
         } else if (view === 'order-received') {
@@ -238,8 +259,9 @@
       // Initial route
       var initialView = Router.getViewFromUrl();
       var initialOrderId = Router.getOrderIdFromUrl();
+      var initialItemId = Router.getItemIdFromUrl();
       if (initialView !== 'home') {
-        updateViews(initialView, { orderId: initialOrderId });
+        updateViews(initialView, { orderId: initialOrderId, itemId: initialItemId });
       }
 
       // Intercept Cart Link click
@@ -254,63 +276,14 @@
   </script>
 
   <!-- ═══════════════════════════════════════════════════
-       SERVICE WORKER ENGINE (Gojek / Twitter PWA Pattern)
+       SERVICE WORKER ENGINE (Clean & Smooth)
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=2.2.4').then(function (reg) {
-        // Trigger immediate background update check on app launch
-        reg.update();
-
-        // Check on tab focus / app reopen
-        document.addEventListener('visibilitychange', function () {
-          if (document.visibilityState === 'visible') {
-            reg.update();
-          }
-        });
-
-        // Listen for new worker installation
-        reg.addEventListener('updatefound', function () {
-          var newWorker = reg.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', function () {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[PWA] New version ready. Applying update...');
-                window.location.reload();
-              }
-            });
-          }
-        });
-      }).catch(function (err) {
+      navigator.serviceWorker.register('/sw.js?v=d4f6b8c').catch(function (err) {
         console.warn('[PWA] Registration warn:', err);
       });
-
-      // Reload when new worker takes active control
-      var hasRefreshed = false;
-      navigator.serviceWorker.addEventListener('controllerchange', function () {
-        if (!hasRefreshed) {
-          hasRefreshed = true;
-          window.location.reload();
-        }
-      });
     }
-
-    // Global Self-Healing Fallback
-    window.addEventListener('error', function (e) {
-      console.error('[PWA Catch]:', e);
-      if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
-        if (sessionStorage.getItem('__auto_recovered') !== '1') {
-          sessionStorage.setItem('__auto_recovered', '1');
-          if ('caches' in window) {
-            caches.keys().then(function (keys) {
-              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-            }).then(function () {
-              window.location.reload();
-            });
-          }
-        }
-      }
-    });
   </script>
 </body>
 </html>

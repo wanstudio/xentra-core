@@ -18,6 +18,12 @@
 </IfModule>
 
 <IfModule mod_headers.c>
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    <FilesMatch "\.(html|htm)$">
+        Header set Content-Security-Policy "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline' https:; img-src * data: blob: https: http:; connect-src * https: http: ws: wss:;"
+    </FilesMatch>
     <FilesMatch "manifest\.json$">
         Header set Content-Type "application/manifest+json; charset=utf-8"
     </FilesMatch>

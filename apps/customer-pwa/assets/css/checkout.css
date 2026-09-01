@@ -250,6 +250,9 @@
 	margin:0 16px 12px;
 	padding:16px;
 	border-radius:20px;
+	min-width:0;
+	max-width:100%;
+	box-sizing:border-box;
 	overflow-wrap:anywhere;
 	word-break:break-word;
 }
@@ -993,77 +996,79 @@
    "TAMBAH INI UNTUK MELENGKAPI PESANANMU" (complement upsell)
    ========================================================= */
 
-.x-complement-section{
-	margin:20px -16px 0 !important;
-	padding:18px 0 0 !important;
-	border-top:1px solid #f0f0f0 !important;
-	width:calc(100% + 32px) !important;
-	box-sizing:border-box !important;
-	overflow:hidden !important;
+/* ── Upsell Recommendation Rail (Identical to Category Track) ── */
+.x-complement-section,
+.x-complement-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+  margin: 16px 0 0 !important;
+  padding: 16px 0 0 !important;
+  border-top: 1px solid #f0f0f0 !important;
+  box-sizing: border-box !important;
 }
 
 .x-complement-section .x-section-title,
-.x-section-title{
-	font-size:15px !important;
-	line-height:22px !important;
-	font-weight:700 !important;
-	color:#111827 !important;
-	margin:0 16px 12px !important;
-	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+.x-complement-wrap .x-section-title {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #111827 !important;
+  margin: 0 0 12px !important;
+  padding: 0 !important;
+  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
 }
 
-.x-section-subtitle{
-	margin:2px 16px 0 !important;
-	font-size:12px;
-	color:#888;
+.x-section-subtitle {
+  margin: 2px 0 0 !important;
+  font-size: 12px !important;
+  color: #888 !important;
 }
 
-.x-complement-track{
-	display:flex !important;
-	flex-wrap:nowrap !important;
-	gap:12px !important;
-	margin:0 !important;
-	padding:4px 16px 14px !important;
-	overflow-x:auto !important;
-	overflow-y:hidden !important;
-	-webkit-overflow-scrolling:touch !important;
-	touch-action:pan-x !important;
-	scrollbar-width:none !important;
-	scroll-behavior:smooth !important;
-	position:relative !important;
-	z-index:5 !important;
-	width:100% !important;
-	box-sizing:border-box !important;
-	cursor:grab !important;
+.x-complement-track {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 12px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 4px 0 12px !important;
+  margin: 0 !important;
+  scrollbar-width: none !important;
+  -webkit-overflow-scrolling: touch !important;
+  touch-action: pan-x pan-y pinch-zoom !important;
+  overscroll-behavior-x: contain !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  box-sizing: border-box !important;
 }
 
-.x-complement-track::-webkit-scrollbar{
-	display:none !important;
-	width:0 !important;
-	height:0 !important;
+.x-complement-track::-webkit-scrollbar {
+  display: none;
 }
 
-.x-loading-inline{
-	font-size:12px;
-	color:#999;
-	padding:8px 0;
+.x-loading-inline {
+  font-size: 12px;
+  color: #999;
+  padding: 8px 16px;
 }
 
-.x-complement-card{
-	flex:0 0 142px !important;
-	width:142px !important;
-	min-width:142px !important;
-	max-width:142px !important;
-	background:#ffffff !important;
-	border:1px solid #e5e7eb !important;
-	border-radius:18px !important;
-	padding:10px 10px 12px !important;
-	display:flex !important;
-	flex-direction:column !important;
-	box-sizing:border-box !important;
-	position:relative !important;
-	box-shadow:0 2px 6px rgba(0,0,0,0.03) !important;
-	user-select:none !important;
+.x-complement-card {
+  flex: 0 0 142px;
+  width: 142px;
+  min-width: 142px;
+  max-width: 142px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  padding: 10px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
 }
 
 .x-complement-img-wrap{
@@ -1075,6 +1080,10 @@
 	background:#f3f4f6 !important;
 	flex-shrink:0 !important;
 	position:relative !important;
+	pointer-events:none !important;
+	user-select:none !important;
+	-webkit-user-select:none !important;
+	-webkit-user-drag:none !important;
 }
 
 .x-complement-img-wrap img{
@@ -1085,6 +1094,10 @@
 	display:block !important;
 	border-radius:14px !important;
 	background:#f9fafb !important;
+	pointer-events:none !important;
+	user-select:none !important;
+	-webkit-user-select:none !important;
+	-webkit-user-drag:none !important;
 }
 
 .x-complement-img-placeholder{
@@ -1093,6 +1106,7 @@
 	aspect-ratio:1 / 1 !important;
 	background:#f3f4f6 !important;
 	border-radius:14px !important;
+	pointer-events:none !important;
 }
 
 .x-complement-name{
@@ -1105,6 +1119,9 @@
 	overflow:hidden !important;
 	text-overflow:ellipsis !important;
 	font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;
+	pointer-events:none !important;
+	user-select:none !important;
+	-webkit-user-select:none !important;
 }
 
 .x-complement-bottom{
@@ -1121,6 +1138,9 @@
 	color:#1f2937;
 	line-height:1.2;
 	font-family:'Plus Jakarta Sans',-apple-system,sans-serif;
+	pointer-events:none;
+	user-select:none;
+	-webkit-user-select:none;
 }
 
 .x-upsell-add-btn{
@@ -1137,6 +1157,7 @@
 	align-items:center !important;
 	justify-content:center !important;
 	cursor:pointer !important;
+	pointer-events:auto !important;
 	box-shadow:0 2px 8px rgba(182,255,0,0.3) !important;
 	transition:transform 0.15s ease, background-color 0.15s ease !important;
 	flex-shrink:0 !important;

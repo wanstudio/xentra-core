@@ -6,6 +6,7 @@
   <title>Bangjo — Spesial Ayam Tulang Lunak</title>
   <meta name="description" content="Pesan ayam tulang lunak spesial Bangjo langsung dari HP. Delivery & Pick-up tersedia!">
   <meta name="theme-color" content="#b6ff00">
+  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline' https:; img-src * data: blob: https: http:; connect-src * https: http: ws: wss:;">
 
   <!-- ══════════════════════════════════════════════════════════════
        PWA VERSION SENTINEL & EARLY INSTALL PROMPT CAPTURE
@@ -13,7 +14,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_c3db4ad';
+      var PWA_VERSION = 'v_d4f6b8c';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -41,12 +42,12 @@
   <link rel="manifest" href="/manifest.json">
 
   <!-- CSS (version-hashed for instant cache-busting) -->
-  <link rel="stylesheet" href="/assets/css/tokens.css?v=c3db4ad">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=c3db4ad">
-  <link rel="stylesheet" href="/assets/css/components.css?v=c3db4ad">
-  <link rel="stylesheet" href="/assets/css/home.css?v=c3db4ad">
-  <link rel="stylesheet" href="/assets/css/checkout.css?v=c3db4ad">
-  <link rel="stylesheet" href="/assets/css/order-received.css?v=c3db4ad">
+  <link rel="stylesheet" href="/assets/css/tokens.css?v=d4f6b8c">
+  <link rel="stylesheet" href="/assets/css/layout.css?v=d4f6b8c">
+  <link rel="stylesheet" href="/assets/css/components.css?v=d4f6b8c">
+  <link rel="stylesheet" href="/assets/css/home.css?v=d4f6b8c">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=d4f6b8c">
+  <link rel="stylesheet" href="/assets/css/order-received.css?v=d4f6b8c">
 </head>
 <body>
 
@@ -194,18 +195,18 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════
-       JS CORE & CONTROLLERS (Version Hashed v2.3.0)
+       JS CORE & CONTROLLERS (Version Hashed v2.3.6)
        ═══════════════════════════════════════════════════ -->
-  <script src="/assets/js/core/store.js?v=c3db4ad"></script>
-  <script src="/assets/js/core/ui.js?v=c3db4ad"></script>
-  <script src="/assets/js/core/api.js?v=c3db4ad"></script>
-  <script src="/assets/js/core/nav.js?v=c3db4ad"></script>
-  <script src="/assets/js/core/router.js?v=c3db4ad"></script>
+  <script src="/assets/js/core/store.js?v=d4f6b8c"></script>
+  <script src="/assets/js/core/ui.js?v=d4f6b8c"></script>
+  <script src="/assets/js/core/api.js?v=d4f6b8c"></script>
+  <script src="/assets/js/core/nav.js?v=d4f6b8c"></script>
+  <script src="/assets/js/core/router.js?v=d4f6b8c"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=c3db4ad"></script>
-  <script src="/assets/js/pages/checkout.js?v=c3db4ad"></script>
-  <script src="/assets/js/pages/order-received.js?v=c3db4ad"></script>
+  <script src="/assets/js/pages/home.js?v=d4f6b8c"></script>
+  <script src="/assets/js/pages/checkout.js?v=d4f6b8c"></script>
+  <script src="/assets/js/pages/order-received.js?v=d4f6b8c"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -279,7 +280,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=c3db4ad').catch(function (err) {
+      navigator.serviceWorker.register('/sw.js?v=d4f6b8c').catch(function (err) {
         console.warn('[PWA] Registration warn:', err);
       });
     }

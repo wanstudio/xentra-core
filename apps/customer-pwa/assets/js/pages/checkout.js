@@ -510,13 +510,17 @@
         '  </div>'
       ) : '') +
 
-      // 6. Items & Upsell Unified Card (Hide or show empty for pure reservation)
+      // 6. Ordered Items Card
       (!isReservation || items.length > 0 ? (
         '  <div class="x-card" id="x-items-card" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
         '    <div id="x-checkout-items-list" class="x-checkout-items">' + renderItemsHtml(items) + '</div>' +
-        '    <div class="x-complement-section" id="x-upsell-container">' +
-        '      <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin-bottom:12px;">Tambah ini untuk melengkapi pesananmu</div>' +
-        '      <div class="x-complement-track" id="x-addon-track"><div class="x-loading-inline">Memuat rekomendasi…</div></div>' +
+        '  </div>' +
+
+        // 6b. Upsell Recommendations Card (Standalone cleanly styled container)
+        '  <div class="x-card x-upsell-card" id="x-upsell-card" style="margin:0 14px 10px;padding:16px 0 14px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);overflow:hidden;">' +
+        '    <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;padding:0 16px;">Tambah ini untuk melengkapi pesananmu</div>' +
+        '    <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:2px 16px 4px;margin:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom;box-sizing:border-box;">' +
+        '      <div class="x-loading-inline" style="padding:0 16px;">Memuat rekomendasi…</div>' +
         '    </div>' +
         '  </div>'
       ) : (
@@ -619,56 +623,92 @@
     var elGrand = $('x-sum-total'); if (elGrand) elGrand.textContent = fmtIDR(grand);
   }
 
-  var DEFAULT_UPSELL_POOL = [
-    { id: 101, name: 'Es Kopi Susu Bangjo', price: 15000, regular_price: 18000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-    { id: 102, name: 'Es Jeruk Peras Murni', price: 8000, regular_price: 10000, image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=500&auto=format&fit=crop' },
-    { id: 103, name: 'Mie Gurih Spesial Bangjo', price: 15000, regular_price: 17000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-    { id: 104, name: 'Ayam Tulang Lunak Bakar', price: 28000, regular_price: 32000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-    { id: 105, name: 'Babi Goreng Krispi Gurih', price: 32000, regular_price: 36000, image_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&auto=format&fit=crop' },
-    { id: 106, name: 'Ayam Cincang Pedas Manis', price: 22000, regular_price: 25000, image_url: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=600&auto=format&fit=crop' },
-    { id: 107, name: 'Tahu Tempe Goreng Lengkuas', price: 10000, regular_price: 12000, image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop' },
-    { id: 108, name: 'Sambal Terasi Uleg Spesial', price: 5000, regular_price: 6000, image_url: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=500&auto=format&fit=crop' },
-    { id: 109, name: 'Kerupuk Kulit Pangsit', price: 6000, regular_price: 7000, image_url: 'https://images.unsplash.com/photo-1541544741938-0af808871cc0?w=500&auto=format&fit=crop' },
-    { id: 110, name: 'Es Cendol Dawet Ayu', price: 12000, regular_price: 15000, image_url: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=500&auto=format&fit=crop' }
-  ];
+  // ── Upsell Recommendation Rail (Pure Catalog Data, No Dummy) ──
+  function getCatalogProductsFromCacheOrData(data) {
+    var list = [];
+    if (!data) return list;
+    if (Array.isArray(data.categories)) {
+      data.categories.forEach(function (cat) {
+        if (Array.isArray(cat.products)) {
+          cat.products.forEach(function (p) {
+            if (p && p.id && p.name) list.push(p);
+          });
+        }
+      });
+    } else if (Array.isArray(data.all_products)) {
+      list = data.all_products;
+    } else if (Array.isArray(data.products)) {
+      list = data.products;
+    } else if (data.products && Array.isArray(data.products.items)) {
+      list = data.products.items;
+    }
+    return list;
+  }
 
-  // ── Upsell Recommendation Rail ──
   function loadUpsell() {
+    var card = $('x-upsell-card');
     var track = $('x-addon-track');
     if (!track) return;
+
     if (upsellItems && upsellItems.length) {
       renderUpsellTrack(track, upsellItems);
       return;
     }
-    if (!API) {
-      renderUpsellTrack(track, DEFAULT_UPSELL_POOL);
-      return;
-    }
-    API.get('/catalog/menu').then(function (data) {
-      var pool = [];
-      if (data && Array.isArray(data.all_products) && data.all_products.length) pool = data.all_products;
-      else if (data && data.products && Array.isArray(data.products.items)) pool = data.products.items;
-      else if (data && Array.isArray(data.products)) pool = data.products;
-      else if (data && Array.isArray(data.items)) pool = data.items;
-      else pool = DEFAULT_UPSELL_POOL;
 
+    // 1. Try local catalog cache first for instant render
+    var pool = [];
+    try {
+      var rawCached = localStorage.getItem('xentra_catalog_cache');
+      if (rawCached) {
+        pool = getCatalogProductsFromCacheOrData(JSON.parse(rawCached));
+      }
+    } catch (_) {}
+
+    if (pool.length > 0) {
       var cartIds = {};
       getCheckoutItems().forEach(function (i) { cartIds[String(i.id)] = true; });
       var filtered = pool.filter(function (p) { return !cartIds[String(p.id)]; });
-      var src = (filtered.length >= 4 ? filtered : filtered.concat(DEFAULT_UPSELL_POOL));
-      upsellItems = src.slice(0, 10);
-      renderUpsellTrack(track, upsellItems);
+      upsellItems = filtered.slice(0, 10);
+      if (upsellItems.length > 0) {
+        if (card) card.style.display = 'block';
+        renderUpsellTrack(track, upsellItems);
+      } else if (card) {
+        card.style.display = 'none';
+      }
+      return;
+    }
+
+    // 2. Fetch fresh catalog from API
+    if (!API) {
+      if (card) card.style.display = 'none';
+      return;
+    }
+
+    API.get('/catalog/menu').then(function (data) {
+      var fetchedPool = getCatalogProductsFromCacheOrData(data);
+      var cartIds = {};
+      getCheckoutItems().forEach(function (i) { cartIds[String(i.id)] = true; });
+      var filtered = fetchedPool.filter(function (p) { return !cartIds[String(p.id)]; });
+      upsellItems = filtered.slice(0, 10);
+      if (upsellItems.length > 0) {
+        if (card) card.style.display = 'block';
+        renderUpsellTrack(track, upsellItems);
+      } else if (card) {
+        card.style.display = 'none';
+      }
     }).catch(function () {
-      renderUpsellTrack(track, DEFAULT_UPSELL_POOL);
+      if (card) card.style.display = 'none';
     });
   }
 
   function renderUpsellTrack(container, items) {
+    if (!container) return;
     var html = '';
-    items.forEach(function (p) {
+    (items || []).forEach(function (p) {
       var img = p.image_url || p.image || '';
+      var price = Number(p.price || 5000);
       html +=
-        '<div class="x-complement-card">' +
+        '<div class="x-complement-card" data-card-id="' + p.id + '">' +
         '  <div class="x-complement-img-wrap">' +
         (img
           ? '<img src="' + UI.escape(img) + '" alt="' + UI.escape(p.name || '') + '" onerror="this.parentElement.innerHTML=\'<div class=\\\'x-complement-img-placeholder\\\'></div>\'">'
@@ -677,64 +717,43 @@
         '  </div>' +
         '  <div class="x-complement-name">' + UI.escape(p.name || 'Menu Tambahan') + '</div>' +
         '  <div class="x-complement-bottom">' +
-        '    <div class="x-complement-price">' + fmtIDR(p.price || 5000) + '</div>' +
-        '    <button type="button" class="x-upsell-add-btn" data-add-upsell="' + p.id + '" aria-label="Tambah"><img src="/assets/icons/plus.svg" class="x-upsell-plus-icon" alt=""></button>' +
+        '    <div class="x-complement-price">' + fmtIDR(price) + '</div>' +
+        '    <button type="button" class="x-upsell-add-btn" data-add-upsell="' + p.id + '" aria-label="Tambah ' + UI.escape(p.name || '') + '">' +
+        '      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;display:block;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+        '    </button>' +
         '  </div>' +
         '</div>';
     });
     container.innerHTML = html;
 
-    // Attach robust momentum touch & drag scroll handler
-    (function enableHorizontalDrag(slider) {
-      var isDown = false;
-      var startX = 0;
-      var scrollLeft = 0;
-
-      slider.onmousedown = function (e) {
-        isDown = true;
-        slider.style.cursor = 'grabbing';
-        startX = e.pageX - slider.offsetLeft;
-        scrollLeft = slider.scrollLeft;
-      };
-
-      window.onmouseup = function () {
-        if (!isDown) return;
-        isDown = false;
-        slider.style.cursor = 'grab';
-      };
-
-      slider.onmousemove = function (e) {
-        if (!isDown) return;
-        e.preventDefault();
-        var x = e.pageX - slider.offsetLeft;
-        var walk = (x - startX) * 1.5;
-        slider.scrollLeft = scrollLeft - walk;
-      };
-
-      slider.onwheel = function (e) {
-        if (e.deltaY !== 0) {
-          slider.scrollLeft += e.deltaY;
-        }
-      };
-    })(container);
-
-    container.querySelectorAll('[data-add-upsell]').forEach(function (btn) {
-      btn.onclick = function (e) {
-        if (e) e.stopPropagation();
-        var pid = btn.dataset.addUpsell;
-        var found = items.find(function (x) { return String(x.id) === String(pid); });
-        if (found) {
-          Store.addItem(found, 1);
-          var listEl = $('x-checkout-items-list');
-          if (listEl) {
-            listEl.innerHTML = renderItemsHtml(getCheckoutItems());
-            bindItemEvents();
+    var buttons = container.querySelectorAll('.x-upsell-add-btn');
+    for (var b = 0; b < buttons.length; b++) {
+      (function (btn) {
+        btn.onclick = function (e) {
+          if (e) {
+            e.stopPropagation();
           }
-          calculateTotals();
-          refreshDeliveryQuote();
-        }
-      };
-    });
+          var pid = btn.getAttribute('data-add-upsell');
+          var found = null;
+          for (var i = 0; i < items.length; i++) {
+            if (String(items[i].id) === String(pid)) {
+              found = items[i];
+              break;
+            }
+          }
+          if (found) {
+            Store.addItem(found, 1);
+            var listEl = $('x-checkout-items-list');
+            if (listEl) {
+              listEl.innerHTML = renderItemsHtml(getCheckoutItems());
+              bindItemEvents();
+            }
+            calculateTotals();
+            refreshDeliveryQuote();
+          }
+        };
+      })(buttons[b]);
+    }
   }
 
   // ── Events Binding ──
