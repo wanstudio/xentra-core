@@ -449,7 +449,7 @@
       '      </div>' +
       '      <button type="button" class="x-pill-btn" id="x-btn-choose-fulfillment">Ubah</button>' +
       '    </div>' +
-      '    <button type="button" class="x-note-button' + (state.fulfillment.note ? ' has-note' : '') + '" id="x-btn-fulfillment-note" style="margin-top:12px;width:100%;"><img src="/assets/icons/write.svg" alt="" class="x-note-icon"><span>' + (state.fulfillment.note ? 'Ubah Catatan Pengantaran' : 'Catatan Pengantaran/Meja') + '</span></button>' +
+      '    <button type="button" class="x-note-button ' + (state.fulfillment.note ? 'has-note' : '') + '" id="x-btn-fulfillment-note" style="margin-top:12px;width:100%;"><img src="' + (state.fulfillment.note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="" class="x-note-icon">Catatan Pengantaran/Meja</button>' +
       '  </div>' +
 
       // 5. Delivery Address Card (Only shown if fulfillment is delivery)
