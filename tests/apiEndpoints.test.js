@@ -132,12 +132,30 @@ test('API POST /api/v1/checkout/create-order: validates items and creates order 
   assert.strictEqual(data.payment.method, 'midtrans');
   assert.ok(data.snap_token);
 
-  // Verify unauthorized visitor cannot view order details without ownership (IDOR Guard - NEW-01)
+  // 1. Verify unauthorized visitor without customer session is rejected with 403 (NEW-01)
   const unauthRes = await mockFetch(`/api/v1/orders/${data.order_id}`);
-  assert.strictEqual(unauthRes.status, 403, 'Unauthorized visitor without matching customer phone/session must be rejected with 403');
+  assert.strictEqual(unauthRes.status, 403, 'Unauthorized visitor without matching customer session must be rejected with 403');
 
-  // Verify authorized tracking with matching phone gets sanitized projection
-  const orderRes = await mockFetch(`/api/v1/orders/${data.order_id}?phone=081234567890`);
+  // 2. Verify query ?phone= cannot bypass authentication (NEW-01 Phone Bypass Guard)
+  const phoneBypassRes = await mockFetch(`/api/v1/orders/${data.order_id}?phone=081234567890`);
+  assert.strictEqual(phoneBypassRes.status, 403, 'Naked phone parameter MUST NOT grant access without OTP session token');
+
+  // 3. Verify authorized customer with verified OTP session token gets sanitized projection (NEW-01)
+  const otpRes = await mockFetch('/api/v1/auth/otp/send', {
+    method: 'POST',
+    body: JSON.stringify({ phone: '081234567890' })
+  });
+  const otpData = await otpRes.json();
+  const verifyRes = await mockFetch('/api/v1/auth/otp/verify', {
+    method: 'POST',
+    body: JSON.stringify({ challenge_id: otpData.challenge_id, otp: '123456', phone: '081234567890' })
+  });
+  const verifyData = await verifyRes.json();
+  assert.ok(verifyData.token, 'OTP verify must return customer token');
+
+  const orderRes = await mockFetch(`/api/v1/orders/${data.order_id}`, {
+    headers: { 'x-customer-token': verifyData.token }
+  });
   assert.strictEqual(orderRes.status, 200);
   const orderData = await orderRes.json();
   assert.strictEqual(orderData.success, true);
@@ -756,5 +774,18 @@ test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close
     body: JSON.stringify({ branch_id: 'branch_bangjo_timur', starting_float: 50000 })
   });
   assert.strictEqual(forbiddenOpenRes.status, 403);
+
+  // 8. Cashier Cross-Branch Order Access Guard (NEW-02)
+  // Cashier A assigned to branch_bangjo_barat attempts to view order belonging to branch_bangjo_timur -> 403 Forbidden
+  const timurOrderId = `ord_test_timur_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_bangjo', 'branch_bangjo_timur', 'Tamu Timur', '0899999999', 'dine_in', 'pos_cashier', 50000, 50000, 'cash', 'pending')
+  `).run(timurOrderId, `XN-TIMUR-${Date.now()}`);
+
+  const crossBranchOrderRes = await mockFetch(`/api/v1/orders/${timurOrderId}`, {
+    headers: cashierAHeaders
+  });
+  assert.strictEqual(crossBranchOrderRes.status, 403, 'Branch-scoped cashier MUST NOT read orders of another branch');
 });
 

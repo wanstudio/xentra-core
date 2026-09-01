@@ -998,27 +998,54 @@ router.get('/orders/:id', (req, res) => {
     return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan pada brand ini.' });
   }
 
-  // P1 HORIZONTAL AUTHORIZATION (IDOR Guard - NEW-01):
-  // Check if caller is authenticated staff/operator, authenticated customer, or verified guest
+  // P1 HORIZONTAL & BRANCH AUTHORIZATION (IDOR Guard - NEW-01 & NEW-02):
+  // Check if caller is authenticated staff/operator (with strict branch isolation) or authenticated customer
   const authHeader = req.headers['authorization'] || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || req.headers['x-customer-token'] || '').trim();
   const session = token ? TokenSessionStore.getSession(token) : null;
-  const isOperator = session && ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'].includes(session.role);
-  const isCustomerOwner = session && (session.type === 'customer' || session.role === 'customer') && session.phone === order.customer_phone;
-  const isGuestVerified = (req.query.phone || req.headers['x-customer-phone']) && (req.query.phone || req.headers['x-customer-phone']).trim() === order.customer_phone;
+  
+  let isAuthorized = false;
 
-  if (!isOperator && !isCustomerOwner && !isGuestVerified) {
+  if (session) {
+    if (session.type === 'customer' || session.role === 'customer') {
+      // Customer must own the order and match tenant brand
+      if (session.brandId === req.brand_id && session.phone === order.customer_phone) {
+        isAuthorized = true;
+      }
+    } else if (['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'].includes(session.role)) {
+      // Operator must match tenant brand
+      let isBrandMatch = session.brandId === req.brand_id;
+      if (!isBrandMatch && session.role === 'owner' && session.organizationId && req.brand?.organization_id) {
+        isBrandMatch = session.organizationId === req.brand.organization_id;
+      }
+
+      if (isBrandMatch) {
+        // Branch-scoped operator roles (branch_manager, cashier, kitchen) MUST match order's branch
+        const branchScopedRoles = ['branch_manager', 'cashier', 'kitchen'];
+        if (branchScopedRoles.includes(session.role)) {
+          if (session.branchId === order.branch_id) {
+            isAuthorized = true;
+          }
+        } else {
+          // Brand-level roles (owner, brand_manager) can view all branches in the brand
+          isAuthorized = true;
+        }
+      }
+    }
+  }
+
+  if (!isAuthorized) {
     return res.status(403).json({
       success: false,
       error: 'FORBIDDEN_ORDER_ACCESS',
-      message: 'Akses ditolak: Anda tidak memiliki wewenang untuk melihat detail pesanan ini.'
+      message: 'Akses ditolak: Anda tidak memiliki sesi terotentikasi yang sah untuk melihat detail pesanan ini.'
     });
   }
 
   const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
   const delivery = db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(order.id);
   const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order.id);
-  const logs = db.prepare('SELECT * FROM order_status_logs WHERE order_id = ? ORDER BY created_at ASC').all(order.id);
+  const logs = db.prepare('SELECT previous_status, new_status, note, created_at FROM order_status_logs WHERE order_id = ? ORDER BY created_at ASC').all(order.id);
 
   // P1 INFORMATION HIDING & PRIVACY (NEW-01 & NEW-02):
   // Return clean DTO projection to prevent internal data/GPS leakage
