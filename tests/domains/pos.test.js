@@ -97,6 +97,43 @@ test('POS 2 — Cashier Shift: handles Open, Cash In/Out, and Close with exact v
 
   assert.ok(shiftClosedEvent);
   assert.strictEqual(shiftClosedEvent.payload.variance, -2000);
+
+  // 5. Domain-Level Ownership Breach Enforcement (NEW-01 & NEW-02)
+  db.prepare("DELETE FROM pos_shifts WHERE cashier_id = 'cashier_victim'").run();
+  const shiftA = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: 'cashier_victim',
+    starting_float: 50000
+  });
+
+  // Rogue cashier attempts to record cash movement on shiftA
+  assert.throws(() => {
+    PosShiftService.recordCashMovement({
+      shift_id: shiftA.id,
+      type: 'in',
+      amount: 100000,
+      actor_id: 'cashier_attacker',
+      actor_role: 'cashier'
+    });
+  }, /Authorization Breach/);
+
+  // Rogue cashier attempts to close shiftA
+  assert.throws(() => {
+    PosShiftService.closeShift({
+      shift_id: shiftA.id,
+      actual_cash: 0,
+      actor_id: 'cashier_attacker',
+      actor_role: 'cashier'
+    });
+  }, /Authorization Breach/);
+
+  // Clean up shiftA
+  PosShiftService.closeShift({
+    shift_id: shiftA.id,
+    actual_cash: 50000,
+    actor_id: 'cashier_victim',
+    actor_role: 'cashier'
+  });
 });
 
 // ==============================================================================

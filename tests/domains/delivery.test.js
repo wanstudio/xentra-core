@@ -91,10 +91,11 @@ test('Delivery 2 — Delivery Calculator: calculates exact fee, promo discount, 
 // ==============================================================================
 test('Delivery 3 — Branch Driver Provider: assigns internal driver and advances delivery status to delivered', async () => {
   const orderId = `ord_test_del_${Date.now()}`;
+  const orderNumber = `ORD-DEL-${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, 'ORD-DEL-1', 'brand_del', 'branch_del', 'Pak Joko', '62812345678', 'delivery', 'customer_app', 50000, 50000, 'midtrans', 'confirmed')
-  `).run(orderId);
+    VALUES (?, ?, 'brand_del', 'branch_del', 'Pak Joko', '62812345678', 'delivery', 'customer_app', 50000, 50000, 'midtrans', 'confirmed')
+  `).run(orderId, orderNumber);
 
   let assignedEvent = null;
   let completedEvent = null;

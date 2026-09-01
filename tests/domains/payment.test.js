@@ -48,8 +48,8 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
   const orderId = `ord_test_cash_${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, 'ORD-CASH-1', 'brand_pay', 'branch_pay', 'Budi Cash', '62812345678', 'dine_in', 'pos_cashier', 50000, 50000, 'cash', 'pending')
-  `).run(orderId);
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Cash', '62812345678', 'dine_in', 'pos_cashier', 50000, 50000, 'cash', 'pending')
+  `).run(orderId, `ORD-CASH-${Date.now()}`);
 
   let settledEvent = null;
   events.EventBus.subscribe('payment.settled', (evt) => {
@@ -103,8 +103,8 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
   const newOrderId = `ord_test_cross_${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, 'ORD-CASH-CROSS', 'brand_pay', 'branch_pay', 'Budi Cross', '62812345678', 'dine_in', 'pos_cashier', 25000, 25000, 'cash', 'pending')
-  `).run(newOrderId);
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Cross', '62812345678', 'dine_in', 'pos_cashier', 25000, 25000, 'cash', 'pending')
+  `).run(newOrderId, `ORD-CASH-CROSS-${Date.now()}`);
 
   // 1. Closed shift rejected
   assert.throws(() => {
@@ -141,8 +141,8 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
   const onlineOrderId = `ord_test_online_${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, 'ORD-ONLINE-1', 'brand_pay', 'branch_pay', 'Budi Online', '62812345678', 'delivery', 'customer_app', 60000, 60000, 'midtrans', 'pending')
-  `).run(onlineOrderId);
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Online', '62812345678', 'delivery', 'customer_app', 60000, 60000, 'midtrans', 'pending')
+  `).run(onlineOrderId, `ORD-ONLINE-${Date.now()}`);
 
   assert.throws(() => {
     CashSettlementService.settleCashPayment({
@@ -156,8 +156,8 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
   const cancelledOrderId = `ord_test_canc_${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, 'ORD-CANC-1', 'brand_pay', 'branch_pay', 'Budi Batal', '62812345678', 'pickup', 'customer_app', 30000, 30000, 'cash', 'cancelled')
-  `).run(cancelledOrderId);
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Batal', '62812345678', 'pickup', 'customer_app', 30000, 30000, 'cash', 'cancelled')
+  `).run(cancelledOrderId, `ORD-CANC-${Date.now()}`);
 
   assert.throws(() => {
     CashSettlementService.settleCashPayment({
@@ -211,13 +211,13 @@ test('Payment 3 — Midtrans Webhook: verifies SHA512 signature, advances status
 
   db.prepare(`
     INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal)
-    VALUES ('item_mid_1', ?, 'prod_mid_1', 'Nasi Goreng Midtrans', 75000, 2, 75000)
-  `).run(orderId);
+    VALUES (?, ?, 'prod_mid_1', 'Nasi Goreng Midtrans', 75000, 2, 75000)
+  `).run(`item_mid_${Date.now()}`, orderId);
 
   db.prepare(`
     INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
-    VALUES ('pay_mid_123', ?, 'midtrans', 'M12345', 'snap_token_123', 'pending', 75000)
-  `).run(orderId);
+    VALUES (?, ?, 'midtrans', 'M12345', 'snap_token_123', 'pending', 75000)
+  `).run(`pay_mid_${Date.now()}`, orderId);
 
   // 1. Calculate valid SHA512 signature
   const serverKey = 'SB-Mid-server-test12345';
@@ -279,13 +279,13 @@ test('Payment 4 — Midtrans Webhook: strictly rejects invalid SHA512 signature 
   const orderId = `ord_test_fake_${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, 'ORD-FAKE-1', 'brand_pay', 'branch_pay', 'Hacker', '62812345678', 'delivery', 'customer_app', 10000, 10000, 'qris', 'pending')
-  `).run(orderId);
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Hacker', '62812345678', 'delivery', 'customer_app', 10000, 10000, 'qris', 'pending')
+  `).run(orderId, `ORD-FAKE-${Date.now()}`);
 
   db.prepare(`
     INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
-    VALUES ('pay_fake_123', ?, 'midtrans', 'M12345', 'snap_token_fake', 'pending', 10000)
-  `).run(orderId);
+    VALUES (?, ?, 'midtrans', 'M12345', 'snap_token_fake', 'pending', 10000)
+  `).run(`pay_fake_${Date.now()}`, orderId);
 
   const fakeWebhookPayload = {
     order_id: orderId,
@@ -327,13 +327,13 @@ test('Payment 5 — Concurrency Race: Stock Depleted on Settlement marks fulfill
 
   db.prepare(`
     INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal)
-    VALUES ('item_race_1', ?, 'prod_race_1', 'Bebek Goreng Langka', 50000, 3, 150000)
-  `).run(orderId);
+    VALUES (?, ?, 'prod_race_1', 'Bebek Goreng Langka', 50000, 3, 150000)
+  `).run(`item_race_${Date.now()}`, orderId);
 
   db.prepare(`
     INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
-    VALUES ('pay_race_123', ?, 'midtrans', 'M12345', 'snap_token_race', 'pending', 150000)
-  `).run(orderId);
+    VALUES (?, ?, 'midtrans', 'M12345', 'snap_token_race', 'pending', 150000)
+  `).run(`pay_race_${Date.now()}`, orderId);
 
   const serverKey = 'SB-Mid-server-test12345';
   const statusCode = '200';
@@ -383,8 +383,8 @@ test('Payment 6 — Terminal State Invariant: rejects settlement on cancelled / 
 
   db.prepare(`
     INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
-    VALUES ('pay_revive_123', ?, 'midtrans', 'M12345', 'snap_token_revive', 'pending', 50000)
-  `).run(orderId);
+    VALUES (?, ?, 'midtrans', 'M12345', 'snap_token_revive', 'pending', 50000)
+  `).run(`pay_revive_${Date.now()}`, orderId);
 
   const serverKey = 'SB-Mid-server-test12345';
   const statusCode = '200';

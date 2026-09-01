@@ -67,16 +67,18 @@ class PosShiftService {
   }
 
   /**
-   * Records a manual Cash Movement (Cash In or Cash Out).
+   * Records a manual Cash Movement (Cash In or Cash Out) with Defense-in-Depth Ownership Verification.
    * 
    * @param {Object} params
    * @param {string} params.shift_id
    * @param {'in'|'out'} params.type
    * @param {number} params.amount
    * @param {string} [params.reason='']
+   * @param {string} [params.actor_id] - ID of actor requesting the mutation
+   * @param {string} [params.actor_role] - Role of actor ('cashier', 'branch_manager', 'owner')
    * @returns {Object} Updated shift summary
    */
-  static recordCashMovement({ shift_id, type, amount, reason = '' }) {
+  static recordCashMovement({ shift_id, type, amount, reason = '', actor_id = null, actor_role = null }) {
     if (!shift_id || !type || !amount) {
       throw new Error('[PosShiftService] "shift_id", "type", and "amount" are required.');
     }
@@ -84,6 +86,11 @@ class PosShiftService {
     const shift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
     if (!shift || shift.status !== 'open') {
       throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup.');
+    }
+
+    // P1 DOMAIN LEVEL DEFENSE-IN-DEPTH OWNERSHIP GUARD (NEW-01 & NEW-02)
+    if (actor_role === 'cashier' && actor_id && shift.cashier_id !== actor_id) {
+      throw new Error(`[PosShiftService Authorization Breach]: Kasir "${actor_id}" tidak berwenang mencatat mutasi kas pada shift milik kasir lain ("${shift.cashier_id}").`);
     }
 
     const moveAmount = Number(amount);
@@ -117,14 +124,16 @@ class PosShiftService {
   }
 
   /**
-   * Closes an active Cashier Shift and calculates Variance.
+   * Closes an active Cashier Shift and calculates Variance with Defense-in-Depth Ownership Verification.
    * 
    * @param {Object} params
    * @param {string} params.shift_id
    * @param {number} params.actual_cash - Actual cash counted by cashier
+   * @param {string} [params.actor_id] - ID of actor requesting the shift closure
+   * @param {string} [params.actor_role] - Role of actor ('cashier', 'branch_manager', 'owner')
    * @returns {Object} Closed shift record with variance
    */
-  static closeShift({ shift_id, actual_cash }) {
+  static closeShift({ shift_id, actual_cash, actor_id = null, actor_role = null }) {
     if (!shift_id || actual_cash == null) {
       throw new Error('[PosShiftService] "shift_id" and "actual_cash" are required to close a shift.');
     }
@@ -132,6 +141,11 @@ class PosShiftService {
     const shift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
     if (!shift || shift.status !== 'open') {
       throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup.');
+    }
+
+    // P1 DOMAIN LEVEL DEFENSE-IN-DEPTH OWNERSHIP GUARD (NEW-01 & NEW-02)
+    if (actor_role === 'cashier' && actor_id && shift.cashier_id !== actor_id) {
+      throw new Error(`[PosShiftService Authorization Breach]: Kasir "${actor_id}" tidak berwenang menutup shift milik kasir lain ("${shift.cashier_id}").`);
     }
 
     const expectedCash = PosShiftModel.calculateExpectedCash({

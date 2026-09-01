@@ -1232,7 +1232,9 @@ router.post('/pos/shifts/:id/cash-movement', requireAuth(['owner', 'brand_manage
       shift_id: shiftId,
       type,
       amount: Number(amount),
-      reason: String(reason)
+      reason: String(reason),
+      actor_id: cashierId,
+      actor_role: req.user.role
     });
 
     res.json({
@@ -1265,7 +1267,7 @@ router.post('/pos/shifts/:id/close', requireAuth(['owner', 'brand_manager', 'bra
       return res.status(404).json({ success: false, error: 'Shift tidak ditemukan pada brand ini.' });
     }
 
-    // P1 SHIFT CLOSING RBAC & OWNERSHIP GUARD (NEW-01)
+    // P1 SHIFT CLOSING RBAC & OWNERSHIP GUARD (NEW-01 & NEW-02)
     if (req.user.role === 'cashier') {
       if (shift.cashier_id !== cashierId || (userBranchId && shift.branch_id !== userBranchId)) {
         return res.status(403).json({
@@ -1292,7 +1294,9 @@ router.post('/pos/shifts/:id/close', requireAuth(['owner', 'brand_manager', 'bra
     const { PosShiftService } = require('../../domains/pos');
     const closedShift = PosShiftService.closeShift({
       shift_id: shiftId,
-      actual_cash: Number(actual_cash)
+      actual_cash: Number(actual_cash),
+      actor_id: cashierId,
+      actor_role: req.user.role
     });
 
     res.json({

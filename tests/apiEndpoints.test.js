@@ -33,20 +33,39 @@ async function mockFetch(path, options = {}) {
     let responseData = null;
 
     const res = {
+      statusCode: 200,
+      headers: {},
       status(code) {
-        statusCode = code;
+        this.statusCode = code;
         return this;
       },
+      setHeader(k, v) {
+        this.headers[k] = v;
+      },
+      getHeader(k) {
+        return this.headers[k];
+      },
+      writeHead(code, headers) {
+        this.statusCode = code;
+        if (headers) Object.assign(this.headers, headers);
+      },
       json(data) {
-        responseData = data;
-        resolve({ status: statusCode, json: async () => responseData });
+        resolve({ status: this.statusCode, json: async () => data });
       },
       send(data) {
-        responseData = data;
-        resolve({ status: statusCode, text: async () => responseData, json: async () => JSON.parse(responseData) });
+        let parsed = data;
+        if (typeof data === 'string') {
+          try { parsed = JSON.parse(data); } catch (_) {}
+        }
+        resolve({ status: this.statusCode, text: async () => data, json: async () => parsed });
       },
-      setHeader() {},
-      getHeader() {}
+      end(data) {
+        let parsed = data;
+        if (typeof data === 'string') {
+          try { parsed = JSON.parse(data); } catch (_) {}
+        }
+        resolve({ status: this.statusCode, text: async () => data, json: async () => parsed });
+      }
     };
 
     app(req, res, (err) => {
@@ -54,6 +73,10 @@ async function mockFetch(path, options = {}) {
     });
   });
 }
+
+test.beforeEach(() => {
+  db.prepare(`UPDATE brands SET primary_color = '#b6ff00' WHERE id = 'brand_bangjo'`).run();
+});
 
 test('API GET /api/v1/brand/info: returns brand info for host app.mybangjo.com', async () => {
   const res = await mockFetch('/api/v1/brand/info');
@@ -394,8 +417,8 @@ test('API Kitchen RBAC: Branch-level operators cannot view or update orders from
 
   db.prepare(`
     INSERT INTO orders (id, brand_id, branch_id, order_number, customer_name, customer_phone, order_type, status, subtotal, grand_total)
-    VALUES (?, 'brand_bangjo', 'branch_bangjo_timur', 'XN-TIMUR-999', 'Customer Timur', '081200000000', 'dine_in', 'confirmed', 50000, 50000)
-  `).run(orderOtherBranchId);
+    VALUES (?, 'brand_bangjo', 'branch_bangjo_timur', ?, 'Customer Timur', '081200000000', 'dine_in', 'confirmed', 50000, 50000)
+  `).run(orderOtherBranchId, 'XN-TIMUR-' + Date.now());
 
   // 5. Kitchen Barat attempts to modify status of order in Branch Timur -> REJECTED 404/Forbidden
   const updateRes = await mockFetch(`/api/v1/kitchen/orders/${orderOtherBranchId}/status`, {
@@ -413,8 +436,8 @@ test('API Kitchen RBAC: Branch-level operators cannot view or update orders from
   const orderBaratId = 'ord_barat_' + Date.now();
   db.prepare(`
     INSERT INTO orders (id, brand_id, branch_id, order_number, customer_name, customer_phone, order_type, status, subtotal, grand_total)
-    VALUES (?, 'brand_bangjo', 'branch_bangjo_barat', 'XN-BARAT-111', 'Customer Barat', '081200000001', 'dine_in', 'confirmed', 35000, 35000)
-  `).run(orderBaratId);
+    VALUES (?, 'brand_bangjo', 'branch_bangjo_barat', ?, 'Customer Barat', '081200000001', 'dine_in', 'confirmed', 35000, 35000)
+  `).run(orderBaratId, 'XN-BARAT-' + Date.now());
 
   // Kitchen role attempts governance action ('cancelled' / 'refunded') -> REJECTED 403 INSUFFICIENT_ROLE_AUTHORITY
   const kitchenCancelRes = await mockFetch(`/api/v1/kitchen/orders/${orderBaratId}/status`, {
@@ -663,6 +686,7 @@ test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close
 
   // Cashier B opens a shift
   const { PosShiftService } = require('../domains/pos');
+  db.prepare("DELETE FROM pos_shifts WHERE cashier_id = 'usr_cashier_b'").run();
   const shiftB = PosShiftService.openShift({
     branch_id: 'branch_bangjo_barat',
     cashier_id: 'usr_cashier_b',
@@ -692,5 +716,13 @@ test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close
     body: JSON.stringify({ actual_cash: 100000 })
   });
   assert.strictEqual(forbiddenCloseRes.status, 403);
+
+  // Clean up shiftB
+  PosShiftService.closeShift({
+    shift_id: shiftB.id,
+    actual_cash: 100000,
+    actor_id: 'usr_cashier_b',
+    actor_role: 'cashier'
+  });
 });
 
