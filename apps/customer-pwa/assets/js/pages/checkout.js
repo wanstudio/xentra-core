@@ -512,12 +512,14 @@
 
       // 6. Items & Upsell Unified Card (Hide or show empty for pure reservation)
       (!isReservation || items.length > 0 ? (
-        '  <div class="x-card" id="x-items-card" style="margin:0 14px 10px;padding:16px 0 14px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);overflow:hidden;">' +
-        '    <div id="x-checkout-items-list" class="x-checkout-items" style="padding:0 16px;">' + renderItemsHtml(items) + '</div>' +
-        '    <div class="x-complement-wrap" id="x-upsell-container" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;width:100%;box-sizing:border-box;">' +
-        '      <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;padding:0 16px;">Tambah ini untuk melengkapi pesananmu</div>' +
-        '      <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:2px 16px 4px;margin:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom;box-sizing:border-box;">' +
-        '        <div class="x-loading-inline" style="padding:0 16px;">Memuat rekomendasi…</div>' +
+        '  <div class="x-card" id="x-items-card" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
+        '    <div id="x-checkout-items-list" class="x-checkout-items">' +
+        '      <div id="x-checkout-items-rows">' + renderItemsHtml(items) + '</div>' +
+        '      <div class="x-complement-section" id="x-upsell-container" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;width:100%;box-sizing:border-box;">' +
+        '        <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;padding:0;">Tambah ini untuk melengkapi pesananmu</div>' +
+        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:2px 0 4px;margin:0;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y pinch-zoom;box-sizing:border-box;">' +
+        '          <div class="x-loading-inline">Memuat rekomendasi…</div>' +
+        '        </div>' +
         '      </div>' +
         '    </div>' +
         '  </div>'
@@ -729,9 +731,9 @@
           }
           if (found) {
             Store.addItem(found, 1);
-            var listEl = $('x-checkout-items-list');
-            if (listEl) {
-              listEl.innerHTML = renderItemsHtml(getCheckoutItems());
+            var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
+            if (rowsEl) {
+              rowsEl.innerHTML = renderItemsHtml(getCheckoutItems());
               bindItemEvents();
             }
             calculateTotals();
@@ -1375,9 +1377,9 @@
       renderEmpty();
       return;
     }
-    var listEl = $('x-checkout-items-list');
-    if (listEl) {
-      listEl.innerHTML = renderItemsHtml(items);
+    var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
+    if (rowsEl) {
+      rowsEl.innerHTML = renderItemsHtml(items);
       bindItemEvents();
       checkoutContainer.querySelectorAll('[data-note-item]').forEach(function (b) {
         b.onclick = function () { openItemNoteSheet(b.dataset.noteItem); };
