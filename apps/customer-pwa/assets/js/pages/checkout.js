@@ -540,13 +540,13 @@
           : '<div class="x-product-image" style="background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:24px;">🍱</div>'
         ) +
         '    <div class="x-quantity">' +
-        '      <button type="button" data-minus-item="' + item.id + '" data-item-minus="' + item.id + '" aria-label="Kurang">−</button>' +
+        '      <button type="button" data-minus-item="' + item.id + '" aria-label="Kurang"><img src="/assets/icons/minus.svg" alt="minus" style="width:13px;height:13px;display:block;margin:auto;"></button>' +
         '      <span class="x-quantity-value">' + qty + '</span>' +
-        '      <button type="button" data-plus-item="' + item.id + '" data-item-plus="' + item.id + '" aria-label="Tambah">+</button>' +
+        '      <button type="button" data-plus-item="' + item.id + '" aria-label="Tambah"><img src="/assets/icons/plus.svg" alt="plus" style="width:13px;height:13px;display:block;margin:auto;"></button>' +
         '    </div>' +
-        '    <button type="button" class="x-note-button' + (note ? ' has-note' : '') + '" data-note-item="' + item.id + '" data-item-note="' + item.id + '">' +
-        '      <img src="/assets/icons/write.svg" alt="" class="x-note-icon">' +
-        '      <span>Catatan</span>' +
+        '    <button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note-item="' + item.id + '">' +
+        '      <img src="' + (note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="Catatan" class="x-note-icon">' +
+        '      Catatan' +
         '    </button>' +
         '  </div>' +
         '</div>';
