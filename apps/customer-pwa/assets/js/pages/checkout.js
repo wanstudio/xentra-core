@@ -620,10 +620,16 @@
   }
 
   var DEFAULT_UPSELL_POOL = [
-    { id: 288, name: 'Es Kopi Susu Bangjo', price: 15000, regular_price: 18000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-    { id: 402, name: 'Es Jeruk Segar', price: 8000, regular_price: 10000, image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400' },
-    { id: 345, name: 'Mie Gurih', price: 15000, regular_price: 17000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-    { id: 286, name: 'Ayam Tulang Lunak Bakar', price: 28000, regular_price: 32000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' }
+    { id: 101, name: 'Es Kopi Susu Bangjo', price: 15000, regular_price: 18000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
+    { id: 102, name: 'Es Jeruk Peras Murni', price: 8000, regular_price: 10000, image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=500&auto=format&fit=crop' },
+    { id: 103, name: 'Mie Gurih Spesial Bangjo', price: 15000, regular_price: 17000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+    { id: 104, name: 'Ayam Tulang Lunak Bakar', price: 28000, regular_price: 32000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+    { id: 105, name: 'Babi Goreng Krispi Gurih', price: 32000, regular_price: 36000, image_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&auto=format&fit=crop' },
+    { id: 106, name: 'Ayam Cincang Pedas Manis', price: 22000, regular_price: 25000, image_url: 'https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=600&auto=format&fit=crop' },
+    { id: 107, name: 'Tahu Tempe Goreng Lengkuas', price: 10000, regular_price: 12000, image_url: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop' },
+    { id: 108, name: 'Sambal Terasi Uleg Spesial', price: 5000, regular_price: 6000, image_url: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=500&auto=format&fit=crop' },
+    { id: 109, name: 'Kerupuk Kulit Pangsit', price: 6000, regular_price: 7000, image_url: 'https://images.unsplash.com/photo-1541544741938-0af808871cc0?w=500&auto=format&fit=crop' },
+    { id: 110, name: 'Es Cendol Dawet Ayu', price: 12000, regular_price: 15000, image_url: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=500&auto=format&fit=crop' }
   ];
 
   // ── Upsell Recommendation Rail ──
@@ -649,8 +655,8 @@
       var cartIds = {};
       getCheckoutItems().forEach(function (i) { cartIds[String(i.id)] = true; });
       var filtered = pool.filter(function (p) { return !cartIds[String(p.id)]; });
-      var src = filtered.length >= 2 ? filtered : pool;
-      upsellItems = src.slice(0, 6);
+      var src = (filtered.length >= 4 ? filtered : filtered.concat(DEFAULT_UPSELL_POOL));
+      upsellItems = src.slice(0, 10);
       renderUpsellTrack(track, upsellItems);
     }).catch(function () {
       renderUpsellTrack(track, DEFAULT_UPSELL_POOL);
