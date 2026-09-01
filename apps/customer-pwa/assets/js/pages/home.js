@@ -388,7 +388,7 @@
 
     document.querySelectorAll('[data-note]').forEach(function (btn) {
       btn.onclick = function () {
-        openNoteSheet(btn.dataset.note);
+        openNote(btn.dataset.note);
       };
     });
   }
@@ -396,6 +396,7 @@
   // ======================================================================
   //  NOTE SHEET (EXACT XENTRA-MVP LOGIC)
   // ======================================================================
+  var openNoteSheet = openNote;
   function portalNoteSheet() {
     var overlay = document.getElementById('x-note-overlay');
     if (overlay && overlay.parentElement !== document.body) {
