@@ -1,13 +1,13 @@
 /**
- * Xentra Customer PWA — Service Worker (Release v2.2.8)
- * Follows Google & Gojek PWA Best Practices:
+ * Xentra Customer PWA — Service Worker
+ * Architecture:
  * 1. Immediate activation via skipWaiting() and clients.claim()
- * 2. Strict Network-First navigation (never serves stale HTML while online)
- * 3. Automatic purge of old version caches on activation
+ * 2. Strict Network-First for HTML, JS, CSS (guarantees 0ms stale code on live connections)
+ * 3. Cache-Fallback for genuine offline operation
+ * 4. Automatic purge of old version caches on activation
  */
-const CACHE_NAME = "bangjo-core-v230";
+const CACHE_NAME = "bangjo-pwa-BUILD_HASH";
 const ASSETS_TO_CACHE = [
-
   "/",
   "/manifest.json",
   "/assets/pwa/icon-192.png",
@@ -34,20 +34,20 @@ self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       return cache.addAll(ASSETS_TO_CACHE).catch(err => {
-        console.warn("[SW Install] Cache addAll warning:", err);
+        console.warn("[SW Install] Cache prefetch warn:", err);
       });
     })
   );
 });
 
-// 2. Activate & Purge All Stale Caches
+// 2. Activate & Purge ALL Stale Caches
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
         keys.map(key => {
           if (key !== CACHE_NAME) {
-            console.log("[SW Activate] Purging stale cache:", key);
+            console.log("[SW Activate] Purging old cache:", key);
             return caches.delete(key);
           }
         })
@@ -56,34 +56,18 @@ self.addEventListener("activate", event => {
   );
 });
 
-// 3. Fetch Strategy: Network-First for HTML & Dynamic, Cache-Fallback
+// 3. Fetch Strategy: Network-First with Live Fallback
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
 
-  // Bypass API, Admin, and Dashboard
+  // Never touch API calls or Merchant Dashboard
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/dashboard')) {
     return;
   }
 
-  // Navigation requests (HTML page loads): ALWAYS Network-First
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          if (response && response.status === 200) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then(c => c.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(() => caches.match("/") || caches.match(event.request))
-    );
-    return;
-  }
-
-  // Static Assets (JS / CSS / Images): Network-First with Cache Fallback
+  // Network-First for HTML navigation, JS scripts, and CSS stylesheets
   event.respondWith(
     fetch(event.request)
       .then(response => {
@@ -93,6 +77,14 @@ self.addEventListener("fetch", event => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => {
+        return caches.match(event.request).then(cached => {
+          if (cached) return cached;
+          if (event.request.mode === "navigate") {
+            return caches.match("/");
+          }
+          return null;
+        });
+      })
   );
 });
