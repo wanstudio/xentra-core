@@ -272,6 +272,13 @@ class PaymentGatewayService {
             );
           }
         }
+      } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
+        // P1 FAILED PAYMENT INVARIANT: Mark order as cancelled with ZERO inventory mutation
+        db.prepare(`
+          UPDATE orders
+          SET status = 'cancelled', updated_at = ?
+          WHERE id = ?
+        `).run(now, order_id);
       }
 
       db.exec('COMMIT;');
