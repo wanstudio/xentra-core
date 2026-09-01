@@ -653,7 +653,29 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       return res.status(404).json({ success: false, error: 'Cabang restoran tidak ditemukan untuk brand ini.' });
     }
 
-    // 2. Compute Delivery Fee (if order_type === 'delivery')
+    // 2. Authoritative Pre-Payment Verification Gate (Single Source of Truth for Product Pricing & Stock)
+    const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
+    const verification = PrePaymentVerificationGate.verify({
+      branch_id: branch.id,
+      brand_id: req.brand_id,
+      items
+    });
+
+    if (!verification.is_valid) {
+      const primaryError = (verification.errors && verification.errors[0]) || 'Gagal memverifikasi produk atau harga pesanan.';
+      return res.status(400).json({
+        success: false,
+        status: verification.status,
+        error: primaryError,
+        errors: verification.errors,
+        price_diffs: verification.price_diffs
+      });
+    }
+
+    const verifiedItems = verification.verified_items;
+    const verifiedSubtotal = verifiedItems.reduce((acc, it) => acc + it.subtotal, 0);
+
+    // 3. Compute Delivery Fee using Authoritative Verified Subtotal
     let deliveryFee = 0;
     let discountAmount = 0;
     let deliveryRecord = null;
@@ -673,15 +695,13 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         ? { enabled: true, target: branch.promo_min_order, discount: branch.promo_delivery_discount }
         : { enabled: true, target: 50000, discount: 10000 };
 
-      // Calculate approximate subtotal for promo evaluation
-      const approxSubtotal = items.reduce((acc, it) => acc + (Number(it.price || it.expected_price || 0) * Number(it.quantity || it.qty || 1)), 0);
-
+      // P1 AUTHORITATIVE PRICING INVARIANT (Finding NEW-01): Use verifiedSubtotal from server, NEVER client price
       const feeCalc = DeliveryCalculator.calculate({
         distance_meters: road.distance_meters,
         free_km: branch.free_delivery_km || 0,
         price_per_km: branch.price_per_km || 3000,
         max_radius_km: branch.max_radius_km || 30,
-        subtotal: approxSubtotal,
+        subtotal: verifiedSubtotal,
         promo_config: promoConfig
       });
 
@@ -702,7 +722,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       };
     }
 
-    // 3. Delegate Cleanly to OrderPlacementService (Architectural Authority & PrePaymentVerificationGate)
+    // 4. Delegate Cleanly to OrderPlacementService (ACID database transaction & event publishing)
     const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
     const placementResult = await OrderPlacementService.submitOrder({
       brand_id: req.brand_id,
