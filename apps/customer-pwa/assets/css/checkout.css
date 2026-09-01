@@ -1745,7 +1745,8 @@
 	pointer-events:auto !important;
 }
 
-.x-sheet,
+.x-overlay .x-sheet,
+.x-checkout-sheet,
 .x-sheet-inner,
 .x-alt-sheet{
 	background:#fff !important;
@@ -1765,6 +1766,7 @@
 	box-sizing:border-box !important;
 }
 
+.x-sheet.open,
 .x-overlay.open .x-sheet,
 .x-overlay.open .x-sheet-inner,
 .x-overlay.open .x-alt-sheet{
