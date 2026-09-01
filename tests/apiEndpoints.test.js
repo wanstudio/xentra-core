@@ -132,8 +132,12 @@ test('API POST /api/v1/checkout/create-order: validates items and creates order 
   assert.strictEqual(data.payment.method, 'midtrans');
   assert.ok(data.snap_token);
 
-  // Verify GET /orders/:id exposes sanitized projection without internal gateway leak (NEW-02)
-  const orderRes = await mockFetch(`/api/v1/orders/${data.order_id}`);
+  // Verify unauthorized visitor cannot view order details without ownership (IDOR Guard - NEW-01)
+  const unauthRes = await mockFetch(`/api/v1/orders/${data.order_id}`);
+  assert.strictEqual(unauthRes.status, 403, 'Unauthorized visitor without matching customer phone/session must be rejected with 403');
+
+  // Verify authorized tracking with matching phone gets sanitized projection
+  const orderRes = await mockFetch(`/api/v1/orders/${data.order_id}?phone=081234567890`);
   assert.strictEqual(orderRes.status, 200);
   const orderData = await orderRes.json();
   assert.strictEqual(orderData.success, true);

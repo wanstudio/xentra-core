@@ -581,6 +581,14 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       });
     }
 
+    // P1 CUSTOMER IDENTITY BINDING (NEW-02): If request is made by authenticated customer session, bind authoritative phone
+    const authHeader = req.headers['authorization'] || '';
+    const customerToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || req.headers['x-customer-token'] || '').trim();
+    const customerSession = customerToken ? TokenSessionStore.getSession(customerToken) : null;
+    if (customerSession && (customerSession.type === 'customer' || customerSession.role === 'customer') && customerSession.brandId === req.brand_id) {
+      customer.phone = customerSession.phone;
+    }
+
     // Locked Decision: Customer information must be valid
     if (!customer.phone || !customer.phone.trim()) {
       return res.status(400).json({ success: false, error: 'Nomor telepon customer wajib diisi.' });
@@ -976,7 +984,7 @@ function requireAuth(allowedRoles = []) {
   };
 }
 
-// 7. Get Order Details & Live Status (Tenant-Scoped to req.brand_id)
+// 7. Get Order Details & Live Status (Protected by Ownership or Operator Auth - NEW-01)
 router.get('/orders/:id', (req, res) => {
   // P1 TENANT ISOLATION: Join branches to strictly verify brand ownership
   const order = db.prepare(`
@@ -990,13 +998,53 @@ router.get('/orders/:id', (req, res) => {
     return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan pada brand ini.' });
   }
 
+  // P1 HORIZONTAL AUTHORIZATION (IDOR Guard - NEW-01):
+  // Check if caller is authenticated staff/operator, authenticated customer, or verified guest
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || req.headers['x-customer-token'] || '').trim();
+  const session = token ? TokenSessionStore.getSession(token) : null;
+  const isOperator = session && ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'].includes(session.role);
+  const isCustomerOwner = session && (session.type === 'customer' || session.role === 'customer') && session.phone === order.customer_phone;
+  const isGuestVerified = (req.query.phone || req.headers['x-customer-phone']) && (req.query.phone || req.headers['x-customer-phone']).trim() === order.customer_phone;
+
+  if (!isOperator && !isCustomerOwner && !isGuestVerified) {
+    return res.status(403).json({
+      success: false,
+      error: 'FORBIDDEN_ORDER_ACCESS',
+      message: 'Akses ditolak: Anda tidak memiliki wewenang untuk melihat detail pesanan ini.'
+    });
+  }
+
   const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
   const delivery = db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(order.id);
   const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order.id);
   const logs = db.prepare('SELECT * FROM order_status_logs WHERE order_id = ? ORDER BY created_at ASC').all(order.id);
 
-  // P1 INFORMATION HIDING & PRIVACY (NEW-02):
-  // Never expose raw_webhook_response or internal gateway config keys to public customer-facing tracking endpoint
+  // P1 INFORMATION HIDING & PRIVACY (NEW-01 & NEW-02):
+  // Return clean DTO projection to prevent internal data/GPS leakage
+  const safeOrder = {
+    id: order.id,
+    order_number: order.order_number,
+    status: order.status,
+    order_type: order.order_type,
+    order_channel: order.order_channel,
+    table_number: order.table_number,
+    subtotal: order.subtotal,
+    delivery_fee: order.delivery_fee,
+    discount_amount: order.discount_amount,
+    grand_total: order.grand_total,
+    payment_method: order.payment_method,
+    order_note: order.order_note,
+    created_at: order.created_at,
+    updated_at: order.updated_at
+  };
+
+  const safeDelivery = delivery ? {
+    destination_address: delivery.destination_address,
+    actual_road_distance_meters: delivery.actual_road_distance_meters,
+    delivery_fee_calculated: delivery.delivery_fee_calculated
+  } : null;
+
   const safePayment = payment ? {
     payment_method: payment.payment_method || payment.provider,
     payment_status: payment.payment_status,
@@ -1007,9 +1055,9 @@ router.get('/orders/:id', (req, res) => {
 
   res.json({
     success: true,
-    order,
+    order: safeOrder,
     items,
-    delivery,
+    delivery: safeDelivery,
     payment: safePayment,
     logs
   });
