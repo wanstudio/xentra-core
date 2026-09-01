@@ -683,8 +683,44 @@
         '</div>';
     });
     container.innerHTML = html;
+
+    // Attach robust momentum touch & drag scroll handler
+    (function enableHorizontalDrag(slider) {
+      var isDown = false;
+      var startX = 0;
+      var scrollLeft = 0;
+
+      slider.onmousedown = function (e) {
+        isDown = true;
+        slider.style.cursor = 'grabbing';
+        startX = e.pageX - slider.offsetLeft;
+        scrollLeft = slider.scrollLeft;
+      };
+
+      window.onmouseup = function () {
+        if (!isDown) return;
+        isDown = false;
+        slider.style.cursor = 'grab';
+      };
+
+      slider.onmousemove = function (e) {
+        if (!isDown) return;
+        e.preventDefault();
+        var x = e.pageX - slider.offsetLeft;
+        var walk = (x - startX) * 1.5;
+        slider.scrollLeft = scrollLeft - walk;
+      };
+
+      slider.onwheel = function (e) {
+        if (e.deltaY !== 0) {
+          slider.scrollLeft += e.deltaY;
+        }
+      };
+    })(container);
+
     container.querySelectorAll('[data-add-upsell]').forEach(function (btn) {
-      btn.onclick = function () {
+      btn.onclick = function (e) {
+        if (e) e.stopPropagation();
         var pid = btn.dataset.addUpsell;
         var found = items.find(function (x) { return String(x.id) === String(pid); });
         if (found) {
