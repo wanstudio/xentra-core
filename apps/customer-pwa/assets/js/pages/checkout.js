@@ -382,8 +382,8 @@
   }
 
   function renderItemsHtml(items) {
-    if (!items.length) return '<div class="x-alt-empty">Keranjang kosong</div>';
-    var html = '';
+    if (!items.length) return '<div class="x-empty-state"><p>Keranjang kosong</p></div>';
+    var html = '<div class="x-card x-checkout-items" id="x-items-card" style="margin:0 14px 10px;padding:16px;border-radius:20px;background:#fff;">';
     items.forEach(function (item) {
       var hasOld = item.regular_price && Number(item.regular_price) > Number(item.price);
       var img = item.image_url || item.image || '';
@@ -392,21 +392,35 @@
       var isPromoFreebie = String(item.id) === 'promo-es-teh-gratis' || Number(item.price) === 0;
 
       html +=
-        '<div class="x-alt-card x-alt-item-card">' +
-        '  <div class="x-alt-item-left">' +
-        '    <div class="x-alt-item-name">' + UI.escape(item.name) + '</div>' +
-        (note ? '<div class="x-alt-item-note">Catatan: ' + UI.escape(note) + '</div>' : '') +
-        '    <div class="x-alt-item-price">' + (isPromoFreebie ? '<s class="x-alt-old">' + fmtIDR(item.regular_price || 5000) + '</s> <b style="color:#16a34a">Gratis</b>' : (hasOld ? '<s class="x-alt-old">' + fmtIDR(item.regular_price) + '</s> ' : '') + '<b>' + fmtIDR(item.price) + '</b>') + '</div>' +
-        '    <div class="x-alt-item-actions">' +
-        '      <button type="button" class="x-alt-note-btn" data-note-item="' + item.id + '"><img src="/assets/icons/write.svg" alt="">Catatan</button>' +
-        '      <div class="x-alt-qty"><button type="button" class="x-alt-qty-btn" data-minus-item="' + item.id + '">−</button><span class="x-alt-qty-val">' + qty + '</span><button type="button" class="x-alt-qty-btn" data-plus-item="' + item.id + '">+</button></div>' +
+        '<div class="x-product x-checkout-item" data-item-id="' + item.id + '">' +
+        '  <div class="x-product-info">' +
+        '    <div class="x-product-name">' + UI.escape(item.name) + '</div>' +
+        (note ? '<div class="x-product-note-inline">Catatan : ' + UI.escape(note) + '</div>' : '') +
+        '    <div class="x-price">' +
+        (isPromoFreebie
+          ? '<div class="x-old-price">' + fmtIDR(item.regular_price || 5000) + '</div><div class="x-current-price" style="color:#16a34a;">Gratis</div>'
+          : (hasOld ? '<div class="x-old-price">' + fmtIDR(item.regular_price) + '</div>' : '') + '<div class="x-current-price">' + fmtIDR(item.price) + '</div>'
+        ) +
         '    </div>' +
         '  </div>' +
-        '  <div class="x-alt-item-right">' +
-        '    <div class="x-alt-item-img-wrap">' + (img ? '<img src="' + UI.escape(img) + '" alt="" onerror="this.parentElement.innerHTML=\'<div class=\\\'x-alt-img-ph\\\'></div>\'">' : '<div class="x-alt-img-ph"></div>') + '</div>' +
+        '  <div class="x-product-right">' +
+        (img
+          ? '<img class="x-product-image" src="' + UI.escape(img) + '" alt="' + UI.escape(item.name) + '" loading="lazy" onerror="this.src=\'/assets/icons/food-default.png\'">'
+          : '<div class="x-product-image" style="background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:24px;">🍱</div>'
+        ) +
+        '    <div class="x-quantity">' +
+        '      <button type="button" data-minus-item="' + item.id + '" aria-label="Kurang">−</button>' +
+        '      <span class="x-quantity-value">' + qty + '</span>' +
+        '      <button type="button" data-plus-item="' + item.id + '" aria-label="Tambah">+</button>' +
+        '    </div>' +
+        '    <button type="button" class="x-note-button' + (note ? ' has-note' : '') + '" data-note-item="' + item.id + '">' +
+        '      <img src="/assets/icons/write.svg" alt="" class="x-note-icon">' +
+        '      <span>Catatan</span>' +
+        '    </button>' +
         '  </div>' +
         '</div>';
     });
+    html += '</div>';
     return html;
   }
 
@@ -527,6 +541,9 @@
         var it = Store.findCartItem(btn.dataset.minusItem);
         if (it) Store.setQty(it.id, Number(it.quantity) - 1);
       };
+    });
+    checkoutContainer.querySelectorAll('[data-note-item]').forEach(function (btn) {
+      btn.onclick = function () { openItemNoteSheet(btn.dataset.noteItem); };
     });
   }
 
