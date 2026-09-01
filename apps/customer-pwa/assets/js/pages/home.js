@@ -418,40 +418,86 @@
 
     document.body.appendChild(overlay);
 
-    // Animate in
-    requestAnimationFrame(function () {
-      requestAnimationFrame(function () {
-        overlay.classList.add('open');
-      });
-    });
-
-    // Events
+    var sheet = overlay.querySelector('.x-note-sheet');
     var input = overlay.querySelector('#x-note-input');
     var counter = overlay.querySelector('#x-note-counter');
+
+    function updateViewport() {
+      if (!overlay.parentNode || !sheet) return;
+      var vv = window.visualViewport;
+      if (!vv) {
+        sheet.style.setProperty('--x-note-keyboard', '0px');
+        sheet.style.setProperty('--x-note-visible-height', '75dvh');
+        return;
+      }
+      var keyboardHeight = Math.max(0, window.innerHeight - (vv.offsetTop + vv.height));
+      sheet.style.setProperty('--x-note-keyboard', keyboardHeight + 'px');
+      sheet.style.setProperty('--x-note-visible-height', vv.height + 'px');
+    }
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewport);
+      window.visualViewport.addEventListener('scroll', updateViewport);
+    }
+
+    // Force layout reflow before slide-up
+    void overlay.offsetHeight;
+
+    // Animate in
+    requestAnimationFrame(function () {
+      overlay.classList.add('open');
+      setTimeout(function () {
+        if (input) input.focus();
+        updateViewport();
+      }, 350);
+    });
 
     input.addEventListener('input', function () {
       if (input.value.length > 150) input.value = input.value.slice(0, 150);
       counter.textContent = input.value.length + '/150';
     });
 
+    var isClosing = false;
+    function closeNote() {
+      if (isClosing) return;
+      isClosing = true;
+      if (input) input.blur();
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewport);
+        window.visualViewport.removeEventListener('scroll', updateViewport);
+      }
+      overlay.classList.remove('open');
+      setTimeout(function () {
+        if (overlay.parentNode) overlay.remove();
+      }, 380);
+    }
+
+    if (window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
+      window.XentraNav.pushClose(closeNote);
+    }
+
     // Close on backdrop tap
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) closeNote();
+      if (e.target === overlay) {
+        if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+          window.XentraNav.close();
+        } else {
+          closeNote();
+        }
+      }
     });
 
     // Save
     overlay.querySelector('#x-note-save').onclick = function () {
       Store.setNote(productId, input.value.trim());
-      closeNote();
+      if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+        window.XentraNav.close();
+      } else {
+        closeNote();
+      }
       renderProducts();
     };
 
-    function closeNote() {
-      overlay.classList.remove('open');
-      setTimeout(function () { overlay.remove(); }, 400);
-    }
-
-    // Attach close function for XentraNav
     overlay.__xentraClose = closeNote;
   }
 
