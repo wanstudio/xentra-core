@@ -53,6 +53,20 @@ class CashSettlementService {
       throw new Error(`[CashSettlementService] Uang yang diterima (Rp ${tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${amount.toLocaleString('id-ID')}).`);
     }
 
+    // P1 IDEMPOTENCY GUARD: Return early if cash payment was already settled to prevent double revenue / events
+    const existingPayment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
+    if (existingPayment && existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT) {
+      return {
+        success: true,
+        idempotent: true,
+        payment_id: existingPayment.id,
+        order_id,
+        amount: Number(existingPayment.amount),
+        payment_status: PaymentModel.STATUSES.SETTLEMENT,
+        message: 'Pembayaran tunai sudah diselesaikan sebelumnya.'
+      };
+    }
+
     const change = tendered - amount;
     const paymentId = `pay_cash_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();

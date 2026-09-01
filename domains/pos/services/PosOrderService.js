@@ -389,9 +389,10 @@ class PosOrderService {
       }
 
       // Record authoritative cash payment lifecycle in order_payments and emit event
+      let cashSettlementResult = null;
       try {
         const { CashSettlementService } = require('../../payment');
-        CashSettlementService.settleCashPayment({
+        cashSettlementResult = CashSettlementService.settleCashPayment({
           order_id: order.id,
           amount: grandTotal,
           amount_tendered: amount_tendered || grandTotal,
@@ -400,15 +401,15 @@ class PosOrderService {
       } catch (e) {
         console.warn('[PosOrderService] Cash settlement record warning:', e.message);
       }
-    }
 
-    // 4. Update Shift Total Cash Sales if shift_id provided and payment is cash (excluding non-transactional reservation)
-    if (shift_id && payment_method === 'cash' && order_type !== 'reservation') {
-      db.prepare(`
-        UPDATE pos_shifts
-        SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
-        WHERE id = ?
-      `).run(grandTotal, grandTotal, shift_id);
+      // 4. Update Shift Total Cash Sales only if shift_id provided and this is a NEW settlement (P1 IDEMPOTENCY: Do not double-count on retry)
+      if (shift_id && (!cashSettlementResult || !cashSettlementResult.idempotent)) {
+        db.prepare(`
+          UPDATE pos_shifts
+          SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
+          WHERE id = ?
+        `).run(grandTotal, grandTotal, shift_id);
+      }
     }
 
     // 5. If settled from held bill, mark held order as settled

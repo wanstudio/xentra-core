@@ -83,6 +83,15 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
       amount_tendered: 1000
     });
   }, /tidak sesuai dengan total tagihan order/);
+
+  // Verify Idempotency Guard: second cash settlement returns idempotent: true without duplicate mutations
+  const secondResult = CashSettlementService.settleCashPayment({
+    order_id: orderId,
+    amount: 50000,
+    amount_tendered: 50000
+  });
+  assert.strictEqual(secondResult.success, true);
+  assert.strictEqual(secondResult.idempotent, true);
 });
 
 // ==============================================================================
