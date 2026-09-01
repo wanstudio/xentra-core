@@ -169,14 +169,14 @@ test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell pre
       { product_id: 'prod_limited', quantity: 2, expected_price: 50000 }
     ],
     delivery_fee: 10000,
-    payment_method: 'midtrans',
+    payment_method: 'cash',
     trace_context: { correlation_id: 'corr_test_order_flow' }
   });
 
   assert.strictEqual(orderResult.success, true);
   assert.strictEqual(orderResult.order.grand_total, 110000);
 
-  // 1. Verify Stock actually decremented in database to 2
+  // 1. Verify Stock actually decremented in database to 2 for confirmed cash order
   const updatedBranchRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
   assert.strictEqual(updatedBranchRow.stock, 2, 'Live stock must be decremented from 4 to 2');
 
@@ -194,6 +194,7 @@ test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell pre
     brand_id: 'brand_test',
     branch_id: 'branch_test',
     customer: { name: 'Customer Race', phone: '6288888888' },
+    payment_method: 'cash',
     items: [{ product_id: 'prod_limited', quantity: 3, expected_price: 50000 }]
   });
   assert.strictEqual(raceResult.success, false);

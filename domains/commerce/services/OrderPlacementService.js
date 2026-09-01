@@ -251,35 +251,38 @@ class OrderPlacementService {
           item.note || ''
         );
 
-        // Optimistic concurrency guard: Deduct live inventory for active fulfillment
-        const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch_id, item.product_id);
-        const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
+        // P1 INVENTORY TIMING & DOS GUARD: Only deduct live physical stock immediately for CASH/POS orders.
+        // For online payment gateways (Midtrans), physical stock is safely deducted upon payment settlement (payment.settled webhook).
+        if (effectivePaymentMethod === 'cash') {
+          const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch_id, item.product_id);
+          const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
 
-        const deductResult = guardedDeductStockStmt.run(item.quantity, branch_id, item.product_id, item.quantity);
-        if (!deductResult || deductResult.changes === 0) {
-          throw new Error(`[CONCURRENCY_RACE] Stok untuk produk "${item.name}" baru saja habis atau tidak mencukupi.`);
+          const deductResult = guardedDeductStockStmt.run(item.quantity, branch_id, item.product_id, item.quantity);
+          if (!deductResult || deductResult.changes === 0) {
+            throw new Error(`[CONCURRENCY_RACE] Stok untuk produk "${item.name}" baru saja habis atau tidak mencukupi.`);
+          }
+
+          const currentStock = prevStock - Number(item.quantity);
+          const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
+
+          // Authoritative Cross-Domain Integration: Write immutable ledger record in Inventory domain table
+          db.prepare(`
+            INSERT INTO inventory_movements (
+              id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
+            ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            movementId,
+            branch_id,
+            item.product_id,
+            -Number(item.quantity),
+            prevStock,
+            currentStock,
+            orderNumber,
+            customer.phone || 'customer_order',
+            `Pemotongan stok otomatis pesanan ${orderNumber} (${effectiveOrderType}/${order_channel})`,
+            now
+          );
         }
-
-        const currentStock = prevStock - Number(item.quantity);
-        const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
-
-        // Authoritative Cross-Domain Integration: Write immutable ledger record in Inventory domain table
-        db.prepare(`
-          INSERT INTO inventory_movements (
-            id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
-          ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          movementId,
-          branch_id,
-          item.product_id,
-          -Number(item.quantity),
-          prevStock,
-          currentStock,
-          orderNumber,
-          customer.phone || 'customer_order',
-          `Pemotongan stok otomatis pesanan ${orderNumber} (${effectiveOrderType}/${order_channel})`,
-          now
-        );
       }
 
       // Save delivery record if provided (e.g. online delivery checkout)
@@ -316,31 +319,33 @@ class OrderPlacementService {
       };
     }
 
-    // 4. Low-stock evaluation & Event Dispatching (After Transaction Commit)
-    for (const item of verifiedItems) {
-      const remainingStock = item.current_stock - item.quantity;
-      const branchThreshold = item.branch_low_stock_threshold != null 
-        ? item.branch_low_stock_threshold 
-        : LowStockThresholdModel.DEFAULT_THRESHOLD;
-      const stockEval = LowStockThresholdModel.evaluate(remainingStock, branchThreshold);
+    // 4. Low-stock evaluation & Event Dispatching (After Transaction Commit for cash orders)
+    if (effectivePaymentMethod === 'cash') {
+      for (const item of verifiedItems) {
+        const remainingStock = item.current_stock - item.quantity;
+        const branchThreshold = item.branch_low_stock_threshold != null 
+          ? item.branch_low_stock_threshold 
+          : LowStockThresholdModel.DEFAULT_THRESHOLD;
+        const stockEval = LowStockThresholdModel.evaluate(remainingStock, branchThreshold);
 
-      if (stockEval.is_low || stockEval.is_out_of_stock) {
-        events.EventBus.publish({
-          type: 'inventory.low_stock_warning',
-          producer: 'commerce',
-          payload: {
-            branch_id,
-            product_id: item.product_id,
-            product_name: item.name,
-            remaining_stock: remainingStock,
-            threshold: stockEval.threshold,
-            is_out_of_stock: stockEval.is_out_of_stock
-          },
-          context: {
-            correlation_id: trace_context.correlation_id,
-            causation_id: orderId
-          }
-        }).catch(() => {});
+        if (stockEval.is_low || stockEval.is_out_of_stock) {
+          events.EventBus.publish({
+            type: 'inventory.low_stock_warning',
+            producer: 'commerce',
+            payload: {
+              branch_id,
+              product_id: item.product_id,
+              product_name: item.name,
+              remaining_stock: remainingStock,
+              threshold: stockEval.threshold,
+              is_out_of_stock: stockEval.is_out_of_stock
+            },
+            context: {
+              correlation_id: trace_context.correlation_id,
+              causation_id: orderId
+            }
+          }).catch(() => {});
+        }
       }
     }
 
@@ -365,6 +370,8 @@ class OrderPlacementService {
       }
     });
 
+    const initialStatus = effectivePaymentMethod === 'cash' ? 'confirmed' : 'pending';
+
     return {
       success: true,
       status: 'VERIFIED',
@@ -381,11 +388,88 @@ class OrderPlacementService {
         subtotal,
         delivery_fee,
         grand_total: grandTotal,
-        status: 'pending',
+        status: initialStatus,
         items: verifiedItems,
         created_at: now
       }
     };
+  }
+
+  /**
+   * Executes atomic stock deduction and ledger entry when an online order is settled.
+   * 
+   * @param {string} orderId
+   * @returns {{ success: boolean, deducted_items: Array<Object> }}
+   */
+  static deductStockForSettledOrder(orderId) {
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+    if (!order) {
+      throw new Error(`[OrderPlacementService] Order "${orderId}" tidak ditemukan.`);
+    }
+
+    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(orderId);
+    if (!items || items.length === 0) {
+      return { success: true, deducted_items: [] };
+    }
+
+    const guardedDeductStockStmt = db.prepare(`
+      UPDATE branch_products
+      SET stock = stock - ?, updated_at = datetime('now')
+      WHERE branch_id = ? AND product_id = ? AND stock >= ?
+    `);
+
+    const now = new Date().toISOString();
+    const deductedItems = [];
+
+    db.exec('BEGIN TRANSACTION;');
+    try {
+      for (const item of items) {
+        const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(order.branch_id, item.product_id);
+        const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
+
+        const deductResult = guardedDeductStockStmt.run(item.quantity, order.branch_id, item.product_id, item.quantity);
+        if (!deductResult || deductResult.changes === 0) {
+          // If stock went below requested after placement, deduct whatever is remaining or record stock depleted
+          db.prepare('UPDATE branch_products SET stock = 0, updated_at = datetime(\'now\') WHERE branch_id = ? AND product_id = ?').run(order.branch_id, item.product_id);
+        }
+
+        const currentStock = Math.max(0, prevStock - Number(item.quantity));
+        const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
+
+        db.prepare(`
+          INSERT INTO inventory_movements (
+            id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
+          ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          movementId,
+          order.branch_id,
+          item.product_id,
+          -Number(item.quantity),
+          prevStock,
+          currentStock,
+          order.order_number,
+          order.customer_phone || 'online_payment',
+          `Pemotongan stok otomatis pembayaran Midtrans lunas [${order.order_number}]`,
+          now
+        );
+
+        deductedItems.push({
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          previous_stock: prevStock,
+          current_stock: currentStock
+        });
+      }
+
+      db.exec('COMMIT;');
+    } catch (err) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      console.error('[OrderPlacementService] Failed to deduct stock on payment settlement:', err.message);
+      return { success: false, error: err.message };
+    }
+
+    return { success: true, deducted_items: deductedItems };
   }
 }
 

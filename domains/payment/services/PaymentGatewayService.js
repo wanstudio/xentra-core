@@ -220,13 +220,17 @@ class PaymentGatewayService {
       WHERE order_id = ?
     `).run(newPaymentStatus, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
 
-    // If settled, advance order status and emit event
+    // If settled, advance order status, trigger physical stock deduction, and emit event
     if (shouldConfirmOrder) {
       db.prepare(`
         UPDATE orders
         SET status = 'confirmed', payment_method = 'midtrans', updated_at = ?
         WHERE id = ?
       `).run(now, order_id);
+
+      // P1 INVENTORY TIMING: Deduct physical stock only after Midtrans settlement confirmation
+      const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
+      OrderPlacementService.deductStockForSettledOrder(order_id);
 
       events.EventBus.publish({
         type: 'payment.settled',
