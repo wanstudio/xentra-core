@@ -10,39 +10,30 @@ function tenantResolver(req, res, next) {
 
     if (db && typeof db.prepare === 'function') {
       try {
-        // 1. Match by custom domain
+        // 1. Match by exact custom domain
         if (cleanHost) {
           brand = db.prepare('SELECT * FROM brands WHERE custom_domain = ?').get(cleanHost);
         }
 
         // 2. Match by brand slug parameter / header
         if (!brand && brandParam) {
-          brand = db.prepare('SELECT * FROM brands WHERE slug = ?').get(brandParam);
+          brand = db.prepare('SELECT * FROM brands WHERE slug = ? OR id = ?').get(brandParam, brandParam);
         }
 
-        // 3. Match known host variations (dev.mybangjo.com, app.mybangjo.com, *.bangjo.*)
+        // 3. Match known domain pattern (*.bangjo.*) only if host explicitly matches
         if (!brand && cleanHost.includes('bangjo')) {
           brand = db.prepare("SELECT * FROM brands WHERE slug = 'bangjo' OR custom_domain LIKE '%bangjo%' LIMIT 1").get();
         }
 
-        // 4. Localhost, loopback, private IP, staging, or default fallback
-        const isLocalOrDev = !cleanHost ||
+        // 4. Localhost / Test Environment Isolation Fallback ONLY (Never in production for unknown hosts)
+        const isLocalOrTest = !cleanHost ||
           cleanHost === 'localhost' ||
           cleanHost === '127.0.0.1' ||
           cleanHost === '::1' ||
-          cleanHost.startsWith('192.168.') ||
-          cleanHost.startsWith('10.') ||
-          cleanHost.startsWith('172.') ||
-          process.env.NODE_ENV !== 'production';
+          process.env.NODE_ENV === 'test';
 
-        if (!brand && isLocalOrDev) {
+        if (!brand && isLocalOrTest) {
           brand = db.prepare('SELECT * FROM brands ORDER BY created_at ASC LIMIT 1').get();
-        }
-
-        // 5. Ultimate single-tenant resilience fallback
-        if (!brand) {
-          brand = db.prepare('SELECT * FROM brands WHERE slug = ?').get(process.env.DEFAULT_BRAND_SLUG || 'bangjo') ||
-                  db.prepare('SELECT * FROM brands ORDER BY created_at ASC LIMIT 1').get();
         }
       } catch (dbErr) {
         console.error('[TenantResolver DB lookup failure]:', dbErr.message);
@@ -54,7 +45,7 @@ function tenantResolver(req, res, next) {
       }
     }
 
-    // STRICT MULTI-TENANT SECURITY BOUNDARY: Fail-Fast only if database has zero brands
+    // STRICT MULTI-TENANT SECURITY BOUNDARY: Fail-Closed if tenant is unknown
     if (!brand) {
       return res.status(404).json({
         success: false,

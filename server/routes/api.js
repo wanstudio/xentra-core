@@ -292,52 +292,28 @@ router.post('/auth/otp/trust', (req, res) => {
 // 5. Menu Catalog & Home
 router.get(['/catalog/menu', '/home'], (req, res) => {
   try {
-    const brandId = req.brand_id || 'brand_bangjo';
+    const brandId = req.brand_id;
     let categories = [];
     let products = [];
 
     try {
+      // P1 STRICT TENANT ISOLATION (NEW-01 & NEW-03):
+      // Only query categories and products belonging exclusively to the resolved brand_id
       categories = db
-        .prepare('SELECT * FROM categories WHERE brand_id = ? OR brand_id = "brand_bangjo" OR brand_id IS NULL ORDER BY sort_order ASC')
+        .prepare('SELECT * FROM categories WHERE brand_id = ? ORDER BY sort_order ASC')
         .all(brandId);
 
       products = db
-        .prepare('SELECT * FROM products WHERE (brand_id = ? OR brand_id = "brand_bangjo" OR brand_id IS NULL) AND (is_active = 1 OR is_active IS NULL) ORDER BY sort_order ASC')
+        .prepare('SELECT * FROM products WHERE brand_id = ? AND (is_active = 1 OR is_active IS NULL) ORDER BY sort_order ASC')
         .all(brandId);
     } catch (dbErr) {
       console.warn('[Catalog Menu DB Warn]:', dbErr.message);
     }
 
-    if (!categories || categories.length === 0) {
-      categories = [
-        { id: 34, name: 'Rekom', slug: 'rekom', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png' },
-        { id: 20, name: 'Paket Ayam', slug: 'paket-ayam', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png' },
-        { id: 26, name: 'Mie Bangjo', slug: 'mie-bangjo', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png' },
-        { id: 35, name: 'Terlaris', slug: 'terlaris', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png' },
-        { id: 22, name: 'Minuman', slug: 'minuman', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-        { id: 21, name: 'Udang', slug: 'udang', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-May-25-2026-01_57_13-PM.png' }
-      ];
-    }
-
-    if (!products || products.length === 0) {
-      products = [
-        { id: 272, category_id: 34, name: 'Paket Spesial Semar', price: 35000, regular_price: 38000, description: 'Nasi + Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-        { id: 285, category_id: 34, name: 'Paket Spesial Petruk', price: 35000, regular_price: 37000, description: 'Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
-        { id: 345, category_id: 34, name: 'Mie Gurih', price: 15000, regular_price: 17000, description: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-        { id: 286, category_id: 20, name: 'Ayam Tulang Lunak Bakar', price: 28000, regular_price: 32000, description: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-        { id: 287, category_id: 26, name: 'Mie Godog Jawa Asli', price: 22000, regular_price: 25000, description: 'Mie godog kuah gurih kaldu kental ayam kampung dengan telor dan sayur segar.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-        { id: 288, category_id: 22, name: 'Es Kopi Susu Bangjo', price: 15000, regular_price: 18000, description: 'Kopi susu gula aren racikan istimewa barista Bangjo dingin segar.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-        { id: 401, category_id: 22, name: 'Es Teh Manis', price: 5000, regular_price: 5000, description: 'Teh melati wangi diseduh segar dingin menyegarkan', image_url: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400' },
-        { id: 402, category_id: 22, name: 'Es Jeruk Segar', price: 8000, regular_price: 10000, description: 'Jeruk peras murni segar', image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400' }
-      ];
-    }
-
-    const tree = categories.map((cat) => {
-      let catProducts = products.filter((p) => String(p.category_id) === String(cat.id) || String(p.cat) === String(cat.id));
+    const tree = (categories || []).map((cat) => {
+      let catProducts = (products || []).filter((p) => String(p.category_id) === String(cat.id) || String(p.cat) === String(cat.id));
       if (catProducts.length === 0 && (cat.name === 'Rekom' || cat.slug === 'rekom')) {
-        catProducts = products.slice(0, 3);
-      } else if (catProducts.length === 0) {
-        catProducts = products.filter((p) => String(p.category_id) === String(cat.id));
+        catProducts = (products || []).slice(0, 3);
       }
 
       return {
@@ -355,7 +331,7 @@ router.get(['/catalog/menu', '/home'], (req, res) => {
       };
     });
 
-    const allNormalized = products.map((p) => ({
+    const allNormalized = (products || []).map((p) => ({
       ...p,
       image: p.image_url || p.image || '',
       image_url: p.image_url || p.image || '',
@@ -386,44 +362,25 @@ router.get(['/catalog/menu', '/home'], (req, res) => {
 // 5.1 Products List Endpoint (with Category Filtering)
 router.get('/products', (req, res) => {
   try {
-    const brandId = req.brand_id || 'brand_bangjo';
+    const brandId = req.brand_id;
     const cat = req.query.category;
     let products = [];
     try {
+      // P1 STRICT TENANT ISOLATION (NEW-01 & NEW-03):
+      // Filter strictly by requested category within authoritative brand_id
       if (cat && cat !== 'all') {
         products = db.prepare(`
           SELECT DISTINCT p.* FROM products p
-          WHERE (p.brand_id = ? OR p.brand_id = 'brand_bangjo' OR p.brand_id IS NULL)
+          WHERE p.brand_id = ?
             AND (p.category_id = ? OR ? = 'all')
             AND (p.is_active = 1 OR p.is_active IS NULL)
           ORDER BY p.sort_order ASC
         `).all(brandId, cat, cat);
       } else {
-        products = db.prepare('SELECT * FROM products WHERE (brand_id = ? OR brand_id = "brand_bangjo" OR brand_id IS NULL) AND (is_active = 1 OR is_active IS NULL) ORDER BY sort_order ASC').all(brandId);
+        products = db.prepare('SELECT * FROM products WHERE brand_id = ? AND (is_active = 1 OR is_active IS NULL) ORDER BY sort_order ASC').all(brandId);
       }
     } catch (err) {
       console.warn('[Products DB Error]:', err.message);
-    }
-
-    if (!products || products.length === 0) {
-      const defaultProducts = [
-        { id: 272, category_id: 34, name: 'Paket Spesial Semar', price: 35000, regular_price: 38000, description: 'Nasi + Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-        { id: 285, category_id: 34, name: 'Paket Spesial Petruk', price: 35000, regular_price: 37000, description: 'Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
-        { id: 345, category_id: 34, name: 'Mie Gurih', price: 15000, regular_price: 17000, description: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-        { id: 286, category_id: 20, name: 'Ayam Tulang Lunak Bakar', price: 28000, regular_price: 32000, description: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-        { id: 287, category_id: 26, name: 'Mie Godog Jawa Asli', price: 22000, regular_price: 25000, description: 'Mie godog kuah gurih kaldu kental ayam kampung dengan telor dan sayur segar.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-        { id: 288, category_id: 22, name: 'Es Kopi Susu Bangjo', price: 15000, regular_price: 18000, description: 'Kopi susu gula aren racikan istimewa barista Bangjo dingin segar.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-        { id: 401, category_id: 22, name: 'Es Teh Manis', price: 5000, regular_price: 5000, description: 'Teh melati wangi diseduh segar dingin menyegarkan', image_url: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400' },
-        { id: 402, category_id: 22, name: 'Es Jeruk Segar', price: 8000, regular_price: 10000, description: 'Jeruk peras murni segar', image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400' }
-      ];
-      if (cat && cat !== 'all') {
-        products = defaultProducts.filter(p => String(p.category_id) === String(cat));
-        if (products.length === 0 && (cat === '34' || cat === 'rekom')) {
-          products = defaultProducts.slice(0, 3);
-        }
-      } else {
-        products = defaultProducts;
-      }
     }
 
     const normalized = (products || []).map((p) => ({
