@@ -897,12 +897,13 @@
   right: 0 !important;
   bottom: var(--x-note-keyboard, 0px) !important;
   width: 100% !important;
-  height: min(75dvh, var(--x-note-visible-height, 75dvh)) !important;
-  max-height: none !important;
-  margin: 0 !important;
+  max-width: 480px !important;
+  margin: 0 auto !important;
+  height: auto !important;
+  max-height: min(440px, var(--x-note-visible-height, 60dvh)) !important;
   background: var(--x-white);
-  border-radius: var(--x-radius-xl) var(--x-radius-xl) 0 0;
-  padding: 8px 26px max(12px, var(--x-safe-bottom));
+  border-radius: 22px 22px 0 0;
+  padding: 10px 20px max(14px, var(--x-safe-bottom));
   transform: translateY(105%);
   transition: transform var(--x-duration-sheet) var(--x-ease-sheet);
   display: flex !important;
@@ -910,6 +911,7 @@
   overflow: hidden;
   touch-action: pan-y;
   box-sizing: border-box !important;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.2);
 }
 
 .x-note-overlay.open .x-note-sheet {
@@ -941,8 +943,9 @@
 
 #x-note-input {
   width: 100%;
-  min-height: 0;
-  padding: 12px 0;
+  min-height: 100px;
+  max-height: 130px;
+  padding: 10px 0;
   border: 0;
   outline: 0;
   resize: none;
@@ -951,7 +954,7 @@
   font-family: var(--x-font);
   font-size: 14px;
   line-height: 21px;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   box-sizing: border-box;
 }
 

@@ -6,7 +6,7 @@
  * 3. Cache-Fallback for genuine offline operation
  * 4. Automatic purge of old version caches on activation
  */
-const CACHE_NAME = "bangjo-pwa-BUILD_HASH";
+const CACHE_NAME = "bangjo-pwa-3793af4";
 const ASSETS_TO_CACHE = [
   "/",
   "/manifest.json",
