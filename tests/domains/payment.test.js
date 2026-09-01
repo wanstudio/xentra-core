@@ -455,3 +455,48 @@ test('Payment 6 — Terminal State Invariant: rejects settlement on cancelled / 
   const finalOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
   assert.strictEqual(finalOrder.status, 'cancelled');
 });
+
+// ==============================================================================
+// Payment 7 — Midtrans Webhook: Strictly rejects amount mismatch (Finding 1 / Business Integrity)
+// ==============================================================================
+test('Payment 7 — Midtrans Webhook: strictly rejects amount mismatch even with valid cryptographic signature', () => {
+  const orderId = `ord_test_mismatch_${Date.now()}`;
+  const orderNumber = `XN-MISMATCH-${Date.now()}`;
+
+  // Actual internal order is Rp 100.000
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Mismatch', '62812345678', 'delivery', 'customer_app', 100000, 100000, 'midtrans', 'pending')
+  `).run(orderId, orderNumber);
+
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
+    VALUES (?, ?, 'midtrans', 'M12345', 'snap_token_mismatch', 'pending', 100000)
+  `).run(`pay_mismatch_${Date.now()}`, orderId);
+
+  const serverKey = 'SB-Mid-server-test12345';
+  const statusCode = '200';
+  const spoofedGrossAmount = '50000.00'; // Only paid 50k instead of 100k
+
+  // Valid cryptographic signature for the spoofed 50k amount
+  const rawSig = `${orderId}${statusCode}${spoofedGrossAmount}${serverKey}`;
+  const validCryptoSig = crypto.createHash('sha512').update(rawSig).digest('hex');
+
+  // Attempt settlement with mismatched amount -> STRICTLY REJECTED by Business Integrity Guard
+  assert.throws(() => {
+    PaymentGatewayService.handleWebhook({
+      order_id: orderId,
+      status_code: statusCode,
+      gross_amount: spoofedGrossAmount,
+      signature_key: validCryptoSig,
+      transaction_status: 'settlement',
+      payment_type: 'qris'
+    });
+  }, /PAYMENT_AMOUNT_MISMATCH/);
+
+  // Assert order & payment remain pending and NOT confirmed
+  const pendingOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
+  const pendingPayment = db.prepare('SELECT payment_status FROM order_payments WHERE order_id = ?').get(orderId);
+  assert.strictEqual(pendingOrder.status, 'pending');
+  assert.strictEqual(pendingPayment.payment_status, 'pending');
+});

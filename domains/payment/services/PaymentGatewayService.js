@@ -234,6 +234,24 @@ class PaymentGatewayService {
       );
     }
 
+    // P1 AUTHORITATIVE FINANCIAL INTEGRITY GUARD:
+    // Strictly verify that Gateway Amount === Order Grand Total === Internal Payment Record Amount
+    if (shouldConfirmOrder || newPaymentStatus === PaymentModel.STATUSES.SETTLEMENT) {
+      const gatewayAmount = Number(gross_amount);
+      const orderAmount = order ? Number(order.grand_total) : null;
+      const paymentAmount = Number(payment.amount);
+
+      if (
+        !Number.isFinite(gatewayAmount) ||
+        (orderAmount !== null && Math.round(gatewayAmount) !== Math.round(orderAmount)) ||
+        Math.round(gatewayAmount) !== Math.round(paymentAmount)
+      ) {
+        throw new Error(
+          `[PAYMENT_AMOUNT_MISMATCH]: Nominal pembayaran gateway (Rp ${gatewayAmount}) tidak cocok dengan tagihan order (Rp ${orderAmount}) atau payment record (Rp ${paymentAmount}). Transaksi settlement ditolak demi integritas finansial.`
+        );
+      }
+    }
+
     const now = new Date().toISOString();
 
     // P1 ATOMICITY INVARIANT (Finding 3): Unify payment update, order confirmation, stock deduction, and ledger into single atomic transaction
