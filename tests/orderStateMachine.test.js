@@ -49,3 +49,34 @@ test('OrderStateMachine: transitions order and inserts audit log', () => {
   assert.strictEqual(logs[0].new_status, 'confirmed');
   assert.strictEqual(logs[0].note, 'Payment captured');
 });
+
+test('OrderStateMachine: strictly rejects operational cancellation on order with settled payment (NEW-01)', () => {
+  const orderId = 'test_ord_paid_' + crypto.randomBytes(4).toString('hex');
+  const orderNum = 'TEST-PAID-' + crypto.randomBytes(4).toString('hex');
+  
+  // Insert confirmed order with settled payment
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, status, subtotal, grand_total)
+    VALUES (?, ?, 'brand_bangjo', 'branch_bangjo_barat', 'Pelanggan Lunas', '081234567890', 'delivery', 'confirmed', 75000, 75000)
+  `).run(orderId, orderNum);
+
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, payment_status, amount)
+    VALUES (?, ?, 'midtrans', 'settlement', 75000)
+  `).run('pay_' + crypto.randomBytes(4).toString('hex'), orderId);
+
+  // Attempt operational cancellation -> STRICTLY REJECTED by Financial Guard
+  assert.throws(() => {
+    OrderStateMachine.transition({
+      order_id: orderId,
+      target_status: 'cancelled',
+      actor_type: 'staff',
+      actor_id: 'mgr_andi',
+      note: 'Bahan mendadak habis'
+    });
+  }, /ORDER_ALREADY_PAID/);
+
+  // Verify status remains confirmed
+  const orderAfter = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(orderAfter.status, 'confirmed');
+});

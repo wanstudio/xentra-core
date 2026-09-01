@@ -54,6 +54,23 @@ class OrderStateMachine {
         );
       }
 
+      // P1 FINANCIAL INTEGRITY INVARIANT (NEW-01):
+      // An order with an active settled payment CANNOT be casually cancelled via operational transition.
+      // It requires an explicit refund workflow so financial and inventory ledger remain strictly reconcilable.
+      if (target_status === 'cancelled') {
+        const settledPayment = db.prepare(`
+          SELECT id, payment_status, amount, provider 
+          FROM order_payments 
+          WHERE order_id = ? AND payment_status = 'settlement'
+        `).get(order_id);
+
+        if (settledPayment) {
+          throw new Error(
+            `[ORDER_ALREADY_PAID]: Pesanan "${order_id}" sudah dibayar lunas (Rp ${settledPayment.amount} via ${settledPayment.provider}). Pembatalan operasional ditolak untuk mencegah anomali finansial. Silakan gunakan alur Refund resmi.`
+          );
+        }
+      }
+
       // 2. Optimistic Compare-and-Swap: Update only if status hasn't changed concurrently
       const updateResult = db.prepare(`
         UPDATE orders 
