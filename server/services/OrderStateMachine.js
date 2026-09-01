@@ -2,13 +2,14 @@ const db = require('../database/db');
 const crypto = require('crypto');
 
 class OrderStateMachine {
+  // P1 SEPARATION OF CONCERNS: Operational transitions strictly exclude financial 'refunded'
   static VALID_TRANSITIONS = {
     pending: ['confirmed', 'cancelled'],
-    confirmed: ['preparing', 'cancelled', 'refunded'],
-    preparing: ['ready', 'cancelled', 'refunded'],
-    ready: ['out_for_delivery', 'completed', 'cancelled', 'refunded'],
-    out_for_delivery: ['completed', 'cancelled', 'refunded'],
-    completed: ['refunded'],
+    confirmed: ['preparing', 'cancelled'],
+    preparing: ['ready', 'cancelled'],
+    ready: ['out_for_delivery', 'completed', 'cancelled'],
+    out_for_delivery: ['completed', 'cancelled'],
+    completed: [],
     cancelled: [],
     refunded: []
   };

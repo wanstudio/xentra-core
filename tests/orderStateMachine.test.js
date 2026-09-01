@@ -12,6 +12,9 @@ test('OrderStateMachine: enforces strict transition rules', () => {
   assert.strictEqual(OrderStateMachine.canTransition('ready', 'out_for_delivery'), true);
   assert.strictEqual(OrderStateMachine.canTransition('out_for_delivery', 'completed'), true);
   assert.strictEqual(OrderStateMachine.canTransition('completed', 'pending'), false); // Cannot revert completed to pending
+  // P1 SEPARATION OF CONCERNS: Operational state machine strictly excludes financial 'refunded'
+  assert.strictEqual(OrderStateMachine.canTransition('confirmed', 'refunded'), false);
+  assert.strictEqual(OrderStateMachine.canTransition('completed', 'refunded'), false);
 });
 
 test('OrderStateMachine: transitions order and inserts audit log', () => {

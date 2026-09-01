@@ -998,12 +998,13 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
 
     // P1 ROLE-BASED TRANSITION AUTHORITY (FINDING-02A)
     // Kitchen role can ONLY advance operational cooking stages ('preparing', 'ready')
-    // Financial/Governance actions ('cancelled', 'refunded') strictly require manager/owner authority
+    // Manager/Owner can advance operational fulfillment lifecycle and cancellation ('cancelled')
+    // Financial/Refund state is EXCLUSIVELY handled via dedicated RefundService
     const ROLE_ALLOWED_TARGET_STATUSES = {
       kitchen: ['preparing', 'ready'],
-      branch_manager: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled', 'refunded'],
-      brand_manager: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled', 'refunded'],
-      owner: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled', 'refunded']
+      branch_manager: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'],
+      brand_manager: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'],
+      owner: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled']
     };
 
     const allowedTargetStatuses = ROLE_ALLOWED_TARGET_STATUSES[req.user.role] || [];
