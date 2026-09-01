@@ -13,7 +13,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_324592c';
+      var PWA_VERSION = 'v_a8b9ccc';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -41,12 +41,12 @@
   <link rel="manifest" href="/manifest.json">
 
   <!-- CSS (version-hashed for instant cache-busting) -->
-  <link rel="stylesheet" href="/assets/css/tokens.css?v=324592c">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=324592c">
-  <link rel="stylesheet" href="/assets/css/components.css?v=324592c">
-  <link rel="stylesheet" href="/assets/css/home.css?v=324592c">
-  <link rel="stylesheet" href="/assets/css/checkout.css?v=324592c">
-  <link rel="stylesheet" href="/assets/css/order-received.css?v=324592c">
+  <link rel="stylesheet" href="/assets/css/tokens.css?v=a8b9ccc">
+  <link rel="stylesheet" href="/assets/css/layout.css?v=a8b9ccc">
+  <link rel="stylesheet" href="/assets/css/components.css?v=a8b9ccc">
+  <link rel="stylesheet" href="/assets/css/home.css?v=a8b9ccc">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=a8b9ccc">
+  <link rel="stylesheet" href="/assets/css/order-received.css?v=a8b9ccc">
 </head>
 <body>
 
@@ -196,16 +196,16 @@
   <!-- ═══════════════════════════════════════════════════
        JS CORE & CONTROLLERS (Version Hashed v2.3.0)
        ═══════════════════════════════════════════════════ -->
-  <script src="/assets/js/core/store.js?v=324592c"></script>
-  <script src="/assets/js/core/ui.js?v=324592c"></script>
-  <script src="/assets/js/core/api.js?v=324592c"></script>
-  <script src="/assets/js/core/nav.js?v=324592c"></script>
-  <script src="/assets/js/core/router.js?v=324592c"></script>
+  <script src="/assets/js/core/store.js?v=a8b9ccc"></script>
+  <script src="/assets/js/core/ui.js?v=a8b9ccc"></script>
+  <script src="/assets/js/core/api.js?v=a8b9ccc"></script>
+  <script src="/assets/js/core/nav.js?v=a8b9ccc"></script>
+  <script src="/assets/js/core/router.js?v=a8b9ccc"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=324592c"></script>
-  <script src="/assets/js/pages/checkout.js?v=324592c"></script>
-  <script src="/assets/js/pages/order-received.js?v=324592c"></script>
+  <script src="/assets/js/pages/home.js?v=a8b9ccc"></script>
+  <script src="/assets/js/pages/checkout.js?v=a8b9ccc"></script>
+  <script src="/assets/js/pages/order-received.js?v=a8b9ccc"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -275,63 +275,14 @@
   </script>
 
   <!-- ═══════════════════════════════════════════════════
-       SERVICE WORKER ENGINE (Gojek / Twitter PWA Pattern)
+       SERVICE WORKER ENGINE (Clean & Smooth)
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=324592c').then(function (reg) {
-        // Trigger immediate background update check on app launch
-        reg.update();
-
-        // Check on tab focus / app reopen
-        document.addEventListener('visibilitychange', function () {
-          if (document.visibilityState === 'visible') {
-            reg.update();
-          }
-        });
-
-        // Listen for new worker installation
-        reg.addEventListener('updatefound', function () {
-          var newWorker = reg.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', function () {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[PWA] New version ready. Applying update...');
-                window.location.reload();
-              }
-            });
-          }
-        });
-      }).catch(function (err) {
+      navigator.serviceWorker.register('/sw.js?v=a8b9ccc').catch(function (err) {
         console.warn('[PWA] Registration warn:', err);
       });
-
-      // Reload when new worker takes active control
-      var hasRefreshed = false;
-      navigator.serviceWorker.addEventListener('controllerchange', function () {
-        if (!hasRefreshed) {
-          hasRefreshed = true;
-          window.location.reload();
-        }
-      });
     }
-
-    // Global Self-Healing Fallback
-    window.addEventListener('error', function (e) {
-      console.error('[PWA Catch]:', e);
-      if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
-        if (sessionStorage.getItem('__auto_recovered') !== '1') {
-          sessionStorage.setItem('__auto_recovered', '1');
-          if ('caches' in window) {
-            caches.keys().then(function (keys) {
-              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
-            }).then(function () {
-              window.location.reload();
-            });
-          }
-        }
-      }
-    });
   </script>
 </body>
 </html>
