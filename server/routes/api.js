@@ -788,21 +788,22 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           customer
         );
       } catch (payErr) {
-        console.error('[Payment Gateway Error]:', payErr.message);
-        // P1 ATOMIC DOMAIN BOUNDARY HARDENING (NEW-01 & NEW-03):
-        // Atomically update financial state in order_payments to 'cancel' and cancel uninitialized operational order
+        console.error('[Payment Gateway Error / Timeout]:', payErr.message);
+        // P1 RECONCILIATION-AWARE FAILURE HANDLING (NEW-01 & NEW-02):
+        // Mark payment as 'reconciliation_pending' so if gateway actually processed the transaction,
+        // incoming settlement webhook can reconcile and confirm the order cleanly.
         db.exec('BEGIN IMMEDIATE;');
         try {
-          db.prepare("UPDATE order_payments SET payment_status = 'cancel', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
-          db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(orderId);
+          db.prepare("UPDATE order_payments SET payment_status = 'reconciliation_pending', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
+          db.prepare("UPDATE orders SET status = 'pending', updated_at = datetime('now') WHERE id = ?").run(orderId);
           db.exec('COMMIT;');
         } catch (_) {
           try { db.exec('ROLLBACK;'); } catch (_) {}
         }
         return res.status(502).json({
           success: false,
-          error: 'PAYMENT_GATEWAY_ERROR',
-          message: `Gagal memproses sesi pembayaran online: ${payErr.message}. Silakan coba metode pembayaran lain atau hubungi cabang.`
+          error: 'PAYMENT_GATEWAY_TIMEOUT',
+          message: `Koneksi ke gateway pembayaran online mengalami kendala (${payErr.message}). Jika Anda sudah melakukan pembayaran, transaksi akan otomatis direkonsiliasi.`
         });
       }
     }

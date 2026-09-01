@@ -3,6 +3,7 @@
 class PaymentModel {
   static STATUSES = {
     PENDING: 'pending',
+    RECONCILIATION_PENDING: 'reconciliation_pending',
     SETTLEMENT: 'settlement',
     CHALLENGE: 'challenge',
     DENY: 'deny',
@@ -18,10 +19,11 @@ class PaymentModel {
 
   /**
    * Authoritative Payment State Machine Transitions
-   * Terminal states (cancel, deny, expire, settlement, refunded) cannot transition to new states.
+   * Terminal states (deny, expire, refunded) cannot transition to new states.
    */
   static VALID_TRANSITIONS = {
-    pending: ['settlement', 'challenge', 'cancel', 'deny', 'expire'],
+    pending: ['settlement', 'challenge', 'cancel', 'deny', 'expire', 'reconciliation_pending'],
+    reconciliation_pending: ['settlement', 'challenge', 'cancel', 'deny', 'expire'],
     challenge: ['settlement', 'cancel', 'deny', 'expire'],
     settlement: ['refunded'],
     cancel: [],
