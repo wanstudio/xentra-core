@@ -412,6 +412,12 @@ class OrderPlacementService {
       return { success: true, deducted_items: [] };
     }
 
+    // P1 IDEMPOTENCY GUARD: Check if inventory deduction was already executed for this order
+    const existingMovement = db.prepare('SELECT id FROM inventory_movements WHERE reference_id = ? AND movement_type = \'sale_deduction\' LIMIT 1').get(order.order_number);
+    if (existingMovement) {
+      return { success: true, idempotent: true, deducted_items: [] };
+    }
+
     const guardedDeductStockStmt = db.prepare(`
       UPDATE branch_products
       SET stock = stock - ?, updated_at = datetime('now')
