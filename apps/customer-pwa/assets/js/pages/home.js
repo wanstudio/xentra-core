@@ -411,12 +411,20 @@
     var v = window.visualViewport;
     if (!v) {
       s.style.setProperty('--x-note-keyboard', '0px');
-      s.style.setProperty('--x-note-visible-height', '75vh');
+      s.style.setProperty('--x-note-visible-height', '52dvh');
       return;
     }
     var kh = Math.max(0, window.innerHeight - (v.offsetTop + v.height));
     s.style.setProperty('--x-note-keyboard', kh + 'px');
-    s.style.setProperty('--x-note-visible-height', v.height + 'px');
+    
+    // In PWA standalone, v.height is the visible area above keyboard
+    // When keyboard is up, sheet height must be a fraction of visible area, NOT full v.height
+    if (kh > 50) {
+      var targetH = Math.min(320, Math.round(v.height * 0.85));
+      s.style.setProperty('--x-note-visible-height', targetH + 'px');
+    } else {
+      s.style.setProperty('--x-note-visible-height', '52dvh');
+    }
   }
 
   function updateNoteCounter() {
