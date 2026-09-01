@@ -89,26 +89,43 @@ const memoryStore = {
   users: [],
   promotions: [
     {
-      id: 'promo_bangjo_pwa_install',
+      id: 'prm_bangjo_pwa_install',
       brand_id: 'brand_bangjo',
-      branch_id: null,
-      promo_type: 'install_incentive',
-      name: 'Promo Install Es Teh',
-      banner_title: 'Install sekarang & dapatkan gratis es teh',
-      banner_subtitle: 'syarat & ketentuan berlaku',
-      reward_title: 'Selamat! Es Teh Gratis untuk pesanan pertamamu!',
-      reward_badge_text: '✓ Bonus PWA Aktif (Rp0)',
-      icon_url: '/assets/img/iced-tea.png',
-      reward_type: 'freebie_product',
-      target_product_id: '288',
-      reward_price: 0,
-      min_spend: 0,
-      target_audience: 'new_user',
-      requires_pwa_installed: 1,
-      max_claims_per_user: 1,
+      name: 'Promo Hadiah Install PWA Es Teh',
+      code: null,
+      capability_type: 'install_incentive',
+      stacking_policy: 'exclusive',
+      priority_weight: 100,
+      max_redemptions_total: null,
+      max_redemptions_per_customer: 1,
       is_active: 1
     }
-  ]
+  ],
+  promotion_rules: [
+    {
+      id: 'rul_pwa_install_01',
+      promotion_id: 'prm_bangjo_pwa_install',
+      rule_type: 'eligibility',
+      rule_payload: JSON.stringify({ requires_pwa_installed: true, target_audience: 'new_user', first_order_only: true })
+    }
+  ],
+  promotion_rewards: [
+    {
+      id: 'rew_pwa_install_01',
+      promotion_id: 'prm_bangjo_pwa_install',
+      reward_type: 'freebie_product',
+      target_product_id: '288',
+      amount_in_cents: 0,
+      presentation_payload: JSON.stringify({
+        banner_title: 'Install sekarang & dapatkan gratis es teh',
+        banner_subtitle: 'syarat & ketentuan berlaku',
+        reward_title: 'Selamat! Es Teh Gratis untuk pesanan pertamamu!',
+        reward_badge_text: '✓ Bonus PWA Aktif (Rp0)',
+        icon_url: '/assets/img/iced-tea.png'
+      })
+    }
+  ],
+  promotion_redemptions: []
 };
 
 // Database Proxy supporting both Native, Portable & Memory Engines
@@ -180,6 +197,15 @@ const db = {
         }
         if (lowerSql.includes('from users')) return memoryStore.users;
         if (lowerSql.includes('from orders')) return memoryStore.orders;
+        if (lowerSql.includes('from promotion_rules')) {
+          if (params[0]) return memoryStore.promotion_rules.filter(r => r.promotion_id === params[0]);
+          return memoryStore.promotion_rules;
+        }
+        if (lowerSql.includes('from promotion_rewards')) {
+          if (params[0]) return memoryStore.promotion_rewards.filter(rw => rw.promotion_id === params[0]);
+          return memoryStore.promotion_rewards;
+        }
+        if (lowerSql.includes('from promotion_redemptions')) return memoryStore.promotion_redemptions;
         if (lowerSql.includes('from promotions')) {
           if (params[0]) return memoryStore.promotions.filter(p => p.brand_id === params[0] && p.is_active === 1);
           return memoryStore.promotions;
@@ -440,31 +466,56 @@ function initSchema(targetDb) {
     CREATE TABLE IF NOT EXISTS promotions (
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
-      branch_id TEXT,
-      code TEXT,
-      promo_type TEXT NOT NULL,
       name TEXT NOT NULL,
-      banner_title TEXT,
-      banner_subtitle TEXT,
-      reward_title TEXT,
-      reward_badge_text TEXT,
-      icon_url TEXT,
-      reward_type TEXT NOT NULL DEFAULT 'freebie_product',
-      target_product_id TEXT,
-      reward_price REAL DEFAULT 0,
-      min_spend REAL DEFAULT 0,
-      target_audience TEXT DEFAULT 'new_user',
-      requires_pwa_installed INTEGER DEFAULT 1,
-      max_claims_per_user INTEGER DEFAULT 1,
-      total_quota INTEGER,
-      claimed_count INTEGER DEFAULT 0,
+      code TEXT UNIQUE,
+      capability_type TEXT NOT NULL,
+      stacking_policy TEXT NOT NULL DEFAULT 'exclusive',
+      priority_weight INTEGER NOT NULL DEFAULT 100,
+      max_redemptions_total INTEGER,
+      max_redemptions_per_customer INTEGER DEFAULT 1,
       start_at TEXT,
       end_at TEXT,
-      is_active INTEGER DEFAULT 1,
+      is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS promotion_rules (
+      id TEXT PRIMARY KEY,
+      promotion_id TEXT NOT NULL,
+      rule_type TEXT NOT NULL,
+      rule_payload TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS promotion_rewards (
+      id TEXT PRIMARY KEY,
+      promotion_id TEXT NOT NULL,
+      reward_type TEXT NOT NULL,
+      target_product_id TEXT,
+      amount_in_cents INTEGER NOT NULL DEFAULT 0,
+      max_discount_in_cents INTEGER,
+      presentation_payload TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS promotion_redemptions (
+      id TEXT PRIMARY KEY,
+      promotion_id TEXT NOT NULL,
+      order_id TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      branch_id TEXT NOT NULL,
+      customer_phone TEXT NOT NULL,
+      benefit_amount INTEGER NOT NULL DEFAULT 0,
+      redeemed_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (promotion_id) REFERENCES promotions(id),
+      FOREIGN KEY (order_id) REFERENCES orders(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust ON promotion_redemptions(promotion_id, customer_phone);
+    CREATE INDEX IF NOT EXISTS idx_prm_redemptions_order ON promotion_redemptions(order_id);
 
     CREATE TABLE IF NOT EXISTS branch_products (
       branch_id TEXT NOT NULL,
@@ -716,29 +767,42 @@ function seedData(targetDb) {
 
     targetDb.prepare(`
       INSERT OR IGNORE INTO promotions (
-        id, brand_id, branch_id, promo_type, name,
-        banner_title, banner_subtitle, reward_title, reward_badge_text, icon_url,
-        reward_type, target_product_id, reward_price, min_spend,
-        target_audience, requires_pwa_installed, max_claims_per_user, is_active
+        id, brand_id, name, code, capability_type, stacking_policy, priority_weight, max_redemptions_total, max_redemptions_per_customer, is_active
       ) VALUES (
-        'promo_bangjo_pwa_install',
+        'prm_bangjo_pwa_install',
         'brand_bangjo',
+        'Promo Hadiah Install PWA Es Teh',
         NULL,
         'install_incentive',
-        'Promo Install Es Teh',
-        'Install sekarang & dapatkan gratis es teh',
-        'syarat & ketentuan berlaku',
-        'Selamat! Es Teh Gratis untuk pesanan pertamamu!',
-        '✓ Bonus PWA Aktif (Rp0)',
-        '/assets/img/iced-tea.png',
+        'exclusive',
+        100,
+        NULL,
+        1,
+        1
+      )
+    `).run();
+
+    targetDb.prepare(`
+      INSERT OR IGNORE INTO promotion_rules (
+        id, promotion_id, rule_type, rule_payload
+      ) VALUES (
+        'rul_pwa_install_01',
+        'prm_bangjo_pwa_install',
+        'eligibility',
+        '{"requires_pwa_installed":true,"target_audience":"new_user","first_order_only":true}'
+      )
+    `).run();
+
+    targetDb.prepare(`
+      INSERT OR IGNORE INTO promotion_rewards (
+        id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload
+      ) VALUES (
+        'rew_pwa_install_01',
+        'prm_bangjo_pwa_install',
         'freebie_product',
         '288',
         0,
-        0,
-        'new_user',
-        1,
-        1,
-        1
+        '{"banner_title":"Install sekarang & dapatkan gratis es teh","banner_subtitle":"syarat & ketentuan berlaku","reward_title":"Selamat! Es Teh Gratis untuk pesanan pertamamu!","reward_badge_text":"✓ Bonus PWA Aktif (Rp0)","icon_url":"/assets/img/iced-tea.png"}'
       )
     `).run();
   }
