@@ -1048,8 +1048,8 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
   }
 });
 
-// 9.1 Staff / POS Cash Settlement Endpoint (Authorized Cashier, Branch Staff, & Delivery Couriers)
-router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'driver']), (req, res) => {
+// 9.1 Staff / POS Cash Settlement Endpoint (Authorized Cashiers, Branch Managers, & Brand Owners)
+router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
     const orderId = req.params.id;
     const { amount_tendered, shift_id } = req.body;
