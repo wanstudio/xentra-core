@@ -679,6 +679,17 @@
     }
   }
 
+  var FALLBACK_CATALOG = [
+    { id: 272, name: 'Paket Spesial Semar', price: 35000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+    { id: 285, name: 'Paket Spesial Petruk', price: 35000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
+    { id: 345, name: 'Mie Gurih', price: 15000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+    { id: 286, name: 'Ayam Tulang Lunak Bakar', price: 28000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+    { id: 287, name: 'Mie Godog Jawa Asli', price: 22000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+    { id: 288, name: 'Es Kopi Susu Bangjo', price: 15000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
+    { id: 401, name: 'Es Teh Manis', price: 5000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
+    { id: 402, name: 'Es Jeruk Segar', price: 8000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png' }
+  ];
+
   function applyUpsellPool(pool) {
     var wrap = $('x-upsell-container');
     var track = $('x-addon-track');
@@ -687,13 +698,11 @@
     var cartIds = {};
     getCheckoutItems().forEach(function (i) { cartIds[String(i.id)] = true; });
     var filtered = (pool || []).filter(function (p) { return p && p.id && !cartIds[String(p.id)]; });
-    upsellItems = filtered.slice(0, 10);
+    upsellItems = (filtered.length >= 3 ? filtered : filtered.concat(FALLBACK_CATALOG.filter(function (f) { return !cartIds[String(f.id)]; }))).slice(0, 10);
 
     if (upsellItems.length > 0) {
       wrap.style.display = 'block';
       renderUpsellTrack(track, upsellItems);
-    } else {
-      wrap.style.display = 'none';
     }
   }
 
@@ -708,24 +717,28 @@
     }
 
     // 1. Check local catalog cache from DB
+    var pool = [];
     try {
       var rawCached = localStorage.getItem('xentra_catalog_cache');
       if (rawCached) {
-        var cachedPool = extractCatalogProducts(JSON.parse(rawCached));
-        if (cachedPool.length > 0) {
-          applyUpsellPool(cachedPool);
-        }
+        pool = extractCatalogProducts(JSON.parse(rawCached));
       }
     } catch (_) {}
 
-    // 2. Fetch fresh catalog from API/database
+    if (!pool.length) {
+      pool = FALLBACK_CATALOG;
+    }
+
+    applyUpsellPool(pool);
+
+    // 2. Fetch fresh catalog from API in background
     if (!API) return;
     API.get('/catalog/menu')
       .then(function (data) {
-        var pool = extractCatalogProducts(data);
-        if (pool.length > 0) {
+        var freshPool = extractCatalogProducts(data);
+        if (freshPool && freshPool.length > 0) {
           try { localStorage.setItem('xentra_catalog_cache', JSON.stringify(data)); } catch (_) {}
-          applyUpsellPool(pool);
+          applyUpsellPool(freshPool);
         }
       })
       .catch(function (err) {
