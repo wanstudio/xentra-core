@@ -348,6 +348,31 @@ class PosOrderService {
       tableNumber = held.table_number || tableNumber;
     }
 
+    // P1 FAIL-FAST VALIDATION (NEW-02): Pre-validate amount_tendered against authoritative pricing BEFORE submitting order
+    // to prevent leaked inventory deduction / order creation on insufficient cash.
+    if (payment_method === 'cash' && order_type !== 'reservation' && Array.isArray(orderItems) && orderItems.length > 0) {
+      const { PrePaymentVerificationGate } = require('../../commerce');
+      const preCheck = PrePaymentVerificationGate.verify({
+        branch_id,
+        brand_id,
+        items: orderItems
+      });
+
+      if (!preCheck.is_valid) {
+        return {
+          success: false,
+          status: preCheck.status,
+          errors: preCheck.errors,
+          price_diffs: preCheck.price_diffs
+        };
+      }
+
+      const expectedGrandTotal = preCheck.verified_items.reduce((sum, it) => sum + (it.subtotal || ((it.unit_price || 0) * it.quantity)), 0);
+      if (typeof amount_tendered === 'number' && amount_tendered < expectedGrandTotal) {
+        throw new Error(`[PosOrderService] Uang yang diterima (Rp ${amount_tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${expectedGrandTotal.toLocaleString('id-ID')}).`);
+      }
+    }
+
     // 2. Delegate Cleanly to Commerce Order Placement Service (ACID + Concurrency Guard)
     const placementResult = await OrderPlacementService.submitOrder({
       brand_id,

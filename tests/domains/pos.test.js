@@ -204,6 +204,24 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
   const stockAfterDineIn = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
   assert.strictEqual(stockAfterDineIn, 48);
 
+  // 1.1 Insufficient Cash Settlement -> FAILS FAST without touching inventory or creating order (NEW-02)
+  await assert.rejects(async () => {
+    await PosOrderService.settleOrder({
+      brand_id: 'brand_pos',
+      branch_id: 'branch_pos',
+      order_type: PosOrderService.ORDER_TYPES.DINE_IN,
+      payment_method: 'cash',
+      amount_tendered: 1000, // Total tagihan 40.000, bayar 1.000 (Kurang!)
+      items: [
+        { product_id: 'prod_pos_1', quantity: 2, expected_price: 20000 }
+      ]
+    });
+  }, /kurang dari total tagihan/);
+
+  // Assert Stock remains strictly UNTOUCHED at 48 (zero leaked deduction)
+  const stockAfterFailedCash = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
+  assert.strictEqual(stockAfterFailedCash, 48);
+
   // 2. Same-Day Reservation via POS -> STRICTLY REJECTED
   const todayStr = new Date().toISOString().slice(0, 10);
   const sameDayPosResult = await PosOrderService.settleOrder({
