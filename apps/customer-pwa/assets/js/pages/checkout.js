@@ -185,13 +185,16 @@
       return;
     }
 
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(function (choice) {
+    var promptEvent = window.__xentra_deferred_prompt || deferredPrompt;
+
+    if (promptEvent) {
+      promptEvent.prompt();
+      promptEvent.userChoice.then(function (choice) {
         if (choice && choice.outcome === 'accepted') {
           try { localStorage.setItem('xentra_pwa_installed', '1'); } catch (_) {}
           if (UI && UI.toast) UI.toast('Terima kasih telah memasang aplikasi!');
         }
+        window.__xentra_deferred_prompt = null;
         deferredPrompt = null;
       }).catch(function () {
         showPwaGuideSheet(isIosPwa ? 'ios' : 'android');

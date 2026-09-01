@@ -8,12 +8,12 @@
   <meta name="theme-color" content="#b6ff00">
 
   <!-- ══════════════════════════════════════════════════════════════
-       PWA VERSION SENTINEL & AUTO-PURGE GUARD (Industry Standard)
-       Executes immediately before CSS/JS to eliminate stale cache white screens.
+       PWA VERSION SENTINEL & EARLY INSTALL PROMPT CAPTURE
+       Executes immediately in <head> to capture beforeinstallprompt on Android
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v2_2_8';
+      var PWA_VERSION = 'v2_2_9';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -24,6 +24,11 @@
           }
         }
       } catch (_) {}
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__xentra_deferred_prompt = e;
+      });
     })();
   </script>
 
@@ -33,7 +38,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Bangjo">
   <link rel="apple-touch-icon" href="/assets/pwa/icon-192.png">
-  <link rel="manifest" href="/manifest.json?v=2.2.8">
+  <link rel="manifest" href="/manifest.json">
 
   <!-- CSS (version-hashed for instant cache-busting) -->
   <link rel="stylesheet" href="/assets/css/tokens.css?v=2.2.8">
