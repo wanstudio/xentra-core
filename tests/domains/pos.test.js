@@ -333,7 +333,7 @@ test('POS 6 — Hardware & KDS Router: formats receipt and routes kitchen ticket
 // POS 7 — Offline Sync Reconciliation & Idempotency Deduplication
 // ==============================================================================
 test('POS 7 — Offline Reconciliation: honors authoritative cash capture & drops duplicate sync', async () => {
-  const txId = 'tx_offline_uuid_999';
+  const txId = 'tx_offline_uuid_' + Date.now();
 
   // 1. First sync attempt: Processed successfully
   const syncResult1 = await OfflineReconciliationService.reconcileOfflineTransaction({

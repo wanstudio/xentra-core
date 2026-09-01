@@ -643,6 +643,12 @@ function seedData(targetDb) {
         INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, sort_order)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(p.id, brandId, p.cat, p.name, p.name.toLowerCase().replace(/ /g, '-'), p.desc, p.price, p.reg, p.img, p.img, i + 1);
+
+      // Allocate seeded product to default branch
+      targetDb.prepare(`
+        INSERT OR IGNORE INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold)
+        VALUES (?, ?, ?, 100, 1, 5)
+      `).run(branchBaratId, p.id, p.price);
     }
   }
 }

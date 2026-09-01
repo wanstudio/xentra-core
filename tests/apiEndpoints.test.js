@@ -138,6 +138,24 @@ test('API POST /api/v1/checkout/create-order: creates cash order without Midtran
   assert.strictEqual(data.success, true);
   assert.strictEqual(data.payment.method, 'cash');
   assert.strictEqual(data.snap_token, null);
+
+  // P1 ISOLATION TEST (NEW-01/Pass4): Product belonging to Brand but NOT allocated to Branch -> STRICTLY REJECTED 400
+  const unallocatedPayload = {
+    branch_id: 'branch_bangjo_barat',
+    payment_method: 'cash',
+    customer: { name: 'Customer Test', phone: '081234567890' },
+    order_type: 'delivery',
+    delivery: { address: 'Jl. Darmo', latitude: -7.291230, longitude: 112.716750 },
+    items: [{ id: '99999_unallocated_prod', quantity: 1 }]
+  };
+
+  const unallocatedRes = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify(unallocatedPayload)
+  });
+  assert.strictEqual(unallocatedRes.status, 400);
+  const unallocatedData = await unallocatedRes.json();
+  assert.strictEqual(unallocatedData.success, false);
 });
 
 test('API Admin: GET & PUT /api/v1/admin/brand updates theme color and logo', async () => {

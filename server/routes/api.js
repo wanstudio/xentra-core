@@ -677,19 +677,23 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           });
         }
 
-        // Check Branch Allocation & Availability
+        // Check Branch Allocation & Availability (P1 STRICT ISOLATION GUARD)
         branchProd = db.prepare('SELECT * FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch.id, item.id);
-        if (branchProd) {
-          if (branchProd.is_available === 0) {
-            return res.status(400).json({
-              success: false,
-              error: `Produk "${prod.name}" saat ini dinonaktifkan di cabang ${branch.name}.`
-            });
-          }
+        if (!branchProd) {
+          return res.status(400).json({
+            success: false,
+            error: `Produk "${prod.name}" belum dialokasikan untuk cabang ${branch.name}.`
+          });
+        }
+        if (branchProd.is_available === 0) {
+          return res.status(400).json({
+            success: false,
+            error: `Produk "${prod.name}" saat ini dinonaktifkan di cabang ${branch.name}.`
+          });
         }
       }
 
-      const unitPrice = isPromoFree ? 0 : (branchProd && branchProd.price != null ? Number(branchProd.price) : Number(prod.price));
+      const unitPrice = isPromoFree ? 0 : (branchProd.price != null ? Number(branchProd.price) : Number(prod.price));
       const prodName = isPromoFree ? 'Es Teh (Gratis Install)' : prod.name;
       const prodId = isPromoFree ? 'promo-es-teh-gratis' : prod.id;
       
@@ -703,9 +707,9 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         });
       }
 
-      // Check Realtime Stock at Branch
-      if (!isPromoFree && branchProd && branchProd.stock != null) {
-        const availableStock = Number(branchProd.stock);
+      // Check Realtime Stock at Branch (No 999 fallback)
+      if (!isPromoFree) {
+        const availableStock = branchProd.stock != null ? Number(branchProd.stock) : 0;
         if (availableStock < qty) {
           return res.status(400).json({
             success: false,
