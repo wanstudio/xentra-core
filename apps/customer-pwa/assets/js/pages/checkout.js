@@ -144,7 +144,7 @@
       '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">3</div><div class="x-pwa-step-body"><strong>Konfirmasi Pasang</strong><span>Tekan <b>Install</b> saat dialog konfirmasi muncul.</span></div></div>'
     );
 
-    var promo = getActiveInstallPromo();
+    var promo = getBannerPromo() || getAppliedRewardPromo();
     var icon = (promo && promo.display && promo.display.icon_url) || '/assets/pwa/icon-192.png';
     var html =
       '<div class="x-pwa-guide-backdrop"></div>' +
