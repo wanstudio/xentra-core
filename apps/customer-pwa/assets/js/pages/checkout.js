@@ -464,7 +464,7 @@
             return (
               '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner">' +
               '    <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
-              '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(r.claim_title || ('Klaim ' + (r.reward_title || 'Es Teh Gratis') + ' untuk pesanan pertamamu!')) + '</div><div class="x-alt-promo-snk">' + UI.escape(r.claim_subtitle || 'syarat & ketentuan berlaku') + '</div></div>' +
+              '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(r.claim_title || 'Klaim Es Teh Gratis untuk pesanan pertamamu!') + '</div><div class="x-alt-promo-snk">' + UI.escape(r.claim_subtitle || 'syarat & ketentuan berlaku') + '</div></div>' +
               '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-claim">Claim</button>' +
               '  </div>'
             );
