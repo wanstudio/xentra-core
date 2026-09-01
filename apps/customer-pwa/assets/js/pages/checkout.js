@@ -69,17 +69,20 @@
     var isStandalone = window.matchMedia && (
       window.matchMedia('(display-mode: standalone)').matches ||
       window.matchMedia('(display-mode: fullscreen)').matches ||
-      window.matchMedia('(display-mode: minimal-ui)').matches
+      window.matchMedia('(display-mode: minimal-ui)').matches ||
+      window.matchMedia('(display-mode: window-controls-overlay)').matches
     );
     // 2. iOS Safari standalone mode check
     var isIosStandalone = window.navigator.standalone === true;
     // 3. Android TWA / WebAPK referrer check
     var isTwa = document.referrer && document.referrer.startsWith('android-app://');
-    // 4. Local persistent storage flag after user installed
+    // 4. URL query param or launcher flag
+    var isUrlFlagged = window.location.search && (window.location.search.indexOf('mode=pwa') !== -1 || window.location.search.indexOf('pwa=1') !== -1);
+    // 5. Local persistent storage flag after user installed
     var isFlaggedInstalled = false;
     try { isFlaggedInstalled = localStorage.getItem('xentra_pwa_installed') === '1'; } catch (_) {}
 
-    return Boolean(isStandalone || isIosStandalone || isTwa || isFlaggedInstalled);
+    return Boolean(isStandalone || isIosStandalone || isTwa || isUrlFlagged || isFlaggedInstalled);
   }
 
   var isPwaInstalled = checkIsPwaInstalled();
@@ -103,11 +106,44 @@
   }
 
   function getBannerPromo() {
-    return promoEvaluation.discovery.find(function (p) { return p.should_show_banner === true; }) || null;
+    var p = promoEvaluation.discovery.find(function (p) { return p.should_show_banner === true; });
+    if (p) return p;
+    if (!checkIsPwaInstalled()) {
+      return {
+        promo_id: 'promo_install_pwa_default',
+        should_show_banner: true,
+        display: {
+          banner_title: 'Install sekarang & dapatkan promo spesial',
+          banner_subtitle: 'Dapatkan Es Teh Manis Gratis untuk pesananmu',
+          icon_url: '/assets/pwa/icon-192.png'
+        }
+      };
+    }
+    return null;
   }
 
   function getAppliedRewardPromo() {
-    return promoEvaluation.applied.find(function (p) { return p.should_grant_reward === true && p.reward; }) || null;
+    var p = promoEvaluation.applied.find(function (p) { return p.should_grant_reward === true && p.reward; });
+    if (p) return p;
+    if (checkIsPwaInstalled()) {
+      return {
+        promo_id: 'promo_install_pwa_default',
+        should_grant_reward: true,
+        display: {
+          reward_title: 'Es Teh Manis Spesial',
+          reward_badge_text: '✓ Bonus PWA Aktif (Rp0)',
+          icon_url: '/assets/pwa/icon-192.png'
+        },
+        reward: {
+          promo_id: 'promo_install_pwa_default',
+          reward_type: 'freebie_product',
+          product_id: 'promo-es-teh-gratis',
+          reward_price: 0,
+          description: 'Bonus Es Teh Manis'
+        }
+      };
+    }
+    return null;
   }
 
   window.addEventListener('beforeinstallprompt', function (e) {
