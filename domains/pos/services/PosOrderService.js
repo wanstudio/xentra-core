@@ -413,18 +413,15 @@ class PosOrderService {
         changeAmount = amount_tendered - grandTotal;
       }
 
-      // Record authoritative cash payment lifecycle in order_payments, atomically update pos_shifts, and emit event
-      try {
-        const { CashSettlementService } = require('../../payment');
-        CashSettlementService.settleCashPayment({
-          order_id: order.id,
-          amount: grandTotal,
-          amount_tendered: amount_tendered || grandTotal,
-          shift_id
-        });
-      } catch (e) {
-        console.warn('[PosOrderService] Cash settlement record warning:', e.message);
-      }
+      // Authoritatively settle cash payment in order_payments and pos_shifts.
+      // (No silent swallowing: any settlement failure will reject immediately and prevent false pos.order.settled event)
+      const { CashSettlementService } = require('../../payment');
+      CashSettlementService.settleCashPayment({
+        order_id: order.id,
+        amount: grandTotal,
+        amount_tendered: amount_tendered || grandTotal,
+        shift_id
+      });
     }
 
     // 5. If settled from held bill, mark held order as settled
