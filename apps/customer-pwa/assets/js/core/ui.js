@@ -101,11 +101,11 @@
     var img = product.image_url || product.image || '';
     var price = Number(product.price || 0);
     return (
-      '<div class="x-complement-card" data-card-id="' + product.id + '">' +
-      '  <div class="x-complement-img-wrap">' +
+      '<div class="x-complement-card" data-card-id="' + product.id + '" style="flex:0 0 142px !important;width:142px !important;min-width:142px !important;max-width:142px !important;flex-shrink:0 !important;box-sizing:border-box !important;">' +
+      '  <div class="x-complement-img-wrap" style="width:100%;height:122px;aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:#f3f4f6;flex-shrink:0;position:relative;pointer-events:none;-webkit-user-drag:none;user-select:none;">' +
       (img
-        ? '<img src="' + escape(img) + '" alt="' + escape(product.name || '') + '" onerror="this.parentElement.innerHTML=\'<div class=\\\'x-complement-img-placeholder\\\'></div>\'">'
-        : '<div class="x-complement-img-placeholder"></div>'
+        ? '<img src="' + escape(img) + '" alt="' + escape(product.name || '') + '" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px;pointer-events:none;-webkit-user-drag:none;" onerror="this.parentElement.innerHTML=\'<div class=\\\'x-complement-img-placeholder\\\'></div>\'">'
+        : '<div class="x-complement-img-placeholder" style="width:100%;height:100%;background:#f3f4f6;border-radius:14px;"></div>'
       ) +
       '  </div>' +
       '  <div class="x-complement-name">' + escape(product.name || '') + '</div>' +

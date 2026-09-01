@@ -1001,7 +1001,7 @@
 .x-complement-wrap {
   width: 100% !important;
   max-width: 100% !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   margin: 16px 0 0 !important;
   padding: 16px 0 0 !important;
   border-top: 1px solid #f0f0f0 !important;
@@ -1031,14 +1031,10 @@
   gap: 12px !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
-  padding: 4px 0 12px !important;
-  margin: 0 !important;
+  padding: 4px 16px 12px !important;
+  margin: 0 -16px !important;
   scrollbar-width: none !important;
   -webkit-overflow-scrolling: touch !important;
-  touch-action: pan-x pan-y pinch-zoom !important;
-  overscroll-behavior-x: contain !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
   box-sizing: border-box !important;
 }
 
