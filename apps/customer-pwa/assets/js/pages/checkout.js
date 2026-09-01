@@ -554,6 +554,7 @@
 
     bindEvents();
     syncPayVisual();
+    loadUpsell();
   }
 
   function renderItemsHtml(items) {
@@ -618,25 +619,42 @@
     var elGrand = $('x-sum-total'); if (elGrand) elGrand.textContent = fmtIDR(grand);
   }
 
+  var DEFAULT_UPSELL_POOL = [
+    { id: 288, name: 'Es Kopi Susu Bangjo', price: 15000, regular_price: 18000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
+    { id: 402, name: 'Es Jeruk Segar', price: 8000, regular_price: 10000, image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400' },
+    { id: 345, name: 'Mie Gurih', price: 15000, regular_price: 17000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+    { id: 286, name: 'Ayam Tulang Lunak Bakar', price: 28000, regular_price: 32000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' }
+  ];
+
   // ── Upsell Recommendation Rail ──
   function loadUpsell() {
     var track = $('x-addon-track');
-    if (!track || !API) return;
+    if (!track) return;
+    if (upsellItems && upsellItems.length) {
+      renderUpsellTrack(track, upsellItems);
+      return;
+    }
+    if (!API) {
+      renderUpsellTrack(track, DEFAULT_UPSELL_POOL);
+      return;
+    }
     API.get('/catalog/menu').then(function (data) {
       var pool = [];
       if (data && Array.isArray(data.all_products) && data.all_products.length) pool = data.all_products;
       else if (data && data.products && Array.isArray(data.products.items)) pool = data.products.items;
       else if (data && Array.isArray(data.products)) pool = data.products;
       else if (data && Array.isArray(data.items)) pool = data.items;
-      if (!pool.length) return;
+      else pool = DEFAULT_UPSELL_POOL;
 
       var cartIds = {};
       getCheckoutItems().forEach(function (i) { cartIds[String(i.id)] = true; });
       var filtered = pool.filter(function (p) { return !cartIds[String(p.id)]; });
-      var src = filtered.length >= 3 ? filtered : pool;
+      var src = filtered.length >= 2 ? filtered : pool;
       upsellItems = src.slice(0, 6);
       renderUpsellTrack(track, upsellItems);
-    }).catch(function () {});
+    }).catch(function () {
+      renderUpsellTrack(track, DEFAULT_UPSELL_POOL);
+    });
   }
 
   function renderUpsellTrack(container, items) {
