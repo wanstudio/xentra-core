@@ -146,6 +146,60 @@ except Exception as e:
     try {
       if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
       execSync('unzip -o ' + JSON.stringify(zipPath) + ' -d ' + JSON.stringify(dest), { stdio: 'pipe' });
+
+      // Auto-sync customer-pwa static files to dev root if dest is dev.mybangjo.com
+      const pwaStaticDir = path.join(dest, 'apps', 'customer-pwa');
+      if (fs.existsSync(pwaStaticDir) && (dest.includes('dev.mybangjo.com') || dest.includes('public_html'))) {
+        try {
+          execSync('cp -r ' + JSON.stringify(path.join(pwaStaticDir, '*')) + ' ' + JSON.stringify(dest) + ' 2>/dev/null || true', { shell: '/bin/bash' });
+        } catch (_) {}
+      }
+
+      // Ensure permanent, safe .htaccess on dev.mybangjo.com
+      if (dest.includes('dev.mybangjo.com')) {
+        const htaccessPath = path.join(dest, '.htaccess');
+        const cleanHtaccess = [
+          '<IfModule mod_rewrite.c>',
+          '    RewriteEngine On',
+          '    RewriteBase /',
+          '    RewriteCond %{REQUEST_FILENAME} -f [OR]',
+          '    RewriteCond %{REQUEST_FILENAME} -d',
+          '    RewriteRule ^ - [L]',
+          '    RewriteRule ^manifest\\.json$ assets/pwa/manifest.json [L]',
+          '    RewriteRule ^service-worker\\.js$ assets/pwa/service-worker.js [L]',
+          '    RewriteRule ^sw\\.js$ assets/pwa/service-worker.js [L]',
+          '    RewriteCond %{REQUEST_URI} !^/api/',
+          '    RewriteRule ^ index.html [L]',
+          '</IfModule>',
+          '<IfModule mod_headers.c>',
+          '    <FilesMatch "manifest\\.json$">',
+          '        Header set Content-Type "application/manifest+json; charset=utf-8"',
+          '    </FilesMatch>',
+          '    <FilesMatch "(service-worker|sw)\\.js$">',
+          '        Header set Content-Type "application/javascript; charset=utf-8"',
+          '        Header set Service-Worker-Allowed "/"',
+          '    </FilesMatch>',
+          '</IfModule>',
+          '# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN',
+          'PassengerAppRoot "/home/mybangjo/xentra-core"',
+          'PassengerBaseURI "/"',
+          'PassengerNodejs "/home/mybangjo/nodevenv/xentra-core/20/bin/node"',
+          'PassengerAppType node',
+          'PassengerStartupFile app.js',
+          'PassengerAppLogFile "/home/mybangjo/xentra-core/passenger.log"',
+          '# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END',
+          '# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION BEGIN',
+          '<IfModule Litespeed>',
+          'SetEnv NODE_OPTIONS --max-old-space-size=1024',
+          'SetEnv SKIP_SYNC 1',
+          '</IfModule>',
+          '# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END'
+        ].join('\n');
+        try {
+          fs.writeFileSync(htaccessPath, cleanHtaccess, 'utf8');
+        } catch (_) {}
+      }
+
       try { fs.mkdirSync(path.join(dest, 'tmp'), { recursive: true }); fs.writeFileSync(path.join(dest, 'tmp', 'restart.txt'), String(Date.now())); } catch {}
       extracted.push(dest);
     } catch (e) {
