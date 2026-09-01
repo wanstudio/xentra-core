@@ -43,27 +43,13 @@
     isSubmitting: false
   };
 
-  // — PWA Install (Android / iOS) + gratis Es Teh Rp0 —
+  // — PWA Install (Android / iOS) Guide —
   var deferredPrompt = null;
   var isIosPwa = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
   var isStandalonePwa = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
   window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); deferredPrompt = e; });
-  window.addEventListener('appinstalled', function(){ addFreeIcedTea(); deferredPrompt = null; try{ localStorage.setItem('xentra_pwa_installed','1'); }catch(_){} });
+  window.addEventListener('appinstalled', function(){ deferredPrompt = null; try{ localStorage.setItem('xentra_pwa_installed','1'); }catch(_){} UI.toast('Aplikasi berhasil dipasang!'); });
 
-  function hasFreeIcedTea(){
-    var cart = Store.getState().cart.items || [];
-    for(var i=0;i<cart.length;i++){ if(String(cart[i].id)==='promo-es-teh-gratis') return true; }
-    return false;
-  }
-  function addFreeIcedTea(){
-    if(hasFreeIcedTea()) return;
-    Store.addItem({ id: 'promo-es-teh-gratis', name: 'Es Teh', price: 0, regular_price: 5000, image_url: '/assets/img/iced-tea.png', description: 'Gratis karena install aplikasi' }, 1);
-    try{ localStorage.setItem('xentra_free_esteh_claimed','1'); }catch(_){}
-    UI.toast('Es Teh gratis ditambahkan!');
-    var listEl = $('x-checkout-items-list');
-    if(listEl){ listEl.innerHTML = renderItemsHtml(getCheckoutItems()); bindItemEvents(); }
-    calculateTotals();
-  }
   function showPwaGuideSheet(platform){
     if(document.getElementById('x-pwa-guide-overlay')) return;
     var isIos = platform === 'ios';
@@ -91,15 +77,13 @@
     if(btn) btn.addEventListener('click', function(){ closeGuide(); });
   }
   function handleInstallClick(){
-    // beri hadiah langsung saat klik Install (sesuai spec: auto muncul Es Teh Rp0)
-    addFreeIcedTea();
-    if(isStandalonePwa){ UI.toast('Aplikasi sudah terpasang — Es Teh gratis sudah di keranjang'); return; }
+    if(isStandalonePwa){ UI.toast('Aplikasi sudah terpasang di perangkat Anda.'); return; }
     if(deferredPrompt){
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then(function(choice){
         if(choice.outcome === 'accepted'){
           try{ localStorage.setItem('xentra_pwa_installed','1'); }catch(_){}
-          UI.toast('Terima kasih — Es Teh gratis sudah ditambahkan');
+          UI.toast('Terima kasih telah memasang aplikasi Bangjo!');
         }
         deferredPrompt = null;
       }).catch(function(){});

@@ -44,7 +44,6 @@ class BranchMatcher {
       const eligibleStockBranches = branches.filter((br) => {
         for (const item of items) {
           const prodId = item.id || item.product_id;
-          if (String(prodId) === 'promo-es-teh-gratis') continue;
           const bp = db.prepare('SELECT stock, is_available FROM branch_products WHERE branch_id = ? AND product_id = ?').get(br.id, prodId);
           if (!bp || bp.is_available === 0) return false;
           const reqQty = Number(item.quantity || item.qty || 1);

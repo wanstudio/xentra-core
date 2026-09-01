@@ -662,40 +662,33 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     const validatedItems = [];
 
     for (const item of items) {
-      const isPromoFree = String(item.id) === 'promo-es-teh-gratis';
-      
       // P1 TENANT & BRANCH ISOLATION HARDENING: Product lookup MUST be strictly scoped to req.brand_id AND branch allocation
-      let prod = null;
-      let branchProd = null;
-
-      if (!isPromoFree) {
-        prod = db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(item.id, req.brand_id);
-        if (!prod) {
-          return res.status(400).json({
-            success: false,
-            error: `Produk "${item.id}" tidak ditemukan pada menu brand ini.`
-          });
-        }
-
-        // Check Branch Allocation & Availability (P1 STRICT ISOLATION GUARD)
-        branchProd = db.prepare('SELECT * FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch.id, item.id);
-        if (!branchProd) {
-          return res.status(400).json({
-            success: false,
-            error: `Produk "${prod.name}" belum dialokasikan untuk cabang ${branch.name}.`
-          });
-        }
-        if (branchProd.is_available === 0) {
-          return res.status(400).json({
-            success: false,
-            error: `Produk "${prod.name}" saat ini dinonaktifkan di cabang ${branch.name}.`
-          });
-        }
+      const prod = db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(item.id, req.brand_id);
+      if (!prod) {
+        return res.status(400).json({
+          success: false,
+          error: `Produk "${item.id}" tidak ditemukan pada menu brand ini.`
+        });
       }
 
-      const unitPrice = isPromoFree ? 0 : (branchProd.price != null ? Number(branchProd.price) : Number(prod.price));
-      const prodName = isPromoFree ? 'Es Teh (Gratis Install)' : prod.name;
-      const prodId = isPromoFree ? 'promo-es-teh-gratis' : prod.id;
+      // Check Branch Allocation & Availability (P1 STRICT ISOLATION GUARD)
+      const branchProd = db.prepare('SELECT * FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch.id, item.id);
+      if (!branchProd) {
+        return res.status(400).json({
+          success: false,
+          error: `Produk "${prod.name}" belum dialokasikan untuk cabang ${branch.name}.`
+        });
+      }
+      if (branchProd.is_available === 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Produk "${prod.name}" saat ini dinonaktifkan di cabang ${branch.name}.`
+        });
+      }
+
+      const unitPrice = branchProd.price != null ? Number(branchProd.price) : Number(prod.price);
+      const prodName = prod.name;
+      const prodId = prod.id;
       
       // P1 DATA-INTEGRITY: Strictly validate quantity as positive integer (NO silent clamping to 1)
       const rawQty = item.quantity != null ? item.quantity : item.qty;
@@ -708,14 +701,12 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       }
 
       // Check Realtime Stock at Branch (No 999 fallback)
-      if (!isPromoFree) {
-        const availableStock = branchProd.stock != null ? Number(branchProd.stock) : 0;
-        if (availableStock < qty) {
-          return res.status(400).json({
-            success: false,
-            error: `Stok produk "${prodName}" di cabang ${branch.name} tidak mencukupi (tersedia: ${availableStock}, diminta: ${qty}).`
-          });
-        }
+      const availableStock = branchProd.stock != null ? Number(branchProd.stock) : 0;
+      if (availableStock < qty) {
+        return res.status(400).json({
+          success: false,
+          error: `Stok produk "${prodName}" di cabang ${branch.name} tidak mencukupi (tersedia: ${availableStock}, diminta: ${qty}).`
+        });
       }
 
       const lineTotal = unitPrice * qty;
@@ -831,34 +822,32 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       for (const it of validatedItems) {
         insertItem.run(it.id, orderId, it.product_id, it.product_name, it.unit_price, it.quantity, it.item_subtotal, it.item_note || '');
 
-        // Deduct branch stock for regular catalog products (excluding special promo hooks)
-        if (it.product_id !== 'promo-es-teh-gratis') {
-          const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch.id, it.product_id);
-          if (bpBefore) {
-            const prevStock = Number(bpBefore.stock || 0);
-            const deductResult = guardedDeductStock.run(it.quantity, branch.id, it.product_id, it.quantity);
-            if (!deductResult || deductResult.changes === 0) {
-              throw new Error(`Stok untuk produk "${it.product_name}" di cabang ini tidak mencukupi (sisa: ${prevStock}).`);
-            }
-            const currentStock = prevStock - Number(it.quantity);
-            const movementId = 'mov_' + crypto.randomBytes(6).toString('hex');
-            db.prepare(`
-              INSERT INTO inventory_movements (
-                id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
-              ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
-            `).run(
-              movementId,
-              branch.id,
-              it.product_id,
-              -Number(it.quantity),
-              prevStock,
-              currentStock,
-              orderNumber,
-              customer.phone || 'customer_checkout',
-              `Pemotongan stok otomatis pesanan online ${orderNumber} (${order_type})`,
-              now
-            );
+        // Deduct branch stock for catalog products
+        const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch.id, it.product_id);
+        if (bpBefore) {
+          const prevStock = Number(bpBefore.stock || 0);
+          const deductResult = guardedDeductStock.run(it.quantity, branch.id, it.product_id, it.quantity);
+          if (!deductResult || deductResult.changes === 0) {
+            throw new Error(`Stok untuk produk "${it.product_name}" di cabang ini tidak mencukupi (sisa: ${prevStock}).`);
           }
+          const currentStock = prevStock - Number(it.quantity);
+          const movementId = 'mov_' + crypto.randomBytes(6).toString('hex');
+          db.prepare(`
+            INSERT INTO inventory_movements (
+              id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
+            ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            movementId,
+            branch.id,
+            it.product_id,
+            -Number(it.quantity),
+            prevStock,
+            currentStock,
+            orderNumber,
+            customer.phone || 'customer_checkout',
+            `Pemotongan stok otomatis pesanan online ${orderNumber} (${order_type})`,
+            now
+          );
         }
       }
 
