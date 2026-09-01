@@ -137,6 +137,36 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
     });
   }, /bukan milik kasir yang sedang login/);
 
+  // 4. Online Payment (Midtrans) Order Rejected for Cash Settlement (NEW-01)
+  const onlineOrderId = `ord_test_online_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, 'ORD-ONLINE-1', 'brand_pay', 'branch_pay', 'Budi Online', '62812345678', 'delivery', 'customer_app', 60000, 60000, 'midtrans', 'pending')
+  `).run(onlineOrderId);
+
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: onlineOrderId,
+      amount: 60000,
+      amount_tendered: 60000
+    });
+  }, /menggunakan metode pembayaran online "midtrans"/);
+
+  // 5. Cancelled Order Rejected for Cash Settlement (NEW-01)
+  const cancelledOrderId = `ord_test_canc_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, 'ORD-CANC-1', 'brand_pay', 'branch_pay', 'Budi Batal', '62812345678', 'pickup', 'customer_app', 30000, 30000, 'cash', 'cancelled')
+  `).run(cancelledOrderId);
+
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: cancelledOrderId,
+      amount: 30000,
+      amount_tendered: 30000
+    });
+  }, /sudah dibatalkan\/kadaluarsa/);
+
   // Verify Idempotency Guard: second cash settlement returns idempotent: true without duplicate mutations
   const secondResult = CashSettlementService.settleCashPayment({
     order_id: orderId,

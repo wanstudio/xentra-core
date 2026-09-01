@@ -40,6 +40,16 @@ class CashSettlementService {
       throw new Error(`[CashSettlementService] Order "${order_id}" tidak ditemukan.`);
     }
 
+    // P1 TERMINAL ORDER STATE GUARD: Strictly reject settlement on cancelled or expired orders
+    if (order.status === 'cancelled' || order.status === 'expired') {
+      throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran untuk pesanan yang sudah dibatalkan/kadaluarsa (Status: "${order.status}").`);
+    }
+
+    // P1 PAYMENT METHOD GUARD: Ensure order was created as cash order
+    if (order.payment_method && order.payment_method !== 'cash') {
+      throw new Error(`[CashSettlementService Payment Method Conflict]: Pesanan "${order_id}" menggunakan metode pembayaran online "${order.payment_method}". Tidak dapat diselesaikan melalui pelunasan tunai (Cash).`);
+    }
+
     // P1 FINANCIAL INTEGRITY (Amount-Bound Check): Settlement amount must match authoritative order.grand_total
     const expectedAmount = Number(order.grand_total);
     if (Number(amount) !== expectedAmount) {
@@ -53,18 +63,23 @@ class CashSettlementService {
       throw new Error(`[CashSettlementService] Uang yang diterima (Rp ${tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${amount.toLocaleString('id-ID')}).`);
     }
 
-    // P1 IDEMPOTENCY GUARD: Return early if cash payment was already settled to prevent double revenue / events
+    // P1 IDEMPOTENCY & PROVIDER GUARD: Return early if cash payment was already settled to prevent double revenue / events
     const existingPayment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
-    if (existingPayment && existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT) {
-      return {
-        success: true,
-        idempotent: true,
-        payment_id: existingPayment.id,
-        order_id,
-        amount: Number(existingPayment.amount),
-        payment_status: PaymentModel.STATUSES.SETTLEMENT,
-        message: 'Pembayaran tunai sudah diselesaikan sebelumnya.'
-      };
+    if (existingPayment) {
+      if (existingPayment.provider && existingPayment.provider !== 'cash') {
+        throw new Error(`[CashSettlementService Provider Conflict]: Pembayaran untuk pesanan "${order_id}" sudah terdaftar dengan provider online "${existingPayment.provider}".`);
+      }
+      if (existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT) {
+        return {
+          success: true,
+          idempotent: true,
+          payment_id: existingPayment.id,
+          order_id,
+          amount: Number(existingPayment.amount),
+          payment_status: PaymentModel.STATUSES.SETTLEMENT,
+          message: 'Pembayaran tunai sudah diselesaikan sebelumnya.'
+        };
+      }
     }
 
     // P1 SHIFT BOUNDARY VALIDATION: Ensure shift belongs to same branch and cashier (if provided)
