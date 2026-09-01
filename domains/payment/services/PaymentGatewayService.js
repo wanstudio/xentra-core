@@ -247,48 +247,9 @@ class PaymentGatewayService {
       `).run(newPaymentStatus, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
 
       if (shouldConfirmOrder) {
-        // 1. Atomic Stock Deduction & Inventory Movement Ledger
-        const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order_id);
-        const existingMovement = db.prepare('SELECT id FROM inventory_movements WHERE reference_id = ? AND movement_type = \'sale_deduction\' LIMIT 1').get(order.order_number);
-
-        if (!existingMovement && items && items.length > 0) {
-          const guardedDeductStockStmt = db.prepare(`
-            UPDATE branch_products
-            SET stock = stock - ?, updated_at = datetime('now')
-            WHERE branch_id = ? AND product_id = ? AND stock >= ?
-          `);
-
-          for (const item of items) {
-            const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(order.branch_id, item.product_id);
-            const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
-
-            const deductResult = guardedDeductStockStmt.run(item.quantity, order.branch_id, item.product_id, item.quantity);
-            if (!deductResult || deductResult.changes === 0) {
-              // P1 CRITICAL CONCURRENCY RACE GUARD: Stock was depleted between checkout and settlement
-              throw new Error(`[OUT_OF_STOCK_RACE] Stok untuk produk "${item.product_name || item.product_id}" tidak mencukupi saat pembayaran diselesaikan (tersisa ${prevStock}, diminta ${item.quantity}).`);
-            }
-
-            const currentStock = prevStock - Number(item.quantity);
-            const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
-
-            db.prepare(`
-              INSERT INTO inventory_movements (
-                id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
-              ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
-            `).run(
-              movementId,
-              order.branch_id,
-              item.product_id,
-              -Number(item.quantity),
-              prevStock,
-              currentStock,
-              order.order_number,
-              order.customer_phone || 'online_payment',
-              `Pemotongan stok otomatis pembayaran Midtrans lunas [${order.order_number}]`,
-              now
-            );
-          }
-        }
+        // 1. Authoritative Cross-Domain Inventory Settlement (Single Source of Truth in Commerce)
+        const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
+        OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
 
         // 2. Confirm Order Record if all items were deducted successfully
         db.prepare(`

@@ -396,12 +396,14 @@ class OrderPlacementService {
   }
 
   /**
-   * Executes atomic stock deduction and ledger entry when an online order is settled.
+   * Authoritative Single Source of Truth: Executes atomic stock deduction and ledger entry when an order is settled.
    * 
    * @param {string} orderId
-   * @returns {{ success: boolean, deducted_items: Array<Object> }}
+   * @param {Object} [options]
+   * @param {boolean} [options.dbTransactionProvided=false] - If caller already manages the DB transaction
+   * @returns {{ success: boolean, idempotent?: boolean, deducted_items: Array<Object> }}
    */
-  static deductStockForSettledOrder(orderId) {
+  static deductStockForSettledOrder(orderId, { dbTransactionProvided = false } = {}) {
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
     if (!order) {
       throw new Error(`[OrderPlacementService] Order "${orderId}" tidak ditemukan.`);
@@ -427,7 +429,10 @@ class OrderPlacementService {
     const now = new Date().toISOString();
     const deductedItems = [];
 
-    db.exec('BEGIN TRANSACTION;');
+    if (!dbTransactionProvided) {
+      db.exec('BEGIN TRANSACTION;');
+    }
+
     try {
       for (const item of items) {
         const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(order.branch_id, item.product_id);
@@ -435,11 +440,11 @@ class OrderPlacementService {
 
         const deductResult = guardedDeductStockStmt.run(item.quantity, order.branch_id, item.product_id, item.quantity);
         if (!deductResult || deductResult.changes === 0) {
-          // If stock went below requested after placement, deduct whatever is remaining or record stock depleted
-          db.prepare('UPDATE branch_products SET stock = 0, updated_at = datetime(\'now\') WHERE branch_id = ? AND product_id = ?').run(order.branch_id, item.product_id);
+          // P1 CRITICAL CONCURRENCY RACE GUARD: Stock was depleted between checkout and settlement
+          throw new Error(`[OUT_OF_STOCK_RACE] Stok untuk produk "${item.product_name || item.product_id}" tidak mencukupi saat pembayaran diselesaikan (tersisa ${prevStock}, diminta ${item.quantity}).`);
         }
 
-        const currentStock = Math.max(0, prevStock - Number(item.quantity));
+        const currentStock = prevStock - Number(item.quantity);
         const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
 
         db.prepare(`
@@ -455,7 +460,7 @@ class OrderPlacementService {
           currentStock,
           order.order_number,
           order.customer_phone || 'online_payment',
-          `Pemotongan stok otomatis pembayaran Midtrans lunas [${order.order_number}]`,
+          `Pemotongan stok otomatis pembayaran lunas [${order.order_number}]`,
           now
         );
 
@@ -468,11 +473,14 @@ class OrderPlacementService {
         });
       }
 
-      db.exec('COMMIT;');
+      if (!dbTransactionProvided) {
+        db.exec('COMMIT;');
+      }
     } catch (err) {
-      try { db.exec('ROLLBACK;'); } catch (_) {}
-      console.error('[OrderPlacementService] Failed to deduct stock on payment settlement:', err.message);
-      return { success: false, error: err.message };
+      if (!dbTransactionProvided) {
+        try { db.exec('ROLLBACK;'); } catch (_) {}
+      }
+      throw err;
     }
 
     return { success: true, deducted_items: deductedItems };
