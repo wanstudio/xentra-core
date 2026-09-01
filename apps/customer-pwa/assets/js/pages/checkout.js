@@ -60,14 +60,41 @@
   function $(id) { return document.getElementById(id); }
   function fmtIDR(n) { return (Number(n) || 0).toLocaleString('id-ID'); }
 
-  // ── PWA Install Logic ──
+  // ── PWA Install Detection Logic ──
   var deferredPrompt = null;
   var isIosPwa = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
-  var isStandalonePwa = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
-  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredPrompt = e; });
+
+  function checkIsPwaInstalled() {
+    // 1. Android / Desktop display-mode check (CSS matchMedia)
+    var isStandalone = window.matchMedia && (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.matchMedia('(display-mode: fullscreen)').matches ||
+      window.matchMedia('(display-mode: minimal-ui)').matches
+    );
+    // 2. iOS Safari standalone mode check
+    var isIosStandalone = window.navigator.standalone === true;
+    // 3. Android TWA / WebAPK referrer check
+    var isTwa = document.referrer && document.referrer.startsWith('android-app://');
+    // 4. Local persistent storage flag after user installed
+    var isFlaggedInstalled = false;
+    try { isFlaggedInstalled = localStorage.getItem('xentra_pwa_installed') === '1'; } catch (_) {}
+
+    return Boolean(isStandalone || isIosStandalone || isTwa || isFlaggedInstalled);
+  }
+
+  var isPwaInstalled = checkIsPwaInstalled();
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+
   window.addEventListener('appinstalled', function () {
     deferredPrompt = null;
+    isPwaInstalled = true;
     try { localStorage.setItem('xentra_pwa_installed', '1'); } catch (_) {}
+    var banner = document.getElementById('x-promo-banner');
+    if (banner) banner.style.display = 'none';
     if (UI && UI.toast) UI.toast('Aplikasi berhasil dipasang!');
   });
 
@@ -293,12 +320,14 @@
       // 1. Header
       '  <div class="x-alt-header"><button type="button" id="x-checkout-back" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Pesanan</span></div>' +
 
-      // 2. Install Promo Banner
-      '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
-      '    <img class="x-alt-promo-img" src="/assets/img/iced-tea.png" alt="Es Teh" onerror="this.style.display=\'none\'">' +
-      '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">Install sekarang &amp; dapatkan gratis es teh</div><div class="x-alt-promo-snk">syarat &amp; ketentuan berlaku</div></div>' +
-      '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-install">Install</button>' +
-      '  </div>' +
+      // 2. Install Promo Banner (Only shown if PWA is NOT yet installed on device)
+      (!checkIsPwaInstalled() ? (
+        '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
+        '    <img class="x-alt-promo-img" src="/assets/img/iced-tea.png" alt="Es Teh" onerror="this.style.display=\'none\'">' +
+        '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">Install sekarang &amp; dapatkan gratis es teh</div><div class="x-alt-promo-snk">syarat &amp; ketentuan berlaku</div></div>' +
+        '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-install">Install</button>' +
+        '  </div>'
+      ) : '') +
 
       // 3. Customer Identity Card (Phone & WhatsApp OTP status)
       '  <div class="x-alt-card x-alt-customer-card" id="x-card-customer" style="margin:0 14px 10px;">' +

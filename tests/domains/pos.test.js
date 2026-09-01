@@ -327,7 +327,7 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
     order_type: PosOrderService.ORDER_TYPES.RESERVATION,
     reservation_date: tomorrowStr,
     guest_count: 4,
-    customer: { name: 'Tamu Reservasi Besok', phone: '0812345678' }
+    customer: { name: 'Tamu Reservasi Besok', phone: '0899999999' }
   });
 
   assert.strictEqual(futurePosResult.success, true);
