@@ -74,6 +74,15 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
   assert.ok(settledEvent);
   assert.strictEqual(settledEvent.payload.order_id, orderId);
   assert.strictEqual(settledEvent.payload.provider, 'cash');
+
+  // Verify Amount-Bound Guard: strictly rejects mismatching amount
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: orderId,
+      amount: 1, // Mismatch against grand_total 50000
+      amount_tendered: 1000
+    });
+  }, /tidak sesuai dengan total tagihan order/);
 });
 
 // ==============================================================================

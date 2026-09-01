@@ -40,6 +40,14 @@ class CashSettlementService {
       throw new Error(`[CashSettlementService] Order "${order_id}" tidak ditemukan.`);
     }
 
+    // P1 FINANCIAL INTEGRITY (Amount-Bound Check): Settlement amount must match authoritative order.grand_total
+    const expectedAmount = Number(order.grand_total);
+    if (Number(amount) !== expectedAmount) {
+      throw new Error(
+        `[CashSettlementService] Jumlah pembayaran (Rp ${Number(amount).toLocaleString('id-ID')}) tidak sesuai dengan total tagihan order (Rp ${expectedAmount.toLocaleString('id-ID')}).`
+      );
+    }
+
     const tendered = typeof amount_tendered === 'number' ? amount_tendered : amount;
     if (tendered < amount) {
       throw new Error(`[CashSettlementService] Uang yang diterima (Rp ${tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${amount.toLocaleString('id-ID')}).`);
