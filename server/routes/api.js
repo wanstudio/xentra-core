@@ -945,12 +945,22 @@ router.get('/orders/:id', (req, res) => {
   const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order.id);
   const logs = db.prepare('SELECT * FROM order_status_logs WHERE order_id = ? ORDER BY created_at ASC').all(order.id);
 
+  // P1 INFORMATION HIDING & PRIVACY (NEW-02):
+  // Never expose raw_webhook_response or internal gateway config keys to public customer-facing tracking endpoint
+  const safePayment = payment ? {
+    payment_method: payment.payment_method || payment.provider,
+    payment_status: payment.payment_status,
+    amount: payment.amount,
+    settled_at: payment.settled_at,
+    created_at: payment.created_at
+  } : null;
+
   res.json({
     success: true,
     order,
     items,
     delivery,
-    payment,
+    payment: safePayment,
     logs
   });
 });

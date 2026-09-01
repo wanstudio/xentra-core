@@ -131,6 +131,17 @@ test('API POST /api/v1/checkout/create-order: validates items and creates order 
   assert.strictEqual(data.subtotal, 100000);
   assert.strictEqual(data.payment.method, 'midtrans');
   assert.ok(data.snap_token);
+
+  // Verify GET /orders/:id exposes sanitized projection without internal gateway leak (NEW-02)
+  const orderRes = await mockFetch(`/api/v1/orders/${data.order_id}`);
+  assert.strictEqual(orderRes.status, 200);
+  const orderData = await orderRes.json();
+  assert.strictEqual(orderData.success, true);
+  assert.strictEqual(orderData.order.id, data.order_id);
+  assert.strictEqual(orderData.payment.payment_method, 'midtrans');
+  assert.strictEqual(orderData.payment.payment_status, 'pending');
+  assert.strictEqual(orderData.payment.raw_webhook_response, undefined, 'raw_webhook_response must never leak to customer tracking');
+  assert.strictEqual(orderData.payment.merchant_id, undefined, 'internal merchant_id must never leak to customer tracking');
 });
 
 test('API POST /api/v1/checkout/create-order: creates cash order without Midtrans snap token', async () => {
