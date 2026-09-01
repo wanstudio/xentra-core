@@ -378,8 +378,9 @@ class PosOrderService {
     const grandTotal = order.grand_total;
 
     // 3. Calculate Change (Kembalian) if cash payment and Record Cash Payment Lifecycle
+    // (Bypass for reservation which is a zero-bill table booking)
     let changeAmount = 0;
-    if (payment_method === 'cash') {
+    if (payment_method === 'cash' && order_type !== 'reservation') {
       if (typeof amount_tendered === 'number') {
         if (amount_tendered < grandTotal) {
           throw new Error(`[PosOrderService] Uang yang diterima (Rp ${amount_tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${grandTotal.toLocaleString('id-ID')}).`);
@@ -401,8 +402,8 @@ class PosOrderService {
       }
     }
 
-    // 4. Update Shift Total Cash Sales if shift_id provided and payment is cash
-    if (shift_id && payment_method === 'cash') {
+    // 4. Update Shift Total Cash Sales if shift_id provided and payment is cash (excluding non-transactional reservation)
+    if (shift_id && payment_method === 'cash' && order_type !== 'reservation') {
       db.prepare(`
         UPDATE pos_shifts
         SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?

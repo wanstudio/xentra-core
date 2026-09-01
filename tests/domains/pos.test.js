@@ -212,16 +212,12 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
     order_type: PosOrderService.ORDER_TYPES.RESERVATION,
     reservation_date: todayStr,
     guest_count: 4,
-    payment_method: 'cash',
-    amount_tendered: 20000,
-    items: [
-      { product_id: 'prod_pos_1', quantity: 1, expected_price: 20000 }
-    ]
+    customer: { name: 'Tamu Reservasi Hari Ini', phone: '0812345678' }
   });
   assert.strictEqual(sameDayPosResult.success, false);
   assert.strictEqual(sameDayPosResult.status, 'SAME_DAY_RESERVATION_REJECTED');
 
-  // 3. Future-Day Reservation via POS (Tomorrow) -> ACCEPTED without immediate stock deduction
+  // 3. Future-Day Reservation via POS (Tomorrow) -> ACCEPTED without immediate stock deduction & 0 bill
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = tomorrow.toISOString().slice(0, 10);
@@ -232,16 +228,14 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
     order_type: PosOrderService.ORDER_TYPES.RESERVATION,
     reservation_date: tomorrowStr,
     guest_count: 4,
-    payment_method: 'cash',
-    amount_tendered: 20000,
-    items: [
-      { product_id: 'prod_pos_1', quantity: 1, expected_price: 20000 }
-    ]
+    customer: { name: 'Tamu Reservasi Besok', phone: '0812345678' }
   });
 
   assert.strictEqual(futurePosResult.success, true);
   assert.strictEqual(futurePosResult.order.order_type, 'reservation');
   assert.strictEqual(futurePosResult.order.reservation_date, tomorrowStr);
+  assert.strictEqual(futurePosResult.order.grand_total, 0);
+  assert.strictEqual(futurePosResult.order.items.length, 0);
 
   // IMPORTANT: Live stock remains UNTOUCHED at 48 upon booking (no premature deduction for future dates)
   const stockAfterBooking = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pos', 'prod_pos_1').stock;
