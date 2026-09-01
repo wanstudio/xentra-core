@@ -427,10 +427,15 @@
       var vv = window.visualViewport;
       if (!vv) {
         sheet.style.setProperty('--x-note-keyboard', '0px');
+        sheet.style.setProperty('--x-note-sheet-height', '340px');
         return;
       }
       var keyboardHeight = Math.max(0, window.innerHeight - (vv.offsetTop + vv.height));
+      var availableHeight = vv.height;
+      var targetHeight = Math.min(340, Math.max(220, Math.round(availableHeight * 0.85)));
+
       sheet.style.setProperty('--x-note-keyboard', keyboardHeight + 'px');
+      sheet.style.setProperty('--x-note-sheet-height', targetHeight + 'px');
     }
 
     if (window.visualViewport) {

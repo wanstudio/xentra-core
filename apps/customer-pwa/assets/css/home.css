@@ -897,10 +897,10 @@
 	right: 0 !important;
 	bottom: var(--x-note-keyboard, 0px) !important;
 	width: 100% !important;
-	height: 52vh !important;
-	height: 52dvh !important;
-	max-height: 52dvh !important;
-	margin: 0 !important;
+	max-width: 480px !important;
+	margin: 0 auto !important;
+	height: var(--x-note-sheet-height, 50vh) !important;
+	max-height: calc(100vh - var(--x-note-keyboard, 0px)) !important;
 	background: #fff;
 	border-radius: 22px 22px 0 0;
 	padding: 8px 26px max(12px, env(safe-area-inset-bottom));
