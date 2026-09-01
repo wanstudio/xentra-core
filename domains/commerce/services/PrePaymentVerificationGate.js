@@ -66,6 +66,19 @@ class PrePaymentVerificationGate {
         continue;
       }
 
+      // SPECIAL INCENTIVE GUARD: Promo Es Teh Gratis Rp0 (PWA Welcome Freebie)
+      if (String(productId) === 'promo-es-teh-gratis') {
+        verifiedItems.push({
+          product_id: 'promo-es-teh-gratis',
+          name: item.name || 'Es Teh Manis',
+          quantity: requestedQty,
+          unit_price: 0,
+          subtotal: 0,
+          notes: 'Selamat! Es Teh Gratis untuk pesanan pertamamu!'
+        });
+        continue;
+      }
+
       const expectedPrice = Number(item.expected_price ?? item.price);
 
       // Query master product joined with branch_products
