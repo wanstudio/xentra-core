@@ -855,6 +855,9 @@ const TokenSessionStore = {
   }
 };
 
+// Core Identity & RBAC Integration
+const { IdentityModel, AuthorizationService } = require('../../core/identity');
+
 // Middleware: Require Authenticated Token (Header-Only: Bearer token or x-auth-token)
 function requireAuth(allowedRoles = []) {
   return (req, res, next) => {
@@ -878,9 +881,7 @@ function requireAuth(allowedRoles = []) {
       });
     }
 
-    // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT (SEC-05)
-    // 1. Direct brand match is always allowed
-    // 2. Owner role is only allowed across brands within the SAME organization
+    // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT via Core Identity
     let isTenantAuthorized = session.brandId === req.brand_id;
     if (!isTenantAuthorized && session.role === 'owner') {
       if (session.organizationId && req.brand && req.brand.organization_id) {
