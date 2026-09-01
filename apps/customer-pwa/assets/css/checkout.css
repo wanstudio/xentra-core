@@ -1722,39 +1722,53 @@
    ========================================================= */
 
 .x-overlay{
-	position:fixed;
-	inset:0;
-	background:rgba(0,0,0,0);
-	display:flex;
-	align-items:flex-end;
-	justify-content:center;
-	z-index:1000000;
-	pointer-events:none;
-	transition:background .35s ease;
+	position:fixed !important;
+	inset:0 !important;
+	width:100vw !important;
+	height:100vh !important;
+	height:100dvh !important;
+	background:rgba(0,0,0,0.45) !important;
+	display:flex !important;
+	align-items:flex-end !important;
+	justify-content:center !important;
+	z-index:1000000 !important;
+	opacity:0 !important;
+	visibility:hidden !important;
+	pointer-events:none !important;
+	transition:opacity 0.35s ease, visibility 0.35s ease !important;
+	isolation:isolate;
 }
 
 .x-overlay.open{
-	background:rgba(0,0,0,.45);
-	pointer-events:auto;
+	opacity:1 !important;
+	visibility:visible !important;
+	pointer-events:auto !important;
 }
 
-.x-sheet-inner{
-	background:#fff;
-	width:100%;
-	max-width:480px;
-	margin:0 auto;
-	max-height:88vh;
-	overflow-y:auto;
-	border-radius:22px 22px 0 0;
-	padding:14px 18px calc(20px + env(safe-area-inset-bottom));
-	box-shadow:0 -10px 35px rgba(0,0,0,.15);
-	transform:translateY(105%);
-	transition:transform .38s cubic-bezier(.22,.61,.36,1);
-	touch-action:pan-y;
+.x-sheet,
+.x-sheet-inner,
+.x-alt-sheet{
+	background:#fff !important;
+	width:100% !important;
+	max-width:480px !important;
+	margin:0 auto !important;
+	max-height:88vh !important;
+	max-height:88dvh !important;
+	overflow-y:auto !important;
+	border-radius:22px 22px 0 0 !important;
+	padding:14px 18px calc(20px + env(safe-area-inset-bottom)) !important;
+	box-shadow:0 -10px 35px rgba(0,0,0,.15) !important;
+	transform:translateY(105%) !important;
+	transition:transform 0.38s cubic-bezier(0.22, 0.61, 0.36, 1) !important;
+	will-change:transform !important;
+	touch-action:pan-y !important;
+	box-sizing:border-box !important;
 }
 
-.x-overlay.open .x-sheet-inner{
-	transform:translateY(0);
+.x-overlay.open .x-sheet,
+.x-overlay.open .x-sheet-inner,
+.x-overlay.open .x-alt-sheet{
+	transform:translateY(0) !important;
 }
 
 .x-sheet-handle{

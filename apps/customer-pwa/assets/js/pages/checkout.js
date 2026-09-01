@@ -690,18 +690,44 @@
     if (o) o.classList.toggle('is-active', state.paymentMethod === 'midtrans');
   }
 
-  // ── Overlay Modal Helper (Rule: Overlay in DOM first before query) ──
+  // ── Overlay Modal Helper (Rule: Overlay in DOM first before query, smooth slide physics) ──
   function makeOverlay(innerHtml) {
     var overlay = document.createElement('div');
-    overlay.className = 'x-overlay open';
-    overlay.innerHTML = '<div class="x-sheet open x-alt-sheet"><div class="x-sheet-handle"></div>' + innerHtml + '</div>';
+    overlay.className = 'x-overlay';
+    overlay.innerHTML = '<div class="x-sheet x-alt-sheet"><div class="x-sheet-handle"></div>' + innerHtml + '</div>';
     document.body.appendChild(overlay);
-    requestAnimationFrame(function () { overlay.classList.add('open'); });
+
+    // Force layout reflow so browser registers the off-screen translateY(105%) start position
+    void overlay.offsetHeight;
+
+    window.requestAnimationFrame(function () {
+      overlay.classList.add('open');
+    });
+
+    var isClosing = false;
     function close() {
+      if (isClosing) return;
+      isClosing = true;
       overlay.classList.remove('open');
-      setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 260);
+      setTimeout(function () {
+        if (overlay.parentNode) overlay.remove();
+      }, 380);
     }
-    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+
+    if (window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
+      window.XentraNav.pushClose(close);
+    }
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) {
+        if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+          window.XentraNav.close();
+        } else {
+          close();
+        }
+      }
+    });
+
     return { overlay: overlay, close: close };
   }
 
@@ -883,13 +909,25 @@
 
   // ── 3. Fulfillment Note Sheet ──
   function openFulfillmentNoteSheet() {
+    var val = state.fulfillment.note || '';
     var sh = makeOverlay(
-      '<h3 class="x-alt-sheet-title">Catatan Pengantaran / Pesanan</h3>' +
-      '<textarea id="x-input-ful-note" class="x-alt-textarea" rows="4" placeholder="Contoh: titip di satpam, rumah pagar hijau, atau permintaan alat makan…">' + UI.escape(state.fulfillment.note || '') + '</textarea>' +
-      '<button type="button" class="x-alt-submit-btn" id="x-save-ful-note" style="margin-top:14px;">Simpan Catatan</button>'
+      '<div class="x-note-header"><h3 style="margin:0;font-size:16px;font-weight:700;color:#111;">Catatan untuk Pengantaran / Toko</h3></div>' +
+      '<textarea id="x-input-ful-note" maxlength="200" style="width:100%;min-height:120px;padding:14px 0;border:0;outline:0;resize:none;background:transparent;font-size:14px;line-height:21px;color:#333;" placeholder="Tambahkan catatan (contoh: titip di satpam, pagar hitam)…">' + UI.escape(val) + '</textarea>' +
+      '<div class="x-note-footer" style="display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid #dedede;">' +
+      '  <span id="x-ful-note-count" style="font-size:12px;color:#777;">' + val.length + '/200</span>' +
+      '  <button type="button" class="x-alt-submit-btn" id="x-save-ful-note" style="width:auto;min-width:96px;height:38px;padding:0 20px;font-size:14px;border-radius:20px;">Simpan</button>' +
+      '</div>'
     );
+
+    var txt = sh.overlay.querySelector('#x-input-ful-note');
+    var cnt = sh.overlay.querySelector('#x-ful-note-count');
+    if (txt && cnt) {
+      txt.addEventListener('input', function () { cnt.textContent = txt.value.length + '/200'; });
+      setTimeout(function () { txt.focus(); }, 350);
+    }
+
     sh.overlay.querySelector('#x-save-ful-note').onclick = function () {
-      state.fulfillment.note = sh.overlay.querySelector('#x-input-ful-note').value.trim();
+      state.fulfillment.note = (txt ? txt.value : '').trim();
       sh.close();
       renderLayout();
       calculateTotals();
@@ -900,14 +938,26 @@
   function openItemNoteSheet(itemId) {
     var item = Store.findCartItem(itemId);
     if (!item) return;
+    var val = (state.notes && state.notes[itemId]) || item.note || '';
     var sh = makeOverlay(
-      '<h3 class="x-alt-sheet-title">Catatan: ' + UI.escape(item.name) + '</h3>' +
-      '<textarea id="x-input-item-note" class="x-alt-textarea" rows="4" placeholder="Contoh: pedas banget, jangan pakai daun bawang…">' + UI.escape(item.note || '') + '</textarea>' +
-      '<button type="button" class="x-alt-submit-btn" id="x-save-item-note" style="margin-top:14px;">Simpan</button>'
+      '<div class="x-note-header"><h3 style="margin:0;font-size:16px;font-weight:700;color:#111;">Catatan : ' + UI.escape(item.name) + '</h3></div>' +
+      '<textarea id="x-input-item-note" maxlength="200" style="width:100%;min-height:120px;padding:14px 0;border:0;outline:0;resize:none;background:transparent;font-size:14px;line-height:21px;color:#333;" placeholder="Tambahkan catatan (contoh: pedas sedang, pisah sambal)…">' + UI.escape(val) + '</textarea>' +
+      '<div class="x-note-footer" style="display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid #dedede;">' +
+      '  <span id="x-item-note-count" style="font-size:12px;color:#777;">' + val.length + '/200</span>' +
+      '  <button type="button" class="x-alt-submit-btn" id="x-save-item-note" style="width:auto;min-width:96px;height:38px;padding:0 20px;font-size:14px;border-radius:20px;">Simpan</button>' +
+      '</div>'
     );
+
+    var txt = sh.overlay.querySelector('#x-input-item-note');
+    var cnt = sh.overlay.querySelector('#x-item-note-count');
+    if (txt && cnt) {
+      txt.addEventListener('input', function () { cnt.textContent = txt.value.length + '/200'; });
+      setTimeout(function () { txt.focus(); }, 350);
+    }
+
     sh.overlay.querySelector('#x-save-item-note').onclick = function () {
-      var v = sh.overlay.querySelector('#x-input-item-note').value.trim();
-      Store.setNote(itemId, v);
+      var noteVal = (txt ? txt.value : '').trim();
+      Store.setNote(itemId, noteVal);
       sh.close();
       renderLayout();
       calculateTotals();
