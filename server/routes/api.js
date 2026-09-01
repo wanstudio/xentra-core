@@ -594,6 +594,34 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       return res.status(400).json({ success: false, error: 'Nama customer wajib diisi.' });
     }
 
+    // P1 RECONCILIATION-AWARE CHECKOUT RECOVERY (NEW-01 & NEW-03):
+    // If this customer already has an existing order in 'reconciliation_pending', query gateway before creating duplicate orders
+    const existingRecon = db.prepare(`
+      SELECT o.id, o.order_number, o.status, p.payment_status, p.snap_token
+      FROM orders o
+      JOIN order_payments p ON p.order_id = o.id
+      WHERE o.brand_id = ? AND o.customer_phone = ? AND p.payment_status = 'reconciliation_pending'
+      ORDER BY o.created_at DESC LIMIT 1
+    `).get(req.brand_id, customer.phone.trim());
+
+    if (existingRecon) {
+      try {
+        const inquiryRes = await PaymentService.checkTransactionStatus(existingRecon.id);
+        if (inquiryRes && inquiryRes.payment_status === 'settlement') {
+          return res.status(200).json({
+            success: true,
+            order_id: existingRecon.id,
+            order_number: existingRecon.order_number,
+            reconciled: true,
+            message: 'Pesanan sebelumnya telah berhasil dikonfirmasi pembayarannya.',
+            redirect: '/order-received/' + existingRecon.id
+          });
+        }
+      } catch (inqErr) {
+        console.warn('[Checkout Pending Recon Inquiry]:', inqErr.message);
+      }
+    }
+
     // P1 LOGIC VALIDATION (NEW-02): For delivery orders, strict coordinates are mandatory (NO fallback to default coordinates)
     if (order_type === 'delivery') {
       if (!delivery || delivery.latitude == null || delivery.longitude == null || isNaN(Number(delivery.latitude)) || isNaN(Number(delivery.longitude))) {

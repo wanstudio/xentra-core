@@ -387,6 +387,89 @@ class PaymentGatewayService {
       payment_status: newPaymentStatus
     };
   }
+
+  /**
+   * Authoritative Gateway Status Inquiry (NEW-01 Resolution):
+   * Queries Midtrans API directly to resolve unknown / reconciliation_pending outcomes.
+   * 
+   * @param {string} order_id
+   * @returns {Promise<Object>}
+   */
+  static async checkTransactionStatus(order_id) {
+    const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
+    if (!order) {
+      throw new Error(`[PaymentGatewayService] Order "${order_id}" tidak ditemukan.`);
+    }
+
+    const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
+    if (!config.server_key) {
+      throw new Error(`[PaymentGatewayService] Server Key Midtrans belum dikonfigurasi untuk brand/cabang order "${order_id}".`);
+    }
+
+    const isProd = config.is_production || process.env.MIDTRANS_IS_PRODUCTION === 'true';
+    const baseUrl = isProd ? 'https://api.midtrans.com/v2' : 'https://api.sandbox.midtrans.com/v2';
+    const statusUrl = `${baseUrl}/${order_id}/status`;
+    const authHeader = 'Basic ' + Buffer.from(config.server_key + ':').toString('base64');
+
+    try {
+      const response = await axios.get(statusUrl, {
+        headers: {
+          Accept: 'application/json',
+          Authorization: authHeader
+        },
+        timeout: 6000
+      });
+
+      if (response && response.data) {
+        return this.handleWebhook(response.data, { skipSignatureCheck: true });
+      }
+    } catch (err) {
+      // 404 means transaction was NEVER created on gateway -> definitively safe to cancel
+      if (err.response && err.response.status === 404) {
+        db.exec('BEGIN IMMEDIATE;');
+        try {
+          db.prepare("UPDATE order_payments SET payment_status = 'cancel', updated_at = datetime('now') WHERE order_id = ?").run(order_id);
+          db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(order_id);
+          db.exec('COMMIT;');
+        } catch (_) {
+          try { db.exec('ROLLBACK;'); } catch (_) {}
+        }
+        return {
+          success: true,
+          order_id,
+          payment_status: 'cancel',
+          order_status: 'cancelled',
+          message: 'Transaksi tidak ditemukan di gateway Midtrans. Pembayaran resmi dibatalkan.'
+        };
+      }
+      throw new Error(`[PaymentGatewayService] Gagal memeriksa status transaksi gateway: ${err.message}`);
+    }
+  }
+
+  /**
+   * Background Reconciliation Worker for all reconciliation_pending orders
+   * 
+   * @returns {Promise<Array<Object>>}
+   */
+  static async reconcilePendingPayments() {
+    const pendingList = db.prepare(`
+      SELECT order_id FROM order_payments 
+      WHERE payment_status = 'reconciliation_pending'
+      ORDER BY created_at ASC
+    `).all();
+
+    const results = [];
+    for (const row of pendingList) {
+      try {
+        const res = await this.checkTransactionStatus(row.order_id);
+        results.push({ order_id: row.order_id, success: true, result: res });
+      } catch (err) {
+        results.push({ order_id: row.order_id, success: false, error: err.message });
+      }
+    }
+    return results;
+  }
 }
 
 module.exports = PaymentGatewayService;
