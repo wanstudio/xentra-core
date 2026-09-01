@@ -394,121 +394,89 @@
   }
 
   // ======================================================================
-  //  NOTE SHEET (EXACT XENTRA-MVP LOGIC)
+  //  NOTE SHEET (Dynamic makeOverlay execution + Compact Height + Green Simpan)
   // ======================================================================
-  var openNoteSheet = openNote;
-  function portalNoteSheet() {
-    var overlay = document.getElementById('x-note-overlay');
-    if (overlay && overlay.parentElement !== document.body) {
-      document.body.appendChild(overlay);
-    }
-  }
-
-  function updateNoteViewport() {
-    var o = document.getElementById('x-note-overlay');
-    var s = document.getElementById('x-note-sheet');
-    if (!o || !s) return;
-    var v = window.visualViewport;
-    if (!v) {
-      s.style.setProperty('--x-note-keyboard', '0px');
-      s.style.setProperty('--x-note-visible-height', '50dvh');
-      return;
-    }
-    var kh = Math.max(0, window.innerHeight - (v.offsetTop + v.height));
-    s.style.setProperty('--x-note-keyboard', kh + 'px');
-    s.style.setProperty('--x-note-visible-height', '50dvh');
-  }
-
-  function updateNoteCounter() {
-    var inp = document.getElementById('x-note-input');
-    var cnt = document.getElementById('x-note-counter');
-    if (inp && cnt) cnt.textContent = inp.value.length + '/200';
-  }
-
   function openNote(productId) {
-    portalNoteSheet();
     var numId = Number(productId);
     var item = Store.findCartItem(numId);
     var curNote = (item && item.note) || Store.getState().notes[numId] || '';
 
-    var inp = document.getElementById('x-note-input');
-    if (inp) {
-      inp.value = curNote;
-      inp.oninput = updateNoteCounter;
+    var overlay = document.createElement('div');
+    overlay.className = 'x-overlay x-note-overlay';
+    overlay.innerHTML =
+      '<div class="x-sheet x-note-sheet" style="height:min(52dvh, 360px) !important;max-height:52dvh !important;display:flex !important;flex-direction:column;">' +
+      '  <div class="x-note-handle"></div>' +
+      '  <div class="x-note-header">' +
+      '    <h3 style="margin:0;font-size:16px;font-weight:700;color:#111;">Tambah catatan untuk pembelian</h3>' +
+      '  </div>' +
+      '  <textarea id="x-note-input" maxlength="200" placeholder="Tambahkan catatan..." style="flex:1 1 auto;width:100%;min-height:0;padding:12px 0;border:0;outline:0;resize:none;background:transparent;color:#333;font-family:inherit;font-size:14px;line-height:21px;">' + UI.escape(curNote) + '</textarea>' +
+      '  <div class="x-note-footer" style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid #dedede;flex:0 0 auto;">' +
+      '    <span id="x-note-counter" style="font-size:12px;color:#777;">' + curNote.length + '/200</span>' +
+      '    <button id="x-note-save" type="button" style="width:86px;height:34px;border:0;border-radius:18px;background:#b6ff00;color:#111;font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>' +
+      '  </div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    var sheet = overlay.querySelector('.x-note-sheet');
+    var input = overlay.querySelector('#x-note-input');
+    var counter = overlay.querySelector('#x-note-counter');
+    var saveBtn = overlay.querySelector('#x-note-save');
+
+    if (input && counter) {
+      input.addEventListener('input', function () {
+        counter.textContent = input.value.length + '/200';
+      });
     }
-    updateNoteCounter();
 
-    var o = document.getElementById('x-note-overlay');
-    var s = document.getElementById('x-note-sheet');
-    if (s) {
-      s.style.setProperty('--x-note-keyboard', '0px');
-      s.style.setProperty('--x-note-visible-height', '50dvh');
-    }
-
-    if (o) o.style.display = 'flex';
-
-    if (window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
-      window.XentraNav.pushClose(closeNote);
-    }
-
-    void (s || o).offsetHeight;
+    void overlay.offsetHeight;
     requestAnimationFrame(function () {
-      if (o) o.classList.add('open');
+      overlay.classList.add('open');
     });
 
     setTimeout(function () {
-      if (inp) inp.focus();
-      updateNoteViewport();
+      if (input) input.focus();
     }, 350);
 
-    var saveBtn = document.getElementById('x-note-save');
+    var isClosing = false;
+    function close() {
+      if (isClosing) return;
+      isClosing = true;
+      if (input) input.blur();
+      overlay.classList.remove('open');
+      setTimeout(function () {
+        if (overlay.parentNode) overlay.remove();
+      }, 380);
+    }
+
+    if (window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
+      window.XentraNav.pushClose(close);
+    }
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) {
+        if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+          window.XentraNav.close();
+        } else {
+          close();
+        }
+      }
+    });
+
     if (saveBtn) {
       saveBtn.onclick = function () {
-        var noteVal = (inp ? inp.value : '').trim();
+        var noteVal = (input ? input.value : '').trim();
         Store.setNote(numId, noteVal);
         if (window.XentraNav && typeof window.XentraNav.close === 'function') {
           window.XentraNav.close();
         } else {
-          closeNote();
+          close();
         }
         renderProducts();
       };
     }
-
-    if (o) {
-      o.onclick = function (e) {
-        if (e.target === o) {
-          if (window.XentraNav && typeof window.XentraNav.close === 'function') {
-            window.XentraNav.close();
-          } else {
-            closeNote();
-          }
-        }
-      };
-    }
   }
-
-  function closeNote() {
-    var o = document.getElementById('x-note-overlay');
-    var s = document.getElementById('x-note-sheet');
-    var inp = document.getElementById('x-note-input');
-    if (!o) return;
-    if (inp) inp.blur();
-    o.classList.remove('open');
-    setTimeout(function () {
-      if (s) {
-        s.style.setProperty('--x-note-keyboard', '0px');
-        s.style.setProperty('--x-note-visible-height', '75dvh');
-      }
-      o.style.display = 'none';
-    }, 380);
-  }
-
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', updateNoteViewport);
-    window.visualViewport.addEventListener('scroll', updateNoteViewport);
-  }
-  window.addEventListener('resize', updateNoteViewport);
+  var openNoteSheet = openNote;
 
   // ======================================================================
   //  CART DOCK
