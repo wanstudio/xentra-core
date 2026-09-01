@@ -1074,6 +1074,26 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
       });
     }
 
+    let effectiveShiftId = shift_id || null;
+
+    // Smart Active Shift Auto-Resolution: Cashier MUST have an open shift to accept cash payments
+    if (!effectiveShiftId && req.user && req.user.role === 'cashier') {
+      const activeShift = db.prepare(`
+        SELECT id FROM pos_shifts 
+        WHERE cashier_id = ? AND branch_id = ? AND status = 'open' 
+        ORDER BY opened_at DESC LIMIT 1
+      `).get(req.user.id, req.user.branch_id);
+
+      if (activeShift) {
+        effectiveShiftId = activeShift.id;
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: 'Kasir belum membuka shift aktif. Harap buka shift kasir terlebih dahulu sebelum menerima pembayaran tunai.'
+        });
+      }
+    }
+
     // Authoritative Domain Settlement Execution (Single Source of Truth)
     const { CashSettlementService } = require('../../domains/payment');
     const result = CashSettlementService.settleCashPayment({
@@ -1081,7 +1101,7 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
       amount: Number(order.grand_total),
       amount_tendered: amount_tendered !== undefined ? Number(amount_tendered) : Number(order.grand_total),
       cashier_id: req.user ? req.user.id : null,
-      shift_id: shift_id || null
+      shift_id: effectiveShiftId
     });
 
     res.json({
