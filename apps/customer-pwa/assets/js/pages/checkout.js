@@ -82,63 +82,32 @@
     return Boolean(isStandalone || isIosStandalone || isTwa || isFlaggedInstalled);
   }
 
-  function shouldShowPwaInstallPromo() {
-    // 1. If PWA is already installed on device -> HIDE banner (replaced by welcome reward badge)
-    if (checkIsPwaInstalled()) return false;
-
-    // 2. If customer is already logged in / registered / verified -> HIDE
-    var storeState = Store && Store.getState ? Store.getState() : {};
-    var isCustomerLoggedIn = Boolean(
-      (storeState.customerSession && storeState.customerSession.phone) ||
-      (state.customer && state.customer.isVerified && state.customer.phone)
-    );
-    if (isCustomerLoggedIn) return false;
-
-    // 3. If customer has already claimed or installed previously in localStorage -> HIDE
-    try {
-      if (localStorage.getItem('xentra_pwa_installed') === '1' || localStorage.getItem('xentra_pwa_claimed') === '1') {
-        return false;
-      }
-    } catch (_) {}
-
-    return true;
-  }
-
-  function isEligibleForPwaWelcomeFreebie() {
-    // Must be installed in PWA and is a new customer without prior order session
-    if (!checkIsPwaInstalled()) return false;
-    var storeState = Store && Store.getState ? Store.getState() : {};
-    var isCustomerLoggedIn = Boolean(
-      (storeState.customerSession && storeState.customerSession.phone) ||
-      (state.customer && state.customer.isVerified && state.customer.phone)
-    );
-    if (isCustomerLoggedIn) return false;
-    try {
-      if (localStorage.getItem('xentra_pwa_claimed') === '1') return false;
-    } catch (_) {}
-    return true;
-  }
-
   var isPwaInstalled = checkIsPwaInstalled();
-  var activePromotions = [];
+  var promoEvaluation = { discovery: [], applied: [], rejected: [] };
 
   function loadActivePromotions() {
-    if (!API) return Promise.resolve([]);
+    if (!API) return Promise.resolve(promoEvaluation);
     var isPwa = checkIsPwaInstalled();
     var phone = state.customer.phone || '';
     return API.get('/promotions/active?is_pwa=' + (isPwa ? '1' : '0') + '&phone=' + encodeURIComponent(phone))
       .then(function (res) {
-        if (res && res.success && Array.isArray(res.promotions)) {
-          activePromotions = res.promotions;
+        if (res && res.success) {
+          promoEvaluation = {
+            discovery: Array.isArray(res.promotions) ? res.promotions : [],
+            applied: Array.isArray(res.applied) ? res.applied : [],
+            rejected: Array.isArray(res.rejected) ? res.rejected : []
+          };
         }
-        return activePromotions;
-      }).catch(function () { return []; });
+        return promoEvaluation;
+      }).catch(function () { return promoEvaluation; });
   }
 
-  function getActiveInstallPromo() {
-    return activePromotions.find(function (p) {
-      return p.capability_type === 'install_incentive' || p.promo_type === 'install_incentive';
-    }) || null;
+  function getBannerPromo() {
+    return promoEvaluation.discovery.find(function (p) { return p.should_show_banner === true; }) || null;
+  }
+
+  function getAppliedRewardPromo() {
+    return promoEvaluation.applied.find(function (p) { return p.should_grant_reward === true && p.reward; }) || null;
   }
 
   window.addEventListener('beforeinstallprompt', function (e) {
@@ -153,6 +122,11 @@
     var banner = document.getElementById('x-promo-banner');
     if (banner) banner.style.display = 'none';
     if (UI && UI.toast) UI.toast('Aplikasi berhasil dipasang!');
+    // Re-evaluate promotions from domain upon app install
+    loadActivePromotions().then(function () {
+      renderLayout();
+      bindEvents();
+    });
   });
 
   function showPwaGuideSheet(platform) {
@@ -276,20 +250,20 @@
     // Load available branches & active promotions
     loadBranches();
     loadActivePromotions().then(function () {
-      if (isEligibleForPwaWelcomeFreebie()) {
-        var promo = getActiveInstallPromo();
-        var rewardPrice = (promo && promo.reward && promo.reward.reward_price !== undefined) ? Number(promo.reward.reward_price) : 0;
-        var rewardDesc = (promo && promo.display && promo.display.reward_title) || 'Selamat! Es Teh Gratis untuk pesanan pertamamu!';
+      var appliedPromo = getAppliedRewardPromo();
+      if (appliedPromo && appliedPromo.reward) {
+        var r = appliedPromo.reward;
         var cartItems = Store.getState().cart.items || [];
-        var hasFreebie = cartItems.some(function (i) { return String(i.id) === 'promo-es-teh-gratis'; });
-        if (!hasFreebie) {
+        var rewardItemId = 'reward_' + (r.promo_id || appliedPromo.promo_id);
+        var hasRewardInCart = cartItems.some(function (i) { return String(i.id) === rewardItemId; });
+        if (!hasRewardInCart) {
           Store.addItem({
-            id: 'promo-es-teh-gratis',
-            name: 'Es Teh Manis',
-            price: rewardPrice,
+            id: rewardItemId,
+            name: (appliedPromo.display && appliedPromo.display.reward_title) || 'Hadiah Promo',
+            price: Number(r.reward_price || 0),
             regular_price: 5000,
-            image_url: '/assets/img/iced-tea.png',
-            description: rewardDesc
+            image_url: (appliedPromo.display && appliedPromo.display.icon_url) || '/assets/pwa/icon-192.png',
+            description: (appliedPromo.display && appliedPromo.display.reward_title) || 'Hadiah Promo'
           }, 1);
         }
       }
@@ -422,28 +396,26 @@
       // 1. Header
       '  <div class="x-alt-header"><button type="button" id="x-checkout-back" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Pesanan</span></div>' +
 
-      // 2. Dynamic Promo Banner OR Installed Welcome Reward Badge (from domains/promo)
+      // 2. Dynamic Promo Presentation (purely driven by domains/promotion decision)
       ((function () {
-        var promo = getActiveInstallPromo();
-        if (shouldShowPwaInstallPromo()) {
-          var bTitle = (promo && promo.display && promo.display.banner_title) || 'Install sekarang & dapatkan gratis es teh';
-          var bSub = (promo && promo.display && promo.display.banner_subtitle) || 'syarat & ketentuan berlaku';
-          var bIcon = (promo && promo.display && promo.display.icon_url) || '/assets/img/iced-tea.png';
+        var bannerPromo = getBannerPromo();
+        var rewardPromo = getAppliedRewardPromo();
+
+        if (bannerPromo && bannerPromo.display) {
+          var b = bannerPromo.display;
           return (
             '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
-            '    <img class="x-alt-promo-img" src="' + UI.escape(bIcon) + '" alt="" onerror="this.style.display=\'none\'">' +
-            '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(bTitle) + '</div><div class="x-alt-promo-snk">' + UI.escape(bSub) + '</div></div>' +
+            '    <img class="x-alt-promo-img" src="' + UI.escape(b.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
+            '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(b.banner_title || 'Promo Menarik') + '</div><div class="x-alt-promo-snk">' + UI.escape(b.banner_subtitle || '') + '</div></div>' +
             '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-install">Install</button>' +
             '  </div>'
           );
-        } else if (isEligibleForPwaWelcomeFreebie()) {
-          var rTitle = (promo && promo.display && promo.display.reward_title) || 'Selamat! Es Teh Gratis untuk pesanan pertamamu!';
-          var rBadge = (promo && promo.display && promo.display.reward_badge_text) || '✓ Bonus PWA Aktif (Rp0)';
-          var rIcon = (promo && promo.display && promo.display.icon_url) || '/assets/img/iced-tea.png';
+        } else if (rewardPromo && rewardPromo.display) {
+          var r = rewardPromo.display;
           return (
             '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner" style="background:#f0fdf4;border:1px solid #bbf7d0;box-shadow:0 2px 10px rgba(22,163,74,0.06);">' +
-            '    <img class="x-alt-promo-img" src="' + UI.escape(rIcon) + '" alt="" onerror="this.style.display=\'none\'">' +
-            '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title" style="color:#15803d;font-size:13px;line-height:1.35;font-weight:700;">' + UI.escape(rTitle) + '</div><div class="x-alt-promo-snk" style="color:#16a34a;font-weight:600;">' + UI.escape(rBadge) + '</div></div>' +
+            '    <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
+            '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title" style="color:#15803d;font-size:13px;line-height:1.35;font-weight:700;">' + UI.escape(r.reward_title || 'Bonus Spesial') + '</div><div class="x-alt-promo-snk" style="color:#16a34a;font-weight:600;">' + UI.escape(r.reward_badge_text || '✓ Hadiah Aktif') + '</div></div>' +
             '  </div>'
           );
         }
