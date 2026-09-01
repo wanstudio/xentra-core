@@ -120,6 +120,24 @@
   }
 
   var isPwaInstalled = checkIsPwaInstalled();
+  var activePromotions = [];
+
+  function loadActivePromotions() {
+    if (!API) return Promise.resolve([]);
+    var isPwa = checkIsPwaInstalled();
+    var phone = state.customer.phone || '';
+    return API.get('/promo/active?is_pwa=' + (isPwa ? '1' : '0') + '&phone=' + encodeURIComponent(phone))
+      .then(function (res) {
+        if (res && res.success && Array.isArray(res.promotions)) {
+          activePromotions = res.promotions;
+        }
+        return activePromotions;
+      }).catch(function () { return []; });
+  }
+
+  function getActiveInstallPromo() {
+    return activePromotions.find(function (p) { return p.promo_type === 'install_incentive'; }) || null;
+  }
 
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault();
@@ -229,24 +247,29 @@
       state.fulfillment.type = storeState.orderType;
     }
 
-    // Load available branches
+    // Load available branches & active promotions
     loadBranches();
-
-    // Auto-grant Welcome Es Teh Gratis Rp0 if opening installed PWA for the first time
-    if (isEligibleForPwaWelcomeFreebie()) {
-      var cartItems = Store.getState().cart.items || [];
-      var hasFreebie = cartItems.some(function (i) { return String(i.id) === 'promo-es-teh-gratis'; });
-      if (!hasFreebie) {
-        Store.addItem({
-          id: 'promo-es-teh-gratis',
-          name: 'Es Teh Manis',
-          price: 0,
-          regular_price: 5000,
-          image_url: '/assets/img/iced-tea.png',
-          description: 'Selamat! Es Teh Gratis untuk pesanan pertamamu!'
-        }, 1);
+    loadActivePromotions().then(function () {
+      if (isEligibleForPwaWelcomeFreebie()) {
+        var promo = getActiveInstallPromo();
+        var rewardPrice = (promo && promo.reward && promo.reward.reward_price !== undefined) ? Number(promo.reward.reward_price) : 0;
+        var rewardDesc = (promo && promo.display && promo.display.reward_title) || 'Selamat! Es Teh Gratis untuk pesanan pertamamu!';
+        var cartItems = Store.getState().cart.items || [];
+        var hasFreebie = cartItems.some(function (i) { return String(i.id) === 'promo-es-teh-gratis'; });
+        if (!hasFreebie) {
+          Store.addItem({
+            id: 'promo-es-teh-gratis',
+            name: 'Es Teh Manis',
+            price: rewardPrice,
+            regular_price: 5000,
+            image_url: '/assets/img/iced-tea.png',
+            description: rewardDesc
+          }, 1);
+        }
       }
-    }
+      renderLayout();
+      bindEvents();
+    });
 
     var items = getCheckoutItems();
     if (!items.length && state.fulfillment.type !== 'reservation') {
@@ -373,19 +396,33 @@
       // 1. Header
       '  <div class="x-alt-header"><button type="button" id="x-checkout-back" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Pesanan</span></div>' +
 
-      // 2. Install Promo Banner OR Installed Welcome Reward Badge
-      (shouldShowPwaInstallPromo() ? (
-        '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
-        '    <img class="x-alt-promo-img" src="/assets/img/iced-tea.png" alt="Es Teh" onerror="this.style.display=\'none\'">' +
-        '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">Install sekarang &amp; dapatkan gratis es teh</div><div class="x-alt-promo-snk">syarat &amp; ketentuan berlaku</div></div>' +
-        '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-install">Install</button>' +
-        '  </div>'
-      ) : (isEligibleForPwaWelcomeFreebie() ? (
-        '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner" style="background:#f0fdf4;border:1px solid #bbf7d0;box-shadow:0 2px 10px rgba(22,163,74,0.06);">' +
-        '    <img class="x-alt-promo-img" src="/assets/img/iced-tea.png" alt="Es Teh" onerror="this.style.display=\'none\'">' +
-        '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title" style="color:#15803d;font-size:13px;line-height:1.35;font-weight:700;">Selamat! Es Teh Gratis untuk pesanan pertamamu!</div><div class="x-alt-promo-snk" style="color:#16a34a;font-weight:600;">✓ Bonus PWA Aktif (Rp0)</div></div>' +
-        '  </div>'
-      ) : '')) +
+      // 2. Dynamic Promo Banner OR Installed Welcome Reward Badge (from domains/promo)
+      ((function () {
+        var promo = getActiveInstallPromo();
+        if (shouldShowPwaInstallPromo()) {
+          var bTitle = (promo && promo.display && promo.display.banner_title) || 'Install sekarang & dapatkan gratis es teh';
+          var bSub = (promo && promo.display && promo.display.banner_subtitle) || 'syarat & ketentuan berlaku';
+          var bIcon = (promo && promo.display && promo.display.icon_url) || '/assets/img/iced-tea.png';
+          return (
+            '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
+            '    <img class="x-alt-promo-img" src="' + UI.escape(bIcon) + '" alt="" onerror="this.style.display=\'none\'">' +
+            '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(bTitle) + '</div><div class="x-alt-promo-snk">' + UI.escape(bSub) + '</div></div>' +
+            '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-install">Install</button>' +
+            '  </div>'
+          );
+        } else if (isEligibleForPwaWelcomeFreebie()) {
+          var rTitle = (promo && promo.display && promo.display.reward_title) || 'Selamat! Es Teh Gratis untuk pesanan pertamamu!';
+          var rBadge = (promo && promo.display && promo.display.reward_badge_text) || '✓ Bonus PWA Aktif (Rp0)';
+          var rIcon = (promo && promo.display && promo.display.icon_url) || '/assets/img/iced-tea.png';
+          return (
+            '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner" style="background:#f0fdf4;border:1px solid #bbf7d0;box-shadow:0 2px 10px rgba(22,163,74,0.06);">' +
+            '    <img class="x-alt-promo-img" src="' + UI.escape(rIcon) + '" alt="" onerror="this.style.display=\'none\'">' +
+            '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title" style="color:#15803d;font-size:13px;line-height:1.35;font-weight:700;">' + UI.escape(rTitle) + '</div><div class="x-alt-promo-snk" style="color:#16a34a;font-weight:600;">' + UI.escape(rBadge) + '</div></div>' +
+            '  </div>'
+          );
+        }
+        return '';
+      })()) +
 
       // 3. Customer Identity Card (Phone & WhatsApp OTP status)
       '  <div class="x-alt-card x-alt-customer-card" id="x-card-customer" style="margin:0 14px 10px;">' +

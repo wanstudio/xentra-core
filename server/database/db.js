@@ -411,6 +411,35 @@ function initSchema(targetDb) {
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS promotions (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      branch_id TEXT,
+      code TEXT,
+      promo_type TEXT NOT NULL,
+      name TEXT NOT NULL,
+      banner_title TEXT,
+      banner_subtitle TEXT,
+      reward_title TEXT,
+      reward_badge_text TEXT,
+      icon_url TEXT,
+      reward_type TEXT NOT NULL DEFAULT 'freebie_product',
+      target_product_id TEXT,
+      reward_price REAL DEFAULT 0,
+      min_spend REAL DEFAULT 0,
+      target_audience TEXT DEFAULT 'new_user',
+      requires_pwa_installed INTEGER DEFAULT 1,
+      max_claims_per_user INTEGER DEFAULT 1,
+      total_quota INTEGER,
+      claimed_count INTEGER DEFAULT 0,
+      start_at TEXT,
+      end_at TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS branch_products (
       branch_id TEXT NOT NULL,
       product_id TEXT NOT NULL,
@@ -658,6 +687,34 @@ function seedData(targetDb) {
         VALUES (?, ?, ?, 100, 1, 5)
       `).run(branchBaratId, p.id, p.price);
     }
+
+    targetDb.prepare(`
+      INSERT OR IGNORE INTO promotions (
+        id, brand_id, branch_id, promo_type, name,
+        banner_title, banner_subtitle, reward_title, reward_badge_text, icon_url,
+        reward_type, target_product_id, reward_price, min_spend,
+        target_audience, requires_pwa_installed, max_claims_per_user, is_active
+      ) VALUES (
+        'promo_bangjo_pwa_install',
+        'brand_bangjo',
+        NULL,
+        'install_incentive',
+        'Promo Install Es Teh',
+        'Install sekarang & dapatkan gratis es teh',
+        'syarat & ketentuan berlaku',
+        'Selamat! Es Teh Gratis untuk pesanan pertamamu!',
+        '✓ Bonus PWA Aktif (Rp0)',
+        '/assets/img/iced-tea.png',
+        'freebie_product',
+        '288',
+        0,
+        0,
+        'new_user',
+        1,
+        1,
+        1
+      )
+    `).run();
   }
 }
 

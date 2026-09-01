@@ -7,6 +7,45 @@ const DeliveryCalculator = require('../services/DeliveryCalculator');
 const PaymentService = require('../services/PaymentService');
 const OrderStateMachine = require('../services/OrderStateMachine');
 const RouteService = require('../services/RouteService');
+const { PromotionEngineService } = require('../../domains/promo');
+
+// 0. Active Promotions Evaluation Endpoint
+router.get('/promo/active', (req, res) => {
+  try {
+    const brandId = req.brand.id;
+    const branchId = req.query.branch_id || null;
+    const isPwa = req.query.is_pwa === '1' || req.query.is_pwa === 'true';
+    const phone = req.query.phone || '';
+
+    const evaluatedPromos = PromotionEngineService.evaluatePromotions({
+      brand_id: brandId,
+      branch_id: branchId,
+      is_pwa_installed: isPwa,
+      customer_phone: phone
+    });
+
+    res.json({
+      success: true,
+      promotions: evaluatedPromos
+    });
+  } catch (err) {
+    console.error('[API Error /promo/active]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Admin/Dashboard Promotion Management
+router.post('/promo/save', (req, res) => {
+  try {
+    const brandId = req.brand.id;
+    const promoData = { ...req.body, brand_id: brandId };
+    const saved = PromotionEngineService.savePromotion(promoData);
+    res.json({ success: true, promotion: saved });
+  } catch (err) {
+    console.error('[API Error /promo/save]:', err);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
 
 // 1. Get Brand Profile & Theme
 router.get('/brand/info', (req, res) => {
