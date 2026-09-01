@@ -258,3 +258,62 @@ test('Payment 5 — Concurrency Race: Stock Depleted on Settlement marks fulfill
   const movements = db.prepare('SELECT * FROM inventory_movements WHERE reference_id = ?').all(orderNumber);
   assert.strictEqual(movements.length, 0, 'No false sale_deduction ledger entry allowed on out-of-stock race');
 });
+
+// ==============================================================================
+// Payment 6 — Terminal State Invariant: Cannot revive cancelled / expired order
+// ==============================================================================
+test('Payment 6 — Terminal State Invariant: rejects settlement on cancelled / expired order', () => {
+  const orderId = `ord_test_revive_${Date.now()}`;
+  const orderNumber = `XN-REVIVE-${Date.now()}`;
+
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Expired', '62812345678', 'delivery', 'customer_app', 50000, 50000, 'midtrans', 'pending')
+  `).run(orderId, orderNumber);
+
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
+    VALUES ('pay_revive_123', ?, 'midtrans', 'M12345', 'snap_token_revive', 'pending', 50000)
+  `).run(orderId);
+
+  const serverKey = 'SB-Mid-server-test12345';
+  const statusCode = '200';
+  const grossAmount = '50000.00';
+
+  // 1. First webhook: Expire payment
+  const rawExpireSig = `${orderId}${statusCode}${grossAmount}${serverKey}`;
+  const expireSig = crypto.createHash('sha512').update(rawExpireSig).digest('hex');
+
+  PaymentGatewayService.handleWebhook({
+    order_id: orderId,
+    status_code: statusCode,
+    gross_amount: grossAmount,
+    signature_key: expireSig,
+    transaction_status: 'expire',
+    payment_type: 'qris'
+  });
+
+  const expiredOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
+  const expiredPayment = db.prepare('SELECT payment_status FROM order_payments WHERE order_id = ?').get(orderId);
+  assert.strictEqual(expiredOrder.status, 'cancelled');
+  assert.strictEqual(expiredPayment.payment_status, 'expire');
+
+  // 2. Second webhook: Attempt settlement on expired/cancelled order -> STRICTLY REJECTED
+  const rawSettleSig = `${orderId}${statusCode}${grossAmount}${serverKey}`;
+  const settleSig = crypto.createHash('sha512').update(rawSettleSig).digest('hex');
+
+  assert.throws(() => {
+    PaymentGatewayService.handleWebhook({
+      order_id: orderId,
+      status_code: statusCode,
+      gross_amount: grossAmount,
+      signature_key: settleSig,
+      transaction_status: 'settlement',
+      payment_type: 'qris'
+    });
+  }, /Transisi status pembayaran tidak valid/);
+
+  // Verify order remains cancelled
+  const finalOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(finalOrder.status, 'cancelled');
+});

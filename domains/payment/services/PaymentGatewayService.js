@@ -183,17 +183,6 @@ class PaymentGatewayService {
       }
     }
 
-    // Idempotency: Return early if already settled
-    if (payment.payment_status === PaymentModel.STATUSES.SETTLEMENT) {
-      return {
-        success: true,
-        idempotent: true,
-        order_id,
-        payment_status: PaymentModel.STATUSES.SETTLEMENT,
-        message: 'Pembayaran sudah diselesaikan sebelumnya.'
-      };
-    }
-
     let newPaymentStatus = PaymentModel.STATUSES.PENDING;
     let shouldConfirmOrder = false;
 
@@ -209,6 +198,40 @@ class PaymentGatewayService {
       shouldConfirmOrder = true;
     } else if (['cancel', 'deny', 'expire'].includes(transaction_status)) {
       newPaymentStatus = transaction_status;
+    }
+
+    // Idempotency: Return early if already settled or in same state
+    if (payment.payment_status === PaymentModel.STATUSES.SETTLEMENT && newPaymentStatus === PaymentModel.STATUSES.SETTLEMENT) {
+      return {
+        success: true,
+        idempotent: true,
+        order_id,
+        payment_status: PaymentModel.STATUSES.SETTLEMENT,
+        message: 'Pembayaran sudah diselesaikan sebelumnya.'
+      };
+    }
+
+    if (payment.payment_status === newPaymentStatus) {
+      return {
+        success: true,
+        idempotent: true,
+        order_id,
+        payment_status: newPaymentStatus,
+        message: `Status pembayaran sudah berada pada "${newPaymentStatus}".`
+      };
+    }
+
+    // P1 STATE MACHINE INVARIANT (NEW-02): Prevent reviving cancelled/expired/terminal orders
+    if (!PaymentModel.canTransition(payment.payment_status, newPaymentStatus)) {
+      throw new Error(
+        `[PaymentGatewayService State Violation]: Transisi status pembayaran tidak valid dari "${payment.payment_status}" ke "${newPaymentStatus}". Status terminal tidak dapat diubah.`
+      );
+    }
+
+    if (order && order.status === 'cancelled' && shouldConfirmOrder) {
+      throw new Error(
+        `[PaymentGatewayService State Violation]: Pesanan "${order_id}" sudah dibatalkan (cancelled) dan tidak dapat dikonfirmasi ulang.`
+      );
     }
 
     const now = new Date().toISOString();

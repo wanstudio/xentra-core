@@ -17,6 +17,32 @@ class PaymentModel {
   };
 
   /**
+   * Authoritative Payment State Machine Transitions
+   * Terminal states (cancel, deny, expire, settlement, refunded) cannot transition to new states.
+   */
+  static VALID_TRANSITIONS = {
+    pending: ['settlement', 'challenge', 'cancel', 'deny', 'expire'],
+    challenge: ['settlement', 'cancel', 'deny', 'expire'],
+    settlement: ['refunded'],
+    cancel: [],
+    deny: [],
+    expire: [],
+    refunded: []
+  };
+
+  /**
+   * Checks if a transition from currentStatus to targetStatus is valid.
+   * 
+   * @param {string} currentStatus
+   * @param {string} targetStatus
+   * @returns {boolean}
+   */
+  static canTransition(currentStatus, targetStatus) {
+    const allowed = this.VALID_TRANSITIONS[currentStatus] || [];
+    return allowed.includes(targetStatus);
+  }
+
+  /**
    * Validates payment creation parameters.
    * 
    * @param {Object} params
