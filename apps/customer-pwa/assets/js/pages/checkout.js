@@ -540,8 +540,8 @@
         '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;"><span>Biaya Booking Reservasi</span><span style="color:#16a34a;font-weight:700;">Gratis (Rp0)</span></div>'
       )) +
       '    <div class="x-alt-pay-methods" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">' +
-      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'cash' ? 'is-active' : '') + '" id="x-opt-cash" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #ddd;border-radius:14px;background:#fff;cursor:pointer;text-align:left;font-family:inherit;font-size:13px;font-weight:600;color:#111;"><img src="/assets/icons/bank.svg" alt="" style="width:20px;height:20px;object-fit:contain;"><span>Tunai / Bayar di Tempat (COD / Kasir)</span></button>' +
-      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'midtrans' ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #ddd;border-radius:14px;background:#fff;cursor:pointer;text-align:left;font-family:inherit;font-size:13px;font-weight:600;color:#111;"><img src="/assets/icons/coupon.svg" alt="" style="width:20px;height:20px;object-fit:contain;"><span>Online Pay (QRIS / GoPay / ShopeePay / VA)</span></button>' +
+      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'cash' ? 'is-active' : '') + '" id="x-opt-cash" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'cash' ? '#b6ff00' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'cash' ? '#f7ffd9' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;font-size:13px;font-weight:600;color:#111;"><img src="/assets/icons/cashblack.svg" alt="" style="width:22px;height:22px;object-fit:contain;flex-shrink:0;"><span>Tunai / Bayar di Tempat (COD / Kasir)</span></button>' +
+      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'midtrans' ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'midtrans' ? '#b6ff00' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'midtrans' ? '#f7ffd9' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;font-size:13px;font-weight:600;color:#111;"><img src="/assets/icons/qrisgreen.svg" alt="" style="width:22px;height:22px;object-fit:contain;flex-shrink:0;"><span>Online Pay (QRIS / GoPay / ShopeePay / VA)</span></button>' +
       '    </div>' +
       '    <div class="x-alt-trust" style="font-size:11px;color:#888;text-align:center;margin-top:10px;"><span>🔒 Transaksi aman &amp; terenkripsi</span><span class="x-alt-trust-sep" style="margin:0 6px;">|</span><span>Diproses oleh <b>Midtrans</b></span></div>' +
       '  </div>' +
@@ -779,8 +779,18 @@
 
   function syncPayVisual() {
     var c = $('x-opt-cash'), o = $('x-opt-online');
-    if (c) c.classList.toggle('is-active', state.paymentMethod === 'cash');
-    if (o) o.classList.toggle('is-active', state.paymentMethod === 'midtrans');
+    if (c) {
+      var isCash = state.paymentMethod === 'cash';
+      c.classList.toggle('is-active', isCash);
+      c.style.borderColor = isCash ? '#b6ff00' : '#e5e7eb';
+      c.style.background = isCash ? '#f7ffd9' : '#fff';
+    }
+    if (o) {
+      var isOnline = state.paymentMethod === 'midtrans';
+      o.classList.toggle('is-active', isOnline);
+      o.style.borderColor = isOnline ? '#b6ff00' : '#e5e7eb';
+      o.style.background = isOnline ? '#f7ffd9' : '#fff';
+    }
   }
 
   // ── Overlay Modal Helper (Rule: Overlay in DOM first before query, smooth slide physics) ──
