@@ -1,11 +1,11 @@
 /**
- * Xentra Customer PWA — Service Worker (Release v2.2.5)
+ * Xentra Customer PWA — Service Worker (Release v2.2.8)
  * Follows Google & Gojek PWA Best Practices:
  * 1. Immediate activation via skipWaiting() and clients.claim()
  * 2. Strict Network-First navigation (never serves stale HTML while online)
  * 3. Automatic purge of old version caches on activation
  */
-const CACHE_NAME = "bangjo-core-v225";
+const CACHE_NAME = "bangjo-core-v228";
 const ASSETS_TO_CACHE = [
 
   "/",
