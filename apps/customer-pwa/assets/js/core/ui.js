@@ -30,7 +30,8 @@
    * toast('Item ditambahkan!', 2000)
    */
   function toast(message, duration) {
-    duration = duration || 2000;
+    var isLong = (message || '').length > 18;
+    duration = duration || (isLong ? 2800 : 2000);
 
     var existing = document.getElementById('x-toast');
     if (existing) existing.remove();
@@ -43,25 +44,26 @@
       'top:50%',
       'left:50%',
       'transform:translate(-50%, -50%) scale(0.92)',
-      'background:rgba(255, 75, 115, 0.94)',
+      'background:#ff3366',
       'color:#ffffff',
-      'padding:12px 24px',
-      'border-radius:18px',
-      'border:1.5px solid rgba(255, 190, 205, 0.7)',
-      'box-shadow:0 10px 30px rgba(255, 60, 105, 0.28), 0 4px 12px rgba(0, 0, 0, 0.08)',
+      'padding:14px 22px',
+      'border-radius:20px',
+      'border:1.5px solid rgba(255, 255, 255, 0.45)',
+      'box-shadow:0 12px 32px rgba(255, 51, 102, 0.32), 0 4px 12px rgba(0, 0, 0, 0.06)',
       'font-family:\'Plus Jakarta Sans\', -apple-system, BlinkMacSystemFont, sans-serif',
-      'font-size:13.5px',
-      'font-weight:700',
+      'font-size:14px',
+      'font-weight:600',
+      'letter-spacing:-0.01em',
       'text-align:center',
       'z-index:999999',
       'opacity:0',
       'transition:opacity .35s cubic-bezier(0.16, 1, 0.3, 1), transform .35s cubic-bezier(0.16, 1, 0.3, 1)',
       'pointer-events:none',
-      'max-width:280px',
+      'max-width:300px',
       'width:auto',
-      'line-height:1.4',
-      'backdrop-filter:blur(6px)',
-      '-webkit-backdrop-filter:blur(6px)'
+      'line-height:1.45',
+      'backdrop-filter:blur(8px)',
+      '-webkit-backdrop-filter:blur(8px)'
     ].join(';');
 
     document.body.appendChild(el);
