@@ -599,7 +599,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       }
     }
 
-    // 1. Resolve Branch (Scoped strictly to current brand)
+    // 1. Resolve Branch with Intelligence (Scoped strictly to current brand, NO arbitrary LIMIT 1)
     let branch = null;
     if (branch_id) {
       branch = db.prepare(`
@@ -608,19 +608,45 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order
         FROM branches b 
         LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id 
-        WHERE b.id = ? AND b.brand_id = ?
+        WHERE b.id = ? AND b.brand_id = ? AND b.is_active = 1
       `).get(branch_id, req.brand_id);
-    }
-    if (!branch) {
-      branch = db.prepare(`
-        SELECT 
-          b.id, b.brand_id, b.name, b.latitude, b.longitude,
-          s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order
-        FROM branches b 
-        LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id 
-        WHERE b.brand_id = ?
-        LIMIT 1
-      `).get(req.brand_id);
+
+      if (!branch) {
+        return res.status(404).json({
+          success: false,
+          error: `Cabang dengan ID "${branch_id}" tidak ditemukan atau sedang nonaktif pada brand ini.`
+        });
+      }
+    } else if (order_type === 'delivery' && delivery && delivery.latitude != null && delivery.longitude != null) {
+      // Intelligent Branch Resolution based on customer coordinates & cart availability
+      const matchResult = await BranchMatcher.matchNearestBranch({
+        brand_id: req.brand_id,
+        customer_lat: Number(delivery.latitude),
+        customer_lng: Number(delivery.longitude),
+        subtotal: 0,
+        items
+      });
+
+      if (matchResult && matchResult.eligible && matchResult.branch) {
+        branch = db.prepare(`
+          SELECT 
+            b.id, b.brand_id, b.name, b.latitude, b.longitude,
+            s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order
+          FROM branches b 
+          LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id 
+          WHERE b.id = ? AND b.brand_id = ?
+        `).get(matchResult.branch.id, req.brand_id);
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: matchResult ? matchResult.reason : 'Tidak ditemukan cabang terdekat yang dapat melayani pengantaran ke lokasi Anda.'
+        });
+      }
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Cabang pemesanan (branch_id) wajib dipilih.'
+      });
     }
 
     if (!branch) {
