@@ -40,9 +40,10 @@ class CashSettlementService {
       throw new Error(`[CashSettlementService] Order "${order_id}" tidak ditemukan.`);
     }
 
-    // P1 TERMINAL ORDER STATE GUARD: Strictly reject settlement on cancelled or expired orders
-    if (order.status === 'cancelled' || order.status === 'expired') {
-      throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran untuk pesanan yang sudah dibatalkan/kadaluarsa (Status: "${order.status}").`);
+    // P1 TERMINAL ORDER STATE GUARD (X-01): Strictly reject settlement on completed, cancelled, or expired orders
+    const TERMINAL_ORDER_STATUSES = ['completed', 'cancelled', 'expired'];
+    if (TERMINAL_ORDER_STATUSES.includes(order.status)) {
+      throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran tunai untuk pesanan yang sudah berada pada status terminal "${order.status}".`);
     }
 
     // P1 PAYMENT METHOD GUARD: Ensure order was created as cash order

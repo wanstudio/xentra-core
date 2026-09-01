@@ -193,7 +193,7 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
       amount: 30000,
       amount_tendered: 30000
     });
-  }, /sudah dibatalkan\/kadaluarsa/);
+  }, /status terminal "cancelled"|sudah dibatalkan/);
 
   // 6. Missing / Invalid amount_tendered Rejected (NEW-01)
   assert.throws(() => {
@@ -508,11 +508,11 @@ test('Payment 8 — Cash Settlement: Preserves existing payment_id in events, pr
   const orderId = `ord_test_preserve_${Date.now()}`;
   const existingPayId = `pay_orig_${Date.now()}`;
 
-  // 1. Order already in 'completed' state
+  // 1. Order in 'preparing' state (in-flight kitchen order)
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Completed', '62812345678', 'dine_in', 'pos_cashier', 80000, 80000, 'cash', 'completed')
-  `).run(orderId, `ORD-COMPL-${Date.now()}`);
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Preparing', '62812345678', 'dine_in', 'pos_cashier', 80000, 80000, 'cash', 'preparing')
+  `).run(orderId, `ORD-PREP-${Date.now()}`);
 
   db.prepare(`
     INSERT INTO order_payments (id, order_id, provider, payment_method, payment_status, amount)
@@ -548,7 +548,22 @@ test('Payment 8 — Cash Settlement: Preserves existing payment_id in events, pr
   assert.ok(capturedEvent);
   assert.strictEqual(capturedEvent.payload.payment_id, existingPayId, 'Event must carry authoritative existing payment_id');
 
-  // Authoritative State Regression Guard: Status must remain 'completed'
+  // Authoritative State Regression Guard: Status must remain 'preparing' (not regressed to confirmed)
   const finalOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
-  assert.strictEqual(finalOrder.status, 'completed', 'Order status must NOT regress from completed to confirmed');
+  assert.strictEqual(finalOrder.status, 'preparing', 'Order status must NOT regress from preparing to confirmed');
+
+  // 4. Terminal State Guard (X-01): Settlement on completed order strictly rejected
+  const completedOrderId = `ord_test_compl_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Done', '62812345678', 'dine_in', 'pos_cashier', 50000, 50000, 'cash', 'completed')
+  `).run(completedOrderId, `ORD-DONE-${Date.now()}`);
+
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: completedOrderId,
+      amount: 50000,
+      amount_tendered: 50000
+    });
+  }, /status terminal "completed"/);
 });
