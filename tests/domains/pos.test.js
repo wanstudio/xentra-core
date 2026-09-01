@@ -266,9 +266,7 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
     order_type: PosOrderService.ORDER_TYPES.RESERVATION,
     reservation_date: tomorrowStr,
     guest_count: 2,
-    payment_method: 'cash',
-    amount_tendered: 20000,
-    items: [{ product_id: 'prod_pos_1', quantity: 1, expected_price: 20000 }]
+    customer: { name: 'Tamu No Show', phone: '0812999999' }
   });
 
   const cancelResult = PosOrderService.cancelNoShowReservation({

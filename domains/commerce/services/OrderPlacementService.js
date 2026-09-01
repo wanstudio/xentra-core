@@ -43,13 +43,22 @@ class OrderPlacementService {
     const effectivePaymentMethod = (payment_method === 'cash') ? 'cash' : 'midtrans';
     const effectiveOrderType = order_type || 'delivery';
 
-    // Strict Validation: Same-Day Reservation Restriction & Food Order Isolation (NEW-02)
+    // Strict Validation: Same-Day Reservation Restriction & Mandatory Guest Count (NEW-02)
     if (effectiveOrderType === 'reservation') {
       if (!reservation_date) {
         return {
           success: false,
           status: 'VALIDATION_ERROR',
           errors: ['Tanggal reservasi wajib diisi untuk tipe pesanan reservation.']
+        };
+      }
+
+      const parsedGuestCount = Number(guest_count);
+      if (!guest_count || !Number.isInteger(parsedGuestCount) || parsedGuestCount <= 0) {
+        return {
+          success: false,
+          status: 'VALIDATION_ERROR',
+          errors: ['Perkiraan jumlah orang (guest_count) wajib diisi dengan bilangan bulat positif (> 0) untuk reservasi.']
         };
       }
 

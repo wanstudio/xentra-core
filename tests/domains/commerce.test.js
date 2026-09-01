@@ -235,7 +235,20 @@ test('Commerce 7 — Reservation: rejects same-day reservation and accepts futur
   assert.strictEqual(sameDayResult.status, 'SAME_DAY_RESERVATION_REJECTED');
   assert.ok(sameDayResult.errors[0].includes('tidak diperbolehkan'));
 
-  // 2. Future-Day reservation request (Tomorrow) -> ACCEPTED as pure table booking (subtotal 0, items [])
+  // 2. Missing/Invalid guest_count -> STRICTLY REJECTED
+  const missingGuestResult = await OrderPlacementService.submitOrder({
+    brand_id: 'brand_test',
+    branch_id: 'branch_test',
+    order_type: 'reservation',
+    reservation_date: tomorrowStr,
+    guest_count: 0,
+    customer: { name: 'Rombongan Tanpa Jumlah Tamu', phone: '0812345678' }
+  });
+  assert.strictEqual(missingGuestResult.success, false);
+  assert.strictEqual(missingGuestResult.status, 'VALIDATION_ERROR');
+  assert.ok(missingGuestResult.errors[0].includes('guest_count'));
+
+  // 3. Future-Day reservation request (Tomorrow) with valid guest_count -> ACCEPTED as pure table booking (subtotal 0, items [])
   const futureResult = await OrderPlacementService.submitOrder({
     brand_id: 'brand_test',
     branch_id: 'branch_test',
@@ -247,6 +260,7 @@ test('Commerce 7 — Reservation: rejects same-day reservation and accepts futur
 
   assert.strictEqual(futureResult.success, true);
   assert.strictEqual(futureResult.order.order_type, 'reservation');
+  assert.strictEqual(futureResult.order.guest_count, 5);
   assert.strictEqual(futureResult.order.subtotal, 0);
   assert.strictEqual(futureResult.order.grand_total, 0);
   assert.strictEqual(futureResult.order.items.length, 0);
