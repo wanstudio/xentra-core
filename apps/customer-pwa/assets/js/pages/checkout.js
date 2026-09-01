@@ -82,6 +82,28 @@
     return Boolean(isStandalone || isIosStandalone || isTwa || isFlaggedInstalled);
   }
 
+  function shouldShowPwaInstallPromo() {
+    // 1. If PWA is already installed on device -> HIDE
+    if (checkIsPwaInstalled()) return false;
+
+    // 2. If customer is already logged in / registered / verified -> HIDE (Promotion is strictly for new guest users)
+    var storeState = Store && Store.getState ? Store.getState() : {};
+    var isCustomerLoggedIn = Boolean(
+      (storeState.customerSession && storeState.customerSession.phone) ||
+      (state.customer && state.customer.isVerified && state.customer.phone)
+    );
+    if (isCustomerLoggedIn) return false;
+
+    // 3. If customer has already claimed or installed previously in localStorage -> HIDE
+    try {
+      if (localStorage.getItem('xentra_pwa_installed') === '1' || localStorage.getItem('xentra_pwa_claimed') === '1') {
+        return false;
+      }
+    } catch (_) {}
+
+    return true;
+  }
+
   var isPwaInstalled = checkIsPwaInstalled();
 
   window.addEventListener('beforeinstallprompt', function (e) {
@@ -320,8 +342,8 @@
       // 1. Header
       '  <div class="x-alt-header"><button type="button" id="x-checkout-back" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Pesanan</span></div>' +
 
-      // 2. Install Promo Banner (Only shown if PWA is NOT yet installed on device)
-      (!checkIsPwaInstalled() ? (
+      // 2. Install Promo Banner (Only shown if PWA is NOT installed AND customer is NOT registered/logged in)
+      (shouldShowPwaInstallPromo() ? (
         '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
         '    <img class="x-alt-promo-img" src="/assets/img/iced-tea.png" alt="Es Teh" onerror="this.style.display=\'none\'">' +
         '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">Install sekarang &amp; dapatkan gratis es teh</div><div class="x-alt-promo-snk">syarat &amp; ketentuan berlaku</div></div>' +
