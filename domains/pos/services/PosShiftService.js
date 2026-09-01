@@ -122,32 +122,54 @@ class PosShiftService {
 
     const movementId = `move_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
+    let updatedShift = null;
 
-    db.prepare(`
-      INSERT INTO pos_cash_movements (id, shift_id, type, amount, reason, created_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(movementId, shift_id, type, moveAmount, reason, now);
+    // P1 ATOMICITY & FINANCIAL RECONCILIATION INVARIANT (NEW-01):
+    // Cash movement ledger insert and shift aggregate update MUST commit or rollback together in a single exclusive transaction.
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      // Re-verify shift state under lock
+      const currentShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      if (!currentShift || currentShift.status !== 'open') {
+        throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup oleh proses lain.');
+      }
 
-    let updateRes;
-    if (type === 'in') {
-      updateRes = db.prepare(`
-        UPDATE pos_shifts
-        SET total_cash_in = total_cash_in + ?, expected_cash = expected_cash + ?
-        WHERE id = ? AND status = 'open'
-      `).run(moveAmount, moveAmount, shift_id);
-    } else {
-      updateRes = db.prepare(`
-        UPDATE pos_shifts
-        SET total_cash_out = total_cash_out + ?, expected_cash = expected_cash - ?
-        WHERE id = ? AND status = 'open'
-      `).run(moveAmount, moveAmount, shift_id);
+      if (actor_role === 'cashier' && actor_id && currentShift.cashier_id !== actor_id) {
+        throw new Error(`[PosShiftService Authorization Breach]: Kasir "${actor_id}" tidak berwenang mencatat mutasi kas pada shift milik kasir lain ("${currentShift.cashier_id}").`);
+      }
+
+      db.prepare(`
+        INSERT INTO pos_cash_movements (id, shift_id, type, amount, reason, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(movementId, shift_id, type, moveAmount, reason, now);
+
+      let updateRes;
+      if (type === 'in') {
+        updateRes = db.prepare(`
+          UPDATE pos_shifts
+          SET total_cash_in = total_cash_in + ?, expected_cash = expected_cash + ?
+          WHERE id = ? AND status = 'open'
+        `).run(moveAmount, moveAmount, shift_id);
+      } else {
+        updateRes = db.prepare(`
+          UPDATE pos_shifts
+          SET total_cash_out = total_cash_out + ?, expected_cash = expected_cash - ?
+          WHERE id = ? AND status = 'open'
+        `).run(moveAmount, moveAmount, shift_id);
+      }
+
+      if (!updateRes || updateRes.changes !== 1) {
+        throw new Error('[PosShiftService] Gagal mencatat mutasi kas: status shift telah berubah.');
+      }
+
+      updatedShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      db.exec('COMMIT;');
+    } catch (err) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw err;
     }
 
-    if (updateRes.changes !== 1) {
-      throw new Error('[PosShiftService] Gagal mencatat mutasi kas: shift sudah ditutup atau tidak aktif.');
-    }
-
-    return db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+    return updatedShift;
   }
 
   /**

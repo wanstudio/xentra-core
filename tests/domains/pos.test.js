@@ -498,3 +498,38 @@ test('POS 8 — Disaster Recovery: reconciles physical cash against un-synced re
   assert.strictEqual(disasterEvent.payload.disaster_variance, 10000);
   assert.ok(disasterEvent.payload.incident_notes.includes('tersiram air'));
 });
+
+// ==============================================================================
+// POS 9 — Cash Movement Atomicity & Rollback Guard (NEW-01)
+// ==============================================================================
+test('POS 9 — Cash Movement Atomicity: recordCashMovement on closed shift rolls back completely with zero orphan movement rows', () => {
+  const closedShift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: 'cashier_atom_test',
+    starting_float: 100000
+  });
+
+  PosShiftService.closeShift({
+    shift_id: closedShift.id,
+    actual_cash: 100000,
+    actor_id: 'cashier_atom_test',
+    actor_role: 'cashier'
+  });
+
+  const movementsBefore = db.prepare('SELECT COUNT(*) as count FROM pos_cash_movements WHERE shift_id = ?').get(closedShift.id).count;
+  assert.strictEqual(movementsBefore, 0);
+
+  // Attempting cash movement on closed shift -> REJECTED
+  assert.throws(() => {
+    PosShiftService.recordCashMovement({
+      shift_id: closedShift.id,
+      type: 'in',
+      amount: 50000,
+      reason: 'Mutasi terlambat'
+    });
+  }, /Shift tidak ditemukan atau sudah ditutup/);
+
+  // INVARIANT CHECK: Zero orphan record inserted in pos_cash_movements
+  const movementsAfter = db.prepare('SELECT COUNT(*) as count FROM pos_cash_movements WHERE shift_id = ?').get(closedShift.id).count;
+  assert.strictEqual(movementsAfter, 0, 'No orphan cash movement row must remain after failed transaction');
+});
