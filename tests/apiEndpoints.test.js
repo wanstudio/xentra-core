@@ -587,3 +587,66 @@ test('API POS Cash Settlement: POST /api/v1/pos/orders/:id/settle-cash completes
   assert.strictEqual(retryData.idempotent, true);
 });
 
+test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close)', async () => {
+  // 1. Login as authorized merchant staff
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'admin', password: 'bangjo123' })
+  });
+  assert.strictEqual(loginRes.status, 200);
+  const loginData = await loginRes.json();
+  const authHeaders = { authorization: `Bearer ${loginData.token}` };
+
+  // 2. Open Shift
+  const openRes = await mockFetch('/api/v1/pos/shifts/open', {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ branch_id: 'branch_bangjo_barat', starting_float: 200000 })
+  });
+  assert.strictEqual(openRes.status, 201);
+  const openData = await openRes.json();
+  assert.strictEqual(openData.success, true);
+  assert.strictEqual(openData.shift.starting_float, 200000);
+  const shiftId = openData.shift.id;
+
+  // 3. Get Current Shift
+  const currentRes = await mockFetch('/api/v1/pos/shifts/current?branch_id=branch_bangjo_barat', {
+    headers: authHeaders
+  });
+  assert.strictEqual(currentRes.status, 200);
+  const currentData = await currentRes.json();
+  assert.strictEqual(currentData.has_active_shift, true);
+  assert.strictEqual(currentData.shift.id, shiftId);
+
+  // 4. Cash Movement (Cash In & Cash Out)
+  const cashInRes = await mockFetch(`/api/v1/pos/shifts/${shiftId}/cash-movement`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ type: 'in', amount: 50000, reason: 'Tambahan modal koin' })
+  });
+  assert.strictEqual(cashInRes.status, 200);
+  const cashInData = await cashInRes.json();
+  assert.strictEqual(cashInData.shift.total_cash_in, 50000);
+
+  const cashOutRes = await mockFetch(`/api/v1/pos/shifts/${shiftId}/cash-movement`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ type: 'out', amount: 20000, reason: 'Beli es batu' })
+  });
+  assert.strictEqual(cashOutRes.status, 200);
+  const cashOutData = await cashOutRes.json();
+  assert.strictEqual(cashOutData.shift.total_cash_out, 20000);
+
+  // 5. Close Shift
+  const closeRes = await mockFetch(`/api/v1/pos/shifts/${shiftId}/close`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ actual_cash: 230000 }) // Expected: 200k + 50k - 20k = 230k (Balanced)
+  });
+  assert.strictEqual(closeRes.status, 200);
+  const closeData = await closeRes.json();
+  assert.strictEqual(closeData.success, true);
+  assert.strictEqual(closeData.shift.status, 'closed');
+  assert.strictEqual(closeData.shift.variance, 0);
+});
+

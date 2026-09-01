@@ -1130,6 +1130,117 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
   }
 });
 
+// 9.2 POS Shift Management Endpoints (Strictly Authorized Cashiers, Branch Managers & Owners)
+router.get('/pos/shifts/current', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const cashierId = req.user.id || req.user.userId;
+    const userBranchId = req.user.branch_id || req.user.branchId || req.query.branch_id;
+
+    if (!userBranchId) {
+      return res.status(400).json({ success: false, error: 'Parameter branch_id wajib disertakan.' });
+    }
+
+    const shift = db.prepare(`
+      SELECT * FROM pos_shifts 
+      WHERE cashier_id = ? AND branch_id = ? AND status = 'open'
+      ORDER BY opened_at DESC LIMIT 1
+    `).get(cashierId, userBranchId);
+
+    res.json({
+      success: true,
+      has_active_shift: !!shift,
+      shift: shift || null
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/shifts/open', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const cashierId = req.user.id || req.user.userId;
+    const branchId = req.user.branch_id || req.user.branchId || req.body.branch_id;
+    const { starting_float = 0 } = req.body;
+
+    if (!branchId) {
+      return res.status(400).json({ success: false, error: 'Cabang (branch_id) wajib disertakan untuk membuka shift.' });
+    }
+
+    const { PosShiftService } = require('../../domains/pos');
+    const shift = PosShiftService.openShift({
+      branch_id: branchId,
+      cashier_id: cashierId,
+      starting_float: Number(starting_float) || 0
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Shift kasir berhasil dibuka.',
+      shift
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/shifts/:id/cash-movement', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const shiftId = req.params.id;
+    const { type, amount, reason = '' } = req.body;
+
+    if (!type || !['in', 'out'].includes(type)) {
+      return res.status(400).json({ success: false, error: 'Tipe mutasi kas wajib "in" atau "out".' });
+    }
+    if (!amount || !Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, error: 'Jumlah uang (amount) harus berupa angka positif.' });
+    }
+
+    const { PosShiftService } = require('../../domains/pos');
+    const shift = PosShiftService.recordCashMovement({
+      shift_id: shiftId,
+      type,
+      amount: Number(amount),
+      reason: String(reason)
+    });
+
+    res.json({
+      success: true,
+      message: `Mutasi kas (${type === 'in' ? 'Cash In' : 'Cash Out'}) berhasil dicatat.`,
+      shift
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/shifts/:id/close', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const shiftId = req.params.id;
+    const { actual_cash } = req.body;
+
+    if (actual_cash === undefined || actual_cash === null || !Number.isFinite(Number(actual_cash)) || Number(actual_cash) < 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nominal kas fisik aktual (actual_cash) wajib diisi dengan angka valid.'
+      });
+    }
+
+    const { PosShiftService } = require('../../domains/pos');
+    const shift = PosShiftService.closeShift({
+      shift_id: shiftId,
+      actual_cash: Number(actual_cash)
+    });
+
+    res.json({
+      success: true,
+      message: 'Shift kasir berhasil ditutup.',
+      shift
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // 10. Midtrans Webhook
 router.post('/webhooks/midtrans', (req, res) => {
   try {
