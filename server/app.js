@@ -264,6 +264,21 @@ app.use((err, req, res, next) => {
 if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(PORT, () => {
     console.log(`[Xentra Core] Standalone SaaS Engine running on http://localhost:${PORT}`);
+
+    // Authoritative Periodic Payment Reconciliation Worker (NEW-01 & NEW-03):
+    // Resolves unknown / reconciliation_pending payment outcomes against Midtrans API
+    const PaymentGatewayService = require('../domains/payment/services/PaymentGatewayService');
+    const interval = setInterval(async () => {
+      try {
+        const reconResults = await PaymentGatewayService.reconcilePendingPayments();
+        if (reconResults && reconResults.length > 0) {
+          console.log(`[Payment Reconciliation Worker] Processed ${reconResults.length} pending transactions.`);
+        }
+      } catch (workerErr) {
+        console.error('[Payment Reconciliation Worker Error]:', workerErr.message);
+      }
+    }, 60000);
+    if (interval.unref) interval.unref();
   });
 
   server.on('error', (err) => {

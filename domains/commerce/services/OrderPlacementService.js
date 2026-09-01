@@ -89,59 +89,61 @@ class OrderPlacementService {
         };
       }
 
-      // Check duplicate active reservation for same customer phone + branch + date
-      if (customer.phone) {
-        const existingRes = db.prepare(`
-          SELECT id FROM orders 
-          WHERE order_type = 'reservation' 
-            AND status NOT IN ('cancelled', 'completed') 
-            AND branch_id = ? 
-            AND customer_phone = ? 
-            AND order_note LIKE ?
-        `).get(branch_id, customer.phone, `%Tgl: ${resDateStr}%`);
-
-        if (existingRes) {
-          return {
-            success: false,
-            status: 'DUPLICATE_RESERVATION',
-            errors: [`Anda sudah memiliki booking reservasi aktif di cabang ini untuk tanggal ${resDateStr}.`]
-          };
-        }
-      }
-
-      // Check daily branch capacity guard (max 30 reservations per branch per day)
-      const dailyBookingsCount = db.prepare(`
-        SELECT COUNT(*) as count FROM orders 
-        WHERE order_type = 'reservation' 
-          AND status NOT IN ('cancelled', 'completed') 
-          AND branch_id = ? 
-          AND order_note LIKE ?
-      `).get(branch_id, `%Tgl: ${resDateStr}%`);
-
-      if (dailyBookingsCount && dailyBookingsCount.count >= 30) {
-        return {
-          success: false,
-          status: 'BRANCH_CAPACITY_FULL',
-          errors: [`Kapasitas reservasi meja untuk cabang ini pada tanggal ${resDateStr} sudah penuh.`]
-        };
-      }
-
-      // P1 BUSINESS INVARIANT (NEW-02): Pure table booking lifecycle.
-      // Reservation is table-agnostic at booking time (no arbitrary table_number allowed from client).
-      // Table assignment is authoritatively performed at physical check-in / POS.
+      // P1 BUSINESS INVARIANT (NEW-01 Race Condition Guard):
+      // Atomic Check-and-Insert inside BEGIN IMMEDIATE transaction to prevent concurrent overbooking.
       const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
       const now = new Date().toISOString();
       const orderNumber = `RES-${Date.now().toString(36).toUpperCase()}`;
 
       try {
-        db.exec('BEGIN TRANSACTION;');
+        db.exec('BEGIN IMMEDIATE;');
 
+        // 1. Check duplicate active reservation for same customer phone + branch + date
+        if (customer.phone) {
+          const existingRes = db.prepare(`
+            SELECT id FROM orders 
+            WHERE order_type = 'reservation' 
+              AND status NOT IN ('cancelled', 'completed') 
+              AND branch_id = ? 
+              AND customer_phone = ? 
+              AND (scheduled_slot_start = ? OR order_note LIKE ?)
+          `).get(branch_id, customer.phone, resDateStr, `%Tgl: ${resDateStr}%`);
+
+          if (existingRes) {
+            db.exec('ROLLBACK;');
+            return {
+              success: false,
+              status: 'DUPLICATE_RESERVATION',
+              errors: [`Anda sudah memiliki booking reservasi aktif di cabang ini untuk tanggal ${resDateStr}.`]
+            };
+          }
+        }
+
+        // 2. Check daily branch capacity guard (max 30 reservations per branch per day)
+        const dailyBookingsCount = db.prepare(`
+          SELECT COUNT(*) as count FROM orders 
+          WHERE order_type = 'reservation' 
+            AND status NOT IN ('cancelled', 'completed') 
+            AND branch_id = ? 
+            AND (scheduled_slot_start = ? OR order_note LIKE ?)
+        `).get(branch_id, resDateStr, `%Tgl: ${resDateStr}%`);
+
+        if (dailyBookingsCount && dailyBookingsCount.count >= 30) {
+          db.exec('ROLLBACK;');
+          return {
+            success: false,
+            status: 'BRANCH_CAPACITY_FULL',
+            errors: [`Kapasitas reservasi meja untuk cabang ini pada tanggal ${resDateStr} sudah penuh.`]
+          };
+        }
+
+        // 3. Table-Agnostic Booking Insert (Authoritative table assignment occurs at POS check-in)
         db.prepare(`
           INSERT INTO orders (
             id, order_number, brand_id, branch_id, customer_name, customer_phone,
-            order_type, order_channel, table_number,
+            order_type, order_channel, table_number, scheduled_slot_start,
             subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'reservation', ?, NULL, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, 'reservation', ?, NULL, ?, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
         `).run(
           orderId,
           orderNumber,
@@ -150,6 +152,7 @@ class OrderPlacementService {
           customer.name || 'Tamu Reservasi',
           customer.phone || '',
           order_channel,
+          resDateStr,
           notes ? `Reservasi (${guest_count || 1} Tamu, Tgl: ${resDateStr}) | ${notes}` : `Reservasi (${guest_count || 1} Tamu, Tgl: ${resDateStr})`,
           now,
           now

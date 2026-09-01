@@ -20,9 +20,9 @@ function tenantResolver(req, res, next) {
           brand = db.prepare('SELECT * FROM brands WHERE slug = ? OR id = ?').get(brandParam, brandParam);
         }
 
-        // 3. Match known domain pattern (*.bangjo.*) only if host explicitly matches
-        if (!brand && cleanHost.includes('bangjo')) {
-          brand = db.prepare("SELECT * FROM brands WHERE slug = 'bangjo' OR custom_domain LIKE '%bangjo%' LIMIT 1").get();
+        // 3. Match official authoritative Bangjo domains only (Strict equality, NO substring matching)
+        if (!brand && (cleanHost === 'app.mybangjo.com' || cleanHost === 'dev.mybangjo.com')) {
+          brand = db.prepare("SELECT * FROM brands WHERE slug = 'bangjo' LIMIT 1").get();
         }
 
         // 4. Localhost / Test Environment Isolation Fallback ONLY (Never in production for unknown hosts)
