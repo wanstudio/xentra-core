@@ -22,13 +22,23 @@ class PosShiftService {
       throw new Error('[PosShiftService] "branch_id" and "cashier_id" are required to open a shift.');
     }
 
-    // Check if cashier already has an active open shift in this branch
+    // 1. P1 Cashier Branch Assignment Verification (NEW-03)
+    try {
+      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(cashier_id);
+      if (user && user.role === 'cashier' && user.branch_id && user.branch_id !== branch_id) {
+        throw new Error(`[PosShiftService Authorization Breach]: Kasir "${cashier_id}" ditugaskan di cabang "${user.branch_id}" dan tidak berwenang membuka shift di cabang "${branch_id}".`);
+      }
+    } catch (e) {
+      if (e.message.includes('Authorization Breach')) throw e;
+    }
+
+    // 2. P1 Global Active Shift Invariant: 1 Cashier = Max 1 Open Shift across all branches
     const existingOpenShift = db.prepare(`
-      SELECT * FROM pos_shifts WHERE branch_id = ? AND cashier_id = ? AND status = 'open'
-    `).get(branch_id, cashier_id);
+      SELECT * FROM pos_shifts WHERE cashier_id = ? AND status = 'open'
+    `).get(cashier_id);
 
     if (existingOpenShift) {
-      throw new Error(`[PosShiftService] Kasir sudah memiliki shift aktif (ID: ${existingOpenShift.id}). Tutup shift lama terlebih dahulu.`);
+      throw new Error(`[PosShiftService] Kasir sudah memiliki shift aktif (ID: ${existingOpenShift.id}) di cabang ${existingOpenShift.branch_id}. Tutup shift lama terlebih dahulu.`);
     }
 
     const shiftId = `shift_${crypto.randomBytes(6).toString('hex')}`;

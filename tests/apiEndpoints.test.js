@@ -724,5 +724,14 @@ test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close
     actor_id: 'usr_cashier_b',
     actor_role: 'cashier'
   });
+
+  // 7. Cashier Cross-Branch Open Shift Guard (NEW-03)
+  // Cashier A assigned to branch_bangjo_barat tries to open shift in branch_bangjo_timur -> 403 Forbidden
+  const forbiddenOpenRes = await mockFetch('/api/v1/pos/shifts/open', {
+    method: 'POST',
+    headers: cashierAHeaders,
+    body: JSON.stringify({ branch_id: 'branch_bangjo_timur', starting_float: 50000 })
+  });
+  assert.strictEqual(forbiddenOpenRes.status, 403);
 });
 

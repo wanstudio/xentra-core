@@ -1159,17 +1159,51 @@ router.get('/pos/shifts/current', requireAuth(['owner', 'brand_manager', 'branch
 router.post('/pos/shifts/open', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
     const cashierId = req.user.id || req.user.userId;
-    const branchId = req.user.branch_id || req.user.branchId || req.body.branch_id;
-    const { starting_float = 0 } = req.body;
+    const userRole = req.user.role;
+    const userBranchId = req.user.branch_id || req.user.branchId;
+    const { starting_float = 0, branch_id: requestedBranchId, cashier_id: requestedCashierId } = req.body;
 
-    if (!branchId) {
+    let targetBranchId = userBranchId || requestedBranchId;
+    let targetCashierId = cashierId;
+
+    // P1 ROLE-BASED BRANCH ENFORCEMENT (NEW-03)
+    if (userRole === 'cashier') {
+      if (userBranchId && requestedBranchId && requestedBranchId !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: `Akses ditolak: Kasir hanya berwenang membuka shift di cabang yang ditugaskan (${userBranchId}).`
+        });
+      }
+      targetBranchId = userBranchId || requestedBranchId;
+      targetCashierId = cashierId; // Cashier cannot open shift on behalf of other cashiers
+    } else if (userRole === 'branch_manager') {
+      if (userBranchId && requestedBranchId && requestedBranchId !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: `Akses ditolak: Manajer cabang hanya berwenang membuka shift di cabang yang ditugaskan (${userBranchId}).`
+        });
+      }
+      targetBranchId = userBranchId || requestedBranchId;
+      targetCashierId = requestedCashierId || cashierId;
+    } else if (['owner', 'brand_manager'].includes(userRole)) {
+      targetBranchId = requestedBranchId || userBranchId;
+      targetCashierId = requestedCashierId || cashierId;
+    }
+
+    if (!targetBranchId) {
       return res.status(400).json({ success: false, error: 'Cabang (branch_id) wajib disertakan untuk membuka shift.' });
+    }
+
+    // Verify branch belongs to authenticated brand
+    const branchCheck = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(targetBranchId, req.brand_id);
+    if (!branchCheck) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
 
     const { PosShiftService } = require('../../domains/pos');
     const shift = PosShiftService.openShift({
-      branch_id: branchId,
-      cashier_id: cashierId,
+      branch_id: targetBranchId,
+      cashier_id: targetCashierId,
       starting_float: Number(starting_float) || 0
     });
 

@@ -134,6 +134,21 @@ test('POS 2 — Cashier Shift: handles Open, Cash In/Out, and Close with exact v
     actor_id: 'cashier_victim',
     actor_role: 'cashier'
   });
+
+  // 6. Cashier Cross-Branch Open Shift Rejection (NEW-03)
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, organization_id, username, password_hash, role, brand_id, branch_id)
+    VALUES ('cashier_locked_branch', 'org_pos', 'kasir_locked', 'hash123', 'cashier', 'brand_pos', 'branch_pos')
+  `).run();
+
+  // Attempting to open shift on branch_pos_other -> STRICTLY REJECTED
+  assert.throws(() => {
+    PosShiftService.openShift({
+      branch_id: 'branch_pos_other',
+      cashier_id: 'cashier_locked_branch',
+      starting_float: 50000
+    });
+  }, /tidak berwenang membuka shift di cabang/);
 });
 
 // ==============================================================================
