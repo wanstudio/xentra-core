@@ -45,6 +45,10 @@ Organization (Holding / SaaS Account)
 5. **Real-Time Event Driven State Machine:**  
    - Order States: `Pending` ➡️ `Confirmed` ➡️ `Preparing` ➡️ `Ready` ➡️ `Out for Delivery` ➡️ `Completed` (or `Cancelled`, `Rejected`, `Refunded`).
    - State changes trigger Server-Sent Events (SSE) / WebSockets to update the customer PWA and kitchen display simultaneously.
+6. **Two-Phase Cash vs. Financial Status Lifecycle (Industry F&B Standard):**  
+   - **Kitchen / Order Fulfillment Status (`orders.status`)**: Decoupled from physical cash collection. For cash orders (COD / Table Dine-in), `orders.status` is set to `confirmed` upon submission so the kitchen can immediately prepare the food and stock is reserved.
+   - **Financial Settlement Status (`order_payments.payment_status`)**: Remains `pending` (outstanding receivable) until physical banknotes are received and settled by the cashier at the POS or confirmed by the delivery courier.
+   - **Shift Cash Report**: Cashier shift reports only account for cash payments transitioned to `settlement`, ensuring 100% accurate drawer balancing without premature uncollected cash inflation.
 
 ---
 
