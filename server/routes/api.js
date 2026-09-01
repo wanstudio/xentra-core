@@ -823,14 +823,19 @@ const TokenSessionStore = {
     const token = 'xnt_auth_' + crypto.randomBytes(24).toString('hex');
     const expiresAt = Date.now() + ttlSeconds * 1000;
     this.sessions.set(token, {
+      id: user.id,
       userId: user.id,
       username: user.username,
       email: user.email,
       fullName: user.full_name,
+      full_name: user.full_name,
       role: user.role,
       brandId: brand_id,
+      brand_id: brand_id,
       organizationId: user.organization_id || null,
+      organization_id: user.organization_id || null,
       branchId: user.branch_id || null,
+      branch_id: user.branch_id || null,
       expiresAt
     });
     return { token, expiresAt };
@@ -1054,16 +1059,17 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
     const orderId = req.params.id;
     const { amount_tendered, shift_id } = req.body;
 
+    // Canonical Session Identity Resolution
+    const cashierId = req.user ? (req.user.id || req.user.userId) : null;
+    const userBranchId = req.user ? (req.user.branch_id || req.user.branchId) : null;
+
     // Scope & Branch Boundary Enforcement
     let verifySql = 'SELECT * FROM orders WHERE id = ? AND brand_id = ?';
     const verifyParams = [orderId, req.brand_id];
 
-    if (req.user && req.user.role === 'branch_manager' && req.user.branch_id) {
+    if (req.user && ['branch_manager', 'cashier'].includes(req.user.role) && userBranchId) {
       verifySql += ' AND branch_id = ?';
-      verifyParams.push(req.user.branch_id);
-    } else if (req.user && req.user.role === 'cashier' && req.user.branch_id) {
-      verifySql += ' AND branch_id = ?';
-      verifyParams.push(req.user.branch_id);
+      verifyParams.push(userBranchId);
     }
 
     const order = db.prepare(verifySql).get(...verifyParams);
@@ -1077,12 +1083,13 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
     let effectiveShiftId = shift_id || null;
 
     // Smart Active Shift Auto-Resolution: Cashier MUST have an open shift to accept cash payments
+    // (Anchored authoritatively to order.branch_id from database)
     if (!effectiveShiftId && req.user && req.user.role === 'cashier') {
       const activeShift = db.prepare(`
         SELECT id FROM pos_shifts 
         WHERE cashier_id = ? AND branch_id = ? AND status = 'open' 
         ORDER BY opened_at DESC LIMIT 1
-      `).get(req.user.id, req.user.branch_id);
+      `).get(cashierId, order.branch_id);
 
       if (activeShift) {
         effectiveShiftId = activeShift.id;
@@ -1108,7 +1115,7 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
       order_id: orderId,
       amount: Number(order.grand_total),
       amount_tendered: Number(amount_tendered),
-      cashier_id: req.user ? req.user.id : null,
+      cashier_id: cashierId,
       shift_id: effectiveShiftId
     });
 
