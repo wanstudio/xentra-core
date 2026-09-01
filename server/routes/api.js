@@ -1084,19 +1084,6 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
       shift_id: shift_id || null
     });
 
-    // Update Shift Total Cash Sales if shift_id provided and new settlement
-    if (shift_id && !result.idempotent) {
-      try {
-        db.prepare(`
-          UPDATE pos_shifts
-          SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
-          WHERE id = ?
-        `).run(order.grand_total, order.grand_total, shift_id);
-      } catch (shiftErr) {
-        console.warn('[API POS Settle Cash] Shift update warning:', shiftErr.message);
-      }
-    }
-
     res.json({
       success: true,
       message: result.message || 'Pembayaran tunai berhasil diselesaikan.',

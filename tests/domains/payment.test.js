@@ -17,6 +17,15 @@ test.before(() => {
     db.prepare(`INSERT OR IGNORE INTO organizations (id, name, slug) VALUES ('org_pay', 'Holding Payment', 'org-pay')`).run();
     db.prepare(`INSERT OR IGNORE INTO brands (id, organization_id, name, slug, default_payment_config) VALUES ('brand_pay', 'org_pay', 'Brand Pay', 'brand-pay', '{"server_key":"SB-Mid-server-test12345","client_key":"SB-Mid-client-123","merchant_id":"M12345"}')`).run();
     db.prepare(`INSERT OR IGNORE INTO branches (id, brand_id, name, slug, whatsapp_number, address_text, latitude, longitude) VALUES ('branch_pay', 'brand_pay', 'Cabang Pay', 'cabang-pay', '62812345678', 'Jl. Pay', -7.25, 112.75)`).run();
+    db.prepare(`INSERT OR IGNORE INTO branches (id, brand_id, name, slug, whatsapp_number, address_text, latitude, longitude) VALUES ('branch_pay_other', 'brand_pay', 'Cabang Lain', 'cabang-lain', '62812345679', 'Jl. Lain', -7.26, 112.76)`).run();
+
+    db.prepare(`
+      INSERT OR REPLACE INTO pos_shifts (id, branch_id, cashier_id, starting_float, total_cash_sales, expected_cash, status)
+      VALUES 
+        ('shift_pay_open', 'branch_pay', 'cashier_pay', 100000, 0, 100000, 'open'),
+        ('shift_pay_closed', 'branch_pay', 'cashier_pay', 100000, 0, 100000, 'closed'),
+        ('shift_other_branch', 'branch_pay_other', 'cashier_other', 100000, 0, 100000, 'open')
+    `).run();
   } catch (e) {
     console.error('Payment seed error:', e.message);
   }
@@ -53,7 +62,8 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
     order_id: orderId,
     amount: 50000,
     amount_tendered: 100000,
-    shift_id: 'shift_123'
+    cashier_id: 'cashier_pay',
+    shift_id: 'shift_pay_open'
   });
 
   assert.strictEqual(result.success, true);
@@ -65,6 +75,11 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
   assert.ok(payRecord);
   assert.strictEqual(payRecord.payment_status, 'settlement');
   assert.strictEqual(payRecord.provider, 'cash');
+
+  // Check pos_shifts table: total_cash_sales and expected_cash incremented atomically
+  const shiftRecord = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get('shift_pay_open');
+  assert.strictEqual(shiftRecord.total_cash_sales, 50000);
+  assert.strictEqual(shiftRecord.expected_cash, 150000);
 
   // Check order status
   const orderRecord = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
@@ -83,6 +98,44 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
       amount_tendered: 1000
     });
   }, /tidak sesuai dengan total tagihan order/);
+
+  // Verify Shift Boundary Guard: strictly rejects closed shift or other branch shift
+  const newOrderId = `ord_test_cross_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, 'ORD-CASH-CROSS', 'brand_pay', 'branch_pay', 'Budi Cross', '62812345678', 'dine_in', 'pos_cashier', 25000, 25000, 'cash', 'pending')
+  `).run(newOrderId);
+
+  // 1. Closed shift rejected
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: newOrderId,
+      amount: 25000,
+      amount_tendered: 25000,
+      shift_id: 'shift_pay_closed'
+    });
+  }, /sudah ditutup/);
+
+  // 2. Cross-branch shift rejected
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: newOrderId,
+      amount: 25000,
+      amount_tendered: 25000,
+      shift_id: 'shift_other_branch'
+    });
+  }, /tidak sesuai dengan cabang order/);
+
+  // 3. Impersonating other cashier shift rejected
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: newOrderId,
+      amount: 25000,
+      amount_tendered: 25000,
+      cashier_id: 'cashier_impostor',
+      shift_id: 'shift_pay_open'
+    });
+  }, /bukan milik kasir yang sedang login/);
 
   // Verify Idempotency Guard: second cash settlement returns idempotent: true without duplicate mutations
   const secondResult = CashSettlementService.settleCashPayment({

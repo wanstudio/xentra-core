@@ -67,11 +67,29 @@ class CashSettlementService {
       };
     }
 
+    // P1 SHIFT BOUNDARY VALIDATION: Ensure shift belongs to same branch and cashier (if provided)
+    let shiftRecord = null;
+    if (shift_id) {
+      shiftRecord = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      if (!shiftRecord) {
+        throw new Error(`[CashSettlementService] Shift kasir dengan ID "${shift_id}" tidak ditemukan.`);
+      }
+      if (shiftRecord.status !== 'open') {
+        throw new Error(`[CashSettlementService] Shift kasir "${shift_id}" sudah ditutup (${shiftRecord.status}) dan tidak dapat menerima transaksi.`);
+      }
+      if (shiftRecord.branch_id !== order.branch_id) {
+        throw new Error(`[CashSettlementService Cross-Scope Violation]: Shift kasir "${shift_id}" (Cabang: ${shiftRecord.branch_id}) tidak sesuai dengan cabang order (Cabang: ${order.branch_id}).`);
+      }
+      if (cashier_id && shiftRecord.cashier_id && shiftRecord.cashier_id !== cashier_id) {
+        throw new Error(`[CashSettlementService Authorization Violation]: Shift kasir "${shift_id}" bukan milik kasir yang sedang login ("${cashier_id}").`);
+      }
+    }
+
     const change = tendered - amount;
     const paymentId = `pay_cash_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
 
-    // P1 ATOMIC CONCURRENCY: Execute Cash Settlement in exclusive transaction with atomic UPSERT
+    // P1 ATOMIC CONCURRENCY & RECONCILIATION: Execute Payment + Shift Mutation in single exclusive transaction
     db.exec('BEGIN IMMEDIATE;');
     try {
       db.prepare(`
@@ -101,6 +119,15 @@ class CashSettlementService {
         SET payment_method = 'cash', status = 'confirmed', updated_at = ?
         WHERE id = ?
       `).run(now, order_id);
+
+      // 3. Atomically Update Shift Cash Register within the SAME transaction
+      if (shift_id) {
+        db.prepare(`
+          UPDATE pos_shifts
+          SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
+          WHERE id = ?
+        `).run(amount, amount, shift_id);
+      }
 
       db.exec('COMMIT;');
     } catch (err) {

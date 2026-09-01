@@ -388,11 +388,10 @@ class PosOrderService {
         changeAmount = amount_tendered - grandTotal;
       }
 
-      // Record authoritative cash payment lifecycle in order_payments and emit event
-      let cashSettlementResult = null;
+      // Record authoritative cash payment lifecycle in order_payments, atomically update pos_shifts, and emit event
       try {
         const { CashSettlementService } = require('../../payment');
-        cashSettlementResult = CashSettlementService.settleCashPayment({
+        CashSettlementService.settleCashPayment({
           order_id: order.id,
           amount: grandTotal,
           amount_tendered: amount_tendered || grandTotal,
@@ -400,15 +399,6 @@ class PosOrderService {
         });
       } catch (e) {
         console.warn('[PosOrderService] Cash settlement record warning:', e.message);
-      }
-
-      // 4. Update Shift Total Cash Sales only if shift_id provided and this is a NEW settlement (P1 IDEMPOTENCY: Do not double-count on retry)
-      if (shift_id && (!cashSettlementResult || !cashSettlementResult.idempotent)) {
-        db.prepare(`
-          UPDATE pos_shifts
-          SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
-          WHERE id = ?
-        `).run(grandTotal, grandTotal, shift_id);
       }
     }
 
