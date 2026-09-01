@@ -81,9 +81,27 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
 // ==============================================================================
 test('Payment 3 — Midtrans Webhook: verifies SHA512 signature, advances status & drops duplicate', async () => {
   const orderId = `ord_test_mid_${Date.now()}`;
+  const orderNumber = `XN-MID-${Date.now()}`;
+
+  // Seed product and branch stock
+  db.prepare(`
+    INSERT OR REPLACE INTO products (id, brand_id, name, slug, price)
+    VALUES ('prod_mid_1', 'brand_pay', 'Nasi Goreng Midtrans', 'nasgor-mid', 75000)
+  `).run();
+
+  db.prepare(`
+    INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, is_available)
+    VALUES ('branch_pay', 'prod_mid_1', 10, 1)
+  `).run();
+
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, 'ORD-MID-1', 'brand_pay', 'branch_pay', 'Siti Online', '62812345678', 'delivery', 'customer_app', 75000, 75000, 'midtrans', 'pending')
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Siti Online', '62812345678', 'delivery', 'customer_app', 75000, 75000, 'midtrans', 'pending')
+  `).run(orderId, orderNumber);
+
+  db.prepare(`
+    INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal)
+    VALUES ('item_mid_1', ?, 'prod_mid_1', 'Nasi Goreng Midtrans', 75000, 2, 75000)
   `).run(orderId);
 
   db.prepare(`
@@ -121,10 +139,27 @@ test('Payment 3 — Midtrans Webhook: verifies SHA512 signature, advances status
   assert.strictEqual(payRecord.payment_status, 'settlement');
   assert.strictEqual(payRecord.payment_method, 'midtrans');
 
-  // 3. Idempotent Test: Same webhook again
+  // Verify Atomic Stock Deduction: 10 - 2 = 8
+  const stockRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pay', 'prod_mid_1');
+  assert.strictEqual(stockRow.stock, 8, 'Stock must be decremented from 10 to 8 on settlement');
+
+  // Verify Inventory Movement Ledger
+  const movements = db.prepare('SELECT * FROM inventory_movements WHERE reference_id = ?').all(orderNumber);
+  assert.strictEqual(movements.length, 1, 'Exactly one inventory ledger record must be written');
+  assert.strictEqual(movements[0].quantity, -2);
+  assert.strictEqual(movements[0].movement_type, 'sale_deduction');
+
+  // 3. Idempotent Test: Same webhook sent a second time -> DROPPED (No duplicate deduction)
   const duplicateResult = PaymentGatewayService.handleWebhook(webhookPayload);
   assert.strictEqual(duplicateResult.success, true);
   assert.strictEqual(duplicateResult.idempotent, true);
+
+  // Verify Stock is STILL 8 (Zero double-deduction)
+  const stockRowAfterDup = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pay', 'prod_mid_1');
+  assert.strictEqual(stockRowAfterDup.stock, 8, 'Duplicate webhook must not decrement stock twice');
+
+  const movementsAfterDup = db.prepare('SELECT * FROM inventory_movements WHERE reference_id = ?').all(orderNumber);
+  assert.strictEqual(movementsAfterDup.length, 1, 'Duplicate webhook must not write duplicate ledger rows');
 });
 
 // ==============================================================================

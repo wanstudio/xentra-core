@@ -213,25 +213,76 @@ class PaymentGatewayService {
 
     const now = new Date().toISOString();
 
-    // Update order_payments table: Provider & Payment Method are strictly 'midtrans'
-    db.prepare(`
-      UPDATE order_payments 
-      SET payment_status = ?, payment_method = 'midtrans', raw_webhook_response = ?, settled_at = CASE WHEN ? = 'settlement' THEN ? ELSE settled_at END
-      WHERE order_id = ?
-    `).run(newPaymentStatus, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
-
-    // If settled, advance order status, trigger physical stock deduction, and emit event
-    if (shouldConfirmOrder) {
+    // P1 ATOMICITY INVARIANT (Finding 3): Unify payment update, order confirmation, stock deduction, and ledger into single atomic transaction
+    db.exec('BEGIN TRANSACTION;');
+    try {
+      // Update order_payments table
       db.prepare(`
-        UPDATE orders
-        SET status = 'confirmed', payment_method = 'midtrans', updated_at = ?
-        WHERE id = ?
-      `).run(now, order_id);
+        UPDATE order_payments 
+        SET payment_status = ?, payment_method = 'midtrans', raw_webhook_response = ?, settled_at = CASE WHEN ? = 'settlement' THEN ? ELSE settled_at END
+        WHERE order_id = ?
+      `).run(newPaymentStatus, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
 
-      // P1 INVENTORY TIMING: Deduct physical stock only after Midtrans settlement confirmation
-      const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
-      OrderPlacementService.deductStockForSettledOrder(order_id);
+      if (shouldConfirmOrder) {
+        // 1. Confirm Order Record
+        db.prepare(`
+          UPDATE orders
+          SET status = 'confirmed', payment_method = 'midtrans', updated_at = ?
+          WHERE id = ?
+        `).run(now, order_id);
 
+        // 2. Atomic Stock Deduction & Inventory Movement Ledger
+        const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order_id);
+        const existingMovement = db.prepare('SELECT id FROM inventory_movements WHERE reference_id = ? AND movement_type = \'sale_deduction\' LIMIT 1').get(order.order_number);
+
+        if (!existingMovement && items && items.length > 0) {
+          const guardedDeductStockStmt = db.prepare(`
+            UPDATE branch_products
+            SET stock = stock - ?, updated_at = datetime('now')
+            WHERE branch_id = ? AND product_id = ? AND stock >= ?
+          `);
+
+          for (const item of items) {
+            const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(order.branch_id, item.product_id);
+            const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
+
+            const deductResult = guardedDeductStockStmt.run(item.quantity, order.branch_id, item.product_id, item.quantity);
+            if (!deductResult || deductResult.changes === 0) {
+              db.prepare('UPDATE branch_products SET stock = 0, updated_at = datetime(\'now\') WHERE branch_id = ? AND product_id = ?').run(order.branch_id, item.product_id);
+            }
+
+            const currentStock = Math.max(0, prevStock - Number(item.quantity));
+            const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
+
+            db.prepare(`
+              INSERT INTO inventory_movements (
+                id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
+              ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              movementId,
+              order.branch_id,
+              item.product_id,
+              -Number(item.quantity),
+              prevStock,
+              currentStock,
+              order.order_number,
+              order.customer_phone || 'online_payment',
+              `Pemotongan stok otomatis pembayaran Midtrans lunas [${order.order_number}]`,
+              now
+            );
+          }
+        }
+      }
+
+      db.exec('COMMIT;');
+    } catch (err) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      console.error('[PaymentGatewayService] Webhook processing failed, transaction rolled back:', err.message);
+      throw new Error(`[PaymentGatewayService Transaction Error]: ${err.message}`);
+    }
+
+    // Publish Core Events outside of DB Transaction
+    if (shouldConfirmOrder) {
       events.EventBus.publish({
         type: 'payment.settled',
         producer: 'payment',
