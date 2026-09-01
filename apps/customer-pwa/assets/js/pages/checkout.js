@@ -462,12 +462,10 @@
             );
           } else {
             return (
-              '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner" style="background:#fefce8;border:1px solid #fef08a;box-shadow:0 2px 10px rgba(234,179,8,0.08);display:flex;align-items:center;justify-content:space-between;">' +
-              '    <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 auto;">' +
-              '      <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
-              '      <div class="x-alt-promo-copy"><div class="x-alt-promo-title" style="color:#854d0e;font-size:13px;line-height:1.35;font-weight:700;">Klaim ' + UI.escape(r.reward_title || 'Bonus Hadiah') + '</div><div class="x-alt-promo-snk" style="color:#a16207;font-weight:600;">Gratis untuk pengguna aplikasi</div></div>' +
-              '    </div>' +
-              '    <button type="button" id="x-btn-promo-claim" style="background:#b6ff00;color:#111;font-size:13px;font-weight:700;padding:6px 14px;border:0;border-radius:16px;cursor:pointer;flex:0 0 auto;margin-left:8px;">Klaim</button>' +
+              '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner">' +
+              '    <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
+              '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">Klaim Es Teh Gratis untuk pesanan pertamamu!</div><div class="x-alt-promo-snk">syarat &amp; ketentuan berlaku</div></div>' +
+              '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-claim">Claim</button>' +
               '  </div>'
             );
           }
