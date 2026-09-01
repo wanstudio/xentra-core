@@ -126,7 +126,7 @@
     if (!API) return Promise.resolve([]);
     var isPwa = checkIsPwaInstalled();
     var phone = state.customer.phone || '';
-    return API.get('/promo/active?is_pwa=' + (isPwa ? '1' : '0') + '&phone=' + encodeURIComponent(phone))
+    return API.get('/promotions/active?is_pwa=' + (isPwa ? '1' : '0') + '&phone=' + encodeURIComponent(phone))
       .then(function (res) {
         if (res && res.success && Array.isArray(res.promotions)) {
           activePromotions = res.promotions;
@@ -136,7 +136,9 @@
   }
 
   function getActiveInstallPromo() {
-    return activePromotions.find(function (p) { return p.promo_type === 'install_incentive'; }) || null;
+    return activePromotions.find(function (p) {
+      return p.capability_type === 'install_incentive' || p.promo_type === 'install_incentive';
+    }) || null;
   }
 
   window.addEventListener('beforeinstallprompt', function (e) {
@@ -154,61 +156,85 @@
   });
 
   function showPwaGuideSheet(platform) {
-    if (document.getElementById('x-pwa-guide-overlay')) return;
+    var existing = document.getElementById('x-pwa-guide-overlay');
+    if (existing) existing.remove();
+
     var isIos = platform === 'ios';
     var steps = isIos ? (
-      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">1</div><div class="x-pwa-step-body"><strong>Ketuk tombol Bagikan</strong><span>Cari ikon Share di menu bawah Safari.</span></div></div>' +
-      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">2</div><div class="x-pwa-step-body"><strong>Pilih "Tambah ke Layar Utama"</strong><span>Pilih <b>Tambahkan ke Layar Utama</b>.</span></div></div>' +
-      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">3</div><div class="x-pwa-step-body"><strong>Ketuk "Tambah"</strong><span>Tekan <b>Tambah</b> di pojok kanan atas.</span></div></div>'
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">1</div><div class="x-pwa-step-body"><strong>Ketuk tombol Bagikan (Share)</strong><span>Cari ikon Share (kotak panah ke atas) di bilah bawah Safari.</span></div></div>' +
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">2</div><div class="x-pwa-step-body"><strong>Pilih "Tambah ke Layar Utama"</strong><span>Gulir menu dan pilih <b>Add to Home Screen</b>.</span></div></div>' +
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">3</div><div class="x-pwa-step-body"><strong>Ketuk "Tambah" (Add)</strong><span>Tekan tombol <b>Tambah</b> di pojok kanan atas.</span></div></div>'
     ) : (
-      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">1</div><div class="x-pwa-step-body"><strong>Buka Menu Browser</strong><span>Ketuk titik tiga (⋮) di Chrome.</span></div></div>' +
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">1</div><div class="x-pwa-step-body"><strong>Buka Menu Browser</strong><span>Ketuk ikon titik tiga (⋮) di pojok kanan atas Chrome.</span></div></div>' +
       '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">2</div><div class="x-pwa-step-body"><strong>Pilih "Install Aplikasi"</strong><span>Pilih <b>Install Aplikasi</b> atau <b>Tambahkan ke Layar Utama</b>.</span></div></div>' +
-      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">3</div><div class="x-pwa-step-body"><strong>Konfirmasi Install</strong><span>Tekan <b>Install</b> saat pop-up muncul.</span></div></div>'
+      '<div class="x-pwa-guide-step"><div class="x-pwa-step-badge">3</div><div class="x-pwa-step-body"><strong>Konfirmasi Pasang</strong><span>Tekan <b>Install</b> saat dialog konfirmasi muncul.</span></div></div>'
     );
-    var icon = '/assets/pwa/icon-192.png';
+
+    var promo = getActiveInstallPromo();
+    var icon = (promo && promo.display && promo.display.icon_url) || '/assets/pwa/icon-192.png';
     var html =
       '<div class="x-pwa-guide-backdrop"></div>' +
-      '<div class="x-pwa-guide-sheet"><div class="x-sheet-handle"></div>' +
-      '  <div class="x-pwa-guide-head"><img src="' + icon + '" alt="Bangjo" class="x-pwa-guide-icon"><div><h3>Pasang Aplikasi Bangjo</h3><p>Nikmati pemesanan instan tanpa buka browser</p></div></div>' +
+      '<div class="x-pwa-guide-sheet">' +
+      '  <div class="x-sheet-handle" style="margin-bottom:12px;"></div>' +
+      '  <div class="x-pwa-guide-head"><img src="' + icon + '" alt="Bangjo" class="x-pwa-guide-icon"><div><h3>Pasang Aplikasi Bangjo</h3><p>Nikmati gratis es teh & kemudahan order</p></div></div>' +
       '  <div class="x-pwa-guide-steps">' + steps + '</div>' +
-      '  <button type="button" id="x-pwa-guide-close" class="x-pwa-guide-close-btn">Mengerti, Saya Coba</button>' +
+      '  <button type="button" id="x-pwa-guide-close" class="x-pwa-guide-close-btn">Mengerti, Saya Pasang</button>' +
       '</div>';
+
     var overlay = document.createElement('div');
     overlay.id = 'x-pwa-guide-overlay';
-    overlay.className = 'x-pwa-guide-overlay open';
+    overlay.className = 'x-pwa-guide-overlay';
     overlay.innerHTML = html;
     document.body.appendChild(overlay);
-    requestAnimationFrame(function () { overlay.classList.add('open'); });
+
+    requestAnimationFrame(function () {
+      overlay.classList.add('open');
+    });
+
     function closeGuide() {
       overlay.classList.remove('open');
-      setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 260);
+      setTimeout(function () { if (overlay.parentNode) overlay.remove(); }, 280);
     }
+
     var bg = overlay.querySelector('.x-pwa-guide-backdrop');
     var btn = overlay.querySelector('#x-pwa-guide-close');
     if (bg) bg.addEventListener('click', closeGuide);
     if (btn) btn.addEventListener('click', closeGuide);
   }
 
-  function handleInstallClick() {
-    if (isStandalonePwa) {
+  function handleInstallClick(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (e && e.stopPropagation) e.stopPropagation();
+
+    if (checkIsPwaInstalled()) {
       if (UI && UI.toast) UI.toast('Aplikasi sudah terpasang di perangkat Anda.');
       return;
     }
+
     if (deferredPrompt) {
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then(function (choice) {
-        if (choice.outcome === 'accepted') {
+        if (choice && choice.outcome === 'accepted') {
           try { localStorage.setItem('xentra_pwa_installed', '1'); } catch (_) {}
           if (UI && UI.toast) UI.toast('Terima kasih telah memasang aplikasi!');
-          // Add Freebie Es Teh
-          Store.addItem({ id: 'promo-es-teh-gratis', name: 'Es Teh Manis', price: 0, regular_price: 5000, image_url: '/assets/img/iced-tea.png', description: 'Promo Spesial PWA' }, 1);
         }
         deferredPrompt = null;
-      }).catch(function () {});
+      }).catch(function () {
+        showPwaGuideSheet(isIosPwa ? 'ios' : 'android');
+      });
       return;
     }
+
     showPwaGuideSheet(isIosPwa ? 'ios' : 'android');
   }
+
+  // Delegated install click listener on document for 100% reliable tap response
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('#x-btn-promo-install');
+    if (btn) {
+      handleInstallClick(e);
+    }
+  });
 
   function getCheckoutItems() {
     var all = (Store.getState().cart.items || []);
