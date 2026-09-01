@@ -415,12 +415,27 @@
           );
         } else if (rewardPromo && rewardPromo.display) {
           var r = rewardPromo.display;
-          return (
-            '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner" style="background:#f0fdf4;border:1px solid #bbf7d0;box-shadow:0 2px 10px rgba(22,163,74,0.06);">' +
-            '    <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
-            '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title" style="color:#15803d;font-size:13px;line-height:1.35;font-weight:700;">' + UI.escape(r.reward_title || 'Bonus Spesial') + '</div><div class="x-alt-promo-snk" style="color:#16a34a;font-weight:600;">' + UI.escape(r.reward_badge_text || '✓ Hadiah Aktif') + '</div></div>' +
-            '  </div>'
-          );
+          var rewardItemId = 'reward_' + (rewardPromo.reward ? (rewardPromo.reward.promo_id || rewardPromo.promo_id) : rewardPromo.promo_id);
+          var hasRewardInCart = items.some(function (i) { return String(i.id) === rewardItemId || String(i.id) === 'promo-es-teh-gratis'; });
+
+          if (hasRewardInCart) {
+            return (
+              '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner" style="background:#f0fdf4;border:1px solid #bbf7d0;box-shadow:0 2px 10px rgba(22,163,74,0.06);">' +
+              '    <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
+              '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title" style="color:#15803d;font-size:13px;line-height:1.35;font-weight:700;">' + UI.escape(r.reward_title || 'Bonus Spesial') + '</div><div class="x-alt-promo-snk" style="color:#16a34a;font-weight:600;">✓ Hadiah telah masuk ke keranjang</div></div>' +
+              '  </div>'
+            );
+          } else {
+            return (
+              '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner" style="background:#fefce8;border:1px solid #fef08a;box-shadow:0 2px 10px rgba(234,179,8,0.08);display:flex;align-items:center;justify-content:space-between;">' +
+              '    <div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1 1 auto;">' +
+              '      <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
+              '      <div class="x-alt-promo-copy"><div class="x-alt-promo-title" style="color:#854d0e;font-size:13px;line-height:1.35;font-weight:700;">Klaim ' + UI.escape(r.reward_title || 'Bonus Hadiah') + '</div><div class="x-alt-promo-snk" style="color:#a16207;font-weight:600;">Gratis untuk pengguna aplikasi</div></div>' +
+              '    </div>' +
+              '    <button type="button" id="x-btn-promo-claim" style="background:#b6ff00;color:#111;font-size:13px;font-weight:700;padding:6px 14px;border:0;border-radius:16px;cursor:pointer;flex:0 0 auto;margin-left:8px;">Klaim</button>' +
+              '  </div>'
+            );
+          }
         }
         return '';
       })()) +
@@ -634,6 +649,29 @@
   function bindEvents() {
     var back = $('x-checkout-back'); if (back) back.onclick = function () { Router.navigate('home'); };
     var promoBtn = $('x-btn-promo-install'); if (promoBtn) promoBtn.onclick = handleInstallClick;
+
+    var claimBtn = $('x-btn-promo-claim');
+    if (claimBtn) {
+      claimBtn.onclick = function () {
+        var rewardPromo = getAppliedRewardPromo();
+        if (rewardPromo && rewardPromo.reward) {
+          var r = rewardPromo.reward;
+          var rewardItemId = 'reward_' + (r.promo_id || rewardPromo.promo_id);
+          Store.addItem({
+            id: rewardItemId,
+            name: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
+            price: Number(r.reward_price || 0),
+            regular_price: 5000,
+            image_url: (rewardPromo.display && rewardPromo.display.icon_url) || '/assets/pwa/icon-192.png',
+            description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo'
+          }, 1);
+          if (UI && UI.toast) UI.toast(((rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah') + ' berhasil diklaim!');
+          renderLayout();
+          bindEvents();
+          calculateTotals();
+        }
+      };
+    }
 
     bindItemEvents();
 
