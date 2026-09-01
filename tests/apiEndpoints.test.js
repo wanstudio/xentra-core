@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const app = require('../server/app');
+const db = require('../server/database/db');
 
 // Helper to make mock requests to Express app
 async function mockFetch(path, options = {}) {
@@ -648,5 +649,48 @@ test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close
   assert.strictEqual(closeData.success, true);
   assert.strictEqual(closeData.shift.status, 'closed');
   assert.strictEqual(closeData.shift.variance, 0);
+
+  // 6. Cross-Cashier / Cross-Branch Ownership Guard Verification (NEW-01)
+  // Seed Cashier A and Cashier B
+  const crypto = require('crypto');
+  const passHash = crypto.createHash('sha256').update('kasir123').digest('hex');
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, organization_id, username, password_hash, role, brand_id, branch_id)
+    VALUES 
+      ('usr_cashier_a', 'org_xentra_holding', 'kasir_a', ?, 'cashier', 'brand_bangjo', 'branch_bangjo_barat'),
+      ('usr_cashier_b', 'org_xentra_holding', 'kasir_b', ?, 'cashier', 'brand_bangjo', 'branch_bangjo_barat')
+  `).run(passHash, passHash);
+
+  // Cashier B opens a shift
+  const { PosShiftService } = require('../domains/pos');
+  const shiftB = PosShiftService.openShift({
+    branch_id: 'branch_bangjo_barat',
+    cashier_id: 'usr_cashier_b',
+    starting_float: 100000
+  });
+
+  // Login as Cashier A
+  const loginCashierARes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'kasir_a', password: 'kasir123' })
+  });
+  const loginCashierAData = await loginCashierARes.json();
+  const cashierAHeaders = { authorization: `Bearer ${loginCashierAData.token}` };
+
+  // Cashier A attempts cash-movement on Shift B -> 403 Forbidden
+  const forbiddenMoveRes = await mockFetch(`/api/v1/pos/shifts/${shiftB.id}/cash-movement`, {
+    method: 'POST',
+    headers: cashierAHeaders,
+    body: JSON.stringify({ type: 'in', amount: 500000 })
+  });
+  assert.strictEqual(forbiddenMoveRes.status, 403);
+
+  // Cashier A attempts close on Shift B -> 403 Forbidden
+  const forbiddenCloseRes = await mockFetch(`/api/v1/pos/shifts/${shiftB.id}/close`, {
+    method: 'POST',
+    headers: cashierAHeaders,
+    body: JSON.stringify({ actual_cash: 100000 })
+  });
+  assert.strictEqual(forbiddenCloseRes.status, 403);
 });
 

@@ -1188,6 +1188,38 @@ router.post('/pos/shifts/:id/cash-movement', requireAuth(['owner', 'brand_manage
     const shiftId = req.params.id;
     const { type, amount, reason = '' } = req.body;
 
+    const cashierId = req.user.id || req.user.userId;
+    const userBranchId = req.user.branch_id || req.user.branchId;
+
+    // Strict Shift Tenant & Ownership Verification
+    const shift = db.prepare(`
+      SELECT s.*, b.brand_id 
+      FROM pos_shifts s
+      JOIN branches b ON b.id = s.branch_id
+      WHERE s.id = ? AND b.brand_id = ?
+    `).get(shiftId, req.brand_id);
+
+    if (!shift) {
+      return res.status(404).json({ success: false, error: 'Shift tidak ditemukan pada brand ini.' });
+    }
+
+    // P1 SHIFT MUTATION RBAC & OWNERSHIP GUARD (NEW-01)
+    if (req.user.role === 'cashier') {
+      if (shift.cashier_id !== cashierId || (userBranchId && shift.branch_id !== userBranchId)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Akses ditolak: Kasir hanya berwenang mencatat mutasi kas pada shift miliknya sendiri.'
+        });
+      }
+    } else if (req.user.role === 'branch_manager') {
+      if (userBranchId && shift.branch_id !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Akses ditolak: Manajer cabang hanya berwenang mengelola shift di cabang yang ditugaskan.'
+        });
+      }
+    }
+
     if (!type || !['in', 'out'].includes(type)) {
       return res.status(400).json({ success: false, error: 'Tipe mutasi kas wajib "in" atau "out".' });
     }
@@ -1196,7 +1228,7 @@ router.post('/pos/shifts/:id/cash-movement', requireAuth(['owner', 'brand_manage
     }
 
     const { PosShiftService } = require('../../domains/pos');
-    const shift = PosShiftService.recordCashMovement({
+    const updatedShift = PosShiftService.recordCashMovement({
       shift_id: shiftId,
       type,
       amount: Number(amount),
@@ -1206,7 +1238,7 @@ router.post('/pos/shifts/:id/cash-movement', requireAuth(['owner', 'brand_manage
     res.json({
       success: true,
       message: `Mutasi kas (${type === 'in' ? 'Cash In' : 'Cash Out'}) berhasil dicatat.`,
-      shift
+      shift: updatedShift
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -1218,6 +1250,38 @@ router.post('/pos/shifts/:id/close', requireAuth(['owner', 'brand_manager', 'bra
     const shiftId = req.params.id;
     const { actual_cash } = req.body;
 
+    const cashierId = req.user.id || req.user.userId;
+    const userBranchId = req.user.branch_id || req.user.branchId;
+
+    // Strict Shift Tenant & Ownership Verification
+    const shift = db.prepare(`
+      SELECT s.*, b.brand_id 
+      FROM pos_shifts s
+      JOIN branches b ON b.id = s.branch_id
+      WHERE s.id = ? AND b.brand_id = ?
+    `).get(shiftId, req.brand_id);
+
+    if (!shift) {
+      return res.status(404).json({ success: false, error: 'Shift tidak ditemukan pada brand ini.' });
+    }
+
+    // P1 SHIFT CLOSING RBAC & OWNERSHIP GUARD (NEW-01)
+    if (req.user.role === 'cashier') {
+      if (shift.cashier_id !== cashierId || (userBranchId && shift.branch_id !== userBranchId)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Akses ditolak: Kasir hanya berwenang menutup shift miliknya sendiri.'
+        });
+      }
+    } else if (req.user.role === 'branch_manager') {
+      if (userBranchId && shift.branch_id !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Akses ditolak: Manajer cabang hanya berwenang menutup shift di cabang yang ditugaskan.'
+        });
+      }
+    }
+
     if (actual_cash === undefined || actual_cash === null || !Number.isFinite(Number(actual_cash)) || Number(actual_cash) < 0) {
       return res.status(400).json({
         success: false,
@@ -1226,7 +1290,7 @@ router.post('/pos/shifts/:id/close', requireAuth(['owner', 'brand_manager', 'bra
     }
 
     const { PosShiftService } = require('../../domains/pos');
-    const shift = PosShiftService.closeShift({
+    const closedShift = PosShiftService.closeShift({
       shift_id: shiftId,
       actual_cash: Number(actual_cash)
     });
@@ -1234,7 +1298,7 @@ router.post('/pos/shifts/:id/close', requireAuth(['owner', 'brand_manager', 'bra
     res.json({
       success: true,
       message: 'Shift kasir berhasil ditutup.',
-      shift
+      shift: closedShift
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
