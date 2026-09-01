@@ -897,7 +897,7 @@
 	right: 0 !important;
 	bottom: var(--x-note-keyboard, 0px) !important;
 	width: 100% !important;
-	height: min(75dvh, var(--x-note-visible-height, 75dvh)) !important;
+	height: min(52dvh, var(--x-note-visible-height, 52dvh)) !important;
 	max-height: none !important;
 	margin: 0 !important;
 	background: #fff;

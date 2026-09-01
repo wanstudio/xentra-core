@@ -427,7 +427,7 @@
       var vv = window.visualViewport;
       if (!vv) {
         sheet.style.setProperty('--x-note-keyboard', '0px');
-        sheet.style.setProperty('--x-note-visible-height', '75dvh');
+        sheet.style.setProperty('--x-note-visible-height', '52dvh');
         return;
       }
       var keyboardHeight = Math.max(0, window.innerHeight - (vv.offsetTop + vv.height));
