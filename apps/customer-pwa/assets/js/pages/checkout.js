@@ -606,7 +606,7 @@
         '  <div class="x-complement-name">' + UI.escape(p.name || 'Menu Tambahan') + '</div>' +
         '  <div class="x-complement-bottom">' +
         '    <div class="x-complement-price">' + fmtIDR(p.price || 5000) + '</div>' +
-        '    <button type="button" class="x-upsell-add-btn" data-add-upsell="' + p.id + '" aria-label="Tambah">+</button>' +
+        '    <button type="button" class="x-upsell-add-btn" data-add-upsell="' + p.id + '" aria-label="Tambah"><img src="/assets/icons/plus.svg" class="x-upsell-plus-icon" alt=""></button>' +
         '  </div>' +
         '</div>';
     });
