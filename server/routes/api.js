@@ -756,7 +756,14 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           customer
         );
       } catch (payErr) {
-        console.warn('[Payment Snap Warn]:', payErr.message);
+        console.error('[Payment Gateway Error]:', payErr.message);
+        // P1 FAIL-CLOSED PAYMENT HARDENING: Mark order as payment_failed and return error to customer
+        db.prepare('UPDATE orders SET status = \'payment_failed\', updated_at = datetime(\'now\') WHERE id = ?').run(orderId);
+        return res.status(502).json({
+          success: false,
+          error: 'PAYMENT_GATEWAY_ERROR',
+          message: `Gagal memproses sesi pembayaran online: ${payErr.message}. Silakan coba metode pembayaran lain atau hubungi cabang.`
+        });
       }
     }
 
