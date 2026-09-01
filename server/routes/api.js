@@ -258,7 +258,15 @@ router.post('/auth/otp/verify', (req, res) => {
     return res.status(400).json(result);
   }
 
-  res.json(result);
+  // P1 CUSTOMER AUTHENTICATION (Finding 1): Issue signed customer session token upon OTP verification
+  const customerSession = TokenSessionStore.createCustomerSession(result.phone, req.brand_id);
+  res.json({
+    success: true,
+    verified: true,
+    phone: result.phone,
+    token: customerSession.token,
+    expires_at: customerSession.expiresAt
+  });
 });
 
 router.post('/auth/otp/trust', (req, res) => {
@@ -272,7 +280,13 @@ router.post('/auth/otp/trust', (req, res) => {
     return res.status(403).json({ success: false, trusted: false, error: 'Perangkat atau sesi nomor belum diverifikasi OTP.' });
   }
 
-  res.json({ success: true, trusted: true });
+  const customerSession = TokenSessionStore.createCustomerSession(phone.trim(), req.brand_id);
+  res.json({
+    success: true,
+    trusted: true,
+    token: customerSession.token,
+    expires_at: customerSession.expiresAt
+  });
 });
 
 // 5. Menu Catalog & Home
@@ -451,18 +465,15 @@ router.post(['/cart/sync', '/checkout/session'], (req, res) => {
   });
 });
 
-// 5.3 Addresses (Customer & Tenant-Scoped Database Persistence)
-router.get('/addresses', (req, res) => {
+// 5.3 Addresses (Protected by Customer OTP Session - Finding 1)
+router.get('/addresses', requireCustomerAuth(), (req, res) => {
   try {
-    const phone = (req.query.phone || req.headers['x-customer-phone'] || '').trim();
-    if (!phone) {
-      return res.json({ success: true, addresses: [] });
-    }
+    const customerPhone = req.customer.phone;
     const addresses = db.prepare(`
       SELECT * FROM customer_addresses 
       WHERE brand_id = ? AND customer_phone = ? 
       ORDER BY is_primary DESC, created_at DESC
-    `).all(req.brand_id, phone);
+    `).all(req.brand_id, customerPhone);
 
     res.json({ success: true, addresses: addresses || [] });
   } catch (err) {
@@ -470,22 +481,15 @@ router.get('/addresses', (req, res) => {
   }
 });
 
-router.post('/addresses', (req, res) => {
+router.post('/addresses', requireCustomerAuth(), (req, res) => {
   try {
-    const { label = 'Rumah', address = '', detail = '', note = '', latitude, longitude, phone } = req.body;
-    const customerPhone = (phone || req.headers['x-customer-phone'] || '').trim();
+    const { label = 'Rumah', address = '', detail = '', note = '', latitude, longitude } = req.body;
+    const customerPhone = req.customer.phone;
 
     if (latitude == null || longitude == null || isNaN(Number(latitude)) || isNaN(Number(longitude))) {
       return res.status(400).json({
         success: false,
         error: 'Titik koordinat (latitude & longitude) wajib diisi dengan angka yang valid.'
-      });
-    }
-
-    if (!customerPhone) {
-      return res.status(400).json({
-        success: false,
-        error: 'Nomor telepon customer wajib disertakan untuk menyimpan alamat.'
       });
     }
 
@@ -529,14 +533,10 @@ router.post('/addresses', (req, res) => {
   }
 });
 
-router.delete('/addresses/:id', (req, res) => {
+router.delete('/addresses/:id', requireCustomerAuth(), (req, res) => {
   try {
-    const phone = (req.query.phone || req.headers['x-customer-phone'] || '').trim();
-    if (phone) {
-      db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').run(req.params.id, req.brand_id, phone);
-    } else {
-      db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
-    }
+    const customerPhone = req.customer.phone;
+    db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').run(req.params.id, req.brand_id, customerPhone);
     res.json({ success: true, message: 'Alamat berhasil dihapus.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -840,6 +840,20 @@ const TokenSessionStore = {
     });
     return { token, expiresAt };
   },
+  createCustomerSession(phone, brand_id, ttlSeconds = 2592000) {
+    const token = 'xnt_cust_' + crypto.randomBytes(24).toString('hex');
+    const expiresAt = Date.now() + ttlSeconds * 1000;
+    this.sessions.set(token, {
+      type: 'customer',
+      role: 'customer',
+      phone: phone.trim(),
+      customerPhone: phone.trim(),
+      brandId: brand_id,
+      brand_id: brand_id,
+      expiresAt
+    });
+    return { token, expiresAt };
+  },
   getSession(token) {
     if (!token) return null;
     const session = this.sessions.get(token);
@@ -854,6 +868,42 @@ const TokenSessionStore = {
     if (token) this.sessions.delete(token);
   }
 };
+
+// Middleware: Require Authenticated Customer Session (Finding 1)
+function requireCustomerAuth() {
+  return (req, res, next) => {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || req.headers['x-customer-token'] || '').trim();
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'CUSTOMER_AUTH_REQUIRED',
+        message: 'Akses ditolak: Nomor WhatsApp bukan kredensial. Harap login dan verifikasi OTP untuk mengakses data alamat pribadi Anda.'
+      });
+    }
+
+    const session = TokenSessionStore.getSession(token);
+    if (!session || (session.type !== 'customer' && session.role !== 'customer')) {
+      return res.status(401).json({
+        success: false,
+        error: 'INVALID_OR_EXPIRED_CUSTOMER_SESSION',
+        message: 'Sesi akun customer Anda tidak valid atau telah kedaluwarsa. Silakan verifikasi OTP kembali.'
+      });
+    }
+
+    if (session.brandId !== req.brand_id) {
+      return res.status(403).json({
+        success: false,
+        error: 'TENANT_MISMATCH',
+        message: 'Sesi customer tidak valid untuk brand ini.'
+      });
+    }
+
+    req.customer = session;
+    next();
+  };
+}
 
 // Core Identity & RBAC Integration
 const { IdentityModel, AuthorizationService } = require('../../core/identity');

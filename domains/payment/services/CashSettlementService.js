@@ -54,7 +54,7 @@ class CashSettlementService {
     const expectedAmount = Number(order.grand_total);
     if (Number(amount) !== expectedAmount) {
       throw new Error(
-        `[CashSettlementService] Jumlah pembayaran (Rp ${Number(amount).toLocaleString('id-ID')}) tidak sesuai dengan total tagihan order (Rp ${expectedAmount.toLocaleString('id-ID')}).`
+        `[SETTLEMENT_AMOUNT_MISMATCH]: Jumlah pembayaran (Rp ${Number(amount).toLocaleString('id-ID')}) tidak sesuai dengan total tagihan order (Rp ${expectedAmount.toLocaleString('id-ID')}).`
       );
     }
 
@@ -68,11 +68,20 @@ class CashSettlementService {
       throw new Error(`[CashSettlementService] Uang yang diterima (Rp ${tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${amount.toLocaleString('id-ID')}).`);
     }
 
+    // P1 AUTHORITATIVE FINANCIAL AMOUNT GUARD (NEW-04):
+    // Strictly verify settlement amount matches order grand total and existing payment record
+    if (Math.round(Number(amount)) !== Math.round(Number(order.grand_total))) {
+      throw new Error(`[SETTLEMENT_AMOUNT_MISMATCH]: Nominal kas (Rp ${amount}) tidak sesuai dengan total tagihan pesanan (Rp ${order.grand_total}).`);
+    }
+
     // P1 IDEMPOTENCY & PROVIDER GUARD: Return early if cash payment was already settled to prevent double revenue / events
     const existingPayment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
     if (existingPayment) {
       if (existingPayment.provider && existingPayment.provider !== 'cash') {
         throw new Error(`[CashSettlementService Provider Conflict]: Pembayaran untuk pesanan "${order_id}" sudah terdaftar dengan provider online "${existingPayment.provider}".`);
+      }
+      if (Math.round(Number(existingPayment.amount)) !== Math.round(Number(order.grand_total))) {
+        throw new Error(`[SETTLEMENT_AMOUNT_MISMATCH]: Record pembayaran sebelumnya (Rp ${existingPayment.amount}) tidak sesuai dengan tagihan pesanan (Rp ${order.grand_total}).`);
       }
       if (existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT) {
         return {
@@ -105,7 +114,8 @@ class CashSettlementService {
     }
 
     const change = tendered - amount;
-    const paymentId = `pay_cash_${crypto.randomBytes(6).toString('hex')}`;
+    const generatedPaymentId = `pay_cash_${crypto.randomBytes(6).toString('hex')}`;
+    const actualPaymentId = existingPayment ? existingPayment.id : generatedPaymentId;
     const now = new Date().toISOString();
 
     // P1 ATOMIC CONCURRENCY & RECONCILIATION: Execute Payment + Shift Mutation in single exclusive transaction
@@ -130,7 +140,7 @@ class CashSettlementService {
         }
       }
 
-      // 2. Insert/Update order_payments
+      // 2. Insert/Update order_payments (Preserves authoritative actualPaymentId)
       db.prepare(`
         INSERT INTO order_payments (
           id, order_id, provider, payment_method, amount, payment_status, settled_at, raw_webhook_response, created_at, updated_at
@@ -143,7 +153,7 @@ class CashSettlementService {
           raw_webhook_response = excluded.raw_webhook_response,
           updated_at = excluded.updated_at
       `).run(
-        paymentId,
+        actualPaymentId,
         order_id,
         amount,
         now,
@@ -152,10 +162,13 @@ class CashSettlementService {
         now
       );
 
-      // 3. Update order payment details & status
+      // 3. Update order payment details & advance status WITHOUT state regression (NEW-03)
+      // Only transition status to 'confirmed' if currently 'pending'. Never regress preparing/ready/completed.
       db.prepare(`
         UPDATE orders
-        SET payment_method = 'cash', status = 'confirmed', updated_at = ?
+        SET payment_method = 'cash',
+            status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
+            updated_at = ?
         WHERE id = ?
       `).run(now, order_id);
 
@@ -165,12 +178,12 @@ class CashSettlementService {
       throw err;
     }
 
-    // 3. Emit Domain Event: payment.settled
+    // 4. Emit Domain Event: payment.settled with authoritative actualPaymentId (NEW-02)
     events.EventBus.publish({
       type: 'payment.settled',
       producer: 'payment',
       payload: {
-        payment_id: paymentId,
+        payment_id: actualPaymentId,
         order_id,
         branch_id: order.branch_id,
         brand_id: order.brand_id,
@@ -185,7 +198,7 @@ class CashSettlementService {
 
     return {
       success: true,
-      payment_id: paymentId,
+      payment_id: actualPaymentId,
       order_id,
       payment_status: 'settlement',
       provider: 'cash',

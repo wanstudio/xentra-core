@@ -500,3 +500,55 @@ test('Payment 7 — Midtrans Webhook: strictly rejects amount mismatch even with
   assert.strictEqual(pendingOrder.status, 'pending');
   assert.strictEqual(pendingPayment.payment_status, 'pending');
 });
+
+// ==============================================================================
+// Payment 8 — Cash Settlement: Payment ID Consistency & State Regression Guard
+// ==============================================================================
+test('Payment 8 — Cash Settlement: Preserves existing payment_id in events, prevents state regression, and rejects amount mismatch', async () => {
+  const orderId = `ord_test_preserve_${Date.now()}`;
+  const existingPayId = `pay_orig_${Date.now()}`;
+
+  // 1. Order already in 'completed' state
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Completed', '62812345678', 'dine_in', 'pos_cashier', 80000, 80000, 'cash', 'completed')
+  `).run(orderId, `ORD-COMPL-${Date.now()}`);
+
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, payment_method, payment_status, amount)
+    VALUES (?, ?, 'cash', 'cash', 'pending', 80000)
+  `).run(existingPayId, orderId);
+
+  let capturedEvent = null;
+  events.EventBus.subscribe('payment.settled', (evt) => {
+    if (evt.payload.order_id === orderId) {
+      capturedEvent = evt;
+    }
+  });
+
+  // 2. Settlement with amount mismatch -> REJECTED
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: orderId,
+      amount: 50000, // Mismatched
+      amount_tendered: 50000
+    });
+  }, /SETTLEMENT_AMOUNT_MISMATCH/);
+
+  // 3. Settle with exact amount
+  const result = CashSettlementService.settleCashPayment({
+    order_id: orderId,
+    amount: 80000,
+    amount_tendered: 100000
+  });
+
+  assert.strictEqual(result.success, true);
+  // Authoritative Payment ID Consistency
+  assert.strictEqual(result.payment_id, existingPayId, 'Result must use existing payment_id');
+  assert.ok(capturedEvent);
+  assert.strictEqual(capturedEvent.payload.payment_id, existingPayId, 'Event must carry authoritative existing payment_id');
+
+  // Authoritative State Regression Guard: Status must remain 'completed'
+  const finalOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(finalOrder.status, 'completed', 'Order status must NOT regress from completed to confirmed');
+});
