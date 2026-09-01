@@ -45,12 +45,19 @@ class PosShiftService {
     const startingFloat = Number(starting_float) || 0;
     const now = new Date().toISOString();
 
-    db.prepare(`
-      INSERT INTO pos_shifts (
-        id, branch_id, cashier_id, starting_float, total_cash_sales,
-        total_cash_in, total_cash_out, expected_cash, status, opened_at
-      ) VALUES (?, ?, ?, ?, 0.0, 0.0, 0.0, ?, 'open', ?)
-    `).run(shiftId, branch_id, cashier_id, startingFloat, startingFloat, now);
+    try {
+      db.prepare(`
+        INSERT INTO pos_shifts (
+          id, branch_id, cashier_id, starting_float, total_cash_sales,
+          total_cash_in, total_cash_out, expected_cash, status, opened_at
+        ) VALUES (?, ?, ?, ?, 0.0, 0.0, 0.0, ?, 'open', ?)
+      `).run(shiftId, branch_id, cashier_id, startingFloat, startingFloat, now);
+    } catch (err) {
+      if (err && err.message && (err.message.includes('UNIQUE constraint failed') || err.message.includes('constraint failed'))) {
+        throw new Error(`[PosShiftService] Kasir "${cashier_id}" sudah memiliki shift aktif (Race Condition Guard). Tutup shift lama terlebih dahulu.`);
+      }
+      throw err;
+    }
 
     // Emit event: pos.shift.opened
     events.EventBus.publish({

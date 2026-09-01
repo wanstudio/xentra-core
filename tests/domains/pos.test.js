@@ -141,14 +141,29 @@ test('POS 2 — Cashier Shift: handles Open, Cash In/Out, and Close with exact v
     VALUES ('cashier_locked_branch', 'org_pos', 'kasir_locked', 'hash123', 'cashier', 'brand_pos', 'branch_pos')
   `).run();
 
-  // Attempting to open shift on branch_pos_other -> STRICTLY REJECTED
+  // 7. Database Unique Constraint Invariant on Active Shift (NEW-04 Race Condition Guard)
+  db.prepare("DELETE FROM pos_shifts WHERE cashier_id = 'cashier_race_test'").run();
+  const shiftRace1 = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: 'cashier_race_test',
+    starting_float: 100000
+  });
+
+  // Attempting direct raw SQL insert of a second open shift for the exact same cashier -> UNIQUE INDEX VIOLATION
   assert.throws(() => {
-    PosShiftService.openShift({
-      branch_id: 'branch_pos_other',
-      cashier_id: 'cashier_locked_branch',
-      starting_float: 50000
-    });
-  }, /tidak berwenang membuka shift di cabang/);
+    db.prepare(`
+      INSERT INTO pos_shifts (id, branch_id, cashier_id, starting_float, status)
+      VALUES ('shift_race_bypass', 'branch_pos', 'cashier_race_test', 50000, 'open')
+    `).run();
+  }, /constraint failed/);
+
+  // Clean up race test shift
+  PosShiftService.closeShift({
+    shift_id: shiftRace1.id,
+    actual_cash: 100000,
+    actor_id: 'cashier_race_test',
+    actor_role: 'cashier'
+  });
 });
 
 // ==============================================================================
