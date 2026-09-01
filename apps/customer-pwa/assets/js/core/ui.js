@@ -40,33 +40,41 @@
     el.textContent = message;
     el.style.cssText = [
       'position:fixed',
-      'bottom:100px',
+      'top:50%',
       'left:50%',
-      'transform:translateX(-50%) translateY(20px)',
-      'background:#222',
-      'color:#fff',
-      'padding:10px 20px',
-      'border-radius:22px',
-      'font-size:13px',
-      'font-weight:600',
-      'z-index:99999',
+      'transform:translate(-50%, -50%) scale(0.92)',
+      'background:rgba(255, 75, 115, 0.94)',
+      'color:#ffffff',
+      'padding:12px 24px',
+      'border-radius:18px',
+      'border:1.5px solid rgba(255, 190, 205, 0.7)',
+      'box-shadow:0 10px 30px rgba(255, 60, 105, 0.28), 0 4px 12px rgba(0, 0, 0, 0.08)',
+      'font-family:\'Plus Jakarta Sans\', -apple-system, BlinkMacSystemFont, sans-serif',
+      'font-size:13.5px',
+      'font-weight:700',
+      'text-align:center',
+      'z-index:999999',
       'opacity:0',
-      'transition:opacity .3s, transform .3s',
+      'transition:opacity .35s cubic-bezier(0.16, 1, 0.3, 1), transform .35s cubic-bezier(0.16, 1, 0.3, 1)',
       'pointer-events:none',
-      'white-space:nowrap'
+      'max-width:280px',
+      'width:auto',
+      'line-height:1.4',
+      'backdrop-filter:blur(6px)',
+      '-webkit-backdrop-filter:blur(6px)'
     ].join(';');
 
     document.body.appendChild(el);
 
     requestAnimationFrame(function () {
       el.style.opacity = '1';
-      el.style.transform = 'translateX(-50%) translateY(0)';
+      el.style.transform = 'translate(-50%, -50%) scale(1)';
     });
 
     setTimeout(function () {
       el.style.opacity = '0';
-      el.style.transform = 'translateX(-50%) translateY(20px)';
-      setTimeout(function () { el.remove(); }, 300);
+      el.style.transform = 'translate(-50%, -50%) scale(0.92)';
+      setTimeout(function () { if (el.parentNode) el.remove(); }, 350);
     }, duration);
   }
 
