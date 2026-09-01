@@ -438,6 +438,10 @@
       sheet.style.setProperty('--x-note-sheet-height', targetHeight + 'px');
     }
 
+    // Set initial compact height before opening
+    sheet.style.setProperty('--x-note-keyboard', '0px');
+    sheet.style.setProperty('--x-note-sheet-height', '340px');
+
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', updateViewport);
       window.visualViewport.addEventListener('scroll', updateViewport);
@@ -446,14 +450,13 @@
     // Force layout reflow before slide-up
     void overlay.offsetHeight;
 
-    // Animate in
+    // Animate directly from bottom to target position
     requestAnimationFrame(function () {
       overlay.classList.add('open');
-      // Trigger focus early so mobile keyboard glides up in sync with the sheet slide-up
+      // Focus when sheet reaches the target resting position
       setTimeout(function () {
         if (input) input.focus();
-        updateViewport();
-      }, 100);
+      }, 350);
     });
 
     input.addEventListener('input', function () {
