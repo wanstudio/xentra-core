@@ -394,119 +394,120 @@
   }
 
   // ======================================================================
-  //  NOTE SHEET
+  //  NOTE SHEET (EXACT XENTRA-MVP LOGIC)
   // ======================================================================
-  function openNoteSheet(productId) {
-    var product = products.find(function (p) { return String(p.id) === String(productId); });
-    if (!product) return;
+  function portalNoteSheet() {
+    var overlay = document.getElementById('x-note-overlay');
+    if (overlay && overlay.parentElement !== document.body) {
+      document.body.appendChild(overlay);
+    }
+  }
 
-    var item = Store.findCartItem(productId);
-    var currentNote = item ? (item.note || '') : '';
+  function updateNoteViewport() {
+    var o = document.getElementById('x-note-overlay');
+    var s = document.getElementById('x-note-sheet');
+    if (!o || !s) return;
+    var v = window.visualViewport;
+    if (!v) {
+      s.style.setProperty('--x-note-keyboard', '0px');
+      s.style.setProperty('--x-note-visible-height', '75vh');
+      return;
+    }
+    var kh = Math.max(0, window.innerHeight - (v.offsetTop + v.height));
+    s.style.setProperty('--x-note-keyboard', kh + 'px');
+    s.style.setProperty('--x-note-visible-height', v.height + 'px');
+  }
 
-    var overlay = document.createElement('div');
-    overlay.className = 'x-note-overlay';
-    overlay.innerHTML =
-      '<div class="x-note-sheet">' +
-      '  <div class="x-note-handle"></div>' +
-      '  <div class="x-note-header"><h3>Catatan: ' + UI.escape(product.name) + '</h3></div>' +
-      '  <textarea id="x-note-input" placeholder="Contoh: Jangan terlalu pedas, kuah dipisah...">' + UI.escape(currentNote) + '</textarea>' +
-      '  <div class="x-note-footer">' +
-      '    <span id="x-note-counter">' + currentNote.length + '/150</span>' +
-      '    <button type="button" id="x-note-save">Simpan</button>' +
-      '  </div>' +
-      '</div>';
+  function updateNoteCounter() {
+    var inp = document.getElementById('x-note-input');
+    var cnt = document.getElementById('x-note-counter');
+    if (inp && cnt) cnt.textContent = inp.value.length + '/200';
+  }
 
-    document.body.appendChild(overlay);
+  function openNote(productId) {
+    portalNoteSheet();
+    var numId = Number(productId);
+    var item = Store.findCartItem(numId);
+    var curNote = (item && item.note) || Store.getState().notes[numId] || '';
 
-    var sheet = overlay.querySelector('.x-note-sheet');
-    var input = overlay.querySelector('#x-note-input');
-    var counter = overlay.querySelector('#x-note-counter');
+    var inp = document.getElementById('x-note-input');
+    if (inp) {
+      inp.value = curNote;
+      inp.oninput = updateNoteCounter;
+    }
+    updateNoteCounter();
 
-    function updateViewport() {
-      if (!overlay.parentNode || !sheet) return;
-      var vv = window.visualViewport;
-      if (!vv) {
-        sheet.style.setProperty('--x-note-keyboard', '0px');
-        sheet.style.setProperty('--x-note-sheet-height', '340px');
-        return;
-      }
-      var keyboardHeight = Math.max(0, window.innerHeight - (vv.offsetTop + vv.height));
-      var availableHeight = vv.height;
-      var targetHeight = Math.min(340, Math.max(220, Math.round(availableHeight * 0.85)));
-
-      sheet.style.setProperty('--x-note-keyboard', keyboardHeight + 'px');
-      sheet.style.setProperty('--x-note-sheet-height', targetHeight + 'px');
+    var o = document.getElementById('x-note-overlay');
+    var s = document.getElementById('x-note-sheet');
+    if (s) {
+      s.style.setProperty('--x-note-keyboard', '0px');
+      s.style.setProperty('--x-note-visible-height', '75dvh');
     }
 
-    // Set initial compact height before opening
-    sheet.style.setProperty('--x-note-keyboard', '0px');
-    sheet.style.setProperty('--x-note-sheet-height', '340px');
-
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateViewport);
-      window.visualViewport.addEventListener('scroll', updateViewport);
-    }
-
-    // Force layout reflow before slide-up
-    void overlay.offsetHeight;
-
-    // Animate directly from bottom to target position
-    requestAnimationFrame(function () {
-      overlay.classList.add('open');
-      // Focus when sheet reaches the target resting position
-      setTimeout(function () {
-        if (input) input.focus();
-      }, 350);
-    });
-
-    input.addEventListener('input', function () {
-      if (input.value.length > 150) input.value = input.value.slice(0, 150);
-      counter.textContent = input.value.length + '/150';
-    });
-
-    var isClosing = false;
-    function closeNote() {
-      if (isClosing) return;
-      isClosing = true;
-      if (input) input.blur();
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateViewport);
-        window.visualViewport.removeEventListener('scroll', updateViewport);
-      }
-      overlay.classList.remove('open');
-      setTimeout(function () {
-        if (overlay.parentNode) overlay.remove();
-      }, 380);
-    }
+    if (o) o.style.display = 'flex';
 
     if (window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
       window.XentraNav.pushClose(closeNote);
     }
 
-    // Close on backdrop tap
-    overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) {
+    void (s || o).offsetHeight;
+    requestAnimationFrame(function () {
+      if (o) o.classList.add('open');
+    });
+
+    setTimeout(function () {
+      if (inp) inp.focus();
+      updateNoteViewport();
+    }, 350);
+
+    var saveBtn = document.getElementById('x-note-save');
+    if (saveBtn) {
+      saveBtn.onclick = function () {
+        var noteVal = (inp ? inp.value : '').trim();
+        Store.setNote(numId, noteVal);
         if (window.XentraNav && typeof window.XentraNav.close === 'function') {
           window.XentraNav.close();
         } else {
           closeNote();
         }
-      }
-    });
+        renderProducts();
+      };
+    }
 
-    // Save
-    overlay.querySelector('#x-note-save').onclick = function () {
-      Store.setNote(productId, input.value.trim());
-      if (window.XentraNav && typeof window.XentraNav.close === 'function') {
-        window.XentraNav.close();
-      } else {
-        closeNote();
-      }
-      renderProducts();
-    };
-
-    overlay.__xentraClose = closeNote;
+    if (o) {
+      o.onclick = function (e) {
+        if (e.target === o) {
+          if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+            window.XentraNav.close();
+          } else {
+            closeNote();
+          }
+        }
+      };
+    }
   }
+
+  function closeNote() {
+    var o = document.getElementById('x-note-overlay');
+    var s = document.getElementById('x-note-sheet');
+    var inp = document.getElementById('x-note-input');
+    if (!o) return;
+    if (inp) inp.blur();
+    o.classList.remove('open');
+    setTimeout(function () {
+      if (s) {
+        s.style.setProperty('--x-note-keyboard', '0px');
+        s.style.setProperty('--x-note-visible-height', '75dvh');
+      }
+      o.style.display = 'none';
+    }, 380);
+  }
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateNoteViewport);
+    window.visualViewport.addEventListener('scroll', updateNoteViewport);
+  }
+  window.addEventListener('resize', updateNoteViewport);
 
   // ======================================================================
   //  CART DOCK

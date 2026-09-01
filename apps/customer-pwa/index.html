@@ -13,7 +13,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_325ba78';
+      var PWA_VERSION = 'v_c2da501';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -41,12 +41,12 @@
   <link rel="manifest" href="/manifest.json">
 
   <!-- CSS (version-hashed for instant cache-busting) -->
-  <link rel="stylesheet" href="/assets/css/tokens.css?v=325ba78">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=325ba78">
-  <link rel="stylesheet" href="/assets/css/components.css?v=325ba78">
-  <link rel="stylesheet" href="/assets/css/home.css?v=325ba78">
-  <link rel="stylesheet" href="/assets/css/checkout.css?v=325ba78">
-  <link rel="stylesheet" href="/assets/css/order-received.css?v=325ba78">
+  <link rel="stylesheet" href="/assets/css/tokens.css?v=c2da501">
+  <link rel="stylesheet" href="/assets/css/layout.css?v=c2da501">
+  <link rel="stylesheet" href="/assets/css/components.css?v=c2da501">
+  <link rel="stylesheet" href="/assets/css/home.css?v=c2da501">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=c2da501">
+  <link rel="stylesheet" href="/assets/css/order-received.css?v=c2da501">
 </head>
 <body>
 
@@ -161,6 +161,21 @@
        ═══════════════════════════════════════════════════ -->
   <div id="xentra-order-view" class="x-page" style="display:none;"></div>
 
+  <!-- NOTE SHEET (EXACT XENTRA-MVP PORTAL) -->
+  <div id="x-note-overlay" class="x-note-overlay" style="display:none;">
+    <div id="x-note-sheet" class="x-note-sheet">
+      <div class="x-note-handle"></div>
+      <div class="x-note-header">
+        <h3>Tambah catatan untuk pembelian</h3>
+      </div>
+      <textarea id="x-note-input" maxlength="200" placeholder="Tambahkan catatan..."></textarea>
+      <div class="x-note-footer">
+        <span id="x-note-counter">0/200</span>
+        <button id="x-note-save" type="button">Simpan</button>
+      </div>
+    </div>
+  </div>
+
   <!-- PWA INSTALL BANNER -->
   <div class="x-pwa-banner" id="x-pwa-banner">
     <div class="x-pwa-banner-card">
@@ -181,16 +196,16 @@
   <!-- ═══════════════════════════════════════════════════
        JS CORE & CONTROLLERS (Version Hashed v2.3.0)
        ═══════════════════════════════════════════════════ -->
-  <script src="/assets/js/core/store.js?v=325ba78"></script>
-  <script src="/assets/js/core/ui.js?v=325ba78"></script>
-  <script src="/assets/js/core/api.js?v=325ba78"></script>
-  <script src="/assets/js/core/nav.js?v=325ba78"></script>
-  <script src="/assets/js/core/router.js?v=325ba78"></script>
+  <script src="/assets/js/core/store.js?v=c2da501"></script>
+  <script src="/assets/js/core/ui.js?v=c2da501"></script>
+  <script src="/assets/js/core/api.js?v=c2da501"></script>
+  <script src="/assets/js/core/nav.js?v=c2da501"></script>
+  <script src="/assets/js/core/router.js?v=c2da501"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=325ba78"></script>
-  <script src="/assets/js/pages/checkout.js?v=325ba78"></script>
-  <script src="/assets/js/pages/order-received.js?v=325ba78"></script>
+  <script src="/assets/js/pages/home.js?v=c2da501"></script>
+  <script src="/assets/js/pages/checkout.js?v=c2da501"></script>
+  <script src="/assets/js/pages/order-received.js?v=c2da501"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -264,7 +279,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=325ba78').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=c2da501').then(function (reg) {
         // Trigger immediate background update check on app launch
         reg.update();
 
