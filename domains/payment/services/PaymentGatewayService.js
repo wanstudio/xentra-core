@@ -160,11 +160,7 @@ class PaymentGatewayService {
   static handleWebhook(webhookData, { skipSignatureCheck = false } = {}) {
     const { order_id, transaction_status, fraud_status, payment_type, gross_amount } = webhookData;
 
-    const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
-    if (!payment) {
-      throw new Error(`Data pembayaran untuk Order ID "${order_id}" tidak ditemukan.`);
-    }
-
+    let payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
 
     // P1 SECURE WEBHOOK VERIFICATION: Strictly fail-closed signature verification (mandatory valid server_key & signature_key)
@@ -179,8 +175,24 @@ class PaymentGatewayService {
 
       const isValid = this.verifySignature(webhookData, config.server_key);
       if (!isValid) {
-        throw new Error(`[PaymentGatewayService] Signature webhook Midtrans tidak valid untuk order "${order_id}".`);
+        throw new Error(`[PaymentGatewayService Signature Fraud]: Signature webhook Midtrans tidak valid untuk order "${order_id}". Transaksi ditolak.`);
       }
+    }
+
+    // P1 RECONCILIATION FAIL-SAFE (NEW-02):
+    // If payment row is missing due to client crash after gateway creation, self-heal local record from authoritative order
+    if (!payment) {
+      if (!order) {
+        throw new Error(`[PaymentGatewayService] Data pesanan untuk Order ID "${order_id}" tidak ditemukan.`);
+      }
+      const selfHealedPaymentId = `pay_${crypto.randomBytes(6).toString('hex')}`;
+      const now = new Date().toISOString();
+      db.prepare(`
+        INSERT INTO order_payments (id, order_id, provider, payment_method, merchant_id, snap_token, payment_status, amount, created_at, updated_at)
+        VALUES (?, ?, 'midtrans', 'midtrans', 'midtrans', NULL, 'pending', ?, ?, ?)
+      `).run(selfHealedPaymentId, order_id, order.grand_total, now, now);
+
+      payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
     }
 
     let newPaymentStatus = PaymentModel.STATUSES.PENDING;

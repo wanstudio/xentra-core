@@ -533,3 +533,54 @@ test('POS 9 — Cash Movement Atomicity: recordCashMovement on closed shift roll
   const movementsAfter = db.prepare('SELECT COUNT(*) as count FROM pos_cash_movements WHERE shift_id = ?').get(closedShift.id).count;
   assert.strictEqual(movementsAfter, 0, 'No orphan cash movement row must remain after failed transaction');
 });
+
+// ==============================================================================
+// POS 10 — Cash Drawer Invariants: Starting Float & Cash Out Boundary (NEW-03, NEW-04)
+// ==============================================================================
+test('POS 10 — Cash Drawer Invariants: rejects negative starting float and excessive cash out', () => {
+  // 1. Negative starting float rejected (NEW-03)
+  assert.throws(() => {
+    PosShiftService.openShift({
+      branch_id: 'branch_pos',
+      cashier_id: 'cashier_float_test',
+      starting_float: -50000
+    });
+  }, /Modal awal kasir.*non-negatif/);
+
+  // 2. Open shift with 50.000 starting float
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: 'cashier_float_test',
+    starting_float: 50000
+  });
+  assert.strictEqual(shift.expected_cash, 50000);
+
+  // 3. Cash out exceeding expected cash rejected (NEW-04)
+  assert.throws(() => {
+    PosShiftService.recordCashMovement({
+      shift_id: shift.id,
+      type: 'out',
+      amount: 100000, // 100k > 50k
+      actor_id: 'cashier_float_test',
+      actor_role: 'cashier'
+    });
+  }, /INSUFFICIENT_DRAWER_CASH/);
+
+  // 4. Valid cash out within drawer balance succeeds
+  const updated = PosShiftService.recordCashMovement({
+    shift_id: shift.id,
+    type: 'out',
+    amount: 20000,
+    actor_id: 'cashier_float_test',
+    actor_role: 'cashier'
+  });
+  assert.strictEqual(updated.expected_cash, 30000);
+
+  // Clean up
+  PosShiftService.closeShift({
+    shift_id: shift.id,
+    actual_cash: 30000,
+    actor_id: 'cashier_float_test',
+    actor_role: 'cashier'
+  });
+});

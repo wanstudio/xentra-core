@@ -47,7 +47,10 @@ class PosShiftService {
     }
 
     const shiftId = `shift_${crypto.randomBytes(6).toString('hex')}`;
-    const startingFloat = Number(starting_float) || 0;
+    const startingFloat = starting_float === undefined || starting_float === null ? 0 : Number(starting_float);
+    if (!Number.isFinite(startingFloat) || startingFloat < 0) {
+      throw new Error('[PosShiftService] Modal awal kasir (starting_float) wajib bernilai angka non-negatif (>= 0).');
+    }
     const now = new Date().toISOString();
 
     try {
@@ -136,6 +139,15 @@ class PosShiftService {
 
       if (actor_role === 'cashier' && actor_id && currentShift.cashier_id !== actor_id) {
         throw new Error(`[PosShiftService Authorization Breach]: Kasir "${actor_id}" tidak berwenang mencatat mutasi kas pada shift milik kasir lain ("${currentShift.cashier_id}").`);
+      }
+
+      // P1 CASH INVENTORY GUARD (NEW-04): Cash out cannot exceed physical cash drawer balance
+      if (type === 'out') {
+        if (moveAmount > Number(currentShift.expected_cash)) {
+          throw new Error(
+            `[INSUFFICIENT_DRAWER_CASH]: Pengeluaran kas (Rp ${moveAmount.toLocaleString('id-ID')}) melebihi saldo kas yang tersedia di laci (Rp ${Number(currentShift.expected_cash).toLocaleString('id-ID')}).`
+          );
+        }
       }
 
       db.prepare(`

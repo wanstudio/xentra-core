@@ -308,6 +308,29 @@ class OrderPlacementService {
         );
       }
 
+      // P1 ATOMIC FINANCIAL TRANSACTION INVARIANT (NEW-01 & NEW-02):
+      // Create local order_payments attempt in the SAME transaction as order, items, and inventory.
+      const initialPaymentId = `pay_${crypto.randomBytes(6).toString('hex')}`;
+      db.prepare(`
+        INSERT INTO order_payments (
+          id, order_id, provider, payment_method, merchant_id, snap_token, payment_status, amount, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?)
+        ON CONFLICT(order_id) DO UPDATE SET
+          amount = excluded.amount,
+          payment_method = excluded.payment_method,
+          provider = excluded.provider,
+          updated_at = excluded.updated_at
+      `).run(
+        initialPaymentId,
+        orderId,
+        effectivePaymentMethod,
+        effectivePaymentMethod,
+        effectivePaymentMethod === 'cash' ? 'cash' : 'midtrans',
+        grandTotal,
+        now,
+        now
+      );
+
       db.exec('COMMIT;');
     } catch (txErr) {
       try { db.exec('ROLLBACK;'); } catch (_) {}
