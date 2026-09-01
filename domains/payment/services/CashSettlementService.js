@@ -58,7 +58,12 @@ class CashSettlementService {
       );
     }
 
-    const tendered = typeof amount_tendered === 'number' ? amount_tendered : amount;
+    // P1 FINANCIAL ASSERTION (NEW-01): Require explicit, finite, and positive amount_tendered assertion
+    if (amount_tendered === undefined || amount_tendered === null || !Number.isFinite(Number(amount_tendered)) || Number(amount_tendered) <= 0) {
+      throw new Error('[CashSettlementService] Nominal uang yang diterima (amount_tendered) wajib diisi dengan angka positif yang valid.');
+    }
+
+    const tendered = Number(amount_tendered);
     if (tendered < amount) {
       throw new Error(`[CashSettlementService] Uang yang diterima (Rp ${tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${amount.toLocaleString('id-ID')}).`);
     }

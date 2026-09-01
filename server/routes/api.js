@@ -1094,12 +1094,20 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
       }
     }
 
+    // P1 EXPLICIT CASHIER ASSERTION: amount_tendered is strictly required (no silent inference)
+    if (amount_tendered === undefined || amount_tendered === null || !Number.isFinite(Number(amount_tendered)) || Number(amount_tendered) <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nominal uang yang diterima (amount_tendered) wajib diisi dengan angka positif yang valid.'
+      });
+    }
+
     // Authoritative Domain Settlement Execution (Single Source of Truth)
     const { CashSettlementService } = require('../../domains/payment');
     const result = CashSettlementService.settleCashPayment({
       order_id: orderId,
       amount: Number(order.grand_total),
-      amount_tendered: amount_tendered !== undefined ? Number(amount_tendered) : Number(order.grand_total),
+      amount_tendered: Number(amount_tendered),
       cashier_id: req.user ? req.user.id : null,
       shift_id: effectiveShiftId
     });

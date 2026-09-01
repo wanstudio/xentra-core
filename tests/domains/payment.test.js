@@ -167,6 +167,15 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
     });
   }, /sudah dibatalkan\/kadaluarsa/);
 
+  // 6. Missing / Invalid amount_tendered Rejected (NEW-01)
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: newOrderId,
+      amount: 25000
+      // amount_tendered omitted
+    });
+  }, /Nominal uang yang diterima \(amount_tendered\) wajib diisi/);
+
   // Verify Idempotency Guard: second cash settlement returns idempotent: true without duplicate mutations
   const secondResult = CashSettlementService.settleCashPayment({
     order_id: orderId,
