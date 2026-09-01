@@ -1048,6 +1048,66 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
   }
 });
 
+// 9.1 Staff / POS Cash Settlement Endpoint (Authorized Cashier, Branch Staff, & Delivery Couriers)
+router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'driver']), (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const { amount_tendered, shift_id } = req.body;
+
+    // Scope & Branch Boundary Enforcement
+    let verifySql = 'SELECT * FROM orders WHERE id = ? AND brand_id = ?';
+    const verifyParams = [orderId, req.brand_id];
+
+    if (req.user && req.user.role === 'branch_manager' && req.user.branch_id) {
+      verifySql += ' AND branch_id = ?';
+      verifyParams.push(req.user.branch_id);
+    } else if (req.user && req.user.role === 'cashier' && req.user.branch_id) {
+      verifySql += ' AND branch_id = ?';
+      verifyParams.push(req.user.branch_id);
+    }
+
+    const order = db.prepare(verifySql).get(...verifyParams);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'Pesanan tidak ditemukan atau berada di luar kewenangan cabang Anda.'
+      });
+    }
+
+    // Authoritative Domain Settlement Execution (Single Source of Truth)
+    const { CashSettlementService } = require('../../domains/payment');
+    const result = CashSettlementService.settleCashPayment({
+      order_id: orderId,
+      amount: Number(order.grand_total),
+      amount_tendered: amount_tendered !== undefined ? Number(amount_tendered) : Number(order.grand_total),
+      cashier_id: req.user ? req.user.id : null,
+      shift_id: shift_id || null
+    });
+
+    // Update Shift Total Cash Sales if shift_id provided and new settlement
+    if (shift_id && !result.idempotent) {
+      try {
+        db.prepare(`
+          UPDATE pos_shifts
+          SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
+          WHERE id = ?
+        `).run(order.grand_total, order.grand_total, shift_id);
+      } catch (shiftErr) {
+        console.warn('[API POS Settle Cash] Shift update warning:', shiftErr.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: result.message || 'Pembayaran tunai berhasil diselesaikan.',
+      idempotent: !!result.idempotent,
+      payment: result
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // 10. Midtrans Webhook
 router.post('/webhooks/midtrans', (req, res) => {
   try {

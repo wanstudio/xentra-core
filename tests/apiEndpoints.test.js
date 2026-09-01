@@ -527,3 +527,63 @@ test('API Delivery Checkout: Strictly rejects delivery orders without valid coor
   assert.ok(data.error.includes('Titik koordinat pengantaran'));
 });
 
+test('API POS Cash Settlement: POST /api/v1/pos/orders/:id/settle-cash completes lifecycle with auth guard', async () => {
+  const db = require('../server/database/db');
+
+  // 1. Create a cash order via checkout
+  const orderRes = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_bangjo_barat',
+      payment_method: 'cash',
+      customer: { name: 'Customer Bayar Tunai', phone: '081234567890' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(orderRes.status, 201);
+  const orderData = await orderRes.json();
+  const orderId = orderData.order_id;
+
+  // 2. Unauthenticated attempt -> 401 Unauthorized
+  const unauthRes = await mockFetch(`/api/v1/pos/orders/${orderId}/settle-cash`, {
+    method: 'POST',
+    body: JSON.stringify({ amount_tendered: 50000 })
+  });
+  assert.strictEqual(unauthRes.status, 401);
+
+  // 3. Login as authorized merchant staff
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'admin', password: 'bangjo123' })
+  });
+  assert.strictEqual(loginRes.status, 200);
+  const loginData = await loginRes.json();
+  const authHeaders = { authorization: `Bearer ${loginData.token}` };
+
+  // 4. Authorized cash settlement
+  const settleRes = await mockFetch(`/api/v1/pos/orders/${orderId}/settle-cash`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ amount_tendered: 50000 })
+  });
+  assert.strictEqual(settleRes.status, 200);
+  const settleData = await settleRes.json();
+  assert.strictEqual(settleData.success, true);
+  assert.strictEqual(settleData.payment.payment_status, 'settlement');
+
+  // Verify in database: order_payments.payment_status is settlement
+  const payRow = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(orderId);
+  assert.strictEqual(payRow.payment_status, 'settlement');
+
+  // 5. Idempotent retry -> 200 with idempotent: true
+  const retryRes = await mockFetch(`/api/v1/pos/orders/${orderId}/settle-cash`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ amount_tendered: 50000 })
+  });
+  assert.strictEqual(retryRes.status, 200);
+  const retryData = await retryRes.json();
+  assert.strictEqual(retryData.idempotent, true);
+});
+
