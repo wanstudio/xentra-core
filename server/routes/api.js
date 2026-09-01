@@ -566,8 +566,8 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     order_note = order_note || note || '';
     if (address && !delivery) {
       delivery = {
-        latitude: address.latitude || -7.2912,
-        longitude: address.longitude || 112.7167,
+        latitude: address.latitude,
+        longitude: address.longitude,
         address: address.formatted_address || address.address || 'Alamat Customer'
       };
     }
@@ -589,12 +589,12 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       return res.status(400).json({ success: false, error: 'Nama customer wajib diisi.' });
     }
 
-    // P1 LOGIC VALIDATION: For delivery orders, coordinates must be explicitly provided (no silent default location)
+    // P1 LOGIC VALIDATION (NEW-02): For delivery orders, strict coordinates are mandatory (NO fallback to default coordinates)
     if (order_type === 'delivery') {
       if (!delivery || delivery.latitude == null || delivery.longitude == null || isNaN(Number(delivery.latitude)) || isNaN(Number(delivery.longitude))) {
         return res.status(400).json({
           success: false,
-          error: 'Titik koordinat pengantaran (latitude & longitude) wajib disertakan untuk pesanan delivery.'
+          error: 'Titik koordinat pengantaran (latitude & longitude) wajib disertakan secara valid untuk pesanan delivery.'
         });
       }
     }
@@ -1744,11 +1744,23 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
   }
 });
 
-router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
+router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
     const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
     const targetPhone = phone !== undefined ? phone : null;
     const targetWa = whatsapp_number !== undefined ? whatsapp_number : null;
+
+    // P1 RBAC BRANCH SCOPE GUARD: Branch Manager can ONLY update their assigned branch profile
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan untuk memperbarui profil cabang yang ditugaskan.'
+        });
+      }
+    }
 
     if (targetWa !== null && targetWa !== undefined) {
       const cleanWaDigits = String(targetWa).replace(/[^0-9]/g, '');

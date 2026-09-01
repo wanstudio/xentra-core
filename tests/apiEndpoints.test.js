@@ -481,5 +481,49 @@ test('API Reporting RBAC: Branch manager cannot access multi-branch comparison r
   assert.strictEqual(branchesRes.status, 403);
   const branchesData = await branchesRes.json();
   assert.strictEqual(branchesData.error, 'INSUFFICIENT_REPORT_AUTHORITY');
+
+  // 3. Branch manager can update their assigned branch profile (lat, lng, address) -> 200 OK
+  const updateProfileRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat', {
+    method: 'PUT',
+    headers: authHeaders,
+    body: JSON.stringify({
+      address_text: 'Jl. Mayjen Sungkono No. 99, Surabaya Barat',
+      latitude: -7.2915,
+      longitude: 112.7158
+    })
+  });
+  assert.strictEqual(updateProfileRes.status, 200);
+  const updateProfileData = await updateProfileRes.json();
+  assert.strictEqual(updateProfileData.success, true);
+
+  // 4. Branch manager attempts to update ANOTHER branch -> 403 FORBIDDEN_BRANCH_SCOPE
+  const updateOtherRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_timur', {
+    method: 'PUT',
+    headers: authHeaders,
+    body: JSON.stringify({ name: 'Hacked Name' })
+  });
+  assert.strictEqual(updateOtherRes.status, 403);
+});
+
+test('API Delivery Checkout: Strictly rejects delivery orders without valid coordinates (NEW-02/Pass4)', async () => {
+  // Attempt delivery order with formatted_address only but missing numeric lat/lng -> REJECTED 400
+  const invalidCoordsPayload = {
+    branch_id: 'branch_bangjo_barat',
+    payment_method: 'cash',
+    customer: { name: 'Customer Jauh', phone: '081234567890' },
+    order_type: 'delivery',
+    address: { formatted_address: 'Lokasi Sangat Jauh 50 km' }, // No lat/lng
+    items: [{ id: '272', quantity: 1 }]
+  };
+
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify(invalidCoordsPayload)
+  });
+
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.ok(data.error.includes('Titik koordinat pengantaran'));
 });
 
