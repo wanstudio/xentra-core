@@ -5,7 +5,7 @@
  * 2. Strict Network-First navigation (never serves stale HTML while online)
  * 3. Automatic purge of old version caches on activation
  */
-const CACHE_NAME = "bangjo-core-v228";
+const CACHE_NAME = "bangjo-core-v230";
 const ASSETS_TO_CACHE = [
 
   "/",
