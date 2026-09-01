@@ -911,11 +911,15 @@
   function openFulfillmentNoteSheet() {
     var val = state.fulfillment.note || '';
     var sh = makeOverlay(
-      '<div class="x-note-header"><h3 style="margin:0;font-size:16px;font-weight:700;color:#111;">Catatan untuk Pengantaran / Toko</h3></div>' +
-      '<textarea id="x-input-ful-note" maxlength="200" style="width:100%;min-height:120px;padding:14px 0;border:0;outline:0;resize:none;background:transparent;font-size:14px;line-height:21px;color:#333;" placeholder="Tambahkan catatan (contoh: titip di satpam, pagar hitam)…">' + UI.escape(val) + '</textarea>' +
-      '<div class="x-note-footer" style="display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid #dedede;">' +
-      '  <span id="x-ful-note-count" style="font-size:12px;color:#777;">' + val.length + '/200</span>' +
-      '  <button type="button" class="x-alt-submit-btn" id="x-save-ful-note" style="width:auto;min-width:96px;height:38px;padding:0 20px;font-size:14px;border-radius:20px;">Simpan</button>' +
+      '<div style="height:min(52dvh, 360px) !important;max-height:52dvh !important;display:flex !important;flex-direction:column;">' +
+      '  <div class="x-note-header">' +
+      '    <h3 style="margin:0;font-size:16px;font-weight:700;color:#111;">Catatan Pengantaran / Toko</h3>' +
+      '  </div>' +
+      '  <textarea id="x-input-ful-note" maxlength="200" style="flex:1 1 auto;width:100%;min-height:0;padding:12px 0;border:0;outline:0;resize:none;background:transparent;color:#333;font-family:inherit;font-size:14px;line-height:21px;" placeholder="Tambahkan catatan (contoh: titip di satpam, pagar hitam)…">' + UI.escape(val) + '</textarea>' +
+      '  <div class="x-note-footer" style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid #dedede;flex:0 0 auto;">' +
+      '    <span id="x-ful-note-count" style="font-size:12px;color:#777;">' + val.length + '/200</span>' +
+      '    <button type="button" id="x-save-ful-note" style="width:86px;height:34px;border:0;border-radius:18px;background:#b6ff00;color:#111;font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>' +
+      '  </div>' +
       '</div>'
     );
 
@@ -940,11 +944,15 @@
     if (!item) return;
     var val = (state.notes && state.notes[itemId]) || item.note || '';
     var sh = makeOverlay(
-      '<div class="x-note-header"><h3 style="margin:0;font-size:16px;font-weight:700;color:#111;">Catatan : ' + UI.escape(item.name) + '</h3></div>' +
-      '<textarea id="x-input-item-note" maxlength="200" style="width:100%;min-height:120px;padding:14px 0;border:0;outline:0;resize:none;background:transparent;font-size:14px;line-height:21px;color:#333;" placeholder="Tambahkan catatan (contoh: pedas sedang, pisah sambal)…">' + UI.escape(val) + '</textarea>' +
-      '<div class="x-note-footer" style="display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid #dedede;">' +
-      '  <span id="x-item-note-count" style="font-size:12px;color:#777;">' + val.length + '/200</span>' +
-      '  <button type="button" class="x-alt-submit-btn" id="x-save-item-note" style="width:auto;min-width:96px;height:38px;padding:0 20px;font-size:14px;border-radius:20px;">Simpan</button>' +
+      '<div style="height:min(52dvh, 360px) !important;max-height:52dvh !important;display:flex !important;flex-direction:column;">' +
+      '  <div class="x-note-header">' +
+      '    <h3 style="margin:0;font-size:16px;font-weight:700;color:#111;">Catatan : ' + UI.escape(item.name) + '</h3>' +
+      '  </div>' +
+      '  <textarea id="x-input-item-note" maxlength="200" style="flex:1 1 auto;width:100%;min-height:0;padding:12px 0;border:0;outline:0;resize:none;background:transparent;color:#333;font-family:inherit;font-size:14px;line-height:21px;" placeholder="Tambahkan catatan (contoh: pedas sedang, pisah sambal)…">' + UI.escape(val) + '</textarea>' +
+      '  <div class="x-note-footer" style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid #dedede;flex:0 0 auto;">' +
+      '    <span id="x-item-note-count" style="font-size:12px;color:#777;">' + val.length + '/200</span>' +
+      '    <button type="button" id="x-save-item-note" style="width:86px;height:34px;border:0;border-radius:18px;background:#b6ff00;color:#111;font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>' +
+      '  </div>' +
       '</div>'
     );
 
