@@ -832,10 +832,16 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         );
       } catch (payErr) {
         console.error('[Payment Gateway Error]:', payErr.message);
-        // P1 DOMAIN BOUNDARY HARDENING (NEW-02 & NEW-03):
-        // Update financial state in order_payments to 'failed' and cancel uninitialized operational order
-        db.prepare("UPDATE order_payments SET payment_status = 'failed', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
-        db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(orderId);
+        // P1 ATOMIC DOMAIN BOUNDARY HARDENING (NEW-01 & NEW-03):
+        // Atomically update financial state in order_payments to 'cancel' and cancel uninitialized operational order
+        db.exec('BEGIN IMMEDIATE;');
+        try {
+          db.prepare("UPDATE order_payments SET payment_status = 'cancel', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
+          db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(orderId);
+          db.exec('COMMIT;');
+        } catch (_) {
+          try { db.exec('ROLLBACK;'); } catch (_) {}
+        }
         return res.status(502).json({
           success: false,
           error: 'PAYMENT_GATEWAY_ERROR',

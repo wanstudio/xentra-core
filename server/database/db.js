@@ -507,6 +507,9 @@ function initSchema(targetDb) {
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_order_payments_order_id ON order_payments(order_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_shifts_unique_active_cashier ON pos_shifts(cashier_id) WHERE status = 'open';
   `);
 
   try { targetDb.exec('ALTER TABLE users ADD COLUMN branch_id TEXT;'); } catch (e) {}

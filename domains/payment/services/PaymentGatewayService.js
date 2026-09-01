@@ -190,6 +190,7 @@ class PaymentGatewayService {
       db.prepare(`
         INSERT INTO order_payments (id, order_id, provider, payment_method, merchant_id, snap_token, payment_status, amount, created_at, updated_at)
         VALUES (?, ?, 'midtrans', 'midtrans', 'midtrans', NULL, 'pending', ?, ?, ?)
+        ON CONFLICT(order_id) DO NOTHING
       `).run(selfHealedPaymentId, order_id, order.grand_total, now, now);
 
       payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
