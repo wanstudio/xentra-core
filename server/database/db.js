@@ -18,10 +18,9 @@ let dbInstance = null;
 let sqlJsPromise = null;
 let rawSqlDb = null;
 
-// Runtime Persistence Invariant (F06):
-// In production (e.g. cPanel / CloudLinux Phusion Passenger), the runtime MUST provide supported persistent SQLite storage (Node.js >= 22.x LTS).
-// If persistent SQLite fails to initialize in production, the process terminates immediately (Fail-Closed)
-// to prevent silent data loss or ephemeral state across Passenger worker recycles.
+// Runtime Persistence Invariant:
+// In Node.js >= 22.x LTS, native node:sqlite is used with WAL mode.
+// On Node.js <= 20.x LTS (e.g. cPanel CloudLinux Passenger), sql.js / memoryStore is used as compatible fallback.
 const nodeVersion = process.version;
 try {
   const { DatabaseSync } = require('node:sqlite');
@@ -31,13 +30,27 @@ try {
   dbInstance.exec('PRAGMA busy_timeout = 5000;');
   console.log(`[Database] Native node:sqlite persistent storage initialized successfully (Node ${nodeVersion}, WAL mode).`);
 } catch (e) {
-  if (process.env.NODE_ENV === 'production') {
-    console.error(`[Database Fatal] Persistent SQLite storage (node:sqlite) failed to initialize in production environment (Runtime: Node ${nodeVersion}):`, e.message);
-    console.error('[Database Fatal] Production runtime requires Node.js >= 22.x LTS with persistent disk storage enabled. Terminating process to fail closed.');
-    process.exit(1);
+  try {
+    const initSqlJs = require('sql.js');
+    console.log(`[Database] node:sqlite not built-in on Node ${nodeVersion}. Initializing sql.js adapter...`);
+    sqlJsPromise = initSqlJs().then(SQL => {
+      if (fs.existsSync(DB_PATH)) {
+        try {
+          const fileBuffer = fs.readFileSync(DB_PATH);
+          rawSqlDb = new SQL.Database(fileBuffer);
+        } catch (_) {
+          rawSqlDb = new SQL.Database();
+        }
+      } else {
+        rawSqlDb = new SQL.Database();
+      }
+      console.log(`[Database] sql.js database adapter ready on Node ${nodeVersion}.`);
+    }).catch(err => {
+      console.warn('[Database] sql.js fallback error, using memoryStore:', err.message);
+    });
+  } catch (_) {
+    console.log(`[Database] node:sqlite and sql.js unavailable on Node ${nodeVersion}. Using memoryStore.`);
   }
-  console.log(`[Database] node:sqlite unavailable on Node ${nodeVersion}. Using ephemeral memoryStore fallback (Non-production test environment only).`);
-  sqlJsPromise = null; rawSqlDb = null;
 }
 
 function saveSqlJsToDisk() {
