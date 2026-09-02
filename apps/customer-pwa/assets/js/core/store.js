@@ -130,7 +130,15 @@
     if (existing) {
       existing.quantity += qty;
     } else {
-      items.push({
+      var isPromo = Boolean(
+        product.is_promo_reward ||
+        String(product.id).indexOf('reward_') === 0 ||
+        Number(product.price) === 0 ||
+        product.price === '0' ||
+        (product.name && product.name.toLowerCase().indexOf('gratis') !== -1)
+      );
+
+      var newItem = {
         id: product.id,
         name: product.name,
         price: Number(product.price),
@@ -138,8 +146,15 @@
         image_url: product.image_url || '',
         description: product.description || '',
         quantity: qty,
-        note: ''
-      });
+        note: '',
+        is_promo_reward: isPromo
+      };
+
+      if (isPromo) {
+        items.unshift(newItem);
+      } else {
+        items.push(newItem);
+      }
     }
 
     save(CART_KEY, state.cart);

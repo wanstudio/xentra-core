@@ -11,6 +11,9 @@
   - Memasang `renderPromoBanner()` ke dalam `Store.subscribe()` pada setiap mutasi kuantitas item keranjang.
   - Memperbaiki bug di mana setelah menu promo dihapus dengan tombol minus (`-`), banner tidak otomatis kembali ke status tombol "Claim" (sebelumnya memerlukan reload halaman manual).
 - **Node.js Environment & LiteSpeed Passenger Compatibility (`db.js`, `deploy-core.sh`)**:
+- **Promo Reward Item Priority Sorting (`store.js`, `checkout.js`)**:
+  - Item hadiah promo (misalnya *Es Teh Gratis*) dikonfigurasi untuk selalu menempati urutan produk pertama (index 0) di list keranjang & halaman checkout (`items.unshift()` dan `getCheckoutItems()` sorting).
+  - Memastikan customer yang mengeklaim promo langsung melihat hadiahnya tampil di baris paling atas tanpa harus scroll ke bawah, memberikan konfirmasi visual instan bahwa klaim hadiah berhasil.
 - **1:1 Card Visual Hierarchy & Checkout Structure Alignment (`checkout.js`, `checkout.css`)**:
   - Header diselaraskan menjadi `Checkout Bangjo`.
   - Reordering card struktur checkout presisi sesuai visual mockup:

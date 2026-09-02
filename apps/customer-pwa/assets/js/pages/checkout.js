@@ -278,10 +278,27 @@
     }
   });
 
+  function isPromoItem(item) {
+    if (!item) return false;
+    return Boolean(
+      item.is_promo_reward ||
+      String(item.id).indexOf('reward_') === 0 ||
+      Number(item.price) === 0 ||
+      item.price === '0' ||
+      (item.name && item.name.toLowerCase().indexOf('gratis') !== -1)
+    );
+  }
+
   function getCheckoutItems() {
-    var all = (Store.getState().cart.items || []);
-    if (!currentItemId) return all;
-    return all.filter(function (i) { return String(i.id) === String(currentItemId); });
+    var all = (Store.getState().cart.items || []).slice();
+    var filtered = !currentItemId ? all : all.filter(function (i) { return String(i.id) === String(currentItemId); });
+    return filtered.sort(function (a, b) {
+      var aPromo = isPromoItem(a);
+      var bPromo = isPromoItem(b);
+      if (aPromo && !bPromo) return -1;
+      if (!aPromo && bPromo) return 1;
+      return 0;
+    });
   }
 
   // ── Mount ──
@@ -835,11 +852,17 @@
             price: Number(r.reward_price || 0),
             regular_price: 5000,
             image_url: (rewardPromo.display && rewardPromo.display.icon_url) || '/assets/pwa/icon-192.png',
-            description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo'
+            description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
+            is_promo_reward: true
           }, 1);
-          renderLayout();
-          bindEvents();
+          var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
+          if (rowsEl) {
+            rowsEl.innerHTML = renderItemsHtml(getCheckoutItems());
+            bindItemEvents();
+          }
           calculateTotals();
+          refreshDeliveryQuote();
+          renderPromoBanner();
         }
       };
     }
