@@ -11,8 +11,9 @@
   - Memasang `renderPromoBanner()` ke dalam `Store.subscribe()` pada setiap mutasi kuantitas item keranjang.
   - Memperbaiki bug di mana setelah menu promo dihapus dengan tombol minus (`-`), banner tidak otomatis kembali ke status tombol "Claim" (sebelumnya memerlukan reload halaman manual).
 - **Node.js Environment & LiteSpeed Passenger Compatibility (`db.js`, `deploy-core.sh`)**:
-- **Checkout Bottom CTA Spacer Alignment (`checkout.js`)**:
-  - Mengurangi tinggi spacer bawah (`.x-alt-cta-spacer`) dari `84px` menjadi `14px` dan merapatkan margin bawah Card 5 (`margin-bottom: 10px`), menyelaraskan jarak vertikal antara card terakhir dengan tombol sticky CTA agar presisi dan proporsional seperti pada `#home`.
+- **Checkout Bottom CTA Spacer Alignment (`checkout.js`, `checkout.css`)**:
+  - Menyamakan jarak antara Card 5 (Ringkasan Pembayaran) dengan tepi atas bilah tombol sticky CTA (`Pesan sekarang`) menjadi tepat `10px`, identik dengan jarak vertikal antar kartu di atasnya (`margin: 10px`).
+  - Menghapus elemen spacer DOM ekstra dan mengunci `padding-bottom` pada kontainer `.x-checkout-alt2` sebesar `calc(74px + env(safe-area-inset-bottom, 0px) + 10px)` agar jarak scroll konsisten di semua viewport.
 - **Promo Reward Item Priority Sorting (`store.js`, `checkout.js`)**:
   - Item hadiah promo (misalnya *Es Teh Gratis*) dikonfigurasi untuk selalu menempati urutan produk pertama (index 0) di list keranjang & halaman checkout (`items.unshift()` dan `getCheckoutItems()` sorting).
   - Memastikan customer yang mengeklaim promo langsung melihat hadiahnya tampil di baris paling atas tanpa harus scroll ke bawah, memberikan konfirmasi visual instan bahwa klaim hadiah berhasil.

@@ -529,7 +529,7 @@
       ) : '') +
 
       // 6. Card 5: Payment Summary & Methods Card
-      '  <div class="x-card x-alt-summary-card" id="x-payment-summary-card" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
+      '  <div class="x-card x-alt-summary-card" id="x-payment-summary-card" style="margin:0 14px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
       '    <div class="x-alt-summary-title" style="font-size:15px;font-weight:700;color:#111;margin-bottom:12px;">Ringkasan pembayaran</div>' +
       (!isReservation ? (
         '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Harga</span><span id="x-sum-subtotal" style="font-weight:600;color:#111;">' + fmtIDR(subtotal) + '</span></div>' +
@@ -563,7 +563,6 @@
       '  </div>' +
 
       // 7. Sticky Submit CTA Bar
-      '  <div class="x-alt-cta-spacer" style="height:14px;"></div>' +
       '  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-lime,#b6ff00);color:#111;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + (isReservation ? 'Konfirmasi Reservasi' : 'Pesan sekarang') + '</button></div>' +
 
       '</div>';
