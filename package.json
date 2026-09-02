@@ -8,6 +8,9 @@
     "start": "node server/app.js",
     "test": "NODE_ENV=test node --test --test-concurrency=1 tests/*.test.js tests/**/*.test.js"
   },
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "keywords": [
     "xentra",
     "restaurant-saas",

@@ -173,24 +173,20 @@ class PromotionEngineService {
       const redemptionId = `rdm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       const amount = Number(p.benefit_amount || p.amount || 0);
 
-      try {
-        db.prepare(`
-          INSERT INTO promotion_redemptions (
-            id, promotion_id, order_id, brand_id, branch_id, customer_phone, benefit_amount, status, redeemed_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))
-          ON CONFLICT(order_id, promotion_id) DO NOTHING
-        `).run(
-          redemptionId,
-          promoId,
-          order_id,
-          brand_id,
-          branch_id,
-          customer_phone || '',
-          amount
-        );
-      } catch (e) {
-        console.warn('[PromotionEngineService] recordRedemptions warning:', e.message);
-      }
+      db.prepare(`
+        INSERT INTO promotion_redemptions (
+          id, promotion_id, order_id, brand_id, branch_id, customer_phone, benefit_amount, status, redeemed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))
+        ON CONFLICT(order_id, promotion_id) DO NOTHING
+      `).run(
+        redemptionId,
+        promoId,
+        order_id,
+        brand_id,
+        branch_id,
+        customer_phone || '',
+        amount
+      );
     }
   }
 
@@ -203,15 +199,11 @@ class PromotionEngineService {
    */
   static voidRedemptions({ order_id, reason = 'Order cancelled or expired' }) {
     if (!order_id) return;
-    try {
-      db.prepare(`
-        UPDATE promotion_redemptions
-        SET status = 'voided', voided_at = datetime('now'), void_reason = ?
-        WHERE order_id = ? AND status = 'active'
-      `).run(reason, order_id);
-    } catch (e) {
-      console.warn('[PromotionEngineService] Failed to void redemptions for order:', order_id, e.message);
-    }
+    db.prepare(`
+      UPDATE promotion_redemptions
+      SET status = 'voided', voided_at = datetime('now'), void_reason = ?
+      WHERE order_id = ? AND status = 'active'
+    `).run(reason, order_id);
   }
 }
 

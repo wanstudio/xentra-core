@@ -183,7 +183,7 @@ except Exception as e:
           '# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN',
           'PassengerAppRoot "/home/mybangjo/xentra-core"',
           'PassengerBaseURI "/"',
-          'PassengerNodejs "/home/mybangjo/nodevenv/xentra-core/20/bin/node"',
+          'PassengerNodejs "' + (process.env.PASSENGER_NODEJS || '/home/mybangjo/nodevenv/xentra-core/22/bin/node') + '"',
           'PassengerAppType node',
           'PassengerStartupFile app.js',
           'PassengerAppLogFile "/home/mybangjo/xentra-core/passenger.log"',

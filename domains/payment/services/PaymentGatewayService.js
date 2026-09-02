@@ -285,23 +285,31 @@ class PaymentGatewayService {
         // 2. Authoritative Atomic Promotion Consumption & Concurrency Race Guard (F01 First-Settlement-Wins)
         const promoItems = db.prepare(`
           SELECT * FROM order_items 
-          WHERE order_id = ? AND (note LIKE '%Promo%' OR note LIKE '%Bonus%' OR note LIKE '%Hadiah%' OR product_id LIKE 'reward_%')
+          WHERE order_id = ? AND (note LIKE '%[PROMO:%' OR product_id LIKE 'prm_%')
         `).all(order_id);
 
         const promoRedemptionsToRecord = [];
         if (promoItems && promoItems.length > 0 && order && order.customer_phone) {
           for (const it of promoItems) {
-            const promoId = it.product_id.startsWith('reward_') ? it.product_id.replace(/^reward_/, '') : it.product_id;
-            
+            let promoId = null;
+            const match = it.note ? it.note.match(/\[PROMO:([^\]]+)\]/) : null;
+            if (match) {
+              promoId = match[1];
+            } else if (String(it.product_id).startsWith('prm_')) {
+              promoId = it.product_id;
+            }
+            if (!promoId) continue;
+
+            const promoRow = db.prepare('SELECT id, max_redemptions_per_customer FROM promotions WHERE id = ?').get(promoId);
+            if (!promoRow) continue;
+
             // Query active customer redemptions for this promo
             const activeRedemptions = db.prepare(`
               SELECT COUNT(*) as count FROM promotion_redemptions 
               WHERE promotion_id = ? AND customer_phone = ? AND status = 'active'
             `).get(promoId, order.customer_phone);
 
-            const promoRow = db.prepare('SELECT max_redemptions_per_customer FROM promotions WHERE id = ?').get(promoId);
-            const maxLimit = promoRow ? Number(promoRow.max_redemptions_per_customer || 1) : 1;
-
+            const maxLimit = Number(promoRow.max_redemptions_per_customer || 1);
             if (activeRedemptions && activeRedemptions.count >= maxLimit) {
               throw new Error(`[PROMO_LIMIT_EXCEEDED_RACE] Batas klaim promo "${promoId}" (${maxLimit}x) telah digunakan oleh pesanan lain milik pelanggan.`);
             }

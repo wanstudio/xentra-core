@@ -290,6 +290,10 @@ class OrderPlacementService {
 
       for (const item of verifiedItems) {
         const itemId = `item_${crypto.randomBytes(6).toString('hex')}`;
+        const formattedItemNote = item.promo_id 
+          ? `[PROMO:${item.promo_id}] ${item.notes || item.note || ''}`.trim()
+          : (item.notes || item.note || '');
+
         insertOrderItemStmt.run(
           itemId,
           orderId,
@@ -298,7 +302,7 @@ class OrderPlacementService {
           item.unit_price,
           item.quantity,
           item.subtotal,
-          item.note || ''
+          formattedItemNote
         );
 
         // P1 INVENTORY TIMING & DOS GUARD: Only deduct live physical stock immediately for CASH/POS orders.
