@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder overlay image (SVG) used for disabled state. Replace with overlay-disabled.png if preferred. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="none"/>
+  <g transform="translate(100,100) scale(1)">
+    <rect x="0" y="0" width="200" height="120" rx="12" fill="#A7AEB0" opacity="0.18"/>
+    <g transform="translate(20,10)" fill="#6A6F73" opacity="0.22">
+      <rect x="0" y="50" width="40" height="40" rx="6"/>
+      <rect x="60" y="30" width="40" height="60" rx="6"/>
+      <rect x="120" y="40" width="40" height="50" rx="6"/>
+    </g>
+  </g>
+</svg>
