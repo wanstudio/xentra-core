@@ -382,20 +382,16 @@ class OrderPlacementService {
       );
 
       // P1 PROMOTION CONSUMPTION BOUNDARY (F01 Hardening):
-      // For immediate cash / POS orders, record immutable redemption ledger in same transaction
+      // For immediate cash / POS orders, record immutable redemption ledger in same transaction atomically
       if (effectivePaymentMethod === 'cash' && verification.applied_promos && verification.applied_promos.length > 0) {
-        try {
-          const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-          PromotionEngineService.recordRedemptions({
-            order_id: orderId,
-            brand_id,
-            branch_id,
-            customer_phone: customer.phone,
-            promotions: verification.applied_promos
-          });
-        } catch (prmErr) {
-          console.warn('[OrderPlacementService] Promo redemption record warning:', prmErr.message);
-        }
+        const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+        PromotionEngineService.recordRedemptions({
+          order_id: orderId,
+          brand_id,
+          branch_id,
+          customer_phone: customer.phone,
+          promotions: verification.applied_promos
+        });
       }
 
       db.exec('COMMIT;');

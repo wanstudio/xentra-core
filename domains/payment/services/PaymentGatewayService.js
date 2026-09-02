@@ -322,31 +322,25 @@ class PaymentGatewayService {
 
         // 4. Record Promotion Redemptions atomically
         if (promoRedemptionsToRecord.length > 0) {
-          try {
-            const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-            PromotionEngineService.recordRedemptions({
-              order_id,
-              brand_id: order?.brand_id,
-              branch_id: order?.branch_id,
-              customer_phone: order?.customer_phone,
-              promotions: promoRedemptionsToRecord
-            });
-          } catch (prmErr) {
-            console.warn('[PaymentGatewayService] recordRedemptions warning:', prmErr.message);
-          }
+          const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+          PromotionEngineService.recordRedemptions({
+            order_id,
+            brand_id: order?.brand_id,
+            branch_id: order?.branch_id,
+            customer_phone: order?.customer_phone,
+            promotions: promoRedemptionsToRecord
+          });
         }
       } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
-        // P1 FAILED PAYMENT INVARIANT: Mark order as cancelled with ZERO inventory mutation & void promo redemptions
+        // P1 FAILED PAYMENT INVARIANT: Mark order as cancelled with ZERO inventory mutation & void promo redemptions atomically
         db.prepare(`
           UPDATE orders
           SET status = 'cancelled', updated_at = ?
           WHERE id = ?
         `).run(now, order_id);
 
-        try {
-          const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-          PromotionEngineService.voidRedemptions({ order_id, reason: `Gateway status ${newPaymentStatus}` });
-        } catch (_) {}
+        const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+        PromotionEngineService.voidRedemptions({ order_id, reason: `Gateway status ${newPaymentStatus}` });
       }
 
       db.exec('COMMIT;');

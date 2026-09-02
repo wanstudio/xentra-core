@@ -74,13 +74,12 @@ class PrePaymentVerificationGate {
       }
 
       // AUTHORITATIVE ZERO-TRUST REWARD RESOLUTION (F02 Hardening):
-      // Client-supplied reward identifiers (reward_*, promo-es-teh-gratis) are treated as CLAIM INTENT only.
-      // Backend independently verifies customer eligibility, rules, and authoritative reward pricing.
+      // Client-supplied reward identifiers (reward_*, is_promo_reward) are treated as CLAIM INTENT only.
+      // Backend independently verifies customer eligibility, rules, and authoritative reward pricing/metadata.
       const isRewardIntent = Boolean(
         item.is_promo_reward ||
         item.promo_id ||
-        String(productId).startsWith('reward_') ||
-        String(productId) === 'promo-es-teh-gratis'
+        String(productId).startsWith('reward_')
       );
 
       if (isRewardIntent && PromotionEngineService) {
@@ -89,7 +88,7 @@ class PrePaymentVerificationGate {
         // Context-aware evaluation
         const nonRewardItems = items.filter(it => {
           const pid = String(it.product_id || it.id || '');
-          return !it.is_promo_reward && !it.promo_id && !pid.startsWith('reward_') && pid !== 'promo-es-teh-gratis';
+          return !it.is_promo_reward && !it.promo_id && !pid.startsWith('reward_');
         });
 
         const evalResult = PromotionEngineService.evaluate({
@@ -109,26 +108,39 @@ class PrePaymentVerificationGate {
 
         const authoritativePromoId = eligiblePromo.promo_id || eligiblePromo.id;
         const rewardSpec = eligiblePromo.reward || {};
-        const authoritativeRewardPrice = Number(rewardSpec.reward_price || rewardSpec.amount_in_cents || 0);
-        const rewardName = eligiblePromo.display?.reward_title || item.name || 'Hadiah Promo Spesial';
-        const targetPid = rewardSpec.product_id || productId || 'reward_item';
+        const targetPid = rewardSpec.product_id;
 
-        // P1 BRANCH CATALOG SCOPE CHECK: Ensure reward product is available in this branch
-        if (targetPid && targetPid !== 'reward_item' && targetPid !== 'prod_welcome_reward') {
-          const bpCheck = db.prepare(`
-            SELECT is_available FROM branch_products WHERE branch_id = ? AND product_id = ?
-          `).get(branch_id, targetPid);
-          if (bpCheck && bpCheck.is_available === 0) {
-            errors.push(`Produk hadiah "${rewardName}" sedang dinonaktifkan di cabang ini.`);
-            continue;
-          }
+        if (!targetPid) {
+          errors.push(`Definisi produk hadiah promo "${eligiblePromo.name || authoritativePromoId}" tidak ditemukan.`);
+          continue;
         }
+
+        // P1 BRANCH CATALOG SCOPE CHECK: Ensure reward product is assigned to this branch
+        const bpCheck = db.prepare(`
+          SELECT bp.is_available, p.name FROM branch_products bp
+          JOIN products p ON p.id = bp.product_id
+          WHERE bp.branch_id = ? AND bp.product_id = ?
+        `).get(branch_id, targetPid);
+
+        if (!bpCheck) {
+          errors.push(`Produk hadiah tidak tersedia di katalog cabang tujuan.`);
+          continue;
+        }
+
+        if (bpCheck.is_available === 0) {
+          errors.push(`Produk hadiah "${bpCheck.name || 'Promo'}" sedang dinonaktifkan di cabang ini.`);
+          continue;
+        }
+
+        const authoritativeRewardPrice = Number(rewardSpec.reward_price || rewardSpec.amount_in_cents || 0);
+        // Authoritative server metadata: master product name from catalog OR reward title from promo definition (NEVER client item.name)
+        const authoritativeRewardName = bpCheck.name || eligiblePromo.display?.reward_title || 'Hadiah Promo Spesial';
 
         verifiedItems.push({
           product_id: targetPid,
           promo_id: authoritativePromoId,
           is_promo_reward: true,
-          name: rewardName,
+          name: authoritativeRewardName,
           quantity: 1,
           unit_price: authoritativeRewardPrice,
           subtotal: authoritativeRewardPrice,

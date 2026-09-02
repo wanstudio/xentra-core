@@ -18,21 +18,25 @@ let dbInstance = null;
 let sqlJsPromise = null;
 let rawSqlDb = null;
 
-// 1. Try Native Node 22.5+ / Node 24 SQLite (Synchronous)
+// Runtime Persistence Invariant (F06):
+// In production (e.g. cPanel / CloudLinux Phusion Passenger), the runtime MUST provide supported persistent SQLite storage (Node.js >= 22.x LTS).
+// If persistent SQLite fails to initialize in production, the process terminates immediately (Fail-Closed)
+// to prevent silent data loss or ephemeral state across Passenger worker recycles.
+const nodeVersion = process.version;
 try {
   const { DatabaseSync } = require('node:sqlite');
   dbInstance = new DatabaseSync(DB_PATH);
   dbInstance.exec('PRAGMA foreign_keys = ON;');
   dbInstance.exec('PRAGMA journal_mode = WAL;');
   dbInstance.exec('PRAGMA busy_timeout = 5000;');
-  console.log('[Database] Native node:sqlite initialized successfully.');
+  console.log(`[Database] Native node:sqlite persistent storage initialized successfully (Node ${nodeVersion}, WAL mode).`);
 } catch (e) {
   if (process.env.NODE_ENV === 'production') {
-    console.error('[Database Fatal] Native SQLite (node:sqlite) failed to initialize in production environment:', e.message);
+    console.error(`[Database Fatal] Persistent SQLite storage (node:sqlite) failed to initialize in production environment (Runtime: Node ${nodeVersion}):`, e.message);
+    console.error('[Database Fatal] Production runtime requires Node.js >= 22.x LTS with persistent disk storage enabled. Terminating process to fail closed.');
     process.exit(1);
   }
-  console.log('[Database] node:sqlite unavailable. Using memoryStore fallback (sql.js disabled to save WASM memory).');
-  // sql.js disabled on Node 20 due to CloudLinux 2GB vmem limit + undici WASM OOM — memoryStore is sufficient for health/deploy
+  console.log(`[Database] node:sqlite unavailable on Node ${nodeVersion}. Using ephemeral memoryStore fallback (Non-production test environment only).`);
   sqlJsPromise = null; rawSqlDb = null;
 }
 

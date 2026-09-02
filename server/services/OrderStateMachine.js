@@ -91,10 +91,8 @@ class OrderStateMachine {
 
       // 4. Void active promotion redemptions if cancelled
       if (target_status === 'cancelled') {
-        try {
-          const PromotionEngineService = require('../../domains/promotion/services/PromotionEngineService');
-          PromotionEngineService.voidRedemptions({ order_id, reason: note || `Order cancelled by ${actor_type}` });
-        } catch (_) {}
+        const PromotionEngineService = require('../../domains/promotion/services/PromotionEngineService');
+        PromotionEngineService.voidRedemptions({ order_id, reason: note || `Order cancelled by ${actor_type}` });
       }
 
       db.exec('COMMIT;');

@@ -209,13 +209,13 @@ test('Promotion 5 — Non-Destructive Cancellation: voidRedemptions marks status
   assert.strictEqual(afterVoid.void_reason, 'Customer cancelled order');
 });
 
-test('Promotion 6 — Authoritative Zero-Trust Reward Resolution: PrePaymentVerificationGate rejects fake rewards', () => {
+test('Promotion 6 — Authoritative Zero-Trust Reward Resolution: PrePaymentVerificationGate rejects fake rewards and enforces server metadata', () => {
   const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
   const db = require('../../server/database/db');
   const brand = db.prepare('SELECT id FROM brands LIMIT 1').get() || { id: 'brand_pos' };
   const branch = db.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'branch_pos' };
 
-  // Attacker attempts to spoof arbitrary free item
+  // 1. Attacker attempts to spoof arbitrary free item
   const spoofResult = PrePaymentVerificationGate.verify({
     branch_id: branch.id,
     brand_id: brand.id,
@@ -228,14 +228,59 @@ test('Promotion 6 — Authoritative Zero-Trust Reward Resolution: PrePaymentVeri
   assert.strictEqual(spoofResult.is_valid, false);
   assert.strictEqual(spoofResult.verified_items.length, 0);
   assert.ok(spoofResult.errors.length > 0);
+
+  // 2. Authoritative metadata enforcement for legitimate reward: Server dictates product_id, name, and unit_price
+  const promoId = 'prm_auth_test_' + Date.now();
+  const rewardProductId = 'prod_reward_' + Date.now();
+  const cat = db.prepare('SELECT id FROM categories WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'cat_pos' };
+
+  db.prepare(`
+    INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active)
+    VALUES (?, ?, ?, 'Es Teh Legit Asli Server', ?, 5000, 1)
+  `).run(rewardProductId, brand.id, cat.id, 'es-teh-server-' + Date.now());
+
+  db.prepare(`
+    INSERT INTO branch_products (branch_id, product_id, price, stock, is_available)
+    VALUES (?, ?, 5000, 50, 1)
+  `).run(branch.id, rewardProductId);
+
+  db.prepare(`
+    INSERT INTO promotions (id, brand_id, name, capability_type, stacking_policy, is_active)
+    VALUES (?, ?, 'Promo Welcome Server', 'install_incentive', 'exclusive', 1)
+  `).run(promoId, brand.id);
+
+  db.prepare(`
+    INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents)
+    VALUES (?, ?, 'free_product', ?, 0)
+  `).run('rwd_' + Date.now(), promoId, rewardProductId);
+
+  const authResult = PrePaymentVerificationGate.verify({
+    branch_id: branch.id,
+    brand_id: brand.id,
+    items: [
+      { product_id: 'reward_' + promoId, name: 'HACKED CLIENT NAME', quantity: 1, expected_price: 99999, is_promo_reward: true }
+    ],
+    customer: { phone: '081299990004' },
+    is_pwa_installed: true
+  });
+
+  assert.strictEqual(authResult.is_valid, true);
+  assert.strictEqual(authResult.verified_items.length, 1);
+  const rewardItem = authResult.verified_items[0];
+  assert.strictEqual(rewardItem.product_id, rewardProductId);
+  assert.strictEqual(rewardItem.unit_price, 0); // Server-enforced price, ignored 99999
+  assert.strictEqual(rewardItem.name, 'Es Teh Legit Asli Server'); // Server-enforced name, ignored HACKED CLIENT NAME
 });
 
-test('Promotion 7 — Scoped POS Offline Idempotency: Reconcile drops concurrent duplicate sync without duplicate orders', async () => {
+test('Promotion 7 — Scoped POS Offline Idempotency: True parallel sync requests against same (branch_id, client_transaction_id) yield exactly one order and one stock deduction', async () => {
   const OfflineReconciliationService = require('../../domains/pos/services/OfflineReconciliationService');
   const db = require('../../server/database/db');
   const brand = db.prepare('SELECT id FROM brands LIMIT 1').get() || { id: 'brand_pos' };
   const branch = db.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'branch_pos' };
+  
+  // Set deterministic initial stock
   const product = db.prepare('SELECT p.id, p.price FROM products p JOIN branch_products bp ON bp.product_id = p.id WHERE bp.branch_id = ? LIMIT 1').get(branch.id) || { id: 'prod_pos_1', price: 20000 };
+  db.prepare('UPDATE branch_products SET stock = 50 WHERE branch_id = ? AND product_id = ?').run(branch.id, product.id);
 
   const clientTxId = 'pos_tx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
 
@@ -245,21 +290,27 @@ test('Promotion 7 — Scoped POS Offline Idempotency: Reconcile drops concurrent
     branch_id: branch.id,
     order_type: 'dine_in',
     payment_method: 'cash',
-    items: [{ product_id: product.id, quantity: 1, expected_price: product.price || 20000 }],
+    items: [{ product_id: product.id, quantity: 2, expected_price: product.price || 20000 }],
     customer: { name: 'Pelanggan Offline Test' }
   };
 
-  // First sync
-  const res1 = await OfflineReconciliationService.reconcileOfflineTransaction(payload);
-  assert.strictEqual(res1.status, 'PROCESSED');
-  assert.ok(res1.order);
+  // True parallel execution: Fire 2 simultaneous sync requests
+  const [res1, res2] = await Promise.all([
+    OfflineReconciliationService.reconcileOfflineTransaction(payload),
+    OfflineReconciliationService.reconcileOfflineTransaction(payload)
+  ]);
 
-  // Second sync (concurrent retry)
-  const res2 = await OfflineReconciliationService.reconcileOfflineTransaction(payload);
-  assert.strictEqual(res2.status, 'DUPLICATE_IGNORED');
-  assert.ok(res2.order);
+  const statuses = [res1.status, res2.status].sort();
+  assert.deepStrictEqual(statuses, ['DUPLICATE_IGNORED', 'PROCESSED'], 'One request must process and the parallel duplicate must be ignored');
+
+  // Verify both responses provide valid order reference
+  assert.ok(res1.order && res2.order);
 
   // Assert exactly 1 order in DB
   const ordersInDb = db.prepare('SELECT COUNT(*) as cnt FROM orders WHERE branch_id = ? AND client_transaction_id = ?').get(branch.id, clientTxId);
   assert.strictEqual(ordersInDb.cnt, 1);
+
+  // Assert exactly one stock mutation (50 - 2 = 48)
+  const finalStock = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch.id, product.id).stock;
+  assert.strictEqual(finalStock, 48, 'Stock must be deducted exactly once (quantity = 2)');
 });
