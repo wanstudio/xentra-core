@@ -536,7 +536,7 @@ router.delete('/addresses/:id', requireCustomerAuth(), (req, res) => {
 
 router.post('/checkout/verify', (req, res) => {
   try {
-    const { branch_id, items = [], order_type = 'delivery', customer = {}, is_pwa_installed = false } = req.body;
+    const { branch_id, items = [], order_type = 'delivery', customer = {}, pwa_runtime = null } = req.body;
     if (order_type === 'reservation') {
       return res.json({ success: true, is_valid: true, status: 'VERIFIED', verified_items: [], price_diffs: [], errors: [] });
     }
@@ -549,7 +549,7 @@ router.post('/checkout/verify', (req, res) => {
       brand_id: req.brand_id,
       items,
       customer,
-      is_pwa_installed: Boolean(is_pwa_installed || customer?.is_pwa_installed)
+      pwa_runtime
     });
     return res.json({
       success: verification.is_valid,
@@ -566,7 +566,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     let {
       branch_id,
       customer = {},
-      is_pwa_installed = false,
+      pwa_runtime = null,
       order_type,
       fulfillment = {},
       schedule_type = 'asap',
@@ -725,7 +725,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         brand_id: req.brand_id,
         items,
         customer,
-        is_pwa_installed: Boolean(is_pwa_installed || customer?.is_pwa_installed)
+        pwa_runtime
       });
 
       if (!verification.is_valid) {
@@ -819,7 +819,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       table_number,
       reservation_date,
       guest_count,
-      is_pwa_installed: Boolean(is_pwa_installed || customer?.is_pwa_installed),
+      pwa_runtime,
       notes: order_note,
       trace_context: {
         correlation_id: `chk_${Date.now()}`

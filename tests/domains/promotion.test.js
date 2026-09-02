@@ -261,7 +261,7 @@ test('Promotion 6 — Authoritative Zero-Trust Reward Resolution: PrePaymentVeri
       { product_id: 'reward_' + promoId, name: 'HACKED CLIENT NAME', quantity: 1, expected_price: 99999, is_promo_reward: true }
     ],
     customer: { phone: '081299990004' },
-    is_pwa_installed: true
+    pwa_runtime: { display_mode: 'standalone' }
   });
 
   assert.strictEqual(authResult.is_valid, true);

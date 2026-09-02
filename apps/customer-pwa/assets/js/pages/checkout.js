@@ -1283,10 +1283,16 @@
     }
 
     var branchId = state.matchedBranch ? state.matchedBranch.id : undefined;
+    var pwaRuntime = (window.Xentra && window.Xentra.PwaRuntime) ? window.Xentra.PwaRuntime.getPwaRuntimeContext() : { display_mode: 'browser' };
 
     // Call Pre-Payment Verification Gate first
     API.post('/checkout/verify', {
       branch_id: branchId,
+      customer: {
+        name: state.customer.name,
+        phone: state.customer.phone
+      },
+      pwa_runtime: pwaRuntime,
       items: items.map(function (i) {
         return {
           product_id: i.id,
@@ -1324,12 +1330,15 @@
     var fulType = state.fulfillment.type;
     var isDelivery = fulType === 'delivery';
 
+    var pwaRuntime = (window.Xentra && window.Xentra.PwaRuntime) ? window.Xentra.PwaRuntime.getPwaRuntimeContext() : { display_mode: 'browser' };
+
     var payload = {
       branch_id: state.matchedBranch ? state.matchedBranch.id : undefined,
       customer: {
         name: state.customer.name || 'Pelanggan Bangjo',
         phone: state.customer.phone
       },
+      pwa_runtime: pwaRuntime,
       order_type: fulType === 'dinein' ? 'dine_in' : fulType,
       fulfillment: {
         type: fulType === 'dinein' ? 'dine_in' : fulType,

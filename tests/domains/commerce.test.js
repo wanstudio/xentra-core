@@ -268,9 +268,70 @@ test('Commerce 7 — Reservation: rejects same-day reservation and accepts futur
 });
 
 // ==============================================================================
-// Commerce 8 — End-to-End Promotion Context Forwarding: OrderPlacementService
+// Commerce 8 — PWA Runtime Context: Test A (Browser Biasa) & Test B (Standalone App)
 // ==============================================================================
-test('Commerce 8 — Promotion Integration: OrderPlacementService forwards customer and is_pwa_installed seamlessly', async () => {
+test('Commerce 8 — PWA Runtime Context: Test A (Browser rejected) & Test B (Standalone accepted)', () => {
+  const brand = db.prepare('SELECT id FROM brands LIMIT 1').get() || { id: 'brand_test' };
+  const branch = db.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'branch_test' };
+  const cat = db.prepare('SELECT id FROM categories WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'cat_test' };
+
+  const promoId = 'prm_ctx_test_' + Date.now();
+  const rewardProductId = 'prod_ctx_reward_' + Date.now();
+
+  db.prepare(`
+    INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active)
+    VALUES (?, ?, ?, 'Es Teh PWA Context', ?, 5000, 1)
+  `).run(rewardProductId, brand.id, cat.id, 'es-teh-ctx-' + Date.now());
+
+  db.prepare(`
+    INSERT INTO branch_products (branch_id, product_id, price, stock, is_available)
+    VALUES (?, ?, 5000, 50, 1)
+  `).run(branch.id, rewardProductId);
+
+  db.prepare(`
+    INSERT INTO promotions (id, brand_id, name, capability_type, stacking_policy, is_active)
+    VALUES (?, ?, 'Promo PWA Context Evaluation', 'install_incentive', 'exclusive', 1)
+  `).run(promoId, brand.id);
+
+  db.prepare(`
+    INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents)
+    VALUES (?, ?, 'free_product', ?, 0)
+  `).run('rwd_ctx_' + Date.now(), promoId, rewardProductId);
+
+  // Test A — Browser biasa (display_mode = 'browser') -> reward rejected
+  const resBrowser = PrePaymentVerificationGate.verify({
+    branch_id: branch.id,
+    brand_id: brand.id,
+    customer: { phone: '081299991101' },
+    pwa_runtime: { display_mode: 'browser' },
+    items: [
+      { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
+    ]
+  });
+  assert.strictEqual(resBrowser.is_valid, false, 'Browser user must be rejected for PWA install reward');
+  assert.strictEqual(resBrowser.verified_items.length, 0);
+
+  // Test B — Installed PWA (display_mode = 'standalone') -> reward accepted
+  const resStandalone = PrePaymentVerificationGate.verify({
+    branch_id: branch.id,
+    brand_id: brand.id,
+    customer: { phone: '081299991101' },
+    pwa_runtime: { display_mode: 'standalone' },
+    items: [
+      { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
+    ]
+  });
+  assert.strictEqual(resStandalone.is_valid, true, 'Installed standalone PWA user must be granted reward');
+  assert.strictEqual(resStandalone.verified_items.length, 1);
+  assert.strictEqual(resStandalone.verified_items[0].product_id, rewardProductId);
+  assert.strictEqual(resStandalone.verified_items[0].unit_price, 0);
+  assert.strictEqual(resStandalone.verified_items[0].name, 'Es Teh PWA Context');
+});
+
+// ==============================================================================
+// Commerce 9 — PWA Runtime Context: Test C (Legacy Flag Bypass) & Test D (End-to-End Placement)
+// ==============================================================================
+test('Commerce 9 — PWA Runtime Context: Test C (Legacy flag rejected) & Test D (End-to-End Placement)', async () => {
   const brand = db.prepare('SELECT id FROM brands LIMIT 1').get() || { id: 'brand_test' };
   const branch = db.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'branch_test' };
   const cat = db.prepare('SELECT id FROM categories WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'cat_test' };
@@ -281,8 +342,8 @@ test('Commerce 8 — Promotion Integration: OrderPlacementService forwards custo
 
   db.prepare(`
     INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active)
-    VALUES (?, ?, ?, 'Menu Utama E2E', ?, 30000, 1)
-  `).run(mainProductId, brand.id, cat.id, 'menu-e2e-' + Date.now());
+    VALUES (?, ?, ?, 'Menu Utama E2E PWA', ?, 30000, 1)
+  `).run(mainProductId, brand.id, cat.id, 'menu-e2e-pwa-' + Date.now());
 
   db.prepare(`
     INSERT INTO branch_products (branch_id, product_id, price, stock, is_available)
@@ -292,7 +353,7 @@ test('Commerce 8 — Promotion Integration: OrderPlacementService forwards custo
   db.prepare(`
     INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active)
     VALUES (?, ?, ?, 'Es Teh Bonus PWA E2E', ?, 5000, 1)
-  `).run(rewardProductId, brand.id, cat.id, 'es-teh-e2e-' + Date.now());
+  `).run(rewardProductId, brand.id, cat.id, 'es-teh-e2e-pwa-' + Date.now());
 
   db.prepare(`
     INSERT INTO branch_products (branch_id, product_id, price, stock, is_available)
@@ -307,40 +368,41 @@ test('Commerce 8 — Promotion Integration: OrderPlacementService forwards custo
   db.prepare(`
     INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents)
     VALUES (?, ?, 'free_product', ?, 0)
-  `).run('rwd_e2e_' + Date.now(), promoId, rewardProductId);
+  `).run('rwd_e2e_pwa_' + Date.now(), promoId, rewardProductId);
 
-  // 1. Submit order without is_pwa_installed -> Reward item is rejected as ineligible
-  const nonPwaResult = await OrderPlacementService.submitOrder({
+  // Test C — Client mencoba manipulasi field lama (is_pwa_installed: true tapi pwa_runtime: browser) -> REJECTED
+  const resLegacySpoof = await OrderPlacementService.submitOrder({
     brand_id: brand.id,
     branch_id: branch.id,
     order_type: 'dine_in',
     payment_method: 'cash',
-    customer: { name: 'Customer Web', phone: '081299990099' },
-    is_pwa_installed: false,
+    customer: { name: 'Customer Spoof', phone: '081299992202' },
+    is_pwa_installed: true, // Legacy client flag MUST have zero authority
+    pwa_runtime: { display_mode: 'browser' },
     items: [
       { product_id: mainProductId, quantity: 1, expected_price: 30000 },
       { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
     ]
   });
-  assert.strictEqual(nonPwaResult.success, false, 'Non-PWA user must not claim PWA install incentive');
+  assert.strictEqual(resLegacySpoof.success, false, 'Legacy client flag is_pwa_installed must not bypass browser display_mode check');
 
-  // 2. Submit order WITH is_pwa_installed: true -> Successfully verified & placed!
-  const pwaResult = await OrderPlacementService.submitOrder({
+  // Test D — PWA runtime diteruskan sampai order placement (End-to-End standalone) -> ACCEPTED
+  const resE2E = await OrderPlacementService.submitOrder({
     brand_id: brand.id,
     branch_id: branch.id,
     order_type: 'dine_in',
     payment_method: 'cash',
-    customer: { name: 'Customer PWA', phone: '081299990099' },
-    is_pwa_installed: true,
+    customer: { name: 'Customer Legit PWA', phone: '081299992202' },
+    pwa_runtime: { display_mode: 'standalone' },
     items: [
       { product_id: mainProductId, quantity: 1, expected_price: 30000 },
       { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
     ]
   });
 
-  assert.strictEqual(pwaResult.success, true, 'PWA user order must succeed');
-  assert.strictEqual(pwaResult.order.items.length, 2);
-  const placedRewardItem = pwaResult.order.items.find(it => it.product_id === rewardProductId);
+  assert.strictEqual(resE2E.success, true, 'Standalone PWA user order must succeed end-to-end');
+  assert.strictEqual(resE2E.order.items.length, 2);
+  const placedRewardItem = resE2E.order.items.find(it => it.product_id === rewardProductId);
   assert.ok(placedRewardItem, 'Reward item must be converted to authoritative target_product_id');
   assert.strictEqual(placedRewardItem.unit_price, 0);
   assert.strictEqual(placedRewardItem.name, 'Es Teh Bonus PWA E2E');

@@ -42,7 +42,7 @@ class OrderPlacementService {
     reservation_date = null,
     guest_count = null,
     client_transaction_id = null,
-    is_pwa_installed = false,
+    pwa_runtime = null,
     notes = '',
     trace_context = {}
   }) {
@@ -219,7 +219,7 @@ class OrderPlacementService {
       brand_id,
       items,
       customer,
-      is_pwa_installed: Boolean(is_pwa_installed || customer?.is_pwa_installed)
+      pwa_runtime
     });
 
     if (!verification.is_valid) {

@@ -28,7 +28,7 @@ class PrePaymentVerificationGate {
    * @param {Array<{ product_id: string|number, quantity: number, expected_price: number, name?: string }>} params.items
    * @returns {{ status: string, is_valid: boolean, verified_items: Array<Object>, price_diffs: Array<Object>, errors: Array<string> }}
    */
-  static verify({ branch_id, brand_id, items = [], customer = {}, is_pwa_installed = false }) {
+  static verify({ branch_id, brand_id, items = [], customer = {}, pwa_runtime = null }) {
     if (!branch_id) {
       throw new Error('[PrePaymentVerificationGate] "branch_id" is required for final verification.');
     }
@@ -36,6 +36,10 @@ class PrePaymentVerificationGate {
     if (!Array.isArray(items) || items.length === 0) {
       throw new Error('[PrePaymentVerificationGate] "items" array must not be empty.');
     }
+
+    // Explicit runtime context inspection (display_mode: standalone = installed PWA)
+    // Client boolean flags (e.g. is_pwa_installed) are NEVER treated as credentials.
+    const isInstalledPwa = Boolean(pwa_runtime && pwa_runtime.display_mode === 'standalone');
 
     // P1 RELATIONAL INTEGRITY (DB-01): Verify that branch belongs strictly to brand
     if (brand_id) {
@@ -67,6 +71,11 @@ class PrePaymentVerificationGate {
       const rawQty = item.quantity != null ? item.quantity : item.qty;
       const requestedQty = Number(rawQty);
 
+      if (!productId) {
+        errors.push('Setiap baris pesanan wajib menyertakan product_id.');
+        continue;
+      }
+
       // P1 DOMAIN INVARIANT GUARD (LOGIC-03): Strictly validate quantity as positive integer > 0
       if (!Number.isInteger(requestedQty) || requestedQty <= 0) {
         errors.push(`Kuantitas untuk produk "${item.name || productId}" harus berupa bilangan bulat positif (> 0).`);
@@ -93,7 +102,7 @@ class PrePaymentVerificationGate {
 
         const evalResult = PromotionEngineService.evaluate({
           brand_id,
-          is_pwa_installed: is_pwa_installed !== undefined ? Boolean(is_pwa_installed) : true,
+          is_pwa_installed: isInstalledPwa,
           customer_phone: (customer && customer.phone) ? String(customer.phone).trim() : '',
           cart_items: nonRewardItems
         });
