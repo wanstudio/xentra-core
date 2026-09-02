@@ -42,8 +42,6 @@
   }
 
   function navigate(view, params) {
-    if (view === currentView && !params) return;
-
     if (view === 'checkout') {
       var itemId = (params && params.itemId) || '';
       window.location.hash = itemId ? '#checkout/item/' + itemId : '#checkout';
@@ -51,8 +49,13 @@
       var orderId = (params && params.orderId) || '';
       window.location.hash = '#order-received/' + orderId;
     } else {
+      // Navigating to Home
+      if (window.location.pathname.startsWith('/checkout') || window.location.pathname.startsWith('/order-received')) {
+        window.location.href = '/';
+        return;
+      }
       if (window.location.hash) {
-        history.pushState(null, '', window.location.pathname);
+        window.location.hash = '';
       }
     }
 
@@ -61,9 +64,15 @@
   }
 
   function goBack() {
-    if (currentView !== 'home') {
-      history.back();
+    if (window.location.pathname.startsWith('/checkout') || window.location.pathname.startsWith('/order-received')) {
+      window.location.href = '/';
+      return;
     }
+    if (window.location.hash) {
+      window.location.hash = '';
+      return;
+    }
+    window.location.href = '/';
   }
 
   function subscribe(fn) {
