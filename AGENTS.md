@@ -2,10 +2,17 @@
 
 This repository uses small, task-focused agent skills rather than one giant instruction file.
 
-## Always start here
-- Read the relevant Xentra Notion decision/requirements before coding.
-- Inspect current Git status, recent commits, and relevant files.
-- Identify the domain owner and preserve locked invariants.
+## Before coding
+- Read the relevant Xentra Notion decisions/requirements.
+- Read every `.agent/skills/*/SKILL.md` relevant to the requested change; do not load unrelated skills unnecessarily.
+- Inspect current Git status, recent commits, and affected files.
+- Identify the domain owner, locked invariants, and existing implementation boundary.
+- Do not write or modify code until the required context is understood.
+
+## Authority
+- Notion = authority for business rules, locked decisions, invariants, and architecture boundaries.
+- Git = evidence of current implementation and history; never invent business rules from code alone.
+- UI/client state is never domain authority.
 
 ## Skills
 - `.agent/skills/xentra-context/SKILL.md` — repository context, source hierarchy, and decision discipline.
@@ -25,8 +32,12 @@ This repository uses small, task-focused agent skills rather than one giant inst
 ## Skill selection
 Use the smallest relevant skill set. Combine skills when a change crosses boundaries; for example, a payment feature normally needs coding workflow + backend + database + integration context. Use Ponytail review when a change adds abstraction or refactoring, Ponytail audit for repository-wide complexity review, and Ponytail debt when accepting a deliberate temporary shortcut.
 
-## Important boundaries
-Notion locked decisions and invariants outrank current implementation details. Git is evidence of implementation/history, not authority to invent business rules. UI state is not domain authority.
+## Execution discipline
+- Preserve existing domain boundaries and locked contracts.
+- Follow YAGNI/minimal-change discipline: do not add speculative abstractions, dependencies, duplication, or unrelated refactors.
+- Prefer existing ownership and contracts before creating parallel services/components/utilities.
+- When a requirement genuinely crosses boundaries, introduce the smallest stable abstraction that satisfies it.
+- Before finishing, verify affected business logic, domain boundaries, runtime wiring, and callers remain coherent.
 
 ## Completion
 A coding task is complete only when the implementation matches the relevant contract, the correct runtime path is wired, affected callers remain coherent, and the changes are committed. Update durable documentation when the contract or architecture changes.
