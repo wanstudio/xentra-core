@@ -1036,7 +1036,7 @@
   overflow-y: hidden !important;
   padding: 4px 0 14px !important;
   margin: 0 !important;
-  touch-action: pan-x pan-y pinch-zoom !important;
+  touch-action: pan-y pinch-zoom !important;
   overscroll-behavior-x: contain !important;
   scrollbar-width: none !important;
   -webkit-overflow-scrolling: touch !important;

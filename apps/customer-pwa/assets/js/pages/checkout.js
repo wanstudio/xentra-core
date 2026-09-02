@@ -471,7 +471,7 @@
         '      <div id="x-checkout-items-rows">' + renderItemsHtml(items) + '</div>' +
         '      <div class="x-complement-section" id="x-upsell-container" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;min-width:0;width:100%;max-width:100%;box-sizing:border-box;">' +
         '        <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;">Tambah ini untuk melengkapi pesananmu</div>' +
-        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 0 14px;margin:0;min-width:0;width:100%;max-width:100%;touch-action:pan-x pan-y pinch-zoom;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none;box-sizing:border-box;cursor:grab;">' +
+        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 0 14px;margin:0;min-width:0;width:100%;max-width:100%;touch-action:pan-y pinch-zoom;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none;box-sizing:border-box;cursor:grab;">' +
         '          <div class="x-loading-inline">Memuat rekomendasi…</div>' +
         '        </div>' +
         '      </div>' +
@@ -605,58 +605,84 @@
 
     // 1. Mouse wheel horizontal scrolling on desktop
     track.addEventListener('wheel', function (e) {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && e.deltaY !== 0) {
-        track.scrollLeft += e.deltaY;
+      var delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (delta !== 0) {
+        track.scrollLeft += delta;
       }
     }, { passive: true });
 
-    // 2. Mouse/Pointer Drag for Desktop (Native momentum scroll handles touch)
-    var isDown = false;
-    var startX = 0;
-    var startScroll = 0;
-    var hasDragged = false;
+    // 2. Touch directional gesture handling for Mobile/PWA
+    var touchStartX = 0;
+    var touchStartY = 0;
+    var touchStartScroll = 0;
+    var touchMoved = false;
+    var isHorizontal = null;
 
-    track.addEventListener('pointerdown', function (e) {
-      if (e.pointerType === 'touch') return;
+    track.addEventListener('touchstart', function (e) {
+      if (!e.touches || e.touches.length !== 1) return;
+      var t = e.touches[0];
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+      touchStartScroll = track.scrollLeft;
+      touchMoved = false;
+      isHorizontal = null;
+    }, { passive: true });
+
+    track.addEventListener('touchmove', function (e) {
+      if (!e.touches || e.touches.length !== 1) return;
+      var t = e.touches[0];
+      var diffX = t.clientX - touchStartX;
+      var diffY = t.clientY - touchStartY;
+
+      if (isHorizontal === null && (Math.abs(diffX) > 4 || Math.abs(diffY) > 4)) {
+        isHorizontal = Math.abs(diffX) >= Math.abs(diffY);
+      }
+
+      if (isHorizontal === true) {
+        touchMoved = true;
+        track.scrollLeft = touchStartScroll - diffX;
+      }
+    }, { passive: true });
+
+    // 3. Desktop Mouse Drag-to-Scroll
+    var isMouseDown = false;
+    var mouseStartX = 0;
+    var mouseStartScroll = 0;
+    var hasMouseDragged = false;
+
+    track.addEventListener('mousedown', function (e) {
       if (e.button !== 0) return;
       if (e.target && e.target.closest && e.target.closest('.x-upsell-add-btn')) return;
-      isDown = true;
-      hasDragged = false;
-      startX = e.clientX;
-      startScroll = track.scrollLeft;
+      isMouseDown = true;
+      hasMouseDragged = false;
+      mouseStartX = e.clientX;
+      mouseStartScroll = track.scrollLeft;
       track.style.cursor = 'grabbing';
-      if (track.setPointerCapture) {
-        try { track.setPointerCapture(e.pointerId); } catch (_) {}
+      track.style.userSelect = 'none';
+    });
+
+    window.addEventListener('mousemove', function (e) {
+      if (!isMouseDown) return;
+      var diffX = e.clientX - mouseStartX;
+      if (Math.abs(diffX) > 3) {
+        hasMouseDragged = true;
+        track.scrollLeft = mouseStartScroll - diffX;
       }
     });
 
-    track.addEventListener('pointermove', function (e) {
-      if (!isDown) return;
-      var currentX = e.clientX;
-      var diff = currentX - startX;
-      if (Math.abs(diff) > 3) {
-        hasDragged = true;
-        track.scrollLeft = startScroll - diff;
-      }
-    });
-
-    function endPointerDrag(e) {
-      if (!isDown) return;
-      isDown = false;
+    window.addEventListener('mouseup', function () {
+      if (!isMouseDown) return;
+      isMouseDown = false;
       track.style.cursor = '';
-      if (e && track.releasePointerCapture && e.pointerId) {
-        try { track.releasePointerCapture(e.pointerId); } catch (_) {}
-      }
-    }
-
-    track.addEventListener('pointerup', endPointerDrag);
-    track.addEventListener('pointercancel', endPointerDrag);
+      track.style.userSelect = '';
+    });
 
     track.addEventListener('click', function (e) {
-      if (hasDragged) {
+      if (hasMouseDragged || touchMoved) {
         e.preventDefault();
         e.stopPropagation();
-        hasDragged = false;
+        hasMouseDragged = false;
+        touchMoved = false;
       }
     }, true);
   }
