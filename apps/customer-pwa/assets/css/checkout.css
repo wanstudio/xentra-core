@@ -1001,6 +1001,7 @@
 .x-complement-wrap {
   width: 100% !important;
   max-width: 100% !important;
+  min-width: 0 !important;
   overflow: visible !important;
   touch-action: auto !important;
   margin: 16px 0 0 !important;
@@ -1030,6 +1031,9 @@
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   gap: 12px !important;
+  width: calc(100% + 32px) !important;
+  max-width: calc(100% + 32px) !important;
+  min-width: 0 !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
   padding: 4px 16px 14px !important;
@@ -1038,8 +1042,12 @@
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-x: contain !important;
   touch-action: pan-x !important;
-  scroll-behavior: smooth !important;
+  cursor: grab !important;
   box-sizing: border-box !important;
+}
+
+.x-complement-track:active {
+  cursor: grabbing !important;
 }
 
 .x-complement-track::-webkit-scrollbar {

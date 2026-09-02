@@ -645,11 +645,48 @@
     return list;
   }
 
+  function enableTrackDragScroll(track) {
+    if (!track || track.__dragInit) return;
+    track.__dragInit = true;
+
+    var isDown = false;
+    var startX = 0;
+    var startScroll = 0;
+    var isDragging = false;
+
+    track.addEventListener('pointerdown', function (e) {
+      if (e.target && e.target.closest && e.target.closest('.x-upsell-add-btn')) return;
+      isDown = true;
+      isDragging = false;
+      startX = e.pageX || e.clientX || 0;
+      startScroll = track.scrollLeft;
+    });
+
+    window.addEventListener('pointermove', function (e) {
+      if (!isDown) return;
+      var currentX = e.pageX || e.clientX || 0;
+      var diff = currentX - startX;
+      if (Math.abs(diff) > 4) {
+        isDragging = true;
+        track.scrollLeft = startScroll - diff;
+      }
+    });
+
+    var stopDrag = function () {
+      isDown = false;
+    };
+
+    window.addEventListener('pointerup', stopDrag);
+    window.addEventListener('pointercancel', stopDrag);
+  }
+
   function renderUpsellTrack(container, items) {
     if (!container) return;
     container.innerHTML = (items || []).map(function (p) {
       return (UI && UI.upsellCard) ? UI.upsellCard(p) : '';
     }).join('');
+
+    enableTrackDragScroll(container);
 
     var buttons = container.querySelectorAll('.x-upsell-add-btn');
     for (var b = 0; b < buttons.length; b++) {
