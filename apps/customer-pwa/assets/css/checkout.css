@@ -1003,7 +1003,7 @@
   max-width: 100% !important;
   min-width: 0 !important;
   overflow: visible !important;
-  touch-action: auto !important;
+  touch-action: pan-x pan-y !important;
   margin: 16px 0 0 !important;
   padding: 16px 0 0 !important;
   border-top: 1px solid #f0f0f0 !important;
@@ -1040,9 +1040,7 @@
   margin: 0 -16px !important;
   scrollbar-width: none !important;
   -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior-x: contain !important;
-  touch-action: pan-x !important;
-  cursor: grab !important;
+  touch-action: pan-x pan-y !important;
   box-sizing: border-box !important;
 }
 
