@@ -11,6 +11,7 @@ This repository uses small, task-focused agent skills rather than one giant inst
 - `.agent/skills/xentra-context/SKILL.md` — repository context, source hierarchy, and decision discipline.
 - `.agent/skills/xentra-business-logic/SKILL.md` — domain boundaries, state/lifecycle reasoning, and business invariants.
 - `.agent/skills/xentra-coding-workflow/SKILL.md` — normal feature/refactor/bug-fix implementation workflow.
+- `.agent/skills/xentra-yagni/SKILL.md` — YAGNI, reuse, dependency, and minimal-change discipline; prevents speculative architecture.
 - `.agent/skills/xentra-backend-engineering/SKILL.md` — Node/Express backend boundaries, API contracts, authority, transactions, and idempotency.
 - `.agent/skills/xentra-frontend-engineering/SKILL.md` — PWA/dashboard/workspace UI, reusable components, state, runtime wiring, and navigation.
 - `.agent/skills/xentra-integration-engineering/SKILL.md` — gateways, webhooks, POS sync, delivery, hardware, and event integrations.
