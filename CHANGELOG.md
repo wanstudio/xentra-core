@@ -11,6 +11,9 @@
   - Memasang `renderPromoBanner()` ke dalam `Store.subscribe()` pada setiap mutasi kuantitas item keranjang.
   - Memperbaiki bug di mana setelah menu promo dihapus dengan tombol minus (`-`), banner tidak otomatis kembali ke status tombol "Claim" (sebelumnya memerlukan reload halaman manual).
 - **Node.js Environment & LiteSpeed Passenger Compatibility (`db.js`, `deploy-core.sh`)**:
+- **Checkout Menu Items Symmetrical Spacing (`checkout.css`)**:
+  - Memperbaiki jarak antar-item menu keranjang pada Card 2 dengan pola simetris (*item* → *16px space* → *divider line #eee* → *16px space* → *item*).
+  - Mengatur `padding: 16px 0` pada `.x-product.x-checkout-item` dengan `padding-top: 0` pada elemen pertama dan `padding-bottom: 0` pada elemen terakhir, mencegah tombol Catatan dan judul menu menempel pada garis pembatas horizontal.
 - **Checkout Bottom CTA Spacer Alignment (`checkout.js`, `checkout.css`)**:
   - Menyamakan jarak antara Card 5 (Ringkasan Pembayaran) dengan tepi atas bilah tombol sticky CTA (`Pesan sekarang`) menjadi tepat `10px`, identik dengan jarak vertikal antar kartu di atasnya (`margin: 10px`).
   - Menghapus elemen spacer DOM ekstra dan mengunci `padding-bottom` pada kontainer `.x-checkout-alt2` sebesar `calc(74px + env(safe-area-inset-bottom, 0px) + 10px)` agar jarak scroll konsisten di semua viewport.
