@@ -11,8 +11,15 @@
   - Memasang `renderPromoBanner()` ke dalam `Store.subscribe()` pada setiap mutasi kuantitas item keranjang.
   - Memperbaiki bug di mana setelah menu promo dihapus dengan tombol minus (`-`), banner tidak otomatis kembali ke status tombol "Claim" (sebelumnya memerlukan reload halaman manual).
 - **Node.js Environment & LiteSpeed Passenger Compatibility (`db.js`, `deploy-core.sh`)**:
-  - Menambahkan fallback adapter `sql.js` dengan persistensi disk ketika berjalan di Node.js <= v20 pada cPanel Dewaweb CloudLinux Passenger (di mana modul `node:sqlite` belum built-in).
-  - Mengonfigurasi alias route Express `['/api/v1', '/api']` agar request API selalu merespons JSON valid dan tidak jatuh ke fallback HTML.
+- **1:1 Card Visual Hierarchy & Checkout Structure Alignment (`checkout.js`, `checkout.css`)**:
+  - Header diselaraskan menjadi `Checkout Bangjo`.
+  - Reordering card struktur checkout presisi sesuai visual mockup:
+    - **Card 1**: Dynamic Promo Slot (`#x-promo-slot`).
+    - **Card 2**: Menu Items & Horizontal Upsell Carousel (`#x-items-card`). Tombol `Catatan` dipindah ke kolom kiri di bawah badge diskon, stepper quantity pill lime terang di kanan bersama thumbnail gambar.
+    - **Card 3**: Tipe Pembelian / Fulfillment Card (`#x-card-fulfillment`) dengan ikon kurir, label tipe, slot waktu tebal, tombol pill `Pilih` hijau-lime, dan baris catatan kurir + tombol `Catatan`.
+    - **Card 4**: Alamat Pengiriman (`#x-card-address`) dengan header + tombol pill `Pilih`, label alamat, alamat lengkap, dan catatan patokan miring.
+    - **Card 5**: Ringkasan Pembayaran & Metode Bayar (`#x-payment-summary-card`) dengan rincian harga/ongkir/diskon, total pembayaran (harga lama dicoret + total aktif besar), 2-grid kolom metode pembayaran (`Tunai (COD)` vs `Online Pay`), dan garansi keamanan Midtrans.
+    - **Bottom Bar**: Sticky action bar dengan full-width lime pill button `Pesan sekarang`.
 
 ## [2.2.7] - 2026-09-01
 ### Fixed

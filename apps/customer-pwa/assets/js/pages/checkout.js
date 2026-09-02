@@ -460,49 +460,12 @@
       '<div class="xentra-checkout x-checkout-alt2">' +
 
       // 1. Header
-      '  <div class="x-alt-header"><button type="button" id="x-checkout-back" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Pesanan</span></div>' +
+      '  <div class="x-alt-header"><button type="button" id="x-checkout-back" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Bangjo</span></div>' +
 
       // 2. Dynamic Promo Presentation (Slot for zero-blink targeted updates)
       '  <div id="x-promo-slot">' + getPromoBannerHtml(items) + '</div>' +
 
-      // 3. Customer Identity Card (Phone & WhatsApp OTP status)
-      '  <div class="x-card x-alt-customer-card" id="x-card-customer" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
-      '    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
-      '      <div style="font-size:14px;font-weight:700;color:#111;">Data Pemesan (WhatsApp)</div>' +
-      '      <button type="button" class="x-pill-btn" id="x-btn-edit-customer">' + (customerPhone ? 'Ubah' : 'Isi Data') + '</button>' +
-      '    </div>' +
-      '    <div style="font-size:14px;font-weight:700;color:#111;">' + UI.escape(customerName) + '</div>' +
-      '    <div style="font-size:12px;color:#777;margin-top:2px;display:flex;align-items:center;gap:6px;">' +
-      '      <span>' + (customerPhone ? UI.escape(customerPhone) : 'Nomor WhatsApp belum diisi') + '</span>' +
-      (isPhoneVerified ? '<span style="color:#16a34a;font-weight:700;font-size:11px;">✓ Terverifikasi</span>' : '') +
-      '    </div>' +
-      '  </div>' +
-
-      // 4. Order Type / Fulfillment Selection Card
-      '  <div class="x-card x-alt-delivery-card" id="x-card-fulfillment" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
-      '    <div class="x-alt-card-top" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">' +
-      '      <div class="x-alt-icon-wrap" style="width:38px;height:38px;flex:0 0 38px;display:flex;align-items:center;justify-content:center;"><img src="' + fulIcon + '" alt="" style="width:36px;height:36px;object-fit:contain;"></div>' +
-      '      <div class="x-alt-delivery-copy" style="flex:1 1 auto;min-width:0;">' +
-      '        <div class="x-alt-delivery-type" style="font-size:14px;font-weight:700;color:#111;">' + UI.escape(fulTitle) + '</div>' +
-      '        <div class="x-alt-delivery-time" style="font-size:12px;color:#777;margin-top:1px;">' + UI.escape(fulSub) + '</div>' +
-      (state.fulfillment.note ? '<div class="x-alt-delivery-note" style="font-size:12px;color:#111;margin-top:2px;font-weight:600;">Catatan: ' + UI.escape(state.fulfillment.note) + '</div>' : '') +
-      '      </div>' +
-      '      <button type="button" class="x-pill-btn" id="x-btn-choose-fulfillment">Ubah</button>' +
-      '    </div>' +
-      '    <button type="button" class="x-note-button ' + (state.fulfillment.note ? 'has-note' : '') + '" id="x-btn-fulfillment-note" style="margin-top:12px;width:100%;"><img src="' + (state.fulfillment.note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="" class="x-note-icon">Catatan Pengantaran/Meja</button>' +
-      '  </div>' +
-
-      // 5. Delivery Address Card (Only shown if fulfillment is delivery)
-      (isDelivery ? (
-        '  <div class="x-card x-alt-address-card" id="x-card-address" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
-        '    <div class="x-alt-address-head" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:14px;font-weight:700;color:#111;">Alamat Pengiriman</span><button type="button" class="x-pill-btn" id="x-btn-change-address">Pilih</button></div>' +
-        '    <div class="x-alt-addr-label" style="font-size:13px;font-weight:700;color:#111;">' + UI.escape(state.address.label) + '</div>' +
-        '    <div class="x-alt-addr-text" style="font-size:12px;color:#666;line-height:17px;margin-top:2px;">' + UI.escape(state.address.formatted_address) + '</div>' +
-        (state.address.detail ? '<div class="x-alt-addr-note" style="font-size:12px;color:#777;margin-top:2px;">Patokan: ' + UI.escape(state.address.detail) + '</div>' : '') +
-        '  </div>'
-      ) : '') +
-
-      // 6. Items & Upsell Unified Card (Hide or show empty for pure reservation)
+      // 3. Card 2: Items & Upsell Unified Card (Directly below promo banner)
       (!isReservation || items.length > 0 ? (
         '  <div class="x-card" id="x-items-card" style="margin:0 14px 10px;padding:16px 16px 14px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);min-width:0;max-width:calc(100% - 28px);overflow:hidden;box-sizing:border-box;">' +
         '    <div id="x-checkout-items-list" class="x-checkout-items" style="min-width:0;width:100%;max-width:100%;overflow:hidden;box-sizing:border-box;">' +
@@ -523,28 +486,68 @@
         '  </div>'
       )) +
 
-      // 7. Payment Summary Card
-      '  <div class="x-card x-alt-summary-card" id="x-payment-summary-card" style="margin:10px 14px 14px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
-      '    <div class="x-alt-summary-title" style="font-size:15px;font-weight:700;color:#111;margin-bottom:12px;">Ringkasan Pembayaran</div>' +
+      // 4. Card 3: Order Type / Fulfillment Selection Card
+      '  <div class="x-card x-alt-delivery-card" id="x-card-fulfillment" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
+      '    <div class="x-alt-card-top" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">' +
+      '      <div class="x-alt-icon-wrap" style="width:48px;height:48px;flex:0 0 48px;display:flex;align-items:center;justify-content:center;"><img src="' + fulIcon + '" alt="" style="width:44px;height:44px;object-fit:contain;"></div>' +
+      '      <div class="x-alt-delivery-copy" style="flex:1 1 auto;min-width:0;">' +
+      '        <div class="x-alt-delivery-type" style="font-size:15px;font-weight:700;color:#111;">' + UI.escape(fulTitle) + '</div>' +
+      '        <div class="x-alt-delivery-types-sub" style="font-size:11.5px;color:#888;margin-top:1px;">delivery / pick-up / dine-in</div>' +
+      '        <div class="x-alt-delivery-time" style="font-size:13px;font-weight:700;color:#111;margin-top:2px;">' + UI.escape(fulSub) + '</div>' +
+      '      </div>' +
+      '      <button type="button" class="x-pill-btn" id="x-btn-choose-fulfillment">Pilih</button>' +
+      '    </div>' +
+      (state.fulfillment.note ? '<div class="x-alt-delivery-note-text" style="font-size:12.5px;color:#555;margin-top:12px;line-height:1.4;"><b>Catatan :</b> ' + UI.escape(state.fulfillment.note) + '</div>' : '') +
+      '    <div style="margin-top:10px;"><button type="button" class="x-note-button ' + (state.fulfillment.note ? 'has-note' : '') + '" id="x-btn-fulfillment-note"><img src="' + (state.fulfillment.note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="" class="x-note-icon">Catatan</button></div>' +
+      '  </div>' +
+
+      // 5. Card 4: Delivery Address Card (Shown when delivery)
+      (isDelivery ? (
+        '  <div class="x-card x-alt-address-card" id="x-card-address" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
+        '    <div class="x-alt-address-head" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:15px;font-weight:700;color:#111;">Alamat Pengiriman</span><button type="button" class="x-pill-btn" id="x-btn-change-address">Pilih</button></div>' +
+        '    <div class="x-alt-addr-label" style="font-size:14px;font-weight:700;color:#111;margin-top:4px;">' + UI.escape(state.address.label || 'Rumah') + '</div>' +
+        '    <div class="x-alt-addr-text" style="font-size:12.5px;color:#666;line-height:18px;margin-top:2px;">' + UI.escape(state.address.formatted_address || 'Pilih alamat pengiriman') + '</div>' +
+        (state.address.detail ? '<div class="x-alt-addr-note" style="font-size:12px;color:#777;margin-top:4px;font-style:italic;">Patokan: ' + UI.escape(state.address.detail) + '</div>' : '') +
+        '  </div>'
+      ) : '') +
+
+      // 6. Card 5: Payment Summary & Methods Card
+      '  <div class="x-card x-alt-summary-card" id="x-payment-summary-card" style="margin:0 14px 14px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
+      '    <div class="x-alt-summary-title" style="font-size:15px;font-weight:700;color:#111;margin-bottom:12px;">Ringkasan pembayaran</div>' +
       (!isReservation ? (
-        '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#555;padding:3px 0;"><span>Total Harga Menu</span><span id="x-sum-subtotal" style="font-weight:600;color:#111;">' + fmtIDR(subtotal) + '</span></div>' +
-        (isDelivery ? '<div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#555;padding:3px 0;"><span>Biaya Ongkos Kirim</span><span id="x-sum-delivery" style="font-weight:600;color:#111;">' + fmtIDR(fee) + '</span></div>' : '') +
-        (discount > 0 ? '<div class="x-alt-sum-row x-alt-discount-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#ff4040;padding:3px 0;"><span>Diskon Promo</span><span id="x-sum-discount" class="x-alt-discount" style="font-weight:700;">-' + fmtIDR(discount) + '</span></div>' : '') +
-        '    <div class="x-alt-sum-divider" style="height:1px;background:#eee;margin:10px 0;"></div>' +
-        '    <div class="x-alt-sum-total" style="display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:#111;"><span>Total Pembayaran</span><span>' + (oldTotal > grand ? '<s id="x-sum-oldtotal" class="x-alt-strike" style="color:#999;font-size:13px;margin-right:6px;">' + fmtIDR(oldTotal) + '</s>' : '') + '<b id="x-sum-total" style="color:#111;">' + fmtIDR(grand) + '</b></span></div>'
+        '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Harga</span><span id="x-sum-subtotal" style="font-weight:600;color:#111;">' + fmtIDR(subtotal) + '</span></div>' +
+        (isDelivery ? '<div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Biaya Penanganan dan Pengiriman</span><span id="x-sum-delivery" style="font-weight:600;color:#111;">' + fmtIDR(fee) + '</span></div>' : '') +
+        (discount > 0 ? '<div class="x-alt-sum-row x-alt-discount-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#ef4444;font-weight:700;padding:3px 0;"><span>Diskon</span><span id="x-sum-discount">-' + fmtIDR(discount) + '</span></div>' : '') +
+        '    <div class="x-alt-sum-divider" style="height:1px;background:#f0f0f0;margin:12px 0 10px;"></div>' +
+        '    <div class="x-alt-sum-total" style="display:flex;align-items:baseline;justify-content:space-between;"><span style="font-size:15px;font-weight:700;color:#111;">Total pembayaran</span><div style="display:flex;align-items:baseline;gap:8px;">' + (oldTotal > grand ? '<s id="x-sum-oldtotal" style="color:#9ca3af;font-size:13px;text-decoration:line-through;">' + fmtIDR(oldTotal) + '</s>' : '') + '<b id="x-sum-total" style="font-size:18px;font-weight:800;color:#111;">' + fmtIDR(grand) + '</b></div></div>'
       ) : (
         '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;"><span>Biaya Booking Reservasi</span><span style="color:#16a34a;font-weight:700;">Gratis (Rp0)</span></div>'
       )) +
-      '    <div class="x-alt-pay-methods" style="margin-top:14px;display:flex;flex-direction:column;gap:8px;">' +
-      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'cash' ? 'is-active' : '') + '" id="x-opt-cash" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'cash' ? '#b6ff00' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'cash' ? '#f7ffd9' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;font-size:13px;font-weight:600;color:#111;"><img src="/assets/icons/cashblack.svg" alt="" style="width:22px;height:22px;object-fit:contain;flex-shrink:0;"><span>Tunai / Bayar di Tempat (COD / Kasir)</span></button>' +
-      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'midtrans' ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'midtrans' ? '#b6ff00' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'midtrans' ? '#f7ffd9' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;font-size:13px;font-weight:600;color:#111;"><img src="/assets/icons/qrisgreen.svg" alt="" style="width:22px;height:22px;object-fit:contain;flex-shrink:0;"><span>Online Pay (QRIS / GoPay / ShopeePay / VA)</span></button>' +
+      '    <div class="x-alt-pay-methods" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'cash' ? 'is-active' : '') + '" id="x-opt-cash" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'cash' ? '#b6ff00' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'cash' ? '#f7ffd9' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
+      '        <img src="/assets/icons/cashblack.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
+      '        <div style="display:flex;flex-direction:column;min-width:0;">' +
+      '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Tunai (COD)</span>' +
+      '          <span style="font-size:11px;color:#777;">Bayar di tempat</span>' +
+      '        </div>' +
+      '      </button>' +
+      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'midtrans' ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'midtrans' ? '#b6ff00' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'midtrans' ? '#f7ffd9' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
+      '        <img src="/assets/icons/qrisgreen.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
+      '        <div style="display:flex;flex-direction:column;min-width:0;">' +
+      '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Online Pay</span>' +
+      '          <span style="font-size:11px;color:#777;">QRIS / E-Wallet</span>' +
+      '        </div>' +
+      '      </button>' +
       '    </div>' +
-      '    <div class="x-alt-trust" style="font-size:11px;color:#888;text-align:center;margin-top:10px;"><span>🔒 Transaksi aman &amp; terenkripsi</span><span class="x-alt-trust-sep" style="margin:0 6px;">|</span><span>Diproses oleh <b>Midtrans</b></span></div>' +
+      '    <div class="x-alt-trust" style="font-size:11.5px;color:#6b7280;text-align:center;margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:3px;">' +
+      '      <div style="display:flex;align-items:center;gap:4px;"><span>🔒</span><span>Transaksi aman dan terenkripsi</span></div>' +
+      '      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#888;"><span>Diproses oleh</span><span style="color:#00a3e0;font-weight:700;">midtrans</span></div>' +
+      '    </div>' +
       '  </div>' +
 
-      // 8. Sticky Submit CTA Bar
-      '  <div class="x-alt-cta-spacer" style="height:80px;"></div>' +
-      '  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:32px;border:0;background:var(--x-lime,#b6ff00);color:#111;font-size:15px;font-weight:700;cursor:pointer;">' + (isReservation ? 'Konfirmasi Reservasi' : 'Pesan Sekarang') + '</button></div>' +
+      // 7. Sticky Submit CTA Bar
+      '  <div class="x-alt-cta-spacer" style="height:84px;"></div>' +
+      '  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-lime,#b6ff00);color:#111;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + (isReservation ? 'Konfirmasi Reservasi' : 'Pesan sekarang') + '</button></div>' +
 
       '</div>';
 
@@ -578,6 +581,10 @@
           ? '<div class="x-product-discount"><img src="/assets/icons/diskon.svg" alt="" class="x-product-discount-icon" onerror="this.style.display=\'none\'"><span>Discount ongkir ' + fmtIDR(state.discount) + '</span></div>'
           : ''
         ) +
+        '    <button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note-item="' + item.id + '">' +
+        '      <img src="' + (note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="Catatan" class="x-note-icon">' +
+        '      Catatan' +
+        '    </button>' +
         '  </div>' +
         '  <div class="x-product-right">' +
         (img
@@ -589,10 +596,6 @@
         '      <span class="x-quantity-value">' + qty + '</span>' +
         '      <button type="button" data-plus-item="' + item.id + '" aria-label="Tambah"><img src="/assets/icons/plus.svg" alt="plus" style="width:13px;height:13px;display:block;margin:auto;"></button>' +
         '    </div>' +
-        '    <button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note-item="' + item.id + '">' +
-        '      <img src="' + (note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="Catatan" class="x-note-icon">' +
-        '      Catatan' +
-        '    </button>' +
         '  </div>' +
         '</div>';
     });
