@@ -334,6 +334,7 @@
         bindItemEvents();
       }
       calculateTotals();
+      renderPromoBanner();
     });
 
     var items = getCheckoutItems();
