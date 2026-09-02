@@ -649,35 +649,68 @@
     if (!track || track.__dragInit) return;
     track.__dragInit = true;
 
+    // 1. Pointer Events (Desktop / Mouse Drag)
     var isDown = false;
     var startX = 0;
     var startScroll = 0;
-    var isDragging = false;
 
-    track.addEventListener('pointerdown', function (e) {
+    track.addEventListener('mousedown', function (e) {
       if (e.target && e.target.closest && e.target.closest('.x-upsell-add-btn')) return;
       isDown = true;
-      isDragging = false;
       startX = e.pageX || e.clientX || 0;
       startScroll = track.scrollLeft;
     });
 
-    window.addEventListener('pointermove', function (e) {
+    window.addEventListener('mousemove', function (e) {
       if (!isDown) return;
       var currentX = e.pageX || e.clientX || 0;
       var diff = currentX - startX;
-      if (Math.abs(diff) > 4) {
-        isDragging = true;
+      if (Math.abs(diff) > 3) {
         track.scrollLeft = startScroll - diff;
       }
     });
 
-    var stopDrag = function () {
+    var stopMouseDrag = function () {
       isDown = false;
     };
+    window.addEventListener('mouseup', stopMouseDrag);
 
-    window.addEventListener('pointerup', stopDrag);
-    window.addEventListener('pointercancel', stopDrag);
+    // 2. Direct Touch Events with Directional Lock for Android PWA WebViews
+    var touchStartX = 0;
+    var touchStartY = 0;
+    var touchStartScroll = 0;
+    var isHorizontalSwipe = null;
+
+    track.addEventListener('touchstart', function (e) {
+      if (!e.touches || !e.touches[0]) return;
+      if (e.target && e.target.closest && e.target.closest('.x-upsell-add-btn')) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchStartScroll = track.scrollLeft;
+      isHorizontalSwipe = null;
+    }, { passive: true });
+
+    track.addEventListener('touchmove', function (e) {
+      if (!e.touches || !e.touches[0]) return;
+      var curX = e.touches[0].clientX;
+      var curY = e.touches[0].clientY;
+      var dx = curX - touchStartX;
+      var dy = curY - touchStartY;
+
+      if (isHorizontalSwipe === null) {
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+          isHorizontalSwipe = Math.abs(dx) >= Math.abs(dy);
+        }
+      }
+
+      if (isHorizontalSwipe) {
+        track.scrollLeft = touchStartScroll - dx;
+      }
+    }, { passive: true });
+
+    track.addEventListener('touchend', function () {
+      isHorizontalSwipe = null;
+    }, { passive: true });
   }
 
   function renderUpsellTrack(container, items) {

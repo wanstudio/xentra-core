@@ -21,7 +21,7 @@ html, body {
   background: var(--x-white);
   color: var(--x-text);
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior: none;
+  overscroll-behavior-y: contain;
 }
 
 /* ── Page Container (mobile-first, centered) ── */

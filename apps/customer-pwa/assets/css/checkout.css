@@ -3365,6 +3365,7 @@ body:has(#x-checkout-note-overlay.open){
   max-width:480px;
   margin:0 auto;
   font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  touch-action: pan-y pan-x !important;
 }
 .x-checkout-alt2 *{ box-sizing:border-box; }
 
