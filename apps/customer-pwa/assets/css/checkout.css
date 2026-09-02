@@ -999,53 +999,38 @@
 /* ── Upsell Recommendation Rail (Identical to Category Track) ── */
 .x-complement-section,
 .x-complement-wrap {
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  overflow: visible !important;
-  touch-action: pan-x pan-y !important;
-  margin: 16px 0 0 !important;
-  padding: 16px 0 0 !important;
-  border-top: 1px solid #f0f0f0 !important;
-  box-sizing: border-box !important;
+  width: 100%;
+  margin: 16px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid #f0f0f0;
+  box-sizing: border-box;
 }
 
 .x-complement-section .x-section-title,
 .x-complement-wrap .x-section-title {
-  font-size: 15px !important;
-  font-weight: 700 !important;
-  color: #111827 !important;
-  margin: 0 0 12px !important;
-  padding: 0 !important;
-  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 12px;
+  padding: 0;
+  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
 }
 
 .x-section-subtitle {
-  margin: 2px 0 0 !important;
-  font-size: 12px !important;
-  color: #888 !important;
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #888;
 }
 
 .x-complement-track {
-  display: flex !important;
-  flex-direction: row !important;
-  flex-wrap: nowrap !important;
-  gap: 12px !important;
-  width: calc(100% + 32px) !important;
-  max-width: calc(100% + 32px) !important;
-  min-width: 0 !important;
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-  padding: 4px 16px 14px !important;
-  margin: 0 -16px !important;
-  scrollbar-width: none !important;
-  -webkit-overflow-scrolling: touch !important;
-  touch-action: pan-x pan-y !important;
-  box-sizing: border-box !important;
-}
-
-.x-complement-track:active {
-  cursor: grabbing !important;
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 16px 14px;
+  margin: 0 -16px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
 }
 
 .x-complement-track::-webkit-scrollbar {
@@ -3363,7 +3348,6 @@ body:has(#x-checkout-note-overlay.open){
   max-width:480px;
   margin:0 auto;
   font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;
-  touch-action: pan-y pan-x !important;
 }
 .x-checkout-alt2 *{ box-sizing:border-box; }
 

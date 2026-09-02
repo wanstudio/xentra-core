@@ -515,9 +515,9 @@
         '  <div class="x-card" id="x-items-card" style="margin:0 14px 10px;padding:16px 16px 14px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);overflow:hidden;">' +
         '    <div id="x-checkout-items-list" class="x-checkout-items">' +
         '      <div id="x-checkout-items-rows">' + renderItemsHtml(items) + '</div>' +
-        '      <div class="x-complement-section" id="x-upsell-container" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;width:100%;box-sizing:border-box;touch-action:pan-x pan-y;">' +
-        '        <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;padding:0;">Tambah ini untuk melengkapi pesananmu</div>' +
-        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 16px 14px;margin:0 -16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;box-sizing:border-box;">' +
+        '      <div class="x-complement-section" id="x-upsell-container" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;">' +
+        '        <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;">Tambah ini untuk melengkapi pesananmu</div>' +
+        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;gap:12px;overflow-x:auto;padding:4px 16px 14px;margin:0 -16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;">' +
         '          <div class="x-loading-inline">Memuat rekomendasi…</div>' +
         '        </div>' +
         '      </div>' +
@@ -649,7 +649,7 @@
     if (!track || track.__dragInit) return;
     track.__dragInit = true;
 
-    // 1. Pointer Events (Desktop / Mouse Drag)
+    // Pointer/Mouse Drag for Desktop only
     var isDown = false;
     var startX = 0;
     var startScroll = 0;
@@ -674,43 +674,6 @@
       isDown = false;
     };
     window.addEventListener('mouseup', stopMouseDrag);
-
-    // 2. Direct Touch Events with Directional Lock for Android PWA WebViews
-    var touchStartX = 0;
-    var touchStartY = 0;
-    var touchStartScroll = 0;
-    var isHorizontalSwipe = null;
-
-    track.addEventListener('touchstart', function (e) {
-      if (!e.touches || !e.touches[0]) return;
-      if (e.target && e.target.closest && e.target.closest('.x-upsell-add-btn')) return;
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-      touchStartScroll = track.scrollLeft;
-      isHorizontalSwipe = null;
-    }, { passive: true });
-
-    track.addEventListener('touchmove', function (e) {
-      if (!e.touches || !e.touches[0]) return;
-      var curX = e.touches[0].clientX;
-      var curY = e.touches[0].clientY;
-      var dx = curX - touchStartX;
-      var dy = curY - touchStartY;
-
-      if (isHorizontalSwipe === null) {
-        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
-          isHorizontalSwipe = Math.abs(dx) >= Math.abs(dy);
-        }
-      }
-
-      if (isHorizontalSwipe) {
-        track.scrollLeft = touchStartScroll - dx;
-      }
-    }, { passive: true });
-
-    track.addEventListener('touchend', function () {
-      isHorizontalSwipe = null;
-    }, { passive: true });
   }
 
   function renderUpsellTrack(container, items) {
