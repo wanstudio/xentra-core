@@ -1002,6 +1002,7 @@
   width: 100% !important;
   max-width: 100% !important;
   overflow: visible !important;
+  touch-action: auto !important;
   margin: 16px 0 0 !important;
   padding: 16px 0 0 !important;
   border-top: 1px solid #f0f0f0 !important;
@@ -1031,10 +1032,13 @@
   gap: 12px !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
-  padding: 4px 16px 12px !important;
+  padding: 4px 16px 14px !important;
   margin: 0 -16px !important;
   scrollbar-width: none !important;
   -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-x: contain !important;
+  touch-action: pan-x !important;
+  scroll-behavior: smooth !important;
   box-sizing: border-box !important;
 }
 
