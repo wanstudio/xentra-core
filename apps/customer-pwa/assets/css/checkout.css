@@ -999,11 +999,13 @@
 /* ── Upsell Recommendation Rail (Identical to Category Track) ── */
 .x-complement-section,
 .x-complement-wrap {
-  width: 100%;
-  margin: 16px 0 0;
-  padding: 16px 0 0;
-  border-top: 1px solid #f0f0f0;
-  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 16px 0 0 !important;
+  padding: 16px 0 0 !important;
+  border-top: 1px solid #f0f0f0 !important;
+  box-sizing: border-box !important;
 }
 
 .x-complement-section .x-section-title,
@@ -1023,18 +1025,24 @@
 }
 
 .x-complement-track {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding: 4px 16px 14px;
-  margin: 0 -16px;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  box-sizing: border-box;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 12px !important;
+  width: calc(100% + 32px) !important;
+  max-width: calc(100% + 32px) !important;
+  min-width: 0 !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 4px 16px 14px !important;
+  margin: 0 -16px !important;
+  scrollbar-width: none !important;
+  -webkit-overflow-scrolling: touch !important;
+  box-sizing: border-box !important;
 }
 
 .x-complement-track::-webkit-scrollbar {
-  display: none;
+  display: none !important;
 }
 
 .x-loading-inline {
