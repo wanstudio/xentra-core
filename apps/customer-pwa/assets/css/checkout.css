@@ -1036,14 +1036,22 @@
   overflow-y: hidden !important;
   padding: 4px 0 14px !important;
   margin: 0 !important;
-  touch-action: pan-x !important;
+  touch-action: pan-x pan-y pinch-zoom !important;
+  overscroll-behavior-x: contain !important;
   scrollbar-width: none !important;
   -webkit-overflow-scrolling: touch !important;
   box-sizing: border-box !important;
+  cursor: grab;
+}
+
+.x-complement-track:active {
+  cursor: grabbing;
 }
 
 .x-complement-track::-webkit-scrollbar {
   display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .x-loading-inline {
@@ -1053,11 +1061,11 @@
 }
 
 .x-complement-card {
-  flex: 0 0 142px;
-  width: 142px;
-  min-width: 142px;
-  max-width: 142px;
-  flex-shrink: 0;
+  flex: 0 0 142px !important;
+  width: 142px !important;
+  min-width: 142px !important;
+  max-width: 142px !important;
+  flex-shrink: 0 !important;
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 18px;

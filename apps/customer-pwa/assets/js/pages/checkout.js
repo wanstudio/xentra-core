@@ -471,7 +471,7 @@
         '      <div id="x-checkout-items-rows">' + renderItemsHtml(items) + '</div>' +
         '      <div class="x-complement-section" id="x-upsell-container" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;min-width:0;width:100%;max-width:100%;box-sizing:border-box;">' +
         '        <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;">Tambah ini untuk melengkapi pesananmu</div>' +
-        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 0 14px;margin:0;min-width:0;width:100%;max-width:100%;touch-action:pan-x;-webkit-overflow-scrolling:touch;scrollbar-width:none;box-sizing:border-box;">' +
+        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 0 14px;margin:0;min-width:0;width:100%;max-width:100%;touch-action:pan-x pan-y pinch-zoom;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none;box-sizing:border-box;cursor:grab;">' +
         '          <div class="x-loading-inline">Memuat rekomendasi…</div>' +
         '        </div>' +
         '      </div>' +
@@ -603,31 +603,62 @@
     if (!track || track.__dragInit) return;
     track.__dragInit = true;
 
-    // Pointer/Mouse Drag for Desktop only
+    // 1. Mouse wheel horizontal scrolling on desktop
+    track.addEventListener('wheel', function (e) {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && e.deltaY !== 0) {
+        track.scrollLeft += e.deltaY;
+      }
+    }, { passive: true });
+
+    // 2. Mouse/Pointer Drag for Desktop (Native momentum scroll handles touch)
     var isDown = false;
     var startX = 0;
     var startScroll = 0;
+    var hasDragged = false;
 
-    track.addEventListener('mousedown', function (e) {
+    track.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'touch') return;
+      if (e.button !== 0) return;
       if (e.target && e.target.closest && e.target.closest('.x-upsell-add-btn')) return;
       isDown = true;
-      startX = e.pageX || e.clientX || 0;
+      hasDragged = false;
+      startX = e.clientX;
       startScroll = track.scrollLeft;
+      track.style.cursor = 'grabbing';
+      if (track.setPointerCapture) {
+        try { track.setPointerCapture(e.pointerId); } catch (_) {}
+      }
     });
 
-    window.addEventListener('mousemove', function (e) {
+    track.addEventListener('pointermove', function (e) {
       if (!isDown) return;
-      var currentX = e.pageX || e.clientX || 0;
+      var currentX = e.clientX;
       var diff = currentX - startX;
       if (Math.abs(diff) > 3) {
+        hasDragged = true;
         track.scrollLeft = startScroll - diff;
       }
     });
 
-    var stopMouseDrag = function () {
+    function endPointerDrag(e) {
+      if (!isDown) return;
       isDown = false;
-    };
-    window.addEventListener('mouseup', stopMouseDrag);
+      track.style.cursor = '';
+      if (e && track.releasePointerCapture && e.pointerId) {
+        try { track.releasePointerCapture(e.pointerId); } catch (_) {}
+      }
+    }
+
+    track.addEventListener('pointerup', endPointerDrag);
+    track.addEventListener('pointercancel', endPointerDrag);
+
+    track.addEventListener('click', function (e) {
+      if (hasDragged) {
+        e.preventDefault();
+        e.stopPropagation();
+        hasDragged = false;
+      }
+    }, true);
   }
 
   function renderUpsellTrack(container, items) {
