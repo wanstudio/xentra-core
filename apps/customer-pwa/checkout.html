@@ -14,7 +14,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_0b76aa3';
+      var PWA_VERSION = 'v_f98d93a';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -42,12 +42,12 @@
   <link rel="manifest" href="/manifest.json">
 
   <!-- CSS (version-hashed for instant cache-busting) -->
-  <link rel="stylesheet" href="/assets/css/tokens.css?v=0b76aa3">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=0b76aa3">
-  <link rel="stylesheet" href="/assets/css/components.css?v=0b76aa3">
-  <link rel="stylesheet" href="/assets/css/home.css?v=0b76aa3">
-  <link rel="stylesheet" href="/assets/css/checkout.css?v=0b76aa3">
-  <link rel="stylesheet" href="/assets/css/order-received.css?v=0b76aa3">
+  <link rel="stylesheet" href="/assets/css/tokens.css?v=f98d93a">
+  <link rel="stylesheet" href="/assets/css/layout.css?v=f98d93a">
+  <link rel="stylesheet" href="/assets/css/components.css?v=f98d93a">
+  <link rel="stylesheet" href="/assets/css/home.css?v=f98d93a">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=f98d93a">
+  <link rel="stylesheet" href="/assets/css/order-received.css?v=f98d93a">
 </head>
 <body>
 
@@ -197,17 +197,17 @@
   <!-- ═══════════════════════════════════════════════════
        JS CORE & CONTROLLERS (Version Hashed v2.3.6)
        ═══════════════════════════════════════════════════ -->
-  <script src="/assets/js/core/store.js?v=0b76aa3"></script>
-  <script src="/assets/js/core/ui.js?v=0b76aa3"></script>
-  <script src="/assets/js/core/api.js?v=0b76aa3"></script>
-  <script src="/assets/js/core/nav.js?v=0b76aa3"></script>
-  <script src="/assets/js/core/router.js?v=0b76aa3"></script>
-  <script src="/assets/js/core/pwa-runtime.js?v=0b76aa3"></script>
+  <script src="/assets/js/core/store.js?v=f98d93a"></script>
+  <script src="/assets/js/core/ui.js?v=f98d93a"></script>
+  <script src="/assets/js/core/api.js?v=f98d93a"></script>
+  <script src="/assets/js/core/nav.js?v=f98d93a"></script>
+  <script src="/assets/js/core/router.js?v=f98d93a"></script>
+  <script src="/assets/js/core/pwa-runtime.js?v=f98d93a"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=0b76aa3"></script>
-  <script src="/assets/js/pages/checkout.js?v=0b76aa3"></script>
-  <script src="/assets/js/pages/order-received.js?v=0b76aa3"></script>
+  <script src="/assets/js/pages/home.js?v=f98d93a"></script>
+  <script src="/assets/js/pages/checkout.js?v=f98d93a"></script>
+  <script src="/assets/js/pages/order-received.js?v=f98d93a"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -281,7 +281,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=0b76aa3').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=f98d93a').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {

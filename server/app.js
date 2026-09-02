@@ -216,8 +216,8 @@ app.post(['/wp-json/xentra/v1/deploy', '/api/v1/deploy', '/wp-json/xentra/v1/dep
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// REST API with Tenant Resolution
-app.use('/api/v1', tenantResolver, apiRoutes);
+// REST API with Tenant Resolution (Support both /api/v1 and /api)
+app.use(['/api/v1', '/api'], tenantResolver, apiRoutes);
 
 // Serve Public Static Assets
 app.use('/assets', express.static(path.join(__dirname, '../apps/customer-pwa/assets')));
