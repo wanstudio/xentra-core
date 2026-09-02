@@ -89,6 +89,14 @@ class OrderStateMachine {
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run(logId, order_id, currentStatus, target_status, actor_type, actor_id, note);
 
+      // 4. Void active promotion redemptions if cancelled
+      if (target_status === 'cancelled') {
+        try {
+          const PromotionEngineService = require('../../domains/promotion/services/PromotionEngineService');
+          PromotionEngineService.voidRedemptions({ order_id, reason: note || `Order cancelled by ${actor_type}` });
+        } catch (_) {}
+      }
+
       db.exec('COMMIT;');
     } catch (txErr) {
       try { db.exec('ROLLBACK;'); } catch (_) {}

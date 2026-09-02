@@ -28,7 +28,7 @@ class PrePaymentVerificationGate {
    * @param {Array<{ product_id: string|number, quantity: number, expected_price: number, name?: string }>} params.items
    * @returns {{ status: string, is_valid: boolean, verified_items: Array<Object>, price_diffs: Array<Object>, errors: Array<string> }}
    */
-  static verify({ branch_id, brand_id, items = [] }) {
+  static verify({ branch_id, brand_id, items = [], customer = {}, is_pwa_installed = false }) {
     if (!branch_id) {
       throw new Error('[PrePaymentVerificationGate] "branch_id" is required for final verification.');
     }
@@ -54,6 +54,13 @@ class PrePaymentVerificationGate {
     const priceDiffs = [];
     const errors = [];
     const verifiedItems = [];
+    const appliedPromos = [];
+
+    // Lazy load PromotionEngineService to avoid circular dependency
+    let PromotionEngineService = null;
+    try {
+      PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+    } catch (_) {}
 
     for (const item of items) {
       const productId = item.product_id || item.id;
@@ -66,15 +73,71 @@ class PrePaymentVerificationGate {
         continue;
       }
 
-      // SPECIAL INCENTIVE GUARD: Promo Es Teh Gratis Rp0 (PWA Welcome Freebie)
-      if (String(productId) === 'promo-es-teh-gratis') {
+      // AUTHORITATIVE ZERO-TRUST REWARD RESOLUTION (F02 Hardening):
+      // Client-supplied reward identifiers (reward_*, promo-es-teh-gratis) are treated as CLAIM INTENT only.
+      // Backend independently verifies customer eligibility, rules, and authoritative reward pricing.
+      const isRewardIntent = Boolean(
+        item.is_promo_reward ||
+        item.promo_id ||
+        String(productId).startsWith('reward_') ||
+        String(productId) === 'promo-es-teh-gratis'
+      );
+
+      if (isRewardIntent && PromotionEngineService) {
+        let promoId = item.promo_id || (String(productId).startsWith('reward_') ? String(productId).replace(/^reward_/, '') : null);
+        
+        // Context-aware evaluation
+        const nonRewardItems = items.filter(it => {
+          const pid = String(it.product_id || it.id || '');
+          return !it.is_promo_reward && !it.promo_id && !pid.startsWith('reward_') && pid !== 'promo-es-teh-gratis';
+        });
+
+        const evalResult = PromotionEngineService.evaluate({
+          brand_id,
+          is_pwa_installed: is_pwa_installed !== undefined ? Boolean(is_pwa_installed) : true,
+          customer_phone: (customer && customer.phone) ? String(customer.phone).trim() : '',
+          cart_items: nonRewardItems
+        });
+
+        const eligiblePromo = (evalResult.applied || []).find(p => !promoId || p.promo_id === promoId || p.id === promoId) ||
+                              (evalResult.discovery || []).find(p => (!promoId || p.promo_id === promoId || p.id === promoId) && p.should_grant_reward);
+
+        if (!eligiblePromo) {
+          errors.push(`Klaim hadiah promo tidak valid atau syarat promo belum terpenuhi.`);
+          continue;
+        }
+
+        const authoritativePromoId = eligiblePromo.promo_id || eligiblePromo.id;
+        const rewardSpec = eligiblePromo.reward || {};
+        const authoritativeRewardPrice = Number(rewardSpec.reward_price || rewardSpec.amount_in_cents || 0);
+        const rewardName = eligiblePromo.display?.reward_title || item.name || 'Hadiah Promo Spesial';
+        const targetPid = rewardSpec.product_id || productId || 'reward_item';
+
+        // P1 BRANCH CATALOG SCOPE CHECK: Ensure reward product is available in this branch
+        if (targetPid && targetPid !== 'reward_item' && targetPid !== 'prod_welcome_reward') {
+          const bpCheck = db.prepare(`
+            SELECT is_available FROM branch_products WHERE branch_id = ? AND product_id = ?
+          `).get(branch_id, targetPid);
+          if (bpCheck && bpCheck.is_available === 0) {
+            errors.push(`Produk hadiah "${rewardName}" sedang dinonaktifkan di cabang ini.`);
+            continue;
+          }
+        }
+
         verifiedItems.push({
-          product_id: 'promo-es-teh-gratis',
-          name: item.name || 'Es Teh Manis',
-          quantity: requestedQty,
-          unit_price: 0,
-          subtotal: 0,
-          notes: 'Selamat! Es Teh Gratis untuk pesanan pertamamu!'
+          product_id: targetPid,
+          promo_id: authoritativePromoId,
+          is_promo_reward: true,
+          name: rewardName,
+          quantity: 1,
+          unit_price: authoritativeRewardPrice,
+          subtotal: authoritativeRewardPrice,
+          notes: eligiblePromo.display?.reward_badge_text || 'Bonus Promo Terverifikasi'
+        });
+
+        appliedPromos.push({
+          promo_id: authoritativePromoId,
+          benefit_amount: authoritativeRewardPrice === 0 ? 5000 : authoritativeRewardPrice
         });
         continue;
       }
@@ -180,6 +243,7 @@ class PrePaymentVerificationGate {
       status: PrePaymentVerificationGate.STATUS.VERIFIED,
       is_valid: true,
       verified_items: verifiedItems,
+      applied_promos: appliedPromos,
       price_diffs: [],
       errors: []
     };

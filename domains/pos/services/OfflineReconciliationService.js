@@ -41,17 +41,16 @@ class OfflineReconciliationService {
     offline_created_at = null,
     customer = {}
   }) {
-    if (!client_transaction_id) {
-      throw new Error('[OfflineReconciliation] "client_transaction_id" is mandatory for offline sync.');
+    if (!client_transaction_id || typeof client_transaction_id !== 'string' || client_transaction_id.trim().length < 8 || client_transaction_id.trim().length > 64) {
+      throw new Error('[OfflineReconciliation] "client_transaction_id" tidak valid (wajib berupa string berkarakter 8-64).');
     }
 
-    // 1. Idempotency Check: Query if order with this client_transaction_id already exists
-    // Note: We check if an order exists with note or metadata containing client_transaction_id
+    // 1. Scoped Idempotency Check: Query directly by scoped (branch_id, client_transaction_id)
     const existingOrder = db.prepare(`
       SELECT * FROM orders 
-      WHERE brand_id = ? AND branch_id = ? AND order_note LIKE ?
+      WHERE branch_id = ? AND client_transaction_id = ?
       LIMIT 1
-    `).get(brand_id, branch_id, `%[TX_ID:${client_transaction_id}]%`);
+    `).get(branch_id, client_transaction_id);
 
     if (existingOrder) {
       return {
@@ -63,25 +62,45 @@ class OfflineReconciliationService {
 
     // 2. Authoritative Capture: Submit Order via Commerce placement
     const noteWithTxId = `POS Offline Sync [TX_ID:${client_transaction_id}] [DeviceTime:${offline_created_at || 'unknown'}]`;
-    const placementResult = await OrderPlacementService.submitOrder({
-      brand_id,
-      branch_id,
-      customer: {
-        name: customer.name || 'Pelanggan POS (Offline)',
-        phone: customer.phone || ''
-      },
-      items,
-      delivery_fee: 0,
-      payment_method,
-      order_channel: 'pos_cashier',
-      fulfillment_type: order_type,
-      table_number: customer.table_number || null,
-      notes: noteWithTxId,
-      trace_context: {
-        correlation_id: client_transaction_id,
-        causation_id: `offline_sync_${Date.now()}`
+    let placementResult;
+
+    try {
+      placementResult = await OrderPlacementService.submitOrder({
+        brand_id,
+        branch_id,
+        customer: {
+          name: customer.name || 'Pelanggan POS (Offline)',
+          phone: customer.phone || ''
+        },
+        items,
+        delivery_fee: 0,
+        payment_method,
+        order_channel: 'pos_cashier',
+        fulfillment_type: order_type,
+        table_number: customer.table_number || null,
+        client_transaction_id,
+        notes: noteWithTxId,
+        trace_context: {
+          correlation_id: client_transaction_id,
+          causation_id: `offline_sync_${Date.now()}`
+        }
+      });
+    } catch (err) {
+      // Handle concurrent duplicate submission via SQLite UNIQUE constraint
+      if (err.message && (err.message.includes('idx_orders_branch_client_tx') || err.message.includes('UNIQUE constraint failed: orders.branch_id, orders.client_transaction_id'))) {
+        const deduplicated = db.prepare(`
+          SELECT * FROM orders WHERE branch_id = ? AND client_transaction_id = ? LIMIT 1
+        `).get(branch_id, client_transaction_id);
+        if (deduplicated) {
+          return {
+            status: 'DUPLICATE_IGNORED',
+            order: deduplicated,
+            message: 'Transaksi offline sudah pernah disinkronkan sebelumnya (Idempotent Deduplicated).'
+          };
+        }
       }
-    });
+      throw err;
+    }
 
     if (!placementResult.success) {
       // In authoritative cash mode, if stock changed while offline, we still record order with variance audit

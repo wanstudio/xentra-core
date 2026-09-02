@@ -267,8 +267,8 @@ class PaymentGatewayService {
 
     const now = new Date().toISOString();
 
-    // P1 ATOMICITY INVARIANT (Finding 3): Unify payment update, order confirmation, stock deduction, and ledger into single atomic transaction
-    db.exec('BEGIN TRANSACTION;');
+    // P1 ATOMICITY INVARIANT: Unify payment update, order confirmation, stock deduction, promo settlement into single atomic transaction
+    db.exec('BEGIN IMMEDIATE;');
     try {
       // Update order_payments table
       db.prepare(`
@@ -282,19 +282,71 @@ class PaymentGatewayService {
         const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
         OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
 
-        // 2. Confirm Order Record if all items were deducted successfully
+        // 2. Authoritative Atomic Promotion Consumption & Concurrency Race Guard (F01 First-Settlement-Wins)
+        const promoItems = db.prepare(`
+          SELECT * FROM order_items 
+          WHERE order_id = ? AND (note LIKE '%Promo%' OR note LIKE '%Bonus%' OR note LIKE '%Hadiah%' OR product_id LIKE 'reward_%')
+        `).all(order_id);
+
+        const promoRedemptionsToRecord = [];
+        if (promoItems && promoItems.length > 0 && order && order.customer_phone) {
+          for (const it of promoItems) {
+            const promoId = it.product_id.startsWith('reward_') ? it.product_id.replace(/^reward_/, '') : it.product_id;
+            
+            // Query active customer redemptions for this promo
+            const activeRedemptions = db.prepare(`
+              SELECT COUNT(*) as count FROM promotion_redemptions 
+              WHERE promotion_id = ? AND customer_phone = ? AND status = 'active'
+            `).get(promoId, order.customer_phone);
+
+            const promoRow = db.prepare('SELECT max_redemptions_per_customer FROM promotions WHERE id = ?').get(promoId);
+            const maxLimit = promoRow ? Number(promoRow.max_redemptions_per_customer || 1) : 1;
+
+            if (activeRedemptions && activeRedemptions.count >= maxLimit) {
+              throw new Error(`[PROMO_LIMIT_EXCEEDED_RACE] Batas klaim promo "${promoId}" (${maxLimit}x) telah digunakan oleh pesanan lain milik pelanggan.`);
+            }
+
+            promoRedemptionsToRecord.push({
+              promo_id: promoId,
+              benefit_amount: it.unit_price === 0 ? 5000 : it.unit_price
+            });
+          }
+        }
+
+        // 3. Confirm Order Record if inventory & promotions verified
         db.prepare(`
           UPDATE orders
           SET status = 'confirmed', payment_method = 'midtrans', updated_at = ?
           WHERE id = ?
         `).run(now, order_id);
+
+        // 4. Record Promotion Redemptions atomically
+        if (promoRedemptionsToRecord.length > 0) {
+          try {
+            const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+            PromotionEngineService.recordRedemptions({
+              order_id,
+              brand_id: order?.brand_id,
+              branch_id: order?.branch_id,
+              customer_phone: order?.customer_phone,
+              promotions: promoRedemptionsToRecord
+            });
+          } catch (prmErr) {
+            console.warn('[PaymentGatewayService] recordRedemptions warning:', prmErr.message);
+          }
+        }
       } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
-        // P1 FAILED PAYMENT INVARIANT: Mark order as cancelled with ZERO inventory mutation
+        // P1 FAILED PAYMENT INVARIANT: Mark order as cancelled with ZERO inventory mutation & void promo redemptions
         db.prepare(`
           UPDATE orders
           SET status = 'cancelled', updated_at = ?
           WHERE id = ?
         `).run(now, order_id);
+
+        try {
+          const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+          PromotionEngineService.voidRedemptions({ order_id, reason: `Gateway status ${newPaymentStatus}` });
+        } catch (_) {}
       }
 
       db.exec('COMMIT;');
@@ -303,22 +355,27 @@ class PaymentGatewayService {
       console.error('[PaymentGatewayService] Settlement transaction error:', err.message);
 
       // P1 FULFILLMENT EXCEPTION (Race Condition between checkout and settlement):
-      // Money has been settled by gateway but inventory was depleted by concurrent orders.
+      // Money has been settled by gateway but inventory or promo limit was exceeded by concurrent orders.
       // Record payment as settlement, mark order as fulfillment_exception for refund/manual intervention.
-      if (err.message && err.message.includes('[OUT_OF_STOCK_RACE]')) {
+      const isConcurrencyException = err.message && (err.message.includes('[OUT_OF_STOCK_RACE]') || err.message.includes('[PROMO_LIMIT_EXCEEDED_RACE]'));
+      if (isConcurrencyException) {
         try {
-          db.exec('BEGIN TRANSACTION;');
+          db.exec('BEGIN IMMEDIATE;');
           db.prepare(`
             UPDATE order_payments 
             SET payment_status = 'settlement', payment_method = 'midtrans', raw_webhook_response = ?, settled_at = ?
             WHERE order_id = ?
           `).run(JSON.stringify(webhookData), now, order_id);
 
+          const notePrefix = err.message && err.message.includes('[PROMO_LIMIT_EXCEEDED_RACE]')
+            ? `[Kendala Promo / Perlu Penyesuaian/Refund]: ${err.message}`
+            : `[Kendala Stok / Perlu Refund]: ${err.message}`;
+
           db.prepare(`
             UPDATE orders
             SET status = 'fulfillment_exception', payment_method = 'midtrans', order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ?
             WHERE id = ?
-          `).run(`[Kendala Stok / Perlu Refund]: ${err.message}`, now, order_id);
+          `).run(notePrefix, now, order_id);
           db.exec('COMMIT;');
 
           events.EventBus.publish({
@@ -341,7 +398,7 @@ class PaymentGatewayService {
             order_id,
             payment_status: 'settlement',
             order_status: 'fulfillment_exception',
-            message: 'Pembayaran berhasil diselesaikan namun stok habis. Pesanan dialihkan ke antrean fulfillment exception untuk tindak lanjut refund.'
+            message: 'Pembayaran berhasil diselesaikan namun terdapat kendala ketersediaan stok atau batas promosi. Pesanan dialihkan ke antrean fulfillment exception untuk rekonsiliasi refund.'
           };
         } catch (innerErr) {
           try { db.exec('ROLLBACK;'); } catch (_) {}

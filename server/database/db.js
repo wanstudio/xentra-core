@@ -27,6 +27,10 @@ try {
   dbInstance.exec('PRAGMA busy_timeout = 5000;');
   console.log('[Database] Native node:sqlite initialized successfully.');
 } catch (e) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[Database Fatal] Native SQLite (node:sqlite) failed to initialize in production environment:', e.message);
+    process.exit(1);
+  }
   console.log('[Database] node:sqlite unavailable. Using memoryStore fallback (sql.js disabled to save WASM memory).');
   // sql.js disabled on Node 20 due to CloudLinux 2GB vmem limit + undici WASM OOM — memoryStore is sufficient for health/deploy
   sqlJsPromise = null; rawSqlDb = null;
@@ -353,6 +357,7 @@ function initSchema(targetDb) {
     CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
       order_number TEXT UNIQUE NOT NULL,
+      client_transaction_id TEXT,
       brand_id TEXT NOT NULL,
       branch_id TEXT NOT NULL,
       customer_name TEXT NOT NULL,
@@ -510,11 +515,16 @@ function initSchema(targetDb) {
       branch_id TEXT NOT NULL,
       customer_phone TEXT NOT NULL,
       benefit_amount INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
       redeemed_at TEXT DEFAULT (datetime('now')),
+      voided_at TEXT,
+      void_reason TEXT,
       FOREIGN KEY (promotion_id) REFERENCES promotions(id),
-      FOREIGN KEY (order_id) REFERENCES orders(id)
+      FOREIGN KEY (order_id) REFERENCES orders(id),
+      UNIQUE (order_id, promotion_id)
     );
     CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust ON promotion_redemptions(promotion_id, customer_phone);
+    CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust_active ON promotion_redemptions(promotion_id, customer_phone) WHERE status = 'active';
     CREATE INDEX IF NOT EXISTS idx_prm_redemptions_order ON promotion_redemptions(order_id);
 
     CREATE TABLE IF NOT EXISTS branch_products (
@@ -640,6 +650,12 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN order_channel TEXT DEFAULT "customer_app";'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN fulfillment_type TEXT DEFAULT "delivery";'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN table_number TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE orders ADD COLUMN client_transaction_id TEXT;'); } catch (e) {}
+  try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_branch_client_tx ON orders(branch_id, client_transaction_id) WHERE client_transaction_id IS NOT NULL;'); } catch (e) {}
+  try { targetDb.exec("ALTER TABLE promotion_redemptions ADD COLUMN status TEXT NOT NULL DEFAULT 'active';"); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE promotion_redemptions ADD COLUMN voided_at TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE promotion_redemptions ADD COLUMN void_reason TEXT;'); } catch (e) {}
+  try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust_active ON promotion_redemptions(promotion_id, customer_phone) WHERE status = 'active';"); } catch (e) {}
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_order_payments_order_id ON order_payments(order_id);'); } catch (e) {}
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_shifts_unique_active_cashier ON pos_shifts(cashier_id) WHERE status = "open";'); } catch (e) {}
 

@@ -567,3 +567,91 @@ test('Payment 8 — Cash Settlement: Preserves existing payment_id in events, pr
     });
   }, /status terminal "completed"/);
 });
+
+test('Payment 9 — Webhook Concurrency Race & Idempotent Retry: First settlement wins, second handles promo exception', () => {
+  const brandId = 'brand_pay';
+  const branchId = 'branch_pay';
+  const customerPhone = '081299990099';
+  const promoId = 'prm_race_limit_1';
+
+  // 1. Create promo with max 1 claim per customer and ensure stock
+  db.prepare(`
+    INSERT OR REPLACE INTO promotions (id, brand_id, name, capability_type, stacking_policy, max_redemptions_per_customer, is_active)
+    VALUES (?, ?, 'Promo 1x Only', 'install_incentive', 'exclusive', 1, 1)
+  `).run(promoId, brandId);
+
+  db.prepare(`
+    INSERT OR IGNORE INTO categories (id, brand_id, name, slug) VALUES ('cat_pay', 'brand_pay', 'Cat Pay', 'cat-pay')
+  `).run();
+  db.prepare(`
+    INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active)
+    VALUES ('prod_pay_1', 'brand_pay', 'cat_pay', 'Bebek Goreng', 'bebek-goreng-pay', 25000, 1)
+  `).run();
+  db.prepare(`
+    INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
+    VALUES ('branch_pay', 'prod_pay_1', 25000, 100, 1)
+  `).run();
+
+  // 2. Create Order A and Order B (both pending with promo applied)
+  const orderIdA = `ord_race_A_${Date.now()}`;
+  const orderIdB = `ord_race_B_${Date.now()}`;
+
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, subtotal, grand_total, payment_method, status)
+    VALUES (?, 'ORD-RACE-A', ?, ?, 'Customer Race', ?, 'delivery', 25000, 25000, 'midtrans', 'pending'),
+           (?, 'ORD-RACE-B', ?, ?, 'Customer Race', ?, 'delivery', 25000, 25000, 'midtrans', 'pending')
+  `).run(orderIdA, brandId, branchId, customerPhone, orderIdB, brandId, branchId, customerPhone);
+
+  db.prepare(`
+    INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note)
+    VALUES ('it_A1', ?, 'prod_pay_1', 'Bebek Goreng', 25000, 1, 25000, ''),
+           ('it_A2', ?, ?, 'Hadiah Es Teh', 0, 1, 0, 'Bonus Promo PWA'),
+           ('it_B1', ?, 'prod_pay_1', 'Bebek Goreng', 25000, 1, 25000, ''),
+           ('it_B2', ?, ?, 'Hadiah Es Teh', 0, 1, 0, 'Bonus Promo PWA')
+  `).run(orderIdA, orderIdA, promoId, orderIdB, orderIdB, promoId);
+
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, payment_method, merchant_id, snap_token, payment_status, amount)
+    VALUES ('pay_A', ?, 'midtrans', 'midtrans', 'midtrans_default', 'snap_A', 'pending', 25000),
+           ('pay_B', ?, 'midtrans', 'midtrans', 'midtrans_default', 'snap_B', 'pending', 25000)
+  `).run(orderIdA, orderIdB);
+
+  // 3. Webhook settlement for Order A (Wins)
+  const webhookPayloadA = {
+    order_id: orderIdA,
+    transaction_status: 'settlement',
+    gross_amount: '25000'
+  };
+
+  const resA = PaymentGatewayService.handleWebhook(webhookPayloadA, { skipSignatureCheck: true });
+  assert.strictEqual(resA.payment_status, 'settlement');
+  const orderAInDb = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderIdA);
+  assert.strictEqual(orderAInDb.status, 'confirmed');
+
+  // Verify redemption recorded for Order A
+  const rdmA = db.prepare("SELECT * FROM promotion_redemptions WHERE order_id = ? AND status = 'active'").get(orderIdA);
+  assert.ok(rdmA);
+
+  // 4. Webhook settlement for Order B (Race: Customer already consumed limit)
+  const webhookPayloadB = {
+    order_id: orderIdB,
+    transaction_status: 'settlement',
+    gross_amount: '25000'
+  };
+
+  const resB = PaymentGatewayService.handleWebhook(webhookPayloadB, { skipSignatureCheck: true });
+  assert.strictEqual(resB.payment_status, 'settlement');
+  assert.strictEqual(resB.order_status, 'fulfillment_exception');
+
+  const orderBInDb = db.prepare('SELECT status, order_note FROM orders WHERE id = ?').get(orderIdB);
+  assert.strictEqual(orderBInDb.status, 'fulfillment_exception');
+  assert.ok(orderBInDb.order_note.includes('PROMO_LIMIT_EXCEEDED_RACE'));
+
+  // 5. Idempotent Retry: Re-sending webhook for Order A returns idempotent success without duplicate rows
+  const retryA = PaymentGatewayService.handleWebhook(webhookPayloadA, { skipSignatureCheck: true });
+  assert.strictEqual(retryA.idempotent, true);
+  assert.strictEqual(retryA.payment_status, 'settlement');
+
+  const totalRdm = db.prepare('SELECT COUNT(*) as count FROM promotion_redemptions WHERE promotion_id = ? AND customer_phone = ?').get(promoId, customerPhone);
+  assert.strictEqual(totalRdm.count, 1);
+});

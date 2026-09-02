@@ -41,6 +41,7 @@ class OrderPlacementService {
     table_number = null,
     reservation_date = null,
     guest_count = null,
+    client_transaction_id = null,
     notes = '',
     trace_context = {}
   }) {
@@ -161,11 +162,11 @@ class OrderPlacementService {
         db.exec('COMMIT;');
       } catch (txErr) {
         try { db.exec('ROLLBACK;'); } catch (_) {}
+        console.error('[OrderPlacementService] Reservation insert error:', txErr.message);
         return {
           success: false,
-          status: 'RESERVATION_ERROR',
-          errors: [txErr.message || 'Gagal membuat data booking reservasi.'],
-          price_diffs: []
+          status: 'ORDER_CREATION_FAILED',
+          errors: [txErr.message]
         };
       }
 
@@ -240,10 +241,10 @@ class OrderPlacementService {
     // 2. Prepared Statements for Transaction
     const insertOrderStmt = db.prepare(`
       INSERT INTO orders (
-        id, order_number, brand_id, branch_id, customer_name, customer_phone,
+        id, order_number, client_transaction_id, brand_id, branch_id, customer_name, customer_phone,
         order_type, order_channel, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
         subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
     `);
 
     const insertOrderItemStmt = db.prepare(`
@@ -259,13 +260,14 @@ class OrderPlacementService {
       WHERE branch_id = ? AND product_id = ? AND stock >= ?
     `);
 
-    // 3. Execute Transaction
+    // 3. Execute Transaction with BEGIN IMMEDIATE to eliminate lock escalation races
     try {
-      db.exec('BEGIN TRANSACTION;');
+      db.exec('BEGIN IMMEDIATE;');
 
       insertOrderStmt.run(
         orderId,
         orderNumber,
+        client_transaction_id || null,
         brand_id,
         branch_id,
         customer.name || 'Pelanggan',
@@ -379,9 +381,32 @@ class OrderPlacementService {
         now
       );
 
+      // P1 PROMOTION CONSUMPTION BOUNDARY (F01 Hardening):
+      // For immediate cash / POS orders, record immutable redemption ledger in same transaction
+      if (effectivePaymentMethod === 'cash' && verification.applied_promos && verification.applied_promos.length > 0) {
+        try {
+          const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+          PromotionEngineService.recordRedemptions({
+            order_id: orderId,
+            brand_id,
+            branch_id,
+            customer_phone: customer.phone,
+            promotions: verification.applied_promos
+          });
+        } catch (prmErr) {
+          console.warn('[OrderPlacementService] Promo redemption record warning:', prmErr.message);
+        }
+      }
+
       db.exec('COMMIT;');
     } catch (txErr) {
       try { db.exec('ROLLBACK;'); } catch (_) {}
+      
+      // Re-throw unique constraint errors for scoped idempotency handling
+      if (txErr.message && (txErr.message.includes('idx_orders_branch_client_tx') || txErr.message.includes('UNIQUE constraint failed: orders.branch_id, orders.client_transaction_id'))) {
+        throw txErr;
+      }
+
       return {
         success: false,
         status: 'OUT_OF_STOCK',
@@ -506,7 +531,14 @@ class OrderPlacementService {
 
     try {
       for (const item of items) {
+        const isVirtualPromo = (item.unit_price === 0 || Number(item.unit_price) === 0) &&
+                               (item.note?.includes('Promo') || item.note?.includes('Bonus') || String(item.product_id).startsWith('prm_') || String(item.product_id).startsWith('reward_'));
+
         const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(order.branch_id, item.product_id);
+        if (!bpBefore && isVirtualPromo) {
+          continue;
+        }
+
         const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
 
         const deductResult = guardedDeductStockStmt.run(item.quantity, order.branch_id, item.product_id, item.quantity);

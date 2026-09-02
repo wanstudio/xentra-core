@@ -104,7 +104,7 @@ class PromotionEngineService {
       if (customer_phone) {
         const rdmRow = db.prepare(`
           SELECT COUNT(*) as count FROM promotion_redemptions 
-          WHERE promotion_id = ? AND customer_phone = ?
+          WHERE promotion_id = ? AND customer_phone = ? AND status = 'active'
         `).get(promo.id, customer_phone);
         if (rdmRow) customerRedemptionsCount = Number(rdmRow.count || 0);
       }
@@ -149,6 +149,8 @@ class PromotionEngineService {
 
   /**
    * Records immutable redemption ledger for applied promotions upon order completion.
+   * Enforces idempotency via UNIQUE(order_id, promotion_id).
+   * 
    * @param {Object} params
    * @param {string} params.order_id
    * @param {string} params.brand_id
@@ -166,22 +168,49 @@ class PromotionEngineService {
     if (!order_id || !Array.isArray(promotions) || promotions.length === 0) return;
 
     for (const p of promotions) {
+      const promoId = p.promo_id || p.id;
+      if (!promoId) continue;
       const redemptionId = `rdm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-      const amount = Number(p.benefit_amount || 0);
+      const amount = Number(p.benefit_amount || p.amount || 0);
 
+      try {
+        db.prepare(`
+          INSERT INTO promotion_redemptions (
+            id, promotion_id, order_id, brand_id, branch_id, customer_phone, benefit_amount, status, redeemed_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))
+          ON CONFLICT(order_id, promotion_id) DO NOTHING
+        `).run(
+          redemptionId,
+          promoId,
+          order_id,
+          brand_id,
+          branch_id,
+          customer_phone || '',
+          amount
+        );
+      } catch (e) {
+        console.warn('[PromotionEngineService] recordRedemptions warning:', e.message);
+      }
+    }
+  }
+
+  /**
+   * Voids promotion redemptions upon order cancellation or refund without destroying audit trail.
+   * 
+   * @param {Object} params
+   * @param {string} params.order_id
+   * @param {string} [params.reason]
+   */
+  static voidRedemptions({ order_id, reason = 'Order cancelled or expired' }) {
+    if (!order_id) return;
+    try {
       db.prepare(`
-        INSERT INTO promotion_redemptions (
-          id, promotion_id, order_id, brand_id, branch_id, customer_phone, benefit_amount, redeemed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      `).run(
-        redemptionId,
-        p.promo_id,
-        order_id,
-        brand_id,
-        branch_id,
-        customer_phone || '',
-        amount
-      );
+        UPDATE promotion_redemptions
+        SET status = 'voided', voided_at = datetime('now'), void_reason = ?
+        WHERE order_id = ? AND status = 'active'
+      `).run(reason, order_id);
+    } catch (e) {
+      console.warn('[PromotionEngineService] Failed to void redemptions for order:', order_id, e.message);
     }
   }
 }
