@@ -65,24 +65,10 @@
   var isIosPwa = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
 
   function checkIsPwaInstalled() {
-    // 1. Android / Desktop display-mode check (CSS matchMedia)
-    var isStandalone = window.matchMedia && (
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.matchMedia('(display-mode: fullscreen)').matches ||
-      window.matchMedia('(display-mode: minimal-ui)').matches ||
-      window.matchMedia('(display-mode: window-controls-overlay)').matches
-    );
-    // 2. iOS Safari standalone mode check
-    var isIosStandalone = window.navigator.standalone === true;
-    // 3. Android TWA / WebAPK referrer check
-    var isTwa = document.referrer && document.referrer.startsWith('android-app://');
-    // 4. URL query param or launcher flag
-    var isUrlFlagged = window.location.search && (window.location.search.indexOf('mode=pwa') !== -1 || window.location.search.indexOf('pwa=1') !== -1);
-    // 5. Local persistent storage flag after user installed
-    var isFlaggedInstalled = false;
-    try { isFlaggedInstalled = localStorage.getItem('xentra_pwa_installed') === '1'; } catch (_) {}
-
-    return Boolean(isStandalone || isIosStandalone || isTwa || isUrlFlagged || isFlaggedInstalled);
+    if (window.Xentra && window.Xentra.PwaRuntime) {
+      return window.Xentra.PwaRuntime.getPwaRuntimeContext().display_mode === 'standalone';
+    }
+    return Boolean(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
   }
 
   var isPwaInstalled = checkIsPwaInstalled();
@@ -107,43 +93,12 @@
 
   function getBannerPromo() {
     var p = promoEvaluation.discovery.find(function (p) { return p.should_show_banner === true; });
-    if (p) return p;
-    if (!checkIsPwaInstalled()) {
-      return {
-        promo_id: 'promo_install_pwa_default',
-        should_show_banner: true,
-        display: {
-          banner_title: 'Install sekarang & dapatkan promo spesial',
-          banner_subtitle: 'Dapatkan Es Teh Manis Gratis untuk pesananmu',
-          icon_url: '/assets/pwa/icon-192.png'
-        }
-      };
-    }
-    return null;
+    return p || null;
   }
 
   function getAppliedRewardPromo() {
     var p = promoEvaluation.applied.find(function (p) { return p.should_grant_reward === true && p.reward; });
-    if (p) return p;
-    if (checkIsPwaInstalled()) {
-      return {
-        promo_id: 'promo_install_pwa_default',
-        should_grant_reward: true,
-        display: {
-          reward_title: 'Es Teh Manis Spesial',
-          reward_badge_text: '✓ Bonus PWA Aktif (Rp0)',
-          icon_url: '/assets/pwa/icon-192.png'
-        },
-        reward: {
-          promo_id: 'promo_install_pwa_default',
-          reward_type: 'freebie_product',
-          product_id: 'promo-es-teh-gratis',
-          reward_price: 0,
-          description: 'Bonus Es Teh Manis'
-        }
-      };
-    }
-    return null;
+    return p || null;
   }
 
   window.addEventListener('beforeinstallprompt', function (e) {
@@ -154,7 +109,6 @@
   window.addEventListener('appinstalled', function () {
     deferredPrompt = null;
     isPwaInstalled = true;
-    try { localStorage.setItem('xentra_pwa_installed', '1'); } catch (_) {}
     var banner = document.getElementById('x-promo-banner');
     if (banner) banner.style.display = 'none';
     if (UI && UI.toast) UI.toast('Aplikasi berhasil dipasang!');
@@ -448,8 +402,8 @@
           var rewardItemId = 'reward_' + (rewardPromo.reward ? (rewardPromo.reward.promo_id || rewardPromo.promo_id) : rewardPromo.promo_id);
           var hasRewardInCart = items.some(function (i) {
             return String(i.id) === rewardItemId ||
-                   String(i.id) === 'promo-es-teh-gratis' ||
                    String(i.id).indexOf('reward_') === 0 ||
+                   Boolean(i.is_promo_reward) ||
                    Number(i.price || 0) === 0;
           });
 
@@ -569,7 +523,7 @@
       var img = item.image_url || item.image || '';
       var qty = Number(item.quantity || 1);
       var note = (state.notes && state.notes[item.id]) || item.note || '';
-      var isPromoFreebie = String(item.id) === 'promo-es-teh-gratis' || Number(item.price) === 0;
+      var isPromoFreebie = Boolean(item.is_promo_reward || String(item.id).indexOf('reward_') === 0 || Number(item.price) === 0);
 
       html +=
         '<div class="x-product x-checkout-item" data-item-id="' + item.id + '">' +
