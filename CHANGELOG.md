@@ -1,3 +1,19 @@
+## [2.2.8] - 2026-09-02
+### Fixed & Hardened (Troubleshooting Reference)
+- **Nested Horizontal Carousel & Momentum Swipe (`checkout.css`, `checkout.js`)**:
+  - Diperbaiki konflik `touch-action` pada kartu upsell/rekomendasi: mengembalikan gestur native mobile agar swipe horizontal dan scroll vertikal halaman bekerja bersamaan dengan akselerasi hardware penuh (60/120fps).
+  - Menerapkan strict overflow containment (`overflow: hidden; max-width: 100%;`) pada parent wrappers (`#x-items-card`, `.x-complement-section`) untuk mencegah kontainer melebar mengikuti total lebar kartu, yang sebelumnya menyebabkan `clientWidth === scrollWidth` dan memicu efek bouncing elastis.
+- **Anti-Blinking Async Re-rendering & Touch Session Preservation (`checkout.js`)**:
+  - Menghapus pemanggilan destruktif `renderLayout()` (full `container.innerHTML` wipe) dari callback background async `loadActivePromotions()`.
+  - Mengisolasi update banner promo ke dedicated DOM slot (`<div id="x-promo-slot">`) via `renderPromoBanner()`, sehingga DOM tree tidak berkedip dan pointer/touch session yang sedang aktif di swipe tidak terputus (*detached DOM element*).
+  - Menambahkan caching key guard (`track.__renderedKey`) di `applyUpsellPool()` agar refresh data katalog tidak menimpa innerHTML dan tidak mereset `scrollLeft` ke 0 saat kartu produk tidak mengalami perubahan ID.
+- **Promo Claim & Welcome Banner Reactivity (`checkout.js`)**:
+  - Memasang `renderPromoBanner()` ke dalam `Store.subscribe()` pada setiap mutasi kuantitas item keranjang.
+  - Memperbaiki bug di mana setelah menu promo dihapus dengan tombol minus (`-`), banner tidak otomatis kembali ke status tombol "Claim" (sebelumnya memerlukan reload halaman manual).
+- **Node.js Environment & LiteSpeed Passenger Compatibility (`db.js`, `deploy-core.sh`)**:
+  - Menambahkan fallback adapter `sql.js` dengan persistensi disk ketika berjalan di Node.js <= v20 pada cPanel Dewaweb CloudLinux Passenger (di mana modul `node:sqlite` belum built-in).
+  - Mengonfigurasi alias route Express `['/api/v1', '/api']` agar request API selalu merespons JSON valid dan tidak jatuh ke fallback HTML.
+
 ## [2.2.7] - 2026-09-01
 ### Fixed
 - Multi-Tenant Domain & Host Resolution (`tenantResolver.js`):
