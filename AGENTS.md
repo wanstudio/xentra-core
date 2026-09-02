@@ -12,6 +12,9 @@ This repository uses small, task-focused agent skills rather than one giant inst
 - `.agent/skills/xentra-business-logic/SKILL.md` — domain boundaries, state/lifecycle reasoning, and business invariants.
 - `.agent/skills/xentra-coding-workflow/SKILL.md` — normal feature/refactor/bug-fix implementation workflow.
 - `.agent/skills/xentra-yagni/SKILL.md` — YAGNI, reuse, dependency, and minimal-change discipline; prevents speculative architecture.
+- `.agent/skills/xentra-ponytail-review/SKILL.md` — change-level review for unnecessary complexity, duplication, and speculative abstraction.
+- `.agent/skills/xentra-ponytail-audit/SKILL.md` — repository-level audit for accumulated over-engineering and architecture drift.
+- `.agent/skills/xentra-ponytail-debt/SKILL.md` — deliberate technical-debt tracking and cleanup discipline.
 - `.agent/skills/xentra-backend-engineering/SKILL.md` — Node/Express backend boundaries, API contracts, authority, transactions, and idempotency.
 - `.agent/skills/xentra-frontend-engineering/SKILL.md` — PWA/dashboard/workspace UI, reusable components, state, runtime wiring, and navigation.
 - `.agent/skills/xentra-integration-engineering/SKILL.md` — gateways, webhooks, POS sync, delivery, hardware, and event integrations.
@@ -20,7 +23,7 @@ This repository uses small, task-focused agent skills rather than one giant inst
 - `.agent/skills/xentra-security-audit/SKILL.md` — security and integrity audit when the task is security-sensitive or requires verification.
 
 ## Skill selection
-Use the smallest relevant skill set. Combine skills when a change crosses boundaries; for example, a payment feature normally needs coding workflow + backend + database + integration context.
+Use the smallest relevant skill set. Combine skills when a change crosses boundaries; for example, a payment feature normally needs coding workflow + backend + database + integration context. Use Ponytail review when a change adds abstraction or refactoring, Ponytail audit for repository-wide complexity review, and Ponytail debt when accepting a deliberate temporary shortcut.
 
 ## Important boundaries
 Notion locked decisions and invariants outrank current implementation details. Git is evidence of implementation/history, not authority to invent business rules. UI state is not domain authority.
