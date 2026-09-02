@@ -958,7 +958,7 @@
 }
 
 .x-note-button{
-	width:fit-content !important;
+	width:fit-content;
 	height:30px !important;
 	margin-top:8px !important;
 	border:1px solid #e5e7eb !important;
@@ -975,6 +975,12 @@
 	gap:6px !important;
 	padding:0 14px !important;
 	box-shadow:none !important;
+}
+
+.x-product-right .x-note-button{
+	width:100% !important;
+	margin-top:6px !important;
+	border-radius:18px !important;
 }
 
 .x-note-button.has-note{

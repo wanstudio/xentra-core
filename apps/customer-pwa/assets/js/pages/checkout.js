@@ -581,10 +581,6 @@
           ? '<div class="x-product-discount"><img src="/assets/icons/diskon.svg" alt="" class="x-product-discount-icon" onerror="this.style.display=\'none\'"><span>Discount ongkir ' + fmtIDR(state.discount) + '</span></div>'
           : ''
         ) +
-        '    <button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note-item="' + item.id + '">' +
-        '      <img src="' + (note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="Catatan" class="x-note-icon">' +
-        '      Catatan' +
-        '    </button>' +
         '  </div>' +
         '  <div class="x-product-right">' +
         (img
@@ -596,6 +592,10 @@
         '      <span class="x-quantity-value">' + qty + '</span>' +
         '      <button type="button" data-plus-item="' + item.id + '" aria-label="Tambah"><img src="/assets/icons/plus.svg" alt="plus" style="width:13px;height:13px;display:block;margin:auto;"></button>' +
         '    </div>' +
+        '    <button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note-item="' + item.id + '">' +
+        '      <img src="' + (note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="Catatan" class="x-note-icon">' +
+        '      Catatan' +
+        '    </button>' +
         '  </div>' +
         '</div>';
     });
