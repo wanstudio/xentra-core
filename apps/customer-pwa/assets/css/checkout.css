@@ -1006,6 +1006,7 @@
   padding: 16px 0 0 !important;
   border-top: 1px solid #f0f0f0 !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
 .x-complement-section .x-section-title,
@@ -1036,7 +1037,6 @@
   overflow-y: hidden !important;
   padding: 4px 0 14px !important;
   margin: 0 !important;
-  touch-action: auto !important;
   overscroll-behavior-x: contain !important;
   scrollbar-width: none !important;
   -webkit-overflow-scrolling: touch !important;
