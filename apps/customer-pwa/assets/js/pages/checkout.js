@@ -101,6 +101,83 @@
     return p || null;
   }
 
+  function getPromoBannerHtml(items) {
+    var bannerPromo = getBannerPromo();
+    var rewardPromo = getAppliedRewardPromo();
+
+    if (bannerPromo && bannerPromo.display) {
+      var b = bannerPromo.display;
+      return (
+        '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
+        '    <img class="x-alt-promo-img" src="' + UI.escape(b.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
+        '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(b.banner_title || 'Promo Menarik') + '</div><div class="x-alt-promo-snk">' + UI.escape(b.banner_subtitle || '') + '</div></div>' +
+        '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-install">Install</button>' +
+        '  </div>'
+      );
+    } else if (rewardPromo && rewardPromo.display) {
+      var r = rewardPromo.display;
+      var rewardItemId = 'reward_' + (rewardPromo.reward ? (rewardPromo.reward.promo_id || rewardPromo.promo_id) : rewardPromo.promo_id);
+      var hasRewardInCart = (items || []).some(function (i) {
+        return String(i.id) === rewardItemId ||
+               String(i.id).indexOf('reward_') === 0 ||
+               Boolean(i.is_promo_reward) ||
+               Number(i.price || 0) === 0;
+      });
+
+      if (hasRewardInCart) {
+        return (
+          '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner" style="background:#f0fdf4;border:1px solid #bbf7d0;box-shadow:0 2px 10px rgba(22,163,74,0.06);">' +
+          '    <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
+          '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title" style="color:#15803d;font-size:13px;line-height:1.35;font-weight:700;">' + UI.escape(r.reward_title || 'Bonus Spesial') + '</div><div class="x-alt-promo-snk" style="color:#16a34a;font-weight:600;">✓ Hadiah telah masuk ke keranjang</div></div>' +
+          '  </div>'
+        );
+      } else {
+        return (
+          '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner">' +
+          '    <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
+          '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(r.claim_title || 'Klaim Es Teh Gratis untuk pesanan pertamamu!') + '</div><div class="x-alt-promo-snk">' + UI.escape(r.claim_subtitle || 'syarat & ketentuan berlaku') + '</div></div>' +
+          '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-claim">Claim</button>' +
+          '  </div>'
+        );
+      }
+    }
+    return '';
+  }
+
+  function renderPromoBanner() {
+    var slot = $('x-promo-slot');
+    if (!slot) return;
+    var items = getCheckoutItems();
+    slot.innerHTML = getPromoBannerHtml(items);
+    var promoBtn = $('x-btn-promo-install'); if (promoBtn) promoBtn.onclick = handleInstallClick;
+    var claimBtn = $('x-btn-promo-claim');
+    if (claimBtn) {
+      claimBtn.onclick = function () {
+        var rewardPromo = getAppliedRewardPromo();
+        if (rewardPromo && rewardPromo.reward) {
+          var rew = rewardPromo.reward;
+          var rewardItemId = 'reward_' + (rew.promo_id || rewardPromo.promo_id);
+          Store.addItem({
+            id: rewardItemId,
+            name: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
+            price: Number(rew.reward_price || 0),
+            regular_price: 5000,
+            image_url: (rewardPromo.display && rewardPromo.display.icon_url) || '/assets/pwa/icon-192.png',
+            description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo'
+          }, 1);
+          var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
+          if (rowsEl) {
+            rowsEl.innerHTML = renderItemsHtml(getCheckoutItems());
+            bindItemEvents();
+          }
+          calculateTotals();
+          refreshDeliveryQuote();
+          renderPromoBanner();
+        }
+      };
+    }
+  }
+
   window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault();
     deferredPrompt = e;
@@ -112,10 +189,8 @@
     var banner = document.getElementById('x-promo-banner');
     if (banner) banner.style.display = 'none';
     if (UI && UI.toast) UI.toast('Aplikasi berhasil dipasang!');
-    // Re-evaluate promotions from domain upon app install
     loadActivePromotions().then(function () {
-      renderLayout();
-      bindEvents();
+      renderPromoBanner();
     });
   });
 
@@ -240,11 +315,10 @@
       state.fulfillment.type = storeState.orderType;
     }
 
-    // Load available branches & active promotions
+    // Load available branches & active promotions (targeted update, zero blinking)
     loadBranches();
     loadActivePromotions().then(function () {
-      renderLayout();
-      bindEvents();
+      renderPromoBanner();
     });
 
     // Subscribe to Store updates (Reactivity on cart item changes/deletions)
@@ -254,7 +328,11 @@
         renderEmpty();
         return;
       }
-      renderLayout();
+      var rowsEl = $('x-checkout-items-rows');
+      if (rowsEl) {
+        rowsEl.innerHTML = renderItemsHtml(activeItems);
+        bindItemEvents();
+      }
       calculateTotals();
     });
 
@@ -383,49 +461,8 @@
       // 1. Header
       '  <div class="x-alt-header"><button type="button" id="x-checkout-back" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Pesanan</span></div>' +
 
-      // 2. Dynamic Promo Presentation (purely driven by domains/promotion decision)
-      ((function () {
-        var bannerPromo = getBannerPromo();
-        var rewardPromo = getAppliedRewardPromo();
-
-        if (bannerPromo && bannerPromo.display) {
-          var b = bannerPromo.display;
-          return (
-            '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
-            '    <img class="x-alt-promo-img" src="' + UI.escape(b.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
-            '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(b.banner_title || 'Promo Menarik') + '</div><div class="x-alt-promo-snk">' + UI.escape(b.banner_subtitle || '') + '</div></div>' +
-            '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-install">Install</button>' +
-            '  </div>'
-          );
-        } else if (rewardPromo && rewardPromo.display) {
-          var r = rewardPromo.display;
-          var rewardItemId = 'reward_' + (rewardPromo.reward ? (rewardPromo.reward.promo_id || rewardPromo.promo_id) : rewardPromo.promo_id);
-          var hasRewardInCart = items.some(function (i) {
-            return String(i.id) === rewardItemId ||
-                   String(i.id).indexOf('reward_') === 0 ||
-                   Boolean(i.is_promo_reward) ||
-                   Number(i.price || 0) === 0;
-          });
-
-          if (hasRewardInCart) {
-            return (
-              '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner" style="background:#f0fdf4;border:1px solid #bbf7d0;box-shadow:0 2px 10px rgba(22,163,74,0.06);">' +
-              '    <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
-              '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title" style="color:#15803d;font-size:13px;line-height:1.35;font-weight:700;">' + UI.escape(r.reward_title || 'Bonus Spesial') + '</div><div class="x-alt-promo-snk" style="color:#16a34a;font-weight:600;">✓ Hadiah telah masuk ke keranjang</div></div>' +
-              '  </div>'
-            );
-          } else {
-            return (
-              '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner">' +
-              '    <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
-              '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(r.claim_title || 'Klaim Es Teh Gratis untuk pesanan pertamamu!') + '</div><div class="x-alt-promo-snk">' + UI.escape(r.claim_subtitle || 'syarat & ketentuan berlaku') + '</div></div>' +
-              '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-claim">Claim</button>' +
-              '  </div>'
-            );
-          }
-        }
-        return '';
-      })()) +
+      // 2. Dynamic Promo Presentation (Slot for zero-blink targeted updates)
+      '  <div id="x-promo-slot">' + getPromoBannerHtml(items) + '</div>' +
 
       // 3. Customer Identity Card (Phone & WhatsApp OTP status)
       '  <div class="x-card x-alt-customer-card" id="x-card-customer" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
@@ -721,7 +758,14 @@
     var cartIds = {};
     getCheckoutItems().forEach(function (i) { cartIds[String(i.id)] = true; });
     var filtered = (pool || []).filter(function (p) { return p && p.id && !cartIds[String(p.id)]; });
-    upsellItems = (filtered.length >= 3 ? filtered : filtered.concat(FALLBACK_CATALOG.filter(function (f) { return !cartIds[String(f.id)]; }))).slice(0, 10);
+    var newUpsell = (filtered.length >= 3 ? filtered : filtered.concat(FALLBACK_CATALOG.filter(function (f) { return !cartIds[String(f.id)]; }))).slice(0, 10);
+
+    var newKey = newUpsell.map(function (x) { return x.id; }).join(',');
+    if (track.__renderedKey && track.__renderedKey === newKey) {
+      return;
+    }
+    track.__renderedKey = newKey;
+    upsellItems = newUpsell;
 
     if (upsellItems.length > 0) {
       wrap.style.display = 'block';
