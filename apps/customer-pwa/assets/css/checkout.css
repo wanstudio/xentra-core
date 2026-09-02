@@ -1029,13 +1029,14 @@
   flex-direction: row !important;
   flex-wrap: nowrap !important;
   gap: 12px !important;
-  width: calc(100% + 32px) !important;
-  max-width: calc(100% + 32px) !important;
+  width: 100% !important;
+  max-width: 100% !important;
   min-width: 0 !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
-  padding: 4px 16px 14px !important;
-  margin: 0 -16px !important;
+  padding: 4px 0 14px !important;
+  margin: 0 !important;
+  touch-action: pan-x !important;
   scrollbar-width: none !important;
   -webkit-overflow-scrolling: touch !important;
   box-sizing: border-box !important;

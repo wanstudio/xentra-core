@@ -512,12 +512,12 @@
 
       // 6. Items & Upsell Unified Card (Hide or show empty for pure reservation)
       (!isReservation || items.length > 0 ? (
-        '  <div class="x-card" id="x-items-card" style="margin:0 14px 10px;padding:16px 16px 14px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);min-width:0;">' +
-        '    <div id="x-checkout-items-list" class="x-checkout-items" style="min-width:0;width:100%;">' +
+        '  <div class="x-card" id="x-items-card" style="margin:0 14px 10px;padding:16px 16px 14px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);min-width:0;box-sizing:border-box;">' +
+        '    <div id="x-checkout-items-list" class="x-checkout-items" style="min-width:0;width:100%;box-sizing:border-box;">' +
         '      <div id="x-checkout-items-rows">' + renderItemsHtml(items) + '</div>' +
-        '      <div class="x-complement-section" id="x-upsell-container" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;min-width:0;width:100%;">' +
+        '      <div class="x-complement-section" id="x-upsell-container" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;min-width:0;width:100%;max-width:100%;box-sizing:border-box;">' +
         '        <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;">Tambah ini untuk melengkapi pesananmu</div>' +
-        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 16px 14px;margin:0 -16px;min-width:0;width:calc(100% + 32px);max-width:calc(100% + 32px);scrollbar-width:none;-webkit-overflow-scrolling:touch;box-sizing:border-box;">' +
+        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 0 14px;margin:0;min-width:0;width:100%;max-width:100%;touch-action:pan-x;-webkit-overflow-scrolling:touch;scrollbar-width:none;box-sizing:border-box;">' +
         '          <div class="x-loading-inline">Memuat rekomendasi…</div>' +
         '        </div>' +
         '      </div>' +
@@ -683,6 +683,19 @@
     }).join('');
 
     enableTrackDragScroll(container);
+
+    if (typeof console !== 'undefined' && console.log) {
+      setTimeout(function () {
+        console.log('[Upsell Track Geometry]', {
+          clientWidth: container.clientWidth,
+          scrollWidth: container.scrollWidth,
+          scrollLeft: container.scrollLeft,
+          canScroll: container.scrollWidth > container.clientWidth,
+          overflowX: window.getComputedStyle ? window.getComputedStyle(container).overflowX : '',
+          touchAction: window.getComputedStyle ? window.getComputedStyle(container).touchAction : ''
+        });
+      }, 100);
+    }
 
     var buttons = container.querySelectorAll('.x-upsell-add-btn');
     for (var b = 0; b < buttons.length; b++) {
