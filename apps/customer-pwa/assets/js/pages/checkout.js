@@ -471,7 +471,7 @@
         '      <div id="x-checkout-items-rows">' + renderItemsHtml(items) + '</div>' +
         '      <div class="x-complement-section" id="x-upsell-container" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;min-width:0;width:100%;max-width:100%;box-sizing:border-box;">' +
         '        <div class="x-section-title" style="font-size:15px;font-weight:700;color:#111;margin:0 0 12px;">Tambah ini untuk melengkapi pesananmu</div>' +
-        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 0 14px;margin:0;min-width:0;width:100%;max-width:100%;touch-action:pan-y pinch-zoom;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none;box-sizing:border-box;cursor:grab;">' +
+        '        <div class="x-complement-track x-scroll-hide" id="x-addon-track" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;overflow-x:auto;overflow-y:hidden;padding:4px 0 14px;margin:0;min-width:0;width:100%;max-width:100%;touch-action:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;scrollbar-width:none;box-sizing:border-box;cursor:grab;">' +
         '          <div class="x-loading-inline">Memuat rekomendasi…</div>' +
         '        </div>' +
         '      </div>' +
@@ -611,40 +611,7 @@
       }
     }, { passive: true });
 
-    // 2. Touch directional gesture handling for Mobile/PWA
-    var touchStartX = 0;
-    var touchStartY = 0;
-    var touchStartScroll = 0;
-    var touchMoved = false;
-    var isHorizontal = null;
-
-    track.addEventListener('touchstart', function (e) {
-      if (!e.touches || e.touches.length !== 1) return;
-      var t = e.touches[0];
-      touchStartX = t.clientX;
-      touchStartY = t.clientY;
-      touchStartScroll = track.scrollLeft;
-      touchMoved = false;
-      isHorizontal = null;
-    }, { passive: true });
-
-    track.addEventListener('touchmove', function (e) {
-      if (!e.touches || e.touches.length !== 1) return;
-      var t = e.touches[0];
-      var diffX = t.clientX - touchStartX;
-      var diffY = t.clientY - touchStartY;
-
-      if (isHorizontal === null && (Math.abs(diffX) > 4 || Math.abs(diffY) > 4)) {
-        isHorizontal = Math.abs(diffX) >= Math.abs(diffY);
-      }
-
-      if (isHorizontal === true) {
-        touchMoved = true;
-        track.scrollLeft = touchStartScroll - diffX;
-      }
-    }, { passive: true });
-
-    // 3. Desktop Mouse Drag-to-Scroll
+    // 2. Desktop Mouse Drag-to-Scroll
     var isMouseDown = false;
     var mouseStartX = 0;
     var mouseStartScroll = 0;
@@ -678,11 +645,10 @@
     });
 
     track.addEventListener('click', function (e) {
-      if (hasMouseDragged || touchMoved) {
+      if (hasMouseDragged) {
         e.preventDefault();
         e.stopPropagation();
         hasMouseDragged = false;
-        touchMoved = false;
       }
     }, true);
   }
