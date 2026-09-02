@@ -355,7 +355,9 @@ class PosOrderService {
       const preCheck = PrePaymentVerificationGate.verify({
         branch_id,
         brand_id,
-        items: orderItems
+        items: orderItems,
+        customer,
+        is_pwa_installed: false
       });
 
       if (!preCheck.is_valid) {

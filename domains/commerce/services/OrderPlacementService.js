@@ -42,6 +42,7 @@ class OrderPlacementService {
     reservation_date = null,
     guest_count = null,
     client_transaction_id = null,
+    is_pwa_installed = false,
     notes = '',
     trace_context = {}
   }) {
@@ -94,7 +95,7 @@ class OrderPlacementService {
       // Atomic Check-and-Insert inside BEGIN IMMEDIATE transaction to prevent concurrent overbooking.
       const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
       const now = new Date().toISOString();
-      const orderNumber = `RES-${Date.now().toString(36).toUpperCase()}`;
+      const orderNumber = `RES-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 
       try {
         db.exec('BEGIN IMMEDIATE;');
@@ -216,7 +217,9 @@ class OrderPlacementService {
     const verification = PrePaymentVerificationGate.verify({
       branch_id,
       brand_id,
-      items
+      items,
+      customer,
+      is_pwa_installed: Boolean(is_pwa_installed || customer?.is_pwa_installed)
     });
 
     if (!verification.is_valid) {
@@ -293,6 +296,8 @@ class OrderPlacementService {
         const formattedItemNote = item.promo_id 
           ? `[PROMO:${item.promo_id}] ${item.notes || item.note || ''}`.trim()
           : (item.notes || item.note || '');
+
+        item.note = formattedItemNote;
 
         insertOrderItemStmt.run(
           itemId,

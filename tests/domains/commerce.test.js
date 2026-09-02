@@ -266,3 +266,83 @@ test('Commerce 7 — Reservation: rejects same-day reservation and accepts futur
   assert.strictEqual(futureResult.order.grand_total, 0);
   assert.strictEqual(futureResult.order.items.length, 0);
 });
+
+// ==============================================================================
+// Commerce 8 — End-to-End Promotion Context Forwarding: OrderPlacementService
+// ==============================================================================
+test('Commerce 8 — Promotion Integration: OrderPlacementService forwards customer and is_pwa_installed seamlessly', async () => {
+  const brand = db.prepare('SELECT id FROM brands LIMIT 1').get() || { id: 'brand_test' };
+  const branch = db.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'branch_test' };
+  const cat = db.prepare('SELECT id FROM categories WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'cat_test' };
+
+  const promoId = 'prm_e2e_pwa_' + Date.now();
+  const rewardProductId = 'prod_e2e_reward_' + Date.now();
+  const mainProductId = 'prod_e2e_main_' + Date.now();
+
+  db.prepare(`
+    INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active)
+    VALUES (?, ?, ?, 'Menu Utama E2E', ?, 30000, 1)
+  `).run(mainProductId, brand.id, cat.id, 'menu-e2e-' + Date.now());
+
+  db.prepare(`
+    INSERT INTO branch_products (branch_id, product_id, price, stock, is_available)
+    VALUES (?, ?, 30000, 50, 1)
+  `).run(branch.id, mainProductId);
+
+  db.prepare(`
+    INSERT INTO products (id, brand_id, category_id, name, slug, price, is_active)
+    VALUES (?, ?, ?, 'Es Teh Bonus PWA E2E', ?, 5000, 1)
+  `).run(rewardProductId, brand.id, cat.id, 'es-teh-e2e-' + Date.now());
+
+  db.prepare(`
+    INSERT INTO branch_products (branch_id, product_id, price, stock, is_available)
+    VALUES (?, ?, 5000, 50, 1)
+  `).run(branch.id, rewardProductId);
+
+  db.prepare(`
+    INSERT INTO promotions (id, brand_id, name, capability_type, stacking_policy, is_active)
+    VALUES (?, ?, 'Promo PWA Welcome E2E', 'install_incentive', 'exclusive', 1)
+  `).run(promoId, brand.id);
+
+  db.prepare(`
+    INSERT INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents)
+    VALUES (?, ?, 'free_product', ?, 0)
+  `).run('rwd_e2e_' + Date.now(), promoId, rewardProductId);
+
+  // 1. Submit order without is_pwa_installed -> Reward item is rejected as ineligible
+  const nonPwaResult = await OrderPlacementService.submitOrder({
+    brand_id: brand.id,
+    branch_id: branch.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    customer: { name: 'Customer Web', phone: '081299990099' },
+    is_pwa_installed: false,
+    items: [
+      { product_id: mainProductId, quantity: 1, expected_price: 30000 },
+      { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
+    ]
+  });
+  assert.strictEqual(nonPwaResult.success, false, 'Non-PWA user must not claim PWA install incentive');
+
+  // 2. Submit order WITH is_pwa_installed: true -> Successfully verified & placed!
+  const pwaResult = await OrderPlacementService.submitOrder({
+    brand_id: brand.id,
+    branch_id: branch.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    customer: { name: 'Customer PWA', phone: '081299990099' },
+    is_pwa_installed: true,
+    items: [
+      { product_id: mainProductId, quantity: 1, expected_price: 30000 },
+      { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
+    ]
+  });
+
+  assert.strictEqual(pwaResult.success, true, 'PWA user order must succeed');
+  assert.strictEqual(pwaResult.order.items.length, 2);
+  const placedRewardItem = pwaResult.order.items.find(it => it.product_id === rewardProductId);
+  assert.ok(placedRewardItem, 'Reward item must be converted to authoritative target_product_id');
+  assert.strictEqual(placedRewardItem.unit_price, 0);
+  assert.strictEqual(placedRewardItem.name, 'Es Teh Bonus PWA E2E');
+  assert.ok((placedRewardItem.note || placedRewardItem.notes || '').includes(`[PROMO:${promoId}]`));
+});

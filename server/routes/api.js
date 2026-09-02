@@ -534,10 +534,9 @@ router.delete('/addresses/:id', requireCustomerAuth(), (req, res) => {
   }
 });
 
-// 5.4 Pre-Payment Verification Gate Endpoint
 router.post('/checkout/verify', (req, res) => {
   try {
-    const { branch_id, items = [], order_type = 'delivery' } = req.body;
+    const { branch_id, items = [], order_type = 'delivery', customer = {}, is_pwa_installed = false } = req.body;
     if (order_type === 'reservation') {
       return res.json({ success: true, is_valid: true, status: 'VERIFIED', verified_items: [], price_diffs: [], errors: [] });
     }
@@ -548,7 +547,9 @@ router.post('/checkout/verify', (req, res) => {
     const verification = PrePaymentVerificationGate.verify({
       branch_id,
       brand_id: req.brand_id,
-      items
+      items,
+      customer,
+      is_pwa_installed: Boolean(is_pwa_installed || customer?.is_pwa_installed)
     });
     return res.json({
       success: verification.is_valid,
@@ -565,6 +566,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     let {
       branch_id,
       customer = {},
+      is_pwa_installed = false,
       order_type,
       fulfillment = {},
       schedule_type = 'asap',
@@ -721,7 +723,9 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       const verification = PrePaymentVerificationGate.verify({
         branch_id: branch.id,
         brand_id: req.brand_id,
-        items
+        items,
+        customer,
+        is_pwa_installed: Boolean(is_pwa_installed || customer?.is_pwa_installed)
       });
 
       if (!verification.is_valid) {
@@ -769,6 +773,13 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         promo_config: promoConfig
       });
 
+      if (!feeCalc.eligible) {
+        return res.status(400).json({
+          success: false,
+          error: feeCalc.reason || 'Alamat pengantaran berada di luar radius layanan cabang ini.'
+        });
+      }
+
       deliveryFee = feeCalc.final_delivery_fee;
       discountAmount = feeCalc.discount_amount;
 
@@ -808,6 +819,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       table_number,
       reservation_date,
       guest_count,
+      is_pwa_installed: Boolean(is_pwa_installed || customer?.is_pwa_installed),
       notes: order_note,
       trace_context: {
         correlation_id: `chk_${Date.now()}`
