@@ -801,6 +801,14 @@ function seedData(targetDb) {
 }
 
 function seedInstallPromotion(targetDb, brandId) {
+  // Bangjo's install incentive must belong to the same authoritative tenant
+  // resolved by app.mybangjo.com / dev.mybangjo.com.
+  // Do not attach the promotion to whichever brand happens to be first in the DB.
+  const bangjoBrand = targetDb.prepare(
+    "SELECT id FROM brands WHERE slug = 'bangjo' LIMIT 1"
+  ).get();
+  if (bangjoBrand && bangjoBrand.id) brandId = bangjoBrand.id;
+
   // Keep the authoritative reward product available even when the database already existed
   // before the install-promo seed was introduced.
   const rewardCategory = targetDb.prepare(
