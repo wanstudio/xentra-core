@@ -86,9 +86,45 @@
             applied: Array.isArray(res.applied) ? res.applied : [],
             rejected: Array.isArray(res.rejected) ? res.rejected : []
           };
+
+          // Marketing discovery is allowed to remain visible for an anonymous
+          // browser even if the discovery endpoint returns an empty list.
+          // Entitlement/claim is still authoritative on the server.
+          if (!isPwa && !promoEvaluation.discovery.some(function (p) {
+            return p && p.capability_type === 'install_incentive' && p.should_show_banner === true;
+          })) {
+            promoEvaluation.discovery.unshift({
+              promo_id: 'prm_bangjo_pwa_install',
+              capability_type: 'install_incentive',
+              name: 'Promo Hadiah Install PWA Es Teh',
+              should_show_banner: true,
+              should_grant_reward: false,
+              display: {
+                banner_title: 'Install sekarang & dapatkan gratis es teh',
+                banner_subtitle: 'syarat & ketentuan berlaku',
+                icon_url: '/assets/img/iced-tea.png'
+              }
+            });
+          }
         }
         return promoEvaluation;
-      }).catch(function () { return promoEvaluation; });
+      }).catch(function () {
+        if (!isPwa) {
+          promoEvaluation.discovery = [{
+            promo_id: 'prm_bangjo_pwa_install',
+            capability_type: 'install_incentive',
+            name: 'Promo Hadiah Install PWA Es Teh',
+            should_show_banner: true,
+            should_grant_reward: false,
+            display: {
+              banner_title: 'Install sekarang & dapatkan gratis es teh',
+              banner_subtitle: 'syarat & ketentuan berlaku',
+              icon_url: '/assets/img/iced-tea.png'
+            }
+          }];
+        }
+        return promoEvaluation;
+      });
   }
 
   function getBannerPromo() {
