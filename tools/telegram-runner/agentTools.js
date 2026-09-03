@@ -93,7 +93,7 @@ const toolDeclarations = [
   },
   {
     name: 'deploy_to_cpanel',
-    description: 'Melakukan git commit, push ke GitHub, dan men-deploy langsung paket xentra-core ke server cPanel (dev.mybangjo.com).',
+    description: 'Melakukan git commit dan push ke main; GitHub Actions workflow deploy-app.yml otomatis mendeploy ke app.mybangjo.com.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -173,20 +173,18 @@ async function executeTool(toolName, args, onProgress) {
     }
 
     case 'deploy_to_cpanel': {
+      // Deployment now runs via GitHub Actions (deploy-app.yml) after push to
+      // main, targeting app.mybangjo.com. This tool only commits & pushes.
       try {
         const commitMsg = (args.commit_message || 'Update via Telegram AI Runner').replace(/"/g, '\\"');
-        const deployScript = path.join(WORKSPACE_ROOT, 'deploy-core.sh');
-        
-        const output = execSync(`bash "${deployScript}" "${commitMsg}"`, {
-          cwd: WORKSPACE_ROOT,
-          encoding: 'utf8',
-          timeout: 60000
-        });
-        return { success: true, deploy_output: output };
+        execSync('git add -A', { cwd: WORKSPACE_ROOT, encoding: 'utf8' });
+        execSync(`git commit -m "${commitMsg}"`, { cwd: WORKSPACE_ROOT, encoding: 'utf8' });
+        execSync('git push origin main', { cwd: WORKSPACE_ROOT, encoding: 'utf8', timeout: 60000 });
+        return { success: true, deploy_output: 'Committed & pushed to main. GitHub Actions deploy-app.yml deploys to app.mybangjo.com.' };
       } catch (err) {
         return {
           success: false,
-          error: 'Proses deploy gagal.',
+          error: 'Proses commit/push gagal.',
           stdout: err.stdout ? err.stdout.toString() : '',
           stderr: err.stderr ? err.stderr.toString() : err.message
         };

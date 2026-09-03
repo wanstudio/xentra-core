@@ -1,4 +1,4 @@
-name: Deploy Xentra Core via SSH
+name: Deploy Xentra Core to app.mybangjo.com
 
 on:
   push:

@@ -146,13 +146,13 @@ async function connectToWhatsApp() {
       const normalizedCmd = trimmedText.toLowerCase().replace(/\s+/g, ' ');
 
       if (['!start', '! start', '!help', '! help', '/start', '/ start', '/help', '/ help'].includes(normalizedCmd)) {
-        const helpText = `*🤖 Selamat Datang di Xentra Core WhatsApp AI Runner!*\n\nBot ini siap membantu Anda memodifikasi kode, menjalankan pengujian, dan melakukan deployment langsung dari WhatsApp saat PC mati.\n\n📌 *Cara Penggunaan:*\nKirim instruksi Anda dalam bahasa Indonesia biasa, contoh:\n• _"Ganti warna tema brand Bangjo jadi #b6ff00 dan ubah tagline-nya"_\n• _"Jalankan unit test untuk memastikan tidak ada error"_\n• _"Buat diskon ongkir 10rb untuk belanja di atas 50rb lalu deploy ke cPanel"_\n\n⚡ *Perintah Cepat:*\n• *!status* — Cek status bot & environment\n• *!test* — Jalankan automated unit tests\n• *!deploy* — Deploy perubahan terbaru ke dev.mybangjo.com`;
+        const helpText = `*🤖 Selamat Datang di Xentra Core WhatsApp AI Runner!*\n\nBot ini siap membantu Anda memodifikasi kode, menjalankan pengujian, dan melakukan deployment langsung dari WhatsApp saat PC mati.\n\n📌 *Cara Penggunaan:*\nKirim instruksi Anda dalam bahasa Indonesia biasa, contoh:\n• _"Ganti warna tema brand Bangjo jadi #b6ff00 dan ubah tagline-nya"_\n• _"Jalankan unit test untuk memastikan tidak ada error"_\n• _"Buat diskon ongkir 10rb untuk belanja di atas 50rb lalu deploy ke cPanel"_\n\n⚡ *Perintah Cepat:*\n• *!status* — Cek status bot & environment\n• *!test* — Jalankan automated unit tests\n• *!deploy* — Commit & push ke main (deploy otomatis ke app.mybangjo.com)`;
         await reply(helpText);
         continue;
       }
 
       if (['!status', '! status', '/status', '/ status'].includes(normalizedCmd)) {
-        await reply(`🟢 *Xentra Core WhatsApp AI Runner Aktif*\n• Status: Online 24/7\n• Model: \`${process.env.GEMINI_MODEL || 'gemini-3.7-flash'}\`\n• Workspace: \`xentra-core\`\n• Deploy Target: \`dev.mybangjo.com\``);
+        await reply(`🟢 *Xentra Core WhatsApp AI Runner Aktif*\n• Status: Online 24/7\n• Model: \`${process.env.GEMINI_MODEL || 'gemini-3.7-flash'}\`\n• Workspace: \`xentra-core\`\n• Deploy Target: \`app.mybangjo.com\` (via GitHub Actions)`);
         continue;
       }
 

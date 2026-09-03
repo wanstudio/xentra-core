@@ -10,24 +10,12 @@ const db = require('./database/db');
 
 const tenantResolver = require('./middleware/tenantResolver');
 const apiRoutes = require('./routes/api');
-const fs = require('fs');
-const { execSync } = require('child_process');
-
-// ---- Deploy receiver for dev.mybangjo.com (shell unzip only, no WASM/multer) ----
-const DEPLOY_TOKEN = process.env.DEPLOY_TOKEN;
-function checkDeployToken(req) {
-  // P1 SECURITY HARDENING: Token MUST ONLY be accepted via HTTP Header (Reject Query String & Body tokens)
-  const h = (req.headers['x-deploy-token'] || '').trim();
-  return Boolean(DEPLOY_TOKEN && h && h === DEPLOY_TOKEN);
-}
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Standard Middlewares: CORS with strict explicit origin checks (No wildcard endsWith)
 const allowedOrigins = [
   'https://app.mybangjo.com',
-  'https://dev.mybangjo.com',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://127.0.0.1:3000'
@@ -53,122 +41,6 @@ app.use(cors({
   },
   credentials: true
 }));
-
-// ---- Deploy endpoint HANYA untuk dev.mybangjo.com (jangan dipakai untuk app) ----
-function handleDeploy(req, res) {
-  if (!checkDeployToken(req)) {
-    return res.status(403).json({ success: false, message: 'Unauthorized: Invalid or missing deploy token header.' });
-  }
-
-  // Reject deploy endpoint on production if explicitly flagged
-  const isDevDeployHost = req.hostname === 'dev.mybangjo.com';
-  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_REMOTE_DEPLOY && !isDevDeployHost) {
-    return res.status(403).json({ success: false, message: 'Remote code deployment endpoint is disabled in production.' });
-  }
-
-  const target = (req.query.target || 'core');
-  // locate zip: raw body
-  let zipPath = null;
-  if (req.body && Buffer.isBuffer(req.body) && req.body.length > 4) {
-    zipPath = '/tmp/xentra-raw-' + Date.now() + '.zip';
-    try { fs.writeFileSync(zipPath, req.body); } catch(e){ return res.status(500).json({success:false, message:e.message}); }
-  }
-  if (!zipPath || !fs.existsSync(zipPath)) {
-    return res.status(400).json({ success: false, message: 'No package file received.' });
-  }
-  const candidates = [];
-  const projectRoot = path.join(__dirname, '..');
-  candidates.push(projectRoot);
-  // mirror only to explicit known project path
-  for (const p of ['/home/mybangjo/xentra-core', '/home/mybangjo/dev.mybangjo.com']) {
-    if (p !== projectRoot && fs.existsSync(p)) candidates.push(p);
-  }
-  let extracted = [];
-  let errors = [];
-
-  // Validate ZIP archive using unzip before extraction.
-  try {
-    execSync('unzip -t ' + JSON.stringify(zipPath), { stdio: 'pipe' });
-  } catch (inspectErr) {
-    try { fs.unlinkSync(zipPath); } catch (_) {}
-    const output = inspectErr.stdout ? inspectErr.stdout.toString().trim() : inspectErr.message;
-    return res.status(400).json({
-      success: false,
-      error: 'INVALID_ARCHIVE',
-      message: 'Paket ZIP tidak valid: ' + output
-    });
-  }
-
-  for (const dest of candidates) {
-    try {
-      if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-      execSync('unzip -o ' + JSON.stringify(zipPath) + ' -d ' + JSON.stringify(dest), { stdio: 'pipe' });
-
-      // Auto-sync customer-pwa static files to dev root if dest is dev.mybangjo.com
-      const pwaStaticDir = path.join(dest, 'apps', 'customer-pwa');
-      if (fs.existsSync(pwaStaticDir) && (dest.includes('dev.mybangjo.com') || dest.includes('public_html'))) {
-        try {
-          execSync('cp -r ' + JSON.stringify(path.join(pwaStaticDir, '*')) + ' ' + JSON.stringify(dest) + ' 2>/dev/null || true', { shell: '/bin/bash' });
-        } catch (_) {}
-      }
-
-      // Ensure permanent, safe .htaccess on dev.mybangjo.com
-      if (dest.includes('dev.mybangjo.com')) {
-        const htaccessPath = path.join(dest, '.htaccess');
-        const cleanHtaccess = [
-          '<IfModule mod_rewrite.c>',
-          '    RewriteEngine On',
-          '    RewriteBase /',
-          '    RewriteCond %{REQUEST_FILENAME} -f [OR]',
-          '    RewriteCond %{REQUEST_FILENAME} -d',
-          '    RewriteRule ^ - [L]',
-          '    RewriteRule ^manifest\\.json$ assets/pwa/manifest.json [L]',
-          '    RewriteRule ^service-worker\\.js$ assets/pwa/service-worker.js [L]',
-          '    RewriteRule ^sw\\.js$ assets/pwa/service-worker.js [L]',
-          '    RewriteCond %{REQUEST_URI} !^/api/',
-          '    RewriteRule ^ index.html [L]',
-          '</IfModule>',
-          '<IfModule mod_headers.c>',
-          '    <FilesMatch "manifest\\.json$">',
-          '        Header set Content-Type "application/manifest+json; charset=utf-8"',
-          '    </FilesMatch>',
-          '    <FilesMatch "(service-worker|sw)\\.js$">',
-          '        Header set Content-Type "application/javascript; charset=utf-8"',
-          '        Header set Service-Worker-Allowed "/"',
-          '    </FilesMatch>',
-          '</IfModule>',
-          '# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN',
-          'PassengerAppRoot "/home/mybangjo/xentra-core"',
-          'PassengerBaseURI "/"',
-          'PassengerNodejs "' + (process.env.PASSENGER_NODEJS || '/home/mybangjo/nodevenv/xentra-core/22/bin/node') + '"',
-          'PassengerAppType node',
-          'PassengerStartupFile app.js',
-          'PassengerAppLogFile "/home/mybangjo/xentra-core/passenger.log"',
-          '# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END',
-          '# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION BEGIN',
-          '<IfModule Litespeed>',
-          'SetEnv NODE_OPTIONS --max-old-space-size=1024',
-          'SetEnv SKIP_SYNC 1',
-          '</IfModule>',
-          '# DO NOT REMOVE OR MODIFY. CLOUDLINUX ENV VARS CONFIGURATION END'
-        ].join('\n');
-        try {
-          fs.writeFileSync(htaccessPath, cleanHtaccess, 'utf8');
-        } catch (_) {}
-      }
-
-      try { fs.mkdirSync(path.join(dest, 'tmp'), { recursive: true }); fs.writeFileSync(path.join(dest, 'tmp', 'restart.txt'), String(Date.now())); } catch {}
-      extracted.push(dest);
-    } catch (e) {
-      errors.push(dest + ': ' + e.message);
-    }
-  }
-  try { fs.unlinkSync(zipPath); } catch {}
-  if (extracted.length === 0) return res.status(500).json({ success:false, message:'Extract failed', errors });
-  return res.json({ success:true, mode:'package_extracted', target, extracted, errors: errors.length?errors:undefined, timestamp:new Date().toISOString(), message:'Xentra Core deployed to dev.' });
-}
-// Deploy uses raw body only (deploy-core.sh --data-binary)
-app.post(['/wp-json/xentra/v1/deploy', '/api/v1/deploy', '/wp-json/xentra/v1/deploy-raw', '/api/v1/deploy-raw'], express.raw({ type: '*/*', limit: '50mb' }), handleDeploy);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

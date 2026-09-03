@@ -1708,7 +1708,7 @@ function serializePublicBrand(brand) {
     slug: brand.slug,
     logo_url: brand.logo_url || '/assets/pwa/icon-192.png',
     primary_color: brand.primary_color || '#b6ff00',
-    custom_domain: brand.custom_domain || 'dev.mybangjo.com',
+    custom_domain: brand.custom_domain || 'app.mybangjo.com',
     tagline: brand.tagline || 'Official Online Food Ordering',
     banners
   };
@@ -1799,7 +1799,7 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
         slug: req.brand.slug,
         logo_url: req.brand.logo_url || '/assets/pwa/icon-192.png',
         primary_color: req.brand.primary_color || '#b6ff00',
-        custom_domain: req.brand.custom_domain || 'dev.mybangjo.com',
+        custom_domain: req.brand.custom_domain || 'app.mybangjo.com',
         tagline: req.brand.tagline || 'Official Online Food Ordering',
         banners: Array.isArray(parsedBanners) ? parsedBanners : []
       }

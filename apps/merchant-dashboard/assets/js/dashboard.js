@@ -102,7 +102,7 @@
     $('brand-logo').value = brand.logo_url || '/assets/pwa/icon-192.png';
     $('brand-color').value = brand.primary_color || '#b6ff00';
     $('brand-color-hex').value = brand.primary_color || '#b6ff00';
-    $('brand-domain').value = brand.custom_domain || 'dev.mybangjo.com';
+    $('brand-domain').value = brand.custom_domain || 'app.mybangjo.com';
 
     $('dash-brand-title').textContent = brand.name || 'Bangjo Resto';
     $('dash-sidebar-logo').src = brand.logo_url || '/assets/pwa/icon-192.png';

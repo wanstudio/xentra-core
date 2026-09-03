@@ -87,7 +87,7 @@ Kirimkan saja instruksi dalam bahasa Indonesia sehari-hari, contohnya:
 ⚡ *Perintah Cepat:*
 /status — Cek status bot & server
 /test — Jalankan automated unit tests
-/deploy — Deploy perubahan saat ini ke dev.mybangjo.com
+/deploy — Commit & push ke main (deploy otomatis ke app.mybangjo.com)
 `;
     await sendMessage(chatId, welcome);
     return;
@@ -96,8 +96,7 @@ Kirimkan saja instruksi dalam bahasa Indonesia sehari-hari, contohnya:
   if (text === '/status') {
     await sendMessage(
       chatId,
-      `🟢 *Xentra Core AI Runner Aktif*\n- Server: Online 24/7\n- Model: \`${process.env.GEMINI_MODEL || 'gemini-2.5-flash'}\`\n- Workspace: \`xentra-core\`\n- Target Deploy: \`dev.mybangjo.com\``
-    );
+      `🟢 *Xentra Core AI Runner Aktif*\n- Server: Online 24/7\n- Model: \`${process.env.GEMINI_MODEL || 'gemini-2.5-flash'}\`\n- Workspace: \`xentra-core\`\n- Target Deploy: \`app.mybangjo.com\` (via GitHub Actions)`);
     return;
   }
 

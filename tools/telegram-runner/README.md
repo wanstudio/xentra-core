@@ -8,13 +8,13 @@ Daemon mandiri berbasis **Node.js** dan **Gemini Flash API** yang memungkinkan A
 
 1. **Remote Coding via Chat:**
    - Cukup kirim chat instruksi (misal: *"Ubah diskon ongkir jadi Rp 10.000 untuk minimal belanja Rp 50.000 lalu deploy"*).
-   - Bot akan membaca kode, melakukan modifikasi file, menjalankan automated tests, lalu mendeploy langsung ke cPanel (`dev.mybangjo.com`).
+   - Bot akan membaca kode, melakukan modifikasi file, menjalankan automated tests, lalu commit & push ke main; GitHub Actions (deploy-app.yml) otomatis mendeploy ke `app.mybangjo.com`.
 2. **Whitelist Keamanan Ketat:**
    - Hanya akun Telegram dengan `TELEGRAM_ALLOWED_USER_ID` terdaftar yang dapat memberikan perintah.
 3. **Zero Inbound Port / No Webhook Setup:**
    - Menggunakan *Long-Polling* resmi Telegram API, sehingga bot bisa berjalan di server manapun (cPanel Node App, VPS, Docker, dsb.) tanpa butuh port terbuka khusus atau domain HTTPS.
 4. **Auto-Testing & Auto-Deploy:**
-   - Bot otomatis memverifikasi perubahan dengan `node --test tests/**/*.test.js` sebelum melakukan git push dan upload cPanel via `deploy-core.sh`.
+   - Bot otomatis memverifikasi perubahan dengan `node --test tests/**/*.test.js` sebelum melakukan git push; GitHub Actions (deploy-app.yml) otomatis mendeploy ke `app.mybangjo.com`.
 
 ---
 

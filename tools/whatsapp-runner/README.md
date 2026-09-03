@@ -14,7 +14,7 @@ Daemon mandiri berbasis **Node.js**, **Baileys (WhatsApp Web Multi-Device)**, da
 3. **Whitelist Keamanan Nomor HP:**
    - Hanya nomor WhatsApp operator yang terdaftar di `ALLOWED_WHATSAPP_NUMBERS` yang dapat memerintah bot. Pesan dari orang lain otomatis diabaikan.
 4. **Automated Testing & Auto-Deploy:**
-   - Bot otomatis memverifikasi kode dengan `node --test tests/**/*.test.js` sebelum melakukan `git push` dan upload paket ke cPanel (`dev.mybangjo.com`).
+   - Bot otomatis memverifikasi kode dengan `node --test tests/**/*.test.js` sebelum melakukan `git push`; GitHub Actions (deploy-app.yml) otomatis mendeploy ke `app.mybangjo.com`.
 
 ---
 

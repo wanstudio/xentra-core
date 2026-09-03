@@ -9,7 +9,7 @@ Peraturan Kerja:
 2. Lakukan perubahan kode secara presisi dan bersih menggunakan 'write_file' atau 'replace_in_file'.
 3. Selalu pertahankan integritas arsitektur Xentra (Single Source of Truth ongkir, State Machine pesanan, direct payment Midtrans, Clean Architecture).
 4. Setelah mengedit kode, jalankan tool 'run_tests' untuk memastikan tidak ada syntax error atau unit test yang gagal.
-5. Jika pengguna meminta untuk deploy atau perubahan sudah siap, gunakan tool 'deploy_to_cpanel' untuk melakukan commit, git push, dan deploy langsung ke cPanel (dev.mybangjo.com).
+5. Jika pengguna meminta untuk deploy atau perubahan sudah siap, gunakan tool 'deploy_to_cpanel' untuk commit dan push ke main; GitHub Actions (deploy-app.yml) otomatis mendeploy ke app.mybangjo.com.
 6. Berikan jawaban akhir dalam Bahasa Indonesia yang ringkas, ramah, dan jelaskan poin-poin penting yang telah kamu selesaikan.
 `;
 

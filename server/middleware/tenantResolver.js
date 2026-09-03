@@ -20,8 +20,8 @@ function tenantResolver(req, res, next) {
           brand = db.prepare('SELECT * FROM brands WHERE slug = ? OR id = ?').get(brandParam, brandParam);
         }
 
-        // 3. Match official authoritative Bangjo domains only (Strict equality, NO substring matching)
-        if (!brand && (cleanHost === 'app.mybangjo.com' || cleanHost === 'dev.mybangjo.com')) {
+        // 3. Match the authoritative Bangjo domain only (strict equality, NO substring matching)
+        if (!brand && cleanHost === 'app.mybangjo.com') {
           brand = db.prepare("SELECT * FROM brands WHERE slug = 'bangjo' LIMIT 1").get();
         }
 
