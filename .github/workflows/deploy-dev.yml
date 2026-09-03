@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: xentra-dev-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -33,7 +37,7 @@ jobs:
           SSH_USER: ${{ secrets.XENTRA_SSH_USER }}
           SSH_PORT: ${{ secrets.XENTRA_SSH_PORT }}
         run: |
-          scp -i ~/.ssh/xentra_deploy_key -P "$SSH_PORT"             xentra-core-deploy.zip             "$SSH_USER@$SSH_HOST:/home/mybangjo/xentra-core-deploy.zip"
+          scp -i ~/.ssh/xentra_deploy_key -P "$SSH_PORT" xentra-core-deploy.zip "$SSH_USER@$SSH_HOST:/home/mybangjo/xentra-core-deploy.zip"
 
       - name: Deploy and restart Passenger
         env:
@@ -54,6 +58,7 @@ jobs:
             mv node_modules node_modules.deploy-backup
           fi
 
+          test -f /home/mybangjo/xentra-core-deploy.zip
           unzip -o /home/mybangjo/xentra-core-deploy.zip -x "node_modules/*"
           rm -f /home/mybangjo/xentra-core-deploy.zip
 
