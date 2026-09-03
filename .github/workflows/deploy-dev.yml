@@ -43,12 +43,26 @@ jobs:
         run: |
           ssh -i ~/.ssh/xentra_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
           set -e
-          cd /home/mybangjo/xentra-core
-          unzip -o /home/mybangjo/xentra-core-deploy.zip
+          APP="/home/mybangjo/xentra-core"
+          VENV="/home/mybangjo/nodevenv/xentra-core/20"
+          cd "$APP"
+
+          # CloudLinux Node Selector requires dependencies to live in the Node virtual environment.
+          # Keep the existing modules as a rollback copy until the new install succeeds.
+          if [ -d node_modules ] && [ ! -L node_modules ]; then
+            rm -rf node_modules.deploy-backup
+            mv node_modules node_modules.deploy-backup
+          fi
+
+          unzip -o /home/mybangjo/xentra-core-deploy.zip -x "node_modules/*"
           rm -f /home/mybangjo/xentra-core-deploy.zip
-          export PATH="/home/mybangjo/nodevenv/xentra-core/20/bin:$PATH"
-          cd /home/mybangjo/xentra-core
-          npm install --omit=dev --prefix /home/mybangjo/nodevenv/xentra-core/20
+
+          source "$VENV/bin/activate"
+          node -v
+          npm -v
+          npm install --omit=dev
+
+          rm -rf node_modules.deploy-backup
           mkdir -p tmp
           touch tmp/restart.txt
           REMOTE
