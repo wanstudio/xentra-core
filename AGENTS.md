@@ -4,6 +4,7 @@ This repository uses small, task-focused agent skills rather than one giant inst
 
 ## Before coding
 - Read the relevant Xentra Notion decisions/requirements.
+- If `docs/notion/` contains a snapshot relevant to the task, read it (see `docs/notion/README.md`). It is a pinned copy of Notion — ask the user when a decision may have changed since the snapshot.
 - Read every `.agent/skills/*/SKILL.md` relevant to the requested change; do not load unrelated skills unnecessarily.
 - Inspect current Git status, recent commits, and affected files.
 - Identify the domain owner, locked invariants, and existing implementation boundary.
