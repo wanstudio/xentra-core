@@ -1,4 +1,4 @@
-name: Auto Deploy Xentra Core to configurable target
+name: Deploy Xentra Core via SSH
 
 on:
   push:
@@ -8,18 +8,45 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Package Xentra Core
         run: |
-          zip -r xentra-core-deploy.zip . -x "node_modules/*" ".git/*" "tmp/*"
+          zip -r xentra-core-deploy.zip .             -x "node_modules/*" ".git/*" "tmp/*" ".env" ".env.*"
 
-      - name: Deploy to dev.mybangjo.com
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.XENTRA_SSH_KEY }}
+          SSH_HOST: ${{ secrets.XENTRA_SSH_HOST }}
         run: |
-          curl -fsS -X POST \
-            -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
-            -H "Content-Type: application/zip" \
-            --data-binary "@xentra-core-deploy.zip" \
-            "${{ secrets.XENTRA_DEPLOY_URL }}/wp-json/xentra/v1/deploy-raw?target=core"
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/xentra_deploy_key
+          chmod 600 ~/.ssh/xentra_deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload package
+        env:
+          SSH_HOST: ${{ secrets.XENTRA_SSH_HOST }}
+          SSH_USER: ${{ secrets.XENTRA_SSH_USER }}
+          SSH_PORT: ${{ secrets.XENTRA_SSH_PORT }}
+        run: |
+          scp -i ~/.ssh/xentra_deploy_key -P "$SSH_PORT"             xentra-core-deploy.zip             "$SSH_USER@$SSH_HOST:/home/mybangjo/xentra-core-deploy.zip"
+
+      - name: Deploy and restart Passenger
+        env:
+          SSH_HOST: ${{ secrets.XENTRA_SSH_HOST }}
+          SSH_USER: ${{ secrets.XENTRA_SSH_USER }}
+          SSH_PORT: ${{ secrets.XENTRA_SSH_PORT }}
+        run: |
+          ssh -i ~/.ssh/xentra_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -e
+          cd /home/mybangjo/xentra-core
+          unzip -o /home/mybangjo/xentra-core-deploy.zip
+          rm -f /home/mybangjo/xentra-core-deploy.zip
+          npm install --omit=dev
+          mkdir -p tmp
+          touch tmp/restart.txt
+          REMOTE
