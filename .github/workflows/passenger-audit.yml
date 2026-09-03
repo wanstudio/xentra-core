@@ -97,7 +97,18 @@ jobs:
           elif [ "$MODE" = "diagnose" ]; then
           echo "############ MODE: DIAGNOSE ############"
           echo "== dev docroot .htaccess (known-good legacy Passenger config) =="
+          ls -la "$HOME/dev.***.com/.htaccess" 2>/dev/null || echo "no dev .htaccess file"
           cat "$HOME/dev.***.com/.htaccess" 2>/dev/null | head -120 || echo "no dev .htaccess"
+          echo "== cloudlinux selector state =="
+          ls -laR "$HOME/.cl.selector" 2>/dev/null | head -40 || echo "no .cl.selector"
+          echo "== selector json/config =="
+          find "$HOME/.cl.selector" -maxdepth 3 -type f 2>/dev/null | head -10
+          for f in $(find "$HOME/.cl.selector" -maxdepth 3 -type f 2>/dev/null | head -5); do echo "--- $f ---"; cat "$f" 2>/dev/null | head -40; done
+          echo "== home logs =="
+          ls -la "$HOME/logs" 2>/dev/null | head -20
+          echo "== litespeed/app error log candidates =="
+          tail -25 "$HOME/logs/error.log" 2>/dev/null || true
+          ls -la "$HOME/logs"/*passenger* 2>/dev/null || true
           echo "== passenger logfiles in home =="
           ls -la "$HOME"/*.log "$APPROOT"/passenger.log 2>/dev/null | head -10
           echo "== standalone boot test (PORT=3999, 8s) =="
