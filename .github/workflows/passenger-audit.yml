@@ -109,6 +109,14 @@ jobs:
           echo "== litespeed/app error log candidates =="
           tail -25 "$HOME/logs/error.log" 2>/dev/null || true
           ls -la "$HOME/logs"/*passenger* 2>/dev/null || true
+          echo "== live passenger/node processes =="
+          ps aux | grep -iE 'passenger|node|xentra|lsapi' | grep -v grep | head -20 || echo "none"
+          echo "== processes by me =="
+          ps -u "$(whoami)" -o pid,etime,cmd 2>/dev/null | grep -iE 'passenger|node' | head -10 || echo "none"
+          echo "== origin header + retry curl =="
+          curl -skI -m 15 --resolve "app.mybangjo.com:443:$ORIGIN" "https://app.mybangjo.com/health" 2>&1 | head -8
+          echo "--- body retry ---"
+          curl -sk -m 15 --resolve "app.mybangjo.com:443:$ORIGIN" -w '\n[HTTP %{http_code}]\n' "https://app.mybangjo.com/health" 2>&1 | head -c 400
           echo "== passenger logfiles in home =="
           ls -la "$HOME"/*.log "$APPROOT"/passenger.log 2>/dev/null | head -10
           echo "== standalone boot test (PORT=3999, 8s) =="
