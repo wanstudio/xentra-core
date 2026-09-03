@@ -58,7 +58,7 @@ jobs:
           echo "== 1. backup docroot .htaccess =="
           cp -a "$DOCROOT/.htaccess" "$DOCROOT/.htaccess.bak-$TS"
           echo "backup written: $DOCROOT/.htaccess.bak-$TS"
-          echo "== 2. write Passenger-enabled .htaccess =="
+          echo "== 2. write Passenger-enabled .htaccess (canonical CloudLinux block) =="
           cat > "$DOCROOT/.htaccess" <<'HTACCESS'
           # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
           PassengerAppRoot "/home/mybangjo/xentra-core"
@@ -66,7 +66,6 @@ jobs:
           PassengerNodejs "/home/mybangjo/nodevenv/xentra-core/20/bin/node"
           PassengerAppType node
           PassengerStartupFile app.js
-          PassengerAppLogFile "/home/mybangjo/xentra-core/passenger.log"
           # DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
           # SPA fallback for customer PWA (keep /api and /health hitting Node)
           <IfModule mod_rewrite.c>
@@ -80,9 +79,14 @@ jobs:
           HTACCESS
           echo "--- new docroot .htaccess ---"
           cat "$DOCROOT/.htaccess"
-          echo "== 3. restart app =="
+          echo "== 3. restart app (kill stale lsnode so LiteSpeed respawns on current config) =="
+          ps aux | grep -iE 'lsnode' | grep -v grep | head -5 || true
+          pkill -f 'lsnode:/home/mybangjo/xentra-core' || echo "no lsnode to kill"
+          sleep 3
           touch "$APPROOT/tmp/restart.txt"
-          sleep 12
+          sleep 25
+          echo "--- lsnode processes after restart ---"
+          ps aux | grep -iE 'lsnode' | grep -v grep | head -5 || echo "none"
           echo "--- passenger.log tail (boot) ---"
           tail -30 "$APPROOT/passenger.log" || echo "no passenger.log"
           echo "== 4. origin-direct checks (bypass Cloudflare via --resolve) =="
