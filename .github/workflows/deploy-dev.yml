@@ -1,4 +1,4 @@
-name: Auto Deploy Xentra Core to dev.mybangjo.com
+name: Auto Deploy Xentra Core to configurable target
 
 on:
   push:
@@ -22,4 +22,4 @@ jobs:
             -H "X-Deploy-Token: ${{ secrets.DEPLOY_TOKEN }}" \
             -H "Content-Type: application/zip" \
             --data-binary "@xentra-core-deploy.zip" \
-            "https://dev.mybangjo.com/wp-json/xentra/v1/deploy-raw?target=core"
+            "${{ secrets.XENTRA_DEPLOY_URL }}/wp-json/xentra/v1/deploy-raw?target=core"
