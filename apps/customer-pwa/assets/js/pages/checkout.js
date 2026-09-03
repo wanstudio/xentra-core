@@ -86,43 +86,12 @@
             applied: Array.isArray(res.applied) ? res.applied : [],
             rejected: Array.isArray(res.rejected) ? res.rejected : []
           };
-
-          // Marketing discovery is allowed to remain visible for an anonymous
-          // browser even if the discovery endpoint returns an empty list.
-          // Entitlement/claim is still authoritative on the server.
-          if (!isPwa && !promoEvaluation.discovery.some(function (p) {
-            return p && p.capability_type === 'install_incentive' && p.should_show_banner === true;
-          })) {
-            promoEvaluation.discovery.unshift({
-              promo_id: 'prm_bangjo_pwa_install',
-              capability_type: 'install_incentive',
-              name: 'Promo Hadiah Install PWA Es Teh',
-              should_show_banner: true,
-              should_grant_reward: false,
-              display: {
-                banner_title: 'Install sekarang & dapatkan gratis es teh',
-                banner_subtitle: 'syarat & ketentuan berlaku',
-                icon_url: '/assets/img/iced-tea.png'
-              }
-            });
-          }
         }
+        // Discovery comes only from the authoritative promotion service.
+        // (Locked business contract 68ac710: no client-injected promo when the
+        // API is empty or fails.)
         return promoEvaluation;
       }).catch(function () {
-        if (!isPwa) {
-          promoEvaluation.discovery = [{
-            promo_id: 'prm_bangjo_pwa_install',
-            capability_type: 'install_incentive',
-            name: 'Promo Hadiah Install PWA Es Teh',
-            should_show_banner: true,
-            should_grant_reward: false,
-            display: {
-              banner_title: 'Install sekarang & dapatkan gratis es teh',
-              banner_subtitle: 'syarat & ketentuan berlaku',
-              icon_url: '/assets/img/iced-tea.png'
-            }
-          }];
-        }
         return promoEvaluation;
       });
   }
@@ -152,13 +121,17 @@
       );
     } else if (rewardPromo && rewardPromo.display) {
       var r = rewardPromo.display;
-      var rewardItemId = 'reward_' + (rewardPromo.reward ? (rewardPromo.reward.promo_id || rewardPromo.promo_id) : rewardPromo.promo_id);
-      var hasRewardInCart = (items || []).some(function (i) {
-        return String(i.id) === rewardItemId ||
-               String(i.id).indexOf('reward_') === 0 ||
-               Boolean(i.is_promo_reward) ||
-               Number(i.price || 0) === 0;
-      });
+      var promoId = rewardPromo.reward ? (rewardPromo.reward.promo_id || rewardPromo.promo_id) : rewardPromo.promo_id;
+      var bridge = window.Xentra && window.Xentra.PromotionRewardCart;
+      // Bridge check is canonical (promotion_id / reward_<promo> id); the loose
+      // scan keeps legacy hydrated carts from an older claim shape claimable-free.
+      var hasRewardInCart = (bridge ? bridge.hasReward(items, promoId) : false) ||
+        (items || []).some(function (i) {
+          return String(i.id) === 'reward_' + promoId ||
+                 String(i.id).indexOf('reward_') === 0 ||
+                 Boolean(i.is_promo_reward) ||
+                 Number(i.price || 0) === 0;
+        });
 
       if (hasRewardInCart) {
         return (
@@ -187,35 +160,45 @@
     slot.innerHTML = getPromoBannerHtml(items);
     var promoBtn = $('x-btn-promo-install'); if (promoBtn) promoBtn.onclick = handleInstallClick;
     var claimBtn = $('x-btn-promo-claim');
-    if (claimBtn) {
-      claimBtn.onclick = function () {
-        var rewardPromo = getAppliedRewardPromo();
-        if (rewardPromo && rewardPromo.reward) {
-          var rew = rewardPromo.reward;
-          var rewardItemId = 'reward_' + (rew.promo_id || rewardPromo.promo_id);
-          Store.addItem({
-            id: rewardItemId,
-            product_id: rew.product_id,
-            name: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
-            price: Number(rew.reward_price || 0),
-            regular_price: 5000,
-            image_url: (rewardPromo.display && rewardPromo.display.icon_url) || '/assets/pwa/icon-192.png',
-            description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
-            is_promo_reward: true,
-            promotion_id: rew.promo_id || rewardPromo.promo_id,
-            reward_type: rew.reward_type || 'freebie_product'
-          }, 1);
-          var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
-          if (rowsEl) {
-            rowsEl.innerHTML = renderItemsHtml(getCheckoutItems());
-            bindItemEvents();
-          }
-          calculateTotals();
-          refreshDeliveryQuote();
-          renderPromoBanner();
-        }
-      };
+    if (claimBtn) claimBtn.onclick = claimRewardIntoCart;
+  }
+
+  // ── Single Claim execution path ──
+  // Server-provided entitlement (promoEvaluation.applied) is converted into one
+  // checkout item through the shared PromotionRewardCart bridge. Idempotent:
+  // if the reward line is already present, Claim does nothing.
+  function claimRewardIntoCart() {
+    var bridge = window.Xentra && window.Xentra.PromotionRewardCart;
+    if (!bridge) return;
+    var rewardPromo = getAppliedRewardPromo();
+    if (!rewardPromo || !rewardPromo.reward) return;
+
+    var rew = rewardPromo.reward;
+    var promoId = rew.promo_id || rewardPromo.promo_id;
+    var items = getCheckoutItems();
+    if (bridge.hasReward(items, promoId)) return;
+
+    var res = bridge.claim(items, {
+      promo_id: promoId,
+      product_id: rew.product_id,
+      name: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
+      reward_type: rew.reward_type || 'freebie_product',
+      regular_price: 5000,
+      image_url: (rewardPromo.display && rewardPromo.display.icon_url) || '/assets/pwa/icon-192.png',
+      description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo'
+    });
+    if (!res || !res.claimed || !res.items.length) return;
+
+    Store.addItem(res.items[0], 1);
+
+    var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
+    if (rowsEl) {
+      rowsEl.innerHTML = renderItemsHtml(getCheckoutItems());
+      bindItemEvents();
     }
+    calculateTotals();
+    refreshDeliveryQuote();
+    renderPromoBanner();
   }
 
   window.addEventListener('beforeinstallprompt', function (e) {
@@ -387,6 +370,13 @@
         return;
       }
       var rowsEl = $('x-checkout-items-rows');
+      if (!rowsEl && activeItems.length) {
+        // First item arrived while the empty-state view was on screen
+        // (e.g. welcome reward claimed): transition to the full checkout layout.
+        renderLayout();
+        rowsEl = $('x-checkout-items-rows');
+        if (!rowsEl) return;
+      }
       if (rowsEl) {
         rowsEl.innerHTML = renderItemsHtml(activeItems);
         bindItemEvents();
@@ -882,32 +872,7 @@
     var promoBtn = $('x-btn-promo-install'); if (promoBtn) promoBtn.onclick = handleInstallClick;
 
     var claimBtn = $('x-btn-promo-claim');
-    if (claimBtn) {
-      claimBtn.onclick = function () {
-        var rewardPromo = getAppliedRewardPromo();
-        if (rewardPromo && rewardPromo.reward) {
-          var r = rewardPromo.reward;
-          var rewardItemId = 'reward_' + (r.promo_id || rewardPromo.promo_id);
-          Store.addItem({
-            id: rewardItemId,
-            name: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
-            price: Number(r.reward_price || 0),
-            regular_price: 5000,
-            image_url: (rewardPromo.display && rewardPromo.display.icon_url) || '/assets/pwa/icon-192.png',
-            description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
-            is_promo_reward: true
-          }, 1);
-          var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
-          if (rowsEl) {
-            rowsEl.innerHTML = renderItemsHtml(getCheckoutItems());
-            bindItemEvents();
-          }
-          calculateTotals();
-          refreshDeliveryQuote();
-          renderPromoBanner();
-        }
-      };
-    }
+    if (claimBtn) claimBtn.onclick = claimRewardIntoCart;
 
     bindItemEvents();
 
