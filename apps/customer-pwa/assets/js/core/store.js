@@ -139,7 +139,10 @@
       );
 
       var newItem = {
+        // Keep the cart row id separate from the authoritative catalog product id.
+        // Promo rewards use id=reward_<promo>, while product_id points to the real product.
         id: product.id,
+        product_id: product.product_id || product.id,
         name: product.name,
         price: Number(product.price),
         regular_price: product.regular_price ? Number(product.regular_price) : null,
@@ -147,7 +150,9 @@
         description: product.description || '',
         quantity: qty,
         note: '',
-        is_promo_reward: isPromo
+        is_promo_reward: isPromo,
+        promotion_id: product.promotion_id || product.promo_id || null,
+        reward_type: product.reward_type || null
       };
 
       if (isPromo) {
