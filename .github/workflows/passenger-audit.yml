@@ -17,6 +17,7 @@ on:
         options:
           - readonly
           - enable
+          - diagnose
 
 jobs:
   run:
@@ -92,6 +93,22 @@ jobs:
           echo "--- $url ---"
           curl -sk -m 20 --resolve "app.mybangjo.com:443:$ORIGIN" -w '\n[HTTP %{http_code}]\n' "$url" 2>&1 | head -c 1500
           echo
+          done
+          elif [ "$MODE" = "diagnose" ]; then
+          echo "############ MODE: DIAGNOSE ############"
+          echo "== dev docroot .htaccess (known-good legacy Passenger config) =="
+          cat "$HOME/dev.***.com/.htaccess" 2>/dev/null | head -120 || echo "no dev .htaccess"
+          echo "== passenger logfiles in home =="
+          ls -la "$HOME"/*.log "$APPROOT"/passenger.log 2>/dev/null | head -10
+          echo "== standalone boot test (PORT=3999, 8s) =="
+          cd "$APPROOT" && PORT=3999 timeout 8 "$HOME/nodevenv/xentra-core/20/bin/node" server/app.js 2>&1 | head -25 || echo "(exit $?)"
+          echo "== .htaccess files with Passenger markers in home =="
+          grep -rl "PASSENGER CONFIGURATION" "$HOME" --include=.htaccess 2>/dev/null | head -10
+          echo "== app docroot .htaccess current (head 40) =="
+          head -40 "$DOCROOT/.htaccess" 2>/dev/null
+          echo "== public curl checks =="
+          for url in "https://app.mybangjo.com/health" "https://app.mybangjo.com/api/v1/promotions/active?is_pwa=0&phone="; do
+          echo "--- $url ---"; curl -sS -m 12 -w '\n[HTTP %{http_code}]\n' "$url" 2>&1 | head -6
           done
           else
           echo "############ MODE: READONLY AUDIT ############"
