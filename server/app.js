@@ -61,7 +61,8 @@ function handleDeploy(req, res) {
   }
 
   // Reject deploy endpoint on production if explicitly flagged
-  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_REMOTE_DEPLOY) {
+  const isDevDeployHost = req.hostname === 'dev.mybangjo.com';
+  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_REMOTE_DEPLOY && !isDevDeployHost) {
     return res.status(403).json({ success: false, message: 'Remote code deployment endpoint is disabled in production.' });
   }
 
