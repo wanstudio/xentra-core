@@ -801,6 +801,42 @@ function seedData(targetDb) {
 }
 
 function seedInstallPromotion(targetDb, brandId) {
+  // Keep the authoritative reward product available even when the database already existed
+  // before the install-promo seed was introduced.
+  const rewardCategory = targetDb.prepare(
+    'SELECT id FROM categories WHERE brand_id = ? AND (slug = ? OR name = ?) LIMIT 1'
+  ).get(brandId, 'minuman', 'Minuman');
+  const rewardCategoryId = rewardCategory?.id || '22';
+
+  targetDb.prepare(`
+    INSERT OR IGNORE INTO products (
+      id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, sort_order
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    '401',
+    brandId,
+    rewardCategoryId,
+    'Es Teh Manis',
+    'es-teh-manis',
+    'Teh melati seduh dingin segar.',
+    5000,
+    5000,
+    '/assets/img/iced-tea.png',
+    '/assets/img/iced-tea.png',
+    99
+  );
+
+  const rewardBranch = targetDb.prepare(
+    'SELECT id FROM branches WHERE brand_id = ? AND is_active = 1 ORDER BY id LIMIT 1'
+  ).get(brandId);
+  if (rewardBranch) {
+    targetDb.prepare(`
+      INSERT OR IGNORE INTO branch_products (
+        branch_id, product_id, price, stock, is_available, low_stock_threshold
+      ) VALUES (?, '401', 5000, 100, 1, 5)
+    `).run(rewardBranch.id);
+  }
+
   targetDb.prepare(`
     INSERT OR IGNORE INTO promotions (
       id, brand_id, name, code, capability_type, stacking_policy, priority_weight, max_redemptions_total, max_redemptions_per_customer, is_active
