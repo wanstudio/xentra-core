@@ -58,6 +58,77 @@
   var $ = function (id) { return document.getElementById(id); };
 
   // ======================================================================
+  //  PWA INSTALL PROMO
+  //  Home must expose the install incentive to anonymous browser guests.
+  //  Eligibility stays authoritative on the Promotion Engine; we only render
+  //  the banner when the server says the install incentive is discoverable.
+  // ======================================================================
+  function initInstallPromo() {
+    var banner = $('x-pwa-banner');
+    if (!banner) return;
+
+    // Installed PWA users must not see the acquisition banner.
+    var standalone = false;
+    try {
+      standalone = Boolean(
+        (window.Xentra && window.Xentra.PwaRuntime &&
+          window.Xentra.PwaRuntime.getPwaRuntimeContext &&
+          window.Xentra.PwaRuntime.getPwaRuntimeContext().display_mode === 'standalone') ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+      );
+    } catch (_) {}
+
+    if (standalone) {
+      banner.classList.remove('x-pwa-banner-show');
+      return;
+    }
+
+    // Dismissal is session-scoped, not an entitlement/identity flag.
+    try {
+      if (sessionStorage.getItem('xentra_install_promo_dismissed') === '1') return;
+    } catch (_) {}
+
+    var installBtn = $('x-pwa-install');
+    var dismissBtn = $('x-pwa-dismiss');
+    var titleEl = banner.querySelector('.x-pwa-banner-text strong');
+    var subtitleEl = banner.querySelector('.x-pwa-banner-text span');
+
+    if (dismissBtn && !dismissBtn.__xentraBound) {
+      dismissBtn.__xentraBound = true;
+      dismissBtn.addEventListener('click', function () {
+        banner.classList.remove('x-pwa-banner-show');
+        try { sessionStorage.setItem('xentra_install_promo_dismissed', '1'); } catch (_) {}
+      });
+    }
+
+    // Do not require login/WhatsApp registration to discover this promo.
+    API.get('/promotions/active?is_pwa=0&phone=')
+      .then(function (res) {
+        if (!res || !res.success) return;
+        var promo = (Array.isArray(res.promotions) ? res.promotions : []).find(function (p) {
+          return p && p.should_show_banner === true;
+        });
+
+        if (!promo || !promo.display) {
+          banner.classList.remove('x-pwa-banner-show');
+          return;
+        }
+
+        var display = promo.display;
+        if (titleEl) titleEl.textContent = display.banner_title || 'Install & dapatkan Es Teh Gratis';
+        if (subtitleEl) subtitleEl.textContent = display.banner_subtitle || 'Gratis untuk pesanan pertama • S&K berlaku';
+        if (installBtn) installBtn.textContent = 'Install';
+
+        banner.classList.add('x-pwa-banner-show');
+      })
+      .catch(function (err) {
+        // Network/API failure must not fabricate an entitlement.
+        banner.classList.remove('x-pwa-banner-show');
+        console.warn('[Home] Install promo discovery warn:', err);
+      });
+  }
+
+  // ======================================================================
   //  HERO CLOCK
   // ======================================================================
   var DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -724,6 +795,9 @@
           applyCatalog(DEFAULT_CATALOG);
         }
       });
+
+    // Discover install incentive for anonymous browser guests.
+    initInstallPromo();
 
     // Render initial cart state
     renderCartDock();
