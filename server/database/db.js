@@ -778,6 +778,7 @@ function seedData(targetDb) {
       { id: '286', cat: catAyam, name: 'Ayam Tulang Lunak Bakar', price: 28000, reg: 32000, desc: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
       { id: '287', cat: catMie, name: 'Mie Godog Jawa Asli', price: 22000, reg: 25000, desc: 'Mie godog kuah gurih kaldu kental ayam kampung dengan telor dan sayur segar.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
       { id: '288', cat: catMinuman, name: 'Es Kopi Susu Bangjo', price: 15000, reg: 18000, desc: 'Kopi susu gula aren racikan istimewa barista Bangjo dingin segar.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
+      { id: '401', cat: catMinuman, name: 'Es Teh Manis', price: 5000, reg: 5000, desc: 'Teh melati seduh dingin segar.', img: '/assets/img/iced-tea.png' },
     ];
 
     for (let i = 0; i < products.length; i++) {
@@ -817,7 +818,7 @@ function seedInstallPromotion(targetDb, brandId) {
 
   targetDb.prepare(`
     INSERT OR IGNORE INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload)
-    VALUES ('rew_pwa_install_01', 'prm_bangjo_pwa_install', 'freebie_product', '288', 0,
+    VALUES ('rew_pwa_install_01', 'prm_bangjo_pwa_install', 'freebie_product', '401', 0,
       '{"banner_title":"Install sekarang & dapatkan gratis es teh","banner_subtitle":"syarat & ketentuan berlaku","reward_title":"Selamat! Es Teh Gratis untuk pesanan pertamamu!","reward_badge_text":"✓ Bonus PWA Aktif (Rp0)","icon_url":"/assets/img/iced-tea.png"}')
   `).run();
 }
