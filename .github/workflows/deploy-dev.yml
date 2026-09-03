@@ -46,6 +46,7 @@ jobs:
           cd /home/mybangjo/xentra-core
           unzip -o /home/mybangjo/xentra-core-deploy.zip
           rm -f /home/mybangjo/xentra-core-deploy.zip
+          export PATH="/home/mybangjo/nodevenv/xentra-core/20/bin:$PATH"
           npm install --omit=dev
           mkdir -p tmp
           touch tmp/restart.txt
