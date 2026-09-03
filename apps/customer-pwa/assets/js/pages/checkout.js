@@ -343,6 +343,7 @@
       var activeItems = getCheckoutItems();
       if (!activeItems.length && state.fulfillment.type !== 'reservation') {
         renderEmpty();
+        renderPromoBanner();
         return;
       }
       var rowsEl = $('x-checkout-items-rows');
@@ -357,6 +358,7 @@
     var items = getCheckoutItems();
     if (!items.length && state.fulfillment.type !== 'reservation') {
       renderEmpty();
+      renderPromoBanner();
       return;
     }
 
@@ -420,6 +422,7 @@
     checkoutContainer.innerHTML =
       '<div class="xentra-checkout x-checkout-alt2">' +
       '  <div class="x-alt-header"><button type="button" id="x-back-empty" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Pesanan</span></div>' +
+      '  <div id="x-promo-slot">' + getPromoBannerHtml([]) + '</div>' +
       '  <div style="text-align:center;padding:56px 20px;">' +
       '    <div style="font-size:48px;margin-bottom:12px;">🛒</div>' +
       '    <div style="font-weight:800;font-size:18px;color:#111;margin-bottom:6px;">Keranjang Masih Kosong</div>' +
