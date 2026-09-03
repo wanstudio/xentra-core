@@ -794,47 +794,32 @@ function seedData(targetDb) {
       `).run(branchBaratId, p.id, p.price);
     }
 
-    targetDb.prepare(`
-      INSERT OR IGNORE INTO promotions (
-        id, brand_id, name, code, capability_type, stacking_policy, priority_weight, max_redemptions_total, max_redemptions_per_customer, is_active
-      ) VALUES (
-        'prm_bangjo_pwa_install',
-        'brand_bangjo',
-        'Promo Hadiah Install PWA Es Teh',
-        NULL,
-        'install_incentive',
-        'exclusive',
-        100,
-        NULL,
-        1,
-        1
-      )
-    `).run();
-
-    targetDb.prepare(`
-      INSERT OR IGNORE INTO promotion_rules (
-        id, promotion_id, rule_type, rule_payload
-      ) VALUES (
-        'rul_pwa_install_01',
-        'prm_bangjo_pwa_install',
-        'eligibility',
-        '{"requires_pwa_installed":true,"target_audience":"new_user","first_order_only":true}'
-      )
-    `).run();
-
-    targetDb.prepare(`
-      INSERT OR IGNORE INTO promotion_rewards (
-        id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload
-      ) VALUES (
-        'rew_pwa_install_01',
-        'prm_bangjo_pwa_install',
-        'freebie_product',
-        '288',
-        0,
-        '{"banner_title":"Install sekarang & dapatkan gratis es teh","banner_subtitle":"syarat & ketentuan berlaku","reward_title":"Selamat! Es Teh Gratis untuk pesanan pertamamu!","reward_badge_text":"✓ Bonus PWA Aktif (Rp0)","icon_url":"/assets/img/iced-tea.png"}'
-      )
-    `).run();
   }
+
+  seedInstallPromotion(targetDb, brandId);
+}
+
+function seedInstallPromotion(targetDb, brandId) {
+  targetDb.prepare(`
+    INSERT OR IGNORE INTO promotions (
+      id, brand_id, name, code, capability_type, stacking_policy, priority_weight, max_redemptions_total, max_redemptions_per_customer, is_active
+    ) VALUES (
+      'prm_bangjo_pwa_install', ?, 'Promo Hadiah Install PWA Es Teh', NULL,
+      'install_incentive', 'exclusive', 100, NULL, 1, 1
+    )
+  `).run(brandId);
+
+  targetDb.prepare(`
+    INSERT OR IGNORE INTO promotion_rules (id, promotion_id, rule_type, rule_payload)
+    VALUES ('rul_pwa_install_01', 'prm_bangjo_pwa_install', 'eligibility',
+      '{"requires_pwa_installed":true,"target_audience":"new_user","first_order_only":true}')
+  `).run();
+
+  targetDb.prepare(`
+    INSERT OR IGNORE INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload)
+    VALUES ('rew_pwa_install_01', 'prm_bangjo_pwa_install', 'freebie_product', '288', 0,
+      '{"banner_title":"Install sekarang & dapatkan gratis es teh","banner_subtitle":"syarat & ketentuan berlaku","reward_title":"Selamat! Es Teh Gratis untuk pesanan pertamamu!","reward_badge_text":"✓ Bonus PWA Aktif (Rp0)","icon_url":"/assets/img/iced-tea.png"}')
+  `).run();
 }
 
 // Auto-run schema initialization
