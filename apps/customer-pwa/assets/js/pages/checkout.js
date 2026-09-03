@@ -195,11 +195,15 @@
           var rewardItemId = 'reward_' + (rew.promo_id || rewardPromo.promo_id);
           Store.addItem({
             id: rewardItemId,
+            product_id: rew.product_id,
             name: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
             price: Number(rew.reward_price || 0),
             regular_price: 5000,
             image_url: (rewardPromo.display && rewardPromo.display.icon_url) || '/assets/pwa/icon-192.png',
-            description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo'
+            description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
+            is_promo_reward: true,
+            promotion_id: rew.promo_id || rewardPromo.promo_id,
+            reward_type: rew.reward_type || 'freebie_product'
           }, 1);
           var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
           if (rowsEl) {
