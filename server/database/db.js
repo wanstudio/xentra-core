@@ -860,6 +860,14 @@ function seedInstallPromotion(targetDb, brandId) {
       '{"requires_pwa_installed":true,"target_audience":"new_user","first_order_only":true}')
   `).run();
 
+  // Repair pre-existing rows created by the old "first brand" seeding logic.
+  targetDb.prepare(
+    "UPDATE promotions SET brand_id = ? WHERE id = 'prm_bangjo_pwa_install'"
+  ).run(brandId);
+  targetDb.prepare(
+    "UPDATE products SET brand_id = ? WHERE id = '401'"
+  ).run(brandId);
+
   targetDb.prepare(`
     INSERT OR IGNORE INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload)
     VALUES ('rew_pwa_install_01', 'prm_bangjo_pwa_install', 'freebie_product', '401', 0,
