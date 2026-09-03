@@ -84,3 +84,116 @@ These changes are implementation alignment with the already-decided Commerce flo
 - Implementasi saat ini masih mengenali installation freebie melalui special-case identifier (`promo-es-teh-gratis`). Secara arsitektur, pengecualian ini **belum didelegasikan ke modul/domain khusus**.
 - Keputusan modular: jangan menghapus atau memblokir behavior Rp0 tersebut. Jika kelak Xentra memiliki sistem promo/freebie yang lebih luas, buat modul/domain khusus dan pindahkan definisi/aturan installation freebie ke sana tanpa mengubah behavior resmi yang sudah berjalan.
 - Audit note: special-case `promo-es-teh-gratis` dikategorikan sebagai **technical debt/modularization gap**, bukan security finding.
+
+## 🔒 LOCKED — Promotion Lifecycle & Installation Freebie Business Contract
+
+### Context
+Xentra memiliki promotion resmi 'promo-es-teh-gratis' sebagai installation freebie. Promo ini bukan sekadar elemen UI. Promotion memiliki lifecycle terpisah antara discovery, eligibility, entitlement, claim, checkout, final validation, dan redemption.
+
+Masalah implementasi yang sedang ditangani: promo card untuk browser guest/new user dapat tidak muncul, dan fallback frontend berisiko menutupi akar masalah jika promotion discovery authoritative tidak mengembalikan promo.
+
+### Business Decision
+Flow promotion resmi Xentra:
+
+DISCOVERY → ELIGIBILITY → ENTITLEMENT → CLAIM → CHECKOUT → FINAL VALIDATION → REDEMPTION
+
+#### Discovery
+Guest/browser baru tetap dapat melihat promotion yang memang ditujukan untuk mereka sebagai promotional discovery. Discovery berarti promo dapat ditampilkan, tetapi belum berarti customer sudah memperoleh reward.
+
+Promotion discovery harus berasal dari promotion/business service yang authoritative. Frontend tidak boleh membuat atau menyuntikkan promo palsu hanya karena API kosong/gagal. Jika guest tidak mendapatkan discovery, root cause harus diperbaiki pada discovery/business flow.
+
+#### Eligibility
+Setelah requirement promo terpenuhi, misalnya PWA berhasil dipasang, sistem mengevaluasi eligibility. Evaluasi dapat mempertimbangkan promotion aktif, requirement PWA, customer/session, first-order requirement jika berlaku, tenant/brand/branch context, periode promo, dan riwayat redemption.
+
+Eligible ≠ reward sudah berada di cart.
+
+#### Entitlement
+Jika eligible, customer memperoleh hak/reward yang dapat diklaim. Untuk installation freebie: Es Teh Gratis, quantity 1, Rp0.
+
+Entitlement adalah keputusan domain/business service, bukan keputusan UI.
+
+#### Claim
+Claim berarti memasukkan reward yang sudah entitled ke checkout. Claim bukan redemption order.
+
+Reward harus menjadi bagian dari satu checkout.items[] bersama produk normal. Tidak boleh ada promo cart terpisah.
+
+Reward harus tetap mereferensikan catalog product yang sebenarnya. Installation freebie saat ini diketahui menargetkan product Es Teh dengan product_id 401. Cart line boleh memiliki identity internal/sintetis untuk membedakan promotion reward, tetapi harus menyimpan referensi authoritative ke product_id.
+
+Konsep: cart line identity ≠ catalog product identity.
+
+#### Remove Reward
+Jika customer menghapus Es Teh Gratis:
+- reward hilang dari checkout.items[];
+- produk normal tetap ada;
+- entitlement tidak otomatis dianggap redeemed atau forfeited;
+- selama entitlement masih valid, promotion kembali menjadi claimable;
+- tombol Claim dapat muncul kembali.
+
+Remove cart item ≠ revoke promotion entitlement.
+
+#### Re-Claim
+Jika customer menekan Claim setelah reward dihapus, valid entitlement + reward belum ada di checkout → reward dimasukkan kembali ke checkout.items[].
+
+Claim harus idempotent. Jika reward sudah berada di checkout, Claim tidak boleh menambah reward kedua.
+
+#### Final Checkout Validation
+Saat customer menekan Pay, sistem melakukan final verification sesuai locked Commerce flow: availability/stock, price, promotion reward validity, customer/session eligibility, product validity, promotion validity, duplicate/redeemed state, dan tenant/brand/branch context.
+
+Browser/localStorage/cart state bukan sumber kebenaran untuk memberikan harga Rp0. Domain/service menentukan apakah reward Rp0 sah.
+
+#### Redemption
+Promotion baru dianggap redeemed/consumed ketika order berhasil mencapai business state yang sesuai untuk redemption.
+
+Menghapus reward dari cart sebelum order bukan redemption.
+
+Setelah redemption berhasil, customer tidak boleh memperoleh reward promo yang sama lagi jika rule promo memang one-time.
+
+### State Model
+DISCOVERABLE → ELIGIBLE → CLAIMABLE → IN_CHECKOUT → REDEEMED
+
+Remove dari IN_CHECKOUT kembali ke CLAIMABLE selama entitlement masih valid.
+
+IN_CHECKOUT tidak boleh dianggap REDEEMED.
+
+### Architecture Boundary
+Promotion/business rules tetap berada pada domain/service yang tepat. Checkout adalah consumer/composition flow, bukan pemilik seluruh business logic promotion.
+
+UI hanya merender promotion view model dan menjalankan action dari application/domain layer. UI tidak boleh menjadi authoritative source untuk eligibility, pricing, redemption, inventory, authorization, atau tenant ownership.
+
+Tidak ada keputusan untuk membuat endpoint Claim baru hanya karena UI memiliki tombol Claim. Jika architecture yang ada dapat memodelkan Claim sebagai conversion dari valid entitlement menjadi cart item, jangan menambah contract baru tanpa alasan teknis/business yang terbukti.
+
+### Implementation Rule
+Current Git implementation adalah evidence, bukan otomatis locked business contract. Jika implementation berbeda dari keputusan ini:
+
+Requirement → investigate current behavior → identify root cause → choose implementation → verify
+
+Jangan mempertahankan fallback atau special-case hanya karena sudah ada di Git jika terbukti bertentangan dengan business contract.
+
+### Acceptance Criteria
+1. Browser guest/new user dapat menerima promotion discovery jika promo memang berlaku untuk guest.
+2. Promo discovery tidak dibuat secara palsu oleh frontend ketika authoritative service gagal.
+3. Setelah PWA requirement terpenuhi, eligibility dapat dievaluasi.
+4. Eligible customer memperoleh entitlement.
+5. Claim memasukkan reward ke checkout.items[].
+6. Reward mereferensikan catalog product yang benar dan memiliki promotion metadata.
+7. Reward berharga Rp0 hanya jika promotion validation mengizinkannya.
+8. Remove reward menghapus hanya reward tersebut.
+9. Setelah remove, Claim muncul kembali selama entitlement masih valid.
+10. Claim ulang memasukkan reward kembali ke checkout.items[].
+11. Double Claim tidak menghasilkan lebih dari satu reward line/entitlement.
+12. Reload/state hydration tidak menggandakan reward.
+13. Produk normal tidak ikut terhapus.
+14. Final payment verification tetap authoritative.
+15. Redemption hanya terjadi pada order yang berhasil memenuhi kondisi redemption.
+
+### Verification Rule
+Unit test helper saja tidak cukup untuk menyatakan promotion flow selesai.
+
+Verification harus membedakan unit test, integration/execution-path test, deployment verification, dan runtime verification.
+
+Jika runtime/browser interaction belum dapat dibuktikan, status harus ditulis NOT VERIFIED, bukan PASS.
+
+### Decision Summary
+Promo card adalah Discovery. Install/requirement menghasilkan Eligibility. Eligibility menghasilkan Entitlement. Claim memasukkan Entitlement menjadi Checkout Item. Remove hanya mengeluarkan item dari cart, bukan mencabut entitlement. Claim ulang memasukkan item kembali. Pay melakukan final validation. Successful order melakukan Redemption.
+
+Ini menjadi business contract untuk installation freebie Xentra dan konteks dasar untuk debugging/implementasi promo berikutnya.
