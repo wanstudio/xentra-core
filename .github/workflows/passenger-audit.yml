@@ -1,12 +1,26 @@
-name: Passenger Audit (read-only)
+name: Passenger Audit & Enable (app.mybangjo.com)
 
-# Diagnostic for docs/DEPLOYMENT.md. Read-only: discovers the app.mybangjo.com
-# vhost docroot and Passenger state. No writes to production.
+# Ops for docs/DEPLOYMENT.md against the app.mybangjo.com vhost.
+#   mode=readonly (default): discover docroot/Passenger state, no writes.
+#   mode=enable:            backup docroot .htaccess -> activate CloudLinux
+#                           Passenger block (Express app at
+#                           /home/mybangjo/xentra-core) -> restart -> verify
+#                           /health and /api/v1/promotions/active
+#                           origin-direct and through Cloudflare.
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'readonly = audit only (no writes); enable = activate Passenger + verify'
+        required: true
+        default: 'readonly'
+        type: choice
+        options:
+          - readonly
+          - enable
 
 jobs:
-  audit:
+  run:
     runs-on: ubuntu-latest
     steps:
       - name: Configure SSH
@@ -19,34 +33,106 @@ jobs:
           chmod 600 ~/.ssh/xentra_key
           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
-      - name: Audit server state
+      - name: Readonly audit or enable Passenger
+        env:
+          SSH_HOST: ${{ secrets.XENTRA_SSH_HOST }}
+          SSH_USER: ${{ secrets.XENTRA_SSH_USER }}
+          SSH_PORT: ${{ secrets.XENTRA_SSH_PORT }}
+        run: |
+          MODE="${{ github.event.inputs.mode }}"
+          ssh -i ~/.ssh/xentra_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'bash -s' "$MODE" "$SSH_HOST" <<'REMOTE'
+          set -e
+          MODE="$1"
+          ORIGIN="$2"
+          DOCROOT="$HOME/app.mybangjo.com"
+          APPROOT="$HOME/xentra-core"
+          TS=$(date +%Y%m%d-%H%M%S)
+
+          if [ "$MODE" = "enable" ]; then
+            echo "############ MODE: ENABLE PASSENGER ############"
+            echo "== 0. preflight =="
+            ls -la "$APPROOT/app.js" "$APPROOT/tmp/restart.txt"
+            if [ -f "$APPROOT/.env" ]; then echo ".env present"; else echo ".env MISSING"; fi
+            "$HOME/nodevenv/xentra-core/20/bin/node" --version
+            echo "--- current docroot .htaccess (first 12 lines) ---"
+            head -12 "$DOCROOT/.htaccess"
+
+            echo "== 1. backup docroot .htaccess =="
+            cp -a "$DOCROOT/.htaccess" "$DOCROOT/.htaccess.bak-$TS"
+            echo "backup written: $DOCROOT/.htaccess.bak-$TS"
+
+            echo "== 2. write Passenger-enabled .htaccess =="
+            cat > "$DOCROOT/.htaccess" <<'HTACCESS'
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/mybangjo/xentra-core"
+PassengerBaseURI "/"
+PassengerNodejs "/home/mybangjo/nodevenv/xentra-core/20/bin/node"
+PassengerAppType node
+PassengerStartupFile app.js
+PassengerAppLogFile "/home/mybangjo/xentra-core/passenger.log"
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+
+# SPA fallback for customer PWA (keep /api and /health hitting Node)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+    RewriteCond %{REQUEST_URI} !^/(api|health|assets|pwa|dashboard)/
+    RewriteRule ^ index.html [L]
+</IfModule>
+HTACCESS
+            echo "--- new docroot .htaccess ---"
+            cat "$DOCROOT/.htaccess"
+
+            echo "== 3. restart app =="
+            touch "$APPROOT/tmp/restart.txt"
+            sleep 12
+            echo "--- passenger.log tail (boot) ---"
+            tail -30 "$APPROOT/passenger.log" || echo "no passenger.log"
+
+            echo "== 4. origin-direct checks (bypass Cloudflare via --resolve) =="
+            for url in \
+              "https://app.mybangjo.com/health" \
+              "https://app.mybangjo.com/api/v1/promotions/active?is_pwa=0&phone=" \
+              "https://app.mybangjo.com/api/v1/promotions/active?is_pwa=1&phone="; do
+              echo "--- $url ---"
+              curl -sk -m 20 --resolve "app.mybangjo.com:443:$ORIGIN" -w '\n[HTTP %{http_code}]\n' "$url" 2>&1 | head -c 1500
+              echo
+            done
+          else
+            echo "############ MODE: READONLY AUDIT ############"
+            echo "== whoami/pwd =="; whoami; pwd; id
+            echo "== app root =="; ls -la "$APPROOT" 2>/dev/null | head -25
+            echo "== app .htaccess =="; head -40 "$APPROOT/.htaccess" 2>/dev/null
+            echo "== restart marker =="; ls -la "$APPROOT/tmp" 2>/dev/null
+            echo "== node venv =="; "$HOME/nodevenv/xentra-core/20/bin/node" --version 2>/dev/null || echo "venv20 missing"
+            echo "== docroot .htaccess (first 30 lines) =="; head -30 "$DOCROOT/.htaccess" 2>/dev/null
+            echo "== passenger.log tail =="; tail -10 "$APPROOT/passenger.log" 2>/dev/null || echo "no passenger.log"
+            echo "== public curl checks =="
+            for url in "https://app.mybangjo.com/health" "https://app.mybangjo.com/api/v1/promotions/active?is_pwa=0&phone="; do
+              echo "--- $url ---"; curl -sS -m 12 -w '\n[HTTP %{http_code}]\n' "$url" 2>&1 | head -6
+            done
+          fi
+          REMOTE
+
+      - name: Public checks through Cloudflare (cache-busting, enable mode only)
+        if: ${{ github.event.inputs.mode == 'enable' }}
         env:
           SSH_HOST: ${{ secrets.XENTRA_SSH_HOST }}
           SSH_USER: ${{ secrets.XENTRA_SSH_USER }}
           SSH_PORT: ${{ secrets.XENTRA_SSH_PORT }}
         run: |
           ssh -i ~/.ssh/xentra_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
-          set -x
-          echo "== whoami/pwd =="; whoami; pwd; id
-          echo "== home top-level =="; ls -la ~ 2>/dev/null | head -40
-          echo "== app root =="; ls -la /home/mybangjo/xentra-core 2>/dev/null | head -25
-          echo "== app .htaccess =="; cat /home/mybangjo/xentra-core/.htaccess 2>/dev/null | head -40
-          echo "== restart marker =="; ls -la /home/mybangjo/xentra-core/tmp 2>/dev/null
-          echo "== node venv =="; /home/mybangjo/nodevenv/xentra-core/20/bin/node --version 2>/dev/null || echo "venv20 missing"
-          echo "== candidate docroots =="
-          for d in ~/public_html ~/app.mybangjo.com ~/dev.mybangjo.com /home/mybangjo/public_html /home/mybangjo/app.mybangjo.com; do
-            if [ -e "$d" ]; then echo "--- $d ---"; ls -la "$d" 2>/dev/null | head -15; echo "..htaccess:"; head -50 "$d/.htaccess" 2>/dev/null; fi
-          done
-          echo "== find wp-config (docroot guess) =="
-          find ~ -maxdepth 3 -name wp-config.php 2>/dev/null | head -10
-          echo "== passenger.log tail =="
-          tail -40 /home/mybangjo/xentra-core/passenger.log 2>/dev/null || echo "no passenger.log"
-          echo "== local curl checks =="
-          for url in "http://127.0.0.1/health" "http://127.0.0.1/api/v1/promotions/active?is_pwa=0&phone="; do
-            echo "--- $url ---"; curl -sS -m 8 -w '\n[HTTP %{http_code}]\n' "$url" 2>&1 | head -6
-          done
-          echo "== public curl checks =="
-          for url in "https://app.mybangjo.com/health" "https://app.mybangjo.com/api/v1/promotions/active?is_pwa=0&phone="; do
-            echo "--- $url ---"; curl -sS -m 12 -w '\n[HTTP %{http_code}]\n' "$url" 2>&1 | head -6
+          set -e
+          CB="cb=$(date +%s)"
+          for url in \
+            "https://app.mybangjo.com/health?$CB" \
+            "https://app.mybangjo.com/api/v1/promotions/active?is_pwa=0&phone=&$CB" \
+            "https://app.mybangjo.com/api/v1/promotions/active?is_pwa=1&phone=&$CB"; do
+            echo "--- $url ---"
+            curl -sS -m 20 -D /tmp/hdrs.txt -o /tmp/body.txt -w 'HTTP %{http_code}\n' "$url" 2>&1
+            grep -iE '^(cf-cache-status|server|content-type):' /tmp/hdrs.txt || true
+            head -c 900 /tmp/body.txt; echo
           done
           REMOTE
