@@ -1,114 +1,71 @@
-<!-- SNAPSHOT FROM NOTION — source page: 03-business-flow; fetched 2026-09-04 -->
+<!-- SNAPSHOT FROM NOTION — source page: 03-business-flow; updated 2026-09-04 -->
 
-# Product Flow
-1. Owner membuat product pada master catalog.
-2. Owner menentukan branch yang menjual produk.
-3. Branch menerima notice produk baru.
-4. Branch memasukkan stok awal.
-5. Produk digunakan sesuai status dan aturan harga.
-# Price Flow
-1. Owner memilih Lock atau Range.
-2. Branch melihat aturan pada field harga.
-3. Lock: field tidak editable.
-4. Range: branch mengisi nilai dalam batas minimum–maksimum.
-5. Nilai di luar range ditolak.
-# Deactivation Flow
-1. Branch menonaktifkan produk.
-2. Produk tidak aktif pada branch tersebut.
-3. Business Log mencatat tindakan.
-4. Owner dapat melihat branch yang melakukan perubahan.
-# Governance Flow
-1. Branch membutuhkan perubahan kebijakan.
-2. Branch mengajukan request.
-3. Owner approve atau reject.
-4. Jika approve, owner melakukan perubahan.
-# Payment / Delivery
-Commerce dapat meminta tarif delivery. Delivery menghasilkan informasi ongkir. Payment memproses pembayaran. Kontrak API detail belum dikunci.
-# POS Flow (Point of Sale Kasir)
-## 1. Shift & Cash Control Flow
--
-	1. Kasir login memilih cabang tugas sesuai kredensial RBAC (cashier).
-- **Locked Decision — Cash Settlement & Active Shift:** `shift_id` boleh **tidak dikirim oleh client**. Untuk role `cashier`, server wajib melakukan **Auto-Attach Active Shift** berdasarkan authenticated cashier + `order.branch_id`, dengan syarat shift berstatus `open`. Jika tidak ada active shift, cash settlement ditolak (fail-closed). Client tidak boleh menentukan atau mengarahkan settlement ke `shift_id` milik kasir/cabang lain.
-- Untuk `owner` / `brand_manager` yang memiliki kewenangan override, settlement darurat dapat dilakukan tanpa shift kasir sesuai policy RBAC. Ini adalah exception operasional yang harus tetap tercatat di audit trail.
-- **Invariant:** cashier cash settlement → `cashier_id = authenticated user` + `shift.branch_id = order.branch_id` + `shift.status = open` → settlement dan pencatatan expected cash terjadi dalam transaction yang konsisten.
-### Cash Payment Lifecycle (Business Decision)
-- Cash/COD/POS order dapat memiliki `orders.status = confirmed` sementara `order_payments.payment_status = pending`. Ini **VALID**, karena order lifecycle (kitchen/fulfillment/inventory) terpisah dari financial lifecycle (uang fisik belum diterima).
-- Setelah uang benar-benar diterima oleh kasir/actor yang berwenang, payment berubah menjadi `settlement`.
-- Payment cash yang masih `pending` tidak dihitung sebagai cash revenue yang sudah diterima.
-- Cash settlement adalah **financial mutation** dan wajib melewati authorization + scope validation + idempotency.
-- Server harus memverifikasi bahwa order memang menggunakan metode cash sebelum cash settlement. Cash settlement tidak boleh menjadi side-door untuk mengubah order Midtrans/non-cash menjadi cash atau menghidupkan kembali order yang sudah cancelled.
--
-	1. Kasir wajib membuka Shift Kasir (Open Shift) dengan memasukkan modal kas awal (Starting Float Cash).
--
-	1. Selama shift berjalan: Kasir mencatat kas masuk (Cash In) atau kas keluar (Cash Out) operasional beserta alasan bisnis. Sistem mencatat seluruh penerimaan kas & non-kas.
--
-	1. Kasir menutup Shift (Close Shift): Kasir menghitung dan menginput total uang fisik aktual di laci (Actual Cash Count). Sistem menghitung selisih kas (Cash Variance: Over/Short) terhadap perhitungan sistem (Expected Cash). Event pos.shift.closed dipancarkan dan terekam di Business Evidence / Audit Log.
-## 2. Order Taking & Bill State Lifecycle
--
-	1. Kasir memilih tipe order resmi Xentra: dinein, pickup, atau delivery.
--
-	1. Untuk pesanan dinein: Kasir dapat mengalokasikan nomor meja / Identifier, menahan tagihan sementara (Hold / Open Bill), dan menambah item pesanan sebelum pelunasan.
--
-	1. Kasir mendukung alur Split Bill (pemisahan tagihan) dan Merge Bill (penggabungan tagihan).
-## 3. Multiple Payment Settlement & Hardware Output
--
-	1. Kasir melayani penyelesaian transaksi dengan metode pembayaran: Tunai (cash dengan kalkulasi kembalian otomatis), QRIS, EDC / Kartu, Transfer, dan Split Payment.
--
-	1. Otoritas mutasi stok didelegasikan ke Commerce/Inventory via event contract (pos.order.placed) tanpa manipulasi langsung tabel stok oleh POS.
--
-	1. Saat pesanan diselesaikan (Paid / Settled): Perintah cetak struk dikirim ke Printer Kasir (dan membuka Cash Drawer via printer trigger), serta perintah cetak tiket dapur dikirim ke Kitchen Ticket Printer / KDS.
-## 4. Offline Operational Continuity & Risk Limits
--
-	1. Kasir mendukung operasional pencatatan pesanan dan pembayaran tunai secara lokal saat koneksi internet terputus (Local-First Continuity).
--
-	1. Transaksi offline menggunakan client_transaction_id (Idempotency Key) untuk mencegah duplikasi saat sinkronisasi kembali online. Transaksi tunai offline yang sah dan struknya telah dicetak diperlakukan sebagai Authoritative Historical Capture oleh server saat rekonsiliasi.
--
-	1. Offline Risk Limit Policy (Fail-Fast Rule): Owner menetapkan batas atas risiko offline global (Global Safety Ceiling). Branch Manager mengonfigurasi batas operasional cabang di dashboard. Jika konfigurasi Branch \<= Safety Ceiling Owner: Diterima & Aktif. Jika konfigurasi Branch \> Safety Ceiling Owner: Ditolak seketika (Validation Error) dengan pesan batas maksimum yang diizinkan (Dilarang auto-clamp diam-diam).
--
-	1. Jika device rusak total sebelum sync, rekonsiliasi finansial diselesaikan melalui Cash Variance & Physical Receipt Audit Trail.
+# 🔒 LOCKED ADDENDUM — Corrected Customer Commerce Flow
 
-## 🔒 LOCKED — Customer Home Flow: Dynamic Branch Discovery → Catalog
+This addendum supersedes earlier Home wording that required authoritative ETA ordering and the shorthand **“One Cart → One Fulfillment Branch.”**
 
-Home Customer adalah container yang merender context bisnis secara dinamis, bukan halaman dengan jumlah Branch/menu yang di-hardcode.
+## Home
+Home is a **fast discovery/presentation layer**. First-load speed is the primary concern.
 
-### Flow
+Flow:
+`Destination Context → Fast Branch Discovery → Customer selects Branch → Catalog → Product → Cart`
 
-`Destination Context → Branch Discovery/Resolution → Branch Context → Category → Product → Cart`
+Home discovery may use a cheap GPS/destination proximity calculation, such as straight-line geographic distance, or another faster equivalent. It must not wait for expensive road routing, ETA, delivery cost, driver availability, full-cart eligibility, stock, pricing, or Branch Acceptance before rendering the initial Home.
 
-### 1 Branch
+Home may display a simple heading such as **“Cabang terdekat dari tempatmu”** and a data-driven Branch array. ETA does not need to appear on Home.
 
-Jika hanya terdapat **1 Branch yang relevan/eligible** untuk context Customer:
-- teks **“Cabang terdekat dari tempatmu”** tidak ditampilkan;
-- Branch selector/carousel tidak ditampilkan;
-- Home langsung menampilkan `Category → Product` untuk Branch tersebut;
-- Branch tetap menjadi authoritative context untuk catalog, eligibility, cart, checkout, dan order.
+The discovery order may change after reload or Customer interaction. This is acceptable because Home ordering is discovery/presentation data, not an authoritative fulfillment decision.
 
-### >1 Branch
+## Catalog / Cart / Checkout
+After Customer selects a Branch:
 
-Jika terdapat **lebih dari 1 Branch yang relevan/eligible**:
-- Home menampilkan Branch discovery/selector;
-- Branch diurutkan berdasarkan **ETA** dari destination context menggunakan data/ranking authoritative dari matching/routing layer;
-- jarak boleh ditampilkan sebagai informasi pendukung;
-- Customer dapat memilih Branch yang tersedia;
-- setelah Branch dipilih, Home menampilkan `Category → Product` dari Branch tersebut.
+`Selected Branch → Category → Product → Cart → Checkout`
 
-### Banyak Branch
+Cart is a **shopping container** and may contain items associated with multiple Branches/brands.
 
-Brand dapat memiliki 2, 10, 50, atau lebih banyak Branch tanpa mengubah architecture Home. Tidak boleh ada fixed branch slot, fixed Branch ID, atau catalog hardcode per Branch. Presentation optimization seperti pagination/lazy loading/virtualization boleh digunakan bila diperlukan.
+Checkout is a **single transaction scope** and may contain items from **one Branch only**. Customer completes different Branches as separate Checkout/Order processes.
 
-### Authority Boundary
+Each Order has exactly one `fulfillment_branch_id`. Multi-Branch fulfillment within one Checkout/Order is prohibited for v1.
 
-Home tidak menentukan sendiri fulfillment Branch, ETA ranking, inventory, price, eligibility, acceptance, authorization, atau business policy. Home menerima data/view model dari layer authoritative dan mengomposisikan reusable components.
+Therefore:
 
-“Cabang terdekat” adalah discovery/presentation concept. AUTO dapat menggunakan BranchMatcher; CUSTOMER_SELECTED dapat menggunakan Branch pilihan Customer. Dalam kedua kasus, Core tetap melakukan canonical eligibility dan Branch Acceptance sesuai contract.
+**Multi-branch Cart is allowed; multi-branch Checkout/Order is not.**
 
-Buyer location tetap berbeda dari delivery destination dan fulfillment Branch. Untuk remote/gift order, destination context menjadi konteks delivery/discovery.
+## Final Actual Verification
+Home is not authoritative. When Customer proceeds to Checkout and especially before payment/commitment, Xentra performs fresh authoritative calculations/checks required by Commerce/Delivery/Inventory/Payment contracts, including current availability/stock, pricing, serviceability, and other applicable conditions.
 
-### Invariants
+## Branch Acceptance
+`ELIGIBLE ≠ ACCEPTED`.
 
-- Home = dynamic container/composition layer.
-- 1 Branch → no branch selector → direct Category → Product.
-- >1 Branch → branch discovery/selector → ETA-ordered presentation → Category → Product.
-- Tidak ada hardcoded Branch count/menu/Branch ID.
-- One Cart → One Fulfillment Branch.
-- UI tidak boleh bypass Core eligibility atau Branch Acceptance.
+After Core Eligibility, Branch operational acceptance remains a separate step.
+
+The Branch acceptance window is a **platform-controlled 3-minute Xentra policy**, not configurable by Owner or Branch Manager.
+
+`ELIGIBLE → AWAITING_BRANCH_ACCEPTANCE → ACCEPTED / REJECTED / TIMEOUT`
+
+Timeout means the Branch is not accepted and the current transaction ends for that Branch.
+
+After rejection/timeout, Customer may explicitly choose another Branch and start a **new Checkout**. The system must not silently rematch the existing transaction.
+
+## Paid Rejection / Timeout
+If the original order was already paid online and the Branch rejects/times out, the original transaction is not transferred to another Branch. It enters financial recovery according to payment state/provider behavior. Customer may immediately start a new independent order while the previous refund/recovery remains pending.
+
+A pending refund on one order must not block an unrelated order for another Branch.
+
+## Customer Cancellation
+Follow the adopted GoFood-style principle: Customer cancellation is allowed before Branch acceptance/confirmation; after Branch acceptance, normal Customer cancellation is not allowed. Core enforces this from authoritative Order state.
+
+Branch/system rejection, timeout, or payment failure must not be classified as Customer cancellation.
+
+## Core Invariants
+- Home is fast discovery, not fulfillment resolution.
+- Home does not need ETA on initial render.
+- Home may use cheap proximity ordering and may reorder after reload/interaction.
+- Actual transaction conditions are freshly checked before payment/commitment.
+- Multi-branch Cart is allowed.
+- One Checkout/Order = one fulfillment Branch.
+- Customer completes different Branches as separate transactions.
+- No silent rematch after rejection/timeout.
+- 3-minute acceptance timeout is platform-controlled, not tenant-configurable.
+- Paid order rejection/timeout does not transfer payment to another Branch.
+- Pending refund on one order does not block another independent order.
