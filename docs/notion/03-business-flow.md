@@ -66,3 +66,49 @@ Commerce dapat meminta tarif delivery. Delivery menghasilkan informasi ongkir. P
 	1. Offline Risk Limit Policy (Fail-Fast Rule): Owner menetapkan batas atas risiko offline global (Global Safety Ceiling). Branch Manager mengonfigurasi batas operasional cabang di dashboard. Jika konfigurasi Branch \<= Safety Ceiling Owner: Diterima & Aktif. Jika konfigurasi Branch \> Safety Ceiling Owner: Ditolak seketika (Validation Error) dengan pesan batas maksimum yang diizinkan (Dilarang auto-clamp diam-diam).
 -
 	1. Jika device rusak total sebelum sync, rekonsiliasi finansial diselesaikan melalui Cash Variance & Physical Receipt Audit Trail.
+
+## 🔒 LOCKED — Customer Home Flow: Dynamic Branch Discovery → Catalog
+
+Home Customer adalah container yang merender context bisnis secara dinamis, bukan halaman dengan jumlah Branch/menu yang di-hardcode.
+
+### Flow
+
+`Destination Context → Branch Discovery/Resolution → Branch Context → Category → Product → Cart`
+
+### 1 Branch
+
+Jika hanya terdapat **1 Branch yang relevan/eligible** untuk context Customer:
+- teks **“Cabang terdekat dari tempatmu”** tidak ditampilkan;
+- Branch selector/carousel tidak ditampilkan;
+- Home langsung menampilkan `Category → Product` untuk Branch tersebut;
+- Branch tetap menjadi authoritative context untuk catalog, eligibility, cart, checkout, dan order.
+
+### >1 Branch
+
+Jika terdapat **lebih dari 1 Branch yang relevan/eligible**:
+- Home menampilkan Branch discovery/selector;
+- Branch diurutkan berdasarkan **ETA** dari destination context menggunakan data/ranking authoritative dari matching/routing layer;
+- jarak boleh ditampilkan sebagai informasi pendukung;
+- Customer dapat memilih Branch yang tersedia;
+- setelah Branch dipilih, Home menampilkan `Category → Product` dari Branch tersebut.
+
+### Banyak Branch
+
+Brand dapat memiliki 2, 10, 50, atau lebih banyak Branch tanpa mengubah architecture Home. Tidak boleh ada fixed branch slot, fixed Branch ID, atau catalog hardcode per Branch. Presentation optimization seperti pagination/lazy loading/virtualization boleh digunakan bila diperlukan.
+
+### Authority Boundary
+
+Home tidak menentukan sendiri fulfillment Branch, ETA ranking, inventory, price, eligibility, acceptance, authorization, atau business policy. Home menerima data/view model dari layer authoritative dan mengomposisikan reusable components.
+
+“Cabang terdekat” adalah discovery/presentation concept. AUTO dapat menggunakan BranchMatcher; CUSTOMER_SELECTED dapat menggunakan Branch pilihan Customer. Dalam kedua kasus, Core tetap melakukan canonical eligibility dan Branch Acceptance sesuai contract.
+
+Buyer location tetap berbeda dari delivery destination dan fulfillment Branch. Untuk remote/gift order, destination context menjadi konteks delivery/discovery.
+
+### Invariants
+
+- Home = dynamic container/composition layer.
+- 1 Branch → no branch selector → direct Category → Product.
+- >1 Branch → branch discovery/selector → ETA-ordered presentation → Category → Product.
+- Tidak ada hardcoded Branch count/menu/Branch ID.
+- One Cart → One Fulfillment Branch.
+- UI tidak boleh bypass Core eligibility atau Branch Acceptance.
