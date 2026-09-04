@@ -38,6 +38,10 @@ class OrderPlacementService {
     payment_method = 'midtrans',
     order_channel = 'customer_app',
     order_type = 'delivery',
+    // R2: how the fulfillment branch was chosen. AUTO = Core matched via
+    // BranchMatcher from the destination; CUSTOMER_SELECTED = the customer
+    // explicitly chose the branch. Distinct from fulfillment branch_id.
+    selection_mode = null,
     table_number = null,
     reservation_date = null,
     guest_count = null,
@@ -143,9 +147,9 @@ class OrderPlacementService {
         db.prepare(`
           INSERT INTO orders (
             id, order_number, brand_id, branch_id, customer_name, customer_phone,
-            order_type, order_channel, table_number, scheduled_slot_start,
+            order_type, order_channel, selection_mode, table_number, scheduled_slot_start,
             subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'reservation', ?, NULL, ?, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, 'reservation', ?, ?, NULL, ?, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
         `).run(
           orderId,
           orderNumber,
@@ -154,6 +158,7 @@ class OrderPlacementService {
           customer.name || 'Tamu Reservasi',
           customer.phone || '',
           order_channel,
+          selection_mode || 'CUSTOMER_SELECTED',
           resDateStr,
           notes ? `Reservasi (${guest_count || 1} Tamu, Tgl: ${resDateStr}) | ${notes}` : `Reservasi (${guest_count || 1} Tamu, Tgl: ${resDateStr})`,
           now,
@@ -245,9 +250,9 @@ class OrderPlacementService {
     const insertOrderStmt = db.prepare(`
       INSERT INTO orders (
         id, order_number, client_transaction_id, brand_id, branch_id, customer_name, customer_phone,
-        order_type, order_channel, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
+        order_type, order_channel, selection_mode, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
         subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
     `);
 
     const insertOrderItemStmt = db.prepare(`
@@ -277,6 +282,7 @@ class OrderPlacementService {
         customer.phone || '',
         effectiveOrderType,
         order_channel,
+        selection_mode || 'CUSTOMER_SELECTED',
         table_number,
         fulfillment_schedule_type,
         scheduled_slot_start,

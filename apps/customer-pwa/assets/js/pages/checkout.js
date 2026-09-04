@@ -1347,6 +1347,28 @@
       return;
     }
 
+    var branchId = state.matchedBranch ? state.matchedBranch.id : undefined;
+
+    // R1 CART/CHECKOUT BOUNDARY — this page submits ONE single-branch checkout
+    // scope. A multi-branch cart is allowed at cart level, but a checkout must
+    // never bundle items from different branch scopes, nor ship one scope
+    // against a different branch. Fail fast with an explicit message instead of
+    // silently selecting/merging/splitting/rematching scopes. The server gate
+    // enforces the identical rule authoritatively.
+    var itemBranchKeys = [];
+    items.forEach(function (i) {
+      if (i.branch_id) {
+        var ik = String(i.branch_id);
+        if (itemBranchKeys.indexOf(ik) === -1) itemBranchKeys.push(ik);
+      }
+    });
+    var scopeBroken = itemBranchKeys.length > 1 ||
+      (itemBranchKeys.length === 1 && branchId && String(branchId) !== itemBranchKeys[0]);
+    if (scopeBroken) {
+      if (UI && UI.toast) UI.toast('Checkout hanya dapat berisi produk dari satu cabang. Pisahkan pesanan Anda per cabang.');
+      return;
+    }
+
     state.isSubmitting = true;
     var btn = $('x-btn-submit-order');
     if (btn) {
@@ -1355,7 +1377,6 @@
       btn.style.opacity = '0.7';
     }
 
-    var branchId = state.matchedBranch ? state.matchedBranch.id : undefined;
     var pwaRuntime = (window.Xentra && window.Xentra.PwaRuntime) ? window.Xentra.PwaRuntime.getPwaRuntimeContext() : { display_mode: 'browser' };
 
     // Call Pre-Payment Verification Gate first
@@ -1372,7 +1393,8 @@
           id: i.id,
           quantity: Number(i.quantity) || 1,
           expected_price: Number(i.price) || 0,
-          name: i.name
+          name: i.name,
+          branch_id: i.branch_id || null
         };
       }),
       order_type: fulType
@@ -1395,18 +1417,32 @@
     });
   }
 
+  // R1.5 INDEPENDENT CHECKOUT: returns true when every line currently in the
+  // cart is part of the submitted order ids — i.e. this checkout consumed the
+  // WHOLE cart (legacy single-branch flow) and the cart may be cleared as today.
+  function allCartItemsOrdered(orderedIds) {
+    var set = {};
+    orderedIds.forEach(function (id) { set[String(id)] = true; });
+    var cartItems = (Store.getState().cart.items || []);
+    if (!cartItems.length) return true;
+    return cartItems.every(function (it) { return set[String(it.id)]; });
+  }
+
   function proceedCreateOrder() {
     var btn = $('x-btn-submit-order');
     if (btn) btn.textContent = 'Memproses pesanan…';
 
     var items = getCheckoutItems();
+    var orderedIds = items.map(function (i) { return String(i.id); });
+    var itemsHaveBranchProvenance = items.some(function (i) { return Boolean(i.branch_id); });
+    var branchId = state.matchedBranch ? state.matchedBranch.id : undefined;
     var fulType = state.fulfillment.type;
     var isDelivery = fulType === 'delivery';
 
     var pwaRuntime = (window.Xentra && window.Xentra.PwaRuntime) ? window.Xentra.PwaRuntime.getPwaRuntimeContext() : { display_mode: 'browser' };
 
     var payload = {
-      branch_id: state.matchedBranch ? state.matchedBranch.id : undefined,
+      branch_id: branchId,
       customer: {
         name: state.customer.name || 'Pelanggan Bangjo',
         phone: state.customer.phone
@@ -1442,7 +1478,8 @@
           product_id: i.id,
           quantity: Number(i.quantity) || 1,
           expected_price: Number(i.price) || 0,
-          note: i.note || ''
+          note: i.note || '',
+          branch_id: i.branch_id || null
         };
       }),
       payment_method: state.paymentMethod || 'cash',
@@ -1462,7 +1499,19 @@
       } else {
         Router.navigate('order-received', { orderId: orderId });
       }
-      if (!currentItemId) Store.clearCart(); else Store.removeItem(currentItemId);
+      // R1 CART/CHECKOUT BOUNDARY — clear only what THIS single-branch checkout
+      // consumed: whole cart when the checkout covered it (legacy flow, cart
+      // cleared as before), otherwise drop only the ordered branch scope so an
+      // independent checkout of another branch scope survives (R1.5).
+      if (currentItemId) {
+        Store.removeItem(currentItemId);
+      } else if (allCartItemsOrdered(orderedIds)) {
+        Store.clearCart();
+      } else if (itemsHaveBranchProvenance && branchId) {
+        Store.removeBranchItems(branchId);
+      } else {
+        orderedIds.forEach(function (id) { Store.removeItem(id); });
+      }
     }
 
     function onFail(errData) {

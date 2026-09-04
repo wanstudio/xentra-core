@@ -655,3 +655,88 @@ test('Payment 9 — Webhook Concurrency Race & Idempotent Retry: First settlemen
   const totalRdm = db.prepare('SELECT COUNT(*) as count FROM promotion_redemptions WHERE promotion_id = ? AND customer_phone = ?').get(promoId, customerPhone);
   assert.strictEqual(totalRdm.count, 1);
 });
+
+// ==============================================================================
+// Payment R11 — Late settlement must never revive a rejected/timed-out order
+// ==============================================================================
+test('Payment R11 — settlement after branch REJECT/BRANCH_TIMEOUT routes to fulfillment_exception (refund) with ZERO stock mutation', () => {
+  const ts = Date.now();
+
+  for (const [label, terminalStatus] of [['timeout', 'timeout'], ['rejected', 'rejected']]) {
+    const orderId = `ord_r11_${label}_${ts}`;
+    const orderNumber = `XN-R11-${label}-${ts}`;
+    const productId = `prod_r11_${label}_${ts}`;
+
+    db.prepare(`INSERT INTO products (id, brand_id, name, slug, price)
+      VALUES (?, 'brand_pay', 'Produk R11 ' + ?, 'prod-r11-' + ?, 60000)`).run(productId, label, label);
+    db.prepare(`INSERT INTO branch_products (branch_id, product_id, stock, is_available)
+      VALUES ('branch_pay', ?, 10, 1)`).run(productId);
+    db.prepare(`
+      INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+      VALUES (?, ?, 'brand_pay', 'branch_pay', 'Customer R11', '62812345678', 'delivery', 'customer_app', 60000, 60000, 'midtrans', ?)
+    `).run(orderId, orderNumber, terminalStatus);
+    db.prepare(`
+      INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal)
+      VALUES (?, ?, ?, 'Produk R11', 60000, 1, 60000)
+    `).run(`item_r11_${label}_${ts}`, orderId, productId);
+    db.prepare(`
+      INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
+      VALUES (?, ?, 'midtrans', 'M12345', 'snap_r11', 'pending', 60000)
+    `).run(`pay_r11_${label}_${ts}`, orderId);
+
+    // Settlement webhook arrives AFTER the branch decision already committed.
+    const result = PaymentGatewayService.handleWebhook({
+      order_id: orderId,
+      status_code: '200',
+      gross_amount: '60000.00',
+      transaction_status: 'settlement',
+      payment_type: 'qris'
+    }, { skipSignatureCheck: true });
+
+    assert.strictEqual(result.success, true, label);
+    assert.strictEqual(result.payment_status, 'settlement', 'money IS settled');
+    assert.strictEqual(result.order_status, 'fulfillment_exception', label + ': order must NOT be force-confirmed');
+
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+    assert.strictEqual(order.status, 'fulfillment_exception', label + ' order routed to the refund queue');
+    assert.ok((order.order_note || '').includes('[Perlu Refund]'), 'structured refund reason recorded');
+    assert.ok((order.order_note || '').includes(terminalStatus), 'note names the terminal status that won the race');
+
+    const stock = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pay', productId);
+    assert.strictEqual(stock.stock, 10, label + ': NO stock deduction for a non-fulfilled order');
+    const movements = db.prepare('SELECT COUNT(*) AS c FROM inventory_movements WHERE reference_id = ?').get(orderNumber);
+    assert.strictEqual(movements.c, 0, label + ': no inventory ledger rows');
+  }
+});
+
+test('Payment R11 — gateway cancel/deny/expire never overwrites a terminal BRANCH_TIMEOUT order', () => {
+  const ts = Date.now();
+  const orderId = `ord_r11_expire_${ts}`;
+  const orderNumber = `XN-R11-EXP-${ts}`;
+
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Customer R11 Exp', '62812345678', 'delivery', 'customer_app', 60000, 60000, 'midtrans', 'timeout')
+  `).run(orderId, orderNumber);
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
+    VALUES (?, ?, 'midtrans', 'M12345', 'snap_r11_exp', 'pending', 60000)
+  `).run(`pay_r11_exp_${ts}`, orderId);
+
+  const result = PaymentGatewayService.handleWebhook({
+    order_id: orderId,
+    status_code: '200',
+    gross_amount: '60000.00',
+    transaction_status: 'expire',
+    payment_type: 'qris'
+  }, { skipSignatureCheck: true });
+
+  assert.strictEqual(result.success, true);
+  assert.strictEqual(result.payment_status, 'expire', 'payment failure is recorded');
+  assert.strictEqual(result.order_status, undefined, 'no order mutation claim for a terminal order');
+
+  const order = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(order.status, 'timeout', 'BRANCH_TIMEOUT survives a later gateway expire');
+  const payRecord = db.prepare('SELECT payment_status FROM order_payments WHERE order_id = ?').get(orderId);
+  assert.strictEqual(payRecord.payment_status, 'expire');
+});

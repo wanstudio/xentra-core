@@ -1570,3 +1570,681 @@ test('C4/Checkout remote/gift delivery: fulfillment branch drives delivery routi
   assert.strictEqual(Number(del.destination_longitude), 112.78);
 });
 
+/* ============================================================================
+   R1 CART/CHECKOUT BOUNDARY — MULTI-BRANCH CART IS ALLOWED; CHECKOUT IS
+   SINGLE-BRANCH; ORDER IS SINGLE-BRANCH. The server enforces the canonical
+   single-branch checkout rule: per-item branch provenance that mixes scopes,
+   or contradicts the resolved fulfillment branch, is REJECTED with
+   CHECKOUT_SINGLE_BRANCH_REQUIRED — never silently merged/split/rematched.
+   Items WITHOUT provenance (legacy single-group carts) are unchanged.
+   ============================================================================ */
+
+test('R1 create-order: single-branch checkout whose item provenance matches the checkout branch is accepted', async () => {
+  csAddBranch('branch_r1_a', { assign272: true });
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r1_a',
+      payment_method: 'cash',
+      customer: { name: 'Customer R1 Scope', phone: '081200000010' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1, branch_id: 'branch_r1_a' }]
+    })
+  });
+  assert.strictEqual(res.status, 201);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(csOrdersCount(), before + 1, 'exactly one order created');
+  const order = db.prepare('SELECT branch_id FROM orders WHERE id = ?').get(data.order_id);
+  assert.strictEqual(order.branch_id, 'branch_r1_a', 'order bound to the single checkout branch');
+});
+
+test('R1 create-order: items mixing TWO branch scopes are rejected (CHECKOUT_SINGLE_BRANCH_REQUIRED) — no order', async () => {
+  csAddBranch('branch_r1_b', { assign272: true });
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r1_a',
+      payment_method: 'cash',
+      customer: { name: 'Customer R1 Mixed', phone: '081200000011' },
+      order_type: 'pickup',
+      items: [
+        { id: '272', quantity: 1, branch_id: 'branch_r1_a' },
+        { id: '272', quantity: 1, branch_id: 'branch_r1_b' }
+      ]
+    })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.strictEqual(data.status, 'CHECKOUT_SINGLE_BRANCH_REQUIRED', 'deterministic semantic status');
+  assert.ok(/satu cabang/i.test(data.error || ''), 'explicit single-branch message');
+  assert.strictEqual(csOrdersCount(), before, 'rejected checkout must NOT create an order');
+});
+
+test('R1 create-order: single provenance contradicting the checkout branch is rejected — no silent re-home', async () => {
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r1_a',
+      payment_method: 'cash',
+      customer: { name: 'Customer R1 WrongScope', phone: '081200000012' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1, branch_id: 'branch_r1_b' }]
+    })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.strictEqual(data.status, 'CHECKOUT_SINGLE_BRANCH_REQUIRED');
+  assert.ok(/branch_r1_b/i.test(data.error || ''), 'names the conflicting provenance scope');
+  assert.strictEqual(csOrdersCount(), before, 'no order and no silent move to another branch');
+});
+
+test('R1 checkout/verify: mixed-branch provenance is rejected at the verify boundary too', async () => {
+  const res = await mockFetch('/api/v1/checkout/verify', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r1_a',
+      order_type: 'pickup',
+      customer: { name: 'Customer R1 Verify', phone: '081200000013' },
+      items: [
+        { id: '272', quantity: 1, branch_id: 'branch_r1_a' },
+        { id: '272', quantity: 1, branch_id: 'branch_r1_b' }
+      ]
+    })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.strictEqual(data.status, 'CHECKOUT_SINGLE_BRANCH_REQUIRED');
+});
+
+test('R1 create-order: legacy items WITHOUT provenance keep working (regression — single-branch flow unchanged)', async () => {
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r1_a',
+      payment_method: 'cash',
+      customer: { name: 'Customer R1 Legacy', phone: '081200000014' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 2 }] // no branch_id → legacy unassigned scope
+    })
+  });
+  assert.strictEqual(res.status, 201, 'legacy payload must not be affected by the R1 guard');
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(csOrdersCount(), before + 1);
+});
+
+test('R1.5 independent checkouts: failure of one branch checkout does not block another branch checkout', async () => {
+  // Checkout A targets a closed branch carrying the same product → rejected.
+  csAddBranch('branch_r1_closed', { is_open_override: 0, assign272: true });
+  const beforeA = csOrdersCount();
+  const aRes = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r1_closed',
+      payment_method: 'cash',
+      customer: { name: 'Customer R1 FailA', phone: '081200000015' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1, branch_id: 'branch_r1_closed' }]
+    })
+  });
+  assert.strictEqual(aRes.status, 400, 'checkout A fails (closed branch)');
+
+  // Checkout B (open branch, same product) succeeds independently right after.
+  const beforeB = csOrdersCount();
+  const bRes = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r1_a',
+      payment_method: 'cash',
+      customer: { name: 'Customer R1 OkB', phone: '081200000016' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1, branch_id: 'branch_r1_a' }]
+    })
+  });
+  assert.strictEqual(bRes.status, 201, 'failure of checkout A must not invalidate checkout B');
+  assert.strictEqual(csOrdersCount(), beforeB + 1, 'only checkout B produced an order');
+});
+
+/* ============================================================================
+   R2/R3 — BRANCH SELECTION MODE + FINAL CHECKOUT VERIFICATION
+   selection_mode (AUTO | CUSTOMER_SELECTED) is HOW the fulfillment branch was
+   chosen — distinct from fulfillment branch_id itself, and persisted on the
+   order. AUTO = Core matches via BranchMatcher; CUSTOMER_SELECTED = the
+   customer's branch_id is INPUT, never authority. Checkout always performs
+   fresh authoritative verification (gate) before any Order is created.
+   ============================================================================ */
+
+test('R2 AUTO selection: create-order without branch_id matches via Core and persists selection_mode AUTO', async () => {
+  const RouteService = require('../server/services/RouteService');
+  const original = RouteService.getRoadDistance;
+  RouteService.getRoadDistance = async () => ({ distance_meters: 1500, duration_seconds: 480, provider: 'osrm' });
+  try {
+    csAddBranch('branch_r2_auto', { assign272: true });
+    const before = csOrdersCount();
+    const res = await mockFetch('/api/v1/checkout/create-order', {
+      method: 'POST',
+      body: JSON.stringify({
+        selection_mode: 'AUTO',
+        payment_method: 'cash',
+        customer: { name: 'Customer AUTO', phone: '081200000020' },
+        order_type: 'delivery',
+        delivery: { address: 'Jl. R2 Auto', latitude: -7.2912, longitude: 112.7154 },
+        items: [{ id: '272', quantity: 1 }]
+      })
+    });
+    assert.strictEqual(res.status, 201, 'AUTO selection must produce an order when an eligible branch exists');
+    const data = await res.json();
+    assert.strictEqual(data.success, true);
+    assert.strictEqual(csOrdersCount(), before + 1, 'exactly one order');
+    const order = db.prepare('SELECT branch_id, selection_mode FROM orders WHERE id = ?').get(data.order_id);
+    assert.ok(order.branch_id, 'Core established the authoritative fulfillment branch');
+    assert.strictEqual(order.selection_mode, 'AUTO', 'selection_mode AUTO persisted');
+  } finally {
+    RouteService.getRoadDistance = original;
+  }
+});
+
+test('R2 CUSTOMER_SELECTED: explicit mode + valid branch is accepted and persisted', async () => {
+  csAddBranch('branch_r2_cs', { assign272: true });
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r2_cs',
+      selection_mode: 'CUSTOMER_SELECTED',
+      payment_method: 'cash',
+      customer: { name: 'Customer Pilih', phone: '081200000021' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 201);
+  const data = await res.json();
+  assert.strictEqual(csOrdersCount(), before + 1);
+  const order = db.prepare('SELECT branch_id, selection_mode FROM orders WHERE id = ?').get(data.order_id);
+  assert.strictEqual(order.branch_id, 'branch_r2_cs');
+  assert.strictEqual(order.selection_mode, 'CUSTOMER_SELECTED', 'selection_mode CUSTOMER_SELECTED persisted');
+});
+
+test('R2 legacy derivation: branch_id without a mode is derived as CUSTOMER_SELECTED (backward compatible)', async () => {
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r2_cs', // no selection_mode → derived
+      payment_method: 'cash',
+      customer: { name: 'Customer Legacy Mode', phone: '081200000022' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 201, 'legacy branch_id-only payloads keep working');
+  const data = await res.json();
+  assert.strictEqual(csOrdersCount(), before + 1);
+  const order = db.prepare('SELECT selection_mode FROM orders WHERE id = ?').get(data.order_id);
+  assert.strictEqual(order.selection_mode, 'CUSTOMER_SELECTED');
+});
+
+test('R2 mode normalization: lowercase customer_selected is accepted', async () => {
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r2_cs',
+      selection_mode: 'customer_selected',
+      payment_method: 'cash',
+      customer: { name: 'Customer Lower', phone: '081200000023' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 201, 'mode normalized to uppercase');
+});
+
+test('R2 invalid selection_mode value is rejected (INVALID_SELECTION_MODE)', async () => {
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r2_cs',
+      selection_mode: 'NEAREST',
+      payment_method: 'cash',
+      customer: { name: 'Customer ModeBuruk', phone: '081200000024' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.strictEqual(data.status, 'INVALID_SELECTION_MODE');
+  assert.strictEqual(csOrdersCount(), before, 'no order created');
+});
+
+test('R2 AUTO + branch_id is contradictory and rejected — client cannot smuggle a branch into AUTO', async () => {
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r2_cs',
+      selection_mode: 'AUTO',
+      payment_method: 'cash',
+      customer: { name: 'Customer ModeAUTO', phone: '081200000025' },
+      order_type: 'delivery',
+      delivery: { address: 'Jl. X', latitude: -7.2912, longitude: 112.7154 },
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.status, 'INVALID_SELECTION_MODE', 'AUTO requests Core matching — a supplied branch_id contradicts it');
+  assert.strictEqual(csOrdersCount(), before, 'no order created');
+});
+
+test('R2 CUSTOMER_SELECTED without branch_id is rejected', async () => {
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      selection_mode: 'CUSTOMER_SELECTED',
+      payment_method: 'cash',
+      customer: { name: 'Customer NoBranch', phone: '081200000026' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.status, 'INVALID_SELECTION_MODE');
+  assert.ok(/branch_id/i.test(data.error || ''), 'explains that branch_id is required');
+});
+
+test('R3 final verification: stale stock at the checkout branch prevents Order creation', async () => {
+  // Branch is open, stocked, and assigned — then stock runs out before checkout.
+  csAddBranch('branch_r2_stale', { assign272: true });
+  db.prepare("UPDATE branch_products SET stock = 0 WHERE branch_id = ? AND product_id = '272'").run('branch_r2_stale');
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r2_stale',
+      payment_method: 'cash',
+      customer: { name: 'Customer Stale', phone: '081200000027' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 400, 'fresh verification must fail against stale stock');
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.strictEqual(data.status, 'OUT_OF_STOCK');
+  assert.strictEqual(csOrdersCount(), before, 'final verification failure must NOT create an Order');
+});
+
+/* ============================================================================
+   R5 — BRANCH ACCEPTANCE (Order/Acceptance boundary)
+   pending (AWAITING_BRANCH_ACCEPTANCE) → ACCEPT ('confirmed', the locked
+   operational acceptance state) or REJECT ('rejected', terminal, distinct from
+   customer 'cancelled'). Server-authoritative, branch/brand-scoped, atomic,
+   audited in order_status_logs, idempotent for repeated identical decisions,
+   and never silently rematched. TIMEOUT is reserved (separate worker task).
+   ============================================================================ */
+
+async function r5Login(username, role, branchId) {
+  const crypto = require('crypto');
+  const hash = crypto.createHash('sha256').update('r5pass').digest('hex');
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role)
+    VALUES (?, 'brand_bangjo', 'org_xentra_holding', ?, ?, ?, ?, 'R5 User', ?)
+  `).run('usr_' + username, branchId || null, username, username + '@bangjo.test', hash, role);
+  return b1Login(username, 'r5pass');
+}
+
+async function r5CreatePendingOrder(branchId, phone) {
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: branchId,
+      payment_method: 'cash',
+      customer: { name: 'Customer R5', phone },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 201, 'pending order must be created for acceptance test');
+  const data = await res.json();
+  return data.order_id;
+}
+
+function r5AuditCount(orderId) {
+  return db.prepare('SELECT COUNT(*) AS c FROM order_status_logs WHERE order_id = ?').get(orderId).c;
+}
+
+test('R5 ACCEPT: own-branch branch_manager accepts a pending order → confirmed, audited, branch immutable', async () => {
+  csAddBranch('branch_r5_acc', { assign272: true });
+  const bm = await r5Login('r5_bm_acc', 'branch_manager', 'branch_r5_acc');
+  assert.strictEqual(bm.status, 200);
+  const orderId = await r5CreatePendingOrder('branch_r5_acc', '081200000050');
+  const created = db.prepare('SELECT status, branch_id FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(created.status, 'pending', 'AWAITING_BRANCH_ACCEPTANCE');
+
+  const res = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST',
+    headers: bm.headers,
+    body: JSON.stringify({ decision: 'accept', note: 'Siap diproses' })
+  });
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(data.decision, 'accept');
+  assert.strictEqual(data.new_status, 'confirmed', 'ACCEPTED = confirmed (locked operational acceptance state)');
+  assert.strictEqual(data.idempotent, undefined);
+
+  const order = db.prepare('SELECT status, branch_id FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(order.status, 'confirmed');
+  assert.strictEqual(order.branch_id, 'branch_r5_acc', 'fulfillment branch unchanged after acceptance');
+
+  const logs = db.prepare('SELECT * FROM order_status_logs WHERE order_id = ?').all(orderId);
+  assert.strictEqual(logs.length, 1);
+  assert.strictEqual(logs[0].previous_status, 'pending');
+  assert.strictEqual(logs[0].new_status, 'confirmed');
+  assert.strictEqual(logs[0].actor_type, 'branch_actor');
+  assert.ok(logs[0].note.includes('[ACCEPT by branch_manager'), 'audit carries actor role + decision');
+});
+
+test('R5 ACCEPT idempotency: repeating ACCEPT on an accepted order is a safe no-op (no duplicate audit)', async () => {
+  const orderId = await r5CreatePendingOrder('branch_r5_acc', '081200000051');
+  const bm = await r5Login('r5_bm_acc2', 'branch_manager', 'branch_r5_acc');
+  assert.strictEqual(bm.status, 200);
+
+  const first = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST', headers: bm.headers, body: JSON.stringify({ decision: 'accept' })
+  });
+  assert.strictEqual(first.status, 200);
+  assert.strictEqual((await first.json()).new_status, 'confirmed');
+  assert.strictEqual(r5AuditCount(orderId), 1);
+
+  const second = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST', headers: bm.headers, body: JSON.stringify({ decision: 'accept' })
+  });
+  assert.strictEqual(second.status, 200);
+  const secondData = await second.json();
+  assert.strictEqual(secondData.success, true);
+  assert.strictEqual(secondData.idempotent, true, 'repeated decision is an explicit no-op');
+  assert.strictEqual(secondData.new_status, 'confirmed');
+  assert.strictEqual(r5AuditCount(orderId), 1, 'no duplicate audit entry');
+});
+
+test('R5 REJECT: owner (brand-wide) rejects with reason → rejected, terminal, audited; no accept after', async () => {
+  csAddBranch('branch_r5_rej', { assign272: true });
+  const owner = await r5Login('r5_owner_rej', 'owner', null);
+  assert.strictEqual(owner.status, 200);
+  const orderId = await r5CreatePendingOrder('branch_r5_rej', '081200000052');
+
+  const res = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST',
+    headers: owner.headers,
+    body: JSON.stringify({ decision: 'reject', reason: 'Cabang penuh dan tidak dapat melayani hari ini' })
+  });
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(data.new_status, 'rejected');
+
+  const order = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(order.status, 'rejected');
+  const log = db.prepare('SELECT * FROM order_status_logs WHERE order_id = ?').get(orderId);
+  assert.ok(log.note.includes('[REJECT by owner'), 'audit carries actor + decision');
+  assert.ok(log.note.includes('Cabang penuh'), 'audit carries the rejection reason');
+
+  // Terminal: ACCEPT after REJECT must fail; no silent rematch/revival.
+  const lateAccept = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST', headers: owner.headers, body: JSON.stringify({ decision: 'accept' })
+  });
+  assert.strictEqual(lateAccept.status, 400, 'ACCEPT after REJECT is an invalid transition');
+  const unchanged = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(unchanged.status, 'rejected');
+});
+
+test('R5 REJECT without a reason is rejected (REASON_REQUIRED) with no state change', async () => {
+  const bm = await r5Login('r5_bm_noreason', 'branch_manager', 'branch_r5_acc');
+  const orderId = await r5CreatePendingOrder('branch_r5_acc', '081200000053');
+  const res = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST', headers: bm.headers, body: JSON.stringify({ decision: 'reject' })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.status, 'REASON_REQUIRED');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+  assert.strictEqual(r5AuditCount(orderId), 0);
+});
+
+test('R5 branch scope: branch_manager cannot accept an order from ANOTHER branch (no cross-branch authority)', async () => {
+  csAddBranch('branch_r5_other', { assign272: true });
+  const orderId = await r5CreatePendingOrder('branch_r5_other', '081200000054');
+  const bmOther = await r5Login('r5_bm_other_scope', 'branch_manager', 'branch_r5_acc'); // assigned to branch_r5_acc
+  const res = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST', headers: bmOther.headers, body: JSON.stringify({ decision: 'accept' })
+  });
+  assert.strictEqual(res.status, 404, 'order is not within this manager\'s branch authority');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+});
+
+test('R5 role boundary: cashier cannot use the branch-acceptance endpoint (403)', async () => {
+  csAddBranch('branch_r5_role', { assign272: true });
+  const orderId = await r5CreatePendingOrder('branch_r5_role', '081200000055');
+  const cashier = await r5Login('r5_cashier_role', 'cashier', 'branch_r5_role');
+  assert.strictEqual(cashier.status, 200);
+  const res = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST', headers: cashier.headers, body: JSON.stringify({ decision: 'accept' })
+  });
+  assert.strictEqual(res.status, 403, 'cashier is not an acceptance actor');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+});
+
+test('R5 REJECT on an order with a settled payment is blocked (refund flow first) — no state change, no audit', async () => {
+  csAddBranch('branch_r5_paid', { assign272: true });
+  const owner = await r5Login('r5_owner_paid', 'owner', null);
+  const orderId = await r5CreatePendingOrder('branch_r5_paid', '081200000056');
+  // Cash create-order already inserts the order_payments row (pending) —
+  // mark it settled to simulate money already taken for this order.
+  db.prepare("UPDATE order_payments SET payment_status = 'settlement', provider = 'midtrans' WHERE order_id = ?").run(orderId);
+
+  const res = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST', headers: owner.headers, body: JSON.stringify({ decision: 'reject', reason: 'Tidak sanggup melayani' })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.ok(/ORDER_ALREADY_PAID/.test(data.error || ''), 'settled payment blocks branch rejection');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+  assert.strictEqual(r5AuditCount(orderId), 0);
+});
+
+test('R5 invalid decision value is rejected (INVALID_DECISION)', async () => {
+  const owner = await r5Login('r5_owner_bad', 'owner', null);
+  const orderId = await r5CreatePendingOrder('branch_r5_acc', '081200000057');
+  const res = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST', headers: owner.headers, body: JSON.stringify({ decision: 'maybe' })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.status, 'INVALID_DECISION');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+});
+
+/* ============================================================================
+   R6/R7 — ACCEPTANCE TIMEOUT + CUSTOMER CANCELLATION
+   R6: pending (AWAITING_BRANCH_ACCEPTANCE) + 3 min → 'timeout' (BRANCH_TIMEOUT),
+       applied by the server-authoritative AcceptanceTimeoutService only.
+   R7: POST /orders/:id/cancel — customer cancels ONLY while pending
+       (CUSTOMER_CANCEL, actor derived from the authenticated OTP session);
+       ACCEPTED/rejected/timed-out/cancelled orders cannot be customer-cancelled.
+   ============================================================================ */
+
+async function r6r7CustomerToken(phone) {
+  const send = await mockFetch('/api/v1/auth/otp/send', {
+    method: 'POST',
+    body: JSON.stringify({ phone })
+  });
+  const sendData = await send.json();
+  const verify = await mockFetch('/api/v1/auth/otp/verify', {
+    method: 'POST',
+    body: JSON.stringify({ challenge_id: sendData.challenge_id, otp: '123456', phone })
+  });
+  const verifyData = await verify.json();
+  assert.ok(verifyData.token, 'customer OTP token must be issued');
+  return { authorization: 'Bearer ' + verifyData.token };
+}
+
+test('R6 API: an overdue pending order is timed out by the worker sweep and ACCEPT afterwards is rejected', async () => {
+  csAddBranch('branch_r6_to', { assign272: true });
+  const orderId = await r5CreatePendingOrder('branch_r6_to', '081200000080');
+  db.prepare("UPDATE orders SET created_at = datetime('now','-200 seconds') WHERE id = ?").run(orderId);
+
+  const AcceptanceTimeoutService = require('../server/services/AcceptanceTimeoutService');
+  const sweep = AcceptanceTimeoutService.checkAndApplyTimeouts();
+  assert.strictEqual(sweep.timed_out, 1, 'the overdue order timed out');
+  const timed = db.prepare('SELECT status, branch_id FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(timed.status, 'timeout');
+  assert.strictEqual(timed.branch_id, 'branch_r6_to', 'timed-out order stays on its original branch');
+
+  // ACCEPT racing AFTER the timeout must be rejected deterministically.
+  const owner = await r5Login('r5_owner_r6', 'owner', null);
+  const lateAccept = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST', headers: owner.headers, body: JSON.stringify({ decision: 'accept' })
+  });
+  assert.strictEqual(lateAccept.status, 400, 'ACCEPT after TIMEOUT is an invalid transition');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'timeout');
+});
+
+test('R7 customer cancel: pending order → CUSTOMER_CANCEL, audited with the authenticated phone; duplicate cancel is a no-op', async () => {
+  csAddBranch('branch_r7_c', { assign272: true });
+  const phone = '081200000081';
+  const token = await r6r7CustomerToken(phone);
+  const orderId = await r5CreatePendingOrder('branch_r7_c', phone);
+
+  const res = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
+    method: 'POST', headers: token, body: JSON.stringify({ reason: 'Ganti rencana' })
+  });
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(data.decision, 'customer_cancel');
+  assert.strictEqual(data.new_status, 'cancelled');
+
+  const log = db.prepare('SELECT * FROM order_status_logs WHERE order_id = ?').get(orderId);
+  assert.strictEqual(log.previous_status, 'pending');
+  assert.strictEqual(log.new_status, 'cancelled');
+  assert.strictEqual(log.actor_type, 'customer', 'actor is the authenticated customer, never client-classified');
+  assert.strictEqual(log.actor_id, phone, 'actor id is the authenticated phone');
+  assert.ok(log.note.includes('[CUSTOMER_CANCEL]'), 'CUSTOMER_CANCEL stays distinct from other cancel classes');
+
+  // Duplicate cancellation: deterministic rejection, no state corruption.
+  const dup = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
+    method: 'POST', headers: token, body: JSON.stringify({ reason: 'lagi' })
+  });
+  assert.strictEqual(dup.status, 400);
+  const dupData = await dup.json();
+  assert.strictEqual(dupData.status, 'CUSTOMER_CANCEL_NOT_ALLOWED');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'cancelled');
+  assert.strictEqual(r5AuditCount(orderId), 1, 'no duplicate audit entry');
+});
+
+test('R7 customer cancel after ACCEPT is NOT allowed (server-enforced, UI alone insufficient)', async () => {
+  csAddBranch('branch_r7_a', { assign272: true });
+  const phone = '081200000082';
+  const token = await r6r7CustomerToken(phone);
+  const orderId = await r5CreatePendingOrder('branch_r7_a', phone);
+
+  const owner = await r5Login('r5_owner_r7a', 'owner', null);
+  const accept = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
+    method: 'POST', headers: owner.headers, body: JSON.stringify({ decision: 'accept' })
+  });
+  assert.strictEqual(accept.status, 200);
+
+  const cancel = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
+    method: 'POST', headers: token, body: JSON.stringify({ reason: 'Batal saja' })
+  });
+  assert.strictEqual(cancel.status, 400, 'ACCEPTED order cannot be customer-cancelled');
+  const data = await cancel.json();
+  assert.strictEqual(data.status, 'CUSTOMER_CANCEL_NOT_ALLOWED');
+  assert.ok(/diterima cabang/i.test(data.error || ''), 'explains the accepted-branch state');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'confirmed');
+});
+
+test('R7 customer cancel: ownership enforced — another customer cannot cancel the order (403)', async () => {
+  csAddBranch('branch_r7_o', { assign272: true });
+  const ownerPhone = '081200000083';
+  const otherToken = await r6r7CustomerToken('081200000084');
+  const orderId = await r5CreatePendingOrder('branch_r7_o', ownerPhone);
+
+  const res = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
+    method: 'POST', headers: otherToken, body: JSON.stringify({ reason: 'bukan pesanan saya' })
+  });
+  assert.strictEqual(res.status, 403);
+  const data = await res.json();
+  assert.strictEqual(data.error, 'FORBIDDEN_ORDER_OWNERSHIP');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+});
+
+test('R7 customer cancel of REJECTED and TIMED-OUT orders is not allowed (terminal states)', async () => {
+  csAddBranch('branch_r7_t', { assign272: true });
+  const phone = '081200000085';
+  const token = await r6r7CustomerToken(phone);
+  const owner = await r5Login('r5_owner_r7t', 'owner', null);
+
+  // Rejected first.
+  const rejOrder = await r5CreatePendingOrder('branch_r7_t', phone);
+  const reject = await mockFetch('/api/v1/orders/' + rejOrder + '/branch-acceptance', {
+    method: 'POST', headers: owner.headers, body: JSON.stringify({ decision: 'reject', reason: 'Menu habis' })
+  });
+  assert.strictEqual(reject.status, 200);
+  const rejCancel = await mockFetch('/api/v1/orders/' + rejOrder + '/cancel', {
+    method: 'POST', headers: token, body: JSON.stringify({ reason: 'batal' })
+  });
+  assert.strictEqual(rejCancel.status, 400);
+  assert.strictEqual((await rejCancel.json()).status, 'CUSTOMER_CANCEL_NOT_ALLOWED');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(rejOrder).status, 'rejected', 'REJECTED is never rewritten as customer cancel');
+
+  // Then timed out.
+  const toOrder = await r5CreatePendingOrder('branch_r7_t', phone);
+  db.prepare("UPDATE orders SET created_at = datetime('now','-200 seconds') WHERE id = ?").run(toOrder);
+  const AcceptanceTimeoutService = require('../server/services/AcceptanceTimeoutService');
+  AcceptanceTimeoutService.checkAndApplyTimeouts();
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(toOrder).status, 'timeout');
+  const toCancel = await mockFetch('/api/v1/orders/' + toOrder + '/cancel', {
+    method: 'POST', headers: token, body: JSON.stringify({ reason: 'batal' })
+  });
+  assert.strictEqual(toCancel.status, 400);
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(toOrder).status, 'timeout', 'TIMEOUT is never rewritten as customer cancel');
+});
+
+test('R7 customer cancel guards: no session → 401; settled payment → ORDER_ALREADY_PAID (no state change)', async () => {
+  csAddBranch('branch_r7_g', { assign272: true });
+  const phone = '081200000086';
+  const token = await r6r7CustomerToken(phone);
+  const orderId = await r5CreatePendingOrder('branch_r7_g', phone);
+
+  // No session.
+  const anon = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
+    method: 'POST', body: JSON.stringify({ reason: 'x' })
+  });
+  assert.strictEqual(anon.status, 401, 'anonymous cancel is rejected');
+
+  // Settled payment blocks CUSTOMER_CANCEL (refund flow first).
+  db.prepare("UPDATE order_payments SET payment_status = 'settlement', provider = 'midtrans' WHERE order_id = ?").run(orderId);
+  const paidCancel = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
+    method: 'POST', headers: token, body: JSON.stringify({ reason: 'batal' })
+  });
+  assert.strictEqual(paidCancel.status, 400);
+  assert.ok(/ORDER_ALREADY_PAID/.test((await paidCancel.json()).error || ''), 'settled payment requires a refund flow');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+  assert.strictEqual(r5AuditCount(orderId), 0, 'no audit entry for a blocked cancel');
+});
+

@@ -203,13 +203,23 @@ For customer fulfillment, eligibility may include:
 
 Only after eligibility is established may the system optimize among eligible candidates using approved factors such as distance, ETA, cost, or policy.
 
-Core v1 invariant:
+Core invariant (SUPERSEDED 2026-09-04 by the Xentra-Core R1 locked decision —
+matching/eligibility here remain per CHECKOUT scope):
 
 ```text
-1 cart → 1 fulfillment branch
+CART (multi-branch allowed: cart lines carry branch provenance)
+        ↓
+group cart lines into per-branch CHECKOUT scopes
+        ↓
+CHECKOUT is SINGLE-BRANCH (mixed scopes → CHECKOUT_SINGLE_BRANCH_REQUIRED)
+        ↓
+ORDER is SINGLE-BRANCH (1 order → 1 fulfillment branch)
 ```
 
-Split fulfillment is not part of the Core v1 model.
+Split fulfillment is not part of the Core v1 order model (one order, one
+branch). A cart may span branches, but each checkout/order must not — item
+provenance is never authority; server eligibility/validation stays
+authoritative per checkout scope.
 
 **Important:** Detailed recovery/rematching policy remains subject to its own approved business contract before implementation.
 

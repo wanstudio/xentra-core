@@ -218,10 +218,11 @@ CREATE TABLE orders (
     customer_phone VARCHAR(30) NOT NULL,
     customer_name VARCHAR(100),
     order_type VARCHAR(20) NOT NULL, -- 'delivery', 'pickup', 'dinein'
+    selection_mode TEXT, -- R2: 'AUTO' (Core/BranchMatcher) or 'CUSTOMER_SELECTED'; NULL = legacy
     fulfillment_schedule_type VARCHAR(20) DEFAULT 'asap', -- 'asap' or 'scheduled'
     scheduled_slot_start TIMESTAMP,
     scheduled_slot_end TIMESTAMP,
-    status VARCHAR(30) DEFAULT 'pending', -- pending, confirmed, preparing, ready, out_for_delivery, completed, cancelled, refunded
+    status VARCHAR(30) DEFAULT 'pending', -- pending(AWAITING_BRANCH_ACCEPTANCE) → confirmed(ACCEPTED) → preparing, ready, out_for_delivery, completed; rejected(REJECTED, terminal, R5); timeout(BRANCH_TIMEOUT, terminal, R6); cancelled(CUSTOMER/SYSTEM cancel, R7); refunded
     subtotal DECIMAL(12, 2) NOT NULL,
     discount_amount DECIMAL(12, 2) DEFAULT 0.00,
     delivery_fee DECIMAL(12, 2) DEFAULT 0.00,

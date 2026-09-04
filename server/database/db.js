@@ -701,10 +701,6 @@ function initSchema(targetDb) {
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
-    -- C2 IDEMPOTENCY (C2.8): a given logical mutation can only ever be recorded once.
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_movements_mutation
-      ON inventory_movements(mutation_id) WHERE mutation_id IS NOT NULL;
-
     CREATE UNIQUE INDEX IF NOT EXISTS idx_order_payments_order_id ON order_payments(order_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_shifts_unique_active_cashier ON pos_shifts(cashier_id) WHERE status = 'open';
   `);
@@ -729,6 +725,7 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN tagline TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN order_channel TEXT DEFAULT "customer_app";'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE orders ADD COLUMN selection_mode TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN fulfillment_type TEXT DEFAULT "delivery";'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN table_number TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN client_transaction_id TEXT;'); } catch (e) {}
@@ -739,6 +736,15 @@ function initSchema(targetDb) {
   try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust_active ON promotion_redemptions(promotion_id, customer_phone) WHERE status = 'active';"); } catch (e) {}
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_order_payments_order_id ON order_payments(order_id);'); } catch (e) {}
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_shifts_unique_active_cashier ON pos_shifts(cashier_id) WHERE status = "open";'); } catch (e) {}
+  // C2 IDEMPOTENCY (C2.8): an inventory_movements table created BEFORE the C2
+  // schema exists on disk without the mutation_id column. The column ALTER and
+  // the partial unique index must live OUTSIDE the CREATE TABLE batch (guarded)
+  // so a stale file database migrates in place instead of crashing the boot.
+  try { targetDb.exec('ALTER TABLE inventory_movements ADD COLUMN mutation_id TEXT;'); } catch (e) {}
+  try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_movements_mutation ON inventory_movements(mutation_id) WHERE mutation_id IS NOT NULL;'); } catch (e) {}
+  // C1 AUDIT (B1/C1): branch_operation_logs created before the C1 schema lacks
+  // the product_id column used for product-scoped audit rows.
+  try { targetDb.exec('ALTER TABLE branch_operation_logs ADD COLUMN product_id TEXT;'); } catch (e) {}
 
   seedData(targetDb);
 }

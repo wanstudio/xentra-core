@@ -162,6 +162,22 @@ if (process.env.NODE_ENV !== 'test') {
       }
     }, 60000);
     if (interval.unref) interval.unref();
+
+    // R6 ACCEPTANCE TIMEOUT WORKER (platform policy — 3 minutes, server
+    // authoritative, atomic + idempotent via OrderStateMachine). Browser
+    // timers never determine Order state. Sweeps every 15 seconds.
+    const AcceptanceTimeoutService = require('./services/AcceptanceTimeoutService');
+    const timeoutWorker = setInterval(() => {
+      try {
+        const sweepResult = AcceptanceTimeoutService.checkAndApplyTimeouts();
+        if (sweepResult.timed_out > 0) {
+          console.log(`[Acceptance Timeout Worker] ${sweepResult.timed_out} order(s) timed out (${sweepResult.processed} scanned).`);
+        }
+      } catch (workerErr) {
+        console.error('[Acceptance Timeout Worker Error]:', workerErr.message);
+      }
+    }, 15000);
+    if (timeoutWorker.unref) timeoutWorker.unref();
   });
 
   server.on('error', (err) => {

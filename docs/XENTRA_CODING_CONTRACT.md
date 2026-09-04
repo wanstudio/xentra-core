@@ -113,8 +113,26 @@ The following are implementation invariants unless superseded by a newer locked 
 
 ### Cart and fulfillment
 
-- One cart resolves to one fulfillment branch.
-- Split fulfillment is not part of the Core v1 fulfillment model.
+> **SUPERSEDED 2026-09-04 (Xentra-Core R1 — locked decision):** the old
+> shorthand “1 cart → 1 branch” is replaced by **MULTI-BRANCH CART IS ALLOWED;
+> CHECKOUT IS SINGLE-BRANCH; ORDER IS SINGLE-BRANCH**. A cart may carry items
+> from different branches (each cart line records optional branch provenance),
+> and the customer places one independent single-branch checkout/order per
+> branch scope. The authoritative contract document
+> (`docs/XENTRA_CART_CHECKOUT_CONTRACT.md`) is pending import into this
+> repository; until it lands, this section plus the R1 task contract govern.
+
+- MULTI-BRANCH CART IS ALLOWED: cart lines may belong to different branches and
+  must keep their branch provenance so scopes never silently merge.
+- CHECKOUT IS SINGLE-BRANCH and ORDER IS SINGLE-BRANCH: every checkout/order
+  resolves to exactly ONE fulfillment branch. A checkout payload that mixes
+  items from more than one branch scope — or ships one scope against a
+  different branch — is REJECTED with `CHECKOUT_SINGLE_BRANCH_REQUIRED`. Items
+  are never silently selected, merged, split, re-homed, or rematched.
+- Independent checkouts: completing (or failing) one branch’s checkout does not
+  invalidate another branch scope in the same cart.
+- Split fulfillment is not part of the Core v1 order model (one order, one
+  branch).
 - Branch matching is a consumer of branch operational truth, not the definition of Branch.
 - Customer-facing state must reflect server-authoritative decisions.
 - A cart must not silently acquire a different business meaning because of client-side state.

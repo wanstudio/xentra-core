@@ -1,4 +1,140 @@
 ## [Unreleased] - 2026-09-04
+### R10/R11/R12 — Commerce integrity audit (defects fixed)
+- **R11 TOCTOU guard**: `OrderStateMachine.transition` now accepts an optional
+  `expected_current_status` re-validated INSIDE the transaction. The R7
+  customer-cancel endpoint passes `'pending'`, closing a real race: customer
+  cancel racing branch ACCEPT could previously cancel an ACCEPTED order
+  (machine allowed `confirmed → cancelled` for managers, and the endpoint's
+  pre-check ran outside the lock). Loser now fails `[STATE_CHANGED]`, order
+  stays ACCEPTED, no audit row. (+2 machine tests)
+- **R11 late-settlement guard**: Midtrans settlement previously force-`UPDATE`d
+  `orders.status='confirmed'` unconditionally — a settlement arriving after
+  branch REJECT/BRANCH_TIMEOUT (or racing the timeout worker) would silently
+  revive a terminal order and start fulfillment. Confirmation is now a CAS
+  from `'pending'`; when the order already left AWAITING, money is still
+  settled but the order is routed to `fulfillment_exception` with a structured
+  `[Perlu Refund]` note and ZERO stock/promo side effects (deterministic with
+  the timeout worker via BEGIN IMMEDIATE serialization). Gateway
+  cancel/deny/expire and the gateway-404 reconciliation path got the same CAS
+  so they never overwrite a terminal BRANCH_TIMEOUT/REJECT. (+2 payment tests)
+- Audit output: R10 no-silent-rematch scan (clean), R11 race matrix, R12
+  contract regression map, and security findings are documented in the task
+  report (no other code changes).
+
+### R6/R7 — Acceptance timeout + customer cancellation
+- **R6 timeout state**: new terminal `orders.status = 'timeout'` (BRANCH_TIMEOUT),
+  valid only from `pending` (AWAITING_BRANCH_ACCEPTANCE). Applied EXCLUSIVELY
+  by the new server-authoritative `AcceptanceTimeoutService`
+  (`ACCEPTANCE_TIMEOUT_SECONDS = 180` — fixed Xentra platform policy, NOT
+  Owner/Branch configurable, no browser timer involvement). A 15s unref'd
+  worker runs inside the Core process (alongside the payment reconciliation
+  worker); each transition is atomic + idempotent via OrderStateMachine
+  (BEGIN IMMEDIATE + CAS + audit), so ACCEPT-vs-TIMEOUT races resolve
+  deterministically (first valid transition wins; loser fails cleanly). A
+  timed-out order stays on its ORIGINAL transaction/branch — never silently
+  transferred or rematched. Settled-payment orders are never auto-timed-out.
+- **R7 customer cancellation**: new `POST /orders/:id/cancel`
+  (requireCustomerAuth). Customer may cancel ONLY while `pending`;
+  ACCEPTED/rejected/timed-out/cancelled orders return
+  `CUSTOMER_CANCEL_NOT_ALLOWED` (server-enforced — UI restrictions are
+  insufficient). Ownership enforced via the authenticated OTP phone (403
+  otherwise); the actor is NEVER client-classified — audit records
+  `actor_type='customer'`, the session phone, and a `[CUSTOMER_CANCEL]` note
+  so CUSTOMER_CANCEL stays distinct from BRANCH_REJECT, BRANCH_TIMEOUT,
+  SYSTEM_CANCEL, and PAYMENT_FAILURE. Settled-payment orders require a refund
+  flow (`ORDER_ALREADY_PAID`). Duplicate cancellation is a deterministic no-op
+  (no second audit row).
+- **Recovery**: branch rejection/timeout/cancellation never rematches,
+  transfers, or mutates the old Order — the customer explicitly starts a NEW
+  Checkout/Order (existing flows unchanged).
+- **Tests**: +4 OrderStateMachine, +3 AcceptanceTimeoutService
+  (`tests/services/acceptanceTimeout.test.js`), +6 API (R6 worker sweep +
+  ACCEPT-after-timeout rejection; R7 cancel happy path + audit + idempotency,
+  cancel-after-ACCEPT block, ownership 403, terminal-state blocks,
+  401/ORDER_ALREADY_PAID guards).
+
+### R5 — Branch acceptance lifecycle (Order/Acceptance boundary)
+- **Locked mapping (per snapshot + approval)**: `orders.status='pending'` is the
+  AWAITING_BRANCH_ACCEPTANCE state; branch ACCEPT → `'confirmed'` (ACCEPTED,
+  the existing locked operational acceptance state); branch REJECT → new
+  terminal `'rejected'` (REJECTED — distinct from customer cancellation
+  `'cancelled'`). TIMEOUT reserved for a separate worker task (not built).
+- **New endpoint** `POST /orders/:id/branch-acceptance` (`accept`|`reject`):
+  server-authoritative, atomic (OrderStateMachine BEGIN IMMEDIATE + CAS),
+  audited (`order_status_logs`: actor role+id, decision, reason, previous/new
+  state, timestamp), and idempotent for repeated identical decisions (explicit
+  `idempotent:true` no-op, no duplicate audit). Reject requires a `reason`
+  (REASON_REQUIRED).
+- **Authorization boundary**: `branch_manager` acts only on their assigned
+  branch (404 otherwise); `brand_manager`/`owner` act brand-wide; cashier and
+  kitchen have no acceptance authority (403). Orders are never silently
+  rematched on rejection; ACCEPT after REJECT / REJECT after ACCEPT are invalid
+  transitions.
+- **Financial integrity**: branch REJECT of an order with a settled payment is
+  blocked (`ORDER_ALREADY_PAID`, refund flow first) — mirroring the locked
+  cancellation guard; promotion redemptions are voided on `rejected` exactly
+  as on `cancelled` so a benefit on an unfulfilled order is released.
+- **Tests**: +3 OrderStateMachine (pending→rejected validity/terminality,
+  atomic audit, settled-payment guard) and +8 API (accept, idempotency,
+  reject+reason+terminality, reason required, cross-branch 404, cashier 403,
+  settled-payment block, invalid decision).
+
+### R2/R3 — Branch selection mode + final checkout verification
+- **`selection_mode` introduced (R2.1)**: `AUTO | CUSTOMER_SELECTED` — HOW the
+  fulfillment branch was chosen, distinct from `fulfillment_branch_id` and
+  persisted on `orders.selection_mode` (new column, guarded migration). AUTO =
+  Core matches via BranchMatcher from the delivery destination;
+  CUSTOMER_SELECTED = the customer's `branch_id` is INPUT, never authority
+  (canonical `EligibilityService.evaluateBranch` + gate still validate it).
+  Legacy clients sending `branch_id` without a mode are derived as
+  CUSTOMER_SELECTED (unchanged behavior).
+- **Deterministic mode validation (R2.2–R2.5)**: invalid mode values,
+  `AUTO` combined with a supplied `branch_id`, and `CUSTOMER_SELECTED` without
+  `branch_id` are rejected `400 INVALID_SELECTION_MODE` before any order side
+  effect — a client can never smuggle a branch into AUTO, and AUTO never
+  silently rematches a rejected CUSTOMER_SELECTED branch.
+- **Fresh authoritative verification confirmed (R3)**: `create-order` still
+  runs the full `PrePaymentVerificationGate` (branch existence/ownership/
+  active/open, fulfillment capability, product active/assignment/availability,
+  stock, quantity, authoritative price, promo, R1 single-branch scope) after
+  branch resolution and before Order creation — verification failure always
+  prevents the Order (new create-order-level stale-stock regression test).
+- **Tests**: +8 API tests (AUTO 201 + persisted mode, CUSTOMER_SELECTED 201 +
+  persisted mode, legacy derivation, normalization, invalid value, AUTO+
+  branch contradiction, CUSTOMER_SELECTED w/o branch, stale-stock no-Order).
+
+### R1 — Cart/Checkout boundary (multi-branch cart; single-branch checkout & order)
+- **Locked decision recorded**: the old “1 cart → 1 branch” shorthand is
+  superseded. MULTI-BRANCH CART IS ALLOWED; CHECKOUT IS SINGLE-BRANCH; ORDER IS
+  SINGLE-BRANCH. Cart lines now record optional branch provenance; a checkout
+  is one branch scope; each scope is ordered independently (failure of one
+  scope does not invalidate another).
+- **Server canonical guard**: new
+  `PrePaymentVerificationGate.assertSingleBranchCheckout(branchId, items)` is
+  the single enforcement point at the checkout boundary. `create-order` and
+  `checkout/verify` reject any payload that mixes item branch provenance, or
+  ships one scope against a different branch, with the deterministic status
+  `CHECKOUT_SINGLE_BRANCH_REQUIRED` (400, no order). Items without provenance
+  (legacy single-group carts) are untouched.
+- **Client cart store** (`store.js`): `addItem(product, qty, branchCtx)` stores
+  `branch_id`/`branch_name` provenance; line identity is branch-scoped (the
+  same catalog product under two branches stays two lines). New APIs:
+  `getCartBranchGroups()`, `getCartItemsForBranch(branchId)`,
+  `removeBranchItems(branchId)` — all legacy operations unchanged.
+- **Checkout page**: sends per-item `branch_id` provenance to verify/create-
+  order, fails fast client-side on a broken multi-branch scope (never silently
+  merges/splits/rematches), and after a successful order clears only the
+  ordered scope — whole cart when the checkout covered it (legacy behavior) —
+  so an independent checkout of another branch scope survives (R1.5).
+- **Tests**: `tests/client/cartScope.test.js` (8 — multi-branch representation,
+  branch-scoped line identity, grouping, scoped removal, legacy compat) +
+  6 API tests (matching-provenance success, mixed-scope rejection, wrong-scope
+  rejection, verify-boundary rejection, legacy regression, R1.5 independence).
+- **Docs**: `XENTRA_CODING_CONTRACT.md` §6 and
+  `XENTRA_CORE_IMPLEMENTATION_PLAN.md` Phase D record the supersession.
+  `docs/XENTRA_CART_CHECKOUT_CONTRACT.md` (referenced by the R1 task) is not
+  yet in the repository — pending import.
+
 ### C4/Checkout alignment — AUTO vs CUSTOMER_SELECTED fulfillment branch
 - **Locked decision enforced**: a cart always resolves to exactly ONE fulfillment
   branch via either AUTO (`BranchMatcher`) or an explicit CUSTOMER_SELECTED

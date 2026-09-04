@@ -16,8 +16,62 @@ class PrePaymentVerificationGate {
     VERIFIED: 'VERIFIED',
     PRICE_CHANGED: 'PRICE_CHANGED',
     OUT_OF_STOCK: 'OUT_OF_STOCK',
-    PRODUCT_UNAVAILABLE: 'PRODUCT_UNAVAILABLE'
+    PRODUCT_UNAVAILABLE: 'PRODUCT_UNAVAILABLE',
+    CHECKOUT_SINGLE_BRANCH_REQUIRED: 'CHECKOUT_SINGLE_BRANCH_REQUIRED'
   };
+
+  /**
+   * R1 CART/CHECKOUT BOUNDARY — canonical single-branch checkout rule.
+   *
+   * Locked contract (R1): MULTI-BRANCH CART IS ALLOWED; CHECKOUT IS
+   * SINGLE-BRANCH; ORDER IS SINGLE-BRANCH. A cart may carry items from
+   * different branches (per-item optional `branch_id` provenance), but a
+   * checkout/order payload must resolve to exactly ONE fulfillment branch.
+   *
+   * This helper is the single enforcement point for that rule at the
+   * checkout boundary. `branch_id` provenance on an item is a declaration of
+   * which branch scope produced it — it is NEVER financial/domain authority
+   * (the gate's verify() still resolves authoritative product/branch/price/
+   * stock server-side). Missing provenance (legacy single-group carts) is
+   * allowed and unchanged.
+   *
+   * Returns null when the payload is a valid single-branch checkout, or
+   * { status: 'CHECKOUT_SINGLE_BRANCH_REQUIRED', error } describing the
+   * violation. The system never silently selects, merges, splits, or
+   * rematches items across branches.
+   *
+   * @param {string|null} branchId - authoritative checkout/order branch
+   * @param {Array<{branch_id?: string|number}>} [items]
+   * @returns {{status: string, error: string}|null}
+   */
+  static assertSingleBranchCheckout(branchId, items = []) {
+    const provKeys = [];
+    const seen = {};
+
+    for (const item of Array.isArray(items) ? items : []) {
+      const raw = item && (item.branch_id != null && String(item.branch_id).trim() !== '') ? String(item.branch_id) : null;
+      if (raw && !seen[raw]) {
+        seen[raw] = true;
+        provKeys.push(raw);
+      }
+    }
+
+    if (provKeys.length > 1) {
+      return {
+        status: PrePaymentVerificationGate.STATUS.CHECKOUT_SINGLE_BRANCH_REQUIRED,
+        error: 'Checkout hanya dapat berisi produk dari satu cabang. Pisahkan pesanan Anda per cabang.'
+      };
+    }
+
+    if (provKeys.length === 1 && branchId && String(branchId) !== provKeys[0]) {
+      return {
+        status: PrePaymentVerificationGate.STATUS.CHECKOUT_SINGLE_BRANCH_REQUIRED,
+        error: `Produk dalam pesanan berasal dari cabang "${provKeys[0]}" sedangkan checkout ditujukan ke cabang "${branchId}". Checkout harus single-branch; pilih cabang yang sesuai.`
+      };
+    }
+
+    return null;
+  }
 
   /**
    * Verifies an order items payload atomically against live database state.

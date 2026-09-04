@@ -267,6 +267,11 @@ class PaymentGatewayService {
 
     const now = new Date().toISOString();
 
+    // Tracks the authoritative Order outcome of this settlement for reporting
+    // (R11: 'confirmed' from AWAITING, or 'fulfillment_exception' when money
+    // settled after the order already left AWAITING).
+    let orderStatusAfterSettlement = null;
+
     // P1 ATOMICITY INVARIANT: Unify payment update, order confirmation, stock deduction, promo settlement into single atomic transaction
     db.exec('BEGIN IMMEDIATE;');
     try {
@@ -278,6 +283,49 @@ class PaymentGatewayService {
       `).run(newPaymentStatus, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
 
       if (shouldConfirmOrder) {
+        // R11 CAS CONFIRM (commerce integrity): an order may be confirmed ONLY
+        // from 'pending' (AWAITING_BRANCH_ACCEPTANCE). If the order already
+        // left AWAITING before this settlement committed — branch REJECTED,
+        // BRANCH_TIMEOUT, customer-cancelled — a late settlement must NEVER
+        // force-confirm it or start fulfillment (stock deduction / promo
+        // redemption). Money is settled and the order is routed to the
+        // fulfillment_exception/refund queue with a structured reason. This is
+        // deterministic against the Acceptance Timeout Worker: BEGIN IMMEDIATE
+        // serializes the two writers, so whichever transaction commits first
+        // wins and the loser observes the new state.
+        const confirmResult = db.prepare(`
+          UPDATE orders
+          SET status = 'confirmed', payment_method = 'midtrans', updated_at = ?
+          WHERE id = ? AND status = 'pending'
+        `).run(now, order_id);
+
+        if (confirmResult && confirmResult.changes > 0) {
+          orderStatusAfterSettlement = 'confirmed';
+        } else {
+          const currentOrderState = db.prepare('SELECT status FROM orders WHERE id = ?').get(order_id);
+          if (currentOrderState && currentOrderState.status === 'confirmed') {
+            // Defensive: already confirmed by an earlier settlement (payment
+            // idempotency normally returns before reaching here).
+            orderStatusAfterSettlement = 'confirmed';
+          } else if (currentOrderState) {
+            orderStatusAfterSettlement = 'fulfillment_exception';
+            db.prepare(`
+              UPDATE orders
+              SET status = 'fulfillment_exception', payment_method = 'midtrans',
+                  order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ?
+              WHERE id = ?
+            `).run(
+              `[Perlu Refund]: Pembayaran diterima setelah pesanan berstatus "${currentOrderState.status}". Pesanan tidak diaktifkan ulang.`,
+              now,
+              order_id
+            );
+          }
+        }
+
+        // Fulfillment side effects (stock deduction + promo redemption) run
+        // ONLY when the order was actually confirmed (from pending or already
+        // confirmed) — never for a rejected/timed-out/cancelled order.
+        if (orderStatusAfterSettlement === 'confirmed') {
         // 1. Authoritative Cross-Domain Inventory Settlement (Single Source of Truth in Commerce)
         const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
         OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
@@ -328,12 +376,9 @@ class PaymentGatewayService {
           }
         }
 
-        // 3. Confirm Order Record if inventory & promotions verified
-        db.prepare(`
-          UPDATE orders
-          SET status = 'confirmed', payment_method = 'midtrans', updated_at = ?
-          WHERE id = ?
-        `).run(now, order_id);
+        // (Order confirmation happened via the R11 CAS UPDATE at the top of
+        // this branch — before any stock/promo side effect — so a late
+        // settlement can never overwrite a rejected/timed-out order.)
 
         // 4. Record Promotion Redemptions atomically
         if (promoRedemptionsToRecord.length > 0) {
@@ -346,16 +391,24 @@ class PaymentGatewayService {
             promotions: promoRedemptionsToRecord
           });
         }
+        }
       } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
-        // P1 FAILED PAYMENT INVARIANT: Mark order as cancelled with ZERO inventory mutation & void promo redemptions atomically
-        db.prepare(`
+        // P1 FAILED PAYMENT INVARIANT: Mark order as cancelled with ZERO inventory
+        // mutation & void promo redemptions atomically — but ONLY while the order
+        // is still 'pending'. A gateway cancel/deny/expire must never overwrite a
+        // terminal decision the branch/worker already committed (BRANCH_REJECT /
+        // BRANCH_TIMEOUT): those orders keep their terminal status and the
+        // payment failure is recorded on the payment record only.
+        const cancelOrderResult = db.prepare(`
           UPDATE orders
           SET status = 'cancelled', updated_at = ?
-          WHERE id = ?
+          WHERE id = ? AND status = 'pending'
         `).run(now, order_id);
 
-        const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-        PromotionEngineService.voidRedemptions({ order_id, reason: `Gateway status ${newPaymentStatus}` });
+        if (cancelOrderResult && cancelOrderResult.changes > 0) {
+          const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+          PromotionEngineService.voidRedemptions({ order_id, reason: `Gateway status ${newPaymentStatus}` });
+        }
       }
 
       db.exec('COMMIT;');
@@ -419,20 +472,39 @@ class PaymentGatewayService {
 
     // Publish Core Events outside of DB Transaction
     if (shouldConfirmOrder) {
-      events.EventBus.publish({
-        type: 'payment.settled',
-        producer: 'payment',
-        payload: {
-          payment_id: payment.id,
-          order_id,
-          branch_id: order?.branch_id,
-          brand_id: order?.brand_id,
-          provider: 'midtrans',
-          payment_method: 'midtrans',
-          amount: Number(gross_amount || payment.amount),
-          settled_at: now
-        }
-      }).catch(() => {});
+      if (orderStatusAfterSettlement === 'fulfillment_exception') {
+        // Money settled but the order can never be fulfilled (branch rejected /
+        // timed out before settlement) — route to the refund queue.
+        events.EventBus.publish({
+          type: 'payment.fulfillment_exception',
+          producer: 'payment',
+          payload: {
+            payment_id: payment.id,
+            order_id,
+            branch_id: order?.branch_id,
+            brand_id: order?.brand_id,
+            provider: 'midtrans',
+            amount: Number(gross_amount || payment.amount),
+            error: `Settlement arrived after order left AWAITING (${orderStatusAfterSettlement}).`,
+            settled_at: now
+          }
+        }).catch(() => {});
+      } else {
+        events.EventBus.publish({
+          type: 'payment.settled',
+          producer: 'payment',
+          payload: {
+            payment_id: payment.id,
+            order_id,
+            branch_id: order?.branch_id,
+            brand_id: order?.brand_id,
+            provider: 'midtrans',
+            payment_method: 'midtrans',
+            amount: Number(gross_amount || payment.amount),
+            settled_at: now
+          }
+        }).catch(() => {});
+      }
     } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
       events.EventBus.publish({
         type: 'payment.failed',
@@ -450,7 +522,8 @@ class PaymentGatewayService {
     return {
       success: true,
       order_id,
-      payment_status: newPaymentStatus
+      payment_status: newPaymentStatus,
+      ...(orderStatusAfterSettlement ? { order_status: orderStatusAfterSettlement } : {})
     };
   }
 
@@ -496,18 +569,23 @@ class PaymentGatewayService {
         db.exec('BEGIN IMMEDIATE;');
         try {
           db.prepare("UPDATE order_payments SET payment_status = 'cancel', updated_at = datetime('now') WHERE order_id = ?").run(order_id);
-          db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(order_id);
+          // R11 CAS: gateway-cancel only applies while the order is still
+          // 'pending' — never overwrite a terminal BRANCH_REJECT/BRANCH_TIMEOUT.
+          const orderCancelled = db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ? AND status = 'pending'").run(order_id);
           db.exec('COMMIT;');
+          const orderStatus = (orderCancelled && orderCancelled.changes > 0) ? 'cancelled' : null;
+          return {
+            success: true,
+            order_id,
+            payment_status: 'cancel',
+            ...(orderStatus ? { order_status: orderStatus } : {}),
+            message: orderStatus
+              ? 'Transaksi tidak ditemukan di gateway Midtrans. Pembayaran resmi dibatalkan.'
+              : 'Transaksi tidak ditemukan di gateway Midtrans. Pembayaran dicatat batal; status pesanan terminal dipertahankan.'
+          };
         } catch (_) {
           try { db.exec('ROLLBACK;'); } catch (_) {}
         }
-        return {
-          success: true,
-          order_id,
-          payment_status: 'cancel',
-          order_status: 'cancelled',
-          message: 'Transaksi tidak ditemukan di gateway Midtrans. Pembayaran resmi dibatalkan.'
-        };
       }
       throw new Error(`[PaymentGatewayService] Gagal memeriksa status transaksi gateway: ${err.message}`);
     }

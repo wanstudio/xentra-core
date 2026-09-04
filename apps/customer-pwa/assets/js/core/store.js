@@ -116,12 +116,25 @@
   }
 
   // ── Cart Operations ──
-  function addItem(product, qty) {
+  // R1 CART/CHECKOUT BOUNDARY: a cart MAY carry items from different branches
+  // (multi-branch cart), while each CHECKOUT/ORDER stays single-branch. Every
+  // cart line therefore records optional branch provenance (branch_id +
+  // branch_name) captured at add time. Cart line identity = id within a branch
+  // scope: the same catalog product added under two different branches stays
+  // two lines, so a multi-branch cart never silently merges scopes.
+  function addItem(product, qty, branchCtx) {
     qty = qty || 1;
+
+    var rawBranchId = (branchCtx && (branchCtx.branch_id || branchCtx.branchId)) ||
+      (product && (product.branch_id || product.branchId)) || null;
+    var branchId = rawBranchId != null ? String(rawBranchId) : null;
+    var branchName = (branchCtx && branchCtx.branch_name) || (product && product.branch_name) || null;
+    var branchKey = branchId || '';
+
     var items = state.cart.items;
     var existing = null;
     for (var i = 0; i < items.length; i++) {
-      if (String(items[i].id) === String(product.id)) {
+      if (String(items[i].id) === String(product.id) && String(items[i].branch_id || '') === branchKey) {
         existing = items[i];
         break;
       }
@@ -154,7 +167,11 @@
         note: '',
         is_promo_reward: isPromo,
         promotion_id: product.promotion_id || product.promo_id || null,
-        reward_type: product.reward_type || null
+        reward_type: product.reward_type || null,
+        // R1: optional branch provenance — which branch scope produced this line.
+        // null = legacy/unassigned group (existing single-branch flows unchanged).
+        branch_id: branchId,
+        branch_name: branchName
       };
 
       if (isPromo) {
@@ -240,6 +257,53 @@
     return null;
   }
 
+  // ── R1 Branch-scope helpers (multi-branch cart representation) ──
+  function cartGroupKey(item) {
+    return (item && item.branch_id) ? String(item.branch_id) : '__unassigned__';
+  }
+
+  // Groups cart lines by their branch provenance, preserving first-seen order.
+  // Legacy lines without provenance form the '__unassigned__' (branch_id: null)
+  // group so existing single-branch flows behave exactly as before.
+  function getCartBranchGroups() {
+    var groups = [];
+    var byKey = {};
+    (state.cart.items || []).forEach(function (item) {
+      var key = cartGroupKey(item);
+      if (!byKey[key]) {
+        byKey[key] = {
+          branch_id: (item && item.branch_id) || null,
+          branch_name: (item && item.branch_name) || null,
+          items: []
+        };
+        groups.push(byKey[key]);
+      }
+      byKey[key].items.push(item);
+    });
+    return groups;
+  }
+
+  // Items belonging to ONE branch scope (branch_id === null => legacy/unassigned).
+  // This is the read boundary a single-branch CHECKOUT consumes from the cart.
+  function getCartItemsForBranch(branchId) {
+    var key = (branchId == null || String(branchId) === '') ? '__unassigned__' : String(branchId);
+    return (state.cart.items || []).filter(function (item) {
+      return cartGroupKey(item) === key;
+    });
+  }
+
+  // Remove ONLY one branch scope (null => legacy/unassigned group), leaving all
+  // other scopes intact. Used by R1.5: completing one branch's checkout must not
+  // invalidate/clear the other branch's independent checkout.
+  function removeBranchItems(branchId) {
+    var key = (branchId == null || String(branchId) === '') ? '__unassigned__' : String(branchId);
+    state.cart.items = (state.cart.items || []).filter(function (item) {
+      return cartGroupKey(item) !== key;
+    });
+    save(CART_KEY, state.cart);
+    notify();
+  }
+
   // ── Export ──
   window.Xentra = window.Xentra || {};
   window.Xentra.Store = {
@@ -260,6 +324,9 @@
     clearCart: clearCart,
     getCartCount: getCartCount,
     getCartSubtotal: getCartSubtotal,
-    findCartItem: findCartItem
+    findCartItem: findCartItem,
+    getCartBranchGroups: getCartBranchGroups,
+    getCartItemsForBranch: getCartItemsForBranch,
+    removeBranchItems: removeBranchItems
   };
 })();

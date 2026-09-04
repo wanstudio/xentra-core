@@ -551,13 +551,22 @@ router.delete('/addresses/:id', requireCustomerAuth(), (req, res) => {
 router.post('/checkout/verify', (req, res) => {
   try {
     const { branch_id, items = [], order_type = 'delivery', customer = {}, pwa_runtime = null } = req.body;
-    if (order_type === 'reservation') {
-      return res.json({ success: true, is_valid: true, status: 'VERIFIED', verified_items: [], price_diffs: [], errors: [] });
-    }
     if (!branch_id) {
       return res.status(400).json({ success: false, error: 'Cabang pemesanan (branch_id) wajib dipilih.' });
     }
     const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
+
+    // R1 CART/CHECKOUT BOUNDARY — CHECKOUT IS SINGLE-BRANCH: reject any
+    // verification payload mixing item branch provenance or contradicting the
+    // checkout branch before any further evaluation. No silent merge/split.
+    const scopeError = PrePaymentVerificationGate.assertSingleBranchCheckout(branch_id, items);
+    if (scopeError) {
+      return res.status(400).json({ success: false, status: scopeError.status, error: scopeError.error });
+    }
+
+    if (order_type === 'reservation') {
+      return res.json({ success: true, is_valid: true, status: 'VERIFIED', verified_items: [], price_diffs: [], errors: [] });
+    }
     const verification = PrePaymentVerificationGate.verify({
       branch_id,
       brand_id: req.brand_id,
@@ -674,6 +683,39 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       }
     }
 
+    // R2 BRANCH SELECTION MODE — how the fulfillment branch is established.
+    // AUTO = Core matches the branch (BranchMatcher) from the delivery
+    // destination; CUSTOMER_SELECTED = the customer explicitly chose branch_id
+    // (INPUT, never authority — Core still validates eligibility).
+    // selection_mode is distinct from fulfillment branch_id and is persisted
+    // on the order for auditability. Legacy clients that send branch_id without
+    // a mode are derived as CUSTOMER_SELECTED (unchanged behavior).
+    let selection_mode = (req.body.selection_mode || req.body.selectionMode || '').toString().trim().toUpperCase();
+    if (selection_mode && !['AUTO', 'CUSTOMER_SELECTED'].includes(selection_mode)) {
+      return res.status(400).json({
+        success: false,
+        status: 'INVALID_SELECTION_MODE',
+        error: `selection_mode "${selection_mode}" tidak valid. Gunakan AUTO atau CUSTOMER_SELECTED.`
+      });
+    }
+    if (!selection_mode) {
+      selection_mode = branch_id ? 'CUSTOMER_SELECTED' : 'AUTO';
+    }
+    if (selection_mode === 'CUSTOMER_SELECTED' && !branch_id) {
+      return res.status(400).json({
+        success: false,
+        status: 'INVALID_SELECTION_MODE',
+        error: 'Mode CUSTOMER_SELECTED memerlukan branch_id yang dipilih customer.'
+      });
+    }
+    if (selection_mode === 'AUTO' && branch_id) {
+      return res.status(400).json({
+        success: false,
+        status: 'INVALID_SELECTION_MODE',
+        error: 'Mode AUTO berarti Core mencocokkan cabang dari tujuan pengantaran — kirim tanpa branch_id agar BranchMatcher memilih. Jangan mengirim branch_id pada mode AUTO.'
+      });
+    }
+
     // 1. Resolve Branch with Intelligence (Scoped strictly to current brand, NO arbitrary LIMIT 1)
     let branch = null;
     if (branch_id) {
@@ -761,12 +803,23 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       return res.status(404).json({ success: false, error: 'Cabang restoran tidak ditemukan untuk brand ini.' });
     }
 
+    // R1 CART/CHECKOUT BOUNDARY — CHECKOUT IS SINGLE-BRANCH (multi-branch cart
+    // is allowed, but each checkout/order resolves to exactly ONE fulfillment
+    // branch). Per-item branch provenance declares the cart scope that produced
+    // the item; mixing scopes, or shipping one scope against a different branch,
+    // is REJECTED with CHECKOUT_SINGLE_BRANCH_REQUIRED. The system never
+    // silently selects, merges, splits, or rematches items across branches.
+    const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
+    const scopeError = PrePaymentVerificationGate.assertSingleBranchCheckout(branch.id, items);
+    if (scopeError) {
+      return res.status(400).json({ success: false, status: scopeError.status, error: scopeError.error });
+    }
+
     // 2. Authoritative Pre-Payment Verification Gate (Single Source of Truth for Product Pricing & Stock)
     let verifiedItems = [];
     let verifiedSubtotal = 0;
 
     if (order_type !== 'reservation') {
-      const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
       const verification = PrePaymentVerificationGate.verify({
         branch_id: branch.id,
         brand_id: req.brand_id,
@@ -863,6 +916,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       payment_method,
       order_channel: 'customer_app',
       order_type,
+      selection_mode,
       table_number,
       reservation_date,
       guest_count,
@@ -1330,6 +1384,144 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
     });
 
     res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 9.0 R5 BRANCH ACCEPTANCE — operational acceptance boundary for an order
+// awaiting branch acceptance (orders.status = 'pending').
+//   ACCEPT → 'confirmed' (ACCEPTED — the locked operational acceptance state:
+//           order valid, kitchen/fulfillment may proceed, inventory deducts)
+//   REJECT → 'rejected' (REJECTED — terminal, DISTINCT from customer
+//           cancellation 'cancelled')
+// TIMEOUT is reserved for a separate timeout-worker task (not implemented).
+// Decisions are server-authoritative, branch/brand-scoped, atomic
+// (OrderStateMachine: BEGIN IMMEDIATE + compare-and-swap + audit log),
+// auditable (order_status_logs: order, actor, previous/new state, decision,
+// reason, timestamp), and idempotent for repeated identical decisions.
+// A rejected branch is NEVER silently rematched to another branch, and an
+// order with a settled payment cannot be branch-rejected (refund flow first).
+router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { decision, reason = '', note = '' } = req.body;
+    if (!decision || !['accept', 'reject'].includes(decision)) {
+      return res.status(400).json({
+        success: false,
+        status: 'INVALID_DECISION',
+        error: 'decision wajib bernilai "accept" atau "reject".'
+      });
+    }
+
+    const targetStatus = decision === 'accept' ? 'confirmed' : 'rejected';
+    if (decision === 'reject' && !String(reason || '').trim()) {
+      return res.status(400).json({
+        success: false,
+        status: 'REASON_REQUIRED',
+        error: 'Alasan penolakan cabang (reason) wajib diisi untuk audit.'
+      });
+    }
+
+    // Branch scope: branch_manager acts ONLY on their assigned branch;
+    // brand_manager/owner are brand-wide. Never trust a client branch_id.
+    const verifySql = `
+      SELECT o.id, o.branch_id, o.status, b.brand_id
+      FROM orders o
+      JOIN branches b ON b.id = o.branch_id
+      WHERE o.id = ? AND b.brand_id = ?
+      ${(req.user.role === 'branch_manager' && req.user.branchId) ? ' AND o.branch_id = ?' : ''}
+    `;
+    const verifyParams = [req.params.id, req.brand_id];
+    if (req.user.role === 'branch_manager' && req.user.branchId) verifyParams.push(req.user.branchId);
+
+    const order = db.prepare(verifySql).get(...verifyParams);
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan pada kewenangan cabang Anda.' });
+    }
+
+    // Idempotency: repeating the SAME decision on an order already in the
+    // target state is a safe no-op (no state change, no duplicate audit).
+    if (order.status === targetStatus) {
+      return res.json({
+        success: true,
+        order_id: order.id,
+        decision,
+        previous_status: order.status,
+        new_status: order.status,
+        idempotent: true
+      });
+    }
+
+    const actorLabel = req.user.role + ':' + (req.user.username || req.user.userId || 'actor');
+    const actorNote = decision === 'accept'
+      ? `[ACCEPT by ${actorLabel}] ${note ? note : ''}`.trim()
+      : `[REJECT by ${actorLabel}] ${String(reason).trim()}`;
+
+    const result = OrderStateMachine.transition({
+      order_id: order.id,
+      target_status: targetStatus,
+      actor_type: 'branch_actor',
+      actor_id: req.user.userId || req.user.username,
+      note: actorNote
+    });
+
+    res.json({ success: true, decision, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 9.0.1 R7 CUSTOMER CANCELLATION — a customer may cancel ONLY an order still
+// awaiting branch acceptance (orders.status = 'pending'). ACCEPTED
+// ('confirmed') and later orders may NOT be customer-cancelled here (branch
+// exception / refund are later tasks), and REJECTED / TIMEOUT / CANCELLED
+// orders are terminal. Server-side enforcement: UI restrictions alone are
+// insufficient. Actor semantics are never client-classified: the audit log
+// records actor_type 'customer' + the AUTHENTICATED phone (from the OTP
+// session — never from the request body) with a [CUSTOMER_CANCEL] note, so
+// CUSTOMER_CANCEL stays distinct from BRANCH_REJECT, BRANCH_TIMEOUT,
+// SYSTEM_CANCEL, and PAYMENT_FAILURE.
+router.post('/orders/:id/cancel', requireCustomerAuth(), (req, res) => {
+  try {
+    const reason = String(req.body.reason || req.body.note || '').trim();
+    const order = db.prepare('SELECT id, status, customer_phone FROM orders WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
+    }
+    if (String(order.customer_phone) !== String(req.customer.phone)) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN_ORDER_OWNERSHIP',
+        message: 'Anda hanya dapat membatalkan pesanan milik Anda sendiri.'
+      });
+    }
+
+    if (order.status !== 'pending') {
+      const hint = order.status === 'confirmed'
+        ? 'Pesanan sudah diterima cabang dan tidak dapat dibatalkan oleh customer pada tahap ini.'
+        : `Pesanan sudah berstatus "${order.status}" dan tidak dapat dibatalkan lagi.`;
+      return res.status(400).json({
+        success: false,
+        status: 'CUSTOMER_CANCEL_NOT_ALLOWED',
+        error: hint
+      });
+    }
+
+    const result = OrderStateMachine.transition({
+      order_id: order.id,
+      target_status: 'cancelled',
+      actor_type: 'customer',
+      actor_id: req.customer.phone,
+      note: `[CUSTOMER_CANCEL]${reason ? ' ' + reason : ''}`,
+      // R11 TOCTOU GUARD: re-validated INSIDE the machine transaction — if a
+      // branch ACCEPT (or timeout) committed between the pre-check above and
+      // this transaction, the order is no longer pending and the cancel must
+      // fail ([STATE_CHANGED]) instead of cancelling an ACCEPTED order.
+      expected_current_status: 'pending'
+    });
+
+    res.json({ success: true, decision: 'customer_cancel', ...result });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
