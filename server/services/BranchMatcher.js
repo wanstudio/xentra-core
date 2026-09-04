@@ -17,6 +17,28 @@ class BranchMatcher {
   static async matchNearestBranch(params) {
     const { brand_id, customer_lat, customer_lng, subtotal = 0, items = [] } = params;
 
+    // C4.3 CUSTOMER LOCATION VALIDATION (server-authoritative input): missing,
+    // non-finite or out-of-range coordinates must fail safely and explicitly —
+    // never silently match on garbage coordinates or a fabricated fallback
+    // location. Range checks are deterministic (lat [-90,90], lng [-180,180]).
+    const latNum = Number(customer_lat);
+    const lngNum = Number(customer_lng);
+    const validLocation =
+      customer_lat != null && customer_lng != null &&
+      customer_lat !== '' && customer_lng !== '' &&
+      Number.isFinite(latNum) && Number.isFinite(lngNum) &&
+      latNum >= -90 && latNum <= 90 &&
+      lngNum >= -180 && lngNum <= 180;
+
+    if (!validLocation) {
+      return {
+        eligible: false,
+        reason: 'Koordinat alamat pengantaran tidak valid.',
+        branch: null,
+        delivery: null
+      };
+    }
+
     // 1. Candidate discovery for delivery matching.
     // C3 CANONICAL-CONSISTENCY NOTE: the SQL predicates below
     //   (brand scope, is_active = 1, is_open_override = 1, is_delivery_active = 1)
@@ -82,6 +104,18 @@ class BranchMatcher {
     }
 
     // 2. Spatial Pre-Filtering (Haversine straight-line filter)
+    // C4.4 CLASSIFICATION: straight-line (Haversine) distance here is a
+    // CANDIDATE OPTIMIZATION ONLY. The authoritative radius decision uses ROAD
+    // distance via DeliveryCalculator below (branch-level max_radius_km from
+    // branch_delivery_settings). The 1.5x pre-filter factor and the existing
+    // defaults (`branch.max_radius_km || 30`, `* 1.5 || 25`) are the current
+    // delivery-policy approximations — kept unchanged, not re-derived here.
+    // C4.8 TOP-N BOUNDARY: only the 3 closest-by-Haversine candidates are road-
+    // evaluated (see loop below). Classification: PERFORMANCE OPTIMIZATION WITH
+    // BOUNDED CORRECTNESS — a candidate ranked 4th+ by straight line whose road
+    // distance is much shorter could in principle be the road-distance winner.
+    // Replacing this ranking requires an approved matching-policy decision
+    // (reported contract gap); it is not silently redesigned here.
     const candidates = branches
       .map((branch) => {
         const straightMeters = RouteService.calculateHaversineMeters(
@@ -102,8 +136,14 @@ class BranchMatcher {
       })
       // Pre-filter out branches whose straight-line distance exceeds 1.5x max radius
       .filter((b) => b.straight_distance_km <= (b.max_delivery_radius_km * 1.5 || 25))
-      // Sort by closest straight-line distance first
-      .sort((a, b) => a.straight_distance_meters - b.straight_distance_meters);
+      // Sort by closest straight-line distance first (deterministic tie-break by id)
+      .sort((a, b) => {
+        const byStraight = a.straight_distance_meters - b.straight_distance_meters;
+        if (byStraight !== 0) return byStraight;
+        const aid = String(a.id);
+        const bid = String(b.id);
+        return aid < bid ? -1 : aid > bid ? 1 : 0;
+      });
 
     if (candidates.length === 0) {
       return {
@@ -159,10 +199,16 @@ class BranchMatcher {
       };
     }
 
-    // Sort by shortest actual road distance
-    eligibleMatches.sort(
-      (a, b) => a.calculation.distance_meters - b.calculation.distance_meters
-    );
+    // C4.7 DETERMINISTIC WINNER: rank eligible branches by shortest actual ROAD
+    // distance, then break ties by branch id — the winner must never depend on
+    // database row order or request iteration order.
+    eligibleMatches.sort((a, b) => {
+      const byDistance = a.calculation.distance_meters - b.calculation.distance_meters;
+      if (byDistance !== 0) return byDistance;
+      const aid = String(a.branch.id);
+      const bid = String(b.branch.id);
+      return aid < bid ? -1 : aid > bid ? 1 : 0;
+    });
 
     const winner = eligibleMatches[0];
 
@@ -185,6 +231,11 @@ class BranchMatcher {
         discount_amount: winner.calculation.discount_amount,
         discount_label: winner.calculation.discount_label,
         final_delivery_fee: winner.calculation.final_delivery_fee,
+        // C4.5 NON-SILENT ROUTING: disclose whether the winning distance/ETA came
+        // from the routing provider or from the Haversine estimate fallback, so a
+        // provider failure can never masquerade as an authoritative route.
+        routing_provider: winner.road_distance.provider || 'osrm',
+        routing_estimated: (winner.road_distance.provider || 'osrm') !== 'osrm',
         estimated_duration_minutes: Math.max(10, Math.round(winner.road_distance.duration_seconds / 60))
       }
     };

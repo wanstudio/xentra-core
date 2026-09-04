@@ -110,7 +110,7 @@ router.get('/brand/branches', (req, res) => {
 // 3. Match Nearest Eligible Branch
 router.post('/delivery/match-branch', async (req, res) => {
   try {
-    const { latitude, longitude, subtotal = 0 } = req.body;
+    const { latitude, longitude, subtotal = 0, items } = req.body;
 
     if (latitude == null || longitude == null) {
       return res.status(400).json({
@@ -119,11 +119,24 @@ router.post('/delivery/match-branch', async (req, res) => {
       });
     }
 
+    // C4.2: when a cart is provided the match is a FULL-CART match — the
+    // matcher (via canonical EligibilityService) only ever selects a branch
+    // able to satisfy the COMPLETE cart, and fails closed otherwise. Items were
+    // previously dropped silently on this route; an explicitly provided
+    // non-array is rejected instead of being ignored.
+    if (items !== undefined && !Array.isArray(items)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Parameter items harus berupa array.'
+      });
+    }
+
     const match = await BranchMatcher.matchNearestBranch({
       brand_id: req.brand_id,
       customer_lat: Number(latitude),
       customer_lng: Number(longitude),
-      subtotal: Number(subtotal)
+      subtotal: Number(subtotal),
+      items: Array.isArray(items) ? items : undefined
     });
 
     res.json({

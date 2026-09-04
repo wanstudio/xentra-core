@@ -1332,3 +1332,77 @@ test('C2 Inventory: isolation, authorization, idempotency and scope guards', asy
   assert.strictEqual(idemLedgerCount, 1);
 });
 
+/* =============================================================================
+   TASK C4 — BRANCH MATCHING (public runtime path)
+   /delivery/match-branch accepts an optional cart and performs FULL-CART
+   matching through canonical EligibilityService: partial-cart branches are
+   excluded, no-branch-fits fails closed, invalid input fails safely.
+   ============================================================================= */
+
+test('C4 API /delivery/match-branch: full-cart matching fails closed when no branch can satisfy the cart', async () => {
+  // Only products assigned to branch_bangjo_barat are eligible there; a
+  // nonexistent product can never be fulfilled -> deterministic fail-closed
+  // BEFORE any routing call (no network dependency).
+  const res = await mockFetch('/api/v1/delivery/match-branch', {
+    method: 'POST',
+    body: JSON.stringify({
+      latitude: -7.2912,
+      longitude: 112.7154,
+      subtotal: 10000,
+      items: [{ id: 'c4_probe_never_assigned', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(data.eligible, false);
+  assert.strictEqual(data.branch, null);
+  assert.ok(/memenuhi seluruh/i.test(data.reason || ''), 'explicit full-cart reason');
+});
+
+test('C4 API /delivery/match-branch: full-cart match selects the branch able to satisfy the cart (RouteService stubbed)', async () => {
+  const RouteService = require('../server/services/RouteService');
+  const original = RouteService.getRoadDistance;
+  RouteService.getRoadDistance = async () => ({ distance_meters: 1500, duration_seconds: 480, provider: 'osrm' });
+  try {
+    const res = await mockFetch('/api/v1/delivery/match-branch', {
+      method: 'POST',
+      body: JSON.stringify({
+        latitude: -7.2912,
+        longitude: 112.7154,
+        subtotal: 35000,
+        items: [{ id: '272', quantity: 1 }] // seeded & assigned to branch_bangjo_barat only
+      })
+    });
+    assert.strictEqual(res.status, 200);
+    const data = await res.json();
+    assert.strictEqual(data.eligible, true, 'cart item is assigned to the seeded branch');
+    assert.strictEqual(data.branch.id, 'branch_bangjo_barat');
+    assert.ok(data.delivery && typeof data.delivery.final_delivery_fee === 'number');
+    assert.strictEqual(data.delivery.routing_provider, 'osrm', 'routing source is disclosed');
+    assert.strictEqual(data.delivery.routing_estimated, false);
+  } finally {
+    RouteService.getRoadDistance = original;
+  }
+});
+
+test('C4 API /delivery/match-branch: invalid input fails safely (400 non-array items, fail-safe invalid coordinates)', async () => {
+  // Explicitly provided non-array items -> deterministic 400 (never silently ignored).
+  const badItems = await mockFetch('/api/v1/delivery/match-branch', {
+    method: 'POST',
+    body: JSON.stringify({ latitude: -7.2912, longitude: 112.7154, items: 'not-an-array' })
+  });
+  assert.strictEqual(badItems.status, 400);
+  assert.ok(/array/i.test((await badItems.json()).error || ''));
+
+  // Out-of-range coordinates -> fail-safe eligible:false (no fabricated match).
+  const badCoords = await mockFetch('/api/v1/delivery/match-branch', {
+    method: 'POST',
+    body: JSON.stringify({ latitude: 999, longitude: 112.7154 })
+  });
+  assert.strictEqual(badCoords.status, 200);
+  const data = await badCoords.json();
+  assert.strictEqual(data.eligible, false);
+  assert.ok(/tidak valid/i.test(data.reason || ''), 'explicit invalid-coordinate reason');
+});
+

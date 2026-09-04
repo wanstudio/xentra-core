@@ -1,4 +1,35 @@
 ## [Unreleased] - 2026-09-04
+### C4 — Branch Matching
+- **Server-authoritative location validation (C4.3)**: `BranchMatcher` now
+  rejects missing, non-finite, or out-of-range customer coordinates with an
+  explicit `eligible:false` reason — invalid input never silently matches on
+  garbage coordinates or a fabricated fallback location.
+- **Deterministic winner (C4.7)**: eligible branches are ranked by shortest
+  ROAD distance; ties (and equal straight-line candidates) are broken by
+  branch id — the winner no longer depends on database row order.
+- **Road distance is the ranking fact (C4.4)**: winner selection uses the
+  routed distance, not straight-line proximity; Haversine remains a documented
+  candidate pre-filter. Radius classification documented: 1.5x straight-line
+  pre-filter + branch-level `max_radius_km` road check are existing
+  delivery-policy approximations, unchanged.
+- **Top-N routing boundary documented (C4.8)**: only the 3 closest-by-
+  Haversine candidates are road-evaluated — classified as a performance
+  optimization with bounded correctness (a 4th+ straight-line candidate with a
+  much shorter road could differ). Not redesigned; flagged as a reported
+  matching-policy gap.
+- **Routing never silent (C4.5/C4.11)**: the winning delivery payload now
+  discloses `routing_provider` and `routing_estimated`, so an OSRM failure
+  falling back to the Haversine estimate can never masquerade as an
+  authoritative route; hard routing failures propagate as explicit errors
+  instead of fabricated successes.
+- **Full-cart matching on the public runtime path (C4.2)**: `POST
+  /delivery/match-branch` now accepts an optional `items` array (previously
+  silently dropped) and performs canonical full-cart matching — partial-cart
+  branches are excluded and a cart no branch can fully satisfy fails closed.
+  An explicitly provided non-array `items` is rejected with 400.
+- **Read-only guarantee (C4.12)**: regression tests prove matching never
+  mutates orders, the inventory ledger, or stock.
+
 ### C3 — Branch/Product Eligibility Boundary
 - **Review pass — cart-level reason contract**: `EligibilityService.evaluateCart()`
   now returns meaningful top-level `reasons` whenever the cart is ineligible —
