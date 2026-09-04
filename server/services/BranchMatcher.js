@@ -1,6 +1,7 @@
 const db = require('../database/db');
 const RouteService = require('./RouteService');
 const DeliveryCalculator = require('./DeliveryCalculator');
+const EligibilityService = require('../../domains/commerce/services/EligibilityService');
 
 class BranchMatcher {
   /**
@@ -39,22 +40,31 @@ class BranchMatcher {
       };
     }
 
-    // P1 FULFILLMENT INTELLIGENCE (LOGIC-02): Filter branches capable of fulfilling 100% cart items
+    // C3 CANONICAL ELIGIBILITY (single decision engine): full-cart eligibility is
+    // decided by EligibilityService (assignment, master active, branch availability
+    // flag, inventory) — never re-implemented inline here.
+    // Core v1 invariant: 1 cart -> 1 fulfillment branch. If NO branch can satisfy
+    // the COMPLETE cart, the match fails closed instead of silently selecting a
+    // branch that cannot fulfill it (no split fulfillment, no automatic rematch).
     if (Array.isArray(items) && items.length > 0) {
-      const eligibleStockBranches = branches.filter((br) => {
-        for (const item of items) {
-          const prodId = item.id || item.product_id;
-          const bp = db.prepare('SELECT stock, is_available FROM branch_products WHERE branch_id = ? AND product_id = ?').get(br.id, prodId);
-          if (!bp || bp.is_available === 0) return false;
-          const reqQty = Number(item.quantity || item.qty || 1);
-          if (bp.stock != null && Number(bp.stock) < reqQty) return false;
-        }
-        return true;
-      });
+      const fullCartBranches = branches.filter((br) =>
+        EligibilityService.evaluateCart({
+          brand_id,
+          branch_id: br.id,
+          items,
+          order_type: 'delivery'
+        }).eligible
+      );
 
-      // If at least one branch can fulfill all items, narrow candidates to them
-      if (eligibleStockBranches.length > 0) {
-        branches = eligibleStockBranches;
+      if (fullCartBranches.length > 0) {
+        branches = fullCartBranches;
+      } else {
+        return {
+          eligible: false,
+          reason: 'Tidak ada cabang yang dapat memenuhi seluruh isi pesanan Anda saat ini.',
+          branch: null,
+          delivery: null
+        };
       }
     }
 

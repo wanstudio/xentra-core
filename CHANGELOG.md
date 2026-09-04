@@ -1,4 +1,35 @@
 ## [Unreleased] - 2026-09-04
+### C3 — Branch/Product Eligibility Boundary
+- **Canonical eligibility engine** (`domains/commerce/services/EligibilityService.js`):
+  one deterministic decision layer answering "can this Branch satisfy this
+  product / the complete cart?" — `evaluateProduct` and `evaluateCart` with
+  fixed evaluation order and stable reason codes
+  (`BRANCH_NOT_FOUND/BRANCH_NOT_ACTIVE/BRANCH_CLOSED/`
+  `FULFILLMENT_NOT_SUPPORTED/PRODUCT_NOT_FOUND/PRODUCT_INACTIVE/`
+  `PRODUCT_NOT_ASSIGNED/PRODUCT_UNAVAILABLE/INSUFFICIENT_STOCK/`
+  `INVALID_QUANTITY/INVALID_CART`). Cross-brand/cross-org inputs fail closed
+  (`BRANCH_NOT_FOUND`/`PRODUCT_NOT_FOUND`) so tenant existence never leaks.
+  The engine only decides eligibility — it never selects a branch, never does
+  routing/ETA/delivery pricing, never mutates or reserves stock.
+- **BranchMatcher consumes the canonical engine**: the inline per-branch
+  stock/assignment re-implementation was removed; delivery candidates are now
+  narrowed through `EligibilityService.evaluateCart`. NULL stock is treated as
+  0 (matching CatalogService/InventoryStockService/PrePaymentVerificationGate)
+  instead of the previous matcher behavior that silently treated unrecorded
+  stock as unlimited.
+- **Full-cart invariant enforced (no split fulfillment)**: when items are
+  provided and NO branch can satisfy the COMPLETE cart, the match now fails
+  closed with an explicit reason instead of silently selecting the nearest
+  branch that cannot fulfill it (Core v1 = 1 cart → 1 fulfillment branch).
+- **Consumer layering documented**: CatalogService remains presentation
+  availability (`is_available`), PrePaymentVerificationGate keeps its stronger
+  final Pay-time checks (same facts + pricing/promotion), and BranchMatcher
+  uses the canonical eligibility result — no duplicate eligibility rule set.
+- **Reported gaps (not invented)**: `dine_in`/`reservation` have no capability
+  flag in the schema, so the engine does not fabricate or substitute one for
+  them; operating hours/schedule remain unimplemented (`is_open_override` is
+  the only authoritative open/close fact).
+
 ### C2 — Branch Inventory Boundary
 - **Atomic guarded stock mutation** (`InventoryStockService.recordMovement`):
   replaced the read→compute→write pattern with a single guarded conditional
