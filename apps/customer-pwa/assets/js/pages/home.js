@@ -17,6 +17,21 @@
   var products = [];
   var activeCategory = null;
 
+  // ── P2 Fast Branch Discovery state ──
+  // Home is DISCOVERY only: it presents nearby branches and records the
+  // customer's branch context. It never resolves the authoritative fulfillment
+  // branch (that happens at Checkout/Core with fresh validation).
+  var branches = [];
+  var branchListError = false;
+  var activeBranch = null;          // customer-selected (or sole) branch context
+  var discoveryOrigin = null;       // { latitude, longitude } discovery signal
+  var gpsAttempted = false;         // GPS is a lightweight signal, tried at most once per load
+  var DISCOVERY_CACHE_KEY = 'xentra_branches_cache';
+  // ── P3 Product/Catalog ──
+  // Stale-response guard: a branch-menu request that arrives after a newer one
+  // superseded it must never overwrite the visible catalog (identity preserved).
+  var catalogLoadSeq = 0;
+
   var DEFAULT_CATALOG = {
     categories: [
       { id: 34, name: 'Rekom', slug: 'rekom', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', products: [
@@ -247,6 +262,283 @@
   }
 
   // ======================================================================
+  //  P2 FAST BRANCH DISCOVERY
+  //  Home renders instantly, then resolves discovery in the background:
+  //  cached branches first → destination context → cheap proximity ordering →
+  //  fresh API data replaces it. No road routing, ETA, delivery-cost, payment,
+  //  stock, eligibility, or acceptance calls are made from Home.
+  // ======================================================================
+  function branchContextOf(branch) {
+    return {
+      branch_id: (branch && branch.id) || null,
+      branch_name: (branch && branch.name) || null
+    };
+  }
+
+  function saveDiscoveryCache(list) {
+    try { localStorage.setItem(DISCOVERY_CACHE_KEY, JSON.stringify(list)); } catch (_) {}
+  }
+
+  function readDiscoveryCache() {
+    try {
+      var raw = localStorage.getItem(DISCOVERY_CACHE_KEY);
+      var list = raw ? JSON.parse(raw) : null;
+      return Array.isArray(list) ? list : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Destination context REUSES the existing single location state (Store
+  // `location`, entered through the Checkout address sheet). Lightweight GPS
+  // (location.js) is only a discovery SIGNAL when no destination is saved —
+  // never delivery authority.
+  function setDiscoveryOrigin(origin) {
+    if (!origin) return;
+    var lat = Number(origin.latitude);
+    var lng = Number(origin.longitude);
+    if (isNaN(lat) || isNaN(lng)) return;
+    discoveryOrigin = { latitude: lat, longitude: lng };
+    if (branches.length) {
+      branches = (window.Xentra.Discovery || {}).orderBranches
+        ? window.Xentra.Discovery.orderBranches(branches, discoveryOrigin)
+        : branches;
+      renderBranchDiscovery();
+    }
+  }
+
+  function resolveDiscoveryContext() {
+    // 1. Reuse existing destination context (one location state only).
+    var loc = null;
+    try { loc = Store.getState().location; } catch (_) {}
+    if (loc && loc.latitude != null && loc.longitude != null) {
+      setDiscoveryOrigin({ latitude: loc.latitude, longitude: loc.longitude });
+      return;
+    }
+
+    // 2. Lightweight GPS as a discovery signal (non-blocking, once per load).
+    if (gpsAttempted) return;
+    gpsAttempted = true;
+    if (!window.XentraLocation || typeof window.XentraLocation.getCurrentPosition !== 'function') return;
+    window.XentraLocation.getCurrentPosition().then(function (pos) {
+      if (pos && pos.lat != null && pos.lng != null) {
+        setDiscoveryOrigin({ latitude: pos.lat, longitude: pos.lng });
+      }
+    }).catch(function () {
+      // Permission denied / unavailable → keep server order, never fabricate distances.
+    });
+  }
+
+  function applyBranchDiscovery(raw) {
+    var list = Array.isArray(raw) ? raw : [];
+    list = list.filter(function (b) {
+      return b && b.id && b.is_active !== 0;
+    });
+    branches = (window.Xentra.Discovery || {}).orderBranches
+      ? window.Xentra.Discovery.orderBranches(list, discoveryOrigin || undefined)
+      : list;
+    branchListError = false;
+
+    if (branches.length === 1) {
+      // Exactly 1 relevant Branch → hide the discovery UI and directly render
+      // the catalog for that Branch context; preserve the context internally
+      // for catalog/Cart/Checkout later authoritative validation (contract).
+      setActiveBranch(branches[0], true);
+    } else if (branches.length > 1) {
+      // Re-confirm the previous selection is still present; otherwise require
+      // an explicit selection (the first displayed Branch is NOT an
+      // authoritative fulfillment Branch).
+      if (activeBranch && !branches.some(function (b) { return String(b.id) === String(activeBranch.id); })) {
+        activeBranch = null;
+        try { Store.setBranchContext(null); } catch (_) {}
+      }
+      renderBranchDiscovery();
+    } else {
+      activeBranch = null;
+      try { Store.setBranchContext(null); } catch (_) {}
+      renderBranchDiscovery();
+    }
+  }
+
+  function setActiveBranch(branch, quiet) {
+    activeBranch = branch || null;
+    try { Store.setBranchContext(activeBranch ? branchContextOf(activeBranch) : null); } catch (_) {}
+    renderBranchDiscovery();
+    // P3: the catalog follows the customer-visible branch selection (the same
+    // branchContext that gates cart provenance). The brand-wide menu stays until
+    // the branch-scoped menu arrives; the selection is never silently re-scoped
+    // by the client.
+    loadCatalog(activeBranch ? activeBranch.id : null);
+    if (activeBranch && !quiet && UI && typeof UI.toast === 'function') {
+      UI.toast('Kamu memesan dari ' + activeBranch.name);
+    }
+  }
+
+  function formatDistance(km) {
+    if (km == null || isNaN(km)) return '';
+    if (km < 1) {
+      return Math.max(50, Math.round(km * 1000 / 50) * 50).toLocaleString('id-ID') + ' m';
+    }
+    return (km % 1 === 0 ? km.toFixed(0) : km.toFixed(1)).replace('.', ',') + ' km';
+  }
+
+  function renderBranchDiscovery() {
+    var container = $('x-branch-discovery');
+    if (!container) return;
+
+    if (!branches.length) {
+      if (branchListError) {
+        container.hidden = false;
+        container.innerHTML =
+          '<div class="x-branch-card x-branch-card-error">' +
+          '  <div class="x-branch-empty-title">Cabang tidak dapat dimuat</div>' +
+          '  <div class="x-branch-empty-sub">Coba lagi nanti. Kamu tetap bisa melihat menu di bawah.</div>' +
+          '</div>';
+      } else {
+        container.hidden = true;
+        container.innerHTML = '';
+      }
+      return;
+    }
+
+    if (branches.length === 1) {
+      // Hide discovery section + heading; catalog already renders for the sole
+      // Branch context (contract: exactly 1 Branch → no discovery UI).
+      container.hidden = true;
+      container.innerHTML = '';
+      return;
+    }
+
+    container.hidden = false;
+
+    var noLocationNote = (discoveryOrigin == null)
+      ? '<div class="x-branch-loc-note">Aktifkan lokasimu untuk mengurutkan cabang terdekat.</div>'
+      : '';
+
+    var html =
+      '<div class="x-branch-head">Cabang terdekat dari tempatmu</div>' +
+      noLocationNote +
+      '<div class="x-branch-list">';
+
+    branches.forEach(function (b) {
+      var isActive = activeBranch && String(activeBranch.id) === String(b.id);
+      var distance = formatDistance(b._distance_km);
+      var distHtml = distance ? '<span class="x-branch-distance">' + distance + '</span>' : '';
+      var address = b.address_text || b.address || '';
+
+      var caps = '';
+      if (b.is_delivery_active) caps += '<span class="x-branch-chip">Dikirim</span>';
+      if (b.is_pickup_active) caps += '<span class="x-branch-chip">Diambil</span>';
+
+      html +=
+        '<button type="button" class="x-branch-card' + (isActive ? ' is-active' : '') + '" data-branch-id="' + UI.escape(String(b.id)) + '">' +
+        '  <span class="x-branch-card-name">' + UI.escape(b.name || '') + '</span>' +
+        (address ? '<span class="x-branch-card-address">' + UI.escape(address) + '</span>' : '') +
+        '  <span class="x-branch-card-meta">' +
+        (distHtml || '') +
+        (caps ? '<span class="x-branch-chips">' + caps + '</span>' : '') +
+        '  </span>' +
+        '<span class="x-branch-card-cta">' + (isActive ? 'Menu di bawah untuk cabang ini' : 'Lihat menu cabang ini') + '</span>' +
+        '</button>';
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+
+    container.querySelectorAll('[data-branch-id]').forEach(function (btn) {
+      btn.onclick = function () {
+        var found = branches.find(function (b) { return String(b.id) === String(btn.dataset.branchId); });
+        if (found) setActiveBranch(found, false);
+      };
+    });
+  }
+
+  function initBranchDiscovery() {
+    // 1. Fast first paint from cached branch data when available.
+    var cached = readDiscoveryCache();
+    if (Array.isArray(cached) && cached.length) {
+      applyBranchDiscovery(cached);
+    }
+
+    // 2. Lightweight, non-blocking destination context.
+    resolveDiscoveryContext();
+
+    // 3. Background refresh with authoritative branch data (cheap DB query).
+    API.get('/brand/branches')
+      .then(function (res) {
+        if (res && res.success && Array.isArray(res.branches) && res.branches.length) {
+          saveDiscoveryCache(res.branches);
+          applyBranchDiscovery(res.branches);
+        } else if (!branches.length) {
+          branchListError = true;
+          renderBranchDiscovery();
+        }
+      })
+      .catch(function (err) {
+        console.warn('[Home] Branch discovery network warn:', err);
+        if (!branches.length) {
+          branchListError = true;
+          renderBranchDiscovery();
+        }
+      });
+  }
+
+  function refreshDiscovery() {
+    resolveDiscoveryContext();
+    if (branches.length) renderBranchDiscovery();
+  }
+
+  // ======================================================================
+  //  P3 CATALOG LOADING (brand-wide fast path + branch-scoped when context set)
+  //  The branch list / selection only ever forwards the customer's branch id to
+  //  the existing backend; availability/stock/pricing stay server-canonical.
+  // ======================================================================
+  function applyCatalog(data) {
+    if (!data || !Array.isArray(data.categories) || !data.categories.length) return;
+    categories = data.categories;
+
+    var rekom = categories.find(function (c) {
+      return String(c.name).trim().toLowerCase() === 'rekom';
+    });
+    var initialCat = rekom || categories[0];
+    activeCategory = initialCat.id;
+    products = (initialCat.products && initialCat.products.length > 0) ? initialCat.products : [];
+
+    renderCategories();
+
+    if (products.length > 0) {
+      renderProducts();
+    } else {
+      loadProducts(activeCategory);
+    }
+  }
+
+  function loadCatalog(branchId) {
+    var seq = ++catalogLoadSeq;
+    var path = branchId ? '/catalog/menu?branch_id=' + encodeURIComponent(branchId) : '/catalog/menu';
+
+    API.get(path)
+      .then(function (data) {
+        if (seq !== catalogLoadSeq) return; // superseded by a newer catalog load
+        if (data && data.success && data.categories && data.categories.length > 0) {
+          if (!branchId) {
+            try { localStorage.setItem('xentra_catalog_cache', JSON.stringify(data)); } catch (_) {}
+          }
+          applyCatalog(data);
+        } else if (!categories.length) {
+          applyCatalog(DEFAULT_CATALOG);
+        }
+      })
+      .catch(function (err) {
+        if (seq !== catalogLoadSeq) return; // superseded by a newer catalog load
+        console.warn('[Home] Load catalog network warn:', err);
+        if (!categories.length) {
+          applyCatalog(DEFAULT_CATALOG);
+        }
+      });
+  }
+
+  // ======================================================================
   //  CATEGORIES
   // ======================================================================
   function renderCategories() {
@@ -351,12 +643,21 @@
       var image = product.image_url || product.image || '';
       var desc = product.description || '';
 
+      // P3: branch-level availability is a SERVER-computed flag (is_available is
+      // only present on branch-scoped menus). The client merely presents it.
+      var unavailable = !!activeBranch && product.is_available === false;
+
       var card = document.createElement('article');
-      card.className = 'x-product';
+      card.className = 'x-product' + (unavailable ? ' x-product-unavailable' : '');
       card.setAttribute('data-product-card', String(product.id));
+      card.onclick = function () { openProductDetail(product); };
 
       var oldPriceHtml = regPrice > price
         ? '<div class="x-old-price">' + UI.money(regPrice) + '</div>'
+        : '';
+
+      var unavailableTag = unavailable
+        ? '<div class="x-unavailable-tag">Tidak tersedia di cabang ini</div>'
         : '';
 
       var controls = '';
@@ -372,6 +673,8 @@
           '  <img src="' + noteIcon + '" alt="Catatan" class="x-note-icon">' +
           '  Catatan' +
           '</button>';
+      } else if (unavailable) {
+        controls = '<span class="x-unavailable-label">Tidak tersedia</span>';
       } else {
         controls = '<button type="button" class="x-add" data-add="' + product.id + '">Tambah</button>';
       }
@@ -380,6 +683,7 @@
         '<div class="x-product-info">' +
         '  <div class="x-product-name">' + UI.escape(product.name) + '</div>' +
         '  <div class="x-product-description">' + UI.escape(desc) + '</div>' +
+        unavailableTag +
         '  <div class="x-price">' + oldPriceHtml +
         '    <div class="x-current-price">' + UI.money(price) + '</div>' +
         '  </div>' +
@@ -428,11 +732,12 @@
 
   function bindProductEvents() {
     document.querySelectorAll('[data-add]').forEach(function (btn) {
-      btn.onclick = function () {
+      btn.onclick = function (e) {
+        e.stopPropagation();
         var pid = btn.dataset.add;
         var p = products.find(function (x) { return String(x.id) === String(pid); });
         if (p) {
-          Store.addItem(p, 1);
+          Store.addItem(p, 1, activeBranch ? branchContextOf(activeBranch) : undefined);
           renderProducts();
           renderCartDock();
           ensureCardVisible(pid);
@@ -441,7 +746,8 @@
     });
 
     document.querySelectorAll('[data-plus]').forEach(function (btn) {
-      btn.onclick = function () {
+      btn.onclick = function (e) {
+        e.stopPropagation();
         var pid = btn.dataset.plus;
         var item = Store.findCartItem(pid);
         if (item) {
@@ -454,7 +760,8 @@
     });
 
     document.querySelectorAll('[data-minus]').forEach(function (btn) {
-      btn.onclick = function () {
+      btn.onclick = function (e) {
+        e.stopPropagation();
         var pid = btn.dataset.minus;
         var item = Store.findCartItem(pid);
         if (item) {
@@ -466,7 +773,8 @@
     });
 
     document.querySelectorAll('[data-note]').forEach(function (btn) {
-      btn.onclick = function () {
+      btn.onclick = function (e) {
+        e.stopPropagation();
         openNote(btn.dataset.note);
       };
     });
@@ -556,6 +864,131 @@
     }
   }
   var openNoteSheet = openNote;
+
+  // ======================================================================
+  //  P3 PRODUCT DETAIL SHEET
+  //  Bottom-sheet presentation of product identity + the ACTIVE branch context.
+  //  It only ever re-uses the existing store's add-to-cart path (same
+  //  provenance rules); it never resolves fulfillment/eligibility/payment and
+  //  never creates an order or a fulfillment_branch_id from this page. Close
+  //  is registered on the shared navigation stack so Back closes it first
+  //  (same contract as the note sheet).
+  // ======================================================================
+  function openProductDetail(product) {
+    if (!product || !product.id) return;
+
+    var branchCtx = activeBranch ? branchContextOf(activeBranch) : null;
+    var unavailable = !!activeBranch && product.is_available === false;
+    var price = Number(product.price || 0);
+    var regPrice = Number(product.regular_price || price);
+    var image = product.image_url || product.image || '';
+
+    var scopedQty = 0;
+    try {
+      if (branchCtx) {
+        scopedQty = Store.getCartItemsForBranch(branchCtx.branch_id)
+          .filter(function (i) { return String(i.id) === String(product.id); })
+          .reduce(function (sum, i) { return sum + Number(i.quantity || 0); }, 0);
+      } else {
+        var existing = Store.findCartItem(product.id);
+        scopedQty = existing ? Number(existing.quantity || 0) : 0;
+      }
+    } catch (_) {}
+
+    var imgHtml = image
+      ? '<div class="x-detail-image-wrap"><img src="' + UI.escape(image) + '" alt="' + UI.escape(product.name) + '"></div>'
+      : '';
+    var oldPriceHtml = regPrice > price
+      ? '<span class="x-detail-old-price">' + UI.money(regPrice) + '</span>'
+      : '';
+    var availabilityHtml = unavailable
+      ? '<div class="x-unavailable-tag">Tidak tersedia di cabang ini</div>'
+      : '';
+    var branchLabelHtml = branchCtx
+      ? '<div class="x-detail-branch">' + UI.escape(branchCtx.branch_name || '') + '</div>'
+      : '';
+    var cartHint = scopedQty > 0
+      ? '<div class="x-detail-cart-hint">Sudah ada <strong>' + scopedQty + '</strong> di keranjang untuk cabang ini.</div>'
+      : '';
+
+    var overlay = document.createElement('div');
+    overlay.className = 'x-overlay x-note-overlay x-detail-overlay';
+    overlay.innerHTML =
+      '<div class="x-sheet x-note-sheet x-detail-sheet">' +
+      '  <div class="x-note-handle"></div>' +
+      '  <button type="button" class="x-detail-close" aria-label="Tutup">&times;</button>' +
+      imgHtml +
+      '  <div class="x-detail-body">' +
+      '    <h3 class="x-detail-name">' + UI.escape(product.name) + '</h3>' +
+      branchLabelHtml +
+      '    <div class="x-detail-desc">' + UI.escape(product.description || '') + '</div>' +
+      availabilityHtml +
+      '    <div class="x-detail-price">' + oldPriceHtml + '<span class="x-detail-current">' + UI.money(price) + '</span></div>' +
+      '    <div class="x-detail-add-area">' +
+      (unavailable
+        ? '<button type="button" class="x-detail-add" disabled>Tidak tersedia</button>'
+        : '<button type="button" class="x-detail-add">' + (scopedQty > 0 ? 'Tambah lagi' : 'Masukkan ke keranjang') + '</button>') +
+      cartHint +
+      '    </div>' +
+      '  </div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+    void overlay.offsetHeight;
+    requestAnimationFrame(function () {
+      overlay.classList.add('open');
+    });
+
+    var isClosing = false;
+    function close() {
+      if (isClosing) return;
+      isClosing = true;
+      overlay.classList.remove('open');
+      setTimeout(function () {
+        if (overlay.parentNode) overlay.remove();
+      }, 380);
+    }
+
+    if (window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
+      window.XentraNav.pushClose(close);
+    }
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) {
+        if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+          window.XentraNav.close();
+        } else {
+          close();
+        }
+      }
+    });
+
+    var closeBtn = overlay.querySelector('.x-detail-close');
+    if (closeBtn) closeBtn.onclick = function () {
+      if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+        window.XentraNav.close();
+      } else {
+        close();
+      }
+    };
+
+    var addBtn = overlay.querySelector('.x-detail-add');
+    if (addBtn && !addBtn.disabled) {
+      addBtn.onclick = function () {
+        Store.addItem(product, 1, branchCtx || undefined);
+        if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+          window.XentraNav.close();
+        } else {
+          close();
+        }
+        renderProducts();
+        renderCartDock();
+        if (UI && typeof UI.toast === 'function') {
+          UI.toast('Ditambahkan ke keranjang');
+        }
+      };
+    }
+  }
 
   // ======================================================================
   //  CART DOCK
@@ -754,26 +1187,6 @@
     // Carousel
     initCarousel();
 
-    function applyCatalog(data) {
-      if (!data || !Array.isArray(data.categories) || !data.categories.length) return;
-      categories = data.categories;
-      
-      var rekom = categories.find(function (c) {
-        return String(c.name).trim().toLowerCase() === 'rekom';
-      });
-      var initialCat = rekom || categories[0];
-      activeCategory = initialCat.id;
-      products = (initialCat.products && initialCat.products.length > 0) ? initialCat.products : [];
-
-      renderCategories();
-      
-      if (products.length > 0) {
-        renderProducts();
-      } else {
-        loadProducts(activeCategory);
-      }
-    }
-
     // 1. Render catalog immediately on page boot (Zero white screen / Zero loading delay)
     try {
       var rawCached = localStorage.getItem('xentra_catalog_cache');
@@ -787,22 +1200,17 @@
       applyCatalog(DEFAULT_CATALOG);
     }
 
-    // 2. Fetch fresh catalog from API in background
-    API.get('/catalog/menu')
-      .then(function (data) {
-        if (data && data.success && data.categories && data.categories.length > 0) {
-          try { localStorage.setItem('xentra_catalog_cache', JSON.stringify(data)); } catch (_) {}
-          applyCatalog(data);
-        } else if (!categories.length) {
-          applyCatalog(DEFAULT_CATALOG);
-        }
-      })
-      .catch(function (err) {
-        console.warn('[Home] Load catalog network warn:', err);
-        if (!categories.length) {
-          applyCatalog(DEFAULT_CATALOG);
-        }
-      });
+    // 2. Fetch fresh catalog in background. When a branch context survived a
+    // reload, the catalog follows that same context (server-scoped menu).
+    var bootBranchId = null;
+    try {
+      var persistedCtx = Store.getState().branchContext;
+      if (persistedCtx && persistedCtx.branch_id != null) bootBranchId = persistedCtx.branch_id;
+    } catch (_) {}
+    loadCatalog(bootBranchId);
+
+    // P2: Branch discovery (fast, non-blocking — presentation only).
+    initBranchDiscovery();
 
     // Discover install incentive for anonymous browser guests.
     initInstallPromo();
@@ -861,6 +1269,14 @@
       if ($('x-sheet') && $('x-sheet').classList.contains('open')) {
         renderCartSheetItems();
       }
+      refreshDiscovery();
+    },
+    selectBranch: function (branchId) {
+      var found = branches.find(function (b) { return String(b.id) === String(branchId); });
+      if (found) setActiveBranch(found, false);
+    },
+    getBranches: function () {
+      return branches;
     }
   };
 })();

@@ -350,7 +350,9 @@
     if (storeState.customerSession) {
       state.customer.phone = storeState.customerSession.phone || '';
       state.customer.name = storeState.customerSession.name || state.customer.name;
-      state.customer.isVerified = true;
+      var hasValidToken = storeState.customerSession.token &&
+        storeState.customerSession.token.indexOf('xnt_cust_') === 0;
+      state.customer.isVerified = !!hasValidToken;
     }
 
     // Restore location
@@ -416,8 +418,24 @@
     API.get('/brand/branches').then(function (res) {
       if (res && res.success && Array.isArray(res.branches)) {
         availableBranches = res.branches;
-        if (!state.matchedBranch && availableBranches.length > 0) {
-          state.matchedBranch = availableBranches[0];
+        if (!state.matchedBranch) {
+          // P2 HOME DISCOVERY CONTEXT: a Home-selected branch prefills the
+          // checkout branch (customer-selected). It is still authoritatively
+          // re-validated by Core at clarify/submit; it is never AUTO-resolved
+          // and never silently rematched. The bare availableBranches[0]
+          // fallback only survives when there is no branch context at all.
+          var ctx = null;
+          try { ctx = Store.getState().branchContext; } catch (_) {}
+          if (ctx && (ctx.branch_id != null || ctx.id != null)) {
+            var ctxId = ctx.branch_id != null ? ctx.branch_id : ctx.id;
+            var fromCtx = availableBranches.find(function (b) {
+              return String(b.id) === String(ctxId);
+            });
+            state.matchedBranch = fromCtx || null;
+          }
+          if (!state.matchedBranch && availableBranches.length > 0) {
+            state.matchedBranch = availableBranches[0];
+          }
         }
       }
     }).catch(function () {});
@@ -1134,40 +1152,157 @@
     };
   }
 
-  // ── 2. Customer Auth / Phone Sheet ──
+  // ── 2. Customer Auth / OTP Verification Sheet ──
+  // Two-step flow: phone entry → OTP entry. Server OTP endpoints are the sole
+  // authority for customer identity. Client never generates tokens.
   function openCustomerAuthSheet() {
+    renderOtpPhoneStep(state.customer.phone || '', state.customer.name || '');
+  }
+
+  function renderOtpPhoneStep(phone, name) {
     var sh = makeOverlay(
-      '<h3 class="x-alt-sheet-title">Data Diri Pemesan</h3>' +
-      '<div style="font-size:13px;color:#6b7280;margin-bottom:12px;">Masukkan nama dan nomor WhatsApp aktif untuk notifikasi pesanan.</div>' +
+      '<h3 class="x-alt-sheet-title">Verifikasi Nomor WhatsApp</h3>' +
+      '<div style="font-size:13px;color:#6b7280;margin-bottom:12px;">Masukkan nomor WhatsApp aktif untuk menerima kode verifikasi.</div>' +
       '<div class="x-alt-sheet-label">Nama Lengkap</div>' +
-      '<input type="text" id="x-input-cust-name" class="x-alt-input" placeholder="Contoh: Budi Santoso" value="' + UI.escape(state.customer.name || '') + '">' +
+      '<input type="text" id="x-otp-input-name" class="x-alt-input" placeholder="Contoh: Budi Santoso" value="' + UI.escape(name) + '">' +
       '<div class="x-alt-sheet-label" style="margin-top:10px;">Nomor WhatsApp</div>' +
-      '<input type="tel" id="x-input-cust-phone" class="x-alt-input" placeholder="081234567890" value="' + UI.escape(state.customer.phone || '') + '">' +
-      '<button type="button" class="x-alt-submit-btn" id="x-save-customer" style="margin-top:16px;">Simpan Data</button>'
+      '<input type="tel" id="x-otp-input-phone" class="x-alt-input" placeholder="081234567890" value="' + UI.escape(phone) + '">' +
+      '<button type="button" class="x-alt-submit-btn" id="x-otp-send-btn" style="margin-top:16px;">Kirim Kode OTP</button>'
     );
 
-    sh.overlay.querySelector('#x-save-customer').onclick = function () {
-      var n = sh.overlay.querySelector('#x-input-cust-name').value.trim();
-      var p = sh.overlay.querySelector('#x-input-cust-phone').value.trim();
+    var sendBtn = sh.overlay.querySelector('#x-otp-send-btn');
+
+    sendBtn.onclick = function () {
+      var n = sh.overlay.querySelector('#x-otp-input-name').value.trim();
+      var p = sh.overlay.querySelector('#x-otp-input-phone').value.trim();
 
       if (!p) {
         if (UI && UI.toast) UI.toast('Nomor WhatsApp wajib diisi.');
         return;
       }
 
-      state.customer.name = n || 'Pelanggan';
-      state.customer.phone = p;
-      state.customer.isVerified = true;
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Mengirim kode…';
 
-      Store.setCustomerSession({
-        phone: p,
-        name: state.customer.name,
-        token: 'cust_' + Date.now()
+      API.post('/auth/otp/send', { phone: p }).then(function (res) {
+        if (res && res.success && res.challenge_id) {
+          sh.close();
+          renderOtpVerifyStep(p, n || 'Pelanggan', res.challenge_id, res.retry_after || 60);
+        } else {
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Kirim Kode OTP';
+          if (UI && UI.toast) UI.toast((res && res.message) || 'Gagal mengirim kode OTP.');
+        }
+      }).catch(function () {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Kirim Kode OTP';
+        if (UI && UI.toast) UI.toast('Gagal mengirim kode OTP. Periksa koneksi Anda.');
       });
+    };
+  }
 
-      sh.close();
-      renderLayout();
-      calculateTotals();
+  function renderOtpVerifyStep(phone, name, challengeId, retryAfter) {
+    var sh = makeOverlay(
+      '<h3 class="x-alt-sheet-title">Masukkan Kode OTP</h3>' +
+      '<div style="font-size:13px;color:#6b7280;margin-bottom:12px;">Kode verifikasi telah dikirim ke <b>' + UI.escape(phone) + '</b>.</div>' +
+      '<div class="x-alt-sheet-label">Kode OTP (6 digit)</div>' +
+      '<input type="tel" id="x-otp-input-code" class="x-alt-input" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="letter-spacing:6px;text-align:center;font-size:18px;font-weight:700;">' +
+      '<button type="button" class="x-alt-submit-btn" id="x-otp-verify-btn" style="margin-top:16px;">Verifikasi</button>' +
+      '<button type="button" id="x-otp-resend-btn" style="width:100%;margin-top:12px;padding:10px;border:0;background:transparent;color:#6b7280;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Kirim Ulang OTP</button>'
+    );
+
+    var verifyBtn = sh.overlay.querySelector('#x-otp-verify-btn');
+    var resendBtn = sh.overlay.querySelector('#x-otp-resend-btn');
+    var codeInput = sh.overlay.querySelector('#x-otp-input-code');
+    var countdown = retryAfter;
+    var countdownTimer = null;
+
+    function startCountdown(seconds) {
+      countdown = seconds;
+      resendBtn.disabled = true;
+      function tick() {
+        if (countdown <= 0) {
+          resendBtn.disabled = false;
+          resendBtn.textContent = 'Kirim Ulang OTP';
+          return;
+        }
+        resendBtn.textContent = 'Kirim Ulang OTP (' + countdown + ' detik)';
+        countdown--;
+        countdownTimer = setTimeout(tick, 1000);
+      }
+      tick();
+    }
+
+    startCountdown(countdown);
+
+    if (codeInput) {
+      setTimeout(function () { codeInput.focus(); }, 400);
+    }
+
+    verifyBtn.onclick = function () {
+      var code = codeInput ? codeInput.value.trim() : '';
+
+      if (!code || code.length < 4) {
+        if (UI && UI.toast) UI.toast('Masukkan kode OTP yang valid.');
+        return;
+      }
+
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = 'Memverifikasi…';
+
+      API.post('/auth/otp/verify', {
+        challenge_id: challengeId,
+        otp: code,
+        phone: phone
+      }).then(function (res) {
+        if (res && res.success && res.verified && res.token) {
+          state.customer.phone = phone;
+          state.customer.name = name;
+          state.customer.isVerified = true;
+
+          Store.setCustomerSession({
+            phone: phone,
+            name: name,
+            token: res.token
+          });
+
+          if (countdownTimer) clearTimeout(countdownTimer);
+          sh.close();
+          renderLayout();
+          calculateTotals();
+          if (UI && UI.toast) UI.toast('Nomor WhatsApp berhasil diverifikasi!');
+        } else {
+          verifyBtn.disabled = false;
+          verifyBtn.textContent = 'Verifikasi';
+          if (UI && UI.toast) UI.toast((res && res.message) || 'Kode OTP tidak valid.');
+          if (codeInput) { codeInput.value = ''; codeInput.focus(); }
+        }
+      }).catch(function () {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = 'Verifikasi';
+        if (UI && UI.toast) UI.toast('Gagal memverifikasi. Periksa koneksi Anda.');
+      });
+    };
+
+    resendBtn.onclick = function () {
+      resendBtn.disabled = true;
+      resendBtn.textContent = 'Mengirim…';
+
+      API.post('/auth/otp/send', { phone: phone }).then(function (res) {
+        if (res && res.success && res.challenge_id) {
+          challengeId = res.challenge_id;
+          startCountdown(res.retry_after || 60);
+          if (UI && UI.toast) UI.toast('Kode OTP baru telah dikirim.');
+        } else {
+          resendBtn.disabled = false;
+          resendBtn.textContent = 'Kirim Ulang OTP';
+          if (UI && UI.toast) UI.toast((res && res.message) || 'Gagal mengirim ulang OTP.');
+        }
+      }).catch(function () {
+        resendBtn.disabled = false;
+        resendBtn.textContent = 'Kirim Ulang OTP';
+        if (UI && UI.toast) UI.toast('Gagal mengirim ulang OTP. Periksa koneksi Anda.');
+      });
     };
   }
 
@@ -1343,6 +1478,13 @@
 
     if (!state.customer.phone) {
       if (UI && UI.toast) UI.toast('Silakan masukkan nomor WhatsApp pemesan.');
+      openCustomerAuthSheet();
+      return;
+    }
+
+    var activeSession = Store.getState().customerSession;
+    if (!activeSession || !activeSession.token || activeSession.token.indexOf('xnt_cust_') !== 0) {
+      if (UI && UI.toast) UI.toast('Silakan verifikasi nomor WhatsApp Anda terlebih dahulu.');
       openCustomerAuthSheet();
       return;
     }

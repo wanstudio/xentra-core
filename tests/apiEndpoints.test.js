@@ -74,6 +74,21 @@ async function mockFetch(path, options = {}) {
   });
 }
 
+// Helper: Create an OTP-verified customer session token
+async function createCustomerSession(phone) {
+  const otpRes = await mockFetch('/api/v1/auth/otp/send', {
+    method: 'POST',
+    body: JSON.stringify({ phone })
+  });
+  const otpData = await otpRes.json();
+  const verifyRes = await mockFetch('/api/v1/auth/otp/verify', {
+    method: 'POST',
+    body: JSON.stringify({ challenge_id: otpData.challenge_id, otp: '123456', phone })
+  });
+  const verifyData = await verifyRes.json();
+  return verifyData.token;
+}
+
 test.beforeEach(() => {
   db.prepare(`UPDATE brands SET primary_color = '#b6ff00' WHERE id = 'brand_bangjo'`).run();
 });
@@ -98,6 +113,8 @@ test('API GET /api/v1/catalog/menu: returns categories and active menu items', a
 });
 
 test('API POST /api/v1/checkout/create-order: validates items and creates order snapshot (Online Midtrans)', async () => {
+  const customerToken = await createCustomerSession('081234567890');
+
   const payload = {
     branch_id: 'branch_bangjo_barat',
     payment_method: 'midtrans',
@@ -119,6 +136,7 @@ test('API POST /api/v1/checkout/create-order: validates items and creates order 
 
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify(payload)
   });
 
@@ -141,20 +159,8 @@ test('API POST /api/v1/checkout/create-order: validates items and creates order 
   assert.strictEqual(phoneBypassRes.status, 403, 'Naked phone parameter MUST NOT grant access without OTP session token');
 
   // 3. Verify authorized customer with verified OTP session token gets sanitized projection (NEW-01)
-  const otpRes = await mockFetch('/api/v1/auth/otp/send', {
-    method: 'POST',
-    body: JSON.stringify({ phone: '081234567890' })
-  });
-  const otpData = await otpRes.json();
-  const verifyRes = await mockFetch('/api/v1/auth/otp/verify', {
-    method: 'POST',
-    body: JSON.stringify({ challenge_id: otpData.challenge_id, otp: '123456', phone: '081234567890' })
-  });
-  const verifyData = await verifyRes.json();
-  assert.ok(verifyData.token, 'OTP verify must return customer token');
-
   const orderRes = await mockFetch(`/api/v1/orders/${data.order_id}`, {
-    headers: { 'x-customer-token': verifyData.token }
+    headers: { 'x-customer-token': customerToken }
   });
   assert.strictEqual(orderRes.status, 200);
   const orderData = await orderRes.json();
@@ -167,12 +173,14 @@ test('API POST /api/v1/checkout/create-order: validates items and creates order 
 });
 
 test('API POST /api/v1/checkout/create-order: creates cash order without Midtrans snap token', async () => {
+  const customerToken = await createCustomerSession('081234567891');
+
   const payload = {
     branch_id: 'branch_bangjo_barat',
     payment_method: 'cash',
     customer: {
       name: 'Budi Santoso',
-      phone: '081234567890'
+      phone: '081234567891'
     },
     order_type: 'delivery',
     delivery: {
@@ -187,6 +195,7 @@ test('API POST /api/v1/checkout/create-order: creates cash order without Midtran
 
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify(payload)
   });
 
@@ -200,7 +209,7 @@ test('API POST /api/v1/checkout/create-order: creates cash order without Midtran
   const unallocatedPayload = {
     branch_id: 'branch_bangjo_barat',
     payment_method: 'cash',
-    customer: { name: 'Customer Test', phone: '081234567890' },
+    customer: { name: 'Customer Test', phone: '081234567891' },
     order_type: 'delivery',
     delivery: { address: 'Jl. Darmo', latitude: -7.291230, longitude: 112.716750 },
     items: [{ id: '99999_unallocated_prod', quantity: 1 }]
@@ -208,6 +217,7 @@ test('API POST /api/v1/checkout/create-order: creates cash order without Midtran
 
   const unallocatedRes = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify(unallocatedPayload)
   });
   assert.strictEqual(unallocatedRes.status, 400);
@@ -563,11 +573,13 @@ test('API Reporting RBAC: Branch manager cannot access multi-branch comparison r
 });
 
 test('API Delivery Checkout: Strictly rejects delivery orders without valid coordinates (NEW-02/Pass4)', async () => {
+  const customerToken = await createCustomerSession('081234567892');
+
   // Attempt delivery order with formatted_address only but missing numeric lat/lng -> REJECTED 400
   const invalidCoordsPayload = {
     branch_id: 'branch_bangjo_barat',
     payment_method: 'cash',
-    customer: { name: 'Customer Jauh', phone: '081234567890' },
+    customer: { name: 'Customer Jauh', phone: '081234567892' },
     order_type: 'delivery',
     address: { formatted_address: 'Lokasi Sangat Jauh 50 km' }, // No lat/lng
     items: [{ id: '272', quantity: 1 }]
@@ -575,6 +587,7 @@ test('API Delivery Checkout: Strictly rejects delivery orders without valid coor
 
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify(invalidCoordsPayload)
   });
 
@@ -586,14 +599,16 @@ test('API Delivery Checkout: Strictly rejects delivery orders without valid coor
 
 test('API POS Cash Settlement: POST /api/v1/pos/orders/:id/settle-cash completes lifecycle with auth guard', async () => {
   const db = require('../server/database/db');
+  const customerToken = await createCustomerSession('081234567893');
 
   // 1. Create a cash order via checkout
   const orderRes = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_bangjo_barat',
       payment_method: 'cash',
-      customer: { name: 'Customer Bayar Tunai', phone: '081234567890' },
+      customer: { name: 'Customer Bayar Tunai', phone: '081234567893' },
       order_type: 'pickup',
       items: [{ id: '272', quantity: 1 }]
     })
@@ -1459,9 +1474,11 @@ function csAddBranch(id, { is_active = 1, is_open_override = 1, delivery = 1, pi
 
 test('C4/Checkout CUSTOMER_SELECTED: valid selected branch is used and the order stores exactly one fulfillment branch', async () => {
   csAddBranch('branch_cs_open', { assign272: true });
+  const customerToken = await createCustomerSession('081200000001');
   const before = csOrdersCount();
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_cs_open',
       payment_method: 'cash',
@@ -1482,9 +1499,11 @@ test('C4/Checkout CUSTOMER_SELECTED: closed branch is rejected — no order, NO 
   // branch_cs_closed is closed but fully stocked with product 272; branch_cs_open
   // (open, stocked) also exists — if a rematch happened, this would pick it.
   csAddBranch('branch_cs_closed', { is_open_override: 0, assign272: true });
+  const customerToken = await createCustomerSession('081200000002');
   const before = csOrdersCount();
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_cs_closed',
       payment_method: 'cash',
@@ -1504,8 +1523,10 @@ test('C4/Checkout CUSTOMER_SELECTED: closed branch is rejected — no order, NO 
 
 test('C4/Checkout CUSTOMER_SELECTED: delivery-disabled branch is rejected for a delivery order', async () => {
   csAddBranch('branch_cs_nodelivery', { delivery: 0, pickup: 1, assign272: true });
+  const customerToken = await createCustomerSession('081200000003');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_cs_nodelivery',
       payment_method: 'cash',
@@ -1523,8 +1544,10 @@ test('C4/Checkout CUSTOMER_SELECTED: delivery-disabled branch is rejected for a 
 
 test('C4/Checkout CUSTOMER_SELECTED: cross-brand and inactive branches are rejected (tenant + active scope)', async () => {
   // Cross-brand branch (exists, belongs to another brand) -> 404, never a candidate.
+  const customerTokenCross = await createCustomerSession('081200000004');
   const cross = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerTokenCross },
     body: JSON.stringify({
       branch_id: 'branch_other_co',
       payment_method: 'cash',
@@ -1537,8 +1560,10 @@ test('C4/Checkout CUSTOMER_SELECTED: cross-brand and inactive branches are rejec
 
   // Inactive branch within the brand -> 404 (active state enforced at resolution).
   csAddBranch('branch_cs_inactive', { is_active: 0, assign272: true });
+  const customerTokenInactive = await createCustomerSession('081200000005');
   const inactive = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerTokenInactive },
     body: JSON.stringify({
       branch_id: 'branch_cs_inactive',
       payment_method: 'cash',
@@ -1552,8 +1577,10 @@ test('C4/Checkout CUSTOMER_SELECTED: cross-brand and inactive branches are rejec
 
 test('C4/Checkout CUSTOMER_SELECTED: product not assigned to the selected open branch is rejected (canonical assignment bound)', async () => {
   csAddBranch('branch_cs_noassign', { assign272: false }); // open, but does NOT carry product 272
+  const customerToken = await createCustomerSession('081200000006');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_cs_noassign',
       payment_method: 'cash',
@@ -1573,8 +1600,10 @@ test('C4/Checkout remote/gift delivery: fulfillment branch drives delivery routi
   // location. The order must bind to the SELECTED fulfillment branch and the
   // stored delivery destination must be exactly the one provided — routing
   // originates from the branch, never from a buyer coordinate.
+  const customerToken = await createCustomerSession('081200000007');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_cs_open',
       payment_method: 'cash',
@@ -1607,8 +1636,10 @@ test('C4/Checkout remote/gift delivery: fulfillment branch drives delivery routi
 test('R1 create-order: single-branch checkout whose item provenance matches the checkout branch is accepted', async () => {
   csAddBranch('branch_r1_a', { assign272: true });
   const before = csOrdersCount();
+  const customerToken = await createCustomerSession('081200000010');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r1_a',
       payment_method: 'cash',
@@ -1628,8 +1659,10 @@ test('R1 create-order: single-branch checkout whose item provenance matches the 
 test('R1 create-order: items mixing TWO branch scopes are rejected (CHECKOUT_SINGLE_BRANCH_REQUIRED) — no order', async () => {
   csAddBranch('branch_r1_b', { assign272: true });
   const before = csOrdersCount();
+  const customerToken = await createCustomerSession('081200000011');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r1_a',
       payment_method: 'cash',
@@ -1651,8 +1684,10 @@ test('R1 create-order: items mixing TWO branch scopes are rejected (CHECKOUT_SIN
 
 test('R1 create-order: single provenance contradicting the checkout branch is rejected — no silent re-home', async () => {
   const before = csOrdersCount();
+  const customerToken = await createCustomerSession('081200000012');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r1_a',
       payment_method: 'cash',
@@ -1670,12 +1705,14 @@ test('R1 create-order: single provenance contradicting the checkout branch is re
 });
 
 test('R1 checkout/verify: mixed-branch provenance is rejected at the verify boundary too', async () => {
+  const customerToken = await createCustomerSession('081200000013b');
   const res = await mockFetch('/api/v1/checkout/verify', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r1_a',
       order_type: 'pickup',
-      customer: { name: 'Customer R1 Verify', phone: '081200000013' },
+      customer: { name: 'Customer R1 Verify', phone: '081200000013b' },
       items: [
         { id: '272', quantity: 1, branch_id: 'branch_r1_a' },
         { id: '272', quantity: 1, branch_id: 'branch_r1_b' }
@@ -1690,8 +1727,10 @@ test('R1 checkout/verify: mixed-branch provenance is rejected at the verify boun
 
 test('R1 create-order: legacy items WITHOUT provenance keep working (regression — single-branch flow unchanged)', async () => {
   const before = csOrdersCount();
+  const customerToken = await createCustomerSession('081200000014');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r1_a',
       payment_method: 'cash',
@@ -1710,8 +1749,10 @@ test('R1.5 independent checkouts: failure of one branch checkout does not block 
   // Checkout A targets a closed branch carrying the same product → rejected.
   csAddBranch('branch_r1_closed', { is_open_override: 0, assign272: true });
   const beforeA = csOrdersCount();
+  const customerTokenA = await createCustomerSession('081200000015');
   const aRes = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerTokenA },
     body: JSON.stringify({
       branch_id: 'branch_r1_closed',
       payment_method: 'cash',
@@ -1724,8 +1765,10 @@ test('R1.5 independent checkouts: failure of one branch checkout does not block 
 
   // Checkout B (open branch, same product) succeeds independently right after.
   const beforeB = csOrdersCount();
+  const customerTokenB = await createCustomerSession('081200000016');
   const bRes = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerTokenB },
     body: JSON.stringify({
       branch_id: 'branch_r1_a',
       payment_method: 'cash',
@@ -1754,8 +1797,10 @@ test('R2 AUTO selection: create-order without branch_id matches via Core and per
   try {
     csAddBranch('branch_r2_auto', { assign272: true });
     const before = csOrdersCount();
+    const customerToken = await createCustomerSession('081200000020');
     const res = await mockFetch('/api/v1/checkout/create-order', {
       method: 'POST',
+      headers: { 'x-customer-token': customerToken },
       body: JSON.stringify({
         selection_mode: 'AUTO',
         payment_method: 'cash',
@@ -1780,8 +1825,10 @@ test('R2 AUTO selection: create-order without branch_id matches via Core and per
 test('R2 CUSTOMER_SELECTED: explicit mode + valid branch is accepted and persisted', async () => {
   csAddBranch('branch_r2_cs', { assign272: true });
   const before = csOrdersCount();
+  const customerToken = await createCustomerSession('081200000021');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r2_cs',
       selection_mode: 'CUSTOMER_SELECTED',
@@ -1801,8 +1848,10 @@ test('R2 CUSTOMER_SELECTED: explicit mode + valid branch is accepted and persist
 
 test('R2 legacy derivation: branch_id without a mode is derived as CUSTOMER_SELECTED (backward compatible)', async () => {
   const before = csOrdersCount();
+  const customerToken = await createCustomerSession('081200000022');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r2_cs', // no selection_mode → derived
       payment_method: 'cash',
@@ -1819,8 +1868,10 @@ test('R2 legacy derivation: branch_id without a mode is derived as CUSTOMER_SELE
 });
 
 test('R2 mode normalization: lowercase customer_selected is accepted', async () => {
+  const customerToken = await createCustomerSession('081200000023');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r2_cs',
       selection_mode: 'customer_selected',
@@ -1835,8 +1886,10 @@ test('R2 mode normalization: lowercase customer_selected is accepted', async () 
 
 test('R2 invalid selection_mode value is rejected (INVALID_SELECTION_MODE)', async () => {
   const before = csOrdersCount();
+  const customerToken = await createCustomerSession('081200000024');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r2_cs',
       selection_mode: 'NEAREST',
@@ -1855,8 +1908,10 @@ test('R2 invalid selection_mode value is rejected (INVALID_SELECTION_MODE)', asy
 
 test('R2 AUTO + branch_id is contradictory and rejected — client cannot smuggle a branch into AUTO', async () => {
   const before = csOrdersCount();
+  const customerToken = await createCustomerSession('081200000025');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r2_cs',
       selection_mode: 'AUTO',
@@ -1874,8 +1929,10 @@ test('R2 AUTO + branch_id is contradictory and rejected — client cannot smuggl
 });
 
 test('R2 CUSTOMER_SELECTED without branch_id is rejected', async () => {
+  const customerToken = await createCustomerSession('081200000026');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       selection_mode: 'CUSTOMER_SELECTED',
       payment_method: 'cash',
@@ -1895,8 +1952,10 @@ test('R3 final verification: stale stock at the checkout branch prevents Order c
   csAddBranch('branch_r2_stale', { assign272: true });
   db.prepare("UPDATE branch_products SET stock = 0 WHERE branch_id = ? AND product_id = '272'").run('branch_r2_stale');
   const before = csOrdersCount();
+  const customerToken = await createCustomerSession('081200000027');
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r2_stale',
       payment_method: 'cash',
@@ -1931,9 +1990,11 @@ async function r5Login(username, role, branchId) {
   return b1Login(username, 'r5pass');
 }
 
-async function r5CreatePendingOrder(branchId, phone) {
+async function r5CreatePendingOrder(branchId, phone, existingToken) {
+  const customerToken = existingToken || await createCustomerSession(phone);
   const res = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: branchId,
       payment_method: 'cash',
@@ -2124,7 +2185,7 @@ async function r6r7CustomerToken(phone) {
   });
   const verifyData = await verify.json();
   assert.ok(verifyData.token, 'customer OTP token must be issued');
-  return { authorization: 'Bearer ' + verifyData.token };
+  return { headers: { authorization: 'Bearer ' + verifyData.token }, rawToken: verifyData.token };
 }
 
 test('R6 API: an overdue pending order is timed out by the worker sweep and ACCEPT afterwards is rejected', async () => {
@@ -2151,11 +2212,11 @@ test('R6 API: an overdue pending order is timed out by the worker sweep and ACCE
 test('R7 customer cancel: pending order → CUSTOMER_CANCEL, audited with the authenticated phone; duplicate cancel is a no-op', async () => {
   csAddBranch('branch_r7_c', { assign272: true });
   const phone = '081200000081';
-  const token = await r6r7CustomerToken(phone);
-  const orderId = await r5CreatePendingOrder('branch_r7_c', phone);
+  const custAuth = await r6r7CustomerToken(phone);
+  const orderId = await r5CreatePendingOrder('branch_r7_c', phone, custAuth.rawToken);
 
   const res = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
-    method: 'POST', headers: token, body: JSON.stringify({ reason: 'Ganti rencana' })
+    method: 'POST', headers: custAuth.headers, body: JSON.stringify({ reason: 'Ganti rencana' })
   });
   assert.strictEqual(res.status, 200);
   const data = await res.json();
@@ -2172,7 +2233,7 @@ test('R7 customer cancel: pending order → CUSTOMER_CANCEL, audited with the au
 
   // Duplicate cancellation: deterministic rejection, no state corruption.
   const dup = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
-    method: 'POST', headers: token, body: JSON.stringify({ reason: 'lagi' })
+    method: 'POST', headers: custAuth.headers, body: JSON.stringify({ reason: 'lagi' })
   });
   assert.strictEqual(dup.status, 400);
   const dupData = await dup.json();
@@ -2184,8 +2245,8 @@ test('R7 customer cancel: pending order → CUSTOMER_CANCEL, audited with the au
 test('R7 customer cancel after ACCEPT is NOT allowed (server-enforced, UI alone insufficient)', async () => {
   csAddBranch('branch_r7_a', { assign272: true });
   const phone = '081200000082';
-  const token = await r6r7CustomerToken(phone);
-  const orderId = await r5CreatePendingOrder('branch_r7_a', phone);
+  const custAuth = await r6r7CustomerToken(phone);
+  const orderId = await r5CreatePendingOrder('branch_r7_a', phone, custAuth.rawToken);
 
   const owner = await r5Login('r5_owner_r7a', 'owner', null);
   const accept = await mockFetch('/api/v1/orders/' + orderId + '/branch-acceptance', {
@@ -2194,7 +2255,7 @@ test('R7 customer cancel after ACCEPT is NOT allowed (server-enforced, UI alone 
   assert.strictEqual(accept.status, 200);
 
   const cancel = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
-    method: 'POST', headers: token, body: JSON.stringify({ reason: 'Batal saja' })
+    method: 'POST', headers: custAuth.headers, body: JSON.stringify({ reason: 'Batal saja' })
   });
   assert.strictEqual(cancel.status, 400, 'ACCEPTED order cannot be customer-cancelled');
   const data = await cancel.json();
@@ -2206,11 +2267,11 @@ test('R7 customer cancel after ACCEPT is NOT allowed (server-enforced, UI alone 
 test('R7 customer cancel: ownership enforced — another customer cannot cancel the order (403)', async () => {
   csAddBranch('branch_r7_o', { assign272: true });
   const ownerPhone = '081200000083';
-  const otherToken = await r6r7CustomerToken('081200000084');
+  const otherAuth = await r6r7CustomerToken('081200000084');
   const orderId = await r5CreatePendingOrder('branch_r7_o', ownerPhone);
 
   const res = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
-    method: 'POST', headers: otherToken, body: JSON.stringify({ reason: 'bukan pesanan saya' })
+    method: 'POST', headers: otherAuth.headers, body: JSON.stringify({ reason: 'bukan pesanan saya' })
   });
   assert.strictEqual(res.status, 403);
   const data = await res.json();
@@ -2221,30 +2282,30 @@ test('R7 customer cancel: ownership enforced — another customer cannot cancel 
 test('R7 customer cancel of REJECTED and TIMED-OUT orders is not allowed (terminal states)', async () => {
   csAddBranch('branch_r7_t', { assign272: true });
   const phone = '081200000085';
-  const token = await r6r7CustomerToken(phone);
+  const custAuth = await r6r7CustomerToken(phone);
   const owner = await r5Login('r5_owner_r7t', 'owner', null);
 
   // Rejected first.
-  const rejOrder = await r5CreatePendingOrder('branch_r7_t', phone);
+  const rejOrder = await r5CreatePendingOrder('branch_r7_t', phone, custAuth.rawToken);
   const reject = await mockFetch('/api/v1/orders/' + rejOrder + '/branch-acceptance', {
     method: 'POST', headers: owner.headers, body: JSON.stringify({ decision: 'reject', reason: 'Menu habis' })
   });
   assert.strictEqual(reject.status, 200);
   const rejCancel = await mockFetch('/api/v1/orders/' + rejOrder + '/cancel', {
-    method: 'POST', headers: token, body: JSON.stringify({ reason: 'batal' })
+    method: 'POST', headers: custAuth.headers, body: JSON.stringify({ reason: 'batal' })
   });
   assert.strictEqual(rejCancel.status, 400);
   assert.strictEqual((await rejCancel.json()).status, 'CUSTOMER_CANCEL_NOT_ALLOWED');
   assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(rejOrder).status, 'rejected', 'REJECTED is never rewritten as customer cancel');
 
   // Then timed out.
-  const toOrder = await r5CreatePendingOrder('branch_r7_t', phone);
+  const toOrder = await r5CreatePendingOrder('branch_r7_t', phone, custAuth.rawToken);
   db.prepare("UPDATE orders SET created_at = datetime('now','-200 seconds') WHERE id = ?").run(toOrder);
   const AcceptanceTimeoutService = require('../server/services/AcceptanceTimeoutService');
   AcceptanceTimeoutService.checkAndApplyTimeouts();
   assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(toOrder).status, 'timeout');
   const toCancel = await mockFetch('/api/v1/orders/' + toOrder + '/cancel', {
-    method: 'POST', headers: token, body: JSON.stringify({ reason: 'batal' })
+    method: 'POST', headers: custAuth.headers, body: JSON.stringify({ reason: 'batal' })
   });
   assert.strictEqual(toCancel.status, 400);
   assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(toOrder).status, 'timeout', 'TIMEOUT is never rewritten as customer cancel');
@@ -2253,8 +2314,8 @@ test('R7 customer cancel of REJECTED and TIMED-OUT orders is not allowed (termin
 test('R7 customer cancel guards: no session → 401; settled payment → ORDER_ALREADY_PAID (no state change)', async () => {
   csAddBranch('branch_r7_g', { assign272: true });
   const phone = '081200000086';
-  const token = await r6r7CustomerToken(phone);
-  const orderId = await r5CreatePendingOrder('branch_r7_g', phone);
+  const custAuth = await r6r7CustomerToken(phone);
+  const orderId = await r5CreatePendingOrder('branch_r7_g', phone, custAuth.rawToken);
 
   // No session.
   const anon = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
@@ -2265,7 +2326,7 @@ test('R7 customer cancel guards: no session → 401; settled payment → ORDER_A
   // Settled payment blocks CUSTOMER_CANCEL (refund flow first).
   db.prepare("UPDATE order_payments SET payment_status = 'settlement', provider = 'midtrans' WHERE order_id = ?").run(orderId);
   const paidCancel = await mockFetch('/api/v1/orders/' + orderId + '/cancel', {
-    method: 'POST', headers: token, body: JSON.stringify({ reason: 'batal' })
+    method: 'POST', headers: custAuth.headers, body: JSON.stringify({ reason: 'batal' })
   });
   assert.strictEqual(paidCancel.status, 400);
   assert.ok(/ORDER_ALREADY_PAID/.test((await paidCancel.json()).error || ''), 'settled payment requires a refund flow');
@@ -2307,8 +2368,10 @@ test('R5 CHECK-2 API: midtrans settlement keeps order AWAITING; only branch-acce
   const PaymentGatewayService = require('../domains/payment/services/PaymentGatewayService');
   csAddBranch('branch_r5_chk2', { assign272: true });
 
+  const customerToken = await createCustomerSession('081200000096');
   const orderRes = await mockFetch('/api/v1/checkout/create-order', {
     method: 'POST',
+    headers: { 'x-customer-token': customerToken },
     body: JSON.stringify({
       branch_id: 'branch_r5_chk2',
       payment_method: 'midtrans',

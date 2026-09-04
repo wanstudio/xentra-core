@@ -2,20 +2,55 @@
 
 This repository uses small, task-focused agent skills rather than one giant instruction file.
 
+## Repository facts
+
+- **Single-process Express monolith** — CommonJS (`require`), not ESM. One `package.json`, no workspaces.
+- **Entry point**: root `app.js` re-exports `server/app.js` (Passenger-compatible). `server/app.js` is the real Express app.
+- **Database**: SQLite via `node:sqlite` (Node 22+) or `sql.js` fallback (Node 20). Tests always use in-memory `:memory:`.
+- **Frontend**: Plain HTML/JS/CSS in `apps/` served as static files — no build step, no framework, no bundler.
+- **Node requirement**: `>=20.20.2` (see `package.json` engines).
+- **Production domain**: `app.mybangjo.com` — deploy is Passenger on CloudLinux cPanel, not Docker.
+
+## Commands
+
+```bash
+npm test          # only verification step — no lint, no typecheck, no formatter
+npm start         # node server/app.js on port 3000
+```
+
+Tests use Node's built-in test runner (`node --test`) with `--test-concurrency=1`. Pattern: `tests/*.test.js tests/**/*.test.js`. There is no ESLint, Prettier, TypeScript, or other static analysis.
+
 ## Before coding
-- Read the relevant Xentra Notion decisions/requirements.
-- If `docs/notion/` contains a snapshot relevant to the task, read it (see `docs/notion/README.md`). It is a pinned copy of Notion — ask the user when a decision may have changed since the snapshot.
-- Read every `.agent/skills/*/SKILL.md` relevant to the requested change; do not load unrelated skills unnecessarily.
-- Inspect current Git status, recent commits, and affected files.
-- Identify the domain owner, locked invariants, and existing implementation boundary.
-- Do not write or modify code until the required context is understood.
+
+1. Read the relevant Xentra Notion decisions/requirements.
+2. If `docs/notion/` contains a snapshot relevant to the task, read it (see `docs/notion/README.md`). It is a pinned copy of Notion — ask the user when a decision may have changed since the snapshot.
+3. Read every `.agent/skills/*/SKILL.md` relevant to the requested change; do not load unrelated skills unnecessarily.
+4. Inspect current Git status, recent commits, and affected files.
+5. Identify the domain owner, locked invariants, and existing implementation boundary.
+6. Do not write or modify code until the required context is understood.
 
 ## Authority
+
 - Notion = authority for business rules, locked decisions, invariants, and architecture boundaries.
 - Git = evidence of current implementation and history; never invent business rules from code alone.
 - UI/client state is never domain authority.
 
+## Architecture layout
+
+```
+server/          Express app, routes, middleware, services, database
+domains/         Domain logic (commerce, delivery, inventory, payment, pos, promotion, reporting)
+core/            Platform foundations (events, identity/RBAC, config, integration, audit)
+apps/            Static frontends (customer-pwa, kitchen-display, merchant-dashboard)
+tests/           Node built-in test runner — mirrors domains/, core/, services/, client/
+tools/           Utility runners (telegram-runner, whatsapp-runner)
+docs/notion/     Pinned Notion decision snapshots
+```
+
+Key domain boundaries: Organization → Brand → Branch. Payment credentials resolve hierarchically (Branch → Brand → Organization). Delivery formula is a single source of truth in `server/services/DeliveryCalculator.js`. Order state machine lives in `server/services/OrderStateMachine.js`.
+
 ## Skills
+
 - `.agent/skills/xentra-context/SKILL.md` — repository context, source hierarchy, and decision discipline.
 - `.agent/skills/xentra-business-logic/SKILL.md` — domain boundaries, state/lifecycle reasoning, and business invariants.
 - `.agent/skills/xentra-coding-workflow/SKILL.md` — normal feature/refactor/bug-fix implementation workflow.
@@ -31,9 +66,11 @@ This repository uses small, task-focused agent skills rather than one giant inst
 - `.agent/skills/xentra-security-audit/SKILL.md` — security and integrity audit when the task is security-sensitive or requires verification.
 
 ## Skill selection
+
 Use the smallest relevant skill set. Combine skills when a change crosses boundaries; for example, a payment feature normally needs coding workflow + backend + database + integration context. Use Ponytail review when a change adds abstraction or refactoring, Ponytail audit for repository-wide complexity review, and Ponytail debt when accepting a deliberate temporary shortcut.
 
 ## Execution discipline
+
 - Preserve existing domain boundaries and locked contracts.
 - Follow YAGNI/minimal-change discipline: do not add speculative abstractions, dependencies, duplication, or unrelated refactors.
 - Prefer existing ownership and contracts before creating parallel services/components/utilities.
@@ -41,4 +78,5 @@ Use the smallest relevant skill set. Combine skills when a change crosses bounda
 - Before finishing, verify affected business logic, domain boundaries, runtime wiring, and callers remain coherent.
 
 ## Completion
+
 A coding task is complete only when the implementation matches the relevant contract, the correct runtime path is wired, affected callers remain coherent, and the changes are committed. Update durable documentation when the contract or architecture changes.

@@ -13,7 +13,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_6d41fab';
+      var PWA_VERSION = 'v_p3c9d51';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -36,12 +36,12 @@
   <link rel="manifest" href="/manifest.json?v=2.2.7">
 
   <!-- CSS (version-hashed for instant cache-busting) -->
-  <link rel="stylesheet" href="/assets/css/tokens.css?v=6d41fab">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=6d41fab">
-  <link rel="stylesheet" href="/assets/css/components.css?v=6d41fab">
-  <link rel="stylesheet" href="/assets/css/home.css?v=6d41fab">
-  <link rel="stylesheet" href="/assets/css/checkout.css?v=6d41fab">
-  <link rel="stylesheet" href="/assets/css/order-received.css?v=6d41fab">
+  <link rel="stylesheet" href="/assets/css/tokens.css?v=p3c9d51">
+  <link rel="stylesheet" href="/assets/css/layout.css?v=p3c9d51">
+  <link rel="stylesheet" href="/assets/css/components.css?v=p3c9d51">
+  <link rel="stylesheet" href="/assets/css/home.css?v=p3c9d51">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=p3c9d51">
+  <link rel="stylesheet" href="/assets/css/order-received.css?v=p3c9d51">
 </head>
 <body>
 
@@ -87,6 +87,9 @@
       </div>
       <div class="x-carousel-dots" id="x-carousel-dots"></div>
     </div>
+
+    <!-- P2 FAST BRANCH DISCOVERY (rendered dynamically by home.js) -->
+    <div id="x-branch-discovery" class="x-branch-discovery" hidden></div>
 
     <!-- CATEGORY TABS -->
     <div class="x-cat-wrap">
@@ -176,18 +179,20 @@
   <!-- ═══════════════════════════════════════════════════
        JS CORE & CONTROLLERS (Version Hashed v2.2.7)
        ═══════════════════════════════════════════════════ -->
-  <script src="/assets/js/core/store.js?v=6d41fab"></script>
-  <script src="/assets/js/core/ui.js?v=6d41fab"></script>
-  <script src="/assets/js/core/api.js?v=6d41fab"></script>
-  <script src="/assets/js/core/nav.js?v=6d41fab"></script>
-  <script src="/assets/js/core/router.js?v=6d41fab"></script>
-  <script src="/assets/js/core/pwa-runtime.js?v=6d41fab"></script>
-  <script src="/assets/js/core/promo-reward-cart.js?v=68ac710"></script>
+  <script src="/assets/js/core/store.js?v=p3c9d51"></script>
+  <script src="/assets/js/core/ui.js?v=p3c9d51"></script>
+  <script src="/assets/js/core/api.js?v=p3c9d51"></script>
+  <script src="/assets/js/core/nav.js?v=p3c9d51"></script>
+  <script src="/assets/js/core/router.js?v=p3c9d51"></script>
+  <script src="/assets/js/core/pwa-runtime.js?v=p3c9d51"></script>
+  <script src="/assets/js/core/promo-reward-cart.js?v=p3c9d51"></script>
+  <script src="/assets/js/location.js?v=p3c9d51"></script>
+  <script src="/assets/js/core/discovery.js?v=p3c9d51"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=6d41fab"></script>
-  <script src="/assets/js/pages/checkout.js?v=6d41fab"></script>
-  <script src="/assets/js/pages/order-received.js?v=6d41fab"></script>
+  <script src="/assets/js/pages/home.js?v=p3c9d51"></script>
+  <script src="/assets/js/pages/checkout.js?v=p3c9d51"></script>
+  <script src="/assets/js/pages/order-received.js?v=p3c9d51"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -261,7 +266,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=6d41fab').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=p3c9d51').then(function (reg) {
         reg.update();
 
         document.addEventListener('visibilitychange', function () {

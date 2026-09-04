@@ -16,10 +16,11 @@ const path = require('node:path');
 
 const STORE_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/store.js');
 
-function freshStore() {
+function freshStore(seedStorage) {
   // Minimal browser shims required by store.js (it only touches window +
-  // localStorage; it never touches document/DOM).
-  const storage = {};
+  // localStorage; it never touches document/DOM). Passing a seedStorage object
+  // simulates a persisted localStorage surfacing across a page reload.
+  const storage = seedStorage || {};
   globalThis.window = globalThis;
   globalThis.localStorage = {
     getItem: (k) => (Object.prototype.hasOwnProperty.call(storage, k) ? storage[k] : null),
@@ -176,4 +177,49 @@ test('R1 scope helpers are read-only: invoking them never mutates the cart', () 
   const after = JSON.stringify(Store.getState().cart.items);
   assert.strictEqual(after, before, 'group/scope reads are side-effect free');
   assert.strictEqual(Store.getState().cart.items.length, 2);
+});
+
+test('P2 branchContext persists and stays separate from matchedBranch (discovery vs AUTO authority)', () => {
+  // One shared backing store: a second freshStore(sharedStorage) behaves like a
+  // real page reload over the same persisted localStorage.
+  const sharedStorage = {};
+  const Store = freshStore(sharedStorage);
+
+  // P2 core invariant: Home discovery/selection writes branchContext; the
+  // transaction-level AUTO match writes matchedBranch. They must never be
+  // conflated because one is a customer-selection prefill signal and the
+  // other is Core's authoritative resolution.
+  assert.strictEqual(Store.getState().branchContext, null, 'no branch context by default');
+  assert.strictEqual(Store.getState().matchedBranch, null, 'no matched branch by default');
+
+  // Home picks a nearby branch (customer-selected).
+  Store.setBranchContext({ branch_id: 41, branch_name: 'Cabang Senayan' });
+  assert.strictEqual(Store.getState().branchContext.branch_id, 41);
+  assert.strictEqual(Store.getState().branchContext.branch_name, 'Cabang Senayan');
+  // Setting discovery context must NOT leak into the transaction match result.
+  assert.strictEqual(Store.getState().matchedBranch, null, 'branchContext must not set matchedBranch');
+
+  // Checkout later resolves the authoritative match for delivery.
+  Store.setMatchedBranch({ id: 99, name: 'Auto Cabang' });
+  assert.strictEqual(Store.getState().matchedBranch.id, 99);
+  // And the resolution must NOT overwrite the customer's discovery context.
+  assert.strictEqual(Store.getState().branchContext.branch_id, 41, 'matchedBranch must not clobber branchContext');
+
+  // Branch context survives a reload (persisted under a dedicated key).
+  const reloaded = freshStore(sharedStorage);
+  assert.strictEqual(reloaded.getState().branchContext.branch_id, 41, 'branchContext persists across reload');
+  assert.strictEqual(reloaded.getState().matchedBranch.id, 99, 'matchedBranch is separately persisted');
+});
+
+test('P2 branchContext add-to-cart provenance flows into the cart scope', () => {
+  const Store = freshStore();
+
+  // Home active branch → provenance on the added line.
+  Store.addItem(product('272', 'Paket Semar'), 1, { branch_id: 41, branch_name: 'Cabang Senayan' });
+
+  const groups = Store.getCartBranchGroups();
+  assert.strictEqual(groups.length, 1);
+  assert.strictEqual(String(groups[0].branch_id), '41');
+  assert.strictEqual(groups[0].branch_name, 'Cabang Senayan');
+  assert.strictEqual(Store.getCartItemsForBranch('41').length, 1);
 });

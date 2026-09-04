@@ -13,6 +13,7 @@
   var SESSION_KEY = PREFIX + 'customer_session';
   var ORDER_TYPE_KEY = PREFIX + 'order_type';
   var ORDER_CTX_KEY = PREFIX + 'order_context';
+  var BRANCH_CTX_KEY = PREFIX + 'branch_context';
 
   var listeners = [];
 
@@ -28,6 +29,14 @@
     }),
     location: load(LOCATION_KEY, null),
     matchedBranch: load(BRANCH_KEY, null),
+    // P2 HOME DISCOVERY CONTEXT: the branch context the customer is currently
+    // browsing/selecting from Home. It is a DISCOVERY/CUSTOMER-SELECTION
+    // context only — never an authoritative fulfillment branch. Checkout uses
+    // it as a branch PREFILL (selection_mode=CUSTOMER_SELECTED) and Core still
+    // validates the final branch authoritatively. Kept separate from
+    // `matchedBranch` (the transaction-level Core match result) on purpose so
+    // Home discovery ordering is never conflated with AUTO resolution.
+    branchContext: load(BRANCH_CTX_KEY, null),
     cart: load(CART_KEY, { items: [] }),
     notes: load(NOTES_KEY, {}),
     promo: { enabled: false, target: 0, discount: 0 }
@@ -107,6 +116,15 @@
   function setMatchedBranch(data) {
     state.matchedBranch = data;
     save(BRANCH_KEY, data);
+    notify();
+  }
+
+  // P2 HOME DISCOVERY CONTEXT — sets the branch context a customer selected on
+  // Home (discovery/selection context, never fulfillment authority). Shape:
+  // { branch_id, branch_name } matching cart-line provenance.
+  function setBranchContext(ctx) {
+    state.branchContext = ctx;
+    save(BRANCH_CTX_KEY, ctx);
     notify();
   }
 
@@ -316,6 +334,7 @@
     setOrderContext: setOrderContext,
     setLocation: setLocation,
     setMatchedBranch: setMatchedBranch,
+    setBranchContext: setBranchContext,
     setPromo: setPromo,
     addItem: addItem,
     setQty: setQty,

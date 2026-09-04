@@ -9,6 +9,7 @@ const OrderStateMachine = require('../services/OrderStateMachine');
 const RouteService = require('../services/RouteService');
 const { PromotionEngineService } = require('../../domains/promotion');
 const { InventoryStockService, InventoryMovementModel } = require('../../domains/inventory');
+const CatalogService = require('../../domains/commerce/services/CatalogService');
 
 // 0. Active Promotions & Evaluation Endpoint
 router.get(['/promo/active', '/promotions/active'], (req, res) => {
@@ -333,21 +334,48 @@ router.post('/auth/otp/trust', (req, res) => {
 router.get(['/catalog/menu', '/home'], (req, res) => {
   try {
     const brandId = req.brand_id;
+    const branchId = req.query.branch_id || '';
     let categories = [];
     let products = [];
 
-    try {
-      // P1 STRICT TENANT ISOLATION (NEW-01 & NEW-03):
-      // Only query categories and products belonging exclusively to the resolved brand_id
-      categories = db
-        .prepare('SELECT * FROM categories WHERE brand_id = ? ORDER BY sort_order ASC')
-        .all(brandId);
+    // P3 BRANCH-SCOPED MENU: when a branch context is explicitly requested it must
+    // belong to this brand AND be active; otherwise fail closed (400) instead of
+    // silently serving a different scope (product pages never silently re-scope).
+    let branchScope = null;
+    if (branchId) {
+      const branch = db.prepare('SELECT id, is_active FROM branches WHERE id = ? AND brand_id = ?').get(branchId, brandId);
+      if (!branch) {
+        return res.status(400).json({ success: false, error: 'branch not found' });
+      }
+      if (!branch.is_active) {
+        return res.status(400).json({ success: false, error: 'branch is inactive' });
+      }
+      branchScope = branch;
+    }
 
-      products = db
-        .prepare('SELECT * FROM products WHERE brand_id = ? AND (is_active = 1 OR is_active IS NULL) ORDER BY sort_order ASC')
-        .all(brandId);
-    } catch (dbErr) {
-      console.warn('[Catalog Menu DB Warn]:', dbErr.message);
+    if (branchScope) {
+      // P3: reuse the canonical commerce branch-scoped menu (branch price override,
+      // C1 operational availability, branch stock estimate). No new catalog source.
+      const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: branchScope.id });
+      categories = menu.categories.map((c) => ({
+        ...c,
+        image: c.icon_url || ''
+      }));
+      products = menu.products;
+    } else {
+      try {
+        // P1 STRICT TENANT ISOLATION (NEW-01 & NEW-03):
+        // Only query categories and products belonging exclusively to the resolved brand_id
+        categories = db
+          .prepare('SELECT * FROM categories WHERE brand_id = ? ORDER BY sort_order ASC')
+          .all(brandId);
+
+        products = db
+          .prepare('SELECT * FROM products WHERE brand_id = ? AND (is_active = 1 OR is_active IS NULL) ORDER BY sort_order ASC')
+          .all(brandId);
+      } catch (dbErr) {
+        console.warn('[Catalog Menu DB Warn]:', dbErr.message);
+      }
     }
 
     const tree = (categories || []).map((cat) => {
@@ -359,8 +387,8 @@ router.get(['/catalog/menu', '/home'], (req, res) => {
       return {
         id: cat.id,
         name: cat.name,
-        slug: cat.slug || cat.name.toLowerCase().replace(/\s+/g, '-'),
-        image: cat.image || cat.image_url || '',
+        slug: cat.slug || String(cat.name || '').toLowerCase().replace(/\s+/g, '-'),
+        image: cat.image || cat.image_url || cat.icon_url || '',
         products: catProducts.map((p) => ({
           ...p,
           image: p.image_url || p.image || '',
@@ -548,9 +576,9 @@ router.delete('/addresses/:id', requireCustomerAuth(), (req, res) => {
   }
 });
 
-router.post('/checkout/verify', (req, res) => {
+router.post('/checkout/verify', requireCustomerAuth(), (req, res) => {
   try {
-    const { branch_id, items = [], order_type = 'delivery', customer = {}, pwa_runtime = null } = req.body;
+    const { branch_id, items = [], order_type = 'delivery', pwa_runtime = null } = req.body;
     if (!branch_id) {
       return res.status(400).json({ success: false, error: 'Cabang pemesanan (branch_id) wajib dipilih.' });
     }
@@ -571,7 +599,7 @@ router.post('/checkout/verify', (req, res) => {
       branch_id,
       brand_id: req.brand_id,
       items,
-      customer,
+      customer: { phone: req.customer.phone, name: req.body.customer?.name || '' },
       pwa_runtime
     });
     return res.json({
@@ -629,13 +657,24 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       });
     }
 
-    // P1 CUSTOMER IDENTITY BINDING (NEW-02): If request is made by authenticated customer session, bind authoritative phone
+    // P1 CUSTOMER IDENTITY BINDING (NEW-02): Extract customer session token
     const authHeader = req.headers['authorization'] || '';
     const customerToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || req.headers['x-customer-token'] || '').trim();
     const customerSession = customerToken ? TokenSessionStore.getSession(customerToken) : null;
-    if (customerSession && (customerSession.type === 'customer' || customerSession.role === 'customer') && customerSession.brandId === req.brand_id) {
-      customer.phone = customerSession.phone;
+
+    // CUSTOMER AUTH BOUNDARY: Checkout requires a valid OTP-verified customer session.
+    // The server is the sole authority for customer identity — client-provided phone
+    // is never trusted as the sole identity source for order creation.
+    if (!customerSession || (customerSession.type !== 'customer' && customerSession.role !== 'customer') || customerSession.brandId !== req.brand_id) {
+      return res.status(401).json({
+        success: false,
+        error: 'CUSTOMER_AUTH_REQUIRED',
+        message: 'Checkout memerlukan verifikasi OTP. Silakan verifikasi nomor WhatsApp Anda.'
+      });
     }
+
+    // Authoritative phone from OTP session — never from request body
+    customer.phone = customerSession.phone;
 
     // Locked Decision: Customer information must be valid
     if (!customer.phone || !customer.phone.trim()) {

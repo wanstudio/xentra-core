@@ -6,7 +6,7 @@
  * 3. Cache-Fallback for genuine offline operation
  * 4. Automatic purge of old version caches on activation
  */
-const CACHE_NAME = "bangjo-pwa-076fc30";
+const CACHE_NAME = "bangjo-pwa-p3c9d51";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -23,6 +23,10 @@ const STATIC_ASSETS = [
   "/assets/js/core/api.js",
   "/assets/js/core/nav.js",
   "/assets/js/core/router.js",
+  "/assets/js/core/pwa-runtime.js",
+  "/assets/js/core/promo-reward-cart.js",
+  "/assets/js/core/discovery.js",
+  "/assets/js/location.js",
   "/assets/js/pages/home.js",
   "/assets/js/pages/checkout.js",
   "/assets/js/pages/order-received.js"
@@ -35,7 +39,7 @@ self.addEventListener("install", event => {
     caches.open(CACHE_NAME).then(cache => {
       const versionedUrls = STATIC_ASSETS.map(u => {
         if (u === "/" || u === "/manifest.json" || u.includes(".png")) return u;
-        return u + "?v=" + "6a193b6";
+        return u + "?v=" + "p3c9d51";
       });
       return cache.addAll(versionedUrls).catch(err => {
         console.warn("[SW Install] Cache prefetch warn:", err);
