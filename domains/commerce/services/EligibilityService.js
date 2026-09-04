@@ -116,6 +116,30 @@ class EligibilityService {
   }
 
   /**
+   * Evaluates only the BRANCH-LEVEL eligibility facts for a requested
+   * order/fulfillment type: exists & belongs to brand, active, open, and the
+   * represented fulfillment capability. Product/assignment/stock are NOT
+   * evaluated here — combine with evaluateProduct/evaluateCart for full-cart
+   * decisions, or use this alone to validate an explicit CUSTOMER_SELECTED
+   * branch before the stronger pre-payment gate.
+   *
+   * No selection happens here: it never ranks, routes, prices, or picks a
+   * branch.
+   *
+   * @returns {{ eligible: boolean, reasons: string[], branch_id: string, brand_id: string, branch: Object|null }}
+   */
+  static evaluateBranch({ brand_id, branch_id, order_type = null }) {
+    const gate = EligibilityService._resolveBranch({ brand_id, branch_id, order_type });
+    return {
+      eligible: gate.ok,
+      reasons: gate.ok ? [] : [gate.reason],
+      branch_id,
+      brand_id,
+      branch: gate.ok ? gate.branch : null
+    };
+  }
+
+  /**
    * Evaluates a single product against one branch.
    *
    * @param {Object} params

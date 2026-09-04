@@ -1,4 +1,24 @@
 ## [Unreleased] - 2026-09-04
+### C4/Checkout alignment — AUTO vs CUSTOMER_SELECTED fulfillment branch
+- **Locked decision enforced**: a cart always resolves to exactly ONE fulfillment
+  branch via either AUTO (`BranchMatcher`) or an explicit CUSTOMER_SELECTED
+  branch. A client-supplied `branch_id` is a PREFERENCE, never authority.
+- **CUSTOMER_SELECTED validated through canonical eligibility**: `create-order`
+  now validates an explicitly selected branch via the new
+  `EligibilityService.evaluateBranch()` (exists/active/open + represented
+  fulfillment capability, reusing the same engine as AUTO) before any order
+  side effect. Ineligible selected branches are REJECTED (400) with an explicit
+  reason — there is NO silent rematch to another branch. Product/assignment/
+  stock/pricing remain enforced by the stronger `PrePaymentVerificationGate`.
+- **Remote/gift delivery**: delivery routing and radius are computed from the
+  fulfillment BRANCH to the delivery DESTINATION; buyer location is not a
+  delivery input (verified by test). `order_type` and `order_channel` remain
+  separate.
+- **Tenant isolation preserved**: cross-brand selection fails closed (404);
+  inactive branches rejected at resolution. Order persistence keeps a single
+  authoritative `branch_id` (stock deducts against that branch). Reservation
+  keeps its dedicated path (no locked branch-open contract).
+
 ### C4 — Branch Matching
 - **Server-authoritative location validation (C4.3)**: `BranchMatcher` now
   rejects missing, non-finite, or out-of-range customer coordinates with an

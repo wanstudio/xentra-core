@@ -380,6 +380,35 @@ test('C3 Canonical consistency: matcher SQL candidates are exactly the branch-ga
   }
 });
 
+test('C3 evaluateBranch: canonical branch-only operational decision (used to validate a CUSTOMER_SELECTED branch)', () => {
+  // Open + active + capability OK.
+  const ok = EligibilityService.evaluateBranch({ brand_id: BRAND, branch_id: BARAT, order_type: 'delivery' });
+  assert.strictEqual(ok.eligible, true);
+  assert.deepStrictEqual(ok.reasons, []);
+  assert.ok(ok.branch && ok.branch.id === BARAT);
+
+  assert.deepStrictEqual(
+    EligibilityService.evaluateBranch({ brand_id: BRAND, branch_id: 'branch_c3_closed', order_type: 'delivery' }).reasons,
+    [EligibilityService.REASONS.BRANCH_CLOSED]
+  );
+  assert.deepStrictEqual(
+    EligibilityService.evaluateBranch({ brand_id: BRAND, branch_id: 'branch_c3_inactive', order_type: 'delivery' }).reasons,
+    [EligibilityService.REASONS.BRANCH_NOT_ACTIVE]
+  );
+  assert.deepStrictEqual(
+    EligibilityService.evaluateBranch({ brand_id: BRAND, branch_id: 'branch_c3_no_delivery', order_type: 'delivery' }).reasons,
+    [EligibilityService.REASONS.FULFILLMENT_NOT_SUPPORTED]
+  );
+  assert.deepStrictEqual(
+    EligibilityService.evaluateBranch({ brand_id: BRAND, branch_id: 'branch_c3_no_pickup', order_type: 'pickup' }).reasons,
+    [EligibilityService.REASONS.FULFILLMENT_NOT_SUPPORTED]
+  );
+  assert.deepStrictEqual(
+    EligibilityService.evaluateBranch({ brand_id: BRAND, branch_id: 'branch_c3_other', order_type: 'delivery' }).reasons,
+    [EligibilityService.REASONS.BRANCH_NOT_FOUND]
+  );
+});
+
 test('C3 Cart input validation: empty/non-array carts are INVALID_CART; branch failure propagates deterministically', () => {
   const empty = EligibilityService.evaluateCart({ brand_id: BRAND, branch_id: BARAT, items: [] });
   assert.strictEqual(empty.eligible, false);

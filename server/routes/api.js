@@ -692,6 +692,39 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           error: `Cabang dengan ID "${branch_id}" tidak ditemukan atau sedang nonaktif pada brand ini.`
         });
       }
+
+      // C4/CHECKOUT ALIGNMENT — CUSTOMER_SELECTED: an explicit branch_id is a
+      // customer PREFERENCE, never trusted directly. Core validates the selected
+      // branch through the SAME canonical operational eligibility as AUTO
+      // (exists/active/open + represented fulfillment capability). If the
+      // selected branch is ineligible we REJECT explicitly — there is
+      // deliberately NO silent rematch to another branch. Reservation keeps its
+      // existing dedicated path (it bypasses the pre-payment gate and has no
+      // locked branch-open contract yet).
+      if (order_type !== 'reservation') {
+        const EligibilityService = require('../../domains/commerce/services/EligibilityService');
+        const selectedElig = EligibilityService.evaluateBranch({
+          brand_id: req.brand_id,
+          branch_id: branch.id,
+          order_type
+        });
+
+        if (!selectedElig.eligible) {
+          const selectedBranchMsg = {
+            BRANCH_NOT_FOUND: `Cabang "${branch_id}" tidak ditemukan pada brand ini.`,
+            BRANCH_NOT_ACTIVE: `Cabang "${branch_id}" sedang nonaktif.`,
+            BRANCH_CLOSED: `Cabang "${branch_id}" sedang tutup. Silakan pilih cabang lain.`,
+            FULFILLMENT_NOT_SUPPORTED: `Cabang "${branch_id}" tidak mendukung metode pemesanan ini. Silakan pilih metode lain.`
+          };
+          const reason = selectedElig.reasons && selectedElig.reasons[0];
+          return res.status(400).json({
+            success: false,
+            error: selectedBranchMsg[reason] || `Cabang "${branch_id}" tidak dapat melayani pesanan ini saat ini. Silakan pilih cabang lain.`,
+            reason: reason || 'BRANCH_INELIGIBLE',
+            branch_id: branch.id
+          });
+        }
+      }
     } else if (order_type === 'delivery' && delivery && delivery.latitude != null && delivery.longitude != null) {
       // Intelligent Branch Resolution based on customer coordinates & cart availability
       const matchResult = await BranchMatcher.matchNearestBranch({

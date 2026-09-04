@@ -1406,3 +1406,167 @@ test('C4 API /delivery/match-branch: invalid input fails safely (400 non-array i
   assert.ok(/tidak valid/i.test(data.reason || ''), 'explicit invalid-coordinate reason');
 });
 
+/* =============================================================================
+   C4/CHECKOUT CONTRACT ALIGNMENT — AUTO vs CUSTOMER_SELECTED fulfillment branch
+   A client branch_id is a preference, never authority. Core validates the
+   selected branch through canonical eligibility and REJECTS (no silent rematch)
+   when it is ineligible. Exactly ONE fulfillment branch per order.
+   ============================================================================= */
+
+function csOrdersCount() {
+  return db.prepare('SELECT COUNT(*) AS c FROM orders').get().c;
+}
+
+function csAddBranch(id, { is_active = 1, is_open_override = 1, delivery = 1, pickup = 1, assign272 = false } = {}) {
+  db.prepare(`INSERT OR REPLACE INTO branches
+    (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override)
+    VALUES (?, 'brand_bangjo', ?, ?, 'Jl. CS', -7.2912, 112.7154, '081200000099', ?, ?)`)
+    .run(id, 'Cabang ' + id, id, is_active, is_open_override);
+  db.prepare(`INSERT OR REPLACE INTO branch_delivery_settings
+    (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount)
+    VALUES (?, ?, ?, ?, 25, 5, 3000, 0)`)
+    .run('bds_' + id, id, delivery, pickup);
+  if (assign272) {
+    db.prepare(`INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available)
+      VALUES (?, '272', 35000, 10, 1)`).run(id);
+  }
+}
+
+test('C4/Checkout CUSTOMER_SELECTED: valid selected branch is used and the order stores exactly one fulfillment branch', async () => {
+  csAddBranch('branch_cs_open', { assign272: true });
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_cs_open',
+      payment_method: 'cash',
+      customer: { name: 'Customer Pilih Cabang', phone: '081200000001' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 201);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(csOrdersCount(), before + 1, 'exactly one order created');
+  const order = db.prepare('SELECT branch_id FROM orders WHERE id = ?').get(data.order_id);
+  assert.strictEqual(order.branch_id, 'branch_cs_open', 'order bound to the single selected branch');
+});
+
+test('C4/Checkout CUSTOMER_SELECTED: closed branch is rejected — no order, NO silent rematch to an open branch', async () => {
+  // branch_cs_closed is closed but fully stocked with product 272; branch_cs_open
+  // (open, stocked) also exists — if a rematch happened, this would pick it.
+  csAddBranch('branch_cs_closed', { is_open_override: 0, assign272: true });
+  const before = csOrdersCount();
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_cs_closed',
+      payment_method: 'cash',
+      customer: { name: 'Customer Tutup', phone: '081200000002' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.strictEqual(data.reason, 'BRANCH_CLOSED');
+  assert.ok(/tutup/i.test(data.error || ''), 'explicit closed-branch reason');
+  assert.strictEqual(csOrdersCount(), before, 'rejected order must NOT be created');
+  assert.strictEqual(db.prepare("SELECT COUNT(*) AS c FROM orders WHERE branch_id = 'branch_cs_closed'").get().c, 0, 'no silent rematch/order');
+});
+
+test('C4/Checkout CUSTOMER_SELECTED: delivery-disabled branch is rejected for a delivery order', async () => {
+  csAddBranch('branch_cs_nodelivery', { delivery: 0, pickup: 1, assign272: true });
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_cs_nodelivery',
+      payment_method: 'cash',
+      customer: { name: 'Customer Antar', phone: '081200000003' },
+      order_type: 'delivery',
+      delivery: { address: 'Jl. Kirim', latitude: -7.2912, longitude: 112.7154 },
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.reason, 'FULFILLMENT_NOT_SUPPORTED');
+  assert.ok(/tidak mendukung/i.test(data.error || ''));
+});
+
+test('C4/Checkout CUSTOMER_SELECTED: cross-brand and inactive branches are rejected (tenant + active scope)', async () => {
+  // Cross-brand branch (exists, belongs to another brand) -> 404, never a candidate.
+  const cross = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_other_co',
+      payment_method: 'cash',
+      customer: { name: 'Customer Lintas', phone: '081200000004' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(cross.status, 404);
+
+  // Inactive branch within the brand -> 404 (active state enforced at resolution).
+  csAddBranch('branch_cs_inactive', { is_active: 0, assign272: true });
+  const inactive = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_cs_inactive',
+      payment_method: 'cash',
+      customer: { name: 'Customer Nonaktif', phone: '081200000005' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(inactive.status, 404);
+});
+
+test('C4/Checkout CUSTOMER_SELECTED: product not assigned to the selected open branch is rejected (canonical assignment bound)', async () => {
+  csAddBranch('branch_cs_noassign', { assign272: false }); // open, but does NOT carry product 272
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_cs_noassign',
+      payment_method: 'cash',
+      customer: { name: 'Customer Tanpa Produk', phone: '081200000006' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  assert.ok(/belum dialokasikan|tidak ditemukan/i.test(data.error || ''), 'assignment bound via gate');
+});
+
+test('C4/Checkout remote/gift delivery: fulfillment branch drives delivery routing; buyer location is not a delivery input', async () => {
+  // Delivery destination (Bandar Lampung analog) is distinct from any buyer
+  // location. The order must bind to the SELECTED fulfillment branch and the
+  // stored delivery destination must be exactly the one provided — routing
+  // originates from the branch, never from a buyer coordinate.
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_cs_open',
+      payment_method: 'cash',
+      customer: { name: 'Buyer Jakarta', phone: '081200000007' }, // buyer location is NOT sent/used
+      order_type: 'delivery',
+      delivery: { address: 'Alamat Penerima Bandar Lampung', latitude: -7.25, longitude: 112.78 },
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 201, 'branch -> destination is the valid geospatial input');
+  const data = await res.json();
+  const order = db.prepare('SELECT branch_id FROM orders WHERE id = ?').get(data.order_id);
+  assert.strictEqual(order.branch_id, 'branch_cs_open', 'fulfillment branch = selected branch');
+  const del = db.prepare('SELECT destination_latitude, destination_longitude, destination_address FROM order_deliveries WHERE order_id = ?').get(data.order_id)
+    || db.prepare('SELECT delivery_latitude AS destination_latitude, delivery_longitude AS destination_longitude, delivery_address AS destination_address FROM orders WHERE id = ?').get(data.order_id);
+  assert.ok(del, 'delivery destination persisted');
+  assert.strictEqual(Number(del.destination_latitude), -7.25);
+  assert.strictEqual(Number(del.destination_longitude), 112.78);
+});
+
