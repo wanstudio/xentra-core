@@ -98,6 +98,79 @@ Untuk order delivery, **buyer**, **recipient/delivery destination**, dan **fulfi
 
 Customer dapat menentukan destination context terlebih dahulu dan memilih Branch yang tersedia, atau menyerahkan pemilihan Branch kepada Xentra melalui AUTO mode. Customer-selected Branch tetap harus melalui canonical eligibility.
 
+## 🔒 LOCKED — Home as Dynamic Container & Branch-Aware Composition
+
+**Decision Date:** 2026-09-04
+
+Home Xentra adalah **container/presentation composition**, bukan halaman yang meng-hardcode jumlah atau struktur Branch. Home menggunakan data/context dari domain/application layer untuk merender bagian yang relevan.
+
+### Core Principle
+
+**Business/data contract → View Model → Home container → reusable UI components**
+
+Home tidak menjadi authority untuk menentukan fulfillment Branch, inventory, price, eligibility, acceptance, authorization, atau business policy. Home hanya mengomposisikan dan menampilkan state/data yang diberikan oleh layer authoritative.
+
+### Branch-Aware Home Behavior
+
+Jumlah Branch tidak menjadi batas arsitektur dan tidak boleh menghasilkan implementasi khusus per jumlah Branch. Brand dengan 1, 2, 50, atau jumlah Branch lainnya menggunakan composition model yang sama.
+
+#### Jika hanya 1 Branch yang relevan/eligible
+- Teks/section **“Cabang terdekat dari tempatmu”** tidak ditampilkan.
+- Branch selector/carousel tidak ditampilkan karena tidak ada pilihan yang perlu diberikan kepada Customer.
+- Home langsung masuk ke context catalog Branch tersebut: **Category → Product**.
+- Secara domain, Branch tetap authoritative dan tetap menjadi `fulfillment_branch_id`; penyederhanaan hanya terjadi pada presentation.
+
+#### Jika lebih dari 1 Branch yang relevan/eligible
+- Home menampilkan Branch discovery/selector.
+- Branch ditampilkan dalam urutan berdasarkan **ETA** dari delivery destination/customer destination context sesuai routing/matching contract.
+- Jarak dapat ditampilkan sebagai informasi pendukung, tetapi Home tidak menghitung ulang atau menggantikan ranking authoritative dari domain/matching layer.
+- Customer dapat memilih Branch yang tersedia sesuai selection contract.
+- Setelah Branch dipilih, Home menampilkan catalog Branch tersebut: **Category → Product**.
+
+#### Jika jumlah Branch besar
+- Tidak ada hardcoded limit berdasarkan jumlah Branch.
+- Rendering harus tetap berbasis data/view model dan reusable component.
+- Pagination, lazy loading, virtualization, atau presentation optimization boleh digunakan bila diperlukan untuk performa, tetapi tidak boleh mengubah business authority atau selection semantics.
+
+### Important Boundary
+
+**“Cabang terdekat” adalah presentation/discovery concept, bukan kewajiban bahwa Branch terdekat harus menjadi fulfillment Branch.** AUTO menggunakan BranchMatcher sesuai contract; CUSTOMER_SELECTED tetap memungkinkan Customer memilih Branch yang valid. Customer-selected Branch tetap melewati canonical eligibility dan Branch Acceptance.
+
+### Single-Branch Simplification
+
+UI boleh menyembunyikan pilihan yang tidak memiliki nilai bagi Customer. **UI simplification tidak boleh menghapus domain state.** Dalam kasus satu Branch, sistem tetap harus membawa context Branch secara authoritative untuk catalog, eligibility, cart, checkout, dan order.
+
+### Catalog Composition
+
+Setelah Branch context ditetapkan, Home mengonsumsi catalog Branch tersebut secara dinamis:
+
+**Selected/Resolved Branch → Category → Product**
+
+Category dan Product yang tampil harus mengikuti data/contract catalog yang authoritative untuk Branch tersebut. Home tidak membuat daftar menu statis per Branch.
+
+### Architectural Invariants
+
+- Home adalah **container/composition layer**, bukan business-rule container.
+- Tidak ada hardcode jumlah Branch.
+- Tidak ada hardcode catalog/menu per Branch.
+- Branch selection dan final `fulfillment_branch_id` adalah konsep yang berbeda tetapi harus tetap konsisten.
+- Customer destination context digunakan untuk discovery/matching delivery; buyer location tidak boleh diasumsikan sama dengan delivery destination.
+- UI tidak boleh mem-bypass canonical eligibility atau Branch Acceptance.
+- One Cart → One Fulfillment Branch tetap berlaku.
+- Reusable component architecture tetap menjadi arah implementasi.
+
+### Verification Expectation
+
+Audit implementasi Home harus memverifikasi minimal:
+1. Brand dengan 1 Branch tidak menampilkan branch selector dan langsung menampilkan Category → Product.
+2. Brand dengan >1 Branch menampilkan Branch discovery/selector secara data-driven.
+3. Branch list tidak bergantung pada hardcoded count atau fixed branch IDs.
+4. Ordering Branch mengikuti authoritative ETA/matching data, bukan kalkulasi ranking ad-hoc di UI.
+5. Pemilihan Branch menghasilkan context yang benar untuk catalog dan cart.
+6. Invalid/unavailable Branch tidak dapat dipaksa melalui UI.
+7. Remote/gift destination tetap memisahkan buyer location dari delivery destination.
+8. Reuse component tetap dipertahankan tanpa menjadikan component sebagai business authority.
+
 ## Reason
 Nilai utama model multi-branch Xentra adalah menghubungkan owner/brand dengan kondisi operasional cabang secara cepat, akurat, dan auditable sehingga keputusan bisnis dapat dibuat berdasarkan kondisi aktual. Optimasi fulfillment Customer adalah salah satu use case dari data Branch, bukan definisi utama Branch.
 
