@@ -626,9 +626,9 @@
       var img = item.image_url || item.image || '';
       var qty = Number(item.quantity || 1);
       var note = (state.notes && state.notes[item.id]) || item.note || '';
-      // Visual classification only (legacy zero-price lines still render
-      // "Gratis") — reward identity itself is canonical (flag / reward_ id).
-      var isPromoFreebie = Boolean(item.is_promo_reward || String(item.id).indexOf('reward_') === 0 || Number(item.price) === 0);
+      // Visual classification only — reward identity is canonical (flag / reward_ id),
+      // never price-based, so a legitimately free catalog product is not mislabelled "Gratis".
+      var isPromoFreebie = Boolean(item.is_promo_reward || String(item.id).indexOf('reward_') === 0);
 
       html +=
         '<div class="x-product x-checkout-item" data-item-id="' + item.id + '">' +

@@ -4,6 +4,23 @@
  */
 const BasePromotionStrategy = require('./BasePromotionStrategy');
 
+// Safe config parsing: malformed Owner-supplied JSON must never crash the
+// promotion evaluation endpoint. Returns the object, an already-object value,
+// or the fallback. Logs enough context for diagnosis without hiding the issue.
+function safeParseObject(value, fallback = {}) {
+  if (!value) return fallback;
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return fallback;
+    return parsed;
+  } catch (error) {
+    console.error('[InstallIncentiveStrategy] Malformed promotion JSON payload (using fallback):', error.message);
+    return fallback;
+  }
+}
+
 class InstallIncentiveStrategy extends BasePromotionStrategy {
   constructor() {
     super('install_incentive');
@@ -21,9 +38,7 @@ class InstallIncentiveStrategy extends BasePromotionStrategy {
     let firstOrderOnly = true;
 
     if (eligibilityRule && eligibilityRule.rule_payload) {
-      const payload = typeof eligibilityRule.rule_payload === 'string'
-        ? JSON.parse(eligibilityRule.rule_payload)
-        : eligibilityRule.rule_payload;
+      const payload = safeParseObject(eligibilityRule.rule_payload);
       if (payload.requires_pwa_installed !== undefined) requiresPwa = Boolean(payload.requires_pwa_installed);
       if (payload.target_audience) targetAudience = payload.target_audience;
       if (payload.first_order_only !== undefined) firstOrderOnly = Boolean(payload.first_order_only);
@@ -48,14 +63,10 @@ class InstallIncentiveStrategy extends BasePromotionStrategy {
       };
     }
 
-    // 3. Extract Reward & Presentation
+    // 3. Extract Reward & Presentation (presentation is cosmetic; malformed
+    //    payload falls back to defaults and never crashes evaluation)
     const primaryReward = promotion.rewards[0] || {};
-    let presentation = {};
-    if (primaryReward.presentation_payload) {
-      presentation = typeof primaryReward.presentation_payload === 'string'
-        ? JSON.parse(primaryReward.presentation_payload)
-        : primaryReward.presentation_payload;
-    }
+    const presentation = safeParseObject(primaryReward.presentation_payload);
 
     const amountInCents = Number(primaryReward.amount_in_cents || 0);
     // No synthetic/fallback product id: the reward target MUST be configured in

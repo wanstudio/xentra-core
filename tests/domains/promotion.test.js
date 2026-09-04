@@ -272,6 +272,93 @@ test('Promotion 6 — Authoritative Zero-Trust Reward Resolution: PrePaymentVeri
   assert.strictEqual(rewardItem.name, 'Es Teh Legit Asli Server'); // Server-enforced name, ignored HACKED CLIENT NAME
 });
 
+test('Promotion 8 — Malformed promotion config never crashes evaluation (safe parse)', () => {
+  const strategy = new InstallIncentiveStrategy();
+
+  // Malformed rule_payload (invalid JSON string) -> must NOT throw; promotion
+  // treats rules as absent (requiresPwa defaults true) and stays on banner.
+  const malformedRule = new Promotion({
+    id: 'prm_malformed_rule',
+    brand_id: 'brand_bangjo',
+    name: 'Broken Rules',
+    capability_type: 'install_incentive',
+    rules: [{ id: 'rul_bad', rule_type: 'eligibility', rule_payload: '{not valid json' }],
+    rewards: [{ id: 'rew_bad', reward_type: 'freebie_product', target_product_id: 'prod_x', amount_in_cents: 0 }]
+  });
+  let r1;
+  assert.doesNotThrow(() => { r1 = strategy.evaluate(malformedRule, { is_pwa_installed: false }); });
+  assert.strictEqual(r1.isEligible, true);
+  assert.strictEqual(r1.should_show_banner, true);
+
+  // Malformed presentation_payload (invalid JSON string) -> falls back to defaults,
+  // still grants the configured reward when install requirement is met.
+  const malformedPresentation = new Promotion({
+    id: 'prm_malformed_pres',
+    brand_id: 'brand_bangjo',
+    name: 'Broken Presentation',
+    capability_type: 'install_incentive',
+    rules: [{ id: 'rul_ok', rule_type: 'eligibility', rule_payload: { requires_pwa_installed: true } }],
+    rewards: [{ id: 'rew_ok', reward_type: 'freebie_product', target_product_id: 'prod_es_teh', amount_in_cents: 0, presentation_payload: '{oops' }]
+  });
+  let r2;
+  assert.doesNotThrow(() => { r2 = strategy.evaluate(malformedPresentation, { is_pwa_installed: true, customer_orders_count: 0 }); });
+  assert.strictEqual(r2.isEligible, true);
+  assert.strictEqual(r2.should_grant_reward, true);
+  assert.strictEqual(r2.reward.product_id, 'prod_es_teh');
+  assert.strictEqual(r2.display.reward_title, 'Selamat! Hadiah spesial untuk pesanan pertamamu!'); // default fallback
+});
+
+test('Promotion 9 — Canonical reward identity: price=0 / name "Gratis" are NOT promo signals', () => {
+  // Mirrors the client cart classification contract (store.js): a reward line
+  // is promo ONLY by promotion_id + product_id (+ is_promo_reward flag), never
+  // by price or by the word "Gratis" in the name.
+  function isCanonicalPromoReward(item, promotionId, productId) {
+    if (!item) return false;
+    return String(item.promotion_id || '') === String(promotionId) &&
+      String(item.product_id || '') === String(productId);
+  }
+
+  // CASE A: normal product price=0, no promotion_id -> NOT a promo reward
+  assert.strictEqual(isCanonicalPromoReward({ product_id: 'prod_free_item', price: 0, promotion_id: null }, 'promo_123', 'prod_ayam'), false);
+  // CASE B: normal product named "Gratis ...", price=0, no promotion_id -> NOT a promo reward
+  assert.strictEqual(isCanonicalPromoReward({ product_id: 'prod_merch', name: 'Gratis Ongkir Merchandise', price: 0, promotion_id: null }, 'promo_123', 'prod_ayam'), false);
+  // CASE C: real promotion reward (promotion_id + product_id) -> IS a promo reward
+  assert.strictEqual(isCanonicalPromoReward({ product_id: 'prod_ayam', price: 0, promotion_id: 'promo_123' }, 'promo_123', 'prod_ayam'), true);
+
+  // A zero-price normal product must never be classified promo by price alone.
+  const zeroPriceNormal = { product_id: 'prod_free_item', price: 0, promotion_id: null };
+  const flaggedAsPromo = Boolean(zeroPriceNormal.is_promo_reward || String(zeroPriceNormal.id || '').indexOf('reward_') === 0);
+  assert.strictEqual(flaggedAsPromo, false);
+});
+
+test('Promotion 10 — Fully configuration-driven reward (dynamic A/B, no source change)', () => {
+  const strategy = new InstallIncentiveStrategy();
+  const base = {
+    brand_id: 'brand_bangjo',
+    capability_type: 'install_incentive',
+    stacking_policy: 'exclusive',
+    rules: [{ id: 'rul', rule_type: 'eligibility', rule_payload: { requires_pwa_installed: true } }]
+  };
+
+  // Configuration A: reward = prod_ayam
+  const promoA = new Promotion({ ...base, id: 'prm_dyn_A', name: 'Reward A', rewards: [{ id: 'rwA', reward_type: 'freebie_product', target_product_id: 'prod_ayam', amount_in_cents: 0 }] });
+  const resA = strategy.evaluate(promoA, { is_pwa_installed: true, customer_orders_count: 0 });
+  assert.strictEqual(resA.should_grant_reward, true);
+  assert.strictEqual(resA.reward.product_id, 'prod_ayam');
+
+  // Configuration B: same logic, reward = prod_es_teh (no code change between A and B)
+  const promoB = new Promotion({ ...base, id: 'prm_dyn_B', name: 'Reward B', rewards: [{ id: 'rwB', reward_type: 'freebie_product', target_product_id: 'prod_es_teh', amount_in_cents: 0 }] });
+  const resB = strategy.evaluate(promoB, { is_pwa_installed: true, customer_orders_count: 0 });
+  assert.strictEqual(resB.should_grant_reward, true);
+  assert.strictEqual(resB.reward.product_id, 'prod_es_teh');
+
+  // Missing target_product_id -> no silent synthetic fallback; safe ineligible
+  const promoMissing = new Promotion({ ...base, id: 'prm_dyn_missing', name: 'No Reward', rewards: [{ id: 'rwM', reward_type: 'freebie_product', amount_in_cents: 0 }] });
+  const resM = strategy.evaluate(promoMissing, { is_pwa_installed: true, customer_orders_count: 0 });
+  assert.strictEqual(resM.isEligible, false);
+  assert.match(resM.reason, /target product is not configured/i);
+});
+
 test('Promotion 7 — Scoped POS Offline Idempotency: True parallel sync requests against same (branch_id, client_transaction_id) yield exactly one order and one stock deduction', async () => {
   const OfflineReconciliationService = require('../../domains/pos/services/OfflineReconciliationService');
   const db = require('../../server/database/db');
