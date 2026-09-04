@@ -618,7 +618,29 @@ test('API POS Cash Settlement: POST /api/v1/pos/orders/:id/settle-cash completes
   const loginData = await loginRes.json();
   const authHeaders = { authorization: `Bearer ${loginData.token}` };
 
-  // 4. Authorized cash settlement
+  // 4. R5 CHECK-2: a customer-app cash order starts AWAITING_BRANCH_ACCEPTANCE
+  // ('pending') and CANNOT be settled before the branch ACCEPTs it — cash
+  // settlement is a payment mutation, NOT an acceptance act.
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+  const prematureSettle = await mockFetch(`/api/v1/pos/orders/${orderId}/settle-cash`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ amount_tendered: 50000 })
+  });
+  assert.strictEqual(prematureSettle.status, 400);
+  assert.ok(/ORDER_NOT_ACCEPTED/.test((await prematureSettle.json()).error || ''), 'unaccepted cash order cannot be settled');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+
+  // 4b. Branch ACCEPT (admin seed user is role 'owner' → brand-wide) → confirmed.
+  const acceptRes = await mockFetch(`/api/v1/orders/${orderId}/branch-acceptance`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({ decision: 'accept', note: 'Diterima kas' })
+  });
+  assert.strictEqual(acceptRes.status, 200);
+  assert.strictEqual((await acceptRes.json()).new_status, 'confirmed');
+
+  // 4c. Authorized cash settlement AFTER acceptance
   const settleRes = await mockFetch(`/api/v1/pos/orders/${orderId}/settle-cash`, {
     method: 'POST',
     headers: authHeaders,
@@ -628,6 +650,9 @@ test('API POS Cash Settlement: POST /api/v1/pos/orders/:id/settle-cash completes
   const settleData = await settleRes.json();
   assert.strictEqual(settleData.success, true);
   assert.strictEqual(settleData.payment.payment_status, 'settlement');
+
+  // Settlement must NOT mutate order acceptance state: stays confirmed.
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'confirmed');
 
   // Verify in database: order_payments.payment_status is settlement
   const payRow = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(orderId);
@@ -2246,5 +2271,79 @@ test('R7 customer cancel guards: no session → 401; settled payment → ORDER_A
   assert.ok(/ORDER_ALREADY_PAID/.test((await paidCancel.json()).error || ''), 'settled payment requires a refund flow');
   assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
   assert.strictEqual(r5AuditCount(orderId), 0, 'no audit entry for a blocked cancel');
+});
+
+/* ============================================================================
+   R5 POST-AUDIT (CHECK-1 / CHECK-4):
+   The generic kitchen PATCH must NOT offer acceptance ('confirmed') or generic
+   cancellation ('cancelled'); those are exclusively served by
+   /orders/:id/branch-acceptance (branch actors) and /orders/:id/cancel
+   (customer, pending only). Payment settlement never bypasses Branch ACCEPT.
+   ============================================================================ */
+
+test('R5 CHECK-1: kitchen PATCH rejects manager-set confirmed/cancelled (403) — acceptance & generic cancel have dedicated endpoints', async () => {
+  csAddBranch('branch_r5_chk1', { assign272: true });
+  const bm = await r5Login('r5_bm_chk1', 'branch_manager', 'branch_r5_chk1');
+  assert.strictEqual(bm.status, 200);
+
+  const orderId = await r5CreatePendingOrder('branch_r5_chk1', '081200000095');
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+
+  const patchConfirmed = await mockFetch(`/api/v1/kitchen/orders/${orderId}/status`, {
+    method: 'PATCH', headers: bm.headers, body: JSON.stringify({ status: 'confirmed' })
+  });
+  assert.strictEqual(patchConfirmed.status, 403, 'generic PATCH must not ACCEPT (branch-acceptance endpoint only)');
+
+  const patchCancelled = await mockFetch(`/api/v1/kitchen/orders/${orderId}/status`, {
+    method: 'PATCH', headers: bm.headers, body: JSON.stringify({ status: 'cancelled' })
+  });
+  assert.strictEqual(patchCancelled.status, 403, 'generic PATCH must not cancel after ACCEPT (R8 exception flow, later task)');
+
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+  assert.strictEqual(r5AuditCount(orderId), 0, 'no audit row for blocked transitions');
+});
+
+test('R5 CHECK-2 API: midtrans settlement keeps order AWAITING; only branch-acceptance confirms', async () => {
+  const PaymentGatewayService = require('../domains/payment/services/PaymentGatewayService');
+  csAddBranch('branch_r5_chk2', { assign272: true });
+
+  const orderRes = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_r5_chk2',
+      payment_method: 'midtrans',
+      customer: { name: 'Customer CHK2', phone: '081200000096' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(orderRes.status, 201);
+  const orderData = await orderRes.json();
+  const orderId = orderData.order_id;
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'pending');
+
+  // Simulate Midtrans settlement (crypto signature verification is covered by
+  // the payment domain suite; here we exercise the order-state boundary).
+  const handled = PaymentGatewayService.handleWebhook({
+    order_id: orderId,
+    status_code: '200',
+    gross_amount: String(orderData.grand_total) + '.00',
+    transaction_status: 'settlement',
+    payment_type: 'qris'
+  }, { skipSignatureCheck: true });
+  assert.strictEqual(handled.payment_status, 'settlement');
+  assert.strictEqual(
+    db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status,
+    'pending',
+    'paid order is still AWAITING_BRANCH_ACCEPTANCE — payment is not acceptance'
+  );
+
+  // Branch ACCEPT (owner, brand-wide) → confirmed.
+  const owner = await r5Login('r5_owner_chk2', 'owner', null);
+  const acceptRes = await mockFetch(`/api/v1/orders/${orderId}/branch-acceptance`, {
+    method: 'POST', headers: owner.headers, body: JSON.stringify({ decision: 'accept' })
+  });
+  assert.strictEqual(acceptRes.status, 200);
+  assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'confirmed');
 });
 

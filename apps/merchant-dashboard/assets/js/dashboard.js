@@ -679,23 +679,50 @@
   }
 
   window.advanceOrderStatus = async function (orderId, currentStatus) {
+    var token = localStorage.getItem(TOKEN_KEY) || '';
+    var authHeaders = { 'Content-Type': 'application/json' };
+    if (token) authHeaders['Authorization'] = 'Bearer ' + token;
+
+    // R5 CHECK-1: acceptance ('pending' → 'confirmed') is EXCLUSIVELY Branch
+    // ACCEPT via /orders/:id/branch-acceptance — never the generic status
+    // PATCH. The branch acceptance endpoint is server-authoritative, audited,
+    // and idempotent.
+    if (currentStatus === 'pending') {
+      try {
+        var acceptRes = await fetch(API_BASE + '/orders/' + orderId + '/branch-acceptance', {
+          method: 'POST',
+          headers: authHeaders,
+          body: JSON.stringify({ decision: 'accept', note: 'Diterima dari Merchant Dashboard' })
+        });
+        var acceptData = await acceptRes.json();
+        if (acceptData && acceptData.success) {
+          showToast('Pesanan DITERIMA: ' + (acceptData.new_status || 'confirmed').toUpperCase());
+          loadOrders();
+        } else {
+          showToast((acceptData && acceptData.error) || 'Gagal menerima pesanan.');
+        }
+      } catch (e) {
+        showToast('Gagal menerima pesanan.');
+      }
+      return;
+    }
+
     var nextMap = {
-      pending: 'confirmed',
       confirmed: 'preparing',
       preparing: 'ready',
-      ready: 'delivered',
-      delivered: 'completed'
+      ready: 'out_for_delivery',
+      out_for_delivery: 'completed'
     };
 
     var nextStatus = nextMap[currentStatus] || 'completed';
     try {
       var res = await fetch(API_BASE + '/kitchen/orders/' + orderId + '/status', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ status: nextStatus, note: 'Status diupdate dari Merchant Dashboard' })
       });
       var data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         showToast('Pesanan diubah ke status: ' + nextStatus.toUpperCase());
         loadOrders();
       }

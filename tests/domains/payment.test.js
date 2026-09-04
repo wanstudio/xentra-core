@@ -48,8 +48,31 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
   const orderId = `ord_test_cash_${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Cash', '62812345678', 'dine_in', 'pos_cashier', 50000, 50000, 'cash', 'pending')
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Cash', '62812345678', 'dine_in', 'pos_cashier', 50000, 50000, 'cash', 'confirmed')
   `).run(orderId, `ORD-CASH-${Date.now()}`);
+
+  // R5/CHECK-2: cash settlement is a PAYMENT mutation only and requires an
+  // ACCEPTED order ('confirmed'). A pending order (AWAITING_BRANCH_ACCEPTANCE)
+  // must be branch-accepted before cash is collected.
+  const pendingCashOrderId = `ord_test_cash_pending_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Cash Pending', '62812345678', 'dine_in', 'customer_app', 40000, 40000, 'cash', 'pending')
+  `).run(pendingCashOrderId, `ORD-CASH-PENDING-${Date.now()}`);
+  assert.throws(() => {
+    CashSettlementService.settleCashPayment({
+      order_id: pendingCashOrderId,
+      amount: 40000,
+      amount_tendered: 40000,
+      cashier_id: 'cashier_pay',
+      shift_id: 'shift_pay_open'
+    });
+  }, /ORDER_NOT_ACCEPTED/);
+  assert.strictEqual(
+    db.prepare('SELECT status FROM orders WHERE id = ?').get(pendingCashOrderId).status,
+    'pending',
+    'unaccepted order cannot be cash-settled'
+  );
 
   let settledEvent = null;
   events.EventBus.subscribe('payment.settled', (evt) => {
@@ -81,7 +104,8 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
   assert.strictEqual(shiftRecord.total_cash_sales, 50000);
   assert.strictEqual(shiftRecord.expected_cash, 150000);
 
-  // Check order status
+  // Check order status: settlement does NOT regress/advance order state — the
+  // order stays 'confirmed' (already accepted); settlement is payment-only.
   const orderRecord = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
   assert.strictEqual(orderRecord.status, 'confirmed');
 
@@ -103,7 +127,7 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
   const newOrderId = `ord_test_cross_${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Cross', '62812345678', 'dine_in', 'pos_cashier', 25000, 25000, 'cash', 'pending')
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Cross', '62812345678', 'dine_in', 'pos_cashier', 25000, 25000, 'cash', 'confirmed')
   `).run(newOrderId, `ORD-CASH-CROSS-${Date.now()}`);
 
   // 1. Closed shift rejected
@@ -141,7 +165,7 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
   const raceOrderId = `ord_test_race_close_${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Race Close', '62812345678', 'dine_in', 'pos_cashier', 15000, 15000, 'cash', 'pending')
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Race Close', '62812345678', 'dine_in', 'pos_cashier', 15000, 15000, 'cash', 'confirmed')
   `).run(raceOrderId, `ORD-RACE-CLOSE-${Date.now()}`);
 
   // Create temporary shift and close it immediately
@@ -161,15 +185,17 @@ test('Payment 2 — Cash Settlement: creates payment record and emits payment.se
     });
   }, /SHIFT_ALREADY_CLOSED|sudah ditutup/);
 
-  // Assert order remains pending and NOT confirmed
-  const pendingOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(raceOrderId);
-  assert.strictEqual(pendingOrder.status, 'pending');
+  // Assert order remains confirmed (accepted) and NOT regressed by the failed settlement
+  const raceOrderAfter = db.prepare('SELECT status FROM orders WHERE id = ?').get(raceOrderId);
+  assert.strictEqual(raceOrderAfter.status, 'confirmed');
 
   // 4. Online Payment (Midtrans) Order Rejected for Cash Settlement (NEW-01)
+  //    (seeded as accepted 'confirmed' so the provider-conflict guard fires;
+  //    the separate pending-guard is asserted earlier as ORDER_NOT_ACCEPTED)
   const onlineOrderId = `ord_test_online_${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Online', '62812345678', 'delivery', 'customer_app', 60000, 60000, 'midtrans', 'pending')
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Online', '62812345678', 'delivery', 'customer_app', 60000, 60000, 'midtrans', 'confirmed')
   `).run(onlineOrderId, `ORD-ONLINE-${Date.now()}`);
 
   assert.throws(() => {
@@ -269,8 +295,10 @@ test('Payment 3 — Midtrans Webhook: verifies SHA512 signature, advances status
   assert.strictEqual(result.payment_status, 'settlement');
 
   // Verify order and payment status
+  // R5/CHECK-2: settlement NEVER transitions pending → confirmed; Branch ACCEPT
+  // is the only acceptance path. The order stays AWAITING_BRANCH_ACCEPTANCE.
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
-  assert.strictEqual(order.status, 'confirmed');
+  assert.strictEqual(order.status, 'pending', 'payment settlement must not bypass Branch ACCEPT');
   assert.strictEqual(order.payment_method, 'midtrans');
 
   const payRecord = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(orderId);
@@ -626,7 +654,7 @@ test('Payment 9 — Webhook Concurrency Race & Idempotent Retry: First settlemen
   const resA = PaymentGatewayService.handleWebhook(webhookPayloadA, { skipSignatureCheck: true });
   assert.strictEqual(resA.payment_status, 'settlement');
   const orderAInDb = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderIdA);
-  assert.strictEqual(orderAInDb.status, 'confirmed');
+  assert.strictEqual(orderAInDb.status, 'pending', 'money settled but order still AWAITING_BRANCH_ACCEPTANCE (R5 check-2)');
 
   // Verify redemption recorded for Order A
   const rdmA = db.prepare("SELECT * FROM promotion_redemptions WHERE order_id = ? AND status = 'active'").get(orderIdA);
@@ -739,4 +767,122 @@ test('Payment R11 — gateway cancel/deny/expire never overwrites a terminal BRA
   assert.strictEqual(order.status, 'timeout', 'BRANCH_TIMEOUT survives a later gateway expire');
   const payRecord = db.prepare('SELECT payment_status FROM order_payments WHERE order_id = ?').get(orderId);
   assert.strictEqual(payRecord.payment_status, 'expire');
+});
+
+// ==============================================================================
+// R5 CHECK-2 — payment settlement NEVER bypasses Branch ACCEPT; ACCEPT is the
+// only transition out of AWAITING_BRANCH_ACCEPTANCE ('pending').
+// ==============================================================================
+test('R5 CHECK-2 — settlement keeps the order AWAITING; only Branch ACCEPT confirms; settlement AFTER ACCEPT leaves status untouched', () => {
+  const ts = Date.now();
+  const OrderStateMachine = require('../../server/services/OrderStateMachine');
+
+  // --- Case A: settlement on a pending order -> money settled, order stays pending ---
+  const orderIdA = `ord_chk2_A_${ts}`;
+  const orderNumberA = `XN-CHK2-A-${ts}`;
+  const productIdA = `prod_chk2_A_${ts}`;
+
+  db.prepare(`INSERT INTO products (id, brand_id, name, slug, price)
+    VALUES (?, 'brand_pay', 'Produk CHK2 A', 'prod-chk2-a', 45000)`).run(productIdA);
+  db.prepare(`INSERT INTO branch_products (branch_id, product_id, stock, is_available)
+    VALUES ('branch_pay', ?, 10, 1)`).run(productIdA);
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Customer CHK2 A', '62812345678', 'delivery', 'customer_app', 45000, 45000, 'midtrans', 'pending')
+  `).run(orderIdA, orderNumberA);
+  db.prepare(`
+    INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal)
+    VALUES (?, ?, ?, 'Produk CHK2 A', 45000, 1, 45000)
+  `).run(`item_chk2_A_${ts}`, orderIdA, productIdA);
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
+    VALUES (?, ?, 'midtrans', 'M12345', 'snap_chk2_a', 'pending', 45000)
+  `).run(`pay_chk2_A_${ts}`, orderIdA);
+
+  const resA = PaymentGatewayService.handleWebhook({
+    order_id: orderIdA,
+    status_code: '200',
+    gross_amount: '45000.00',
+    transaction_status: 'settlement',
+    payment_type: 'qris'
+  }, { skipSignatureCheck: true });
+
+  assert.strictEqual(resA.success, true);
+  assert.strictEqual(resA.payment_status, 'settlement');
+  assert.strictEqual(resA.order_status, undefined, 'settlement does NOT claim an order-status change');
+
+  let orderA = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderIdA);
+  assert.strictEqual(orderA.status, 'pending', 'paid order stays AWAITING_BRANCH_ACCEPTANCE — payment is not acceptance');
+
+  // --- Branch ACCEPT is the ONLY transition to 'confirmed' ---
+  const acceptRes = OrderStateMachine.transition({
+    order_id: orderIdA,
+    target_status: 'confirmed',
+    actor_type: 'branch_actor',
+    actor_id: 'usr_bm_chk2',
+    note: '[ACCEPT by branch_manager:usr_bm_chk2] OK'
+  });
+  assert.strictEqual(acceptRes.success, true);
+  orderA = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderIdA);
+  assert.strictEqual(orderA.status, 'confirmed');
+
+  // --- Case B: settlement arriving AFTER ACCEPT is fine and leaves status alone ---
+  const orderIdB = `ord_chk2_B_${ts}`;
+  const orderNumberB = `XN-CHK2-B-${ts}`;
+  const productIdB = `prod_chk2_B_${ts}`;
+
+  db.prepare(`INSERT INTO products (id, brand_id, name, slug, price)
+    VALUES (?, 'brand_pay', 'Produk CHK2 B', 'prod-chk2-b', 30000)`).run(productIdB);
+  db.prepare(`INSERT INTO branch_products (branch_id, product_id, stock, is_available)
+    VALUES ('branch_pay', ?, 10, 1)`).run(productIdB);
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Customer CHK2 B', '62812345678', 'delivery', 'customer_app', 30000, 30000, 'midtrans', 'confirmed')
+  `).run(orderIdB, orderNumberB);
+  db.prepare(`
+    INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal)
+    VALUES (?, ?, ?, 'Produk CHK2 B', 30000, 1, 30000)
+  `).run(`item_chk2_B_${ts}`, orderIdB, productIdB);
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
+    VALUES (?, ?, 'midtrans', 'M12345', 'snap_chk2_b', 'pending', 30000)
+  `).run(`pay_chk2_B_${ts}`, orderIdB);
+
+  const resB = PaymentGatewayService.handleWebhook({
+    order_id: orderIdB,
+    status_code: '200',
+    gross_amount: '30000.00',
+    transaction_status: 'settlement',
+    payment_type: 'qris'
+  }, { skipSignatureCheck: true });
+  assert.strictEqual(resB.success, true);
+  assert.strictEqual(resB.payment_status, 'settlement');
+  const orderB = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderIdB);
+  assert.strictEqual(orderB.status, 'confirmed', 'accepted order stays accepted; settlement is payment-only');
+
+  // --- Case C: gateway cancel/expire still cancels a PENDING (unpaid) order only ---
+  const orderIdC = `ord_chk2_C_${ts}`;
+  const orderNumberC = `XN-CHK2-C-${ts}`;
+
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Customer CHK2 C', '62812345678', 'delivery', 'customer_app', 20000, 20000, 'midtrans', 'pending')
+  `).run(orderIdC, orderNumberC);
+  db.prepare(`
+    INSERT INTO order_payments (id, order_id, provider, merchant_id, snap_token, payment_status, amount)
+    VALUES (?, ?, 'midtrans', 'M12345', 'snap_chk2_c', 'pending', 20000)
+  `).run(`pay_chk2_C_${ts}`, orderIdC);
+
+  PaymentGatewayService.handleWebhook({
+    order_id: orderIdC,
+    status_code: '200',
+    gross_amount: '20000.00',
+    transaction_status: 'expire',
+    payment_type: 'qris'
+  }, { skipSignatureCheck: true });
+  assert.strictEqual(
+    db.prepare('SELECT status FROM orders WHERE id = ?').get(orderIdC).status,
+    'cancelled',
+    'payment failure still cancels an unpaid pending order (PAYMENT_FAILURE class)'
+  );
 });

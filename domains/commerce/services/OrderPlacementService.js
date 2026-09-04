@@ -54,6 +54,17 @@ class OrderPlacementService {
     const effectivePaymentMethod = (payment_method === 'cash') ? 'cash' : 'midtrans';
     const effectiveOrderType = order_type || 'delivery';
 
+    // R5/CHECK-2 OPERATIONAL BOUNDARY: an order is 'confirmed' (ACCEPTED) at
+    // creation ONLY when a Branch actor created it (POS cashier channel — the
+    // branch is present and commits to the order at the counter). Customer-app
+    // cash/midtrans orders start 'pending' (AWAITING_BRANCH_ACCEPTANCE) and
+    // ONLY Branch ACCEPT (POST /orders/:id/branch-acceptance) moves them to
+    // 'confirmed'. Payment settlement never confirms an order (payment state
+    // remains separate from order acceptance state).
+    const insertedStatus = (effectivePaymentMethod === 'cash' && order_channel === 'pos_cashier')
+      ? 'confirmed'
+      : 'pending';
+
     // Strict Validation: Same-Day Reservation Restriction & Mandatory Guest Count (NEW-02)
     if (effectiveOrderType === 'reservation') {
       if (!reservation_date) {
@@ -252,7 +263,7 @@ class OrderPlacementService {
         id, order_number, client_transaction_id, brand_id, branch_id, customer_name, customer_phone,
         order_type, order_channel, selection_mode, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
         subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertOrderItemStmt = db.prepare(`
@@ -292,6 +303,7 @@ class OrderPlacementService {
         Number(delivery_fee || 0),
         grandTotal,
         effectivePaymentMethod,
+        insertedStatus,
         notes,
         now,
         now
@@ -477,7 +489,7 @@ class OrderPlacementService {
       }
     });
 
-    const initialStatus = effectivePaymentMethod === 'cash' ? 'confirmed' : 'pending';
+    const initialStatus = insertedStatus;
 
     return {
       success: true,

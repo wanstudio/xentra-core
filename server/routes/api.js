@@ -1331,14 +1331,24 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
     }
 
     // P1 ROLE-BASED TRANSITION AUTHORITY (FINDING-02A)
-    // Kitchen role can ONLY advance operational cooking stages ('preparing', 'ready')
-    // Manager/Owner can advance operational fulfillment lifecycle and cancellation ('cancelled')
-    // Financial/Refund state is EXCLUSIVELY handled via dedicated RefundService
+    // Kitchen role can ONLY advance operational cooking stages ('preparing', 'ready').
+    // Manager/Owner can advance the operational fulfillment lifecycle
+    // ('preparing' → 'ready' → 'out_for_delivery' → 'completed').
+    // R5 BOUNDARY (CHECK-1/CHECK-4): ACCEPT ('confirmed') is EXCLUSIVELY served
+    // by POST /orders/:id/branch-acceptance (branch_manager | brand_manager |
+    // owner, audited [ACCEPT by <actor>], idempotent); this generic PATCH must
+    // NOT offer 'confirmed' — payment/kitchen/generic flows must never silently
+    // become Branch operational acceptance. 'cancelled' is likewise removed:
+    // after ACCEPT, cancellation is NOT a generic normal operation — it is a
+    // Branch Exception / recovery path (R8, later task) or payment-driven
+    // failure. Customer cancellation is served by POST /orders/:id/cancel
+    // (pending only). Financial/Refund state is EXCLUSIVELY handled via a
+    // dedicated recovery flow.
     const ROLE_ALLOWED_TARGET_STATUSES = {
       kitchen: ['preparing', 'ready'],
-      branch_manager: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'],
-      brand_manager: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'],
-      owner: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled']
+      branch_manager: ['preparing', 'ready', 'out_for_delivery', 'completed'],
+      brand_manager: ['preparing', 'ready', 'out_for_delivery', 'completed'],
+      owner: ['preparing', 'ready', 'out_for_delivery', 'completed']
     };
 
     const allowedTargetStatuses = ROLE_ALLOWED_TARGET_STATUSES[req.user.role] || [];

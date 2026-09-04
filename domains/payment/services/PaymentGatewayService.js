@@ -267,12 +267,13 @@ class PaymentGatewayService {
 
     const now = new Date().toISOString();
 
-    // Tracks the authoritative Order outcome of this settlement for reporting
-    // (R11: 'confirmed' from AWAITING, or 'fulfillment_exception' when money
-    // settled after the order already left AWAITING).
+    // Tracks the authoritative Order outcome of a settlement for reporting:
+    // 'fulfillment_exception' when money is settled for an order that already
+    // left AWAITING (terminal). Settlement NEVER moves the order to 'confirmed'
+    // — R5 boundary: payment success is not Branch operational acceptance.
     let orderStatusAfterSettlement = null;
 
-    // P1 ATOMICITY INVARIANT: Unify payment update, order confirmation, stock deduction, promo settlement into single atomic transaction
+    // P1 ATOMICITY INVARIANT: Unify payment update, fulfillment commitment (stock deduction + promo settlement), and terminal-order routing into single atomic transaction
     db.exec('BEGIN IMMEDIATE;');
     try {
       // Update order_payments table
@@ -283,49 +284,41 @@ class PaymentGatewayService {
       `).run(newPaymentStatus, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
 
       if (shouldConfirmOrder) {
-        // R11 CAS CONFIRM (commerce integrity): an order may be confirmed ONLY
-        // from 'pending' (AWAITING_BRANCH_ACCEPTANCE). If the order already
-        // left AWAITING before this settlement committed — branch REJECTED,
-        // BRANCH_TIMEOUT, customer-cancelled — a late settlement must NEVER
-        // force-confirm it or start fulfillment (stock deduction / promo
-        // redemption). Money is settled and the order is routed to the
-        // fulfillment_exception/refund queue with a structured reason. This is
-        // deterministic against the Acceptance Timeout Worker: BEGIN IMMEDIATE
-        // serializes the two writers, so whichever transaction commits first
-        // wins and the loser observes the new state.
-        const confirmResult = db.prepare(`
-          UPDATE orders
-          SET status = 'confirmed', payment_method = 'midtrans', updated_at = ?
-          WHERE id = ? AND status = 'pending'
-        `).run(now, order_id);
+        // R5 INTEGRITY (locked contract — Payment → Branch ACCEPT → Fulfillment):
+        // Payment settlement NEVER transitions the order to 'confirmed'. Branch
+        // ACCEPT (POST /orders/:id/branch-acceptance) is the ONLY path out of
+        // 'pending' (AWAITING_BRANCH_ACCEPTANCE); payment success must never
+        // silently become Branch operational acceptance. Order state and
+        // payment state remain separate state machines. The status read happens
+        // INSIDE the BEGIN IMMEDIATE transaction, so it is deterministic
+        // against the Acceptance Timeout Worker and concurrent branch decisions.
+        const currentOrderState = db.prepare('SELECT status FROM orders WHERE id = ?').get(order_id);
+        const terminalOrderStatuses = ['rejected', 'timeout', 'cancelled', 'fulfillment_exception'];
 
-        if (confirmResult && confirmResult.changes > 0) {
-          orderStatusAfterSettlement = 'confirmed';
+        if (currentOrderState && terminalOrderStatuses.includes(currentOrderState.status)) {
+          // Late settlement after a committed terminal decision (BRANCH_REJECT /
+          // BRANCH_TIMEOUT / CUSTOMER_CANCEL / earlier exception): the order is
+          // NEVER revived and fulfillment never starts. Money is settled and the
+          // order is routed to the existing recovery queue
+          // (fulfillment_exception) with a structured refund reason (R11 —
+          // preserved behavior).
+          orderStatusAfterSettlement = 'fulfillment_exception';
+          db.prepare(`
+            UPDATE orders
+            SET status = 'fulfillment_exception', payment_method = 'midtrans',
+                order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ?
+            WHERE id = ?
+          `).run(
+            `[Perlu Refund]: Pembayaran diterima setelah pesanan berstatus "${currentOrderState.status}". Pesanan tidak diaktifkan ulang.`,
+            now,
+            order_id
+          );
         } else {
-          const currentOrderState = db.prepare('SELECT status FROM orders WHERE id = ?').get(order_id);
-          if (currentOrderState && currentOrderState.status === 'confirmed') {
-            // Defensive: already confirmed by an earlier settlement (payment
-            // idempotency normally returns before reaching here).
-            orderStatusAfterSettlement = 'confirmed';
-          } else if (currentOrderState) {
-            orderStatusAfterSettlement = 'fulfillment_exception';
-            db.prepare(`
-              UPDATE orders
-              SET status = 'fulfillment_exception', payment_method = 'midtrans',
-                  order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ?
-              WHERE id = ?
-            `).run(
-              `[Perlu Refund]: Pembayaran diterima setelah pesanan berstatus "${currentOrderState.status}". Pesanan tidak diaktifkan ulang.`,
-              now,
-              order_id
-            );
-          }
-        }
-
-        // Fulfillment side effects (stock deduction + promo redemption) run
-        // ONLY when the order was actually confirmed (from pending or already
-        // confirmed) — never for a rejected/timed-out/cancelled order.
-        if (orderStatusAfterSettlement === 'confirmed') {
+          // Order is 'pending' (stays pending — still AWAITING_BRANCH_ACCEPTANCE)
+          // or already 'confirmed' (accepted before the webhook landed). Payment
+          // completed → run the authoritative fulfillment commitment (stock
+          // deduction + promo redemption). Order status is left untouched; the
+          // status transition to 'confirmed' belongs to Branch ACCEPT only.
         // 1. Authoritative Cross-Domain Inventory Settlement (Single Source of Truth in Commerce)
         const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
         OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });

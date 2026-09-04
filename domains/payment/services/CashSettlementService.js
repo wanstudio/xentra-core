@@ -40,10 +40,22 @@ class CashSettlementService {
       throw new Error(`[CashSettlementService] Order "${order_id}" tidak ditemukan.`);
     }
 
-    // P1 TERMINAL ORDER STATE GUARD (X-01): Strictly reject settlement on completed, cancelled, or expired orders
-    const TERMINAL_ORDER_STATUSES = ['completed', 'cancelled', 'expired'];
+    // P1 TERMINAL ORDER STATE GUARD (X-01): Strictly reject settlement on terminal orders.
+    const TERMINAL_ORDER_STATUSES = ['completed', 'cancelled', 'expired', 'rejected', 'timeout', 'fulfillment_exception'];
     if (TERMINAL_ORDER_STATUSES.includes(order.status)) {
       throw new Error(`[CashSettlementService] Tidak dapat menyelesaikan pembayaran tunai untuk pesanan yang sudah berada pada status terminal "${order.status}".`);
+    }
+
+    // R5/CHECK-2 BOUNDARY: cash settlement is a PAYMENT lifecycle mutation only.
+    // Order acceptance is a separate branch decision — the order must already be
+    // accepted ('confirmed') before cash is collected. An order still in
+    // 'pending' (AWAITING_BRANCH_ACCEPTANCE) cannot be settled: the branch must
+    // ACCEPT it first (POST /orders/:id/branch-acceptance). This keeps cashier
+    // settlement from silently becoming Branch operational acceptance.
+    if (order.status === 'pending') {
+      throw new Error(
+        `[ORDER_NOT_ACCEPTED]: Pesanan "${order_id}" masih menunggu penerimaan cabang (ACCEPT) dan belum dapat dilunasi. Silakan terima pesanan terlebih dahulu.`
+      );
     }
 
     // P1 PAYMENT METHOD GUARD: Ensure order was created as cash order
@@ -163,12 +175,12 @@ class CashSettlementService {
         now
       );
 
-      // 3. Update order payment details & advance status WITHOUT state regression (NEW-03)
-      // Only transition status to 'confirmed' if currently 'pending'. Never regress preparing/ready/completed.
+      // 3. Update order payment details WITHOUT any order-status mutation
+      // (R5/CHECK-2): settlement is a PAYMENT lifecycle change only. Order
+      // acceptance to 'confirmed' is exclusively a Branch ACCEPT decision.
       db.prepare(`
         UPDATE orders
         SET payment_method = 'cash',
-            status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
             updated_at = ?
         WHERE id = ?
       `).run(now, order_id);
