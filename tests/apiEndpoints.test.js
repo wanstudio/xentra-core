@@ -145,8 +145,8 @@ test('API POST /api/v1/checkout/create-order: validates items and creates order 
   assert.strictEqual(data.success, true);
   assert.ok(data.order_id.startsWith('ord_'));
   assert.ok(data.order_number.startsWith('XN-'));
-  // Subtotal = (35000 * 2) + (15000 * 2) = 70000 + 30000 = 100000
-  assert.strictEqual(data.subtotal, 100000);
+  // Subtotal = (25000 * 2) + (12000 * 2) = 50000 + 24000 = 74000
+  assert.strictEqual(data.subtotal, 74000);
   assert.strictEqual(data.payment.method, 'midtrans');
   assert.ok(data.snap_token);
 

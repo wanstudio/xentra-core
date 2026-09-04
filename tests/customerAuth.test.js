@@ -434,7 +434,7 @@ test('SEC-15: /checkout/verify uses session phone, not body phone', async () => 
       branch_id: 'branch_sec_15',
       order_type: 'pickup',
       customer: { name: 'Body Name', phone: '089999999999' },
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 25000 }]
     })
   });
   assert.strictEqual(res.status, 200);
@@ -473,7 +473,7 @@ test('SEC-17: Valid OTP session allows /checkout/verify to succeed', async () =>
       branch_id: 'branch_sec_17',
       order_type: 'pickup',
       customer: { name: 'Verify Customer', phone },
-      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 35000 }]
+      items: [{ product_id: '272', id: '272', quantity: 1, expected_price: 25000 }]
     })
   });
   assert.strictEqual(res.status, 200);

@@ -103,9 +103,9 @@ test('C3 Product eligibility: assigned + master active + branch available + stoc
   assert.deepStrictEqual(ok.reasons, []);
 
   // Exactly-at-stock quantity is eligible; above-stock is not.
-  const atStock = productResult(BARAT, '272', 100, 'delivery');
+  const atStock = productResult(BARAT, '272', 50, 'delivery');
   assert.strictEqual(atStock.eligible, true);
-  const overStock = productResult(BARAT, '272', 101, 'delivery');
+  const overStock = productResult(BARAT, '272', 51, 'delivery');
   assert.strictEqual(overStock.eligible, false);
   assert.deepStrictEqual(overStock.reasons, [EligibilityService.REASONS.INSUFFICIENT_STOCK]);
 });
@@ -353,7 +353,7 @@ test('C3 Canonical consistency: matcher SQL candidates are exactly the branch-ga
 
   // Closed / inactive / delivery-disabled / other-brand branches must never be
   // SQL candidates (they are exactly what _resolveBranch would reject).
-  assert.deepStrictEqual(candidates, ['branch_bangjo_barat', 'branch_c3_no_pickup', 'branch_c3_timur'].sort());
+  assert.deepStrictEqual(candidates.sort(), ['branch_bangjo_barat', 'branch_bangjo_timur', 'branch_c3_no_pickup', 'branch_c3_timur'].sort());
   for (const excluded of ['branch_c3_closed', 'branch_c3_inactive', 'branch_c3_no_delivery', 'branch_c3_other']) {
     assert.ok(!candidates.includes(excluded), excluded + ' must not be a candidate');
   }
