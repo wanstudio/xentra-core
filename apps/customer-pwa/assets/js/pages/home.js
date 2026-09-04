@@ -28,9 +28,14 @@
   var gpsAttempted = false;         // GPS is a lightweight signal, tried at most once per load
   var DISCOVERY_CACHE_KEY = 'xentra_branches_cache';
   // ── P3 Product/Catalog ──
-  // Stale-response guard: a branch-menu request that arrives after a newer one
-  // superseded it must never overwrite the visible catalog (identity preserved).
+  // Stale-response guards: a branch-menu request (catalogLoadSeq) OR a
+  // per-category product request (productLoadSeq) that arrives after a newer one
+  // superseded it must never overwrite the visible state (branch identity held).
+  // catalogBranchId is the branch the currently shown catalog belongs to
+  // (null = brand-wide). It is used to keep category/product fallbacks branch-safe.
   var catalogLoadSeq = 0;
+  var productLoadSeq = 0;
+  var catalogBranchId = null;
 
   var DEFAULT_CATALOG = {
     categories: [
@@ -363,11 +368,15 @@
   function setActiveBranch(branch, quiet) {
     activeBranch = branch || null;
     try { Store.setBranchContext(activeBranch ? branchContextOf(activeBranch) : null); } catch (_) {}
-    renderBranchDiscovery();
+    // The catalog MUST follow the new context immediately: the previous branch's
+    // categories/products are cleared (never a stale/mixed catalog under the new
+    // selection) and an honest loading state is shown until its menu arrives.
+    clearCatalogForBranch('Memuat menu cabang...');
     // P3: the catalog follows the customer-visible branch selection (the same
     // branchContext that gates cart provenance). The brand-wide menu stays until
     // the branch-scoped menu arrives; the selection is never silently re-scoped
     // by the client.
+    renderBranchDiscovery();
     loadCatalog(activeBranch ? activeBranch.id : null);
     if (activeBranch && !quiet && UI && typeof UI.toast === 'function') {
       UI.toast('Kamu memesan dari ' + activeBranch.name);
@@ -418,27 +427,33 @@
     var html =
       '<div class="x-branch-head">Cabang terdekat dari tempatmu</div>' +
       noLocationNote +
-      '<div class="x-branch-list">';
+      // Horizontal carousel: Home discovery stays compact; the active card only
+      // expresses "you are browsing this branch's menu", never fulfillment.
+      '<div class="x-branch-scroll x-scroll-hide">';
 
     branches.forEach(function (b) {
       var isActive = activeBranch && String(activeBranch.id) === String(b.id);
-      var distance = formatDistance(b._distance_km);
-      var distHtml = distance ? '<span class="x-branch-distance">' + distance + '</span>' : '';
-      var address = b.address_text || b.address || '';
 
-      var caps = '';
-      if (b.is_delivery_active) caps += '<span class="x-branch-chip">Dikirim</span>';
-      if (b.is_pickup_active) caps += '<span class="x-branch-chip">Diambil</span>';
+      // Branch photo: no image column exists in any branch view-model; when the
+      // contract supplies an image we render it, otherwise a data-derived initials
+      // monogram placeholder (never a product/brand image as branch identity).
+      var photoHtml = b.image_url
+        ? '<img class="x-branch-card-photo-img" src="' + UI.escape(b.image_url) + '" alt="' + UI.escape(b.name || '') + '" loading="lazy">'
+        : '<span class="x-branch-card-photo-mono">' + UI.escape(branchMonogram(b.name)) + '</span>';
+
+      // Category preview is only available for the already-loaded branch menu
+      // (per-branch categories are NOT part of the /brand/branches contract);
+      // it mirrors the categories rendered on this page for the active branch.
+      var catHtml = isActive ? branchCategoryPreviewHtml() : '';
 
       html +=
         '<button type="button" class="x-branch-card' + (isActive ? ' is-active' : '') + '" data-branch-id="' + UI.escape(String(b.id)) + '">' +
-        '  <span class="x-branch-card-name">' + UI.escape(b.name || '') + '</span>' +
-        (address ? '<span class="x-branch-card-address">' + UI.escape(address) + '</span>' : '') +
-        '  <span class="x-branch-card-meta">' +
-        (distHtml || '') +
-        (caps ? '<span class="x-branch-chips">' + caps + '</span>' : '') +
+        '  <span class="x-branch-card-photo">' + photoHtml + '</span>' +
+        '  <span class="x-branch-card-body">' +
+        '    <span class="x-branch-card-name">' + UI.escape(b.name || '') + '</span>' +
+        catHtml +
+        branchPromoHtml(b) +
         '  </span>' +
-        '<span class="x-branch-card-cta">' + (isActive ? 'Menu di bawah untuk cabang ini' : 'Lihat menu cabang ini') + '</span>' +
         '</button>';
     });
 
@@ -448,9 +463,47 @@
     container.querySelectorAll('[data-branch-id]').forEach(function (btn) {
       btn.onclick = function () {
         var found = branches.find(function (b) { return String(b.id) === String(btn.dataset.branchId); });
-        if (found) setActiveBranch(found, false);
+        // Selection is silent: no confirmation toast, no address/phone surfacing.
+        if (found) setActiveBranch(found, true);
       };
     });
+  }
+
+  function branchMonogram(name) {
+    var clean = String(name || '').trim();
+    if (!clean) return '?';
+    var parts = clean.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return clean.slice(0, 2).toUpperCase();
+  }
+
+  function branchCategoryPreviewHtml() {
+    var list = (categories || []).slice(0, 4);
+    if (!list.length) return '';
+    var html = list.map(function (c) {
+      return '<span class="x-branch-cat-chip">' + UI.escape(String(c.name || '')) + '</span>';
+    }).join('');
+    if ((categories || []).length > 4) html += '<span class="x-branch-cat-chip">+' + ((categories || []).length - 4) + '</span>';
+    return '<span class="x-branch-cats">' + html + '</span>';
+  }
+
+  function toRupiah(n) {
+    return (UI && typeof UI.money === 'function') ? UI.money(n) : (Number(n).toLocaleString('id-ID') + ' IDR');
+  }
+
+  function branchPromoHtml(b) {
+    // Promo lines render EXISTING configured settings only (branch_delivery_settings);
+    // amounts/conditions come from the API payload, never hardcoded values.
+    var html = '';
+    if (b.free_delivery_km && b.free_delivery_km > 0) {
+      html += '<span class="x-branch-promo">🛵 Gratis ongkir · Maks ' + formatDistance(b.free_delivery_km) + '</span>';
+    }
+    if (b.promo_delivery_discount && b.promo_delivery_discount > 0) {
+      html += '<span class="x-branch-promo">💸 Diskon ongkir ' + toRupiah(b.promo_delivery_discount) +
+        (b.promo_min_order && b.promo_min_order > 0 ? ' · Min. belanja ' + toRupiah(b.promo_min_order) : '') +
+        '</span>';
+    }
+    return html;
   }
 
   function initBranchDiscovery() {
@@ -493,6 +546,34 @@
   //  The branch list / selection only ever forwards the customer's branch id to
   //  the existing backend; availability/stock/pricing stay server-canonical.
   // ======================================================================
+
+  // Clears all catalog state before a branch-context change. The previous
+  // branch's categories/products must not linger under the new selection, and
+  // in-flight per-category loads are invalidated so a late response cannot land
+  // on the wrong branch. `loading` (optional) renders an honest state while the
+  // brand-new branch menu is being fetched.
+  function clearCatalogForBranch(loading) {
+    categories = [];
+    products = [];
+    activeCategory = null;
+    catalogBranchId = null;
+    ++productLoadSeq; // in-flight per-category loads must never mix branches
+
+    var track = $('x-cat-track');
+    if (track) track.innerHTML = loading ? '<div class="x-loading">' + loading + '</div>' : '';
+    var productsEl = $('x-products');
+    if (productsEl) productsEl.innerHTML = loading ? '<div class="x-loading">' + loading + '</div>' : '';
+  }
+
+  // Honest empty branch: a branch menu that is empty (or failed to load) shows
+  // an empty state — it is NEVER substituted with brand-wide or static products.
+  function renderEmptyBranchCatalog() {
+    clearCatalogForBranch(null);
+    renderCategories();
+    renderProducts();
+    if (branches.length > 1) renderBranchDiscovery();
+  }
+
   function applyCatalog(data) {
     if (!data || !Array.isArray(data.categories) || !data.categories.length) return;
     categories = data.categories;
@@ -511,20 +592,33 @@
     } else {
       loadProducts(activeCategory);
     }
+
+    // Refresh the discovery section so the active card's category preview mirrors
+    // the freshly loaded branch menu (per-branch preview is not in the API).
+    if (branches.length > 1) renderBranchDiscovery();
   }
 
   function loadCatalog(branchId) {
     var seq = ++catalogLoadSeq;
+    catalogBranchId = branchId ? String(branchId) : null;
     var path = branchId ? '/catalog/menu?branch_id=' + encodeURIComponent(branchId) : '/catalog/menu';
 
     API.get(path)
       .then(function (data) {
         if (seq !== catalogLoadSeq) return; // superseded by a newer catalog load
         if (data && data.success && data.categories && data.categories.length > 0) {
-          if (!branchId) {
+          // Only the brand-wide menu (no branch context) is cached; branch menus
+          // are never cached so a cache key can never cross branch identities.
+          if (!catalogBranchId) {
             try { localStorage.setItem('xentra_catalog_cache', JSON.stringify(data)); } catch (_) {}
           }
           applyCatalog(data);
+          return;
+        }
+        // With a branch context, an empty/failed menu must be honest — a branch
+        // whose menu has no data is never filled with brand-wide/static content.
+        if (catalogBranchId) {
+          renderEmptyBranchCatalog();
         } else if (!categories.length) {
           applyCatalog(DEFAULT_CATALOG);
         }
@@ -532,7 +626,9 @@
       .catch(function (err) {
         if (seq !== catalogLoadSeq) return; // superseded by a newer catalog load
         console.warn('[Home] Load catalog network warn:', err);
-        if (!categories.length) {
+        if (catalogBranchId) {
+          renderEmptyBranchCatalog();
+        } else if (!categories.length) {
           applyCatalog(DEFAULT_CATALOG);
         }
       });
@@ -601,22 +697,36 @@
       return;
     }
 
+    // Stale per-category responses are invalidated by every newer load AND by
+    // every branch switch (clearCatalogForBranch), so a late response can never
+    // overwrite a newer selection with old-branch data.
+    var seq = ++productLoadSeq;
     container.innerHTML = '<div class="x-loading">Memuat menu...</div>';
 
     API.get('/products?category=' + encodeURIComponent(categoryId))
       .then(function (data) {
+        if (seq !== productLoadSeq) return;
         if (data.success && Array.isArray(data.items) && data.items.length > 0) {
           products = data.items;
           if (found) found.products = products;
-        } else {
+        } else if (!catalogBranchId) {
+          // Brand-wide (no branch context) subcategory fallback only — never
+          // inside a branch context.
           var backupCat = DEFAULT_CATALOG.categories.find(function (c) { return String(c.id) === String(categoryId); });
-          products = (backupCat && backupCat.products) || DEFAULT_CATALOG.categories[0].products;
+          products = (backupCat && backupCat.products) || [];
+        } else {
+          products = [];
         }
         renderProducts();
       })
       .catch(function () {
-        var backupCat = DEFAULT_CATALOG.categories.find(function (c) { return String(c.id) === String(categoryId); });
-        products = (backupCat && backupCat.products) || DEFAULT_CATALOG.categories[0].products;
+        if (seq !== productLoadSeq) return;
+        if (!catalogBranchId) {
+          var backupCat = DEFAULT_CATALOG.categories.find(function (c) { return String(c.id) === String(categoryId); });
+          products = (backupCat && backupCat.products) || [];
+        } else {
+          products = [];
+        }
         renderProducts();
       });
   }
@@ -1187,26 +1297,34 @@
     // Carousel
     initCarousel();
 
-    // 1. Render catalog immediately on page boot (Zero white screen / Zero loading delay)
+    // 1. First paint without a "wrong branch" flash: when a branch context survived
+    // a reload, show an honest loading state (never a brand-wide catalog inside
+    // a branch context). Without one, the brand-wide menu is the legitimate
+    // first paint and comes from the cache/first-paint fallback.
+    var bootBranchId = null;
     try {
-      var rawCached = localStorage.getItem('xentra_catalog_cache');
-      if (rawCached) {
-        var parsed = JSON.parse(rawCached);
-        applyCatalog(parsed);
-      } else {
+      var persistedCtx = Store.getState().branchContext;
+      if (persistedCtx && persistedCtx.branch_id != null) bootBranchId = String(persistedCtx.branch_id);
+    } catch (_) {}
+
+    if (bootBranchId) {
+      clearCatalogForBranch('Memuat menu cabang...');
+    } else {
+      try {
+        var rawCached = localStorage.getItem('xentra_catalog_cache');
+        if (rawCached) {
+          var parsed = JSON.parse(rawCached);
+          applyCatalog(parsed);
+        } else {
+          applyCatalog(DEFAULT_CATALOG);
+        }
+      } catch (_) {
         applyCatalog(DEFAULT_CATALOG);
       }
-    } catch (_) {
-      applyCatalog(DEFAULT_CATALOG);
     }
 
     // 2. Fetch fresh catalog in background. When a branch context survived a
     // reload, the catalog follows that same context (server-scoped menu).
-    var bootBranchId = null;
-    try {
-      var persistedCtx = Store.getState().branchContext;
-      if (persistedCtx && persistedCtx.branch_id != null) bootBranchId = persistedCtx.branch_id;
-    } catch (_) {}
     loadCatalog(bootBranchId);
 
     // P2: Branch discovery (fast, non-blocking — presentation only).
@@ -1273,7 +1391,7 @@
     },
     selectBranch: function (branchId) {
       var found = branches.find(function (b) { return String(b.id) === String(branchId); });
-      if (found) setActiveBranch(found, false);
+      if (found) setActiveBranch(found, true);
     },
     getBranches: function () {
       return branches;

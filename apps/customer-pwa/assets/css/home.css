@@ -385,12 +385,16 @@
 }
 
 
-/* ── Cart Dock (Floating Bottom Bar) ── */
+/* ── Cart Dock (Floating Bottom Bar) ──
+   position:fixed escapes the page box; constrain it to the app-shell width so
+   the dock never spans a wider desktop viewport (mobile: shell == viewport). */
 .x-cart-dock {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
+  max-width: var(--x-page-max);
+  margin: 0 auto;
   z-index: var(--x-z-dock);
   transform: translateY(110%);
   transition: transform var(--x-duration-sheet) var(--x-ease-sheet);
@@ -1024,7 +1028,7 @@
   top: max(12px, var(--x-safe-top, 12px));
   left: 12px;
   right: 12px;
-  max-width: 460px;
+  max-width: var(--x-page-max);
   margin: 0 auto;
   z-index: var(--x-z-pwa);
   transform: translateY(-130%);
@@ -1278,125 +1282,149 @@
 }
 
 /* ── P2 Fast Branch Discovery ──
-   Home discovery is presentation-only: no ETA, no routing, cheap proximity. */
+   Home discovery is presentation-only: no ETA, no routing, cheap proximity.
+   The section is a compact horizontal carousel: the active card only expresses
+   "you are browsing this branch's menu", never fulfillment. Home is a discovery
+   surface, not a branch directory. */
 .x-branch-discovery {
   display: block;
-  padding: 14px var(--x-page-pad) 2px;
+  padding: 14px 0 2px;
+}
+
+.x-branch-discovery[hidden] {
+  display: none !important;
 }
 
 .x-branch-head {
+  padding: 0 var(--x-page-pad) 4px;
   font-size: 17px;
   font-weight: 800;
   color: var(--x-charcoal);
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .x-branch-loc-note {
+  padding: 0 var(--x-page-pad) 2px;
   font-size: 12px;
   color: var(--x-gray-500);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
-.x-branch-list {
+.x-branch-scroll {
   display: flex;
-  flex-direction: column;
   gap: 10px;
+  overflow-x: auto;
+  padding: 2px var(--x-page-pad) 8px;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+
+.x-branch-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .x-branch-card {
+  flex: 0 0 200px;
   display: block;
-  width: 100%;
   text-align: left;
   background: var(--x-white);
   border: 1.5px solid var(--x-border);
   border-radius: var(--x-radius-md);
-  padding: 13px 15px;
+  padding: 0;
   font-family: var(--x-font);
   cursor: pointer;
+  overflow: hidden;
   box-shadow: var(--x-shadow-sm);
+  scroll-snap-align: start;
   transition: border-color var(--x-duration-fast), box-shadow var(--x-duration-fast), transform var(--x-duration-fast);
 }
 
 .x-branch-card:active {
-  transform: scale(0.99);
+  transform: scale(0.98);
 }
 
 .x-branch-card.is-active {
   border-color: var(--x-lime-dark);
   box-shadow: var(--x-shadow-md);
-  background: var(--x-lime-bg);
+}
+
+/* Branch photo: image_url when the contract supplies one, otherwise a
+   data-derived initials monogram (never a product/brand image as identity). */
+.x-branch-card-photo {
+  display: block;
+  width: 100%;
+  height: 88px;
+  background: var(--x-gray-50);
+  position: relative;
+}
+
+.x-branch-card-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.x-branch-card-photo-mono {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--x-gray-400);
+  letter-spacing: 1px;
+}
+
+.x-branch-card-body {
+  display: block;
+  padding: 10px 12px 12px;
 }
 
 .x-branch-card-name {
   display: block;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 800;
   color: var(--x-charcoal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.x-branch-card-address {
-  display: block;
-  font-size: 12px;
-  color: var(--x-gray-500);
-  margin-top: 3px;
-  line-height: 1.4;
-}
-
-.x-branch-card-meta {
+.x-branch-cats {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 8px;
   flex-wrap: wrap;
-}
-
-.x-branch-distance {
-  display: inline-flex;
-  align-items: center;
   gap: 4px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--x-gray-700);
+  margin-top: 6px;
 }
 
-.x-branch-distance::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  background: var(--x-lime-dark);
-  border-radius: 50%;
-}
-
-.x-branch-chips {
-  display: inline-flex;
-  gap: 6px;
-}
-
-.x-branch-chip {
-  font-size: 11px;
+.x-branch-cat-chip {
+  font-size: 10px;
   font-weight: 700;
   color: var(--x-gray-700);
   background: var(--x-gray-50);
   border: 1px solid var(--x-border);
   border-radius: var(--x-radius-pill);
-  padding: 2px 9px;
+  padding: 2px 7px;
 }
 
-.x-branch-card-cta {
+.x-branch-promo {
   display: block;
-  margin-top: 9px;
-  font-size: 12px;
-  font-weight: 800;
-  color: var(--x-lime-dark);
-}
-
-.x-branch-card.is-active .x-branch-card-cta {
-  color: var(--x-charcoal);
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--x-gray-700);
+  line-height: 1.4;
 }
 
 .x-branch-card-error {
   border-style: dashed;
   cursor: default;
+  padding: 14px 16px;
+  margin: 0 var(--x-page-pad);
 }
 
 .x-branch-empty-title {
