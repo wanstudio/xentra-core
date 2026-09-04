@@ -6,15 +6,17 @@
 
 ## 1. Tenancy & Hierarchy Tables
 
-> **Implementation note (B1 — Branch Operational Boundary, 2026-09-04):** the live
-> SQLite schema in `server/database/db.js` implements the tenancy hierarchy with the tables
-> below (`organizations` → `brands` → `branches`, plus `branch_delivery_settings` carrying
-> the delivery/pickup capability flags that this spec's `branch_settings` example describes).
-> Known deltas from this spec, deliberately not materialized yet (no approved business contract):
-> `dinein_enabled` and `operating_hours` (schedule-driven open state). Branch open/close is
-> currently represented by the server-authoritative `branches.is_open_override` master switch
-> consumed by `BranchMatcher` and the public branch API. Every authorized branch operational
-> mutation is recorded append-only in `branch_operation_logs`.
+> **Implementation note (B1/C1 — Branch & Product Assignment Boundary, 2026-09-04):** the
+> live SQLite schema in `server/database/db.js` implements the tenancy hierarchy with the
+> tables below (`organizations` → `brands` → `branches`, plus `branch_delivery_settings`
+> carrying the delivery/pickup capability flags that this spec's `branch_settings` example
+> describes). Product → Branch assignment is the `branch_products` table below with a
+> DB-level brand-consistency trigger. Known deltas from this spec, deliberately not
+> materialized yet (no approved business contract): `dinein_enabled` and `operating_hours`
+> (schedule-driven open state). Branch open/close is represented by the server-authoritative
+> `branches.is_open_override` master switch consumed by `BranchMatcher` and the public branch
+> API. Every authorized branch/product-operational mutation is recorded append-only in
+> `branch_operation_logs`.
 
 ### `organizations`
 Master SaaS account / holding organization.
@@ -105,10 +107,34 @@ CREATE TABLE branch_operation_logs (
     actor_id VARCHAR(64),
     actor_role VARCHAR(30),
     authorized BOOLEAN DEFAULT TRUE,
+    product_id VARCHAR(36),           -- set for product-scoped ops (e.g. availability toggle)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
     FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
 );
+```
+
+### `branch_products` (C1 — Product → Branch Assignment)
+An explicit, brand-consistent assignment of a Product Master row to one Branch.
+Assignment ≠ inventory (the row carries no stock until the Inventory domain records it;
+API-created assignments keep `stock` NULL) and ≠ operational availability (`is_available`
+is a branch-scoped flag toggled by Owner/Brand or the assigned Branch Manager).
+```sql
+CREATE TABLE branch_products (
+    branch_id VARCHAR(36) NOT NULL,
+    product_id VARCHAR(36) NOT NULL,
+    price REAL,                       -- optional branch price override
+    stock INTEGER DEFAULT 100,        -- Inventory domain owns stock semantics
+    is_available BOOLEAN DEFAULT TRUE,
+    low_stock_threshold INTEGER DEFAULT 5,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (branch_id, product_id),
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+-- Brand-consistency enforcement (C1.3): product.brand_id must equal branch.brand_id.
+-- Enforced by BEFORE INSERT/UPDATE triggers raising CROSS_BRAND_ASSIGNMENT_REJECTED.
 ```
 
 ---

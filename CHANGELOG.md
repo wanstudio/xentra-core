@@ -1,4 +1,24 @@
 ## [Unreleased] - 2026-09-04
+### C1 — Product → Branch Assignment Boundary
+- **Explicit assignment API** (`/admin/branches/:id/products`): Owner/Brand
+  authority assigns an existing brand product to a branch of the same brand
+  (idempotent — repeat assign returns `already_assigned`, PK prevents
+  duplicates); list endpoint exposes assignments for Owner/Brand/Branch
+  Manager (scoped). Branch Manager toggles operational availability
+  (`PATCH .../products/:productId`, own branch only, strict 0|1, audited in
+  `branch_operation_logs` with `product_id`).
+- **Brand consistency enforced twice**: app-layer (`product.brand_id` must
+  equal `branch.brand_id`, else 400 `PRODUCT_BRAND_MISMATCH`) and a DB
+  trigger raising `CROSS_BRAND_ASSIGNMENT_REJECTED` on any raw cross-brand
+  `branch_products` insert/update. Cross-organization/branch tampering
+  rejected by the tenant ownership guard.
+- **Assignment ≠ Inventory**: assigning a product creates the assignment row
+  WITHOUT fabricating stock (`stock` stays NULL until the Inventory domain
+  records it); availability toggles never touch stock.
+- **Consumer coherence**: `CatalogService` branch-scoped menus now treat an
+  unassigned product as NOT available with zero stock (no synthetic 999);
+  brand-wide (pre-branch) master menus are unchanged.
+
 ### B1 — Organization → Brand → Branch Operational Boundary
 - **Branch operational state is now transitionable & audited**: `PUT
   /admin/branches/:id` accepts the server-authoritative `is_open_override`

@@ -2393,6 +2393,202 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
   }
 });
 
+/* =========================================================================
+   C1 — PRODUCT → BRANCH ASSIGNMENT BOUNDARY
+   Product Master stays brand-owned (products.brand_id). A branch_products row
+   is the EXPLICIT assignment of a brand product to a branch of the SAME brand.
+   - Assignment (create/list) = Owner / Brand authority.
+   - Operational availability toggle (is_available) = Branch Manager within
+     their own branch, or Owner / Brand.
+   - Assignment NEVER mutates stock: physical stock belongs to the Inventory
+     domain and is intentionally not fabricated here (stock stays NULL).
+   ========================================================================= */
+
+// C1 List assignments of one branch
+router.get('/admin/branches/:id/products', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+    }
+
+    const assignments = db.prepare(`
+      SELECT bp.branch_id, bp.product_id, bp.price, bp.stock, bp.is_available, bp.low_stock_threshold,
+             p.name AS product_name, p.is_active AS is_master_active
+      FROM branch_products bp
+      JOIN products p ON p.id = bp.product_id
+      WHERE bp.branch_id = ?
+      ORDER BY p.sort_order ASC, p.name ASC
+    `).all(req.params.id);
+
+    res.json({ success: true, branch_id: req.params.id, assignments: assignments || [] });
+  } catch (err) {
+    console.error('[API Error GET /admin/branches/:id/products]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// C1 Assign an existing brand product to a branch of the SAME brand (Owner/Brand authority)
+router.post('/admin/branches/:id/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const productId = String((req.body && req.body.product_id) || '').trim();
+    if (!productId) {
+      return res.status(400).json({ success: false, error: 'product_id wajib diisi.' });
+    }
+
+    // Branch ownership (tenant-scoped)
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+    }
+
+    // C1.3 Brand consistency: the product master must belong to the SAME brand as the branch.
+    // (A product of another brand is not found here → cross-brand assignment is impossible.)
+    const product = db.prepare('SELECT id, brand_id, price FROM products WHERE id = ? AND brand_id = ?').get(productId, req.brand_id);
+    if (!product) {
+      return res.status(400).json({
+        success: false,
+        error: 'PRODUCT_BRAND_MISMATCH',
+        message: 'Produk tidak ditemukan atau bukan milik brand ini; produk hanya dapat dialokasikan ke cabang brand yang sama.'
+      });
+    }
+
+    // C1.4 Assignment != Inventory: the assignment row is created WITHOUT fabricating stock.
+    // stock stays NULL until the Inventory domain records actual branch stock.
+    const stmt = db.prepare(`
+      INSERT OR IGNORE INTO branch_products (branch_id, product_id, price, stock)
+      VALUES (?, ?, ?, NULL)
+    `).run(req.params.id, productId, product.price != null ? product.price : null);
+    const alreadyAssigned = !stmt || stmt.changes === 0;
+
+    const assignment = db.prepare(`
+      SELECT branch_id, product_id, price, stock, is_available, low_stock_threshold
+      FROM branch_products WHERE branch_id = ? AND product_id = ?
+    `).get(req.params.id, productId);
+
+    res.status(alreadyAssigned ? 200 : 201).json({
+      success: true,
+      already_assigned: alreadyAssigned,
+      assignment
+    });
+  } catch (err) {
+    if (String(err && err.message).includes('CROSS_BRAND_ASSIGNMENT_REJECTED')) {
+      return res.status(400).json({
+        success: false,
+        error: 'CROSS_BRAND_ASSIGNMENT_REJECTED',
+        message: 'Produk dan cabang harus berasal dari brand yang sama.'
+      });
+    }
+    console.error('[API Error POST /admin/branches/:id/products]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// C1 Toggle operational availability (is_available) of an assigned product.
+// Branch Manager limited to own branch; Owner/Brand anywhere in their brand.
+router.patch('/admin/branches/:id/products/:productId', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    // Strict 0|1 validation of the availability flag.
+    const rawAvail = req.body && req.body.is_available;
+    let nextAvailability = null;
+    if (rawAvail !== undefined && rawAvail !== null) {
+      if (rawAvail === true) nextAvailability = 1;
+      else if (rawAvail === false) nextAvailability = 0;
+      else {
+        const n = Number(rawAvail);
+        if (n !== 0 && n !== 1) {
+          return res.status(400).json({ success: false, error: 'Nilai is_available tidak valid. Gunakan 0 atau 1.' });
+        }
+        nextAvailability = n;
+      }
+    } else if (rawAvail === null) {
+      return res.status(400).json({ success: false, error: 'Nilai is_available tidak valid. Gunakan 0 atau 1.' });
+    }
+    if (nextAvailability === null) {
+      return res.status(400).json({ success: false, error: 'Nilai is_available wajib diisi (0 atau 1).' });
+    }
+
+    // Branch Manager may only toggle their OWN branch.
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    // Branch ownership + assignment existence with brand-consistent product.
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+    }
+    const assignment = db.prepare(`
+      SELECT bp.branch_id, bp.product_id, bp.is_available, p.name AS product_name
+      FROM branch_products bp
+      JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
+      WHERE bp.branch_id = ? AND bp.product_id = ?
+    `).get(req.brand_id, req.params.id, req.params.productId);
+    if (!assignment) {
+      return res.status(404).json({
+        success: false,
+        error: 'Produk tidak dialokasikan ke cabang ini.'
+      });
+    }
+
+    const previousValue = assignment.is_available;
+    const stmt = db.prepare(`
+      UPDATE branch_products SET is_available = ?, updated_at = datetime('now')
+      WHERE branch_id = ? AND product_id = ?
+    `).run(nextAvailability, req.params.id, req.params.productId);
+    if (!stmt || stmt.changes === 0) {
+      return res.status(404).json({ success: false, error: 'Alokasi produk tidak ditemukan.' });
+    }
+
+    // B1/C1 operational audit trail (append-only).
+    db.prepare(`
+      INSERT INTO branch_operation_logs (id, branch_id, brand_id, organization_id, product_id, action, field, previous_value, new_value, actor_id, actor_role, authorized)
+      VALUES (?, ?, ?, ?, ?, 'branch_product.update', 'is_available', ?, ?, ?, ?, 1)
+    `).run(
+      'bol_' + crypto.randomUUID(),
+      req.params.id,
+      req.brand_id,
+      req.organization_id || null,
+      req.params.productId,
+      JSON.stringify(previousValue),
+      JSON.stringify(nextAvailability),
+      req.user.userId || req.user.id || req.user.username || 'system',
+      req.user.role || 'system'
+    );
+
+    res.json({
+      success: true,
+      assignment: {
+        branch_id: req.params.id,
+        product_id: req.params.productId,
+        product_name: assignment.product_name,
+        is_available: nextAvailability
+      }
+    });
+  } catch (err) {
+    console.error('[API Error PATCH /admin/branches/:id/products/:productId]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 15. Admin Orders List & Analytics Summary
 router.get('/admin/orders', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {

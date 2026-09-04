@@ -347,8 +347,9 @@ function initSchema(targetDb) {
       branch_id TEXT NOT NULL,
       brand_id TEXT NOT NULL,
       organization_id TEXT,
-      action TEXT NOT NULL,          -- e.g. 'branch.update', 'branch.create'
-      field TEXT NOT NULL,           -- affected field: name/is_active/is_open_override/free_delivery_km/...
+      product_id TEXT,               -- set for product-scoped ops (e.g. branch product availability)
+      action TEXT NOT NULL,          -- e.g. 'branch.update', 'branch.create', 'branch_product.update'
+      field TEXT NOT NULL,           -- affected field: name/is_active/is_open_override/is_available/...
       previous_value TEXT,           -- stringified scalar before change (NULL when no prior value)
       new_value TEXT,                -- stringified scalar after change
       actor_id TEXT,
@@ -577,6 +578,27 @@ function initSchema(targetDb) {
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
+
+    -- C1 BRAND CONSISTENCY (C1.3/C1.9): a Product -> Branch assignment is only valid when the
+    -- product master and the branch belong to the SAME brand. Enforced at the database layer so a
+    -- cross-brand assignment can never be written (app-layer guards are defense-in-depth).
+    CREATE TRIGGER IF NOT EXISTS trg_branch_products_brand_consistency_insert
+    BEFORE INSERT ON branch_products
+    FOR EACH ROW
+    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id)
+         IS NOT (SELECT brand_id FROM branches WHERE id = NEW.branch_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'CROSS_BRAND_ASSIGNMENT_REJECTED');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_branch_products_brand_consistency_update
+    BEFORE UPDATE OF product_id, branch_id ON branch_products
+    FOR EACH ROW
+    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id)
+         IS NOT (SELECT brand_id FROM branches WHERE id = NEW.branch_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'CROSS_BRAND_ASSIGNMENT_REJECTED');
+    END;
 
     CREATE TABLE IF NOT EXISTS pos_shifts (
       id TEXT PRIMARY KEY,

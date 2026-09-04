@@ -90,7 +90,11 @@ class CatalogService {
         prod.branch_raw_price
       );
 
-      const isAvailable = prod.branch_availability !== 0 && prod.is_master_active === 1;
+      // C1 CONSUMER COHERENCE: in a branch-scoped menu an item is operationally available ONLY
+      // when it is explicitly assigned to that branch AND the branch availability flag is on
+      // (bp row exists -> branch_availability 0|1; missing row -> NULL = unassigned = NOT available).
+      // In a brand-wide (pre-branch) menu the master product list is presented as available.
+      const isAvailable = prod.is_master_active === 1 && prod.branch_availability === 1;
 
       return {
         id: prod.id,
@@ -106,7 +110,9 @@ class CatalogService {
         image_url: prod.image_url,
         is_active: prod.is_master_active === 1,
         is_available: isAvailable,
-        stock_estimate: prod.branch_stock != null ? prod.branch_stock : 999,
+        // No artificial quantity: branch stock is only meaningful once a branch context exists;
+        // unassigned/missing stock resolves to 0 (never a fake 999).
+        stock_estimate: branch_id ? (prod.branch_stock != null ? Number(prod.branch_stock) : 0) : null,
         sort_order: prod.sort_order
       };
     });

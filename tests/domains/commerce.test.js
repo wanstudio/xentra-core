@@ -88,6 +88,28 @@ test('Commerce 4 — Catalog Service: formats active menu for UX display', () =>
 });
 
 // ==============================================================================
+// Commerce 4b — C1: Assignment != Inventory (branch-scoped catalog is strict)
+// ==============================================================================
+test('Commerce 4b — C1 Catalog coherence: unassigned product is NOT available in branch menu; no synthetic stock; brand-wide menu unaffected', () => {
+  // Branch-scoped menu: prod_unassigned (no branch_products row for branch_test) must be
+  // presented as unavailable with zero stock — never a fake 999 — while assigned items stay.
+  const branchMenu = CatalogService.getMenu({ brand_id: 'brand_test', branch_id: 'branch_test' });
+  const unassigned = branchMenu.products.find(p => p.id === 'prod_unassigned');
+  assert.ok(unassigned, 'unassigned product still listed (brand master) in branch menu');
+  assert.strictEqual(unassigned.is_available, false, 'unassigned => NOT operationally available');
+  assert.strictEqual(unassigned.stock_estimate, 0, 'unassigned => no artificial stock quantity');
+  const assigned = branchMenu.products.find(p => p.id === 'prod_lock');
+  assert.strictEqual(assigned.is_available, true);
+  assert.strictEqual(assigned.stock_estimate, 100);
+
+  // Brand-wide (pre-branch) menu: master listing, no stock context, availability not branch-bound.
+  const brandMenu = CatalogService.getMenu({ brand_id: 'brand_test' });
+  const brandUnassigned = brandMenu.products.find(p => p.id === 'prod_unassigned');
+  assert.strictEqual(brandUnassigned.is_available, true, 'brand-wide menu presents master product');
+  assert.strictEqual(brandUnassigned.stock_estimate, null, 'no branch context => no stock claim');
+});
+
+// ==============================================================================
 // Commerce 5 — Pre-Payment Final Verification Gate (No 999 fake stock & Price Check)
 // ==============================================================================
 test('Commerce 5 — Pre-Payment Gate: verifies stock, rejects unassigned branch products, and detects price change', () => {

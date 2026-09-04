@@ -988,3 +988,197 @@ test('B1 Authorization: operational mutation requires a managing role; login rej
   assert.strictEqual(rogue.data.error, 'BRANCH_TENANT_MISMATCH');
 });
 
+/* =============================================================================
+   TASK C1 — PRODUCT → BRANCH ASSIGNMENT BOUNDARY
+   Explicit assignment, brand consistency (app + DB trigger), owner/brand vs
+   branch-manager authority split, assignment != inventory.
+   ============================================================================= */
+
+async function c1Login(username, password) {
+  const res = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password })
+  });
+  const data = await res.json();
+  return { status: res.status, data, headers: { authorization: 'Bearer ' + data.token } };
+}
+
+function c1CountAssignments(branchId, productId) {
+  const row = db.prepare('SELECT COUNT(*) AS c FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchId, productId);
+  return row.c;
+}
+
+test('C1 Assignment: valid assign is idempotent; cross-brand/cross-org rejected; DB trigger enforces brand consistency', async () => {
+  const crypto = require('crypto');
+  // Brand-master product owned by the resolved brand, and a product owned by ANOTHER brand.
+  db.prepare(`
+    INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, regular_price, is_active, sort_order)
+    VALUES ('prod_c1_new', 'brand_bangjo', '34', 'Produk C1 Baru', 'produk-c1-baru', 18000, 20000, 1, 50)
+  `).run();
+  db.prepare(`
+    INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active)
+    VALUES ('prod_other_co', 'brand_other_co', NULL, 'Produk Brand Lain', 'produk-brand-lain', 99999, 1)
+  `).run();
+
+  const owner = await c1Login('admin', 'bangjo123');
+  assert.strictEqual(owner.status, 200);
+
+  // 1. Valid assignment → 201; assignment row carries NO fabricated stock (stock stays NULL).
+  const assignRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/products', {
+    method: 'POST',
+    headers: owner.headers,
+    body: JSON.stringify({ product_id: 'prod_c1_new' })
+  });
+  assert.strictEqual(assignRes.status, 201);
+  const assignData = await assignRes.json();
+  assert.strictEqual(assignData.success, true);
+  assert.strictEqual(assignData.already_assigned, false);
+  assert.strictEqual(assignData.assignment.product_id, 'prod_c1_new');
+  assert.strictEqual(assignData.assignment.stock, null, 'Assignment must not fabricate inventory');
+  assert.strictEqual(c1CountAssignments('branch_bangjo_barat', 'prod_c1_new'), 1);
+
+  // 2. Duplicate assign → deterministic already_assigned (PK prevents inconsistent duplicates).
+  const dupRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/products', {
+    method: 'POST',
+    headers: owner.headers,
+    body: JSON.stringify({ product_id: 'prod_c1_new' })
+  });
+  assert.strictEqual(dupRes.status, 200);
+  const dupData = await dupRes.json();
+  assert.strictEqual(dupData.already_assigned, true);
+  assert.strictEqual(c1CountAssignments('branch_bangjo_barat', 'prod_c1_new'), 1);
+
+  // 3. Product of Brand B cannot be assigned to a Branch of Brand A (app-layer).
+  const crossBrandRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/products', {
+    method: 'POST',
+    headers: owner.headers,
+    body: JSON.stringify({ product_id: 'prod_other_co' })
+  });
+  assert.strictEqual(crossBrandRes.status, 400);
+  const crossBrandData = await crossBrandRes.json();
+  assert.strictEqual(crossBrandData.error, 'PRODUCT_BRAND_MISMATCH');
+  assert.strictEqual(c1CountAssignments('branch_bangjo_barat', 'prod_other_co'), 0);
+
+  // 4. Branch of another brand/organization is not addressable (ownership guard).
+  const crossOrgRes = await mockFetch('/api/v1/admin/branches/branch_other_co/products', {
+    method: 'POST',
+    headers: owner.headers,
+    body: JSON.stringify({ product_id: 'prod_c1_new' })
+  });
+  assert.strictEqual(crossOrgRes.status, 404);
+
+  // 5. Database trigger rejects a raw cross-brand write even if the app layer is bypassed.
+  assert.throws(
+    () => db.prepare("INSERT INTO branch_products (branch_id, product_id) VALUES ('branch_bangjo_barat', 'prod_other_co')").run(),
+    /CROSS_BRAND_ASSIGNMENT_REJECTED/,
+    'DB-level brand-consistency trigger must abort cross-brand assignment'
+  );
+
+  // 6. Assignment list reflects the new row.
+  const listRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/products', { headers: owner.headers });
+  assert.strictEqual(listRes.status, 200);
+  const listData = await listRes.json();
+  assert.ok(listData.assignments.some((a) => a.product_id === 'prod_c1_new' && a.product_name === 'Produk C1 Baru'));
+});
+
+test('C1 Branch scope: availability toggle is own-branch only, audited, and never mutates stock', async () => {
+  const crypto = require('crypto');
+  const bmHash = crypto.createHash('sha256').update('c1bmpass').digest('hex');
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role)
+    VALUES ('usr_c1_bm', 'brand_bangjo', 'org_xentra_holding', 'branch_bangjo_barat', 'bm_c1', 'bm_c1@bangjo.com', ?, 'BM C1', 'branch_manager')
+  `).run(bmHash);
+  db.prepare(`
+    INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
+    VALUES ('branch_c1_timur', 'brand_bangjo', 'Bangjo C1 Timur', 'bangjo-c1-timur', 'Jl. C1 No. 1', -7.28, 112.76, '081244444444', 1)
+  `).run();
+
+  const bm = await c1Login('bm_c1', 'c1bmpass');
+  assert.strictEqual(bm.status, 200);
+
+  const stockBefore = db.prepare("SELECT stock FROM branch_products WHERE branch_id = 'branch_bangjo_barat' AND product_id = 'prod_c1_new'").get().stock;
+
+  // 1. Branch Manager toggles availability of an assigned product in OWN branch → 200.
+  const toggleRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/products/prod_c1_new', {
+    method: 'PATCH',
+    headers: bm.headers,
+    body: JSON.stringify({ is_available: 0 })
+  });
+  assert.strictEqual(toggleRes.status, 200);
+  const toggleData = await toggleRes.json();
+  assert.strictEqual(toggleData.success, true);
+  assert.strictEqual(toggleData.assignment.is_available, 0);
+
+  const rowAfter = db.prepare("SELECT is_available, stock FROM branch_products WHERE branch_id = 'branch_bangjo_barat' AND product_id = 'prod_c1_new'").get();
+  assert.strictEqual(rowAfter.is_available, 0, 'availability persisted server-side');
+  assert.strictEqual(rowAfter.stock, stockBefore, 'availability toggle MUST NOT mutate stock (assignment != inventory)');
+
+  // 2. Audit trail row exists (product-scoped, actor = branch_manager, authorized).
+  const auditRow = db.prepare(`
+    SELECT * FROM branch_operation_logs
+    WHERE action = 'branch_product.update' AND product_id = 'prod_c1_new' AND branch_id = 'branch_bangjo_barat'
+    ORDER BY created_at DESC, rowid DESC LIMIT 1
+  `).get();
+  assert.ok(auditRow, 'product availability change must be audited');
+  assert.strictEqual(auditRow.actor_role, 'branch_manager');
+  assert.strictEqual(auditRow.field, 'is_available');
+  assert.strictEqual(auditRow.new_value, '0');
+  assert.strictEqual(auditRow.authorized, 1);
+
+  // 3. Branch Manager cannot toggle ANOTHER branch → 403 (scope guard runs before mutation).
+  const crossRes = await mockFetch('/api/v1/admin/branches/branch_c1_timur/products/prod_c1_new', {
+    method: 'PATCH',
+    headers: bm.headers,
+    body: JSON.stringify({ is_available: 0 })
+  });
+  assert.strictEqual(crossRes.status, 403);
+  assert.strictEqual((await crossRes.json()).error, 'FORBIDDEN_BRANCH_SCOPE');
+
+  // 4. Toggling a product that is NOT assigned to the branch → 404.
+  const notAssignedRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/products/prod_c1_never', {
+    method: 'PATCH',
+    headers: bm.headers,
+    body: JSON.stringify({ is_available: 0 })
+  });
+  assert.strictEqual(notAssignedRes.status, 404);
+
+  // 5. Invalid availability values → 400.
+  const invalidRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/products/prod_c1_new', {
+    method: 'PATCH',
+    headers: bm.headers,
+    body: JSON.stringify({ is_available: 2 })
+  });
+  assert.strictEqual(invalidRes.status, 400);
+
+  // 6. Non-manager roles cannot toggle availability.
+  const kitchenHash = crypto.createHash('sha256').update('c1kitchen').digest('hex');
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role)
+    VALUES ('usr_c1_kitchen', 'brand_bangjo', 'org_xentra_holding', 'branch_bangjo_barat', 'c1_kitchen', 'c1_kitchen@bangjo.com', ?, 'Kitchen C1', 'kitchen')
+  `).run(kitchenHash);
+  const kitchen = await c1Login('c1_kitchen', 'c1kitchen');
+  assert.strictEqual(kitchen.status, 200);
+  const kitchenRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/products/prod_c1_new', {
+    method: 'PATCH',
+    headers: kitchen.headers,
+    body: JSON.stringify({ is_available: 1 })
+  });
+  assert.strictEqual(kitchenRes.status, 403);
+  assert.strictEqual((await kitchenRes.json()).error, 'INSUFFICIENT_PERMISSIONS');
+
+  // 7. Anonymous request → 401.
+  const anonRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/products/prod_c1_new', {
+    method: 'PATCH',
+    body: JSON.stringify({ is_available: 1 })
+  });
+  assert.strictEqual(anonRes.status, 401);
+
+  // Restore availability so seeded-state consumers stay coherent.
+  const restoreRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/products/prod_c1_new', {
+    method: 'PATCH',
+    headers: bm.headers,
+    body: JSON.stringify({ is_available: 1 })
+  });
+  assert.strictEqual(restoreRes.status, 200);
+});
+
