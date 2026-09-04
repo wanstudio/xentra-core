@@ -68,6 +68,36 @@ Semua kontrak checkout/order/matching harus membedakan **branch selection mode**
 
 Jika policy lebih lanjut diperlukan (mis. channel/order_type mana yang mengizinkan CUSTOMER_SELECTED), policy tersebut harus dikunci secara eksplisit sebelum implementation dan tidak boleh diinvent oleh coding agent.
 
+## 🔒 LOCKED — Eligibility ≠ Branch Acceptance
+
+**Decision Date:** 2026-09-04
+
+Xentra membedakan **system eligibility** dengan **operational acceptance oleh Branch**. `ELIGIBLE` tidak berarti order otomatis diterima.
+
+Flow:
+
+`Order Request → Core Eligibility → ELIGIBLE → Branch Acceptance → ACCEPT / REJECT`
+
+Branch memiliki operational authority untuk menerima atau menolak request yang secara sistem eligible sesuai kondisi operasional aktual dan policy yang berlaku. Branch acceptance tidak boleh bypass canonical eligibility, dan Core tidak boleh mengubah rejection menjadi acceptance secara diam-diam. Acceptance/rejection harus menjadi state transition yang dapat diaudit.
+
+Berlaku sebagai boundary untuk order/request yang membutuhkan tindakan operasional Branch, termasuk delivery, pickup, dine-in, reservation, dan flow lain sejauh order type tersebut memiliki Branch acceptance step.
+
+Timeout, rejection reason taxonomy, dan UX setelah rejection belum dikunci; coding agent wajib report GAP dan tidak boleh mengarang policy.
+
+Fulfillment selection dan acceptance adalah tahap berbeda:
+
+`AUTO → BranchMatcher → Eligibility → Branch Acceptance`
+
+`CUSTOMER_SELECTED → Selected Branch → Eligibility → Branch Acceptance`
+
+Keduanya tetap menghasilkan tepat satu fulfillment branch dan tidak mengizinkan split fulfillment.
+
+## 🔒 LOCKED — Customer / Branch / Fulfillment Context
+
+Untuk order delivery, **buyer**, **recipient/delivery destination**, dan **fulfillment Branch** adalah context yang berbeda. Buyer dapat berada di kota/lokasi berbeda dari recipient. Branch discovery/matching dan delivery eligibility harus menggunakan delivery destination sebagai tujuan fulfillment, bukan mengasumsikan lokasi buyer sebagai delivery origin.
+
+Customer dapat menentukan destination context terlebih dahulu dan memilih Branch yang tersedia, atau menyerahkan pemilihan Branch kepada Xentra melalui AUTO mode. Customer-selected Branch tetap harus melalui canonical eligibility.
+
 ## Reason
 Nilai utama model multi-branch Xentra adalah menghubungkan owner/brand dengan kondisi operasional cabang secara cepat, akurat, dan auditable sehingga keputusan bisnis dapat dibuat berdasarkan kondisi aktual. Optimasi fulfillment Customer adalah salah satu use case dari data Branch, bukan definisi utama Branch.
 
