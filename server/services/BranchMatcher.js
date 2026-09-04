@@ -17,7 +17,20 @@ class BranchMatcher {
   static async matchNearestBranch(params) {
     const { brand_id, customer_lat, customer_lng, subtotal = 0, items = [] } = params;
 
-    // 1. Fetch active branches for brand
+    // 1. Candidate discovery for delivery matching.
+    // C3 CANONICAL-CONSISTENCY NOTE: the SQL predicates below
+    //   (brand scope, is_active = 1, is_open_override = 1, is_delivery_active = 1)
+    // are semantically IDENTICAL to the branch-level checks
+    // EligibilityService._resolveBranch() performs (BRANCH_NOT_FOUND,
+    // BRANCH_NOT_ACTIVE, BRANCH_CLOSED, FULFILLMENT_NOT_SUPPORTED). They are a
+    // SAFE CANDIDATE-DISCOVERY OPTIMIZATION, not a second eligibility policy:
+    // any branch excluded here would also be excluded by the canonical engine
+    // (a missing branch_delivery_settings row -> NULL capability is rejected by
+    // both), and every returned branch passes those branch facts, so per-branch
+    // evaluateCart() below can only ever disagree on ITEM-level facts. Keeping
+    // them in SQL preserves the early "no active delivery branch" result and
+    // avoids evaluating cart items on branches the engine could never accept.
+    // Selection (nearest/route/fee) stays here, outside EligibilityService.
     let branches = db
       .prepare(`
         SELECT 

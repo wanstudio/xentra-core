@@ -281,6 +281,105 @@ test('C3 No split fulfillment: complementary availability across branches yields
   assert.strictEqual(atTimur.eligible, false);
 });
 
+test('C3 Cart reasons contract: eligible cart has reasons [], single failed item surfaces its reason at cart level', () => {
+  const complete = EligibilityService.evaluateCart({
+    brand_id: BRAND,
+    branch_id: BARAT,
+    order_type: 'delivery',
+    items: [{ product_id: '272', quantity: 1 }, { product_id: '345', quantity: 1 }]
+  });
+  assert.strictEqual(complete.eligible, true);
+  assert.deepStrictEqual(complete.reasons, [], 'eligible cart must carry no reasons');
+
+  const oneFail = EligibilityService.evaluateCart({
+    brand_id: BRAND,
+    branch_id: BARAT,
+    order_type: 'delivery',
+    items: [{ product_id: '272', quantity: 1 }, { product_id: '345', quantity: 9999 }]
+  });
+  assert.strictEqual(oneFail.eligible, false);
+  assert.deepStrictEqual(oneFail.reasons, [EligibilityService.REASONS.INSUFFICIENT_STOCK], 'cart-level reason must reflect the failed item');
+  // Item-level detail stays intact.
+  const failedLine = oneFail.items.find((i) => i.product_id === '345');
+  assert.strictEqual(failedLine.eligible, false);
+  assert.deepStrictEqual(failedLine.reasons, [EligibilityService.REASONS.INSUFFICIENT_STOCK]);
+});
+
+test('C3 Cart reasons contract: multiple failed items produce deduplicated deterministic codes in first-seen item order', () => {
+  // Item 1 exceeds stock (INSUFFICIENT_STOCK); items 2 and 3 are the same
+  // unassigned product (PRODUCT_NOT_ASSIGNED twice -> must dedupe to one).
+  const cart = EligibilityService.evaluateCart({
+    brand_id: BRAND,
+    branch_id: BARAT,
+    order_type: 'delivery',
+    items: [
+      { product_id: '345', quantity: 9999 },
+      { product_id: 'prod_c3_unassigned', quantity: 1 },
+      { product_id: 'prod_c3_unassigned', quantity: 2 }
+    ]
+  });
+  assert.strictEqual(cart.eligible, false);
+  assert.deepStrictEqual(cart.reasons, [
+    EligibilityService.REASONS.INSUFFICIENT_STOCK,
+    EligibilityService.REASONS.PRODUCT_NOT_ASSIGNED
+  ], 'first-seen order, deduplicated');
+
+  // Reversing item order reverses the deterministic reason order (ordering is
+  // a function of the cart, never of internal state).
+  const reversed = EligibilityService.evaluateCart({
+    brand_id: BRAND,
+    branch_id: BARAT,
+    order_type: 'delivery',
+    items: [
+      { product_id: 'prod_c3_unassigned', quantity: 1 },
+      { product_id: '345', quantity: 9999 }
+    ]
+  });
+  assert.deepStrictEqual(reversed.reasons, [
+    EligibilityService.REASONS.PRODUCT_NOT_ASSIGNED,
+    EligibilityService.REASONS.INSUFFICIENT_STOCK
+  ]);
+});
+
+test('C3 Canonical consistency: matcher SQL candidates are exactly the branch-gate-passing delivery branches; item failures never turn into branch reasons', () => {
+  // Mirror the exact candidate-discovery query BranchMatcher runs (same
+  // predicates: brand scope, active, open, delivery capability).
+  const candidates = db.prepare(`
+    SELECT b.id FROM branches b
+    LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
+    WHERE b.brand_id = ? AND b.is_active = 1 AND b.is_open_override = 1 AND s.is_delivery_active = 1
+    ORDER BY b.id
+  `).all(BRAND).map((r) => r.id);
+
+  // Closed / inactive / delivery-disabled / other-brand branches must never be
+  // SQL candidates (they are exactly what _resolveBranch would reject).
+  assert.deepStrictEqual(candidates, ['branch_bangjo_barat', 'branch_c3_no_pickup', 'branch_c3_timur'].sort());
+  for (const excluded of ['branch_c3_closed', 'branch_c3_inactive', 'branch_c3_no_delivery', 'branch_c3_other']) {
+    assert.ok(!candidates.includes(excluded), excluded + ' must not be a candidate');
+  }
+
+  // For every SQL candidate the canonical engine never disagrees on branch
+  // facts: with a guaranteed item-level failure, the cart reason is exactly the
+  // item code (PRODUCT_NOT_ASSIGNED) — never a branch-level code.
+  const branchReasonCodes = [
+    EligibilityService.REASONS.BRANCH_NOT_FOUND,
+    EligibilityService.REASONS.BRANCH_NOT_ACTIVE,
+    EligibilityService.REASONS.BRANCH_CLOSED,
+    EligibilityService.REASONS.FULFILLMENT_NOT_SUPPORTED
+  ];
+  for (const branchId of candidates) {
+    const res = EligibilityService.evaluateCart({
+      brand_id: BRAND,
+      branch_id: branchId,
+      order_type: 'delivery',
+      items: [{ product_id: 'prod_c3_unassigned', quantity: 1 }]
+    });
+    assert.strictEqual(res.eligible, false, branchId + ' fails on the item, not on branch facts');
+    assert.deepStrictEqual(res.reasons, [EligibilityService.REASONS.PRODUCT_NOT_ASSIGNED]);
+    assert.ok(res.reasons.every((r) => !branchReasonCodes.includes(r)), branchId + ' must never surface a branch-level reason');
+  }
+});
+
 test('C3 Cart input validation: empty/non-array carts are INVALID_CART; branch failure propagates deterministically', () => {
   const empty = EligibilityService.evaluateCart({ brand_id: BRAND, branch_id: BARAT, items: [] });
   assert.strictEqual(empty.eligible, false);

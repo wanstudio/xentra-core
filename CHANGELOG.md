@@ -1,5 +1,21 @@
 ## [Unreleased] - 2026-09-04
 ### C3 — Branch/Product Eligibility Boundary
+- **Review pass — cart-level reason contract**: `EligibilityService.evaluateCart()`
+  now returns meaningful top-level `reasons` whenever the cart is ineligible —
+  the deterministic blocking codes of the failed item evaluations,
+  deduplicated and ordered by first-seen item order (e.g.
+  `["INSUFFICIENT_STOCK", "PRODUCT_NOT_ASSIGNED"]`). Item-level reasons remain
+  intact per line; `eligible: true` still returns `reasons: []`; branch-level
+  failure still surfaces the single branch reason.
+- **Review pass — BranchMatcher pre-filter audited**: the candidate-discovery
+  SQL predicates (`is_active`, `is_open_override`, `is_delivery_active`) are
+  documented as a SAFE OPTIMIZATION semantically identical to
+  `EligibilityService._resolveBranch()` checks — never a second eligibility
+  policy. Any excluded branch would also be rejected by the canonical engine
+  (incl. missing `branch_delivery_settings` row → NULL capability), so
+  per-branch `evaluateCart()` can only disagree on item-level facts. Selection
+  (nearest/route/fee) remains exclusively in BranchMatcher; regression tests
+  prove candidates never surface branch-level reasons.
 - **Canonical eligibility engine** (`domains/commerce/services/EligibilityService.js`):
   one deterministic decision layer answering "can this Branch satisfy this
   product / the complete cart?" — `evaluateProduct` and `evaluateCart` with

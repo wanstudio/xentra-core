@@ -251,6 +251,11 @@ class EligibilityService {
    * @param {Array<{ product_id?: string|number, id?: string|number, quantity?: number, qty?: number }>} params.items
    * @param {string} [params.order_type]
    * @returns {{ eligible: boolean, reasons: string[], branch_id: string, brand_id: string, items: Array<{ product_id: string|number, quantity: number, eligible: boolean, reasons: string[] }> }}
+   *   When `eligible` is false, top-level `reasons` aggregates the blocking
+   *   reason codes of the failed item evaluations (deduplicated, deterministic
+   *   first-seen item order). When the branch gate fails, `reasons` carries the
+   *   single branch-level reason and every item repeats it. `eligible: true`
+   *   always returns `reasons: []`.
    */
   static evaluateCart({ brand_id, branch_id, items, order_type = null }) {
     if (!Array.isArray(items) || items.length === 0) {
@@ -299,9 +304,29 @@ class EligibilityService {
       };
     });
 
+    const eligible = evaluatedItems.every((it) => it.eligible);
+
+    // Cart-level reason contract: whenever the cart is ineligible, the
+    // top-level `reasons` carries the deterministic blocking reason codes of
+    // the failed item evaluations (first-seen order across items, deduplicated,
+    // reusing EligibilityService.REASONS — never invented here). Item-level
+    // reasons remain intact for per-line diagnostics.
+    const reasons = [];
+    if (!eligible) {
+      for (const item of evaluatedItems) {
+        if (!item.eligible) {
+          for (const reason of item.reasons) {
+            if (reason && !reasons.includes(reason)) {
+              reasons.push(reason);
+            }
+          }
+        }
+      }
+    }
+
     return {
-      eligible: evaluatedItems.every((it) => it.eligible),
-      reasons: [],
+      eligible,
+      reasons,
       branch_id,
       brand_id,
       items: evaluatedItems
