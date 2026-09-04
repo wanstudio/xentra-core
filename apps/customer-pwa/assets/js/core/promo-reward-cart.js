@@ -34,17 +34,24 @@
     });
   }
 
-  /** Builds the canonical checkout line for an entitled reward. */
+  /** Builds the canonical checkout line for an entitled reward.
+   *  Economics (price/regular_price) come from the authoritative server reward
+   *  payload (reward_price, regular_price); the client never invents prices. */
   function buildRewardItem(reward) {
     if (!reward) return null;
     var promoId = promoIdOf(reward.promo_id || reward.promotion_id);
     if (!promoId || !reward.product_id) return null;
+    var rewardPrice = reward.reward_price !== undefined && reward.reward_price !== null
+      ? Number(reward.reward_price)
+      : (reward.price !== undefined && reward.price !== null ? Number(reward.price) : 0);
     return {
       id: 'reward_' + promoId,
       product_id: String(reward.product_id),
       name: reward.name || 'Hadiah Promo',
-      price: 0,
-      regular_price: Number(reward.regular_price || 0),
+      price: rewardPrice,
+      regular_price: reward.regular_price !== undefined && reward.regular_price !== null
+        ? Number(reward.regular_price)
+        : rewardPrice,
       image_url: reward.image_url || '',
       description: reward.description || '',
       quantity: 1,

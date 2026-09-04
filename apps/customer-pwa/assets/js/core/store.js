@@ -130,12 +130,14 @@
     if (existing) {
       existing.quantity += qty;
     } else {
+      // Promo-line identity is canonical only (flag / promotion_id / synthetic
+      // reward_ id). Price-0 or name "Gratis" heuristics are NOT used, so a
+      // legitimately discounted or free catalog product is never misflagged.
       var isPromo = Boolean(
         product.is_promo_reward ||
-        String(product.id).indexOf('reward_') === 0 ||
-        Number(product.price) === 0 ||
-        product.price === '0' ||
-        (product.name && product.name.toLowerCase().indexOf('gratis') !== -1)
+        product.promotion_id ||
+        product.promo_id ||
+        String(product.id).indexOf('reward_') === 0
       );
 
       var newItem = {

@@ -64,9 +64,13 @@
   var deferredPrompt = null;
   var isIosPwa = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
 
+  // PROMOTION INSTALL STATE (not runtime display-mode): has the user accepted
+  // the install action? Satisfied when running standalone OR the accepted-
+  // install marker is set in this browser profile. Distinct from the runtime
+  // display_mode fact, which the order gate still validates separately at Pay.
   function checkIsPwaInstalled() {
     if (window.Xentra && window.Xentra.PwaRuntime) {
-      return window.Xentra.PwaRuntime.getPwaRuntimeContext().display_mode === 'standalone';
+      return window.Xentra.PwaRuntime.getPwaRuntimeContext().install_requirement_satisfied === true;
     }
     return Boolean(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
   }
@@ -125,12 +129,13 @@
       var bridge = window.Xentra && window.Xentra.PromotionRewardCart;
       // Bridge check is canonical (promotion_id / reward_<promo> id); the loose
       // scan keeps legacy hydrated carts from an older claim shape claimable-free.
+      // Canonical reward identity first; legacy hydration fallback keeps
+      // older claim shapes (id reward_* / is_promo_reward flag) claimable-free.
       var hasRewardInCart = (bridge ? bridge.hasReward(items, promoId) : false) ||
         (items || []).some(function (i) {
           return String(i.id) === 'reward_' + promoId ||
                  String(i.id).indexOf('reward_') === 0 ||
-                 Boolean(i.is_promo_reward) ||
-                 Number(i.price || 0) === 0;
+                 Boolean(i.is_promo_reward);
         });
 
       if (hasRewardInCart) {
@@ -178,14 +183,18 @@
     var items = getCheckoutItems();
     if (bridge.hasReward(items, promoId)) return;
 
+    // Reward line economics come from the authoritative server payload
+    // (reward_price / regular_price / product identity) — no client hardcodes.
+    var display = rewardPromo.display || {};
     var res = bridge.claim(items, {
       promo_id: promoId,
       product_id: rew.product_id,
-      name: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo',
+      name: rew.product_name || display.reward_title || 'Hadiah Promo',
       reward_type: rew.reward_type || 'freebie_product',
-      regular_price: 5000,
-      image_url: (rewardPromo.display && rewardPromo.display.icon_url) || '/assets/pwa/icon-192.png',
-      description: (rewardPromo.display && rewardPromo.display.reward_title) || 'Hadiah Promo'
+      reward_price: rew.reward_price,
+      regular_price: rew.regular_price,
+      image_url: rew.image_url || display.icon_url || '',
+      description: rew.description || display.reward_title || 'Hadiah Promo'
     });
     if (!res || !res.claimed || !res.items.length) return;
 
@@ -209,6 +218,14 @@
   window.addEventListener('appinstalled', function () {
     deferredPrompt = null;
     isPwaInstalled = true;
+    // Persist the installed-confirmation marker so the same browser tab (where
+    // display-mode is still 'browser') is treated as installed for discovery and
+    // shows the reward state instead of an Install banner.
+    if (window.Xentra && window.Xentra.PwaRuntime && window.Xentra.PwaRuntime.markInstalled) {
+      window.Xentra.PwaRuntime.markInstalled();
+    } else {
+      try { localStorage.setItem('xentra_pwa_installed', '1'); } catch (_) {}
+    }
     var banner = document.getElementById('x-promo-banner');
     if (banner) banner.style.display = 'none';
     if (UI && UI.toast) UI.toast('Aplikasi berhasil dipasang!');
@@ -279,8 +296,17 @@
       promptEvent.prompt();
       promptEvent.userChoice.then(function (choice) {
         if (choice && choice.outcome === 'accepted') {
-          try { localStorage.setItem('xentra_pwa_installed', '1'); } catch (_) {}
+          if (window.Xentra && window.Xentra.PwaRuntime && window.Xentra.PwaRuntime.markInstalled) {
+            window.Xentra.PwaRuntime.markInstalled();
+          } else {
+            try { localStorage.setItem('xentra_pwa_installed', '1'); } catch (_) {}
+          }
           if (UI && UI.toast) UI.toast('Terima kasih telah memasang aplikasi!');
+          // Switch this tab to the reward state right away (the appinstalled
+          // event may lag the prompt acceptance).
+          loadActivePromotions().then(function () {
+            renderPromoBanner();
+          });
         }
         window.__xentra_deferred_prompt = null;
         deferredPrompt = null;
@@ -293,22 +319,26 @@
     showPwaGuideSheet(isIosPwa ? 'ios' : 'android');
   }
 
-  // Delegated install click listener on document for 100% reliable tap response
+  // Delegated install click listener on document for 100% reliable tap response.
+  // Covers BOTH install entry points: the promo card button on checkout
+  // (#x-btn-promo-install) and the persistent top "Bangjo App" banner button
+  // (#x-pwa-install) shown on every view for guests.
   document.addEventListener('click', function (e) {
-    var btn = e.target.closest('#x-btn-promo-install');
+    var btn = e.target.closest('#x-btn-promo-install, #x-pwa-install');
     if (btn) {
       handleInstallClick(e);
     }
   });
 
+  // Reward/promo line identity: canonical metadata or the synthetic line id.
+  // Price-0 or name "Gratis" heuristics are intentionally NOT used here so a
+  // legitimately discounted/free product is never misclassified as a promo.
   function isPromoItem(item) {
     if (!item) return false;
     return Boolean(
       item.is_promo_reward ||
-      String(item.id).indexOf('reward_') === 0 ||
-      Number(item.price) === 0 ||
-      item.price === '0' ||
-      (item.name && item.name.toLowerCase().indexOf('gratis') !== -1)
+      item.promotion_id ||
+      String(item.id).indexOf('reward_') === 0
     );
   }
 
@@ -613,6 +643,8 @@
       var img = item.image_url || item.image || '';
       var qty = Number(item.quantity || 1);
       var note = (state.notes && state.notes[item.id]) || item.note || '';
+      // Visual classification only (legacy zero-price lines still render
+      // "Gratis") — reward identity itself is canonical (flag / reward_ id).
       var isPromoFreebie = Boolean(item.is_promo_reward || String(item.id).indexOf('reward_') === 0 || Number(item.price) === 0);
 
       html +=
@@ -1310,6 +1342,24 @@
     };
   }
 
+  // ── 6b. Reward needs the installed PWA context at Pay ──
+  // Server authority requires pwa_runtime.display_mode === 'standalone' before
+  // an order containing the freebie reward is accepted. If the user claimed the
+  // reward in a plain browser tab (installed marker only), guide them to finish
+  // from the installed app instead of failing with a confusing API error.
+  function showRewardStandaloneSheet() {
+    var sh = makeOverlay(
+      '<div style="text-align:center;margin-bottom:12px;">' +
+      '  <div style="font-size:36px;margin-bottom:8px;">🍹</div>' +
+      '  <h3 class="x-alt-sheet-title" style="margin:0 0 6px;">Selesaikan dari Aplikasi Bangjo</h3>' +
+      '  <p style="font-size:13px;color:#6b7280;margin:0;line-height:1.5;">Es Teh Gratis aktif untuk checkout dari aplikasi Bangjo yang sudah terpasang. Buka Bangjo dari ikon di layar utama perangkatmu dan selesaikan pesanan di sana — hadiah otomatis terpakai.</p>' +
+      '</div>' +
+      '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:10px 12px;font-size:12px;color:#15803d;line-height:1.45;margin:4px 0 2px;">💡 Kamu tetap bisa memesan dari browser ini tanpa hadiah: hapus item "Es Teh Gratis" dari pesananmu lalu lanjutkan.</div>' +
+      '<button type="button" class="x-alt-submit-btn" id="x-btn-reward-standalone-ok" style="margin-top:14px;">Mengerti, buka aplikasi</button>'
+    );
+    sh.overlay.querySelector('#x-btn-reward-standalone-ok').onclick = function () { sh.close(); };
+  }
+
   // ── 7. Execute Pre-Payment Verification & Submit Order ──
   function executePrePaymentAndSubmit() {
     if (state.isSubmitting) return;
@@ -1326,6 +1376,17 @@
     if (!state.customer.phone) {
       if (UI && UI.toast) UI.toast('Silakan masukkan nomor WhatsApp pemesan.');
       openCustomerAuthSheet();
+      return;
+    }
+
+    // Reward line + non-standalone context -> the authoritative gate would
+    // reject it at Pay. Intercept early with a clear next step.
+    var ctxNow = (window.Xentra && window.Xentra.PwaRuntime) ? window.Xentra.PwaRuntime.getPwaRuntimeContext() : { display_mode: 'browser' };
+    var hasRewardLine = items.some(function (i) {
+      return Boolean(i.is_promo_reward) || String(i.id).indexOf('reward_') === 0;
+    });
+    if (hasRewardLine && ctxNow.display_mode !== 'standalone') {
+      showRewardStandaloneSheet();
       return;
     }
 

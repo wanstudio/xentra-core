@@ -129,6 +129,25 @@ class PromotionEngineService {
           ...evalResult
         };
 
+        // Authoritative catalog enrichment for granted rewards: the client cart
+        // line must be built from server facts (product identity, name, prices),
+        // never from client hardcodes. Falls back silently when the reward
+        // product is not in this brand's catalog (kept configurable/dynamic).
+        if (evalResult.should_grant_reward && evalResult.reward && evalResult.reward.product_id) {
+          try {
+            const catalogProduct = db.prepare(`
+              SELECT name, price, regular_price, image_url
+              FROM products
+              WHERE id = ? AND brand_id = ?
+            `).get(String(evalResult.reward.product_id), brand_id);
+            if (catalogProduct) {
+              item.reward.product_name = catalogProduct.name;
+              item.reward.regular_price = Number(catalogProduct.regular_price || catalogProduct.price || 0);
+              item.reward.image_url = catalogProduct.image_url || '';
+            }
+          } catch (_) { /* enrichment must never break eligibility */ }
+        }
+
         discoveryList.push(item);
 
         if (evalResult.should_grant_reward) {

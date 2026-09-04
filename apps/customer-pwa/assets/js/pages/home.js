@@ -67,21 +67,28 @@
     var banner = $('x-pwa-banner');
     if (!banner) return;
 
-    // Installed PWA users must not see the acquisition banner.
-    var standalone = false;
+    // Users whose promotion install requirement is satisfied (running standalone
+    // OR the accepted-install marker in this browser profile) must not see the
+    // acquisition banner. The marker is UI-only; entitlement and redemption stay
+    // authoritative on the server.
+    var requirementSatisfied = false;
     try {
-      standalone = Boolean(
-        (window.Xentra && window.Xentra.PwaRuntime &&
-          window.Xentra.PwaRuntime.getPwaRuntimeContext &&
-          window.Xentra.PwaRuntime.getPwaRuntimeContext().display_mode === 'standalone') ||
-        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
-      );
+      var pwaCtx = (window.Xentra && window.Xentra.PwaRuntime && window.Xentra.PwaRuntime.getPwaRuntimeContext)
+        ? window.Xentra.PwaRuntime.getPwaRuntimeContext()
+        : null;
+      requirementSatisfied = Boolean(pwaCtx ? pwaCtx.install_requirement_satisfied : (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
     } catch (_) {}
 
-    if (standalone) {
+    if (requirementSatisfied) {
       banner.classList.remove('x-pwa-banner-show');
       return;
     }
+
+    // Hide the acquisition banner the moment the install completes, including
+    // in this same browser tab (marker written by PwaRuntime on appinstalled).
+    window.addEventListener('appinstalled', function () {
+      banner.classList.remove('x-pwa-banner-show');
+    });
 
     // Dismissal is session-scoped, not an entitlement/identity flag.
     try {
