@@ -91,7 +91,8 @@ router.get('/brand/branches', (req, res) => {
         SELECT 
           b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone,
           b.is_active, b.is_open_override,
-          s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km
+          s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km,
+          s.promo_delivery_discount, s.promo_min_order
         FROM branches b
         LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
         WHERE b.brand_id = ? AND b.is_active = 1
@@ -335,8 +336,6 @@ router.get(['/catalog/menu', '/home'], (req, res) => {
   try {
     const brandId = req.brand_id;
     const branchId = req.query.branch_id || '';
-    let categories = [];
-    let products = [];
 
     // P3 BRANCH-SCOPED MENU: when a branch context is explicitly requested it must
     // belong to this brand AND be active; otherwise fail closed (400) instead of
@@ -353,56 +352,40 @@ router.get(['/catalog/menu', '/home'], (req, res) => {
       branchScope = branch;
     }
 
-    if (branchScope) {
-      // P3: reuse the canonical commerce branch-scoped menu (branch price override,
-      // C1 operational availability, branch stock estimate). No new catalog source.
-      const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: branchScope.id });
-      categories = menu.categories.map((c) => ({
-        ...c,
-        image: c.icon_url || ''
-      }));
-      products = menu.products;
-    } else {
-      try {
-        // P1 STRICT TENANT ISOLATION (NEW-01 & NEW-03):
-        // Only query categories and products belonging exclusively to the resolved brand_id
-        categories = db
-          .prepare('SELECT * FROM categories WHERE brand_id = ? ORDER BY sort_order ASC')
-          .all(brandId);
+    // P3: always reuse the canonical commerce CatalogService — both branch-scoped
+    // and brand-wide menus go through the same domain ownership path.
+    // CatalogService returns branch price override, C1 operational availability,
+    // and branch stock estimate when branch_id is provided.
+    const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: branchScope ? branchScope.id : null });
 
-        products = db
-          .prepare('SELECT * FROM products WHERE brand_id = ? AND (is_active = 1 OR is_active IS NULL) ORDER BY sort_order ASC')
-          .all(brandId);
-      } catch (dbErr) {
-        console.warn('[Catalog Menu DB Warn]:', dbErr.message);
-      }
-    }
+    const categories = menu.categories.map((c) => ({
+      ...c,
+      image: c.icon_url || ''
+    }));
+    const products = menu.products;
 
-    const tree = (categories || []).map((cat) => {
-      let catProducts = (products || []).filter((p) => String(p.category_id) === String(cat.id) || String(p.cat) === String(cat.id));
-      if (catProducts.length === 0 && (cat.name === 'Rekom' || cat.slug === 'rekom')) {
-        catProducts = (products || []).slice(0, 3);
-      }
+    const tree = categories.map((cat) => {
+      const catProducts = products.filter((p) => String(p.category_id) === String(cat.id));
 
       return {
         id: cat.id,
         name: cat.name,
         slug: cat.slug || String(cat.name || '').toLowerCase().replace(/\s+/g, '-'),
-        image: cat.image || cat.image_url || cat.icon_url || '',
+        image: cat.image || cat.icon_url || '',
         products: catProducts.map((p) => ({
           ...p,
-          image: p.image_url || p.image || '',
-          image_url: p.image_url || p.image || '',
+          image: p.image_url || '',
+          image_url: p.image_url || '',
           regular_price: p.regular_price || p.price,
           sale_price: p.price
         }))
       };
     });
 
-    const allNormalized = (products || []).map((p) => ({
+    const allNormalized = products.map((p) => ({
       ...p,
-      image: p.image_url || p.image || '',
-      image_url: p.image_url || p.image || '',
+      image: p.image_url || '',
+      image_url: p.image_url || '',
       regular_price: p.regular_price || p.price,
       sale_price: p.price
     }));
