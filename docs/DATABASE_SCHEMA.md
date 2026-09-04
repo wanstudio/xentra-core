@@ -6,17 +6,20 @@
 
 ## 1. Tenancy & Hierarchy Tables
 
-> **Implementation note (B1/C1 — Branch & Product Assignment Boundary, 2026-09-04):** the
-> live SQLite schema in `server/database/db.js` implements the tenancy hierarchy with the
-> tables below (`organizations` → `brands` → `branches`, plus `branch_delivery_settings`
-> carrying the delivery/pickup capability flags that this spec's `branch_settings` example
-> describes). Product → Branch assignment is the `branch_products` table below with a
-> DB-level brand-consistency trigger. Known deltas from this spec, deliberately not
-> materialized yet (no approved business contract): `dinein_enabled` and `operating_hours`
-> (schedule-driven open state). Branch open/close is represented by the server-authoritative
-> `branches.is_open_override` master switch consumed by `BranchMatcher` and the public branch
-> API. Every authorized branch/product-operational mutation is recorded append-only in
-> `branch_operation_logs`.
+> **Implementation note (B1/C1/C2 — Branch, Product Assignment & Inventory Boundary,
+> 2026-09-04):** the live SQLite schema in `server/database/db.js` implements the tenancy
+> hierarchy with the tables below (`organizations` → `brands` → `branches`, plus
+> `branch_delivery_settings` carrying the delivery/pickup capability flags that this spec's
+> `branch_settings` example describes). Product → Branch assignment is the `branch_products`
+> table below with DB-level brand-consistency and non-negative-stock triggers; physical
+> stock lives in `branch_products.stock` (owned by the Inventory domain, never fabricated by
+> assignment) and every mutation is recorded in the immutable `inventory_movements` ledger
+> (atomic guarded updates + optional `mutation_id` idempotency). Known deltas from this spec,
+> deliberately not materialized yet (no approved business contract): `dinein_enabled` and
+> `operating_hours` (schedule-driven open state). Branch open/close is represented by the
+> server-authoritative `branches.is_open_override` master switch consumed by `BranchMatcher`
+> and the public branch API. Authorized branch/product-operational mutations are recorded
+> append-only in `branch_operation_logs`.
 
 ### `organizations`
 Master SaaS account / holding organization.
@@ -135,6 +138,32 @@ CREATE TABLE branch_products (
 );
 -- Brand-consistency enforcement (C1.3): product.brand_id must equal branch.brand_id.
 -- Enforced by BEFORE INSERT/UPDATE triggers raising CROSS_BRAND_ASSIGNMENT_REJECTED.
+-- Non-negative physical stock (C2.6): BEFORE INSERT/UPDATE OF stock triggers raise
+-- NEGATIVE_STOCK_REJECTED when NEW.stock < 0.
+```
+
+### `inventory_movements` (C2 — immutable branch inventory ledger)
+Append-only ledger recording every physical-stock mutation at the branch boundary: who,
+what (product), which branch, signed quantity, before/after stock, reference and when.
+Inventory audit is NOT a financial ledger.
+```sql
+CREATE TABLE inventory_movements (
+    id VARCHAR(36) PRIMARY KEY,
+    branch_id VARCHAR(36) NOT NULL,
+    product_id VARCHAR(36) NOT NULL,
+    movement_type VARCHAR(30) NOT NULL,  -- purchase_in/transfer_in/return_in/sale_deduction/transfer_out/waste_spoilage/audit_adjustment
+    quantity INTEGER NOT NULL,            -- signed
+    previous_stock INTEGER NOT NULL,
+    current_stock INTEGER NOT NULL,
+    reference_id VARCHAR(64),             -- PO number / order number / transfer id
+    mutation_id VARCHAR(64),              -- C2 idempotency key (UNIQUE where not null)
+    actor_id VARCHAR(64),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+-- UNIQUE partial index on mutation_id guarantees a logical mutation is applied at most once.
 ```
 
 ---

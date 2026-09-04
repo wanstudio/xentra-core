@@ -169,3 +169,119 @@ test('Inventory 4 — Stock Adjustment: records opname variance with mandatory r
   assert.strictEqual(ledger.actor_id, 'auditor_rina');
   assert.ok(ledger.notes.includes('Hasil Stock Opname'));
 });
+
+// ==============================================================================
+// Inventory 5 — C2.7 Atomic Guarded Mutation: two -1 deductions from stock 1
+// ==============================================================================
+test('Inventory 5 — C2 Atomicity: concurrent-style double deduction cannot oversell (exactly one succeeds, stock 0)', () => {
+  db.prepare(`
+    INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active)
+    VALUES ('prod_inv_3', 'brand_inv', 'cat_inv', 'Es Teh Botol (Stok 1)', 'es-teh-botol-1', 5000, 1)
+  `).run();
+  db.prepare(`
+    INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock)
+    VALUES ('branch_inv', 'prod_inv_3', 1)
+  `).run();
+
+  // Mutation A consumes the single unit.
+  const first = InventoryStockService.recordMovement({
+    branch_id: 'branch_inv',
+    product_id: 'prod_inv_3',
+    movement_type: InventoryMovementModel.MOVEMENT_TYPES.AUDIT_ADJUSTMENT,
+    quantity: -1,
+    actor_id: 'cashier_a'
+  });
+  assert.strictEqual(first.success, true);
+  assert.strictEqual(first.current_stock, 0);
+
+  // Mutation B must FAIL (stock would go negative) and leave stock at 0.
+  assert.throws(() => {
+    InventoryStockService.recordMovement({
+      branch_id: 'branch_inv',
+      product_id: 'prod_inv_3',
+      movement_type: InventoryMovementModel.MOVEMENT_TYPES.AUDIT_ADJUSTMENT,
+      quantity: -1,
+      actor_id: 'cashier_b'
+    });
+  }, /Stok tidak boleh negatif/);
+
+  assert.strictEqual(InventoryStockService.getStock('branch_inv', 'prod_inv_3'), 0, 'Final stock must be 0, never -1');
+  const ledgerCount = db.prepare("SELECT COUNT(*) AS c FROM inventory_movements WHERE branch_id = 'branch_inv' AND product_id = 'prod_inv_3'").get().c;
+  assert.strictEqual(ledgerCount, 1, 'Only the successful mutation is recorded');
+});
+
+// ==============================================================================
+// Inventory 6 — C2.8 Idempotency: same mutation_id is applied exactly once
+// ==============================================================================
+test('Inventory 6 — C2 Idempotency: replaying mutation_id never double-applies', () => {
+  db.prepare(`
+    INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active)
+    VALUES ('prod_inv_4', 'brand_inv', 'cat_inv', 'Galon Air (Idempotent)', 'galon-air', 20000, 1)
+  `).run();
+  db.prepare(`
+    INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock)
+    VALUES ('branch_inv', 'prod_inv_4', 10)
+  `).run();
+
+  const mutationId = 'mut_c2_inv_001';
+  const firstCall = InventoryStockService.recordMovement({
+    branch_id: 'branch_inv',
+    product_id: 'prod_inv_4',
+    movement_type: InventoryMovementModel.MOVEMENT_TYPES.AUDIT_ADJUSTMENT,
+    quantity: 3,
+    mutation_id: mutationId,
+    actor_id: 'staff_gudang'
+  });
+  assert.strictEqual(firstCall.success, true);
+  assert.strictEqual(firstCall.idempotent, undefined);
+  assert.strictEqual(InventoryStockService.getStock('branch_inv', 'prod_inv_4'), 13);
+
+  // Replay (even with a DIFFERENT quantity) must return the ORIGINAL result, no stock change.
+  const replay = InventoryStockService.recordMovement({
+    branch_id: 'branch_inv',
+    product_id: 'prod_inv_4',
+    movement_type: InventoryMovementModel.MOVEMENT_TYPES.AUDIT_ADJUSTMENT,
+    quantity: -99,
+    mutation_id: mutationId,
+    actor_id: 'staff_gudang'
+  });
+  assert.strictEqual(replay.idempotent, true);
+  assert.strictEqual(replay.current_stock, 13);
+  assert.strictEqual(InventoryStockService.getStock('branch_inv', 'prod_inv_4'), 13, 'Replay must not mutate stock');
+
+  const ledgerCount = db.prepare('SELECT COUNT(*) AS c FROM inventory_movements WHERE mutation_id = ?').get(mutationId).c;
+  assert.strictEqual(ledgerCount, 1, 'Exactly one ledger entry per mutation_id');
+});
+
+// ==============================================================================
+// Inventory 7 — C2.6 DB-level enforcement: stock can never be written negative
+// ==============================================================================
+test('Inventory 7 — C2 Database guard: negative stock writes are rejected by DB trigger', () => {
+  db.prepare(`
+    INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active)
+    VALUES ('prod_inv_5', 'brand_inv', 'cat_inv', 'Produk DB Guard', 'db-guard', 10000, 1)
+  `).run();
+  db.prepare(`
+    INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock)
+    VALUES ('branch_inv', 'prod_inv_5', 5)
+  `).run();
+
+  // Raw UPDATE to -1 (bypassing services) must be aborted by the trigger.
+  assert.throws(
+    () => db.prepare("UPDATE branch_products SET stock = -1 WHERE branch_id = 'branch_inv' AND product_id = 'prod_inv_5'").run(),
+    /NEGATIVE_STOCK_REJECTED/,
+    'DB trigger must reject negative stock updates'
+  );
+  assert.strictEqual(InventoryStockService.getStock('branch_inv', 'prod_inv_5'), 5, 'Stock unchanged after rejected write');
+
+  // Raw INSERT with negative stock must also be aborted.
+  db.prepare(`
+    INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active)
+    VALUES ('prod_inv_6', 'brand_inv', 'cat_inv', 'Produk DB Guard 2', 'db-guard-2', 10000, 1)
+  `).run();
+  assert.throws(
+    () => db.prepare("INSERT INTO branch_products (branch_id, product_id, stock) VALUES ('branch_inv', 'prod_inv_6', -3)").run(),
+    /NEGATIVE_STOCK_REJECTED/,
+    'DB trigger must reject negative stock inserts'
+  );
+});

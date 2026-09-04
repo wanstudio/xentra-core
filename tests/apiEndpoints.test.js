@@ -1182,3 +1182,153 @@ test('C1 Branch scope: availability toggle is own-branch only, audited, and neve
   assert.strictEqual(restoreRes.status, 200);
 });
 
+/* =============================================================================
+   TASK C2 — BRANCH INVENTORY BOUNDARY
+   Branch-scoped physical stock: atomic guarded mutation, ledger audit,
+   no negative stock, idempotency, authorization & isolation.
+   ============================================================================= */
+
+async function c2Patch(branchId, productId, body, headers) {
+  return mockFetch('/api/v1/admin/branches/' + branchId + '/inventory/' + productId, {
+    method: 'PATCH',
+    headers: headers || {},
+    body: JSON.stringify(body)
+  });
+}
+
+function c2Stock(branchId, productId) {
+  const row = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branchId, productId);
+  return row ? row.stock : undefined;
+}
+
+test('C2 Inventory: valid adjustment from NULL stock, ledger audit, negative & type/quantity validation', async () => {
+  const owner = await c1Login('admin', 'bangjo123');
+  assert.strictEqual(owner.status, 200);
+
+  // prod_c1_new was assigned in the C1 test with stock NULL (assignment != inventory).
+  assert.strictEqual(c2Stock('branch_bangjo_barat', 'prod_c1_new'), null, 'C1 assignment carries no stock');
+
+  // 1. audit_adjustment +5 must start from zero (no fabricated stock before the adjustment).
+  const plusRes = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: 5 }, owner.headers);
+  assert.strictEqual(plusRes.status, 200);
+  const plusData = await plusRes.json();
+  assert.strictEqual(plusData.success, true);
+  assert.strictEqual(plusData.movement.previous_stock, 0);
+  assert.strictEqual(plusData.movement.current_stock, 5);
+  assert.strictEqual(plusData.stock, 5);
+
+  // 2. Reduction -3 → 2, ledger records actor role.
+  const minusRes = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: -3, notes: 'Koreksi opname' }, owner.headers);
+  assert.strictEqual(minusRes.status, 200);
+  const ledgerRow = db.prepare(`
+    SELECT * FROM inventory_movements
+    WHERE branch_id = 'branch_bangjo_barat' AND product_id = 'prod_c1_new'
+    ORDER BY created_at DESC, rowid DESC LIMIT 1
+  `).get();
+  assert.ok(ledgerRow, 'immutable ledger entry written');
+  assert.strictEqual(ledgerRow.movement_type, 'audit_adjustment');
+  assert.strictEqual(ledgerRow.quantity, -3);
+  assert.strictEqual(ledgerRow.previous_stock, 5);
+  assert.strictEqual(ledgerRow.current_stock, 2);
+  assert.ok(String(ledgerRow.notes).startsWith('[owner]'), 'actor role recorded in ledger notes');
+
+  // 3. Over-reduction below zero → 409, stock unchanged.
+  const overRes = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: -5 }, owner.headers);
+  assert.strictEqual(overRes.status, 409);
+  assert.strictEqual((await overRes.json()).error, 'INSUFFICIENT_STOCK');
+  assert.strictEqual(c2Stock('branch_bangjo_barat', 'prod_c1_new'), 2);
+
+  // 4. Manual API refuses order/PO-owned movement types.
+  const poRes = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'purchase_in', quantity: 5 }, owner.headers);
+  assert.strictEqual(poRes.status, 400);
+  assert.strictEqual((await poRes.json()).error, 'INVALID_MOVEMENT_TYPE');
+  const saleRes = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'sale_deduction', quantity: -1 }, owner.headers);
+  assert.strictEqual(saleRes.status, 400);
+
+  // 5. waste_spoilage must be a reduction only.
+  const wastePlus = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'waste_spoilage', quantity: 1 }, owner.headers);
+  assert.strictEqual(wastePlus.status, 400);
+  const wasteMinus = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'waste_spoilage', quantity: -1 }, owner.headers);
+  assert.strictEqual(wasteMinus.status, 200);
+  assert.strictEqual(c2Stock('branch_bangjo_barat', 'prod_c1_new'), 1);
+
+  // 6. Quantity validation rejects invalid values.
+  for (const bad of [-1, 1.5, 'abc', null, '', 0]) {
+    // -1 alone is only valid if it would not go negative here; use a separate controlled case below.
+    if (bad === -1) continue;
+    const invalidRes = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: bad }, owner.headers);
+    assert.strictEqual(invalidRes.status, 400, 'quantity=' + JSON.stringify(bad) + ' must be rejected');
+    assert.strictEqual((await invalidRes.json()).error, 'INVALID_QUANTITY');
+  }
+
+  // 7. Inventory list reflects authoritative stock.
+  const listRes = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/inventory', { headers: owner.headers });
+  assert.strictEqual(listRes.status, 200);
+  const listData = await listRes.json();
+  const row = listData.inventory.find((i) => i.product_id === 'prod_c1_new');
+  assert.ok(row, 'assigned product present in branch inventory');
+  assert.strictEqual(row.stock, 1);
+});
+
+test('C2 Inventory: isolation, authorization, idempotency and scope guards', async () => {
+  const owner = await c1Login('admin', 'bangjo123');
+  assert.strictEqual(owner.status, 200);
+
+  // 1. Unassigned product → inventory mutation rejected (assignment boundary).
+  const unassignedRes = await c2Patch('branch_bangjo_barat', 'prod_c1_never', { movement_type: 'audit_adjustment', quantity: 1 }, owner.headers);
+  assert.strictEqual(unassignedRes.status, 404);
+
+  // 2. Branch isolation: assign prod_c1_new to branch_c1_timur; mutating Timur must not touch Barat.
+  await mockFetch('/api/v1/admin/branches/branch_c1_timur/products', {
+    method: 'POST',
+    headers: owner.headers,
+    body: JSON.stringify({ product_id: 'prod_c1_new' })
+  });
+  assert.strictEqual(c2Stock('branch_c1_timur', 'prod_c1_new'), null);
+  const baratBefore = c2Stock('branch_bangjo_barat', 'prod_c1_new');
+  const timurPlus = await c2Patch('branch_c1_timur', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: 7 }, owner.headers);
+  assert.strictEqual(timurPlus.status, 200);
+  assert.strictEqual(c2Stock('branch_c1_timur', 'prod_c1_new'), 7);
+  assert.strictEqual(c2Stock('branch_bangjo_barat', 'prod_c1_new'), baratBefore, 'Branch A mutation must not leak into Branch B');
+
+  // 3. Cross-brand / cross-org branch is not addressable.
+  const crossBrandRes = await c2Patch('branch_other_co', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: 1 }, owner.headers);
+  assert.strictEqual(crossBrandRes.status, 404);
+
+  // 4. Branch Manager: own branch allowed, foreign branch forbidden, kitchen/anonymous rejected.
+  const bm = await c1Login('bm_c1', 'c1bmpass');
+  assert.strictEqual(bm.status, 200);
+  const bmOwn = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: 1, notes: 'Stok awal' }, bm.headers);
+  assert.strictEqual(bmOwn.status, 200);
+  const bmForeign = await c2Patch('branch_c1_timur', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: 1 }, bm.headers);
+  assert.strictEqual(bmForeign.status, 403);
+  assert.strictEqual((await bmForeign.json()).error, 'FORBIDDEN_BRANCH_SCOPE');
+
+  const kitchen = await c1Login('c1_kitchen', 'c1kitchen');
+  const kitchenRes = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: 1 }, kitchen.headers);
+  assert.strictEqual(kitchenRes.status, 403);
+  assert.strictEqual((await kitchenRes.json()).error, 'INSUFFICIENT_PERMISSIONS');
+
+  const anonRes = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: 1 });
+  assert.strictEqual(anonRes.status, 401);
+  const anonList = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/inventory');
+  assert.strictEqual(anonList.status, 401);
+
+  // 5. Idempotency through the API: same mutation_id twice → one stock change.
+  const stockBeforeIdem = c2Stock('branch_bangjo_barat', 'prod_c1_new');
+  const idem1 = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: 2, mutation_id: 'c2_mut_001' }, owner.headers);
+  assert.strictEqual(idem1.status, 200);
+  const idem1Data = await idem1.json();
+  assert.strictEqual(idem1Data.movement.idempotent, undefined);
+  const stockAfterOne = c2Stock('branch_bangjo_barat', 'prod_c1_new');
+  assert.strictEqual(stockAfterOne, stockBeforeIdem + 2);
+
+  const idem2 = await c2Patch('branch_bangjo_barat', 'prod_c1_new', { movement_type: 'audit_adjustment', quantity: 2, mutation_id: 'c2_mut_001' }, owner.headers);
+  assert.strictEqual(idem2.status, 200);
+  const idem2Data = await idem2.json();
+  assert.strictEqual(idem2Data.movement.idempotent, true, 'replay must be flagged idempotent');
+  assert.strictEqual(c2Stock('branch_bangjo_barat', 'prod_c1_new'), stockAfterOne, 'replay must not change stock');
+  const idemLedgerCount = db.prepare("SELECT COUNT(*) AS c FROM inventory_movements WHERE mutation_id = 'c2_mut_001'").get().c;
+  assert.strictEqual(idemLedgerCount, 1);
+});
+

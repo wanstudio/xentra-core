@@ -600,6 +600,24 @@ function initSchema(targetDb) {
       SELECT RAISE(ABORT, 'CROSS_BRAND_ASSIGNMENT_REJECTED');
     END;
 
+    -- C2 NON-NEGATIVE PHYSICAL STOCK (C2.6/C2.15): physical stock can never become negative,
+    -- regardless of which application path writes it. App-layer guards are defense-in-depth.
+    CREATE TRIGGER IF NOT EXISTS trg_branch_products_stock_non_negative_insert
+    BEFORE INSERT ON branch_products
+    FOR EACH ROW
+    WHEN NEW.stock IS NOT NULL AND NEW.stock < 0
+    BEGIN
+      SELECT RAISE(ABORT, 'NEGATIVE_STOCK_REJECTED');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_branch_products_stock_non_negative_update
+    BEFORE UPDATE OF stock ON branch_products
+    FOR EACH ROW
+    WHEN NEW.stock IS NOT NULL AND NEW.stock < 0
+    BEGIN
+      SELECT RAISE(ABORT, 'NEGATIVE_STOCK_REJECTED');
+    END;
+
     CREATE TABLE IF NOT EXISTS pos_shifts (
       id TEXT PRIMARY KEY,
       branch_id TEXT NOT NULL,
@@ -676,12 +694,16 @@ function initSchema(targetDb) {
       previous_stock INTEGER NOT NULL,
       current_stock INTEGER NOT NULL,
       reference_id TEXT, -- PO ID, Order ID, Transfer ID, etc.
+      mutation_id TEXT, -- C2 idempotency key: replaying the same mutation_id never applies twice
       actor_id TEXT,
       notes TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
+    -- C2 IDEMPOTENCY (C2.8): a given logical mutation can only ever be recorded once.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_movements_mutation
+      ON inventory_movements(mutation_id) WHERE mutation_id IS NOT NULL;
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_order_payments_order_id ON order_payments(order_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_shifts_unique_active_cashier ON pos_shifts(cashier_id) WHERE status = 'open';

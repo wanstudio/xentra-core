@@ -1,4 +1,24 @@
 ## [Unreleased] - 2026-09-04
+### C2 — Branch Inventory Boundary
+- **Atomic guarded stock mutation** (`InventoryStockService.recordMovement`):
+  replaced the read→compute→write pattern with a single guarded conditional
+  UPDATE (`stock = COALESCE(stock,0) + qty WHERE ... AND COALESCE(stock,0) + qty >= 0`)
+  inside `BEGIN IMMEDIATE`, so concurrent mutations can never overwrite each
+  other or oversell — matching the pattern order settlement already used.
+- **Idempotency (C2.8)**: optional `mutation_id` on inventory mutations,
+  enforced by a UNIQUE partial index on `inventory_movements(mutation_id)`;
+  replaying the same mutation returns the original result and never
+  double-applies (unique-race handled too).
+- **DB-level negative-stock guard (C2.6/C2.15)**: `branch_products` triggers
+  abort any INSERT/UPDATE that would write `stock < 0`
+  (`NEGATIVE_STOCK_REJECTED`), regardless of application path.
+- **Branch inventory API** (`GET/PATCH /admin/branches/:id/inventory`):
+  branch-scoped read + operational adjustments (`audit_adjustment` ±,
+  `waste_spoilage` − only). `purchase_in`/`sale_deduction` stay owned by the
+  PO-receipt and order-settlement flows and are refused as manual operations.
+  Enforces assignment existence + brand consistency, Branch Manager own-branch
+  scope, strict quantity validation, and records actor role in the ledger.
+
 ### C1 — Product → Branch Assignment Boundary
 - **Explicit assignment API** (`/admin/branches/:id/products`): Owner/Brand
   authority assigns an existing brand product to a branch of the same brand
