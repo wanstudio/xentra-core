@@ -37,30 +37,6 @@
   var productLoadSeq = 0;
   var catalogBranchId = null;
 
-  var DEFAULT_CATALOG = {
-    categories: [
-      { id: 34, name: 'Rekom', slug: 'rekom', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', products: [
-        { id: 272, category_id: 34, name: 'Paket Spesial Semar', price: 35000, regular_price: 38000, description: 'Nasi + Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-        { id: 285, category_id: 34, name: 'Paket Spesial Petruk', price: 35000, regular_price: 37000, description: 'Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis + Kremesan + Sambal Terasi + Lalapan', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
-        { id: 345, category_id: 34, name: 'Mie Gurih', price: 15000, regular_price: 17000, description: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' }
-      ]},
-      { id: 20, name: 'Paket Ayam', slug: 'paket-ayam', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', products: [
-        { id: 272, category_id: 20, name: 'Paket Spesial Semar', price: 35000, regular_price: 38000, description: 'Nasi + Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-        { id: 285, category_id: 20, name: 'Paket Spesial Petruk', price: 35000, regular_price: 37000, description: 'Ayam Tulang Lunak Goreng + Telor Ceplok + Tempe Goreng + Es Teh Manis', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
-        { id: 286, category_id: 20, name: 'Ayam Tulang Lunak Bakar', price: 28000, regular_price: 32000, description: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' }
-      ]},
-      { id: 26, name: 'Mie Bangjo', slug: 'mie-bangjo', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-11_28_14-AM.png', products: [
-        { id: 345, category_id: 26, name: 'Mie Gurih', price: 15000, regular_price: 17000, description: 'Mie + daging + pangsit rebus + kerupuk pangsit + sawi + tahu + kuah', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-        { id: 287, category_id: 26, name: 'Mie Godog Jawa Asli', price: 22000, regular_price: 25000, description: 'Mie godog kuah gurih kaldu kental ayam kampung dengan telor dan sayur segar.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' }
-      ]},
-      { id: 22, name: 'Minuman', slug: 'minuman', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', products: [
-        { id: 288, category_id: 22, name: 'Es Kopi Susu Bangjo', price: 15000, regular_price: 18000, description: 'Kopi susu gula aren racikan istimewa barista Bangjo dingin segar.', image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-        { id: 401, category_id: 22, name: 'Es Teh Manis', price: 5000, regular_price: 5000, description: 'Teh melati wangi diseduh segar dingin menyegarkan', image_url: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400' },
-        { id: 402, category_id: 22, name: 'Es Jeruk Segar', price: 8000, regular_price: 10000, description: 'Jeruk peras murni segar', image_url: 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400' }
-      ]}
-    ]
-  };
-
   var ICONS = {
     minus: '/assets/icons/minus.svg',
     plus: '/assets/icons/plus.svg',
@@ -376,7 +352,9 @@
     // branchContext that gates cart provenance). The brand-wide menu stays until
     // the branch-scoped menu arrives; the selection is never silently re-scoped
     // by the client.
-    renderBranchDiscovery();
+    // Task A: Update active card in-place (no DOM destroy/rebuild) to preserve
+    // horizontal scroll position. Full render only when the branch list changes.
+    updateBranchActiveState();
     loadCatalog(activeBranch ? activeBranch.id : null);
     if (activeBranch && !quiet && UI && typeof UI.toast === 'function') {
       UI.toast('Kamu memesan dari ' + activeBranch.name);
@@ -394,6 +372,11 @@
   function renderBranchDiscovery() {
     var container = $('x-branch-discovery');
     if (!container) return;
+
+    // Task A: Save scroll position before DOM rebuild to prevent bounce on
+    // horizontal carousels when branch list data changes.
+    var scrollEl = container.querySelector('.x-branch-scroll');
+    var savedScrollLeft = scrollEl ? scrollEl.scrollLeft : 0;
 
     if (!branches.length) {
       if (branchListError) {
@@ -467,6 +450,52 @@
         if (found) setActiveBranch(found, true);
       };
     });
+
+    // Task A: Restore horizontal scroll position after DOM rebuild.
+    var newScrollEl = container.querySelector('.x-branch-scroll');
+    if (newScrollEl && savedScrollLeft) newScrollEl.scrollLeft = savedScrollLeft;
+  }
+
+  // Task A: Update branch card active state in-place without destroying/rebuilding
+  // the entire DOM. This prevents horizontal scroll position reset when the user
+  // clicks a card that is scrolled into view (e.g. Card 3/4/5).
+  function updateBranchActiveState() {
+    var container = $('x-branch-discovery');
+    if (!container) return;
+    var scrollEl = container.querySelector('.x-branch-scroll');
+    var savedScrollLeft = scrollEl ? scrollEl.scrollLeft : 0;
+
+    container.querySelectorAll('[data-branch-id]').forEach(function (btn) {
+      var isActive = activeBranch && String(activeBranch.id) === String(btn.dataset.branchId);
+      if (isActive) {
+        btn.classList.add('is-active');
+      } else {
+        btn.classList.remove('is-active');
+      }
+      // Update category preview on the active card
+      var catEl = btn.querySelector('.x-branch-cats-text');
+      if (isActive) {
+        var catText = branchCategoryPreviewHtml();
+        if (catEl) {
+          catEl.innerHTML = catText ? catText.replace(/^<span class="x-branch-cats-text">/, '').replace(/<\/span>$/, '') : '';
+        } else if (catText) {
+          var bodyEl = btn.querySelector('.x-branch-card-body');
+          if (bodyEl) {
+            var nameEl = bodyEl.querySelector('.x-branch-card-name');
+            if (nameEl && nameEl.nextSibling) {
+              nameEl.insertAdjacentHTML('afterend', catText);
+            } else {
+              bodyEl.insertAdjacentHTML('afterbegin', catText);
+            }
+          }
+        }
+      } else if (catEl) {
+        catEl.remove();
+      }
+    });
+
+    // Restore horizontal scroll position after any DOM class mutations
+    if (scrollEl) scrollEl.scrollLeft = savedScrollLeft;
   }
 
   function branchMonogram(name) {
@@ -575,10 +604,7 @@
     if (!data || !Array.isArray(data.categories) || !data.categories.length) return;
     categories = data.categories;
 
-    var rekom = categories.find(function (c) {
-      return String(c.name).trim().toLowerCase() === 'rekom';
-    });
-    var initialCat = rekom || categories[0];
+    var initialCat = categories[0];
     activeCategory = initialCat.id;
     products = (initialCat.products && initialCat.products.length > 0) ? initialCat.products : [];
 
@@ -617,7 +643,7 @@
         if (catalogBranchId) {
           renderEmptyBranchCatalog();
         } else if (!categories.length) {
-          applyCatalog(DEFAULT_CATALOG);
+          renderEmptyBranchCatalog();
         }
       })
       .catch(function (err) {
@@ -626,7 +652,7 @@
         if (catalogBranchId) {
           renderEmptyBranchCatalog();
         } else if (!categories.length) {
-          applyCatalog(DEFAULT_CATALOG);
+          renderEmptyBranchCatalog();
         }
       });
   }
@@ -645,11 +671,7 @@
     }
 
     if (!activeCategory && categories[0]) {
-      // Pick 'Rekom' category first, fallback to first
-      var rekom = categories.find(function (c) {
-        return String(c.name).trim().toLowerCase() === 'rekom';
-      });
-      activeCategory = (rekom || categories[0]).id;
+      activeCategory = categories[0].id;
     }
 
     categories.forEach(function (cat) {
@@ -700,17 +722,26 @@
     var seq = ++productLoadSeq;
     container.innerHTML = '<div class="x-loading">Memuat menu...</div>';
 
+    // When inside a branch context, the catalog was already loaded by
+    // loadCatalog() and products[] should already be populated from
+    // categories[].products. A per-category API call is only legitimate in
+    // brand-wide mode. In branch context, if the catalog didn't carry products
+    // for this category, show an honest empty state — never fall back to a
+    // brand-wide or hardcoded product list.
+    if (catalogBranchId) {
+      if (seq !== productLoadSeq) return;
+      products = [];
+      if (found) found.products = [];
+      renderProducts();
+      return;
+    }
+
     API.get('/products?category=' + encodeURIComponent(categoryId))
       .then(function (data) {
         if (seq !== productLoadSeq) return;
         if (data.success && Array.isArray(data.items) && data.items.length > 0) {
           products = data.items;
           if (found) found.products = products;
-        } else if (!catalogBranchId) {
-          // Brand-wide (no branch context) subcategory fallback only — never
-          // inside a branch context.
-          var backupCat = DEFAULT_CATALOG.categories.find(function (c) { return String(c.id) === String(categoryId); });
-          products = (backupCat && backupCat.products) || [];
         } else {
           products = [];
         }
@@ -718,12 +749,7 @@
       })
       .catch(function () {
         if (seq !== productLoadSeq) return;
-        if (!catalogBranchId) {
-          var backupCat = DEFAULT_CATALOG.categories.find(function (c) { return String(c.id) === String(categoryId); });
-          products = (backupCat && backupCat.products) || [];
-        } else {
-          products = [];
-        }
+        products = [];
         renderProducts();
       });
   }
@@ -1312,12 +1338,8 @@
         if (rawCached) {
           var parsed = JSON.parse(rawCached);
           applyCatalog(parsed);
-        } else {
-          applyCatalog(DEFAULT_CATALOG);
         }
-      } catch (_) {
-        applyCatalog(DEFAULT_CATALOG);
-      }
+      } catch (_) {}
     }
 
     // 2. Fetch fresh catalog in background. When a branch context survived a
