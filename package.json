@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server/app.js",
-    "test": "NODE_ENV=test node --test --test-concurrency=1 tests/*.test.js tests/**/*.test.js"
+    "test": "cross-env NODE_ENV=test node --test --test-concurrency=1 tests/*.test.js tests/**/*.test.js"
   },
   "engines": {
     "node": ">=20.20.2"
@@ -28,5 +28,8 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "sql.js": "^1.14.2"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0"
   }
 }
