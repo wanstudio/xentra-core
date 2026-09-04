@@ -789,3 +789,202 @@ test('API 21: POS Shift Lifecycle Endpoints (Open, Current, Cash Movement, Close
   assert.strictEqual(crossBranchOrderRes.status, 403, 'Branch-scoped cashier MUST NOT read orders of another branch');
 });
 
+/* =============================================================================
+   TASK B1 — ORGANIZATION → BRAND → BRANCH OPERATIONAL BOUNDARY
+   Hierarchy integrity, branch scope enforcement, operational state transitions,
+   runtime consumer effect, and the branch_operation_logs audit trail.
+   ============================================================================= */
+
+async function b1Login(username, password) {
+  const res = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username, password })
+  });
+  const data = await res.json();
+  return { status: res.status, data, headers: { authorization: 'Bearer ' + data.token } };
+}
+
+async function b1PutBranch(token, branchId, payload) {
+  return mockFetch('/api/v1/admin/branches/' + branchId, {
+    method: 'PUT',
+    headers: token,
+    body: JSON.stringify(payload)
+  });
+}
+
+test('B1 Hierarchy: cross-brand branch tamper is rejected and admin list is brand-scoped', async () => {
+  const crypto = require('crypto');
+  // Seed a second Organization → Brand → Branch that does NOT belong to the resolved tenant.
+  db.prepare(`INSERT OR IGNORE INTO organizations (id, name, slug) VALUES ('org_other_co', 'Other Co Holding', 'other-co')`).run();
+  db.prepare(`INSERT OR IGNORE INTO brands (id, organization_id, name, slug) VALUES ('brand_other_co', 'org_other_co', 'Other Brand', 'other-brand')`).run();
+  db.prepare(`
+    INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
+    VALUES ('branch_other_co', 'brand_other_co', 'Cabang Brand Lain', 'cabang-lain', 'Jl. Lain No. 1', -6.2, 106.8, '081222222222', 1)
+  `).run();
+
+  const owner = await b1Login('admin', 'bangjo123');
+  assert.strictEqual(owner.status, 200);
+
+  // 1. Admin branch list must NOT expose another brand's branch.
+  const listRes = await mockFetch('/api/v1/admin/branches', { headers: owner.headers });
+  const listData = await listRes.json();
+  assert.strictEqual(listRes.status, 200);
+  assert.ok(listData.branches.every((b) => b.brand_id === undefined || b.brand_id === 'brand_bangjo'));
+  assert.ok(!listData.branches.some((b) => b.id === 'branch_other_co'), 'Cross-brand branch leaked into admin list');
+
+  // 2. Mutating a branch of ANOTHER brand by swapping the Branch ID → 404 (ownership guard).
+  const tamperRes = await b1PutBranch(owner.headers, 'branch_other_co', { is_open_override: 0 });
+  assert.strictEqual(tamperRes.status, 404, 'Cross-brand branch mutation must be rejected');
+  const tamperData = await tamperRes.json();
+  assert.strictEqual(tamperData.success, false);
+
+  // 3. The foreign branch remains untouched.
+  const foreignBranch = db.prepare("SELECT is_open_override FROM branches WHERE id = 'branch_other_co'").get();
+  assert.strictEqual(foreignBranch.is_open_override, 1);
+});
+
+test('B1 Branch Manager scope: own-branch operational transition allowed, cross-branch denied', async () => {
+  const crypto = require('crypto');
+  const hash = crypto.createHash('sha256').update('bm1pass').digest('hex');
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role)
+    VALUES ('usr_b1_bm', 'brand_bangjo', 'org_xentra_holding', 'branch_bangjo_barat', 'bm_b1', 'bm_b1@bangjo.com', ?, 'BM B1', 'branch_manager')
+  `).run(hash);
+  db.prepare(`
+    INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override)
+    VALUES ('branch_b1_timur', 'brand_bangjo', 'Bangjo B1 Timur', 'bangjo-b1-timur', 'Jl. B1 No. 1', -7.29, 112.74, '081233333333', 1, 1)
+  `).run();
+
+  const bm = await b1Login('bm_b1', 'bm1pass');
+  assert.strictEqual(bm.status, 200);
+  assert.strictEqual(bm.data.user.branch_id, 'branch_bangjo_barat');
+
+  // Sanity: branch is open before the transition (server-authoritative state).
+  const before = db.prepare("SELECT is_open_override FROM branches WHERE id = 'branch_bangjo_barat'").get();
+  assert.strictEqual(before.is_open_override, 1);
+
+  // 1. Branch Manager closes ONLY their own assigned branch → 200, state persisted.
+  const closeRes = await b1PutBranch(bm.headers, 'branch_bangjo_barat', { is_open_override: 0 });
+  assert.strictEqual(closeRes.status, 200);
+  const closeData = await closeRes.json();
+  assert.strictEqual(closeData.success, true);
+  assert.strictEqual(closeData.branch.is_open_override, 0);
+  const afterClose = db.prepare("SELECT is_open_override FROM branches WHERE id = 'branch_bangjo_barat'").get();
+  assert.strictEqual(afterClose.is_open_override, 0);
+
+  // 2. Audit trail recorded: actor = branch_manager, field, before/after values.
+  const auditRow = db.prepare(`
+    SELECT * FROM branch_operation_logs
+    WHERE branch_id = 'branch_bangjo_barat' AND field = 'is_open_override'
+    ORDER BY created_at DESC, rowid DESC LIMIT 1
+  `).get();
+  assert.ok(auditRow, 'branch_operation_logs row must exist for an authorized operational mutation');
+  assert.strictEqual(auditRow.actor_role, 'branch_manager');
+  assert.strictEqual(auditRow.previous_value, '1');
+  assert.strictEqual(auditRow.new_value, '0');
+  assert.strictEqual(auditRow.brand_id, 'brand_bangjo');
+  assert.strictEqual(auditRow.authorized, 1);
+
+  // 3. Branch Manager tries to close ANOTHER branch → 403 FORBIDDEN_BRANCH_SCOPE.
+  const crossRes = await b1PutBranch(bm.headers, 'branch_b1_timur', { is_open_override: 0 });
+  assert.strictEqual(crossRes.status, 403);
+  const crossData = await crossRes.json();
+  assert.strictEqual(crossData.error, 'FORBIDDEN_BRANCH_SCOPE');
+  const untouched = db.prepare("SELECT is_open_override FROM branches WHERE id = 'branch_b1_timur'").get();
+  assert.strictEqual(untouched.is_open_override, 1);
+
+  // Restore barat to open so later tests keep a deliverable branch.
+  const reopenRes = await b1PutBranch(bm.headers, 'branch_bangjo_barat', { is_open_override: 1 });
+  assert.strictEqual(reopenRes.status, 200);
+});
+
+test('B1 Operational state: invalid transitions rejected; state is server-authoritative for runtime consumers', async () => {
+  const owner = await b1Login('admin', 'bangjo123');
+  assert.strictEqual(owner.status, 200);
+
+  // 1. Invalid operational-state values are rejected (no silent persistence of arbitrary values).
+  const invalid1 = await b1PutBranch(owner.headers, 'branch_bangjo_barat', { is_open_override: 2 });
+  assert.strictEqual(invalid1.status, 400);
+  const invalid2 = await b1PutBranch(owner.headers, 'branch_bangjo_barat', { is_open_override: 'buka' });
+  assert.strictEqual(invalid2.status, 400);
+  const invalid3 = await b1PutBranch(owner.headers, 'branch_bangjo_barat', { is_active: 'yes' });
+  assert.strictEqual(invalid3.status, 400);
+  const stillOpen = db.prepare("SELECT is_open_override, is_active FROM branches WHERE id = 'branch_bangjo_barat'").get();
+  assert.strictEqual(stillOpen.is_open_override, 1);
+  assert.strictEqual(stillOpen.is_active, 1);
+
+  // 2. Public branch endpoint exposes the authoritative open/close state.
+  const publicBefore = await mockFetch('/api/v1/brand/branches');
+  const publicBeforeData = await publicBefore.json();
+  const baratPublic = publicBeforeData.branches.find((b) => b.id === 'branch_bangjo_barat');
+  assert.strictEqual(baratPublic.is_open_override, 1);
+
+  // 3. Close EVERY currently-open delivery branch (deterministic: earlier tests may have created
+  //    additional delivery branches in this shared in-file DB) → delivery matching must find no
+  //    eligible branch (fail-safe; operational state is authoritative for the runtime consumer).
+  const openDeliveryBranches = db.prepare(`
+    SELECT b.id FROM branches b
+    LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
+    WHERE b.brand_id = 'brand_bangjo' AND b.is_active = 1 AND b.is_open_override = 1 AND s.is_delivery_active = 1
+  `).all();
+  assert.ok(openDeliveryBranches.length >= 1, 'Expected at least one open delivery branch before close');
+  for (const br of openDeliveryBranches) {
+    const closeRes = await b1PutBranch(owner.headers, br.id, { is_open_override: 0 });
+    assert.strictEqual(closeRes.status, 200, 'Close of ' + br.id);
+  }
+
+  const publicClosed = await mockFetch('/api/v1/brand/branches');
+  const publicClosedData = await publicClosed.json();
+  assert.strictEqual(publicClosedData.branches.find((b) => b.id === 'branch_bangjo_barat').is_open_override, 0);
+
+  const matchRes = await mockFetch('/api/v1/delivery/match-branch', {
+    method: 'POST',
+    body: JSON.stringify({ latitude: -7.29123, longitude: 112.71675 })
+  });
+  const matchData = await matchRes.json();
+  assert.strictEqual(matchData.eligible, false, 'Closed branches must not be offered for delivery');
+  assert.ok(/belum ada cabang/i.test(matchData.reason || ''), 'Reason must reflect no active branch');
+
+  // 4. Reopen every branch that was closed so the shared test DB is left as found.
+  for (const br of openDeliveryBranches) {
+    const reopenRes = await b1PutBranch(owner.headers, br.id, { is_open_override: 1 });
+    assert.strictEqual(reopenRes.status, 200, 'Reopen of ' + br.id);
+  }
+  const afterOpen = db.prepare("SELECT is_open_override FROM branches WHERE id = 'branch_bangjo_barat'").get();
+  assert.strictEqual(afterOpen.is_open_override, 1);
+});
+
+test('B1 Authorization: operational mutation requires a managing role; login rejects cross-brand branch reference', async () => {
+  const crypto = require('crypto');
+  // 1. A kitchen (branch-scoped non-manager) role cannot mutate branch operational state.
+  const kitchenHash = crypto.createHash('sha256').update('b1kitchen').digest('hex');
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role)
+    VALUES ('usr_b1_kitchen', 'brand_bangjo', 'org_xentra_holding', 'branch_bangjo_barat', 'b1_kitchen', 'b1_kitchen@bangjo.com', ?, 'Kitchen B1', 'kitchen')
+  `).run(kitchenHash);
+  const kitchen = await b1Login('b1_kitchen', 'b1kitchen');
+  assert.strictEqual(kitchen.status, 200);
+  const denied = await b1PutBranch(kitchen.headers, 'branch_bangjo_barat', { is_open_override: 0 });
+  assert.strictEqual(denied.status, 403);
+  const deniedData = await denied.json();
+  assert.strictEqual(deniedData.error, 'INSUFFICIENT_PERMISSIONS');
+
+  // 2. No token → 401.
+  const anon = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat', {
+    method: 'PUT',
+    body: JSON.stringify({ is_open_override: 0 })
+  });
+  assert.strictEqual(anon.status, 401);
+
+  // 3. Login integrity: an operator row whose branch_id references a branch of ANOTHER brand
+  //    must not be able to log in (branch/brand relationship enforced at the identity boundary).
+  const rogueHash = crypto.createHash('sha256').update('roguepass').digest('hex');
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role)
+    VALUES ('usr_b1_rogue', 'brand_bangjo', 'org_xentra_holding', 'branch_other_co', 'b1_rogue', 'b1_rogue@bangjo.com', ?, 'Rogue B1', 'branch_manager')
+  `).run(rogueHash);
+  const rogue = await b1Login('b1_rogue', 'roguepass');
+  assert.strictEqual(rogue.status, 401);
+  assert.strictEqual(rogue.data.error, 'BRANCH_TENANT_MISMATCH');
+});
+

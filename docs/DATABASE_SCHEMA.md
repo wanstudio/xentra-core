@@ -6,6 +6,16 @@
 
 ## 1. Tenancy & Hierarchy Tables
 
+> **Implementation note (B1 — Branch Operational Boundary, 2026-09-04):** the live
+> SQLite schema in `server/database/db.js` implements the tenancy hierarchy with the tables
+> below (`organizations` → `brands` → `branches`, plus `branch_delivery_settings` carrying
+> the delivery/pickup capability flags that this spec's `branch_settings` example describes).
+> Known deltas from this spec, deliberately not materialized yet (no approved business contract):
+> `dinein_enabled` and `operating_hours` (schedule-driven open state). Branch open/close is
+> currently represented by the server-authoritative `branches.is_open_override` master switch
+> consumed by `BranchMatcher` and the public branch API. Every authorized branch operational
+> mutation is recorded append-only in `branch_operation_logs`.
+
 ### `organizations`
 Master SaaS account / holding organization.
 ```sql
@@ -75,6 +85,29 @@ CREATE TABLE branch_settings (
     promo_config JSON, -- { enabled: true, min_subtotal: 50000, discount_amount: 10000, label: "Diskon Ongkir" }
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+);
+```
+
+### `branch_operation_logs` (B1 — append-only operational audit trail)
+Records every authorized mutation to a Branch's operational/profile state so the system can
+determine what changed, which Branch was affected, who performed it, when, and that
+authorization/scope was satisfied. Written by the branch mutation path only; never updated.
+```sql
+CREATE TABLE branch_operation_logs (
+    id VARCHAR(36) PRIMARY KEY,
+    branch_id VARCHAR(36) NOT NULL,
+    brand_id VARCHAR(36) NOT NULL,
+    organization_id VARCHAR(36),
+    action VARCHAR(30) NOT NULL,      -- e.g. 'branch.update', 'branch.create'
+    field VARCHAR(40) NOT NULL,       -- e.g. is_active, is_open_override, name, price_per_km
+    previous_value TEXT,
+    new_value TEXT,
+    actor_id VARCHAR(64),
+    actor_role VARCHAR(30),
+    authorized BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
 );
 ```
 

@@ -1648,6 +1648,20 @@ router.post('/auth/merchant/login', (req, res) => {
       return res.status(401).json({ success: false, error: 'Username atau password salah.' });
     }
 
+    // B1 BRANCH/BRAND INTEGRITY (B1.1, B1.8): a branch-scoped operator account must reference a
+    // branch that actually belongs to the brand being logged into. A cross-brand branch reference
+    // can never become an active session (defense-in-depth on top of the DB foreign key).
+    if (user.branch_id) {
+      const ownedBranch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(user.branch_id, req.brand_id);
+      if (!ownedBranch) {
+        return res.status(401).json({
+          success: false,
+          error: 'BRANCH_TENANT_MISMATCH',
+          message: 'Akun operator tidak terdaftar pada cabang brand ini. Hubungi pemilik brand.'
+        });
+      }
+    }
+
     // Register active session in TokenSessionStore
     const { token, expiresAt } = TokenSessionStore.createSession(user, req.brand_id);
 
@@ -2076,8 +2090,8 @@ router.get('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, res
   try {
     const branches = db.prepare(`
       SELECT 
-        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active,
-        s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order
+        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override,
+        s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order
       FROM branches b
       LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
       WHERE b.brand_id = ?
@@ -2188,9 +2202,29 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
 
 router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
+    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
     const targetPhone = phone !== undefined ? phone : null;
     const targetWa = whatsapp_number !== undefined ? whatsapp_number : null;
+
+    // B1 OPERATIONAL STATE VALIDATION (B1.3): authoritative branch operational booleans
+    // (is_active lifecycle, is_open_override open/close switch) accept ONLY 0 or 1.
+    // Rejects invalid transitions instead of silently persisting arbitrary client values.
+    const normBoolField = (value) => {
+      if (value === undefined || value === null) return null;
+      if (value === true) return 1;
+      if (value === false) return 0;
+      const n = Number(value);
+      if (n !== 0 && n !== 1) return undefined; // sentinel: invalid
+      return n;
+    };
+    const providedIsActive = normBoolField(is_active);
+    const providedIsOpenOverride = normBoolField(is_open_override);
+    if (is_active !== undefined && providedIsActive === undefined) {
+      return res.status(400).json({ success: false, error: 'Nilai is_active tidak valid. Gunakan 0 atau 1.' });
+    }
+    if (is_open_override !== undefined && providedIsOpenOverride === undefined) {
+      return res.status(400).json({ success: false, error: 'Nilai is_open_override tidak valid. Gunakan 0 atau 1.' });
+    }
 
     // P1 RBAC BRANCH SCOPE GUARD: Branch Manager can ONLY update their assigned branch profile
     if (req.user.role === 'branch_manager') {
@@ -2216,13 +2250,21 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
     }
 
     // P1 TENANT WRITE BOUNDARY GUARD (FINDING 01): Verify branch ownership before ANY mutation
-    const existingBranch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    // B1: full pre-mutation snapshot is captured so every authorized change is auditable (B1.10).
+    const existingBranch = db.prepare(`
+      SELECT id, name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override
+      FROM branches WHERE id = ? AND brand_id = ?
+    `).get(req.params.id, req.brand_id);
     if (!existingBranch) {
       return res.status(404).json({
         success: false,
         error: 'Cabang tidak ditemukan pada brand ini.'
       });
     }
+    const existingSettings = db.prepare(`
+      SELECT free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount
+      FROM branch_delivery_settings WHERE branch_id = ?
+    `).get(req.params.id) || {};
 
     db.exec('BEGIN TRANSACTION;');
     try {
@@ -2235,6 +2277,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
             phone = COALESCE(?, phone),
             whatsapp_number = COALESCE(?, whatsapp_number),
             is_active = COALESCE(?, is_active),
+            is_open_override = COALESCE(?, is_open_override),
             updated_at = datetime('now')
         WHERE id = ? AND brand_id = ?
       `).run(
@@ -2244,7 +2287,8 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         longitude !== undefined ? longitude : null,
         targetPhone !== undefined ? targetPhone : null,
         targetWa !== undefined ? targetWa : null,
-        is_active !== undefined ? is_active : null,
+        providedIsActive,
+        providedIsOpenOverride,
         req.params.id,
         req.brand_id
       );
@@ -2271,13 +2315,79 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         req.brand_id
       );
 
+      // B1 OPERATIONAL AUDIT TRAIL (B1.10): append-only branch_operation_logs rows for every
+      // field actually changed by this AUTHORIZED mutation. Records what changed, which branch,
+      // who performed it (actor id + role), and that authorization/scope was satisfied.
+      const stringifyScalar = (v) => (v === null || v === undefined ? null : JSON.stringify(v));
+      const normNum = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
+      const scalarChanged = (prev, next, isNum) => {
+        const p = prev === undefined ? null : prev;
+        const n = next === undefined ? null : next;
+        if (p === null && n === null) return false;
+        if (p === null || n === null) return true;
+        if (isNum) return Number(p) !== Number(n);
+        return String(p) !== String(n);
+      };
+
+      const prevOpen = (existingBranch.is_open_override === null || existingBranch.is_open_override === undefined) ? 1 : existingBranch.is_open_override;
+      const tracked = [
+        { field: 'name', prev: existingBranch.name, next: name !== undefined ? String(name) : existingBranch.name, isNum: false },
+        { field: 'address_text', prev: existingBranch.address_text, next: address_text !== undefined ? String(address_text) : existingBranch.address_text, isNum: false },
+        { field: 'latitude', prev: existingBranch.latitude, next: latitude !== undefined ? normNum(latitude) : existingBranch.latitude, isNum: true },
+        { field: 'longitude', prev: existingBranch.longitude, next: longitude !== undefined ? normNum(longitude) : existingBranch.longitude, isNum: true },
+        { field: 'phone', prev: existingBranch.phone, next: targetPhone !== undefined ? String(targetPhone) : existingBranch.phone, isNum: false },
+        { field: 'whatsapp_number', prev: existingBranch.whatsapp_number || null, next: targetWa !== undefined ? String(targetWa) : (existingBranch.whatsapp_number || null), isNum: false },
+        { field: 'is_active', prev: existingBranch.is_active, next: providedIsActive !== null ? providedIsActive : existingBranch.is_active, isNum: true },
+        { field: 'is_open_override', prev: prevOpen, next: providedIsOpenOverride !== null ? providedIsOpenOverride : prevOpen, isNum: true }
+      ];
+
+      const hadSettingsRow = Boolean(db.prepare('SELECT 1 FROM branch_delivery_settings WHERE branch_id = ?').get(req.params.id));
+      if (hadSettingsRow) {
+        const sPrev = existingSettings;
+        tracked.push(
+          { field: 'free_delivery_km', prev: sPrev.free_delivery_km, next: free_delivery_km !== undefined ? normNum(free_delivery_km) : sPrev.free_delivery_km, isNum: true },
+          { field: 'price_per_km', prev: sPrev.price_per_km, next: price_per_km !== undefined ? normNum(price_per_km) : sPrev.price_per_km, isNum: true },
+          { field: 'max_radius_km', prev: sPrev.max_radius_km, next: max_radius_km !== undefined ? normNum(max_radius_km) : sPrev.max_radius_km, isNum: true },
+          { field: 'promo_min_order', prev: sPrev.promo_min_order, next: promo_min_order !== undefined ? normNum(promo_min_order) : sPrev.promo_min_order, isNum: true },
+          { field: 'promo_delivery_discount', prev: sPrev.promo_delivery_discount, next: promo_delivery_discount !== undefined ? normNum(promo_delivery_discount) : sPrev.promo_delivery_discount, isNum: true }
+        );
+      }
+
+      const actorId = req.user ? (req.user.userId || req.user.id || req.user.username || 'system') : 'system';
+      const actorRole = req.user ? (req.user.role || 'system') : 'system';
+      for (const t of tracked) {
+        if (!scalarChanged(t.prev, t.next, t.isNum)) continue;
+        db.prepare(`
+          INSERT INTO branch_operation_logs (id, branch_id, brand_id, organization_id, action, field, previous_value, new_value, actor_id, actor_role, authorized)
+          VALUES (?, ?, ?, ?, 'branch.update', ?, ?, ?, ?, ?, 1)
+        `).run(
+          'bol_' + crypto.randomUUID(),
+          existingBranch.id,
+          req.brand_id,
+          req.organization_id || null,
+          t.field,
+          stringifyScalar(t.prev),
+          stringifyScalar(t.next),
+          actorId,
+          actorRole
+        );
+      }
+
       db.exec('COMMIT;');
     } catch (txErr) {
       try { db.exec('ROLLBACK;'); } catch (_) {}
       throw txErr;
     }
 
-    res.json({ success: true, message: 'Pengaturan cabang & ongkir berhasil disimpan.' });
+    res.json({
+      success: true,
+      message: 'Pengaturan cabang & ongkir berhasil disimpan.',
+      branch: {
+        id: existingBranch.id,
+        is_active: providedIsActive !== null ? providedIsActive : existingBranch.is_active,
+        is_open_override: providedIsOpenOverride !== null ? providedIsOpenOverride : (existingBranch.is_open_override == null ? 1 : existingBranch.is_open_override)
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -1,4 +1,25 @@
 ## [Unreleased] - 2026-09-04
+### B1 — Organization → Brand → Branch Operational Boundary
+- **Branch operational state is now transitionable & audited**: `PUT
+  /admin/branches/:id` accepts the server-authoritative `is_open_override`
+  switch (validated strictly as 0|1; invalid transitions → 400) alongside
+  `is_active`; every authorized change is snapshotted before mutation and
+  recorded append-only in the new `branch_operation_logs` table (what changed,
+  which branch, actor id/role, before/after values).
+- **Branch-scope enforcement verified for operational writes**: Branch Manager
+  may only transition their assigned branch (`FORBIDDEN_BRANCH_SCOPE`
+  otherwise); non-manager branch roles and anonymous callers are rejected;
+  cross-brand branch-ID tampering is blocked by the tenant ownership guard.
+- **Identity boundary hardening**: merchant login now rejects an operator
+  record whose `branch_id` references a branch of another brand
+  (`BRANCH_TENANT_MISMATCH`) — the org → brand → branch relationship is
+  enforced at session creation, not only by the database FK.
+- **Admin branch list** now exposes `is_open_override` and capability flags.
+- **Reported (not invented — no locked business contract yet)**: schedule-driven
+  operating hours and a `dine_in` capability flag remain unimplemented; open
+  state is the `is_open_override` master switch consumed by `BranchMatcher` and
+  the public branch API (see `docs/DATABASE_SCHEMA.md` drift note).
+
 ### PWA Install Incentive — End-to-End State Machine & Server Authority
 - **One promotion contract across UI and Pay** (`PrePaymentVerificationGate`):
   the gate no longer rejects rewards based on `display_mode` alone. Install

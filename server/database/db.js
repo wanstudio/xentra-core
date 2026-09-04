@@ -339,6 +339,26 @@ function initSchema(targetDb) {
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
     );
 
+    -- B1 OPERATIONAL AUDIT TRAIL (append-only): records authoritative branch operational/profile
+    -- mutations so the system can determine WHAT changed, WHICH branch, WHO performed it, WHEN,
+    -- and that authorization/scope was satisfied. Written by the branch mutation path only.
+    CREATE TABLE IF NOT EXISTS branch_operation_logs (
+      id TEXT PRIMARY KEY,
+      branch_id TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      organization_id TEXT,
+      action TEXT NOT NULL,          -- e.g. 'branch.update', 'branch.create'
+      field TEXT NOT NULL,           -- affected field: name/is_active/is_open_override/free_delivery_km/...
+      previous_value TEXT,           -- stringified scalar before change (NULL when no prior value)
+      new_value TEXT,                -- stringified scalar after change
+      actor_id TEXT,
+      actor_role TEXT,
+      authorized INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS categories (
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
