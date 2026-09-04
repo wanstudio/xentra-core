@@ -1,3 +1,32 @@
+## [Unreleased] - 2026-09-04
+### PWA Install Incentive — End-to-End State Machine & Server Authority
+- **One promotion contract across UI and Pay** (`PrePaymentVerificationGate`):
+  the gate no longer rejects rewards based on `display_mode` alone. Install
+  requirement is satisfied when `pwa_runtime` reports standalone OR
+  `install_state === 'accepted'` — the same context that made the reward
+  claimable in the browser tab. Legacy booleans (`is_pwa_installed`) are never
+  read; entitlement authority stays in the server DB checks (promo active,
+  first order, redemption ledger, brand/branch catalog). Removed the client-side
+  "finish in the app" Pay interception.
+- **PwaRuntime = single source of truth** (`pwa-runtime.js`): one
+  `beforeinstallprompt` capture (in `<head>`), shared `promptInstall()`/
+  `markInstalled()`/`getInstallState()`, single `appinstalled` handler that
+  broadcasts `xentra:pwa-installed` for checkout/home. Removed competing
+  per-page listeners and the dead `deferredPrompt` duplicate.
+- **Server-authoritative reward lines**: claim builds the cart line from the
+  server payload (`product_id`, `product_name`, `reward_price`, `regular_price`,
+  `image_url`) with catalog enrichment in `PromotionEngineService`; no client
+  hardcoded prices.
+- **Dynamic reward config**: no synthetic reward product fallback in
+  `InstallIncentiveStrategy` (no grant when `target_product_id` is unset);
+  ledger `benefit_amount` for Rp0 rewards follows the configured catalog price
+  (gate + `PaymentGatewayService`) — no hardcoded 5000.
+- **Canonical reward identity only**: price-0 / name-\"gratis\" heuristics
+  removed from `store.js`/`checkout.js` reward detection (one visual-only
+  fallback remains for legacy free lines).
+- Docs updated (`02-domain-blueprint.md`, `AUDIT_VERIFICATION_01-06.md` F02,
+  `DEPLOYMENT.md`) — Es Teh/401 now described strictly as seed/demo data.
+
 ## [2.2.8] - 2026-09-02
 ### Fixed & Hardened (Troubleshooting Reference)
 - **Nested Horizontal Carousel & Momentum Swipe (`checkout.css`, `checkout.js`)**:

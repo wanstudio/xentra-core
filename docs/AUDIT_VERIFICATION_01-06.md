@@ -89,6 +89,12 @@ Resolve:
 
 The server must determine whether the customer is eligible and what the reward actually means.
 
+### Resolution status — RESOLVED (2026-09-04)
+
+The gate no longer contains any static reward special-case. `PrePaymentVerificationGate` resolves reward intent generically through `PromotionEngineService` (promotion row → reward config → authoritative target product), validates branch/brand catalog, and rebuilds the order line with server-derived `product_id`, name, `unit_price` and notes. Ledger `benefit_amount` for Rp0 rewards follows the configured catalog price of the granted product (never a hardcoded amount).
+
+The former standalone-only authorization at Pay was removed in favor of one consistent promotion contract: install requirement is satisfied when `pwa_runtime` reports `display_mode === 'standalone'` OR `install_state === 'accepted'` (the same context that made the reward claimable in the UI). This context is never a credential — legacy boolean fields (`is_pwa_installed`) remain unread, and eligibility/redemption authority stays in the server DB checks.
+
 ---
 
 ## F03 — Token/session storage is process-memory only

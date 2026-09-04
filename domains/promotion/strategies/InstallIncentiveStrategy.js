@@ -58,10 +58,12 @@ class InstallIncentiveStrategy extends BasePromotionStrategy {
     }
 
     const amountInCents = Number(primaryReward.amount_in_cents || 0);
-    const targetProductId = primaryReward.target_product_id || 'prod_welcome_reward';
+    // No synthetic/fallback product id: the reward target MUST be configured in
+    // the promotion reward row (data config) or no reward is granted.
+    const targetProductId = primaryReward.target_product_id;
     const isPwaInstalled = Boolean(context.is_pwa_installed);
 
-    // Case A: Opened in web browser (PWA not yet installed) -> Prompt to install
+    // Case A: Opened in web browser (PWA install requirement not satisfied) -> Prompt to install
     if (requiresPwa && !isPwaInstalled) {
       return {
         isEligible: true,
@@ -75,7 +77,15 @@ class InstallIncentiveStrategy extends BasePromotionStrategy {
       };
     }
 
-    // Case B: Opened from installed PWA -> Grant welcome gift!
+    // A grant requires an authoritative reward product from the configuration.
+    if (!targetProductId) {
+      return {
+        isEligible: false,
+        reason: 'Reward target product is not configured for this promotion.'
+      };
+    }
+
+    // Case B: Install requirement satisfied -> eligible for the configured reward.
     return {
       isEligible: true,
       should_show_banner: false,

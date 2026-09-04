@@ -99,15 +99,23 @@ curl -sS https://app.mybangjo.com/health
 # Promo discovery — guest browser (expect discovery with should_show_banner=true)
 curl -sS 'https://app.mybangjo.com/api/v1/promotions/active?is_pwa=0&phone='
 
-# Promo entitlement — installed PWA (expect applied with reward product_id 401, price 0)
+# Promo entitlement — install requirement satisfied (is_pwa=1): running
+# standalone OR accepted-install state in the same tab (pwa-runtime install_state).
+# Seed reward targets product 401 (Es Teh); swap via promotion_rewards config — no source change.
 curl -sS 'https://app.mybangjo.com/api/v1/promotions/active?is_pwa=1&phone='
 ```
 
 Expected shapes (per `domains/promotion`, install-incentive):
 - `is_pwa=0` → `promotions[].should_show_banner === true` → checkout renders the
   **Install** promo card.
-- `is_pwa=1` → `applied[].should_grant_reward === true` with
-  `reward.product_id === "401"`, `reward_price === 0` → checkout renders **Claim**.
+- `is_pwa=1` → `applied[].should_grant_reward === true` with authoritative
+  reward fields enriched from the catalog: `product_id`, `reward_price`, and
+  `product_name`/`regular_price`/`image_url` → checkout renders **Claim**.
+
+Pay (`POST /checkout/verify`) is NOT standalone-only: it evaluates the same
+promotion contract from `pwa_runtime` (`display_mode === 'standalone'` OR
+`install_state === 'accepted'`) while authority stays in the server DB checks
+(promo active, first order, redemption ledger, branch/brand catalog, price).
 
 Full UI flow (install banner → claim → remove → re-claim, single `checkout.items[]`,
 no duplicates on reload) must be exercised in a real browser against the live host;

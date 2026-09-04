@@ -298,30 +298,50 @@ test('Commerce 8 — PWA Runtime Context: Test A (Browser rejected) & Test B (St
     VALUES (?, ?, 'free_product', ?, 0)
   `).run('rwd_ctx_' + Date.now(), promoId, rewardProductId);
 
-  // Test A — Browser biasa (display_mode = 'browser') -> reward rejected
+  // Test A — Browser biasa, install requirement NOT satisfied (display_mode 'browser',
+  // install_state 'none') -> reward rejected (engine sees discovery-only)
   const resBrowser = PrePaymentVerificationGate.verify({
     branch_id: branch.id,
     brand_id: brand.id,
     customer: { phone: '081299991101' },
-    pwa_runtime: { display_mode: 'browser' },
+    pwa_runtime: { display_mode: 'browser', install_state: 'none', install_requirement_satisfied: false },
     items: [
       { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
     ]
   });
-  assert.strictEqual(resBrowser.is_valid, false, 'Browser user must be rejected for PWA install reward');
+  assert.strictEqual(resBrowser.is_valid, false, 'Browser user without satisfied install requirement must be rejected for PWA install reward');
   assert.strictEqual(resBrowser.verified_items.length, 0);
+
+  // Test A2 — Browser tab, install requirement satisfied via accepted-install state
+  // (the same context that made the reward CLAIMABLE) -> reward accepted at Pay.
+  // This removes the previous standalone-only contradiction: UI claim and Pay
+  // gate now share one promotion contract, while authority stays server-side.
+  const resAcceptedTab = PrePaymentVerificationGate.verify({
+    branch_id: branch.id,
+    brand_id: brand.id,
+    customer: { phone: '081299991102' },
+    pwa_runtime: { display_mode: 'browser', install_state: 'accepted', install_requirement_satisfied: true },
+    items: [
+      { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
+    ]
+  });
+  assert.strictEqual(resAcceptedTab.is_valid, true, 'Reward entitled via accepted-install promotion flow must survive Pay');
+  assert.strictEqual(resAcceptedTab.verified_items.length, 1);
+  assert.strictEqual(resAcceptedTab.verified_items[0].product_id, rewardProductId);
+  assert.strictEqual(resAcceptedTab.verified_items[0].unit_price, 0);
+  assert.strictEqual(resAcceptedTab.verified_items[0].name, 'Es Teh PWA Context');
 
   // Test B — Installed PWA (display_mode = 'standalone') -> reward accepted
   const resStandalone = PrePaymentVerificationGate.verify({
     branch_id: branch.id,
     brand_id: brand.id,
-    customer: { phone: '081299991101' },
+    customer: { phone: '081299991103' },
     pwa_runtime: { display_mode: 'standalone' },
     items: [
       { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
     ]
   });
-  assert.strictEqual(resStandalone.is_valid, true, 'Installed standalone PWA user must be granted reward');
+  assert.strictEqual(resStandalone.is_valid, true, 'Standalone PWA user must be granted reward');
   assert.strictEqual(resStandalone.verified_items.length, 1);
   assert.strictEqual(resStandalone.verified_items[0].product_id, rewardProductId);
   assert.strictEqual(resStandalone.verified_items[0].unit_price, 0);
@@ -370,7 +390,9 @@ test('Commerce 9 — PWA Runtime Context: Test C (Legacy flag rejected) & Test D
     VALUES (?, ?, 'free_product', ?, 0)
   `).run('rwd_e2e_pwa_' + Date.now(), promoId, rewardProductId);
 
-  // Test C — Client mencoba manipulasi field lama (is_pwa_installed: true tapi pwa_runtime: browser) -> REJECTED
+  // Test C — Client mencoba manipulasi field lama (is_pwa_installed: true, NO
+  // pwa_runtime contract) -> REJECTED. The legacy boolean is never read; the
+  // gate only consumes the pwa_runtime context object.
   const resLegacySpoof = await OrderPlacementService.submitOrder({
     brand_id: brand.id,
     branch_id: branch.id,
@@ -378,13 +400,33 @@ test('Commerce 9 — PWA Runtime Context: Test C (Legacy flag rejected) & Test D
     payment_method: 'cash',
     customer: { name: 'Customer Spoof', phone: '081299992202' },
     is_pwa_installed: true, // Legacy client flag MUST have zero authority
-    pwa_runtime: { display_mode: 'browser' },
+    pwa_runtime: { display_mode: 'browser', install_state: 'none' },
     items: [
       { product_id: mainProductId, quantity: 1, expected_price: 30000 },
       { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
     ]
   });
-  assert.strictEqual(resLegacySpoof.success, false, 'Legacy client flag is_pwa_installed must not bypass browser display_mode check');
+  assert.strictEqual(resLegacySpoof.success, false, 'Legacy client flag is_pwa_installed must not grant a reward without the pwa_runtime install-state contract');
+
+  // Test C2 — Same-tab accepted flow end-to-end (display_mode 'browser' + install_state
+  // 'accepted') must place the order with the reward — promotion flow and Pay are
+  // now one consistent contract.
+  const resAcceptedTabE2E = await OrderPlacementService.submitOrder({
+    brand_id: brand.id,
+    branch_id: branch.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    customer: { name: 'Customer Accepted Tab', phone: '081299992204' },
+    pwa_runtime: { display_mode: 'browser', install_state: 'accepted', install_requirement_satisfied: true },
+    items: [
+      { product_id: mainProductId, quantity: 1, expected_price: 30000 },
+      { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
+    ]
+  });
+  assert.strictEqual(resAcceptedTabE2E.success, true, 'Accepted-install reward must survive Pay end-to-end');
+  const acceptedTabRewardItem = resAcceptedTabE2E.order.items.find(it => it.product_id === rewardProductId);
+  assert.ok(acceptedTabRewardItem, 'Reward item must be converted to authoritative target_product_id');
+  assert.strictEqual(acceptedTabRewardItem.unit_price, 0);
 
   // Test D — PWA runtime diteruskan sampai order placement (End-to-End standalone) -> ACCEPTED
   const resE2E = await OrderPlacementService.submitOrder({

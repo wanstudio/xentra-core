@@ -314,9 +314,16 @@ class PaymentGatewayService {
               throw new Error(`[PROMO_LIMIT_EXCEEDED_RACE] Batas klaim promo "${promoId}" (${maxLimit}x) telah digunakan oleh pesanan lain milik pelanggan.`);
             }
 
+            // Ledger benefit follows the configured catalog price of the granted
+            // product (dynamic per reward config) — never a hardcoded amount.
+            let benefitAmount = Number(it.unit_price || 0);
+            if (benefitAmount === 0) {
+              const rewardProduct = db.prepare('SELECT COALESCE(regular_price, price, 0) AS v FROM products WHERE id = ?').get(it.product_id);
+              benefitAmount = rewardProduct ? Number(rewardProduct.v || 0) : 0;
+            }
             promoRedemptionsToRecord.push({
               promo_id: promoId,
-              benefit_amount: it.unit_price === 0 ? 5000 : it.unit_price
+              benefit_amount: benefitAmount
             });
           }
         }

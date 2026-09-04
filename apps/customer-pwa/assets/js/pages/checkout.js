@@ -7,7 +7,7 @@
  * 2. Customer Identity: WhatsApp OTP authentication & verified session binding
  * 3. Pre-Payment Verification Gate: Realtime price/stock check with "Ada perubahan di pesananmu, cek dulu yuk" modal
  * 4. Dual Payment: Tunai (COD / Bayar di Kasir) & Online Payment (Midtrans Snap)
- * 5. PWA Install Incentive: Es Teh Gratis Rp0 (promo-es-teh-gratis)
+ * 5. PWA Install Incentive: configuration-driven reward (promotion domain)
  * 6. Add-on recommendation rail (GET /catalog/menu)
  */
 (function () {
@@ -61,13 +61,14 @@
   function fmtIDR(n) { return (Number(n) || 0).toLocaleString('id-ID'); }
 
   // ── PWA Install Detection Logic ──
-  var deferredPrompt = null;
+  // PwaRuntime (core/pwa-runtime.js) is the single source of truth for the
+  // install lifecycle (deferred prompt, accepted marker, appinstalled).
   var isIosPwa = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
 
   // PROMOTION INSTALL STATE (not runtime display-mode): has the user accepted
   // the install action? Satisfied when running standalone OR the accepted-
-  // install marker is set in this browser profile. Distinct from the runtime
-  // display_mode fact, which the order gate still validates separately at Pay.
+  // install marker is set in this browser profile. The same context is sent to
+  // the server at Pay; entitlement authority stays in the Promotion Domain.
   function checkIsPwaInstalled() {
     if (window.Xentra && window.Xentra.PwaRuntime) {
       return window.Xentra.PwaRuntime.getPwaRuntimeContext().install_requirement_satisfied === true;
@@ -75,7 +76,6 @@
     return Boolean(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
   }
 
-  var isPwaInstalled = checkIsPwaInstalled();
   var promoEvaluation = { discovery: [], applied: [], rejected: [] };
 
   function loadActivePromotions() {
@@ -149,7 +149,7 @@
         return (
           '  <div class="x-alt-promo-banner" id="x-welcome-reward-banner">' +
           '    <img class="x-alt-promo-img" src="' + UI.escape(r.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
-          '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(r.claim_title || 'Klaim Es Teh Gratis untuk pesanan pertamamu!') + '</div><div class="x-alt-promo-snk">' + UI.escape(r.claim_subtitle || 'syarat & ketentuan berlaku') + '</div></div>' +
+          '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(r.claim_title || 'Klaim hadiah spesial untuk pesanan pertamamu!') + '</div><div class="x-alt-promo-snk">' + UI.escape(r.claim_subtitle || 'syarat & ketentuan berlaku') + '</div></div>' +
           '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-claim">Claim</button>' +
           '  </div>'
         );
@@ -210,22 +210,11 @@
     renderPromoBanner();
   }
 
-  window.addEventListener('beforeinstallprompt', function (e) {
-    e.preventDefault();
-    deferredPrompt = e;
-  });
-
-  window.addEventListener('appinstalled', function () {
-    deferredPrompt = null;
-    isPwaInstalled = true;
-    // Persist the installed-confirmation marker so the same browser tab (where
-    // display-mode is still 'browser') is treated as installed for discovery and
-    // shows the reward state instead of an Install banner.
-    if (window.Xentra && window.Xentra.PwaRuntime && window.Xentra.PwaRuntime.markInstalled) {
-      window.Xentra.PwaRuntime.markInstalled();
-    } else {
-      try { localStorage.setItem('xentra_pwa_installed', '1'); } catch (_) {}
-    }
+  // beforeinstallprompt is captured ONCE in <head> on every page (stored on
+  // window.__xentra_deferred_prompt) and consumed by PwaRuntime.promptInstall().
+  // appinstalled is handled once in PwaRuntime (marker + broadcast). This page
+  // reacts to the broadcast to refresh the reward state.
+  document.addEventListener('xentra:pwa-installed', function () {
     var banner = document.getElementById('x-promo-banner');
     if (banner) banner.style.display = 'none';
     if (UI && UI.toast) UI.toast('Aplikasi berhasil dipasang!');
@@ -251,11 +240,12 @@
 
     var promo = getBannerPromo() || getAppliedRewardPromo();
     var icon = (promo && promo.display && promo.display.icon_url) || '/assets/pwa/icon-192.png';
+    var tagline = (promo && promo.display && (promo.display.banner_subtitle || promo.display.reward_badge_text)) || 'Dapatkan promo spesial untuk pesanan pertamamu';
     var html =
       '<div class="x-pwa-guide-backdrop"></div>' +
       '<div class="x-pwa-guide-sheet">' +
       '  <div class="x-sheet-handle" style="margin-bottom:12px;"></div>' +
-      '  <div class="x-pwa-guide-head"><img src="' + icon + '" alt="Bangjo" class="x-pwa-guide-icon"><div><h3>Pasang Aplikasi Bangjo</h3><p>Nikmati gratis es teh & kemudahan order</p></div></div>' +
+      '  <div class="x-pwa-guide-head"><img src="' + icon + '" alt="Bangjo" class="x-pwa-guide-icon"><div><h3>Pasang Aplikasi Bangjo</h3><p>' + UI.escape(tagline) + '</p></div></div>' +
       '  <div class="x-pwa-guide-steps">' + steps + '</div>' +
       '  <button type="button" id="x-pwa-guide-close" class="x-pwa-guide-close-btn">Mengerti, Saya Pasang</button>' +
       '</div>';
@@ -290,33 +280,26 @@
       return;
     }
 
-    var promptEvent = window.__xentra_deferred_prompt || deferredPrompt;
-
-    if (promptEvent) {
-      promptEvent.prompt();
-      promptEvent.userChoice.then(function (choice) {
-        if (choice && choice.outcome === 'accepted') {
-          if (window.Xentra && window.Xentra.PwaRuntime && window.Xentra.PwaRuntime.markInstalled) {
-            window.Xentra.PwaRuntime.markInstalled();
-          } else {
-            try { localStorage.setItem('xentra_pwa_installed', '1'); } catch (_) {}
-          }
-          if (UI && UI.toast) UI.toast('Terima kasih telah memasang aplikasi!');
-          // Switch this tab to the reward state right away (the appinstalled
-          // event may lag the prompt acceptance).
-          loadActivePromotions().then(function () {
-            renderPromoBanner();
-          });
-        }
-        window.__xentra_deferred_prompt = null;
-        deferredPrompt = null;
-      }).catch(function () {
-        showPwaGuideSheet(isIosPwa ? 'ios' : 'android');
-      });
+    var pwaRt = window.Xentra && window.Xentra.PwaRuntime;
+    if (!pwaRt || typeof pwaRt.promptInstall !== 'function') {
+      showPwaGuideSheet(isIosPwa ? 'ios' : 'android');
       return;
     }
 
-    showPwaGuideSheet(isIosPwa ? 'ios' : 'android');
+    pwaRt.promptInstall().then(function (res) {
+      if (res && res.accepted) {
+        if (UI && UI.toast) UI.toast('Terima kasih telah memasang aplikasi!');
+        // Switch this tab to the reward state right away (the appinstalled
+        // event may lag the prompt acceptance).
+        loadActivePromotions().then(function () {
+          renderPromoBanner();
+        });
+      } else if (!res || !res.prompted) {
+        // No native prompt available (iOS Safari / unsupported): guide instead
+        // of pretending the install happened.
+        showPwaGuideSheet(isIosPwa ? 'ios' : 'android');
+      }
+    });
   }
 
   // Delegated install click listener on document for 100% reliable tap response.
@@ -1342,25 +1325,10 @@
     };
   }
 
-  // ── 6b. Reward needs the installed PWA context at Pay ──
-  // Server authority requires pwa_runtime.display_mode === 'standalone' before
-  // an order containing the freebie reward is accepted. If the user claimed the
-  // reward in a plain browser tab (installed marker only), guide them to finish
-  // from the installed app instead of failing with a confusing API error.
-  function showRewardStandaloneSheet() {
-    var sh = makeOverlay(
-      '<div style="text-align:center;margin-bottom:12px;">' +
-      '  <div style="font-size:36px;margin-bottom:8px;">🍹</div>' +
-      '  <h3 class="x-alt-sheet-title" style="margin:0 0 6px;">Selesaikan dari Aplikasi Bangjo</h3>' +
-      '  <p style="font-size:13px;color:#6b7280;margin:0;line-height:1.5;">Es Teh Gratis aktif untuk checkout dari aplikasi Bangjo yang sudah terpasang. Buka Bangjo dari ikon di layar utama perangkatmu dan selesaikan pesanan di sana — hadiah otomatis terpakai.</p>' +
-      '</div>' +
-      '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:10px 12px;font-size:12px;color:#15803d;line-height:1.45;margin:4px 0 2px;">💡 Kamu tetap bisa memesan dari browser ini tanpa hadiah: hapus item "Es Teh Gratis" dari pesananmu lalu lanjutkan.</div>' +
-      '<button type="button" class="x-alt-submit-btn" id="x-btn-reward-standalone-ok" style="margin-top:14px;">Mengerti, buka aplikasi</button>'
-    );
-    sh.overlay.querySelector('#x-btn-reward-standalone-ok').onclick = function () { sh.close(); };
-  }
-
   // ── 7. Execute Pre-Payment Verification & Submit Order ──
+  // The pwa_runtime context (display_mode + install_state) is sent to the
+  // authoritative PrePaymentVerificationGate; the client never decides whether
+  // a claimed reward may be paid.
   function executePrePaymentAndSubmit() {
     if (state.isSubmitting) return;
 
@@ -1376,17 +1344,6 @@
     if (!state.customer.phone) {
       if (UI && UI.toast) UI.toast('Silakan masukkan nomor WhatsApp pemesan.');
       openCustomerAuthSheet();
-      return;
-    }
-
-    // Reward line + non-standalone context -> the authoritative gate would
-    // reject it at Pay. Intercept early with a clear next step.
-    var ctxNow = (window.Xentra && window.Xentra.PwaRuntime) ? window.Xentra.PwaRuntime.getPwaRuntimeContext() : { display_mode: 'browser' };
-    var hasRewardLine = items.some(function (i) {
-      return Boolean(i.is_promo_reward) || String(i.id).indexOf('reward_') === 0;
-    });
-    if (hasRewardLine && ctxNow.display_mode !== 'standalone') {
-      showRewardStandaloneSheet();
       return;
     }
 

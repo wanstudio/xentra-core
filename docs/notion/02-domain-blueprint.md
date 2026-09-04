@@ -80,10 +80,10 @@ These changes are implementation alignment with the already-decided Commerce flo
 ## Locked Decision — Payment & Installation Freebie Exception
 - `payment_method` default **cash** adalah behavior resmi dan dipertahankan. Jika client tidak mengirim payment method, checkout menggunakan `cash`.
 - Payment method resmi Xentra tetap **cash** dan **Midtrans**.
-- `promo-es-teh-gratis` adalah **installation freebie resmi**. Setelah instalasi, produk tersebut memang masuk ke checkout dengan harga **Rp0**. Ini adalah pengecualian pricing yang disengaja, bukan bug atau bypass.
-- Implementasi saat ini masih mengenali installation freebie melalui special-case identifier (`promo-es-teh-gratis`). Secara arsitektur, pengecualian ini **belum didelegasikan ke modul/domain khusus**.
-- Keputusan modular: jangan menghapus atau memblokir behavior Rp0 tersebut. Jika kelak Xentra memiliki sistem promo/freebie yang lebih luas, buat modul/domain khusus dan pindahkan definisi/aturan installation freebie ke sana tanpa mengubah behavior resmi yang sudah berjalan.
-- Audit note: special-case `promo-es-teh-gratis` dikategorikan sebagai **technical debt/modularization gap**, bukan security finding.
+- Promosi PWA-install sepenuhnya **configuration-driven** lewat Promotion Domain. Reward produk (target_product_id), harga reward, dan presentasi disimpan sebagai **data konfigurasi** (promotion_rewards / presentation_payload); source code tidak memuat identitas reward spesifik.
+- `Es Teh`/product `401` yang muncul di seed adalah **demo/fixture data** (boleh), bukan business rule. Tidak ada `if (productId === '401')` atau `if (promoId === 'promo-es-teh-gratis')` di business logic mana pun.
+- Reward yang diklaim adalah SATU cart line normal di `checkout.items[]` dengan metadata `promotion_id + product_id (+ is_promo_reward sebagai presentation hint)`; harga line (price/reward_price/regular_price/name/image) berasal dari payload server, bukan hardcode client.
+- **Revision (owner directive, 2026-09-04):** kontrak Pay tidak lagi bersifat standalone-only. Instalasi dianggap memenuhi requirement promo bila runtime standalone ATAU `install_state === 'accepted'` (context `pwa_runtime`), supaya reward yang sah lewat promotion flow tidak ditolak hanya karena dibayar dari tab browser. Konteks ini bukan kredential — otoritas tetap DB: promo aktif, first-order per customer, redemption ledger, katalog brand/branch, harga authoritative dari catalog (benefit ledger mengikuti harga product konfigurasi, bukan angka hardcoded).
 
 ## 🔒 LOCKED — Promotion Lifecycle & Installation Freebie Business Contract
 

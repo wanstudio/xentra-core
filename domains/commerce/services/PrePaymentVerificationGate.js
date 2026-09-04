@@ -37,9 +37,21 @@ class PrePaymentVerificationGate {
       throw new Error('[PrePaymentVerificationGate] "items" array must not be empty.');
     }
 
-    // Explicit runtime context inspection (display_mode: standalone = installed PWA)
-    // Client boolean flags (e.g. is_pwa_installed) are NEVER treated as credentials.
-    const isInstalledPwa = Boolean(pwa_runtime && pwa_runtime.display_mode === 'standalone');
+    // PWA INSTALL REQUIREMENT — same contract the Promotion Engine used for
+    // discovery/claim, so a reward legitimately entitled through the promotion
+    // flow is never rejected at Pay just because the runtime is a browser tab:
+    //   - running standalone (display_mode) OR
+    //   - the accepted-install state this profile reported at claim time
+    //     (install_state === 'accepted' / install_requirement_satisfied).
+    // This is CONTEXT for entitlement evaluation only; it is never a credential.
+    // Authority stays in the server DB checks below (promotion active, first
+    // order per customer, redemption ledger, target product/branch catalog) and
+    // legacy boolean fields (e.g. is_pwa_installed) are never read.
+    const installRequirementSatisfied = Boolean(pwa_runtime && (
+      pwa_runtime.display_mode === 'standalone' ||
+      pwa_runtime.install_state === 'accepted' ||
+      pwa_runtime.install_requirement_satisfied === true
+    ));
 
     // P1 RELATIONAL INTEGRITY (DB-01): Verify that branch belongs strictly to brand
     if (brand_id) {
@@ -102,7 +114,7 @@ class PrePaymentVerificationGate {
 
         const evalResult = PromotionEngineService.evaluate({
           brand_id,
-          is_pwa_installed: isInstalledPwa,
+          is_pwa_installed: installRequirementSatisfied,
           customer_phone: (customer && customer.phone) ? String(customer.phone).trim() : '',
           cart_items: nonRewardItems
         });
@@ -125,8 +137,10 @@ class PrePaymentVerificationGate {
         }
 
         // P1 BRANCH CATALOG SCOPE CHECK: Ensure reward product is assigned to this branch
+        // (name + prices come from the catalog so benefit/ledger values follow
+        // the configured reward product — never a hardcoded amount)
         const bpCheck = db.prepare(`
-          SELECT bp.is_available, p.name FROM branch_products bp
+          SELECT bp.is_available, p.name, p.price, p.regular_price FROM branch_products bp
           JOIN products p ON p.id = bp.product_id
           WHERE bp.branch_id = ? AND bp.product_id = ?
         `).get(branch_id, targetPid);
@@ -144,6 +158,9 @@ class PrePaymentVerificationGate {
         const authoritativeRewardPrice = Number(rewardSpec.reward_price || rewardSpec.amount_in_cents || 0);
         // Authoritative server metadata: master product name from catalog OR reward title from promo definition (NEVER client item.name)
         const authoritativeRewardName = bpCheck.name || eligiblePromo.display?.reward_title || 'Hadiah Promo Spesial';
+        // For a Rp0 freebie the ledger benefit = the configured catalog price of
+        // the granted product (dynamic per reward config).
+        const catalogRewardPrice = Number(bpCheck.regular_price || bpCheck.price || authoritativeRewardPrice);
 
         verifiedItems.push({
           product_id: targetPid,
@@ -158,7 +175,7 @@ class PrePaymentVerificationGate {
 
         appliedPromos.push({
           promo_id: authoritativePromoId,
-          benefit_amount: authoritativeRewardPrice === 0 ? 5000 : authoritativeRewardPrice
+          benefit_amount: authoritativeRewardPrice === 0 ? catalogRewardPrice : authoritativeRewardPrice
         });
         continue;
       }

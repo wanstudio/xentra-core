@@ -85,8 +85,9 @@
     }
 
     // Hide the acquisition banner the moment the install completes, including
-    // in this same browser tab (marker written by PwaRuntime on appinstalled).
-    window.addEventListener('appinstalled', function () {
+    // in this same browser tab (marker written by PwaRuntime on appinstalled,
+    // which broadcasts the xentra:pwa-installed event).
+    document.addEventListener('xentra:pwa-installed', function () {
       banner.classList.remove('x-pwa-banner-show');
     });
 
@@ -122,7 +123,7 @@
         }
 
         var display = promo.display;
-        if (titleEl) titleEl.textContent = display.banner_title || 'Install & dapatkan Es Teh Gratis';
+        if (titleEl) titleEl.textContent = display.banner_title || 'Install & dapatkan promo spesial';
         if (subtitleEl) subtitleEl.textContent = display.banner_subtitle || 'Gratis untuk pesanan pertama • S&K berlaku';
         if (installBtn) installBtn.textContent = 'Install';
 
