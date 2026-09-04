@@ -197,3 +197,54 @@ Jika runtime/browser interaction belum dapat dibuktikan, status harus ditulis NO
 Promo card adalah Discovery. Install/requirement menghasilkan Eligibility. Eligibility menghasilkan Entitlement. Claim memasukkan Entitlement menjadi Checkout Item. Remove hanya mengeluarkan item dari cart, bukan mencabut entitlement. Claim ulang memasukkan item kembali. Pay melakukan final validation. Successful order melakukan Redemption.
 
 Ini menjadi business contract untuk installation freebie Xentra dan konteks dasar untuk debugging/implementasi promo berikutnya.
+
+## 🔒 LOCKED — Home Container & Dynamic Branch-to-Catalog Composition
+
+Home berada pada presentation/composition boundary. Home bukan sumber business authority dan tidak boleh meng-hardcode Branch, menu, product, eligibility, price, inventory, fulfillment, atau acceptance.
+
+### Dynamic Composition
+
+`Domain/Application Data → View Model → Home Container → Reusable Components`
+
+Jumlah Branch tidak menentukan struktur implementasi. Satu Brand dapat memiliki 1, 2, 50, atau jumlah Branch lainnya tanpa membuat Home variant khusus.
+
+### Branch Count Behavior
+
+**1 Branch yang relevan/eligible:**
+- hide branch discovery/selector;
+- hide teks **“Cabang terdekat dari tempatmu”**;
+- langsung render `Category → Product` dalam context Branch tersebut;
+- tetap mempertahankan Branch sebagai authoritative fulfillment/catalog context.
+
+**>1 Branch yang relevan/eligible:**
+- render Branch discovery/selector secara data-driven;
+- urutkan berdasarkan ETA yang diberikan oleh matching/routing layer authoritative;
+- jarak dapat ditampilkan sebagai informasi pendukung;
+- Customer dapat memilih Branch yang valid;
+- setelah selection, render `Category → Product` untuk Branch tersebut.
+
+Jumlah Branch besar tidak boleh memicu hardcoded branch slots atau branch-specific code. Pagination/lazy loading/virtualization dapat digunakan sebagai optimasi presentation tanpa mengubah business semantics.
+
+### Boundary
+
+“Cabang terdekat” adalah discovery/presentation concept, bukan aturan bahwa Branch terdekat wajib menjadi fulfillment Branch. AUTO menggunakan BranchMatcher; CUSTOMER_SELECTED menggunakan selected Branch yang tetap harus melewati canonical eligibility dan Branch Acceptance.
+
+UI simplification pada single-Branch case hanya menyembunyikan pilihan yang tidak diperlukan; UI tidak boleh menghapus atau menggantikan authoritative Branch context.
+
+### Catalog
+
+Setelah Branch context ditetapkan, Home mengonsumsi catalog Branch secara dinamis:
+
+`Resolved/Selected Branch → Category → Product`
+
+Tidak boleh ada daftar menu statis per Branch atau fixed branch IDs di presentation layer.
+
+### Invariants
+
+- Home = container/composition, bukan business-rule container.
+- Branch count bukan implementation contract.
+- Catalog data berasal dari authoritative domain/application contract.
+- UI tidak menghitung ulang authoritative ETA/ranking.
+- Buyer location ≠ delivery destination ≠ fulfillment Branch.
+- One Cart → One Fulfillment Branch.
+- UI tidak boleh bypass eligibility atau acceptance.
