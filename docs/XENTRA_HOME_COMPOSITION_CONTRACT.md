@@ -6,132 +6,181 @@
 
 ## Purpose
 
-Customer Home is a dynamic container/composition layer. It must not hardcode Branch count, Branch IDs, menu/catalog structure, or business authority.
+Customer Home is a dynamic, fast presentation/discovery container. It must not hardcode Branch count, Branch IDs, menu/catalog structure, fulfillment authority, or transaction business rules.
 
-## Canonical Flow
+## Canonical Customer Flow
 
 ```text
 Destination Context
       ↓
-Branch Discovery / Resolution
+FAST Branch Discovery
       ↓
-Branch Context
+Customer selects Branch
       ↓
 Category
       ↓
 Product
       ↓
 Cart
+      ↓
+Checkout (single Branch scope)
+      ↓
+Fresh authoritative verification
+      ↓
+Payment
+      ↓
+Branch Acceptance
+      ↓
+Fulfillment
 ```
+
+## Home Performance Contract
+
+Home first-load speed is the primary presentation requirement.
+
+Home discovery may use a cheap GPS/destination proximity algorithm, primarily geographic proximity such as straight-line distance, or another faster equivalent. The exact algorithm is an implementation choice as long as it is fast, deterministic enough for the UI purpose, and does not become transaction authority.
+
+Home MUST NOT block initial render on:
+
+- road-routing API calls;
+- authoritative ETA calculation;
+- delivery-cost calculation;
+- driver availability;
+- full-cart eligibility;
+- stock verification;
+- authoritative pricing;
+- Branch Acceptance;
+- payment verification.
+
+Home does not need to display ETA/distance on initial render. A simple heading such as **“Cabang terdekat dari tempatmu”** and a data-driven Branch array is sufficient.
+
+The discovery ordering may change after reload or Customer interaction/context changes. This is acceptable because Home ordering is a discovery/presentation result, not a fulfillment promise.
 
 ## Branch Count Behavior
 
-### Exactly 1 relevant/eligible Branch
+### Exactly 1 relevant Branch
 
-- Hide branch discovery/selector.
+- Hide Branch selector/discovery UI.
 - Hide the text/section `Cabang terdekat dari tempatmu`.
-- Directly render `Category → Product` for the resolved Branch.
-- Preserve the authoritative Branch context internally for catalog, eligibility, cart, checkout, and order.
+- Directly render `Category → Product` for that Branch context.
+- Preserve Branch context internally for catalog, Cart, Checkout, and later authoritative validation.
 
-### More than 1 relevant/eligible Branch
+### More than 1 Branch
 
-- Render Branch discovery/selector from data.
-- Present Branches ordered by authoritative ETA from the matching/routing layer.
-- Distance may be shown as supporting information.
-- Customer may select a valid Branch.
-- After selection, render `Category → Product` for that Branch.
+- Render a data-driven Branch discovery array.
+- Do not require ETA calculation before initial Home render.
+- Customer may click/select a Branch and enter that Branch's catalog context.
+- The first displayed Branch is not guaranteed to become the final fulfillment Branch.
 
 ### Large Branch counts
 
-1, 2, 50, or more Branches use the same composition model. Do not create fixed Branch slots, Branch-specific Home variants, or hardcoded catalog structures. Pagination, lazy loading, or virtualization may be used as presentation optimizations without changing business semantics.
+1, 2, 50, or more Branches use the same composition model. Pagination, lazy loading, virtualization, database geographic indexing, or other performance optimizations may be used without changing business semantics.
 
 ## Authority Boundary
 
-Home receives authoritative data/view models and renders them. Home must not independently determine:
+Home is not authoritative for:
 
 - fulfillment Branch;
-- ETA/ranking;
+- ETA/routing;
 - inventory availability;
 - authoritative price;
 - eligibility;
 - Branch acceptance;
 - authorization;
-- business policy;
+- payment state;
+- order state;
 - financial or inventory mutations.
 
-`Cabang terdekat` is a discovery/presentation concept, not a rule that the nearest Branch must be the final fulfillment Branch.
+“Cabang terdekat” is a discovery/presentation concept only.
 
-## Fulfillment Selection
+## Cart / Checkout Boundary
 
-Xentra Core v1 remains:
+The previous shorthand **“1 Cart → 1 Fulfillment Branch”** is superseded by the more precise rule:
 
-```text
-1 Cart → 1 Fulfillment Branch
-```
+> **Multi-branch Cart is allowed; multi-branch Checkout/Order is not.**
 
-Selection modes remain distinct:
+Cart is a shopping container and may retain items associated with multiple Branches/brands.
 
-```text
-AUTO
-  → BranchMatcher
-  → Canonical Eligibility
-  → Branch Acceptance
+Checkout is a transaction scope for **one Branch only**. Customer completes different Branches as separate Checkout/Order processes.
 
-CUSTOMER_SELECTED
-  → Selected Branch
-  → Canonical Eligibility
-  → Branch Acceptance
-```
+Every Order has exactly one `fulfillment_branch_id`.
 
-Customer-selected Branch is not a bypass. Invalid or ineligible selection must not silently rematch to another Branch.
+No single Checkout/Order may combine fulfillment from multiple Branches in Xentra Core v1.
 
-## Location Context
+## Authoritative Transaction Boundary
 
-```text
-Buyer Location ≠ Delivery Destination ≠ Fulfillment Branch
-```
+Actual operational calculations happen when Customer proceeds into Checkout and, critically, before payment/commitment.
 
-For remote/gift orders, destination context is used for delivery discovery/matching. Buyer location must not be assumed to be the delivery destination.
+At that point the system performs fresh checks required by the applicable domains, including current availability/stock, price, serviceability, fulfillment capability, promotion validity, and other required conditions.
 
-## Catalog Composition
+Home state is never sufficient evidence to authorize payment or create an authoritative fulfillment commitment.
 
-After Branch context is resolved/selected:
+## Branch Selection Modes
 
-```text
-Resolved/Selected Branch → Category → Product
-```
+`AUTO` and `CUSTOMER_SELECTED` remain valid **transaction-level selection semantics** where the applicable Commerce contract requires them. They are NOT Home discovery behavior.
 
-Catalog content is data-driven and Branch-aware. Presentation must not maintain fixed menus per Branch.
+- Home discovery does not call `AUTO` merely because it orders nearby Branches.
+- `CUSTOMER_SELECTED` means the Customer explicitly selects a Branch; Core still validates it.
+- `AUTO` means Core/BranchMatcher is explicitly asked to resolve a Branch for a transaction when no explicit Customer selection exists.
 
-## Acceptance Boundary
+Do not conflate Home discovery ordering with `AUTO` fulfillment resolution.
 
-System eligibility and Branch operational acceptance remain separate:
+## Acceptance
+
+Eligibility and Branch Acceptance remain separate:
 
 ```text
 Order Request
   → Core Eligibility
   → ELIGIBLE
-  → Branch Acceptance
-  → ACCEPT / REJECT
+  → AWAITING_BRANCH_ACCEPTANCE
+  → ACCEPT / REJECT / TIMEOUT
 ```
 
-An eligible Branch/order is not automatically accepted merely because the Home UI displays it.
+The Xentra platform Branch Acceptance timeout is **3 minutes**. It is platform-controlled and is **not configurable by Owner or Branch Manager**.
+
+After rejection/timeout, the current transaction for that Branch ends. Customer may explicitly choose another Branch and start a **new Checkout**. No silent rematch.
+
+## Paid Rejection / Timeout
+
+If the original transaction was already paid online and its Branch rejects/times out, the original transaction is not transferred to another Branch. It enters financial recovery according to payment state/provider behavior.
+
+Customer may immediately start a new independent order while the prior refund/recovery remains pending. A pending refund on one order must not block another Branch/order.
+
+## Customer Cancellation
+
+Follow the adopted GoFood-style principle:
+
+- Customer cancellation is allowed before Branch acceptance/confirmation.
+- After Branch acceptance, normal Customer cancellation is not allowed.
+- Core enforces cancellation from authoritative Order state.
+- Branch/system rejection, timeout, or payment failure must not be classified as Customer cancellation.
+
+## Agent Rules
+
+1. Do not turn Home discovery into fulfillment matching.
+2. Do not add routing/ETA calls to initial Home merely to produce a more accurate display.
+3. Do not treat Home's nearest/first Branch as an authoritative fulfillment commitment.
+4. Do not mix items from multiple Branches into one Checkout/Order.
+5. Do not silently rematch a rejected/timed-out transaction.
+6. Do not block a new independent order because another order is awaiting refund/recovery.
+7. Do not invent Owner/Branch Manager controls for the 3-minute acceptance policy.
+8. If a required business policy is absent, report the GAP rather than inventing it.
 
 ## Verification Matrix
 
-Implementation must verify at least:
-
-1. One Branch: selector hidden and direct Category → Product.
-2. Two Branches: selector rendered from data and ordered by authoritative ETA.
-3. Many Branches: no fixed count/slots or Branch-specific code.
-4. Invalid/unavailable selected Branch cannot be forced through client/UI state.
-5. Selected Branch context reaches catalog and cart correctly.
-6. Remote/gift buyer and delivery destination remain separate.
-7. AUTO and CUSTOMER_SELECTED preserve their distinct semantics.
-8. One Cart → One Fulfillment Branch remains enforced.
-9. UI remains a composition layer and does not become business authority.
-10. Existing reusable components are used where applicable.
-
-## Agent Rule
-
-Coding agents must implement this contract, not invent additional Home business rules. If a required policy is absent or contradictory, report the gap and stop at the decision boundary rather than guessing.
+1. Initial Home renders without waiting for road routing/ETA/payment/acceptance checks.
+2. One Branch hides discovery and renders its catalog directly.
+3. Multiple Branches render a data-driven nearby Branch array.
+4. Home does not hardcode Branch IDs/count/menu structures.
+5. Reload/interaction may change discovery ordering without violating transaction authority.
+6. Customer-selected Branch reaches the correct catalog/Cart context.
+7. Cart can contain items associated with multiple Branches.
+8. Checkout isolates one Branch scope.
+9. Order stores exactly one fulfillment Branch.
+10. Fresh authoritative verification occurs before payment/commitment.
+11. Acceptance timeout is 3 minutes and tenant roles cannot configure it.
+12. Rejection/timeout ends the current transaction; alternative requires explicit new Checkout.
+13. Paid rejection/timeout is financially recovered without transferring payment to another Branch.
+14. Pending refund does not block an unrelated new order.
+15. Cancellation follows authoritative Order state.
