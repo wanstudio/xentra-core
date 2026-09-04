@@ -478,13 +478,10 @@
   }
 
   function branchCategoryPreviewHtml() {
-    var list = (categories || []).slice(0, 4);
+    var list = categories || [];
     if (!list.length) return '';
-    var html = list.map(function (c) {
-      return '<span class="x-branch-cat-chip">' + UI.escape(String(c.name || '')) + '</span>';
-    }).join('');
-    if ((categories || []).length > 4) html += '<span class="x-branch-cat-chip">+' + ((categories || []).length - 4) + '</span>';
-    return '<span class="x-branch-cats">' + html + '</span>';
+    var text = list.map(function (c) { return UI.escape(String(c.name || '')); }).join(', ');
+    return '<span class="x-branch-cats-text">' + text + '</span>';
   }
 
   function toRupiah(n) {
