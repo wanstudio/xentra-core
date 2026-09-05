@@ -137,6 +137,24 @@ The exact physical schema for Branch-owned Product/Category records, snapshot fi
 8. Customer-facing Branch Catalog reads must not silently fall back to the global Master Catalog.
 9. No implementation may invent schema or synchronization rules that have not been separately approved.
 
+## Current implementation acceptance — 2026-09-05
+
+The current Xentra-Core checkpoint is accepted for the **main Branch Catalog architecture goal**:
+
+- the demo dataset now targets exactly five canonical Branches;
+- Branches have independent Branch Categories and Branch Product subsets;
+- shared Master Products may be adopted independently by multiple Branches;
+- CatalogService/API and Home branch context are expected to consume Branch-scoped catalog data rather than a global Master Catalog fallback;
+- the frontend must not hardcode Branch-specific product catalogs.
+
+This acceptance concerns the **catalog structure and branch-scoped UI consumption**, not every operational property of the demo seed implementation.
+
+### Deferred seed-cleanup issue
+
+Commit `f80dd4cf49d95df276f2815dc5cf200f01b184f8` currently performs broad cleanup of non-canonical Branches and related records. This is explicitly **deferred** and excluded from the current architecture acceptance. A future hardening task must restrict destructive cleanup to clearly seed-owned/demo data and must never delete arbitrary persistent business data merely to converge the demo dataset to five Branches.
+
+The deferred cleanup concern does not alter the accepted Master Catalog / Branch Catalog ownership model or the branch-scoped Catalog → UI flow.
+
 ## Relationship to previous Home decision
 
 The earlier Home rule remains valid at the presentation level: Home has one Branch Context and must not mix products from multiple Branches. The clarification here changes **what Branch-scoped Catalog means**: it is a Branch-owned saved/adopted catalog, not merely a projection of globally-owned categories/products through `branch_products`.
