@@ -2507,6 +2507,14 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
           message: 'Branch Manager hanya memiliki kewenangan untuk memperbarui profil cabang yang ditugaskan.'
         });
       }
+      // GLOBAL BRANCH ACTIVATION GUARD: Only Owner / Brand Manager can mutate is_active
+      if (is_active !== undefined) {
+        return res.status(403).json({
+          success: false,
+          error: 'INSUFFICIENT_PERMISSIONS',
+          message: 'Hanya Pemilik Toko (Owner) atau Brand Manager yang berwenang mengubah status aktivasi global cabang.'
+        });
+      }
     }
 
     if (targetWa !== null && targetWa !== undefined) {

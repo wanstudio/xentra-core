@@ -515,9 +515,16 @@
   /* =========================================================================
      MODUL 3: CABANG & PENGATURAN ONGKIR CONTROLLER
      ========================================================================= */
+  /* =========================================================================
+     MODUL 3: CABANG & PENGATURAN ONGKIR CONTROLLER
+     ========================================================================= */
   async function loadBranches() {
     try {
-      var res = await fetch(API_BASE + '/admin/branches');
+      var token = localStorage.getItem(TOKEN_KEY) || '';
+      var headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+
+      var res = await fetch(API_BASE + '/admin/branches', { headers: headers });
       var data = await res.json();
       if (data.success && data.branches) {
         state.branches = data.branches;
@@ -533,41 +540,49 @@
     if (!container) return;
 
     if (!state.branches.length) {
-      state.branches = [
-        {
-          id: 'branch_bangjo_barat',
-          name: 'Bangjo Surabaya Barat',
-          address_text: 'Jl. Mayjen Sungkono No. 88, Surabaya Barat',
-          latitude: -7.2912,
-          longitude: 112.7154,
-          phone: '081234567890',
-          is_active: 1,
-          free_delivery_km: 2.0,
-          price_per_km: 3000.0,
-          max_radius_km: 12.0,
-          promo_min_order: 50000.0,
-          promo_delivery_discount: 10000.0
-        }
-      ];
+      container.innerHTML = '<div class="text-muted text-center py-6">Tidak ada cabang terdaftar.</div>';
+      return;
     }
 
     var html = state.branches.map(function (b) {
+      var isGloballyActive = b.is_active === 1 || b.is_active === true;
+      var isOpen = b.is_open_override === 1 || b.is_open_override === true || b.is_open_override == null;
+
+      var activationBadge = isGloballyActive
+        ? '<span class="x-badge x-badge-success">● Aktif</span>'
+        : '<span class="x-badge x-badge-muted">● Nonaktif</span>';
+
+      var openBadge = isOpen
+        ? '<span class="x-badge x-badge-info" style="font-size:11px;">Buka Operasional</span>'
+        : '<span class="x-badge x-badge-warning" style="font-size:11px;">Tutup Operasional</span>';
+
+      var toggleBtn = isGloballyActive
+        ? '<button type="button" class="x-btn-secondary x-btn-danger-outline" style="font-size:12px;font-weight:700;" onclick="toggleBranchActivation(\'' + b.id + '\', true)">Nonaktifkan Cabang</button>'
+        : '<button type="button" class="x-btn-secondary x-btn-success-outline" style="font-size:12px;font-weight:700;" onclick="toggleBranchActivation(\'' + b.id + '\', false)">Aktifkan Cabang</button>';
+
       return [
-        '<div class="x-branch-card">',
+        '<div class="x-branch-card' + (isGloballyActive ? '' : ' style="opacity:0.85;background:#f8fafc;"') + '">',
           '<div class="x-branch-card-header">',
-            '<h4>' + b.name + '</h4>',
-            '<span class="x-badge ' + (b.is_active ? 'x-badge-success' : 'x-badge-danger') + '">' + (b.is_active ? '● Buka' : '✕ Tutup') + '</span>',
+            '<div>',
+              '<h4 style="display:inline-block;margin-right:8px;">' + b.name + '</h4>',
+              openBadge,
+            '</div>',
+            '<div>' + activationBadge + '</div>',
           '</div>',
           '<p class="text-muted" style="font-size:13px;">📍 ' + b.address_text + '</p>',
+          '<div class="x-branch-detail-row"><span>Status Global:</span><span style="font-weight:700;' + (isGloballyActive ? 'color:#15803d;' : 'color:#64748b;') + '">' + (isGloballyActive ? 'Aktif (Tampil di Pelanggan)' : 'Nonaktif (Disembunyikan)') + '</span></div>',
           '<div class="x-branch-detail-row"><span>📱 WhatsApp Cabang:</span><span style="font-weight:600;color:var(--x-primary);">' + (b.phone || '<span style="color:#ef4444;">(Wajib diisi)</span>') + '</span></div>',
           '<div class="x-branch-detail-row"><span>Koordinat GPS:</span><span>' + b.latitude + ', ' + b.longitude + '</span></div>',
           '<div class="x-branch-detail-row"><span>Gratis Ongkir:</span><span style="color:#10b981;">' + (b.free_delivery_km || 0) + ' KM Pertama Gratis</span></div>',
           '<div class="x-branch-detail-row"><span>Tarif per KM:</span><span>' + formatMoney(b.price_per_km || 3000) + ' / km</span></div>',
           '<div class="x-branch-detail-row"><span>Radius Maksimal:</span><span>' + (b.max_radius_km || 12) + ' KM</span></div>',
           '<div class="x-branch-detail-row"><span>Promo Diskon Ongkir:</span><span>Diskon ' + formatMoney(b.promo_delivery_discount || 10000) + ' (Min. ' + formatMoney(b.promo_min_order || 50000) + ')</span></div>',
-          '<div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">',
-            '<button type="button" class="x-btn-secondary" style="font-size:12px;" onclick="editBranchPhone(\'' + b.id + '\')">📱 Ubah No. WA</button>',
-            '<button type="button" class="x-btn-secondary" style="font-size:12px;" onclick="editBranchSettings(\'' + b.id + '\')">⚙️ Atur Ongkir</button>',
+          '<div style="margin-top:12px;display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:10px;">',
+            '<div>' + toggleBtn + '</div>',
+            '<div style="display:flex;gap:6px;">',
+              '<button type="button" class="x-btn-secondary" style="font-size:12px;" onclick="editBranchPhone(\'' + b.id + '\')">📱 Ubah No. WA</button>',
+              '<button type="button" class="x-btn-secondary" style="font-size:12px;" onclick="editBranchSettings(\'' + b.id + '\')">⚙️ Atur Ongkir</button>',
+            '</div>',
           '</div>',
         '</div>'
       ].join('');
@@ -575,6 +590,33 @@
 
     container.innerHTML = html.join('');
   }
+
+  window.toggleBranchActivation = async function (id, currentlyActive) {
+    var nextActive = currentlyActive ? 0 : 1;
+    var actionName = currentlyActive ? 'menonaktifkan' : 'mengaktifkan';
+    if (!confirm('Apakah Anda yakin ingin ' + actionName + ' cabang ini secara global?')) return;
+
+    var token = localStorage.getItem(TOKEN_KEY) || '';
+    var authHeaders = { 'Content-Type': 'application/json' };
+    if (token) authHeaders['Authorization'] = 'Bearer ' + token;
+
+    try {
+      var res = await fetch(API_BASE + '/admin/branches/' + id, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ is_active: nextActive })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast(nextActive ? '✅ Cabang berhasil diaktifkan secara global!' : '⏸️ Cabang berhasil dinonaktifkan.');
+        loadBranches();
+      } else {
+        alert((data && (data.message || data.error)) || 'Gagal mengubah status aktivasi cabang.');
+      }
+    } catch (err) {
+      alert('Terjadi kesalahan saat mengubah status cabang: ' + err.message);
+    }
+  };
 
   window.editBranchPhone = function (id) {
     var b = state.branches.find(function (x) { return x.id === id; }) || state.branches[0];
@@ -586,9 +628,13 @@
       return;
     }
 
+    var token = localStorage.getItem(TOKEN_KEY) || '';
+    var headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+
     fetch(API_BASE + '/admin/branches/' + id, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify({ phone: newPhone })
     }).then(function (res) {
       if (!res.ok) throw new Error('Gagal memperbarui nomor WhatsApp cabang.');
@@ -608,9 +654,13 @@
     var newPriceKm = prompt('Tarif ongkir per KM berikutnya (Rp):', b.price_per_km || 3000);
     if (newPriceKm === null) return;
 
+    var token = localStorage.getItem(TOKEN_KEY) || '';
+    var headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+
     fetch(API_BASE + '/admin/branches/' + id, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify({
         free_delivery_km: Number(newFreeKm),
         price_per_km: Number(newPriceKm)

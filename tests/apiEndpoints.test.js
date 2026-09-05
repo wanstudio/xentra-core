@@ -2410,3 +2410,82 @@ test('R5 CHECK-2 API: midtrans settlement keeps order AWAITING; only branch-acce
   assert.strictEqual(db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status, 'confirmed');
 });
 
+/* =============================================================================
+   GLOBAL BRANCH ACTIVATION (OWNER AUTHORITY VS BRANCH MANAGER OPERATIONAL STATE)
+   ============================================================================= */
+
+test('GLOBAL ACTIVATION 1: Owner can globally deactivate and reactivate a branch', async () => {
+  const owner = await b1Login('admin', 'bangjo123');
+  assert.strictEqual(owner.status, 200);
+
+  const targetBranch = 'branch_bangjo_timur';
+
+  // 1. Deactivate branch
+  const deactRes = await b1PutBranch(owner.headers, targetBranch, { is_active: 0 });
+  assert.strictEqual(deactRes.status, 200);
+  const deactData = await deactRes.json();
+  assert.strictEqual(deactData.success, true);
+  assert.strictEqual(deactData.branch.is_active, 0);
+
+  const rowDeact = db.prepare('SELECT is_active FROM branches WHERE id = ?').get(targetBranch);
+  assert.strictEqual(rowDeact.is_active, 0);
+
+  // Audit trail recorded
+  const auditRow = db.prepare(`
+    SELECT * FROM branch_operation_logs
+    WHERE branch_id = ? AND field = 'is_active'
+    ORDER BY created_at DESC, rowid DESC LIMIT 1
+  `).get(targetBranch);
+  assert.ok(auditRow);
+  assert.strictEqual(auditRow.actor_role, 'owner');
+  assert.strictEqual(auditRow.new_value, '0');
+
+  // Customer endpoint /brand/branches must exclude the deactivated branch
+  const publicRes = await mockFetch('/api/v1/brand/branches');
+  const publicData = await publicRes.json();
+  assert.ok(!publicData.branches.some(b => b.id === targetBranch), 'Deactivated branch must not be in public list');
+
+  // Reactivate branch
+  const reactRes = await b1PutBranch(owner.headers, targetBranch, { is_active: 1 });
+  assert.strictEqual(reactRes.status, 200);
+  const reactData = await reactRes.json();
+  assert.strictEqual(reactData.branch.is_active, 1);
+
+  const rowReact = db.prepare('SELECT is_active FROM branches WHERE id = ?').get(targetBranch);
+  assert.strictEqual(rowReact.is_active, 1);
+});
+
+test('GLOBAL ACTIVATION 2: Branch Manager is strictly FORBIDDEN (403) from mutating is_active', async () => {
+  const crypto = require('crypto');
+  const hash = crypto.createHash('sha256').update('bm_act_pass').digest('hex');
+  db.prepare(`
+    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role)
+    VALUES ('usr_bm_act', 'brand_bangjo', 'org_xentra_holding', 'branch_bangjo_barat', 'bm_act', 'bm_act@bangjo.com', ?, 'BM Act', 'branch_manager')
+  `).run(hash);
+
+  const bm = await b1Login('bm_act', 'bm_act_pass');
+  assert.strictEqual(bm.status, 200);
+
+  // BM tries to mutate is_active on their OWN branch
+  const deniedRes = await b1PutBranch(bm.headers, 'branch_bangjo_barat', { is_active: 0 });
+  assert.strictEqual(deniedRes.status, 403);
+  const deniedData = await deniedRes.json();
+  assert.strictEqual(deniedData.error, 'INSUFFICIENT_PERMISSIONS');
+
+  // Branch remains active
+  const branchRow = db.prepare('SELECT is_active FROM branches WHERE id = ?').get('branch_bangjo_barat');
+  assert.strictEqual(branchRow.is_active, 1);
+});
+
+test('GLOBAL ACTIVATION 3: Cross-brand is_active mutation by Owner is rejected with 404', async () => {
+  const owner = await b1Login('admin', 'bangjo123');
+  assert.strictEqual(owner.status, 200);
+
+  // Attempt to mutate branch belonging to another brand
+  const crossRes = await b1PutBranch(owner.headers, 'branch_other_co', { is_active: 0 });
+  assert.strictEqual(crossRes.status, 404);
+
+  const foreignBranch = db.prepare("SELECT is_active FROM branches WHERE id = 'branch_other_co'").get();
+  assert.strictEqual(foreignBranch.is_active, 1);
+});
+
