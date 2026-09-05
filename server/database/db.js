@@ -1077,19 +1077,22 @@ function seedData(targetDb) {
   }
 
   // Safe cleanup of legacy demo branches for brandId that have 0 orders
-  // and are not part of the 5 demo branches or test fixtures
+  // Safe cleanup of non-canonical branches for brandId
   try {
     const targetBranchIds = demoBranches.map(b => b.id);
     const existingBrandBranches = targetDb.prepare('SELECT id FROM branches WHERE brand_id = ?').all(brandId);
     for (const eb of existingBrandBranches) {
       if (!targetBranchIds.includes(eb.id)) {
-        // Only clean up if it's a legacy demo branch (e.g. branch_17*, branch_b1_*, branch_c1_*) and has NO orders
-        if (/^branch_(17\d+|b1_|c1_|demo)/.test(eb.id)) {
-          const orderCount = targetDb.prepare('SELECT count(*) as c FROM orders WHERE branch_id = ?').get(eb.id)?.c || 0;
-          if (orderCount === 0) {
-            targetDb.prepare('DELETE FROM branches WHERE id = ?').run(eb.id);
-          }
-        }
+        try { targetDb.prepare('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE branch_id = ?)').run(eb.id); } catch(_) {}
+        try { targetDb.prepare('DELETE FROM order_status_logs WHERE order_id IN (SELECT id FROM orders WHERE branch_id = ?)').run(eb.id); } catch(_) {}
+        try { targetDb.prepare('DELETE FROM order_deliveries WHERE order_id IN (SELECT id FROM orders WHERE branch_id = ?)').run(eb.id); } catch(_) {}
+        try { targetDb.prepare('DELETE FROM order_payments WHERE order_id IN (SELECT id FROM orders WHERE branch_id = ?)').run(eb.id); } catch(_) {}
+        try { targetDb.prepare('DELETE FROM orders WHERE branch_id = ?').run(eb.id); } catch(_) {}
+        try { targetDb.prepare('DELETE FROM branch_products WHERE branch_id = ?').run(eb.id); } catch(_) {}
+        try { targetDb.prepare('DELETE FROM branch_categories WHERE branch_id = ?').run(eb.id); } catch(_) {}
+        try { targetDb.prepare('DELETE FROM branch_delivery_settings WHERE branch_id = ?').run(eb.id); } catch(_) {}
+        try { targetDb.prepare('DELETE FROM branch_operation_logs WHERE branch_id = ?').run(eb.id); } catch(_) {}
+        try { targetDb.prepare('DELETE FROM branches WHERE id = ?').run(eb.id); } catch(_) {}
       }
     }
   } catch (e) {
