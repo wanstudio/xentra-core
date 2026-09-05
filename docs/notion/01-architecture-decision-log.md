@@ -1,4 +1,4 @@
-<!-- SNAPSHOT FROM NOTION — source page: 01-architecture-decision-log; fetched 2026-09-04 -->
+<!-- SNAPSHOT FROM NOTION — source page: 01-architecture-decision-log; fetched 2026-09-05 -->
 
 # 🔒 Branch as Operational Truth Boundary
 
@@ -85,3 +85,109 @@ A pending refund on one Order must not globally lock the Customer or block an un
 ## 🔒 LOCKED — Customer Cancellation
 
 Follow the adopted GoFood-style principle: Customer cancellation is allowed before Branch acceptance/confirmation; after Branch acceptance, normal Customer cancellation is not allowed. Core enforces cancellation from authoritative Order state. Branch/system rejection, timeout, or payment failure must not be classified as Customer cancellation.
+
+## 🔒 LOCKED — Master Catalog vs Branch Catalog Ownership & Snapshot Boundary
+
+### Decision
+**Master Catalog dan Branch Catalog adalah dua ownership/context yang berbeda. Catalog milik Owner/Brand berfungsi sebagai master product library. Branch memiliki kewenangan operasional untuk memilih product dari master catalog dan membentuk Branch Catalog sendiri. Branch Catalog bukan live mirror dari Master Catalog.**
+
+### Master Catalog owns
+- master product identity dan product library milik Brand;
+- master product metadata sesuai contract Catalog;
+- daftar product yang dapat dipilih/adopt oleh Branch;
+- master catalog lifecycle.
+
+Master Catalog adalah **source/library**, bukan operational selling configuration setiap Branch.
+
+### Branch Catalog owns
+- product yang sudah dipilih/adopt oleh Branch;
+- category/menu structure milik Branch;
+- branch-level availability, stock, dan operational selling configuration sesuai domain contract;
+- keputusan category/menu placement di Branch.
+
+**Category Branch adalah kewenangan Branch.** Category pada Branch tidak harus sama dengan category Master Catalog. Branch boleh membuat, rename, atau mengatur category sendiri. Product dari Master Catalog dapat ditempatkan ke category Branch mana pun; Xentra tidak mengoreksi keputusan merchandising Branch hanya karena category tersebut berbeda dari category Master Catalog.
+
+### Adoption / Save Point
+Ketika Branch memilih product dari Master Catalog untuk dijual, proses tersebut adalah **adoption/copy ke Branch Catalog**, bukan ketergantungan live yang membuat Branch otomatis mengikuti perubahan Master Catalog.
+
+Conceptual flow:
+**Master Catalog → Branch memilih product → Adoption / Save Point → Branch Catalog**
+
+Branch Catalog harus tetap memiliki operational record setelah product di-adopt. Perubahan Master Catalog di kemudian hari tidak boleh secara otomatis menghapus atau menonaktifkan product yang sudah ada di Branch Catalog.
+
+### Master change ≠ automatic Branch mutation
+Jika Owner menonaktifkan atau mengubah product pada Master Catalog yang sudah pernah di-adopt oleh Branch:
+- Branch Catalog **tidak otomatis dihapus**;
+- Branch Catalog **tidak otomatis menjadi disabled hanya karena master berubah**;
+- perubahan Master menjadi event/communication yang nantinya dapat diberitahukan kepada Branch;
+- penyelesaian transaksi yang sedang berjalan dan keputusan disable pada Branch mengikuti workflow operasional yang akan dikunci kemudian.
+
+Contoh future communication:
+**"Owner menonaktifkan product ini mulai hari ini. Selesaikan transaksi jika ada yang sedang berjalan. Jika tidak ada transaksi, silakan nonaktifkan product ini di Branch Settings."**
+
+Workflow komunikasi Owner → Branch ini adalah **future capability** dan belum mengunci schema/rule implementasinya sekarang.
+
+### Database relationship direction
+Model konseptual yang dikunci:
+
+```text
+Master Catalog (Brand-owned)
+        │
+        │ product available for adoption
+        ▼
+Branch Manager
+        │
+        │ adopt / copy
+        ▼
+Branch Catalog (Branch-owned)
+        ├── Branch Product
+        │     ├── stock
+        │     ├── availability
+        │     ├── branch price/configuration
+        │     └── branch operational state
+        │
+        └── Branch Category
+              └── Branch-controlled menu grouping
+```
+
+Ini **bukan** model live-reference sederhana:
+**Branch → Master Product → Master Category**.
+
+### Category independence
+Master Category dan Branch Category tidak boleh diperlakukan sebagai satu identity hanya karena nama/category_id-nya sama.
+
+Contoh valid:
+- Master Catalog memiliki category `Makanan`, `Mie`, `Minuman`.
+- Branch A boleh memiliki `Menu Favorit`, `Mie`, `Minuman`.
+- Branch B boleh memiliki `Paket Hemat`, `Minuman Dingin` dan tidak menjual Mie.
+- Branch C bahkan dapat menempatkan product Ayam ke category Branch bernama `Menu Ikan` jika Manager memilih demikian.
+
+Business responsibility berada pada Branch; Xentra menjaga integrity dan contract, bukan mengoreksi merchandising decision yang tidak dilarang oleh business rule.
+
+### Catalog ↔ Branch boundary
+Catalog dan Branch tetap domain yang dapat berkolaborasi tetapi tidak saling mengambil authority.
+- Catalog menyediakan master product library dan contract adoption.
+- Branch memiliki operational context dan kewenangan branch-level selling configuration.
+- Branch Catalog menjadi save point untuk product yang sudah di-adopt.
+- Home/customer UI harus membaca **Branch Catalog** ketika berada dalam Branch Context, bukan menganggap Master Catalog sebagai live operational catalog Branch.
+
+### Schema implication
+Schema saat ini **tidak boleh diasumsikan sudah merepresentasikan keputusan ini sepenuhnya**. `branch_products` yang hanya menyimpan reference ke `products` belum otomatis berarti sudah memiliki snapshot/copy semantics atau Branch-owned category structure.
+
+Karena itu:
+- jangan menambahkan schema secara ad-hoc;
+- jangan membuat `branch_categories`, `categories.branch_id`, `products.branch_id`, atau `branch_catalog` tanpa kontrak schema yang dikunci;
+- perubahan schema berikutnya harus dirancang sebagai keputusan architecture/data-model terpisah sebelum implementasi.
+
+### Invariants
+- **Master Catalog mutation must not silently mutate an already-adopted Branch Catalog.**
+- **Branch Category is Branch-owned and independent from Master Category.**
+- **Product adoption is a save point, not a live dependency for Branch selling configuration.**
+- **Branch may choose which master products it sells.**
+- **A product can exist in Master Catalog without being sold by a Branch.**
+- **Different Branches may sell different subsets of the same Master Catalog.**
+- **Different Branches may organize the same product under different Branch Categories.**
+- **No global/master catalog fallback is allowed when the UI is presenting an established Branch Catalog context.**
+
+### Scope / future work
+This decision locks the ownership and relationship model. It does **not yet** lock the exact physical database schema, versioning fields, synchronization/version policy, conflict resolution, notification transport, or Owner → Branch communication workflow. Those require separate explicit decisions before implementation.
