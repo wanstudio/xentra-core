@@ -616,9 +616,10 @@
       loadProducts(activeCategory);
     }
 
-    // Refresh the discovery section so the active card's category preview mirrors
-    // the freshly loaded branch menu (per-branch preview is not in the API).
-    if (branches.length > 1) renderBranchDiscovery();
+    // Update the active branch card's category preview to mirror the freshly
+    // loaded branch menu. Use in-place update (no DOM rebuild) to preserve
+    // horizontal scroll position in the branch carousel.
+    if (branches.length > 1) updateBranchActiveState();
   }
 
   function loadCatalog(branchId) {

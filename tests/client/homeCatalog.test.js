@@ -207,3 +207,189 @@ test('setActiveBranch uses updateBranchActiveState instead of renderBranchDiscov
   assert.ok(setActiveMatch[0].includes('updateBranchActiveState()'), 'setActiveBranch must call updateBranchActiveState');
   assert.ok(!setActiveMatch[0].includes('renderBranchDiscovery()'), 'setActiveBranch must NOT call renderBranchDiscovery (prevents bounce)');
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COMPREHENSIVE BRANCH ISOLATION TESTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+// Test 1 — BARAT catalog: only BARAT-assigned products are available
+test('Test 1 — BARAT catalog: only BARAT-assigned products have is_available=true', async () => {
+  // Ensure deterministic branch_products
+  db.prepare(`DELETE FROM branch_products WHERE branch_id IN (?, ?)`).run(BARAT, TIMUR);
+  db.prepare(`INSERT INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold) VALUES (?, '272', 25000, 50, 1, 5)`).run(BARAT);
+  db.prepare(`INSERT INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold) VALUES (?, '285', 28000, 30, 1, 5)`).run(BARAT);
+  db.prepare(`INSERT INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold) VALUES (?, '288', 5000, 100, 1, 5)`).run(BARAT);
+  db.prepare(`INSERT INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold) VALUES (?, '345', 12000, 40, 1, 5)`).run(BARAT);
+  db.prepare(`INSERT INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold) VALUES (?, '272', 25000, 75, 1, 5)`).run(TIMUR);
+  db.prepare(`INSERT INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold) VALUES (?, '287', 15000, 60, 1, 5)`).run(TIMUR);
+
+  const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+
+  const availableIds = data.all_products.filter((p) => p.is_available).map((p) => String(p.id));
+  // BARAT should have: 272, 285, 288, 345
+  assert.ok(availableIds.includes('272'), 'BARAT has product 272');
+  assert.ok(availableIds.includes('285'), 'BARAT has product 285');
+  assert.ok(availableIds.includes('288'), 'BARAT has product 288');
+  assert.ok(availableIds.includes('345'), 'BARAT has product 345');
+  // BARAT should NOT have 287 (TIMUR-only)
+  assert.ok(!availableIds.includes('287'), 'BARAT does NOT have product 287 (TIMUR-only)');
+});
+
+// Test 2 — TIMUR catalog: only TIMUR-assigned products are available
+test('Test 2 — TIMUR catalog: only TIMUR-assigned products have is_available=true', async () => {
+  // Branch_products already set from Test 1
+  const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${TIMUR}`);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+
+  const availableIds = data.all_products.filter((p) => p.is_available).map((p) => String(p.id));
+  // TIMUR should have: 272, 287
+  assert.ok(availableIds.includes('272'), 'TIMUR has product 272');
+  assert.ok(availableIds.includes('287'), 'TIMUR has product 287');
+  // TIMUR should NOT have 285, 288, 345 (BARAT-only)
+  assert.ok(!availableIds.includes('285'), 'TIMUR does NOT have product 285 (BARAT-only)');
+  assert.ok(!availableIds.includes('288'), 'TIMUR does NOT have product 288 (BARAT-only)');
+  assert.ok(!availableIds.includes('345'), 'TIMUR does NOT have product 345 (BARAT-only)');
+});
+
+// Test 3 — Cross-branch leakage: TIMUR active shows only TIMUR products
+test('Test 3 — Cross-branch leakage: selecting TIMUR never shows BARAT-only products', async () => {
+  const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${TIMUR}`);
+  const data = await res.json();
+
+  // Products assigned to TIMUR
+  const timurProducts = ['272', '287'];
+  // Products assigned to BARAT only
+  const baratOnlyProducts = ['285', '288', '345'];
+
+  const availableIds = data.all_products.filter((p) => p.is_available).map((p) => String(p.id));
+
+  for (const pid of timurProducts) {
+    assert.ok(availableIds.includes(pid), `TIMUR must have product ${pid}`);
+  }
+  for (const pid of baratOnlyProducts) {
+    assert.ok(!availableIds.includes(pid), `TIMUR must NOT have BARAT-only product ${pid}`);
+  }
+});
+
+// Test 4 — No global fallback: branch catalog failure shows empty state
+test('Test 4 — No global fallback: branch catalog failure shows empty state, not DEFAULT_CATALOG', () => {
+  const homePath = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/home.js');
+  const content = fs.readFileSync(homePath, 'utf8');
+
+  // DEFAULT_CATALOG must not exist
+  assert.ok(!content.includes('var DEFAULT_CATALOG'), 'DEFAULT_CATALOG variable must not exist');
+
+  // No fallback to DEFAULT_CATALOG in loadCatalog
+  const loadCatalogMatch = content.match(/function loadCatalog[\s\S]*?^  }/m);
+  if (loadCatalogMatch) {
+    assert.ok(!loadCatalogMatch[0].includes('DEFAULT_CATALOG'), 'loadCatalog must not fallback to DEFAULT_CATALOG');
+  }
+
+  // renderEmptyBranchCatalog is used for honest empty state
+  assert.ok(content.includes('renderEmptyBranchCatalog()'), 'must use renderEmptyBranchCatalog for honest empty state');
+});
+
+// Test 5 — Branch-less endpoint: Home does not use /products?category= when branch is selected
+test('Test 5 — Branch-less endpoint: loadProducts short-circuits when catalogBranchId is set', () => {
+  const homePath = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/home.js');
+  const content = fs.readFileSync(homePath, 'utf8');
+
+  // Find the loadProducts function
+  const loadProductsMatch = content.match(/function loadProducts[\s\S]*?^  }/m);
+  assert.ok(loadProductsMatch, 'loadProducts must exist');
+
+  const funcBody = loadProductsMatch[0];
+
+  // Must check catalogBranchId before making API call
+  const catalogBranchCheck = funcBody.indexOf('if (catalogBranchId)');
+  const apiCall = funcBody.indexOf('/products?category=');
+  assert.ok(catalogBranchCheck >= 0, 'loadProducts must check catalogBranchId');
+  assert.ok(apiCall >= 0, 'loadProducts must have /products?category= for brand-wide mode');
+  assert.ok(catalogBranchCheck < apiCall, 'catalogBranchId check must come BEFORE /products?category= call');
+
+  // When catalogBranchId is set, it must return empty array (no fallback)
+  const afterCatalogCheck = funcBody.substring(catalogBranchCheck, catalogBranchCheck + 200);
+  assert.ok(afterCatalogCheck.includes('products = []'), 'must set products to empty array when in branch context');
+});
+
+// Test 6 — Branch switching race: stale response cannot overwrite newer branch
+test('Test 6 — Branch switching race: catalogLoadSeq prevents stale overwrites', () => {
+  const homePath = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/home.js');
+  const content = fs.readFileSync(homePath, 'utf8');
+
+  // loadCatalog must use catalogLoadSeq for stale protection
+  const loadCatalogMatch = content.match(/function loadCatalog[\s\S]*?^  }/m);
+  assert.ok(loadCatalogMatch, 'loadCatalog must exist');
+
+  const funcBody = loadCatalogMatch[0];
+  assert.ok(funcBody.includes('var seq = ++catalogLoadSeq'), 'must increment catalogLoadSeq');
+  assert.ok(funcBody.includes('if (seq !== catalogLoadSeq) return'), 'must check seq on response to prevent stale overwrites');
+
+  // clearCatalogForBranch must increment productLoadSeq
+  const clearMatch = content.match(/function clearCatalogForBranch[\s\S]*?^  }/m);
+  assert.ok(clearMatch, 'clearCatalogForBranch must exist');
+  assert.ok(clearMatch[0].includes('++productLoadSeq'), 'clearCatalogForBranch must increment productLoadSeq');
+});
+
+// Test 7 — Category isolation: categories come from branch-scoped catalog
+test('Test 7 — Category isolation: categories are derived from branch-scoped catalog', async () => {
+  const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.ok(Array.isArray(data.categories), 'categories must be an array');
+  assert.ok(data.categories.length > 0, 'must have categories');
+
+  // Each category must have products
+  for (const cat of data.categories) {
+    assert.ok(cat.id, 'category must have id');
+    assert.ok(cat.name, 'category must have name');
+  }
+});
+
+// Test 8 — Carousel stability: applyCatalog uses updateBranchActiveState (not renderBranchDiscovery)
+test('Test 8 — Carousel stability: applyCatalog uses updateBranchActiveState, not renderBranchDiscovery', () => {
+  const homePath = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/home.js');
+  const content = fs.readFileSync(homePath, 'utf8');
+
+  // Find the applyCatalog function
+  const applyCatalogMatch = content.match(/function applyCatalog[\s\S]*?^  }/m);
+  assert.ok(applyCatalogMatch, 'applyCatalog must exist');
+
+  const funcBody = applyCatalogMatch[0];
+
+  // Must use updateBranchActiveState (not renderBranchDiscovery) to preserve scroll
+  assert.ok(funcBody.includes('updateBranchActiveState()'), 'applyCatalog must call updateBranchActiveState');
+  assert.ok(!funcBody.includes('renderBranchDiscovery()'), 'applyCatalog must NOT call renderBranchDiscovery (preserves carousel scroll)');
+});
+
+// Test 9 — Async race protection: productLoadSeq invalidates in-flight requests
+test('Test 9 — Async race protection: productLoadSeq prevents stale category responses', () => {
+  const homePath = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/home.js');
+  const content = fs.readFileSync(homePath, 'utf8');
+
+  const loadProductsMatch = content.match(/function loadProducts[\s\S]*?^  }/m);
+  assert.ok(loadProductsMatch, 'loadProducts must exist');
+
+  const funcBody = loadProductsMatch[0];
+  assert.ok(funcBody.includes('var seq = ++productLoadSeq'), 'must increment productLoadSeq');
+  assert.ok(funcBody.includes('if (seq !== productLoadSeq) return'), 'must check seq on response');
+});
+
+// Test 10 — No stale data after branch switch: clearCatalogForBranch clears everything
+test('Test 10 — No stale data after branch switch: clearCatalogForBranch clears categories, products, activeCategory', () => {
+  const homePath = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/home.js');
+  const content = fs.readFileSync(homePath, 'utf8');
+
+  const clearMatch = content.match(/function clearCatalogForBranch[\s\S]*?^  }/m);
+  assert.ok(clearMatch, 'clearCatalogForBranch must exist');
+
+  const funcBody = clearMatch[0];
+  assert.ok(funcBody.includes('categories = []'), 'must clear categories');
+  assert.ok(funcBody.includes('products = []'), 'must clear products');
+  assert.ok(funcBody.includes('activeCategory = null'), 'must clear activeCategory');
+  assert.ok(funcBody.includes('catalogBranchId = null'), 'must clear catalogBranchId');
+  assert.ok(funcBody.includes('++productLoadSeq'), 'must increment productLoadSeq');
+});
