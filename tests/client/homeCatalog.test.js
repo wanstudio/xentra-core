@@ -97,8 +97,9 @@ test('Branch B catalog differs from Branch A catalog (different availability)', 
   const resB = await mockFetch(`/api/v1/catalog/menu?branch_id=${TIMUR}`);
   const dataB = await resB.json();
 
-  // Both return all master products but with different branch-specific data
-  assert.strictEqual(dataA.all_products.length, dataB.all_products.length, 'same master product count');
+  // BRANCH CATALOG MODEL: each branch returns only its adopted products (may differ in count)
+  assert.ok(dataA.all_products.length >= 2, 'BARAT has adopted products');
+  assert.ok(dataB.all_products.length >= 2, 'TIMUR has adopted products');
 
   // At least one product must have different availability between branches
   const baratAvail = new Set(dataA.all_products.filter((p) => p.is_available).map((p) => String(p.id)));

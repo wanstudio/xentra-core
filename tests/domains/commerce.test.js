@@ -90,14 +90,12 @@ test('Commerce 4 — Catalog Service: formats active menu for UX display', () =>
 // ==============================================================================
 // Commerce 4b — C1: Assignment != Inventory (branch-scoped catalog is strict)
 // ==============================================================================
-test('Commerce 4b — C1 Catalog coherence: unassigned product is NOT available in branch menu; no synthetic stock; brand-wide menu unaffected', () => {
-  // Branch-scoped menu: prod_unassigned (no branch_products row for branch_test) must be
-  // presented as unavailable with zero stock — never a fake 999 — while assigned items stay.
+test('Commerce 4b — C1 Catalog coherence: unassigned product is NOT in branch menu; brand-wide unaffected', () => {
+  // BRANCH CATALOG MODEL: branch_products is the source of truth. Unassigned products
+  // (no branch_products row) do NOT appear in the branch-scoped menu at all.
   const branchMenu = CatalogService.getMenu({ brand_id: 'brand_test', branch_id: 'branch_test' });
   const unassigned = branchMenu.products.find(p => p.id === 'prod_unassigned');
-  assert.ok(unassigned, 'unassigned product still listed (brand master) in branch menu');
-  assert.strictEqual(unassigned.is_available, false, 'unassigned => NOT operationally available');
-  assert.strictEqual(unassigned.stock_estimate, 0, 'unassigned => no artificial stock quantity');
+  assert.ok(!unassigned, 'unassigned product MUST NOT appear in branch menu (branch catalog is not a filtered master view)');
   const assigned = branchMenu.products.find(p => p.id === 'prod_lock');
   assert.strictEqual(assigned.is_available, true);
   assert.strictEqual(assigned.stock_estimate, 100);

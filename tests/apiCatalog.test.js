@@ -7,6 +7,9 @@
  * requested the route delegates to the canonical commerce CatalogService (branch
  * price override, C1 operational availability, branch stock estimate) AND fails
  * closed (400) for an unknown/inactive branch.
+ *
+ * BRANCH CATALOG MODEL: branch_products is the source of truth for branch context.
+ * Only adopted products appear. Categories come from branch_categories (Branch-owned).
  */
 
 const test = require('node:test');
@@ -70,13 +73,13 @@ function findProduct(brandProducts, id) {
   return brandProducts.find((p) => String(p.id) === String(id));
 }
 
-test('P3-01 branch-scoped catalog returns assigned products with correct stock and availability', async () => {
+test('P3-01 branch-scoped catalog returns adopted products with correct stock and availability', async () => {
   const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
   assert.strictEqual(res.status, 200);
   const data = await res.json();
   assert.strictEqual(data.success, true);
-  assert.ok(data.categories.length > 0, 'categories present');
-  assert.ok(data.all_products.length >= 4, 'branch-assigned products present');
+  assert.ok(data.categories.length > 0, 'branch categories present');
+  assert.ok(data.all_products.length >= 4, 'branch-adopted products present');
 
   for (const p of data.all_products) {
     assert.strictEqual(typeof p.is_available, 'boolean', `is_available must be explicit for ${p.id}`);
@@ -86,8 +89,9 @@ test('P3-01 branch-scoped catalog returns assigned products with correct stock a
   assert.ok(p272, 'Nasi Goreng present at BARAT');
   assert.strictEqual(p272.is_available, true, 'assigned product is available');
 
-  const makanan = data.categories.find((c) => String(c.name).toLowerCase() === 'makanan');
-  assert.ok(makanan && makanan.products.length > 0, 'Makanan category populated in branch scope');
+  // Branch categories come from branch_categories, not master categories
+  const favorit = data.categories.find((c) => String(c.name).toLowerCase() === 'menu favorit');
+  assert.ok(favorit && favorit.products.length > 0, 'Menu Favorit category populated in branch scope');
 });
 
 test('P3-02 branch price override is honored and is_available reflects the flag', async () => {
@@ -115,17 +119,17 @@ test('P3-02 branch price override is honored and is_available reflects the flag'
   db.prepare(`UPDATE branch_products SET price = 25000, stock = 50, is_available = 1 WHERE branch_id = ? AND product_id = '272'`).run(BARAT);
 });
 
-test('P3-03 master product without a branch_products row is listed but unavailable at that branch', async () => {
+test('P3-03 master product not adopted by a branch does NOT appear in branch catalog', async () => {
   db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, description, price, is_active, sort_order) VALUES ('prod_p3_unassigned', ?, '34', 'Menu Tanpa Cabang', 'menu-tanpa-cabang', 'Tidak dialokasikan ke cabang manapun.', 25000, 1, 99)`).run(BRAND);
 
   const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
   assert.strictEqual(res.status, 200);
   const data = await res.json();
 
+  // BRANCH CATALOG MODEL: unassigned products do NOT appear in branch menu at all.
+  // Only adopted products (branch_products rows) are shown.
   const unassigned = findProduct(data.all_products, 'prod_p3_unassigned');
-  assert.ok(unassigned, 'product listed in branch menu');
-  assert.strictEqual(unassigned.is_available, false, 'unassigned (missing branch row) is NOT available');
-  assert.strictEqual(unassigned.stock_estimate, 0, 'unassigned stock resolves to 0, never a fake number');
+  assert.ok(!unassigned, 'unassigned product MUST NOT appear in branch menu (branch catalog is not a filtered master view)');
 });
 
 test('P3-04 unknown branch id fails closed (400) instead of silently re-scoping', async () => {
@@ -156,18 +160,18 @@ test('P3-06 brand-wide catalog uses CatalogService and returns coherent projecti
   assert.strictEqual(data.all_products[0].stock_estimate, null, 'brand-wide stock_estimate is null');
 });
 
-test('P3-07 product assigned to branch is visible in branch-scoped catalog', async () => {
+test('P3-07 product adopted by branch is visible in branch-scoped catalog', async () => {
   const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
   assert.strictEqual(res.status, 200);
   const data = await res.json();
   assert.strictEqual(data.success, true);
 
   const p272 = findProduct(data.all_products, '272');
-  assert.ok(p272, 'Nasi Goreng assigned to BARAT is visible');
-  assert.strictEqual(p272.is_available, true, 'assigned product is available');
+  assert.ok(p272, 'Nasi Goreng adopted by BARAT is visible');
+  assert.strictEqual(p272.is_available, true, 'adopted product is available');
 });
 
-test('P3-08 product not assigned to branch shows as unavailable with stock 0', async () => {
+test('P3-08 product not adopted by branch does NOT appear in branch catalog', async () => {
   db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, description, price, is_active, sort_order) VALUES ('prod_p3_only_other', ?, '34', 'Produk Lain', 'produk-lain', 'Hanya di cabang lain', 10000, 1, 98)`).run(BRAND);
   db.prepare(`INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, is_active) VALUES ('branch_p3_other', ?, 'Cabang Lain', 'cabang-lain', 'Jl. Timur', -7.28, 112.75, 1)`).run(BRAND);
   db.prepare(`INSERT OR IGNORE INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES ('branch_p3_other', 'prod_p3_only_other', 10000, 50, 1)`).run();
@@ -176,10 +180,9 @@ test('P3-08 product not assigned to branch shows as unavailable with stock 0', a
   assert.strictEqual(res.status, 200);
   const data = await res.json();
 
+  // BRANCH CATALOG MODEL: product adopted by another branch does NOT appear here.
   const unassigned = findProduct(data.all_products, 'prod_p3_only_other');
-  assert.ok(unassigned, 'product exists in master catalog and is listed');
-  assert.strictEqual(unassigned.is_available, false, 'not assigned to BARAT -> unavailable');
-  assert.strictEqual(unassigned.stock_estimate, 0, 'no branch row -> stock resolves to 0');
+  assert.ok(!unassigned, 'product adopted by another branch MUST NOT appear in this branch menu');
 });
 
 test('P3-09 unavailable branch product (is_available=0) is not treated as available', async () => {
@@ -187,7 +190,7 @@ test('P3-09 unavailable branch product (is_available=0) is not treated as availa
   const data = await res.json();
 
   const p285 = findProduct(data.all_products, '285');
-  assert.ok(p285, 'Ayam Geprek still listed');
+  assert.ok(p285, 'Ayam Geprek still listed (adopted by BARAT)');
   assert.strictEqual(p285.is_available, false, 'is_available=0 surfaces as unavailable');
 });
 
@@ -202,28 +205,50 @@ test('P3-10 branch-specific stock is surfaced correctly', async () => {
   db.prepare(`UPDATE branch_products SET stock = 40 WHERE branch_id = ? AND product_id = '345'`).run(BARAT);
 });
 
-test('P3-11 empty category does not cause cross-branch product leakage', async () => {
-  db.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, sort_order) VALUES (99901, ?, 'Kosong', 'kosong', 99)`).run(BRAND);
+test('P3-11 branch categories do not leak products across branches', async () => {
+  const resBarat = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
+  const dataBarat = await resBarat.json();
 
-  const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
-  assert.strictEqual(res.status, 200);
-  const data = await res.json();
+  const resTimur = await mockFetch(`/api/v1/catalog/menu?branch_id=${TIMUR}`);
+  const dataTimur = await resTimur.json();
 
-  const empty = data.categories.find((c) => String(c.id) === '99901');
-  assert.ok(empty, 'empty category present');
-  assert.strictEqual(empty.products.length, 0, 'empty category has zero products');
+  // BARAT has its own categories, TIMUR has its own
+  const baratCatNames = dataBarat.categories.map(c => c.name);
+  const timurCatNames = dataTimur.categories.map(c => c.name);
+
+  assert.ok(baratCatNames.includes('Menu Favorit'), 'BARAT has Menu Favorit');
+  assert.ok(baratCatNames.includes('Minuman Segar'), 'BARAT has Minuman Segar');
+  assert.ok(!baratCatNames.includes('Paket Hemat'), 'BARAT does NOT have TIMUR category');
+
+  assert.ok(timurCatNames.includes('Paket Hemat'), 'TIMUR has Paket Hemat');
+  assert.ok(timurCatNames.includes('Kopi & Teh'), 'TIMUR has Kopi & Teh');
+  assert.ok(!timurCatNames.includes('Menu Favorit'), 'TIMUR does NOT have BARAT category');
 });
 
-test('P3-12 category shows only its own category products, not products from other categories', async () => {
-  db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, description, price, is_active, sort_order) VALUES ('prod_p3_snack_only', ?, '36', 'Snack Khusus', 'snack-khusus', 'Produk kategori Snack', 10000, 1, 97)`).run(BRAND);
+test('P3-12 same product in different branch categories: each branch sees its own placement', async () => {
+  // Product 272 (Nasi Goreng) is adopted by both branches into different categories
+  const resBarat = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
+  const dataBarat = await resBarat.json();
+  const p272Barat = findProduct(dataBarat.all_products, '272');
+  assert.ok(p272Barat, 'BARAT has Nasi Goreng');
+  assert.strictEqual(String(p272Barat.category_id), 'bc_barat_favorit', 'BARAT places Nasi Goreng in Menu Favorit');
 
-  const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
-  const data = await res.json();
-  const makanan = data.categories.find((c) => String(c.name).toLowerCase() === 'makanan');
-  assert.ok(makanan, 'Makanan category exists');
+  const resTimur = await mockFetch(`/api/v1/catalog/menu?branch_id=${TIMUR}`);
+  const dataTimur = await resTimur.json();
+  const p272Timur = findProduct(dataTimur.all_products, '272');
+  assert.ok(p272Timur, 'TIMUR has Nasi Goreng');
+  assert.strictEqual(String(p272Timur.category_id), 'bc_timur_paket', 'TIMUR places Nasi Goreng in Paket Hemat');
 
-  const snackProduct = makanan.products.find((p) => String(p.id) === 'prod_p3_snack_only');
-  assert.ok(!snackProduct, 'Makanan does NOT inject products from Snack category');
+  // Verify the categories reflect this
+  const baratFavorit = dataBarat.categories.find(c => String(c.id) === 'bc_barat_favorit');
+  assert.ok(baratFavorit, 'BARAT Menu Favorit category exists');
+  const baratNasiGoreng = baratFavorit.products.find(p => String(p.id) === '272');
+  assert.ok(baratNasiGoreng, 'Nasi Goreng is in BARAT Menu Favorit');
+
+  const timurPaket = dataTimur.categories.find(c => String(c.id) === 'bc_timur_paket');
+  assert.ok(timurPaket, 'TIMUR Paket Hemat category exists');
+  const timurNasiGoreng = timurPaket.products.find(p => String(p.id) === '272');
+  assert.ok(timurNasiGoreng, 'Nasi Goreng is in TIMUR Paket Hemat');
 });
 
 test('P3-13 same product assigned to two branches: each branch sees its own stock', async () => {
@@ -264,11 +289,11 @@ test('P3-15 Branch A has products Branch B does not (and vice versa)', async () 
   assert.ok(!baratAvail.includes('287'), 'BARAT does not have Kopi Susu');
 });
 
-test('P3-16 Product 285 (Ayam Geprek) is unavailable at BARAT despite being assigned', async () => {
+test('P3-16 Product 285 (Ayam Geprek) is unavailable at BARAT despite being adopted', async () => {
   const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
   const data = await res.json();
   const p285 = findProduct(data.all_products, '285');
-  assert.ok(p285, 'Ayam Geprek listed');
+  assert.ok(p285, 'Ayam Geprek listed (adopted by BARAT)');
   assert.strictEqual(p285.is_available, false, 'is_available=0 respected');
   assert.strictEqual(p285.stock_estimate, 30, 'stock still shown even though unavailable');
 });

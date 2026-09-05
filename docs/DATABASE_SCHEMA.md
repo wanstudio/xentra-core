@@ -170,38 +170,132 @@ CREATE TABLE inventory_movements (
 
 ## 2. Menu & Catalog Tables
 
-### `categories`
+### Master Catalog (Brand-owned)
+
+The Master Catalog is the owner/brand product library. It contains the master product
+identity, metadata, and master categories. Products may exist in the Master Catalog
+without being adopted by any Branch.
+
+### `categories` (Master Categories — Brand-owned)
 ```sql
 CREATE TABLE categories (
     id VARCHAR(36) PRIMARY KEY,
     brand_id VARCHAR(36) NOT NULL,
     name VARCHAR(255) NOT NULL,
+    slug TEXT,
+    image_url TEXT,
+    image TEXT,
     sort_order INT DEFAULT 0,
+    is_active INT DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
 );
 ```
 
-### `products`
+### `products` (Master Products — Brand-owned)
 ```sql
 CREATE TABLE products (
     id VARCHAR(36) PRIMARY KEY,
     brand_id VARCHAR(36) NOT NULL,
-    category_id VARCHAR(36) NOT NULL,
+    category_id VARCHAR(36),
     name VARCHAR(255) NOT NULL,
+    slug TEXT,
     description TEXT,
     price DECIMAL(12, 2) NOT NULL,
     regular_price DECIMAL(12, 2),
-    sale_price DECIMAL(12, 2),
+    pricing_mode TEXT DEFAULT 'lock',
+    min_price REAL,
+    max_price REAL,
     image_url VARCHAR(500),
+    image TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     sort_order INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 );
 ```
+
+### Branch Catalog (Branch-owned)
+
+The Branch Catalog is NOT a filtered view of the Master Catalog. It is a Branch-owned
+operational selling catalog. Adoption of a Master Product is a **save point** — a snapshot
+of the Master Product at the time of adoption. Subsequent Master mutations do NOT
+silently mutate the Branch Catalog.
+
+#### Ownership model
+
+- **Master Category ≠ Branch Category**: A Branch may create its own categories, rename
+  them, and place adopted products into different categories than the Master.
+- **Master Product ≠ Branch Product**: A Branch Product preserves provenance to the
+  originating Master Product but owns its snapshot metadata, category placement, and
+  operational state.
+- **Adoption = Save Point**: When a Branch adopts a Master Product, snapshot columns
+  capture the Master Product metadata. These snapshots are NOT updated when the
+  Master Product changes.
+
+#### Key invariants
+
+- A product may exist in Master Catalog without being adopted by any Branch.
+- A Branch may adopt only the Master Products it chooses.
+- Branch A and Branch B may sell different subsets of the same Master Catalog.
+- The same Master Product may be placed into different Branch Categories by different Branches.
+- Master Product mutations (rename, disable, etc.) do NOT silently mutate Branch Catalog.
+- Branch Context MUST read Branch Catalog. No Master Catalog fallback is allowed.
+
+### `branch_categories` (Branch-owned Categories)
+```sql
+CREATE TABLE branch_categories (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    branch_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+);
+```
+
+### `branch_products` (Branch Catalog — Adopted Products with Snapshot)
+```sql
+CREATE TABLE branch_products (
+    branch_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    branch_category_id TEXT,
+    product_name TEXT,
+    product_description TEXT,
+    product_image_url TEXT,
+    price REAL,
+    stock INTEGER DEFAULT 100,
+    is_available INTEGER DEFAULT 1,
+    low_stock_threshold INTEGER DEFAULT 5,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (branch_id, product_id),
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (branch_category_id) REFERENCES branch_categories(id) ON DELETE SET NULL
+);
+```
+
+#### Column semantics
+
+- `product_id` → FK to Master Product (provenance; CASCADE DELETE if master deleted).
+- `branch_category_id` → FK to Branch Category (Branch-owned placement).
+- `product_name` → Snapshot of Master Product name at adoption time.
+- `product_description` → Snapshot of Master Product description at adoption time.
+- `product_image_url` → Snapshot of Master Product image at adoption time.
+- `price` → Branch selling price (subject to PricingPolicyModel: lock/range).
+- `stock` → Branch-owned physical stock (Inventory domain).
+- `is_available` → Branch-owned availability flag.
+
+#### Triggers
+
+- `trg_branch_products_brand_consistency_insert/update`: Enforces that `product.brand_id = branch.brand_id` (C1 cross-brand guard).
+- `trg_branch_products_stock_non_negative_insert/update`: Enforces `stock >= 0` (C2 non-negative stock guard).
 
 ---
 

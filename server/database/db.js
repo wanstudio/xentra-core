@@ -121,12 +121,19 @@ const memoryStore = {
     { id: 345, brand_id: 'brand_bangjo', category_id: 36, name: 'Kentang', price: 12000, regular_price: 12000, description: 'Kentang goreng renyah dengan bumbu balado.', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', is_active: 1, sort_order: 5 }
   ],
   branch_products: [
-    { branch_id: 'branch_bangjo_barat', product_id: '272', price: 25000, stock: 50, is_available: 1 },
-    { branch_id: 'branch_bangjo_barat', product_id: '285', price: 28000, stock: 30, is_available: 0 },
-    { branch_id: 'branch_bangjo_barat', product_id: '288', price: 5000, stock: 100, is_available: 1 },
-    { branch_id: 'branch_bangjo_barat', product_id: '345', price: 12000, stock: 40, is_available: 1 },
-    { branch_id: 'branch_bangjo_timur', product_id: '272', price: 25000, stock: 75, is_available: 1 },
-    { branch_id: 'branch_bangjo_timur', product_id: '287', price: 15000, stock: 60, is_available: 1 }
+    { branch_id: 'branch_bangjo_barat', product_id: '272', branch_category_id: 'bc_barat_favorit', product_name: 'Nasi Goreng', product_description: 'Nasi goreng spesial dengan bumbu khas Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 25000, stock: 50, is_available: 1 },
+    { branch_id: 'branch_bangjo_barat', product_id: '285', branch_category_id: 'bc_barat_favorit', product_name: 'Ayam Geprek', product_description: 'Ayam goreng tepung dengan sambal geprek pedas.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png', price: 28000, stock: 30, is_available: 0 },
+    { branch_id: 'branch_bangjo_barat', product_id: '288', branch_category_id: 'bc_barat_minuman', product_name: 'Es Teh', product_description: 'Teh melati seduh dingin segar.', product_image_url: '/assets/img/iced-tea.png', price: 5000, stock: 100, is_available: 1 },
+    { branch_id: 'branch_bangjo_barat', product_id: '345', branch_category_id: 'bc_barat_snack', product_name: 'Kentang', product_description: 'Kentang goreng renyah dengan bumbu balado.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 12000, stock: 40, is_available: 1 },
+    { branch_id: 'branch_bangjo_timur', product_id: '272', branch_category_id: 'bc_timur_paket', product_name: 'Nasi Goreng', product_description: 'Nasi goreng spesial dengan bumbu khas Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 25000, stock: 75, is_available: 1 },
+    { branch_id: 'branch_bangjo_timur', product_id: '287', branch_category_id: 'bc_timur_kopi', product_name: 'Kopi Susu', product_description: 'Kopi susu gula aren racikan istimewa barista Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', price: 15000, stock: 60, is_available: 1 }
+  ],
+  branch_categories: [
+    { id: 'bc_barat_favorit', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Menu Favorit', slug: 'menu-favorit', sort_order: 1 },
+    { id: 'bc_barat_minuman', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Minuman Segar', slug: 'minuman-segar', sort_order: 2 },
+    { id: 'bc_barat_snack', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Cemilan', slug: 'cemilan', sort_order: 3 },
+    { id: 'bc_timur_paket', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_timur', name: 'Paket Hemat', slug: 'paket-hemat', sort_order: 1 },
+    { id: 'bc_timur_kopi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_timur', name: 'Kopi & Teh', slug: 'kopi-teh', sort_order: 2 }
   ],
   orders: [],
   users: [],
@@ -228,6 +235,15 @@ const db = {
         if (lowerSql.includes('from products')) {
           if (params[1]) return memoryStore.products.filter(p => String(p.category_id) === String(params[1]));
           return memoryStore.products;
+        }
+        if (lowerSql.includes('from branch_products')) {
+          if (params[0] && params[1]) return memoryStore.branch_products.filter(bp => bp.branch_id === params[0] && bp.product_id === params[1]);
+          if (params[0]) return memoryStore.branch_products.filter(bp => bp.branch_id === params[0]);
+          return memoryStore.branch_products;
+        }
+        if (lowerSql.includes('from branch_categories')) {
+          if (params[0]) return memoryStore.branch_categories.filter(bc => bc.branch_id === params[0]);
+          return memoryStore.branch_categories;
         }
         if (lowerSql.includes('from categories')) return memoryStore.categories;
         if (lowerSql.includes('from branches')) {
@@ -587,9 +603,25 @@ function initSchema(targetDb) {
     CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust_active ON promotion_redemptions(promotion_id, customer_phone) WHERE status = 'active';
     CREATE INDEX IF NOT EXISTS idx_prm_redemptions_order ON promotion_redemptions(order_id);
 
+    CREATE TABLE IF NOT EXISTS branch_categories (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      branch_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS branch_products (
       branch_id TEXT NOT NULL,
       product_id TEXT NOT NULL,
+      branch_category_id TEXT,
+      product_name TEXT,
+      product_description TEXT,
+      product_image_url TEXT,
       price REAL,
       stock INTEGER DEFAULT 100,
       is_available INTEGER DEFAULT 1,
@@ -598,7 +630,8 @@ function initSchema(targetDb) {
       updated_at TEXT DEFAULT (datetime('now')),
       PRIMARY KEY (branch_id, product_id),
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
-      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (branch_category_id) REFERENCES branch_categories(id) ON DELETE SET NULL
     );
 
     -- C1 BRAND CONSISTENCY (C1.3/C1.9): a Product -> Branch assignment is only valid when the
@@ -768,6 +801,26 @@ function initSchema(targetDb) {
   // the product_id column used for product-scoped audit rows.
   try { targetDb.exec('ALTER TABLE branch_operation_logs ADD COLUMN product_id TEXT;'); } catch (e) {}
 
+  // MASTER CATALOG ↔ BRANCH CATALOG: branch_products snapshot columns and
+  // branch_categories table. Idempotent — safe for fresh and existing databases.
+  try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN branch_category_id TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_name TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_description TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_image_url TEXT;'); } catch (e) {}
+
+  // Migrate existing branch_products: snapshot master product metadata into the new columns.
+  // This runs idempotently — only rows where product_name IS NULL are migrated.
+  try {
+    targetDb.exec(`
+      UPDATE branch_products
+      SET product_name = (SELECT name FROM products WHERE id = branch_products.product_id),
+          product_description = (SELECT description FROM products WHERE id = branch_products.product_id),
+          product_image_url = (SELECT image_url FROM products WHERE id = branch_products.product_id),
+          branch_category_id = (SELECT category_id FROM products WHERE id = branch_products.product_id)
+      WHERE product_name IS NULL
+    `);
+  } catch (e) {}
+
   seedData(targetDb);
 }
 
@@ -895,23 +948,51 @@ function seedData(targetDb) {
       `).run(p.id, brandId, p.cat, p.name, p.name.toLowerCase().replace(/ /g, '-'), p.desc, p.price, p.reg, p.img, p.img, i + 1);
     }
 
-    // Branch-scoped product assignments (branch_products)
-    // Branch A (Barat): Nasi Goreng, Ayam Geprek (unavailable), Es Teh, Kentang
-    // Branch B (Timur): Nasi Goreng, Kopi Susu
+    // BRANCH CATEGORIES: each branch owns its own category structure.
+    // Branch categories are independent from Master Categories.
+    const branchCategories = [
+      // BARAT branch categories
+      { id: 'bc_barat_favorit', brand: brandId, branch: branchBaratId, name: 'Menu Favorit', slug: 'menu-favorit', sort: 1 },
+      { id: 'bc_barat_minuman', brand: brandId, branch: branchBaratId, name: 'Minuman Segar', slug: 'minuman-segar', sort: 2 },
+      { id: 'bc_barat_snack', brand: brandId, branch: branchBaratId, name: 'Cemilan', slug: 'cemilan', sort: 3 },
+      // TIMUR branch categories
+      { id: 'bc_timur_paket', brand: brandId, branch: branchTimurId, name: 'Paket Hemat', slug: 'paket-hemat', sort: 1 },
+      { id: 'bc_timur_kopi', brand: brandId, branch: branchTimurId, name: 'Kopi & Teh', slug: 'kopi-teh', sort: 2 },
+    ];
+
+    for (const bc of branchCategories) {
+      targetDb.prepare(`
+        INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(bc.id, bc.brand, bc.branch, bc.name, bc.slug, bc.sort);
+    }
+
+    // BRANCH-SCOPED PRODUCT ASSIGNMENTS with snapshot fields and branch category.
+    // Each branch adopts a different subset and places products into its own categories.
+    //
+    // BARAT: Nasi Goreng (Menu Favorit), Ayam Geprek unavailable (Menu Favorit),
+    //        Es Teh (Minuman Segar), Kentang (Cemilan)
+    // TIMUR: Nasi Goreng (Paket Hemat), Kopi Susu (Kopi & Teh)
+    //
+    // Product 272 (Nasi Goreng) is adopted by BOTH branches into DIFFERENT categories.
+    // Product 285 (Ayam Geprek) is adopted by BARAT only.
+    // Product 287 (Kopi Susu) is adopted by TIMUR only.
+    // Product 345 (Kentang) is adopted by BARAT only.
     const branchAssignments = [
-      { branch: branchBaratId, productId: '272', price: 25000, stock: 50, available: 1 },
-      { branch: branchBaratId, productId: '285', price: 28000, stock: 30, available: 0 },
-      { branch: branchBaratId, productId: '288', price: 5000, stock: 100, available: 1 },
-      { branch: branchBaratId, productId: '345', price: 12000, stock: 40, available: 1 },
-      { branch: branchTimurId, productId: '272', price: 25000, stock: 75, available: 1 },
-      { branch: branchTimurId, productId: '287', price: 15000, stock: 60, available: 1 },
+      { branch: branchBaratId, productId: '272', catId: 'bc_barat_favorit', price: 25000, stock: 50, available: 1 },
+      { branch: branchBaratId, productId: '285', catId: 'bc_barat_favorit', price: 28000, stock: 30, available: 0 },
+      { branch: branchBaratId, productId: '288', catId: 'bc_barat_minuman', price: 5000, stock: 100, available: 1 },
+      { branch: branchBaratId, productId: '345', catId: 'bc_barat_snack', price: 12000, stock: 40, available: 1 },
+      { branch: branchTimurId, productId: '272', catId: 'bc_timur_paket', price: 25000, stock: 75, available: 1 },
+      { branch: branchTimurId, productId: '287', catId: 'bc_timur_kopi', price: 15000, stock: 60, available: 1 },
     ];
 
     for (const a of branchAssignments) {
+      const master = targetDb.prepare('SELECT name, description, image_url FROM products WHERE id = ?').get(a.productId);
       targetDb.prepare(`
-        INSERT OR IGNORE INTO branch_products (branch_id, product_id, price, stock, is_available, low_stock_threshold)
-        VALUES (?, ?, ?, ?, ?, 5)
-      `).run(a.branch, a.productId, a.price, a.stock, a.available);
+        INSERT OR IGNORE INTO branch_products (branch_id, product_id, branch_category_id, product_name, product_description, product_image_url, price, stock, is_available, low_stock_threshold)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 5)
+      `).run(a.branch, a.productId, a.catId, master?.name, master?.description, master?.image_url, a.price, a.stock, a.available);
     }
 
   }
