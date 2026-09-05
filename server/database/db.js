@@ -826,8 +826,11 @@ function initSchema(targetDb) {
     // Step 2: Create branch-owned categories for adopted products.
     // For each branch + master category combination, ensure a branch-owned category exists.
     // This maps Master Category → Branch Category deterministically.
+    // Each branch_product is updated by its own (branch_id, product_id) identity,
+    // NOT by branch_id alone — multiple products in the same branch can map to
+    // different master categories and therefore different branch categories.
     const legacyBranchProducts = targetDb.prepare(`
-      SELECT DISTINCT bp.branch_id, p.category_id as master_cat_id, p.brand_id
+      SELECT DISTINCT bp.branch_id, bp.product_id, p.category_id as master_cat_id, p.brand_id
       FROM branch_products bp
       JOIN products p ON bp.product_id = p.id
       WHERE bp.branch_category_id IS NULL AND p.category_id IS NOT NULL
@@ -853,10 +856,10 @@ function initSchema(targetDb) {
         branchCat = { id: bcId };
       }
 
-      // Link branch_products to the branch-owned category
+      // Link THIS branch_product to the branch-owned category by its exact identity.
       targetDb.prepare(
-        'UPDATE branch_products SET branch_category_id = ? WHERE branch_id = ? AND branch_category_id IS NULL'
-      ).run(branchCat.id, row.branch_id);
+        'UPDATE branch_products SET branch_category_id = ? WHERE branch_id = ? AND product_id = ? AND branch_category_id IS NULL'
+      ).run(branchCat.id, row.branch_id, row.product_id);
     }
 
     // Step 3: Establish branch selling price from master ONCE for adopted products without price.

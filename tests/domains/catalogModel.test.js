@@ -501,3 +501,297 @@ test('TEST 16 — Cross-branch adoption: same product, fully independent branch 
   assert.strictEqual(pXA.is_available, true, 'Branch A available');
   assert.strictEqual(pXB.is_available, true, 'Branch B available');
 });
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MIGRATION CATEGORY-MAPPING REGRESSION TESTS
+// Tests A-G: verify legacy migration assigns branch_category_id per product's
+// Master Category, NOT per branch_id alone.
+// ══════════════════════════════════════════════════════════════════════════════
+
+const MIG_BRAND = 'brand_test_migcat';
+const MIG_ORG = 'org_test_migcat';
+const MIG_BRANCH = 'bm_test_migcat';
+const MIG_PROD_A = 'pa_migcat';
+const MIG_PROD_B = 'pb_migcat';
+const MIG_PROD_C = 'pc_migcat';
+const MIG_CAT_MAKANAN = 'cm_migcat';
+const MIG_CAT_MINUMAN = 'cn_migcat';
+const MIG_CAT_SNACK = 'cs_migcat';
+const MIG_BRANCH_TIMUR = 'bt_migcat';
+
+function runMigration(targetDb) {
+  // Snapshot metadata
+  targetDb.exec(`
+    UPDATE branch_products
+    SET product_name = COALESCE(product_name, (SELECT name FROM products WHERE id = branch_products.product_id)),
+        product_description = COALESCE(product_description, (SELECT description FROM products WHERE id = branch_products.product_id)),
+        product_image_url = COALESCE(product_image_url, (SELECT image_url FROM products WHERE id = branch_products.product_id))
+    WHERE product_name IS NULL
+  `);
+
+  // Branch category migration — the fixed logic
+  const legacyRows = targetDb.prepare(`
+    SELECT DISTINCT bp.branch_id, bp.product_id, p.category_id as master_cat_id, p.brand_id
+    FROM branch_products bp
+    JOIN products p ON bp.product_id = p.id
+    WHERE bp.branch_category_id IS NULL AND p.category_id IS NOT NULL
+  `).all();
+
+  for (const row of legacyRows) {
+    const masterCat = targetDb.prepare('SELECT name, slug FROM categories WHERE id = ?').get(row.master_cat_id);
+    const catName = masterCat?.name || 'Lainnya';
+    const catSlug = masterCat?.slug || 'lainnya';
+    let branchCat = targetDb.prepare(
+      'SELECT id FROM branch_categories WHERE branch_id = ? AND name = ?'
+    ).get(row.branch_id, catName);
+    if (!branchCat) {
+      const bcId = `bc_mig_${row.branch_id}_${row.master_cat_id}`;
+      targetDb.prepare(`
+        INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order)
+        VALUES (?, ?, ?, ?, ?, 99)
+      `).run(bcId, row.brand_id, row.branch_id, catName, catSlug);
+      branchCat = { id: bcId };
+    }
+    targetDb.prepare(
+      'UPDATE branch_products SET branch_category_id = ? WHERE branch_id = ? AND product_id = ? AND branch_category_id IS NULL'
+    ).run(branchCat.id, row.branch_id, row.product_id);
+  }
+
+  // Price migration
+  targetDb.exec(`
+    UPDATE branch_products
+    SET price = (SELECT price FROM products WHERE id = branch_products.product_id)
+    WHERE price IS NULL
+  `);
+}
+
+test.before(() => {
+  db.prepare(`INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, 'MigCat Org', 'migcat-org')`).run(MIG_ORG);
+  db.prepare(`INSERT OR IGNORE INTO brands (id, organization_id, name, slug) VALUES (?, ?, 'MigCat Brand', 'migcat-brand')`).run(MIG_BRAND, MIG_ORG);
+  db.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug) VALUES (?, ?, 'Makanan', 'makanan')`).run(MIG_CAT_MAKANAN, MIG_BRAND);
+  db.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug) VALUES (?, ?, 'Minuman', 'minuman')`).run(MIG_CAT_MINUMAN, MIG_BRAND);
+  db.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug) VALUES (?, ?, 'Snack', 'snack')`).run(MIG_CAT_SNACK, MIG_BRAND);
+  db.prepare(`INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude) VALUES (?, ?, 'MigCat Barat', 'migcat-barat', 'Jl. A', -7.25, 112.75)`).run(MIG_BRANCH, MIG_BRAND);
+  db.prepare(`INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude) VALUES (?, ?, 'MigCat Timur', 'migcat-timur', 'Jl. B', -7.28, 112.76)`).run(MIG_BRANCH_TIMUR, MIG_BRAND);
+  db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, 'Prod A', 'pa', 10000, 1)`).run(MIG_PROD_A, MIG_BRAND, MIG_CAT_MAKANAN);
+  db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, 'Prod B', 'pb', 20000, 1)`).run(MIG_PROD_B, MIG_BRAND, MIG_CAT_MINUMAN);
+  db.prepare(`INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES (?, ?, ?, 'Prod C', 'pc', 15000, 1)`).run(MIG_PROD_C, MIG_BRAND, MIG_CAT_SNACK);
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TEST A — Multiple Master Categories in One Branch
+// Product A → Makanan, Product B → Minuman. Both NULL branch_category_id.
+// After migration: A gets Makanan branch category, B gets Minuman branch category.
+// ══════════════════════════════════════════════════════════════════════════════
+test('TEST A — Multiple Master Categories in one Branch: each product gets correct branch category', () => {
+  // Insert legacy branch_products with NULL branch_category_id
+  db.prepare('INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, is_available) VALUES (?, ?, 10, 1)').run(MIG_BRANCH, MIG_PROD_A);
+  db.prepare('INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, is_available) VALUES (?, ?, 20, 1)').run(MIG_BRANCH, MIG_PROD_B);
+
+  // Verify legacy state
+  const legA = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(MIG_BRANCH, MIG_PROD_A);
+  const legB = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(MIG_BRANCH, MIG_PROD_B);
+  assert.ok(!legA.branch_category_id || legA.branch_category_id === null, 'Product A starts with NULL branch_category_id');
+  assert.ok(!legB.branch_category_id || legB.branch_category_id === null, 'Product B starts with NULL branch_category_id');
+
+  // Run migration
+  runMigration(db);
+
+  // Verify each product got the correct branch-owned category
+  const migA = db.prepare(`
+    SELECT bp.branch_category_id, bc.name as cat_name
+    FROM branch_products bp
+    JOIN branch_categories bc ON bp.branch_category_id = bc.id
+    WHERE bp.branch_id = ? AND bp.product_id = ?
+  `).get(MIG_BRANCH, MIG_PROD_A);
+  const migB = db.prepare(`
+    SELECT bp.branch_category_id, bc.name as cat_name
+    FROM branch_products bp
+    JOIN branch_categories bc ON bp.branch_category_id = bc.id
+    WHERE bp.branch_id = ? AND bp.product_id = ?
+  `).get(MIG_BRANCH, MIG_PROD_B);
+
+  assert.ok(migA.branch_category_id, 'Product A has branch_category_id');
+  assert.ok(migB.branch_category_id, 'Product B has branch_category_id');
+  assert.strictEqual(migA.cat_name, 'Makanan', 'Product A assigned to Makanan branch category');
+  assert.strictEqual(migB.cat_name, 'Minuman', 'Product B assigned to Minuman branch category');
+  assert.notStrictEqual(migA.branch_category_id, migB.branch_category_id, 'Different master categories → different branch categories');
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TEST B — Multiple Products Same Master Category
+// Both Product A and Product B → Makanan. After migration, both get the same
+// branch-owned Makanan category (no duplicate).
+// ══════════════════════════════════════════════════════════════════════════════
+test('TEST B — Multiple products same master category: share one branch category, no duplicates', () => {
+  // Product A already migrated. Insert Product C (also Makanan) as legacy.
+  db.prepare('INSERT OR REPLACE INTO branch_products (branch_id, product_id, branch_category_id, stock, is_available) VALUES (?, ?, NULL, 15, 1)').run(MIG_BRANCH, MIG_PROD_C);
+  // Force master category to Makanan for this test
+  db.prepare('UPDATE products SET category_id = ? WHERE id = ?').run(MIG_CAT_MAKANAN, MIG_PROD_C);
+
+  runMigration(db);
+
+  const migA = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(MIG_BRANCH, MIG_PROD_A);
+  const migC = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(MIG_BRANCH, MIG_PROD_C);
+  assert.strictEqual(migA.branch_category_id, migC.branch_category_id, 'Same master category → same branch category');
+
+  // No duplicate branch categories for this branch+name
+  const catCount = db.prepare("SELECT COUNT(*) as cnt FROM branch_categories WHERE branch_id = ? AND name = 'Makanan'").get(MIG_BRANCH);
+  assert.strictEqual(catCount.cnt, 1, 'No duplicate Makanan branch category');
+
+  // Restore Product C category
+  db.prepare('UPDATE products SET category_id = ? WHERE id = ?').run(MIG_CAT_SNACK, MIG_PROD_C);
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TEST C — Cross-Branch Independence
+// Branch Barat: Product A → Makanan
+// Branch Timur: Product B → Minuman
+// After migration: Barat references Barat-owned category, Timur references Timur-owned.
+// ══════════════════════════════════════════════════════════════════════════════
+test('TEST C — Cross-Branch Independence: each branch references its own branch categories', () => {
+  db.prepare('INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, is_available) VALUES (?, ?, 10, 1)').run(MIG_BRANCH, MIG_PROD_A);
+  db.prepare('INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, is_available) VALUES (?, ?, 20, 1)').run(MIG_BRANCH_TIMUR, MIG_PROD_B);
+
+  runMigration(db);
+
+  const baratProdA = db.prepare(`
+    SELECT bp.branch_category_id, bc.branch_id as cat_branch
+    FROM branch_products bp
+    JOIN branch_categories bc ON bp.branch_category_id = bc.id
+    WHERE bp.branch_id = ? AND bp.product_id = ?
+  `).get(MIG_BRANCH, MIG_PROD_A);
+
+  const timurProdB = db.prepare(`
+    SELECT bp.branch_category_id, bc.branch_id as cat_branch
+    FROM branch_products bp
+    JOIN branch_categories bc ON bp.branch_category_id = bc.id
+    WHERE bp.branch_id = ? AND bp.product_id = ?
+  `).get(MIG_BRANCH_TIMUR, MIG_PROD_B);
+
+  assert.ok(baratProdA.branch_category_id, 'Barat Product A has branch_category_id');
+  assert.ok(timurProdB.branch_category_id, 'Timur Product B has branch_category_id');
+  assert.strictEqual(baratProdA.cat_branch, MIG_BRANCH, 'Barat category belongs to Barat');
+  assert.strictEqual(timurProdB.cat_branch, MIG_BRANCH_TIMUR, 'Timur category belongs to Timur');
+  assert.notStrictEqual(baratProdA.branch_category_id, timurProdB.branch_category_id, 'Different branches have different branch category FKs');
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TEST D — Preserve Valid Assignment
+// If branch_product.branch_category_id is already non-null, migration must NOT change it.
+// ══════════════════════════════════════════════════════════════════════════════
+test('TEST D — Preserve valid assignment: existing branch_category_id is not overwritten', () => {
+  // Ensure Product A already has a valid branch_category_id from TEST A/B
+  const existing = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(MIG_BRANCH, MIG_PROD_A);
+  assert.ok(existing.branch_category_id, 'Product A has existing branch_category_id');
+
+  const originalCatId = existing.branch_category_id;
+
+  // Run migration again
+  runMigration(db);
+
+  const after = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(MIG_BRANCH, MIG_PROD_A);
+  assert.strictEqual(after.branch_category_id, originalCatId, 'Existing branch_category_id preserved after migration');
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TEST E — Idempotency
+// Run migration twice. No duplicates, no reassignment.
+// ══════════════════════════════════════════════════════════════════════════════
+test('TEST E — Idempotency: running migration twice produces same result', () => {
+  const beforeA = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(MIG_BRANCH, MIG_PROD_A);
+  const beforeB = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(MIG_BRANCH, MIG_PROD_B);
+
+  // Run migration twice
+  runMigration(db);
+  runMigration(db);
+
+  const afterA = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(MIG_BRANCH, MIG_PROD_A);
+  const afterB = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(MIG_BRANCH, MIG_PROD_B);
+
+  assert.strictEqual(afterA.branch_category_id, beforeA.branch_category_id, 'Product A category unchanged after second migration');
+  assert.strictEqual(afterB.branch_category_id, beforeB.branch_category_id, 'Product B category unchanged after second migration');
+
+  // No duplicate categories
+  const catCount = db.prepare("SELECT COUNT(*) as cnt FROM branch_categories WHERE branch_id = ? AND name = 'Makanan'").get(MIG_BRANCH);
+  assert.strictEqual(catCount.cnt, 1, 'No duplicate Makanan category after second migration');
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TEST F — No Master Category ID Leak
+// branch_products.branch_category_id must reference branch_categories.id,
+// NEVER products.category_id.
+// ══════════════════════════════════════════════════════════════════════════════
+test('TEST F — No Master Category ID Leak: branch_category_id references branch_categories, not products', () => {
+  const rows = db.prepare(`
+    SELECT bp.branch_id, bp.product_id, bp.branch_category_id,
+           p.category_id as master_cat_id
+    FROM branch_products bp
+    JOIN products p ON bp.product_id = p.id
+    WHERE bp.branch_id IN (?, ?)
+  `).all(MIG_BRANCH, MIG_BRANCH_TIMUR);
+
+  for (const row of rows) {
+    if (row.branch_category_id) {
+      const bc = db.prepare('SELECT id FROM branch_categories WHERE id = ?').get(row.branch_category_id);
+      assert.ok(bc, `branch_category_id ${row.branch_category_id} references a valid branch_categories row`);
+      assert.notStrictEqual(row.branch_category_id, row.master_cat_id, `branch_category_id ${row.branch_category_id} is NOT the master category_id ${row.master_cat_id}`);
+    }
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TEST G — Mixed Legacy Data
+// One Branch with 3 legacy products from 3 different Master Categories.
+// All branch_category_id NULL. After migration, each maps to correct category.
+// This test would FAIL if the old branch_id-only UPDATE were used.
+// ══════════════════════════════════════════════════════════════════════════════
+test('TEST G — Mixed Legacy Data: 3 products, 3 master categories, each gets correct branch category', () => {
+  const branch = 'bm_mixed';
+  db.prepare(`INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude) VALUES (?, ?, 'Mixed Branch', 'mixed', 'Jl. M', -7.3, 112.7)`).run(branch, MIG_BRAND);
+
+  // Insert 3 legacy products, all NULL branch_category_id
+  db.prepare('INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, is_available) VALUES (?, ?, 10, 1)').run(branch, MIG_PROD_A);
+  db.prepare('INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, is_available) VALUES (?, ?, 20, 1)').run(branch, MIG_PROD_B);
+  db.prepare('INSERT OR REPLACE INTO branch_products (branch_id, product_id, stock, is_available) VALUES (?, ?, 15, 1)').run(branch, MIG_PROD_C);
+
+  // Verify legacy state
+  for (const pid of [MIG_PROD_A, MIG_PROD_B, MIG_PROD_C]) {
+    const leg = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch, pid);
+    assert.ok(!leg.branch_category_id, `Product ${pid} starts with NULL branch_category_id`);
+  }
+
+  runMigration(db);
+
+  // Product A → Makanan
+  const migA = db.prepare(`
+    SELECT bc.name as cat_name FROM branch_products bp
+    JOIN branch_categories bc ON bp.branch_category_id = bc.id
+    WHERE bp.branch_id = ? AND bp.product_id = ?
+  `).get(branch, MIG_PROD_A);
+  assert.strictEqual(migA.cat_name, 'Makanan', 'Mixed: Product A → Makanan');
+
+  // Product B → Minuman
+  const migB = db.prepare(`
+    SELECT bc.name as cat_name FROM branch_products bp
+    JOIN branch_categories bc ON bp.branch_category_id = bc.id
+    WHERE bp.branch_id = ? AND bp.product_id = ?
+  `).get(branch, MIG_PROD_B);
+  assert.strictEqual(migB.cat_name, 'Minuman', 'Mixed: Product B → Minuman');
+
+  // Product C → Snack
+  const migC = db.prepare(`
+    SELECT bc.name as cat_name FROM branch_products bp
+    JOIN branch_categories bc ON bp.branch_category_id = bc.id
+    WHERE bp.branch_id = ? AND bp.product_id = ?
+  `).get(branch, MIG_PROD_C);
+  assert.strictEqual(migC.cat_name, 'Snack', 'Mixed: Product C → Snack');
+
+  // All three are different
+  const allIds = [migA, migB, migC].map(r => {
+    const row = db.prepare('SELECT bp.branch_category_id FROM branch_products bp WHERE bp.branch_id = ? AND bp.product_id = ?').get(branch, r.cat_name === 'Makanan' ? MIG_PROD_A : r.cat_name === 'Minuman' ? MIG_PROD_B : MIG_PROD_C);
+    return row.branch_category_id;
+  });
+  const uniqueIds = new Set(allIds);
+  assert.strictEqual(uniqueIds.size, 3, 'All 3 products have different branch category IDs (3 different master categories)');
+});
