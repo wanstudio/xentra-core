@@ -106,6 +106,51 @@ const memoryStore = {
       price_per_km: 2500.0,
       max_radius_km: 10.0,
       promo_config: JSON.stringify({ enabled: true, target: 40000, discount: 5000 })
+    },
+    {
+      id: 'branch_bangjo_pusat',
+      brand_id: 'brand_bangjo',
+      name: 'Bangjo Surabaya Pusat',
+      slug: 'surabaya-pusat',
+      address_text: 'Jl. Basuki Rahmat No. 25, Surabaya Pusat',
+      latitude: -7.2600,
+      longitude: 112.7400,
+      phone: '081234567892',
+      is_active: 1,
+      free_delivery_km: 2.5,
+      price_per_km: 3000.0,
+      max_radius_km: 10.0,
+      promo_config: JSON.stringify({ enabled: true, target: 45000, discount: 5000 })
+    },
+    {
+      id: 'branch_bangjo_utara',
+      brand_id: 'brand_bangjo',
+      name: 'Bangjo Surabaya Utara',
+      slug: 'surabaya-utara',
+      address_text: 'Jl. Perak Timur No. 40, Surabaya Utara',
+      latitude: -7.2300,
+      longitude: 112.7350,
+      phone: '081234567893',
+      is_active: 1,
+      free_delivery_km: 2.0,
+      price_per_km: 3000.0,
+      max_radius_km: 12.0,
+      promo_config: JSON.stringify({ enabled: true, target: 50000, discount: 8000 })
+    },
+    {
+      id: 'branch_bangjo_selatan',
+      brand_id: 'brand_bangjo',
+      name: 'Bangjo Surabaya Selatan',
+      slug: 'surabaya-selatan',
+      address_text: 'Jl. Ahmad Yani No. 102, Surabaya Selatan',
+      latitude: -7.3150,
+      longitude: 112.7300,
+      phone: '081234567894',
+      is_active: 1,
+      free_delivery_km: 3.0,
+      price_per_km: 2500.0,
+      max_radius_km: 15.0,
+      promo_config: JSON.stringify({ enabled: true, target: 40000, discount: 5000 })
     }
   ],
   categories: [
@@ -118,22 +163,51 @@ const memoryStore = {
     { id: 285, brand_id: 'brand_bangjo', category_id: 34, name: 'Ayam Geprek', price: 28000, regular_price: 28000, description: 'Ayam goreng tepung dengan sambal geprek pedas.', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png', is_active: 1, sort_order: 2 },
     { id: 288, brand_id: 'brand_bangjo', category_id: 22, name: 'Es Teh', price: 5000, regular_price: 5000, description: 'Teh melati seduh dingin segar.', image: '/assets/img/iced-tea.png', is_active: 1, sort_order: 3 },
     { id: 287, brand_id: 'brand_bangjo', category_id: 22, name: 'Kopi Susu', price: 15000, regular_price: 15000, description: 'Kopi susu gula aren racikan istimewa barista Bangjo.', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', is_active: 1, sort_order: 4 },
-    { id: 345, brand_id: 'brand_bangjo', category_id: 36, name: 'Kentang', price: 12000, regular_price: 12000, description: 'Kentang goreng renyah dengan bumbu balado.', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', is_active: 1, sort_order: 5 }
+    { id: 345, brand_id: 'brand_bangjo', category_id: 36, name: 'Kentang Goreng', price: 12000, regular_price: 12000, description: 'Kentang goreng renyah dengan bumbu balado.', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', is_active: 1, sort_order: 5 },
+    { id: 286, brand_id: 'brand_bangjo', category_id: 34, name: 'Ayam Bakar', price: 28000, regular_price: 32000, description: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', is_active: 1, sort_order: 6 },
+    { id: 401, brand_id: 'brand_bangjo', category_id: 22, name: 'Es Teh Manis', price: 6000, regular_price: 6000, description: 'Teh melati seduh dingin manis segar.', image: '/assets/img/iced-tea.png', is_active: 1, sort_order: 7 },
+    { id: 346, brand_id: 'brand_bangjo', category_id: 34, name: 'Mie Goreng Bangjo', price: 22000, regular_price: 22000, description: 'Mie goreng spesial bumbu rempah pilihan Bangjo.', image: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', is_active: 1, sort_order: 8 }
   ],
   branch_products: [
+    // Barat (4 products)
     { branch_id: 'branch_bangjo_barat', product_id: '272', branch_category_id: 'bc_barat_favorit', product_name: 'Nasi Goreng', product_description: 'Nasi goreng spesial dengan bumbu khas Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 25000, stock: 50, is_available: 1 },
     { branch_id: 'branch_bangjo_barat', product_id: '285', branch_category_id: 'bc_barat_favorit', product_name: 'Ayam Geprek', product_description: 'Ayam goreng tepung dengan sambal geprek pedas.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png', price: 28000, stock: 30, is_available: 0 },
     { branch_id: 'branch_bangjo_barat', product_id: '288', branch_category_id: 'bc_barat_minuman', product_name: 'Es Teh', product_description: 'Teh melati seduh dingin segar.', product_image_url: '/assets/img/iced-tea.png', price: 5000, stock: 100, is_available: 1 },
-    { branch_id: 'branch_bangjo_barat', product_id: '345', branch_category_id: 'bc_barat_snack', product_name: 'Kentang', product_description: 'Kentang goreng renyah dengan bumbu balado.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 12000, stock: 40, is_available: 1 },
+    { branch_id: 'branch_bangjo_barat', product_id: '345', branch_category_id: 'bc_barat_snack', product_name: 'Kentang Goreng', product_description: 'Kentang goreng renyah dengan bumbu balado.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 12000, stock: 40, is_available: 1 },
+    // Timur (2 products)
     { branch_id: 'branch_bangjo_timur', product_id: '272', branch_category_id: 'bc_timur_paket', product_name: 'Nasi Goreng', product_description: 'Nasi goreng spesial dengan bumbu khas Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 25000, stock: 75, is_available: 1 },
-    { branch_id: 'branch_bangjo_timur', product_id: '287', branch_category_id: 'bc_timur_kopi', product_name: 'Kopi Susu', product_description: 'Kopi susu gula aren racikan istimewa barista Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', price: 15000, stock: 60, is_available: 1 }
+    { branch_id: 'branch_bangjo_timur', product_id: '287', branch_category_id: 'bc_timur_kopi', product_name: 'Kopi Susu', product_description: 'Kopi susu gula aren racikan istimewa barista Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', price: 15000, stock: 60, is_available: 1 },
+    // Pusat (3 products)
+    { branch_id: 'branch_bangjo_pusat', product_id: '346', branch_category_id: 'bc_pusat_rekomendasi', product_name: 'Mie Goreng Bangjo', product_description: 'Mie goreng spesial bumbu rempah pilihan Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 22000, stock: 40, is_available: 1 },
+    { branch_id: 'branch_bangjo_pusat', product_id: '286', branch_category_id: 'bc_pusat_rekomendasi', product_name: 'Ayam Bakar', product_description: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 28000, stock: 25, is_available: 1 },
+    { branch_id: 'branch_bangjo_pusat', product_id: '345', branch_category_id: 'bc_pusat_snack', product_name: 'Kentang Goreng', product_description: 'Kentang goreng renyah dengan bumbu balado.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 12000, stock: 50, is_available: 1 },
+    // Utara (3 products)
+    { branch_id: 'branch_bangjo_utara', product_id: '272', branch_category_id: 'bc_utara_bestseller', product_name: 'Nasi Goreng', product_description: 'Nasi goreng spesial dengan bumbu khas Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 26000, stock: 60, is_available: 1 },
+    { branch_id: 'branch_bangjo_utara', product_id: '286', branch_category_id: 'bc_utara_bestseller', product_name: 'Ayam Bakar', product_description: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 30000, stock: 20, is_available: 1 },
+    { branch_id: 'branch_bangjo_utara', product_id: '401', branch_category_id: 'bc_utara_minuman', product_name: 'Es Teh Manis', product_description: 'Teh melati seduh dingin manis segar.', product_image_url: '/assets/img/iced-tea.png', price: 6000, stock: 80, is_available: 1 },
+    // Selatan (4 products)
+    { branch_id: 'branch_bangjo_selatan', product_id: '272', branch_category_id: 'bc_selatan_makan', product_name: 'Nasi Goreng', product_description: 'Nasi goreng spesial dengan bumbu khas Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 25000, stock: 45, is_available: 1 },
+    { branch_id: 'branch_bangjo_selatan', product_id: '346', branch_category_id: 'bc_selatan_makan', product_name: 'Mie Goreng Bangjo', product_description: 'Mie goreng spesial bumbu rempah pilihan Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 22000, stock: 35, is_available: 1 },
+    { branch_id: 'branch_bangjo_selatan', product_id: '287', branch_category_id: 'bc_selatan_kopi', product_name: 'Kopi Susu', product_description: 'Kopi susu gula aren racikan istimewa barista Bangjo.', product_image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', price: 16000, stock: 50, is_available: 1 },
+    { branch_id: 'branch_bangjo_selatan', product_id: '288', branch_category_id: 'bc_selatan_kopi', product_name: 'Es Teh', product_description: 'Teh melati seduh dingin segar.', product_image_url: '/assets/img/iced-tea.png', price: 5000, stock: 90, is_available: 1 }
   ],
   branch_categories: [
+    // Barat
     { id: 'bc_barat_favorit', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Menu Favorit', slug: 'menu-favorit', sort_order: 1 },
     { id: 'bc_barat_minuman', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Minuman Segar', slug: 'minuman-segar', sort_order: 2 },
     { id: 'bc_barat_snack', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Cemilan', slug: 'cemilan', sort_order: 3 },
+    // Timur
     { id: 'bc_timur_paket', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_timur', name: 'Paket Hemat', slug: 'paket-hemat', sort_order: 1 },
-    { id: 'bc_timur_kopi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_timur', name: 'Kopi & Teh', slug: 'kopi-teh', sort_order: 2 }
+    { id: 'bc_timur_kopi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_timur', name: 'Kopi & Teh', slug: 'kopi-teh', sort_order: 2 },
+    // Pusat
+    { id: 'bc_pusat_rekomendasi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_pusat', name: 'Rekomendasi Chef', slug: 'rekomendasi-chef', sort_order: 1 },
+    { id: 'bc_pusat_snack', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_pusat', name: 'Kudapan', slug: 'kudapan', sort_order: 2 },
+    // Utara
+    { id: 'bc_utara_bestseller', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_utara', name: 'Best Seller', slug: 'best-seller', sort_order: 1 },
+    { id: 'bc_utara_minuman', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_utara', name: 'Minuman Segar', slug: 'minuman-segar', sort_order: 2 },
+    // Selatan
+    { id: 'bc_selatan_makan', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_selatan', name: 'Menu Utama', slug: 'menu-utama', sort_order: 1 },
+    { id: 'bc_selatan_kopi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_selatan', name: 'Kedai Kopi & Teh', slug: 'kedai-kopi-teh', sort_order: 2 }
   ],
   orders: [],
   users: [],
@@ -931,88 +1005,144 @@ function seedData(targetDb) {
   try {
     branch = targetDb.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brandId);
   } catch (e) {}
-  const branchBaratId = branch?.id || 'branch_bangjo_barat';
+  const branchBaratId = 'branch_bangjo_barat';
   const branchTimurId = 'branch_bangjo_timur';
+  const branchPusatId = 'branch_bangjo_pusat';
+  const branchUtaraId = 'branch_bangjo_utara';
+  const branchSelatanId = 'branch_bangjo_selatan';
 
-  // Branch A: Bangjo Surabaya Barat
-  targetDb.prepare(`
-    INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-  `).run(
-    branchBaratId,
-    brandId,
-    'Bangjo Surabaya Barat',
-    'surabaya-barat',
-    'Jl. Mayjen Sungkono No. 88, Surabaya Barat',
-    -7.2912,
-    112.7154,
-    '081234567890'
-  );
-
-  targetDb.prepare(`
-    INSERT OR IGNORE INTO branch_delivery_settings (id, branch_id, max_radius_km, free_delivery_km, price_per_km, min_order_amount, promo_delivery_discount, promo_min_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run('bds_barat_' + branchBaratId, branchBaratId, 12.0, 0, 3000.0, 15000.0, 5000.0, 50000.0);
-
-  // Branch B: Bangjo Surabaya Timur (second branch for branch-scoped catalog demo)
-  targetDb.prepare(`
-    INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-  `).run(
-    branchTimurId,
-    brandId,
-    'Bangjo Surabaya Timur',
-    'surabaya-timur',
-    'Jl. Dharmawangsa No. 12, Surabaya Timur',
-    -7.2845,
-    112.7560,
-    '081234567891'
-  );
-
-  targetDb.prepare(`
-    INSERT OR IGNORE INTO branch_delivery_settings (id, branch_id, max_radius_km, free_delivery_km, price_per_km, min_order_amount, promo_delivery_discount, promo_min_order)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run('bds_timur_' + branchTimurId, branchTimurId, 10.0, 3.0, 2500.0, 15000.0, 3000.0, 40000.0);
-
-  // P1 DATA-LOSS GUARD: NEVER run destructive DELETE statements on startup in seedData
-  const catCount = targetDb.prepare('SELECT COUNT(*) as cnt FROM categories WHERE brand_id = ?').get(brandId)?.cnt || 0;
-  if (catCount === 0) {
-    const catMakanan = '34';
-    const catMinuman = '22';
-    const catSnack = '36';
-
-    targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catMakanan, brandId, 'Makanan', 'makanan', 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', 1);
-    targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catMinuman, brandId, 'Minuman', 'minuman', 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', 2);
-    targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catSnack, brandId, 'Snack', 'snack', 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', 3);
-
-    const products = [
-      { id: '272', cat: catMakanan, name: 'Nasi Goreng', price: 25000, reg: 25000, desc: 'Nasi goreng spesial dengan bumbu khas Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-      { id: '285', cat: catMakanan, name: 'Ayam Geprek', price: 28000, reg: 28000, desc: 'Ayam goreng tepung dengan sambal geprek pedas.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
-      { id: '288', cat: catMinuman, name: 'Es Teh', price: 5000, reg: 5000, desc: 'Teh melati seduh dingin segar.', img: '/assets/img/iced-tea.png' },
-      { id: '287', cat: catMinuman, name: 'Kopi Susu', price: 15000, reg: 15000, desc: 'Kopi susu gula aren racikan istimewa barista Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-      { id: '345', cat: catSnack, name: 'Kentang Goreng', price: 12000, reg: 12000, desc: 'Kentang goreng renyah dengan bumbu balado.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-    ];
-
-    for (let i = 0; i < products.length; i++) {
-      const p = products[i];
-      targetDb.prepare(`
-        INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(p.id, brandId, p.cat, p.name, p.name.toLowerCase().replace(/ /g, '-'), p.desc, p.price, p.reg, p.img, p.img, i + 1);
+  const demoBranches = [
+    {
+      id: branchBaratId,
+      name: 'Bangjo Surabaya Barat',
+      slug: 'surabaya-barat',
+      address: 'Jl. Mayjen Sungkono No. 88, Surabaya Barat',
+      lat: -7.2912,
+      lng: 112.7154,
+      phone: '081234567890',
+      bds: { id: 'bds_barat_' + branchBaratId, max_radius: 12.0, free_km: 0, price_km: 3000.0, min_order: 15000.0, promo_discount: 5000.0, promo_min: 50000.0 }
+    },
+    {
+      id: branchTimurId,
+      name: 'Bangjo Surabaya Timur',
+      slug: 'surabaya-timur',
+      address: 'Jl. Dharmawangsa No. 12, Surabaya Timur',
+      lat: -7.2845,
+      lng: 112.7560,
+      phone: '081234567891',
+      bds: { id: 'bds_timur_' + branchTimurId, max_radius: 10.0, free_km: 3.0, price_km: 2500.0, min_order: 15000.0, promo_discount: 3000.0, promo_min: 40000.0 }
+    },
+    {
+      id: branchPusatId,
+      name: 'Bangjo Surabaya Pusat',
+      slug: 'surabaya-pusat',
+      address: 'Jl. Basuki Rahmat No. 25, Surabaya Pusat',
+      lat: -7.2600,
+      lng: 112.7400,
+      phone: '081234567892',
+      bds: { id: 'bds_pusat_' + branchPusatId, max_radius: 10.0, free_km: 2.5, price_km: 3000.0, min_order: 15000.0, promo_discount: 5000.0, promo_min: 45000.0 }
+    },
+    {
+      id: branchUtaraId,
+      name: 'Bangjo Surabaya Utara',
+      slug: 'surabaya-utara',
+      address: 'Jl. Perak Timur No. 40, Surabaya Utara',
+      lat: -7.2300,
+      lng: 112.7350,
+      phone: '081234567893',
+      bds: { id: 'bds_utara_' + branchUtaraId, max_radius: 12.0, free_km: 2.0, price_km: 3000.0, min_order: 15000.0, promo_discount: 4000.0, promo_min: 50000.0 }
+    },
+    {
+      id: branchSelatanId,
+      name: 'Bangjo Surabaya Selatan',
+      slug: 'surabaya-selatan',
+      address: 'Jl. Ahmad Yani No. 102, Surabaya Selatan',
+      lat: -7.3150,
+      lng: 112.7300,
+      phone: '081234567894',
+      bds: { id: 'bds_selatan_' + branchSelatanId, max_radius: 15.0, free_km: 3.0, price_km: 2500.0, min_order: 15000.0, promo_discount: 5000.0, promo_min: 40000.0 }
     }
+  ];
+
+  for (const b of demoBranches) {
+    targetDb.prepare(`
+      INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+    `).run(b.id, brandId, b.name, b.slug, b.address, b.lat, b.lng, b.phone);
+
+    targetDb.prepare(`
+      INSERT OR IGNORE INTO branch_delivery_settings (id, branch_id, max_radius_km, free_delivery_km, price_per_km, min_order_amount, promo_delivery_discount, promo_min_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(b.bds.id, b.id, b.bds.max_radius, b.bds.free_km, b.bds.price_km, b.bds.min_order, b.bds.promo_discount, b.bds.promo_min);
+  }
+
+  // Safe cleanup of legacy demo branches for brandId that have 0 orders
+  // and are not part of the 5 demo branches or test fixtures
+  try {
+    const targetBranchIds = demoBranches.map(b => b.id);
+    const existingBrandBranches = targetDb.prepare('SELECT id FROM branches WHERE brand_id = ?').all(brandId);
+    for (const eb of existingBrandBranches) {
+      if (!targetBranchIds.includes(eb.id)) {
+        // Only clean up if it's a legacy demo branch (e.g. branch_17*, branch_b1_*, branch_c1_*) and has NO orders
+        if (/^branch_(17\d+|b1_|c1_|demo)/.test(eb.id)) {
+          const orderCount = targetDb.prepare('SELECT count(*) as c FROM orders WHERE branch_id = ?').get(eb.id)?.c || 0;
+          if (orderCount === 0) {
+            targetDb.prepare('DELETE FROM branches WHERE id = ?').run(eb.id);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[db] Safe branch cleanup skipped:', e.message);
+  }
+
+  // MASTER CATEGORIES & PRODUCTS (Superset for all branches)
+  const catMakanan = '34';
+  const catMinuman = '22';
+  const catSnack = '36';
+
+  targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catMakanan, brandId, 'Makanan', 'makanan', 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png', 1);
+  targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catMinuman, brandId, 'Minuman', 'minuman', 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', 2);
+  targetDb.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug, image_url, image, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(catSnack, brandId, 'Snack', 'snack', 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', 'https://app.mybangjo.com/wp-content/uploads/2026/08/New-Project.png', 3);
+
+  const masterProducts = [
+    { id: '272', cat: catMakanan, name: 'Nasi Goreng', price: 25000, reg: 25000, desc: 'Nasi goreng spesial dengan bumbu khas Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+    { id: '285', cat: catMakanan, name: 'Ayam Geprek', price: 28000, reg: 28000, desc: 'Ayam goreng tepung dengan sambal geprek pedas.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
+    { id: '288', cat: catMinuman, name: 'Es Teh', price: 5000, reg: 5000, desc: 'Teh melati seduh dingin segar.', img: '/assets/img/iced-tea.png' },
+    { id: '287', cat: catMinuman, name: 'Kopi Susu', price: 15000, reg: 15000, desc: 'Kopi susu gula aren racikan istimewa barista Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
+    { id: '345', cat: catSnack, name: 'Kentang Goreng', price: 12000, reg: 12000, desc: 'Kentang goreng renyah dengan bumbu balado.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+    { id: '286', cat: catMakanan, name: 'Ayam Bakar', price: 28000, reg: 32000, desc: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
+    { id: '401', cat: catMinuman, name: 'Es Teh Manis', price: 6000, reg: 6000, desc: 'Teh melati seduh dingin manis segar.', img: '/assets/img/iced-tea.png' },
+    { id: '346', cat: catMakanan, name: 'Mie Goreng Bangjo', price: 22000, reg: 22000, desc: 'Mie goreng spesial bumbu rempah pilihan Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+  ];
+
+  for (let i = 0; i < masterProducts.length; i++) {
+    const p = masterProducts[i];
+    targetDb.prepare(`
+      INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(p.id, brandId, p.cat, p.name, p.name.toLowerCase().replace(/ /g, '-'), p.desc, p.price, p.reg, p.img, p.img, i + 1);
   }
 
   // BRANCH CATEGORIES: each branch owns its own category structure.
   // Branch categories are independent from Master Categories.
-  // We ensure these demo categories exist for BARAT and TIMUR.
   const branchCategories = [
-    // BARAT branch categories
+    // Barat
     { id: 'bc_barat_favorit', brand: brandId, branch: branchBaratId, name: 'Menu Favorit', slug: 'menu-favorit', sort: 1 },
     { id: 'bc_barat_minuman', brand: brandId, branch: branchBaratId, name: 'Minuman Segar', slug: 'minuman-segar', sort: 2 },
     { id: 'bc_barat_snack', brand: brandId, branch: branchBaratId, name: 'Cemilan', slug: 'cemilan', sort: 3 },
-    // TIMUR branch categories
+    // Timur
     { id: 'bc_timur_paket', brand: brandId, branch: branchTimurId, name: 'Paket Hemat', slug: 'paket-hemat', sort: 1 },
     { id: 'bc_timur_kopi', brand: brandId, branch: branchTimurId, name: 'Kopi & Teh', slug: 'kopi-teh', sort: 2 },
+    // Pusat
+    { id: 'bc_pusat_rekomendasi', brand: brandId, branch: branchPusatId, name: 'Rekomendasi Chef', slug: 'rekomendasi-chef', sort: 1 },
+    { id: 'bc_pusat_snack', brand: brandId, branch: branchPusatId, name: 'Kudapan', slug: 'kudapan', sort: 2 },
+    // Utara
+    { id: 'bc_utara_bestseller', brand: brandId, branch: branchUtaraId, name: 'Best Seller', slug: 'best-seller', sort: 1 },
+    { id: 'bc_utara_minuman', brand: brandId, branch: branchUtaraId, name: 'Minuman Segar', slug: 'minuman-segar', sort: 2 },
+    // Selatan
+    { id: 'bc_selatan_makan', brand: brandId, branch: branchSelatanId, name: 'Menu Utama', slug: 'menu-utama', sort: 1 },
+    { id: 'bc_selatan_kopi', brand: brandId, branch: branchSelatanId, name: 'Kedai Kopi & Teh', slug: 'kedai-kopi-teh', sort: 2 },
   ];
 
   for (const bc of branchCategories) {
@@ -1024,22 +1154,28 @@ function seedData(targetDb) {
 
   // BRANCH-SCOPED PRODUCT ASSIGNMENTS with snapshot fields and branch category.
   // Each branch adopts a different subset and places products into its own categories.
-  //
-  // BARAT: Nasi Goreng (Menu Favorit), Ayam Geprek unavailable (Menu Favorit),
-  //        Es Teh (Minuman Segar), Kentang Goreng (Cemilan)
-  // TIMUR: Nasi Goreng (Paket Hemat), Kopi Susu (Kopi & Teh)
-  //
-  // Product 272 (Nasi Goreng) is adopted by BOTH branches into DIFFERENT categories, stocks, prices.
-  // Product 285 (Ayam Geprek) is adopted by BARAT only.
-  // Product 287 (Kopi Susu) is adopted by TIMUR only.
-  // Product 345 (Kentang Goreng) is adopted by BARAT only.
   const branchAssignments = [
+    // Barat (4 products)
     { branch: branchBaratId, productId: '272', catId: 'bc_barat_favorit', name: 'Nasi Goreng', desc: 'Nasi goreng spesial dengan bumbu khas Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 25000, stock: 50, available: 1 },
     { branch: branchBaratId, productId: '285', catId: 'bc_barat_favorit', name: 'Ayam Geprek', desc: 'Ayam goreng tepung dengan sambal geprek pedas.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png', price: 28000, stock: 30, available: 0 },
     { branch: branchBaratId, productId: '288', catId: 'bc_barat_minuman', name: 'Es Teh', desc: 'Teh melati seduh dingin segar.', img: '/assets/img/iced-tea.png', price: 5000, stock: 100, available: 1 },
     { branch: branchBaratId, productId: '345', catId: 'bc_barat_snack', name: 'Kentang Goreng', desc: 'Kentang goreng renyah dengan bumbu balado.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 12000, stock: 40, available: 1 },
+    // Timur (2 products)
     { branch: branchTimurId, productId: '272', catId: 'bc_timur_paket', name: 'Nasi Goreng', desc: 'Nasi goreng spesial dengan bumbu khas Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 25000, stock: 75, available: 1 },
     { branch: branchTimurId, productId: '287', catId: 'bc_timur_kopi', name: 'Kopi Susu', desc: 'Kopi susu gula aren racikan istimewa barista Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', price: 15000, stock: 60, available: 1 },
+    // Pusat (3 products)
+    { branch: branchPusatId, productId: '346', catId: 'bc_pusat_rekomendasi', name: 'Mie Goreng Bangjo', desc: 'Mie goreng spesial bumbu rempah pilihan Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 22000, stock: 40, available: 1 },
+    { branch: branchPusatId, productId: '286', catId: 'bc_pusat_rekomendasi', name: 'Ayam Bakar', desc: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 28000, stock: 25, available: 1 },
+    { branch: branchPusatId, productId: '345', catId: 'bc_pusat_snack', name: 'Kentang Goreng', desc: 'Kentang goreng renyah dengan bumbu balado.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 12000, stock: 50, available: 1 },
+    // Utara (3 products)
+    { branch: branchUtaraId, productId: '272', catId: 'bc_utara_bestseller', name: 'Nasi Goreng', desc: 'Nasi goreng spesial dengan bumbu khas Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 26000, stock: 60, available: 1 },
+    { branch: branchUtaraId, productId: '286', catId: 'bc_utara_bestseller', name: 'Ayam Bakar', desc: 'Ayam bakar rempah lumuran bumbu khas Bangjo empuk sampai ke tulang.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 30000, stock: 20, available: 1 },
+    { branch: branchUtaraId, productId: '401', catId: 'bc_utara_minuman', name: 'Es Teh Manis', desc: 'Teh melati seduh dingin manis segar.', img: '/assets/img/iced-tea.png', price: 6000, stock: 80, available: 1 },
+    // Selatan (4 products)
+    { branch: branchSelatanId, productId: '272', catId: 'bc_selatan_makan', name: 'Nasi Goreng', desc: 'Nasi goreng spesial dengan bumbu khas Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 25000, stock: 45, available: 1 },
+    { branch: branchSelatanId, productId: '346', catId: 'bc_selatan_makan', name: 'Mie Goreng Bangjo', desc: 'Mie goreng spesial bumbu rempah pilihan Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 22000, stock: 35, available: 1 },
+    { branch: branchSelatanId, productId: '287', catId: 'bc_selatan_kopi', name: 'Kopi Susu', desc: 'Kopi susu gula aren racikan istimewa barista Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', price: 16000, stock: 50, available: 1 },
+    { branch: branchSelatanId, productId: '288', catId: 'bc_selatan_kopi', name: 'Es Teh', desc: 'Teh melati seduh dingin segar.', img: '/assets/img/iced-tea.png', price: 5000, stock: 90, available: 1 }
   ];
 
   for (const a of branchAssignments) {

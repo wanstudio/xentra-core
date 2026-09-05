@@ -353,7 +353,15 @@ test('C3 Canonical consistency: matcher SQL candidates are exactly the branch-ga
 
   // Closed / inactive / delivery-disabled / other-brand branches must never be
   // SQL candidates (they are exactly what _resolveBranch would reject).
-  assert.deepStrictEqual(candidates.sort(), ['branch_bangjo_barat', 'branch_bangjo_timur', 'branch_c3_no_pickup', 'branch_c3_timur'].sort());
+  assert.deepStrictEqual(candidates.sort(), [
+    'branch_bangjo_barat',
+    'branch_bangjo_pusat',
+    'branch_bangjo_selatan',
+    'branch_bangjo_timur',
+    'branch_bangjo_utara',
+    'branch_c3_no_pickup',
+    'branch_c3_timur'
+  ].sort());
   for (const excluded of ['branch_c3_closed', 'branch_c3_inactive', 'branch_c3_no_delivery', 'branch_c3_other']) {
     assert.ok(!candidates.includes(excluded), excluded + ' must not be a candidate');
   }
