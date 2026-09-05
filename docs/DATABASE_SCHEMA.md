@@ -235,6 +235,19 @@ silently mutate the Branch Catalog.
   capture the Master Product metadata. These snapshots are NOT updated when the
   Master Product changes.
 
+#### Branch Catalog isolation guarantees
+
+- **Master `is_active` ≠ Branch availability**: A Master Product with `is_active=0`
+  does NOT make adopted Branch Products unavailable. Branch Catalog reads use
+  `branch_products.is_available` as the sole availability authority.
+- **Master price ≠ Branch selling price**: Master Product `price` is NOT a live
+  fallback for adopted Branch Products. `branch_products.price` is established at
+  adoption/migration time and is the authoritative selling price. Master price
+  mutations do NOT silently mutate adopted Branch selling prices.
+- **Master Category ≠ Branch Category**: `branch_products.branch_category_id`
+  references a Branch-owned `branch_categories` row, NOT a Master `categories` row.
+  The migration resolves/creates Branch-owned categories for legacy data.
+
 #### Key invariants
 
 - A product may exist in Master Catalog without being adopted by any Branch.
@@ -284,13 +297,13 @@ CREATE TABLE branch_products (
 #### Column semantics
 
 - `product_id` → FK to Master Product (provenance; CASCADE DELETE if master deleted).
-- `branch_category_id` → FK to Branch Category (Branch-owned placement).
-- `product_name` → Snapshot of Master Product name at adoption time.
-- `product_description` → Snapshot of Master Product description at adoption time.
-- `product_image_url` → Snapshot of Master Product image at adoption time.
-- `price` → Branch selling price (subject to PricingPolicyModel: lock/range).
+- `branch_category_id` → FK to **Branch-owned** category (NOT Master Category). Created/resolved during migration. Branch Category ≠ Master Category.
+- `product_name` → Snapshot of Master Product name at adoption time. Master mutations do NOT rewrite this.
+- `product_description` → Snapshot of Master Product description at adoption time. Master mutations do NOT rewrite this.
+- `product_image_url` → Snapshot of Master Product image at adoption time. Master mutations do NOT rewrite this.
+- `price` → **Branch selling price**. Established at adoption/migration time. Master price mutations do NOT silently mutate this. This is the authoritative selling price for Branch Catalog reads.
 - `stock` → Branch-owned physical stock (Inventory domain).
-- `is_available` → Branch-owned availability flag.
+- `is_available` → **Branch-owned availability flag**. Master Product `is_active` does NOT gate Branch Catalog availability. A disabled master product with `is_available=1` on an adopted branch product remains available in that branch's catalog.
 
 #### Triggers
 

@@ -71,7 +71,6 @@ class CatalogService {
         p.min_price,
         p.max_price,
         COALESCE(bp.product_image_url, p.image_url) as image_url,
-        p.is_active as is_master_active,
         p.sort_order,
         bp.price as branch_raw_price,
         bp.stock as branch_stock,
@@ -94,11 +93,9 @@ class CatalogService {
         prod.branch_raw_price
       );
 
-      // C1 CONSUMER COHERENCE: in a branch-scoped menu an item is operationally
-      // available ONLY when it is explicitly adopted (branch_products row exists)
-      // AND the branch availability flag is on. Since we query from branch_products,
-      // every row is adopted — availability is determined by the flag alone.
-      const isAvailable = prod.is_master_active === 1 && prod.branch_availability === 1;
+      // BRANCH CATALOG OWNERSHIP: once adopted, branch_products controls availability.
+      // Master Product is_active does NOT gate Branch Catalog availability.
+      const isAvailable = prod.branch_availability === 1;
 
       return {
         id: prod.id,
@@ -112,7 +109,7 @@ class CatalogService {
         pricing_mode: pricing.mode,
         is_overridden: pricing.is_overridden,
         image_url: prod.image_url,
-        is_active: prod.is_master_active === 1,
+        is_active: prod.branch_availability === 1,
         is_available: isAvailable,
         stock_estimate: prod.branch_stock != null ? Number(prod.branch_stock) : 0,
         sort_order: prod.sort_order

@@ -261,8 +261,9 @@ class PrePaymentVerificationGate {
         continue;
       }
 
-      // Check Master & Branch active status
-      const isAvailable = masterProduct.is_active === 1 && (masterProduct.branch_availability !== 0);
+      // BRANCH CATALOG OWNERSHIP: once adopted, branch_products controls availability.
+      // Master Product is_active does NOT gate Branch Catalog availability.
+      const isAvailable = (masterProduct.branch_availability !== 0);
       if (!isAvailable) {
         errors.push(`Produk "${masterProduct.name}" saat ini dinonaktifkan di cabang ini.`);
         continue;

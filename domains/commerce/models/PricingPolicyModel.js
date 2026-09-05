@@ -29,7 +29,26 @@ class PricingPolicyModel {
     const basePrice = masterProduct.price;
     const mode = (masterProduct.pricing_mode || PricingPolicyModel.MODES.LOCK).toLowerCase();
 
-    // Mode LOCK: Branch cannot change price. Always returns owner base price.
+    // BRANCH CATALOG ISOLATION: when a concrete branch price is provided (adopted
+    // product), it is authoritative. Master price must not silently override it.
+    if (typeof branchPrice === 'number' && !isNaN(branchPrice)) {
+      if (mode === PricingPolicyModel.MODES.RANGE) {
+        const min = typeof masterProduct.min_price === 'number' ? masterProduct.min_price : basePrice;
+        const max = typeof masterProduct.max_price === 'number' ? masterProduct.max_price : basePrice;
+        if (branchPrice < min || branchPrice > max) {
+          throw new Error(`[PricingPolicyModel] Branch price ${branchPrice} is out of allowed range [${min}, ${max}].`);
+        }
+      }
+      return {
+        effective_price: branchPrice,
+        mode: mode,
+        is_overridden: true
+      };
+    }
+
+    // No branch price set — fall back to master base price.
+    // This path is used for brand-wide (Master) catalog and range-mode products
+    // that have not yet set a branch override.
     if (mode === PricingPolicyModel.MODES.LOCK) {
       return {
         effective_price: basePrice,
@@ -38,23 +57,7 @@ class PricingPolicyModel {
       };
     }
 
-    // Mode RANGE: Branch can set price strictly within min_price and max_price.
     if (mode === PricingPolicyModel.MODES.RANGE) {
-      const min = typeof masterProduct.min_price === 'number' ? masterProduct.min_price : basePrice;
-      const max = typeof masterProduct.max_price === 'number' ? masterProduct.max_price : basePrice;
-
-      if (typeof branchPrice === 'number' && !isNaN(branchPrice)) {
-        if (branchPrice < min || branchPrice > max) {
-          throw new Error(`[PricingPolicyModel] Branch price ${branchPrice} is out of allowed range [${min}, ${max}].`);
-        }
-        return {
-          effective_price: branchPrice,
-          mode: PricingPolicyModel.MODES.RANGE,
-          is_overridden: true
-        };
-      }
-
-      // Default to owner base price if branch has not set a custom price yet
       return {
         effective_price: basePrice,
         mode: PricingPolicyModel.MODES.RANGE,

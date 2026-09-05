@@ -808,18 +808,68 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_description TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_image_url TEXT;'); } catch (e) {}
 
-  // Migrate existing branch_products: snapshot master product metadata into the new columns.
+  // Migrate existing branch_products:
+  // 1. Snapshot master product metadata (product_name, description, image_url)
+  // 2. Create/resolve branch-owned categories (NOT master category_id)
+  // 3. Establish branch selling price from master ONCE
   // This runs idempotently — only rows where product_name IS NULL are migrated.
   try {
+    // Step 1: Snapshot metadata (existing behavior, safe)
     targetDb.exec(`
       UPDATE branch_products
-      SET product_name = (SELECT name FROM products WHERE id = branch_products.product_id),
-          product_description = (SELECT description FROM products WHERE id = branch_products.product_id),
-          product_image_url = (SELECT image_url FROM products WHERE id = branch_products.product_id),
-          branch_category_id = (SELECT category_id FROM products WHERE id = branch_products.product_id)
+      SET product_name = COALESCE(product_name, (SELECT name FROM products WHERE id = branch_products.product_id)),
+          product_description = COALESCE(product_description, (SELECT description FROM products WHERE id = branch_products.product_id)),
+          product_image_url = COALESCE(product_image_url, (SELECT image_url FROM products WHERE id = branch_products.product_id))
       WHERE product_name IS NULL
     `);
-  } catch (e) {}
+
+    // Step 2: Create branch-owned categories for adopted products.
+    // For each branch + master category combination, ensure a branch-owned category exists.
+    // This maps Master Category → Branch Category deterministically.
+    const legacyBranchProducts = targetDb.prepare(`
+      SELECT DISTINCT bp.branch_id, p.category_id as master_cat_id, p.brand_id
+      FROM branch_products bp
+      JOIN products p ON bp.product_id = p.id
+      WHERE bp.branch_category_id IS NULL AND p.category_id IS NOT NULL
+    `).all();
+
+    for (const row of legacyBranchProducts) {
+      // Find existing master category name
+      const masterCat = targetDb.prepare('SELECT name, slug FROM categories WHERE id = ?').get(row.master_cat_id);
+      const catName = masterCat?.name || 'Lainnya';
+      const catSlug = masterCat?.slug || 'lainnya';
+
+      // Find or create branch-owned category with same name
+      let branchCat = targetDb.prepare(
+        'SELECT id FROM branch_categories WHERE branch_id = ? AND name = ?'
+      ).get(row.branch_id, catName);
+
+      if (!branchCat) {
+        const bcId = `bc_mig_${row.branch_id}_${row.master_cat_id}`;
+        targetDb.prepare(`
+          INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order)
+          VALUES (?, ?, ?, ?, ?, 99)
+        `).run(bcId, row.brand_id, row.branch_id, catName, catSlug);
+        branchCat = { id: bcId };
+      }
+
+      // Link branch_products to the branch-owned category
+      targetDb.prepare(
+        'UPDATE branch_products SET branch_category_id = ? WHERE branch_id = ? AND branch_category_id IS NULL'
+      ).run(branchCat.id, row.branch_id);
+    }
+
+    // Step 3: Establish branch selling price from master ONCE for adopted products without price.
+    // After this, branch_products.price is the Branch selling authority.
+    targetDb.exec(`
+      UPDATE branch_products
+      SET price = (SELECT price FROM products WHERE id = branch_products.product_id)
+      WHERE price IS NULL
+    `);
+  } catch (e) {
+    console.error('[db] Branch catalog migration failed:', e.message);
+    throw e;
+  }
 
   seedData(targetDb);
 }

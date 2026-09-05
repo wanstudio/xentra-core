@@ -53,12 +53,12 @@ test('Commerce 1 — Self-Registration: successfully registered in core DomainRe
 // ==============================================================================
 // Commerce 2 — Pure Pricing Policy (Lock Mode)
 // ==============================================================================
-test('Commerce 2 — Pricing Policy: Mode LOCK strictly returns owner base price', () => {
+test('Commerce 2 — Pricing Policy: Mode LOCK uses branch price when adopted (branch is authoritative)', () => {
   const masterProduct = { price: 25000, pricing_mode: 'lock' };
   const resolved = PricingPolicyModel.resolvePrice(masterProduct, 99999);
-  assert.strictEqual(resolved.effective_price, 25000);
+  assert.strictEqual(resolved.effective_price, 99999);
   assert.strictEqual(resolved.mode, 'lock');
-  assert.strictEqual(resolved.is_overridden, false);
+  assert.strictEqual(resolved.is_overridden, true);
 });
 
 // ==============================================================================
@@ -82,7 +82,7 @@ test('Commerce 4 — Catalog Service: formats active menu for UX display', () =>
   const menu = CatalogService.getMenu({ brand_id: 'brand_test', branch_id: 'branch_test' });
   assert.ok(menu.products.length >= 3);
   const prodLock = menu.products.find(p => p.id === 'prod_lock');
-  assert.strictEqual(prodLock.price, 25000); // Lock mode respected
+  assert.strictEqual(prodLock.price, 99999); // Branch price is authoritative for adopted product
   const prodRange = menu.products.find(p => p.id === 'prod_range');
   assert.strictEqual(prodRange.price, 32000); // Range override respected
 });
@@ -116,7 +116,7 @@ test('Commerce 5 — Pre-Payment Gate: verifies stock, rejects unassigned branch
     brand_id: 'brand_test',
     branch_id: 'branch_test',
     items: [
-      { product_id: 'prod_lock', quantity: 2, expected_price: 25000 },
+      { product_id: 'prod_lock', quantity: 2, expected_price: 99999 },
       { product_id: 'prod_range', quantity: 1, expected_price: 32000 }
     ]
   });
