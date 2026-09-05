@@ -990,7 +990,7 @@ function seedData(targetDb) {
       { id: '285', cat: catMakanan, name: 'Ayam Geprek', price: 28000, reg: 28000, desc: 'Ayam goreng tepung dengan sambal geprek pedas.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
       { id: '288', cat: catMinuman, name: 'Es Teh', price: 5000, reg: 5000, desc: 'Teh melati seduh dingin segar.', img: '/assets/img/iced-tea.png' },
       { id: '287', cat: catMinuman, name: 'Kopi Susu', price: 15000, reg: 15000, desc: 'Kopi susu gula aren racikan istimewa barista Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-      { id: '345', cat: catSnack, name: 'Kentang', price: 12000, reg: 12000, desc: 'Kentang goreng renyah dengan bumbu balado.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
+      { id: '345', cat: catSnack, name: 'Kentang Goreng', price: 12000, reg: 12000, desc: 'Kentang goreng renyah dengan bumbu balado.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
     ];
 
     for (let i = 0; i < products.length; i++) {
@@ -1000,54 +1000,62 @@ function seedData(targetDb) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(p.id, brandId, p.cat, p.name, p.name.toLowerCase().replace(/ /g, '-'), p.desc, p.price, p.reg, p.img, p.img, i + 1);
     }
+  }
 
-    // BRANCH CATEGORIES: each branch owns its own category structure.
-    // Branch categories are independent from Master Categories.
-    const branchCategories = [
-      // BARAT branch categories
-      { id: 'bc_barat_favorit', brand: brandId, branch: branchBaratId, name: 'Menu Favorit', slug: 'menu-favorit', sort: 1 },
-      { id: 'bc_barat_minuman', brand: brandId, branch: branchBaratId, name: 'Minuman Segar', slug: 'minuman-segar', sort: 2 },
-      { id: 'bc_barat_snack', brand: brandId, branch: branchBaratId, name: 'Cemilan', slug: 'cemilan', sort: 3 },
-      // TIMUR branch categories
-      { id: 'bc_timur_paket', brand: brandId, branch: branchTimurId, name: 'Paket Hemat', slug: 'paket-hemat', sort: 1 },
-      { id: 'bc_timur_kopi', brand: brandId, branch: branchTimurId, name: 'Kopi & Teh', slug: 'kopi-teh', sort: 2 },
-    ];
+  // BRANCH CATEGORIES: each branch owns its own category structure.
+  // Branch categories are independent from Master Categories.
+  // We ensure these demo categories exist for BARAT and TIMUR.
+  const branchCategories = [
+    // BARAT branch categories
+    { id: 'bc_barat_favorit', brand: brandId, branch: branchBaratId, name: 'Menu Favorit', slug: 'menu-favorit', sort: 1 },
+    { id: 'bc_barat_minuman', brand: brandId, branch: branchBaratId, name: 'Minuman Segar', slug: 'minuman-segar', sort: 2 },
+    { id: 'bc_barat_snack', brand: brandId, branch: branchBaratId, name: 'Cemilan', slug: 'cemilan', sort: 3 },
+    // TIMUR branch categories
+    { id: 'bc_timur_paket', brand: brandId, branch: branchTimurId, name: 'Paket Hemat', slug: 'paket-hemat', sort: 1 },
+    { id: 'bc_timur_kopi', brand: brandId, branch: branchTimurId, name: 'Kopi & Teh', slug: 'kopi-teh', sort: 2 },
+  ];
 
-    for (const bc of branchCategories) {
+  for (const bc of branchCategories) {
+    targetDb.prepare(`
+      INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(bc.id, bc.brand, bc.branch, bc.name, bc.slug, bc.sort);
+  }
+
+  // BRANCH-SCOPED PRODUCT ASSIGNMENTS with snapshot fields and branch category.
+  // Each branch adopts a different subset and places products into its own categories.
+  //
+  // BARAT: Nasi Goreng (Menu Favorit), Ayam Geprek unavailable (Menu Favorit),
+  //        Es Teh (Minuman Segar), Kentang Goreng (Cemilan)
+  // TIMUR: Nasi Goreng (Paket Hemat), Kopi Susu (Kopi & Teh)
+  //
+  // Product 272 (Nasi Goreng) is adopted by BOTH branches into DIFFERENT categories, stocks, prices.
+  // Product 285 (Ayam Geprek) is adopted by BARAT only.
+  // Product 287 (Kopi Susu) is adopted by TIMUR only.
+  // Product 345 (Kentang Goreng) is adopted by BARAT only.
+  const branchAssignments = [
+    { branch: branchBaratId, productId: '272', catId: 'bc_barat_favorit', name: 'Nasi Goreng', desc: 'Nasi goreng spesial dengan bumbu khas Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 25000, stock: 50, available: 1 },
+    { branch: branchBaratId, productId: '285', catId: 'bc_barat_favorit', name: 'Ayam Geprek', desc: 'Ayam goreng tepung dengan sambal geprek pedas.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png', price: 28000, stock: 30, available: 0 },
+    { branch: branchBaratId, productId: '288', catId: 'bc_barat_minuman', name: 'Es Teh', desc: 'Teh melati seduh dingin segar.', img: '/assets/img/iced-tea.png', price: 5000, stock: 100, available: 1 },
+    { branch: branchBaratId, productId: '345', catId: 'bc_barat_snack', name: 'Kentang Goreng', desc: 'Kentang goreng renyah dengan bumbu balado.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png', price: 12000, stock: 40, available: 1 },
+    { branch: branchTimurId, productId: '272', catId: 'bc_timur_paket', name: 'Nasi Goreng', desc: 'Nasi goreng spesial dengan bumbu khas Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png', price: 25000, stock: 75, available: 1 },
+    { branch: branchTimurId, productId: '287', catId: 'bc_timur_kopi', name: 'Kopi Susu', desc: 'Kopi susu gula aren racikan istimewa barista Bangjo.', img: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png', price: 15000, stock: 60, available: 1 },
+  ];
+
+  for (const a of branchAssignments) {
+    const existing = targetDb.prepare('SELECT branch_id, product_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(a.branch, a.productId);
+    if (!existing) {
       targetDb.prepare(`
-        INSERT OR IGNORE INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(bc.id, bc.brand, bc.branch, bc.name, bc.slug, bc.sort);
-    }
-
-    // BRANCH-SCOPED PRODUCT ASSIGNMENTS with snapshot fields and branch category.
-    // Each branch adopts a different subset and places products into its own categories.
-    //
-    // BARAT: Nasi Goreng (Menu Favorit), Ayam Geprek unavailable (Menu Favorit),
-    //        Es Teh (Minuman Segar), Kentang (Cemilan)
-    // TIMUR: Nasi Goreng (Paket Hemat), Kopi Susu (Kopi & Teh)
-    //
-    // Product 272 (Nasi Goreng) is adopted by BOTH branches into DIFFERENT categories.
-    // Product 285 (Ayam Geprek) is adopted by BARAT only.
-    // Product 287 (Kopi Susu) is adopted by TIMUR only.
-    // Product 345 (Kentang) is adopted by BARAT only.
-    const branchAssignments = [
-      { branch: branchBaratId, productId: '272', catId: 'bc_barat_favorit', price: 25000, stock: 50, available: 1 },
-      { branch: branchBaratId, productId: '285', catId: 'bc_barat_favorit', price: 28000, stock: 30, available: 0 },
-      { branch: branchBaratId, productId: '288', catId: 'bc_barat_minuman', price: 5000, stock: 100, available: 1 },
-      { branch: branchBaratId, productId: '345', catId: 'bc_barat_snack', price: 12000, stock: 40, available: 1 },
-      { branch: branchTimurId, productId: '272', catId: 'bc_timur_paket', price: 25000, stock: 75, available: 1 },
-      { branch: branchTimurId, productId: '287', catId: 'bc_timur_kopi', price: 15000, stock: 60, available: 1 },
-    ];
-
-    for (const a of branchAssignments) {
-      const master = targetDb.prepare('SELECT name, description, image_url FROM products WHERE id = ?').get(a.productId);
-      targetDb.prepare(`
-        INSERT OR IGNORE INTO branch_products (branch_id, product_id, branch_category_id, product_name, product_description, product_image_url, price, stock, is_available, low_stock_threshold)
+        INSERT INTO branch_products (branch_id, product_id, branch_category_id, product_name, product_description, product_image_url, price, stock, is_available, low_stock_threshold)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 5)
-      `).run(a.branch, a.productId, a.catId, master?.name, master?.description, master?.image_url, a.price, a.stock, a.available);
+      `).run(a.branch, a.productId, a.catId, a.name, a.desc, a.img, a.price, a.stock, a.available);
+    } else {
+      targetDb.prepare(`
+        UPDATE branch_products
+        SET branch_category_id = ?, product_name = ?, product_description = ?, product_image_url = ?, price = ?, stock = ?, is_available = ?
+        WHERE branch_id = ? AND product_id = ?
+      `).run(a.catId, a.name, a.desc, a.img, a.price, a.stock, a.available, a.branch, a.productId);
     }
-
   }
 
   seedInstallPromotion(targetDb, brandId);
