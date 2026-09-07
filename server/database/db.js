@@ -44,7 +44,8 @@ try {
       } else {
         rawSqlDb = new SQL.Database();
       }
-      console.log(`[Database] sql.js database adapter ready on Node ${nodeVersion}.`);
+      rawSqlDb.run('PRAGMA foreign_keys = ON;');
+      console.log(`[Database] sql.js database adapter ready on Node ${nodeVersion} (PRAGMA foreign_keys = ON).`);
     }).catch(err => {
       console.warn('[Database] sql.js fallback error, using memoryStore:', err.message);
     });
