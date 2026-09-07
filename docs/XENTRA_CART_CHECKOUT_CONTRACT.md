@@ -1,7 +1,7 @@
 # Xentra Cart & Checkout Contract
 
 **Status:** LOCKED BUSINESS/UX CONTRACT
-**Decision Date:** 2026-09-07
+**Decision Date:** 2026-09-08
 **Authority:** Current Notion locked decisions
 
 ## 🔒 Locked Cart Interaction Performance Model
@@ -42,6 +42,40 @@ The immediate path must not synchronously wait for:
 Secondary reconciliation may be batched/coalesced across rapid quantity changes. Reconciliation results must be revision-aware so stale results cannot overwrite newer Cart State.
 
 Optimistic client state is not business authority. Core/server remains authoritative for final price, availability/stock, promotion eligibility/benefit, delivery capability/economics, fulfillment Branch, payment state, and Order state according to their respective domain contracts.
+
+## 🔒 Locked Checkout Upsell Branch Scope
+
+Checkout is a **single fulfillment cycle for exactly one Branch**. Therefore, Checkout upsell/recommendation is also constrained to that Checkout fulfillment Branch.
+
+### Upsell rule
+
+The Checkout section such as **“Tambah ini untuk melengkapi pesananmu”** must contain products from the **current Checkout fulfillment Branch only**.
+
+```text
+Multi-Branch Cart
+      ↓
+Checkout Branch A
+      ↓
+Checkout items = Branch A scope
+Upsell = Branch A scope only
+      ↓
+Order = Branch A
+```
+
+- Cross-Branch products must not appear as Checkout upsell.
+- Checkout must not use another Branch as an upsell fallback merely because that product exists globally or in the Customer's Cart.
+- Multi-Branch Cart remains allowed. This rule does not turn Cart into a single-Branch container.
+- Checkout remains single-Branch and Order remains single-Branch.
+- Catalog/domain remains authoritative for Branch Product assignment, availability, price, and stock.
+- Checkout/UI must not create business eligibility for a product from another Branch.
+- If the existing data/API contract cannot provide Branch-scoped upsell, report the **data-contract gap** rather than inventing cross-Branch behavior.
+
+### Authority and composition
+
+Checkout may orchestrate the upsell presentation for its current fulfillment context, but it does not become the authority for catalog availability, price, stock, or Branch Product assignment.
+
+This rule is a direct consequence of the locked boundary:
+**Multi-Branch Cart → Single-Branch Checkout → Single-Branch Order.**
 
 ## Core Boundary
 
@@ -87,6 +121,8 @@ Cart may contain multiple Branch scopes
 Customer starts Checkout for one Branch
   ↓
 Checkout contains that Branch's items only
+  ↓
+Checkout upsell contains that Branch's products only
   ↓
 Quantity changes update shared Cart State immediately
   ↓
@@ -163,6 +199,7 @@ Follow the adopted GoFood-style principle:
 - Client-provided `branch_id` is not authoritative merely because it was sent by the client.
 - Customer location, delivery destination, and fulfillment Branch remain distinct contexts.
 - Cart quantity is client interaction state, but final transactional validity remains server/Core authoritative.
+- Checkout upsell scope follows the authoritative Checkout fulfillment Branch; it is not a cross-Branch recommendation authority.
 
 ## Agent Rules
 
@@ -176,7 +213,9 @@ Follow the adopted GoFood-style principle:
 8. Do not make quantity `+/-` wait for expensive secondary processing before updating the UI.
 9. Do not create a second independent mutable cart quantity authority inside Checkout.
 10. Do not apply stale asynchronous reconciliation results over a newer Cart State revision.
-11. If a required policy is not defined, report the GAP instead of inventing behavior.
+11. Do not show cross-Branch products in Checkout upsell.
+12. Do not invent a cross-Branch upsell fallback when Branch-scoped upsell data is unavailable; report the data-contract gap.
+13. If a required policy is not defined, report the GAP instead of inventing behavior.
 
 ## Verification Matrix
 
@@ -184,14 +223,16 @@ Follow the adopted GoFood-style principle:
 2. Starting Checkout for Branch A excludes Branch B items.
 3. Branch B items remain available for a separate Checkout.
 4. One Checkout creates an Order with exactly one fulfillment Branch.
-5. Initial Home does not wait for expensive routing/ETA/payment/acceptance checks.
-6. `+/-` updates the shared Cart State and directly affected UI immediately.
-7. Checkout quantity changes are visible in Home/Cart after Back without requiring an independent checkout-to-home synchronization authority.
-8. Rapid quantity changes can reconcile as a latest-state batch without losing the final intended quantity.
-9. Stale reconciliation results cannot overwrite a newer Cart State.
-10. Fresh verification occurs before payment/commitment.
-11. Branch acceptance has a 3-minute platform-controlled timeout.
-12. Rejection/timeout does not silently rematch.
-13. Paid rejection/timeout does not transfer payment to another Branch.
-14. Pending refund does not block an independent new order.
-15. Customer cancellation is enforced by authoritative Order state.
+5. Checkout upsell contains products from the Checkout fulfillment Branch only.
+6. Cross-Branch products are excluded from Checkout upsell.
+7. Initial Home does not wait for expensive routing/ETA/payment/acceptance checks.
+8. `+/-` updates the shared Cart State and directly affected UI immediately.
+9. Checkout quantity changes are visible in Home/Cart after Back without requiring an independent checkout-to-home synchronization authority.
+10. Rapid quantity changes can reconcile as a latest-state batch without losing the final intended quantity.
+11. Stale reconciliation results cannot overwrite a newer Cart State.
+12. Fresh verification occurs before payment/commitment.
+13. Branch acceptance has a 3-minute platform-controlled timeout.
+14. Rejection/timeout does not silently rematch.
+15. Paid rejection/timeout does not transfer payment to another Branch.
+16. Pending refund does not block an independent new order.
+17. Customer cancellation is enforced by authoritative Order state.
