@@ -79,6 +79,7 @@ class OfflineReconciliationService {
         fulfillment_type: order_type,
         table_number: customer.table_number || null,
         client_transaction_id,
+        shift_id,
         notes: noteWithTxId,
         trace_context: {
           correlation_id: client_transaction_id,
@@ -114,14 +115,7 @@ class OfflineReconciliationService {
     const order = placementResult.order;
     const grandTotal = order.grand_total;
 
-    // 3. Update Shift Cash Sales if shift active
-    if (shift_id && payment_method === 'cash') {
-      db.prepare(`
-        UPDATE pos_shifts
-        SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
-        WHERE id = ?
-      `).run(grandTotal, grandTotal, shift_id);
-    }
+    // 3. Emit reconciliation success event (shift cash sales is updated atomically inside submitOrder)
 
     // 4. Emit reconciliation success event
     events.EventBus.publish({

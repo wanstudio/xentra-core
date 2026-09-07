@@ -668,3 +668,278 @@ test('POS 12 — Disaster Recovery CAS Guard: atomic compare-and-set rejects clo
   assert.strictEqual(finalRow.closed_at, normalClosed.closed_at);
 });
 
+// ==============================================================================
+// POS 13 — Offline Reconciliation Atomicity: Normal Flow (Order + Shift Cash Sales)
+// ==============================================================================
+test('POS 13 — Offline Reconciliation Atomicity: normal reconciliation commits order and increments shift cash_sales atomically', async () => {
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: `cashier_atom_norm_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    starting_float: 100000
+  });
+
+  const txId = 'tx_offline_atom_norm_' + Date.now();
+  const res = await OfflineReconciliationService.reconcileOfflineTransaction({
+    client_transaction_id: txId,
+    brand_id: 'brand_pos',
+    branch_id: 'branch_pos',
+    shift_id: shift.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    items: [
+      { product_id: 'prod_pos_1', quantity: 2, expected_price: 20000 }
+    ],
+    offline_created_at: new Date().toISOString()
+  });
+
+  assert.strictEqual(res.status, 'PROCESSED');
+  assert.strictEqual(res.order.grand_total, 40000);
+
+  // Check order persisted
+  const persistedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(res.order.id);
+  assert.ok(persistedOrder);
+  assert.strictEqual(persistedOrder.grand_total, 40000);
+
+  // Check shift cash sales incremented
+  const updatedShift = db.prepare('SELECT total_cash_sales, expected_cash FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(updatedShift.total_cash_sales, 40000);
+  assert.strictEqual(updatedShift.expected_cash, 140000); // 100k float + 40k cash
+});
+
+// ==============================================================================
+// POS 14 — Offline Reconciliation Atomicity: Rollback on Shift Update Failure
+// ==============================================================================
+test('POS 14 — Offline Reconciliation Atomicity: failure in shift cash_sales update rolls back order completely (zero orphan order)', async () => {
+  const cid = `cashier_atom_closed_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  // Create and close a shift immediately so that updating shift fails ([SHIFT_UPDATE_FAILED])
+  const closedShift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: cid,
+    starting_float: 50000
+  });
+
+  PosShiftService.closeShift({
+    shift_id: closedShift.id,
+    actual_cash: 50000,
+    actor_id: cid,
+    actor_role: 'cashier'
+  });
+
+  const txId = 'tx_offline_atom_fail_' + Date.now();
+
+  const ordersCountBefore = db.prepare('SELECT COUNT(*) as cnt FROM orders WHERE branch_id = ?').get('branch_pos').cnt;
+
+  // Attempt offline reconciliation targeting closed shift
+  const res = await OfflineReconciliationService.reconcileOfflineTransaction({
+    client_transaction_id: txId,
+    brand_id: 'brand_pos',
+    branch_id: 'branch_pos',
+    shift_id: closedShift.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    items: [
+      { product_id: 'prod_pos_1', quantity: 1, expected_price: 20000 }
+    ],
+    offline_created_at: new Date().toISOString()
+  });
+
+  assert.strictEqual(res.status, 'ERROR');
+  assert.ok(res.message.includes('Gagal'));
+
+  // Verify order was rolled back and NOT persisted in orders table
+  const orphanOrder = db.prepare('SELECT * FROM orders WHERE branch_id = ? AND client_transaction_id = ?').get('branch_pos', txId);
+  assert.strictEqual(orphanOrder, undefined, 'Order must not remain persisted when shift update fails');
+
+  const ordersCountAfter = db.prepare('SELECT COUNT(*) as cnt FROM orders WHERE branch_id = ?').get('branch_pos').cnt;
+  assert.strictEqual(ordersCountAfter, ordersCountBefore, 'Total orders count must be unchanged');
+
+  // Verify shift cash sales remain untouched
+  const shiftAfter = db.prepare('SELECT total_cash_sales, expected_cash FROM pos_shifts WHERE id = ?').get(closedShift.id);
+  assert.strictEqual(shiftAfter.total_cash_sales, 0);
+  assert.strictEqual(shiftAfter.expected_cash, 50000);
+});
+
+// ==============================================================================
+// POS 15 — Offline Reconciliation Atomicity: Reverse Failure (Order Validation/Stock Failure)
+// ==============================================================================
+test('POS 15 — Offline Reconciliation Atomicity: order placement failure does NOT increment shift cash_sales', async () => {
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: `cashier_atom_stock_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    starting_float: 50000
+  });
+
+  const txId = 'tx_offline_atom_stockfail_' + Date.now();
+
+  // Submit offline transaction with invalid non-existent product
+  const res = await OfflineReconciliationService.reconcileOfflineTransaction({
+    client_transaction_id: txId,
+    brand_id: 'brand_pos',
+    branch_id: 'branch_pos',
+    shift_id: shift.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    items: [
+      { product_id: 'prod_non_existent_fake_999', quantity: 1, expected_price: 50000 }
+    ],
+    offline_created_at: new Date().toISOString()
+  });
+
+  assert.strictEqual(res.status, 'ERROR');
+
+  // Shift cash sales must remain 0 and expected_cash remain initial float
+  const shiftAfter = db.prepare('SELECT total_cash_sales, expected_cash FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(shiftAfter.total_cash_sales, 0, 'Shift total_cash_sales must not be incremented');
+  assert.strictEqual(shiftAfter.expected_cash, 50000);
+});
+
+// ==============================================================================
+// POS 16 — Offline Reconciliation Idempotency & Replay: Exactly One Order and One Shift Increment
+// ==============================================================================
+test('POS 16 — Offline Reconciliation Idempotency: replaying same offline transaction yields DUPLICATE_IGNORED and increments cash_sales exactly once', async () => {
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: `cashier_atom_idem_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    starting_float: 100000
+  });
+
+  const txId = 'tx_offline_atom_idem_' + Date.now();
+  const txPayload = {
+    client_transaction_id: txId,
+    brand_id: 'brand_pos',
+    branch_id: 'branch_pos',
+    shift_id: shift.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    items: [
+      { product_id: 'prod_pos_2', quantity: 2, expected_price: 8000 }
+    ],
+    offline_created_at: new Date().toISOString()
+  };
+
+  // Attempt 1: Processed
+  const res1 = await OfflineReconciliationService.reconcileOfflineTransaction(txPayload);
+  assert.strictEqual(res1.status, 'PROCESSED');
+  assert.strictEqual(res1.order.grand_total, 16000);
+
+  // Check shift cash sales after attempt 1
+  const shiftAfter1 = db.prepare('SELECT total_cash_sales, expected_cash FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(shiftAfter1.total_cash_sales, 16000);
+  assert.strictEqual(shiftAfter1.expected_cash, 116000);
+
+  // Attempt 2: Replay same payload
+  const res2 = await OfflineReconciliationService.reconcileOfflineTransaction(txPayload);
+  assert.strictEqual(res2.status, 'DUPLICATE_IGNORED');
+
+  // Verify only 1 order exists
+  const orders = db.prepare('SELECT * FROM orders WHERE branch_id = ? AND client_transaction_id = ?').all('branch_pos', txId);
+  assert.strictEqual(orders.length, 1);
+
+  // Verify shift cash sales was NOT double incremented
+  const shiftAfter2 = db.prepare('SELECT total_cash_sales, expected_cash FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(shiftAfter2.total_cash_sales, 16000, 'cash_sales must not be double incremented on replay');
+  assert.strictEqual(shiftAfter2.expected_cash, 116000);
+});
+
+// ==============================================================================
+// POS 17 — Concurrent Reconciliation Race: UNIQUE constraint prevents duplicate order & double increment
+// ==============================================================================
+test('POS 17 — Offline Reconciliation Concurrency: simulated concurrent sync requests result in exactly one processed and no double increment', async () => {
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: `cashier_atom_conc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    starting_float: 50000
+  });
+
+  const txId = 'tx_offline_atom_conc_' + Date.now();
+  const txPayload = {
+    client_transaction_id: txId,
+    brand_id: 'brand_pos',
+    branch_id: 'branch_pos',
+    shift_id: shift.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    items: [
+      { product_id: 'prod_pos_2', quantity: 1, expected_price: 8000 }
+    ],
+    offline_created_at: new Date().toISOString()
+  };
+
+  // Launch two concurrent reconciliation promises
+  const [res1, res2] = await Promise.all([
+    OfflineReconciliationService.reconcileOfflineTransaction(txPayload),
+    OfflineReconciliationService.reconcileOfflineTransaction(txPayload)
+  ]);
+
+  const statuses = [res1.status, res2.status].sort();
+  assert.deepStrictEqual(statuses, ['DUPLICATE_IGNORED', 'PROCESSED']);
+
+  // Verify exactly one order exists
+  const orders = db.prepare('SELECT * FROM orders WHERE branch_id = ? AND client_transaction_id = ?').all('branch_pos', txId);
+  assert.strictEqual(orders.length, 1);
+
+  // Verify shift cash sales incremented exactly once (8000)
+  const shiftAfter = db.prepare('SELECT total_cash_sales, expected_cash FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(shiftAfter.total_cash_sales, 8000);
+  assert.strictEqual(shiftAfter.expected_cash, 58000);
+});
+
+// ==============================================================================
+// POS 18 — Batch Sync Isolation: Independent Transactions in processBatchSync
+// ==============================================================================
+test('POS 18 — Batch Sync Isolation: failure in one transaction does not roll back an already-successful independent transaction', async () => {
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: `cashier_atom_batch_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    starting_float: 50000
+  });
+
+  const txGood = {
+    client_transaction_id: 'tx_batch_good_' + Date.now(),
+    brand_id: 'brand_pos',
+    shift_id: shift.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    items: [
+      { product_id: 'prod_pos_2', quantity: 2, expected_price: 8000 }
+    ],
+    offline_created_at: new Date().toISOString()
+  };
+
+  const txBad = {
+    client_transaction_id: 'tx_batch_bad_' + Date.now(),
+    brand_id: 'brand_pos',
+    shift_id: shift.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    items: [
+      { product_id: 'prod_does_not_exist_xyz', quantity: 1, expected_price: 99999 }
+    ],
+    offline_created_at: new Date().toISOString()
+  };
+
+  const batchResult = await OfflineReconciliationService.processBatchSync({
+    branch_id: 'branch_pos',
+    transactions: [txGood, txBad]
+  });
+
+  assert.strictEqual(batchResult.total, 2);
+  assert.strictEqual(batchResult.processed, 1);
+  assert.strictEqual(batchResult.failed, 1);
+
+  // Verify txGood order was successfully committed and persisted
+  const goodOrder = db.prepare('SELECT * FROM orders WHERE branch_id = ? AND client_transaction_id = ?').get('branch_pos', txGood.client_transaction_id);
+  assert.ok(goodOrder, 'Valid transaction in batch must remain persisted');
+  assert.strictEqual(goodOrder.grand_total, 16000);
+
+  // Verify txBad order does not exist
+  const badOrder = db.prepare('SELECT * FROM orders WHERE branch_id = ? AND client_transaction_id = ?').get('branch_pos', txBad.client_transaction_id);
+  assert.strictEqual(badOrder, undefined, 'Failed transaction must not exist');
+
+  // Verify shift cash sales reflects only txGood (16000)
+  const shiftAfter = db.prepare('SELECT total_cash_sales, expected_cash FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(shiftAfter.total_cash_sales, 16000);
+  assert.strictEqual(shiftAfter.expected_cash, 66000);
+});
+
+

@@ -46,6 +46,7 @@ class OrderPlacementService {
     reservation_date = null,
     guest_count = null,
     client_transaction_id = null,
+    shift_id = null,
     pwa_runtime = null,
     notes = '',
     trace_context = {}
@@ -419,6 +420,21 @@ class OrderPlacementService {
           customer_phone: customer.phone,
           promotions: verification.applied_promos
         });
+      }
+
+      // P1 POS OFFLINE RECONCILIATION & CASH SALES ATOMICITY:
+      // Update POS shift cash sales in the same atomic database transaction as order placement.
+      // If shift is closed, missing, or fails update, entire placement rolls back with zero orphan order.
+      if (shift_id && effectivePaymentMethod === 'cash') {
+        const shiftUpdateRes = db.prepare(`
+          UPDATE pos_shifts
+          SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
+          WHERE id = ? AND status = 'open'
+        `).run(grandTotal, grandTotal, shift_id);
+
+        if (shiftUpdateRes.changes !== 1) {
+          throw new Error(`[SHIFT_UPDATE_FAILED]: POS shift "${shift_id}" tidak ditemukan atau sudah ditutup.`);
+        }
       }
 
       db.exec('COMMIT;');
