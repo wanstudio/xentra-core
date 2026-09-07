@@ -1,8 +1,47 @@
 # Xentra Cart & Checkout Contract
 
 **Status:** LOCKED BUSINESS/UX CONTRACT
-**Decision Date:** 2026-09-04
+**Decision Date:** 2026-09-07
 **Authority:** Current Notion locked decisions
+
+## 🔒 Locked Cart Interaction Performance Model
+
+> **Shared Authoritative Cart State + Optimistic Transaction + Asynchronous Reconciliation.**
+
+Cart interaction is a fast path. Quantity changes must update the shared authoritative in-memory Cart State immediately; expensive secondary work must not block the interaction.
+
+### Shared Cart State
+
+Home, Cart, and Checkout consume the same Cart State for cart interaction data.
+
+If quantity is changed in Checkout and the Customer navigates Back to Home/Cart, Home/Cart must reflect the latest Cart State. Checkout must not maintain an independent mutable copy of cart quantity.
+
+### Quantity transaction
+
+```text
+User + / -
+  ↓
+Cart transaction
+  ↓
+Authoritative in-memory Cart State
+  ↓
+Immediate local UI update
+  ↓
+Asynchronous reconciliation
+```
+
+The immediate path must not synchronously wait for:
+
+- network/API requests;
+- delivery/routing/ETA calculation;
+- promotion evaluation;
+- stock/availability verification;
+- payment processing;
+- unrelated page-wide rendering or subscriber work.
+
+Secondary reconciliation may be batched/coalesced across rapid quantity changes. Reconciliation results must be revision-aware so stale results cannot overwrite newer Cart State.
+
+Optimistic client state is not business authority. Core/server remains authoritative for final price, availability/stock, promotion eligibility/benefit, delivery capability/economics, fulfillment Branch, payment state, and Order state according to their respective domain contracts.
 
 ## Core Boundary
 
@@ -48,6 +87,10 @@ Cart may contain multiple Branch scopes
 Customer starts Checkout for one Branch
   ↓
 Checkout contains that Branch's items only
+  ↓
+Quantity changes update shared Cart State immediately
+  ↓
+Secondary reconciliation runs asynchronously
   ↓
 Fresh authoritative verification
   ↓
@@ -119,6 +162,7 @@ Follow the adopted GoFood-style principle:
 - A Branch selected from Home is a customer selection/context, not proof that the Branch can fulfill the final transaction.
 - Client-provided `branch_id` is not authoritative merely because it was sent by the client.
 - Customer location, delivery destination, and fulfillment Branch remain distinct contexts.
+- Cart quantity is client interaction state, but final transactional validity remains server/Core authoritative.
 
 ## Agent Rules
 
@@ -129,7 +173,10 @@ Follow the adopted GoFood-style principle:
 5. Do not put the 3-minute acceptance policy under Owner or Branch Manager settings.
 6. Do not perform expensive routing/ETA work merely to render initial Home.
 7. Do not treat Home discovery order as authoritative fulfillment resolution.
-8. If a required policy is not defined, report the GAP instead of inventing behavior.
+8. Do not make quantity `+/-` wait for expensive secondary processing before updating the UI.
+9. Do not create a second independent mutable cart quantity authority inside Checkout.
+10. Do not apply stale asynchronous reconciliation results over a newer Cart State revision.
+11. If a required policy is not defined, report the GAP instead of inventing behavior.
 
 ## Verification Matrix
 
@@ -138,9 +185,13 @@ Follow the adopted GoFood-style principle:
 3. Branch B items remain available for a separate Checkout.
 4. One Checkout creates an Order with exactly one fulfillment Branch.
 5. Initial Home does not wait for expensive routing/ETA/payment/acceptance checks.
-6. Fresh verification occurs before payment/commitment.
-7. Branch acceptance has a 3-minute platform-controlled timeout.
-8. Rejection/timeout does not silently rematch.
-9. Paid rejection/timeout does not transfer payment to another Branch.
-10. Pending refund does not block an independent new order.
-11. Customer cancellation is enforced by authoritative Order state.
+6. `+/-` updates the shared Cart State and directly affected UI immediately.
+7. Checkout quantity changes are visible in Home/Cart after Back without requiring an independent checkout-to-home synchronization authority.
+8. Rapid quantity changes can reconcile as a latest-state batch without losing the final intended quantity.
+9. Stale reconciliation results cannot overwrite a newer Cart State.
+10. Fresh verification occurs before payment/commitment.
+11. Branch acceptance has a 3-minute platform-controlled timeout.
+12. Rejection/timeout does not silently rematch.
+13. Paid rejection/timeout does not transfer payment to another Branch.
+14. Pending refund does not block an independent new order.
+15. Customer cancellation is enforced by authoritative Order state.
