@@ -56,12 +56,11 @@ class OrderPlacementService {
     const effectiveOrderType = order_type || 'delivery';
 
     // R5/CHECK-2 OPERATIONAL BOUNDARY: an order is 'confirmed' (ACCEPTED) at
-    // creation ONLY when a Branch actor created it (POS cashier channel — the
-    // branch is present and commits to the order at the counter). Customer-app
-    // cash/midtrans orders start 'pending' (AWAITING_BRANCH_ACCEPTANCE) and
-    // ONLY Branch ACCEPT (POST /orders/:id/branch-acceptance) moves them to
-    // 'confirmed'. Payment settlement never confirms an order (payment state
-    // remains separate from order acceptance state).
+    // creation ONLY when a Branch actor created it (POS cashier channel —
+    // the branch is present and commits to the order at the counter).
+    // Customer-app cash/midtrans orders start 'pending' and ONLY Branch
+    // ACCEPT moves them to 'confirmed'. Payment settlement never confirms
+    // an order (payment state remains separate from order acceptance state).
     const insertedStatus = (effectivePaymentMethod === 'cash' && order_channel === 'pos_cashier')
       ? 'confirmed'
       : 'pending';
@@ -87,7 +86,6 @@ class OrderPlacementService {
 
       const resDate = new Date(reservation_date);
       const today = new Date();
-      // Compare only YYYY-MM-DD
       const resDateStr = resDate.toISOString().slice(0, 10);
       const todayStr = today.toISOString().slice(0, 10);
 
@@ -107,8 +105,6 @@ class OrderPlacementService {
         };
       }
 
-      // P1 BUSINESS INVARIANT (NEW-01 Race Condition Guard):
-      // Atomic Check-and-Insert inside BEGIN IMMEDIATE transaction to prevent concurrent overbooking.
       const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
       const now = new Date().toISOString();
       const orderNumber = `RES-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
@@ -116,7 +112,6 @@ class OrderPlacementService {
       try {
         db.exec('BEGIN IMMEDIATE;');
 
-        // 1. Check duplicate active reservation for same customer phone + branch + date
         if (customer.phone) {
           const existingRes = db.prepare(`
             SELECT id FROM orders 
@@ -137,7 +132,6 @@ class OrderPlacementService {
           }
         }
 
-        // 2. Check daily branch capacity guard (max 30 reservations per branch per day)
         const dailyBookingsCount = db.prepare(`
           SELECT COUNT(*) as count FROM orders 
           WHERE order_type = 'reservation' 
@@ -155,7 +149,6 @@ class OrderPlacementService {
           };
         }
 
-        // 3. Table-Agnostic Booking Insert (Authoritative table assignment occurs at POS check-in)
         db.prepare(`
           INSERT INTO orders (
             id, order_number, brand_id, branch_id, customer_name, customer_phone,
@@ -188,7 +181,6 @@ class OrderPlacementService {
         };
       }
 
-      // Publish Core Event: commerce.reservation.booked
       await events.EventBus.publish({
         type: 'commerce.reservation.booked',
         producer: 'commerce',
@@ -230,7 +222,6 @@ class OrderPlacementService {
       };
     }
 
-    // 1. Execute Atomic Pre-Payment Verification Gate (For live food orders: delivery, pickup, dine_in)
     const verification = PrePaymentVerificationGate.verify({
       branch_id,
       brand_id,
@@ -258,7 +249,6 @@ class OrderPlacementService {
     const randSuffix = Math.floor(1000 + Math.random() * 9000);
     const orderNumber = `XN-${today}-${randSuffix}`;
 
-    // 2. Prepared Statements for Transaction
     const insertOrderStmt = db.prepare(`
       INSERT INTO orders (
         id, order_number, client_transaction_id, brand_id, branch_id, customer_name, customer_phone,
@@ -273,14 +263,12 @@ class OrderPlacementService {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    // Guarded Conditional Deduction: WHERE stock >= ? prevents overselling even under high concurrency
     const guardedDeductStockStmt = db.prepare(`
       UPDATE branch_products
       SET stock = stock - ?, updated_at = datetime('now')
       WHERE branch_id = ? AND product_id = ? AND stock >= ?
     `);
 
-    // 3. Execute Transaction with BEGIN IMMEDIATE to eliminate lock escalation races
     try {
       db.exec('BEGIN IMMEDIATE;');
 
@@ -329,8 +317,6 @@ class OrderPlacementService {
           formattedItemNote
         );
 
-        // P1 INVENTORY TIMING & DOS GUARD: Only deduct live physical stock immediately for CASH/POS orders.
-        // For online payment gateways (Midtrans), physical stock is safely deducted upon payment settlement (payment.settled webhook).
         if (effectivePaymentMethod === 'cash') {
           const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch_id, item.product_id);
           const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
@@ -343,7 +329,6 @@ class OrderPlacementService {
           const currentStock = prevStock - Number(item.quantity);
           const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
 
-          // Authoritative Cross-Domain Integration: Write immutable ledger record in Inventory domain table
           db.prepare(`
             INSERT INTO inventory_movements (
               id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
@@ -363,7 +348,6 @@ class OrderPlacementService {
         }
       }
 
-      // Save delivery record if provided (e.g. online delivery checkout)
       if (delivery_record) {
         db.prepare(`
           INSERT INTO order_deliveries (
@@ -386,8 +370,6 @@ class OrderPlacementService {
         );
       }
 
-      // P1 ATOMIC FINANCIAL TRANSACTION INVARIANT (NEW-01 & NEW-02):
-      // Create local order_payments attempt in the SAME transaction as order, items, and inventory.
       const initialPaymentId = `pay_${crypto.randomBytes(6).toString('hex')}`;
       db.prepare(`
         INSERT INTO order_payments (
@@ -409,8 +391,6 @@ class OrderPlacementService {
         now
       );
 
-      // P1 PROMOTION CONSUMPTION BOUNDARY (F01 Hardening):
-      // For immediate cash / POS orders, record immutable redemption ledger in same transaction atomically
       if (effectivePaymentMethod === 'cash' && verification.applied_promos && verification.applied_promos.length > 0) {
         const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
         PromotionEngineService.recordRedemptions({
@@ -424,24 +404,24 @@ class OrderPlacementService {
 
       // P1 POS OFFLINE RECONCILIATION & CASH SALES ATOMICITY:
       // Update POS shift cash sales in the same atomic database transaction as order placement.
-      // If shift is closed, missing, or fails update, entire placement rolls back with zero orphan order.
+      // If shift is closed, missing, not owned by this branch, or fails update, entire
+      // placement rolls back with zero orphan order.
       if (shift_id && effectivePaymentMethod === 'cash') {
         const shiftUpdateRes = db.prepare(`
           UPDATE pos_shifts
           SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
-          WHERE id = ? AND status = 'open'
-        `).run(grandTotal, grandTotal, shift_id);
+          WHERE id = ? AND branch_id = ? AND status = 'open'
+        `).run(grandTotal, grandTotal, shift_id, branch_id);
 
         if (shiftUpdateRes.changes !== 1) {
-          throw new Error(`[SHIFT_UPDATE_FAILED]: POS shift "${shift_id}" tidak ditemukan atau sudah ditutup.`);
+          throw new Error(`[SHIFT_UPDATE_FAILED]: POS shift "${shift_id}" tidak ditemukan, bukan milik cabang "${branch_id}", atau sudah ditutup.`);
         }
       }
 
       db.exec('COMMIT;');
     } catch (txErr) {
       try { db.exec('ROLLBACK;'); } catch (_) {}
-      
-      // Re-throw unique constraint errors for scoped idempotency handling
+
       if (txErr.message && (txErr.message.includes('idx_orders_branch_client_tx') || txErr.message.includes('UNIQUE constraint failed: orders.branch_id, orders.client_transaction_id'))) {
         throw txErr;
       }
@@ -454,7 +434,6 @@ class OrderPlacementService {
       };
     }
 
-    // 4. Low-stock evaluation & Event Dispatching (After Transaction Commit for cash orders)
     if (effectivePaymentMethod === 'cash') {
       for (const item of verifiedItems) {
         const remainingStock = item.current_stock - item.quantity;
@@ -484,7 +463,6 @@ class OrderPlacementService {
       }
     }
 
-    // 5. Publish Core Event: commerce.order.placed
     await events.EventBus.publish({
       type: 'commerce.order.placed',
       producer: 'commerce',
@@ -549,7 +527,6 @@ class OrderPlacementService {
       return { success: true, deducted_items: [] };
     }
 
-    // P1 IDEMPOTENCY GUARD: Check if inventory deduction was already executed for this order
     const existingMovement = db.prepare('SELECT id FROM inventory_movements WHERE reference_id = ? AND movement_type = \'sale_deduction\' LIMIT 1').get(order.order_number);
     if (existingMovement) {
       return { success: true, idempotent: true, deducted_items: [] };
@@ -582,7 +559,6 @@ class OrderPlacementService {
 
         const deductResult = guardedDeductStockStmt.run(item.quantity, order.branch_id, item.product_id, item.quantity);
         if (!deductResult || deductResult.changes === 0) {
-          // P1 CRITICAL CONCURRENCY RACE GUARD: Stock was depleted between checkout and settlement
           throw new Error(`[OUT_OF_STOCK_RACE] Stok untuk produk "${item.product_name || item.product_id}" tidak mencukupi saat pembayaran diselesaikan (tersisa ${prevStock}, diminta ${item.quantity}).`);
         }
 
