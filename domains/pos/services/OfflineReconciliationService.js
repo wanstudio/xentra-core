@@ -211,29 +211,52 @@ class OfflineReconciliationService {
     paper_receipts_total,
     incident_notes = ''
   }) {
-    const shift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
-    if (!shift) {
+    const initialShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+    if (!initialShift) {
       throw new Error('[OfflineReconciliation] Shift record not found for disaster recovery.');
+    }
+    if (initialShift.status !== 'open') {
+      throw new Error('[OfflineReconciliation] Shift tidak ditemukan atau sudah ditutup.');
     }
 
     const physicalCash = Number(actual_physical_cash) || 0;
     const paperTotal = Number(paper_receipts_total) || 0;
-    const systemExpected = Number(shift.expected_cash) || 0;
-
-    // Variance between physical cash count and un-synced receipt ledger
-    const disasterVariance = physicalCash - (systemExpected + paperTotal);
     const now = new Date().toISOString();
+    let disasterVariance = 0;
+    let reconciledShift = null;
 
-    // Close shift with disaster recovery status
-    db.prepare(`
-      UPDATE pos_shifts
-      SET 
-        actual_cash = ?,
-        variance = ?,
-        status = 'closed',
-        closed_at = ?
-      WHERE id = ?
-    `).run(physicalCash, disasterVariance, now, shift_id);
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      // Re-verify under exclusive lock to guarantee atomic state check
+      const currentShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      if (!currentShift || currentShift.status !== 'open') {
+        throw new Error('[OfflineReconciliation] Shift tidak ditemukan atau sudah ditutup oleh proses lain.');
+      }
+
+      const systemExpected = Number(currentShift.expected_cash) || 0;
+      disasterVariance = physicalCash - (systemExpected + paperTotal);
+
+      // Atomic Compare-and-Set (CAS): only update if still 'open'
+      const closeRes = db.prepare(`
+        UPDATE pos_shifts
+        SET 
+          actual_cash = ?,
+          variance = ?,
+          status = 'closed',
+          closed_at = ?
+        WHERE id = ? AND status = 'open'
+      `).run(physicalCash, disasterVariance, now, shift_id);
+
+      if (closeRes.changes !== 1) {
+        throw new Error('[OfflineReconciliation] Gagal menutup shift: status shift telah berubah.');
+      }
+
+      reconciledShift = currentShift;
+      db.exec('COMMIT;');
+    } catch (err) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw err;
+    }
 
     // Record formal audit event
     events.EventBus.publish({
@@ -241,8 +264,8 @@ class OfflineReconciliationService {
       producer: 'pos',
       payload: {
         shift_id,
-        branch_id: shift.branch_id,
-        cashier_id: shift.cashier_id,
+        branch_id: reconciledShift.branch_id,
+        cashier_id: reconciledShift.cashier_id,
         physical_cash: physicalCash,
         paper_receipts_total: paperTotal,
         disaster_variance: disasterVariance,
@@ -253,7 +276,7 @@ class OfflineReconciliationService {
 
     return {
       shift_id,
-      branch_id: shift.branch_id,
+      branch_id: reconciledShift.branch_id,
       status: 'closed_via_disaster_recovery',
       actual_physical_cash: physicalCash,
       paper_receipts_total: paperTotal,

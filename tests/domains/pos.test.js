@@ -584,3 +584,87 @@ test('POS 10 — Cash Drawer Invariants: rejects negative starting float and exc
     actor_role: 'cashier'
   });
 });
+
+// ==============================================================================
+// POS 11 — Disaster Recovery Idempotency & CAS Guard (Finding MEDIUM)
+// ==============================================================================
+test('POS 11 — Disaster Recovery Idempotency: repeated reconciliation cannot overwrite financial closing values', () => {
+  // 1. Open shift for disaster recovery testing
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: 'cashier_dr_idempotency',
+    starting_float: 50000
+  });
+
+  // 2. First valid disaster recovery reconciliation
+  const firstResult = OfflineReconciliationService.recordDisasterRecoveryReconciliation({
+    shift_id: shift.id,
+    actual_physical_cash: 250000,
+    paper_receipts_total: 190000,
+    incident_notes: 'Initial disaster reconciliation'
+  });
+
+  assert.strictEqual(firstResult.status, 'closed_via_disaster_recovery');
+  assert.strictEqual(firstResult.actual_physical_cash, 250000);
+  assert.strictEqual(firstResult.variance, 10000);
+
+  // Snapshot closed shift state from database
+  const closedRow1 = db.prepare('SELECT actual_cash, variance, status, closed_at FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(closedRow1.status, 'closed');
+  assert.strictEqual(closedRow1.actual_cash, 250000);
+  assert.strictEqual(closedRow1.variance, 10000);
+  assert.ok(closedRow1.closed_at);
+
+  // 3. Second reconciliation attempt against the already-closed shift MUST FAIL
+  assert.throws(() => {
+    OfflineReconciliationService.recordDisasterRecoveryReconciliation({
+      shift_id: shift.id,
+      actual_physical_cash: 999999, // Malicious / erroneous overwrite
+      paper_receipts_total: 888888,
+      incident_notes: 'Tampered second reconciliation'
+    });
+  }, /sudah ditutup/i);
+
+  // 4. Verify authoritative values were NOT overwritten
+  const closedRow2 = db.prepare('SELECT actual_cash, variance, status, closed_at FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(closedRow2.status, 'closed');
+  assert.strictEqual(closedRow2.actual_cash, 250000, 'actual_cash must not be overwritten by second reconciliation');
+  assert.strictEqual(closedRow2.variance, 10000, 'variance must not be overwritten by second reconciliation');
+  assert.strictEqual(closedRow2.closed_at, closedRow1.closed_at, 'closed_at must be immutable');
+});
+
+test('POS 12 — Disaster Recovery CAS Guard: atomic compare-and-set rejects closing already non-open shift', () => {
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: 'cashier_dr_cas',
+    starting_float: 50000
+  });
+
+  // Close shift normally first
+  PosShiftService.closeShift({
+    shift_id: shift.id,
+    actual_cash: 50000,
+    actor_id: 'cashier_dr_cas',
+    actor_role: 'cashier'
+  });
+
+  const normalClosed = db.prepare('SELECT actual_cash, variance, status, closed_at FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(normalClosed.status, 'closed');
+  assert.strictEqual(normalClosed.actual_cash, 50000);
+
+  // Attempt disaster recovery reconciliation on normally closed shift -> MUST BE REJECTED
+  assert.throws(() => {
+    OfflineReconciliationService.recordDisasterRecoveryReconciliation({
+      shift_id: shift.id,
+      actual_physical_cash: 200000,
+      paper_receipts_total: 100000,
+      incident_notes: 'Late reconciliation attempt'
+    });
+  }, /sudah ditutup/i);
+
+  // Verify normal closing values remain intact
+  const finalRow = db.prepare('SELECT actual_cash, variance, status, closed_at FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(finalRow.actual_cash, 50000);
+  assert.strictEqual(finalRow.closed_at, normalClosed.closed_at);
+});
+
