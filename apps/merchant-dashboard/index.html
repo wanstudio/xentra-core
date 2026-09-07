@@ -1,14 +1,17 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
+<!DOCTYPE html>
+<html lang="id">
+<head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Xentra Core — Portal Pemilik Resto & Dashboard</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/dashboard.css?v=2.0.6">
-  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css">
+  <link rel="stylesheet" href="/assets/css/dashboard.css?v=2.1.1">
+  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=2.1.1">
 </head>
 <body>
 
@@ -314,7 +317,12 @@
 
       <!-- TAB 3: MENU & CATALOG -->
       <section id="tab-catalog" class="x-tab-content">
-        <div class="x-card-panel">
+
+        <!-- ══════════════════════════════════════════════════════
+             PANEL A: OWNER / BRAND MANAGER — Master Catalog CRUD
+             Hidden automatically when role = branch_manager
+             ══════════════════════════════════════════════════════ -->
+        <div id="panel-owner-catalog" class="x-card-panel">
           <div class="x-panel-header-flex">
             <div>
               <h3>🍔 Manajemen Menu & Produk</h3>
@@ -352,7 +360,61 @@
             </table>
           </div>
         </div>
-      </section>
+
+        <!-- ══════════════════════════════════════════════════════
+             PANEL B: BRANCH MANAGER — Katalog Cabang Inline
+             Hidden automatically when role = owner / brand_manager
+             ══════════════════════════════════════════════════════ -->
+        <div id="panel-branch-catalog" style="display:none;">
+
+          <!-- Header: Branch name + Add Category button -->
+          <div class="x-card-panel" style="margin-bottom:16px;">
+            <div class="x-panel-header-flex">
+              <div>
+                <h3>📋 Katalog Cabang Saya</h3>
+                <p id="branch-catalog-subtitle" class="text-muted" style="font-size:13px;">Memuat info cabang...</p>
+              </div>
+              <div class="x-header-buttons">
+                <button type="button" class="x-btn-secondary" style="font-size:13px;" id="btn-add-branch-category-inline">+ Tambah Kategori</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section: Category Manager -->
+          <div class="x-card-panel" style="margin-bottom:16px;">
+            <div class="x-catalog-section-title" style="margin-bottom:10px;">
+              <h4>🗂️ Kategori Cabang (<span id="branch-inline-cat-count">0</span>)</h4>
+              <p class="text-muted" style="font-size:12px;margin:2px 0 0;">Klik kategori untuk filter menu. Klik ✏️ / 🗑️ untuk kelola.</p>
+            </div>
+            <!-- Category chips with edit/delete actions -->
+            <div id="branch-inline-categories-bar" style="display:flex;flex-wrap:wrap;gap:8px;min-height:36px;align-items:center;">
+              <span class="text-muted" style="font-size:13px;">Memuat kategori...</span>
+            </div>
+          </div>
+
+          <!-- Section: Active (Adopted) Products — filterable by category -->
+          <div class="x-card-panel" style="margin-bottom:16px;">
+            <div class="x-catalog-section-title">
+              <h4>✅ Menu Aktif Cabang (<span id="branch-inline-active-count">0</span>)</h4>
+              <p class="text-muted" style="font-size:12px;margin:2px 0 0;" id="branch-inline-filter-label">Semua kategori</p>
+            </div>
+            <div id="branch-inline-adopted-container" class="x-branch-catalog-grid" style="margin-top:12px;">
+              <p class="text-muted" style="font-size:13px;">Memuat menu aktif...</p>
+            </div>
+          </div>
+
+          <!-- Section: Master Recommendations (not yet adopted) -->
+          <div class="x-card-panel">
+            <div class="x-catalog-section-title">
+              <h4>💡 Rekomendasi dari Owner / Belum Diadopsi (<span id="branch-inline-available-count">0</span>)</h4>
+              <p class="text-muted" style="font-size:12px;margin:2px 0 0;">Pilih produk dari Owner untuk ditampilkan di halaman pemesanan pelanggan cabang Anda.</p>
+            </div>
+            <div id="branch-inline-available-container" class="x-branch-catalog-grid" style="margin-top:12px;">
+              <p class="text-muted" style="font-size:13px;">Memuat rekomendasi produk...</p>
+            </div>
+          </div>
+
+        </div>
 
       <!-- TAB 4: BRANCHES & DELIVERY -->
       <section id="tab-branches" class="x-tab-content">
@@ -497,10 +559,87 @@
     </div>
   </div>
 
+  <!-- MODAL: BRANCH CATALOG MANAGER -->
+  <div id="modal-branch-catalog" class="x-modal-backdrop" style="display:none;">
+    <div class="x-modal-card x-modal-lg">
+      <div class="x-modal-header">
+        <div>
+          <h3 id="modal-branch-catalog-title">Kelola Katalog Cabang</h3>
+          <p class="text-muted" style="font-size:12px;margin:0;" id="modal-branch-catalog-subtitle">Pilih produk rekomendasi Owner dan atur menu cabang</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closeBranchCatalogModal()">✕</button>
+      </div>
+      
+      <div class="x-modal-scroll-body">
+        <!-- Section 1: Active Branch Products -->
+        <div>
+          <div class="x-catalog-section-title">
+            <h4>✅ Menu Aktif Cabang (<span id="branch-active-count">0</span>)</h4>
+            <button type="button" class="x-btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="promptAddBranchCategory()">+ Tambah Kategori Cabang</button>
+          </div>
+          <div id="branch-adopted-products-container" class="x-branch-catalog-grid">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Section 2: Master Recommendations Available for Adoption -->
+        <div>
+          <div class="x-catalog-section-title">
+            <h4>💡 Rekomendasi Owner / Belum Diadopsi (<span id="branch-available-count">0</span>)</h4>
+          </div>
+          <div id="branch-available-products-container" class="x-branch-catalog-grid">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <div class="x-modal-footer">
+        <button type="button" class="x-btn-secondary" onclick="closeBranchCatalogModal()">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ADOPT PRODUCT FORM -->
+  <div id="modal-adopt-product" class="x-modal-backdrop" style="display:none; z-index: 1100;">
+    <div class="x-modal-card" style="max-width: 460px;">
+      <div class="x-modal-header">
+        <h3 id="modal-adopt-title">Adopsi Produk ke Cabang</h3>
+        <button type="button" class="x-modal-close" onclick="closeAdoptModal()">✕</button>
+      </div>
+      <form id="form-adopt-product" class="x-form">
+        <input type="hidden" id="adopt-product-id" value="">
+        <input type="hidden" id="adopt-pricing-mode" value="">
+        <input type="hidden" id="adopt-min-price" value="">
+        <input type="hidden" id="adopt-max-price" value="">
+        
+        <div class="x-form-group">
+          <label>Nama Menu</label>
+          <input type="text" id="adopt-product-name" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+        </div>
+
+        <div class="x-form-group">
+          <label for="adopt-branch-category">Kategori di Cabang Ini</label>
+          <select id="adopt-branch-category" class="x-input" required></select>
+        </div>
+
+        <div class="x-form-group">
+          <label for="adopt-price">Harga Jual Cabang (Rp)</label>
+          <input type="number" id="adopt-price" class="x-input" required>
+          <small id="adopt-price-hint" class="text-muted" style="display:block;margin-top:4px;font-size:12px;"></small>
+        </div>
+
+        <div class="x-modal-footer">
+          <button type="button" class="x-btn-secondary" onclick="closeAdoptModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-adopt">Simpan ke Katalog Cabang</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="x-toast-container" class="x-toast-container"></div>
 
   <!-- Dashboard JavaScript -->
-  <script src="/dashboard/assets/js/dashboard.js?v=2.0.6"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=2.1.1"></script>
 </body>
 </html>
