@@ -697,6 +697,10 @@ function initSchema(targetDb) {
       product_name TEXT,
       product_description TEXT,
       product_image_url TEXT,
+      -- Override columns: NULL = inherit from Master Product; non-NULL = branch value wins.
+      name_override TEXT,
+      description_override TEXT,
+      image_override TEXT,
       price REAL,
       stock INTEGER DEFAULT 100,
       is_available INTEGER DEFAULT 1,
@@ -882,6 +886,11 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_name TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_description TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_image_url TEXT;'); } catch (e) {}
+  // Override columns (Master Product Default + Branch Optional Override architecture).
+  // NULL = inherit from Master Product at query time; non-NULL = branch value wins.
+  try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN name_override TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN description_override TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN image_override TEXT;'); } catch (e) {}
 
   // BRANCH CATEGORY MANAGEMENT (Kategori Cabang upgrade): branch_categories needs its
   // own image reference + updated_at so the dashboard can rename/re-image a category

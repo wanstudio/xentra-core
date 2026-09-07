@@ -2,11 +2,12 @@
  * Xentra Commerce Catalog Service
  * Pure catalog display service for Customer PWA & menu presentation.
  *
- * BRANCH CATALOG MODEL:
+ * BRANCH CATALOG MODEL (Master Product Default + Branch Optional Override):
  * When a branch context is provided, CatalogService queries branch_products as the
  * primary source (Branch Catalog), joining branch_categories for the category tree.
- * This implements the LOCKED save-point semantics: Branch Catalog is NOT a filtered
- * view of Master Catalog. Each Branch owns its category structure and product placement.
+ * Resolution rule: branch override column is used when non-NULL; otherwise the live
+ * Master Product value is used. This ensures master product updates propagate to all
+ * branches that have not explicitly overridden the field.
  *
  * BRAND-WIDE MODEL (no branch context):
  * Queries the Master Catalog (products + categories) directly.
@@ -23,7 +24,8 @@ class CatalogService {
    * BRANCH CONTEXT (branch_id provided):
    *   Source = branch_products + branch_categories (Branch Catalog).
    *   Only adopted products appear. Categories are Branch-owned.
-   *   Product metadata uses snapshot fields (product_name, etc.) with master fallback.
+   *   Product metadata resolves via override columns:
+   *     name_override IS NOT NULL → branch value; NULL → live master value.
    *
    * BRAND-WIDE (no branch_id):
    *   Source = products + categories (Master Catalog).
@@ -48,6 +50,7 @@ class CatalogService {
   /**
    * BRANCH CATALOG: branch_products is the source of truth.
    * Only adopted products appear. Categories come from branch_categories.
+   * Override resolution: COALESCE(bp.name_override, p.name) — NULL override = live master.
    */
   static _getBranchMenu(brand_id, branch_id) {
     // 1. Fetch branch-owned categories
@@ -57,24 +60,31 @@ class CatalogService {
       ORDER BY sort_order ASC, name ASC
     `).all(branch_id, brand_id);
 
-    // 2. Fetch adopted products (branch_products is the source) with master fallback for pricing
+    // 2. Fetch adopted products with override resolution:
+    //    COALESCE(bp.<field>_override, p.<field>) — NULL override = live master field.
     const rawProducts = db.prepare(`
       SELECT
         bp.product_id as id,
         p.brand_id,
         bp.branch_category_id as category_id,
-        COALESCE(bp.product_name, p.name) as name,
+        COALESCE(bp.name_override, p.name) as name,
         p.slug,
-        COALESCE(bp.product_description, p.description) as description,
+        COALESCE(bp.description_override, p.description) as description,
         p.price as owner_price,
         p.pricing_mode,
         p.min_price,
         p.max_price,
-        COALESCE(bp.product_image_url, p.image_url) as image_url,
+        COALESCE(bp.image_override, p.image_url) as image_url,
         p.sort_order,
         bp.price as branch_raw_price,
         bp.stock as branch_stock,
-        bp.is_available as branch_availability
+        bp.is_available as branch_availability,
+        bp.name_override,
+        bp.description_override,
+        bp.image_override,
+        p.name as master_name,
+        p.description as master_description,
+        p.image_url as master_image_url
       FROM branch_products bp
       INNER JOIN products p ON bp.product_id = p.id AND p.brand_id = ?
       WHERE bp.branch_id = ?
@@ -112,7 +122,15 @@ class CatalogService {
         is_active: prod.branch_availability === 1,
         is_available: isAvailable,
         stock_estimate: prod.branch_stock != null ? Number(prod.branch_stock) : 0,
-        sort_order: prod.sort_order
+        sort_order: prod.sort_order,
+        // Override field metadata for Dashboard UI:
+        // null = inheriting master value; non-null = branch has overridden
+        name_override: prod.name_override || null,
+        description_override: prod.description_override || null,
+        image_override: prod.image_override || null,
+        master_name: prod.master_name,
+        master_description: prod.master_description,
+        master_image_url: prod.master_image_url
       };
     });
 

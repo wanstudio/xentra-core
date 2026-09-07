@@ -2715,5 +2715,42 @@ test('CHECKOUT PROMO REGRESSION — CASE B: branch with valid promo config appli
   assert.strictEqual(orderRow.grand_total, orderRow.subtotal + orderRow.delivery_fee - 7000, 'Grand total must reflect branch-configured promo discount');
 });
 
+test('API Branch Categories: PUT /api/v1/admin/branches/:id/categories/reorder updates sort order and reflects in customer catalog', async () => {
+  // Login as admin
+  const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
+    method: 'POST',
+    body: JSON.stringify({ username: 'admin', password: 'bangjo123' })
+  });
+  const loginData = await loginRes.json();
+  const authHeaders = { authorization: 'Bearer ' + loginData.token };
+
+  const testBranchId = 'branch_bangjo_barat';
+  const initialCats = db.prepare('SELECT id, name, sort_order FROM branch_categories WHERE branch_id = ? ORDER BY sort_order ASC').all(testBranchId);
+  assert.ok(initialCats.length >= 2, 'Must have at least 2 categories');
+
+  const reversedIds = initialCats.map(c => c.id).reverse();
+
+  // Call reorder endpoint
+  const reorderRes = await mockFetch(`/api/v1/admin/branches/${testBranchId}/categories/reorder`, {
+    method: 'PUT',
+    headers: authHeaders,
+    body: JSON.stringify({ order: reversedIds })
+  });
+  assert.strictEqual(reorderRes.status, 200);
+  const reorderData = await reorderRes.json();
+  assert.strictEqual(reorderData.success, true);
+
+  // Check database sort order
+  const updatedCats = db.prepare('SELECT id, name, sort_order FROM branch_categories WHERE branch_id = ? ORDER BY sort_order ASC').all(testBranchId);
+  assert.deepStrictEqual(updatedCats.map(c => c.id), reversedIds);
+
+  // Check customer menu endpoint reflects the new order
+  const menuRes = await mockFetch(`/api/v1/catalog/menu?branch_id=${testBranchId}`);
+  assert.strictEqual(menuRes.status, 200);
+  const menuData = await menuRes.json();
+  assert.strictEqual(menuData.success, true);
+  assert.deepStrictEqual(menuData.categories.map(c => c.id), reversedIds);
+});
+
 
 

@@ -1302,7 +1302,7 @@
       // Category name / filter button
       var nameBtn = document.createElement('button');
       nameBtn.type = 'button';
-      nameBtn.style.cssText = 'border:none;background:none;padding:5px 8px 5px 4px;font-size:12px;font-weight:' + (isActive ? '700' : '500') + ';cursor:pointer;color:#1e293b;';
+      nameBtn.style.cssText = 'border:none;background:none;padding:6px 8px 6px 2px;font-size:13px;font-weight:' + (isActive ? '700' : '500') + ';cursor:pointer;color:#1e293b;';
       nameBtn.textContent = cat.name;
       nameBtn.addEventListener('click', function () { setBranchCatalogFilter(cat.id); });
       chip.appendChild(nameBtn);
@@ -1320,7 +1320,7 @@
       var delBtn = document.createElement('button');
       delBtn.type = 'button';
       delBtn.title = 'Hapus kategori';
-      delBtn.style.cssText = 'border:none;background:none;padding:5px 8px 5px 4px;font-size:12px;cursor:pointer;color:#ef4444;';
+      delBtn.style.cssText = 'border:none;background:none;padding:6px 10px 6px 4px;font-size:12px;cursor:pointer;color:#ef4444;opacity:0.8;';
       delBtn.textContent = '🗑️';
       delBtn.addEventListener('click', function (e) { e.stopPropagation(); deleteBranchCategory(cat.id, cat.name); });
       chip.appendChild(delBtn);
@@ -1329,17 +1329,23 @@
       handle.addEventListener('dragstart', function (e) {
         _dragSrcCatId = cat.id;
         _dragSrcEl = chip;
+        chip.style.cursor = 'grabbing';
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', cat.id);
-        setTimeout(function () { chip.style.opacity = '0.45'; }, 0);
+        setTimeout(function () {
+          chip.style.opacity = '0.4';
+          chip.style.transform = 'scale(0.96)';
+        }, 0);
       });
 
       handle.addEventListener('dragend', function () {
         chip.style.opacity = '1';
-        chip.style.boxShadow = '';
-        // Remove all dragover highlights
+        chip.style.cursor = 'grab';
+        chip.style.transform = '';
         bar.querySelectorAll('[data-cat-id]').forEach(function (el) {
-          el.style.boxShadow = '';
+          el.style.borderLeft = '';
+          el.style.borderRight = '';
+          el.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
         });
       });
 
@@ -1347,31 +1353,37 @@
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         if (chip !== _dragSrcEl) {
-          chip.style.boxShadow = '0 0 0 2px var(--x-primary,#b6ff00)';
+          var rect = chip.getBoundingClientRect();
+          var midX = rect.left + rect.width / 2;
+          if (e.clientX < midX) {
+            chip.style.borderLeft = '3px solid var(--x-primary,#10b981)';
+            chip.style.borderRight = '';
+          } else {
+            chip.style.borderLeft = '';
+            chip.style.borderRight = '3px solid var(--x-primary,#10b981)';
+          }
         }
       });
 
       chip.addEventListener('dragleave', function () {
-        chip.style.boxShadow = '';
+        chip.style.borderLeft = '';
+        chip.style.borderRight = '';
       });
 
       chip.addEventListener('drop', function (e) {
         e.preventDefault();
-        chip.style.boxShadow = '';
+        chip.style.borderLeft = '';
+        chip.style.borderRight = '';
         if (!_dragSrcCatId || _dragSrcCatId === cat.id) return;
 
-        // Reorder chips in DOM
-        var chips = Array.from(bar.querySelectorAll('[data-cat-id]'));
-        var srcIdx = chips.findIndex(function (el) { return el.dataset.catId === _dragSrcCatId; });
-        var dstIdx = chips.findIndex(function (el) { return el.dataset.catId === cat.id; });
+        var rect = chip.getBoundingClientRect();
+        var midX = rect.left + rect.width / 2;
+        var insertBefore = e.clientX < midX;
 
-        if (srcIdx === -1 || dstIdx === -1) return;
-
-        // Move src before or after dst
-        if (srcIdx < dstIdx) {
-          bar.insertBefore(_dragSrcEl, chip.nextSibling);
-        } else {
+        if (insertBefore) {
           bar.insertBefore(_dragSrcEl, chip);
+        } else {
+          bar.insertBefore(_dragSrcEl, chip.nextSibling);
         }
 
         // Build new order from DOM

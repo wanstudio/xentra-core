@@ -3026,11 +3026,14 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       }
     }
 
-    // Insert or update branch_products snapshot
+    // Insert or adopt branch_products (override columns start NULL = inherit master).
+    // Override columns (name_override, description_override, image_override) are NOT populated
+    // here; they remain NULL so the branch inherits live Master Product values at query time.
+    // Use PATCH /admin/branches/:id/products/:productId/override to set branch-specific overrides.
     db.prepare(`
       INSERT INTO branch_products (
-        branch_id, product_id, branch_category_id, product_name, product_description, product_image_url, price, is_available, stock
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 100)
+        branch_id, product_id, branch_category_id, price, is_available, stock
+      ) VALUES (?, ?, ?, ?, 1, 100)
       ON CONFLICT(branch_id, product_id) DO UPDATE SET
         branch_category_id = excluded.branch_category_id,
         price = excluded.price,
@@ -3040,9 +3043,6 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       req.params.id,
       product.id,
       branchCategoryId,
-      product.name,
-      product.description,
-      product.image_url,
       resolved.effective_price
     );
 
@@ -3126,6 +3126,77 @@ router.delete('/admin/branches/:id/products/:productId', requireAuth(['owner', '
     });
   } catch (err) {
     console.error('[API Error DELETE /admin/branches/:id/products/:productId]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// C1.8-OVR Branch Product Override — set or clear per-field content overrides.
+// NULL body field = clear override (branch falls back to live Master Product value).
+// Non-null body field = branch override wins at query time via COALESCE in CatalogService.
+router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+    }
+
+    const bp = db.prepare('SELECT branch_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(req.params.id, req.params.productId);
+    if (!bp) {
+      return res.status(404).json({ success: false, error: 'Produk tidak ditemukan di katalog cabang ini.' });
+    }
+
+    // Only fields explicitly present in the request body are updated.
+    // Pass null to clear an override; omit the key entirely to leave it untouched.
+    const updates = {};
+    if (Object.prototype.hasOwnProperty.call(req.body, 'name')) {
+      updates.name_override = req.body.name != null ? String(req.body.name).trim() || null : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'description')) {
+      updates.description_override = req.body.description != null ? String(req.body.description).trim() || null : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(req.body, 'image_url')) {
+      updates.image_override = req.body.image_url != null ? String(req.body.image_url).trim() || null : null;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, error: 'Tidak ada field override yang disediakan (name, description, image_url).' });
+    }
+
+    const setParts = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+    const values = [...Object.values(updates), req.params.id, req.params.productId];
+    db.prepare(`UPDATE branch_products SET ${setParts}, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?`).run(...values);
+
+    // Read back the resolved state for the response
+    const resolved = db.prepare(`
+      SELECT
+        COALESCE(bp.name_override, p.name) as name,
+        COALESCE(bp.description_override, p.description) as description,
+        COALESCE(bp.image_override, p.image_url) as image_url,
+        bp.name_override, bp.description_override, bp.image_override,
+        p.name as master_name, p.description as master_description, p.image_url as master_image_url
+      FROM branch_products bp
+      JOIN products p ON p.id = bp.product_id
+      WHERE bp.branch_id = ? AND bp.product_id = ?
+    `).get(req.params.id, req.params.productId);
+
+    res.json({
+      success: true,
+      message: 'Override produk berhasil disimpan.',
+      override: resolved
+    });
+  } catch (err) {
+    console.error('[API Error PATCH /admin/branches/:id/products/:productId/override]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

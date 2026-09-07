@@ -147,32 +147,37 @@ test('TEST 4 — Different Branch Categories: same product, different branch pla
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
-// TEST 5 — Master mutation isolation (snapshot semantics)
-// Adopt Product X into Branch A. Then change Master Product X name/metadata.
-// Branch Catalog MUST NOT silently mutate.
+// TEST 5 — Override architecture: master propagation vs explicit branch override
+// Under Master Product Default + Branch Optional Override:
+//   - Branch with NO override: sees live master updates (propagation)
+//   - Branch with explicit override: override wins, master update does not affect it
 // ══════════════════════════════════════════════════════════════════════════════
-test('TEST 5 — Master mutation isolation: snapshot prevents silent Branch mutation', () => {
-  // Snapshot the current branch product name
-  const before = db.prepare('SELECT product_name, product_description, product_image_url FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A, PRODUCT_X);
-  assert.strictEqual(before.product_name, 'Product X', 'Before: snapshot has original name');
+test('TEST 5 — Override architecture: master update propagates to branch without override', () => {
+  // Ensure no override is set for Branch A Product X
+  db.prepare('UPDATE branch_products SET name_override = NULL, description_override = NULL, image_override = NULL WHERE branch_id = ? AND product_id = ?').run(BRANCH_A, PRODUCT_X);
 
   // Mutate the Master Product
   db.prepare("UPDATE products SET name = 'RENAMED BY OWNER', description = 'New desc', image_url = 'new-img.png' WHERE id = ? AND brand_id = ?").run(PRODUCT_X, BRAND);
 
-  // Branch Catalog must still show the ORIGINAL snapshot
-  const adoption = db.prepare('SELECT product_name, product_description, product_image_url FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A, PRODUCT_X);
-  assert.strictEqual(adoption.product_name, 'Product X', 'Branch snapshot NOT mutated by master change');
-  assert.strictEqual(adoption.product_description, 'Desc X', 'Branch description NOT mutated');
-  assert.strictEqual(adoption.product_image_url, 'img-x.png', 'Branch image NOT mutated');
-
-  // CatalogService should also return the snapshot values
+  // Branch with NO override MUST see the live master value (propagation is expected)
   const menuA = CatalogService.getMenu({ brand_id: BRAND, branch_id: BRANCH_A });
   const pX = menuA.products.find(p => p.id === PRODUCT_X);
-  assert.strictEqual(pX.name, 'Product X', 'CatalogService returns snapshot name, not mutated master name');
-  assert.strictEqual(pX.description, 'Desc X', 'CatalogService returns snapshot description');
+  assert.strictEqual(pX.name, 'RENAMED BY OWNER', 'Branch without override sees live master update');
+  assert.strictEqual(pX.description, 'New desc', 'Branch description reflects live master');
 
-  // Restore master product for other tests
+  // Override fields must be null (confirming no override is active)
+  assert.strictEqual(pX.name_override, null, 'name_override is null — inheriting master');
+  assert.strictEqual(pX.master_name, 'RENAMED BY OWNER', 'master_name reflects updated master');
+
+  // Now set an explicit branch override — it must win over master
+  db.prepare('UPDATE branch_products SET name_override = ? WHERE branch_id = ? AND product_id = ?').run('Branch Locked Name', BRANCH_A, PRODUCT_X);
+  const menuA2 = CatalogService.getMenu({ brand_id: BRAND, branch_id: BRANCH_A });
+  const pX2 = menuA2.products.find(p => p.id === PRODUCT_X);
+  assert.strictEqual(pX2.name, 'Branch Locked Name', 'Explicit override wins over master');
+
+  // Restore master product and clear override for subsequent tests
   db.prepare("UPDATE products SET name = 'Product X', description = 'Desc X', image_url = 'img-x.png' WHERE id = ? AND brand_id = ?").run(PRODUCT_X, BRAND);
+  db.prepare('UPDATE branch_products SET name_override = NULL, description_override = NULL, image_override = NULL WHERE branch_id = ? AND product_id = ?').run(BRANCH_A, PRODUCT_X);
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
