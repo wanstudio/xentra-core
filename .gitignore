@@ -30,3 +30,7 @@ tools/**/.env.local
 auth_session/
 *.session
 
+
+# Uploaded category images (test/runtime artifacts — not source)
+apps/customer-pwa/assets/uploads/categories/*
+!apps/customer-pwa/assets/uploads/categories/.gitkeep

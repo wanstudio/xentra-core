@@ -636,10 +636,47 @@
     </div>
   </div>
 
+  <!-- MODAL: EDIT BRANCH CATEGORY (name + image) -->
+  <div id="modal-branch-category-edit" class="x-modal-backdrop" style="display:none; z-index: 1100;">
+    <div class="x-modal-card" style="max-width: 420px;">
+      <div class="x-modal-header">
+        <h3>Ubah Kategori Cabang</h3>
+        <button type="button" class="x-modal-close" onclick="closeBranchCategoryEditModal()">✕</button>
+      </div>
+      <form id="form-branch-category-edit" class="x-form">
+        <input type="hidden" id="bce-cat-id" value="">
+
+        <div class="x-form-group">
+          <label for="bce-name">Nama Kategori</label>
+          <input type="text" id="bce-name" class="x-input" maxlength="40" placeholder="Contoh: Menu Favorit" required>
+        </div>
+
+        <div class="x-form-group">
+          <label>Gambar Kategori</label>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div id="bce-image-preview-wrap" style="width:72px;height:72px;border-radius:14px;overflow:hidden;background:#f8fafc;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <img id="bce-image-preview" src="" alt="Preview kategori" style="width:100%;height:100%;object-fit:cover;display:none;">
+              <span id="bce-image-preview-mono" style="font-weight:700;color:#94a3b8;font-size:20px;">?</span>
+            </div>
+            <div style="flex:1;">
+              <input type="file" id="bce-image-file" class="x-input" accept="image/png,image/jpeg,image/webp">
+              <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">JPG, PNG, atau WEBP. Maks 3MB. Tampil persegi (1:1) di Home.</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="x-modal-footer">
+          <button type="button" class="x-btn-secondary" onclick="closeBranchCategoryEditModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-branch-category-edit">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="x-toast-container" class="x-toast-container"></div>
 
   <!-- Dashboard JavaScript -->
-  <script src="/dashboard/assets/js/dashboard.js?v=2.1.1"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=2.1.2"></script>
 </body>
 </html>

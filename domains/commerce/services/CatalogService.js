@@ -122,7 +122,7 @@ class CatalogService {
         brand_id: c.brand_id,
         name: c.name,
         slug: c.slug,
-        icon_url: c.icon_url,
+        image_url: c.image_url || null,
         sort_order: c.sort_order
       })),
       products: resolvedProducts
@@ -202,7 +202,7 @@ class CatalogService {
         brand_id: c.brand_id,
         name: c.name,
         slug: c.slug,
-        icon_url: c.icon_url,
+        image_url: c.image_url || null,
         sort_order: c.sort_order
       })),
       products: resolvedProducts

@@ -42,7 +42,11 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+// 6mb JSON limit: base64-encoded category/menu image uploads (see POST
+// /admin/branches/:id/categories/:catId/image) are ~33% larger than the raw
+// file, and raw files are capped at 3MB — 6mb gives comfortable headroom
+// without opening the door to arbitrarily large payloads.
+app.use(express.json({ limit: '6mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // REST API with Tenant Resolution (Support both /api/v1 and /api)

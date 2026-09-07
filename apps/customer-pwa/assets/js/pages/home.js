@@ -681,9 +681,9 @@
       btn.className = 'x-cat' + (String(cat.id) === String(activeCategory) ? ' active' : '');
       btn.setAttribute('data-cat-id', String(cat.id));
 
-      var imgHtml = cat.image
-        ? '<img src="' + UI.escape(cat.image) + '" alt="' + UI.escape(cat.name) + '" loading="lazy">'
-        : '';
+      var imgHtml = cat.image_url
+        ? '<img src="' + UI.escape(cat.image_url) + '" alt="' + UI.escape(cat.name) + '" loading="lazy">'
+        : '<span class="x-cat-image-mono">' + UI.escape(branchMonogram(cat.name)) + '</span>';
 
       btn.innerHTML =
         '<span class="x-cat-image">' + imgHtml + '</span>' +

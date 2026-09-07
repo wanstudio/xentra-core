@@ -1258,23 +1258,46 @@
     categories.forEach(function (cat) {
       var isActive = branchCatalogFilter === cat.id;
 
-      // Outer chip wrapper — this is the draggable unit
+      // Outer chip wrapper — visual grouping only; NOT itself draggable so that
+      // clicking the name/edit/delete buttons never accidentally starts a drag.
       var chip = document.createElement('span');
       chip.dataset.catId = cat.id;
-      chip.draggable = true;
       chip.style.cssText = [
-        'display:inline-flex;align-items:center;gap:0;border-radius:20px;overflow:hidden;cursor:grab;',
+        'display:inline-flex;align-items:center;gap:0;border-radius:20px;overflow:hidden;',
         'border:1px solid ' + (isActive ? 'var(--x-primary,#b6ff00)' : '#e2e8f0') + ';',
         'background:' + (isActive ? '#f0ffe0' : '#f8fafc') + ';',
         'transition:box-shadow 0.15s,opacity 0.15s;'
       ].join('');
 
-      // Drag handle indicator
+      // Drag handle indicator — this is the ONLY draggable element in the chip.
+      // Native HTML5 drag-and-drop only starts a drag from the element the user
+      // actually presses on, so scoping `draggable` to just this handle (rather
+      // than the whole chip) means clicking the name/edit/delete buttons never
+      // triggers a drag.
       var handle = document.createElement('span');
+      handle.draggable = true;
       handle.title = 'Geser untuk ubah urutan';
       handle.style.cssText = 'padding:5px 4px 5px 10px;font-size:13px;color:#94a3b8;cursor:grab;user-select:none;';
       handle.textContent = '⠿';
       chip.appendChild(handle);
+
+      // Small square thumbnail so admins can see the persisted category image
+      // (or a safe monogram fallback — never a broken image).
+      var thumbWrap = document.createElement('span');
+      thumbWrap.style.cssText = 'width:22px;height:22px;border-radius:6px;overflow:hidden;background:#eef2f6;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:2px;';
+      if (cat.image_url) {
+        var thumbImg = document.createElement('img');
+        thumbImg.src = cat.image_url;
+        thumbImg.alt = '';
+        thumbImg.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+        thumbWrap.appendChild(thumbImg);
+      } else {
+        var thumbMono = document.createElement('span');
+        thumbMono.style.cssText = 'font-size:10px;font-weight:700;color:#94a3b8;';
+        thumbMono.textContent = (cat.name || '?').trim().slice(0, 1).toUpperCase();
+        thumbWrap.appendChild(thumbMono);
+      }
+      chip.appendChild(thumbWrap);
 
       // Category name / filter button
       var nameBtn = document.createElement('button');
@@ -1287,10 +1310,10 @@
       // Edit button
       var editBtn = document.createElement('button');
       editBtn.type = 'button';
-      editBtn.title = 'Ubah nama';
+      editBtn.title = 'Ubah nama & gambar';
       editBtn.style.cssText = 'border:none;background:none;padding:5px 5px;font-size:12px;cursor:pointer;color:#64748b;';
       editBtn.textContent = '✏️';
-      editBtn.addEventListener('click', function (e) { e.stopPropagation(); editBranchCategory(cat.id, cat.name); });
+      editBtn.addEventListener('click', function (e) { e.stopPropagation(); openBranchCategoryEditModal(cat); });
       chip.appendChild(editBtn);
 
       // Delete button
@@ -1302,8 +1325,8 @@
       delBtn.addEventListener('click', function (e) { e.stopPropagation(); deleteBranchCategory(cat.id, cat.name); });
       chip.appendChild(delBtn);
 
-      // ── HTML5 Drag Events ──────────────────────────────────────
-      chip.addEventListener('dragstart', function (e) {
+      // ── HTML5 Drag Events (bound on the handle; chip is the moved unit) ──
+      handle.addEventListener('dragstart', function (e) {
         _dragSrcCatId = cat.id;
         _dragSrcEl = chip;
         e.dataTransfer.effectAllowed = 'move';
@@ -1311,7 +1334,7 @@
         setTimeout(function () { chip.style.opacity = '0.45'; }, 0);
       });
 
-      chip.addEventListener('dragend', function () {
+      handle.addEventListener('dragend', function () {
         chip.style.opacity = '1';
         chip.style.boxShadow = '';
         // Remove all dragover highlights
@@ -1419,27 +1442,135 @@
     renderInlineAdoptedProducts(adopted, catId);
   };
 
-  window.editBranchCategory = async function (catId, currentName) {
-    var newName = prompt('Ubah nama kategori:', currentName);
-    if (!newName || !newName.trim() || newName.trim() === currentName) return;
+  // ── Branch Category Edit Modal (name + image) ──────────────────────────
+  var _bceSelectedFile = null; // File object staged for upload on save
 
-    try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories/' + catId, {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ name: newName.trim() })
-      });
-      var data = await res.json();
-      if (data.success) {
-        showToast('\u2705 Kategori berhasil diubah!');
-        loadInlineBranchCatalog();
-      } else {
-        showToast('\u274C ' + (data.error || 'Gagal mengubah nama kategori.'));
-      }
-    } catch (err) {
-      showToast('\u274C Kesalahan jaringan.');
+  window.openBranchCategoryEditModal = function (cat) {
+    _bceSelectedFile = null;
+    $('bce-cat-id').value = cat.id;
+    $('bce-name').value = cat.name || '';
+    $('bce-image-file').value = '';
+
+    var previewImg = $('bce-image-preview');
+    var previewMono = $('bce-image-preview-mono');
+    if (cat.image_url) {
+      previewImg.src = cat.image_url;
+      previewImg.style.display = 'block';
+      previewMono.style.display = 'none';
+    } else {
+      previewImg.style.display = 'none';
+      previewMono.style.display = 'block';
+      previewMono.textContent = (cat.name || '?').trim().slice(0, 1).toUpperCase();
     }
+
+    var modal = $('modal-branch-category-edit');
+    if (modal) modal.style.display = 'flex';
   };
+
+  window.closeBranchCategoryEditModal = function () {
+    var modal = $('modal-branch-category-edit');
+    if (modal) modal.style.display = 'none';
+    _bceSelectedFile = null;
+  };
+
+  (function initBranchCategoryEditModal() {
+    var fileInput = $('bce-image-file');
+    if (fileInput) {
+      fileInput.addEventListener('change', function () {
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) { _bceSelectedFile = null; return; }
+
+        var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (allowed.indexOf(file.type) === -1) {
+          showToast('❌ Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+          fileInput.value = '';
+          return;
+        }
+        if (file.size > 3 * 1024 * 1024) {
+          showToast('❌ Ukuran gambar melebihi batas maksimal 3MB.');
+          fileInput.value = '';
+          return;
+        }
+
+        _bceSelectedFile = file;
+
+        // Local preview only — the actual persisted image comes back from the
+        // backend after upload; this is just so the admin sees what they picked.
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          var previewImg = $('bce-image-preview');
+          var previewMono = $('bce-image-preview-mono');
+          previewImg.src = e.target.result;
+          previewImg.style.display = 'block';
+          previewMono.style.display = 'none';
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    var form = $('form-branch-category-edit');
+    if (form) {
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+
+        var catId = $('bce-cat-id').value;
+        var newName = $('bce-name').value.trim();
+        if (!newName) {
+          showToast('❌ Nama kategori wajib diisi.');
+          return;
+        }
+
+        var saveBtn = $('btn-save-branch-category-edit');
+        if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Menyimpan...'; }
+
+        try {
+          // 1. Rename (always sent — cheap and keeps behavior simple/predictable)
+          var renameRes = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories/' + catId, {
+            method: 'PATCH',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ name: newName })
+          });
+          var renameData = await renameRes.json();
+          if (!renameData.success) {
+            showToast('❌ ' + (renameData.error || 'Gagal mengubah nama kategori.'));
+            return;
+          }
+
+          // 2. Image (only if a new file was staged) — uploaded as base64 to the
+          // backend, which decodes it, writes a real file, and stores only the
+          // resulting URL. Never persisted as base64 in the database.
+          if (_bceSelectedFile) {
+            var base64 = await new Promise(function (resolve, reject) {
+              var reader = new FileReader();
+              reader.onload = function () { resolve(reader.result); };
+              reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
+              reader.readAsDataURL(_bceSelectedFile);
+            });
+
+            var imageRes = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories/' + catId + '/image', {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ image_base64: base64, mime_type: _bceSelectedFile.type })
+            });
+            var imageData = await imageRes.json();
+            if (!imageData.success) {
+              showToast('❌ ' + (imageData.error || 'Gagal mengunggah gambar kategori.'));
+              return;
+            }
+          }
+
+          showToast('✅ Kategori berhasil diperbarui!');
+          closeBranchCategoryEditModal();
+          loadInlineBranchCatalog();
+        } catch (err) {
+          console.error('[Branch Category Edit Error]:', err);
+          showToast('❌ Kesalahan jaringan saat menyimpan kategori.');
+        } finally {
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Simpan'; }
+        }
+      });
+    }
+  })();
 
   window.deleteBranchCategory = async function (catId, catName) {
     if (!confirm('Hapus kategori "' + catName + '"? Produk di kategori ini tidak akan dihapus, hanya dipindah ke tanpa kategori.')) return;

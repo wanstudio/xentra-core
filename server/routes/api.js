@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
 const db = require('../database/db');
 const BranchMatcher = require('../services/BranchMatcher');
 const DeliveryCalculator = require('../services/DeliveryCalculator');
@@ -2889,7 +2891,7 @@ router.get('/admin/branches/:id/catalog', requireAuth(['owner', 'brand_manager',
     }
 
     const branchCategories = db.prepare(`
-      SELECT id, name, slug, sort_order
+      SELECT id, name, slug, image_url, sort_order
       FROM branch_categories
       WHERE branch_id = ? AND brand_id = ?
       ORDER BY sort_order ASC, name ASC
@@ -3146,6 +3148,9 @@ router.post('/admin/branches/:id/categories', requireAuth(['owner', 'brand_manag
     if (!name) {
       return res.status(400).json({ success: false, error: 'Nama kategori cabang wajib diisi.' });
     }
+    if (name.length > 40) {
+      return res.status(400).json({ success: false, error: 'Nama kategori maksimal 40 karakter.' });
+    }
 
     const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
     if (!branch) {
@@ -3183,17 +3188,88 @@ router.patch('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'bra
 
     const name = String((req.body && req.body.name) || '').trim();
     if (!name) return res.status(400).json({ success: false, error: 'Nama kategori wajib diisi.' });
+    if (name.length > 40) {
+      return res.status(400).json({ success: false, error: 'Nama kategori maksimal 40 karakter.' });
+    }
 
     const cat = db.prepare('SELECT id FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
       .get(req.params.catId, req.params.id, req.brand_id);
     if (!cat) return res.status(404).json({ success: false, error: 'Kategori cabang tidak ditemukan.' });
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    db.prepare('UPDATE branch_categories SET name = ?, slug = ? WHERE id = ?').run(name, slug, req.params.catId);
+    db.prepare("UPDATE branch_categories SET name = ?, slug = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(name, slug, req.params.catId);
 
     res.json({ success: true, category: { id: req.params.catId, name, slug } });
   } catch (err) {
     console.error('[API Error PATCH /admin/branches/:id/categories/:catId]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Upload / replace a branch category's image.
+// Follows the same storage pattern already used across Xentra for menu photos:
+// the file is persisted to disk under the app's static /assets tree and only the
+// resulting persistent URL is written to the database — never a base64 blob.
+const CATEGORY_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/categories');
+const CATEGORY_IMAGE_MAX_BYTES = 3 * 1024 * 1024; // 3MB
+const CATEGORY_IMAGE_MIME_TO_EXT = {
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp'
+};
+
+router.post('/admin/branches/:id/categories/:catId/image', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+      }
+    }
+
+    const cat = db.prepare('SELECT id FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
+      .get(req.params.catId, req.params.id, req.brand_id);
+    if (!cat) return res.status(404).json({ success: false, error: 'Kategori cabang tidak ditemukan.' });
+
+    const { image_base64, mime_type } = req.body || {};
+    if (!image_base64 || typeof image_base64 !== 'string') {
+      return res.status(400).json({ success: false, error: 'Gambar kategori wajib diunggah.' });
+    }
+
+    const ext = CATEGORY_IMAGE_MIME_TO_EXT[String(mime_type || '').toLowerCase()];
+    if (!ext) {
+      return res.status(400).json({ success: false, error: 'Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.' });
+    }
+
+    // Strip an optional data URL prefix (e.g. "data:image/png;base64,...") before decoding.
+    const rawBase64 = image_base64.includes(',') ? image_base64.split(',').pop() : image_base64;
+    let buffer;
+    try {
+      buffer = Buffer.from(rawBase64, 'base64');
+    } catch (decodeErr) {
+      return res.status(400).json({ success: false, error: 'Gambar tidak dapat diproses (data tidak valid).' });
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ success: false, error: 'Gambar kosong atau rusak.' });
+    }
+    if (buffer.length > CATEGORY_IMAGE_MAX_BYTES) {
+      return res.status(400).json({ success: false, error: 'Ukuran gambar melebihi batas maksimal 3MB.' });
+    }
+
+    fs.mkdirSync(CATEGORY_IMAGE_DIR, { recursive: true });
+    const fileName = `${req.params.catId}-${Date.now()}.${ext}`;
+    fs.writeFileSync(path.join(CATEGORY_IMAGE_DIR, fileName), buffer);
+
+    const imageUrl = `/assets/uploads/categories/${fileName}`;
+    db.prepare("UPDATE branch_categories SET image_url = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(imageUrl, req.params.catId);
+
+    res.json({ success: true, category: { id: req.params.catId, image_url: imageUrl } });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/categories/:catId/image]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -3212,10 +3288,26 @@ router.delete('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'br
       .get(req.params.catId, req.params.id, req.brand_id);
     if (!cat) return res.status(404).json({ success: false, error: 'Kategori cabang tidak ditemukan.' });
 
-    // Unassign products from this category before deleting
-    db.prepare('UPDATE branch_products SET branch_category_id = NULL WHERE branch_category_id = ? AND branch_id = ?')
-      .run(req.params.catId, req.params.id);
-    db.prepare('DELETE FROM branch_categories WHERE id = ?').run(req.params.catId);
+    // Unassign products, delete the category, then re-pack the remaining categories'
+    // sort_order into a contiguous 1..N sequence — all inside one atomic transaction
+    // so Home never observes a gap (e.g. 1, 4, 7) or a half-applied delete.
+    const remaining = db.prepare(
+      'SELECT id FROM branch_categories WHERE branch_id = ? AND brand_id = ? AND id != ? ORDER BY sort_order ASC, name ASC'
+    ).all(req.params.id, req.brand_id, req.params.catId);
+
+    const updateSort = db.prepare('UPDATE branch_categories SET sort_order = ? WHERE id = ?');
+
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      db.prepare('UPDATE branch_products SET branch_category_id = NULL WHERE branch_category_id = ? AND branch_id = ?')
+        .run(req.params.catId, req.params.id);
+      db.prepare('DELETE FROM branch_categories WHERE id = ?').run(req.params.catId);
+      remaining.forEach((c, idx) => updateSort.run(idx + 1, c.id));
+      db.exec('COMMIT;');
+    } catch (txErr) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw txErr;
+    }
 
     res.json({ success: true });
   } catch (err) {
@@ -3239,17 +3331,56 @@ router.put('/admin/branches/:id/categories/reorder', requireAuth(['owner', 'bran
       return res.status(400).json({ success: false, error: 'Payload "order" harus berupa array ID kategori.' });
     }
 
+    // Reject duplicate IDs in the payload — a duplicate would make ordering ambiguous
+    // and would silently clobber another category's sort_order.
+    const uniqueIds = new Set(order.map(String));
+    if (uniqueIds.size !== order.length) {
+      return res.status(400).json({ success: false, error: 'Payload "order" mengandung ID kategori duplikat.' });
+    }
+
     const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
     if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan.' });
 
-    // Update each category's sort_order inside a single transaction
+    // AUTHORITATIVE VALIDATION: every ID in the payload must actually belong to THIS
+    // branch (and brand). Reject the whole request up front — never let one branch's
+    // reorder touch another branch's categories, and never trust client-sent order
+    // for IDs we haven't verified ownership of.
+    const owned = db.prepare('SELECT id FROM branch_categories WHERE branch_id = ? AND brand_id = ?')
+      .all(req.params.id, req.brand_id);
+    const ownedIds = new Set(owned.map((c) => String(c.id)));
+    const invalidIds = order.filter((catId) => !ownedIds.has(String(catId)));
+    if (invalidIds.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'FORBIDDEN_BRANCH_SCOPE',
+        message: 'Sebagian ID kategori tidak valid atau bukan milik cabang ini.'
+      });
+    }
+
+    // Categories that exist for this branch but were NOT included in the payload keep
+    // their relative order and are placed deterministically after the reordered set,
+    // so no category is ever left with an undefined/garbage sort_order.
+    const orderedIdStrings = order.map(String);
+    const untouched = owned
+      .map((c) => String(c.id))
+      .filter((id) => !uniqueIds.has(id));
+    const finalOrder = [...orderedIdStrings, ...untouched];
+
+    // Update every category's sort_order inside a single atomic transaction — if
+    // anything throws mid-way, the whole transaction rolls back and the previous
+    // ordering stays fully intact.
     const updateSort = db.prepare('UPDATE branch_categories SET sort_order = ? WHERE id = ? AND branch_id = ? AND brand_id = ?');
-    const runAll = db.transaction((ids) => {
-      ids.forEach((catId, idx) => {
+
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      finalOrder.forEach((catId, idx) => {
         updateSort.run(idx + 1, catId, req.params.id, req.brand_id);
       });
-    });
-    runAll(order);
+      db.exec('COMMIT;');
+    } catch (txErr) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw txErr;
+    }
 
     res.json({ success: true });
   } catch (err) {

@@ -194,21 +194,21 @@ const memoryStore = {
   ],
   branch_categories: [
     // Barat
-    { id: 'bc_barat_favorit', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Menu Favorit', slug: 'menu-favorit', sort_order: 1 },
-    { id: 'bc_barat_minuman', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Minuman Segar', slug: 'minuman-segar', sort_order: 2 },
-    { id: 'bc_barat_snack', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Cemilan', slug: 'cemilan', sort_order: 3 },
+    { id: 'bc_barat_favorit', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Menu Favorit', slug: 'menu-favorit', image_url: null, sort_order: 1 },
+    { id: 'bc_barat_minuman', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Minuman Segar', slug: 'minuman-segar', image_url: null, sort_order: 2 },
+    { id: 'bc_barat_snack', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_barat', name: 'Cemilan', slug: 'cemilan', image_url: null, sort_order: 3 },
     // Timur
-    { id: 'bc_timur_paket', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_timur', name: 'Paket Hemat', slug: 'paket-hemat', sort_order: 1 },
-    { id: 'bc_timur_kopi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_timur', name: 'Kopi & Teh', slug: 'kopi-teh', sort_order: 2 },
+    { id: 'bc_timur_paket', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_timur', name: 'Paket Hemat', slug: 'paket-hemat', image_url: null, sort_order: 1 },
+    { id: 'bc_timur_kopi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_timur', name: 'Kopi & Teh', slug: 'kopi-teh', image_url: null, sort_order: 2 },
     // Pusat
-    { id: 'bc_pusat_rekomendasi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_pusat', name: 'Rekomendasi Chef', slug: 'rekomendasi-chef', sort_order: 1 },
-    { id: 'bc_pusat_snack', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_pusat', name: 'Kudapan', slug: 'kudapan', sort_order: 2 },
+    { id: 'bc_pusat_rekomendasi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_pusat', name: 'Rekomendasi Chef', slug: 'rekomendasi-chef', image_url: null, sort_order: 1 },
+    { id: 'bc_pusat_snack', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_pusat', name: 'Kudapan', slug: 'kudapan', image_url: null, sort_order: 2 },
     // Utara
-    { id: 'bc_utara_bestseller', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_utara', name: 'Best Seller', slug: 'best-seller', sort_order: 1 },
-    { id: 'bc_utara_minuman', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_utara', name: 'Minuman Segar', slug: 'minuman-segar', sort_order: 2 },
+    { id: 'bc_utara_bestseller', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_utara', name: 'Best Seller', slug: 'best-seller', image_url: null, sort_order: 1 },
+    { id: 'bc_utara_minuman', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_utara', name: 'Minuman Segar', slug: 'minuman-segar', image_url: null, sort_order: 2 },
     // Selatan
-    { id: 'bc_selatan_makan', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_selatan', name: 'Menu Utama', slug: 'menu-utama', sort_order: 1 },
-    { id: 'bc_selatan_kopi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_selatan', name: 'Kedai Kopi & Teh', slug: 'kedai-kopi-teh', sort_order: 2 }
+    { id: 'bc_selatan_makan', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_selatan', name: 'Menu Utama', slug: 'menu-utama', image_url: null, sort_order: 1 },
+    { id: 'bc_selatan_kopi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_selatan', name: 'Kedai Kopi & Teh', slug: 'kedai-kopi-teh', image_url: null, sort_order: 2 }
   ],
   orders: [],
   users: [],
@@ -882,6 +882,12 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_name TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_description TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN product_image_url TEXT;'); } catch (e) {}
+
+  // BRANCH CATEGORY MANAGEMENT (Kategori Cabang upgrade): branch_categories needs its
+  // own image reference + updated_at so the dashboard can rename/re-image a category
+  // and have Home read the same persisted value. Idempotent — safe on existing DBs.
+  try { targetDb.exec('ALTER TABLE branch_categories ADD COLUMN image_url TEXT;'); } catch (e) {}
+  try { targetDb.exec("ALTER TABLE branch_categories ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));"); } catch (e) {}
 
   // Migrate existing branch_products:
   // 1. Snapshot master product metadata (product_name, description, image_url)
