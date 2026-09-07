@@ -537,7 +537,9 @@
 
     // Fulfillment subtitle & info
     var fulTitle = 'Delivery';
-    var fulSub = 'Hari ini | ' + state.fulfillment.timeSlot;
+    var fulSub = state.fulfillment.scheduled
+      ? ((state.fulfillment.date || 'Hari ini') + ' | ' + (state.fulfillment.timeSlot || '12.00 - 12.30'))
+      : 'Sekarang (15–25 menit)';
     var fulIcon = '/assets/icons/delivery.png';
 
     if (isPickup) {
@@ -555,7 +557,7 @@
       var rTime = state.fulfillment.reservationTime || '12:00';
       var rGuests = state.fulfillment.guestCount || 2;
       fulSub = rDate + ' • ' + rTime + ' (' + rGuests + ' Orang)';
-      fulIcon = '/assets/icons/info_green.svg';
+      fulIcon = '/assets/icons/reservasi.png';
     }
 
     var customerName = state.customer.name || 'Pelanggan';
@@ -1040,143 +1042,328 @@
     return { overlay: overlay, close: close };
   }
 
-  // ── 1. Fulfillment Sheet (4 Order Types: Delivery, Pick-up, Dine-in, Reservation) ──
+  // ── 1. Fulfillment Sheet (4 Order Types: Delivery, Pick-up, Dine-in, Reservasi) ──
   function openFulfillmentSheet() {
-    var draftType = state.fulfillment.type || 'delivery';
-    if (draftType === 'dinein') draftType = 'dine_in';
+    // Determine dynamic branch capability availability
+    var curBranch = state.matchedBranch || (availableBranches && availableBranches[0]) || null;
+    var isDeliveryAvail = !curBranch || curBranch.is_delivery_active !== 0;
+    var isPickupAvail = !curBranch || curBranch.is_pickup_active !== 0;
+    var isDineInAvail = !curBranch || curBranch.is_dine_in_active !== 0;
+    var isReservationAvail = !curBranch || curBranch.is_reservation_active !== 0;
 
-    // Calculate tomorrow's date for minimum reservation date constraint
-    var tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    var minDateStr = tomorrow.toISOString().slice(0, 10);
-    var defaultResDate = state.fulfillment.reservationDate || minDateStr;
+    var availabilityMap = {
+      delivery: isDeliveryAvail,
+      pickup: isPickupAvail,
+      dine_in: isDineInAvail,
+      reservation: isReservationAvail
+    };
 
-    var branchOptionsHtml = '';
-    availableBranches.forEach(function (b) {
-      var isSel = state.matchedBranch && String(state.matchedBranch.id) === String(b.id);
-      branchOptionsHtml += '<option value="' + b.id + '" ' + (isSel ? 'selected' : '') + '>' + UI.escape(b.name) + '</option>';
-    });
+    // Initial committed values
+    var committedType = state.fulfillment.type || 'delivery';
+    if (committedType === 'dinein') committedType = 'dine_in';
+    if (!availabilityMap[committedType]) {
+      // Fallback to first available type
+      if (isDeliveryAvail) committedType = 'delivery';
+      else if (isPickupAvail) committedType = 'pickup';
+      else if (isDineInAvail) committedType = 'dine_in';
+      else if (isReservationAvail) committedType = 'reservation';
+    }
+
+    // Clone committed state into DRAFT
+    var draft = {
+      type: committedType,
+      scheduled: Boolean(state.fulfillment.scheduled),
+      date: state.fulfillment.date || 'Hari ini',
+      timeSlot: state.fulfillment.timeSlot || '16:00-16:30',
+      tableNumber: state.fulfillment.tableNumber || '',
+      reservationDate: state.fulfillment.reservationDate || '',
+      reservationTime: state.fulfillment.reservationTime || '12:00',
+      guestCount: state.fulfillment.guestCount || 2
+    };
+
+    var WHEEL_ITEM_HEIGHT = 44;
+
+    function buildScheduleDates() {
+      var list = [];
+      var now = new Date();
+      var daysMap = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+      for (var i = 0; i < 7; i++) {
+        var d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
+        var label = i === 0 ? 'Hari ini' : (i === 1 ? 'Besok' : daysMap[d.getDay()]);
+        list.push({
+          value: label,
+          label: label,
+          iso: d.toISOString().slice(0, 10)
+        });
+      }
+      return list;
+    }
+
+    function buildScheduleSlots(dateLabel) {
+      // Generate standard 30-minute delivery slots
+      var slots = [
+        '10:00-10:30', '10:30-11:00', '11:00-11:30', '11:30-12:00',
+        '12:00-12:30', '12:30-13:00', '13:00-13:30', '13:30-14:00',
+        '14:00-14:30', '14:30-15:00', '15:00-15:30', '15:30-16:00',
+        '16:00-16:30', '16:30-17:00', '17:00-17:30', '17:30-18:00',
+        '18:00-18:30', '18:30-19:00', '19:00-19:30', '19:30-20:00',
+        '20:00-20:30', '20:30-21:00'
+      ];
+      return slots.map(function (s) { return { value: s, label: s }; });
+    }
 
     var sh = makeOverlay(
-      '<h3 class="x-alt-sheet-title">Pilih Tipe Pembelian</h3>' +
-      '<div class="x-alt-fulfillment-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-      '  <button type="button" class="x-alt-fulfill-opt ' + (draftType === 'delivery' ? 'is-active' : '') + '" data-type="delivery"><img src="/assets/icons/delivery.png" alt=""><span>🛵 Delivery</span></button>' +
-      '  <button type="button" class="x-alt-fulfill-opt ' + (draftType === 'pickup' ? 'is-active' : '') + '" data-type="pickup"><img src="/assets/icons/pick_up.png" alt=""><span>🛍️ Pick-up</span></button>' +
-      '  <button type="button" class="x-alt-fulfill-opt ' + (draftType === 'dine_in' ? 'is-active' : '') + '" data-type="dine_in"><img src="/assets/icons/dine_in.png" alt=""><span>🍽️ Dine-in</span></button>' +
-      '  <button type="button" class="x-alt-fulfill-opt ' + (draftType === 'reservation' ? 'is-active' : '') + '" data-type="reservation"><img src="/assets/icons/info_green.svg" alt=""><span>📅 Reservasi</span></button>' +
-      '</div>' +
-
-      '<div class="x-alt-sheet-divider"></div>' +
-
-      // Dynamic Context Section
-      '<div id="x-ful-dynamic-section">' +
-      '  <!-- Rendered dynamically depending on selected order_type -->' +
-      '</div>' +
-
-      '<button type="button" class="x-alt-submit-btn" id="x-save-fulfillment" style="margin-top:18px;">Simpan Pilihan</button>'
+      '<div class="x-fulfillment-sheet" style="padding:0;font-family:var(--x-font, \'Plus Jakarta Sans\', sans-serif);">' +
+      '  <h3 class="x-fulfillment-title">Pilih tipe pembelian</h3>' +
+      '  <div class="x-fulfillment-types" id="x-ful-grid">' +
+      '    <!-- Rendered dynamically -->' +
+      '  </div>' +
+      '  <div id="x-ful-schedule-container">' +
+      '    <!-- Rendered dynamically for delivery -->' +
+      '  </div>' +
+      '  <div class="x-fulfillment-promo">' +
+      '    <span class="x-fulfillment-promo-icon">i</span>' +
+      '    <span>Ketersediaan promo tergantung pada tipe pembelian</span>' +
+      '  </div>' +
+      '  <div class="x-fulfillment-actions">' +
+      '    <button type="button" class="x-fulfillment-cancel" id="x-ful-btn-cancel">Gak jadi</button>' +
+      '    <button type="button" class="x-fulfillment-confirm" id="x-ful-btn-confirm">Konfirmasi</button>' +
+      '  </div>' +
+      '</div>'
     );
 
     var overlay = sh.overlay;
-    var dynSection = overlay.querySelector('#x-ful-dynamic-section');
+    var gridEl = overlay.querySelector('#x-ful-grid');
+    var schedContainer = overlay.querySelector('#x-ful-schedule-container');
 
-    function renderDynamicOptions(type) {
-      if (!dynSection) return;
-      if (type === 'delivery') {
-        dynSection.innerHTML =
-          '<div class="x-alt-sheet-label">Waktu Pengantaran</div>' +
-          '<div class="x-alt-time-options">' +
-          '  <label class="x-alt-radio"><input type="radio" name="ful-time" value="now" ' + (!state.fulfillment.scheduled ? 'checked' : '') + '><span>⚡ Sekarang (15–25 menit)</span></label>' +
-          '  <label class="x-alt-radio"><input type="radio" name="ful-time" value="schedule" ' + (state.fulfillment.scheduled ? 'checked' : '') + '><span>🕒 Jadwalkan — Hari ini 12.00–12.30</span></label>' +
-          '</div>';
-      } else if (type === 'pickup') {
-        dynSection.innerHTML =
-          '<div class="x-alt-sheet-label">Pilih Cabang Outlet</div>' +
-          '<select id="x-select-branch" class="x-alt-input" style="background:#fff;">' + (branchOptionsHtml || '<option>Cabang Utama</option>') + '</select>' +
-          '<div style="font-size:12px;color:#6b7280;margin-top:6px;">Pesanan akan disiapkan dan dapat diambil langsung di kasir cabang pilihanmu.</div>';
-      } else if (type === 'dine_in') {
-        dynSection.innerHTML =
-          '<div class="x-alt-sheet-label">Nomor Meja</div>' +
-          '<input type="text" id="x-input-table" class="x-alt-input" placeholder="Contoh: Meja 03 / Area Outdoor 5" value="' + UI.escape(state.fulfillment.tableNumber || '') + '">' +
-          '<div style="font-size:12px;color:#6b7280;margin-top:6px;">Makanan akan diantar langsung ke meja kamu.</div>';
-      } else if (type === 'reservation') {
-        dynSection.innerHTML =
-          '<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#92400e;line-height:1.4;">' +
-          '  ⚠️ <b>Aturan Reservasi:</b> Reservasi hanya berlaku untuk <b>besok atau tanggal setelahnya</b>. Reservasi hari yang sama tidak diperkenankan.' +
+    function renderGrid() {
+      var options = [
+        { type: 'delivery', label: 'Delivery', icon: '/assets/icons/delivery.png', avail: availabilityMap.delivery },
+        { type: 'pickup', label: 'Pick-up', icon: '/assets/icons/pick_up.png', avail: availabilityMap.pickup },
+        { type: 'dine_in', label: 'Dine-in', icon: '/assets/icons/dine_in.png', avail: availabilityMap.dine_in },
+        { type: 'reservation', label: 'Reservasi', icon: '/assets/icons/reservasi.png', avail: availabilityMap.reservation }
+      ];
+
+      var html = '';
+      options.forEach(function (opt) {
+        var isAct = draft.type === opt.type;
+        var isDis = !opt.avail;
+        html +=
+          '<button type="button" class="x-fulfillment-type ' + (isAct ? 'active' : '') + ' ' + (isDis ? 'disabled' : '') + '" data-type="' + opt.type + '" ' + (isDis ? 'disabled' : '') + '>' +
+          '  <img src="' + opt.icon + '" alt="">' +
+          '  <div class="x-fulfillment-type-text">' +
+          '    <strong>' + opt.label + '</strong>' +
+          (isDis ? '<small>Unavailable</small>' : '') +
+          '  </div>' +
+          '</button>';
+      });
+      gridEl.innerHTML = html;
+
+      gridEl.querySelectorAll('.x-fulfillment-type:not(.disabled)').forEach(function (btn) {
+        btn.onclick = function () {
+          var chosen = btn.dataset.type;
+          if (!availabilityMap[chosen]) return; // Guard: rejection on unavailable
+          draft.type = chosen;
+          // Switching away from delivery clears delivery scheduling
+          if (chosen !== 'delivery') {
+            draft.scheduled = false;
+          }
+          renderGrid();
+          renderScheduleSection();
+        };
+      });
+    }
+
+    function buildWheel(container, items, selectedVal, onSelect) {
+      if (!container) return;
+      container.innerHTML = '';
+      if (!items || !items.length) return;
+
+      var padTop = document.createElement('div');
+      padTop.className = 'x-wheel-pad';
+      padTop.style.height = WHEEL_ITEM_HEIGHT + 'px';
+      container.appendChild(padTop);
+
+      var itemEls = items.map(function (it) {
+        var el = document.createElement('div');
+        el.className = 'x-wheel-item';
+        el.style.height = WHEEL_ITEM_HEIGHT + 'px';
+        el.textContent = it.label;
+        container.appendChild(el);
+        return el;
+      });
+
+      var padBottom = document.createElement('div');
+      padBottom.className = 'x-wheel-pad';
+      padBottom.style.height = WHEEL_ITEM_HEIGHT + 'px';
+      container.appendChild(padBottom);
+
+      var currentIndex = 0;
+      items.forEach(function (it, idx) {
+        if (it.value === selectedVal) currentIndex = idx;
+      });
+
+      function updateVisual(activeIndex) {
+        itemEls.forEach(function (el, idx) {
+          var dist = Math.abs(idx - activeIndex);
+          el.classList.toggle('active', dist < 0.5);
+          el.style.opacity = dist < 0.5 ? '1' : (dist < 1.5 ? '0.45' : '0.22');
+          el.style.transform = 'scale(' + (dist < 0.5 ? 1 : 0.92) + ')';
+        });
+      }
+
+      var isScrolling = null;
+      container.addEventListener('scroll', function () {
+        var rawIdx = container.scrollTop / WHEEL_ITEM_HEIGHT;
+        updateVisual(rawIdx);
+        clearTimeout(isScrolling);
+        isScrolling = setTimeout(function () {
+          var settledIdx = Math.round(container.scrollTop / WHEEL_ITEM_HEIGHT);
+          settledIdx = Math.max(0, Math.min(items.length - 1, settledIdx));
+          container.scrollTo({ top: settledIdx * WHEEL_ITEM_HEIGHT, behavior: 'smooth' });
+          updateVisual(settledIdx);
+          if (typeof onSelect === 'function') {
+            onSelect(items[settledIdx], settledIdx);
+          }
+        }, 80);
+      });
+
+      // Direct click on wheel item
+      itemEls.forEach(function (el, idx) {
+        el.onclick = function (e) {
+          e.stopPropagation();
+          container.scrollTo({ top: idx * WHEEL_ITEM_HEIGHT, behavior: 'smooth' });
+          updateVisual(idx);
+          if (typeof onSelect === 'function') {
+            onSelect(items[idx], idx);
+          }
+        };
+      });
+
+      // Initial scroll position
+      container.scrollTop = currentIndex * WHEEL_ITEM_HEIGHT;
+      updateVisual(currentIndex);
+    }
+
+    function renderScheduleSection() {
+      if (draft.type !== 'delivery') {
+        schedContainer.innerHTML = '';
+        return;
+      }
+
+      var html =
+        '<div class="x-fulfillment-divider"></div>' +
+        '<div class="x-fulfillment-schedule-head">' +
+        '  <span style="font-size:14px;font-weight:600;color:#1f2937;">Jadwalkan delivery</span>' +
+        '  <button type="button" class="x-fulfillment-toggle ' + (draft.scheduled ? 'on' : '') + '" id="x-ful-schedule-toggle" aria-pressed="' + (draft.scheduled ? 'true' : 'false') + '">' +
+        '    <span></span>' +
+        '  </button>' +
+        '</div>';
+
+      if (draft.scheduled) {
+        html +=
+          '<div class="x-fulfillment-schedule-picker" id="x-ful-picker">' +
+          '  <div class="x-fulfillment-picker-row">' +
+          '    <div class="x-wheel-highlight"></div>' +
+          '    <div class="x-wheel-divider"></div>' +
+          '    <div class="x-wheel-col" id="x-wheel-date-col"></div>' +
+          '    <div class="x-wheel-col" id="x-wheel-time-col"></div>' +
+          '  </div>' +
           '</div>' +
-          '<div class="x-alt-sheet-label">Pilih Cabang Reservasi</div>' +
-          '<select id="x-select-res-branch" class="x-alt-input" style="background:#fff;margin-bottom:10px;">' + (branchOptionsHtml || '<option>Cabang Utama</option>') + '</select>' +
-          '<div class="x-alt-sheet-label">Tanggal Kedatangan (Min. Besok)</div>' +
-          '<input type="date" id="x-input-res-date" class="x-alt-input" min="' + minDateStr + '" value="' + defaultResDate + '" style="margin-bottom:10px;">' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-          '  <div>' +
-          '    <div class="x-alt-sheet-label">Jam Kedatangan</div>' +
-          '    <input type="time" id="x-input-res-time" class="x-alt-input" value="' + (state.fulfillment.reservationTime || '12:00') + '">' +
-          '  </div>' +
-          '  <div>' +
-          '    <div class="x-alt-sheet-label">Jumlah Tamu</div>' +
-          '    <input type="number" id="x-input-res-guests" class="x-alt-input" min="1" max="100" value="' + (state.fulfillment.guestCount || 2) + '">' +
-          '  </div>' +
+          '<div class="x-fulfillment-selected-summary">' +
+          '  <span>Pembelianmu bakal sampai pada</span>' +
+          '  <strong id="x-ful-summary-text">' + UI.escape(draft.date) + ' | ' + UI.escape(draft.timeSlot) + '</strong>' +
           '</div>';
+      }
+
+      schedContainer.innerHTML = html;
+
+      var toggleBtn = schedContainer.querySelector('#x-ful-schedule-toggle');
+      if (toggleBtn) {
+        toggleBtn.onclick = function () {
+          draft.scheduled = !draft.scheduled;
+          if (!draft.scheduled) {
+            draft.date = 'Hari ini';
+            draft.timeSlot = '16:00-16:30';
+          }
+          renderScheduleSection();
+        };
+      }
+
+      if (draft.scheduled) {
+        var dateCol = schedContainer.querySelector('#x-wheel-date-col');
+        var timeCol = schedContainer.querySelector('#x-wheel-time-col');
+        var sumText = schedContainer.querySelector('#x-ful-summary-text');
+
+        var dates = buildScheduleDates();
+        var slots = buildScheduleSlots(draft.date);
+
+        if (!draft.date || !dates.some(function (d) { return d.value === draft.date; })) {
+          draft.date = dates[0].value;
+        }
+        if (!draft.timeSlot || !slots.some(function (s) { return s.value === draft.timeSlot; })) {
+          draft.timeSlot = slots[0].value;
+        }
+
+        function updateSummary() {
+          if (sumText) {
+            sumText.textContent = draft.date + ' | ' + draft.timeSlot;
+          }
+        }
+
+        buildWheel(dateCol, dates, draft.date, function (selectedDate) {
+          draft.date = selectedDate.value;
+          updateSummary();
+        });
+
+        buildWheel(timeCol, slots, draft.timeSlot, function (selectedSlot) {
+          draft.timeSlot = selectedSlot.value;
+          updateSummary();
+        });
       }
     }
 
-    renderDynamicOptions(draftType);
+    renderGrid();
+    renderScheduleSection();
 
-    overlay.querySelectorAll('[data-type]').forEach(function (b) {
-      b.onclick = function () {
-        draftType = b.dataset.type;
-        overlay.querySelectorAll('[data-type]').forEach(function (x) { x.classList.toggle('is-active', x === b); });
-        renderDynamicOptions(draftType);
+    // Cancel: "Gak jadi" closes and discards draft
+    var cancelBtn = overlay.querySelector('#x-ful-btn-cancel');
+    if (cancelBtn) {
+      cancelBtn.onclick = function () {
+        sh.close();
       };
-    });
+    }
 
-    overlay.querySelector('#x-save-fulfillment').onclick = function () {
-      state.fulfillment.type = draftType;
-      Store.setOrderType(draftType);
-
-      if (draftType === 'delivery') {
-        var v = overlay.querySelector('input[name="ful-time"]:checked');
-        state.fulfillment.scheduled = !!(v && v.value === 'schedule');
-        state.fulfillment.timeSlot = state.fulfillment.scheduled ? '12.00 - 12.30' : 'Sekarang';
-      } else if (draftType === 'pickup') {
-        var selB = overlay.querySelector('#x-select-branch');
-        if (selB && selB.value) {
-          var found = availableBranches.find(function (x) { return String(x.id) === String(selB.value); });
-          if (found) state.matchedBranch = found;
-        }
-      } else if (draftType === 'dine_in') {
-        var tbl = overlay.querySelector('#x-input-table');
-        state.fulfillment.tableNumber = tbl ? tbl.value.trim() : '';
-      } else if (draftType === 'reservation') {
-        var rDateInput = overlay.querySelector('#x-input-res-date');
-        var rTimeInput = overlay.querySelector('#x-input-res-time');
-        var rGuestInput = overlay.querySelector('#x-input-res-guests');
-        var rBranchSel = overlay.querySelector('#x-select-res-branch');
-
-        var rDateVal = rDateInput ? rDateInput.value : '';
-        if (!rDateVal || rDateVal < minDateStr) {
-          if (UI && UI.toast) UI.toast('Reservasi hari yang sama tidak diperkenankan. Pilih minimal besok.');
+    // Confirm: "Konfirmasi" validates and commits draft state
+    var confirmBtn = overlay.querySelector('#x-ful-btn-confirm');
+    if (confirmBtn) {
+      confirmBtn.onclick = function () {
+        if (!availabilityMap[draft.type]) {
+          if (UI && UI.toast) UI.toast('Tipe pembelian yang dipilih tidak tersedia.');
           return;
         }
 
-        state.fulfillment.reservationDate = rDateVal;
-        state.fulfillment.reservationTime = rTimeInput ? rTimeInput.value : '12:00';
-        state.fulfillment.guestCount = rGuestInput ? Math.max(1, parseInt(rGuestInput.value, 10) || 2) : 2;
-
-        if (rBranchSel && rBranchSel.value) {
-          var foundB = availableBranches.find(function (x) { return String(x.id) === String(rBranchSel.value); });
-          if (foundB) state.matchedBranch = foundB;
+        // Commit to state.fulfillment
+        state.fulfillment.type = draft.type;
+        state.fulfillment.scheduled = Boolean(draft.scheduled);
+        if (draft.type === 'delivery') {
+          state.fulfillment.date = draft.date || 'Hari ini';
+          state.fulfillment.timeSlot = draft.scheduled ? (draft.timeSlot || '16:00-16:30') : 'Sekarang (15–25 menit)';
+        } else {
+          state.fulfillment.scheduled = false;
         }
-      }
 
-      sh.close();
-      var y = window.scrollY;
-      renderLayout();
-      calculateTotals();
-      loadUpsell();
-      refreshDeliveryQuote();
-      window.scrollTo(0, y);
-    };
+        Store.setOrderType(draft.type);
+
+        sh.close();
+        var y = window.scrollY;
+        renderLayout();
+        calculateTotals();
+        loadUpsell();
+        refreshDeliveryQuote();
+        window.scrollTo(0, y);
+      };
+    }
   }
 
   // ── 2. Customer Auth / OTP Verification Sheet ──
