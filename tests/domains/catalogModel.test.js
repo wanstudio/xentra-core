@@ -6,8 +6,9 @@
  * Tests prove the physical model implements the locked Xentra contract:
  * - Master Catalog = Owner/Brand master library
  * - Branch Catalog = Branch-owned operational selling catalog
- * - Adoption = Save Point (snapshot semantics)
- * - Master mutation ≠ automatic Branch mutation
+ * - Adoption = Branch registers the product (override columns start NULL)
+ * - Master mutation propagates to branches without an override
+ * - Explicit branch override wins over live master
  * - Master Category ≠ Branch Category
  * - Branch Context reads Branch Catalog (no master fallback)
  */
@@ -87,22 +88,29 @@ test('TEST 1 — Master-only product exists without any branch adoption', () => 
 
 // ══════════════════════════════════════════════════════════════════════════════
 // TEST 2 — Branch adoption
-// Branch A adopts Master Product X. Branch Product preserves master provenance.
+// Branch A adopts Master Product X.
+// Override columns are NULL (branch inherits live master).
+// Provenance preserved via product_id FK.
 // ══════════════════════════════════════════════════════════════════════════════
-test('TEST 2 — Branch adoption preserves master provenance', () => {
+test('TEST 2 — Branch adoption: override columns NULL, provenance preserved via FK', () => {
   const adoption = db.prepare('SELECT * FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A, PRODUCT_X);
   assert.ok(adoption, 'Branch A has adopted Product X');
-  assert.strictEqual(adoption.product_name, 'Product X', 'Snapshot preserves master product name');
-  assert.strictEqual(adoption.product_description, 'Desc X', 'Snapshot preserves master description');
-  assert.strictEqual(adoption.product_image_url, 'img-x.png', 'Snapshot preserves master image');
+
+  // Override columns must be NULL after adoption (branch inherits live master values)
+  // Adoption is NOT a snapshot — it is registration of intent to sell.
+  assert.strictEqual(adoption.name_override,        null, 'name_override must be NULL after adoption (inherits master)');
+  assert.strictEqual(adoption.description_override, null, 'description_override must be NULL after adoption');
+  assert.strictEqual(adoption.image_override,       null, 'image_override must be NULL after adoption');
+
+  // Operational fields are branch-owned
   assert.strictEqual(adoption.price, 25000, 'Branch price is set');
   assert.strictEqual(adoption.stock, 50, 'Branch stock is set');
   assert.strictEqual(adoption.is_available, 1, 'Branch availability is set');
   assert.strictEqual(String(adoption.branch_category_id), 'bc_a_fav', 'Branch category is branch-owned');
 
-  // FK to master product still exists (provenance)
+  // FK to master product preserves provenance
   const masterProduct = db.prepare('SELECT * FROM products WHERE id = ?').get(PRODUCT_X);
-  assert.ok(masterProduct, 'Master product still exists');
+  assert.ok(masterProduct, 'Master product still exists (provenance via FK)');
 });
 
 // ══════════════════════════════════════════════════════════════════════════════

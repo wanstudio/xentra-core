@@ -220,20 +220,23 @@ CREATE TABLE products (
 ### Branch Catalog (Branch-owned)
 
 The Branch Catalog is NOT a filtered view of the Master Catalog. It is a Branch-owned
-operational selling catalog. Adoption of a Master Product is a **save point** — a snapshot
-of the Master Product at the time of adoption. Subsequent Master mutations do NOT
-silently mutate the Branch Catalog.
+operational selling catalog.
 
-#### Ownership model
+> [!IMPORTANT]
+> **Architecture change (2026-09-07):** The previous "Adoption = Save Point (snapshot)" model
+> has been **superseded** by **Master Product Default + Branch Optional Override**.
+> Snapshot columns (`product_name`, `product_description`, `product_image_url`) are retained
+> for backward compatibility but are no longer the resolution path in `CatalogService`.
+
+#### Ownership model (current — override architecture)
 
 - **Master Category ≠ Branch Category**: A Branch may create its own categories, rename
   them, and place adopted products into different categories than the Master.
-- **Master Product ≠ Branch Product**: A Branch Product preserves provenance to the
-  originating Master Product but owns its snapshot metadata, category placement, and
-  operational state.
-- **Adoption = Save Point**: When a Branch adopts a Master Product, snapshot columns
-  capture the Master Product metadata. These snapshots are NOT updated when the
-  Master Product changes.
+- **Adoption ≠ Snapshot**: Adopting a product registers the Branch's intent to sell it.
+  Override columns default to NULL; the Branch inherits live Master values until an explicit
+  override is set.
+- **Resolution rule**: `COALESCE(bp.name_override, p.name)` — NULL override = live Master
+  propagation; non-NULL = branch value wins.
 
 #### Branch Catalog isolation guarantees
 
@@ -272,15 +275,20 @@ CREATE TABLE branch_categories (
 );
 ```
 
-### `branch_products` (Branch Catalog — Adopted Products with Snapshot)
+### `branch_products` (Branch Catalog — Adopted Products with Optional Overrides)
 ```sql
 CREATE TABLE branch_products (
     branch_id TEXT NOT NULL,
     product_id TEXT NOT NULL,
     branch_category_id TEXT,
+    -- Legacy snapshot columns (backward compat, no longer read by CatalogService):
     product_name TEXT,
     product_description TEXT,
     product_image_url TEXT,
+    -- Override columns (current architecture — Master Product Default + Branch Optional Override):
+    name_override TEXT,           -- NULL = inherit live master; non-NULL = branch value wins
+    description_override TEXT,    -- NULL = inherit live master; non-NULL = branch value wins
+    image_override TEXT,          -- NULL = inherit live master; non-NULL = branch value wins
     price REAL,
     stock INTEGER DEFAULT 100,
     is_available INTEGER DEFAULT 1,
@@ -297,13 +305,14 @@ CREATE TABLE branch_products (
 #### Column semantics
 
 - `product_id` → FK to Master Product (provenance; CASCADE DELETE if master deleted).
-- `branch_category_id` → FK to **Branch-owned** category (NOT Master Category). Created/resolved during migration. Branch Category ≠ Master Category.
-- `product_name` → Snapshot of Master Product name at adoption time. Master mutations do NOT rewrite this.
-- `product_description` → Snapshot of Master Product description at adoption time. Master mutations do NOT rewrite this.
-- `product_image_url` → Snapshot of Master Product image at adoption time. Master mutations do NOT rewrite this.
-- `price` → **Branch selling price**. Established at adoption/migration time. Master price mutations do NOT silently mutate this. This is the authoritative selling price for Branch Catalog reads.
+- `branch_category_id` → FK to **Branch-owned** category (NOT Master Category).
+- `name_override` → Branch override for product name. **NULL = inherit live master** (propagation); non-NULL = branch value wins via `COALESCE(bp.name_override, p.name)`.
+- `description_override` → Same override semantics as `name_override` for description.
+- `image_override` → Same override semantics for image URL.
+- `product_name` / `product_description` / `product_image_url` → **Legacy snapshot columns**. Kept for backward compatibility. Not read by `CatalogService`. Migration: if legacy value differs from current master → promoted to override column; if identical → override stays NULL.
+- `price` → **Branch selling price**. Established at adoption/migration time. This is the authoritative selling price for Branch Catalog reads.
 - `stock` → Branch-owned physical stock (Inventory domain).
-- `is_available` → **Branch-owned availability flag**. Master Product `is_active` does NOT gate Branch Catalog availability. A disabled master product with `is_available=1` on an adopted branch product remains available in that branch's catalog.
+- `is_available` → **Branch-owned availability flag**. Master `is_active` does NOT gate Branch Catalog availability.
 
 #### Triggers
 

@@ -183,6 +183,19 @@ Karena itu:
 - **Master Catalog mutation must not silently mutate an already-adopted Branch Catalog.**
 - **Branch Category is Branch-owned and independent from Master Category.**
 - **Product adoption is a save point, not a live dependency for Branch selling configuration.**
+
+> **IMPLEMENTATION NOTE (2026-09-07 — SUPERSEDES snapshot implementation):**
+> The "save point = snapshot columns" implementation has been replaced by
+> **Master Product Default + Branch Optional Override**.
+> - Adoption no longer copies `product_name`/`product_description`/`product_image_url`.
+> - Override columns (`name_override`, `description_override`, `image_override`) default to NULL.
+> - NULL override = Branch inherits live Master value (propagation).
+> - Non-NULL override = Branch value wins via `COALESCE` at query time.
+> - Legacy snapshot columns are retained for backward compatibility but are not the resolution path.
+> - The business invariant "adoption ≠ live dependency" is preserved: branches explicitly set overrides;
+>   master propagation only applies when no override is present.
+> - Endpoint: `PATCH /api/v1/admin/branches/:id/products/:productId/override`
+
 - **Branch may choose which master products it sells.**
 - **A product can exist in Master Catalog without being sold by a Branch.**
 - **Different Branches may sell different subsets of the same Master Catalog.**

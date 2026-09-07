@@ -4,6 +4,15 @@
 **Decision date:** 2026-09-05
 **Authority:** Current Notion `01 — Architecture Decision Log`
 
+> [!IMPORTANT]
+> **Architecture update (2026-09-07):** The "Adoption = Save Point (snapshot)" implementation model
+> described in this document has been **SUPERSEDED** by **Master Product Default + Branch Optional Override**.
+> The business ownership boundaries (Master owns identity, Branch owns operational config) remain locked.
+> Only the implementation model for content fields (name/description/image) changed:
+> adoption no longer copies data; override columns (NULL = inherit master, non-NULL = branch wins)
+> replace the snapshot columns as the resolution path. See `docs/DATABASE_SCHEMA.md` and
+> `tests/branchMenuOverride.test.js` for the current implementation.
+
 ## Core decision
 
 Xentra distinguishes **Master Catalog** from **Branch Catalog**.
@@ -69,7 +78,7 @@ Master Catalog
       ▼
 Branch Manager
       │
-      │ adopt / copy / save point
+      │ adopt (override columns start NULL — branch inherits live master)
       ▼
 Branch Catalog
       ├── Branch Product

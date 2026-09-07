@@ -899,12 +899,16 @@ function initSchema(targetDb) {
   try { targetDb.exec("ALTER TABLE branch_categories ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));"); } catch (e) {}
 
   // Migrate existing branch_products:
-  // 1. Snapshot master product metadata (product_name, description, image_url)
-  // 2. Create/resolve branch-owned categories (NOT master category_id)
-  // 3. Establish branch selling price from master ONCE
-  // This runs idempotently — only rows where product_name IS NULL are migrated.
+  // 1. Fill legacy snapshot columns (product_name, etc.) idempotently from master for pre-override rows.
+  // 2. Migrate legacy snapshot → override:
+  //    If the legacy snapshot value DIFFERS from the current master value, that difference is
+  //    a genuine branch customisation — preserve it as an explicit override.
+  //    If identical to master (was just a copy), leave override NULL so the branch inherits live master.
+  //    Idempotent: only runs on rows where name_override IS NULL (not yet migrated).
+  // 3. Create/resolve branch-owned categories (NOT master category_id).
+  // 4. Establish branch selling price from master ONCE.
   try {
-    // Step 1: Snapshot metadata (existing behavior, safe)
+    // Step 1: Fill legacy snapshot columns for rows that never had them (pre-override schema rows).
     targetDb.exec(`
       UPDATE branch_products
       SET product_name = COALESCE(product_name, (SELECT name FROM products WHERE id = branch_products.product_id)),
@@ -913,7 +917,43 @@ function initSchema(targetDb) {
       WHERE product_name IS NULL
     `);
 
-    // Step 2: Create branch-owned categories for adopted products.
+    // Step 2: Migrate legacy snapshot values → override columns.
+    // Idempotent guard: only process rows where name_override IS NULL (not yet evaluated).
+    // name: if legacy snapshot differs from current master → set name_override, else leave NULL.
+    targetDb.exec(`
+      UPDATE branch_products
+      SET name_override = CASE
+            WHEN product_name IS NOT NULL
+             AND product_name != (SELECT name FROM products WHERE id = branch_products.product_id)
+            THEN product_name
+            ELSE NULL
+          END
+      WHERE name_override IS NULL AND product_name IS NOT NULL
+    `);
+    // description
+    targetDb.exec(`
+      UPDATE branch_products
+      SET description_override = CASE
+            WHEN product_description IS NOT NULL
+             AND product_description != (SELECT description FROM products WHERE id = branch_products.product_id)
+            THEN product_description
+            ELSE NULL
+          END
+      WHERE description_override IS NULL AND product_description IS NOT NULL
+    `);
+    // image
+    targetDb.exec(`
+      UPDATE branch_products
+      SET image_override = CASE
+            WHEN product_image_url IS NOT NULL
+             AND product_image_url != (SELECT image_url FROM products WHERE id = branch_products.product_id)
+            THEN product_image_url
+            ELSE NULL
+          END
+      WHERE image_override IS NULL AND product_image_url IS NOT NULL
+    `);
+
+    // Step 3: Create branch-owned categories for adopted products.
     // For each branch + master category combination, ensure a branch-owned category exists.
     // This maps Master Category → Branch Category deterministically.
     // Each branch_product is updated by its own (branch_id, product_id) identity,
@@ -952,7 +992,7 @@ function initSchema(targetDb) {
       ).run(branchCat.id, row.branch_id, row.product_id);
     }
 
-    // Step 3: Establish branch selling price from master ONCE for adopted products without price.
+    // Step 4: Establish branch selling price from master ONCE for adopted products without price.
     // After this, branch_products.price is the Branch selling authority.
     targetDb.exec(`
       UPDATE branch_products

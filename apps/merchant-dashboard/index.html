@@ -677,6 +677,59 @@
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="x-toast-container" class="x-toast-container"></div>
 
+  <!-- MODAL: BRANCH PRODUCT OVERRIDE (name / description / image_url) -->
+  <div id="modal-branch-override" class="x-modal-backdrop" style="display:none; z-index: 1200;">
+    <div class="x-modal-card" style="max-width:520px;">
+      <div class="x-modal-header">
+        <div>
+          <h3 id="override-product-heading">Override Produk</h3>
+          <p class="text-muted" style="font-size:12px;margin:0;">Kosongkan field untuk menghapus override dan kembali ke nilai Master.</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closeBranchOverrideModal()">✕</button>
+      </div>
+      <div class="x-modal-scroll-body" style="padding:20px;display:flex;flex-direction:column;gap:20px;">
+
+        <!-- NAME -->
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">Nama Produk</label>
+          <div style="font-size:11px;color:#64748b;margin-bottom:6px;">
+            Nilai Master: <strong id="override-name-master"></strong>
+            &nbsp;|&nbsp; Status: <span id="override-name-status" style="font-weight:700;"></span>
+          </div>
+          <input id="override-name-input" type="text" class="x-input" placeholder="Biarkan kosong = ikuti Master" style="width:100%;" />
+        </div>
+
+        <!-- DESCRIPTION -->
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">Deskripsi Produk</label>
+          <div style="font-size:11px;color:#64748b;margin-bottom:6px;">
+            Nilai Master: <strong id="override-desc-master"></strong>
+            &nbsp;|&nbsp; Status: <span id="override-desc-status" style="font-weight:700;"></span>
+          </div>
+          <textarea id="override-desc-input" class="x-input" rows="3" placeholder="Biarkan kosong = ikuti Master" style="width:100%;resize:vertical;"></textarea>
+        </div>
+
+        <!-- IMAGE URL -->
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">URL Gambar</label>
+          <div style="font-size:11px;color:#64748b;margin-bottom:6px;">
+            Nilai Master: <strong id="override-img-master"></strong>
+            &nbsp;|&nbsp; Status: <span id="override-img-status" style="font-weight:700;"></span>
+          </div>
+          <input id="override-img-input" type="text" class="x-input" placeholder="Biarkan kosong = ikuti Master" style="width:100%;" />
+        </div>
+
+      </div>
+      <div class="x-modal-footer" style="justify-content:space-between;">
+        <button type="button" class="x-btn-secondary" style="color:#ef4444;border-color:#fecaca;" onclick="clearBranchProductOverride()">🗑 Reset Semua ke Master</button>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="x-btn-secondary" onclick="closeBranchOverrideModal()">Batal</button>
+          <button type="button" class="x-btn-primary" id="btn-save-override" onclick="saveBranchProductOverride()">Simpan Override</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Dashboard JavaScript -->
   <script src="/dashboard/assets/js/dashboard.js?v=2.1.2"></script>
 </body>

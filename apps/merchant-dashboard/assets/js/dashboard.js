@@ -690,9 +690,21 @@
         ? '<span class="x-badge x-badge-range">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
         : '<span class="x-badge x-badge-lock">Harga Terkunci</span>';
 
+      // Override status badges — one per supported field
+      var nameSrc     = p.name_override        ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
+      var descSrc     = p.description_override ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
+      var imgSrc      = p.image_override       ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
+
+      var productDataJson = esc(JSON.stringify({
+        product_id: p.product_id,
+        name: p.name, name_override: p.name_override, master_name: p.master_name,
+        description: p.description, description_override: p.description_override, master_description: p.master_description,
+        image_url: p.image_url, image_override: p.image_override, master_image_url: p.master_image_url
+      }));
+
       return [
         '<div class="x-product-card-simple">',
-          '<img src="' + img + '" class="x-product-card-thumb" alt="' + esc(p.name) + '">',
+          '<img src="' + esc(img) + '" class="x-product-card-thumb" alt="' + esc(p.name) + '">',
           '<div class="x-product-card-content">',
             '<h5>' + esc(p.name) + '</h5>',
             '<div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;">',
@@ -700,10 +712,16 @@
               modeBadge,
             '</div>',
             '<div class="x-product-card-price">Jual: ' + formatMoney(p.price) + ' <small class="text-muted" style="font-weight:normal;">(Owner: ' + formatMoney(p.master_price) + ')</small></div>',
+            '<div style="font-size:11px;color:#64748b;margin:4px 0;display:flex;gap:8px;flex-wrap:wrap;">',
+              '<span>Nama: ' + nameSrc + '</span>',
+              '<span>Deskripsi: ' + descSrc + '</span>',
+              '<span>Gambar: ' + imgSrc + '</span>',
+            '</div>',
             '<div class="x-product-card-actions">',
               '<button type="button" class="x-badge ' + (isAvailable ? 'x-badge-success' : 'x-badge-warning') + '" style="border:none;cursor:pointer;font-size:11px;" onclick="toggleBranchProductAvailability(\'' + p.product_id + '\', ' + (isAvailable ? 0 : 1) + ')">',
                 (isAvailable ? '● Tersedia' : '○ Habis'),
               '</button>',
+              '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#0369a1;" onclick="openBranchOverrideModal(\'' + productDataJson + '\')">✏ Override</button>',
               '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#ef4444;" onclick="removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\')">Hapus dari Cabang</button>',
             '</div>',
           '</div>',
@@ -782,6 +800,102 @@
       }
     } catch (err) {
       showToast('❌ Kesalahan jaringan.');
+    }
+  };
+
+  /* =========================================================================
+     MODUL 3.2: BRANCH PRODUCT OVERRIDE — name / description / image_url
+     Master Product Default + Branch Optional Override
+     ========================================================================= */
+  var _overrideProductId = null;
+
+  window.openBranchOverrideModal = function (productDataRaw) {
+    var p;
+    try { p = JSON.parse(productDataRaw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'")); } catch (e) { showToast('❌ Gagal membuka override.'); return; }
+    _overrideProductId = p.product_id;
+
+    var modal = $('modal-branch-override');
+    if (!modal) { showToast('❌ Modal override tidak ditemukan di HTML.'); return; }
+
+    // Product heading
+    $('override-product-heading').textContent = 'Override Produk: ' + (p.master_name || p.name || p.product_id);
+
+    // Name row
+    $('override-name-input').value     = p.name_override != null ? p.name_override : '';
+    $('override-name-master').textContent = p.master_name || '(tidak ada)';
+    $('override-name-status').textContent  = p.name_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
+
+    // Description row
+    $('override-desc-input').value     = p.description_override != null ? p.description_override : '';
+    $('override-desc-master').textContent = p.master_description || '(tidak ada)';
+    $('override-desc-status').textContent  = p.description_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
+
+    // Image row
+    $('override-img-input').value      = p.image_override != null ? p.image_override : '';
+    $('override-img-master').textContent = p.master_image_url || '(tidak ada)';
+    $('override-img-status').textContent  = p.image_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
+
+    modal.style.display = 'flex';
+  };
+
+  window.closeBranchOverrideModal = function () {
+    var modal = $('modal-branch-override');
+    if (modal) modal.style.display = 'none';
+    _overrideProductId = null;
+  };
+
+  window.saveBranchProductOverride = async function () {
+    if (!currentManagingBranchId || !_overrideProductId) return;
+    var btn = $('btn-save-override');
+    btn.disabled = true;
+    btn.textContent = 'Menyimpan...';
+
+    // Empty string = user wants to clear the override (send null)
+    var nameVal = $('override-name-input').value;
+    var descVal = $('override-desc-input').value;
+    var imgVal  = $('override-img-input').value;
+
+    var payload = {};
+    payload.name        = nameVal.trim()  !== '' ? nameVal.trim()  : null;
+    payload.description = descVal.trim()  !== '' ? descVal.trim()  : null;
+    payload.image_url   = imgVal.trim()   !== '' ? imgVal.trim()   : null;
+
+    try {
+      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('✅ Override produk berhasil disimpan!');
+        window.closeBranchOverrideModal();
+        reloadBranchCatalogView();
+      } else {
+        showToast('❌ ' + (data.message || data.error || 'Gagal menyimpan override.'));
+      }
+    } catch (err) {
+      showToast('❌ Kesalahan jaringan saat menyimpan override.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Simpan Override';
+    }
+  };
+
+  window.clearBranchProductOverride = async function () {
+    if (!currentManagingBranchId || !_overrideProductId) return;
+    if (!confirm('Hapus semua override untuk produk ini? Semua field akan kembali mengikuti nilai Master.')) return;
+    var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
+      method: 'PATCH', headers: getAuthHeaders(),
+      body: JSON.stringify({ name: null, description: null, image_url: null })
+    });
+    var data = await res.json();
+    if (data.success) {
+      showToast('✅ Semua override dikembalikan ke Master.');
+      window.closeBranchOverrideModal();
+      reloadBranchCatalogView();
+    } else {
+      showToast('❌ ' + (data.error || 'Gagal menghapus override.'));
     }
   };
 
