@@ -681,8 +681,9 @@
       btn.className = 'x-cat' + (String(cat.id) === String(activeCategory) ? ' active' : '');
       btn.setAttribute('data-cat-id', String(cat.id));
 
-      var imgHtml = cat.image_url
-        ? '<img src="' + UI.escape(cat.image_url) + '" alt="' + UI.escape(cat.name) + '" loading="lazy">'
+      var catImg = cat.image_url || cat.image || cat.icon_url;
+      var imgHtml = catImg
+        ? '<img src="' + UI.escape(catImg) + '" alt="' + UI.escape(cat.name) + '" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML=\'<span class=\\\'x-cat-image-mono\\\'>' + UI.escape(branchMonogram(cat.name)) + '</span>\';">'
         : '<span class="x-cat-image-mono">' + UI.escape(branchMonogram(cat.name)) + '</span>';
 
       btn.innerHTML =
@@ -768,7 +769,7 @@
     var state = Store.getState();
 
     products.forEach(function (product) {
-      var item = Store.findCartItem(product.id);
+      var item = Store.findCartItem(product.id, activeBranch ? String(activeBranch.id) : undefined);
       var qty = item ? item.quantity : 0;
       var note = (item && item.note) || state.notes[product.id] || '';
 
@@ -883,9 +884,9 @@
       btn.onclick = function (e) {
         e.stopPropagation();
         var pid = btn.dataset.plus;
-        var item = Store.findCartItem(pid);
+        var item = Store.findCartItem(pid, activeBranch ? String(activeBranch.id) : undefined);
         if (item) {
-          Store.setQty(pid, item.quantity + 1);
+          Store.setQty(pid, item.quantity + 1, item.branch_id == null ? null : item.branch_id);
           renderProducts();
           renderCartDock();
           ensureCardVisible(pid);
@@ -897,9 +898,9 @@
       btn.onclick = function (e) {
         e.stopPropagation();
         var pid = btn.dataset.minus;
-        var item = Store.findCartItem(pid);
+        var item = Store.findCartItem(pid, activeBranch ? String(activeBranch.id) : undefined);
         if (item) {
-          Store.setQty(pid, item.quantity - 1);
+          Store.setQty(pid, item.quantity - 1, item.branch_id == null ? null : item.branch_id);
           renderProducts();
           renderCartDock();
         }
@@ -1144,12 +1145,21 @@
     var totalEl = $('x-cart-total');
     var badgeEl = $('x-cart-badge');
 
-    if (countEl) countEl.textContent = count + ' Item';
+    // R1 CART SHEET: >1 branch scopes → the dock labels the multi-branch state
+    // (N Pesanan · dari N cabang) and its CTA routes through the Branch Order
+    // Switcher instead of a (rejected, mixed-scope) merged #checkout.
+    var groups = Store.getCartBranchGroups();
+    var multi = groups.length > 1;
+
+    if (countEl) countEl.textContent = multi ? groups.length + ' Pesanan' : count + ' Item';
     if (totalEl) totalEl.textContent = UI.money(total).replace('Rp', '');
     if (badgeEl) {
       badgeEl.textContent = count;
       badgeEl.style.display = count > 0 ? 'flex' : 'none';
     }
+
+    var dockSub = countEl && countEl.parentNode ? countEl.parentNode.querySelector('span') : null;
+    if (dockSub) dockSub.textContent = multi ? 'dari ' + groups.length + ' cabang' : 'Lihat pesanan kamu';
 
     if ($('x-promo-icon-img')) {
       $('x-promo-icon-img').src = ICONS.coupon;
@@ -1178,82 +1188,140 @@
   // ======================================================================
   //  CART SHEET (Bottom Sheet with item list)
   // ======================================================================
+  // R1 CART SHEET back-navigation: the sheet registers a stack close so browser
+  // back closes the topmost overlay (cart sheet first, then the page). The flag
+  // prevents duplicate stack entries across repeated opens.
+  var sheetNavRegistered = false;
+
   function openCartSheet() {
     var backdrop = $('x-backdrop');
     var sheet = $('x-sheet');
     if (backdrop) backdrop.classList.add('open');
     if (sheet) sheet.classList.add('open');
+    if (!sheetNavRegistered && window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
+      sheetNavRegistered = true;
+      window.XentraNav.pushClose(closeSheet);
+    }
     renderCartSheetItems();
   }
 
   function closeSheet() {
+    sheetNavRegistered = false;
     var backdrop = $('x-backdrop');
     var sheet = $('x-sheet');
     if (backdrop) backdrop.classList.remove('open');
     if (sheet) sheet.classList.remove('open');
   }
 
+  function branchLabel(group, index) {
+    if (group && group.branch_name) return String(group.branch_name);
+    return 'Pesanan ' + (index + 1);
+  }
+
+  // R1 CART SHEET grouping: a single branch scope keeps the flat list +
+  // Ringkasan Pesanan + single checkout CTA (existing single-branch flow). More
+  // than one branch scope renders one section per branch separated by a subtle
+  // 1px divider, with NO global summary and NO merged checkout CTA — each
+  // branch checks out independently via the Branch Order Switcher.
   function renderCartSheetItems() {
     var container = $('x-sheet-items');
     if (!container) return;
     container.innerHTML = '';
 
     var state = Store.getState();
-    var items = state.cart.items || [];
+    var groups = Store.getCartBranchGroups();
 
-    if (!items.length) {
+    if (!groups.length) {
       container.innerHTML = '<div class="x-empty">Keranjang kosong.</div>';
+      setSheetSummaryVisible(false);
+      setMultiCta(false);
       return;
     }
 
-    items.forEach(function (item) {
-      var note = state.notes[item.id] || item.note || '';
-      var lineTotal = Number(item.price || 0) * Number(item.quantity || 0);
+    var multi = groups.length > 1;
 
-      var row = document.createElement('div');
-      row.className = 'x-sheet-item';
+    groups.forEach(function (group, gi) {
+      if (gi > 0) {
+        var divider = document.createElement('div');
+        divider.className = 'x-sheet-group-divider';
+        container.appendChild(divider);
+      }
 
-      var image = item.image_url || item.image || '';
-      var noteHtml = note
-        ? '<div class="x-sheet-item-note" data-edit-note="' + item.id + '"><img src="' + ICONS.write + '" alt="Edit catatan"><span>: ' + UI.escape(note) + '</span></div>'
-        : '';
+      if (multi) {
+        var heading = document.createElement('div');
+        heading.className = 'x-sheet-branch';
+        var gcount = group.items.reduce(function (s, it) { return s + Number(it.quantity || 0); }, 0);
+        heading.innerHTML =
+          '<span class="x-sheet-branch-name">' + UI.escape(branchLabel(group, gi)) + '</span>' +
+          '<span class="x-sheet-branch-count">' + gcount + ' item</span>';
+        container.appendChild(heading);
+      }
 
-      row.innerHTML =
-        '<div class="x-sheet-item-main">' +
-        (image
-          ? '<img class="x-sheet-item-image" src="' + UI.escape(image) + '" alt="' + UI.escape(item.name) + '">'
-          : '<div class="x-sheet-item-image"></div>') +
-        '  <div class="x-sheet-item-body">' +
-        '    <div class="x-sheet-item-name">' + UI.escape(item.name) + '</div>' +
-        noteHtml +
-        '    <div class="x-sheet-item-qty-price">' + item.quantity + ' × ' + UI.money(item.price) + '</div>' +
-        '  </div>' +
-        '  <button type="button" class="x-sheet-item-delete" data-delete="' + item.id + '" aria-label="Hapus ' + UI.escape(item.name) + '">' +
-        '    <img src="' + ICONS.trash + '" alt="Hapus">' +
-        '  </button>' +
-        '</div>' +
-        '<div class="x-sheet-item-footer" data-checkout-single-item="' + item.id + '" role="button" aria-label="Beli ' + UI.escape(item.name) + ' sekarang">' +
-        '  <div class="x-sheet-item-footer-left">' +
-        '    <img class="x-bike-icon" src="' + ICONS.bike + '" alt="">' +
-        '    <span>' + item.quantity + ' item</span>' +
-        '  </div>' +
-        '  <div class="x-sheet-item-footer-right">' +
-        '    <strong>' + UI.money(lineTotal).replace('Rp', '') + '</strong>' +
-        '    <img class="x-arrow-icon" src="' + ICONS.right + '" alt=">">' +
-        '  </div>' +
-        '</div>';
-
-      container.appendChild(row);
+      group.items.forEach(function (item) {
+        container.appendChild(buildSheetItemRow(item, state));
+      });
     });
 
-    // Render summary
-    renderCartSummary();
+    if (multi) {
+      setSheetSummaryVisible(false);
+      setMultiCta(true);
+    } else {
+      renderCartSummary();
+      setSheetSummaryVisible(true);
+      setMultiCta(false);
+    }
 
-    // Bind delete buttons
+    bindSheetItemEvents(container);
+  }
+
+  function buildSheetItemRow(item, state) {
+    var note = state.notes[item.id] || item.note || '';
+    var lineTotal = Number(item.price || 0) * Number(item.quantity || 0);
+
+    var row = document.createElement('div');
+    row.className = 'x-sheet-item';
+
+    var image = item.image_url || item.image || '';
+    var noteHtml = note
+      ? '<div class="x-sheet-item-note" data-edit-note="' + item.id + '"><img src="' + ICONS.write + '" alt="Edit catatan"><span>: ' + UI.escape(note) + '</span></div>'
+      : '';
+
+    row.innerHTML =
+      '<div class="x-sheet-item-main">' +
+      (image
+        ? '<img class="x-sheet-item-image" src="' + UI.escape(image) + '" alt="' + UI.escape(item.name) + '">'
+        : '<div class="x-sheet-item-image"></div>') +
+      '  <div class="x-sheet-item-body">' +
+      '    <div class="x-sheet-item-name">' + UI.escape(item.name) + '</div>' +
+      noteHtml +
+      '    <div class="x-sheet-item-qty-price">' + item.quantity + ' × ' + UI.money(item.price) + '</div>' +
+      '  </div>' +
+      '  <button type="button" class="x-sheet-item-delete" data-delete="' + item.id + '" data-delete-branch="' + (item.branch_id || '') + '" aria-label="Hapus ' + UI.escape(item.name) + '">' +
+      '    <img src="' + ICONS.trash + '" alt="Hapus">' +
+      '  </button>' +
+      '</div>' +
+      '<div class="x-sheet-item-footer" data-checkout-single-item="' + item.id + '" role="button" aria-label="Beli ' + UI.escape(item.name) + ' sekarang">' +
+      '  <div class="x-sheet-item-footer-left">' +
+      '    <img class="x-bike-icon" src="' + ICONS.bike + '" alt="">' +
+      '    <span>' + item.quantity + ' item</span>' +
+      '  </div>' +
+      '  <div class="x-sheet-item-footer-right">' +
+      '    <strong>' + UI.money(lineTotal).replace('Rp', '') + '</strong>' +
+      '    <img class="x-arrow-icon" src="' + ICONS.right + '" alt=">">' +
+      '  </div>' +
+      '</div>';
+
+    return row;
+  }
+
+  function bindSheetItemEvents(container) {
+    // Bind delete buttons (branch-scoped: a row only ever removes its own branch
+    // scope's line, never the same SKU in another branch section)
     container.querySelectorAll('[data-delete]').forEach(function (btn) {
       btn.onclick = function (e) {
         e.stopPropagation();
-        Store.removeItem(btn.dataset.delete);
+        var branchId = btn.dataset.deleteBranch || null;
+        Store.removeCartItem(btn.dataset.delete, branchId);
         renderProducts();
         renderCartDock();
         renderCartSheetItems();
@@ -1280,6 +1348,159 @@
         } else {
           window.location.href = '/checkout/?item=' + encodeURIComponent(pid);
         }
+      };
+    });
+  }
+
+  function setSheetSummaryVisible(show) {
+    var totalEl = document.querySelector('.x-sheet-total');
+    if (totalEl) totalEl.style.display = show ? '' : 'none';
+    var btn = $('x-sheet-checkout');
+    if (btn) btn.style.display = show ? '' : 'none';
+  }
+
+  // R1 multi-branch bottom CTA inside the sheet: "N Pesanan · dari N cabang" +
+  // aggregate total. Tapping it opens the Branch Order Switcher — it never
+  // submits a merged multi-branch checkout.
+  var multiCtaEl = null;
+  function setMultiCta(show) {
+    if (multiCtaEl) {
+      multiCtaEl.remove();
+      multiCtaEl = null;
+    }
+    var sheetContent = document.querySelector('#x-sheet .x-sheet-content');
+    if (!show || !sheetContent) return;
+
+    var groups = Store.getCartBranchGroups();
+    var count = groups.length;
+    var total = groups.reduce(function (sum, g) {
+      return sum + g.items.reduce(function (s, it) { return s + Number(it.price || 0) * Number(it.quantity || 0); }, 0);
+    }, 0);
+
+    multiCtaEl = document.createElement('div');
+    multiCtaEl.className = 'x-sheet-multi-cta';
+    multiCtaEl.setAttribute('role', 'button');
+    multiCtaEl.innerHTML =
+      '<div class="x-sheet-multi-cta-left">' +
+      '  <strong>' + count + ' Pesanan</strong>' +
+      '  <span>dari ' + count + ' cabang</span>' +
+      '</div>' +
+      '<div class="x-sheet-multi-cta-total">' + UI.money(total).replace('Rp', '') + '</div>';
+
+    multiCtaEl.onclick = function () {
+      closeSheet();
+      openBranchSwitcher();
+    };
+
+    sheetContent.appendChild(multiCtaEl);
+  }
+
+  // Branch-scoped checkout route: single-branch flows go straight to that
+  // branch's #checkout (legacy/unassigned group keeps the plain #checkout).
+  function goToCheckout(branchId) {
+    closeSheet();
+    if (window.Xentra && window.Xentra.Router) {
+      window.Xentra.Router.navigate('checkout', { branchId: branchId || undefined });
+    } else {
+      var q = branchId ? '?branch_id=' + encodeURIComponent(branchId) : '';
+      window.location.href = '/checkout/' + q;
+    }
+  }
+
+  // R1 CART SHEET §5B: bottom checkout CTA (dock link + sheet CTA). One branch
+  // scope → that branch's #checkout directly. More than one scope → Branch
+  // Order Switcher (no silent-select, no merged checkout).
+  function openCheckoutFlow() {
+    var groups = Store.getCartBranchGroups();
+    closeSheet();
+    if (groups.length > 1) {
+      openBranchSwitcher();
+    } else {
+      goToCheckout(groups[0] ? groups[0].branch_id : null);
+    }
+  }
+
+  // Branch Order Switcher: the multi-branch gateway. The customer explicitly
+  // picks ONE branch order; each row carries its own single-branch checkout.
+  function openBranchSwitcher() {
+    var groups = Store.getCartBranchGroups();
+    if (!groups.length) return;
+
+    var existing = document.querySelector('.x-branch-switcher-overlay');
+    if (existing) existing.remove();
+
+    var rowsHtml = groups.map(function (g, idx) {
+      var count = g.items.reduce(function (s, it) { return s + Number(it.quantity || 0); }, 0);
+      var sub = g.items.reduce(function (s, it) { return s + Number(it.price || 0) * Number(it.quantity || 0); }, 0);
+      var key = g.branch_id ? String(g.branch_id) : '__unassigned__';
+      return '' +
+        '<div class="x-branch-switcher-row">' +
+        '  <div class="x-branch-switcher-header-line">' +
+        '    <div class="x-branch-switcher-name">' + UI.escape(branchLabel(g, idx)) + '</div>' +
+        '  </div>' +
+        '  <div class="x-branch-switcher-body-line">' +
+        '    <div class="x-branch-switcher-meta">' + count + ' item</div>' +
+        '    <div class="x-branch-switcher-total">' + UI.money(sub) + '</div>' +
+        '  </div>' +
+        '  <div class="x-branch-switcher-action-line">' +
+        '    <button type="button" class="x-branch-switcher-btn" data-switch-branch="' + key + '">' +
+        '      Checkout &rarr;' +
+        '    </button>' +
+        '  </div>' +
+        '</div>';
+    }).join('');
+
+    var overlay = document.createElement('div');
+    overlay.className = 'x-overlay x-branch-switcher-overlay';
+    overlay.innerHTML =
+      '<div class="x-sheet x-branch-switcher-sheet">' +
+      '  <div class="x-sheet-handle"></div>' +
+      '  <div class="x-branch-switcher-head">' +
+      '    <h3 class="x-branch-switcher-title">Pesanan kamu</h3>' +
+      '  </div>' +
+      '  <div class="x-branch-switcher-list">' + rowsHtml + '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+
+    void overlay.offsetHeight;
+    requestAnimationFrame(function () {
+      overlay.classList.add('open');
+    });
+
+    var isClosing = false;
+    function closeSwitcher() {
+      if (isClosing) return;
+      isClosing = true;
+      overlay.classList.remove('open');
+      setTimeout(function () {
+        if (overlay.parentNode) overlay.remove();
+      }, 380);
+    }
+
+    if (window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
+      window.XentraNav.pushClose(closeSwitcher);
+    }
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) {
+        if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+          window.XentraNav.close();
+        } else {
+          closeSwitcher();
+        }
+      }
+    });
+
+    overlay.querySelectorAll('[data-switch-branch]').forEach(function (row) {
+      row.onclick = function () {
+        var key = row.dataset.switchBranch;
+        if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+          window.XentraNav.close();
+        } else {
+          closeSwitcher();
+        }
+        goToCheckout(key === '__unassigned__' ? '__unassigned__' : key);
       };
     });
   }
@@ -1363,17 +1584,23 @@
     // Backdrop → close sheet
     var backdrop = $('x-backdrop');
     if (backdrop) backdrop.onclick = closeSheet;
+    // Green bottom checkout CTA link (fast path to completing an order).
+    // State A (1 branch): direct to #checkout for that branch.
+    // State B (>1 branches): open Branch Order Switcher bottom sheet.
+    var checkoutLink = $('x-cart-checkout-link');
+    if (checkoutLink) {
+      checkoutLink.onclick = function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        openCheckoutFlow();
+      };
+    }
 
-    // Checkout button in sheet
+    // Checkout button in sheet (single-branch flow; multi-branch hides this
+    // button and shows the Branch Order Switcher CTA instead)
     var sheetCheckout = $('x-sheet-checkout');
     if (sheetCheckout) {
       sheetCheckout.onclick = function () {
-        closeSheet();
-        if (window.Xentra && window.Xentra.Router) {
-          window.Xentra.Router.navigate('checkout');
-        } else {
-          window.location.href = '/checkout/';
-        }
+        openCheckoutFlow();
       };
     }
 
@@ -1412,6 +1639,12 @@
     selectBranch: function (branchId) {
       var found = branches.find(function (b) { return String(b.id) === String(branchId); });
       if (found) setActiveBranch(found, true);
+    },
+    openCheckoutFlow: function () {
+      openCheckoutFlow();
+    },
+    openBranchSwitcher: function () {
+      openBranchSwitcher();
     },
     getBranches: function () {
       return branches;

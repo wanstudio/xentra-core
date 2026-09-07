@@ -361,20 +361,26 @@ router.get(['/catalog/menu', '/home'], (req, res) => {
     // and branch stock estimate when branch_id is provided.
     const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: branchScope ? branchScope.id : null });
 
-    const categories = menu.categories.map((c) => ({
-      ...c,
-      image: c.icon_url || ''
-    }));
+    const categories = menu.categories.map((c) => {
+      const img = c.image_url || c.icon_url || c.image || '';
+      return {
+        ...c,
+        image: img,
+        image_url: img
+      };
+    });
     const products = menu.products;
 
     const tree = categories.map((cat) => {
       const catProducts = products.filter((p) => String(p.category_id) === String(cat.id));
+      const catImg = cat.image_url || cat.image || cat.icon_url || '';
 
       return {
         id: cat.id,
         name: cat.name,
         slug: cat.slug || String(cat.name || '').toLowerCase().replace(/\s+/g, '-'),
-        image: cat.image || cat.icon_url || '',
+        image: catImg,
+        image_url: catImg,
         products: catProducts.map((p) => ({
           ...p,
           image: p.image_url || '',
@@ -2891,7 +2897,7 @@ router.get('/admin/branches/:id/catalog', requireAuth(['owner', 'brand_manager',
     }
 
     const branchCategories = db.prepare(`
-      SELECT id, name, slug, image_url, sort_order
+      SELECT id, brand_id, branch_id, name, slug, image_url, sort_order
       FROM branch_categories
       WHERE branch_id = ? AND brand_id = ?
       ORDER BY sort_order ASC, name ASC

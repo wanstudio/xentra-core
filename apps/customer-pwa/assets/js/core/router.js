@@ -41,10 +41,26 @@
     return params.get('item_id') || params.get('item') || null;
   }
 
+  // R1 CART/CHECKOUT BOUNDARY: a checkout is always single-branch. The branch
+  // param scopes the checkout to ONE branch's cart lines (#checkout/branch/<id>
+  // or ?branch_id=). '__unassigned__' is the legacy provenance sentinel (lines
+  // added without branch context); null means no scope filter (legacy flows).
+  function getBranchIdFromUrl() {
+    var hash = window.location.hash || '';
+    var matchHash = hash.match(/#checkout[\/=]branch[\/=]([a-zA-Z0-9_-]+)/) || hash.match(/#checkout\?branch(?:_id)?=([a-zA-Z0-9_-]+)/);
+    if (matchHash && matchHash[1]) return matchHash[1];
+
+    var params = new URLSearchParams(window.location.search);
+    return params.get('branch_id') || params.get('branch') || null;
+  }
+
   function navigate(view, params) {
     if (view === 'checkout') {
+      var branchId = (params && params.branchId) || '';
       var itemId = (params && params.itemId) || '';
-      window.location.hash = itemId ? '#checkout/item/' + itemId : '#checkout';
+      window.location.hash = branchId
+        ? '#checkout/branch/' + branchId
+        : (itemId ? '#checkout/item/' + itemId : '#checkout');
     } else if (view === 'order-received') {
       var orderId = (params && params.orderId) || '';
       window.location.hash = '#order-received/' + orderId;
@@ -93,16 +109,18 @@
     var v = getViewFromUrl();
     var orderId = getOrderIdFromUrl();
     var itemId = getItemIdFromUrl();
+    var branchId = getBranchIdFromUrl();
     currentView = v;
-    emit(v, { orderId: orderId, itemId: itemId });
+    emit(v, { orderId: orderId, itemId: itemId, branchId: branchId });
   });
 
   window.addEventListener('popstate', function () {
     var v = getViewFromUrl();
     var orderId = getOrderIdFromUrl();
     var itemId = getItemIdFromUrl();
+    var branchId = getBranchIdFromUrl();
     currentView = v;
-    emit(v, { orderId: orderId, itemId: itemId });
+    emit(v, { orderId: orderId, itemId: itemId, branchId: branchId });
   });
 
   // Export
@@ -112,6 +130,7 @@
     getViewFromUrl: getViewFromUrl,
     getOrderIdFromUrl: getOrderIdFromUrl,
     getItemIdFromUrl: getItemIdFromUrl,
+    getBranchIdFromUrl: getBranchIdFromUrl,
     navigate: navigate,
     goBack: goBack,
     subscribe: subscribe

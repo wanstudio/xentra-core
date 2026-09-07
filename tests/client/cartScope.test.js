@@ -164,6 +164,32 @@ test('R1 legacy ops (setQty/removeItem/clearCart) still behave correctly on prov
   assert.strictEqual(Store.getCartBranchGroups().length, 0);
 });
 
+test('R1 branch-scoped line removal: deleting a row in one cart sheet section never deletes the same SKU in another branch section', () => {
+  const Store = freshStore();
+
+  // Same product id under two branches + one legacy/unassigned line.
+  Store.addItem(product('288', 'Es Kopi', 15000), 1, { branch_id: 'branch_a' });
+  Store.addItem(product('288', 'Es Kopi', 15000), 1, { branch_id: 'branch_b' });
+  Store.addItem(product('272', 'Paket Semar', 35000), 1);
+
+  // Delete the branch_a line only.
+  Store.removeCartItem('288', 'branch_a');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_a').length, 0, 'branch_a line removed');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b').length, 1, 'branch_b line untouched');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b')[0].quantity, 1);
+  assert.strictEqual(Store.getCartItemsForBranch(null).length, 1, 'legacy line untouched');
+  assert.strictEqual(Store.getCartCount(), 2, 'remaining lines: branch_b 288 + legacy 272');
+
+  // Deleting by an unknown scope is a no-op for the other scopes.
+  Store.removeCartItem('288', 'branch_zz');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b').length, 1);
+
+  // The legacy/unassigned line removes through its own scope.
+  Store.removeCartItem('272', null);
+  assert.strictEqual(Store.getCartBranchGroups().length, 1);
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b').length, 1);
+});
+
 test('R1 scope helpers are read-only: invoking them never mutates the cart', () => {
   const Store = freshStore();
 
@@ -222,4 +248,157 @@ test('P2 branchContext add-to-cart provenance flows into the cart scope', () => 
   assert.strictEqual(String(groups[0].branch_id), '41');
   assert.strictEqual(groups[0].branch_name, 'Cabang Senayan');
   assert.strictEqual(Store.getCartItemsForBranch('41').length, 1);
+});
+
+// ============================================================================
+// BUGFIX: checkout quantity +/− targeted the WRONG cart line in a multi-branch
+// cart. Store.findCartItem/setQty were global product-id lookups; with a
+// branch-scoped checkout, a click on branch A's row could mutate branch B's
+// line (the visible quantity never changed — "dead" buttons). Fix: optional
+// branchId scope on findCartItem/setQty using the same line identity as
+// addItem/cartGroupKey (product id within ONE branch scope; null = legacy
+// unassigned group). Legacy two-arg calls keep the old global behavior.
+// ============================================================================
+
+test('BUGFIX quantity scope: unlock single branch (+/−) mutates exactly that checkout line', () => {
+  const Store = freshStore();
+
+  Store.addItem(product('288', 'Es Kopi', 15000), 2); // legacy/unassigned line
+  const line = Store.findCartItem('288', null);
+  assert.ok(line, 'legacy line resolves through the unassigned scope');
+  assert.strictEqual(line.quantity, 2);
+
+  // Simulate a "+" tap on that checkout row.
+  const after = Store.findCartItem('288', null);
+  Store.setQty('288', Number(after.quantity) + 1, after.branch_id == null ? null : after.branch_id);
+
+  assert.strictEqual(Store.getCartItemsForBranch(null)[0].quantity, 3, 'incremented the unassigned line');
+  assert.strictEqual(Store.getCartBranchGroups().length, 1);
+
+  // Simulate a "−" tap — decrements, never ignores the minus.
+  const row = Store.findCartItem('288', null);
+  Store.setQty('288', Number(row.quantity) - 1, null);
+  assert.strictEqual(Store.getCartItemsForBranch(null)[0].quantity, 2);
+});
+
+test('BUGFIX quantity scope: plus/minus on the same SKU in two branches stay independent', () => {
+  const Store = freshStore();
+
+  Store.addItem(product('288', 'Es Kopi', 15000), 2, { branch_id: 'branch_a' });
+  Store.addItem(product('288', 'Es Kopi', 15000), 1, { branch_id: 'branch_b' });
+
+  // "+" on the branch A row.
+  const a = Store.findCartItem('288', 'branch_a');
+  Store.setQty('288', Number(a.quantity) + 1, 'branch_a');
+
+  assert.strictEqual(Store.getCartItemsForBranch('branch_a')[0].quantity, 3, 'branch A grew');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b')[0].quantity, 1, 'branch B untouched (was 1)');
+
+  // "−" on the branch B row.
+  const b = Store.findCartItem('288', 'branch_b');
+  Store.setQty('288', Number(b.quantity) - 1, 'branch_b');
+
+  assert.strictEqual(Store.getCartItemsForBranch('branch_a')[0].quantity, 3, 'branch A untouched by B minus');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b').length, 0, 'branch B line removed by its own minus');
+
+  // Decrementing B down to zero removes the B line only (never the same SKU line
+  // in branch A) — the two lines stay independent.
+  assert.strictEqual(Store.getCartBranchGroups().length, 1, 'branch B line was removed, not globbed');
+  assert.strictEqual(Store.findCartItem('288', 'branch_b'), null, 'no branch B line remains');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_a')[0].quantity, 3);
+});
+
+test('BUGFIX quantity scope: minus to zero removes ONLY its own branch line, never the same SKU elsewhere', () => {
+  const Store = freshStore();
+
+  Store.addItem(product('288', 'Es Kopi', 15000), 1, { branch_id: 'branch_a' });
+  Store.addItem(product('288', 'Es Kopi', 15000), 4, { branch_id: 'branch_b' });
+  Store.addItem(product('272', 'Paket Semar', 35000), 1, { branch_id: 'branch_a' });
+
+  // Branch A row is tapped down to zero.
+  Store.setQty('288', 0, 'branch_a');
+
+  assert.strictEqual(Store.getCartItemsForBranch('branch_a').length, 1, 'branch A keeps its other line (272)');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_a')[0].id, '272');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b').length, 1, 'branch B 288 untouched');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b')[0].quantity, 4);
+  assert.strictEqual(Store.getCartBranchGroups().length, 2, 'both scopes survive');
+});
+
+test('BUGFIX quantity scope: unassigned (legacy) mutation never touches a provenanced line of the same SKU', () => {
+  const Store = freshStore();
+
+  Store.addItem(product('288', 'Es Kopi', 15000), 2); // legacy/unassigned
+  Store.addItem(product('288', 'Es Kopi', 15000), 3, { branch_id: 'branch_a' });
+
+  // "−"/zero on the legacy row.
+  Store.setQty('288', 0, null);
+
+  assert.strictEqual(Store.getCartItemsForBranch(null).length, 0, 'legacy line removed');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_a').length, 1, 'branch A line intact');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_a')[0].quantity, 3);
+});
+
+test('BUGFIX quantity scope: changing one line updates notifies subscribers and totals consistently', () => {
+  const Store = freshStore();
+
+  Store.addItem(product('272', 'Paket Semar', 35000), 1, { branch_id: 'branch_a' });
+  Store.addItem(product('345', 'Mie Gurih', 15000), 2, { branch_id: 'branch_b' });
+  Store.addItem(product('286', 'Es Teh', 5000), 3, { branch_id: 'branch_a' });
+
+  let notified = 0;
+  const off = Store.subscribe(function () { notified += 1; });
+
+  // A "+" tap on the branch B item only.
+  const b = Store.findCartItem('345', 'branch_b');
+  Store.setQty('345', Number(b.quantity) + 1, 'branch_b');
+  off();
+
+  assert.ok(notified > 0, 'subscribers (checkout totals/re-render) fired');
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b')[0].quantity, 3);
+
+  // Only branch B changed: A lines keep 1 + 3 = 4 items, B 3 items.
+  const aItems = Store.getCartItemsForBranch('branch_a');
+  assert.deepStrictEqual(aItems.map((i) => i.quantity), [1, 3], 'branch A rows untouched');
+  assert.strictEqual(Store.getCartCount(), 7, '1 + 3 + (2 + 1)');
+  assert.strictEqual(Store.getCartSubtotal(), 35000 * 1 + 15000 * 3 + 5000 * 3);
+});
+
+test('BUGFIX quantity scope: mutation survives a reload (persisted per line, not just in memory)', () => {
+  const sharedStorage = {};
+  const Store = freshStore(sharedStorage);
+
+  Store.addItem(product('288', 'Es Kopi', 15000), 2, { branch_id: 'branch_a' });
+  Store.addItem(product('288', 'Es Kopi', 15000), 5, { branch_id: 'branch_b' });
+
+  // Mutation on branch A (as if a + tap), then the page reloads.
+  const a = Store.findCartItem('288', 'branch_a');
+  Store.setQty('288', Number(a.quantity) + 1, 'branch_a');
+
+  const reloaded = freshStore(sharedStorage);
+  assert.strictEqual(reloaded.findCartItem('288', 'branch_a').quantity, 3, 'reloaded branch A reflects the + tap');
+  assert.strictEqual(reloaded.findCartItem('288', 'branch_b').quantity, 5, 'reloaded branch B untouched');
+  assert.strictEqual(reloaded.getCartItemsForBranch('branch_a').length, 1);
+});
+
+test('BUGFIX quantity scope: scoped lookup returns null for a foreign scope; legacy global ops are unchanged', () => {
+  const Store = freshStore();
+
+  Store.addItem(product('288', 'Es Kopi', 15000), 2, { branch_id: 'branch_a' });
+  Store.addItem(product('345', 'Mie Gurih', 15000), 1, { branch_id: 'branch_b' });
+
+  // A scoped lookup for a scope the SKU is not in → null (guard against wrong mutation).
+  assert.strictEqual(Store.findCartItem('288', 'branch_zz'), null);
+  assert.strictEqual(Store.findCartItem('288', 'branch_b'), null, '288 lives in branch A only');
+
+  // Legacy two-arg behavior is preserved exactly for older callers.
+  assert.strictEqual(Store.findCartItem('288').branch_id, 'branch_a', 'global first-match lookup unchanged');
+  Store.setQty('288', 0); // legacy global delete
+  assert.strictEqual(Store.getCartItemsForBranch('branch_a').length, 0);
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b').length, 1, 'other branch untouched');
+
+  Store.addItem(product('272', 'Paket Semar', 35000), 1, { branch_id: 'branch_a' });
+  Store.removeItem('345'); // legacy removeItem still global
+  assert.strictEqual(Store.getCartItemsForBranch('branch_b').length, 0);
+  assert.strictEqual(Store.getCartItemsForBranch('branch_a').length, 1);
 });

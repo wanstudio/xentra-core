@@ -1298,8 +1298,23 @@
 
   var branchCatalogFilter = 'all'; // active branch category filter ('all' or catId)
 
+  function getActiveBranchId() {
+    if (currentManagingBranchId) return currentManagingBranchId;
+    if (currentBranchCatalogData && currentBranchCatalogData.branch && currentBranchCatalogData.branch.id) {
+      return currentBranchCatalogData.branch.id;
+    }
+    if (_bceCurrentCat && _bceCurrentCat.branch_id) {
+      return _bceCurrentCat.branch_id;
+    }
+    var user = getStoredUser();
+    if (user && user.branch_id) return user.branch_id;
+    return null;
+  }
+
   async function loadInlineBranchCatalog() {
-    if (!currentManagingBranchId) return;
+    var branchId = getActiveBranchId();
+    if (!branchId) return;
+    currentManagingBranchId = branchId;
 
     var adoptedEl = $('branch-inline-adopted-container');
     var availableEl = $('branch-inline-available-container');
@@ -1372,31 +1387,26 @@
     categories.forEach(function (cat) {
       var isActive = branchCatalogFilter === cat.id;
 
-      // Outer chip wrapper — visual grouping only; NOT itself draggable so that
-      // clicking the name/edit/delete buttons never accidentally starts a drag.
+      // Outer chip wrapper — represents the category item in the list
       var chip = document.createElement('span');
       chip.dataset.catId = cat.id;
+      chip.draggable = true;
       chip.style.cssText = [
         'display:inline-flex;align-items:center;gap:0;border-radius:20px;overflow:hidden;',
         'border:1px solid ' + (isActive ? 'var(--x-primary,#b6ff00)' : '#e2e8f0') + ';',
         'background:' + (isActive ? '#f0ffe0' : '#f8fafc') + ';',
-        'transition:box-shadow 0.15s,opacity 0.15s;'
+        'transition:box-shadow 0.15s,opacity 0.15s;',
+        'cursor:grab;'
       ].join('');
 
-      // Drag handle indicator — this is the ONLY draggable element in the chip.
-      // Native HTML5 drag-and-drop only starts a drag from the element the user
-      // actually presses on, so scoping `draggable` to just this handle (rather
-      // than the whole chip) means clicking the name/edit/delete buttons never
-      // triggers a drag.
+      // Drag handle indicator
       var handle = document.createElement('span');
-      handle.draggable = true;
-      handle.title = 'Geser untuk ubah urutan';
+      handle.title = 'Tahan & geser untuk ubah urutan';
       handle.style.cssText = 'padding:5px 4px 5px 10px;font-size:13px;color:#94a3b8;cursor:grab;user-select:none;';
       handle.textContent = '⠿';
       chip.appendChild(handle);
 
       // Small square thumbnail so admins can see the persisted category image
-      // (or a safe monogram fallback — never a broken image).
       var thumbWrap = document.createElement('span');
       thumbWrap.style.cssText = 'width:22px;height:22px;border-radius:6px;overflow:hidden;background:#eef2f6;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:2px;';
       if (cat.image_url) {
@@ -1416,31 +1426,43 @@
       // Category name / filter button
       var nameBtn = document.createElement('button');
       nameBtn.type = 'button';
+      nameBtn.draggable = false;
       nameBtn.style.cssText = 'border:none;background:none;padding:6px 8px 6px 2px;font-size:13px;font-weight:' + (isActive ? '700' : '500') + ';cursor:pointer;color:#1e293b;';
       nameBtn.textContent = cat.name;
-      nameBtn.addEventListener('click', function () { setBranchCatalogFilter(cat.id); });
+      nameBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        setBranchCatalogFilter(cat.id);
+      });
       chip.appendChild(nameBtn);
 
       // Edit button
       var editBtn = document.createElement('button');
       editBtn.type = 'button';
+      editBtn.draggable = false;
       editBtn.title = 'Ubah nama & gambar';
       editBtn.style.cssText = 'border:none;background:none;padding:5px 5px;font-size:12px;cursor:pointer;color:#64748b;';
       editBtn.textContent = '✏️';
-      editBtn.addEventListener('click', function (e) { e.stopPropagation(); openBranchCategoryEditModal(cat); });
+      editBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openBranchCategoryEditModal(cat);
+      });
       chip.appendChild(editBtn);
 
       // Delete button
       var delBtn = document.createElement('button');
       delBtn.type = 'button';
+      delBtn.draggable = false;
       delBtn.title = 'Hapus kategori';
       delBtn.style.cssText = 'border:none;background:none;padding:6px 10px 6px 4px;font-size:12px;cursor:pointer;color:#ef4444;opacity:0.8;';
       delBtn.textContent = '🗑️';
-      delBtn.addEventListener('click', function (e) { e.stopPropagation(); deleteBranchCategory(cat.id, cat.name); });
+      delBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        deleteBranchCategory(cat.id, cat.name);
+      });
       chip.appendChild(delBtn);
 
-      // ── HTML5 Drag Events (bound on the handle; chip is the moved unit) ──
-      handle.addEventListener('dragstart', function (e) {
+      // ── HTML5 Drag Events ──
+      chip.addEventListener('dragstart', function (e) {
         _dragSrcCatId = cat.id;
         _dragSrcEl = chip;
         chip.style.cursor = 'grabbing';
@@ -1452,14 +1474,14 @@
         }, 0);
       });
 
-      handle.addEventListener('dragend', function () {
+      chip.addEventListener('dragend', function () {
         chip.style.opacity = '1';
         chip.style.cursor = 'grab';
         chip.style.transform = '';
         bar.querySelectorAll('[data-cat-id]').forEach(function (el) {
           el.style.borderLeft = '';
           el.style.borderRight = '';
-          el.style.boxShadow = '0 1px 2px rgba(0,0,0,0.05)';
+          el.style.boxShadow = '';
         });
       });
 
@@ -1488,7 +1510,7 @@
         e.preventDefault();
         chip.style.borderLeft = '';
         chip.style.borderRight = '';
-        if (!_dragSrcCatId || _dragSrcCatId === cat.id) return;
+        if (!_dragSrcCatId || _dragSrcCatId === cat.id || !_dragSrcEl) return;
 
         var rect = chip.getBoundingClientRect();
         var midX = rect.left + rect.width / 2;
@@ -1515,8 +1537,15 @@
   }
 
   async function saveBranchCategoryOrder(orderedIds) {
+    var branchId = getActiveBranchId();
+    if (!branchId) {
+      showToast('❌ Cabang tidak valid atau belum dipilih.');
+      return;
+    }
+    currentManagingBranchId = branchId;
+
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories/reorder', {
+      var res = await fetch(API_BASE + '/admin/branches/' + branchId + '/categories/reorder', {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ order: orderedIds })
@@ -1570,23 +1599,25 @@
 
   // ── Branch Category Edit Modal (name + image) ──────────────────────────
   var _bceSelectedFile = null; // File object staged for upload on save
+  var _bceCurrentCat = null;   // Active category being edited
 
   window.openBranchCategoryEditModal = function (cat) {
     _bceSelectedFile = null;
-    $('bce-cat-id').value = cat.id;
-    $('bce-name').value = cat.name || '';
+    _bceCurrentCat = cat || null;
+    $('bce-cat-id').value = cat ? cat.id : '';
+    $('bce-name').value = (cat && cat.name) || '';
     $('bce-image-file').value = '';
 
     var previewImg = $('bce-image-preview');
     var previewMono = $('bce-image-preview-mono');
-    if (cat.image_url) {
+    if (cat && cat.image_url) {
       previewImg.src = cat.image_url;
       previewImg.style.display = 'block';
       previewMono.style.display = 'none';
     } else {
       previewImg.style.display = 'none';
       previewMono.style.display = 'block';
-      previewMono.textContent = (cat.name || '?').trim().slice(0, 1).toUpperCase();
+      previewMono.textContent = ((cat && cat.name) || '?').trim().slice(0, 1).toUpperCase();
     }
 
     var modal = $('modal-branch-category-edit');
@@ -1597,6 +1628,7 @@
     var modal = $('modal-branch-category-edit');
     if (modal) modal.style.display = 'none';
     _bceSelectedFile = null;
+    _bceCurrentCat = null;
   };
 
   (function initBranchCategoryEditModal() {
@@ -1646,25 +1678,36 @@
           return;
         }
 
+        var activeBranchId = getActiveBranchId();
+        if (!activeBranchId) {
+          showToast('❌ Cabang tidak valid atau belum dipilih.');
+          return;
+        }
+        currentManagingBranchId = activeBranchId;
+
         var saveBtn = $('btn-save-branch-category-edit');
         if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Menyimpan...'; }
 
         try {
-          // 1. Rename (always sent — cheap and keeps behavior simple/predictable)
-          var renameRes = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories/' + catId, {
+          // 1. Rename (always sent — keeps behavior simple/predictable)
+          var renameRes = await fetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + catId, {
             method: 'PATCH',
             headers: getAuthHeaders(),
             body: JSON.stringify({ name: newName })
           });
-          var renameData = await renameRes.json();
-          if (!renameData.success) {
-            showToast('❌ ' + (renameData.error || 'Gagal mengubah nama kategori.'));
+          var renameData = {};
+          try {
+            renameData = await renameRes.json();
+          } catch (_) {
+            renameData = { success: false, error: 'Respon server tidak valid saat mengubah nama kategori.' };
+          }
+
+          if (!renameRes.ok || !renameData.success) {
+            showToast('❌ ' + (renameData.error || renameData.message || 'Gagal mengubah nama kategori.'));
             return;
           }
 
-          // 2. Image (only if a new file was staged) — uploaded as base64 to the
-          // backend, which decodes it, writes a real file, and stores only the
-          // resulting URL. Never persisted as base64 in the database.
+          // 2. Image (only if a new file was staged) — uploaded as base64 to backend
           if (_bceSelectedFile) {
             var base64 = await new Promise(function (resolve, reject) {
               var reader = new FileReader();
@@ -1673,24 +1716,32 @@
               reader.readAsDataURL(_bceSelectedFile);
             });
 
-            var imageRes = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories/' + catId + '/image', {
+            var imageRes = await fetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + catId + '/image', {
               method: 'POST',
               headers: getAuthHeaders(),
               body: JSON.stringify({ image_base64: base64, mime_type: _bceSelectedFile.type })
             });
-            var imageData = await imageRes.json();
-            if (!imageData.success) {
-              showToast('❌ ' + (imageData.error || 'Gagal mengunggah gambar kategori.'));
+            var imageData = {};
+            try {
+              imageData = await imageRes.json();
+            } catch (_) {
+              imageData = { success: false, error: 'Respon server tidak valid saat mengunggah gambar.' };
+            }
+
+            if (!imageRes.ok || !imageData.success) {
+              showToast('❌ ' + (imageData.error || imageData.message || 'Gagal mengunggah gambar kategori.'));
               return;
             }
           }
 
           showToast('✅ Kategori berhasil diperbarui!');
           closeBranchCategoryEditModal();
-          loadInlineBranchCatalog();
+          if (typeof loadInlineBranchCatalog === 'function') {
+            loadInlineBranchCatalog();
+          }
         } catch (err) {
           console.error('[Branch Category Edit Error]:', err);
-          showToast('❌ Kesalahan jaringan saat menyimpan kategori.');
+          showToast('❌ ' + (err.message || 'Kesalahan jaringan saat menyimpan kategori.'));
         } finally {
           if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Simpan'; }
         }
@@ -1701,21 +1752,28 @@
   window.deleteBranchCategory = async function (catId, catName) {
     if (!confirm('Hapus kategori "' + catName + '"? Produk di kategori ini tidak akan dihapus, hanya dipindah ke tanpa kategori.')) return;
 
+    var branchId = getActiveBranchId();
+    if (!branchId) {
+      showToast('❌ Cabang tidak valid atau belum dipilih.');
+      return;
+    }
+    currentManagingBranchId = branchId;
+
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories/' + catId, {
+      var res = await fetch(API_BASE + '/admin/branches/' + branchId + '/categories/' + catId, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
       var data = await res.json();
       if (data.success) {
-        showToast('\u2705 Kategori dihapus.');
+        showToast('✅ Kategori dihapus.');
         if (branchCatalogFilter === catId) branchCatalogFilter = 'all';
         loadInlineBranchCatalog();
       } else {
-        showToast('\u274C ' + (data.error || 'Gagal menghapus kategori.'));
+        showToast('❌ ' + (data.error || 'Gagal menghapus kategori.'));
       }
     } catch (err) {
-      showToast('\u274C Kesalahan jaringan.');
+      showToast('❌ Kesalahan jaringan.');
     }
   };
 

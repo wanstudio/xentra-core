@@ -203,15 +203,25 @@
     notify();
   }
 
-  function setQty(productId, qty) {
+  // R1 branch scope for mutation ops: `branchId === undefined` keeps the legacy
+  // global first-match behavior; any other value (including null/'' →
+  // '__unassigned__') restricts the op to ONE cart scope using the same
+  // identity rule as cartGroupKey (product id within a branch scope).
+  function mutationScopeKey(branchId) {
+    if (branchId === undefined) return undefined;
+    return (branchId == null || String(branchId) === '') ? '__unassigned__' : String(branchId);
+  }
+
+  function setQty(productId, qty, branchId) {
+    var key = mutationScopeKey(branchId);
     var items = state.cart.items;
     if (qty <= 0) {
       state.cart.items = items.filter(function (i) {
-        return String(i.id) !== String(productId);
+        return !(String(i.id) === String(productId) && (key === undefined || cartGroupKey(i) === key));
       });
     } else {
       for (var i = 0; i < items.length; i++) {
-        if (String(items[i].id) === String(productId)) {
+        if (String(items[i].id) === String(productId) && (key === undefined || cartGroupKey(items[i]) === key)) {
           items[i].quantity = qty;
           break;
         }
@@ -267,10 +277,11 @@
     return total;
   }
 
-  function findCartItem(productId) {
+  function findCartItem(productId, branchId) {
+    var key = mutationScopeKey(branchId);
     var items = state.cart.items;
     for (var i = 0; i < items.length; i++) {
-      if (String(items[i].id) === String(productId)) return items[i];
+      if (String(items[i].id) === String(productId) && (key === undefined || cartGroupKey(items[i]) === key)) return items[i];
     }
     return null;
   }
@@ -322,6 +333,19 @@
     notify();
   }
 
+  // R1 branch-scoped line removal: removes ONLY the line matching productId
+  // inside the given branch scope (null => legacy/unassigned). The same product
+  // added under other branches stays untouched, so deleting a row in one cart
+  // sheet section can never delete another branch's line.
+  function removeCartItem(productId, branchId) {
+    var key = (branchId == null || String(branchId) === '') ? '__unassigned__' : String(branchId);
+    state.cart.items = (state.cart.items || []).filter(function (item) {
+      return !(String(item.id) === String(productId) && cartGroupKey(item) === key);
+    });
+    save(CART_KEY, state.cart);
+    notify();
+  }
+
   // ── Export ──
   window.Xentra = window.Xentra || {};
   window.Xentra.Store = {
@@ -346,6 +370,7 @@
     findCartItem: findCartItem,
     getCartBranchGroups: getCartBranchGroups,
     getCartItemsForBranch: getCartItemsForBranch,
-    removeBranchItems: removeBranchItems
+    removeBranchItems: removeBranchItems,
+    removeCartItem: removeCartItem
   };
 })();

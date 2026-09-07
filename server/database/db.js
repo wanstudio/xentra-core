@@ -684,8 +684,10 @@ function initSchema(targetDb) {
       branch_id TEXT NOT NULL,
       name TEXT NOT NULL,
       slug TEXT NOT NULL,
+      image_url TEXT,
       sort_order INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
     );

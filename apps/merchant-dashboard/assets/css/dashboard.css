@@ -26,10 +26,19 @@
   --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
 
-* {
+html, body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: var(--font-family);
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+input, button, select, textarea, optgroup {
+  font-family: inherit;
 }
 
 .x-dash-layout,
@@ -902,6 +911,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
+  font-family: var(--font-family);
 }
 
 .x-modal-card {
@@ -912,6 +922,12 @@
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   animation: modalPop 0.2s ease forwards;
+  font-family: var(--font-family);
+  color: var(--text-main);
+}
+
+.x-modal-card * {
+  font-family: inherit;
 }
 
 @keyframes modalPop {
@@ -930,6 +946,8 @@
 .x-modal-header h3 {
   font-size: 18px;
   font-weight: 800;
+  font-family: var(--font-family);
+  color: var(--text-main);
 }
 
 .x-modal-close {
@@ -938,11 +956,23 @@
   font-size: 18px;
   color: var(--text-muted);
   cursor: pointer;
+  font-family: var(--font-family);
 }
 
 .x-modal-card .x-form {
   padding: 24px;
   margin-top: 0;
+}
+
+.x-modal-card label {
+  font-family: var(--font-family);
+}
+
+.x-modal-card input,
+.x-modal-card select,
+.x-modal-card textarea,
+.x-modal-card button {
+  font-family: var(--font-family);
 }
 
 .x-form-row {

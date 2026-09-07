@@ -22,6 +22,10 @@
   var upsellItems = [];
   var availableBranches = [];
   var currentItemId = null;
+  // R1 CART/CHECKOUT BOUNDARY: a checkout is single-branch. When the URL carries
+  // #checkout/branch/<id>, this page consumes ONLY that branch's cart lines.
+  // null = no scope filter (legacy whole-cart flow).
+  var currentBranchId = null;
 
   var state = {
     fulfillment: {
@@ -326,7 +330,14 @@
   }
 
   function getCheckoutItems() {
-    var all = (Store.getState().cart.items || []).slice();
+    var all;
+    if (currentBranchId) {
+      // Branch-scoped checkout: only this branch's cart lines, never a merge.
+      var scopeBranchId = currentBranchId === '__unassigned__' ? null : currentBranchId;
+      all = Store.getCartItemsForBranch(scopeBranchId);
+    } else {
+      all = (Store.getState().cart.items || []).slice();
+    }
     var filtered = !currentItemId ? all : all.filter(function (i) { return String(i.id) === String(currentItemId); });
     return filtered.sort(function (a, b) {
       var aPromo = isPromoItem(a);
@@ -344,6 +355,9 @@
 
     var urlItemId = Router && Router.getItemIdFromUrl ? Router.getItemIdFromUrl() : null;
     if (urlItemId) currentItemId = String(urlItemId);
+
+    var urlBranchId = Router && Router.getBranchIdFromUrl ? Router.getBranchIdFromUrl() : null;
+    currentBranchId = urlBranchId ? String(urlBranchId) : null;
 
     // Restore customer session from Store
     var storeState = Store.getState();
@@ -419,22 +433,33 @@
       if (res && res.success && Array.isArray(res.branches)) {
         availableBranches = res.branches;
         if (!state.matchedBranch) {
-          // P2 HOME DISCOVERY CONTEXT: a Home-selected branch prefills the
-          // checkout branch (customer-selected). It is still authoritatively
-          // re-validated by Core at clarify/submit; it is never AUTO-resolved
-          // and never silently rematched. The bare availableBranches[0]
-          // fallback only survives when there is no branch context at all.
-          var ctx = null;
-          try { ctx = Store.getState().branchContext; } catch (_) {}
-          if (ctx && (ctx.branch_id != null || ctx.id != null)) {
-            var ctxId = ctx.branch_id != null ? ctx.branch_id : ctx.id;
-            var fromCtx = availableBranches.find(function (b) {
-              return String(b.id) === String(ctxId);
+          // An explicit branch-scoped checkout (#checkout/branch/<id>) prefills
+          // the branch it came from — never silently re-scopes the cart to a
+          // different branch. The bare availableBranches[0] fallback only
+          // survives when no branch scope and no branch context exist at all.
+          if (currentBranchId && currentBranchId !== '__unassigned__') {
+            var fromBranchParam = availableBranches.find(function (b) {
+              return String(b.id) === String(currentBranchId);
             });
-            state.matchedBranch = fromCtx || null;
+            state.matchedBranch = fromBranchParam || null;
           }
-          if (!state.matchedBranch && availableBranches.length > 0) {
-            state.matchedBranch = availableBranches[0];
+          if (!state.matchedBranch) {
+            // P2 HOME DISCOVERY CONTEXT: a Home-selected branch prefills the
+            // checkout branch (customer-selected). It is still authoritatively
+            // re-validated by Core at clarify/submit; it is never AUTO-resolved
+            // and never silently rematched.
+            var ctx = null;
+            try { ctx = Store.getState().branchContext; } catch (_) {}
+            if (ctx && (ctx.branch_id != null || ctx.id != null)) {
+              var ctxId = ctx.branch_id != null ? ctx.branch_id : ctx.id;
+              var fromCtx = availableBranches.find(function (b) {
+                return String(b.id) === String(ctxId);
+              });
+              state.matchedBranch = fromCtx || null;
+            }
+            if (!state.matchedBranch && availableBranches.length > 0) {
+              state.matchedBranch = availableBranches[0];
+            }
           }
         }
       }
@@ -670,9 +695,9 @@
           : '<div class="x-product-image" style="background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:24px;">🍱</div>'
         ) +
         '    <div class="x-quantity">' +
-        '      <button type="button" data-minus-item="' + item.id + '" aria-label="Kurang"><img src="/assets/icons/minus.svg" alt="minus" style="width:13px;height:13px;display:block;margin:auto;"></button>' +
+        '      <button type="button" data-minus-item="' + item.id + '" data-branch-item="' + (item.branch_id || '') + '" aria-label="Kurang"><img src="/assets/icons/minus.svg" alt="minus" style="width:13px;height:13px;display:block;margin:auto;"></button>' +
         '      <span class="x-quantity-value">' + qty + '</span>' +
-        '      <button type="button" data-plus-item="' + item.id + '" aria-label="Tambah"><img src="/assets/icons/plus.svg" alt="plus" style="width:13px;height:13px;display:block;margin:auto;"></button>' +
+        '      <button type="button" data-plus-item="' + item.id + '" data-branch-item="' + (item.branch_id || '') + '" aria-label="Tambah"><img src="/assets/icons/plus.svg" alt="plus" style="width:13px;height:13px;display:block;margin:auto;"></button>' +
         '    </div>' +
         '    <button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note-item="' + item.id + '">' +
         '      <img src="' + (note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="Catatan" class="x-note-icon">' +
@@ -941,14 +966,16 @@
     if (!checkoutContainer) return;
     checkoutContainer.querySelectorAll('[data-plus-item]').forEach(function (btn) {
       btn.onclick = function () {
-        var it = Store.findCartItem(btn.dataset.plusItem);
-        if (it) Store.setQty(it.id, Number(it.quantity) + 1);
+        var bid = btn.dataset.branchItem || null;
+        var it = Store.findCartItem(btn.dataset.plusItem, bid);
+        if (it) Store.setQty(it.id, Number(it.quantity) + 1, it.branch_id == null ? null : it.branch_id);
       };
     });
     checkoutContainer.querySelectorAll('[data-minus-item]').forEach(function (btn) {
       btn.onclick = function () {
-        var it = Store.findCartItem(btn.dataset.minusItem);
-        if (it) Store.setQty(it.id, Number(it.quantity) - 1);
+        var bid = btn.dataset.branchItem || null;
+        var it = Store.findCartItem(btn.dataset.minusItem, bid);
+        if (it) Store.setQty(it.id, Number(it.quantity) - 1, it.branch_id == null ? null : it.branch_id);
       };
     });
     checkoutContainer.querySelectorAll('[data-note-item]').forEach(function (btn) {
