@@ -58,14 +58,21 @@
     } catch (_) {}
   }
 
-  function notify() {
-    var snap = getState();
+  // Reactivity boundary: notify() broadcasts a LIGHTWEIGHT mutation descriptor
+  // (e.g. { type: 'cart' }), NOT a deep-cloned snapshot. Subscribers must read
+  // `getState()` (or the specific getters) when they actually need data — today
+  // every subscriber re-reads state itself, so the previous per-mutation
+  // JSON-clone of the entire app state was 100% wasted work on every operation,
+  // synchronous to every qty click on the PWA.
+  function notify(mutation) {
     for (var i = 0; i < listeners.length; i++) {
-      try { listeners[i](snap); } catch (e) { console.error('[Store]', e); }
+      try { listeners[i](mutation || null); } catch (e) { console.error('[Store]', e); }
     }
   }
 
   // ── Public API ──
+  // Snapshot getter: still a detached deep clone when a caller genuinely needs
+  // a point-in-time snapshot (kept for callers that rely on immutability).
   function getState() {
     return JSON.parse(JSON.stringify(state));
   }
@@ -96,8 +103,8 @@
 
   function setOrderType(type) {
     state.orderType = type;
+    notify({ type: 'orderType' });
     save(ORDER_TYPE_KEY, type);
-    notify();
   }
 
   function setOrderContext(type, ctx) {
@@ -109,14 +116,14 @@
 
   function setLocation(loc) {
     state.location = loc;
+    notify({ type: 'location' });
     save(LOCATION_KEY, loc);
-    notify();
   }
 
   function setMatchedBranch(data) {
     state.matchedBranch = data;
+    notify({ type: 'branch' });
     save(BRANCH_KEY, data);
-    notify();
   }
 
   // P2 HOME DISCOVERY CONTEXT — sets the branch context a customer selected on
@@ -199,8 +206,8 @@
       }
     }
 
+    notify({ type: 'cart' });
     save(CART_KEY, state.cart);
-    notify();
   }
 
   // R1 branch scope for mutation ops: `branchId === undefined` keeps the legacy
@@ -228,8 +235,8 @@
       }
     }
 
+    notify({ type: 'cart' });
     save(CART_KEY, state.cart);
-    notify();
   }
 
   function removeItem(productId) {
@@ -246,17 +253,17 @@
     }
 
     state.notes[productId] = noteText;
+    notify({ type: 'cart' });
     save(CART_KEY, state.cart);
     save(NOTES_KEY, state.notes);
-    notify();
   }
 
   function clearCart() {
     state.cart = { items: [] };
     state.notes = {};
+    notify({ type: 'cart' });
     save(CART_KEY, state.cart);
     save(NOTES_KEY, state.notes);
-    notify();
   }
 
   function getCartCount() {
@@ -329,8 +336,8 @@
     state.cart.items = (state.cart.items || []).filter(function (item) {
       return cartGroupKey(item) !== key;
     });
+    notify({ type: 'cart' });
     save(CART_KEY, state.cart);
-    notify();
   }
 
   // R1 branch-scoped line removal: removes ONLY the line matching productId
@@ -342,8 +349,8 @@
     state.cart.items = (state.cart.items || []).filter(function (item) {
       return !(String(item.id) === String(productId) && cartGroupKey(item) === key);
     });
+    notify({ type: 'cart' });
     save(CART_KEY, state.cart);
-    notify();
   }
 
   // ── Export ──

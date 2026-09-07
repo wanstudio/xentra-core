@@ -873,8 +873,6 @@
         var p = products.find(function (x) { return String(x.id) === String(pid); });
         if (p) {
           Store.addItem(p, 1, activeBranch ? branchContextOf(activeBranch) : undefined);
-          renderProducts();
-          renderCartDock();
           ensureCardVisible(pid);
         }
       };
@@ -887,8 +885,6 @@
         var item = Store.findCartItem(pid, activeBranch ? String(activeBranch.id) : undefined);
         if (item) {
           Store.setQty(pid, item.quantity + 1, item.branch_id == null ? null : item.branch_id);
-          renderProducts();
-          renderCartDock();
           ensureCardVisible(pid);
         }
       };
@@ -901,8 +897,6 @@
         var item = Store.findCartItem(pid, activeBranch ? String(activeBranch.id) : undefined);
         if (item) {
           Store.setQty(pid, item.quantity - 1, item.branch_id == null ? null : item.branch_id);
-          renderProducts();
-          renderCartDock();
         }
       };
     });
@@ -1116,8 +1110,6 @@
         } else {
           close();
         }
-        renderProducts();
-        renderCartDock();
         if (UI && typeof UI.toast === 'function') {
           UI.toast('Ditambahkan ke keranjang');
         }
@@ -1322,9 +1314,6 @@
         e.stopPropagation();
         var branchId = btn.dataset.deleteBranch || null;
         Store.removeCartItem(btn.dataset.delete, branchId);
-        renderProducts();
-        renderCartDock();
-        renderCartSheetItems();
         if (Store.getCartCount() <= 0) closeSheet();
       };
     });
@@ -1605,7 +1594,12 @@
     }
 
     // Subscribe to store changes (2-Way Realtime Reactive Sync)
+    // The home DOM exists on every page (checkout/order-received share the SPA
+    // shell), so this MUST skip when home is not the active view — rebuilding
+    // the hidden catalog grid per checkout keystroke was pure wasted work.
     Store.subscribe(function () {
+      if (window.Xentra && window.Xentra.Router && window.Xentra.Router.getCurrentView &&
+          window.Xentra.Router.getCurrentView() !== 'home') return;
       renderProducts();
       renderCartDock();
       if ($('x-sheet') && $('x-sheet').classList.contains('open')) {

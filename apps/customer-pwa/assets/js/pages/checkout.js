@@ -203,15 +203,6 @@
     if (!res || !res.claimed || !res.items.length) return;
 
     Store.addItem(res.items[0], 1);
-
-    var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
-    if (rowsEl) {
-      rowsEl.innerHTML = renderItemsHtml(getCheckoutItems());
-      bindItemEvents();
-    }
-    calculateTotals();
-    refreshDeliveryQuote();
-    renderPromoBanner();
   }
 
   // beforeinstallprompt is captured ONCE in <head> on every page (stored on
@@ -390,41 +381,14 @@
       renderPromoBanner();
     });
 
-    // Subscribe to Store updates (Reactivity on cart item changes/deletions)
-    Store.subscribe(function () {
-      var activeItems = getCheckoutItems();
-      if (!activeItems.length && state.fulfillment.type !== 'reservation') {
-        renderEmpty();
-        renderPromoBanner();
-        return;
-      }
-      var rowsEl = $('x-checkout-items-rows');
-      if (!rowsEl && activeItems.length) {
-        // First item arrived while the empty-state view was on screen
-        // (e.g. welcome reward claimed): transition to the full checkout layout.
-        renderLayout();
-        rowsEl = $('x-checkout-items-rows');
-        if (!rowsEl) return;
-      }
-      if (rowsEl) {
-        rowsEl.innerHTML = renderItemsHtml(activeItems);
-        bindItemEvents();
-      }
-      calculateTotals();
-      renderPromoBanner();
-    });
+    // The single Store subscriber is registered ONCE at module scope (see
+    // "Sync with Store changes" at the bottom). Registering inside mount()
+    // would ACCUMULATE a duplicate subscriber on every checkout visit and
+    // duplicate every row render per mutation.
 
-    var items = getCheckoutItems();
-    if (!items.length && state.fulfillment.type !== 'reservation') {
-      renderEmpty();
-      renderPromoBanner();
-      return;
-    }
-
-    renderLayout();
-    calculateTotals();
+    syncRowsFromItems(getCheckoutItems());
     loadUpsell();
-    refreshDeliveryQuote();
+    quoteNow();
   }
 
   function loadBranches() {
@@ -466,19 +430,122 @@
     }).catch(function () {});
   }
 
+  // ── Cart row sync (single source of truth for the items DOM) ──
+  // Re-render strategy per mutation:
+  //  * empty cart            -> full empty-state render (includes promo slot)
+  //  * first item / new line -> full rows rebuild + rebind + promo banner
+  //  * qty-only change       -> in-place quantity patch (NO innerHTML rebuild,
+  //                             NO event rebinding, NO promo re-render)
+  // The promo banner is only re-rendered when the LINE SET changes (add/remove/
+  // reward claim); a pure qty change cannot alter server-provided promo
+  // presentation. A delivery quote landing can change the per-row ongkir
+  // discount, so we also force a full rebuild when the discount changed.
+  var lastRowKeys = null;
+  var lastRowDiscount = 0;
+
+  function itemRowKey(item) {
+    return String(item.id) + '::' + (item && item.branch_id ? String(item.branch_id) : 'u');
+  }
+
+  function syncRowsFromItems(items) {
+    var isReservation = state.fulfillment.type === 'reservation';
+
+    if (!items.length) {
+      lastRowKeys = null;
+      lastRowDiscount = 0;
+      if (!isReservation) {
+        renderEmpty();
+        renderPromoBanner();
+      } else {
+        // Reservation checkout with no menu lines: still show the reservation
+        // layout (booking card), unlike the empty-cart state for other types.
+        renderLayout();
+        calculateTotals();
+      }
+      return;
+    }
+
+    var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
+    if (!rowsEl) {
+      // First item arrived while the empty-state view was on screen
+      // (e.g. welcome reward claimed): transition to the full checkout layout.
+      renderLayout();
+      lastRowKeys = null;
+      lastRowDiscount = 0;
+      rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
+      if (!rowsEl) { calculateTotals(); return; }
+    }
+
+    var keys = items.map(itemRowKey).join('|');
+    var discount = Number(state.discount) || 0;
+    if (rowsEl && (keys !== lastRowKeys || discount !== lastRowDiscount)) {
+      rowsEl.innerHTML = renderItemsHtml(items);
+      bindItemEvents();
+      renderPromoBanner();
+      lastRowKeys = keys;
+      lastRowDiscount = discount;
+    } else if (rowsEl) {
+      // Qty-only change: patch the visible quantity, keep existing DOM/events.
+      items.forEach(function (i) {
+        var row = rowsEl.querySelector('[data-item-key="' + itemRowKey(i) + '"]');
+        if (!row) return;
+        var q = row.querySelector('.x-quantity-value');
+        if (q) q.textContent = String(i.quantity);
+      });
+    }
+    calculateTotals();
+  }
+
   // ── Delivery quote calculation via BranchMatcher ──
-  function refreshDeliveryQuote() {
-    if (!API) return;
-    var isDelivery = state.fulfillment.type === 'delivery';
-    if (!isDelivery) {
+  // Delivery ongkir / subtotal-sensitive discount eligibility is a SERVER-side
+  // (delivery domain) decision: the client must re-quote after cart changes,
+  // but NEVER synchronously per keystroke. This pipeline is async, trailing-
+  // debounced (400ms), and latest-wins: every response carries a sequence id so
+  // a stale reply (for an older qty) can never overwrite a newer cart state.
+  //
+  // Loop breaker: the module-scope Store subscriber previously called
+  // refreshDeliveryQuote -> Store.setMatchedBranch(res) -> notify() -> the same
+  // subscriber -> refreshDeliveryQuote ... forever. Now the quote path applies
+  // results LOCALLY first and only propagates a *changed* branch id to the
+  // Store (and the subscriber only reacts to 'cart'/'location', then schedules,
+  // debounced — never a hard re-enter loop).
+  var quoteTimer = null;
+  var quoteSeq = 0;
+
+  function quoteNow() {
+    clearTimeout(quoteTimer);
+    quoteTimer = null;
+    runDeliveryQuote(++quoteSeq);
+  }
+
+  function scheduleDeliveryQuote() {
+    if (state.fulfillment.type !== 'delivery') {
+      clearTimeout(quoteTimer);
+      quoteTimer = null;
       state.deliveryFee = 0;
       state.discount = 0;
       state.deliveryQuote = null;
       calculateTotals();
       return;
     }
+    clearTimeout(quoteTimer);
+    var seq = ++quoteSeq;
+    quoteTimer = setTimeout(function () { runDeliveryQuote(seq); }, 400);
+  }
 
+  function runDeliveryQuote(seq) {
+    quoteTimer = null;
+    if (seq !== quoteSeq) return; // superseded by a newer schedule/cart change
+    if (!API) return;
+    if (state.fulfillment.type !== 'delivery') return;
     var items = getCheckoutItems();
+    if (!items.length) {
+      state.deliveryFee = 0;
+      state.discount = 0;
+      state.deliveryQuote = null;
+      calculateTotals();
+      return;
+    }
     var subtotal = items.reduce(function (s, i) { return s + Number(i.price || 0) * Number(i.quantity || 0); }, 0);
 
     API.post('/delivery/match-branch', {
@@ -486,21 +553,28 @@
       longitude: state.address.longitude,
       subtotal: subtotal
     }).then(function (res) {
+      if (seq !== quoteSeq) return; // a newer cart already superseded this reply
       if (res && res.eligible && res.delivery) {
+        var previousBranch = state.matchedBranch;
         state.matchedBranch = res.branch || null;
         state.deliveryQuote = res.delivery;
         state.deliveryFee = Number(res.delivery.final_delivery_fee || 0);
         state.discount = Number(res.delivery.discount_amount || 0);
-        try { Store.setMatchedBranch(res); } catch (_) {}
+        // Only persist when the resolved branch actually changed — persisting
+        // the same branch per quote would re-notify and re-enter the quote path.
+        if (res.branch && (!previousBranch || String(previousBranch.id) !== String(res.branch.id))) {
+          try { Store.setMatchedBranch(res); } catch (_) {}
+        }
       } else if (res && !res.eligible) {
         state.deliveryFee = 0;
         state.discount = 0;
         state.deliveryQuote = res.delivery || null;
         if (UI && UI.toast) UI.toast(res.reason || 'Alamat di luar jangkauan pengantaran.');
       }
-      calculateTotals();
+      syncRowsFromItems(getCheckoutItems());
     }).catch(function () {
-      calculateTotals();
+      if (seq !== quoteSeq) return;
+      syncRowsFromItems(getCheckoutItems());
     });
   }
 
@@ -676,7 +750,7 @@
       var isPromoFreebie = Boolean(item.is_promo_reward || String(item.id).indexOf('reward_') === 0);
 
       html +=
-        '<div class="x-product x-checkout-item" data-item-id="' + item.id + '">' +
+        '<div class="x-product x-checkout-item" data-item-id="' + item.id + '" data-item-key="' + itemRowKey(item) + '">' +
         '  <div class="x-product-info">' +
         '    <div class="x-product-name">' + UI.escape(item.name || '') + '</div>' +
         (note ? '<div class="x-product-note-inline">Catatan : ' + UI.escape(note) + '</div>' : '') +
@@ -839,13 +913,6 @@
           }
           if (found) {
             Store.addItem(found, 1);
-            var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
-            if (rowsEl) {
-              rowsEl.innerHTML = renderItemsHtml(getCheckoutItems());
-              bindItemEvents();
-            }
-            calculateTotals();
-            refreshDeliveryQuote();
           }
         };
       })(buttons[b]);
@@ -1360,7 +1427,7 @@
         renderLayout();
         calculateTotals();
         loadUpsell();
-        refreshDeliveryQuote();
+        scheduleDeliveryQuote();
         window.scrollTo(0, y);
       };
     }
@@ -1621,7 +1688,7 @@
       renderLayout();
       calculateTotals();
       loadUpsell();
-      refreshDeliveryQuote();
+      scheduleDeliveryQuote();
       window.scrollTo(0, y);
     };
   }
@@ -1905,23 +1972,19 @@
   }
 
   // ── Sync with Store changes ──
-  Store.subscribe(function () {
-    if (!checkoutContainer || checkoutContainer.style.display === 'none' || state.isSubmitting) return;
-    var items = getCheckoutItems();
-    if (!items.length && state.fulfillment.type !== 'reservation') {
-      renderEmpty();
-      return;
-    }
-    var rowsEl = $('x-checkout-items-rows') || $('x-checkout-items-list');
-    if (rowsEl) {
-      rowsEl.innerHTML = renderItemsHtml(items);
-      bindItemEvents();
-      checkoutContainer.querySelectorAll('[data-note-item]').forEach(function (b) {
-        b.onclick = function () { openItemNoteSheet(b.dataset.noteItem); };
-      });
-    }
-    calculateTotals();
-    refreshDeliveryQuote();
+  // Registered ONCE at module scope. Reacts only to cart / location mutations
+  // (the ops that actually change checkout rows or delivery eligibility) and
+  // delegates rendering to syncRowsFromItems (targeted qty patch / full rebuild
+  // when the line set changed). Delivery re-quote is scheduled (debounced +
+  // latest-wins), never fired synchronously from here.
+  Store.subscribe(function (mutation) {
+    if (!checkoutContainer || state.isSubmitting) return;
+    if (Router && Router.getCurrentView && Router.getCurrentView() !== 'checkout') return;
+    if (checkoutContainer.style.display === 'none') return;
+    var mt = mutation && mutation.type;
+    if (mt !== 'cart' && mt !== 'location') return;
+    syncRowsFromItems(getCheckoutItems());
+    scheduleDeliveryQuote();
   });
 
   window.Xentra = window.Xentra || {};
