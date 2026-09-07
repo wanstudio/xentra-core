@@ -76,7 +76,7 @@ class OfflineReconciliationService {
         delivery_fee: 0,
         payment_method,
         order_channel: 'pos_cashier',
-        fulfillment_type: order_type,
+        order_type,
         table_number: customer.table_number || null,
         client_transaction_id,
         shift_id,
