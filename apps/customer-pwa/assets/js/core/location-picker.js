@@ -1505,13 +1505,13 @@
       // Form 1: Nama alamat (wajib)
       '<div class="x-loc-form-group">' +
       '  <div class="x-loc-form-label">Nama alamat <span class="wajib">(wajib)</span></div>' +
-      '  <input type="text" id="x-input-fav-name" class="x-loc-form-input" placeholder="Rumah Pak Probo" value="' + UI.escape(existingLabel) + '">' +
+      '  <input type="text" id="x-input-fav-name" class="x-loc-form-input" placeholder="" value="' + UI.escape(existingLabel) + '">' +
       '</div>' +
 
       // Form 2: Detail lokasi/patokan (optional)
       '<div class="x-loc-form-group">' +
       '  <div class="x-loc-form-label">Detail lokasi/patokan <span class="optional">(optional)</span></div>' +
-      '  <input type="text" id="x-input-fav-detail" class="x-loc-form-input" placeholder="depan vihara" value="' + UI.escape(existingDetail) + '">' +
+      '  <input type="text" id="x-input-fav-detail" class="x-loc-form-input" placeholder="" value="' + UI.escape(existingDetail) + '">' +
       '</div>' +
 
       // Custom Checkbox: "Simpan sebagai favorit" (Reference Image 3)
