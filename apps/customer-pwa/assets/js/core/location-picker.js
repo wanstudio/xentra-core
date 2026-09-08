@@ -172,6 +172,23 @@
   }
 
   // ══════════════════════════════════════════════════════════════
+  var GUEST_FAV_KEY = 'xentra_v2_guest_favorites';
+
+  function getGuestFavorites() {
+    try {
+      var raw = localStorage.getItem(GUEST_FAV_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveGuestFavorites(list) {
+    try {
+      localStorage.setItem(GUEST_FAV_KEY, JSON.stringify(list || []));
+    } catch (_) {}
+  }
+
   //  FAVORITE ADDRESSES DATA & RENDERING
   // ══════════════════════════════════════════════════════════════
   function loadFavoriteAddresses(containerEl, onSelectFav) {
@@ -180,13 +197,23 @@
 
     var session = Store && Store.getState().customerSession;
     if (!session || !session.token) {
-      // Unauthenticated customer: show the clean Empty State from Reference 1
-      renderEmptyFavoriteState(favContainer);
+      // Unauthenticated customer: load saved local favorites if available, else show clean Empty State
+      var localFavs = getGuestFavorites();
+      if (Array.isArray(localFavs) && localFavs.length > 0) {
+        renderFavoriteList(favContainer, localFavs, onSelectFav, containerEl);
+      } else {
+        renderEmptyFavoriteState(favContainer);
+      }
       return;
     }
 
     if (!API) {
-      renderEmptyFavoriteState(favContainer);
+      var localFavsFallback = getGuestFavorites();
+      if (Array.isArray(localFavsFallback) && localFavsFallback.length > 0) {
+        renderFavoriteList(favContainer, localFavsFallback, onSelectFav, containerEl);
+      } else {
+        renderEmptyFavoriteState(favContainer);
+      }
       return;
     }
 
@@ -195,11 +222,21 @@
         if (res && res.success && Array.isArray(res.addresses) && res.addresses.length > 0) {
           renderFavoriteList(favContainer, res.addresses, onSelectFav, containerEl);
         } else {
-          renderEmptyFavoriteState(favContainer);
+          var localFavsFallback = getGuestFavorites();
+          if (Array.isArray(localFavsFallback) && localFavsFallback.length > 0) {
+            renderFavoriteList(favContainer, localFavsFallback, onSelectFav, containerEl);
+          } else {
+            renderEmptyFavoriteState(favContainer);
+          }
         }
       })
       .catch(function () {
-        renderEmptyFavoriteState(favContainer);
+        var localFavsFallback = getGuestFavorites();
+        if (Array.isArray(localFavsFallback) && localFavsFallback.length > 0) {
+          renderFavoriteList(favContainer, localFavsFallback, onSelectFav, containerEl);
+        } else {
+          renderEmptyFavoriteState(favContainer);
+        }
       });
   }
 
@@ -336,6 +373,19 @@
     delBtn.onclick = function () {
       delBtn.disabled = true;
       delBtn.textContent = 'Menghapus…';
+
+      // Check if address is a guest local favorite
+      var session = Store && Store.getState().customerSession;
+      if (!session || !session.token || String(addressItem.id).indexOf('guest_') === 0) {
+        var currentGuestFavs = getGuestFavorites();
+        var filtered = currentGuestFavs.filter(function (f) { return String(f.id) !== String(addressItem.id); });
+        saveGuestFavorites(filtered);
+        closeModal();
+        if (UI && UI.toast) UI.toast('Alamat favorit berhasil dihapus');
+        if (typeof onDeleted === 'function') onDeleted();
+        return;
+      }
+
       API.delete('/addresses/' + addressItem.id)
         .then(function (res) {
           closeModal();
@@ -1473,6 +1523,20 @@
       konfirmasiBtn.disabled = true;
       konfirmasiBtn.textContent = 'Memproses…';
 
+      function resetButton() {
+        konfirmasiBtn.disabled = false;
+        konfirmasiBtn.textContent = 'Konfirmasi';
+        konfirmasiBtn.classList.add('is-enabled');
+        konfirmasiBtn.classList.remove('is-disabled');
+      }
+
+      // Safety timeout so button is NEVER permanently stuck
+      var timeoutId = setTimeout(function () {
+        if (konfirmasiBtn && konfirmasiBtn.disabled && konfirmasiBtn.textContent === 'Memproses…') {
+          resetButton();
+        }
+      }, 10000);
+
       // Branch 1: If Checked, Save to Favorite Address
       if (favChecked) {
         saveFavoriteAddress({
@@ -1483,9 +1547,9 @@
           latitude: lat,
           longitude: lng
         }, function (err, savedRecord) {
+          clearTimeout(timeoutId);
           if (err) {
-            konfirmasiBtn.disabled = false;
-            konfirmasiBtn.textContent = 'Konfirmasi';
+            resetButton();
             if (UI && UI.toast) UI.toast(err.message || 'Gagal menyimpan alamat favorit');
             return;
           }
@@ -1509,6 +1573,7 @@
         });
       } else {
         // Branch 2: Not checked → DO NOT create favorite address, use location as Active Destination
+        clearTimeout(timeoutId);
         applyActiveDestination({
           latitude: lat,
           longitude: lng,
@@ -1531,13 +1596,32 @@
   function saveFavoriteAddress(data, callback) {
     var session = Store && Store.getState().customerSession;
     if (!session || !session.token) {
-      // Prompt user login/OTP if saving favorite requires authentication
-      if (typeof window.openCustomerAuthSheet === 'function') {
-        window.openCustomerAuthSheet(function () {
-          saveFavoriteAddress(data, callback);
-        });
-      } else {
-        callback(new Error('Silakan masuk / verifikasi nomor HP terlebih dahulu untuk menyimpan favorit.'));
+      // Guest customer: persist directly to localStorage guest favorites
+      try {
+        var localList = getGuestFavorites();
+        var recordId = data.id || ('guest_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
+        var existingIdx = localList.findIndex(function (item) { return String(item.id) === String(recordId); });
+        var savedRecord = {
+          id: recordId,
+          label: data.label,
+          address: data.address,
+          detail: data.detail || '',
+          latitude: data.latitude,
+          longitude: data.longitude,
+          is_primary: false,
+          created_at: new Date().toISOString()
+        };
+
+        if (existingIdx !== -1) {
+          localList[existingIdx] = savedRecord;
+        } else {
+          localList.unshift(savedRecord);
+        }
+
+        saveGuestFavorites(localList);
+        callback(null, savedRecord);
+      } catch (err) {
+        callback(err || new Error('Gagal menyimpan di perangkat'));
       }
       return;
     }
@@ -1551,7 +1635,9 @@
       is_primary: false
     };
 
-    var req = data.id ? API.put('/addresses/' + data.id, payload) : API.post('/addresses', payload);
+    var req = data.id && String(data.id).indexOf('guest_') !== 0 ?
+      API.put('/addresses/' + data.id, payload) :
+      API.post('/addresses', payload);
 
     req
       .then(function (res) {

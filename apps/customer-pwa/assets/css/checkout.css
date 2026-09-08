@@ -2121,7 +2121,7 @@
 	display:flex !important;
 	align-items:flex-end !important;
 	justify-content:center !important;
-	z-index:1000000 !important;
+	z-index:var(--x-z-overlay, 2147483000) !important;
 	opacity:0 !important;
 	visibility:hidden !important;
 	pointer-events:none !important;
