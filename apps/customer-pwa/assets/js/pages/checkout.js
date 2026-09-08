@@ -1625,7 +1625,10 @@
         '    <img src="/assets/icons/ac.svg" alt="AC" class="x-floor-badge-icon">' +
         '    <img src="/assets/icons/no_smoking.png" alt="No Smoking" class="x-floor-badge-icon">' +
         '  </div>' +
-        '  <div class="x-floor-mushola" style="left:30px;top:30px;width:145px;height:130px;">Mushola</div>';
+        '  <div class="x-floor-mushola" style="left:50px;top:16px;width:86px;height:144px;">' +
+        '    <img src="/assets/icons/mushola.png" alt="" class="x-floor-mushola-img">' +
+        '    <span class="x-floor-mushola-text">Mushola</span>' +
+        '  </div>';
 
       indoorTables.forEach(function (t) {
         html += renderTableHtml(t, 0);
@@ -1639,7 +1642,7 @@
         '  </div>';
 
       smokingTables.forEach(function (t) {
-        html += renderTableHtml(t, 370);
+        html += renderTableHtml(t, 375);
       });
       html += '</div>';
 
@@ -1680,15 +1683,14 @@
       var styleStr =
         'left:' + (t.x || 0) + 'px;' +
         'top:' + relY + 'px;' +
-        'width:' + (t.width || 80) + 'px;' +
-        'height:' + (t.height || 60) + 'px;';
+        'width:' + (t.width || 86) + 'px;' +
+        'height:' + (t.height || 68) + 'px;';
 
       var tableArtUrl = '/assets/icons/meja.png';
 
       return (
         '<div class="x-table-card ' + (isSelected ? 'is-selected' : '') + ' ' + (isUnavailable ? 'is-unavailable' : '') + '" ' +
         '     data-table-id="' + t.id + '" data-table-number="' + t.table_number + '" style="' + styleStr + '">' +
-        (isSelected ? '<div class="x-table-selected-badge">✓</div>' : '') +
         '  <div class="x-table-art">' +
         '    <img src="' + tableArtUrl + '" alt="" style="' + (isVertical ? 'transform:rotate(90deg);' : '') + '">' +
         '    <div class="x-table-label-box">' +

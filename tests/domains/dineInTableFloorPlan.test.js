@@ -21,11 +21,11 @@ test('Dine-In Table Floor Plan & DiningTableService Invariants', async (t) => {
     const layout = DiningTableService.initializeBranchLayout(branchId, 'template_01');
     assert.ok(layout);
     assert.strictEqual(layout.branch_id, branchId);
-    assert.strictEqual(layout.tables.length, 11);
+    assert.strictEqual(layout.tables.length, 15);
 
     // Verify layout can be retrieved with live state
     const retrieved = DiningTableService.getBranchLayout(branchId);
-    assert.strictEqual(retrieved.tables.length, 11);
+    assert.strictEqual(retrieved.tables.length, 15);
     
     // Check initial status: Meja 1, 3, 6 are initially blocked as per template reference
     const t1 = retrieved.tables.find(t => t.table_number === '1');
@@ -95,21 +95,21 @@ test('Dine-In Table Floor Plan & DiningTableService Invariants', async (t) => {
 
   await t.test('4. Payment settlement creates active Dining Session mapping multiple tables', () => {
     const layout = DiningTableService.getBranchLayout(branchId);
-    // Use available tables: Table 7 and Table 8
-    const table7 = layout.tables.find(t => t.table_number === '7');
+    // Use available tables with capacity 8: Table 8 and Table 11
     const table8 = layout.tables.find(t => t.table_number === '8');
+    const table11 = layout.tables.find(t => t.table_number === '11');
 
     const holdRef = 'ref_order_pay_settle';
     DiningTableService.holdTablesForPayment({
       branch_id: branchId,
-      table_ids: [table7.id, table8.id],
+      table_ids: [table8.id, table11.id],
       hold_reference_id: holdRef
     });
 
     // Create session upon payment
     const sessionRes = DiningTableService.createOrAttachDiningSession({
       branch_id: branchId,
-      table_ids: [table7.id, table8.id],
+      table_ids: [table8.id, table11.id],
       order_id: 'order_123',
       guest_count: 12,
       customer_name: 'Ahmad',
@@ -122,20 +122,20 @@ test('Dine-In Table Floor Plan & DiningTableService Invariants', async (t) => {
 
     // Both tables are now occupied
     const stateAfterSettle = DiningTableService.getBranchLayout(branchId);
-    const t7 = stateAfterSettle.tables.find(t => t.id === table7.id);
     const t8 = stateAfterSettle.tables.find(t => t.id === table8.id);
-    assert.strictEqual(t7.operational_state, 'occupied');
+    const t11 = stateAfterSettle.tables.find(t => t.id === table11.id);
     assert.strictEqual(t8.operational_state, 'occupied');
-    assert.strictEqual(t7.current_session_id, sessionRes.session_id);
+    assert.strictEqual(t11.operational_state, 'occupied');
+    assert.strictEqual(t8.current_session_id, sessionRes.session_id);
 
     // Dining completion releases tables
     const completed = DiningTableService.completeDiningSession(sessionRes.session_id, 'Staff Checkout');
     assert.strictEqual(completed.status, 'completed');
 
     const stateAfterComplete = DiningTableService.getBranchLayout(branchId);
-    const t7Done = stateAfterComplete.tables.find(t => t.id === table7.id);
-    assert.strictEqual(t7Done.operational_state, 'available');
-    assert.strictEqual(t7Done.current_session_id, null);
+    const t8Done = stateAfterComplete.tables.find(t => t.id === table8.id);
+    assert.strictEqual(t8Done.operational_state, 'available');
+    assert.strictEqual(t8Done.current_session_id, null);
   });
 
   await t.test('5. QR Code Token resolution and regeneration', () => {

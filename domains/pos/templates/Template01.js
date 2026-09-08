@@ -33,14 +33,14 @@ const TEMPLATE_01 = {
       name: 'Indoor Area',
       ac: true,
       smoking: false,
-      bounds: { x: 10, y: 10, width: 360, height: 350 }
+      bounds: { x: 10, y: 10, width: 360, height: 355 }
     },
     {
       id: 'sec_smoking',
       name: 'Smoking Area',
       ac: false,
       smoking: true,
-      bounds: { x: 10, y: 370, width: 360, height: 240 }
+      bounds: { x: 10, y: 375, width: 360, height: 185 }
     }
   ],
   non_table_objects: [
@@ -50,36 +50,67 @@ const TEMPLATE_01 = {
       label: 'Mushola',
       shape: 'polygon',
       points: [
-        { x: 30, y: 30 },
-        { x: 130, y: 30 },
-        { x: 130, y: 130 },
-        { x: 175, y: 130 },
-        { x: 175, y: 160 },
-        { x: 30, y: 160 }
+        { x: 50, y: 16 },
+        { x: 138, y: 16 },
+        { x: 138, y: 134 },
+        { x: 198, y: 134 },
+        { x: 198, y: 160 },
+        { x: 50, y: 160 }
       ],
-      x: 30,
-      y: 30,
-      width: 145,
-      height: 130,
+      x: 50,
+      y: 16,
+      width: 148,
+      height: 144,
       background_color: '#d6d8db',
       text_color: '#374151'
     }
   ],
   tables: [
     // --- Indoor Section ---
+    // Row 1 (Top beside Mushola)
     {
-      table_number: '11',
-      label: 'meja 11',
-      capacity: 8,
+      table_number: '15',
+      label: 'meja 15',
+      capacity: 4,
       section_id: 'sec_indoor',
       shape: 'rectangle',
       orientation: 'horizontal',
-      x: 170,
-      y: 30,
-      width: 170,
-      height: 80,
+      x: 148,
+      y: 16,
+      width: 86,
+      height: 68,
       initial_state: 'available'
     },
+    {
+      table_number: '14',
+      label: 'meja 14',
+      capacity: 4,
+      section_id: 'sec_indoor',
+      shape: 'rectangle',
+      orientation: 'horizontal',
+      x: 244,
+      y: 16,
+      width: 86,
+      height: 68,
+      initial_state: 'available'
+    },
+
+    // Row 2 (Beside Mushola L-bottom)
+    {
+      table_number: '13',
+      label: 'meja 13',
+      capacity: 4,
+      section_id: 'sec_indoor',
+      shape: 'rectangle',
+      orientation: 'horizontal',
+      x: 244,
+      y: 92,
+      width: 86,
+      height: 68,
+      initial_state: 'available'
+    },
+
+    // Row 3 (Full 3-column row below Mushola)
     {
       table_number: '10',
       label: 'meja 10',
@@ -87,12 +118,40 @@ const TEMPLATE_01 = {
       section_id: 'sec_indoor',
       shape: 'rectangle',
       orientation: 'horizontal',
-      x: 240,
-      y: 120,
-      width: 100,
-      height: 80,
+      x: 52,
+      y: 180,
+      width: 86,
+      height: 68,
       initial_state: 'available'
     },
+    {
+      table_number: '11',
+      label: 'meja 11',
+      capacity: 8,
+      section_id: 'sec_indoor',
+      shape: 'rectangle',
+      orientation: 'horizontal',
+      x: 148,
+      y: 180,
+      width: 86,
+      height: 68,
+      initial_state: 'available'
+    },
+    {
+      table_number: '12',
+      label: 'meja 12',
+      capacity: 4,
+      section_id: 'sec_indoor',
+      shape: 'rectangle',
+      orientation: 'horizontal',
+      x: 244,
+      y: 180,
+      width: 86,
+      height: 68,
+      initial_state: 'available'
+    },
+
+    // Row 4 (Bottom indoor row)
     {
       table_number: '9',
       label: 'meja 9',
@@ -100,10 +159,10 @@ const TEMPLATE_01 = {
       section_id: 'sec_indoor',
       shape: 'rectangle',
       orientation: 'horizontal',
-      x: 240,
-      y: 210,
-      width: 100,
-      height: 80,
+      x: 52,
+      y: 258,
+      width: 86,
+      height: 68,
       initial_state: 'available'
     },
     {
@@ -113,10 +172,10 @@ const TEMPLATE_01 = {
       section_id: 'sec_indoor',
       shape: 'rectangle',
       orientation: 'horizontal',
-      x: 30,
-      y: 190,
-      width: 170,
-      height: 80,
+      x: 148,
+      y: 258,
+      width: 86,
+      height: 68,
       initial_state: 'available'
     },
     {
@@ -126,27 +185,15 @@ const TEMPLATE_01 = {
       section_id: 'sec_indoor',
       shape: 'rectangle',
       orientation: 'horizontal',
-      x: 30,
-      y: 280,
-      width: 170,
-      height: 80,
-      initial_state: 'available'
-    },
-    {
-      table_number: '6',
-      label: 'meja 6',
-      capacity: 4,
-      section_id: 'sec_indoor',
-      shape: 'rectangle',
-      orientation: 'horizontal',
-      x: 240,
-      y: 300,
-      width: 100,
-      height: 80,
-      initial_state: 'blocked' // Initially unavailable as seen in reference
+      x: 244,
+      y: 258,
+      width: 86,
+      height: 68,
+      initial_state: 'blocked' // Unavailable in reference image
     },
 
     // --- Outdoor / Smoking Section ---
+    // Top Row of Smoking Section (y absolute 390 -> relY 15)
     {
       table_number: '2',
       label: 'meja 2',
@@ -154,10 +201,10 @@ const TEMPLATE_01 = {
       section_id: 'sec_smoking',
       shape: 'rectangle',
       orientation: 'horizontal',
-      x: 35,
+      x: 52,
       y: 390,
-      width: 85,
-      height: 70,
+      width: 86,
+      height: 68,
       initial_state: 'available'
     },
     {
@@ -167,12 +214,27 @@ const TEMPLATE_01 = {
       section_id: 'sec_smoking',
       shape: 'rectangle',
       orientation: 'horizontal',
-      x: 135,
+      x: 148,
       y: 390,
-      width: 85,
-      height: 70,
-      initial_state: 'blocked' // Initially unavailable in reference
+      width: 86,
+      height: 68,
+      initial_state: 'blocked' // Unavailable in reference image
     },
+    {
+      table_number: '6',
+      label: 'meja 6',
+      capacity: 4,
+      section_id: 'sec_smoking',
+      shape: 'rectangle',
+      orientation: 'horizontal',
+      x: 244,
+      y: 390,
+      width: 86,
+      height: 68,
+      initial_state: 'available'
+    },
+
+    // Bottom Row of Smoking Section (y absolute 468 -> relY 93)
     {
       table_number: '1',
       label: 'meja 1',
@@ -180,11 +242,11 @@ const TEMPLATE_01 = {
       section_id: 'sec_smoking',
       shape: 'rectangle',
       orientation: 'horizontal',
-      x: 35,
-      y: 480,
-      width: 85,
-      height: 70,
-      initial_state: 'blocked' // Initially unavailable in reference
+      x: 52,
+      y: 468,
+      width: 86,
+      height: 68,
+      initial_state: 'blocked' // Unavailable in reference image
     },
     {
       table_number: '4',
@@ -193,10 +255,10 @@ const TEMPLATE_01 = {
       section_id: 'sec_smoking',
       shape: 'rectangle',
       orientation: 'horizontal',
-      x: 135,
-      y: 480,
-      width: 85,
-      height: 70,
+      x: 148,
+      y: 468,
+      width: 86,
+      height: 68,
       initial_state: 'available'
     },
     {
@@ -205,11 +267,11 @@ const TEMPLATE_01 = {
       capacity: 8,
       section_id: 'sec_smoking',
       shape: 'rectangle',
-      orientation: 'vertical',
-      x: 245,
-      y: 390,
-      width: 85,
-      height: 160,
+      orientation: 'horizontal',
+      x: 244,
+      y: 468,
+      width: 86,
+      height: 68,
       initial_state: 'available'
     }
   ]
