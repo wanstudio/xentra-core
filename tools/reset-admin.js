@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const crypto = require('crypto');
+const fs = require('fs');
 require('dotenv').config();
 const path = require('path');
 
@@ -63,6 +64,15 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     db.prepare('INSERT INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(id, brand.id, organizationId, username, username + '@bangjo.com', passwordHash, username, 'owner');
     console.log('OK created user ' + id + ' (' + username + ', role owner, brand ' + brand.id + ')');
+  }
+
+  try {
+    const tmpDir = path.join(__dirname, '..', 'tmp');
+    fs.mkdirSync(tmpDir, { recursive: true });
+    fs.writeFileSync(path.join(tmpDir, 'restart.txt'), String(Date.now()));
+    console.log('Passenger restart requested (tmp/restart.txt touched).');
+  } catch (err) {
+    console.warn('Could not touch tmp/restart.txt:', err.message);
   }
 })().catch((err) => {
   console.error('FAILED:', err.message);
