@@ -416,25 +416,10 @@
           console.warn('[Login fetch warn]:', fetchErr);
         }
 
-        // Resilient Fallback for Owner/Admin Login
-        if (username === 'admin' && (password === 'bangjo123' || password.length > 0)) {
-          var fallbackUser = {
-            id: 'usr_bangjo_owner',
-            username: 'admin',
-            full_name: 'Pemilik Restaurant',
-            role: 'owner',
-            brand_name: 'Bangjo Resto'
-          };
-          localStorage.setItem(TOKEN_KEY, 'xnt_auth_session_local_' + Date.now());
-          localStorage.setItem(USER_KEY, JSON.stringify(fallbackUser));
-          btn.innerHTML = '<span>Login Berhasil! Mengalihkan...</span>';
-          setTimeout(function () {
-            window.location.href = '/dashboard/';
-          }, 250);
-          return;
-        }
-
-        errorBox.textContent = '❌ Username atau password yang Anda masukkan salah.';
+        // NO client-side session fabrication. A failed server login (wrong
+        // password, network error) must never write a local token: the dashboard
+        // would validate it, get 401, and bounce straight back here (login loop).
+        errorBox.textContent = '❌ ' + ((data && (data.error || data.message)) || 'Username atau password yang Anda masukkan salah.');
         errorBox.style.display = 'block';
         btn.disabled = false;
         btn.innerHTML = '<span>Masuk ke Dashboard</span>';
