@@ -6,8 +6,13 @@ on:
       - main
 
 concurrency:
-  group: xentra-dev-deploy
+  group: xentra-app-production
   cancel-in-progress: true
+
+env:
+  DEPLOY_ROOT: /home/mybangjo/dev.mybangjo.com
+  DEPLOY_ARCHIVE: /home/mybangjo/dev.mybangjo.com-deploy.zip
+  NODE_VENV: /home/mybangjo/nodevenv/xentra-core/20
 
 jobs:
   deploy:
@@ -19,7 +24,8 @@ jobs:
 
       - name: Package Xentra Core
         run: |
-          zip -r xentra-core-deploy.zip .             -x "node_modules/*" ".git/*" "tmp/*" ".env" ".env.*"
+          zip -r xentra-core-deploy.zip . \
+            -x "node_modules/*" ".git/*" "tmp/*" ".env" ".env.*"
 
       - name: Configure SSH
         env:
@@ -37,7 +43,10 @@ jobs:
           SSH_USER: ${{ secrets.XENTRA_SSH_USER }}
           SSH_PORT: ${{ secrets.XENTRA_SSH_PORT }}
         run: |
-          scp -i ~/.ssh/xentra_deploy_key -P "$SSH_PORT" xentra-core-deploy.zip "$SSH_USER@$SSH_HOST:/home/mybangjo/xentra-core-deploy.zip"
+          scp -i ~/.ssh/xentra_deploy_key \
+            -P "$SSH_PORT" \
+            xentra-core-deploy.zip \
+            "$SSH_USER@$SSH_HOST:${{ env.DEPLOY_ARCHIVE }}"
 
       - name: Deploy and restart Passenger
         env:
@@ -45,10 +54,17 @@ jobs:
           SSH_USER: ${{ secrets.XENTRA_SSH_USER }}
           SSH_PORT: ${{ secrets.XENTRA_SSH_PORT }}
         run: |
-          ssh -i ~/.ssh/xentra_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
-          set -e
-          APP="/home/mybangjo/xentra-core"
+          ssh -i ~/.ssh/xentra_deploy_key \
+            -p "$SSH_PORT" \
+            "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
+          set -euo pipefail
+
+          APP="/home/mybangjo/dev.mybangjo.com"
+          ARCHIVE="/home/mybangjo/dev.mybangjo.com-deploy.zip"
           VENV="/home/mybangjo/nodevenv/xentra-core/20"
+
+          test -d "$APP"
+          test -f "$ARCHIVE"
           cd "$APP"
 
           # CloudLinux Node Selector requires dependencies to live in the Node virtual environment.
@@ -58,9 +74,8 @@ jobs:
             mv node_modules node_modules.deploy-backup
           fi
 
-          test -f /home/mybangjo/xentra-core-deploy.zip
-          unzip -o /home/mybangjo/xentra-core-deploy.zip -x "node_modules/*"
-          rm -f /home/mybangjo/xentra-core-deploy.zip
+          unzip -o "$ARCHIVE" -x "node_modules/*"
+          rm -f "$ARCHIVE"
 
           source "$VENV/bin/activate"
           node -v
