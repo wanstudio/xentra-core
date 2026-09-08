@@ -1018,6 +1018,49 @@ input, button, select, textarea, optgroup {
   font-weight: 800;
 }
 
+/* Toggle switch cabang: hijau = aktif, merah = nonaktif */
+.x-toggle {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.x-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.x-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: #ef4444;
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+.x-toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  top: 3px;
+  background: #ffffff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.3);
+}
+.x-toggle input:checked + .x-toggle-slider,
+.x-toggle.x-toggle-on .x-toggle-slider {
+  background: #10b981;
+}
+.x-toggle input:checked + .x-toggle-slider::before,
+.x-toggle.x-toggle-on .x-toggle-slider::before {
+  transform: translateX(22px);
+}
+
 .x-branch-detail-row {
   display: flex;
   justify-content: space-between;

@@ -2867,6 +2867,50 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
   }
 });
 
+router.delete('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const existing = db.prepare('SELECT id, name FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        error: 'Cabang tidak ditemukan pada brand ini.'
+      });
+    }
+
+    // B1 FINANCIAL INTEGRITY: a branch that has ever processed an order must
+    // never be hard-deleted (order/payment/fulfillment history stays anchored).
+    // The orders.branch_id FK is intentionally left as RESTRICT for this reason.
+    const orderCount = db.prepare('SELECT COUNT(*) AS c FROM orders WHERE branch_id = ?').get(req.params.id);
+    if (orderCount && Number(orderCount.c) > 0) {
+      return res.status(409).json({
+        success: false,
+        error: 'BRANCH_HAS_ORDER_HISTORY',
+        message: 'Cabang tidak dapat dihapus karena sudah memiliki riwayat pesanan. Nonaktifkan cabang saja, jangan dihapus.'
+      });
+    }
+
+    db.exec('BEGIN TRANSACTION;');
+    try {
+      // FK ON DELETE CASCADE cleans branch_delivery_settings, branch_categories,
+      // branch_products, branch_tables, inventory + table rows, etc.
+      // users.branch_id is ON DELETE SET NULL → staff cabang otomatis dilepas, bukan dihapus.
+      db.prepare('DELETE FROM branches WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
+      db.exec('COMMIT;');
+    } catch (txErr) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw txErr;
+    }
+
+    res.json({
+      success: true,
+      message: 'Cabang berhasil dihapus.',
+      branch_id: req.params.id
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 /* =========================================================================
    C1 — PRODUCT → BRANCH ASSIGNMENT BOUNDARY
    Product Master stays brand-owned (products.brand_id). A branch_products row

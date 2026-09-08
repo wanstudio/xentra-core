@@ -695,17 +695,15 @@
       var isGloballyActive = b.is_active === 1 || b.is_active === true;
       var isOpen = b.is_open_override === 1 || b.is_open_override === true || b.is_open_override == null;
 
-      var activationBadge = isGloballyActive
-        ? '<span class="x-badge x-badge-success">● Aktif</span>'
-        : '<span class="x-badge x-badge-muted">● Nonaktif</span>';
-
       var openBadge = isOpen
         ? '<span class="x-badge x-badge-info" style="font-size:11px;">Buka Operasional</span>'
         : '<span class="x-badge x-badge-warning" style="font-size:11px;">Tutup Operasional</span>';
 
-      var toggleBtn = isGloballyActive
-        ? '<button type="button" class="x-btn-secondary x-btn-danger-outline" style="font-size:12px;font-weight:700;" onclick="toggleBranchActivation(\'' + b.id + '\', true)">Nonaktifkan Cabang</button>'
-        : '<button type="button" class="x-btn-secondary x-btn-success-outline" style="font-size:12px;font-weight:700;" onclick="toggleBranchActivation(\'' + b.id + '\', false)">Aktifkan Cabang</button>';
+      var toggleSwitch = '' +
+        '<label class="x-toggle' + (isGloballyActive ? ' x-toggle-on' : '') + '">' +
+          '<input type="checkbox" ' + (isGloballyActive ? 'checked' : '') + ' onchange="toggleBranchActivation(\'' + b.id + '\', this.checked)" aria-label="Aktifkan atau nonaktifkan cabang">' +
+          '<span class="x-toggle-slider"></span>' +
+        '</label>';
 
       return [
         '<div class="x-branch-card' + (isGloballyActive ? '' : ' style="opacity:0.85;background:#f8fafc;"') + '">',
@@ -714,23 +712,19 @@
               '<h4 style="display:inline-block;margin-right:8px;">' + b.name + '</h4>',
               openBadge,
             '</div>',
-            '<div>' + activationBadge + '</div>',
+            '<div>' + toggleSwitch + '</div>',
           '</div>',
-          '<p class="text-muted" style="font-size:13px;">📍 ' + b.address_text + '</p>',
-          '<div class="x-branch-detail-row"><span>Status Global:</span><span style="font-weight:700;' + (isGloballyActive ? 'color:#15803d;' : 'color:#64748b;') + '">' + (isGloballyActive ? 'Aktif (Tampil di Pelanggan)' : 'Nonaktif (Disembunyikan)') + '</span></div>',
-          '<div class="x-branch-detail-row"><span>📱 WhatsApp Cabang:</span><span style="font-weight:600;color:var(--x-primary);">' + (b.phone || '<span style="color:#ef4444;">(Wajib diisi)</span>') + '</span></div>',
-          '<div class="x-branch-detail-row"><span>Koordinat GPS:</span><span>' + b.latitude + ', ' + b.longitude + '</span></div>',
+          '<p class="text-muted" style="font-size:13px;">📍 ' + (b.address_text || '') + '</p>',
+          '<div class="x-branch-detail-row"><span>📱 WhatsApp Cabang:</span><span style="font-weight:600;color:var(--x-primary);">' + (b.phone || b.whatsapp_number || '<span style="color:#ef4444;">(Wajib diisi)</span>') + '</span></div>',
+          '<div class="x-branch-detail-row"><span>Koordinat GPS:</span><span>' + (b.latitude || 0) + ', ' + (b.longitude || 0) + '</span></div>',
           '<div class="x-branch-detail-row"><span>Gratis Ongkir:</span><span style="color:#10b981;">' + (b.free_delivery_km || 0) + ' KM Pertama Gratis</span></div>',
           '<div class="x-branch-detail-row"><span>Tarif per KM:</span><span>' + formatMoney(b.price_per_km || 3000) + ' / km</span></div>',
           '<div class="x-branch-detail-row"><span>Radius Maksimal:</span><span>' + (b.max_radius_km || 12) + ' KM</span></div>',
           '<div class="x-branch-detail-row"><span>Promo Diskon Ongkir:</span><span>Diskon ' + formatMoney(b.promo_delivery_discount || 10000) + ' (Min. ' + formatMoney(b.promo_min_order || 50000) + ')</span></div>',
-          '<div style="margin-top:12px;display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:10px;">',
-            '<div>' + toggleBtn + '</div>',
-            '<div style="display:flex;gap:6px;flex-wrap:wrap;">',
-              '<button type="button" class="x-btn-secondary" style="font-size:12px;background:#f0fdf4;border-color:#bbf7d0;color:#15803d;font-weight:700;" onclick="openBranchCatalogModal(\'' + b.id + '\')">📋 Kelola Katalog Cabang</button>',
-              '<button type="button" class="x-btn-secondary" style="font-size:12px;" onclick="editBranchPhone(\'' + b.id + '\')">📱 No. WA</button>',
-              '<button type="button" class="x-btn-secondary" style="font-size:12px;" onclick="editBranchSettings(\'' + b.id + '\')">⚙️ Ongkir</button>',
-            '</div>',
+          '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:10px;">',
+            '<button type="button" class="x-btn-secondary" style="font-size:12px;font-weight:700;" onclick="openBranchModal(\'' + b.id + '\')">✏️ Edit</button>',
+            '<button type="button" class="x-btn-secondary" style="font-size:12px;background:#f0fdf4;border-color:#bbf7d0;color:#15803d;font-weight:700;" onclick="openBranchCatalogModal(\'' + b.id + '\')">📋 Kelola Katalog Cabang</button>',
+            '<button type="button" class="x-btn-secondary" style="font-size:12px;color:#ef4444;border-color:#fecaca;margin-left:auto;" onclick="deleteBranch(\'' + b.id + '\')">🗑 Hapus</button>',
           '</div>',
         '</div>'
       ].join('');
@@ -1135,11 +1129,8 @@
   }
 
 
-  window.toggleBranchActivation = async function (id, currentlyActive) {
-    var nextActive = currentlyActive ? 0 : 1;
-    var actionName = currentlyActive ? 'menonaktifkan' : 'mengaktifkan';
-    if (!confirm('Apakah Anda yakin ingin ' + actionName + ' cabang ini secara global?')) return;
-
+  window.toggleBranchActivation = async function (id, isChecked) {
+    var nextActive = isChecked ? 1 : 0;
     try {
       var res = await adminFetch(API_BASE + '/admin/branches/' + id, {
         method: 'PUT',
@@ -1148,62 +1139,115 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        showToast(nextActive ? '✅ Cabang berhasil diaktifkan secara global!' : '⏸️ Cabang berhasil dinonaktifkan.');
+        showToast(nextActive ? '✅ Cabang telah aktif.' : '⛔ Cabang telah nonaktif.');
         loadBranches();
       } else {
-        alert((data && (data.message || data.error)) || 'Gagal mengubah status aktivasi cabang.');
+        alert((data && (data.message || data.error)) || 'Gagal mengubah status cabang.');
+        loadBranches();
       }
     } catch (err) {
+      if (err.status === 401) return;
       alert('Terjadi kesalahan saat mengubah status cabang: ' + err.message);
+      loadBranches();
     }
   };
 
-  window.editBranchPhone = function (id) {
-    var b = state.branches.find(function (x) { return x.id === id; }) || state.branches[0];
-    var newPhone = prompt('Nomor WhatsApp Resmi Cabang (Wajib, format 08xxx atau 62xxx):', b.phone || '');
-    if (newPhone === null) return;
-    newPhone = newPhone.trim();
-    if (!newPhone) {
-      alert('❌ Nomor WhatsApp Cabang wajib diisi dan tidak boleh kosong!');
-      return;
+  window.openBranchModal = function (branchId) {
+    var b = branchId ? (state.branches.find(function (x) { return x.id === branchId; }) || null) : null;
+    $('branch-id').value = b ? b.id : '';
+    $('branch-name').value = b ? (b.name || '') : '';
+    $('branch-address').value = b ? (b.address_text || '') : '';
+    $('branch-phone').value = b ? (b.phone || b.whatsapp_number || '') : '';
+    $('branch-latitude').value = b ? Number(b.latitude || 0) : '';
+    $('branch-longitude').value = b ? Number(b.longitude || 0) : '';
+    $('branch-free-km').value = b ? (b.free_delivery_km != null ? b.free_delivery_km : 0) : 0;
+    $('branch-price-km').value = b ? (b.price_per_km != null ? b.price_per_km : 3000) : 3000;
+    $('branch-radius').value = b ? (b.max_radius_km != null ? b.max_radius_km : 10) : 10;
+    $('branch-promo-minorder').value = b ? (b.promo_min_order != null ? b.promo_min_order : 50000) : 50000;
+    $('branch-promo-discount').value = b ? (b.promo_delivery_discount != null ? b.promo_delivery_discount : 0) : 0;
+    $('branch-open-override').checked = b ? !(b.is_open_override === 0 || b.is_open_override === false) : true;
+    $('modal-branch-title').textContent = b ? ('Edit Cabang: ' + (b.name || '')) : 'Tambah Cabang';
+    var modal = $('modal-branch');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    setTimeout(function () { $('branch-name').focus(); }, 80);
+  };
+
+  window.closeBranchModal = function () {
+    var modal = $('modal-branch');
+    if (!modal) return;
+    modal.style.display = 'none';
+    $('form-branch').reset();
+  };
+
+  window.deleteBranch = async function (branchId) {
+    var b = state.branches.find(function (x) { return x.id === branchId; }) || {};
+    if (!confirm('Yakin ingin menghapus cabang "' + (b.name || branchId) + '"? Tindakan ini tidak dapat dibatalkan.')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId), {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (!res.ok || !data.success) {
+        alert((data && (data.message || data.error)) || 'Gagal menghapus cabang.');
+        return;
+      }
+      showToast('✅ Cabang berhasil dihapus.');
+      loadBranches();
+    } catch (err) {
+      if (err.status === 401) return;
+      alert('Terjadi kesalahan saat menghapus cabang: ' + err.message);
     }
-
-    adminFetch(API_BASE + '/admin/branches/' + id, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ phone: newPhone })
-    }).then(function (res) {
-      if (!res.ok) throw new Error('Gagal memperbarui nomor WhatsApp cabang.');
-      return res.json();
-    }).then(function () {
-      showToast('✅ Nomor WhatsApp cabang berhasil disimpan!');
-      loadBranches();
-    }).catch(function (err) {
-      alert(err.message);
-    });
   };
 
-  window.editBranchSettings = function (id) {
-    var b = state.branches.find(function (x) { return x.id === id; }) || state.branches[0];
-    var newFreeKm = prompt('Berapa KM pertama yang gratis ongkir?', b.free_delivery_km || 0);
-    if (newFreeKm === null) return;
-    var newPriceKm = prompt('Tarif ongkir per KM berikutnya (Rp):', b.price_per_km || 3000);
-    if (newPriceKm === null) return;
+  var formBranchEl = $('form-branch');
+  if (formBranchEl) {
+    formBranchEl.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var id = $('branch-id').value;
+      var payload = {
+        name: $('branch-name').value.trim(),
+        address_text: $('branch-address').value.trim(),
+        phone: $('branch-phone').value.trim(),
+        whatsapp_number: $('branch-phone').value.trim(),
+        latitude: $('branch-latitude').value !== '' ? Number($('branch-latitude').value) : 0,
+        longitude: $('branch-longitude').value !== '' ? Number($('branch-longitude').value) : 0,
+        free_delivery_km: $('branch-free-km').value !== '' ? Number($('branch-free-km').value) : 0,
+        price_per_km: $('branch-price-km').value !== '' ? Number($('branch-price-km').value) : 3000,
+        max_radius_km: $('branch-radius').value !== '' ? Number($('branch-radius').value) : 10,
+        promo_min_order: $('branch-promo-minorder').value !== '' ? Number($('branch-promo-minorder').value) : 50000,
+        promo_delivery_discount: $('branch-promo-discount').value !== '' ? Number($('branch-promo-discount').value) : 0,
+        is_open_override: $('branch-open-override').checked ? 1 : 0
+      };
 
-    adminFetch(API_BASE + '/admin/branches/' + id, {
-      method: 'PUT',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        free_delivery_km: Number(newFreeKm),
-        price_per_km: Number(newPriceKm)
-      })
-    }).then(function () {
-      showToast('✅ Formula ongkir cabang diperbarui!');
-      loadBranches();
-    }).catch(function (err) {
-      console.warn('[Branch settings save warn]:', err);
+      var btn = this.querySelector('button[type="submit"]');
+      if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+      try {
+        var url = id ? (API_BASE + '/admin/branches/' + encodeURIComponent(id)) : (API_BASE + '/admin/branches');
+        var method = id ? 'PUT' : 'POST';
+        var res = await adminFetch(url, {
+          method: method,
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload)
+        });
+        var data = await res.json();
+        if (!res.ok || !data.success) {
+          alert((data && (data.message || data.error)) || 'Gagal menyimpan cabang.');
+          return;
+        }
+        showToast(id ? '✅ Perubahan cabang disimpan.' : '✅ Cabang baru berhasil ditambahkan.');
+        closeBranchModal();
+        loadBranches();
+      } catch (err) {
+        if (err.status === 401) return;
+        alert('Terjadi kesalahan saat menyimpan cabang: ' + err.message);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Simpan Cabang'; }
+      }
     });
-  };
+  }
 
   /* =========================================================================
      MODUL 4: PESANAN REALTIME CONTROLLER
