@@ -954,13 +954,17 @@
     // "Konfirmasi" button
     var confirmBtn = mapOverlay.querySelector('#x-btn-map-konfirmasi');
     confirmBtn.onclick = function () {
+      var fullAddr = currentResolvedAddress.address || currentResolvedAddress.title || '';
+      var titleText = currentResolvedAddress.title || 'Alamat Terpilih';
+
       // If + Tambah Alamat flow, always go to Detail Alamat form with Favorite checkbox checked
       if (isAddingFav) {
         openAddressDetailSheet({
-          address: currentResolvedAddress.address || currentResolvedAddress.title,
+          title: titleText,
+          address: fullAddr,
           latitude: currentPinCoords.lat,
           longitude: currentPinCoords.lng,
-          label: currentResolvedAddress.title,
+          label: titleText,
           detail: '',
           isFavorite: true,
           onSelect: function () {
@@ -971,10 +975,11 @@
       } else {
         // Direct selection from Map: open Detail Alamat sheet with checkbox unchecked by default
         openAddressDetailSheet({
-          address: currentResolvedAddress.address || currentResolvedAddress.title,
+          title: titleText,
+          address: fullAddr,
           latitude: currentPinCoords.lat,
           longitude: currentPinCoords.lng,
-          label: currentResolvedAddress.title,
+          label: titleText,
           detail: '',
           isFavorite: false,
           onSelect: function () {
@@ -1007,30 +1012,41 @@
           var full = (res && res.address && (res.address.formatted_address || res.address.display_name)) ||
             (res && res.address_text) || '';
           
-          var title = 'Lokasi Terpilih';
-          var addr = 'Sekitar titik peta terpilih';
+          var title = '';
+          var addr = '';
 
-          if (full && !/^titik koordinat/i.test(full)) {
+          // Prefer structured fields from Mapbox Geocoding v6 or Nominatim
+          var road = (res && res.road) || (res && res.address && res.address.road) || '';
+          var neighborhood = (res && res.neighborhood) || (res && res.address && res.address.neighborhood) || '';
+          var locality = (res && res.locality) || (res && res.address && res.address.locality) || '';
+          var city = (res && res.city) || (res && res.address && res.address.city) || '';
+
+          if (road || neighborhood) {
+            title = (road || neighborhood).trim();
+            var subParts = [neighborhood !== road ? neighborhood : '', locality, city].filter(Boolean);
+            addr = subParts.length ? subParts.join(', ') : full;
+          } else if (full && !/^titik koordinat/i.test(full) && !/^lokasi terpilih/i.test(full)) {
             var parts = full.split(',');
-            title = (parts[0] || 'Lokasi Terpilih').trim();
+            title = (parts[0] || 'Alamat Terpilih').trim();
             addr = parts.slice(1).join(',').trim() || full;
-          } else if (res && res.address && res.address.road) {
-            title = res.address.road;
-            addr = res.address.display_name || res.address.road;
+          } else {
+            title = 'Titik Terpilih';
+            addr = 'Koordinat: ' + Number(coords.lat).toFixed(5) + ', ' + Number(coords.lng).toFixed(5);
           }
 
           if (titleEl) titleEl.textContent = title;
           if (addrEl) addrEl.textContent = addr;
           if (badgeEl) badgeEl.textContent = title;
-          if (typeof onResolved === 'function') onResolved({ title: title, address: addr || full });
+          if (typeof onResolved === 'function') onResolved({ title: title, address: addr || full || title });
         })
         .catch(function () {
           if (currentSeq !== revGeocodeSeq) return;
-          var fallback = 'Area sekitar titik peta terpilih';
-          if (titleEl) titleEl.textContent = 'Lokasi Terpilih';
-          if (addrEl) addrEl.textContent = fallback;
-          if (badgeEl) badgeEl.textContent = 'Lokasi Terpilih';
-          if (typeof onResolved === 'function') onResolved({ title: 'Lokasi Terpilih', address: fallback });
+          var fallbackTitle = 'Titik Terpilih';
+          var fallbackAddr = 'Koordinat: ' + Number(coords.lat).toFixed(5) + ', ' + Number(coords.lng).toFixed(5);
+          if (titleEl) titleEl.textContent = fallbackTitle;
+          if (addrEl) addrEl.textContent = fallbackAddr;
+          if (badgeEl) badgeEl.textContent = fallbackTitle;
+          if (typeof onResolved === 'function') onResolved({ title: fallbackTitle, address: fallbackAddr });
         });
     }, 400);
   }
@@ -1154,9 +1170,11 @@
         if (typeof onPoiClick === 'function') {
           onPoiClick(poi);
         }
+        var curZ = (mapInst && typeof mapInst.getZoom === 'function') ? mapInst.getZoom() : 17.2;
         mapInst.flyTo({
           center: [poi.lng, poi.lat],
-          zoom: 17.5,
+          zoom: Math.max(curZ, 14),
+          duration: 500,
           essential: true
         });
       });
@@ -1273,9 +1291,11 @@
         currentLng = coords.lng;
         isProgrammaticMove = true;
         if (mapInst) {
+          var curZ = (typeof mapInst.getZoom === 'function') ? mapInst.getZoom() : 17.2;
           mapInst.flyTo({
             center: [coords.lng, coords.lat],
-            zoom: 17.5,
+            zoom: Math.max(curZ, 14),
+            duration: 500,
             essential: true
           });
         } else if (fallbackCtrl) {
@@ -1439,8 +1459,14 @@
     var existingId = params.existingId || null;
 
     var parts = addressText.split(',');
-    var titlePreview = parts[0] || 'Alamat Terpilih';
-    var addressPreview = parts.slice(1).join(',').trim() || addressText;
+    var titlePreview = params.title || parts[0] || 'Alamat Terpilih';
+    var addressPreview = addressText;
+    if (params.title && addressText.startsWith(params.title)) {
+      var remaining = addressText.slice(params.title.length).replace(/^[\s,]+/, '');
+      if (remaining) addressPreview = remaining;
+    } else if (parts.length > 1) {
+      addressPreview = parts.slice(1).join(',').trim();
+    }
 
     var detailHtml =
       '<h3 class="x-loc-sheet-title">Detail alamat</h3>' +

@@ -151,12 +151,22 @@ class RouteService {
         const feat = mboxRes.data && mboxRes.data.features && mboxRes.data.features[0];
         if (feat && feat.properties) {
           const props = feat.properties;
+          const ctx = props.context || {};
+          const road = (props.feature_type === 'street' || props.feature_type === 'address') ? (props.name || '') : '';
+          const neighborhood = (ctx.neighborhood && ctx.neighborhood.name) || (props.feature_type === 'neighborhood' ? props.name : '');
+          const locality = (ctx.locality && ctx.locality.name) || (props.feature_type === 'locality' ? props.name : '');
+          const city = (ctx.place && ctx.place.name) || (ctx.region && ctx.region.name) || '';
+
           const name = props.name || props.full_address || props.place_formatted || '';
           const full = props.full_address || [name, props.place_formatted].filter(Boolean).join(', ') || name;
           if (name || full) {
             return {
               address: full || name,
-              display_name: full || name
+              display_name: full || name,
+              road: road || neighborhood || name,
+              neighborhood: neighborhood,
+              locality: locality,
+              city: city
             };
           }
         }
