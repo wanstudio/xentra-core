@@ -242,9 +242,10 @@
 
 .x-cat-track {
   display: flex;
+  align-items: flex-start !important;
   gap: 18px;
   overflow-x: auto;
-  padding: 0 var(--x-page-pad) 10px;
+  padding: 4px var(--x-page-pad) 10px;
   scrollbar-width: none;
 }
 
@@ -257,9 +258,15 @@
   width: 92px;
   border: 0;
   padding: 0;
+  margin: 0;
   background: transparent;
   cursor: pointer;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: top;
+  align-self: flex-start;
 }
 
 .x-cat-image {
@@ -272,6 +279,8 @@
   overflow: hidden;
   border-radius: var(--x-radius-sm);
   background: var(--x-gray-bg);
+  flex-shrink: 0;
+  margin: 0 0 8px;
 }
 
 .x-cat-image img {
@@ -292,11 +301,15 @@
   color: var(--x-charcoal) !important;
   font-weight: 700;
   font-size: 12px;
+  line-height: 1.35;
+  margin: 0;
+  width: 100%;
+  word-break: break-word;
 }
 
 .x-cat.active .x-cat-name {
   color: var(--x-charcoal) !important;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .x-cat-line {
@@ -307,6 +320,7 @@
   background: var(--x-lime);
   border-radius: 3px;
   transition: width 0.2s ease;
+  flex-shrink: 0;
 }
 
 .x-cat.active .x-cat-line {
