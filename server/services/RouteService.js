@@ -152,9 +152,11 @@ class RouteService {
         if (feat && feat.properties) {
           const props = feat.properties;
           const ctx = props.context || {};
-          const road = (props.feature_type === 'street' || props.feature_type === 'address') ? (props.name || '') : '';
-          const neighborhood = (ctx.neighborhood && ctx.neighborhood.name) || (props.feature_type === 'neighborhood' ? props.name : '');
-          const locality = (ctx.locality && ctx.locality.name) || (props.feature_type === 'locality' ? props.name : '');
+          const NON_ADDRESSABLE = ['postcode', 'country', 'region', 'district'];
+          const isNonAddressable = NON_ADDRESSABLE.includes(props.feature_type);
+          const road = (!isNonAddressable && (props.feature_type === 'street' || props.feature_type === 'address')) ? (props.name || '') : '';
+          const neighborhood = (ctx.neighborhood && ctx.neighborhood.name) || (!isNonAddressable && props.feature_type === 'neighborhood' ? props.name : '');
+          const locality = (ctx.locality && ctx.locality.name) || (!isNonAddressable && props.feature_type === 'locality' ? props.name : '');
           const city = (ctx.place && ctx.place.name) || (ctx.region && ctx.region.name) || '';
 
           const name = props.name || props.full_address || props.place_formatted || '';
@@ -163,7 +165,7 @@ class RouteService {
             return {
               address: full || name,
               display_name: full || name,
-              road: road || neighborhood || name,
+              road: road || neighborhood || (isNonAddressable ? '' : name),
               neighborhood: neighborhood,
               locality: locality,
               city: city

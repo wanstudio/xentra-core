@@ -1021,14 +1021,31 @@
           var locality = (res && res.locality) || (res && res.address && res.address.locality) || '';
           var city = (res && res.city) || (res && res.address && res.address.city) || '';
 
+          // Guard: pure-numeric or postcode-only strings are not valid address titles
+          if (road && /^\d{4,6}$/.test(road.trim())) road = '';
+          if (neighborhood && /^\d{4,6}$/.test(neighborhood.trim())) neighborhood = '';
+
           if (road || neighborhood) {
             title = (road || neighborhood).trim();
             var subParts = [neighborhood !== road ? neighborhood : '', locality, city].filter(Boolean);
             addr = subParts.length ? subParts.join(', ') : full;
           } else if (full && !/^titik koordinat/i.test(full) && !/^lokasi terpilih/i.test(full)) {
             var parts = full.split(',');
-            title = (parts[0] || 'Alamat Terpilih').trim();
-            addr = parts.slice(1).join(',').trim() || full;
+            var firstPart = (parts[0] || '').trim();
+            var isPostcodeFirst = /^\d{4,6}$/.test(firstPart);
+            if (isPostcodeFirst && parts.length > 1) {
+              // Skip pure-numeric first parts (postal codes) — use next meaningful part
+              firstPart = (parts[1] || '').trim();
+              title = firstPart || 'Alamat Terpilih';
+              addr = [parts[0].trim()].concat(parts.slice(2)).join(',').trim() || full;
+            } else if (isPostcodeFirst) {
+              // Lone postal code is not an address title — degrade to coordinates.
+              title = 'Titik Terpilih';
+              addr = 'Koordinat: ' + Number(coords.lat).toFixed(5) + ', ' + Number(coords.lng).toFixed(5);
+            } else {
+              title = firstPart || 'Alamat Terpilih';
+              addr = parts.slice(1).join(',').trim() || full;
+            }
           } else {
             title = 'Titik Terpilih';
             addr = 'Koordinat: ' + Number(coords.lat).toFixed(5) + ', ' + Number(coords.lng).toFixed(5);
