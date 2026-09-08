@@ -1,4 +1,4 @@
-name: Deploy Xentra Core to app.mybangjo.com
+name: Deploy Xentra Core to dev.mybangjo.com
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 concurrency:
-  group: xentra-app-production
+  group: xentra-dev-deploy
   cancel-in-progress: true
 
 env:
