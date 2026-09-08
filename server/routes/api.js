@@ -1481,6 +1481,31 @@ router.get('/orders/:id', (req, res) => {
   });
 });
 
+// 7.1 Customer Order History (Protected by Customer Auth)
+router.get('/customer/orders', requireCustomerAuth(), (req, res) => {
+  try {
+    const customerPhone = req.customer.phone;
+    const orders = db.prepare(`
+      SELECT o.id, o.order_number, o.status, o.order_type, o.subtotal, o.delivery_fee, o.discount_amount,
+             o.grand_total, o.payment_method, o.created_at, b.name as branch_name
+      FROM orders o
+      JOIN branches b ON b.id = o.branch_id
+      WHERE b.brand_id = ? AND o.customer_phone = ?
+      ORDER BY o.created_at DESC
+      LIMIT 50
+    `).all(req.brand_id, customerPhone);
+
+    const enriched = orders.map(ord => ({
+      ...ord,
+      items: db.prepare('SELECT id, product_name, quantity, unit_price, item_subtotal FROM order_items WHERE order_id = ?').all(ord.id)
+    }));
+
+    res.json({ success: true, orders: enriched });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 8. Kitchen Display Queue (Strictly Tenant-Scoped & Branch-Scoped for Operator Roles)
 router.get('/kitchen/queue', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
   // If user is a branch-level operator, strictly enforce their assigned branch

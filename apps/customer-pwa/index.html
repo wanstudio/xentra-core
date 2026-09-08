@@ -60,19 +60,22 @@
     <!-- HERO HEADER -->
     <header class="x-hero-header">
       <div class="x-hero-top-row">
-        <button class="x-hero-btn-join" id="x-btn-join">Yuk, join!</button>
+        <!-- LEFT: Active Destination Location Pill (Tap to open "Pilih lokasi") -->
+        <button type="button" class="x-hero-loc-pill" id="x-hero-loc-pill" aria-label="Pilih lokasi pengiriman">
+          <span class="x-hero-loc-icon">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 0.9375C6.13298 0.939113 4.8224 1.48288 3.85577 2.44951C2.88913 3.41615 2.34537 4.72672 2.34375 6.09375C2.3425 7.21082 2.70737 8.29753 3.3825 9.1875C3.3825 9.1875 3.52313 9.37266 3.5461 9.39937L7.5 14.0625L11.4558 9.39703C11.4764 9.37219 11.6175 9.1875 11.6175 9.1875L11.618 9.18609C12.2927 8.29645 12.6573 7.21029 12.6563 6.09375C12.6546 4.72672 12.1109 3.41615 11.1442 2.44951C10.1776 1.48288 8.86703 0.939113 7.5 0.9375ZM7.5 7.96875C7.12916 7.96875 6.76665 7.85878 6.45831 7.65276C6.14997 7.44673 5.90964 7.15389 5.76773 6.81128C5.62581 6.46867 5.58868 6.09167 5.66103 5.72796C5.73338 5.36424 5.91195 5.03015 6.17418 4.76792C6.4364 4.5057 6.77049 4.32712 7.13421 4.25478C7.49792 4.18243 7.87492 4.21956 8.21753 4.36148C8.56015 4.50339 8.85298 4.74371 9.05901 5.05206C9.26504 5.3604 9.375 5.72291 9.375 6.09375C9.37438 6.59084 9.17664 7.06739 8.82514 7.41889C8.47365 7.77039 7.99709 7.96813 7.5 7.96875Z" fill="#1E1E1E"/></svg>
+          </span>
+          <span class="x-hero-loc-text" id="x-hero-loc-text">Lokasimu</span>
+        </button>
+
+        <!-- RIGHT: Yuk Join! + Library (Orders) + Profile -->
         <div class="x-hero-action-icons">
-          <button class="x-hero-icon-btn" id="x-btn-notif" aria-label="Notifikasi">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-            </svg>
+          <button type="button" class="x-hero-btn-join" id="x-btn-join">Yuk, join!</button>
+          <button type="button" class="x-hero-icon-btn" id="x-btn-library" aria-label="Riwayat Pesanan">
+            <img src="/assets/icons/library.svg" alt="Riwayat" width="18" height="18">
           </button>
-          <button class="x-hero-icon-btn" id="x-btn-search" aria-label="Cari">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"/>
-              <path d="m21 21-4.3-4.3"/>
-            </svg>
+          <button type="button" class="x-hero-icon-btn" id="x-btn-profile" aria-label="Profil Saya">
+            <img src="/assets/icons/black_flowbite_user-solid.svg" alt="Profil" width="20" height="20">
           </button>
         </div>
       </div>
@@ -183,6 +186,21 @@
        ═══════════════════════════════════════════════════ -->
   <div id="xentra-order-view" class="x-page" style="display:none;"></div>
 
+  <!-- ═══════════════════════════════════════════════════
+       4. AFFILIATE VIEW (YUK, JOIN!)
+       ═══════════════════════════════════════════════════ -->
+  <div id="xentra-affiliate-view" class="x-page" style="display:none;"></div>
+
+  <!-- ═══════════════════════════════════════════════════
+       5. ORDER HISTORY VIEW (LIBRARY.SVG)
+       ═══════════════════════════════════════════════════ -->
+  <div id="xentra-history-view" class="x-page" style="display:none;"></div>
+
+  <!-- ═══════════════════════════════════════════════════
+       6. PROFILE VIEW (USER ICON)
+       ═══════════════════════════════════════════════════ -->
+  <div id="xentra-profile-view" class="x-page" style="display:none;"></div>
+
   <!-- NOTE SHEET (EXACT XENTRA-MVP PORTAL) -->
   <div id="x-note-overlay" class="x-note-overlay" style="display:none;">
     <div id="x-note-sheet" class="x-note-sheet">
@@ -233,6 +251,7 @@
   <script src="/assets/js/pages/home.js?v=p6c9d12"></script>
   <script src="/assets/js/pages/checkout.js?v=p6c9d12"></script>
   <script src="/assets/js/pages/order-received.js?v=p6c9d12"></script>
+  <script src="/assets/js/pages/aux-pages.js?v=p6c9d12"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -242,6 +261,7 @@
       var Router = window.Xentra && window.Xentra.Router;
       var Checkout = window.Xentra && window.Xentra.Checkout;
       var OrderReceived = window.Xentra && window.Xentra.OrderReceived;
+      var AuxPages = window.XentraAuxPages;
 
       if (!Router) return;
 
@@ -249,27 +269,50 @@
         var homeEl = document.getElementById('xentra-home-view');
         var checkoutEl = document.getElementById('xentra-checkout-view');
         var orderEl = document.getElementById('xentra-order-view');
+        var affiliateEl = document.getElementById('xentra-affiliate-view');
+        var historyEl = document.getElementById('xentra-history-view');
+        var profileEl = document.getElementById('xentra-profile-view');
+
+        // Hide all views first
+        if (homeEl) homeEl.style.display = 'none';
+        if (checkoutEl) checkoutEl.style.display = 'none';
+        if (orderEl) orderEl.style.display = 'none';
+        if (affiliateEl) affiliateEl.style.display = 'none';
+        if (historyEl) historyEl.style.display = 'none';
+        if (profileEl) profileEl.style.display = 'none';
 
         if (view === 'checkout') {
-          if (homeEl) homeEl.style.display = 'none';
-          if (orderEl) orderEl.style.display = 'none';
           if (checkoutEl) {
             checkoutEl.style.display = 'block';
             if (Checkout) Checkout.mount(checkoutEl, params);
             window.scrollTo(0, 0);
           }
         } else if (view === 'order-received') {
-          if (homeEl) homeEl.style.display = 'none';
-          if (checkoutEl) checkoutEl.style.display = 'none';
           if (orderEl) {
             orderEl.style.display = 'block';
             if (OrderReceived) OrderReceived.mount(orderEl, params && params.orderId);
             window.scrollTo(0, 0);
           }
+        } else if (view === 'affiliate') {
+          if (affiliateEl) {
+            affiliateEl.style.display = 'block';
+            if (AuxPages) AuxPages.mountAffiliate(affiliateEl);
+            window.scrollTo(0, 0);
+          }
+        } else if (view === 'history') {
+          if (historyEl) {
+            historyEl.style.display = 'block';
+            if (AuxPages) AuxPages.mountHistory(historyEl);
+            window.scrollTo(0, 0);
+          }
+        } else if (view === 'profile') {
+          if (profileEl) {
+            profileEl.style.display = 'block';
+            if (AuxPages) AuxPages.mountProfile(profileEl);
+            window.scrollTo(0, 0);
+          }
         } else {
           // Home
-          if (checkoutEl) checkoutEl.style.display = 'none';
-          if (orderEl) orderEl.style.display = 'none';
           if (homeEl) {
             homeEl.style.display = 'block';
             if (window.XentraHome && typeof window.XentraHome.refresh === 'function') {

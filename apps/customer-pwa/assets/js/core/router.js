@@ -17,6 +17,15 @@
     if (hash.startsWith('#order-received') || window.location.pathname.startsWith('/order-received')) {
       return 'order-received';
     }
+    if (hash.startsWith('#affiliate') || window.location.pathname.startsWith('/affiliate')) {
+      return 'affiliate';
+    }
+    if (hash.startsWith('#history') || window.location.pathname.startsWith('/history')) {
+      return 'history';
+    }
+    if (hash.startsWith('#profile') || window.location.pathname.startsWith('/profile')) {
+      return 'profile';
+    }
     return 'home';
   }
 
@@ -64,9 +73,19 @@
     } else if (view === 'order-received') {
       var orderId = (params && params.orderId) || '';
       window.location.hash = '#order-received/' + orderId;
+    } else if (view === 'affiliate') {
+      window.location.hash = '#affiliate';
+    } else if (view === 'history') {
+      window.location.hash = '#history';
+    } else if (view === 'profile') {
+      window.location.hash = '#profile';
     } else {
       // Navigating to Home
-      if (window.location.pathname.startsWith('/checkout') || window.location.pathname.startsWith('/order-received')) {
+      if (window.location.pathname.startsWith('/checkout') ||
+          window.location.pathname.startsWith('/order-received') ||
+          window.location.pathname.startsWith('/affiliate') ||
+          window.location.pathname.startsWith('/history') ||
+          window.location.pathname.startsWith('/profile')) {
         window.location.href = '/';
         return;
       }
@@ -80,7 +99,11 @@
   }
 
   function goBack() {
-    if (window.location.pathname.startsWith('/checkout') || window.location.pathname.startsWith('/order-received')) {
+    if (window.location.pathname.startsWith('/checkout') ||
+        window.location.pathname.startsWith('/order-received') ||
+        window.location.pathname.startsWith('/affiliate') ||
+        window.location.pathname.startsWith('/history') ||
+        window.location.pathname.startsWith('/profile')) {
       window.location.href = '/';
       return;
     }

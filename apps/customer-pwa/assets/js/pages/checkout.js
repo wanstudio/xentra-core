@@ -563,6 +563,7 @@
         state.deliveryQuote = res.delivery;
         state.deliveryFee = Number(res.delivery.final_delivery_fee || 0);
         state.discount = Number(res.delivery.discount_amount || 0);
+
         // Only persist when the resolved branch actually changed — persisting
         // the same branch per quote would re-notify and re-enter the quote path.
         if (res.branch && (!previousBranch || String(previousBranch.id) !== String(res.branch.id))) {
@@ -1766,11 +1767,11 @@
   // ── 2. Customer Auth / OTP Verification Sheet ──
   // Two-step flow: phone entry → OTP entry. Server OTP endpoints are the sole
   // authority for customer identity. Client never generates tokens.
-  function openCustomerAuthSheet() {
-    renderOtpPhoneStep(state.customer.phone || '', state.customer.name || '');
+  function openCustomerAuthSheet(onSuccess) {
+    renderOtpPhoneStep(state.customer.phone || '', state.customer.name || '', onSuccess);
   }
 
-  function renderOtpPhoneStep(phone, name) {
+  function renderOtpPhoneStep(phone, name, onSuccess) {
     var sh = makeOverlay(
       '<h3 class="x-alt-sheet-title">Verifikasi Nomor WhatsApp</h3>' +
       '<div style="font-size:13px;color:#6b7280;margin-bottom:12px;">Masukkan nomor WhatsApp aktif untuk menerima kode verifikasi.</div>' +
@@ -1798,7 +1799,7 @@
       API.post('/auth/otp/send', { phone: p }).then(function (res) {
         if (res && res.success && res.challenge_id) {
           sh.close();
-          renderOtpVerifyStep(p, n || 'Pelanggan', res.challenge_id, res.retry_after || 60);
+          renderOtpVerifyStep(p, n || 'Pelanggan', res.challenge_id, res.retry_after || 60, onSuccess);
         } else {
           sendBtn.disabled = false;
           sendBtn.textContent = 'Kirim Kode OTP';
@@ -1812,7 +1813,7 @@
     };
   }
 
-  function renderOtpVerifyStep(phone, name, challengeId, retryAfter) {
+  function renderOtpVerifyStep(phone, name, challengeId, retryAfter, onSuccess) {
     var sh = makeOverlay(
       '<h3 class="x-alt-sheet-title">Masukkan Kode OTP</h3>' +
       '<div style="font-size:13px;color:#6b7280;margin-bottom:12px;">Kode verifikasi telah dikirim ke <b>' + UI.escape(phone) + '</b>.</div>' +
@@ -1882,6 +1883,9 @@
           renderLayout();
           calculateTotals();
           if (UI && UI.toast) UI.toast('Nomor WhatsApp berhasil diverifikasi!');
+          if (typeof onSuccess === 'function') {
+            try { onSuccess(); } catch (e) { console.error('[Auth Callback]', e); }
+          }
         } else {
           verifyBtn.disabled = false;
           verifyBtn.textContent = 'Verifikasi';

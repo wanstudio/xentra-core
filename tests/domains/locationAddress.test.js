@@ -615,3 +615,62 @@ test('LOC-12: Location Picker Flow A (Search) and Flow C (Map) create explicit c
   assert.strictEqual(mapDest.detail, 'Depan Bank BRI');
 });
 
+test('LOC-13: Changing Active Destination does NOT silently change Cart Branch or Cart items', () => {
+  const client = freshClientContext();
+  const Store = client.Store;
+
+  // Add item with branch provenance to cart
+  const item = { id: 101, name: 'Ayam Tulang Lunak Original', price: 25000, quantity: 2 };
+  Store.addItem(item, 2, { branch_id: 'branch-pringsewu', branch_name: 'Bangjo Pringsewu' });
+
+  const cartBefore = Store.getState().cart;
+  assert.strictEqual(cartBefore.items.length, 1);
+  assert.strictEqual(cartBefore.items[0].branch_id, 'branch-pringsewu');
+
+  // Change Active Destination to a far location
+  Store.setActiveDestination({
+    latitude: -6.2088,
+    longitude: 106.8456,
+    address: 'Jl. Sudirman, Jakarta Pusat',
+    label: 'Kantor Pusat',
+    source: 'search',
+    is_explicit: true
+  });
+
+  const cartAfter = Store.getState().cart;
+  assert.strictEqual(cartAfter.items.length, 1, 'Cart items must not be emptied or mutated');
+  assert.strictEqual(cartAfter.items[0].branch_id, 'branch-pringsewu', 'Cart branch provenance must not be mutated');
+  assert.strictEqual(cartAfter.items[0].quantity, 2);
+});
+
+test('LOC-14: GET /api/v1/customer/orders returns order history with items for authenticated customer', async () => {
+  const customerPhone = '081299998888';
+  const token = await createCustomerSession(customerPhone);
+  const branchId = 'branch_bangjo_barat';
+
+  const orderId = 'ord_hist_test_' + Date.now();
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_phone, customer_name, order_type, subtotal, delivery_fee, discount_amount, grand_total, payment_method, status, created_at, updated_at)
+    VALUES (?, ?, 'brand_bangjo', ?, ?, ?, 'delivery', 50000, 10000, 0, 60000, 'cash', 'completed', datetime('now'), datetime('now'))
+  `).run(orderId, 'ORD-HIST-01', branchId, customerPhone, 'Pelanggan Budi');
+
+  db.prepare(`
+    INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run('item_' + Date.now(), orderId, '272', 'Ayam Bakar Madu', 25000, 2, 50000);
+
+  const res = await mockFetch('/api/v1/customer/orders', {
+    headers: { 'x-customer-token': token }
+  });
+
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.ok(Array.isArray(data.orders));
+  const found = data.orders.find(o => o.id === orderId);
+  assert.ok(found, 'Created order must be present in customer history');
+  assert.strictEqual(found.status, 'completed');
+  assert.strictEqual(found.items.length, 1);
+  assert.strictEqual(found.items[0].product_name, 'Ayam Bakar Madu');
+});
+

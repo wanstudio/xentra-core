@@ -394,9 +394,11 @@
     setTimeout(function () { if (input) input.focus(); }, 300);
 
     var searchTimer = null;
+    var searchSeq = 0;
     input.addEventListener('input', function () {
       var q = input.value.trim();
       clearTimeout(searchTimer);
+      var currentSeq = ++searchSeq;
       if (q.length < 3) {
         resultsBox.innerHTML = '<div style="padding:24px 16px;text-align:center;font-size:12.5px;color:#94a3b8;">Ketik minimal 3 huruf untuk mencari alamat…</div>';
         return;
@@ -407,6 +409,7 @@
       searchTimer = setTimeout(function () {
         API.get('/location/search?q=' + encodeURIComponent(q))
           .then(function (res) {
+            if (currentSeq !== searchSeq) return; // Stale async reply superseded
             var list = (res && res.results) || [];
             if (!list.length) {
               resultsBox.innerHTML = '<div style="padding:24px 16px;text-align:center;font-size:12.5px;color:#94a3b8;">Tidak ada hasil ditemukan untuk "' + UI.escape(q) + '"</div>';
@@ -450,7 +453,8 @@
             });
           })
           .catch(function () {
-            resultsBox.innerHTML = '<div style="padding:20px;text-align:center;font-size:12.5px;color:#ef4444;">Gagal menghubungi server pencarian alamat.</div>';
+            if (currentSeq !== searchSeq) return;
+            resultsBox.innerHTML = '<div style="padding:24px 16px;text-align:center;font-size:12.5px;color:#ef4444;">Gagal memuat alamat. Periksa koneksi internet Anda.</div>';
           });
       }, 350);
     });
@@ -692,6 +696,7 @@
 
   // Reverse geocodes coordinates with debouncing and updates the bottom card info
   var revGeocodeTimer = null;
+  var revGeocodeSeq = 0;
   function updateLocationDetailsFromCoords(coords, containerEl, onResolved) {
     var titleEl = containerEl.querySelector('#x-map-loc-title');
     var addrEl = containerEl.querySelector('#x-map-loc-addr');
@@ -699,9 +704,11 @@
     if (addrEl) addrEl.textContent = 'Menentukan nama jalan dan lokasi…';
 
     clearTimeout(revGeocodeTimer);
+    var currentSeq = ++revGeocodeSeq;
     revGeocodeTimer = setTimeout(function () {
       API.get('/delivery/reverse-geocode?lat=' + coords.lat + '&lng=' + coords.lng)
         .then(function (res) {
+          if (currentSeq !== revGeocodeSeq) return; // Discard superseded reply
           var full = (res && res.address && (res.address.formatted_address || res.address.display_name)) ||
             (res && res.address_text) || ('Titik Koordinat: ' + coords.lat.toFixed(4) + ', ' + coords.lng.toFixed(4));
           var parts = full.split(',');
@@ -713,6 +720,7 @@
           if (typeof onResolved === 'function') onResolved({ title: title, address: full });
         })
         .catch(function () {
+          if (currentSeq !== revGeocodeSeq) return;
           var fallback = 'Koordinat: ' + coords.lat.toFixed(4) + ', ' + coords.lng.toFixed(4);
           if (titleEl) titleEl.textContent = 'Titik Peta';
           if (addrEl) addrEl.textContent = fallback;
@@ -1043,7 +1051,8 @@
 
   function updateHomeLocationBar() {
     var bar = document.getElementById('x-home-loc-bar');
-    if (!bar) return;
+    var heroPill = document.getElementById('x-hero-loc-pill');
+    var heroPillText = document.getElementById('x-hero-loc-text');
 
     var dest = null;
     try {
@@ -1052,14 +1061,15 @@
         (Store && Store.getState().location);
     } catch (_) {}
 
-    var titleEl = bar.querySelector('.x-locbar-title');
-    var tagEl = bar.querySelector('.x-locbar-source-tag');
-    var addrEl = bar.querySelector('.x-locbar-address');
+    var titleEl = bar ? bar.querySelector('.x-locbar-title') : null;
+    var tagEl = bar ? bar.querySelector('.x-locbar-source-tag') : null;
+    var addrEl = bar ? bar.querySelector('.x-locbar-address') : null;
 
     if (!dest || (!dest.address && !dest.formatted_address)) {
       if (titleEl) titleEl.textContent = 'Pilih lokasi pengiriman';
       if (tagEl) tagEl.style.display = 'none';
       if (addrEl) addrEl.textContent = 'Ketuk untuk memilih alamat atau koordinat';
+      if (heroPillText) heroPillText.textContent = 'Lokasimu';
       return;
     }
 
@@ -1073,6 +1083,10 @@
       tagEl.textContent = source === 'favorite' ? 'Favorit' : (source === 'gps' ? 'GPS' : (source === 'map' ? 'Peta' : 'Cari'));
     }
     if (addrEl) addrEl.textContent = addr;
+
+    if (heroPillText) {
+      heroPillText.textContent = label || 'Lokasimu';
+    }
   }
 
   // ── Public API ──

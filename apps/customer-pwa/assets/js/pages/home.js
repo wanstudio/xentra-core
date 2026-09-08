@@ -1572,18 +1572,50 @@
     renderCartDock();
 
     // Home Location Bar → open "Pilih lokasi" sheet
+    function handleOpenLocationPicker() {
+      if (window.XentraLocationPicker && typeof window.XentraLocationPicker.open === 'function') {
+        window.XentraLocationPicker.open({
+          onSelect: function () {
+            refreshDiscovery();
+          }
+        });
+      }
+    }
+
     var locBar = $('x-home-loc-bar');
-    if (locBar) {
-      locBar.onclick = function () {
-        if (window.XentraLocationPicker && typeof window.XentraLocationPicker.open === 'function') {
-          window.XentraLocationPicker.open({
-            onSelect: function () {
-              refreshDiscovery();
-            }
-          });
+    if (locBar) locBar.onclick = handleOpenLocationPicker;
+
+    var heroLocPill = $('x-hero-loc-pill');
+    if (heroLocPill) heroLocPill.onclick = handleOpenLocationPicker;
+
+    // Header Navigation buttons: Join (Affiliate), Library (History), Profile
+    var btnJoin = $('x-btn-join');
+    if (btnJoin) {
+      btnJoin.onclick = function () {
+        if (window.Xentra && window.Xentra.Router) {
+          window.Xentra.Router.navigate('affiliate');
         }
       };
     }
+
+    var btnLibrary = $('x-btn-library');
+    if (btnLibrary) {
+      btnLibrary.onclick = function () {
+        if (window.Xentra && window.Xentra.Router) {
+          window.Xentra.Router.navigate('history');
+        }
+      };
+    }
+
+    var btnProfile = $('x-btn-profile');
+    if (btnProfile) {
+      btnProfile.onclick = function () {
+        if (window.Xentra && window.Xentra.Router) {
+          window.Xentra.Router.navigate('profile');
+        }
+      };
+    }
+
     if (window.XentraLocationPicker && typeof window.XentraLocationPicker.updateBar === 'function') {
       window.XentraLocationPicker.updateBar();
     }
