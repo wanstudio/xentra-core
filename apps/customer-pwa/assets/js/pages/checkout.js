@@ -1521,8 +1521,9 @@
     var dineInLayoutData = null;
 
     function renderDineInFloorPlan() {
-      var curBranch = state.matchedBranch || (availableBranches && availableBranches[0]) || null;
-      var branchId = curBranch ? curBranch.id : '';
+      var fb = getFulfillmentBranch();
+      var curBranch = state.matchedBranch || (fb ? { id: fb.id, name: fb.name } : null) || (availableBranches && availableBranches[0]) || null;
+      var branchId = curBranch ? curBranch.id : (currentBranchId || '');
 
       schedContainer.innerHTML =
         '<div class="x-fulfillment-divider"></div>' +
@@ -1559,28 +1560,48 @@
         autoRecommendTable();
       };
 
-      // Fetch branch layout from authoritative server API
-      API.get('/dine-in/layout?branch_id=' + encodeURIComponent(branchId))
-        .then(function (res) {
-          if (res && res.success && res.layout) {
-            dineInLayoutData = res.layout;
-            autoRecommendTable();
-          } else {
+      function fetchLayout(bid) {
+        API.get('/dine-in/layout?branch_id=' + encodeURIComponent(bid))
+          .then(function (res) {
+            if (res && res.success && res.layout) {
+              dineInLayoutData = res.layout;
+              autoRecommendTable();
+            } else {
+              schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
+                '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">Gagal memuat denah meja.</div>';
+            }
+          })
+          .catch(function (err) {
+            console.warn('[Checkout] Load dine-in layout error:', err);
             schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
               '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">Gagal memuat denah meja.</div>';
+          });
+      }
+
+      if (!branchId && (!availableBranches || availableBranches.length === 0)) {
+        loadBranches();
+        setTimeout(function () {
+          var fbRetry = getFulfillmentBranch();
+          var retryBranch = state.matchedBranch || (fbRetry ? { id: fbRetry.id } : null) || (availableBranches && availableBranches[0]) || null;
+          var retryId = retryBranch ? retryBranch.id : '';
+          if (retryId) {
+            fetchLayout(retryId);
+          } else {
+            schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
+              '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">Gagal memuat denah meja (cabang belum dipilih).</div>';
           }
-        })
-        .catch(function (err) {
-          console.warn('[Checkout] Load dine-in layout error:', err);
-          schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
-            '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">Gagal memuat denah meja.</div>';
-        });
+        }, 300);
+        return;
+      }
+
+      fetchLayout(branchId);
     }
 
     function autoRecommendTable() {
       if (!dineInLayoutData) return;
-      var curBranch = state.matchedBranch || (availableBranches && availableBranches[0]) || null;
-      var branchId = curBranch ? curBranch.id : '';
+      var fb = getFulfillmentBranch();
+      var curBranch = state.matchedBranch || (fb ? { id: fb.id } : null) || (availableBranches && availableBranches[0]) || null;
+      var branchId = curBranch ? curBranch.id : (currentBranchId || '');
 
       API.post('/dine-in/recommend-tables', {
         branch_id: branchId,
@@ -1614,10 +1635,10 @@
         '    <img src="/assets/icons/ac.svg" alt="AC" class="x-floor-badge-icon">' +
         '    <img src="/assets/icons/no_smoking.png" alt="No Smoking" class="x-floor-badge-icon">' +
         '  </div>' +
-        '  <div class="x-floor-mushola" style="left:35px;top:20px;width:125px;height:120px;">Mushola</div>';
+        '  <div class="x-floor-mushola" style="left:30px;top:30px;width:145px;height:130px;">Mushola</div>';
 
       indoorTables.forEach(function (t) {
-        html += renderTableHtml(t);
+        html += renderTableHtml(t, 0);
       });
       html += '</div>';
 
@@ -1628,7 +1649,7 @@
         '  </div>';
 
       smokingTables.forEach(function (t) {
-        html += renderTableHtml(t);
+        html += renderTableHtml(t, 370);
       });
       html += '</div>';
 
@@ -1658,14 +1679,17 @@
       });
     }
 
-    function renderTableHtml(t) {
+    function renderTableHtml(t, sectionBaseY) {
       var isSelected = (draft.selectedTableIds || []).indexOf(t.id) !== -1;
       var isUnavailable = t.operational_state !== 'available';
 
       var isVertical = t.orientation === 'vertical';
+      var relY = (t.y != null ? t.y : 0) - (sectionBaseY || 0);
+      if (relY < 0) relY = 0;
+
       var styleStr =
         'left:' + (t.x || 0) + 'px;' +
-        'top:' + ((t.y ? t.y : 0) % 360) + 'px;' +
+        'top:' + relY + 'px;' +
         'width:' + (t.width || 80) + 'px;' +
         'height:' + (t.height || 60) + 'px;';
 
