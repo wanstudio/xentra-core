@@ -1,4 +1,4 @@
-name: Deploy Xentra Core to dev.mybangjo.com
+name: Deploy Xentra Core to app.mybangjo.com
 
 on:
   push:
@@ -6,12 +6,12 @@ on:
       - main
 
 concurrency:
-  group: xentra-dev-deploy
+  group: xentra-app-deploy
   cancel-in-progress: true
 
 env:
-  DEPLOY_ROOT: /home/mybangjo/dev.mybangjo.com
-  DEPLOY_ARCHIVE: /home/mybangjo/dev.mybangjo.com-deploy.zip
+  DEPLOY_ROOT: /home/mybangjo/xentra-core
+  DEPLOY_ARCHIVE: /home/mybangjo/xentra-core-deploy.zip
   NODE_VENV: /home/mybangjo/nodevenv/xentra-core/20
 
 jobs:
@@ -25,7 +25,7 @@ jobs:
       - name: Package Xentra Core
         run: |
           zip -r xentra-core-deploy.zip . \
-            -x "node_modules/*" ".git/*" "tmp/*" ".env" ".env.*"
+            -x "node_modules/*" ".git/*" "tmp/*" ".env" ".env.*" ".htaccess"
 
       - name: Configure SSH
         env:
@@ -59,22 +59,23 @@ jobs:
             "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
           set -e
 
-          APP="/home/mybangjo/dev.mybangjo.com"
-          ARCHIVE="/home/mybangjo/dev.mybangjo.com-deploy.zip"
+          APP="/home/mybangjo/xentra-core"
+          ARCHIVE="/home/mybangjo/xentra-core-deploy.zip"
           VENV="/home/mybangjo/nodevenv/xentra-core/20"
 
           test -d "$APP"
           test -f "$ARCHIVE"
           cd "$APP"
 
-          # CloudLinux Node Selector requires dependencies to live in the Node virtual environment.
-          # Keep the existing modules as a rollback copy until the new install succeeds.
+          # Keep the existing dependency directory until the new install succeeds.
           if [ -d node_modules ] && [ ! -L node_modules ]; then
             rm -rf node_modules.deploy-backup
             mv node_modules node_modules.deploy-backup
           fi
 
-          unzip -o "$ARCHIVE" -x "node_modules/*"
+          # .htaccess is intentionally excluded from the package so cPanel Passenger
+          # configuration remains managed by the server environment.
+          unzip -o "$ARCHIVE" -x "node_modules/*" ".htaccess"
           rm -f "$ARCHIVE"
 
           source "$VENV/bin/activate"
