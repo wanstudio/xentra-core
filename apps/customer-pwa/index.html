@@ -14,7 +14,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_p6c9d12';
+      var PWA_VERSION = 'v_p7f4a02';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -42,13 +42,13 @@
   <link rel="manifest" href="/manifest.json">
 
   <!-- CSS (version-hashed for instant cache-busting) -->
-  <link rel="stylesheet" href="/assets/css/tokens.css?v=p6c9d12">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=p6c9d12">
-  <link rel="stylesheet" href="/assets/css/components.css?v=p6c9d12">
-  <link rel="stylesheet" href="/assets/css/home.css?v=p6c9d12">
-  <link rel="stylesheet" href="/assets/css/checkout.css?v=p6c9d12">
-  <link rel="stylesheet" href="/assets/css/order-received.css?v=p6c9d12">
-  <link rel="stylesheet" href="/assets/css/location-picker.css?v=p6c9d12">
+  <link rel="stylesheet" href="/assets/css/tokens.css?v=p7f4a02">
+  <link rel="stylesheet" href="/assets/css/layout.css?v=p7f4a02">
+  <link rel="stylesheet" href="/assets/css/components.css?v=p7f4a02">
+  <link rel="stylesheet" href="/assets/css/home.css?v=p7f4a02">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=p7f4a02">
+  <link rel="stylesheet" href="/assets/css/order-received.css?v=p7f4a02">
+  <link rel="stylesheet" href="/assets/css/location-picker.css?v=p7f4a02">
 </head>
 <body>
 
@@ -71,11 +71,11 @@
         <!-- RIGHT: Yuk Join! + Library (Orders) + Profile -->
         <div class="x-hero-action-icons">
           <button type="button" class="x-hero-btn-join" id="x-btn-join">Yuk, join!</button>
-          <button type="button" class="x-hero-icon-btn" id="x-btn-library" aria-label="Riwayat Pesanan">
-            <img src="/assets/icons/library.svg" alt="Riwayat" width="18" height="18">
+          <button type="button" class="x-hero-icon-btn x-hero-icon-btn-library" id="x-btn-library" aria-label="Riwayat Pesanan">
+            <img src="/assets/icons/library.svg" alt="Riwayat" width="17" height="17">
           </button>
-          <button type="button" class="x-hero-icon-btn" id="x-btn-profile" aria-label="Profil Saya">
-            <img src="/assets/icons/black_flowbite_user-solid.svg" alt="Profil" width="20" height="20">
+          <button type="button" class="x-hero-icon-btn x-hero-icon-btn-profile" id="x-btn-profile" aria-label="Profil Saya">
+            <img src="/assets/icons/black_flowbite_user-solid.svg" alt="Profil" width="22" height="22">
           </button>
         </div>
       </div>
@@ -222,22 +222,22 @@
   <!-- ═══════════════════════════════════════════════════
        JS CORE & CONTROLLERS (Version Hashed v2.3.6)
        ═══════════════════════════════════════════════════ -->
-  <script src="/assets/js/core/store.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/ui.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/api.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/nav.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/router.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/pwa-runtime.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/promo-reward-cart.js?v=p6c9d12"></script>
-  <script src="/assets/js/location.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/discovery.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/location-picker.js?v=p6c9d12"></script>
+  <script src="/assets/js/core/store.js?v=p7f4a02"></script>
+  <script src="/assets/js/core/ui.js?v=p7f4a02"></script>
+  <script src="/assets/js/core/api.js?v=p7f4a02"></script>
+  <script src="/assets/js/core/nav.js?v=p7f4a02"></script>
+  <script src="/assets/js/core/router.js?v=p7f4a02"></script>
+  <script src="/assets/js/core/pwa-runtime.js?v=p7f4a02"></script>
+  <script src="/assets/js/core/promo-reward-cart.js?v=p7f4a02"></script>
+  <script src="/assets/js/location.js?v=p7f4a02"></script>
+  <script src="/assets/js/core/discovery.js?v=p7f4a02"></script>
+  <script src="/assets/js/core/location-picker.js?v=p7f4a02"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=p6c9d12"></script>
-  <script src="/assets/js/pages/checkout.js?v=p6c9d12"></script>
-  <script src="/assets/js/pages/order-received.js?v=p6c9d12"></script>
-  <script src="/assets/js/pages/aux-pages.js?v=p6c9d12"></script>
+  <script src="/assets/js/pages/home.js?v=p7f4a02"></script>
+  <script src="/assets/js/pages/checkout.js?v=p7f4a02"></script>
+  <script src="/assets/js/pages/order-received.js?v=p7f4a02"></script>
+  <script src="/assets/js/pages/aux-pages.js?v=p7f4a02"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -339,7 +339,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=p6c9d12').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=p7f4a02').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {

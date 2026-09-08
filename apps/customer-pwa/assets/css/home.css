@@ -22,16 +22,21 @@
 
 /* ── Location Pill Button (Left in Header) ── */
 .x-hero-loc-pill {
-  background: var(--x-white);
-  color: #1e293b;
-  font-family: var(--x-font);
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 14px;
-  border-radius: 24px;
-  border: none;
-  box-shadow: var(--x-shadow-hero);
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background: var(--x-white) !important;
+  color: #1e293b !important;
+  font-family: var(--x-font) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px;
+  height: 36px;
+  padding: 0 13px !important;
+  border-radius: 20px !important;
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: var(--x-shadow-hero) !important;
   cursor: pointer;
   flex: 1 1 auto;
   min-width: 90px;
@@ -39,6 +44,7 @@
   user-select: none;
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.15s ease, background-color 0.15s ease;
+  box-sizing: border-box;
 }
 
 .x-hero-loc-pill:active {
@@ -54,13 +60,13 @@
 
 .x-hero-loc-icon img,
 .x-hero-loc-icon svg {
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   display: block;
 }
 
 .x-hero-loc-text {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 800;
   color: #1e1e1e;
   white-space: nowrap;
@@ -72,18 +78,27 @@
 
 /* ── Hero Right Actions ── */
 .x-hero-btn-join {
-  background: var(--x-white);
-  color: #0f172a;
-  font-family: var(--x-font);
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  background: var(--x-white) !important;
+  color: #0f172a !important;
+  font-family: var(--x-font) !important;
   font-weight: 800;
   font-size: 13px;
-  padding: 8px 16px;
-  border-radius: 20px;
-  border: none;
-  box-shadow: var(--x-shadow-hero);
+  height: 36px;
+  padding: 0 15px !important;
+  border-radius: 20px !important;
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: var(--x-shadow-hero) !important;
   cursor: pointer;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 0.15s ease;
+  box-sizing: border-box;
 }
 
 .x-hero-btn-join:active {
@@ -93,25 +108,31 @@
 .x-hero-action-icons {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   flex-shrink: 0;
 }
 
 .x-hero-icon-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: var(--x-white);
-  border: none;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+  width: 36px;
+  height: 36px;
+  border-radius: 50% !important;
+  background: var(--x-white) !important;
+  border: 0 !important;
+  outline: none !important;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #0f172a;
-  box-shadow: var(--x-shadow-hero);
+  box-shadow: var(--x-shadow-hero) !important;
   cursor: pointer;
   flex-shrink: 0;
   padding: 0;
+  margin: 0;
   transition: transform 0.15s ease;
+  box-sizing: border-box;
 }
 
 .x-hero-icon-btn:active {
@@ -120,9 +141,20 @@
 
 .x-hero-icon-btn img,
 .x-hero-icon-btn svg {
-  width: 25px;
-  height: 25px;
   display: block;
+}
+
+/* Specific icon sizing to balance visually against 36px circle */
+.x-hero-icon-btn-library img,
+.x-hero-icon-btn-library svg {
+  width: 17px;
+  height: 17px;
+}
+
+.x-hero-icon-btn-profile img,
+.x-hero-icon-btn-profile svg {
+  width: 22px;
+  height: 22px;
 }
 
 .x-hero-clock-wrap {

@@ -1102,4 +1102,21 @@
       updateHomeLocationBar();
     });
   }
+
+  // Global robust click delegation for opening location picker
+  document.addEventListener('click', function (e) {
+    var pill = e.target && e.target.closest('#x-hero-loc-pill, [data-action="open-location-picker"]');
+    if (pill) {
+      e.preventDefault();
+      e.stopPropagation();
+      openMainLocationSheet({
+        onSelect: function () {
+          if (window.XentraHome && typeof window.XentraHome.refresh === 'function') {
+            window.XentraHome.refresh();
+          }
+        }
+      });
+    }
+  }, true);
 })();
+
