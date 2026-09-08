@@ -1135,7 +1135,7 @@
         '<div style="width:26px;height:26px;border-radius:50%;background:' + badgeBg + ';border:2px solid #ffffff;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;transition:transform 0.15s ease;">' +
           iconSvg +
         '</div>' +
-        '<div style="margin-top:3px;padding:3px 7px;background:#ffffff;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.16);border:1px solid rgba(0,0,0,0.06);font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:700;color:' + textColor + ';white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;pointer-events:none;line-height:1.2;">' +
+        '<div style="margin-top:2px;font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:700;color:' + textColor + ';white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;pointer-events:none;line-height:1.2;text-shadow:0 1px 3px #ffffff, 0 0 6px #ffffff;">' +
           UI.escape(poi.name) +
         '</div>';
 

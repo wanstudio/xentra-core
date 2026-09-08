@@ -740,21 +740,22 @@
   border-radius: 50%;
 }
 
-/* POI Badge under Center Pin */
+/* Label under Center Pin (Clean text without white box) */
 .x-map-pin-badge {
-  margin-top: 6px;
-  background: #ffffff;
-  border: 1px solid #fed7aa;
+  margin-top: 4px;
+  background: transparent;
+  border: none;
   color: #ea580c;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 800;
-  padding: 3px 10px;
-  border-radius: 6px;
+  padding: 0;
+  border-radius: 0;
   white-space: nowrap;
-  max-width: 160px;
+  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: none;
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.95), 0 0 8px rgba(255, 255, 255, 0.95);
 }
 
 /* Floating Top Search Bar Container */
