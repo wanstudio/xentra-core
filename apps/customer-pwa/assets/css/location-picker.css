@@ -511,10 +511,10 @@
 .x-loc-popover-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 700;
+  gap: 10px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
   color: #1f2937;
   border: none;
   background: transparent;
@@ -523,11 +523,20 @@
   text-align: left;
   font-family: inherit;
   width: 100%;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.x-loc-popover-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
 }
 
 .x-loc-popover-item:active,
 .x-loc-popover-item:hover {
-  background: #f3f4f6;
+  background: #f8fafc;
+  color: #0f172a;
 }
 
 .x-loc-popover-item.is-danger {
@@ -537,6 +546,7 @@
 .x-loc-popover-item.is-danger:active,
 .x-loc-popover-item.is-danger:hover {
   background: #fef2f2;
+  color: #dc2626;
 }
 
 /* ── FLOW A: Search Sheet ── */
