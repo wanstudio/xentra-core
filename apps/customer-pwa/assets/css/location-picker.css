@@ -170,22 +170,23 @@
 
 /* ── Search Bar & Quick Action Pills (Reference Image) ── */
 .x-loc-search-box-main {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   background: #f1f3f5;
   border-radius: 999px;
-  padding: 10px 18px;
-  cursor: pointer;
+  padding: 8px 16px;
   border: 1.5px solid #d1d5db;
   margin-bottom: 12px;
-  transition: border-color 0.15s ease, background 0.15s ease;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  user-select: text;
 }
 
-.x-loc-search-box-main:active {
-  background: #e9ecef;
+.x-loc-search-box-main:focus-within {
+  background: #ffffff;
+  border-color: #9ca3af;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
 .x-loc-search-box-dot {
@@ -195,12 +196,38 @@
   flex-shrink: 0;
 }
 
-.x-loc-search-box-ph {
+.x-loc-search-inline-input {
   flex: 1;
+  border: none;
+  background: transparent;
   font-size: 14px;
-  color: #9ca3af;
   font-family: inherit;
   font-weight: 500;
+  color: #111827;
+  outline: none;
+  min-width: 0;
+  padding: 4px 0;
+}
+
+.x-loc-search-inline-input::placeholder {
+  color: #9ca3af;
+}
+
+.x-loc-search-clear-btn {
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: #9ca3af;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.x-loc-search-clear-btn.is-visible {
+  display: flex;
 }
 
 .x-loc-search-box-mag {
@@ -208,6 +235,28 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: #9ca3af;
+}
+
+/* Inline Autocomplete Results Dropdown inside Main Sheet */
+.x-loc-inline-dropdown {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-top: -4px;
+  margin-bottom: 14px;
+  padding: 6px 0;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  animation: x-fade-in 0.15s ease;
+}
+
+.x-loc-inline-dropdown.is-open {
+  display: flex;
 }
 
 /* 2 Quick Action Pills: Lokasimu saat ini & Pilih lewat peta */
@@ -624,10 +673,10 @@
   inset: 0;
 }
 
-/* Fixed Center Pin (Reference Images 2 & 3) */
+/* Fixed Center Pin (Reference Images 1 & 2) */
 .x-map-center-pin-wrap {
   position: absolute;
-  top: 40%;
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -100%);
   z-index: 20;
@@ -644,7 +693,7 @@
   transform: translateX(-50%);
   width: 12px;
   height: 6px;
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.25);
   border-radius: 50%;
 }
 
@@ -655,7 +704,7 @@
   border: 3px solid #ffffff;
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
-  box-shadow: 0 4px 12px rgba(255, 87, 34, 0.4);
+  box-shadow: 0 4px 14px rgba(255, 87, 34, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -668,49 +717,245 @@
   border-radius: 50%;
 }
 
-/* Floating Map Controls */
+/* POI Badge under Center Pin */
+.x-map-pin-badge {
+  margin-top: 6px;
+  background: #ffffff;
+  border: 1px solid #fed7aa;
+  color: #ea580c;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* Floating Top Search Bar Container */
 .x-map-top-bar {
   position: absolute;
   top: max(16px, calc(10px + var(--x-safe-top, 0px)));
   left: 16px;
   right: 16px;
-  z-index: 30;
+  z-index: 40;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
 }
 
-.x-map-floating-search {
-  flex: 1;
+.x-map-search-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.x-map-search-input-box {
   background: #ffffff;
   border-radius: 999px;
-  padding: 10px 16px;
+  padding: 8px 14px;
   display: flex;
   align-items: center;
   gap: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.14);
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s ease;
+}
+
+.x-map-search-input-box:focus-within {
+  border-color: #cbd5e1;
+}
+
+.x-map-search-icon-left {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.x-map-search-input-field {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-family: inherit;
+  color: #111827;
+  outline: none;
+  min-width: 0;
+}
+
+.x-map-search-input-field::placeholder {
+  color: #94a3b8;
+}
+
+.x-map-search-clear-btn {
+  background: none;
+  border: none;
+  padding: 4px;
   cursor: pointer;
+  color: #94a3b8;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
 }
 
-.x-map-floating-search span {
+.x-map-search-clear-btn.is-visible {
+  display: flex;
+}
+
+.x-map-search-icon-right {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+}
+
+/* Floating Autocomplete Dropdown directly under Search Bar */
+.x-map-search-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 50;
+  display: none;
+  padding: 6px 0;
+  border: 1px solid #f1f5f9;
+}
+
+.x-map-search-dropdown.is-open {
+  display: block;
+}
+
+.x-map-search-dropdown-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 11px 16px;
+  border-bottom: 1px solid #f8fafc;
+  cursor: pointer;
+  background: #ffffff;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.12s ease;
+}
+
+.x-map-search-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.x-map-search-dropdown-item:active,
+.x-map-search-dropdown-item:hover {
+  background: #f8fafc;
+}
+
+.x-map-search-dropdown-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.x-map-search-dropdown-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.x-map-search-dropdown-title {
   font-size: 13.5px;
-  color: #6b7280;
-  font-weight: 500;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.3;
 }
 
+.x-map-search-dropdown-addr {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Floating Zoom Controls (Top Right) */
+.x-map-zoom-controls {
+  position: absolute;
+  top: max(80px, calc(72px + var(--x-safe-top, 0px)));
+  right: 16px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+  border: 1px solid #f1f5f9;
+}
+
+.x-map-zoom-btn {
+  width: 36px;
+  height: 36px;
+  background: #ffffff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s ease;
+}
+
+.x-map-zoom-btn:active {
+  background: #f1f5f9;
+}
+
+.x-map-zoom-btn + .x-map-zoom-btn {
+  border-top: 1px solid #f1f5f9;
+}
+
+/* Floating Controls (Back on Left, GPS on Right - Floating above Bottom Card) */
 .x-map-fab-back {
-  width: 42px;
-  height: 42px;
+  position: absolute;
+  bottom: 230px;
+  left: 16px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: #ffffff;
   border: none;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  z-index: 35;
+  z-index: 30;
+  transition: transform 0.1s ease;
+}
+
+.x-map-fab-back:active {
+  transform: scale(0.94);
 }
 
 .x-map-fab-gps {
@@ -722,15 +967,20 @@
   border-radius: 50%;
   background: #ffffff;
   border: none;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 30;
+  transition: transform 0.1s ease;
 }
 
-/* Map Bottom Confirmation Card (Reference Image 2) */
+.x-map-fab-gps:active {
+  transform: scale(0.94);
+}
+
+/* Map Bottom Confirmation Card (Reference Images 1 & 2) */
 .x-map-bottom-card {
   position: absolute;
   bottom: 0;
@@ -1033,4 +1283,29 @@
 
 @keyframes x-loc-spin {
   to { transform: rotate(360deg); }
+}
+
+/* ── Mapbox GL & POI Markers ── */
+.mapboxgl-map {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.mapboxgl-ctrl-bottom-left,
+.mapboxgl-ctrl-bottom-right {
+  display: none !important;
+}
+
+.x-map-poi-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  z-index: 10;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.x-map-poi-badge:active {
+  transform: scale(0.95);
 }

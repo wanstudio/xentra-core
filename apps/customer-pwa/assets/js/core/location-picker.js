@@ -24,6 +24,47 @@
 
   var DEFAULT_LAT = -5.3971; // Bandar Lampung / Pringsewu default area
   var DEFAULT_LNG = 105.2668;
+  var MAPBOX_TOKEN = (window.XentraConfig && window.XentraConfig.mapboxToken) ||
+    'pk.eyJ1IjoiaWtod2FucyIsImEiOiJjbXQ5c2cwMzYwOW15MnpxdXdpeWU3am45In0.YcX49DH0uXP70aBxVDC-TA';
+
+  // Dynamic Mapbox GL JS & CSS Loader
+  function loadMapboxGL() {
+    return new Promise(function (resolve, reject) {
+      if (window.mapboxgl && typeof window.mapboxgl.Map === 'function') {
+        resolve();
+        return;
+      }
+      var css = document.getElementById('xentra-mapbox-css');
+      if (!css) {
+        css = document.createElement('link');
+        css.id = 'xentra-mapbox-css';
+        css.rel = 'stylesheet';
+        css.href = 'https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.css';
+        document.head.appendChild(css);
+      }
+      var script = document.getElementById('xentra-mapbox-js');
+      if (script) {
+        if (script.dataset.loaded === '1' || (window.mapboxgl && typeof window.mapboxgl.Map === 'function')) {
+          resolve();
+          return;
+        }
+        script.addEventListener('load', function () { resolve(); });
+        script.addEventListener('error', function () { reject(new Error('Mapbox JS gagal dimuat')); });
+        return;
+      }
+      script = document.createElement('script');
+      script.id = 'xentra-mapbox-js';
+      script.src = 'https://api.mapbox.com/mapbox-gl-js/v3.4.0/mapbox-gl.js';
+      script.onload = function () {
+        script.dataset.loaded = '1';
+        resolve();
+      };
+      script.onerror = function () {
+        reject(new Error('Library Mapbox GL tidak dapat dimuat'));
+      };
+      document.head.appendChild(script);
+    });
+  }
 
   // Active overlay tracker for LIFO cleanup
   var activeOverlays = [];
@@ -85,41 +126,8 @@
     var onDestinationSelected = options.onSelect || null;
 
     var sheetHtml =
-      '<h3 class="x-loc-sheet-title">Pilih lokasi</h3>' +
-
-      // Top Search Input Box (matching reference image)
-      '<div class="x-loc-search-box-main" id="x-act-search">' +
-        '<div class="x-loc-search-box-dot">' +
-          '<svg width="22" height="22" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5" stroke="#FA3E3E" stroke-width="6.5"/></svg>' +
-        '</div>' +
-        '<div class="x-loc-search-box-ph">Cari alamat</div>' +
-        '<div class="x-loc-search-box-mag">' +
-          '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M13.23 13.23 16.77 16.77M15 8.75A6.25 6.25 0 1 1 2.5 8.75a6.25 6.25 0 0 1 12.5 0Z" stroke="#9ca3af" stroke-width="2" stroke-linecap="round"/></svg>' +
-        '</div>' +
-      '</div>' +
-
-      // 2 Action Pill Buttons: "Lokasimu saat ini" and "Pilih lewat peta" side by side
-      '<div class="x-loc-quick-pills">' +
-        '<button type="button" class="x-loc-pill-btn" id="x-act-gps">' +
-          '<span class="x-loc-pill-icon">' +
-            '<img src="/assets/icons/target.svg" alt="" width="18" height="18">' +
-          '</span>' +
-          '<span class="x-loc-pill-text">Lokasimu saat ini</span>' +
-        '</button>' +
-        '<button type="button" class="x-loc-pill-btn" id="x-act-map">' +
-          '<span class="x-loc-pill-icon">' +
-            '<img src="/assets/icons/mini_map.svg" alt="" width="18" height="18">' +
-          '</span>' +
-          '<span class="x-loc-pill-text">Pilih lewat peta</span>' +
-        '</button>' +
-      '</div>' +
-
-      // Divider separating top actions and favorite addresses
-      '<div class="x-loc-divider"></div>' +
-
-      // Alamat Favorit Section
+      '<h3 class="x-loc-sheet-title">Alamat favorit</h3>' +
       '<div class="x-loc-fav-section">' +
-        '<div class="x-loc-fav-header">Alamat favorit</div>' +
         '<div id="x-loc-fav-container"><div style="padding:16px;text-align:center;font-size:12px;color:#94a3b8;">Memuat alamat favorit…</div></div>' +
         '<button type="button" class="x-loc-btn-add-fav" id="x-btn-add-fav">' +
           '<span class="x-loc-btn-add-fav-icon">' +
@@ -150,31 +158,7 @@
       if (typeof onDestinationSelected === 'function') onDestinationSelected();
     });
 
-    // Action 1: Search
-    var actSearch = el.querySelector('#x-act-search');
-    if (actSearch) {
-      actSearch.onclick = function () {
-        openSearchFlow({ onSelect: onDestinationSelected });
-      };
-    }
-
-    // Action 2: GPS
-    var actGps = el.querySelector('#x-act-gps');
-    if (actGps) {
-      actGps.onclick = function () {
-        triggerGpsFlow(el, { onSelect: onDestinationSelected });
-      };
-    }
-
-    // Action 3: Map Picker
-    var actMap = el.querySelector('#x-act-map');
-    if (actMap) {
-      actMap.onclick = function () {
-        openMapPickerFlow({ onSelect: onDestinationSelected });
-      };
-    }
-
-    // Action 4: + Tambah Alamat
+    // Action: + Tambah Alamat
     var btnAddFav = el.querySelector('#x-btn-add-fav');
     if (btnAddFav) {
       btnAddFav.onclick = function () {
@@ -541,32 +525,52 @@
     var mapOverlay = document.createElement('div');
     mapOverlay.className = 'x-map-picker-view';
     mapOverlay.innerHTML =
-      // Floating Header (Back + Search preview)
+      // Floating Header (Search Bar + Dropdown autocomplete - Reference Image 1 & 2)
       '<div class="x-map-top-bar">' +
-      '  <button type="button" class="x-map-fab-back" id="x-map-back" aria-label="Kembali">' +
-      '    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"><path d="M12 4l-6 6 6 6"/></svg>' +
-      '  </button>' +
-      '  <div class="x-map-floating-search" id="x-map-search-bar">' +
-      '    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"><circle cx="8.75" cy="8.75" r="5.75"/><path d="m13.23 13.23 3.54 3.54"/></svg>' +
-      '    <span>Cari alamat</span>' +
+      '  <div class="x-map-search-wrapper">' +
+      '    <div class="x-map-search-input-box">' +
+      '      <div class="x-map-search-icon-left">' +
+      '        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5" stroke="#FA3E3E" stroke-width="6"/></svg>' +
+      '      </div>' +
+      '      <input type="text" id="x-map-search-input" class="x-map-search-input-field" placeholder="Cari alamat" autocomplete="off">' +
+      '      <button type="button" id="x-map-search-clear" class="x-map-search-clear-btn" aria-label="Hapus teks">' +
+      '        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
+      '      </button>' +
+      '      <div class="x-map-search-icon-right">' +
+      '        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8.75" cy="8.75" r="5.75"/><path d="m13.23 13.23 3.54 3.54"/></svg>' +
+      '      </div>' +
+      '    </div>' +
+      '    <div class="x-map-search-dropdown" id="x-map-search-dropdown"></div>' +
       '  </div>' +
       '</div>' +
 
-      // Map Viewport with Center Pin (Reference Images 2 & 3)
+      // Floating Zoom Controls (+ / -) in Top Right (Reference Image 1)
+      '<div class="x-map-zoom-controls">' +
+      '  <button type="button" class="x-map-zoom-btn" id="x-map-zoom-in" aria-label="Perbesar">+</button>' +
+      '  <button type="button" class="x-map-zoom-btn" id="x-map-zoom-out" aria-label="Perkecil">−</button>' +
+      '</div>' +
+
+      // Map Viewport with Center Pin & Place Badge (Reference Image 1)
       '<div class="x-map-viewport" id="x-map-viewport">' +
       '  <div class="x-map-tiles-canvas" id="x-map-canvas"></div>' +
       '  <div class="x-map-center-pin-wrap">' +
       '    <div class="x-map-pin-icon-body"><div class="x-map-pin-dot"></div></div>' +
+      '    <div class="x-map-pin-badge" id="x-map-pin-badge">Memuat…</div>' +
       '    <div class="x-map-pin-pulse"></div>' +
       '  </div>' +
       '</div>' +
 
-      // Floating GPS re-center button
+      // Floating Back button on bottom left above card (Reference Image 1)
+      '<button type="button" class="x-map-fab-back" id="x-map-back" aria-label="Kembali">' +
+      '  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"><path d="M12 4l-6 6 6 6"/></svg>' +
+      '</button>' +
+
+      // Floating GPS re-center button on bottom right above card (Reference Image 1)
       '<button type="button" class="x-map-fab-gps" id="x-map-gps-fab" aria-label="Lokasi Saya">' +
       '  <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="#111" stroke-width="2"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3" fill="#111"/><path d="M10 1v3M10 16v3M1 10h3M16 10h3"/></svg>' +
       '</button>' +
 
-      // Bottom Confirmation Card (Reference Image 2)
+      // Bottom Confirmation Card (Reference Image 1 & 2)
       '<div class="x-map-bottom-card">' +
       '  <div class="x-loc-sheet-handle" style="margin-bottom:10px;"></div>' +
       '  <div class="x-map-bottom-head">' +
@@ -606,16 +610,46 @@
       else closeMap();
     };
 
+    // Helper to authoritatively set selected location (POI or search result)
+    function setSelectedLocation(title, address, coords) {
+      if (!title) return;
+      currentResolvedAddress = {
+        title: title,
+        address: address || title
+      };
+      if (coords && coords.lat && coords.lng) {
+        currentPinCoords = { lat: Number(coords.lat), lng: Number(coords.lng) };
+      }
+
+      var titleEl = mapOverlay.querySelector('#x-map-loc-title');
+      var addrEl = mapOverlay.querySelector('#x-map-loc-addr');
+      var badgeEl = mapOverlay.querySelector('#x-map-pin-badge');
+
+      if (titleEl) titleEl.textContent = currentResolvedAddress.title;
+      if (addrEl) addrEl.textContent = currentResolvedAddress.address;
+      if (badgeEl) badgeEl.textContent = currentResolvedAddress.title;
+    }
+
     // Initialize Interactive Canvas Map View (Pan & Pinch via OSM tiles)
-    initInteractiveMapCanvas(
+    var mapController = initInteractiveMapCanvas(
       mapOverlay.querySelector('#x-map-viewport'),
       mapOverlay.querySelector('#x-map-canvas'),
       initialCoords,
-      function onCenterMoved(newCoords) {
+      function onCenterMoved(newCoords, wasProgrammatic) {
         currentPinCoords = newCoords;
+        // If movement was caused by clicking a POI or selecting a search result,
+        // do not trigger reverse geocoding as the user has already explicitly picked this location!
+        if (wasProgrammatic) return;
+
         updateLocationDetailsFromCoords(newCoords, mapOverlay, function (resolved) {
           currentResolvedAddress = resolved;
         });
+      },
+      function onPoiSelected(poi) {
+        if (!poi) return;
+        var pTitle = poi.name;
+        var pAddr = poi.address || poi.full_address || poi.place_formatted || poi.name;
+        setSelectedLocation(pTitle, pAddr, { lat: poi.lat, lng: poi.lng });
       }
     );
 
@@ -624,21 +658,226 @@
       currentResolvedAddress = resolved;
     });
 
-    // Top Search Bar click
-    mapOverlay.querySelector('#x-map-search-bar').onclick = function () {
-      openSearchFlow({
-        onSelect: function () {
-          closeMap();
-          if (typeof options.onSelect === 'function') options.onSelect();
+    // Zoom Buttons
+    var zoomInBtn = mapOverlay.querySelector('#x-map-zoom-in');
+    var zoomOutBtn = mapOverlay.querySelector('#x-map-zoom-out');
+    if (zoomInBtn && mapController) {
+      zoomInBtn.onclick = function (e) {
+        e.stopPropagation();
+        mapController.zoomIn();
+      };
+    }
+    if (zoomOutBtn && mapController) {
+      zoomOutBtn.onclick = function (e) {
+        e.stopPropagation();
+        mapController.zoomOut();
+      };
+    }
+
+    // ── Floating Live Autocomplete Search (Reference Image 2) ──
+    var searchInput = mapOverlay.querySelector('#x-map-search-input');
+    var searchClear = mapOverlay.querySelector('#x-map-search-clear');
+    var searchDropdown = mapOverlay.querySelector('#x-map-search-dropdown');
+    var mapSearchTimer = null;
+    var mapSearchSeq = 0;
+
+    function hideDropdown() {
+      if (searchDropdown) {
+        searchDropdown.classList.remove('is-open');
+        searchDropdown.innerHTML = '';
+      }
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener('input', function () {
+        var query = searchInput.value.trim();
+        if (searchClear) {
+          if (query.length > 0) searchClear.classList.add('is-visible');
+          else searchClear.classList.remove('is-visible');
+        }
+
+        clearTimeout(mapSearchTimer);
+        var currentSeq = ++mapSearchSeq;
+
+        if (query.length < 3) {
+          hideDropdown();
+          return;
+        }
+
+        searchDropdown.innerHTML = '<div style="padding:14px 16px;font-size:12.5px;color:#64748b;text-align:center;"><span class="x-loc-spinner"></span> Mencari tempat terdekat…</div>';
+        searchDropdown.classList.add('is-open');
+
+        mapSearchTimer = setTimeout(function () {
+          var pLng = currentPinCoords.lng;
+          var pLat = currentPinCoords.lat;
+
+          // Prefer client-side Mapbox Search Box API (from xentra-mvp) for instant sub-second local results
+          if (MAPBOX_TOKEN) {
+            var sessionToken = 'sess_' + Math.random().toString(36).slice(2, 10);
+            var mboxUrl = 'https://api.mapbox.com/search/searchbox/v1/suggest?q=' + encodeURIComponent(query) +
+              '&proximity=' + encodeURIComponent(pLng) + ',' + encodeURIComponent(pLat) +
+              '&country=id&limit=8&access_token=' + MAPBOX_TOKEN +
+              '&session_token=' + sessionToken;
+
+            fetch(mboxUrl)
+              .then(function (res) { return res.json(); })
+              .then(function (data) {
+                if (currentSeq !== mapSearchSeq) return;
+                var suggestions = (data && Array.isArray(data.suggestions)) ? data.suggestions : [];
+                if (!suggestions.length) {
+                  searchDropdown.innerHTML = '<div style="padding:16px;font-size:12.5px;color:#94a3b8;text-align:center;">Tidak ada hasil ditemukan</div>';
+                  return;
+                }
+
+                var html = '';
+                suggestions.forEach(function (s, idx) {
+                  var sTitle = s.name || s.address || 'Lokasi';
+                  var sAddr = s.full_address || s.place_formatted || s.address || '';
+                  html +=
+                    '<button type="button" class="x-map-search-dropdown-item" data-idx="' + idx + '">' +
+                    '  <div class="x-map-search-dropdown-icon">' +
+                    '    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FA3E3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>' +
+                    '  </div>' +
+                    '  <div class="x-map-search-dropdown-info">' +
+                    '    <div class="x-map-search-dropdown-title">' + UI.escape(sTitle) + '</div>' +
+                    '    <div class="x-map-search-dropdown-addr">' + UI.escape(sAddr) + '</div>' +
+                    '  </div>' +
+                    '</button>';
+                });
+                searchDropdown.innerHTML = html;
+
+                searchDropdown.querySelectorAll('.x-map-search-dropdown-item').forEach(function (btn) {
+                  btn.onclick = function (e) {
+                    e.stopPropagation();
+                    var item = suggestions[Number(btn.getAttribute('data-idx'))];
+                    if (!item) return;
+
+                    var retrUrl = 'https://api.mapbox.com/search/searchbox/v1/retrieve/' +
+                      encodeURIComponent(item.mapbox_id) + '?access_token=' + MAPBOX_TOKEN +
+                      '&session_token=' + sessionToken;
+
+                    fetch(retrUrl)
+                      .then(function (r) { return r.json(); })
+                      .then(function (rData) {
+                        var feat = rData && rData.features && rData.features[0];
+                        if (feat && feat.geometry && Array.isArray(feat.geometry.coordinates)) {
+                          var newLng = feat.geometry.coordinates[0];
+                          var newLat = feat.geometry.coordinates[1];
+                          var sTitle = item.name || (feat.properties && feat.properties.name) || 'Lokasi';
+                          var sAddr = (feat.properties && (feat.properties.full_address || feat.properties.place_formatted)) || item.full_address || sTitle;
+
+                          currentPinCoords = { lat: newLat, lng: newLng };
+                          setSelectedLocation(sTitle, sAddr, currentPinCoords);
+                          if (mapController && typeof mapController.panTo === 'function') {
+                            mapController.panTo(currentPinCoords);
+                          }
+                        }
+                      })
+                      .catch(function () {});
+
+                    searchInput.value = item.name || '';
+                    hideDropdown();
+                  };
+                });
+              })
+              .catch(function () {
+                fallbackSearchApi(query, currentPinCoords);
+              });
+            return;
+          }
+
+          fallbackSearchApi(query, currentPinCoords);
+        }, 300);
+
+        function fallbackSearchApi(q, coords) {
+          var searchUrl = '/location/search?q=' + encodeURIComponent(q) +
+            '&lat=' + encodeURIComponent(coords.lat) +
+            '&lng=' + encodeURIComponent(coords.lng);
+
+          API.get(searchUrl)
+            .then(function (res) {
+              if (currentSeq !== mapSearchSeq) return;
+              var results = (res && res.results) || [];
+              if (!results.length) {
+                searchDropdown.innerHTML = '<div style="padding:16px;font-size:12.5px;color:#94a3b8;text-align:center;">Tidak ada hasil ditemukan</div>';
+                return;
+              }
+
+              var html = '';
+              results.forEach(function (item, idx) {
+                var itemTitle = item.title || (item.display_name ? item.display_name.split(',')[0] : 'Lokasi');
+                var itemAddr = item.address || item.display_name || '';
+                html +=
+                  '<button type="button" class="x-map-search-dropdown-item" data-idx="' + idx + '">' +
+                  '  <div class="x-map-search-dropdown-icon">' +
+                  '    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FA3E3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>' +
+                  '  </div>' +
+                  '  <div class="x-map-search-dropdown-info">' +
+                  '    <div class="x-map-search-dropdown-title">' + UI.escape(itemTitle) + '</div>' +
+                  '    <div class="x-map-search-dropdown-addr">' + UI.escape(itemAddr) + '</div>' +
+                  '  </div>' +
+                  '</button>';
+              });
+              searchDropdown.innerHTML = html;
+
+              searchDropdown.querySelectorAll('.x-map-search-dropdown-item').forEach(function (btn) {
+                btn.onclick = function (e) {
+                  e.stopPropagation();
+                  var selected = results[Number(btn.getAttribute('data-idx'))];
+                  if (!selected) return;
+
+                  var newLat = Number(selected.latitude || selected.lat);
+                  var newLng = Number(selected.longitude || selected.lon);
+
+                  if (!isNaN(newLat) && !isNaN(newLng)) {
+                    currentPinCoords = { lat: newLat, lng: newLng };
+                    var selTitle = selected.title || itemTitle;
+                    var selAddr = selected.address || selected.display_name || selTitle;
+                    setSelectedLocation(selTitle, selAddr, currentPinCoords);
+                    if (mapController && typeof mapController.panTo === 'function') {
+                      mapController.panTo(currentPinCoords);
+                    }
+                  }
+
+                  searchInput.value = selected.title || itemTitle;
+                  hideDropdown();
+                };
+              });
+            })
+            .catch(function () {
+              if (currentSeq !== mapSearchSeq) return;
+              searchDropdown.innerHTML = '<div style="padding:16px;font-size:12.5px;color:#ef4444;text-align:center;">Gagal memuat alamat</div>';
+            });
         }
       });
-    };
+    }
+
+    if (searchClear) {
+      searchClear.onclick = function (e) {
+        e.stopPropagation();
+        searchInput.value = '';
+        searchClear.classList.remove('is-visible');
+        hideDropdown();
+        searchInput.focus();
+      };
+    }
+
+    // Dismiss dropdown when clicking on map viewport
+    var viewportEl = mapOverlay.querySelector('#x-map-viewport');
+    if (viewportEl) {
+      viewportEl.addEventListener('click', function () {
+        hideDropdown();
+      });
+    }
 
     // Re-center on GPS
     mapOverlay.querySelector('#x-map-gps-fab').onclick = function () {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(function (pos) {
           currentPinCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          if (mapController && typeof mapController.panTo === 'function') {
+            mapController.panTo(currentPinCoords);
+          }
           updateLocationDetailsFromCoords(currentPinCoords, mapOverlay, function (resolved) {
             currentResolvedAddress = resolved;
           });
@@ -646,14 +885,12 @@
       }
     };
 
-    // "Ubah" button opens search flow
+    // "Ubah" button focuses search input
     mapOverlay.querySelector('#x-btn-ubah-map').onclick = function () {
-      openSearchFlow({
-        onSelect: function () {
-          closeMap();
-          if (typeof options.onSelect === 'function') options.onSelect();
-        }
-      });
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
     };
 
     // "Konfirmasi" button
@@ -691,14 +928,17 @@
     };
   }
 
-  // Reverse geocodes coordinates with debouncing and updates the bottom card info
+  // Reverse geocodes coordinates with debouncing and updates the bottom card info + pin badge
   var revGeocodeTimer = null;
   var revGeocodeSeq = 0;
   function updateLocationDetailsFromCoords(coords, containerEl, onResolved) {
     var titleEl = containerEl.querySelector('#x-map-loc-title');
     var addrEl = containerEl.querySelector('#x-map-loc-addr');
+    var badgeEl = containerEl.querySelector('#x-map-pin-badge');
+
     if (titleEl) titleEl.textContent = 'Mencari alamat…';
     if (addrEl) addrEl.textContent = 'Menentukan nama jalan dan lokasi…';
+    if (badgeEl) badgeEl.textContent = 'Mencari…';
 
     clearTimeout(revGeocodeTimer);
     var currentSeq = ++revGeocodeSeq;
@@ -707,32 +947,315 @@
         .then(function (res) {
           if (currentSeq !== revGeocodeSeq) return; // Discard superseded reply
           var full = (res && res.address && (res.address.formatted_address || res.address.display_name)) ||
-            (res && res.address_text) || ('Titik Koordinat: ' + coords.lat.toFixed(4) + ', ' + coords.lng.toFixed(4));
-          var parts = full.split(',');
-          var title = (parts[0] || 'Lokasi Terpilih').trim();
-          var addr = parts.slice(1).join(',').trim() || full;
+            (res && res.address_text) || '';
+          
+          var title = 'Lokasi Terpilih';
+          var addr = 'Sekitar titik peta terpilih';
+
+          if (full && !/^titik koordinat/i.test(full)) {
+            var parts = full.split(',');
+            title = (parts[0] || 'Lokasi Terpilih').trim();
+            addr = parts.slice(1).join(',').trim() || full;
+          } else if (res && res.address && res.address.road) {
+            title = res.address.road;
+            addr = res.address.display_name || res.address.road;
+          }
 
           if (titleEl) titleEl.textContent = title;
           if (addrEl) addrEl.textContent = addr;
-          if (typeof onResolved === 'function') onResolved({ title: title, address: full });
+          if (badgeEl) badgeEl.textContent = title;
+          if (typeof onResolved === 'function') onResolved({ title: title, address: addr || full });
         })
         .catch(function () {
           if (currentSeq !== revGeocodeSeq) return;
-          var fallback = 'Koordinat: ' + coords.lat.toFixed(4) + ', ' + coords.lng.toFixed(4);
-          if (titleEl) titleEl.textContent = 'Titik Peta';
+          var fallback = 'Area sekitar titik peta terpilih';
+          if (titleEl) titleEl.textContent = 'Lokasi Terpilih';
           if (addrEl) addrEl.textContent = fallback;
-          if (typeof onResolved === 'function') onResolved({ title: 'Titik Peta', address: fallback });
+          if (badgeEl) badgeEl.textContent = 'Lokasi Terpilih';
+          if (typeof onResolved === 'function') onResolved({ title: 'Lokasi Terpilih', address: fallback });
         });
     }, 400);
   }
 
-  // Pure lightweight canvas tile renderer for interactive map drag without external heavy libraries
-  function initInteractiveMapCanvas(viewportEl, canvasContainer, centerCoords, onCenterChanged) {
+  // POI Cache across movements matching xentra-mvp
+  var XENTRA_POI_CACHE = new Map();
+
+  function initInteractiveMapCanvas(viewportEl, canvasContainer, centerCoords, onCenterChanged, onPoiClick) {
+    var zoom = 17.2;
+    var currentLat = centerCoords.lat;
+    var currentLng = centerCoords.lng;
+    var renderedPoiMarkers = new Map();
+    var mapInst = null;
+    var debounceTimer = null;
+
+    // Fallback Canvas Renderer (in case Mapbox fails to load)
+    var fallbackCtrl = null;
+
+    function renderPoiToMap(poi) {
+      if (!mapInst || !poi || !poi.lat || !poi.lng || !poi.name) return;
+      var key = poi.name + '_' + Number(poi.lat).toFixed(5) + '_' + Number(poi.lng).toFixed(5);
+      if (renderedPoiMarkers.has(key)) return;
+
+      var nameLower = (poi.name || '').toLowerCase();
+      var cats = Array.isArray(poi.category) ? poi.category.join(' ').toLowerCase() : '';
+      var maki = (poi.maki || '').toLowerCase();
+
+      // 1. Food / Resto / Warung / Mie / Nasi / Ayam (Orange Fork & Spoon)
+      var isFood = false;
+      if (/pecel|lele|ayam|mie|bakmi|bakso|nasi|soto|bebek|sate|warung|rm\.|rm\b|rumah makan|diner|restaurant|makan|seafood|padang|martabak|burger|pizza|d'master|fried chicken|lesehan|dapur|kitchen|steak|gulai|sop|bubur|pempek|along|bang jo|semar|juju|roni|geprek/i.test(nameLower) ||
+          /restaurant|fast_food|fast-food|indonesian restaurant|diner|eatery/i.test(cats) ||
+          /restaurant|fast-food|diner/i.test(maki)) {
+        isFood = true;
+      }
+
+      // 2. Cafe / Kopi / Boba / Minuman (Purple Coffee Cup)
+      var isCafe = false;
+      if (!isFood) {
+        if (/cafe|café|coffee|kopi|boba|bar\b|lounge|espresso|kedai kopi|angkringan|tea house|sel-sel/i.test(nameLower) ||
+            /^(cafe|coffee_shop|bar)$/i.test(maki) ||
+            (/\b(coffee|cafe|café|boba|tea shop|espresso)\b/i.test(cats))) {
+          isCafe = true;
+        }
+      }
+
+      // 3. Medical / Klinik / Dokter (Red Plus)
+      var isMedical = false;
+      if (!isFood && !isCafe) {
+        if (/health|doctor|clinic|hospital|pharmacy|apotek|med/i.test(cats) ||
+            /doctor|hospital|pharmacy/i.test(maki) ||
+            /klinik|dokter|dr\.|dr\b|apotek|puskesmas|rumah sakit|rs\b/i.test(nameLower)) {
+          isMedical = true;
+        }
+      }
+
+      // 4. Shop / Toko / Swalayan / Jasa (Blue Shopping Bag)
+      var isShop = false;
+      if (!isFood && !isCafe && !isMedical) {
+        if (/shop|shopping|store|toko|market|mart|grocery|bakery|cake|interior|tech|studio|bank|atm/i.test(cats) ||
+            /shop|grocery|bakery|bank/i.test(maki) ||
+            /toko|mart|swalayan|bakery|cake|interior|tech|studio|bank|atm|bri\b|bca\b|mandiri\b/i.test(nameLower)) {
+          isShop = true;
+        }
+      }
+
+      var badgeBg = 'linear-gradient(135deg, #ff7a18 0%, #ff5200 100%)';
+      var textColor = '#c2410c';
+      var iconSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ffffff"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>';
+
+      if (isFood) {
+        badgeBg = 'linear-gradient(135deg, #ff7a18 0%, #ff5200 100%)';
+        textColor = '#c2410c';
+        iconSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ffffff"><path d="M11 9H9V2H7v7H5V2H3v7c0 2.12 1.66 3.84 3.75 3.97V22h2.5v-9.03C11.34 12.84 13 11.12 13 9V2h-2v7zm5-3v8h2.5v8H21V2c-2.76 0-5 2.24-5 4z"/></svg>';
+      } else if (isCafe) {
+        badgeBg = 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)';
+        textColor = '#7e22ce';
+        iconSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8zM6 1v3M10 1v3M14 1v3"/></svg>';
+      } else if (isMedical) {
+        badgeBg = 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)';
+        textColor = '#b91c1c';
+        iconSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="#ffffff"><path d="M19 10.5h-5.5V5h-3v5.5H5v3h5.5V19h3v-5.5H19z"/></svg>';
+      } else if (isShop) {
+        badgeBg = 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)';
+        textColor = '#1d4ed8';
+        iconSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/></svg>';
+      } else {
+        badgeBg = 'linear-gradient(135deg, #64748b 0%, #475569 100%)';
+        textColor = '#334155';
+        iconSvg = '<svg width="11" height="11" viewBox="0 0 24 24" fill="#ffffff"><circle cx="12" cy="12" r="6"/></svg>';
+      }
+
+      var el = document.createElement('div');
+      el.className = 'x-map-poi-badge';
+      el.style.display = 'flex';
+      el.style.flexDirection = 'column';
+      el.style.alignItems = 'center';
+      el.style.cursor = 'pointer';
+      el.style.zIndex = '5';
+      el.style.userSelect = 'none';
+
+      el.innerHTML =
+        '<div style="width:26px;height:26px;border-radius:50%;background:' + badgeBg + ';border:2px solid #ffffff;box-shadow:0 3px 10px rgba(0,0,0,0.22);display:flex;align-items:center;justify-content:center;transition:transform 0.15s ease;">' +
+          iconSvg +
+        '</div>' +
+        '<div style="margin-top:3px;padding:3px 7px;background:#ffffff;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.16);border:1px solid rgba(0,0,0,0.06);font-family:\'Plus Jakarta Sans\',sans-serif;font-size:11px;font-weight:700;color:' + textColor + ';white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;pointer-events:none;line-height:1.2;">' +
+          UI.escape(poi.name) +
+        '</div>';
+
+      el.addEventListener('mouseenter', function () {
+        var iconDiv = el.querySelector('div');
+        if (iconDiv) iconDiv.style.transform = 'scale(1.18)';
+      });
+      el.addEventListener('mouseleave', function () {
+        var iconDiv = el.querySelector('div');
+        if (iconDiv) iconDiv.style.transform = 'scale(1)';
+      });
+
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        isProgrammaticMove = true;
+        if (typeof onPoiClick === 'function') {
+          onPoiClick(poi);
+        }
+        mapInst.flyTo({
+          center: [poi.lng, poi.lat],
+          zoom: 17.5,
+          essential: true
+        });
+      });
+
+      var marker = new window.mapboxgl.Marker({
+        element: el,
+        anchor: 'bottom'
+      }).setLngLat([poi.lng, poi.lat]).addTo(mapInst);
+
+      renderedPoiMarkers.set(key, marker);
+    }
+
+    function syncAllCachedPois() {
+      if (!mapInst) return;
+      XENTRA_POI_CACHE.forEach(function (poi) {
+        renderPoiToMap(poi);
+      });
+    }
+
+    // Fetches nearby POIs from Mapbox Searchbox Category API
+    function fetchMapboxPois(cLat, cLng) {
+      if (!MAPBOX_TOKEN) return;
+      var url = 'https://api.mapbox.com/search/searchbox/v1/category/food_and_drink?proximity=' +
+        encodeURIComponent(cLng) + ',' + encodeURIComponent(cLat) +
+        '&limit=15&access_token=' + MAPBOX_TOKEN;
+
+      fetch(url)
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          if (data && Array.isArray(data.features)) {
+            data.features.forEach(function (f) {
+              if (f.geometry && Array.isArray(f.geometry.coordinates) && f.properties && f.properties.name) {
+                var p = {
+                  name: f.properties.name,
+                  address: f.properties.full_address || f.properties.place_formatted || f.properties.name,
+                  lng: f.geometry.coordinates[0],
+                  lat: f.geometry.coordinates[1],
+                  category: f.properties.poi_category || ['food']
+                };
+                var k = p.name + '_' + Number(p.lat).toFixed(5) + '_' + Number(p.lng).toFixed(5);
+                XENTRA_POI_CACHE.set(k, p);
+                renderPoiToMap(p);
+              }
+            });
+          }
+        })
+        .catch(function () {});
+    }
+
+    var isProgrammaticMove = false;
+
+    // Attempt to initialize official Mapbox GL JS (xentra-mvp engine)
+    loadMapboxGL()
+      .then(function () {
+        window.mapboxgl.accessToken = MAPBOX_TOKEN;
+        mapInst = new window.mapboxgl.Map({
+          container: canvasContainer,
+          style: 'mapbox://styles/mapbox/streets-v12',
+          center: [currentLng, currentLat],
+          zoom: zoom,
+          attributionControl: false
+        });
+
+        mapInst.on('load', function () {
+          syncAllCachedPois();
+          fetchMapboxPois(currentLat, currentLng);
+        });
+
+        // User manually touches or drags map -> reset programmatic flag
+        mapInst.on('dragstart', function () {
+          isProgrammaticMove = false;
+        });
+        mapInst.on('touchstart', function () {
+          isProgrammaticMove = false;
+        });
+        mapInst.on('wheel', function () {
+          isProgrammaticMove = false;
+        });
+
+        mapInst.on('move', function () {
+          var center = mapInst.getCenter();
+          currentLat = center.lat;
+          currentLng = center.lng;
+        });
+
+        mapInst.on('moveend', function () {
+          var center = mapInst.getCenter();
+          currentLat = center.lat;
+          currentLng = center.lng;
+          syncAllCachedPois();
+
+          var wasProgrammatic = isProgrammaticMove;
+          isProgrammaticMove = false;
+
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(function () {
+            fetchMapboxPois(currentLat, currentLng);
+            if (typeof onCenterChanged === 'function') {
+              onCenterChanged({ lat: currentLat, lng: currentLng }, wasProgrammatic);
+            }
+          }, 250);
+        });
+
+        setTimeout(function () { if (mapInst) mapInst.resize(); }, 150);
+      })
+      .catch(function (err) {
+        console.warn('[MapPicker] Mapbox GL failed, falling back to lightweight canvas tiles:', err.message);
+        fallbackCtrl = initFallbackCanvas(viewportEl, canvasContainer, centerCoords, onCenterChanged);
+      });
+
+    return {
+      panTo: function (coords) {
+        currentLat = coords.lat;
+        currentLng = coords.lng;
+        isProgrammaticMove = true;
+        if (mapInst) {
+          mapInst.flyTo({
+            center: [coords.lng, coords.lat],
+            zoom: 17.5,
+            essential: true
+          });
+        } else if (fallbackCtrl) {
+          fallbackCtrl.panTo(coords);
+        }
+      },
+      zoomIn: function () {
+        if (mapInst) {
+          mapInst.zoomIn();
+        } else if (fallbackCtrl) {
+          fallbackCtrl.zoomIn();
+        }
+      },
+      zoomOut: function () {
+        if (mapInst) {
+          mapInst.zoomOut();
+        } else if (fallbackCtrl) {
+          fallbackCtrl.zoomOut();
+        }
+      },
+      destroy: function () {
+        clearTimeout(debounceTimer);
+        renderedPoiMarkers.forEach(function (m) { m.remove(); });
+        renderedPoiMarkers.clear();
+        if (mapInst) {
+          mapInst.remove();
+          mapInst = null;
+        }
+      }
+    };
+  }
+
+  // Graceful Fallback Canvas Tile Engine (OSM)
+  function initFallbackCanvas(viewportEl, canvasContainer, centerCoords, onCenterChanged) {
     var zoom = 16;
     var currentLat = centerCoords.lat;
     var currentLng = centerCoords.lng;
 
-    // Convert lat/lng to tile coordinates
     function latLngToPoint(lat, lng, z) {
       var n = Math.pow(2, z);
       var rad = lat * Math.PI / 180;
@@ -758,10 +1281,8 @@
       var rect = viewportEl.getBoundingClientRect();
       var w = rect.width || window.innerWidth;
       var h = rect.height || window.innerHeight;
-
       var halfW = w / 2;
       var halfH = h / 2;
-
       var minTileX = Math.floor((centerPt.x - halfW) / 256);
       var maxTileX = Math.floor((centerPt.x + halfW) / 256);
       var minTileY = Math.floor((centerPt.y - halfH) / 256);
@@ -799,11 +1320,8 @@
       if (!isDragging) return;
       var curX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
       var curY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
-      var dx = curX - startX;
-      var dy = curY - startY;
-
-      centerPt.x = startPtX - dx;
-      centerPt.y = startPtY - dy;
+      centerPt.x = startPtX - (curX - startX);
+      centerPt.y = startPtY - (curY - startY);
       renderTiles();
     }
 
@@ -821,10 +1339,32 @@
     viewportEl.addEventListener('mousedown', onPointerDown);
     window.addEventListener('mousemove', onPointerMove);
     window.addEventListener('mouseup', onPointerUp);
-
     viewportEl.addEventListener('touchstart', onPointerDown, { passive: true });
     window.addEventListener('touchmove', onPointerMove, { passive: true });
     window.addEventListener('touchend', onPointerUp, { passive: true });
+
+    return {
+      panTo: function (coords) {
+        currentLat = coords.lat;
+        currentLng = coords.lng;
+        centerPt = latLngToPoint(currentLat, currentLng, zoom);
+        renderTiles();
+      },
+      zoomIn: function () {
+        if (zoom < 18) {
+          zoom++;
+          centerPt = latLngToPoint(currentLat, currentLng, zoom);
+          renderTiles();
+        }
+      },
+      zoomOut: function () {
+        if (zoom > 12) {
+          zoom--;
+          centerPt = latLngToPoint(currentLat, currentLng, zoom);
+          renderTiles();
+        }
+      }
+    };
   }
 
   // ══════════════════════════════════════════════════════════════
@@ -864,13 +1404,13 @@
       // Form 1: Nama alamat (wajib)
       '<div class="x-loc-form-group">' +
       '  <div class="x-loc-form-label">Nama alamat <span class="wajib">(wajib)</span></div>' +
-      '  <input type="text" id="x-input-fav-name" class="x-loc-form-input" placeholder="Rumah / kantor / lainnya..." value="' + UI.escape(existingLabel) + '">' +
+      '  <input type="text" id="x-input-fav-name" class="x-loc-form-input" placeholder="Rumah Pak Probo" value="' + UI.escape(existingLabel) + '">' +
       '</div>' +
 
       // Form 2: Detail lokasi/patokan (optional)
       '<div class="x-loc-form-group">' +
       '  <div class="x-loc-form-label">Detail lokasi/patokan <span class="optional">(optional)</span></div>' +
-      '  <input type="text" id="x-input-fav-detail" class="x-loc-form-input" placeholder="No Rumah / unit / lantai" value="' + UI.escape(existingDetail) + '">' +
+      '  <input type="text" id="x-input-fav-detail" class="x-loc-form-input" placeholder="depan vihara" value="' + UI.escape(existingDetail) + '">' +
       '</div>' +
 
       // Custom Checkbox: "Simpan sebagai favorit" (Reference Image 3)
@@ -911,10 +1451,11 @@
       konfirmasiBtn.classList.toggle('is-disabled', !isValid);
     });
 
-    // Ubah button opens Search
+    // Ubah button opens Map Picker to re-select
     ubahBtn.onclick = function () {
       sh.close();
-      openSearchFlow({
+      openMapPickerFlow({
+        isAddingFavorite: favChecked,
         onSelect: params.onSelect
       });
     };
