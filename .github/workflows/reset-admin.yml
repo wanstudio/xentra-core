@@ -47,8 +47,8 @@ jobs:
               -p "$SSH_PORT" \
               "$SSH_USER@$SSH_HOST" \
               "cd '$DEPLOY_ROOT' && bash -s" <<'COMMAND_SCRIPT'
-$COMMAND
-COMMAND_SCRIPT
+              $COMMAND
+              COMMAND_SCRIPT
           else
             ssh -i ~/.ssh/xentra_deploy_key \
               -p "$SSH_PORT" \
