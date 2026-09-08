@@ -1018,8 +1018,8 @@
 	top:0;
 	width:86px;
 	height:144px;
-	background:#d6d8db;
-	border-radius:14px 14px 0 14px;
+	background:#d4d6d9;
+	border-radius:12px 12px 0 12px;
 	display:flex;
 	align-items:center;
 	justify-content:center;
@@ -1028,27 +1028,26 @@
 	font-weight:600;
 	color:#374151;
 	letter-spacing:0.2px;
-	padding-bottom:24px;
+	padding-bottom:28px;
 	box-sizing:border-box;
 }
 
 .x-floor-mushola-part-bottom{
 	position:absolute;
 	left:70px;
-	top:92px;
+	top:88px;
 	width:112px;
-	height:52px;
-	background:#d6d8db;
-	border-radius:0 12px 14px 0;
+	height:56px;
+	background:#d4d6d9;
+	border-radius:0 12px 12px 0;
 }
 
 .x-table-card{
 	position:absolute;
 	border:1.5px solid #e5e7eb;
-	border-radius:14px;
+	border-radius:12px;
 	background:#fff;
 	display:flex;
-	flex-direction:column;
 	align-items:center;
 	justify-content:center;
 	cursor:pointer;
@@ -1056,62 +1055,26 @@
 	transition:all .15s cubic-bezier(0.4, 0, 0.2, 1);
 	box-sizing:border-box;
 	z-index:3;
-	padding:0;
-	overflow:visible;
+	padding:8px 10px;
+	overflow:hidden;
 }
 
 .x-table-card:hover:not(.is-unavailable){
-	transform:scale(1.02);
 	border-color:#b6ff00;
 }
 
-.x-table-card.is-selected{
-	border:2px solid #b6ff00 !important;
-	background:#fff;
-	box-shadow:0 0 0 1px #b6ff00;
-}
-
-.x-table-card.is-unavailable{
-	background:#9ca3af;
-	border-color:#9ca3af;
-	cursor:not-allowed;
-	opacity:0.92;
-}
-
-.x-table-card.is-unavailable .x-table-art img{
-	filter:contrast(0.7) brightness(1.2);
-}
-
-.x-table-art{
-	position:relative;
+.x-table-box{
 	width:100%;
 	height:100%;
-	display:flex;
-	align-items:center;
-	justify-content:center;
-}
-
-.x-table-art img{
-	position:absolute;
-	inset:0;
-	width:100%;
-	height:100%;
-	object-fit:contain;
-	pointer-events:none;
-	padding:2px;
-	box-sizing:border-box;
-}
-
-.x-table-label-box{
-	position:relative;
-	z-index:2;
-	text-align:center;
-	color:#fff;
+	background:#2d2d2d;
+	border-radius:6px;
 	display:flex;
 	flex-direction:column;
 	align-items:center;
 	justify-content:center;
-	line-height:1.2;
+	gap:2px;
+	box-sizing:border-box;
+	transition:all .15s ease;
 }
 
 .x-table-label{
@@ -1119,28 +1082,49 @@
 	font-weight:700;
 	font-style:italic;
 	color:#fff;
-	text-shadow:0 1px 2px rgba(0,0,0,0.7);
 	letter-spacing:-0.2px;
+	line-height:1;
+}
+
+/* Selected state: outer card has lime border & lime tinted bg, inner box becomes pure solid lime with dark italic text */
+.x-table-card.is-selected{
+	border:2px solid #b6ff00 !important;
+	background:#f7ffd9 !important;
+	box-shadow:none !important;
+}
+
+.x-table-card.is-selected .x-table-box{
+	background:#c6ff00 !important;
+}
+
+.x-table-card.is-selected .x-table-label{
+	color:#1f2937 !important;
+}
+
+/* Unavailable state: outer card background is solid grey, inner box is darker grey with italic label & small unavailable text */
+.x-table-card.is-unavailable{
+	background:#c4c7cb !important;
+	border:1.5px solid #b5b8bc !important;
+	cursor:not-allowed !important;
+	opacity:1 !important;
+}
+
+.x-table-card.is-unavailable .x-table-box{
+	background:#7d8288 !important;
+}
+
+.x-table-card.is-unavailable .x-table-label{
+	color:#ffffff !important;
+	opacity:0.95;
 }
 
 .x-table-unavail-badge{
-	font-size:8px;
+	font-size:7px;
 	font-style:italic;
-	color:#f3f4f6;
+	color:#e5e7eb;
 	margin-top:1px;
-	text-shadow:0 1px 2px rgba(0,0,0,0.7);
 	letter-spacing:-0.2px;
-}
-
-.x-table-seats-badge{
-	font-size:9px;
-	color:#b6ff00;
-	font-weight:600;
-	margin-top:1px;
-}
-
-.x-table-selected-badge{
-	display:none;
+	line-height:1;
 }
 
 .x-fulfillment-confirm:disabled{

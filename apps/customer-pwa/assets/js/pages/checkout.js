@@ -1683,7 +1683,6 @@
       var isSelected = (draft.selectedTableIds || []).indexOf(t.id) !== -1;
       var isUnavailable = t.operational_state !== 'available';
 
-      var isVertical = t.orientation === 'vertical';
       var relY = (t.y != null ? t.y : 0) - (sectionBaseY || 0);
       if (relY < 0) relY = 0;
 
@@ -1693,17 +1692,16 @@
         'width:' + (t.width || 86) + 'px;' +
         'height:' + (t.height || 68) + 'px;';
 
-      var tableArtUrl = '/assets/icons/meja.png';
+      var cardClass = 'x-table-card' +
+        (isSelected ? ' is-selected' : '') +
+        (isUnavailable ? ' is-unavailable' : '');
 
       return (
-        '<div class="x-table-card ' + (isSelected ? 'is-selected' : '') + ' ' + (isUnavailable ? 'is-unavailable' : '') + '" ' +
+        '<div class="' + cardClass + '" ' +
         '     data-table-id="' + t.id + '" data-table-number="' + t.table_number + '" style="' + styleStr + '">' +
-        '  <div class="x-table-art">' +
-        '    <img src="' + tableArtUrl + '" alt="" style="' + (isVertical ? 'transform:rotate(90deg);' : '') + '">' +
-        '    <div class="x-table-label-box">' +
-        '      <span class="x-table-label">' + UI.escape(t.label || ('meja ' + t.table_number)) + '</span>' +
+        '  <div class="x-table-box">' +
+        '    <span class="x-table-label">' + UI.escape(t.label || ('meja ' + t.table_number)) + '</span>' +
         (isUnavailable ? '<span class="x-table-unavail-badge">unavailable</span>' : '') +
-        '    </div>' +
         '  </div>' +
         '</div>'
       );
