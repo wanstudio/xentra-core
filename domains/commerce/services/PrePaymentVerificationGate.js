@@ -95,15 +95,18 @@ class PrePaymentVerificationGate {
     // discovery/claim, so a reward legitimately entitled through the promotion
     // flow is never rejected at Pay just because the runtime is a browser tab:
     //   - running standalone (display_mode) OR
-    //   - the accepted-install state this profile reported at claim time
-    //     (install_state === 'accepted' / install_requirement_satisfied).
+    //   - a VERIFIED install reported by the client
+    //     (install_requirement_satisfied — written ONLY by appinstalled /
+    //     standalone detection; prompt acceptance never sets it).
+    // Merely ACCEPTING the install prompt (install_state === 'accepted') is NOT
+    // verified and does NOT satisfy the requirement (locked contract: accepted
+    // != installed).
     // This is CONTEXT for entitlement evaluation only; it is never a credential.
     // Authority stays in the server DB checks below (promotion active, first
     // order per customer, redemption ledger, target product/branch catalog) and
     // legacy boolean fields (e.g. is_pwa_installed) are never read.
     const installRequirementSatisfied = Boolean(pwa_runtime && (
       pwa_runtime.display_mode === 'standalone' ||
-      pwa_runtime.install_state === 'accepted' ||
       pwa_runtime.install_requirement_satisfied === true
     ));
 

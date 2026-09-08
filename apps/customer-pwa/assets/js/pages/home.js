@@ -63,10 +63,10 @@
     var banner = $('x-pwa-banner');
     if (!banner) return;
 
-    // Users whose promotion install requirement is satisfied (running standalone
-    // OR the accepted-install marker in this browser profile) must not see the
-    // acquisition banner. The marker is UI-only; entitlement and redemption stay
-    // authoritative on the server.
+    // Users whose promotion install requirement is satisfied (VERIFIED install:
+    // appinstalled / standalone marker, never mere prompt acceptance) must not
+    // see the acquisition banner. The marker is UI-only; entitlement and
+    // redemption stay authoritative on the server.
     var requirementSatisfied = false;
     try {
       var pwaCtx = (window.Xentra && window.Xentra.PwaRuntime && window.Xentra.PwaRuntime.getPwaRuntimeContext)

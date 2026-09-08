@@ -332,24 +332,39 @@ test('Commerce 8 — PWA Runtime Context: Test A (Browser rejected) & Test B (St
   assert.strictEqual(resBrowser.is_valid, false, 'Browser user without satisfied install requirement must be rejected for PWA install reward');
   assert.strictEqual(resBrowser.verified_items.length, 0);
 
-  // Test A2 — Browser tab, install requirement satisfied via accepted-install state
-  // (the same context that made the reward CLAIMABLE) -> reward accepted at Pay.
-  // This removes the previous standalone-only contradiction: UI claim and Pay
-  // gate now share one promotion contract, while authority stays server-side.
+  // Test A2 — Browser tab, install prompt ACCEPTED but NOT verified (display_mode
+  // 'browser', install_state 'accepted', install_requirement_satisfied false)
+  // -> reward REJECTED. Locked contract: accepted != installed; only a verified
+  // install (appinstalled / standalone) satisfies the requirement.
   const resAcceptedTab = PrePaymentVerificationGate.verify({
     branch_id: branch.id,
     brand_id: brand.id,
     customer: { phone: '081299991102' },
-    pwa_runtime: { display_mode: 'browser', install_state: 'accepted', install_requirement_satisfied: true },
+    pwa_runtime: { display_mode: 'browser', install_state: 'accepted', install_requirement_satisfied: false },
     items: [
       { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
     ]
   });
-  assert.strictEqual(resAcceptedTab.is_valid, true, 'Reward entitled via accepted-install promotion flow must survive Pay');
-  assert.strictEqual(resAcceptedTab.verified_items.length, 1);
-  assert.strictEqual(resAcceptedTab.verified_items[0].product_id, rewardProductId);
-  assert.strictEqual(resAcceptedTab.verified_items[0].unit_price, 0);
-  assert.strictEqual(resAcceptedTab.verified_items[0].name, 'Es Teh PWA Context');
+  assert.strictEqual(resAcceptedTab.is_valid, false, 'Accepted-install prompt without verified install must NOT satisfy the PWA requirement');
+  assert.strictEqual(resAcceptedTab.verified_items.length, 0);
+
+  // Test A3 — Browser tab, VERIFIED install (appinstalled marker written, same
+  // tab still display_mode 'browser', install_state 'installed') -> reward
+  // accepted at Pay. UI claim and Pay gate share one promotion contract.
+  const resVerifiedTab = PrePaymentVerificationGate.verify({
+    branch_id: branch.id,
+    brand_id: brand.id,
+    customer: { phone: '081299991102' },
+    pwa_runtime: { display_mode: 'browser', install_state: 'installed', install_requirement_satisfied: true },
+    items: [
+      { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
+    ]
+  });
+  assert.strictEqual(resVerifiedTab.is_valid, true, 'Reward entitled via verified-install promotion flow must survive Pay');
+  assert.strictEqual(resVerifiedTab.verified_items.length, 1);
+  assert.strictEqual(resVerifiedTab.verified_items[0].product_id, rewardProductId);
+  assert.strictEqual(resVerifiedTab.verified_items[0].unit_price, 0);
+  assert.strictEqual(resVerifiedTab.verified_items[0].name, 'Es Teh PWA Context');
 
   // Test B — Installed PWA (display_mode = 'standalone') -> reward accepted
   const resStandalone = PrePaymentVerificationGate.verify({
@@ -428,25 +443,42 @@ test('Commerce 9 — PWA Runtime Context: Test C (Legacy flag rejected) & Test D
   });
   assert.strictEqual(resLegacySpoof.success, false, 'Legacy client flag is_pwa_installed must not grant a reward without the pwa_runtime install-state contract');
 
-  // Test C2 — Same-tab accepted flow end-to-end (display_mode 'browser' + install_state
-  // 'accepted') must place the order with the reward — promotion flow and Pay are
-  // now one consistent contract.
+  // Test C2 — Same-tab ACCEPTED-but-not-verified flow end-to-end (display_mode
+  // 'browser' + install_state 'accepted', install_requirement_satisfied false)
+  // must NOT place the order with the reward: accepted != installed (locked).
   const resAcceptedTabE2E = await OrderPlacementService.submitOrder({
     brand_id: brand.id,
     branch_id: branch.id,
     order_type: 'dine_in',
     payment_method: 'cash',
     customer: { name: 'Customer Accepted Tab', phone: '081299992204' },
-    pwa_runtime: { display_mode: 'browser', install_state: 'accepted', install_requirement_satisfied: true },
+    pwa_runtime: { display_mode: 'browser', install_state: 'accepted', install_requirement_satisfied: false },
     items: [
       { product_id: mainProductId, quantity: 1, expected_price: 30000 },
       { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
     ]
   });
-  assert.strictEqual(resAcceptedTabE2E.success, true, 'Accepted-install reward must survive Pay end-to-end');
-  const acceptedTabRewardItem = resAcceptedTabE2E.order.items.find(it => it.product_id === rewardProductId);
-  assert.ok(acceptedTabRewardItem, 'Reward item must be converted to authoritative target_product_id');
-  assert.strictEqual(acceptedTabRewardItem.unit_price, 0);
+  assert.strictEqual(resAcceptedTabE2E.success, false, 'Unverified accepted-install reward must be rejected end-to-end');
+
+  // Test C2b — Same-tab VERIFIED-install flow end-to-end (display_mode 'browser'
+  // + install_state 'installed', install_requirement_satisfied true) -> the
+  // legitimately entitled reward must survive Pay.
+  const resVerifiedTabE2E = await OrderPlacementService.submitOrder({
+    brand_id: brand.id,
+    branch_id: branch.id,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    customer: { name: 'Customer Verified Tab', phone: '081299992204' },
+    pwa_runtime: { display_mode: 'browser', install_state: 'installed', install_requirement_satisfied: true },
+    items: [
+      { product_id: mainProductId, quantity: 1, expected_price: 30000 },
+      { product_id: 'reward_' + promoId, quantity: 1, expected_price: 0, is_promo_reward: true }
+    ]
+  });
+  assert.strictEqual(resVerifiedTabE2E.success, true, 'Verified-install reward must survive Pay end-to-end');
+  const verifiedTabRewardItem = resVerifiedTabE2E.order.items.find(it => it.product_id === rewardProductId);
+  assert.ok(verifiedTabRewardItem, 'Reward item must be converted to authoritative target_product_id');
+  assert.strictEqual(verifiedTabRewardItem.unit_price, 0);
 
   // Test D — PWA runtime diteruskan sampai order placement (End-to-End standalone) -> ACCEPTED
   const resE2E = await OrderPlacementService.submitOrder({

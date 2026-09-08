@@ -66,12 +66,13 @@
 
   // ── PWA Install Detection Logic ──
   // PwaRuntime (core/pwa-runtime.js) is the single source of truth for the
-  // install lifecycle (deferred prompt, accepted marker, appinstalled).
+  // install lifecycle (deferred prompt, VERIFIED install marker, appinstalled).
+  // Prompt acceptance alone is NEVER treated as installed; the requirement is
+  // satisfied only after a verified install (appinstalled / standalone).
   var isIosPwa = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
 
-  // PROMOTION INSTALL STATE (not runtime display-mode): has the user accepted
-  // the install action? Satisfied when running standalone OR the accepted-
-  // install marker is set in this browser profile. The same context is sent to
+  // PROMOTION INSTALL STATE (not runtime display-mode): is the install
+  // requirement satisfied (verified install only)? The same context is sent to
   // the server at Pay; entitlement authority stays in the Promotion Domain.
   function checkIsPwaInstalled() {
     if (window.Xentra && window.Xentra.PwaRuntime) {
@@ -283,12 +284,11 @@
 
     pwaRt.promptInstall().then(function (res) {
       if (res && res.accepted) {
-        if (UI && UI.toast) UI.toast('Terima kasih telah memasang aplikasi!');
-        // Switch this tab to the reward state right away (the appinstalled
-        // event may lag the prompt acceptance).
-        loadActivePromotions().then(function () {
-          renderPromoBanner();
-        });
+        // Accepted only means the user accepted the prompt — the requirement
+        // is NOT satisfied yet. Stay on the install/discovery state until the
+        // appinstalled broadcast (verified install) refreshes the banner into
+        // the claim/reward state. Never treat prompt acceptance as entitlement.
+        if (UI && UI.toast) UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
       } else if (!res || !res.prompted) {
         // No native prompt available (iOS Safari / unsupported): guide instead
         // of pretending the install happened.
