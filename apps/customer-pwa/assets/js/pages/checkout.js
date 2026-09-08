@@ -1978,6 +1978,28 @@
 
   // ── 5. Delivery Address Sheet ──
   function openAddressSheet() {
+    if (window.XentraLocationPicker && typeof window.XentraLocationPicker.open === 'function') {
+      window.XentraLocationPicker.open({
+        onSelect: function () {
+          var savedDest = (Store.getActiveDestination && Store.getActiveDestination()) || Store.getState().activeDestination || Store.getState().location;
+          if (savedDest && (savedDest.address || savedDest.formatted_address)) {
+            state.address.formatted_address = savedDest.address || savedDest.formatted_address;
+            if (savedDest.latitude != null) state.address.latitude = Number(savedDest.latitude);
+            if (savedDest.longitude != null) state.address.longitude = Number(savedDest.longitude);
+            if (savedDest.label) state.address.label = savedDest.label;
+            if (savedDest.detail) state.address.detail = savedDest.detail;
+          }
+          var y = window.scrollY;
+          renderLayout();
+          calculateTotals();
+          loadUpsell();
+          scheduleDeliveryQuote();
+          window.scrollTo(0, y);
+        }
+      });
+      return;
+    }
+
     var sh = makeOverlay(
       '<h3 class="x-alt-sheet-title">Alamat Pengiriman</h3>' +
       '<div style="font-size:13px;color:#6b7280;margin-bottom:10px;">Pastikan alamat dan titik pengantaran sudah sesuai.</div>' +

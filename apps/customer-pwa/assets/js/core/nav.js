@@ -27,9 +27,11 @@
     }
   };
 
-  window.addEventListener('popstate', function () {
-    if (window.XentraNav.hasOpen()) {
-      window.XentraNav.close();
-    }
-  });
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('popstate', function () {
+      if (window.XentraNav.hasOpen()) {
+        window.XentraNav.close();
+      }
+    });
+  }
 })();

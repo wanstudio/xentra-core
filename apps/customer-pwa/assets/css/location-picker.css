@@ -1,0 +1,1004 @@
+/* ==========================================================================
+   XENTRA LOCATION PICKER & FAVORITE ADDRESS STYLES
+   Exact implementation matching the 4 reference flows.
+   Uses tokens from tokens.css: #b6ff00 / #c4ff00 (lime), #00A637 (check green),
+   #111 (dark text), #6b7280 / #777 (secondary text), Plus Jakarta Sans.
+   ========================================================================== */
+
+/* ── Home Location Bar ── */
+.x-home-location-bar {
+  margin: 12px var(--x-page-pad) 0;
+  background: var(--x-white);
+  border-radius: 16px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.x-home-location-bar:active {
+  transform: scale(0.985);
+}
+
+.x-locbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.x-locbar-pin-icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.x-locbar-pin-icon img,
+.x-locbar-pin-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.x-locbar-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.x-locbar-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.x-locbar-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.x-locbar-source-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+}
+
+.x-locbar-address {
+  font-size: 11.5px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.x-locbar-change-btn {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  background: #f1f5f9;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── Location Sheets General Overlay ── */
+.x-loc-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: 1000 !important;
+  display: flex !important;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.35s ease, visibility 0.35s ease;
+  isolation: isolate;
+}
+
+.x-loc-overlay.open {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+.x-loc-sheet {
+  width: 100%;
+  max-width: var(--x-page-max, 480px);
+  margin: 0 auto;
+  background: #ffffff;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 14px 18px max(24px, calc(16px + var(--x-safe-bottom, 0px)));
+  box-sizing: border-box;
+  box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.15);
+  transform: translateY(105%);
+  transition: transform var(--x-duration-sheet, 0.38s) var(--x-ease-sheet, cubic-bezier(0.22, 0.61, 0.36, 1));
+  max-height: 88vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.x-loc-overlay.open .x-loc-sheet {
+  transform: translateY(0);
+}
+
+.x-loc-sheet-handle {
+  width: 42px;
+  height: 5px;
+  margin: 0 auto 16px;
+  border-radius: 999px;
+  background: #d5d5d5;
+  display: block;
+}
+
+.x-loc-sheet-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 16px;
+  letter-spacing: -0.2px;
+}
+
+/* ── Primary Action Buttons (Cari alamat, Lokasi saat ini, Pilih lewat peta) ── */
+.x-loc-quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.x-loc-action-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.x-loc-action-row:active {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.x-loc-action-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.x-loc-action-icon img,
+.x-loc-action-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.x-loc-action-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.x-loc-action-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.3;
+}
+
+.x-loc-action-desc {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Alamat Favorit Section ── */
+.x-loc-fav-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.x-loc-fav-header {
+  font-size: 16px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+/* Empty State Card (Reference Image 1) */
+.x-loc-fav-empty-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+  margin-bottom: 16px;
+}
+
+.x-loc-fav-empty-icon {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #d8ff26;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.x-loc-fav-empty-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.x-loc-fav-empty-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.x-loc-fav-empty-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.3;
+  margin-bottom: 3px;
+}
+
+.x-loc-fav-empty-desc {
+  font-size: 11.5px;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+/* Saved Favorite Address Cards (Reference Image 4) */
+.x-loc-fav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.x-loc-fav-card {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.x-loc-fav-card:active {
+  border-color: #cbd5e1;
+}
+
+.x-loc-fav-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.x-loc-fav-card-label {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.25;
+}
+
+.x-loc-fav-card-more {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #4b5563;
+  transition: background 0.15s ease;
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+
+.x-loc-fav-card-more:active {
+  background: #e5e7eb;
+}
+
+.x-loc-fav-card-addr {
+  font-size: 12.5px;
+  color: #6b7280;
+  line-height: 18px;
+  margin-top: 4px;
+}
+
+.x-loc-fav-card-patokan {
+  margin-top: 8px;
+  padding-left: 8px;
+  border-left: 2px solid #9ca3af;
+  font-size: 12px;
+  font-style: italic;
+  color: #6b7280;
+  line-height: 16px;
+}
+
+/* + Tambah Alamat Pill Button (Reference Images 1 & 4) */
+.x-loc-btn-add-fav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px 20px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.x-loc-btn-add-fav:active {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.x-loc-btn-add-fav-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Three-Dots Actions Popup / Sheet ── */
+.x-loc-popover-menu {
+  position: absolute;
+  top: 40px;
+  right: 14px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e5e7eb;
+  padding: 6px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 130px;
+}
+
+.x-loc-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  width: 100%;
+}
+
+.x-loc-popover-item:active,
+.x-loc-popover-item:hover {
+  background: #f3f4f6;
+}
+
+.x-loc-popover-item.is-danger {
+  color: #ef4444;
+}
+
+.x-loc-popover-item.is-danger:active,
+.x-loc-popover-item.is-danger:hover {
+  background: #fef2f2;
+}
+
+/* ── FLOW A: Search Sheet ── */
+.x-loc-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f1f5f9;
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.x-loc-search-box:focus-within {
+  background: #ffffff;
+  border-color: #94a3b8;
+}
+
+.x-loc-search-box svg {
+  flex: 0 0 18px;
+  color: #94a3b8;
+}
+
+.x-loc-search-input {
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-family: inherit;
+  color: #111827;
+  outline: none;
+  width: 100%;
+}
+
+.x-loc-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 55vh;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.x-loc-search-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #f1f5f9;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.x-loc-search-item:active {
+  background: #f8fafc;
+}
+
+.x-loc-search-item-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.x-loc-search-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.x-loc-search-item-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.3;
+}
+
+.x-loc-search-item-desc {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+/* ── FLOW C: Map Picker Fullscreen Overlay ── */
+.x-map-picker-view {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 1050;
+  background: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.x-map-picker-view.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.x-map-viewport {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: hidden;
+  background: #f8fafc;
+  cursor: grab;
+}
+
+.x-map-viewport:active {
+  cursor: grabbing;
+}
+
+.x-map-tiles-canvas {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+
+/* Fixed Center Pin (Reference Images 2 & 3) */
+.x-map-center-pin-wrap {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  z-index: 20;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.x-map-pin-pulse {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 50%;
+}
+
+.x-map-pin-icon-body {
+  width: 44px;
+  height: 44px;
+  background: #ff5722;
+  border: 3px solid #ffffff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 4px 12px rgba(255, 87, 34, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.x-map-pin-dot {
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border-radius: 50%;
+}
+
+/* Floating Map Controls */
+.x-map-top-bar {
+  position: absolute;
+  top: max(16px, calc(10px + var(--x-safe-top, 0px)));
+  left: 16px;
+  right: 16px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.x-map-floating-search {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 999px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+
+.x-map-floating-search span {
+  font-size: 13.5px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.x-map-fab-back {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  z-index: 35;
+}
+
+.x-map-fab-gps {
+  position: absolute;
+  bottom: 230px;
+  right: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 30;
+}
+
+/* Map Bottom Confirmation Card (Reference Image 2) */
+.x-map-bottom-card {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: var(--x-page-max, 480px);
+  margin: 0 auto;
+  z-index: 30;
+  background: #ffffff;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 14px 18px max(24px, calc(16px + var(--x-safe-bottom, 0px)));
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.x-map-bottom-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.x-map-bottom-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #111827;
+}
+
+/* Ubah pill button (lime green) */
+.x-btn-ubah-lime {
+  background: #c4ff00;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.1s ease;
+}
+
+.x-btn-ubah-lime:active {
+  transform: scale(0.95);
+}
+
+/* Selected Location Preview Row with Red Dot */
+.x-loc-selected-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.x-loc-red-dot {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.x-loc-red-dot img,
+.x-loc-red-dot svg {
+  width: 18px;
+  height: 18px;
+}
+
+.x-loc-selected-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.x-loc-selected-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #111827;
+  line-height: 1.3;
+}
+
+.x-loc-selected-addr {
+  font-size: 12.5px;
+  color: #6b7280;
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+/* ── Full Confirmation Button (Green Lime / Disabled State) ── */
+.x-btn-konfirmasi-main {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Enabled: #c4ff00 lime green */
+.x-btn-konfirmasi-main.is-enabled,
+.x-btn-konfirmasi-main:not(:disabled) {
+  background: #c4ff00;
+  color: #111827;
+  box-shadow: 0 4px 14px rgba(196, 255, 0, 0.35);
+}
+
+.x-btn-konfirmasi-main.is-enabled:active,
+.x-btn-konfirmasi-main:not(:disabled):active {
+  transform: scale(0.98);
+}
+
+/* Disabled: #f1f5f9 / #e5e7eb */
+.x-btn-konfirmasi-main:disabled,
+.x-btn-konfirmasi-main.is-disabled {
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+/* ── FLOW D: Detail Alamat Sheet (Reference Image 3) ── */
+.x-loc-form-group {
+  margin-bottom: 14px;
+}
+
+.x-loc-form-label {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.x-loc-form-label .wajib {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.x-loc-form-label .optional {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.x-loc-form-input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #d1d5db;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: #111827;
+  box-sizing: border-box;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.x-loc-form-input:focus {
+  border-color: #94a3b8;
+}
+
+.x-loc-form-input::placeholder {
+  color: #9ca3af;
+}
+
+/* Custom Checkbox (Reference Image 3: uncheck=stroke grey, check=green #00A637) */
+.x-loc-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.x-loc-custom-check {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  border: 2px solid #cbd5e1;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.x-loc-custom-check.is-checked {
+  background: #00a637;
+  border-color: #00a637;
+}
+
+.x-loc-custom-check svg {
+  display: none;
+}
+
+.x-loc-custom-check.is-checked svg {
+  display: block;
+}
+
+/* ── Delete Confirmation Dialog Modal ── */
+.x-loc-confirm-modal {
+  background: #ffffff;
+  border-radius: 24px;
+  padding: 24px 20px 20px;
+  max-width: 380px;
+  width: calc(100% - 32px);
+  margin: auto;
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  border: 1px solid #e5e7eb;
+}
+
+.x-loc-confirm-illustration {
+  width: 140px;
+  height: auto;
+  margin: 0 auto 14px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.x-loc-confirm-illustration img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.x-loc-confirm-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.x-loc-confirm-desc {
+  font-size: 12.5px;
+  color: #6b7280;
+  line-height: 1.4;
+  margin-bottom: 18px;
+}
+
+.x-loc-confirm-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.x-loc-confirm-btn-cancel {
+  padding: 12px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.x-loc-confirm-btn-delete {
+  padding: 12px;
+  border-radius: 999px;
+  border: none;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* ── Inline Spinner / Loading State ── */
+.x-loc-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: x-loc-spin 0.6s linear infinite;
+}
+
+@keyframes x-loc-spin {
+  to { transform: rotate(360deg); }
+}

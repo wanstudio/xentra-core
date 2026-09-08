@@ -1571,6 +1571,23 @@
     // Render initial cart state
     renderCartDock();
 
+    // Home Location Bar → open "Pilih lokasi" sheet
+    var locBar = $('x-home-loc-bar');
+    if (locBar) {
+      locBar.onclick = function () {
+        if (window.XentraLocationPicker && typeof window.XentraLocationPicker.open === 'function') {
+          window.XentraLocationPicker.open({
+            onSelect: function () {
+              refreshDiscovery();
+            }
+          });
+        }
+      };
+    }
+    if (window.XentraLocationPicker && typeof window.XentraLocationPicker.updateBar === 'function') {
+      window.XentraLocationPicker.updateBar();
+    }
+
     // Cart button → open sheet
     var cartBtn = $('x-cart-button');
     if (cartBtn) cartBtn.onclick = openCartSheet;
@@ -1634,6 +1651,9 @@
         renderCartSheetItems();
       }
       refreshDiscovery();
+      if (window.XentraLocationPicker && typeof window.XentraLocationPicker.updateBar === 'function') {
+        window.XentraLocationPicker.updateBar();
+      }
     },
     selectBranch: function (branchId) {
       var found = branches.find(function (b) { return String(b.id) === String(branchId); });

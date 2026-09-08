@@ -482,3 +482,136 @@ test('LOC-08: Historical order delivery data is frozen and unaffected by Favorit
   assert.ok(frozenDelAfterDelete, 'order_deliveries survives address deletion');
   assert.strictEqual(frozenDelAfterDelete.destination_address, 'Jl. Raya Kupang Indah No. 7, Surabaya');
 });
+
+test('LOC-09: Navigation stack contract — overlays close in LIFO order without leaving page', () => {
+  const NAV_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/nav.js');
+  delete require.cache[NAV_PATH];
+  globalThis.window = globalThis;
+  require(NAV_PATH);
+
+  const XentraNav = globalThis.window.XentraNav;
+  assert.strictEqual(XentraNav.hasOpen(), false);
+
+  let sheet1Closed = false;
+  let sheet2Closed = false;
+  let sheet3Closed = false;
+
+  XentraNav.pushClose(() => { sheet1Closed = true; });
+  XentraNav.pushClose(() => { sheet2Closed = true; });
+  XentraNav.pushClose(() => { sheet3Closed = true; });
+
+  assert.strictEqual(XentraNav.hasOpen(), true);
+
+  // First back press: closes topmost sheet (sheet3)
+  const c1 = XentraNav.close();
+  assert.strictEqual(c1, true);
+  assert.strictEqual(sheet3Closed, true);
+  assert.strictEqual(sheet2Closed, false);
+  assert.strictEqual(sheet1Closed, false);
+
+  // Second back press: closes sheet2
+  const c2 = XentraNav.close();
+  assert.strictEqual(c2, true);
+  assert.strictEqual(sheet2Closed, true);
+  assert.strictEqual(sheet1Closed, false);
+
+  // Third back press: closes sheet1
+  const c3 = XentraNav.close();
+  assert.strictEqual(c3, true);
+  assert.strictEqual(sheet1Closed, true);
+  assert.strictEqual(XentraNav.hasOpen(), false);
+
+  // When no overlays open, close returns false (allows normal navigation)
+  const c4 = XentraNav.close();
+  assert.strictEqual(c4, false);
+});
+
+test('LOC-10: Location Picker Flow D — Detail Alamat validation and separation of Active Destination vs Favorite Address', () => {
+  const client = freshClientContext();
+  const Store = client.Store;
+
+  // Initial state: no destination
+  assert.strictEqual(Store.getActiveDestination(), null);
+
+  // Flow D Scenario 1: Checkbox UNCHECKED
+  // User selects location, inputs label, leaves "Simpan sebagai favorit" UNCHECKED
+  Store.setActiveDestination({
+    address: 'Jl. Melati 1, Pringsewu Timur, Indonesia',
+    latitude: -5.3582,
+    longitude: 104.9754,
+    label: 'Warung Pecel Vihara',
+    detail: 'Patokan depan ruko',
+    source: 'map',
+    is_explicit: true
+  });
+
+  const dest1 = Store.getActiveDestination();
+  assert.strictEqual(dest1.label, 'Warung Pecel Vihara');
+  assert.strictEqual(dest1.source, 'map');
+  assert.strictEqual(dest1.favorite_id, null, 'Unchecked favorite must NOT have favorite_id');
+
+  // Flow D Scenario 2: Checkbox CHECKED
+  // User checks "Simpan sebagai favorit" -> Saved to addresses, then set as Active Destination
+  const savedFavId = 'addr_fav_test_01';
+  Store.setActiveDestination({
+    address: 'Jl. Dewi 18, Pidada 1, Panjang Bandar Lampung',
+    latitude: -5.4600,
+    longitude: 105.3100,
+    label: 'Rumah Ibu',
+    detail: 'patokan samping vihara',
+    source: 'favorite',
+    is_explicit: true,
+    favorite_id: savedFavId
+  });
+
+  const dest2 = Store.getActiveDestination();
+  assert.strictEqual(dest2.label, 'Rumah Ibu');
+  assert.strictEqual(dest2.source, 'favorite');
+  assert.strictEqual(dest2.favorite_id, savedFavId);
+});
+
+test('LOC-11: Location Picker Flow B (GPS) — must NEVER automatically create Favorite Address', () => {
+  const client = freshClientContext();
+  const Store = client.Store;
+  const XentraLocation = client.XentraLocation;
+
+  // Simulate GPS coordinates reverse geocoded
+  const gpsCoords = { latitude: -5.3971, longitude: 105.2668, accuracy: 10 };
+  const destGps = XentraLocation.createDestinationFromGps(gpsCoords, 'Jl. Raden Intan No. 55');
+
+  assert.strictEqual(destGps.source, 'gps');
+  assert.strictEqual(destGps.is_explicit, false);
+  assert.strictEqual(destGps.favorite_id, undefined);
+
+  Store.setActiveDestination(destGps);
+  const active = Store.getActiveDestination();
+  assert.strictEqual(active.source, 'gps');
+  assert.strictEqual(active.favorite_id, null, 'GPS must NEVER create or link a favorite_id');
+});
+
+test('LOC-12: Location Picker Flow A (Search) and Flow C (Map) create explicit canonical destinations', () => {
+  const client = freshClientContext();
+  const XentraLocation = client.XentraLocation;
+
+  // Search
+  const searchDest = XentraLocation.createDestinationFromSearch({
+    display_name: 'Perwara Interior, Jl. Mawar I No.6, Pringsewu',
+    latitude: -5.3621,
+    longitude: 104.9812,
+    label: 'Perwara Interior'
+  });
+  assert.strictEqual(searchDest.source, 'search');
+  assert.strictEqual(searchDest.is_explicit, true);
+  assert.strictEqual(searchDest.label, 'Perwara Interior');
+
+  // Map
+  const mapDest = XentraLocation.createDestinationFromMap(
+    { latitude: -5.3650, longitude: 104.9830 },
+    'Jl. Ahmad Yani, Pringsewu',
+    'Depan Bank BRI'
+  );
+  assert.strictEqual(mapDest.source, 'map');
+  assert.strictEqual(mapDest.is_explicit, true);
+  assert.strictEqual(mapDest.detail, 'Depan Bank BRI');
+});
+
