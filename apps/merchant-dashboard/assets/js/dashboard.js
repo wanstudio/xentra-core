@@ -19,6 +19,35 @@
     return headers;
   }
 
+  function clearStoredSession() {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  }
+
+  function redirectToLogin() {
+    if (typeof checkAppRoute === 'function') {
+      checkAppRoute();
+    } else if (!window.location.pathname.includes('login')) {
+      window.location.href = '/dashboard/login';
+    }
+  }
+
+  // Every admin call goes through this wrapper. A 401 means the session is gone
+  // on the server (e.g. Passenger restart wiped the in-memory TokenSessionStore),
+  // so the stale local token must never keep the dashboard rendering empty UI.
+  function adminFetch(url, options) {
+    return fetch(url, options).then(function (res) {
+      if (res.status === 401) {
+        clearStoredSession();
+        redirectToLogin();
+        var err = new Error('SESSION_EXPIRED');
+        err.status = 401;
+        throw err;
+      }
+      return res;
+    });
+  }
+
   var state = {
     brand: null,
     categories: [],
@@ -108,7 +137,7 @@
      ========================================================================= */
   async function loadBrandSettings() {
     try {
-      var res = await fetch(API_BASE + '/admin/brand', { headers: getAuthHeaders() });
+      var res = await adminFetch(API_BASE + '/admin/brand', { headers: getAuthHeaders() });
       var data = await res.json();
       if (data && data.brand) {
         state.brand = data.brand;
@@ -215,7 +244,7 @@
       };
 
       try {
-        var res = await fetch(API_BASE + '/admin/brand', {
+        var res = await adminFetch(API_BASE + '/admin/brand', {
           method: 'PUT',
           headers: getAuthHeaders(),
           body: JSON.stringify(payload)
@@ -248,7 +277,7 @@
         if (!url) return;
 
         try {
-          var res = await fetch(API_BASE + '/admin/banners', {
+          var res = await adminFetch(API_BASE + '/admin/banners', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ image_url: url, title: title })
@@ -301,7 +330,7 @@
         var id = btn.getAttribute('data-id');
         if (!confirm('Hapus slide banner ini?')) return;
         try {
-          var res = await fetch(API_BASE + '/admin/banners/' + encodeURIComponent(id), {
+          var res = await adminFetch(API_BASE + '/admin/banners/' + encodeURIComponent(id), {
             method: 'DELETE',
             headers: getAuthHeaders()
           });
@@ -326,8 +355,8 @@
     try {
       var authHeaders = getAuthHeaders();
       var [catRes, prodRes] = await Promise.all([
-        fetch(API_BASE + '/admin/categories', { headers: authHeaders }),
-        fetch(API_BASE + '/admin/products', { headers: authHeaders })
+        adminFetch(API_BASE + '/admin/categories', { headers: authHeaders }),
+        adminFetch(API_BASE + '/admin/products', { headers: authHeaders })
       ]);
 
       var catData = await catRes.json();
@@ -483,7 +512,7 @@
 
   window.toggleStock = async function (id) {
     try {
-      var res = await fetch(API_BASE + '/admin/products/' + id + '/toggle', {
+      var res = await adminFetch(API_BASE + '/admin/products/' + id + '/toggle', {
         method: 'PATCH',
         headers: getAuthHeaders()
       });
@@ -500,7 +529,7 @@
   window.deleteProduct = async function (id) {
     if (!confirm('Apakah Anda yakin ingin menghapus menu ini?')) return;
     try {
-      var res = await fetch(API_BASE + '/admin/products/' + id, {
+      var res = await adminFetch(API_BASE + '/admin/products/' + id, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -522,7 +551,7 @@
       if (!name || !name.trim()) return;
 
       try {
-        var res = await fetch(API_BASE + '/admin/categories', {
+        var res = await adminFetch(API_BASE + '/admin/categories', {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({ name: name.trim() })
@@ -584,7 +613,7 @@
       var method = id ? 'PUT' : 'POST';
 
       try {
-        var res = await fetch(url, {
+        var res = await adminFetch(url, {
           method: method,
           headers: getAuthHeaders(),
           body: JSON.stringify(payload)
@@ -605,7 +634,7 @@
             imgReader.readAsDataURL(_productImageFile);
           });
 
-          var imageRes = await fetch(API_BASE + '/admin/products/' + savedId + '/image', {
+          var imageRes = await adminFetch(API_BASE + '/admin/products/' + savedId + '/image', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ image_base64: base64, mime_type: _productImageFile.type })
@@ -642,7 +671,7 @@
      ========================================================================= */
   async function loadBranches() {
     try {
-      var res = await fetch(API_BASE + '/admin/branches', { headers: getAuthHeaders() });
+      var res = await adminFetch(API_BASE + '/admin/branches', { headers: getAuthHeaders() });
       var data = await res.json();
       if (data.success && data.branches) {
         state.branches = data.branches;
@@ -744,7 +773,7 @@
     if (availableContainer) availableContainer.innerHTML = '<p class="text-muted" style="font-size:13px;">Memuat produk rekomendasi Owner...</p>';
 
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/catalog', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/catalog', {
         headers: getAuthHeaders()
       });
       var data = await res.json();
@@ -857,7 +886,7 @@
   window.toggleBranchProductAvailability = async function (productId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ is_available: nextAvail })
@@ -879,7 +908,7 @@
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.')) return;
 
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -953,7 +982,7 @@
     payload.image_url   = imgVal.trim()   !== '' ? imgVal.trim()   : null;
 
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify(payload)
@@ -977,7 +1006,7 @@
   window.clearBranchProductOverride = async function () {
     if (!currentManagingBranchId || !_overrideProductId) return;
     if (!confirm('Hapus semua override untuk produk ini? Semua field akan kembali mengikuti nilai Master.')) return;
-    var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
+    var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
       method: 'PATCH', headers: getAuthHeaders(),
       body: JSON.stringify({ name: null, description: null, image_url: null })
     });
@@ -997,7 +1026,7 @@
     if (!name || !name.trim()) return;
 
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories', {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ name: name.trim() })
@@ -1074,7 +1103,7 @@
       var priceVal = Number($('adopt-price').value);
 
       try {
-        var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/adopt', {
+        var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/adopt', {
           method: 'POST',
           headers: getAuthHeaders(),
           body: JSON.stringify({
@@ -1112,7 +1141,7 @@
     if (!confirm('Apakah Anda yakin ingin ' + actionName + ' cabang ini secara global?')) return;
 
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + id, {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + id, {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ is_active: nextActive })
@@ -1139,7 +1168,7 @@
       return;
     }
 
-    fetch(API_BASE + '/admin/branches/' + id, {
+    adminFetch(API_BASE + '/admin/branches/' + id, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ phone: newPhone })
@@ -1161,7 +1190,7 @@
     var newPriceKm = prompt('Tarif ongkir per KM berikutnya (Rp):', b.price_per_km || 3000);
     if (newPriceKm === null) return;
 
-    fetch(API_BASE + '/admin/branches/' + id, {
+    adminFetch(API_BASE + '/admin/branches/' + id, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({
@@ -1171,6 +1200,8 @@
     }).then(function () {
       showToast('✅ Formula ongkir cabang diperbarui!');
       loadBranches();
+    }).catch(function (err) {
+      console.warn('[Branch settings save warn]:', err);
     });
   };
 
@@ -1182,7 +1213,7 @@
     if (!tbody) return;
 
     try {
-      var res = await fetch(API_BASE + '/admin/orders', { headers: getAuthHeaders() });
+      var res = await adminFetch(API_BASE + '/admin/orders', { headers: getAuthHeaders() });
       var data = await res.json();
       if (data.success && data.orders) {
         state.orders = data.orders;
@@ -1240,7 +1271,7 @@
     // and idempotent.
     if (currentStatus === 'pending') {
       try {
-        var acceptRes = await fetch(API_BASE + '/orders/' + orderId + '/branch-acceptance', {
+        var acceptRes = await adminFetch(API_BASE + '/orders/' + orderId + '/branch-acceptance', {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({ decision: 'accept', note: 'Diterima dari Merchant Dashboard' })
@@ -1267,7 +1298,7 @@
 
     var nextStatus = nextMap[currentStatus] || 'completed';
     try {
-      var res = await fetch(API_BASE + '/kitchen/orders/' + orderId + '/status', {
+      var res = await adminFetch(API_BASE + '/kitchen/orders/' + orderId + '/status', {
         method: 'PATCH',
         headers: authHeaders,
         body: JSON.stringify({ status: nextStatus, note: 'Status diupdate dari Merchant Dashboard' })
@@ -1287,7 +1318,7 @@
      ========================================================================= */
   async function loadOverview() {
     try {
-      var res = await fetch(API_BASE + '/admin/analytics/summary', { headers: getAuthHeaders() });
+      var res = await adminFetch(API_BASE + '/admin/analytics/summary', { headers: getAuthHeaders() });
       var data = await res.json();
       if (data.success && data.summary) {
         $('stat-omzet').textContent = formatMoney(data.summary.total_omzet);
@@ -1367,6 +1398,29 @@
     return true;
   }
 
+  // Server-side session validation at boot: a token that exists locally but is
+  // not valid on the server (401 INVALID_OR_EXPIRED_TOKEN) must force a real
+  // login instead of letting the dashboard render an empty/fake state.
+  async function validateServerSession() {
+    var token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return false;
+    try {
+      var res = await adminFetch(API_BASE + '/auth/merchant/me', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (data && data.success) {
+        if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        return true;
+      }
+      clearStoredSession();
+      redirectToLogin();
+      return false;
+    } catch (e) {
+      // adminFetch already cleared + redirected on 401; keep the session on
+      // network-level errors (server unreachable is not an expired session).
+      return e && e.message === 'SESSION_EXPIRED' ? false : true;
+    }
+  }
+
   function initAuthListeners() {
     var btnLogout = $('btn-logout');
     if (btnLogout) {
@@ -1416,7 +1470,7 @@
     if (catsEl) catsEl.innerHTML = '<span class="text-muted" style="font-size:13px;">Memuat kategori...</span>';
 
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/catalog', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/catalog', {
         headers: getAuthHeaders()
       });
       var data = await res.json();
@@ -1637,7 +1691,7 @@
     currentManagingBranchId = branchId;
 
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + branchId + '/categories/reorder', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + branchId + '/categories/reorder', {
         method: 'PUT',
         headers: getAuthHeaders(),
         body: JSON.stringify({ order: orderedIds })
@@ -1782,7 +1836,7 @@
 
         try {
           // 1. Rename (always sent — keeps behavior simple/predictable)
-          var renameRes = await fetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + catId, {
+          var renameRes = await adminFetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + catId, {
             method: 'PATCH',
             headers: getAuthHeaders(),
             body: JSON.stringify({ name: newName })
@@ -1808,7 +1862,7 @@
               reader.readAsDataURL(_bceSelectedFile);
             });
 
-            var imageRes = await fetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + catId + '/image', {
+            var imageRes = await adminFetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + catId + '/image', {
               method: 'POST',
               headers: getAuthHeaders(),
               body: JSON.stringify({ image_base64: base64, mime_type: _bceSelectedFile.type })
@@ -1852,7 +1906,7 @@
     currentManagingBranchId = branchId;
 
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + branchId + '/categories/' + catId, {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + branchId + '/categories/' + catId, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -1958,7 +2012,7 @@
   window.toggleBranchProductAvailability = async function (productId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
         method: 'PATCH',
         headers: getAuthHeaders(),
         body: JSON.stringify({ is_available: nextAvail })
@@ -1982,7 +2036,7 @@
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
 
     try {
-      var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
         method: 'DELETE',
         headers: getAuthHeaders()
       });
@@ -2010,6 +2064,7 @@
 
   window.__xentraInitDashboard = function () {
     checkAuth();
+    validateServerSession();
     applyRoleBasedUI();
     loadBrandSettings();
     if (isBranchManager()) {
@@ -2047,7 +2102,7 @@
         var name = prompt('Nama Kategori Baru untuk Cabang ini:');
         if (!name || !name.trim()) return;
         try {
-          var res = await fetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories', {
+          var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ name: name.trim() })
@@ -2068,6 +2123,7 @@
     // Apply role-based UI before data load
     var isAuth = checkAuth();
     applyRoleBasedUI();
+    validateServerSession();
 
     // Initial data fetch if authenticated
     loadBrandSettings();
