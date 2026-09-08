@@ -1063,68 +1063,26 @@
 	border-color:#b6ff00;
 }
 
-.x-table-box{
+.x-table-svg{
 	width:100%;
 	height:100%;
-	background:#2d2d2d;
-	border-radius:6px;
-	display:flex;
-	flex-direction:column;
-	align-items:center;
-	justify-content:center;
-	gap:2px;
-	box-sizing:border-box;
-	transition:all .15s ease;
+	display:block;
+	pointer-events:none;
 }
 
-.x-table-label{
-	font-size:11px;
-	font-weight:700;
-	font-style:italic;
-	color:#fff;
-	letter-spacing:-0.2px;
-	line-height:1;
-}
-
-/* Selected state: outer card has lime border & lime tinted bg, inner box becomes pure solid lime with dark italic text */
+/* Selected state: outer card has lime border & lime tinted bg */
 .x-table-card.is-selected{
 	border:2px solid #b6ff00 !important;
 	background:#f7ffd9 !important;
 	box-shadow:none !important;
 }
 
-.x-table-card.is-selected .x-table-box{
-	background:#c6ff00 !important;
-}
-
-.x-table-card.is-selected .x-table-label{
-	color:#1f2937 !important;
-}
-
-/* Unavailable state: outer card background is solid grey, inner box is darker grey with italic label & small unavailable text */
+/* Unavailable state: outer card background is solid grey */
 .x-table-card.is-unavailable{
 	background:#c4c7cb !important;
 	border:1.5px solid #b5b8bc !important;
 	cursor:not-allowed !important;
 	opacity:1 !important;
-}
-
-.x-table-card.is-unavailable .x-table-box{
-	background:#7d8288 !important;
-}
-
-.x-table-card.is-unavailable .x-table-label{
-	color:#ffffff !important;
-	opacity:0.95;
-}
-
-.x-table-unavail-badge{
-	font-size:7px;
-	font-style:italic;
-	color:#e5e7eb;
-	margin-top:1px;
-	letter-spacing:-0.2px;
-	line-height:1;
 }
 
 .x-fulfillment-confirm:disabled{

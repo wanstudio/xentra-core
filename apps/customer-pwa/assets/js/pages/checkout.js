@@ -1696,13 +1696,24 @@
         (isSelected ? ' is-selected' : '') +
         (isUnavailable ? ' is-unavailable' : '');
 
+      // Dynamic SVG colors: selected => #c6ff00, unavailable => #7d8288, normal => #2d2d2d
+      var tableFill = isSelected ? '#c6ff00' : (isUnavailable ? '#7d8288' : '#2d2d2d');
+      var textFill = isSelected ? '#1f2937' : '#ffffff';
+      var labelText = UI.escape(t.label || ('meja ' + t.table_number));
+
+      var textY = isUnavailable ? '21' : '26';
+
+      var svgContent =
+        '<svg class="x-table-svg" viewBox="0 0 66 48" width="100%" height="100%">' +
+        '  <rect x="0" y="0" width="66" height="48" rx="5" ry="5" fill="' + tableFill + '"/>' +
+        '  <text x="33" y="' + textY + '" fill="' + textFill + '" font-size="11" font-style="italic" font-weight="700" text-anchor="middle" dominant-baseline="middle" letter-spacing="-0.2">' + labelText + '</text>' +
+        (isUnavailable ? '  <text x="33" y="33" fill="#e5e7eb" font-size="7" font-style="italic" font-weight="400" text-anchor="middle" dominant-baseline="middle" letter-spacing="-0.2">unavailable</text>' : '') +
+        '</svg>';
+
       return (
         '<div class="' + cardClass + '" ' +
         '     data-table-id="' + t.id + '" data-table-number="' + t.table_number + '" style="' + styleStr + '">' +
-        '  <div class="x-table-box">' +
-        '    <span class="x-table-label">' + UI.escape(t.label || ('meja ' + t.table_number)) + '</span>' +
-        (isUnavailable ? '<span class="x-table-unavail-badge">unavailable</span>' : '') +
-        '  </div>' +
+        svgContent +
         '</div>'
       );
     }
