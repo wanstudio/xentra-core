@@ -21,6 +21,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   const isHash = /^[a-f0-9]{64}$/i.test(credential);
   const passwordHash = isHash ? credential.toLowerCase() : crypto.createHash('sha256').update(credential).digest('hex');
+  const dbPath = process.env.DB_PATH || path.join(__dirname, '..', 'server', 'database', 'xentra.db');
+  console.log('dbPath=' + dbPath);
 
   const db = require(path.join(__dirname, '..', 'server', 'database', 'db.js'));
 
@@ -37,6 +39,10 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     process.exit(1);
   }
 
+  console.log('usersBefore=' + JSON.stringify(db.prepare('SELECT COUNT(*) AS c FROM users').get()));
+  console.log('brandsBefore=' + JSON.stringify(db.prepare('SELECT COUNT(*) AS c FROM brands').get()));
+  console.log('usersColumns=' + JSON.stringify(db.prepare('PRAGMA table_info(users)').all().map((c) => c.name + (c.notnull ? '!' : ''))));
+
   let brand = db.prepare("SELECT * FROM brands WHERE custom_domain = ?").get('app.mybangjo.com');
   if (!brand) brand = db.prepare("SELECT * FROM brands WHERE slug = ?").get('bangjo');
   if (!brand) brand = db.prepare("SELECT * FROM brands WHERE id = 'brand_bangjo'").get();
@@ -51,20 +57,34 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     console.error('No brand/organization found to attach the new user to.');
     process.exit(1);
   }
+  console.log('targetBrand=' + brand.id + ' targetOrg=' + organizationId);
 
   const byUsername = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   const byEmail = db.prepare('SELECT * FROM users WHERE email = ?').get(username + '@bangjo.com');
   const existing = byUsername || byEmail;
 
+  // db.exec propagates SQL errors instead of swallowing them like prepare().run() in sql.js mode.
+  const esc = (v) => String(v).replace(/'/g, "''");
+
   if (existing) {
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(passwordHash, existing.id);
+    db.exec("UPDATE users SET password_hash = '" + passwordHash + "', updated_at = datetime('now') WHERE id = '" + esc(existing.id) + "'");
     console.log('OK updated password for user ' + existing.id + ' (' + existing.username + ', role ' + existing.role + ')');
   } else {
     const id = 'usr_' + username;
-    db.prepare('INSERT INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(id, brand.id, organizationId, username, username + '@bangjo.com', passwordHash, username, 'owner');
+    db.exec(
+      "INSERT INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role) VALUES ('" +
+        esc(id) + "', '" + esc(brand.id) + "', '" + esc(organizationId) + "', '" + esc(username) + "', '" +
+        esc(username + '@bangjo.com') + "', '" + passwordHash + "', '" + esc(username) + "', 'owner')"
+    );
     console.log('OK created user ' + id + ' (' + username + ', role owner, brand ' + brand.id + ')');
   }
+
+  const verify = db.prepare('SELECT id, username, role, brand_id, password_hash FROM users WHERE username = ?').get(username);
+  if (!verify || verify.password_hash !== passwordHash) {
+    console.error('SANITY FAIL: user row not persisted correctly.');
+    process.exit(1);
+  }
+  console.log('sanityOK id=' + verify.id + ' role=' + verify.role + ' brand=' + verify.brand_id);
 
   try {
     const tmpDir = path.join(__dirname, '..', 'tmp');
