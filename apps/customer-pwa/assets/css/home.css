@@ -98,8 +98,8 @@
 }
 
 .x-hero-icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: var(--x-white);
   border: none;
@@ -120,8 +120,8 @@
 
 .x-hero-icon-btn img,
 .x-hero-icon-btn svg {
-  width: 22px;
-  height: 22px;
+  width: 25px;
+  height: 25px;
   display: block;
 }
 

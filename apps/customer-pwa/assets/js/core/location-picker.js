@@ -87,49 +87,46 @@
     var sheetHtml =
       '<h3 class="x-loc-sheet-title">Pilih lokasi</h3>' +
 
-      // 3 Quick Action Rows
-      '<div class="x-loc-quick-actions">' +
-      '  <button type="button" class="x-loc-action-row" id="x-act-search">' +
-      '    <div class="x-loc-action-icon">' +
-      '      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round"><circle cx="8.75" cy="8.75" r="5.75"/><path d="m13.23 13.23 3.54 3.54"/></svg>' +
-      '    </div>' +
-      '    <div class="x-loc-action-text">' +
-      '      <div class="x-loc-action-name">Cari alamat</div>' +
-      '      <div class="x-loc-action-desc">Ketik nama jalan, gedung, atau perumahan</div>' +
-      '    </div>' +
-      '  </button>' +
-
-      '  <button type="button" class="x-loc-action-row" id="x-act-gps">' +
-      '    <div class="x-loc-action-icon">' +
-      '      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="#00A637" stroke-width="2"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3" fill="#00A637"/><path d="M10 1v3M10 16v3M1 10h3M16 10h3"/></svg>' +
-      '    </div>' +
-      '    <div class="x-loc-action-text">' +
-      '      <div class="x-loc-action-name">Lokasimu saat ini</div>' +
-      '      <div class="x-loc-action-desc" id="x-act-gps-desc">Deteksi otomatis via GPS perangkat</div>' +
-      '    </div>' +
-      '  </button>' +
-
-      '  <button type="button" class="x-loc-action-row" id="x-act-map">' +
-      '    <div class="x-loc-action-icon">' +
-      '      <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M14.67 17.5 12.61 6.5 3.33 7.35V14.83c0 .94 0 1.4.18 1.76.16.31.42.57.73.73.36.18.83.18 1.76.18h8.67ZM11.25 12.53c0 1.8-1.78 3.06-2.56 3.53a.5.5 0 0 1-.71 0c-.78-.47-2.56-1.73-2.56-3.53a3 3 0 1 1 5.83 0Z" fill="#3b82f6"/></svg>' +
-      '    </div>' +
-      '    <div class="x-loc-action-text">' +
-      '      <div class="x-loc-action-name">Pilih lewat peta</div>' +
-      '      <div class="x-loc-action-desc">Geser pin langsung di atas peta interaktif</div>' +
-      '    </div>' +
-      '  </button>' +
+      // Top Search Input Box (matching reference image)
+      '<div class="x-loc-search-box-main" id="x-act-search">' +
+        '<div class="x-loc-search-box-dot">' +
+          '<svg width="22" height="22" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5" stroke="#FA3E3E" stroke-width="6.5"/></svg>' +
+        '</div>' +
+        '<div class="x-loc-search-box-ph">Cari alamat</div>' +
+        '<div class="x-loc-search-box-mag">' +
+          '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M13.23 13.23 16.77 16.77M15 8.75A6.25 6.25 0 1 1 2.5 8.75a6.25 6.25 0 0 1 12.5 0Z" stroke="#9ca3af" stroke-width="2" stroke-linecap="round"/></svg>' +
+        '</div>' +
       '</div>' +
+
+      // 2 Action Pill Buttons: "Lokasimu saat ini" and "Pilih lewat peta" side by side
+      '<div class="x-loc-quick-pills">' +
+        '<button type="button" class="x-loc-pill-btn" id="x-act-gps">' +
+          '<span class="x-loc-pill-icon">' +
+            '<img src="/assets/icons/target.svg" alt="" width="18" height="18">' +
+          '</span>' +
+          '<span class="x-loc-pill-text">Lokasimu saat ini</span>' +
+        '</button>' +
+        '<button type="button" class="x-loc-pill-btn" id="x-act-map">' +
+          '<span class="x-loc-pill-icon">' +
+            '<img src="/assets/icons/mini_map.svg" alt="" width="18" height="18">' +
+          '</span>' +
+          '<span class="x-loc-pill-text">Pilih lewat peta</span>' +
+        '</button>' +
+      '</div>' +
+
+      // Divider separating top actions and favorite addresses
+      '<div class="x-loc-divider"></div>' +
 
       // Alamat Favorit Section
       '<div class="x-loc-fav-section">' +
-      '  <div class="x-loc-fav-header">Alamat favorit</div>' +
-      '  <div id="x-loc-fav-container"><div style="padding:16px;text-align:center;font-size:12px;color:#94a3b8;">Memuat alamat favorit…</div></div>' +
-      '  <button type="button" class="x-loc-btn-add-fav" id="x-btn-add-fav">' +
-      '    <span class="x-loc-btn-add-fav-icon">' +
-      '      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="9" fill="#00A637"/><path d="M9 5v8M5 9h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>' +
-      '    </span>' +
-      '    Tambah alamat' +
-      '  </button>' +
+        '<div class="x-loc-fav-header">Alamat favorit</div>' +
+        '<div id="x-loc-fav-container"><div style="padding:16px;text-align:center;font-size:12px;color:#94a3b8;">Memuat alamat favorit…</div></div>' +
+        '<button type="button" class="x-loc-btn-add-fav" id="x-btn-add-fav">' +
+          '<span class="x-loc-btn-add-fav-icon">' +
+            '<svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" fill="#00A637"/><path d="M12 7v10M7 12h10" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/></svg>' +
+          '</span>' +
+          'Tambah alamat' +
+        '</button>' +
       '</div>';
 
     var sh = createOverlay(sheetHtml);
