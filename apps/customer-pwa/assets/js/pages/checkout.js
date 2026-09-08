@@ -8,7 +8,7 @@
  * 3. Pre-Payment Verification Gate: Realtime price/stock check with "Ada perubahan di pesananmu, cek dulu yuk" modal
  * 4. Dual Payment: Tunai (COD / Bayar di Kasir) & Online Payment (Midtrans Snap)
  * 5. PWA Install Incentive: configuration-driven reward (promotion domain)
- * 6. Add-on recommendation rail (GET /catalog/menu)
+ * 6. Add-on recommendation rail — Branch-scoped ONLY (GET /catalog/menu?branch_id=<Checkout fulfillment branch>)
  */
 (function () {
   'use strict';
@@ -427,6 +427,9 @@
           }
         }
       }
+      // Branch list resolved -> the Checkout fulfillment Branch is now known
+      // (may have been unresolved at the initial mount): scope the upsell rail.
+      loadUpsell();
     }).catch(function () {});
   }
 
@@ -564,6 +567,10 @@
         // the same branch per quote would re-notify and re-enter the quote path.
         if (res.branch && (!previousBranch || String(previousBranch.id) !== String(res.branch.id))) {
           try { Store.setMatchedBranch(res); } catch (_) {}
+          // The observed fulfillment Branch changed -> the upsell rail must
+          // follow the Checkout fulfillment Branch authority (same as the
+          // order's branch_id) and re-scope to the newly resolved Branch.
+          loadUpsell();
         }
       } else if (res && !res.eligible) {
         state.deliveryFee = 0;
@@ -912,23 +919,104 @@
             }
           }
           if (found) {
-            Store.addItem(found, 1);
+            // Locked rule: Checkout is one fulfillment cycle for one Branch, so
+            // an upsell item enters the cart in the SAME scope the checkout list
+            // reads (getCheckoutItems): the URL branch scope for a scoped
+            // checkout (instantly visible + part of THIS Branch's order), or a
+            // classical provenance-free line for the legacy branch-less checkout.
+            // Never a different branch: an added item in another scope would be
+            // in the cart yet never appear in this checkout's item list.
+            var addScope = getCheckoutItemScope();
+            Store.addItem(found, 1, addScope ? { branch_id: addScope.id, branch_name: addScope.name } : undefined);
           }
         };
       })(buttons[b]);
     }
   }
 
-  var FALLBACK_CATALOG = [
-    { id: 272, name: 'Paket Spesial Semar', price: 35000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-    { id: 285, name: 'Paket Spesial Petruk', price: 35000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-04_05_15-PM-300x300.png' },
-    { id: 345, name: 'Mie Gurih', price: 15000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-    { id: 286, name: 'Ayam Tulang Lunak Bakar', price: 28000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-3-2026-02_13_17-PM-300x300.png' },
-    { id: 287, name: 'Mie Godog Jawa Asli', price: 22000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/ChatGPT-Image-Aug-4-2026-09_24_59-AM-300x300.png' },
-    { id: 288, name: 'Es Kopi Susu Bangjo', price: 15000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-    { id: 401, name: 'Es Teh Manis', price: 5000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/kopijo.png' },
-    { id: 402, name: 'Es Jeruk Segar', price: 8000, image_url: 'https://app.mybangjo.com/wp-content/uploads/2026/08/unnamed-7-2.png' }
-  ];
+  // ── Checkout Upsell: fulfillment-branch-scoped rail ──
+  // Locked rule (docs/XENTRA_CART_CHECKOUT_CONTRACT.md — Checkout Upsell Branch
+  // Scope): Checkout is exactly ONE fulfillment cycle for exactly ONE Branch, so
+  // this rail may contain products from the Checkout fulfillment Branch ONLY.
+  // Its source is the authoritative Branch-scoped catalog contract
+  // `GET /catalog/menu?branch_id=<id>` (Catalog domain returns only products
+  // assigned to that Branch). There is strictly NO global-catalog fallback and
+  // NO other-Branch fallback on this page: if the Branch cannot be resolved the
+  // rail stays hidden until the Branch is known.
+  var upsellFetchedBranch = null; // branch id the current rail was sourced for
+
+  // Re-adding the customer's own friction: a line the customer clears with the
+  // minus button (qty → 0) is remembered for this checkout session and re-enters
+  // the upsell rail IMMEDIATELY, so clearing items can never drain the rail and
+  // an accidental removal is one tap away. Scope-filtered at render time, so the
+  // "one fulfillment Branch only" contract is preserved.
+  var recentlyRemoved = [];
+
+  function rememberRemoved(line) {
+    if (!line || line.id == null) return;
+    if (line.is_promo_reward || String(line.id).indexOf('reward_') === 0) return; // rewards re-claim via their own flow
+    recentlyRemoved = recentlyRemoved.filter(function (x) { return String(x.id) !== String(line.id); });
+    recentlyRemoved.unshift({
+      id: line.id,
+      name: line.name || 'Produk',
+      price: Number(line.price || 0),
+      regular_price: line.regular_price ? Number(line.regular_price) : null,
+      image_url: line.image_url || '',
+      description: line.description || '',
+      branch_id: line.branch_id || null,
+      branch_name: line.branch_name || ''
+    });
+    if (recentlyRemoved.length > 10) recentlyRemoved.pop();
+  }
+
+  // Resolves the Checkout fulfillment Branch — same authority as the order's
+  // branch_id in proceedCreateOrder (state.matchedBranch, falling back to the
+  // URL branch scope, then the Home branchContext prefill).
+  function getFulfillmentBranch() {
+    if (state.matchedBranch && state.matchedBranch.id != null) {
+      return { id: String(state.matchedBranch.id), name: state.matchedBranch.name || '' };
+    }
+    if (currentBranchId) {
+      var scope = currentBranchId === '__unassigned__' ? null : String(currentBranchId);
+      if (scope) {
+        var found = null;
+        for (var i = 0; i < availableBranches.length; i++) {
+          if (String(availableBranches[i].id) === scope) { found = availableBranches[i]; break; }
+        }
+        return { id: scope, name: found ? found.name : '' };
+      }
+    }
+    try {
+      var ctx = Store.getState().branchContext;
+      if (ctx && (ctx.branch_id != null || ctx.id != null)) {
+        return {
+          id: String(ctx.branch_id != null ? ctx.branch_id : ctx.id),
+          name: ctx.branch_name || ''
+        };
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // Scope an upsell ADD lands in = the exact scope the checkout LIST reads from
+  // (getCheckoutItems): for a branch-scoped checkout that is the URL branch
+  // scope, so the added item becomes visible in the list immediately and joins
+  // THIS Branch's order. A branch-less (legacy) checkout keeps the classical
+  // provenance-free add, which its full list shows. NEVER a different branch —
+  // an added item in another scope would silently never appear here.
+  function getCheckoutItemScope() {
+    if (!currentBranchId) return null;
+    if (currentBranchId === '__unassigned__') return null;
+    var sid = String(currentBranchId);
+    var name = '';
+    if (state.matchedBranch && String(state.matchedBranch.id) === sid) {
+      name = state.matchedBranch.name || '';
+    }
+    for (var i = 0; i < availableBranches.length; i++) {
+      if (String(availableBranches[i].id) === sid) { name = availableBranches[i].name || ''; break; }
+    }
+    return { id: sid, name: name };
+  }
 
   function applyUpsellPool(pool) {
     var wrap = $('x-upsell-container');
@@ -937,10 +1025,43 @@
 
     var cartIds = {};
     getCheckoutItems().forEach(function (i) { cartIds[String(i.id)] = true; });
-    var filtered = (pool || []).filter(function (p) { return p && p.id && !cartIds[String(p.id)]; });
-    var newUpsell = (filtered.length >= 3 ? filtered : filtered.concat(FALLBACK_CATALOG.filter(function (f) { return !cartIds[String(f.id)]; }))).slice(0, 10);
 
-    var newKey = newUpsell.map(function (x) { return x.id; }).join(',');
+    // Recently-removed lines re-enter the rail FIRST (the item the customer just
+    // cleared is the most likely one-tap re-add), then the fulfillment-branch
+    // catalog pool. Removed lines are scope-filtered exactly like the list they
+    // came from (scoped -> that branch only; branch-less -> the legacy,
+    // provenance-free family), so a cleared item can surface WITHOUT ever
+    // leaking another Branch into the rail. While the fulfillment Branch is
+    // unresolved, nothing is merged (the rail stays hidden — no leak ever).
+    var removedScopeKey = '__unassigned__';
+    if (currentBranchId && currentBranchId !== '__unassigned__') {
+      removedScopeKey = String(currentBranchId);
+    }
+    var branchResolved = Boolean(upsellFetchedBranch) || Boolean(currentBranchId);
+
+    var merged = [];
+    var seen = {};
+    function add(p) {
+      if (!p || p.id == null) return;
+      var k = String(p.id);
+      if (seen[k] || cartIds[k]) return;
+      seen[k] = true;
+      merged.push(p);
+    }
+    if (branchResolved) {
+      recentlyRemoved.forEach(function (r) {
+        var rKey = (r.branch_id == null || String(r.branch_id) === '') ? '__unassigned__' : String(r.branch_id);
+        if (rKey === removedScopeKey) add(r);
+      });
+    }
+    (pool || []).forEach(add);
+
+    var newUpsell = merged.slice(0, 10);
+
+    // Rail identity includes the fulfillment branch: a quote resolving a
+    // different fulfillment Branch MUST re-render (never keep the old scope),
+    // and an empty Branch result MUST hide the rail (never show old/global items).
+    var newKey = 'B' + (upsellFetchedBranch || '') + '|' + newUpsell.map(function (x) { return x.id; }).join(',');
     if (track.__renderedKey && track.__renderedKey === newKey) {
       return;
     }
@@ -950,47 +1071,45 @@
     if (upsellItems.length > 0) {
       wrap.style.display = 'block';
       renderUpsellTrack(track, upsellItems);
+    } else {
+      wrap.style.display = 'none';
     }
   }
 
   function loadUpsell() {
     var wrap = $('x-upsell-container');
     var track = $('x-addon-track');
-    if (!track) return;
+    if (!wrap || !track) return;
 
-    if (upsellItems && upsellItems.length) {
-      applyUpsellPool(upsellItems);
+    var branch = getFulfillmentBranch();
+    var branchKey = (branch && branch.id) || '';
+
+    if (branchKey !== upsellFetchedBranch) {
+      upsellFetchedBranch = branchKey;
+      applyUpsellPool([]); // drop any previous-scope rail immediately
+      if (!branch) return; // fulfillment Branch unresolved: NEVER fall back to a global catalog
+      if (!API) return;
+      API.get('/catalog/menu?branch_id=' + encodeURIComponent(branch.id))
+        .then(function (data) {
+          if (upsellFetchedBranch !== branchKey) return; // superseded by a newer scope
+          var freshPool = extractCatalogProducts(data);
+          if (freshPool && freshPool.length > 0) {
+            applyUpsellPool(freshPool);
+          } else {
+            applyUpsellPool([]);
+          }
+        })
+        .catch(function (err) {
+          if (upsellFetchedBranch !== branchKey) return;
+          console.warn('[Checkout] Load upsell error:', err);
+          applyUpsellPool([]);
+        });
       return;
     }
 
-    // 1. Check local catalog cache from DB
-    var pool = [];
-    try {
-      var rawCached = localStorage.getItem('xentra_catalog_cache');
-      if (rawCached) {
-        pool = extractCatalogProducts(JSON.parse(rawCached));
-      }
-    } catch (_) {}
-
-    if (!pool.length) {
-      pool = FALLBACK_CATALOG;
-    }
-
-    applyUpsellPool(pool);
-
-    // 2. Fetch fresh catalog from API in background
-    if (!API) return;
-    API.get('/catalog/menu')
-      .then(function (data) {
-        var freshPool = extractCatalogProducts(data);
-        if (freshPool && freshPool.length > 0) {
-          try { localStorage.setItem('xentra_catalog_cache', JSON.stringify(data)); } catch (_) {}
-          applyUpsellPool(freshPool);
-        }
-      })
-      .catch(function (err) {
-        console.warn('[Checkout] Load upsell error:', err);
-      });
+    // Same Branch as the sourced rail: just re-apply the pool for a freshly
+    // rendered layout (no re-fetch, no cross-scope risk).
+    applyUpsellPool(upsellItems);
   }
 
   // ── Events Binding ──
@@ -1044,7 +1163,11 @@
       btn.onclick = function () {
         var bid = btn.dataset.branchItem || null;
         var it = Store.findCartItem(btn.dataset.minusItem, bid);
-        if (it) Store.setQty(it.id, Number(it.quantity) - 1, it.branch_id == null ? null : it.branch_id);
+        if (!it) return;
+        // Clearing the line (qty → 0) moves it into the upsell rail so the rail
+        // never empties as the customer trims the checkout list.
+        if (Number(it.quantity) - 1 <= 0) rememberRemoved(it);
+        Store.setQty(it.id, Number(it.quantity) - 1, it.branch_id == null ? null : it.branch_id);
       };
     });
     checkoutContainer.querySelectorAll('[data-note-item]').forEach(function (btn) {
@@ -1313,6 +1436,11 @@
     }
 
     function renderScheduleSection() {
+      if (draft.type === 'dine_in') {
+        renderDineInFloorPlan();
+        return;
+      }
+
       if (draft.type !== 'delivery') {
         schedContainer.innerHTML = '';
         return;
@@ -1390,6 +1518,174 @@
       }
     }
 
+    var dineInLayoutData = null;
+
+    function renderDineInFloorPlan() {
+      var curBranch = state.matchedBranch || (availableBranches && availableBranches[0]) || null;
+      var branchId = curBranch ? curBranch.id : '';
+
+      schedContainer.innerHTML =
+        '<div class="x-fulfillment-divider"></div>' +
+        '<div class="x-dinein-container">' +
+        '  <div class="x-dinein-guest-row">' +
+        '    <span class="x-dinein-guest-label">Jumlah Tamu</span>' +
+        '    <div class="x-dinein-guest-control">' +
+        '      <button type="button" class="x-dinein-guest-btn" id="x-btn-guest-minus">−</button>' +
+        '      <span class="x-dinein-guest-count" id="x-txt-guest-count">' + (draft.guestCount || 1) + '</span>' +
+        '      <button type="button" class="x-dinein-guest-btn" id="x-btn-guest-plus">+</button>' +
+        '    </div>' +
+        '  </div>' +
+        '  <div class="x-dinein-header-title">Pilih meja</div>' +
+        '  <div id="x-dinein-floor-canvas" class="x-floor-wrapper">' +
+        '    <div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px;">Memuat tata letak meja…</div>' +
+        '  </div>' +
+        '</div>';
+
+      var minusBtn = schedContainer.querySelector('#x-btn-guest-minus');
+      var plusBtn = schedContainer.querySelector('#x-btn-guest-plus');
+      var countTxt = schedContainer.querySelector('#x-txt-guest-count');
+
+      minusBtn.onclick = function () {
+        if (draft.guestCount > 1) {
+          draft.guestCount--;
+          countTxt.textContent = draft.guestCount;
+          autoRecommendTable();
+        }
+      };
+
+      plusBtn.onclick = function () {
+        draft.guestCount++;
+        countTxt.textContent = draft.guestCount;
+        autoRecommendTable();
+      };
+
+      // Fetch branch layout from authoritative server API
+      API.get('/dine-in/layout?branch_id=' + encodeURIComponent(branchId))
+        .then(function (res) {
+          if (res && res.success && res.layout) {
+            dineInLayoutData = res.layout;
+            autoRecommendTable();
+          } else {
+            schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
+              '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">Gagal memuat denah meja.</div>';
+          }
+        })
+        .catch(function (err) {
+          console.warn('[Checkout] Load dine-in layout error:', err);
+          schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
+            '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">Gagal memuat denah meja.</div>';
+        });
+    }
+
+    function autoRecommendTable() {
+      if (!dineInLayoutData) return;
+      var curBranch = state.matchedBranch || (availableBranches && availableBranches[0]) || null;
+      var branchId = curBranch ? curBranch.id : '';
+
+      API.post('/dine-in/recommend-tables', {
+        branch_id: branchId,
+        guest_count: draft.guestCount || 1
+      }).then(function (res) {
+        if (res && res.success && res.recommendation && res.recommendation.table_ids) {
+          draft.selectedTableIds = res.recommendation.table_ids;
+          var primaryTbl = res.recommendation.tables && res.recommendation.tables[0];
+          draft.tableNumber = primaryTbl ? primaryTbl.table_number : '';
+          draft.selectedTables = res.recommendation.tables || [];
+        }
+        renderFloorCanvas();
+      }).catch(function () {
+        renderFloorCanvas();
+      });
+    }
+
+    function renderFloorCanvas() {
+      var canvasEl = schedContainer.querySelector('#x-dinein-floor-canvas');
+      if (!canvasEl || !dineInLayoutData) return;
+
+      var tables = dineInLayoutData.tables || [];
+      var nonTables = dineInLayoutData.non_table_objects || [];
+
+      var indoorTables = tables.filter(function (t) { return t.section_id === 'sec_indoor'; });
+      var smokingTables = tables.filter(function (t) { return t.section_id === 'sec_smoking'; });
+
+      var html =
+        '<div class="x-floor-section-indoor">' +
+        '  <div class="x-floor-badge-group">' +
+        '    <img src="/assets/icons/ac.svg" alt="AC" class="x-floor-badge-icon">' +
+        '    <img src="/assets/icons/no_smoking.png" alt="No Smoking" class="x-floor-badge-icon">' +
+        '  </div>' +
+        '  <div class="x-floor-mushola" style="left:35px;top:20px;width:125px;height:120px;">Mushola</div>';
+
+      indoorTables.forEach(function (t) {
+        html += renderTableHtml(t);
+      });
+      html += '</div>';
+
+      html +=
+        '<div class="x-floor-section-smoking">' +
+        '  <div class="x-floor-badge-group">' +
+        '    <img src="/assets/icons/smoking.png" alt="Smoking Area" class="x-floor-badge-icon">' +
+        '  </div>';
+
+      smokingTables.forEach(function (t) {
+        html += renderTableHtml(t);
+      });
+      html += '</div>';
+
+      canvasEl.innerHTML = html;
+
+      canvasEl.querySelectorAll('.x-table-card:not(.is-unavailable)').forEach(function (card) {
+        card.onclick = function (e) {
+          e.stopPropagation();
+          var tid = card.dataset.tableId;
+          var tnum = card.dataset.tableNumber;
+          var isSel = card.classList.contains('is-selected');
+
+          if (!draft.selectedTableIds) draft.selectedTableIds = [];
+
+          if (isSel) {
+            draft.selectedTableIds = draft.selectedTableIds.filter(function (id) { return id !== tid; });
+            if (draft.tableNumber === tnum) {
+              draft.tableNumber = draft.selectedTableIds.length > 0 ? '' : '';
+            }
+          } else {
+            // Customer manual override
+            draft.selectedTableIds.push(tid);
+            draft.tableNumber = tnum;
+          }
+          renderFloorCanvas();
+        };
+      });
+    }
+
+    function renderTableHtml(t) {
+      var isSelected = (draft.selectedTableIds || []).indexOf(t.id) !== -1;
+      var isUnavailable = t.operational_state !== 'available';
+
+      var isVertical = t.orientation === 'vertical';
+      var styleStr =
+        'left:' + (t.x || 0) + 'px;' +
+        'top:' + ((t.y ? t.y : 0) % 360) + 'px;' +
+        'width:' + (t.width || 80) + 'px;' +
+        'height:' + (t.height || 60) + 'px;';
+
+      var tableArtUrl = '/assets/icons/meja.png';
+
+      return (
+        '<div class="x-table-card ' + (isSelected ? 'is-selected' : '') + ' ' + (isUnavailable ? 'is-unavailable' : '') + '" ' +
+        '     data-table-id="' + t.id + '" data-table-number="' + t.table_number + '" style="' + styleStr + '">' +
+        (isSelected ? '<div class="x-table-selected-badge">✓</div>' : '') +
+        '  <div class="x-table-art">' +
+        '    <img src="' + tableArtUrl + '" alt="" style="' + (isVertical ? 'transform:rotate(90deg);' : '') + '">' +
+        '    <div class="x-table-label-box">' +
+        '      <span class="x-table-label">' + UI.escape(t.label || ('meja ' + t.table_number)) + '</span>' +
+        (isUnavailable ? '<span class="x-table-unavail-badge">unavailable</span>' : '') +
+        '    </div>' +
+        '  </div>' +
+        '</div>'
+      );
+    }
+
     renderGrid();
     renderScheduleSection();
 
@@ -1410,12 +1706,24 @@
           return;
         }
 
+        if (draft.type === 'dine_in') {
+          if (!draft.selectedTableIds || draft.selectedTableIds.length === 0) {
+            if (UI && UI.toast) UI.toast('Silakan pilih nomor meja untuk makan di tempat (Dine-in).');
+            return;
+          }
+        }
+
         // Commit to state.fulfillment
         state.fulfillment.type = draft.type;
         state.fulfillment.scheduled = Boolean(draft.scheduled);
         if (draft.type === 'delivery') {
           state.fulfillment.date = draft.date || 'Hari ini';
           state.fulfillment.timeSlot = draft.scheduled ? (draft.timeSlot || '16:00-16:30') : 'Sekarang (15–25 menit)';
+        } else if (draft.type === 'dine_in') {
+          state.fulfillment.scheduled = false;
+          state.fulfillment.tableNumber = draft.tableNumber || (draft.selectedTableIds && draft.selectedTableIds.length ? 'Meja ' + draft.tableNumber : '');
+          state.fulfillment.table_ids = draft.selectedTableIds || [];
+          state.fulfillment.guestCount = draft.guestCount || 1;
         } else {
           state.fulfillment.scheduled = false;
         }
@@ -1983,6 +2291,9 @@
     if (checkoutContainer.style.display === 'none') return;
     var mt = mutation && mutation.type;
     if (mt !== 'cart' && mt !== 'location') return;
+    // Cart membership changed: re-apply the rail so a cleared line re-enters it
+    // (recentlyRemoved) and a re-added line drops out of it — without a refetch.
+    if (mt === 'cart') applyUpsellPool(upsellItems);
     syncRowsFromItems(getCheckoutItems());
     scheduleDeliveryQuote();
   });

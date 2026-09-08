@@ -384,6 +384,35 @@ class PaymentGatewayService {
             promotions: promoRedemptionsToRecord
           });
         }
+        // 5. Authoritative Dine-in Table Settlement: Transition held tables to occupied dining session
+        if (order && order.order_type === 'dine_in') {
+          try {
+            const { DiningTableService } = require('../../pos');
+            let tableIds = [];
+            const activeHold = db.prepare("SELECT hold_reference_id, table_id FROM branch_table_holds WHERE hold_reference_id = ? AND status = 'active'").all(order.id);
+            if (activeHold && activeHold.length > 0) {
+              tableIds = activeHold.map(h => h.table_id);
+            } else if (order.table_number) {
+              // Resolve table_id from table_number
+              const tbl = db.prepare('SELECT id FROM branch_tables WHERE branch_id = ? AND (table_number = ? OR label = ?)').get(order.branch_id, order.table_number, order.table_number);
+              if (tbl) tableIds = [tbl.id];
+            }
+
+            if (tableIds.length > 0) {
+              DiningTableService.createOrAttachDiningSession({
+                branch_id: order.branch_id,
+                table_ids: tableIds,
+                order_id: order.id,
+                customer_name: order.customer_name,
+                customer_phone: order.customer_phone,
+                guest_count: 1,
+                hold_reference_id: order.id
+              });
+            }
+          } catch (dineErr) {
+            console.warn('[PaymentGatewayService] Dine-in table settlement warning:', dineErr.message);
+          }
+        }
         }
       } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
         // P1 FAILED PAYMENT INVARIANT: Mark order as cancelled with ZERO inventory
@@ -401,6 +430,14 @@ class PaymentGatewayService {
         if (cancelOrderResult && cancelOrderResult.changes > 0) {
           const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
           PromotionEngineService.voidRedemptions({ order_id, reason: `Gateway status ${newPaymentStatus}` });
+
+          // Release Dine-in table hold if any
+          if (order && order.order_type === 'dine_in') {
+            try {
+              const { DiningTableService } = require('../../pos');
+              DiningTableService.releaseHold({ branch_id: order.branch_id, hold_reference_id: order.id, reason: newPaymentStatus });
+            } catch (_) {}
+          }
         }
       }
 

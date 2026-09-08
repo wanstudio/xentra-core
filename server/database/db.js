@@ -837,6 +837,86 @@ function initSchema(targetDb) {
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
       FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
     );
+    CREATE TABLE IF NOT EXISTS branch_dining_layouts (
+      id TEXT PRIMARY KEY,
+      branch_id TEXT UNIQUE NOT NULL,
+      canvas_config TEXT NOT NULL DEFAULT '{"width":380,"height":620}',
+      sections_config TEXT NOT NULL DEFAULT '[]',
+      non_table_objects_config TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS branch_tables (
+      id TEXT PRIMARY KEY,
+      branch_id TEXT NOT NULL,
+      table_number TEXT NOT NULL,
+      label TEXT NOT NULL,
+      capacity INTEGER NOT NULL DEFAULT 4,
+      section_id TEXT,
+      x REAL NOT NULL DEFAULT 0,
+      y REAL NOT NULL DEFAULT 0,
+      width REAL NOT NULL DEFAULT 80,
+      height REAL NOT NULL DEFAULT 60,
+      shape TEXT NOT NULL DEFAULT 'rectangle',
+      orientation TEXT NOT NULL DEFAULT 'horizontal',
+      qr_token TEXT UNIQUE,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_branch_tables_num ON branch_tables(branch_id, table_number);
+
+    CREATE TABLE IF NOT EXISTS branch_table_states (
+      table_id TEXT PRIMARY KEY,
+      operational_state TEXT NOT NULL DEFAULT 'available', -- 'available' | 'held' | 'occupied' | 'reserved' | 'blocked'
+      current_session_id TEXT,
+      notes TEXT,
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (table_id) REFERENCES branch_tables(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS branch_table_holds (
+      id TEXT PRIMARY KEY,
+      branch_id TEXT NOT NULL,
+      table_id TEXT NOT NULL,
+      customer_phone TEXT,
+      hold_reference_id TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active', -- 'active' | 'converted' | 'expired' | 'cancelled'
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+      FOREIGN KEY (table_id) REFERENCES branch_tables(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_bth_ref ON branch_table_holds(hold_reference_id);
+    CREATE INDEX IF NOT EXISTS idx_bth_expires ON branch_table_holds(expires_at) WHERE status = 'active';
+
+    CREATE TABLE IF NOT EXISTS dining_sessions (
+      id TEXT PRIMARY KEY,
+      branch_id TEXT NOT NULL,
+      customer_name TEXT,
+      customer_phone TEXT,
+      guest_count INTEGER DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'active', -- 'active' | 'completed'
+      opened_at TEXT DEFAULT (datetime('now')),
+      closed_at TEXT,
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS dining_session_tables (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      table_id TEXT NOT NULL,
+      attached_at TEXT DEFAULT (datetime('now')),
+      UNIQUE (session_id, table_id),
+      FOREIGN KEY (session_id) REFERENCES dining_sessions(id) ON DELETE CASCADE,
+      FOREIGN KEY (table_id) REFERENCES branch_tables(id) ON DELETE CASCADE
+    );
+
     CREATE UNIQUE INDEX IF NOT EXISTS idx_order_payments_order_id ON order_payments(order_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_shifts_unique_active_cashier ON pos_shifts(cashier_id) WHERE status = 'open';
   `);
@@ -864,6 +944,7 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN selection_mode TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN fulfillment_type TEXT DEFAULT "delivery";'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN table_number TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE orders ADD COLUMN dining_session_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN client_transaction_id TEXT;'); } catch (e) {}
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_branch_client_tx ON orders(branch_id, client_transaction_id) WHERE client_transaction_id IS NOT NULL;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE promotion_redemptions ADD COLUMN status TEXT NOT NULL DEFAULT 'active';"); } catch (e) {}

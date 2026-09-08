@@ -57,6 +57,9 @@ try {
   registration = domain.DomainRegistry.getDomain('pos');
 }
 
+const DiningTableService = require('./services/DiningTableService');
+const TableRecommendationService = require('./services/TableRecommendationService');
+
 module.exports = {
   identity: POS_IDENTITY,
   capabilities: POS_CAPABILITIES,
@@ -66,5 +69,7 @@ module.exports = {
   PosShiftService,
   PosOrderService,
   PosHardwareRouter,
-  OfflineReconciliationService
+  OfflineReconciliationService,
+  DiningTableService,
+  TableRecommendationService
 };

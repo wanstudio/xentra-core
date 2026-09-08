@@ -928,6 +928,32 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       };
     }
 
+    // 3. Dine-in Table Validation and Concurrency Hold
+    let tableIdsToHold = [];
+    if (order_type === 'dine_in') {
+      const { DiningTableService } = require('../../domains/pos');
+      const reqTableIds = Array.isArray(req.body.table_ids) ? req.body.table_ids : [];
+      if (reqTableIds.length === 0 && table_number) {
+        // Resolve table_id from table_number if table_ids array not directly sent
+        const tblRow = db.prepare('SELECT id FROM branch_tables WHERE branch_id = ? AND (table_number = ? OR label = ?)').get(branch.id, table_number, table_number);
+        if (tblRow) reqTableIds.push(tblRow.id);
+      }
+
+      if (reqTableIds.length > 0) {
+        // Authoritatively check availability
+        const availCheck = DiningTableService.validateTablesAvailable(branch.id, reqTableIds);
+        if (!availCheck.valid) {
+          return res.status(400).json({
+            success: false,
+            status: 'TABLE_UNAVAILABLE',
+            error: availCheck.error,
+            unavailable_table_id: availCheck.unavailable_table_id
+          });
+        }
+        tableIdsToHold = reqTableIds;
+      }
+    }
+
     // 4. Delegate Cleanly to OrderPlacementService (ACID database transaction & event publishing)
     const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
     const placementResult = await OrderPlacementService.submitOrder({
@@ -974,6 +1000,33 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     const orderId = order.id;
     const orderNumber = order.order_number;
     const subtotal = order.subtotal;
+
+    // 4a. Dine-in Table Hold for Payment Stage (15-minute hold) or Immediate Session for Cash
+    if (order_type === 'dine_in' && tableIdsToHold.length > 0) {
+      const { DiningTableService } = require('../../domains/pos');
+      try {
+        if (payment_method === 'midtrans') {
+          DiningTableService.holdTablesForPayment({
+            branch_id: branch.id,
+            table_ids: tableIdsToHold,
+            customer_phone: customer.phone,
+            hold_reference_id: orderId
+          });
+        } else if (payment_method === 'cash') {
+          DiningTableService.createOrAttachDiningSession({
+            branch_id: branch.id,
+            table_ids: tableIdsToHold,
+            order_id: orderId,
+            customer_name: customer.name,
+            customer_phone: customer.phone,
+            guest_count: guest_count || 1,
+            hold_reference_id: null
+          });
+        }
+      } catch (tblHoldErr) {
+        console.warn('[Checkout Dine-In Table Hold Warning]:', tblHoldErr.message);
+      }
+    }
 
     // 4. Payment Gateway Resolution (Midtrans Snap or Cash)
     let snapResult = { snap_token: null, redirect_url: null, merchant_id: payment_method === 'cash' ? 'cash' : 'midtrans_default' };
@@ -3697,6 +3750,201 @@ router.get('/reports/:report_type', requireAuth(['owner', 'brand_manager', 'bran
       success: true,
       data: report
     });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// =========================================================================
+// DINE-IN TABLE FLOOR PLAN & OPERATIONAL DOMAIN APIS
+// =========================================================================
+const { DiningTableService, TableRecommendationService } = require('../../domains/pos');
+
+// Customer / Public: Get Branch Floor Plan & Operational Table State
+router.get('/dine-in/layout', (req, res) => {
+  try {
+    const branchId = req.query.branch_id || (req.query.branchId ? req.query.branchId : null);
+    if (!branchId) {
+      return res.status(400).json({ success: false, error: 'branch_id parameter wajib disertakan.' });
+    }
+
+    const layout = DiningTableService.getBranchLayout(branchId);
+    res.json({ success: true, layout });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Customer: Recommend Table(s) based on Guest Count & Spatial Proximity
+router.post('/dine-in/recommend-tables', (req, res) => {
+  try {
+    const { branch_id, guest_count } = req.body;
+    if (!branch_id) {
+      return res.status(400).json({ success: false, error: 'branch_id wajib diisi.' });
+    }
+
+    const layout = DiningTableService.getBranchLayout(branch_id);
+    const recommendation = TableRecommendationService.recommendTables({
+      tables: layout.tables,
+      guest_count: Number(guest_count) || 1
+    });
+
+    res.json({ success: true, recommendation });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Customer: Resolve Branch & Table from scanned QR token
+router.get('/dine-in/qr/:token', (req, res) => {
+  try {
+    const resolved = DiningTableService.resolveFromQr(req.params.token);
+    if (!resolved) {
+      return res.status(404).json({ success: false, error: 'QR Meja tidak valid atau telah dicabut.' });
+    }
+    res.json({ success: true, table: resolved });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Staff / Owner: Regenerate QR Token for a table
+router.post('/dine-in/tables/:id/regenerate-qr', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const result = DiningTableService.regenerateQrToken(req.params.id);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Staff / POS: Block or Unblock a table
+router.post('/dine-in/tables/:id/block', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const { is_blocked, reason } = req.body;
+    const result = DiningTableService.setTableBlockedState(req.params.id, Boolean(is_blocked), reason);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Staff / POS: Complete Active Dining Session (Releases tables)
+router.post('/dine-in/sessions/:id/complete', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const actorId = req.user ? (req.user.id || req.user.username) : 'staff';
+    const result = DiningTableService.completeDiningSession(req.params.id, actorId);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Staff / POS: Operational Table Reassignment for Active Dining Session
+router.post('/dine-in/sessions/:id/reassign-tables', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const { table_ids } = req.body;
+    const result = DiningTableService.reassignSessionTables({
+      session_id: req.params.id,
+      new_table_ids: table_ids
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Staff / Manager: Update Branch Dining Layout Configuration (Editor persistence)
+router.put('/dine-in/layout/:branch_id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const branchId = req.params.branch_id;
+    const { canvas, sections, non_table_objects, tables } = req.body;
+
+    const existingLayout = db.prepare('SELECT id FROM branch_dining_layouts WHERE branch_id = ?').get(branchId);
+    const layoutId = existingLayout ? existingLayout.id : `layout_${crypto.randomBytes(6).toString('hex')}`;
+    const now = new Date().toISOString();
+
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      db.prepare(`
+        INSERT INTO branch_dining_layouts (
+          id, branch_id, canvas_config, sections_config, non_table_objects_config, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(branch_id) DO UPDATE SET
+          canvas_config = excluded.canvas_config,
+          sections_config = excluded.sections_config,
+          non_table_objects_config = excluded.non_table_objects_config,
+          updated_at = excluded.updated_at
+      `).run(
+        layoutId,
+        branchId,
+        JSON.stringify(canvas || { width: 380, height: 620 }),
+        JSON.stringify(sections || []),
+        JSON.stringify(non_table_objects || []),
+        now,
+        now
+      );
+
+      if (Array.isArray(tables)) {
+        for (const t of tables) {
+          const tableId = t.id || `tbl_${branchId}_${t.table_number}`;
+          const qrToken = t.qr_token || `qr_${crypto.randomBytes(8).toString('hex')}`;
+
+          db.prepare(`
+            INSERT INTO branch_tables (
+              id, branch_id, table_number, label, capacity, section_id,
+              x, y, width, height, shape, orientation, qr_token, is_active, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(branch_id, table_number) DO UPDATE SET
+              label = excluded.label,
+              capacity = excluded.capacity,
+              section_id = excluded.section_id,
+              x = excluded.x,
+              y = excluded.y,
+              width = excluded.width,
+              height = excluded.height,
+              shape = excluded.shape,
+              orientation = excluded.orientation,
+              is_active = excluded.is_active,
+              updated_at = excluded.updated_at
+          `).run(
+            tableId,
+            branchId,
+            String(t.table_number),
+            t.label || `meja ${t.table_number}`,
+            Number(t.capacity) || 4,
+            t.section_id || null,
+            Number(t.x) || 0,
+            Number(t.y) || 0,
+            Number(t.width) || 80,
+            Number(t.height) || 60,
+            t.shape || 'rectangle',
+            t.orientation || 'horizontal',
+            qrToken,
+            t.is_active !== undefined ? (t.is_active ? 1 : 0) : 1,
+            now,
+            now
+          );
+
+          if (t.operational_state) {
+            db.prepare(`
+              INSERT INTO branch_table_states (table_id, operational_state, updated_at)
+              VALUES (?, ?, ?)
+              ON CONFLICT(table_id) DO UPDATE SET
+                operational_state = excluded.operational_state,
+                updated_at = excluded.updated_at
+            `).run(tableId, t.operational_state, now);
+          }
+        }
+      }
+
+      db.exec('COMMIT;');
+    } catch (saveErr) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw saveErr;
+    }
+
+    res.json({ success: true, message: 'Tata letak meja berhasil diperbarui.' });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }

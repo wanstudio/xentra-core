@@ -48,6 +48,9 @@ class OrderPlacementService {
     client_transaction_id = null,
     shift_id = null,
     pwa_runtime = null,
+    dining_session_id = null,
+    table_ids = null,
+    hold_reference_id = null,
     notes = '',
     trace_context = {}
   }) {
@@ -253,8 +256,8 @@ class OrderPlacementService {
       INSERT INTO orders (
         id, order_number, client_transaction_id, brand_id, branch_id, customer_name, customer_phone,
         order_type, order_channel, selection_mode, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
-        subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, order_note, dining_session_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const insertOrderItemStmt = db.prepare(`
@@ -294,6 +297,7 @@ class OrderPlacementService {
         effectivePaymentMethod,
         insertedStatus,
         notes,
+        dining_session_id || null,
         now,
         now
       );

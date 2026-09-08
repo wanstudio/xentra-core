@@ -884,6 +884,248 @@
 	filter:brightness(0.96);
 }
 
+/* =========================================================================
+   DINE-IN FLOOR PLAN CANVAS & TABLE STYLES (TEMPLATE #01)
+   ========================================================================= */
+.x-dinein-container{
+	margin-top:14px;
+	display:flex;
+	flex-direction:column;
+	gap:12px;
+}
+
+.x-dinein-guest-row{
+	display:flex;
+	align-items:center;
+	justify-content:space-between;
+	background:#f9fafb;
+	border:1px solid #e5e7eb;
+	border-radius:14px;
+	padding:8px 14px;
+}
+
+.x-dinein-guest-label{
+	font-size:13px;
+	font-weight:600;
+	color:#374151;
+}
+
+.x-dinein-guest-control{
+	display:flex;
+	align-items:center;
+	gap:10px;
+}
+
+.x-dinein-guest-btn{
+	width:30px;
+	height:30px;
+	border-radius:50%;
+	border:1px solid #d1d5db;
+	background:#fff;
+	font-size:16px;
+	font-weight:700;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	cursor:pointer;
+	color:#1f2937;
+	transition:all .12s ease;
+}
+
+.x-dinein-guest-btn:active{
+	background:#e5e7eb;
+}
+
+.x-dinein-guest-count{
+	font-size:14px;
+	font-weight:700;
+	color:#111;
+	min-width:20px;
+	text-align:center;
+}
+
+.x-dinein-header-title{
+	font-size:14px;
+	font-weight:700;
+	color:#111;
+	margin:6px 0 2px;
+}
+
+.x-floor-wrapper{
+	position:relative;
+	width:100%;
+	border:1.5px solid #e5e7eb;
+	border-radius:18px;
+	background:#fafafa;
+	padding:12px;
+	box-sizing:border-box;
+	overflow:hidden;
+}
+
+.x-floor-section-indoor{
+	position:relative;
+	border:1.5px solid #e5e7eb;
+	border-radius:16px;
+	background:#fff;
+	padding:12px;
+	margin-bottom:14px;
+	min-height:380px;
+}
+
+.x-floor-section-smoking{
+	position:relative;
+	border:1.5px solid #e5e7eb;
+	border-radius:16px;
+	background:#fff;
+	padding:12px;
+	min-height:220px;
+}
+
+.x-floor-badge-group{
+	position:absolute;
+	left:14px;
+	top:14px;
+	display:flex;
+	flex-direction:column;
+	gap:8px;
+	z-index:4;
+}
+
+.x-floor-badge-icon{
+	width:24px;
+	height:24px;
+	object-fit:contain;
+}
+
+.x-floor-mushola{
+	position:absolute;
+	background:#d6d8db;
+	border-radius:10px;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+	font-size:12px;
+	font-style:italic;
+	color:#4b5563;
+	font-weight:600;
+	z-index:2;
+	user-select:none;
+}
+
+/* L-shape cutout effect via pseudo-element */
+.x-floor-mushola::after{
+	content:'';
+	position:absolute;
+	bottom:0;
+	right:0;
+	width:45px;
+	height:35px;
+	background:#fff;
+	border-top-left-radius:10px;
+}
+
+.x-table-card{
+	position:absolute;
+	border:1.5px solid #e5e7eb;
+	border-radius:14px;
+	background:#fff;
+	display:flex;
+	flex-direction:column;
+	align-items:center;
+	justify-content:center;
+	cursor:pointer;
+	user-select:none;
+	transition:all .18s cubic-bezier(0.4, 0, 0.2, 1);
+	box-sizing:border-box;
+	z-index:3;
+	padding:4px;
+}
+
+.x-table-card:hover:not(.is-unavailable){
+	transform:scale(1.02);
+	border-color:#b6ff00;
+}
+
+.x-table-card.is-selected{
+	border:2px solid #b6ff00;
+	background:#f7ffd9;
+	box-shadow:0 0 0 2px #b6ff00, 0 4px 12px rgba(182, 255, 0, 0.35);
+}
+
+.x-table-card.is-unavailable{
+	background:#9ca3af;
+	border-color:#9ca3af;
+	cursor:not-allowed;
+	opacity:0.85;
+}
+
+.x-table-art{
+	position:relative;
+	width:100%;
+	height:100%;
+	display:flex;
+	align-items:center;
+	justify-content:center;
+}
+
+.x-table-art img{
+	position:absolute;
+	inset:0;
+	width:100%;
+	height:100%;
+	object-fit:fill;
+	pointer-events:none;
+}
+
+.x-table-label-box{
+	position:relative;
+	z-index:2;
+	text-align:center;
+	color:#fff;
+	display:flex;
+	flex-direction:column;
+	align-items:center;
+	justify-content:center;
+	line-height:1.2;
+}
+
+.x-table-label{
+	font-size:12px;
+	font-weight:700;
+	font-style:italic;
+	color:#fff;
+	text-shadow:0 1px 2px rgba(0,0,0,0.6);
+}
+
+.x-table-unavail-badge{
+	font-size:9px;
+	font-style:italic;
+	color:#f3f4f6;
+	margin-top:2px;
+	text-shadow:0 1px 2px rgba(0,0,0,0.6);
+}
+
+.x-table-seats-badge{
+	font-size:9px;
+	color:#b6ff00;
+	font-weight:600;
+	margin-top:1px;
+}
+
+.x-table-selected-badge{
+	position:absolute;
+	top:-8px;
+	right:-8px;
+	background:#b6ff00;
+	color:#111;
+	font-size:10px;
+	font-weight:800;
+	border-radius:999px;
+	padding:2px 6px;
+	box-shadow:0 2px 5px rgba(0,0,0,0.15);
+	z-index:5;
+}
+
 .x-fulfillment-confirm:disabled{
 	background:#e5e7eb;
 	color:#9ca3af;

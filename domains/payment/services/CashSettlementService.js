@@ -185,6 +185,35 @@ class CashSettlementService {
         WHERE id = ?
       `).run(now, order_id);
 
+      // 3b. Authoritative Dine-in Table Settlement: Transition held tables to occupied dining session
+      if (order && order.order_type === 'dine_in') {
+        try {
+          const { DiningTableService } = require('../../pos');
+          let tableIds = [];
+          const activeHold = db.prepare("SELECT hold_reference_id, table_id FROM branch_table_holds WHERE hold_reference_id = ? AND status = 'active'").all(order.id);
+          if (activeHold && activeHold.length > 0) {
+            tableIds = activeHold.map(h => h.table_id);
+          } else if (order.table_number) {
+            const tbl = db.prepare('SELECT id FROM branch_tables WHERE branch_id = ? AND (table_number = ? OR label = ?)').get(order.branch_id, order.table_number, order.table_number);
+            if (tbl) tableIds = [tbl.id];
+          }
+
+          if (tableIds.length > 0) {
+            DiningTableService.createOrAttachDiningSession({
+              branch_id: order.branch_id,
+              table_ids: tableIds,
+              order_id: order.id,
+              customer_name: order.customer_name,
+              customer_phone: order.customer_phone,
+              guest_count: order.guest_count || 1,
+              hold_reference_id: order.id
+            });
+          }
+        } catch (dineErr) {
+          console.warn('[CashSettlementService] Dine-in table settlement warning:', dineErr.message);
+        }
+      }
+
       db.exec('COMMIT;');
     } catch (err) {
       try { db.exec('ROLLBACK;'); } catch (_) {}
