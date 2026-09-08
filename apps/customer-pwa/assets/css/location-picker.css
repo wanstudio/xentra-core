@@ -419,26 +419,38 @@
 }
 
 .x-loc-fav-card-more {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
   border-radius: 50%;
-  background: #f3f4f6;
+  background: #f1f5f9;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #4b5563;
-  transition: background 0.15s ease;
-  font-weight: 800;
-  font-size: 16px;
-  line-height: 1;
+  transition: background 0.15s ease, transform 0.1s ease;
   padding: 0;
+  box-sizing: border-box;
+}
+
+.x-loc-fav-more-icon {
+  width: 15px;
+  height: 15px;
+  display: block;
+  pointer-events: none;
+  opacity: 0.75;
+  transition: opacity 0.15s ease;
+}
+
+.x-loc-fav-card-more:hover .x-loc-fav-more-icon,
+.x-loc-fav-card-more:active .x-loc-fav-more-icon {
+  opacity: 1;
 }
 
 .x-loc-fav-card-more:active {
-  background: #e5e7eb;
+  background: #e2e8f0;
+  transform: scale(0.94);
 }
 
 .x-loc-fav-card-addr {

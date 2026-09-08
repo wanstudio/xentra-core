@@ -1267,6 +1267,7 @@
       date: state.fulfillment.date || 'Hari ini',
       timeSlot: state.fulfillment.timeSlot || '16:00-16:30',
       tableNumber: state.fulfillment.tableNumber || '',
+      selectedTableIds: Array.isArray(state.fulfillment.table_ids) ? state.fulfillment.table_ids.slice() : [],
       reservationDate: state.fulfillment.reservationDate || '',
       reservationTime: state.fulfillment.reservationTime || '12:00',
       guestCount: state.fulfillment.guestCount || 2
@@ -1594,6 +1595,31 @@
       fetchLayout(branchId);
     }
 
+    function computeSelectedTableNumbers(tableIds) {
+      if (!tableIds || !tableIds.length || !dineInLayoutData || !dineInLayoutData.tables) {
+        return draft.tableNumber || '';
+      }
+      var idMap = {};
+      dineInLayoutData.tables.forEach(function (t) {
+        idMap[t.id] = t.table_number || (t.label ? t.label.replace(/^meja\s*/i, '') : '');
+      });
+      var nums = tableIds.map(function (id) {
+        return idMap[id];
+      }).filter(Boolean);
+
+      // Unique and sort numerically / alphabetically
+      var uniqueNums = [];
+      nums.forEach(function (n) {
+        if (uniqueNums.indexOf(n) === -1) uniqueNums.push(n);
+      });
+      uniqueNums.sort(function (a, b) {
+        var na = parseInt(a, 10), nb = parseInt(b, 10);
+        return (!isNaN(na) && !isNaN(nb)) ? (na - nb) : String(a).localeCompare(String(b));
+      });
+
+      return uniqueNums.join(', ');
+    }
+
     function autoRecommendTable() {
       if (!dineInLayoutData) return;
       var fb = getFulfillmentBranch();
@@ -1606,8 +1632,7 @@
       }).then(function (res) {
         if (res && res.success && res.recommendation && res.recommendation.table_ids) {
           draft.selectedTableIds = res.recommendation.table_ids;
-          var primaryTbl = res.recommendation.tables && res.recommendation.tables[0];
-          draft.tableNumber = primaryTbl ? primaryTbl.table_number : '';
+          draft.tableNumber = computeSelectedTableNumbers(draft.selectedTableIds);
           draft.selectedTables = res.recommendation.tables || [];
         }
         renderFloorCanvas();
@@ -1666,14 +1691,11 @@
 
           if (isSel) {
             draft.selectedTableIds = draft.selectedTableIds.filter(function (id) { return id !== tid; });
-            if (draft.tableNumber === tnum) {
-              draft.tableNumber = draft.selectedTableIds.length > 0 ? '' : '';
-            }
           } else {
-            // Customer manual override
+            // Customer manual override / multiple selection
             draft.selectedTableIds.push(tid);
-            draft.tableNumber = tnum;
           }
+          draft.tableNumber = computeSelectedTableNumbers(draft.selectedTableIds);
           renderFloorCanvas();
         };
       });
@@ -1753,7 +1775,8 @@
           state.fulfillment.timeSlot = draft.scheduled ? (draft.timeSlot || '16:00-16:30') : 'Sekarang (15–25 menit)';
         } else if (draft.type === 'dine_in') {
           state.fulfillment.scheduled = false;
-          state.fulfillment.tableNumber = draft.tableNumber || (draft.selectedTableIds && draft.selectedTableIds.length ? 'Meja ' + draft.tableNumber : '');
+          var tNumStr = draft.tableNumber || computeSelectedTableNumbers(draft.selectedTableIds);
+          state.fulfillment.tableNumber = tNumStr;
           state.fulfillment.table_ids = draft.selectedTableIds || [];
           state.fulfillment.guestCount = draft.guestCount || 1;
         } else {
@@ -2253,10 +2276,12 @@
       fulfillment: {
         type: fulType === 'dinein' ? 'dine_in' : fulType,
         table_number: state.fulfillment.tableNumber || null,
+        table_ids: Array.isArray(state.fulfillment.table_ids) ? state.fulfillment.table_ids : [],
         reservation_date: state.fulfillment.reservationDate || null,
         guest_count: state.fulfillment.guestCount || null
       },
       table_number: state.fulfillment.tableNumber || null,
+      table_ids: Array.isArray(state.fulfillment.table_ids) ? state.fulfillment.table_ids : [],
       reservation_date: state.fulfillment.reservationDate || null,
       guest_count: state.fulfillment.guestCount || null,
       schedule_type: state.fulfillment.scheduled ? 'scheduled' : 'asap',

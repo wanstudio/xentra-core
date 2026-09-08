@@ -260,7 +260,9 @@
         '<div class="x-loc-fav-card" data-fav-id="' + UI.escape(addr.id) + '">' +
         '  <div class="x-loc-fav-card-top">' +
         '    <div class="x-loc-fav-card-label">' + UI.escape(addr.label || 'Rumah') + '</div>' +
-        '    <button type="button" class="x-loc-fav-card-more" data-action="more" aria-label="Menu" data-id="' + UI.escape(addr.id) + '">•••</button>' +
+        '    <button type="button" class="x-loc-fav-card-more" data-action="more" aria-label="Menu" data-id="' + UI.escape(addr.id) + '">' +
+        '      <img src="/assets/icons/option.svg" alt="" class="x-loc-fav-more-icon">' +
+        '    </button>' +
         '  </div>' +
         '  <div class="x-loc-fav-card-addr">' + UI.escape(addr.address) + '</div>' +
         (addr.detail ? '<div class="x-loc-fav-card-patokan">' + UI.escape(addr.detail) + '</div>' : '') +
