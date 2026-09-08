@@ -168,78 +168,145 @@
       return;
     }
 
-    function scrollToSlide(idx) {
-      var slide = slides[idx];
-      if (!slide || !track) return;
-      // Scroll HANYA horizontal track container lokal, jangan pernah ganggu window / vertical scroll pengguna!
-      var targetLeft = slide.offsetLeft - (track.clientWidth - slide.clientWidth) / 2;
-      track.scrollTo({
-        left: Math.max(0, targetLeft),
-        behavior: 'smooth'
-      });
-    }
+    function setupInfiniteLoop() {
+      // Clone first and last slides for seamless forward looping
+      var originalSlides = Array.from(track.querySelectorAll('.x-carousel-slide'));
+      var numOriginals = originalSlides.length;
+      if (numOriginals <= 1) return;
 
-    // Create dot buttons
-    dots.innerHTML = '';
-    for (var i = 0; i < slides.length; i++) {
-      var dot = document.createElement('button');
-      dot.className = 'x-carousel-dot' + (i === 0 ? ' active' : '');
-      dot.setAttribute('data-slide', String(i));
-      dot.onclick = (function (idx) {
-        return function () {
-          scrollToSlide(idx);
-        };
-      })(i);
-      dots.appendChild(dot);
-    }
+      var firstClone = originalSlides[0].cloneNode(true);
+      firstClone.classList.add('x-clone-slide');
+      var lastClone = originalSlides[numOriginals - 1].cloneNode(true);
+      lastClone.classList.add('x-clone-slide');
 
-    // Observe scroll for active dot
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        if (entry.isIntersecting) {
-          var idx = Array.from(slides).indexOf(entry.target);
-          if (idx >= 0) {
-            autoIdx = idx;
-            dots.querySelectorAll('.x-carousel-dot').forEach(function (d, j) {
-              d.classList.toggle('active', j === idx);
-            });
-          }
-        }
-      });
-    }, { root: track, threshold: 0.6 });
+      track.insertBefore(lastClone, originalSlides[0]);
+      track.appendChild(firstClone);
 
-    slides.forEach(function (s) { observer.observe(s); });
+      var allSlides = track.querySelectorAll('.x-carousel-slide');
+      var currentIndex = 1; // start at the first real slide
 
-    // Auto-play state & viewport observer
-    var autoIdx = 0;
-    var isCarouselInViewport = true;
-    var isUserInteracting = false;
+      // Set initial scroll position to the first real slide without animation
+      function setInitialPosition() {
+        if (!track || !allSlides[currentIndex]) return;
+        var s = allSlides[currentIndex];
+        track.scrollLeft = s.offsetLeft;
+      }
+      setTimeout(setInitialPosition, 50);
 
-    // Hanya aktif jika carousel sedang terlihat di layar (tidak mengganggu user yang scroll ke bawah)
-    if ('IntersectionObserver' in window && container) {
-      var vpObserver = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) {
-          isCarouselInViewport = e.isIntersecting;
+      // Create dot buttons only for original slides
+      dots.innerHTML = '';
+      for (var i = 0; i < numOriginals; i++) {
+        var dot = document.createElement('button');
+        dot.className = 'x-carousel-dot' + (i === 0 ? ' active' : '');
+        dot.setAttribute('data-slide', String(i));
+        dot.onclick = (function (origIdx) {
+          return function () {
+            currentIndex = origIdx + 1;
+            scrollToIndex(currentIndex, true);
+            updateDots(origIdx);
+          };
+        })(i);
+        dots.appendChild(dot);
+      }
+
+      function updateDots(realIdx) {
+        var dotBtns = dots.querySelectorAll('.x-carousel-dot');
+        dotBtns.forEach(function (d, j) {
+          d.classList.toggle('active', j === realIdx);
         });
-      }, { threshold: 0.2 });
-      vpObserver.observe(container);
+      }
+
+      var isAnimating = false;
+      function scrollToIndex(idx, smooth) {
+        if (!allSlides[idx]) return;
+        var s = allSlides[idx];
+        track.scrollTo({
+          left: s.offsetLeft,
+          behavior: smooth ? 'smooth' : 'auto'
+        });
+      }
+
+      // Handle continuous forward progression
+      function nextSlide() {
+        if (isAnimating || !isCarouselInViewport || isUserInteracting) return;
+        currentIndex++;
+        scrollToIndex(currentIndex, true);
+
+        var realDotIdx = (currentIndex - 1) % numOriginals;
+        if (realDotIdx < 0) realDotIdx += numOriginals;
+        updateDots(realDotIdx);
+
+        // When reaching the cloned first slide, seamlessly reset to real first slide
+        if (currentIndex >= allSlides.length - 1) {
+          isAnimating = true;
+          setTimeout(function () {
+            currentIndex = 1;
+            scrollToIndex(currentIndex, false);
+            isAnimating = false;
+          }, 600); // 600ms corresponds to the smooth scroll duration
+        }
+      }
+
+      // Track manual scroll snap
+      var scrollEndTimer = null;
+      track.addEventListener('scroll', function () {
+        clearTimeout(scrollEndTimer);
+        scrollEndTimer = setTimeout(function () {
+          if (isAnimating) return;
+          var curLeft = track.scrollLeft;
+          var closestIdx = 1;
+          var minDiff = Infinity;
+          allSlides.forEach(function (s, idx) {
+            var diff = Math.abs(s.offsetLeft - curLeft);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestIdx = idx;
+            }
+          });
+
+          currentIndex = closestIdx;
+          if (currentIndex === 0) {
+            // Snapped to last clone -> jump instantly to real last slide
+            currentIndex = numOriginals;
+            scrollToIndex(currentIndex, false);
+          } else if (currentIndex === allSlides.length - 1) {
+            // Snapped to first clone -> jump instantly to real first slide
+            currentIndex = 1;
+            scrollToIndex(currentIndex, false);
+          }
+
+          var realDotIdx = (currentIndex - 1) % numOriginals;
+          if (realDotIdx < 0) realDotIdx += numOriginals;
+          updateDots(realDotIdx);
+        }, 120);
+      }, { passive: true });
+
+      // Auto-play state & viewport observer
+      var isCarouselInViewport = true;
+      var isUserInteracting = false;
+
+      if ('IntersectionObserver' in window && container) {
+        var vpObserver = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            isCarouselInViewport = e.isIntersecting;
+          });
+        }, { threshold: 0.2 });
+        vpObserver.observe(container);
+      }
+
+      // Pause autoplay when user interacts
+      track.addEventListener('touchstart', function () { isUserInteracting = true; }, { passive: true });
+      track.addEventListener('touchend', function () {
+        setTimeout(function () { isUserInteracting = false; }, 3000);
+      }, { passive: true });
+      track.addEventListener('pointerenter', function () { isUserInteracting = true; });
+      track.addEventListener('pointerleave', function () { isUserInteracting = false; });
+
+      // Always slide to the left continuously (forward direction)
+      setInterval(nextSlide, 4000);
     }
 
-    // Pause autoplay saat user menyentuh/berinteraksi dengan carousel
-    track.addEventListener('touchstart', function () { isUserInteracting = true; }, { passive: true });
-    track.addEventListener('touchend', function () {
-      setTimeout(function () { isUserInteracting = false; }, 3000);
-    }, { passive: true });
-    track.addEventListener('pointerenter', function () { isUserInteracting = true; });
-    track.addEventListener('pointerleave', function () { isUserInteracting = false; });
-
-    setInterval(function () {
-      // ATURAN MUTLAK: Jangan slide jika carousel di luar layar atau user sedang aktif berinteraksi
-      if (!isCarouselInViewport || isUserInteracting) return;
-
-      autoIdx = (autoIdx + 1) % slides.length;
-      scrollToSlide(autoIdx);
-    }, 5000);
+    setupInfiniteLoop();
   }
 
   // ======================================================================
@@ -1571,7 +1638,7 @@
     // Render initial cart state
     renderCartDock();
 
-    // Home Location Bar → open "Pilih lokasi" sheet
+    // Home Location Pill (Header) → open "Pilih lokasi" sheet
     function handleOpenLocationPicker() {
       if (window.XentraLocationPicker && typeof window.XentraLocationPicker.open === 'function') {
         window.XentraLocationPicker.open({
@@ -1582,11 +1649,11 @@
       }
     }
 
-    var locBar = $('x-home-loc-bar');
-    if (locBar) locBar.onclick = handleOpenLocationPicker;
-
     var heroLocPill = $('x-hero-loc-pill');
     if (heroLocPill) heroLocPill.onclick = handleOpenLocationPicker;
+
+    var locBar = $('x-home-loc-bar');
+    if (locBar) locBar.onclick = handleOpenLocationPicker;
 
     // Header Navigation buttons: Join (Affiliate), Library (History), Profile
     var btnJoin = $('x-btn-join');

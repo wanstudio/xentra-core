@@ -1074,7 +1074,7 @@
     }
 
     var addr = dest.address || dest.formatted_address;
-    var label = dest.label || 'Lokasi Terpilih';
+    var label = dest.label || (addr ? addr.split(',')[0].trim() : 'Lokasi Terpilih');
     var source = dest.source || 'manual';
 
     if (titleEl) titleEl.textContent = label;
@@ -1086,6 +1086,7 @@
 
     if (heroPillText) {
       heroPillText.textContent = label || 'Lokasimu';
+      heroPillText.setAttribute('title', addr || label);
     }
   }
 
