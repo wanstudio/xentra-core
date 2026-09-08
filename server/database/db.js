@@ -254,12 +254,36 @@ const memoryStore = {
 };
 
 // Database Proxy supporting both Native, Portable & Memory Engines
+//
+// sql.js adapter transactional safety: sql.js `export()` (used for disk
+// persistence) runs its own internal BEGIN/COMMIT, so persisting DURING an
+// open user transaction would silently COMMIT it and make a later
+// `exec('COMMIT;')` fail with "cannot commit - no transaction is active".
+// Track the transaction state here and defer disk exports until the user
+// transaction ends (BEGIN/COMMIT/ROLLBACK are single statements via run()).
+let sqlJsTxActive = false;
+const detectTransactionStatement = (sql) => {
+  const s = String(sql || '').toLowerCase().replace(/;/g, ' ');
+  if (s.includes('begin')) return 'begin';
+  if (s.includes('commit') || s.includes('end transaction')) return 'commit';
+  if (s.includes('rollback')) return 'rollback';
+  return 'none';
+};
+
 const db = {
   exec: (sql) => {
+    const tx = detectTransactionStatement(sql);
     if (dbInstance) return dbInstance.exec(sql);
     if (rawSqlDb) {
       const res = rawSqlDb.run(sql);
-      saveSqlJsToDisk();
+      if (tx === 'begin') {
+        sqlJsTxActive = true;
+      } else if (tx === 'commit' || tx === 'rollback') {
+        sqlJsTxActive = false;
+        saveSqlJsToDisk();
+      } else if (!sqlJsTxActive) {
+        saveSqlJsToDisk();
+      }
       return res;
     }
     if (sqlJsPromise) {
@@ -296,7 +320,7 @@ const db = {
             stmt.bind(params);
             stmt.step();
             stmt.free();
-            saveSqlJsToDisk();
+            if (!sqlJsTxActive) saveSqlJsToDisk();
             return { changes: 1 };
           } catch (_) { return { changes: 1 }; }
         }
