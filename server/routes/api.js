@@ -154,10 +154,12 @@ router.post('/delivery/match-branch', async (req, res) => {
   }
 });
 
-// 4. Address Search Suggestion (Nominatim)
+// 4. Address Search Suggestion (Nominatim with proximity ranking)
 router.get('/location/search', async (req, res) => {
   const q = req.query.q || '';
-  const results = await RouteService.searchAddress(q);
+  const lat = req.query.lat || req.query.latitude;
+  const lng = req.query.lng || req.query.longitude;
+  const results = await RouteService.searchAddress(q, lat, lng);
   res.json({ success: true, results });
 });
 

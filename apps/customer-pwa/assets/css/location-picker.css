@@ -112,7 +112,7 @@
   width: 100vw !important;
   height: 100vh !important;
   height: 100dvh !important;
-  z-index: 1000 !important;
+  z-index: var(--x-z-overlay, 2147483000) !important;
   display: flex !important;
   align-items: flex-end;
   background: rgba(0, 0, 0, 0.45);
@@ -630,19 +630,20 @@
 
 /* ── FLOW C: Map Picker Fullscreen Overlay ── */
 .x-map-picker-view {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  z-index: 1050;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  z-index: var(--x-z-overlay, 2147483000) !important;
   background: #e2e8f0;
-  display: flex;
+  display: flex !important;
   flex-direction: column;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   transition: opacity 0.25s ease, visibility 0.25s ease;
+  isolation: isolate;
 }
 
 .x-map-picker-view.open {
