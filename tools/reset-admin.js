@@ -36,10 +36,18 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     process.exit(1);
   }
 
-  let owner = db.prepare("SELECT * FROM users WHERE id = 'usr_bangjo_owner'").get();
-  if (!owner) owner = db.prepare("SELECT * FROM users WHERE role = 'owner' LIMIT 1").get();
-  if (!owner) {
-    console.error('No owner user found to copy brand/organization scope from.');
+  let brand = db.prepare("SELECT * FROM brands WHERE custom_domain = ?").get('app.mybangjo.com');
+  if (!brand) brand = db.prepare("SELECT * FROM brands WHERE slug = ?").get('bangjo');
+  if (!brand) brand = db.prepare("SELECT * FROM brands WHERE id = 'brand_bangjo'").get();
+  if (!brand) brand = db.prepare("SELECT * FROM brands LIMIT 1").get();
+
+  let organizationId = brand && brand.organization_id;
+  if (organizationId === undefined || organizationId === null) {
+    const org = db.prepare("SELECT id FROM organizations LIMIT 1").get();
+    organizationId = org && org.id;
+  }
+  if (!brand || !organizationId) {
+    console.error('No brand/organization found to attach the new user to.');
     process.exit(1);
   }
 
@@ -53,8 +61,8 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   } else {
     const id = 'usr_' + username;
     db.prepare('INSERT INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(id, owner.brand_id, owner.organization_id, username, username + '@bangjo.com', passwordHash, username, 'owner');
-    console.log('OK created user ' + id + ' (' + username + ', role owner, brand ' + owner.brand_id + ')');
+      .run(id, brand.id, organizationId, username, username + '@bangjo.com', passwordHash, username, 'owner');
+    console.log('OK created user ' + id + ' (' + username + ', role owner, brand ' + brand.id + ')');
   }
 })().catch((err) => {
   console.error('FAILED:', err.message);

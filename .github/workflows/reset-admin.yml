@@ -6,8 +6,8 @@ on:
       username:
         description: 'Admin username to create or reset (password will be set/reset)'
         required: true
-      password:
-        description: 'New password (never printed to run logs)'
+      password_hash:
+        description: 'sha256 hex of the new password (compute: printf %s "$pw" | sha256sum)'
         required: true
 
 env:
@@ -35,10 +35,9 @@ jobs:
           SSH_USER: ${{ secrets.XENTRA_SSH_USER }}
           SSH_PORT: ${{ secrets.XENTRA_SSH_PORT }}
           USERNAME: ${{ inputs.username }}
-          PASSWORD: ${{ inputs.password }}
+          PASSWORD_HASH: ${{ inputs.password_hash }}
         run: |
-          HASH=$(printf '%s' "$PASSWORD" | sha256sum | cut -d' ' -f1)
           ssh -i ~/.ssh/xentra_deploy_key \
             -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" \
-            "cd '$DEPLOY_ROOT' && source '$NODE_VENV/bin/activate' && node '$DEPLOY_ROOT/tools/reset-admin.js' '$USERNAME' '$HASH'"
+            "cd '$DEPLOY_ROOT' && source '$NODE_VENV/bin/activate' && node '$DEPLOY_ROOT/tools/reset-admin.js' '$USERNAME' '$PASSWORD_HASH'"
