@@ -422,6 +422,26 @@
     }).join('');
   }
 
+  // File object staged for menu photo upload on save (null when none chosen).
+  var _productImageFile = null;
+
+  // Show the staged/current menu photo preview; fall back to the "Belum ada foto"
+  // placeholder when there is no image.
+  function setProductImagePreview(src, hasImage) {
+    var previewImg = $('prod-image-preview');
+    var emptyBox = $('prod-image-empty');
+    if (!previewImg || !emptyBox) return;
+    if (hasImage && src) {
+      previewImg.src = src;
+      previewImg.style.display = 'block';
+      emptyBox.style.display = 'none';
+    } else {
+      previewImg.removeAttribute('src');
+      previewImg.style.display = 'none';
+      emptyBox.style.display = 'flex';
+    }
+  }
+
   // Product Actions
   window.openAddProduct = function () {
     $('modal-product-title').textContent = 'Tambah Menu Baru';
@@ -430,7 +450,10 @@
     $('prod-price').value = '';
     $('prod-regular-price').value = '';
     $('prod-desc').value = '';
-    $('prod-image').value = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400';
+    _productImageFile = null;
+    var fileInput = $('prod-image-file');
+    if (fileInput) fileInput.value = '';
+    setProductImagePreview('', false);
     $('modal-product').style.display = 'flex';
   };
 
@@ -445,12 +468,17 @@
     $('prod-price').value = prod.price;
     $('prod-regular-price').value = prod.regular_price || prod.price;
     $('prod-desc').value = prod.description || '';
-    $('prod-image').value = prod.image || '';
+    _productImageFile = null;
+    var fileInput = $('prod-image-file');
+    if (fileInput) fileInput.value = '';
+    var existingImage = prod.image || prod.image_url || '';
+    setProductImagePreview(existingImage, existingImage !== '');
     $('modal-product').style.display = 'flex';
   };
 
   window.closeProductModal = function () {
     $('modal-product').style.display = 'none';
+    _productImageFile = null;
   };
 
   window.toggleStock = async function (id) {
@@ -509,6 +537,38 @@
       }
     });
 
+    var btnPick = $('btn-prod-image-pick');
+    var prodFileInput = $('prod-image-file');
+    if (btnPick && prodFileInput) {
+      btnPick.addEventListener('click', function () { prodFileInput.click(); });
+      prodFileInput.addEventListener('change', function () {
+        var file = prodFileInput.files && prodFileInput.files[0];
+        if (!file) { _productImageFile = null; return; }
+
+        var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (allowed.indexOf(file.type) === -1) {
+          showToast('❌ Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+          prodFileInput.value = '';
+          return;
+        }
+        if (file.size > 3 * 1024 * 1024) {
+          showToast('❌ Ukuran gambar melebihi batas maksimal 3MB.');
+          prodFileInput.value = '';
+          return;
+        }
+
+        _productImageFile = file;
+
+        // Local preview only — the persisted URL comes back from the backend
+        // after upload; this is just so the admin sees what they picked.
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          setProductImagePreview(e.target.result, true);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     $('form-product').addEventListener('submit', async function (e) {
       e.preventDefault();
       var id = $('prod-id').value;
@@ -517,8 +577,7 @@
         category_id: $('prod-category').value,
         price: Number($('prod-price').value),
         regular_price: Number($('prod-regular-price').value || $('prod-price').value),
-        description: $('prod-desc').value,
-        image: $('prod-image').value
+        description: $('prod-desc').value
       };
 
       var url = id ? (API_BASE + '/admin/products/' + id) : (API_BASE + '/admin/products');
@@ -531,11 +590,44 @@
           body: JSON.stringify(payload)
         });
         var data = await res.json();
-        if (data.success) {
-          showToast('✅ Menu berhasil disimpan!');
-          window.closeProductModal();
-          loadCatalog();
+        if (!data.success) {
+          showToast('❌ ' + (data.error || data.message || 'Gagal menyimpan menu.'));
+          return;
         }
+
+        // Photo: uploaded only when the admin staged a new file on save.
+        var savedId = (data.product && data.product.id) || id;
+        if (_productImageFile && savedId) {
+          var base64 = await new Promise(function (resolve, reject) {
+            var imgReader = new FileReader();
+            imgReader.onload = function () { resolve(imgReader.result); };
+            imgReader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
+            imgReader.readAsDataURL(_productImageFile);
+          });
+
+          var imageRes = await fetch(API_BASE + '/admin/products/' + savedId + '/image', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ image_base64: base64, mime_type: _productImageFile.type })
+          });
+          var imageData = {};
+          try {
+            imageData = await imageRes.json();
+          } catch (_) {
+            var rawBody = '';
+            try { rawBody = await imageRes.text(); } catch (_) {}
+            var detail = rawBody.length > 160 ? (rawBody.slice(0, 160) + '…') : rawBody;
+            imageData = { success: false, error: 'Upload foto gagal (HTTP ' + imageRes.status + '). ' + (detail ? detail + ' ' : '') + 'Pastikan server sudah di-restart, lalu coba lagi.' };
+          }
+          if (!imageRes.ok || !imageData.success) {
+            showToast('❌ ' + (imageData.error || imageData.message || 'Gagal mengunggah foto menu.'));
+            return;
+          }
+        }
+
+        showToast('✅ Menu berhasil disimpan!');
+        window.closeProductModal();
+        loadCatalog();
       } catch (err) {
         showToast('Gagal menyimpan menu.');
       }

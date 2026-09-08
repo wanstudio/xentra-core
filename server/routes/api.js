@@ -3449,14 +3449,17 @@ router.patch('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'bra
 // Follows the same storage pattern already used across Xentra for menu photos:
 // the file is persisted to disk under the app's static /assets tree and only the
 // resulting persistent URL is written to the database — never a base64 blob.
-const CATEGORY_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/categories');
-const CATEGORY_IMAGE_MAX_BYTES = 3 * 1024 * 1024; // 3MB
-const CATEGORY_IMAGE_MIME_TO_EXT = {
+// The size limit and MIME map are shared by the category and menu image upload
+// endpoints so both accept exactly the same files.
+const IMAGE_MAX_BYTES = 3 * 1024 * 1024; // 3MB
+const IMAGE_MIME_TO_EXT = {
   'image/jpeg': 'jpg',
   'image/jpg': 'jpg',
   'image/png': 'png',
   'image/webp': 'webp'
 };
+const CATEGORY_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/categories');
+const PRODUCT_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/products');
 
 router.post('/admin/branches/:id/categories/:catId/image', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
@@ -3476,7 +3479,7 @@ router.post('/admin/branches/:id/categories/:catId/image', requireAuth(['owner',
       return res.status(400).json({ success: false, error: 'Gambar kategori wajib diunggah.' });
     }
 
-    const ext = CATEGORY_IMAGE_MIME_TO_EXT[String(mime_type || '').toLowerCase()];
+    const ext = IMAGE_MIME_TO_EXT[String(mime_type || '').toLowerCase()];
     if (!ext) {
       return res.status(400).json({ success: false, error: 'Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.' });
     }
@@ -3493,7 +3496,7 @@ router.post('/admin/branches/:id/categories/:catId/image', requireAuth(['owner',
     if (!buffer || buffer.length === 0) {
       return res.status(400).json({ success: false, error: 'Gambar kosong atau rusak.' });
     }
-    if (buffer.length > CATEGORY_IMAGE_MAX_BYTES) {
+    if (buffer.length > IMAGE_MAX_BYTES) {
       return res.status(400).json({ success: false, error: 'Ukuran gambar melebihi batas maksimal 3MB.' });
     }
 
@@ -3508,6 +3511,59 @@ router.post('/admin/branches/:id/categories/:catId/image', requireAuth(['owner',
     res.json({ success: true, category: { id: req.params.catId, image_url: imageUrl } });
   } catch (err) {
     console.error('[API Error POST /admin/branches/:id/categories/:catId/image]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Upload / replace a master product (menu item) image.
+// Mirrors the branch-category image upload contract above: base64 + mime_type in
+// JSON, the same allowed formats/size, the file persisted to disk, and only the
+// resulting URL stored in the database. Writes BOTH products.image_url (consumed
+// by the customer PWA and public APIs) and products.image (consumed by the
+// owner/branch dashboard tables and the Edit Menu modal).
+router.post('/admin/products/:productId/image', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const product = db.prepare('SELECT id FROM products WHERE id = ? AND brand_id = ?')
+      .get(req.params.productId, req.brand_id);
+    if (!product) return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+
+    const { image_base64, mime_type } = req.body || {};
+    if (!image_base64 || typeof image_base64 !== 'string') {
+      return res.status(400).json({ success: false, error: 'Gambar menu wajib diunggah.' });
+    }
+
+    const ext = IMAGE_MIME_TO_EXT[String(mime_type || '').toLowerCase()];
+    if (!ext) {
+      return res.status(400).json({ success: false, error: 'Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.' });
+    }
+
+    // Strip an optional data URL prefix (e.g. "data:image/png;base64,...") before decoding.
+    const rawBase64 = image_base64.includes(',') ? image_base64.split(',').pop() : image_base64;
+    let buffer;
+    try {
+      buffer = Buffer.from(rawBase64, 'base64');
+    } catch (decodeErr) {
+      return res.status(400).json({ success: false, error: 'Gambar tidak dapat diproses (data tidak valid).' });
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ success: false, error: 'Gambar kosong atau rusak.' });
+    }
+    if (buffer.length > IMAGE_MAX_BYTES) {
+      return res.status(400).json({ success: false, error: 'Ukuran gambar melebihi batas maksimal 3MB.' });
+    }
+
+    fs.mkdirSync(PRODUCT_IMAGE_DIR, { recursive: true });
+    const fileName = `${req.params.productId}-${Date.now()}.${ext}`;
+    fs.writeFileSync(path.join(PRODUCT_IMAGE_DIR, fileName), buffer);
+
+    const imageUrl = `/assets/uploads/products/${fileName}`;
+    db.prepare("UPDATE products SET image_url = ?, image = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(imageUrl, imageUrl, req.params.productId);
+
+    res.json({ success: true, product: { id: req.params.productId, image_url: imageUrl, image: imageUrl } });
+  } catch (err) {
+    console.error('[API Error POST /admin/products/:productId/image]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -4066,6 +4122,12 @@ router.put('/dine-in/layout/:branch_id', requireAuth(['owner', 'brand_manager', 
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
+});
+
+// JSON 404 for any unmatched API request (all methods) — prevents clients that
+// parse with res.json() from ever receiving Express's HTML default body.
+router.use((req, res) => {
+  res.status(404).json({ success: false, error: 'ENDPOINT_NOT_FOUND', status_code: 404 });
 });
 
 module.exports = router;
