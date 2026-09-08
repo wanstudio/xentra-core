@@ -1,0 +1,44 @@
+name: Xentra Reset Admin Password
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: 'Admin username to create or reset (password will be set/reset)'
+        required: true
+      password:
+        description: 'New password (never printed to run logs)'
+        required: true
+
+env:
+  DEPLOY_ROOT: /home/mybangjo/xentra-core
+  NODE_VENV: /home/mybangjo/nodevenv/xentra-core/20
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.XENTRA_SSH_KEY }}
+          SSH_HOST: ${{ secrets.XENTRA_SSH_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/xentra_deploy_key
+          chmod 600 ~/.ssh/xentra_deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Run reset script
+        env:
+          SSH_HOST: ${{ secrets.XENTRA_SSH_HOST }}
+          SSH_USER: ${{ secrets.XENTRA_SSH_USER }}
+          SSH_PORT: ${{ secrets.XENTRA_SSH_PORT }}
+          USERNAME: ${{ inputs.username }}
+          PASSWORD: ${{ inputs.password }}
+        run: |
+          HASH=$(printf '%s' "$PASSWORD" | sha256sum | cut -d' ' -f1)
+          ssh -i ~/.ssh/xentra_deploy_key \
+            -p "$SSH_PORT" \
+            "$SSH_USER@$SSH_HOST" \
+            "cd '$DEPLOY_ROOT' && source '$NODE_VENV/bin/activate' && node '$DEPLOY_ROOT/tools/reset-admin.js' '$USERNAME' '$HASH'"
