@@ -497,7 +497,7 @@ router.get('/addresses', requireCustomerAuth(), (req, res) => {
     const addresses = db.prepare(`
       SELECT * FROM customer_addresses 
       WHERE brand_id = ? AND customer_phone = ? 
-      ORDER BY is_primary DESC, created_at DESC
+      ORDER BY is_primary DESC, updated_at DESC, created_at DESC
     `).all(req.brand_id, customerPhone);
 
     res.json({ success: true, addresses: addresses || [] });
@@ -508,7 +508,7 @@ router.get('/addresses', requireCustomerAuth(), (req, res) => {
 
 router.post('/addresses', requireCustomerAuth(), (req, res) => {
   try {
-    const { label = 'Rumah', address = '', detail = '', note = '', latitude, longitude } = req.body;
+    const { label = 'Rumah', address = '', detail = '', note = '', latitude, longitude, is_primary } = req.body;
     const customerPhone = req.customer.phone;
 
     if (latitude == null || longitude == null || isNaN(Number(latitude)) || isNaN(Number(longitude))) {
@@ -518,38 +518,61 @@ router.post('/addresses', requireCustomerAuth(), (req, res) => {
       });
     }
 
+    if (!address || !String(address).trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Alamat lengkap wajib diisi.'
+      });
+    }
+
     const addrId = 'addr_' + crypto.randomBytes(6).toString('hex');
     const existingCount = db.prepare('SELECT COUNT(*) as cnt FROM customer_addresses WHERE brand_id = ? AND customer_phone = ?').get(req.brand_id, customerPhone);
-    const isPrimary = (!existingCount || existingCount.cnt === 0) ? 1 : 0;
+    
+    let isPrimary = 0;
+    if (is_primary !== undefined) {
+      isPrimary = (is_primary === 1 || is_primary === true || is_primary === '1') ? 1 : 0;
+    } else {
+      isPrimary = (!existingCount || existingCount.cnt === 0) ? 1 : 0;
+    }
 
+    // If marked as primary, demote any existing primary addresses for this customer & brand
+    if (isPrimary === 1) {
+      db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_phone = ?').run(req.brand_id, customerPhone);
+    }
+
+    const now = new Date().toISOString();
     db.prepare(`
       INSERT INTO customer_addresses (
-        id, brand_id, customer_phone, label, address, detail, note, latitude, longitude, is_primary
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, brand_id, customer_phone, label, address, detail, note, latitude, longitude, is_primary, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       addrId,
       req.brand_id,
       customerPhone,
-      label,
-      address,
-      detail || '',
-      note || '',
+      (label || 'Rumah').trim(),
+      String(address).trim(),
+      (detail || '').trim(),
+      (note || '').trim(),
       Number(latitude),
       Number(longitude),
-      isPrimary
+      isPrimary,
+      now,
+      now
     );
 
     const created = {
       id: addrId,
       brand_id: req.brand_id,
       customer_phone: customerPhone,
-      label,
-      address,
-      detail,
-      note,
+      label: (label || 'Rumah').trim(),
+      address: String(address).trim(),
+      detail: (detail || '').trim(),
+      note: (note || '').trim(),
       latitude: Number(latitude),
       longitude: Number(longitude),
-      is_primary: isPrimary
+      is_primary: isPrimary,
+      created_at: now,
+      updated_at: now
     };
 
     res.status(201).json({ success: true, address: created });
@@ -558,10 +581,95 @@ router.post('/addresses', requireCustomerAuth(), (req, res) => {
   }
 });
 
+router.put('/addresses/:id', requireCustomerAuth(), (req, res) => {
+  try {
+    const customerPhone = req.customer.phone;
+    const existing = db.prepare('SELECT * FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').get(req.params.id, req.brand_id, customerPhone);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Alamat tidak ditemukan atau Anda tidak memiliki akses.' });
+    }
+
+    const { label, address, detail, note, latitude, longitude, is_primary } = req.body;
+
+    const newLabel = label !== undefined ? String(label).trim() : existing.label;
+    const newAddress = address !== undefined ? String(address).trim() : existing.address;
+    const newDetail = detail !== undefined ? String(detail).trim() : existing.detail;
+    const newNote = note !== undefined ? String(note).trim() : existing.note;
+
+    if (newAddress === '') {
+      return res.status(400).json({ success: false, error: 'Alamat lengkap tidak boleh kosong.' });
+    }
+
+    let newLat = existing.latitude;
+    let newLng = existing.longitude;
+    if (latitude !== undefined) {
+      if (latitude == null || isNaN(Number(latitude))) {
+        return res.status(400).json({ success: false, error: 'Latitude harus berupa angka valid.' });
+      }
+      newLat = Number(latitude);
+    }
+    if (longitude !== undefined) {
+      if (longitude == null || isNaN(Number(longitude))) {
+        return res.status(400).json({ success: false, error: 'Longitude harus berupa angka valid.' });
+      }
+      newLng = Number(longitude);
+    }
+
+    let newIsPrimary = existing.is_primary;
+    if (is_primary !== undefined) {
+      newIsPrimary = (is_primary === 1 || is_primary === true || is_primary === '1') ? 1 : 0;
+      if (newIsPrimary === 1) {
+        db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_phone = ? AND id != ?').run(req.brand_id, customerPhone, req.params.id);
+      }
+    }
+
+    const now = new Date().toISOString();
+    db.prepare(`
+      UPDATE customer_addresses
+      SET label = ?, address = ?, detail = ?, note = ?, latitude = ?, longitude = ?, is_primary = ?, updated_at = ?
+      WHERE id = ? AND brand_id = ? AND customer_phone = ?
+    `).run(
+      newLabel,
+      newAddress,
+      newDetail,
+      newNote,
+      newLat,
+      newLng,
+      newIsPrimary,
+      now,
+      req.params.id,
+      req.brand_id,
+      customerPhone
+    );
+
+    const updated = {
+      id: req.params.id,
+      brand_id: req.brand_id,
+      customer_phone: customerPhone,
+      label: newLabel,
+      address: newAddress,
+      detail: newDetail,
+      note: newNote,
+      latitude: newLat,
+      longitude: newLng,
+      is_primary: newIsPrimary,
+      created_at: existing.created_at,
+      updated_at: now
+    };
+
+    res.json({ success: true, address: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.delete('/addresses/:id', requireCustomerAuth(), (req, res) => {
   try {
     const customerPhone = req.customer.phone;
-    db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').run(req.params.id, req.brand_id, customerPhone);
+    const result = db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').run(req.params.id, req.brand_id, customerPhone);
+    if (result.changes === 0) {
+      return res.status(404).json({ success: false, error: 'Alamat tidak ditemukan atau Anda tidak memiliki akses.' });
+    }
     res.json({ success: true, message: 'Alamat berhasil dihapus.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -3763,7 +3871,12 @@ const { DiningTableService, TableRecommendationService } = require('../../domain
 // Customer / Public: Get Branch Floor Plan & Operational Table State
 router.get('/dine-in/layout', (req, res) => {
   try {
-    const branchId = req.query.branch_id || (req.query.branchId ? req.query.branchId : null);
+    let branchId = req.query.branch_id || (req.query.branchId ? req.query.branchId : null);
+    if (!branchId && req.brand_id) {
+      const defaultBranch = db.prepare('SELECT id FROM branches WHERE brand_id = ? AND is_active = 1 ORDER BY is_delivery_active DESC, created_at ASC LIMIT 1').get(req.brand_id);
+      if (defaultBranch) branchId = defaultBranch.id;
+    }
+
     if (!branchId) {
       return res.status(400).json({ success: false, error: 'branch_id parameter wajib disertakan.' });
     }
@@ -3778,7 +3891,12 @@ router.get('/dine-in/layout', (req, res) => {
 // Customer: Recommend Table(s) based on Guest Count & Spatial Proximity
 router.post('/dine-in/recommend-tables', (req, res) => {
   try {
-    const { branch_id, guest_count } = req.body;
+    let { branch_id, guest_count } = req.body || {};
+    if (!branch_id && req.brand_id) {
+      const defaultBranch = db.prepare('SELECT id FROM branches WHERE brand_id = ? AND is_active = 1 ORDER BY is_delivery_active DESC, created_at ASC LIMIT 1').get(req.brand_id);
+      if (defaultBranch) branch_id = defaultBranch.id;
+    }
+
     if (!branch_id) {
       return res.status(400).json({ success: false, error: 'branch_id wajib diisi.' });
     }

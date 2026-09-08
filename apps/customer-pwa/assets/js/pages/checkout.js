@@ -360,14 +360,14 @@
       state.customer.isVerified = !!hasValidToken;
     }
 
-    // Restore location
-    var savedLoc = storeState.location;
-    if (savedLoc && savedLoc.formatted_address) {
-      state.address.formatted_address = savedLoc.formatted_address;
-      if (savedLoc.latitude) state.address.latitude = savedLoc.latitude;
-      if (savedLoc.longitude) state.address.longitude = savedLoc.longitude;
-      if (savedLoc.label) state.address.label = savedLoc.label;
-      if (savedLoc.detail) state.address.detail = savedLoc.detail;
+    // Restore canonical active destination / location
+    var savedDest = storeState.activeDestination || storeState.location;
+    if (savedDest && (savedDest.address || savedDest.formatted_address)) {
+      state.address.formatted_address = savedDest.address || savedDest.formatted_address;
+      if (savedDest.latitude != null) state.address.latitude = Number(savedDest.latitude);
+      if (savedDest.longitude != null) state.address.longitude = Number(savedDest.longitude);
+      if (savedDest.label) state.address.label = savedDest.label;
+      if (savedDest.detail) state.address.detail = savedDest.detail;
     }
 
     // Restore order type
@@ -1561,37 +1561,27 @@
       };
 
       function fetchLayout(bid) {
-        API.get('/dine-in/layout?branch_id=' + encodeURIComponent(bid))
+        var endpoint = bid ? ('/dine-in/layout?branch_id=' + encodeURIComponent(bid)) : '/dine-in/layout';
+        API.get(endpoint)
           .then(function (res) {
             if (res && res.success && res.layout) {
               dineInLayoutData = res.layout;
+              if (res.layout.branch_id && (!state.matchedBranch || !state.matchedBranch.id)) {
+                state.matchedBranch = { id: res.layout.branch_id, name: 'Bangjo' };
+              }
               autoRecommendTable();
             } else {
+              var msg = (res && res.error) ? res.error : 'Gagal memuat denah meja.';
               schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
-                '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">Gagal memuat denah meja.</div>';
+                '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">' + msg + '</div>';
             }
           })
           .catch(function (err) {
             console.warn('[Checkout] Load dine-in layout error:', err);
+            var errMsg = (err && (err.message || (err.data && err.data.error))) || 'Gagal memuat denah meja.';
             schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
-              '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">Gagal memuat denah meja.</div>';
+              '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">' + errMsg + '</div>';
           });
-      }
-
-      if (!branchId && (!availableBranches || availableBranches.length === 0)) {
-        loadBranches();
-        setTimeout(function () {
-          var fbRetry = getFulfillmentBranch();
-          var retryBranch = state.matchedBranch || (fbRetry ? { id: fbRetry.id } : null) || (availableBranches && availableBranches[0]) || null;
-          var retryId = retryBranch ? retryBranch.id : '';
-          if (retryId) {
-            fetchLayout(retryId);
-          } else {
-            schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
-              '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">Gagal memuat denah meja (cabang belum dipilih).</div>';
-          }
-        }, 300);
-        return;
       }
 
       fetchLayout(branchId);
@@ -1601,7 +1591,7 @@
       if (!dineInLayoutData) return;
       var fb = getFulfillmentBranch();
       var curBranch = state.matchedBranch || (fb ? { id: fb.id } : null) || (availableBranches && availableBranches[0]) || null;
-      var branchId = curBranch ? curBranch.id : (currentBranchId || '');
+      var branchId = curBranch ? curBranch.id : (currentBranchId || (dineInLayoutData && dineInLayoutData.branch_id) || '');
 
       API.post('/dine-in/recommend-tables', {
         branch_id: branchId,
@@ -2006,13 +1996,26 @@
       state.address.detail = d;
 
       try {
-        Store.setLocation({
-          formatted_address: state.address.formatted_address,
-          latitude: state.address.latitude,
-          longitude: state.address.longitude,
-          label: state.address.label,
-          detail: state.address.detail
-        });
+        if (Store.setActiveDestination) {
+          Store.setActiveDestination({
+            address: state.address.formatted_address,
+            formatted_address: state.address.formatted_address,
+            latitude: state.address.latitude,
+            longitude: state.address.longitude,
+            label: state.address.label,
+            detail: state.address.detail,
+            source: 'manual',
+            is_explicit: true
+          });
+        } else {
+          Store.setLocation({
+            formatted_address: state.address.formatted_address,
+            latitude: state.address.latitude,
+            longitude: state.address.longitude,
+            label: state.address.label,
+            detail: state.address.detail
+          });
+        }
       } catch (_) {}
 
       sh.close();

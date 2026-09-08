@@ -618,6 +618,8 @@ function initSchema(targetDb) {
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
     );
+    CREATE INDEX IF NOT EXISTS idx_customer_addresses_phone ON customer_addresses(brand_id, customer_phone);
+
 
     CREATE TABLE IF NOT EXISTS promotions (
       id TEXT PRIMARY KEY,

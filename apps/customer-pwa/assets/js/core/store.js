@@ -9,6 +9,7 @@
   var CART_KEY = PREFIX + 'cart';
   var NOTES_KEY = PREFIX + 'notes';
   var LOCATION_KEY = PREFIX + 'location';
+  var ACTIVE_DESTINATION_KEY = PREFIX + 'active_destination';
   var BRANCH_KEY = PREFIX + 'branch';
   var SESSION_KEY = PREFIX + 'customer_session';
   var ORDER_TYPE_KEY = PREFIX + 'order_type';
@@ -16,6 +17,22 @@
   var BRANCH_CTX_KEY = PREFIX + 'branch_context';
 
   var listeners = [];
+
+  // Initialize initial activeDestination, falling back to legacy location if present
+  var initialActiveDest = load(ACTIVE_DESTINATION_KEY, null);
+  var initialLoc = load(LOCATION_KEY, null);
+  if (!initialActiveDest && initialLoc) {
+    initialActiveDest = {
+      latitude: initialLoc.latitude != null ? Number(initialLoc.latitude) : null,
+      longitude: initialLoc.longitude != null ? Number(initialLoc.longitude) : null,
+      address: initialLoc.formatted_address || initialLoc.address || '',
+      label: initialLoc.label || 'Lokasi Terpilih',
+      detail: initialLoc.detail || '',
+      source: initialLoc.source || 'manual',
+      is_explicit: initialLoc.is_explicit !== undefined ? Boolean(initialLoc.is_explicit) : true,
+      updated_at: initialLoc.updated_at || new Date().toISOString()
+    };
+  }
 
   var state = {
     brand: null,
@@ -27,7 +44,17 @@
       dine_in: { tableNumber: '', note: '' },
       reservation: { reservationDate: '', reservationTime: '12:00', guestCount: 2, note: '' }
     }),
-    location: load(LOCATION_KEY, null),
+    location: initialLoc || (initialActiveDest ? {
+      formatted_address: initialActiveDest.address,
+      latitude: initialActiveDest.latitude,
+      longitude: initialActiveDest.longitude,
+      label: initialActiveDest.label,
+      detail: initialActiveDest.detail
+    } : null),
+    // CANONICAL ACTIVE DESTINATION
+    // Current customer destination context. Can exist for guest or authenticated customer.
+    // Can originate from 'gps', 'search', 'map', 'favorite', or 'manual'.
+    activeDestination: initialActiveDest,
     matchedBranch: load(BRANCH_KEY, null),
     // P2 HOME DISCOVERY CONTEXT: the branch context the customer is currently
     // browsing/selecting from Home. It is a DISCOVERY/CUSTOMER-SELECTION
@@ -116,9 +143,81 @@
 
   function setLocation(loc) {
     state.location = loc;
+    if (loc && loc.latitude != null && loc.longitude != null) {
+      state.activeDestination = {
+        latitude: Number(loc.latitude),
+        longitude: Number(loc.longitude),
+        address: loc.formatted_address || loc.address || '',
+        label: loc.label || 'Lokasi Terpilih',
+        detail: loc.detail || '',
+        source: loc.source || 'manual',
+        is_explicit: loc.is_explicit !== undefined ? Boolean(loc.is_explicit) : true,
+        updated_at: loc.updated_at || new Date().toISOString()
+      };
+      save(ACTIVE_DESTINATION_KEY, state.activeDestination);
+    } else if (loc === null) {
+      state.activeDestination = null;
+      try { localStorage.removeItem(ACTIVE_DESTINATION_KEY); } catch (_) {}
+    }
     notify({ type: 'location' });
     save(LOCATION_KEY, loc);
   }
+
+  // CANONICAL ACTIVE DESTINATION SETTER
+  // Accepts canonical destination shape:
+  // { latitude, longitude, address, label, detail, source, is_explicit }
+  function setActiveDestination(dest) {
+    if (!dest) {
+      state.activeDestination = null;
+      state.location = null;
+      try { localStorage.removeItem(ACTIVE_DESTINATION_KEY); } catch (_) {}
+      try { localStorage.removeItem(LOCATION_KEY); } catch (_) {}
+      notify({ type: 'activeDestination' });
+      return;
+    }
+
+    var lat = dest.latitude != null ? Number(dest.latitude) : null;
+    var lng = dest.longitude != null ? Number(dest.longitude) : null;
+    var addr = dest.address || dest.formatted_address || '';
+    var label = dest.label || 'Lokasi Terpilih';
+    var detail = dest.detail || '';
+    var source = dest.source || 'manual'; // 'gps' | 'search' | 'map' | 'favorite' | 'manual'
+    var isExplicit = dest.is_explicit !== undefined ? Boolean(dest.is_explicit) : (source !== 'gps');
+
+    var canonical = {
+      latitude: lat,
+      longitude: lng,
+      address: addr,
+      label: label,
+      detail: detail,
+      source: source,
+      is_explicit: isExplicit,
+      favorite_id: dest.favorite_id || null,
+      updated_at: new Date().toISOString()
+    };
+
+    state.activeDestination = canonical;
+    save(ACTIVE_DESTINATION_KEY, canonical);
+
+    // Keep legacy location state synchronized for backward compatibility with existing callers
+    state.location = {
+      formatted_address: addr,
+      latitude: lat,
+      longitude: lng,
+      label: label,
+      detail: detail,
+      source: source,
+      is_explicit: isExplicit
+    };
+    save(LOCATION_KEY, state.location);
+
+    notify({ type: 'activeDestination' });
+  }
+
+  function getActiveDestination() {
+    return state.activeDestination ? Object.assign({}, state.activeDestination) : null;
+  }
+
 
   function setMatchedBranch(data) {
     state.matchedBranch = data;
@@ -364,6 +463,8 @@
     setOrderType: setOrderType,
     setOrderContext: setOrderContext,
     setLocation: setLocation,
+    setActiveDestination: setActiveDestination,
+    getActiveDestination: getActiveDestination,
     setMatchedBranch: setMatchedBranch,
     setBranchContext: setBranchContext,
     setPromo: setPromo,

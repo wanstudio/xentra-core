@@ -101,7 +101,7 @@ test('P3-07 product-page add never creates an order or a fulfillment_branch_id',
 
   // Cart delta is the ONLY mutation from an add.
   const keys = Object.keys(state).sort();
-  assert.deepStrictEqual(keys, ['branchContext', 'brand', 'cart', 'customerSession', 'location', 'matchedBranch', 'notes', 'orderContext', 'orderType', 'promo']);
+  assert.deepStrictEqual(keys, ['activeDestination', 'branchContext', 'brand', 'cart', 'customerSession', 'location', 'matchedBranch', 'notes', 'orderContext', 'orderType', 'promo']);
 });
 
 test('P3-08 client price/stock are display-only and can never become server authority', () => {

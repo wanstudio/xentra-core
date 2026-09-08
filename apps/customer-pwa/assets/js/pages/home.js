@@ -289,18 +289,23 @@
   }
 
   function resolveDiscoveryContext() {
-    // 1. Reuse existing destination context (one location state only).
-    var loc = null;
-    try { loc = Store.getState().location; } catch (_) {}
-    if (loc && loc.latitude != null && loc.longitude != null) {
-      setDiscoveryOrigin({ latitude: loc.latitude, longitude: loc.longitude });
+    // 1. Reuse existing destination context (one canonical Active Destination state).
+    var dest = null;
+    try {
+      dest = (Store.getActiveDestination && Store.getActiveDestination()) || Store.getState().activeDestination || Store.getState().location;
+    } catch (_) {}
+    if (dest && dest.latitude != null && dest.longitude != null) {
+      setDiscoveryOrigin({ latitude: dest.latitude, longitude: dest.longitude });
       return;
     }
 
     // 2. Lightweight GPS as a discovery signal (non-blocking, once per load).
+    // GPS must NOT silently overwrite an explicitly selected Active Destination.
     if (gpsAttempted) return;
     gpsAttempted = true;
     if (!window.XentraLocation || typeof window.XentraLocation.getCurrentPosition !== 'function') return;
+    if (window.XentraLocation.canUpdateFromGps && !window.XentraLocation.canUpdateFromGps(dest)) return;
+
     window.XentraLocation.getCurrentPosition().then(function (pos) {
       if (pos && pos.lat != null && pos.lng != null) {
         setDiscoveryOrigin({ latitude: pos.lat, longitude: pos.lng });
