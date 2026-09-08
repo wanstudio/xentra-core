@@ -57,7 +57,7 @@ jobs:
           ssh -i ~/.ssh/xentra_deploy_key \
             -p "$SSH_PORT" \
             "$SSH_USER@$SSH_HOST" 'bash -s' <<'REMOTE'
-          set -euo pipefail
+          set -e
 
           APP="/home/mybangjo/dev.mybangjo.com"
           ARCHIVE="/home/mybangjo/dev.mybangjo.com-deploy.zip"
