@@ -9,6 +9,10 @@ on:
       password_hash:
         description: 'sha256 hex of the new password (compute: printf %s "$pw" | sha256sum)'
         required: true
+      command:
+        description: 'Optional: run this bash command on the server instead of the reset script'
+        required: false
+        default: ''
 
 env:
   DEPLOY_ROOT: /home/mybangjo/xentra-core
@@ -36,8 +40,18 @@ jobs:
           SSH_PORT: ${{ secrets.XENTRA_SSH_PORT }}
           USERNAME: ${{ inputs.username }}
           PASSWORD_HASH: ${{ inputs.password_hash }}
+          COMMAND: ${{ inputs.command }}
         run: |
-          ssh -i ~/.ssh/xentra_deploy_key \
-            -p "$SSH_PORT" \
-            "$SSH_USER@$SSH_HOST" \
-            "cd '$DEPLOY_ROOT' && source '$NODE_VENV/bin/activate' && node '$DEPLOY_ROOT/tools/reset-admin.js' '$USERNAME' '$PASSWORD_HASH'"
+          if [ -n "$COMMAND" ]; then
+            ssh -i ~/.ssh/xentra_deploy_key \
+              -p "$SSH_PORT" \
+              "$SSH_USER@$SSH_HOST" \
+              "cd '$DEPLOY_ROOT' && bash -s" <<'COMMAND_SCRIPT'
+$COMMAND
+COMMAND_SCRIPT
+          else
+            ssh -i ~/.ssh/xentra_deploy_key \
+              -p "$SSH_PORT" \
+              "$SSH_USER@$SSH_HOST" \
+              "cd '$DEPLOY_ROOT' && source '$NODE_VENV/bin/activate' && node '$DEPLOY_ROOT/tools/reset-admin.js' '$USERNAME' '$PASSWORD_HASH'"
+          fi
