@@ -43,12 +43,10 @@ jobs:
           COMMAND: ${{ inputs.command }}
         run: |
           if [ -n "$COMMAND" ]; then
-            ssh -i ~/.ssh/xentra_deploy_key \
+            printf '%s\n' "$COMMAND" | ssh -i ~/.ssh/xentra_deploy_key \
               -p "$SSH_PORT" \
               "$SSH_USER@$SSH_HOST" \
-              "cd '$DEPLOY_ROOT' && bash -s" <<'COMMAND_SCRIPT'
-              $COMMAND
-              COMMAND_SCRIPT
+              "cd '$DEPLOY_ROOT' && bash -s"
           else
             ssh -i ~/.ssh/xentra_deploy_key \
               -p "$SSH_PORT" \
