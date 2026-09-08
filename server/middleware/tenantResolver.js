@@ -1,7 +1,11 @@
 const db = require('../database/db');
 
-function tenantResolver(req, res, next) {
+async function tenantResolver(req, res, next) {
   try {
+    if (db && db.readyPromise) {
+      await db.readyPromise;
+    }
+
     const host = req.headers.host || '';
     const cleanHost = host.split(':')[0].toLowerCase();
     const brandParam = req.query.brand || req.headers['x-brand-slug'] || '';

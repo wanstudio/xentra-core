@@ -83,3 +83,36 @@ test('SQL.JS FK Enforcement — Case C: Native runtime (current db) has foreign 
     'Inserting branch with invalid brand_id must fail foreign key constraint'
   );
 });
+
+test('SQL.JS Adapter Contract — Error propagation and changes count', async () => {
+  const SQL = await initSqlJs();
+  const rawSqlDb = new SQL.Database();
+  rawSqlDb.run('PRAGMA foreign_keys = ON;');
+  rawSqlDb.run('CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT);');
+
+  // Test prepared insert
+  const insertStmt = rawSqlDb.prepare('INSERT INTO users (id, name) VALUES (?, ?);');
+  insertStmt.bind(['u1', 'User One']);
+  insertStmt.step();
+  insertStmt.free();
+  assert.strictEqual(rawSqlDb.getRowsModified(), 1, 'getRowsModified must return 1 on successful insert');
+
+  // Test duplicate insert throws UNIQUE constraint failed
+  const dupStmt = rawSqlDb.prepare('INSERT INTO users (id, name) VALUES (?, ?);');
+  dupStmt.bind(['u1', 'User One Duplicate']);
+  assert.throws(() => {
+    try {
+      dupStmt.step();
+    } finally {
+      dupStmt.free();
+    }
+  }, /UNIQUE constraint failed/i);
+
+  // Test update modified count
+  const updateStmt = rawSqlDb.prepare('UPDATE users SET name = ? WHERE id = ?;');
+  updateStmt.bind(['Updated User', 'non_existent_id']);
+  updateStmt.step();
+  updateStmt.free();
+  assert.strictEqual(rawSqlDb.getRowsModified(), 0, 'getRowsModified must return 0 when no rows match');
+});
+

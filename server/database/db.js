@@ -21,6 +21,7 @@ let rawSqlDb = null;
 // Runtime Persistence Invariant:
 // In Node.js >= 22.x LTS, native node:sqlite is used with WAL mode.
 // On Node.js <= 20.x LTS (e.g. cPanel CloudLinux Passenger), sql.js / memoryStore is used as compatible fallback.
+let dbReadyPromise = null;
 const nodeVersion = process.version;
 try {
   const { DatabaseSync } = require('node:sqlite');
@@ -29,6 +30,7 @@ try {
   dbInstance.exec('PRAGMA journal_mode = WAL;');
   dbInstance.exec('PRAGMA busy_timeout = 5000;');
   console.log(`[Database] Native node:sqlite persistent storage initialized successfully (Node ${nodeVersion}, WAL mode).`);
+  dbReadyPromise = Promise.resolve();
 } catch (e) {
   try {
     const initSqlJs = require('sql.js');
@@ -46,23 +48,111 @@ try {
       }
       rawSqlDb.run('PRAGMA foreign_keys = ON;');
       console.log(`[Database] sql.js database adapter ready on Node ${nodeVersion} (PRAGMA foreign_keys = ON).`);
+      initSchema(db);
     }).catch(err => {
       console.warn('[Database] sql.js fallback error, using memoryStore:', err.message);
     });
+    dbReadyPromise = sqlJsPromise;
   } catch (_) {
     console.log(`[Database] node:sqlite and sql.js unavailable on Node ${nodeVersion}. Using memoryStore.`);
+    dbReadyPromise = Promise.resolve();
   }
 }
 
-function saveSqlJsToDisk() {
-  if (!rawSqlDb) return;
-  try {
-    const data = rawSqlDb.export();
-    fs.writeFileSync(DB_PATH, Buffer.from(data));
-  } catch (err) {
-    console.error('[Database] Failed to write sql.js to disk:', err);
+let saveTimeout = null;
+let isSaving = false;
+let saveQueued = false;
+
+function saveSqlJsToDisk(immediate = false) {
+  if (!rawSqlDb || DB_PATH === ':memory:') return;
+
+  if (sqlJsTxActive) {
+    saveQueued = true;
+    return;
+  }
+
+  const doSaveSync = () => {
+    try {
+      const data = rawSqlDb.export();
+      const tmpPath = `${DB_PATH}.tmp.${process.pid}.${Date.now()}`;
+      fs.writeFileSync(tmpPath, Buffer.from(data));
+      fs.renameSync(tmpPath, DB_PATH);
+    } catch (err) {
+      console.error('[Database] Failed to write sql.js to disk (sync):', err);
+    }
+  };
+
+  const doSaveAsync = () => {
+    if (isSaving) {
+      saveQueued = true;
+      return;
+    }
+    if (sqlJsTxActive) {
+      saveQueued = true;
+      return;
+    }
+
+    let data;
+    try {
+      data = rawSqlDb.export();
+    } catch (err) {
+      console.error('[Database] Failed to export sql.js:', err);
+      return;
+    }
+
+    isSaving = true;
+    saveQueued = false;
+    const tmpPath = `${DB_PATH}.tmp.${process.pid}.${Date.now()}`;
+    const buffer = Buffer.from(data);
+
+    fs.promises.writeFile(tmpPath, buffer)
+      .then(() => fs.promises.rename(tmpPath, DB_PATH))
+      .catch((err) => {
+        console.error('[Database] Failed to write sql.js to disk (async):', err);
+        try {
+          if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+        } catch (_) {}
+      })
+      .finally(() => {
+        isSaving = false;
+        if (saveQueued && !sqlJsTxActive) {
+          saveSqlJsToDisk(false);
+        }
+      });
+  };
+
+  if (immediate) {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout);
+      saveTimeout = null;
+    }
+    doSaveSync();
+  } else {
+    if (saveTimeout) return;
+    saveTimeout = setTimeout(() => {
+      saveTimeout = null;
+      doSaveAsync();
+    }, 50);
+    if (saveTimeout.unref) saveTimeout.unref();
   }
 }
+
+// Ensure flush to disk on graceful shutdown or exit
+const flushOnExit = () => {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout);
+    saveTimeout = null;
+  }
+  if (rawSqlDb && DB_PATH !== ':memory:') {
+    try {
+      const data = rawSqlDb.export();
+      fs.writeFileSync(DB_PATH, Buffer.from(data));
+    } catch (_) {}
+  }
+};
+process.on('beforeExit', flushOnExit);
+process.on('SIGINT', () => { flushOnExit(); process.exit(0); });
+process.on('SIGTERM', () => { flushOnExit(); process.exit(0); });
 
 // In-Memory test/mock store
 const memoryStore = {
@@ -280,49 +370,71 @@ const db = {
         sqlJsTxActive = true;
       } else if (tx === 'commit' || tx === 'rollback') {
         sqlJsTxActive = false;
-        saveSqlJsToDisk();
+        saveSqlJsToDisk(false);
       } else if (!sqlJsTxActive) {
-        saveSqlJsToDisk();
+        saveSqlJsToDisk(false);
       }
       return res;
     }
     if (sqlJsPromise) {
-      sqlJsPromise.then(d => { d.run(sql); saveSqlJsToDisk(); }).catch(() => {});
+      throw new Error('[Database] sql.js is still initializing or unavailable.');
     }
   },
   prepare: (sql) => {
     if (dbInstance) return dbInstance.prepare(sql);
     if (rawSqlDb) {
+      const tx = detectTransactionStatement(sql);
       return {
         all: (...params) => {
+          const stmt = rawSqlDb.prepare(sql);
           try {
-            const stmt = rawSqlDb.prepare(sql);
             stmt.bind(params);
             const rows = [];
             while (stmt.step()) rows.push(stmt.getAsObject());
-            stmt.free();
             return rows;
-          } catch (_) { return []; }
+          } finally {
+            stmt.free();
+          }
         },
         get: (...params) => {
+          const stmt = rawSqlDb.prepare(sql);
           try {
-            const stmt = rawSqlDb.prepare(sql);
             stmt.bind(params);
             let row = undefined;
             if (stmt.step()) row = stmt.getAsObject();
-            stmt.free();
             return row;
-          } catch (_) { return undefined; }
+          } finally {
+            stmt.free();
+          }
         },
         run: (...params) => {
+          const stmt = rawSqlDb.prepare(sql);
           try {
-            const stmt = rawSqlDb.prepare(sql);
             stmt.bind(params);
             stmt.step();
+          } finally {
             stmt.free();
-            if (!sqlJsTxActive) saveSqlJsToDisk();
-            return { changes: 1 };
-          } catch (_) { return { changes: 1 }; }
+          }
+
+          if (tx === 'begin') {
+            sqlJsTxActive = true;
+          } else if (tx === 'commit' || tx === 'rollback') {
+            sqlJsTxActive = false;
+            saveSqlJsToDisk(false);
+          } else if (!sqlJsTxActive) {
+            saveSqlJsToDisk(false);
+          }
+
+          const changes = rawSqlDb.getRowsModified();
+          let lastInsertRowid = 0;
+          try {
+            const rowidRes = rawSqlDb.exec('SELECT last_insert_rowid() AS id;');
+            if (rowidRes && rowidRes.length > 0 && rowidRes[0].values && rowidRes[0].values.length > 0) {
+              lastInsertRowid = rowidRes[0].values[0][0];
+            }
+          } catch (_) {}
+
+          return { changes, lastInsertRowid };
         }
       };
     }
@@ -1442,13 +1554,11 @@ function seedInstallPromotion(targetDb, brandId) {
   `).run();
 }
 
-// Auto-run schema initialization
+db.readyPromise = dbReadyPromise;
+
+// Auto-run schema initialization for native instance (sql.js runs it in sqlJsPromise callback)
 if (dbInstance) {
   initSchema(db);
-} else if (sqlJsPromise) {
-  sqlJsPromise.then(raw => {
-    initSchema(db);
-  });
 }
 
 module.exports = db;
