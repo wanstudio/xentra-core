@@ -864,7 +864,7 @@
         : '';
 
       var unavailableTag = unavailable
-        ? '<div class="x-unavailable-tag">Tidak tersedia di cabang ini</div>'
+        ? '<div class="x-unavailable-tag">Habis</div>'
         : '';
 
       var controls = '';
@@ -881,7 +881,7 @@
           '  Catatan' +
           '</button>';
       } else if (unavailable) {
-        controls = '<span class="x-unavailable-label">Tidak tersedia</span>';
+        controls = '<span class="x-unavailable-label">Habis</span>';
       } else {
         controls = '<button type="button" class="x-add" data-add="' + product.id + '">Tambah</button>';
       }
@@ -1103,7 +1103,7 @@
       ? '<span class="x-detail-old-price">' + UI.money(regPrice) + '</span>'
       : '';
     var availabilityHtml = unavailable
-      ? '<div class="x-unavailable-tag">Tidak tersedia di cabang ini</div>'
+      ? '<div class="x-unavailable-tag">Habis</div>'
       : '';
     var branchLabelHtml = branchCtx
       ? '<div class="x-detail-branch">' + UI.escape(branchCtx.branch_name || '') + '</div>'
@@ -1127,7 +1127,7 @@
       '    <div class="x-detail-price">' + oldPriceHtml + '<span class="x-detail-current">' + UI.money(price) + '</span></div>' +
       '    <div class="x-detail-add-area">' +
       (unavailable
-        ? '<button type="button" class="x-detail-add" disabled>Tidak tersedia</button>'
+        ? '<button type="button" class="x-detail-add" disabled>Habis</button>'
         : '<button type="button" class="x-detail-add">' + (scopedQty > 0 ? 'Tambah lagi' : 'Masukkan ke keranjang') + '</button>') +
       cartHint +
       '    </div>' +

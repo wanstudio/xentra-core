@@ -3136,9 +3136,15 @@ router.get('/admin/branches/:id/catalog', requireAuth(['owner', 'brand_manager',
     const adoptedProducts = db.prepare(`
       SELECT 
         bp.product_id,
-        COALESCE(bp.product_name, p.name) as name,
-        COALESCE(bp.product_description, p.description) as description,
-        COALESCE(bp.product_image_url, p.image_url) as image_url,
+        COALESCE(bp.name_override, p.name) as name,
+        COALESCE(bp.description_override, p.description) as description,
+        COALESCE(bp.image_override, p.image_url) as image_url,
+        bp.name_override,
+        bp.description_override,
+        bp.image_override,
+        p.name as master_name,
+        p.description as master_description,
+        p.image_url as master_image_url,
         bp.branch_category_id,
         bc.name as branch_category_name,
         bp.price,
@@ -3366,7 +3372,8 @@ router.delete('/admin/branches/:id/products/:productId', requireAuth(['owner', '
   }
 });
 
-// C1.8-OVR Branch Product Override — set or clear per-field content overrides.
+// C1.8-OVR Branch Product Override — set or clear per-field content overrides
+// plus pricing policy (price) and category assignment (branch_category_id).
 // NULL body field = clear override (branch falls back to live Master Product value).
 // Non-null body field = branch override wins at query time via COALESCE in CatalogService.
 router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
@@ -3387,7 +3394,13 @@ router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['o
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
 
-    const bp = db.prepare('SELECT branch_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(req.params.id, req.params.productId);
+    const bp = db.prepare(`
+      SELECT bp.branch_id, bp.branch_category_id, bp.price,
+             p.price as master_price, p.pricing_mode, p.min_price, p.max_price
+      FROM branch_products bp
+      JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
+      WHERE bp.branch_id = ? AND bp.product_id = ?
+    `).get(req.brand_id, req.params.id, req.params.productId);
     if (!bp) {
       return res.status(404).json({ success: false, error: 'Produk tidak ditemukan di katalog cabang ini.' });
     }
@@ -3405,8 +3418,66 @@ router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['o
       updates.image_override = req.body.image_url != null ? String(req.body.image_url).trim() || null : null;
     }
 
+    // price — enforced by the same locked PricingPolicyModel used at adopt time:
+    //   lock  → branch CANNOT change price (custom price rejected, master wins)
+    //   range → branch price must sit inside [min_price, max_price]
+    if (Object.prototype.hasOwnProperty.call(req.body, 'price')) {
+      const rawPrice = req.body.price;
+      const mode = (bp.pricing_mode || 'lock').toLowerCase();
+
+      const branchPrice = (rawPrice === null || rawPrice === '' || rawPrice === undefined)
+        ? bp.master_price
+        : Number(rawPrice);
+      if (!Number.isFinite(branchPrice) || branchPrice < 0) {
+        return res.status(400).json({ success: false, error: 'INVALID_BRANCH_PRICE', message: 'Harga cabang harus berupa angka positif.' });
+      }
+      if (mode === 'lock' && branchPrice !== bp.master_price) {
+        return res.status(403).json({
+          success: false,
+          error: 'PRICE_LOCKED',
+          message: 'Harga cabang dikunci owner. Tidak dapat diubah oleh cabang.'
+        });
+      }
+      try {
+        const resolved = PricingPolicyModel.resolvePrice(
+          {
+            price: bp.master_price,
+            pricing_mode: mode,
+            min_price: bp.min_price,
+            max_price: bp.max_price
+          },
+          branchPrice
+        );
+        updates.price = resolved.effective_price;
+      } catch (pricingErr) {
+        return res.status(400).json({ success: false, error: 'INVALID_BRANCH_PRICE', message: pricingErr.message });
+      }
+    }
+
+    // branch_category_id — move the adopted product to another Branch-owned
+    // category. Empty/null clears the assignment; the value must belong to THIS
+    // branch (authoritative validation, never trust a cross-branch id).
+    if (Object.prototype.hasOwnProperty.call(req.body, 'branch_category_id')) {
+      const rawCat = req.body.branch_category_id;
+      if (rawCat === null || rawCat === '' || rawCat === undefined) {
+        updates.branch_category_id = null;
+      } else {
+        const catId = String(rawCat).trim();
+        const validCat = db.prepare('SELECT id FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
+          .get(catId, req.params.id, req.brand_id);
+        if (!validCat) {
+          return res.status(400).json({
+            success: false,
+            error: 'FORBIDDEN_BRANCH_SCOPE',
+            message: 'Kategori cabang tidak valid untuk cabang ini.'
+          });
+        }
+        updates.branch_category_id = catId;
+      }
+    }
+
     if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ success: false, error: 'Tidak ada field override yang disediakan (name, description, image_url).' });
+      return res.status(400).json({ success: false, error: 'Tidak ada field override yang disediakan (name, description, image_url, price, branch_category_id).' });
     }
 
     const setParts = Object.keys(updates).map(k => `${k} = ?`).join(', ');
@@ -3420,9 +3491,13 @@ router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['o
         COALESCE(bp.description_override, p.description) as description,
         COALESCE(bp.image_override, p.image_url) as image_url,
         bp.name_override, bp.description_override, bp.image_override,
-        p.name as master_name, p.description as master_description, p.image_url as master_image_url
+        p.name as master_name, p.description as master_description, p.image_url as master_image_url,
+        bp.price, p.price as master_price, p.pricing_mode, p.min_price, p.max_price,
+        bp.branch_category_id, bc.name as branch_category_name,
+        bp.is_available, bp.stock
       FROM branch_products bp
       JOIN products p ON p.id = bp.product_id
+      LEFT JOIN branch_categories bc ON bc.id = bp.branch_category_id
       WHERE bp.branch_id = ? AND bp.product_id = ?
     `).get(req.params.id, req.params.productId);
 
@@ -3529,6 +3604,7 @@ const IMAGE_MIME_TO_EXT = {
 };
 const CATEGORY_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/categories');
 const PRODUCT_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/products');
+const BRANCH_PRODUCT_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/branch-products');
 
 router.post('/admin/branches/:id/categories/:catId/image', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
@@ -3633,6 +3709,67 @@ router.post('/admin/products/:productId/image', requireAuth(['owner', 'brand_man
     res.json({ success: true, product: { id: req.params.productId, image_url: imageUrl, image: imageUrl } });
   } catch (err) {
     console.error('[API Error POST /admin/products/:productId/image]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Upload / replace an adopted (branch) product's own photo override.
+// Mirrors the branch-category and master-product image upload contract so the
+// branch UI uses the same base64 + mime_type flow and the same 3MB limit.
+// The override image is stored per branch (never touches the master product),
+// persisted to disk, and only the resulting URL is written to
+// branch_products.image_override (COALESCE pick-up in CatalogService).
+router.post('/admin/branches/:id/products/:productId/image', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE' });
+      }
+    }
+
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan.' });
+
+    const bp = db.prepare('SELECT branch_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(req.params.id, req.params.productId);
+    if (!bp) return res.status(404).json({ success: false, error: 'Produk tidak ditemukan di katalog cabang ini.' });
+
+    const { image_base64, mime_type } = req.body || {};
+    if (!image_base64 || typeof image_base64 !== 'string') {
+      return res.status(400).json({ success: false, error: 'Gambar menu wajib diunggah.' });
+    }
+
+    const ext = IMAGE_MIME_TO_EXT[String(mime_type || '').toLowerCase()];
+    if (!ext) {
+      return res.status(400).json({ success: false, error: 'Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.' });
+    }
+
+    const rawBase64 = image_base64.includes(',') ? image_base64.split(',').pop() : image_base64;
+    let buffer;
+    try {
+      buffer = Buffer.from(rawBase64, 'base64');
+    } catch (decodeErr) {
+      return res.status(400).json({ success: false, error: 'Gambar tidak dapat diproses (data tidak valid).' });
+    }
+
+    if (!buffer || buffer.length === 0) {
+      return res.status(400).json({ success: false, error: 'Gambar kosong atau rusak.' });
+    }
+    if (buffer.length > IMAGE_MAX_BYTES) {
+      return res.status(400).json({ success: false, error: 'Ukuran gambar melebihi batas maksimal 3MB.' });
+    }
+
+    fs.mkdirSync(BRANCH_PRODUCT_IMAGE_DIR, { recursive: true });
+    const fileName = `${req.params.id}-${req.params.productId}-${Date.now()}.${ext}`;
+    fs.writeFileSync(path.join(BRANCH_PRODUCT_IMAGE_DIR, fileName), buffer);
+
+    const imageUrl = `/assets/uploads/branch-products/${fileName}`;
+    db.prepare("UPDATE branch_products SET image_override = ?, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?")
+      .run(imageUrl, req.params.id, req.params.productId);
+
+    res.json({ success: true, product: { branch_id: req.params.id, product_id: req.params.productId, image_url: imageUrl, image_override: imageUrl } });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/products/:productId/image]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

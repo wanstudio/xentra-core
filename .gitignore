@@ -38,3 +38,7 @@ apps/customer-pwa/assets/uploads/categories/*
 # Uploaded menu (product) images (test/runtime artifacts — not source)
 apps/customer-pwa/assets/uploads/products/*
 !apps/customer-pwa/assets/uploads/products/.gitkeep
+
+# Uploaded branch-product override images (test/runtime artifacts — not source)
+apps/customer-pwa/assets/uploads/branch-products/*
+!apps/customer-pwa/assets/uploads/branch-products/.gitkeep

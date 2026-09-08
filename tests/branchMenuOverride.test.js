@@ -35,6 +35,10 @@ const BRANCH_B = 'branch_bangjo_timur';
 const PRODUCT  = 'prod_ovr_test';
 const CAT_ID   = '34';
 
+// 1x1 transparent PNG, base64-encoded — small, valid, deterministic fixture.
+const TINY_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
 // ---- Helpers ----
 
 function mockFetch(path, options) {
@@ -86,6 +90,13 @@ async function patchOverride(branchId, productId, fields, token) {
     method: 'PATCH',
     headers: { authorization: 'Bearer ' + tok },
     body: JSON.stringify(fields)
+  });
+}
+
+async function getAdminCatalog(branchId, token) {
+  var tok = token || (await getAuthToken());
+  return mockFetch('/api/v1/admin/branches/' + branchId + '/catalog', {
+    headers: { authorization: 'Bearer ' + tok }
   });
 }
 
@@ -343,4 +354,146 @@ test('OVR-17 migration: legacy snapshot different from master -> name_override =
   assert.strictEqual(p.name, legacyName, 'catalog returns migrated override');
   // Cleanup
   db.prepare('UPDATE branch_products SET name_override = NULL, product_name = NULL WHERE branch_id = ? AND product_id = ?').run(BRANCH, PRODUCT);
+});
+
+test('OVR-18 admin catalog GET exposes resolved values + override/master metadata + price policy', async function() {
+  clearOverrides();
+  db.prepare("UPDATE products SET pricing_mode = 'lock', min_price = NULL, max_price = NULL WHERE id = ?").run(PRODUCT);
+  var res = await getAdminCatalog(BRANCH);
+  assert.strictEqual(res.status, 200, JSON.stringify(res.body));
+  assert.strictEqual(res.body.success, true);
+  var ap = res.body.adopted_products.find(function(x) { return x.product_id === PRODUCT; });
+  assert.ok(ap, 'adopted product present in admin catalog');
+  // Resolved values via override columns (COALESCE fallback to master)
+  assert.strictEqual(ap.name,        'Master Name',        'resolved name');
+  assert.strictEqual(ap.description, 'Master description', 'resolved description');
+  assert.strictEqual(ap.image_url,   '/master-img.png',    'resolved image_url');
+  // Override source metadata
+  assert.strictEqual(ap.name_override,        null, 'name_override null');
+  assert.strictEqual(ap.description_override, null, 'description_override null');
+  assert.strictEqual(ap.image_override,       null, 'image_override null');
+  // Master source metadata (drives the dashboard edit modal)
+  assert.strictEqual(ap.master_name,        'Master Name',        'master_name present');
+  assert.strictEqual(ap.master_description, 'Master description', 'master_description present');
+  assert.strictEqual(ap.master_image_url,   '/master-img.png',    'master_image_url present');
+  // Price policy metadata
+  assert.strictEqual(ap.price, 30000, 'branch price');
+  assert.strictEqual(ap.master_price, 30000, 'master price');
+  assert.strictEqual(ap.pricing_mode, 'lock', 'pricing mode');
+  // Override resolution in admin catalog matches branch-specific resolution
+  db.prepare('UPDATE branch_products SET name_override = ?, description_override = ?, image_override = ? WHERE branch_id = ? AND product_id = ?').run(
+    'AdminName', 'AdminDesc', '/admin-img.png', BRANCH, PRODUCT
+  );
+  var res2 = await getAdminCatalog(BRANCH);
+  var ap2 = res2.body.adopted_products.find(function(x) { return x.product_id === PRODUCT; });
+  assert.strictEqual(ap2.name,       'AdminName',   'override wins in admin catalog');
+  assert.strictEqual(ap2.description,'AdminDesc',   'override wins description');
+  assert.strictEqual(ap2.image_url,  '/admin-img.png', 'override wins image');
+  assert.strictEqual(ap2.name_override, 'AdminName', 'name_override exposed');
+  clearOverrides();
+});
+
+test('OVR-19 price policy: lock mode rejects custom branch price, accepts master price', async function() {
+  clearOverrides();
+  db.prepare("UPDATE products SET pricing_mode = 'lock', min_price = NULL, max_price = NULL WHERE id = ?").run(PRODUCT);
+
+  var reject = await patchOverride(BRANCH, PRODUCT, { price: 99999 });
+  assert.strictEqual(reject.status, 403, 'lock custom price rejected: ' + JSON.stringify(reject.body));
+  assert.strictEqual(reject.body.error, 'PRICE_LOCKED', 'PRICE_LOCKED error code');
+
+  var row = db.prepare('SELECT price FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT);
+  assert.strictEqual(row.price, 30000, 'price unchanged after lock rejection');
+
+  var ok = await patchOverride(BRANCH, PRODUCT, { price: 30000 });
+  assert.strictEqual(ok.status, 200, 'lock master price accepted');
+  var row2 = db.prepare('SELECT price FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT);
+  assert.strictEqual(row2.price, 30000, 'branch price stays master');
+});
+
+test('OVR-20 price policy: range mode accepts within bounds and rejects outside', async function() {
+  clearOverrides();
+  db.prepare("UPDATE products SET pricing_mode = 'range', min_price = 20000, max_price = 40000 WHERE id = ?").run(PRODUCT);
+
+  var within = await patchOverride(BRANCH, PRODUCT, { price: 25000 });
+  assert.strictEqual(within.status, 200, 'range within accepted: ' + JSON.stringify(within.body));
+  var row = db.prepare('SELECT price FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT);
+  assert.strictEqual(row.price, 25000, 'range price persisted');
+
+  var outside = await patchOverride(BRANCH, PRODUCT, { price: 99999 });
+  assert.strictEqual(outside.status, 400, 'range above max rejected');
+  assert.strictEqual(outside.body.error, 'INVALID_BRANCH_PRICE', 'INVALID_BRANCH_PRICE error code');
+  var row2 = db.prepare('SELECT price FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT);
+  assert.strictEqual(row2.price, 25000, 'out-of-range price not persisted');
+
+  // reset to lock for subsequent tests
+  db.prepare("UPDATE products SET pricing_mode = 'lock', min_price = NULL, max_price = NULL WHERE id = ?").run(PRODUCT);
+  db.prepare('UPDATE branch_products SET price = 30000 WHERE branch_id = ? AND product_id = ?').run(BRANCH, PRODUCT);
+});
+
+test('OVR-21 category move: valid own-branch category applies, cross-branch rejected, null clears', async function() {
+  clearOverrides();
+  var cats = db.prepare('SELECT id FROM branch_categories WHERE branch_id = ? ORDER BY sort_order ASC LIMIT 2').all(BRANCH);
+  var foreignCat = db.prepare('SELECT id FROM branch_categories WHERE branch_id = ? LIMIT 1').get(BRANCH_B);
+  assert.ok(cats.length > 0, 'branch A has at least one category');
+  assert.ok(foreignCat, 'branch B has a category');
+
+  var target = cats.length > 1 ? cats[1].id : cats[0].id;
+  var move = await patchOverride(BRANCH, PRODUCT, { branch_category_id: target });
+  assert.strictEqual(move.status, 200, 'move category accepted: ' + JSON.stringify(move.body));
+  var row = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT);
+  assert.strictEqual(String(row.branch_category_id), String(target), 'category moved within branch');
+
+  var foreign = await patchOverride(BRANCH, PRODUCT, { branch_category_id: String(foreignCat.id) });
+  assert.strictEqual(foreign.status, 400, 'cross-branch category rejected');
+  assert.strictEqual(foreign.body.error, 'FORBIDDEN_BRANCH_SCOPE', 'cross-branch error code');
+  var row2 = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT);
+  assert.strictEqual(String(row2.branch_category_id), String(target), 'rejected move leaves assignment unchanged');
+
+  var clear = await patchOverride(BRANCH, PRODUCT, { branch_category_id: null });
+  assert.strictEqual(clear.status, 200, 'null clears category');
+  var row3 = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT);
+  assert.strictEqual(row3.branch_category_id, null, 'assignment cleared');
+
+  // restore
+  db.prepare('UPDATE branch_products SET branch_category_id = ? WHERE branch_id = ? AND product_id = ?').run(cats[0].id, BRANCH, PRODUCT);
+});
+
+test('OVR-22 branch product photo upload sets image_override and resolves in customer catalog', async function() {
+  clearOverrides();
+  var tok = await getAuthToken();
+
+  var res = await mockFetch('/api/v1/admin/branches/' + BRANCH + '/products/' + PRODUCT + '/image', {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + tok },
+    body: JSON.stringify({ image_base64: TINY_PNG_BASE64, mime_type: 'image/png' })
+  });
+  assert.strictEqual(res.status, 200, 'image upload accepted: ' + JSON.stringify(res.body));
+  assert.ok(
+    /^\/assets\/uploads\/branch-products\//.test(res.body.product.image_override),
+    'override URL under /assets/uploads/branch-products/: ' + res.body.product.image_override
+  );
+
+  var row = db.prepare('SELECT image_override FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH, PRODUCT);
+  assert.strictEqual(row.image_override, res.body.product.image_override, 'image_override persisted');
+
+  var p = getProduct(BRANCH);
+  assert.strictEqual(p.image_url, res.body.product.image_override, 'customer catalog resolves branch photo');
+
+  // unsupported mime is rejected before any write
+  var bad = await mockFetch('/api/v1/admin/branches/' + BRANCH + '/products/' + PRODUCT + '/image', {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + tok },
+    body: JSON.stringify({ image_base64: TINY_PNG_BASE64, mime_type: 'image/svg+xml' })
+  });
+  assert.strictEqual(bad.status, 400, 'unsupported mime rejected');
+
+  // missing image is rejected
+  var missing = await mockFetch('/api/v1/admin/branches/' + BRANCH + '/products/' + PRODUCT + '/image', {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + tok },
+    body: JSON.stringify({ mime_type: 'image/png' })
+  });
+  assert.strictEqual(missing.status, 400, 'missing image rejected');
+
+  clearOverrides();
 });

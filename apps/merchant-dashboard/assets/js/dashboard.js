@@ -814,8 +814,17 @@
         product_id: p.product_id,
         name: p.name, name_override: p.name_override, master_name: p.master_name,
         description: p.description, description_override: p.description_override, master_description: p.master_description,
-        image_url: p.image_url, image_override: p.image_override, master_image_url: p.master_image_url
+        image_url: p.image_url, image_override: p.image_override, master_image_url: p.master_image_url,
+        price: p.price, master_price: p.master_price, pricing_mode: p.pricing_mode,
+        min_price: p.min_price, max_price: p.max_price,
+        branch_category_id: p.branch_category_id
       }));
+
+      var availabilityToggle = '' +
+        '<label class="x-toggle' + (isAvailable ? ' x-toggle-on' : '') + '" title="' + (isAvailable ? 'Menu tersedia' : 'Menu habis') + '">' +
+          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchProductAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
+          '<span class="x-toggle-slider"></span>' +
+        '</label>';
 
       return [
         '<div class="x-product-card-simple">',
@@ -833,10 +842,8 @@
               '<span>Gambar: ' + imgSrc + '</span>',
             '</div>',
             '<div class="x-product-card-actions">',
-              '<button type="button" class="x-badge ' + (isAvailable ? 'x-badge-success' : 'x-badge-warning') + '" style="border:none;cursor:pointer;font-size:11px;" onclick="toggleBranchProductAvailability(\'' + p.product_id + '\', ' + (isAvailable ? 0 : 1) + ')">',
-                (isAvailable ? '● Tersedia' : '○ Habis'),
-              '</button>',
-              '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#0369a1;" onclick="openBranchOverrideModal(\'' + productDataJson + '\')">✏ Override</button>',
+              availabilityToggle,
+              '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#0369a1;" onclick="openBranchOverrideModal(\'' + productDataJson + '\')">✏ Edit</button>',
               '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#ef4444;" onclick="removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\')">Hapus dari Cabang</button>',
             '</div>',
           '</div>',
@@ -923,17 +930,55 @@
      Master Product Default + Branch Optional Override
      ========================================================================= */
   var _overrideProductId = null;
+  var _bpSelectedFile = null; // staged photo File to upload on save
+
+  (function initBranchProductPhoto() {
+    var fileInput = $('override-img-file');
+    if (!fileInput) return;
+    fileInput.addEventListener('change', function () {
+      var file = fileInput.files && fileInput.files[0];
+      if (!file) { _bpSelectedFile = null; return; }
+
+      var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (allowed.indexOf(file.type) === -1) {
+        showToast('❌ Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+        fileInput.value = '';
+        return;
+      }
+      if (file.size > 3 * 1024 * 1024) {
+        showToast('❌ Ukuran gambar melebihi batas maksimal 3MB.');
+        fileInput.value = '';
+        return;
+      }
+
+      _bpSelectedFile = file;
+
+      // Local preview only — the persisted URL comes back from the backend.
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var previewImg = $('override-img-preview');
+        var previewMono = $('override-img-preview-mono');
+        if (!previewImg) return;
+        previewImg.src = e.target.result;
+        previewImg.style.display = 'block';
+        if (previewMono) previewMono.style.display = 'none';
+        $('override-img-status').textContent = '🟡 OVERRIDE baru (belum disimpan)';
+      };
+      reader.readAsDataURL(file);
+    });
+  })();
 
   window.openBranchOverrideModal = function (productDataRaw) {
     var p;
     try { p = JSON.parse(productDataRaw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'")); } catch (e) { showToast('❌ Gagal membuka override.'); return; }
     _overrideProductId = p.product_id;
+    _bpSelectedFile = null;
 
     var modal = $('modal-branch-override');
     if (!modal) { showToast('❌ Modal override tidak ditemukan di HTML.'); return; }
 
     // Product heading
-    $('override-product-heading').textContent = 'Override Produk: ' + (p.master_name || p.name || p.product_id);
+    $('override-product-heading').textContent = 'Edit Menu: ' + (p.master_name || p.name || p.product_id);
 
     // Name row
     $('override-name-input').value     = p.name_override != null ? p.name_override : '';
@@ -945,10 +990,49 @@
     $('override-desc-master').textContent = p.master_description || '(tidak ada)';
     $('override-desc-status').textContent  = p.description_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
 
-    // Image row
-    $('override-img-input').value      = p.image_override != null ? p.image_override : '';
-    $('override-img-master').textContent = p.master_image_url || '(tidak ada)';
-    $('override-img-status').textContent  = p.image_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
+    // Photo row — live override URL preview'd from the catalog payload
+    var imgInput = $('override-img-file');
+    if (imgInput) imgInput.value = '';
+    var hasImg = p.image_url || p.image_override || p.master_image_url;
+    var previewImg = $('override-img-preview');
+    var previewMono = $('override-img-preview-mono');
+    if (hasImg) {
+      previewImg.src = p.image_url || p.master_image_url;
+      previewImg.style.display = 'block';
+      previewMono.style.display = 'none';
+    } else {
+      previewImg.style.display = 'none';
+      previewMono.style.display = 'block';
+      previewMono.textContent = (p.name || p.master_name || '?').trim().slice(0, 1).toUpperCase();
+    }
+    $('override-img-status').textContent = p.image_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
+
+    // Price row — pricing policy drives editability (same UX as adopt modal)
+    var isRange = String(p.pricing_mode).toLowerCase() === 'range';
+    var priceInput = $('override-price-input');
+    var priceHint = $('override-price-hint');
+    if (isRange) {
+      priceInput.readOnly = false;
+      priceInput.value = p.price != null ? p.price : (p.master_price != null ? p.master_price : '');
+      priceInput.min = p.min_price != null ? p.min_price : p.master_price;
+      priceInput.max = p.max_price != null ? p.max_price : p.master_price;
+      priceHint.innerHTML = '💡 <strong>Range Harga Fleksibel:</strong> Cabang diizinkan menentukan harga antara <strong>' + formatMoney(p.min_price) + '</strong> s/d <strong>' + formatMoney(p.max_price) + '</strong>.';
+    } else {
+      priceInput.readOnly = true;
+      priceInput.value = p.price != null ? p.price : (p.master_price != null ? p.master_price : '');
+      priceHint.innerHTML = '🔒 <strong>Harga Terkunci:</strong> Ditetapkan paten oleh Pemilik Resto (Owner) sebesar <strong>' + formatMoney(p.master_price) + '</strong>.';
+    }
+
+    // Category row — branch categories of the currently managed branch
+    var cats = (currentBranchCatalogData && currentBranchCatalogData.categories) || [];
+    var catSelect = $('override-category-select');
+    if (catSelect) {
+      var catOptions = cats.map(function (c) {
+        return '<option value="' + c.id + '"' + (String(p.branch_category_id) === String(c.id) ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+      });
+      catOptions.unshift('<option value="">Tanpa Kategori</option>');
+      catSelect.innerHTML = catOptions.join('');
+    }
 
     modal.style.display = 'flex';
   };
@@ -957,6 +1041,7 @@
     var modal = $('modal-branch-override');
     if (modal) modal.style.display = 'none';
     _overrideProductId = null;
+    _bpSelectedFile = null;
   };
 
   window.saveBranchProductOverride = async function () {
@@ -968,14 +1053,51 @@
     // Empty string = user wants to clear the override (send null)
     var nameVal = $('override-name-input').value;
     var descVal = $('override-desc-input').value;
-    var imgVal  = $('override-img-input').value;
 
     var payload = {};
     payload.name        = nameVal.trim()  !== '' ? nameVal.trim()  : null;
     payload.description = descVal.trim()  !== '' ? descVal.trim()  : null;
-    payload.image_url   = imgVal.trim()   !== '' ? imgVal.trim()   : null;
+
+    // price — lock mode is readonly (input disabled); range mode always sent so
+    // the server re-validates against the locked PricingPolicyModel.
+    var pricingMode = String($('override-price-input').readOnly ? 'lock' : 'range').toLowerCase();
+    if (pricingMode === 'range') {
+      payload.price = Number($('override-price-input').value);
+    }
+
+    // category — empty select clears the assignment; otherwise the chosen
+    // branch category id (server validates ownership against the branch).
+    var catVal = $('override-category-select').value;
+    payload.branch_category_id = catVal !== '' ? catVal : null;
 
     try {
+      // 1. Staged photo (if any) — upload first, server returns the override URL.
+      if (_bpSelectedFile) {
+        var base64 = await new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve(reader.result); };
+          reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
+          reader.readAsDataURL(_bpSelectedFile);
+        });
+
+        var imgRes = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/image', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ image_base64: base64, mime_type: _bpSelectedFile.type })
+        });
+        var imgData = {};
+        try {
+          imgData = await imgRes.json();
+        } catch (_) {
+          imgData = { success: false, error: 'Respon server tidak valid saat mengunggah gambar.' };
+        }
+        if (!imgRes.ok || !imgData.success) {
+          showToast('❌ ' + (imgData.error || imgData.message || 'Gagal mengunggah gambar.'));
+          return;
+        }
+      }
+
+      // 2. Text + price + category overrides
       var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
         method: 'PATCH',
         headers: getAuthHeaders(),
@@ -983,32 +1105,34 @@
       });
       var data = await res.json();
       if (data.success) {
-        showToast('✅ Override produk berhasil disimpan!');
+        showToast('✅ Perubahan menu cabang berhasil disimpan!');
         window.closeBranchOverrideModal();
-        reloadBranchCatalogView();
+        if (isBranchManager()) loadInlineBranchCatalog();
+        else reloadBranchCatalogView();
       } else {
-        showToast('❌ ' + (data.message || data.error || 'Gagal menyimpan override.'));
+        showToast('❌ ' + (data.message || data.error || 'Gagal menyimpan perubahan.'));
       }
     } catch (err) {
-      showToast('❌ Kesalahan jaringan saat menyimpan override.');
+      showToast('❌ Kesalahan jaringan saat menyimpan perubahan.');
     } finally {
       btn.disabled = false;
-      btn.textContent = 'Simpan Override';
+      btn.textContent = 'Simpan';
     }
   };
 
   window.clearBranchProductOverride = async function () {
     if (!currentManagingBranchId || !_overrideProductId) return;
-    if (!confirm('Hapus semua override untuk produk ini? Semua field akan kembali mengikuti nilai Master.')) return;
+    if (!confirm('Kembalikan semua nilai ke Master? Nama, deskripsi, foto, harga, dan kategori dikembalikan ke pengaturan asal produk Master.')) return;
     var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
       method: 'PATCH', headers: getAuthHeaders(),
-      body: JSON.stringify({ name: null, description: null, image_url: null })
+      body: JSON.stringify({ name: null, description: null, image_url: null, price: null, branch_category_id: null })
     });
     var data = await res.json();
     if (data.success) {
-      showToast('✅ Semua override dikembalikan ke Master.');
+      showToast('✅ Semua nilai dikembalikan ke Master.');
       window.closeBranchOverrideModal();
-      reloadBranchCatalogView();
+      if (isBranchManager()) loadInlineBranchCatalog();
+      else reloadBranchCatalogView();
     } else {
       showToast('❌ ' + (data.error || 'Gagal menghapus override.'));
     }
@@ -1996,6 +2120,22 @@
         ? '<span class="x-badge x-badge-range">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
         : '<span class="x-badge x-badge-lock">Harga Terkunci</span>';
 
+      var productDataJson = esc(JSON.stringify({
+        product_id: p.product_id,
+        name: p.name, name_override: p.name_override, master_name: p.master_name,
+        description: p.description, description_override: p.description_override, master_description: p.master_description,
+        image_url: p.image_url, image_override: p.image_override, master_image_url: p.master_image_url,
+        price: p.price, master_price: p.master_price, pricing_mode: p.pricing_mode,
+        min_price: p.min_price, max_price: p.max_price,
+        branch_category_id: p.branch_category_id
+      }));
+
+      var availabilityToggle = '' +
+        '<label class="x-toggle' + (isAvailable ? ' x-toggle-on' : '') + '" title="' + (isAvailable ? 'Menu tersedia' : 'Menu habis') + '">' +
+          '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchProductAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
+          '<span class="x-toggle-slider"></span>' +
+        '</label>';
+
       return [
         '<div class="x-product-card-simple">',
           '<img src="' + img + '" class="x-product-card-thumb" alt="' + esc(p.name) + '">',
@@ -2007,9 +2147,8 @@
             '</div>',
             '<div class="x-product-card-price">Jual: ' + formatMoney(p.price) + ' <small class="text-muted" style="font-weight:normal;">(Owner: ' + formatMoney(p.master_price) + ')</small></div>',
             '<div class="x-product-card-actions">',
-              '<button type="button" class="x-badge ' + (isAvailable ? 'x-badge-success' : 'x-badge-warning') + '" style="border:none;cursor:pointer;font-size:11px;" onclick="toggleBranchProductAvailability(\'' + p.product_id + '\', ' + (isAvailable ? 0 : 1) + ')">',
-                (isAvailable ? '● Tersedia' : '○ Habis'),
-              '</button>',
+              availabilityToggle,
+              '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#0369a1;" onclick="openBranchOverrideModal(\'' + productDataJson + '\')">✏ Edit</button>',
               '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#ef4444;" onclick="removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\')">' + 'Hapus dari Cabang</button>',
             '</div>',
           '</div>',
