@@ -1001,36 +1001,45 @@
 	object-fit:contain;
 }
 
-.x-floor-mushola{
+.x-floor-mushola-lshape{
 	position:absolute;
-	background-color:transparent;
+	left:52px;
+	top:16px;
+	width:182px;
+	height:144px;
+	z-index:2;
+	pointer-events:none;
+	user-select:none;
+}
+
+.x-floor-mushola-part-top{
+	position:absolute;
+	left:0;
+	top:0;
+	width:86px;
+	height:144px;
+	background:#d6d8db;
+	border-radius:14px 14px 0 14px;
 	display:flex;
 	align-items:center;
 	justify-content:center;
-	z-index:2;
-	user-select:none;
-	overflow:hidden;
-}
-
-.x-floor-mushola-img{
-	position:absolute;
-	inset:0;
-	width:100%;
-	height:100%;
-	object-fit:fill;
-	pointer-events:none;
-}
-
-.x-floor-mushola-text{
-	position:relative;
-	z-index:3;
-	font-size:10px;
+	font-size:11px;
 	font-style:italic;
-	color:#374151;
 	font-weight:600;
-	margin-top:-14px;
-	margin-left:-8px;
+	color:#374151;
 	letter-spacing:0.2px;
+	padding-bottom:24px;
+	box-sizing:border-box;
+}
+
+.x-floor-mushola-part-bottom{
+	position:absolute;
+	left:70px;
+	top:92px;
+	width:112px;
+	height:52px;
+	background:#d6d8db;
+	border-radius:0 12px 14px 0;
 }
 
 .x-table-card{

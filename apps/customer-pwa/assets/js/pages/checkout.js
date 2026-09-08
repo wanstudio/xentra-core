@@ -1528,7 +1528,8 @@
       schedContainer.innerHTML =
         '<div class="x-fulfillment-divider"></div>' +
         '<div class="x-dinein-container">' +
-        '  <div class="x-dinein-guest-row">' +
+        '  <!-- Guest count filtering temporarily hidden per user request -->' +
+        '  <div class="x-dinein-guest-row" style="display:none !important;">' +
         '    <span class="x-dinein-guest-label">Jumlah Tamu</span>' +
         '    <div class="x-dinein-guest-control">' +
         '      <button type="button" class="x-dinein-guest-btn" id="x-btn-guest-minus">−</button>' +
@@ -1546,19 +1547,23 @@
       var plusBtn = schedContainer.querySelector('#x-btn-guest-plus');
       var countTxt = schedContainer.querySelector('#x-txt-guest-count');
 
-      minusBtn.onclick = function () {
-        if (draft.guestCount > 1) {
-          draft.guestCount--;
-          countTxt.textContent = draft.guestCount;
-          autoRecommendTable();
-        }
-      };
+      if (minusBtn) {
+        minusBtn.onclick = function () {
+          if (draft.guestCount > 1) {
+            draft.guestCount--;
+            if (countTxt) countTxt.textContent = draft.guestCount;
+            autoRecommendTable();
+          }
+        };
+      }
 
-      plusBtn.onclick = function () {
-        draft.guestCount++;
-        countTxt.textContent = draft.guestCount;
-        autoRecommendTable();
-      };
+      if (plusBtn) {
+        plusBtn.onclick = function () {
+          draft.guestCount++;
+          if (countTxt) countTxt.textContent = draft.guestCount;
+          autoRecommendTable();
+        };
+      }
 
       function fetchLayout(bid) {
         var endpoint = bid ? ('/dine-in/layout?branch_id=' + encodeURIComponent(bid)) : '/dine-in/layout';
@@ -1569,7 +1574,8 @@
               if (res.layout.branch_id && (!state.matchedBranch || !state.matchedBranch.id)) {
                 state.matchedBranch = { id: res.layout.branch_id, name: 'Bangjo' };
               }
-              autoRecommendTable();
+              // Render layout immediately
+              renderFloorCanvas();
             } else {
               var msg = (res && res.error) ? res.error : 'Gagal memuat denah meja.';
               schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
@@ -1625,9 +1631,9 @@
         '    <img src="/assets/icons/ac.svg" alt="AC" class="x-floor-badge-icon">' +
         '    <img src="/assets/icons/no_smoking.png" alt="No Smoking" class="x-floor-badge-icon">' +
         '  </div>' +
-        '  <div class="x-floor-mushola" style="left:50px;top:16px;width:86px;height:144px;">' +
-        '    <img src="/assets/icons/mushola.png" alt="" class="x-floor-mushola-img">' +
-        '    <span class="x-floor-mushola-text">Mushola</span>' +
+        '  <div class="x-floor-mushola-lshape">' +
+        '    <div class="x-floor-mushola-part-top">Mushola</div>' +
+        '    <div class="x-floor-mushola-part-bottom"></div>' +
         '  </div>';
 
       indoorTables.forEach(function (t) {
@@ -2341,7 +2347,21 @@
     if (Router && Router.getCurrentView && Router.getCurrentView() !== 'checkout') return;
     if (checkoutContainer.style.display === 'none') return;
     var mt = mutation && mutation.type;
-    if (mt !== 'cart' && mt !== 'location') return;
+    if (mt !== 'cart' && mt !== 'location' && mt !== 'activeDestination') return;
+
+    if (mt === 'location' || mt === 'activeDestination') {
+      var savedDest = (Store.getActiveDestination && Store.getActiveDestination()) || Store.getState().activeDestination || Store.getState().location;
+      if (savedDest && (savedDest.address || savedDest.formatted_address)) {
+        state.address.formatted_address = savedDest.address || savedDest.formatted_address;
+        if (savedDest.latitude != null) state.address.latitude = Number(savedDest.latitude);
+        if (savedDest.longitude != null) state.address.longitude = Number(savedDest.longitude);
+        if (savedDest.label) state.address.label = savedDest.label;
+        if (savedDest.detail) state.address.detail = savedDest.detail;
+      }
+      renderLayout();
+      calculateTotals();
+    }
+
     // Cart membership changed: re-apply the rail so a cleared line re-enters it
     // (recentlyRemoved) and a re-added line drops out of it — without a refetch.
     if (mt === 'cart') applyUpsellPool(upsellItems);
@@ -2350,5 +2370,9 @@
   });
 
   window.Xentra = window.Xentra || {};
-  window.Xentra.Checkout = { mount: mount };
+  window.Xentra.Checkout = {
+    mount: mount,
+    openCustomerAuthSheet: openCustomerAuthSheet
+  };
+  window.openCustomerAuthSheet = openCustomerAuthSheet;
 })();
