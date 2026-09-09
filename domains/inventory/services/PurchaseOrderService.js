@@ -1,10 +1,9 @@
 'use strict';
-
 const crypto = require('crypto');
-const db = require('../../../server/database/db');
+const db = require('../../../core/data/DataAccess');
 const { events } = require('../../../core');
 const InventoryStockService = require('./InventoryStockService');
-const InventoryMovementModel = require('../models/InventoryMovementModel');
+const InventoryMovementModel = require('./InventoryMovementModel');
 
 class PurchaseOrderService {
   /**
