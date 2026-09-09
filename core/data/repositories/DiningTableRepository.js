@@ -181,6 +181,16 @@ class DiningTableRepository {
     `, [operationalState, currentSessionId, notes, updatedAt, tableId]);
   }
 
+  updateTableOperationalState({ tableId, operationalState, notes, updatedAt }) {
+    return this.db.execute(`
+      UPDATE branch_table_states
+      SET operational_state = ?,
+          notes = ?,
+          updated_at = ?
+      WHERE table_id = ?
+    `, [operationalState, notes, updatedAt, tableId]);
+  }
+
   insertHold({
     holdId,
     branchId,
