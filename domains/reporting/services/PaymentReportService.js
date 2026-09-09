@@ -35,7 +35,6 @@ class PaymentReportService {
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
 
-    // Breakdown by payment provider & status
     const breakdown = db.prepare(`
       SELECT 
         p.provider,
@@ -48,7 +47,6 @@ class PaymentReportService {
       GROUP BY p.provider, p.payment_status
     `).all(...params);
 
-    // Summary of settled funds
     let totalCashSettled = 0;
     let totalMidtransSettled = 0;
     let totalPending = 0;
