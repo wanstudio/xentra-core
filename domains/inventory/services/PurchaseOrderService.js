@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const db = require('../../../core/data/DataAccess');
 const { events } = require('../../../core');
 const InventoryStockService = require('./InventoryStockService');
-const InventoryMovementModel = require('./InventoryMovementModel');
+const InventoryMovementModel = require('../models/InventoryMovementModel');
 
 class PurchaseOrderService {
   /**
@@ -125,19 +125,16 @@ class PurchaseOrderService {
         }
 
         if (receiveQty > 0) {
-          // Mutate stock & record ledger entry
           const branchProduct = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(po.branch_id, item.product_id);
           const prevStock = branchProduct ? Number(branchProduct.stock || 0) : 0;
           const nextStock = prevStock + receiveQty;
 
-          // Update branch_products stock
           db.prepare(`
             UPDATE branch_products
             SET stock = ?, updated_at = ?
             WHERE branch_id = ? AND product_id = ?
           `).run(nextStock, now, po.branch_id, item.product_id);
 
-          // Insert immutable inventory ledger entry
           const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
           db.prepare(`
             INSERT INTO inventory_movements (
@@ -156,7 +153,6 @@ class PurchaseOrderService {
             now
           );
 
-          // Update PO item received quantity
           db.prepare(`
             UPDATE inventory_po_items
             SET received_quantity = ?
@@ -172,7 +168,6 @@ class PurchaseOrderService {
         }
       }
 
-      // Mark PO as received
       db.prepare(`
         UPDATE inventory_purchase_orders
         SET status = 'received', received_by = ?, received_at = ?, updated_at = ?
@@ -185,7 +180,6 @@ class PurchaseOrderService {
       throw e;
     }
 
-    // Emit event: inventory.stock.received
     events.EventBus.publish({
       type: 'inventory.stock.received',
       producer: 'inventory',
