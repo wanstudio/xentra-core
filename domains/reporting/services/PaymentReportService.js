@@ -1,7 +1,9 @@
 'use strict';
 
-const db = require('../../../core/data/DataAccess');
+const { ReportingRepository } = require('../../../core/data/repositories');
 const ReportFilterModel = require('../models/ReportFilterModel');
+
+const reportingRepository = new ReportingRepository();
 
 class PaymentReportService {
   /**
@@ -12,40 +14,7 @@ class PaymentReportService {
    */
   static getPaymentReport(filterParams = {}) {
     const filter = ReportFilterModel.normalize(filterParams);
-
-    let whereClauses = [];
-    const params = [];
-
-    if (filter.branch_id) {
-      whereClauses.push('o.branch_id = ?');
-      params.push(filter.branch_id);
-    }
-    if (filter.brand_id) {
-      whereClauses.push('o.brand_id = ?');
-      params.push(filter.brand_id);
-    }
-    if (filter.start_date) {
-      whereClauses.push('p.created_at >= ?');
-      params.push(filter.start_date);
-    }
-    if (filter.end_date) {
-      whereClauses.push('p.created_at <= ?');
-      params.push(filter.end_date);
-    }
-
-    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-
-    const breakdown = db.prepare(`
-      SELECT 
-        p.provider,
-        p.payment_status,
-        COUNT(*) as transaction_count,
-        COALESCE(SUM(p.amount), 0) as total_amount
-      FROM order_payments p
-      JOIN orders o ON p.order_id = o.id
-      ${whereSql}
-      GROUP BY p.provider, p.payment_status
-    `).all(...params);
+    const breakdown = reportingRepository.getPaymentBreakdown(filter);
 
     let totalCashSettled = 0;
     let totalMidtransSettled = 0;
