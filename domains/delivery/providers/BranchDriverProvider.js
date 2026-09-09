@@ -28,13 +28,11 @@ class BranchDriverProvider {
     }
 
     const now = new Date().toISOString();
-    const normalizedDriverName = driver_name.trim();
-    const normalizedDriverPhone = driver_phone.trim();
 
     orderRepository.insertOrUpdateDeliveryAssignment({
       orderId: order_id,
-      driverName: normalizedDriverName,
-      driverPhone: normalizedDriverPhone,
+      driverName: driver_name.trim(),
+      driverPhone: driver_phone.trim(),
       updatedAt: now
     });
 
@@ -46,8 +44,8 @@ class BranchDriverProvider {
         order_number: order.order_number,
         branch_id: order.branch_id,
         provider_type: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
-        driver_name: normalizedDriverName,
-        driver_phone: normalizedDriverPhone,
+        driver_name,
+        driver_phone,
         assigned_by
       }
     }).catch(() => {});
@@ -56,8 +54,8 @@ class BranchDriverProvider {
       success: true,
       provider: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
       order_id,
-      driver_name: normalizedDriverName,
-      driver_phone: normalizedDriverPhone,
+      driver_name,
+      driver_phone,
       status: 'assigned'
     };
   }
