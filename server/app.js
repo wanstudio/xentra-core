@@ -149,8 +149,10 @@ app.use((err, req, res, next) => {
 });
 
 if (process.env.NODE_ENV !== 'test') {
-  const server = app.listen(PORT, () => {
-    console.log(`[Xentra Core] Standalone SaaS Engine running on http://localhost:${PORT}`);
+  // Wait for database to be fully ready (sql.js async init on Node 20) before accepting requests
+  const startServer = () => {
+    const server = app.listen(PORT, () => {
+      console.log(`[Xentra Core] Standalone SaaS Engine running on http://localhost:${PORT}`);
 
     // Authoritative Periodic Payment Reconciliation Worker (NEW-01 & NEW-03):
     // Resolves unknown / reconciliation_pending payment outcomes against Midtrans API
@@ -191,6 +193,20 @@ if (process.env.NODE_ENV !== 'test') {
       console.error('[Xentra Core Server Error]:', err);
     }
   });
+  };
+
+  // Wait for DB migration to complete before starting server (fixes sql.js race condition)
+  if (db.readyPromise) {
+    db.readyPromise.then(() => {
+      console.log('[Xentra Core] Database ready. Starting server...');
+      startServer();
+    }).catch(err => {
+      console.error('[Xentra Core] Database init failed:', err.message);
+      startServer(); // Start anyway — some routes may still work
+    });
+  } else {
+    startServer();
+  }
 }
 
 module.exports = app;
