@@ -14,28 +14,10 @@
  *
  * Note: Does not perform final pre-payment stock locking (handled by PrePaymentVerificationGate).
  */
-const db = require('../../../server/database/db');
+const db = require('../../../core/data/DataAccess');
 const PricingPolicyModel = require('../models/PricingPolicyModel');
 
 class CatalogService {
-  /**
-   * Retrieves active menu categories and products formatted for customer display.
-   *
-   * BRANCH CONTEXT (branch_id provided):
-   *   Source = branch_products + branch_categories (Branch Catalog).
-   *   Only adopted products appear. Categories are Branch-owned.
-   *   Product metadata resolves via override columns:
-   *     name_override IS NOT NULL → branch value; NULL → live master value.
-   *
-   * BRAND-WIDE (no branch_id):
-   *   Source = products + categories (Master Catalog).
-   *   All active master products are shown.
-   *
-   * @param {Object} params
-   * @param {string} params.brand_id
-   * @param {string} [params.branch_id]
-   * @returns {{ categories: Array<Object>, products: Array<Object> }}
-   */
   static getMenu({ brand_id, branch_id = null }) {
     if (!brand_id) {
       throw new Error('[CatalogService] "brand_id" is required.');
@@ -47,21 +29,13 @@ class CatalogService {
     return this._getBrandWideMenu(brand_id);
   }
 
-  /**
-   * BRANCH CATALOG: branch_products is the source of truth.
-   * Only adopted products appear. Categories come from branch_categories.
-   * Override resolution: COALESCE(bp.name_override, p.name) — NULL override = live master.
-   */
   static _getBranchMenu(brand_id, branch_id) {
-    // 1. Fetch branch-owned categories
     const branchCategories = db.prepare(`
       SELECT * FROM branch_categories
       WHERE branch_id = ? AND brand_id = ?
       ORDER BY sort_order ASC, name ASC
     `).all(branch_id, brand_id);
 
-    // 2. Fetch adopted products with override resolution:
-    //    COALESCE(bp.<field>_override, p.<field>) — NULL override = live master field.
     const rawProducts = db.prepare(`
       SELECT
         bp.product_id as id,
@@ -91,7 +65,6 @@ class CatalogService {
       ORDER BY p.sort_order ASC, p.name ASC
     `).all(brand_id, branch_id);
 
-    // 3. Resolve pricing and build response
     const resolvedProducts = rawProducts.map(prod => {
       const pricing = PricingPolicyModel.resolvePrice(
         {
@@ -103,8 +76,6 @@ class CatalogService {
         prod.branch_raw_price
       );
 
-      // BRANCH CATALOG OWNERSHIP: once adopted, branch_products controls availability.
-      // Master Product is_active does NOT gate Branch Catalog availability.
       const isAvailable = prod.branch_availability === 1;
 
       return {
@@ -123,8 +94,6 @@ class CatalogService {
         is_available: isAvailable,
         stock_estimate: prod.branch_stock != null ? Number(prod.branch_stock) : 0,
         sort_order: prod.sort_order,
-        // Override field metadata for Dashboard UI:
-        // null = inheriting master value; non-null = branch has overridden
         name_override: prod.name_override || null,
         description_override: prod.description_override || null,
         image_override: prod.image_override || null,
@@ -147,19 +116,13 @@ class CatalogService {
     };
   }
 
-  /**
-   * BRAND-WIDE CATALOG: Master Catalog is the source.
-   * All active master products are shown. Categories come from master categories.
-   */
   static _getBrandWideMenu(brand_id) {
-    // 1. Fetch master categories
     const categories = db.prepare(`
       SELECT * FROM categories
       WHERE brand_id = ?
       ORDER BY sort_order ASC, name ASC
     `).all(brand_id);
 
-    // 2. Fetch all active master products
     const rawProducts = db.prepare(`
       SELECT
         p.id,
@@ -183,7 +146,6 @@ class CatalogService {
       ORDER BY p.sort_order ASC, p.name ASC
     `).all(brand_id);
 
-    // 3. Resolve pricing and build response
     const resolvedProducts = rawProducts.map(prod => {
       const pricing = PricingPolicyModel.resolvePrice(
         {
