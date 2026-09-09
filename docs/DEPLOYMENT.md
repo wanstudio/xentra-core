@@ -100,7 +100,8 @@ curl -sS https://app.mybangjo.com/health
 curl -sS 'https://app.mybangjo.com/api/v1/promotions/active?is_pwa=0&phone='
 
 # Promo entitlement — install requirement satisfied (is_pwa=1): running
-# standalone OR accepted-install state in the same tab (pwa-runtime install_state).
+# standalone OR VERIFIED install state in the browser profile.
+# A prompt acceptance alone is NOT sufficient.
 # Seed reward targets product 401 (Es Teh); swap via promotion_rewards config — no source change.
 curl -sS 'https://app.mybangjo.com/api/v1/promotions/active?is_pwa=1&phone='
 ```
@@ -112,14 +113,41 @@ Expected shapes (per `domains/promotion`, install-incentive):
   reward fields enriched from the catalog: `product_id`, `reward_price`, and
   `product_name`/`regular_price`/`image_url` → checkout renders **Claim**.
 
-Pay (`POST /checkout/verify`) is NOT standalone-only: it evaluates the same
-promotion contract from `pwa_runtime` (`display_mode === 'standalone'` OR
-`install_state === 'accepted'`) while authority stays in the server DB checks
-(promo active, first order, redemption ledger, branch/brand catalog, price).
+The install requirement is **VERIFIED install only**: a user accepting the native
+install prompt is not by itself proof that installation completed. Verification
+comes from `appinstalled` when available, or standalone runtime detection
+(`display-mode: standalone`, with the iOS `navigator.standalone` fallback). A
+permanent verified marker may preserve the verified state across reloads/tabs in
+the same browser profile. The legacy prompt-acceptance marker must not satisfy
+the requirement.
 
-Full UI flow (install banner → claim → remove → re-claim, single `checkout.items[]`,
+Pay (`POST /checkout/verify`) must use the same verified promotion context:
+`display_mode === 'standalone'` OR verified `install_state === 'installed'`.
+The browser signal remains context, not a credential; final promotion authority
+stays in server-side DB/domain checks (promo active, first order, redemption
+ledger, branch/brand catalog, price).
+
+Full UI flow (install banner → verified installation → Home install banner disappears
+→ checkout re-evaluation → Claim → remove → re-claim, single `checkout.items[]`,
 no duplicates on reload) must be exercised in a real browser against the live host;
 that remains a manual runtime check until an E2E harness exists.
+
+## 🔒 Locked Customer Delivery Schedule Timezone
+
+For customer-facing Delivery schedule calculation, the source of current date/time
+is the **customer device/browser local timezone**, not the WordPress/server timezone.
+
+- Slot interval remains **30 minutes**.
+- First slot = **current customer-device local time + 1 hour**, then rounded **up** to the next 30-minute boundary.
+- Mandatory order: `device local current time → +1 hour → ceil to 30 minutes`.
+- Example: `13:56 → 14:56 → 15:00`, so the first slot is `15:00–15:30`.
+- Date/day rollover is also based on the customer's local timezone. Example:
+  `23:40 → 00:40 next day → 01:00` means the first slot belongs to the next local day.
+- ASAP / Pesan sekarang remains the default; schedule remains optional.
+
+This customer-facing timezone rule supersedes the earlier documentation that used
+WordPress timezone for schedule calculation. Other business logic may continue to
+use WordPress/server timezone where explicitly required.
 
 ## Failure modes to distinguish
 
