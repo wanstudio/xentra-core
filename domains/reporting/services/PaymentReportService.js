@@ -1,6 +1,6 @@
 'use strict';
 
-const db = require('../../../server/database/db');
+const db = require('../../../core/data/DataAccess');
 const ReportFilterModel = require('../models/ReportFilterModel');
 
 class PaymentReportService {
