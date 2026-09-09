@@ -21,6 +21,51 @@ A typical client flow is:
 5. Infrastructure is provisioned from the registry.
 6. Runtime receives the request and resolves tenant context from the authoritative host/domain mapping.
 
+## Control-plane authorization — LOCKED
+
+Domain Management is a **Control Plane capability** and MUST use the existing Xentra authorization model. Do not create a separate `domain_admin`, `domain_manager`, or parallel authentication system.
+
+Authorization model:
+
+`Xentra Identity → Actor Type: XENTRA_WORKFORCE → Role → Scope → Permission(resource:action)`
+
+Initial platform role:
+
+- `PLATFORM_ADMIN`
+
+A limited `SUPPORT`/operations role may be introduced later with explicitly restricted permissions. Merchant roles such as `owner`, `brand_manager`, `branch_manager`, `cashier`, and `kitchen` MUST NOT be used as substitutes for Control Plane authority.
+
+Domain permissions are resource/action based, including:
+
+- `domain:read`
+- `domain:create`
+- `domain:verify`
+- `domain:update`
+- `domain:disable`
+- `domain:delete`
+
+## Persistent Domain Registry — LOCKED
+
+The Domain Registry MUST be persistent and MUST NOT rely on the current in-memory-only `DomainRegistry` singleton as the system of record.
+
+Minimum domain resource shape:
+
+`id, hostname, organization_id, brand_id, type, is_primary, verification_status, verification_method, verification_token/challenge, provisioning_status, tls_status, status, created_at, updated_at`
+
+The registry is authoritative for:
+
+- domain → organization/brand/tenant association
+- verification lifecycle
+- primary/secondary state
+- provisioning lifecycle
+- TLS state
+- activation/deactivation
+- audit/lifecycle state
+
+## Required lifecycle
+
+`xentra.cloud → Domain Management → Persistent Domain Registry → Verification → Provisioning → Cloudflare/Edge → Xentra Runtime → Authoritative Tenant Resolution`
+
 ## Infrastructure rules
 
 - Nginx/reverse proxy configuration may contain domains technically, but client-specific entries must be generated/managed by provisioning, not manually hardcoded as application architecture.
@@ -49,6 +94,7 @@ Owns:
 - SSL/provisioning status
 - domain activation/deactivation
 - audit/lifecycle state
+- Control Plane authorization for domain operations
 
 ### Infrastructure / Provisioning
 
@@ -77,3 +123,5 @@ The existing Bangjo deployment was historically mirrored from GitHub into Bangjo
 The target architecture is Xentra-controlled runtime infrastructure with client domains registered and provisioned through Xentra Cloud.
 
 Do not migrate DNS or manually alter production Nginx configuration until Domain Management and its provisioning contract are verified/implemented.
+
+**This document is an architecture guardrail. Subsequent implementation MUST conform to these locked decisions unless an explicit architecture decision supersedes them.**
