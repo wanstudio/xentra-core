@@ -87,6 +87,18 @@ class PosShiftRepository {
     `, [expectedCash, actualCash, variance, closedAt, shiftId]);
   }
 
+  closeDisasterRecovery({ shiftId, actualCash, variance, closedAt }) {
+    return this.db.execute(`
+      UPDATE pos_shifts
+      SET
+        actual_cash = ?,
+        variance = ?,
+        status = 'closed',
+        closed_at = ?
+      WHERE id = ? AND status = 'open'
+    `, [actualCash, variance, closedAt, shiftId]);
+  }
+
   incrementCashSales({ shiftId, branchId, amount }) {
     return this.db.execute(`
       UPDATE pos_shifts
