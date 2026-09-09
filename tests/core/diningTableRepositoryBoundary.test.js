@@ -66,11 +66,12 @@ test('DiningTableRepository exposes semantic hold and session persistence operat
   repo.attachDiningSessionTable({ mappingId: 'map-1', sessionId: 'sess-1', tableId: 'table-1', attachedAt: '2026-09-10T00:01:00.000Z' });
   repo.associateOrderToDiningSession({ orderId: 'ord-1', sessionId: 'sess-1', updatedAt: '2026-09-10T00:01:00.000Z' });
 
-  assert.equal(calls.execute.length, 8);
+  assert.equal(calls.execute.length, 9);
   assert.match(calls.execute[0].sql, /branch_dining_layouts/);
   assert.match(calls.execute[1].sql, /branch_tables/);
   assert.match(calls.execute[4].sql, /branch_table_holds/);
   assert.match(calls.execute[5].sql, /branch_table_holds/);
   assert.match(calls.execute[6].sql, /dining_sessions/);
-  assert.match(calls.execute[7].sql, /dining_session_tables|UPDATE orders/);
+  assert.match(calls.execute[7].sql, /dining_session_tables/);
+  assert.match(calls.execute[8].sql, /UPDATE orders/);
 });
