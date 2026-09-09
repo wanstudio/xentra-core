@@ -56,6 +56,22 @@ class OrderRepository {
     return this.db.queryMany('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
   }
 
+  convertReservationToDineIn({ orderId, tableNumber, updatedAt }) {
+    return this.db.execute(`
+      UPDATE orders
+      SET order_type = 'dine_in', status = 'active_table', table_number = ?, updated_at = ?
+      WHERE id = ?
+    `, [String(tableNumber), updatedAt, orderId]);
+  }
+
+  cancelReservationNoShow({ orderId, reason, updatedAt }) {
+    return this.db.execute(`
+      UPDATE orders
+      SET status = 'cancelled', order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ?
+      WHERE id = ?
+    `, [reason, updatedAt, orderId]);
+  }
+
   findHeldById(heldOrderId) {
     return this.db.queryOne(
       'SELECT * FROM pos_held_orders WHERE id = ?',
