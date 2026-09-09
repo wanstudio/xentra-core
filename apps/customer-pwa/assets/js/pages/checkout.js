@@ -1468,6 +1468,11 @@
         return;
       }
 
+      if (draft.type === 'reservation') {
+        renderReservationSection();
+        return;
+      }
+
       if (draft.type !== 'delivery' && draft.type !== 'pickup') {
         schedContainer.innerHTML = '';
         return;
@@ -1569,6 +1574,117 @@
     }
 
     var dineInLayoutData = null;
+
+    // Reservation picker (customer app). Locked rules (notion roadmap):
+    //   - reservation is a future arrival booking (tomorrow onwards); the date
+    //     wheel STARTS at Besok — "Hari ini" is never offered.
+    //   - guest estimate 1-20, booking fee Rp0.
+    //   - time window is a placeholder 09:00-21:00 pending an operating-hours
+    //     data source (same B1 gap as delivery scheduling).
+    function renderReservationSection() {
+      schedContainer.innerHTML =
+        '<div class="x-fulfillment-divider"></div>' +
+        '<div class="x-fulfillment-schedule-head">' +
+        '  <span style="font-size:14px;font-weight:600;color:#1f2937;">Jadwalkan reservasi</span>' +
+        '</div>' +
+        '<div class="x-fulfillment-schedule-picker" id="x-res-picker">' +
+        '  <div class="x-fulfillment-picker-row">' +
+        '    <div class="x-wheel-highlight"></div>' +
+        '    <div class="x-wheel-divider"></div>' +
+        '    <div class="x-wheel-col" id="x-res-date-col"></div>' +
+        '    <div class="x-wheel-col" id="x-res-time-col"></div>' +
+        '  </div>' +
+        '</div>' +
+        '<div class="x-dinein-guest-row" style="padding:4px 16px 0;">' +
+        '  <span class="x-dinein-guest-label">Jumlah Orang</span>' +
+        '  <div class="x-dinein-guest-control">' +
+        '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-minus" aria-label="Kurangi orang">−</button>' +
+        '    <span class="x-dinein-guest-count" id="x-res-guest-count">' + (draft.guestCount || 2) + '</span>' +
+        '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-plus" aria-label="Tambah orang">+</button>' +
+        '  </div>' +
+        '</div>' +
+        '<div class="x-fulfillment-selected-summary">' +
+        '  <span>Reservasi kedatangan</span>' +
+        '  <strong id="x-res-summary-text"></strong>' +
+        '</div>';
+
+      var dateCol = schedContainer.querySelector('#x-res-date-col');
+      var timeCol = schedContainer.querySelector('#x-res-time-col');
+      var sumText = schedContainer.querySelector('#x-res-summary-text');
+      var guestTxt = schedContainer.querySelector('#x-res-guest-count');
+
+      // Dates: Besok (day 1) + the following 5 device-local days (6 booking
+      // days). The value is the device-local ISO date (YYYY-MM-DD) so the
+      // server rejects it only if it is actually same-day-or-earlier.
+      var days = buildScheduleDays();
+      var dateItems = days.slice(1).map(function (d) {
+        return { value: d.iso, label: d.value };
+      });
+
+      // Booking time window placeholder: 09:00-21:00 in 30-minute steps.
+      var timeItems = [];
+      for (var m = 9 * 60; m + 30 <= 21 * 60; m += 30) {
+        var hh = ('0' + Math.floor(m / 60)).slice(-2);
+        var mm = ('0' + (m % 60)).slice(-2);
+        var tv = hh + ':' + mm;
+        timeItems.push({ value: tv, label: tv });
+      }
+
+      if (!dateItems.some(function (d) { return d.value === draft.reservationDate; })) {
+        draft.reservationDate = dateItems.length ? dateItems[0].value : '';
+      }
+      if (!timeItems.some(function (t) { return t.value === draft.reservationTime; })) {
+        draft.reservationTime = timeItems.length ? timeItems[0].value : '12:00';
+      }
+      if (!draft.guestCount || draft.guestCount < 1) draft.guestCount = 2;
+
+      function dateLabel(value) {
+        for (var i = 0; i < dateItems.length; i++) {
+          if (dateItems[i].value === value) return dateItems[i].label;
+        }
+        return value;
+      }
+
+      function updateSummary() {
+        if (sumText) {
+          sumText.textContent = dateLabel(draft.reservationDate) + ' • ' + draft.reservationTime + ' (' + (draft.guestCount || 2) + ' Orang)';
+        }
+      }
+
+      buildWheel(dateCol, dateItems, draft.reservationDate, function (it) {
+        draft.reservationDate = it.value;
+        updateSummary();
+      });
+      buildWheel(timeCol, timeItems, draft.reservationTime, function (it) {
+        draft.reservationTime = it.value;
+        updateSummary();
+      });
+
+      if (guestTxt) {
+        var minusRes = schedContainer.querySelector('#x-res-guest-minus');
+        var plusRes = schedContainer.querySelector('#x-res-guest-plus');
+        if (minusRes) {
+          minusRes.onclick = function () {
+            if (draft.guestCount > 1) {
+              draft.guestCount--;
+              guestTxt.textContent = draft.guestCount;
+              updateSummary();
+            }
+          };
+        }
+        if (plusRes) {
+          plusRes.onclick = function () {
+            if (draft.guestCount < 20) {
+              draft.guestCount++;
+              guestTxt.textContent = draft.guestCount;
+              updateSummary();
+            }
+          };
+        }
+      }
+
+      updateSummary();
+    }
 
     function renderDineInFloorPlan() {
       var fb = getFulfillmentBranch();
@@ -1821,6 +1937,11 @@
         if (draft.type === 'delivery' || draft.type === 'pickup') {
           state.fulfillment.date = draft.date || 'Hari ini';
           state.fulfillment.timeSlot = draft.scheduled ? (draft.timeSlot || '16:00-16:30') : 'Sekarang (15–25 menit)';
+        } else if (draft.type === 'reservation') {
+          state.fulfillment.scheduled = false;
+          state.fulfillment.reservationDate = draft.reservationDate || '';
+          state.fulfillment.reservationTime = draft.reservationTime || '12:00';
+          state.fulfillment.guestCount = draft.guestCount || 2;
         } else if (draft.type === 'dine_in') {
           state.fulfillment.scheduled = false;
           var tNumStr = draft.tableNumber || computeSelectedTableNumbers(draft.selectedTableIds);
@@ -2310,6 +2431,15 @@
     var branchId = state.matchedBranch ? state.matchedBranch.id : undefined;
     var fulType = state.fulfillment.type;
     var isDelivery = fulType === 'delivery';
+    var isReservation = fulType === 'reservation';
+
+    // Reservation requires a chosen arrival date (server remains the authority
+    // for the same-day rejection).
+    if (isReservation && !state.fulfillment.reservationDate) {
+      if (btn) btn.textContent = 'Konfirmasi Reservasi';
+      if (UI && UI.toast) UI.toast('Silakan pilih tanggal reservasi terlebih dahulu.');
+      return;
+    }
 
     var pwaRuntime = (window.Xentra && window.Xentra.PwaRuntime) ? window.Xentra.PwaRuntime.getPwaRuntimeContext() : { display_mode: 'browser' };
 

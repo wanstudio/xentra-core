@@ -20,6 +20,11 @@
  * TEST 14: Pick-up + schedule OFF -> "Sekarang"/ASAP committed, slot cleared
  * TEST 15: Switching between delivery <-> pick-up keeps scheduling; switching to a
  *          non-schedulable type (dine-in/reservation) clears it
+ *
+ * Reservation contract (locked: future arrival booking, tomorrow onwards):
+ * TEST 16: Reservation -> date wheel starts at Besok (no same-day), guest
+ *          estimate committed with reservationDate/reservationTime; same-day
+ *          date value is never produced
  */
 'use strict';
 
@@ -28,6 +33,8 @@ const assert = require('node:assert');
 const path = require('node:path');
 
 const STORE_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/store.js');
+const SCHEDULE_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/delivery-schedule.js');
+const schedule = require(SCHEDULE_PATH);
 
 let persistentStorage = {};
 
@@ -77,7 +84,10 @@ function createFulfillmentSheetController(initialState, branchConfig) {
     type: committedType,
     scheduled: Boolean(committedState.scheduled),
     date: committedState.date || 'Hari ini',
-    timeSlot: committedState.timeSlot || '16:00-16:30'
+    timeSlot: committedState.timeSlot || '16:00-16:30',
+    reservationDate: committedState.reservationDate || '',
+    reservationTime: committedState.reservationTime || '12:00',
+    guestCount: committedState.guestCount || 2
   };
 
   return {
@@ -109,6 +119,11 @@ function createFulfillmentSheetController(initialState, branchConfig) {
       if (date) draft.date = date;
       if (slot) draft.timeSlot = slot;
     },
+    setReservation: (date, time, guests) => {
+      if (date) draft.reservationDate = date;
+      if (time) draft.reservationTime = time;
+      if (guests) draft.guestCount = guests;
+    },
     cancel: () => {
       // Discard draft: re-clone from committed
       draft = {
@@ -124,12 +139,22 @@ function createFulfillmentSheetController(initialState, branchConfig) {
         throw new Error('Tipe pembelian tidak tersedia');
       }
       const schedulable = draft.type === 'delivery' || draft.type === 'pickup';
-      committedState = {
-        type: draft.type,
-        scheduled: Boolean(draft.scheduled),
-        date: schedulable ? (draft.date || 'Hari ini') : 'Hari ini',
-        timeSlot: schedulable ? (draft.scheduled ? draft.timeSlot : 'Sekarang (15–25 menit)') : ''
-      };
+      if (draft.type === 'reservation') {
+        committedState = {
+          type: 'reservation',
+          scheduled: false,
+          reservationDate: draft.reservationDate || '',
+          reservationTime: draft.reservationTime || '12:00',
+          guestCount: draft.guestCount || 2
+        };
+      } else {
+        committedState = {
+          type: draft.type,
+          scheduled: Boolean(draft.scheduled),
+          date: schedulable ? (draft.date || 'Hari ini') : 'Hari ini',
+          timeSlot: schedulable ? (draft.scheduled ? draft.timeSlot : 'Sekarang (15–25 menit)') : ''
+        };
+      }
       return committedState;
     }
   };
@@ -356,4 +381,29 @@ test('TEST 15: Switching between delivery <-> pick-up keeps scheduling; switchin
   const confirmed = ctrl.confirm();
   assert.strictEqual(confirmed.type, 'reservation');
   assert.strictEqual(confirmed.scheduled, false);
+});
+
+test('TEST 16: Reservation -> date wheel starts at Besok (never same-day) and commits reservationDate/time/guests', () => {
+  // Locked "tomorrow onwards" driver, exercised through the real delivery-schedule
+  // module (same device-local date source the picker uses at slice(1,8)).
+  const days = schedule.buildScheduleDays(new Date(2026, 8, 9, 23, 40));
+  const dateItems = days.slice(1).map((d) => ({ value: d.iso, label: d.value }));
+
+  assert.strictEqual(dateItems[0].label, 'Besok', 'First offered day must be Besok');
+  assert.strictEqual(dateItems[0].value, '2026-09-10', 'First offered day is the next device-local day');
+  assert.ok(!dateItems.some((d) => d.value === '2026-09-09'), 'Same-day (Hari ini) must never be offered');
+  assert.strictEqual(dateItems.length, 6);
+
+  // Customer picks from the wheel then confirms
+  const ctrl = createFulfillmentSheetController(
+    { type: 'reservation', scheduled: false, reservationDate: '', reservationTime: '12:00', guestCount: 2 }
+  );
+  ctrl.setReservation('2026-09-10', '19:00', 4);
+
+  const confirmed = ctrl.confirm();
+  assert.strictEqual(confirmed.type, 'reservation');
+  assert.strictEqual(confirmed.scheduled, false, 'Reservation is never a scheduler-slot order');
+  assert.strictEqual(confirmed.reservationDate, '2026-09-10');
+  assert.strictEqual(confirmed.reservationTime, '19:00');
+  assert.strictEqual(confirmed.guestCount, 4);
 });

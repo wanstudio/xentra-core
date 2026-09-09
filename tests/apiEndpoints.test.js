@@ -309,6 +309,55 @@ test('Pick-up schedule: scheduled pick-up order persists the device-timezone ISO
   assert.strictEqual(row.scheduled_slot_end, isoEnd);
 });
 
+test('Reservation create order: future booking accepted, same-day rejected via API', async () => {
+  const customerToken = await createCustomerSession('081299996004');
+  const tomorrowStr = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  // Future booking (tomorrow) -> accepted as pure table booking
+  const okRes = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { 'x-customer-token': customerToken },
+    body: JSON.stringify({
+      branch_id: 'branch_bangjo_barat',
+      payment_method: 'cash',
+      customer: { name: 'Reservation Customer', phone: '081299996004' },
+      order_type: 'reservation',
+      reservation_date: tomorrowStr,
+      reservation_time: '19:00',
+      guest_count: 4,
+      items: []
+    })
+  });
+  const okResBody = await okRes.json();
+  assert.strictEqual(okRes.status, 201, 'reservation create body: ' + JSON.stringify(okResBody));
+  const okData = okResBody;
+  const row = db.prepare('SELECT order_type, scheduled_slot_start, status, order_note FROM orders WHERE id = ?').get(okData.order_id);
+  assert.strictEqual(row.order_type, 'reservation');
+  assert.strictEqual(row.scheduled_slot_start, tomorrowStr);
+  assert.strictEqual(row.status, 'confirmed');
+  assert.ok(String(row.order_note).includes('4 Tamu'), 'Guest count persisted in reservation note');
+
+  // Same-day -> strictly rejected by the server (never UI-only)
+  const sameDayRes = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { 'x-customer-token': customerToken },
+    body: JSON.stringify({
+      branch_id: 'branch_bangjo_barat',
+      payment_method: 'cash',
+      customer: { name: 'Reservation Customer', phone: '081299996004' },
+      order_type: 'reservation',
+      reservation_date: todayStr,
+      reservation_time: '19:00',
+      guest_count: 4,
+      items: []
+    })
+  });
+  assert.strictEqual(sameDayRes.status, 400);
+  const sameDayData = await sameDayRes.json();
+  assert.strictEqual(sameDayData.status, 'SAME_DAY_RESERVATION_REJECTED');
+});
+
 test('API Admin: GET & PUT /api/v1/admin/brand updates theme color and logo', async () => {
   // Login first to get admin session token
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {

@@ -39,6 +39,24 @@ Delivery and Pick-up both support the same scheduling UI.
 - Unscheduled pick-up stays ASAP and commits the same “Sekarang” slot as
   delivery.
 
+## Reservation (customer app)
+
+Reservation is a **future arrival booking** — locked rules from the Notion
+roadmap: tomorrow onwards only, same-day strictly rejected, guest estimate.
+
+- In the sheet, selecting **Reservasi** opens the reservation picker:
+  - **Date wheel** starts at **Besok** (next device-local day) + the following
+    5 days (6 booking days). “Hari ini” is never offered.
+  - **Time wheel**: 30-minute steps in a 09:00–21:00 window (placeholder until
+    an operating-hours data source exists — B1 gap, same as delivery scheduling).
+  - **Jumlah Orang**: stepper 1–20 (default 2).
+- Confirming commits `reservationDate` (device-local YYYY-MM-DD),
+  `reservationTime` (HH:MM) and `guestCount` to the fulfillment state.
+- **No toggle jadwal** — a reservation is always a dated booking.
+- Server (OrderPlacementService) remains the authority for the same-day
+  rejection (`reservation_date >= tomorrow`) and duplicate/booking-capacity
+  guards.
+
 ### LOCKED — Schedule slot & timezone rule (2026-09-09)
 
 **Current time source = device/customer local timezone.** The schedule picker

@@ -14,7 +14,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_p7f4a0a';
+      var PWA_VERSION = 'v_p7f4a0b';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -236,7 +236,7 @@
 
   <!-- Page Controllers -->
   <script src="/assets/js/pages/home.js?v=p7f4a08"></script>
-  <script src="/assets/js/pages/checkout.js?v=p7f4a0a"></script>
+  <script src="/assets/js/pages/checkout.js?v=p7f4a0b"></script>
   <script src="/assets/js/pages/order-received.js?v=p7f4a03"></script>
   <script src="/assets/js/pages/aux-pages.js?v=p7f4a03"></script>
 
@@ -340,7 +340,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=p7f4a0a').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=p7f4a0b').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {
