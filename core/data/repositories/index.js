@@ -6,6 +6,7 @@ const PaymentRepository = require('./PaymentRepository');
 const PromotionRepository = require('./PromotionRepository');
 const DiningTableRepository = require('./DiningTableRepository');
 const PosOrderRepository = require('./PosOrderRepository');
+const BranchRepository = require('./BranchRepository');
 
 module.exports = {
   CatalogRepository,
@@ -13,5 +14,6 @@ module.exports = {
   PaymentRepository,
   PromotionRepository,
   DiningTableRepository,
-  PosOrderRepository
+  PosOrderRepository,
+  BranchRepository
 };
