@@ -8,8 +8,10 @@
  * 3. Final Availability: Strictly enforces branch product assignment & active status (No 999 fake fallback).
  * 4. Branch Low-Stock Threshold: Captures branch manager configured threshold.
  */
-const db = require('../../../core/data/DataAccess');
+const CatalogRepository = require('../../../core/data/repositories/CatalogRepository');
 const PricingPolicyModel = require('../models/PricingPolicyModel');
+
+const catalogRepository = new CatalogRepository();
 
 class PrePaymentVerificationGate {
   static STATUS = {
@@ -54,17 +56,14 @@ class PrePaymentVerificationGate {
       pwa_runtime.install_requirement_satisfied === true
     ));
 
-    if (brand_id) {
-      const branchBelongs = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, brand_id);
-      if (!branchBelongs) {
-        return {
-          status: 'BRANCH_BRAND_MISMATCH',
-          is_valid: false,
-          verified_items: [],
-          price_diffs: [],
-          errors: [`Cabang "${branch_id}" bukan merupakan cabang resmi dari brand "${brand_id}".`]
-        };
-      }
+    if (brand_id && !catalogRepository.branchBelongsToBrand(branch_id, brand_id)) {
+      return {
+        status: 'BRANCH_BRAND_MISMATCH',
+        is_valid: false,
+        verified_items: [],
+        price_diffs: [],
+        errors: [`Cabang "${branch_id}" bukan merupakan cabang resmi dari brand "${brand_id}".`]
+      };
     }
 
     const priceDiffs = [];
@@ -119,11 +118,7 @@ class PrePaymentVerificationGate {
           errors.push(`Definisi produk hadiah promo "${eligiblePromo.name || authoritativePromoId}" tidak ditemukan.`);
           continue;
         }
-        const bpCheck = db.prepare(`
-          SELECT bp.is_available, p.name, p.price, p.regular_price FROM branch_products bp
-          JOIN products p ON p.id = bp.product_id
-          WHERE bp.branch_id = ? AND bp.product_id = ?
-        `).get(branch_id, targetPid);
+        const bpCheck = catalogRepository.findRewardProduct(branch_id, targetPid);
         if (!bpCheck) {
           errors.push('Produk hadiah tidak tersedia di katalog cabang tujuan.');
           continue;
@@ -153,18 +148,11 @@ class PrePaymentVerificationGate {
       }
 
       const expectedPrice = Number(item.expected_price ?? item.price);
-      const masterProduct = db.prepare(`
-        SELECT 
-          p.*, 
-          bp.branch_id as bp_branch_id,
-          bp.price as branch_raw_price, 
-          bp.stock as branch_stock, 
-          bp.is_available as branch_availability,
-          bp.low_stock_threshold as branch_low_stock_threshold
-        FROM products p
-        LEFT JOIN branch_products bp ON p.id = bp.product_id AND bp.branch_id = ?
-        WHERE p.id = ? AND p.brand_id = ?
-      `).get(branch_id, productId, brand_id);
+      const masterProduct = catalogRepository.findProductForBranch({
+        branchId: branch_id,
+        productId,
+        brandId: brand_id
+      });
       if (!masterProduct) {
         errors.push(`Produk "${item.name || productId}" tidak ditemukan di sistem.`);
         continue;
