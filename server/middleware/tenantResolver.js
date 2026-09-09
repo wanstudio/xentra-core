@@ -1,8 +1,10 @@
-const DataAccess = require('../../core/data/DataAccess');
+const { BrandRepository } = require('../../core/data/repositories');
+
+const brandRepository = new BrandRepository();
 
 async function tenantResolver(req, res, next) {
   try {
-    await DataAccess.ready();
+    await brandRepository.ready();
 
     const host = req.headers.host || '';
     const cleanHost = host.split(':')[0].toLowerCase();
@@ -13,12 +15,7 @@ async function tenantResolver(req, res, next) {
       // Production tenant resolution is authoritative: exact host → registered custom domain.
       // Client-specific hostnames must never be hardcoded in application code.
       if (cleanHost) {
-        brand = DataAccess.queryOne(`
-          SELECT *
-          FROM brands
-          WHERE lower(trim(custom_domain)) = ?
-          LIMIT 1
-        `, [cleanHost]);
+        brand = brandRepository.findByCustomDomain(cleanHost);
       }
 
       // Localhost/test fallback exists only to keep isolated development/test execution practical.
@@ -30,7 +27,7 @@ async function tenantResolver(req, res, next) {
         process.env.NODE_ENV === 'test';
 
       if (!brand && isLocalOrTest) {
-        brand = DataAccess.queryOne('SELECT * FROM brands ORDER BY created_at ASC LIMIT 1');
+        brand = brandRepository.findFirstForLocalDevelopment();
       }
     } catch (dbErr) {
       console.error('[TenantResolver DB lookup failure]:', dbErr.message);
