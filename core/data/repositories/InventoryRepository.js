@@ -63,6 +63,41 @@ class InventoryRepository {
       referenceId, actorId, notes, createdAt
     ]);
   }
+
+  findMovementByMutationId(mutationId) {
+    return this.db.queryOne(
+      'SELECT * FROM inventory_movements WHERE mutation_id = ?',
+      [mutationId]
+    );
+  }
+
+  updateStock({ branchId, productId, quantity, updatedAt }) {
+    return this.db.execute(`
+      UPDATE branch_products
+      SET stock = COALESCE(stock, 0) + ?, updated_at = ?
+      WHERE branch_id = ? AND product_id = ? AND (COALESCE(stock, 0) + ?) >= 0
+    `, [quantity, updatedAt, branchId, productId, quantity]);
+  }
+
+  insertMovement({
+    id, branchId, productId, movementType, quantity, previousStock,
+    currentStock, referenceId, mutationId, actorId, notes, createdAt
+  }) {
+    return this.db.execute(`
+      INSERT INTO inventory_movements (
+        id, branch_id, product_id, movement_type, quantity, previous_stock,
+        current_stock, reference_id, mutation_id, actor_id, notes, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      id, branchId, productId, movementType, quantity, previousStock,
+      currentStock, referenceId, mutationId, actorId, notes, createdAt
+    ]);
+  }
+
+  getStock(branchId, productId) {
+    const row = this.findBranchProduct(branchId, productId);
+    return row ? Number(row.stock || 0) : 0;
+  }
 }
 
 module.exports = InventoryRepository;
