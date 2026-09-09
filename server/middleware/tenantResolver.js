@@ -1,48 +1,44 @@
-const db = require('../database/db');
+const DataAccess = require('../../core/data/DataAccess');
 
 async function tenantResolver(req, res, next) {
   try {
-    if (db && db.readyPromise) {
-      await db.readyPromise;
-    }
+    await DataAccess.ready();
 
     const host = req.headers.host || '';
     const cleanHost = host.split(':')[0].toLowerCase();
 
     let brand = null;
 
-    if (db && typeof db.prepare === 'function') {
-      try {
-        // Production tenant resolution is authoritative: exact host → registered custom domain.
-        // Client-specific hostnames must never be hardcoded in application code.
-        if (cleanHost) {
-          brand = db.prepare(`
-            SELECT *
-            FROM brands
-            WHERE lower(trim(custom_domain)) = ?
-            LIMIT 1
-          `).get(cleanHost);
-        }
-
-        // Localhost/test fallback exists only to keep isolated development/test execution practical.
-        // It must never become a production tenant-selection mechanism.
-        const isLocalOrTest = !cleanHost ||
-          cleanHost === 'localhost' ||
-          cleanHost === '127.0.0.1' ||
-          cleanHost === '::1' ||
-          process.env.NODE_ENV === 'test';
-
-        if (!brand && isLocalOrTest) {
-          brand = db.prepare('SELECT * FROM brands ORDER BY created_at ASC LIMIT 1').get();
-        }
-      } catch (dbErr) {
-        console.error('[TenantResolver DB lookup failure]:', dbErr.message);
-        return res.status(503).json({
-          success: false,
-          error: 'DATABASE_UNAVAILABLE',
-          message: 'Layanan database tidak tersedia saat menyelesaikan tenant.'
-        });
+    try {
+      // Production tenant resolution is authoritative: exact host → registered custom domain.
+      // Client-specific hostnames must never be hardcoded in application code.
+      if (cleanHost) {
+        brand = DataAccess.queryOne(`
+          SELECT *
+          FROM brands
+          WHERE lower(trim(custom_domain)) = ?
+          LIMIT 1
+        `, [cleanHost]);
       }
+
+      // Localhost/test fallback exists only to keep isolated development/test execution practical.
+      // It must never become a production tenant-selection mechanism.
+      const isLocalOrTest = !cleanHost ||
+        cleanHost === 'localhost' ||
+        cleanHost === '127.0.0.1' ||
+        cleanHost === '::1' ||
+        process.env.NODE_ENV === 'test';
+
+      if (!brand && isLocalOrTest) {
+        brand = DataAccess.queryOne('SELECT * FROM brands ORDER BY created_at ASC LIMIT 1');
+      }
+    } catch (dbErr) {
+      console.error('[TenantResolver DB lookup failure]:', dbErr.message);
+      return res.status(503).json({
+        success: false,
+        error: 'DATABASE_UNAVAILABLE',
+        message: 'Layanan database tidak tersedia saat menyelesaikan tenant.'
+      });
     }
 
     // STRICT MULTI-TENANT SECURITY BOUNDARY: Fail closed if the host is not registered.
