@@ -2943,7 +2943,7 @@ router.get('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res
 
 router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, category_id, price, regular_price, description, image } = req.body;
+    const { name, category_id, price, regular_price, description, image, pricing_mode, min_price, max_price } = req.body;
     if (!name || !price) return res.status(400).json({ success: false, error: 'Nama dan harga menu wajib diisi.' });
 
     // P1 TENANT CATEGORY INTEGRITY GUARD (FINDING 02)
@@ -2961,8 +2961,8 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     db.prepare(`
-      INSERT INTO products (id, brand_id, category_id, name, slug, description, price, is_active, sort_order)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products WHERE brand_id = ?))
+      INSERT INTO products (id, brand_id, category_id, name, slug, description, price, regular_price, pricing_mode, min_price, max_price, is_active, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM products WHERE brand_id = ?))
     `).run(
       id,
       req.brand_id,
@@ -2971,6 +2971,10 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
       slug,
       description !== undefined ? description : '',
       Number(price),
+      regular_price ? Number(regular_price) : Number(price),
+      pricing_mode || 'lock',
+      min_price !== undefined ? Number(min_price) : null,
+      max_price !== undefined ? Number(max_price) : null,
       req.brand_id
     );
 
@@ -2994,7 +2998,7 @@ router.post('/admin/products', requireAuth(['owner', 'brand_manager']), (req, re
 
 router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, category_id, price, regular_price, description, image, is_active } = req.body;
+    const { name, category_id, price, regular_price, description, image, is_active, pricing_mode, min_price, max_price } = req.body;
 
     // P1 TENANT CATEGORY INTEGRITY GUARD (FINDING 02)
     if (category_id !== undefined && category_id !== null) {
@@ -3012,6 +3016,10 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       SET name = COALESCE(?, name),
           category_id = COALESCE(?, category_id),
           price = COALESCE(?, price),
+          regular_price = COALESCE(?, regular_price),
+          pricing_mode = COALESCE(?, pricing_mode),
+          min_price = COALESCE(?, min_price),
+          max_price = COALESCE(?, max_price),
           description = COALESCE(?, description),
           is_active = COALESCE(?, is_active),
           updated_at = datetime('now')
@@ -3020,6 +3028,10 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       name !== undefined ? name : null,
       category_id !== undefined ? category_id : null,
       price !== undefined ? price : null,
+      regular_price !== undefined ? regular_price : null,
+      pricing_mode !== undefined ? pricing_mode : null,
+      min_price !== undefined ? min_price : null,
+      max_price !== undefined ? max_price : null,
       description !== undefined ? description : null,
       is_active !== undefined ? is_active : null,
       req.params.id,

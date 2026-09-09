@@ -591,6 +591,23 @@
             <input type="number" id="prod-regular-price" class="x-input" placeholder="32000">
           </div>
         </div>
+        <div class="x-form-row">
+          <div class="x-form-group">
+            <label for="prod-pricing-mode">Mode Harga</label>
+            <select id="prod-pricing-mode" class="x-input">
+              <option value="lock">Tetap (Lock)</option>
+              <option value="range">Fleksibel (Range)</option>
+            </select>
+          </div>
+          <div class="x-form-group" id="prod-range-fields" style="display:none;">
+            <label>Harga Range (Rp)</label>
+            <div class="x-form-row">
+              <input type="number" id="prod-min-price" class="x-input" placeholder="Min" style="flex:1;">
+              <span style="padding:0 6px;color:#94a3b8;">—</span>
+              <input type="number" id="prod-max-price" class="x-input" placeholder="Max" style="flex:1;">
+            </div>
+          </div>
+        </div>
         <div class="x-form-group">
           <label for="prod-desc">Deskripsi Menu</label>
           <textarea id="prod-desc" class="x-input" rows="2" placeholder="Deskripsi bahan, rasa, porsi..."></textarea>

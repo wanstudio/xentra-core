@@ -480,6 +480,10 @@
     $('prod-name').value = '';
     $('prod-price').value = '';
     $('prod-regular-price').value = '';
+    $('prod-pricing-mode').value = 'lock';
+    $('prod-min-price').value = '';
+    $('prod-max-price').value = '';
+    toggleRangeFields();
     $('prod-desc').value = '';
     _productImageFile = null;
     var fileInput = $('prod-image-file');
@@ -498,6 +502,10 @@
     $('prod-category').value = prod.category_id;
     $('prod-price').value = prod.price;
     $('prod-regular-price').value = prod.regular_price || prod.price;
+    $('prod-pricing-mode').value = prod.pricing_mode || 'lock';
+    $('prod-min-price').value = prod.min_price || '';
+    $('prod-max-price').value = prod.max_price || '';
+    toggleRangeFields();
     $('prod-desc').value = prod.description || '';
     _productImageFile = null;
     var fileInput = $('prod-image-file');
@@ -511,6 +519,13 @@
     $('modal-product').style.display = 'none';
     _productImageFile = null;
   };
+
+  function toggleRangeFields() {
+    var isRange = $('prod-pricing-mode').value === 'range';
+    $('prod-range-fields').style.display = isRange ? 'flex' : 'none';
+  }
+
+  $('prod-pricing-mode').addEventListener('change', toggleRangeFields);
 
   window.toggleStock = async function (id) {
     try {
@@ -603,11 +618,15 @@
     $('form-product').addEventListener('submit', async function (e) {
       e.preventDefault();
       var id = $('prod-id').value;
+      var pricingMode = $('prod-pricing-mode').value;
       var payload = {
         name: $('prod-name').value,
         category_id: $('prod-category').value,
         price: Number($('prod-price').value),
         regular_price: Number($('prod-regular-price').value || $('prod-price').value),
+        pricing_mode: pricingMode,
+        min_price: pricingMode === 'range' ? Number($('prod-min-price').value || $('prod-price').value) : null,
+        max_price: pricingMode === 'range' ? Number($('prod-max-price').value || $('prod-price').value) : null,
         description: $('prod-desc').value
       };
 
