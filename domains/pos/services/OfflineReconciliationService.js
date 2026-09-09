@@ -8,27 +8,11 @@
  * 4. Disaster Recovery Reconciliation: Resolves cash variance & un-synced paper receipt trails when cashier device is lost/damaged.
  */
 const crypto = require('crypto');
-const db = require('../../../server/database/db');
+const db = require('../../../core/data/DataAccess');
 const { events } = require('../../../core');
 const { OrderPlacementService } = require('../../commerce');
 
 class OfflineReconciliationService {
-  /**
-   * Reconciles a single offline transaction with strict Idempotency deduplication.
-   * 
-   * @param {Object} params
-   * @param {string} params.client_transaction_id - Unique UUID generated on cashier device
-   * @param {string} params.brand_id
-   * @param {string} params.branch_id
-   * @param {string} [params.shift_id]
-   * @param {string} [params.order_type='dinein']
-   * @param {string} [params.payment_method='cash']
-   * @param {number} [params.amount_tendered]
-   * @param {Array<Object>} params.items
-   * @param {string} [params.offline_created_at] - Timestamp from device clock
-   * @param {Object} [params.customer]
-   * @returns {Promise<{ status: 'PROCESSED'|'DUPLICATE_IGNORED'|'ERROR', order?: Object, message?: string }>}
-   */
   static async reconcileOfflineTransaction({
     client_transaction_id,
     brand_id,
@@ -45,7 +29,6 @@ class OfflineReconciliationService {
       throw new Error('[OfflineReconciliation] "client_transaction_id" tidak valid (wajib berupa string berkarakter 8-64).');
     }
 
-    // 1. Scoped Idempotency Check: Query directly by scoped (branch_id, client_transaction_id)
     const existingOrder = db.prepare(`
       SELECT * FROM orders 
       WHERE branch_id = ? AND client_transaction_id = ?
@@ -60,7 +43,6 @@ class OfflineReconciliationService {
       };
     }
 
-    // 2. Authoritative Capture: Submit Order via Commerce placement
     const noteWithTxId = `POS Offline Sync [TX_ID:${client_transaction_id}] [DeviceTime:${offline_created_at || 'unknown'}]`;
     let placementResult;
 
@@ -87,7 +69,6 @@ class OfflineReconciliationService {
         }
       });
     } catch (err) {
-      // Handle concurrent duplicate submission via SQLite UNIQUE constraint
       if (err.message && (err.message.includes('idx_orders_branch_client_tx') || err.message.includes('UNIQUE constraint failed: orders.branch_id, orders.client_transaction_id'))) {
         const deduplicated = db.prepare(`
           SELECT * FROM orders WHERE branch_id = ? AND client_transaction_id = ? LIMIT 1
@@ -104,7 +85,6 @@ class OfflineReconciliationService {
     }
 
     if (!placementResult.success) {
-      // In authoritative cash mode, if stock changed while offline, we still record order with variance audit
       return {
         status: 'ERROR',
         errors: placementResult.errors,
@@ -115,9 +95,6 @@ class OfflineReconciliationService {
     const order = placementResult.order;
     const grandTotal = order.grand_total;
 
-    // 3. Emit reconciliation success event (shift cash sales is updated atomically inside submitOrder)
-
-    // 4. Emit reconciliation success event
     events.EventBus.publish({
       type: 'pos.offline.reconciled',
       producer: 'pos',
@@ -141,14 +118,6 @@ class OfflineReconciliationService {
     };
   }
 
-  /**
-   * Batch processes a queue of offline transactions uploaded by POS terminal.
-   * 
-   * @param {Object} params
-   * @param {string} params.branch_id
-   * @param {Array<Object>} params.transactions
-   * @returns {Promise<{ total: number, processed: number, duplicates: number, failed: number, results: Array<Object> }>}
-   */
   static async processBatchSync({ branch_id, transactions = [] }) {
     if (!Array.isArray(transactions)) {
       throw new Error('[OfflineReconciliation] "transactions" must be an array.');
@@ -188,17 +157,6 @@ class OfflineReconciliationService {
     };
   }
 
-  /**
-   * Handles Disaster Recovery Physical Reconciliation when cashier hardware is lost/damaged.
-   * Reconciles financial shift balance against physical paper receipt bundles and cash drawer count.
-   * 
-   * @param {Object} params
-   * @param {string} params.shift_id
-   * @param {number} params.actual_physical_cash
-   * @param {number} params.paper_receipts_total
-   * @param {string} [params.incident_notes='']
-   * @returns {Object} Disaster Recovery Variance Record
-   */
   static recordDisasterRecoveryReconciliation({
     shift_id,
     actual_physical_cash,
@@ -221,7 +179,6 @@ class OfflineReconciliationService {
 
     db.exec('BEGIN IMMEDIATE;');
     try {
-      // Re-verify under exclusive lock to guarantee atomic state check
       const currentShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
       if (!currentShift || currentShift.status !== 'open') {
         throw new Error('[OfflineReconciliation] Shift tidak ditemukan atau sudah ditutup oleh proses lain.');
@@ -230,7 +187,6 @@ class OfflineReconciliationService {
       const systemExpected = Number(currentShift.expected_cash) || 0;
       disasterVariance = physicalCash - (systemExpected + paperTotal);
 
-      // Atomic Compare-and-Set (CAS): only update if still 'open'
       const closeRes = db.prepare(`
         UPDATE pos_shifts
         SET 
@@ -252,7 +208,6 @@ class OfflineReconciliationService {
       throw err;
     }
 
-    // Record formal audit event
     events.EventBus.publish({
       type: 'pos.disaster_recovery.reconciled',
       producer: 'pos',
