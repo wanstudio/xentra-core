@@ -33,6 +33,37 @@ Customer / Merchant UI
 
 The exact physical deployment may evolve, but the IP boundary must remain intact.
 
+## Repository boundary — LOCKED
+
+`xentra-core` and `xentra-connector` MUST be separate Git repositories and separate deployment units.
+
+### `xentra-core`
+
+Contains the Xentra proprietary application/core, Control Plane, business logic, algorithms, platform services, and security-sensitive server-side logic.
+
+Rules:
+
+1. `xentra-core` remains under Xentra-controlled repository and infrastructure access.
+2. `xentra-core` MUST NOT be copied/deployed as readable source code to client-controlled infrastructure.
+3. Client deployments must not depend on shipping the complete `xentra-core` repository or equivalent readable server-side source.
+
+### `xentra-connector`
+
+A separate repository containing only the minimum enterprise/client-side integration layer required to communicate with Xentra Core and interact with client-owned data/storage where required.
+
+Rules:
+
+1. The connector MUST remain minimal and replaceable.
+2. The connector MUST NOT become a copy, fork, or disguised mirror of `xentra-core`.
+3. Proprietary algorithms, core business rules, secrets, and security-sensitive core implementation SHOULD remain in Xentra-controlled services.
+4. The connector communicates with Xentra Core through an explicit, versioned API/contract boundary.
+
+### Important security rule
+
+Separate repositories alone do not guarantee IP protection. Deployment artifacts, credentials, source maps, runtime permissions, build pipelines, and API boundaries must also preserve the separation.
+
+If any readable Xentra proprietary server-side implementation is physically present on a client-controlled server, assume the client's root/administrator can access it.
+
 ## Source-code rule
 
 Any server-side code physically deployed onto a client-controlled server must be treated as potentially readable by that client's root/administrator. Docker/containerization, filesystem permissions, minification, or obfuscation do not provide a reliable IP boundary against a client-controlled administrator.
