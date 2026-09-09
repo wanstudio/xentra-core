@@ -55,6 +55,23 @@ class OrderRepository {
   findItems(orderId) {
     return this.db.queryMany('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
   }
+
+  findHeldById(heldOrderId) {
+    return this.db.queryOne(
+      'SELECT * FROM pos_held_orders WHERE id = ?',
+      [heldOrderId]
+    );
+  }
+
+  findActiveHeldByTable({ branchId, tableNumber }) {
+    return this.db.queryOne(`
+      SELECT *
+      FROM pos_held_orders
+      WHERE branch_id = ? AND table_number = ? AND status = 'held'
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [branchId, String(tableNumber)]);
+  }
 }
 
 module.exports = OrderRepository;
