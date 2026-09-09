@@ -78,6 +78,47 @@ class OrderRepository {
     return this.db.queryMany('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
   }
 
+  findDeliveryByOrderId(orderId) {
+    return this.db.queryOne('SELECT * FROM order_deliveries WHERE order_id = ?', [orderId]);
+  }
+
+  insertOrUpdateDeliveryAssignment({ orderId, driverName, driverPhone, updatedAt }) {
+    const existing = this.findDeliveryByOrderId(orderId);
+    if (existing) {
+      return this.db.execute(`
+        UPDATE order_deliveries
+        SET driver_name = ?,
+            driver_phone = ?,
+            status = 'assigned',
+            updated_at = ?
+        WHERE order_id = ?
+      `, [driverName, driverPhone, updatedAt, orderId]);
+    }
+
+    const deliveryId = `del_${Date.now()}`;
+    return this.db.execute(`
+      INSERT INTO order_deliveries (
+        id, order_id, driver_name, driver_phone, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, 'assigned', ?, ?)
+    `, [deliveryId, orderId, driverName, driverPhone, updatedAt, updatedAt]);
+  }
+
+  updateDeliveryStatus({ orderId, status, updatedAt }) {
+    return this.db.execute(`
+      UPDATE order_deliveries
+      SET status = ?, updated_at = ?
+      WHERE order_id = ?
+    `, [status, updatedAt, orderId]);
+  }
+
+  markDelivered({ orderId, updatedAt }) {
+    return this.db.execute(`
+      UPDATE orders
+      SET status = 'delivered', updated_at = ?
+      WHERE id = ?
+    `, [updatedAt, orderId]);
+  }
+
   insertOrder({
     id, orderNumber, clientTransactionId, brandId, branchId, customerName, customerPhone,
     orderType, orderChannel, selectionMode, tableNumber, fulfillmentScheduleType,
