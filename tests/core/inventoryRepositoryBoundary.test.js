@@ -78,5 +78,5 @@ test('InventoryRepository preserves branch stock mutation and ledger operations'
 
   assert.match(calls.execute[0].sql, /UPDATE branch_products/);
   assert.match(calls.execute[1].sql, /INSERT INTO inventory_movements/);
-  assert.equal(calls.execute[0].params, calls.execute[0].params);
+  assert.deepEqual(calls.execute[0].params, ['15', '2026-09-10T00:00:00.000Z', 'branch-1', 'product-1']);
 });
