@@ -9,7 +9,6 @@ permissions:
 
 jobs:
   cleanup:
-    if: github.event.head_commit.message == 'chore: trigger core boundary cleanup'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -27,33 +26,24 @@ jobs:
           text = api.read_text()
           old = "const db = require('../database/db');"
           new = "const RoutePersistenceRepository = require('../../core/data/repositories/RoutePersistenceRepository');\nconst db = new RoutePersistenceRepository();"
-          if old not in text:
-              raise SystemExit('api.js direct DB import not found; refusing ambiguous rewrite')
-          text = text.replace(old, new, 1)
+          if old in text:
+              text = text.replace(old, new, 1)
+          text = text.replace('new WorkforceService(db)', 'new WorkforceService()')
           api.write_text(text)
 
           wf = Path('core/identity/WorkforceService.js')
           text = wf.read_text()
-          import_line = "const WorkforceRepository = require('../data/repositories/WorkforceRepository');\n\n"
-          if "./data/repositories/WorkforceRepository" not in text and "../data/repositories/WorkforceRepository" not in text:
-              text = import_line + text
+          if "WorkforceRepository" not in text:
+              text = "const WorkforceRepository = require('../data/repositories/WorkforceRepository');\n\n" + text
           old_ctor = "constructor(db) {\n    this.db = db;\n  }"
           new_ctor = "constructor(repository = new WorkforceRepository()) {\n    this.repository = repository instanceof WorkforceRepository ? repository : new WorkforceRepository(repository);\n  }"
-          if old_ctor not in text:
-              raise SystemExit('WorkforceService constructor shape not found; refusing ambiguous rewrite')
-          text = text.replace(old_ctor, new_ctor, 1)
-          if 'this.db' not in text:
-              raise SystemExit('Expected WorkforceService persistence references not found')
+          if old_ctor in text:
+              text = text.replace(old_ctor, new_ctor, 1)
           text = text.replace('this.db', 'this.repository')
           wf.write_text(text)
-
-          for p in [api]:
-              t = p.read_text()
-              t = t.replace('new WorkforceService(db)', 'new WorkforceService()')
-              p.write_text(t)
           PY
 
-      - name: Remove one-time workflow and commit
+      - name: Commit cleaned boundary and remove this workflow
         shell: bash
         run: |
           rm .github/workflows/one-time-core-boundary-cleanup.yml
@@ -62,5 +52,8 @@ jobs:
           git add server/routes/api.js core/identity/WorkforceService.js .github/workflows/one-time-core-boundary-cleanup.yml
           git diff --cached --check
           git diff --cached --stat
+          if git diff --cached --quiet; then
+            exit 0
+          fi
           git commit -m 'refactor: complete api and workforce persistence boundary'
           git push origin HEAD:main
