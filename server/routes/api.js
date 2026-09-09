@@ -3226,6 +3226,17 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
           message: 'Hanya Pemilik Toko (Owner) atau Brand Manager yang berwenang mengubah status aktivasi global cabang.'
         });
       }
+      // DELIVERY SETTINGS GUARD: Branch Manager cannot change delivery fee policy (ongkir formula)
+      const deliveryFields = [free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount];
+      const deliveryFieldNames = ['free_delivery_km', 'price_per_km', 'max_radius_km', 'promo_min_order', 'promo_delivery_discount'];
+      const hasDeliveryChange = deliveryFields.some((v, i) => v !== undefined && v !== null && String(v) !== String(Object.values(existingSettings)[i] ?? ''));
+      if (hasDeliveryChange) {
+        return res.status(403).json({
+          success: false,
+          error: 'INSUFFICIENT_PERMISSIONS',
+          message: 'Hanya Pemilik Toko (Owner) atau Brand Manager yang berwenang mengubah pengaturan ongkir dan promosi pengiriman.'
+        });
+      }
     }
 
     if (targetWa !== null && targetWa !== undefined) {
