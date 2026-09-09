@@ -1598,9 +1598,9 @@
         '<div class="x-dinein-guest-row" style="padding:4px 16px 0;">' +
         '  <span class="x-dinein-guest-label">Jumlah Orang</span>' +
         '  <div class="x-dinein-guest-control">' +
-        '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-minus" aria-label="Kurangi orang">−</button>' +
+        '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-minus" aria-label="Kurangi orang"><img src="/assets/icons/minus.svg" alt="Kurangi orang" style="width:14px;height:14px"></button>' +
         '    <span class="x-dinein-guest-count" id="x-res-guest-count">' + (draft.guestCount || 2) + '</span>' +
-        '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-plus" aria-label="Tambah orang">+</button>' +
+        '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-plus" aria-label="Tambah orang"><img src="/assets/icons/plus.svg" alt="Tambah orang" style="width:14px;height:14px"></button>' +
         '  </div>' +
         '</div>' +
         '<div class="x-fulfillment-selected-summary">' +
@@ -1616,7 +1616,7 @@
       // Dates: Besok (day 1) + the following 5 device-local days (6 booking
       // days). The value is the device-local ISO date (YYYY-MM-DD) so the
       // server rejects it only if it is actually same-day-or-earlier.
-      var days = buildScheduleDays();
+      var days = buildScheduleDates();
       var dateItems = days.slice(1).map(function (d) {
         return { value: d.iso, label: d.value };
       });

@@ -31,9 +31,11 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
+const fs = require('node:fs');
 
 const STORE_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/store.js');
 const SCHEDULE_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/delivery-schedule.js');
+const CHECKOUT_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/checkout.js');
 const schedule = require(SCHEDULE_PATH);
 
 let persistentStorage = {};
@@ -393,6 +395,13 @@ test('TEST 16: Reservation -> date wheel starts at Besok (never same-day) and co
   assert.strictEqual(dateItems[0].value, '2026-09-10', 'First offered day is the next device-local day');
   assert.ok(!dateItems.some((d) => d.value === '2026-09-09'), 'Same-day (Hari ini) must never be offered');
   assert.strictEqual(dateItems.length, 6);
+
+  // Regression guard: the sheet's reservation picker builds its wheel through
+  // buildScheduleDates() (the helper defined in openFulfillmentSheet). A bare
+  // buildScheduleDays() call there throws ReferenceError and blanks the picker.
+  const checkoutSrc = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+  assert.ok(!/(?<!\.)buildScheduleDays\s*\(/.test(checkoutSrc),
+    'checkout.js must not call bare buildScheduleDays() — use buildScheduleDates()');
 
   // Customer picks from the wheel then confirms
   const ctrl = createFulfillmentSheetController(
