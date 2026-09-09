@@ -54,6 +54,20 @@ class PromotionRepository {
     return Number(row?.count || 0);
   }
 
+  findPromotion(promotionId) {
+    return this.db.queryOne(
+      'SELECT id, max_redemptions_per_customer FROM promotions WHERE id = ?',
+      [promotionId]
+    );
+  }
+
+  findRewardProductPrice(productId) {
+    return this.db.queryOne(
+      'SELECT COALESCE(regular_price, price, 0) AS v FROM products WHERE id = ?',
+      [productId]
+    );
+  }
+
   findRewardCatalogProduct({ productId, brandId }) {
     return this.db.queryOne(`
       SELECT name, price, regular_price, image_url
