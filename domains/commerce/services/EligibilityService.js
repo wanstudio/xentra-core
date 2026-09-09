@@ -48,7 +48,9 @@
  * fail closed with BRANCH_NOT_FOUND / PRODUCT_NOT_FOUND so existence is never
  * leaked across tenant boundaries.
  */
-const db = require('../../../core/data/DataAccess');
+const { EligibilityRepository } = require('../../../core/data/repositories');
+
+const eligibilityRepository = new EligibilityRepository();
 
 // order types whose fulfillment capability IS represented in the schema
 const CAPABILITY_REPRESENTED = { delivery: 'is_delivery_active', pickup: 'is_pickup_active' };
@@ -70,13 +72,10 @@ class EligibilityService {
   };
 
   static _resolveBranch({ brand_id, branch_id, order_type }) {
-    const branch = db.prepare(`
-      SELECT b.id, b.brand_id, b.name, b.is_active, b.is_open_override,
-             s.is_delivery_active, s.is_pickup_active
-      FROM branches b
-      LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
-      WHERE b.id = ? AND b.brand_id = ?
-    `).get(branch_id, brand_id);
+    const branch = eligibilityRepository.findBranchEligibilityContext({
+      branchId: branch_id,
+      brandId: brand_id
+    });
 
     if (!branch) return { ok: false, reason: EligibilityService.REASONS.BRANCH_NOT_FOUND };
     if (branch.is_active !== 1) return { ok: false, reason: EligibilityService.REASONS.BRANCH_NOT_ACTIVE };
@@ -128,9 +127,10 @@ class EligibilityService {
       return { eligible: false, reasons: [EligibilityService.REASONS.INVALID_QUANTITY], branch_id, brand_id, product_id, quantity: qty };
     }
 
-    const product = db.prepare(
-      'SELECT id, name, is_active FROM products WHERE id = ? AND brand_id = ?'
-    ).get(product_id, brand_id);
+    const product = eligibilityRepository.findProductForEligibility({
+      productId: product_id,
+      brandId: brand_id
+    });
 
     if (!product) {
       return { eligible: false, reasons: [EligibilityService.REASONS.PRODUCT_NOT_FOUND], branch_id, brand_id, product_id, quantity: qty };
@@ -139,9 +139,10 @@ class EligibilityService {
       return { eligible: false, reasons: [EligibilityService.REASONS.PRODUCT_INACTIVE], branch_id, brand_id, product_id, quantity: qty };
     }
 
-    const bp = db.prepare(
-      'SELECT stock, is_available FROM branch_products WHERE branch_id = ? AND product_id = ?'
-    ).get(branch_id, product_id);
+    const bp = eligibilityRepository.findBranchProductEligibility({
+      branchId: branch_id,
+      productId: product_id
+    });
 
     if (!bp) {
       return { eligible: false, reasons: [EligibilityService.REASONS.PRODUCT_NOT_ASSIGNED], branch_id, brand_id, product_id, quantity: qty };
