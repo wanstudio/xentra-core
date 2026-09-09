@@ -1,15 +1,14 @@
 'use strict';
 const crypto = require('crypto');
-const db = require('../../../core/data/DataAccess');
 const { events } = require('../../../core');
-const InventoryStockService = require('./InventoryStockService');
-const InventoryMovementModel = require('../models/InventoryMovementModel');
+const { InventoryRepository } = require('../../../core/data/repositories');
+const inventoryRepository = new InventoryRepository();
 
 class PurchaseOrderService {
   /**
    * Stage 1: Creates a Purchase Order in 'pending' / 'ordered' state.
    * Locked Rule: PO creation DOES NOT mutate live inventory stock.
-   * 
+   *
    * @param {Object} params
    * @param {string} params.brand_id
    * @param {string} params.branch_id
@@ -36,30 +35,38 @@ class PurchaseOrderService {
     const now = new Date().toISOString();
 
     try {
-      db.exec('BEGIN TRANSACTION;');
+      inventoryRepository.beginTransaction();
 
-      db.prepare(`
-        INSERT INTO inventory_purchase_orders (
-          id, po_number, brand_id, branch_id, supplier_name, status, created_by, notes, ordered_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)
-      `).run(poId, poNumber, brand_id, branch_id, supplier_name, created_by, notes, now, now, now);
+      inventoryRepository.insertPurchaseOrder({
+        id: poId,
+        poNumber,
+        brandId: brand_id,
+        branchId: branch_id,
+        supplierName: supplier_name,
+        createdBy: created_by,
+        notes,
+        orderedAt: now,
+        createdAt: now,
+        updatedAt: now
+      });
 
       for (const item of items) {
         const itemId = `poi_${crypto.randomBytes(6).toString('hex')}`;
-        db.prepare(`
-          INSERT INTO inventory_po_items (
-            id, po_id, product_id, quantity, unit_cost, received_quantity
-          ) VALUES (?, ?, ?, ?, ?, 0)
-        `).run(itemId, poId, item.product_id, Number(item.quantity), Number(item.unit_cost || 0));
+        inventoryRepository.insertPurchaseOrderItem({
+          id: itemId,
+          poId,
+          productId: item.product_id,
+          quantity: Number(item.quantity),
+          unitCost: Number(item.unit_cost || 0)
+        });
       }
 
-      db.exec('COMMIT;');
+      inventoryRepository.commitTransaction();
     } catch (e) {
-      try { db.exec('ROLLBACK;'); } catch (_) {}
+      try { inventoryRepository.rollbackTransaction(); } catch (_) {}
       throw e;
     }
 
-    // Emit event: inventory.po.created
     events.EventBus.publish({
       type: 'inventory.po.created',
       producer: 'inventory',
@@ -87,7 +94,7 @@ class PurchaseOrderService {
   /**
    * Stage 2: Verifies Goods Receipt upon physical arrival.
    * Locked Rule: Stock mutation only occurs HERE via ACID transactions and immutable ledger entries.
-   * 
+   *
    * @param {Object} params
    * @param {string} params.po_id
    * @param {string} [params.received_by]
@@ -99,7 +106,7 @@ class PurchaseOrderService {
     received_by = null,
     received_items = null
   }) {
-    const po = db.prepare('SELECT * FROM inventory_purchase_orders WHERE id = ?').get(po_id);
+    const po = inventoryRepository.findPurchaseOrderById(po_id);
     if (!po) {
       throw new Error(`[PurchaseOrderService] Purchase Order "${po_id}" tidak ditemukan.`);
     }
@@ -108,12 +115,12 @@ class PurchaseOrderService {
       throw new Error(`[PurchaseOrderService] Purchase Order "${po.po_number}" sudah berstatus "${po.status}".`);
     }
 
-    const items = db.prepare('SELECT * FROM inventory_po_items WHERE po_id = ?').all(po_id);
+    const items = inventoryRepository.findPurchaseOrderItems(po_id);
     const now = new Date().toISOString();
     const updatedStocks = [];
 
     try {
-      db.exec('BEGIN TRANSACTION;');
+      inventoryRepository.beginTransaction();
 
       for (const item of items) {
         let receiveQty = item.quantity;
@@ -125,39 +132,37 @@ class PurchaseOrderService {
         }
 
         if (receiveQty > 0) {
-          const branchProduct = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(po.branch_id, item.product_id);
+          const branchProduct = inventoryRepository.findBranchProduct(po.branch_id, item.product_id);
           const prevStock = branchProduct ? Number(branchProduct.stock || 0) : 0;
           const nextStock = prevStock + receiveQty;
 
-          db.prepare(`
-            UPDATE branch_products
-            SET stock = ?, updated_at = ?
-            WHERE branch_id = ? AND product_id = ?
-          `).run(nextStock, now, po.branch_id, item.product_id);
+          inventoryRepository.updateBranchProductStock({
+            branchId: po.branch_id,
+            productId: item.product_id,
+            stock: nextStock,
+            updatedAt: now
+          });
 
           const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
-          db.prepare(`
-            INSERT INTO inventory_movements (
-              id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
-            ) VALUES (?, ?, ?, 'purchase_in', ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            movementId,
-            po.branch_id,
-            item.product_id,
-            receiveQty,
-            prevStock,
-            nextStock,
-            po.po_number,
-            received_by,
-            `Penerimaan barang fisik dari PO ${po.po_number} (${po.supplier_name})`,
-            now
-          );
+          inventoryRepository.insertMovement({
+            id: movementId,
+            branchId: po.branch_id,
+            productId: item.product_id,
+            movementType: 'purchase_in',
+            quantity: receiveQty,
+            previousStock: prevStock,
+            currentStock: nextStock,
+            referenceId: po.po_number,
+            actorId: received_by,
+            notes: `Penerimaan barang fisik dari PO ${po.po_number} (${po.supplier_name})`,
+            createdAt: now
+          });
 
-          db.prepare(`
-            UPDATE inventory_po_items
-            SET received_quantity = ?
-            WHERE po_id = ? AND product_id = ?
-          `).run(receiveQty, po_id, item.product_id);
+          inventoryRepository.updatePurchaseOrderItemReceivedQuantity({
+            poId: po_id,
+            productId: item.product_id,
+            receivedQuantity: receiveQty
+          });
 
           updatedStocks.push({
             product_id: item.product_id,
@@ -168,15 +173,16 @@ class PurchaseOrderService {
         }
       }
 
-      db.prepare(`
-        UPDATE inventory_purchase_orders
-        SET status = 'received', received_by = ?, received_at = ?, updated_at = ?
-        WHERE id = ?
-      `).run(received_by, now, now, po_id);
+      inventoryRepository.markPurchaseOrderReceived({
+        poId: po_id,
+        receivedBy: received_by,
+        receivedAt: now,
+        updatedAt: now
+      });
 
-      db.exec('COMMIT;');
+      inventoryRepository.commitTransaction();
     } catch (e) {
-      try { db.exec('ROLLBACK;'); } catch (_) {}
+      try { inventoryRepository.rollbackTransaction(); } catch (_) {}
       throw e;
     }
 
