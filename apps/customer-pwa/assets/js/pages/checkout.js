@@ -4,6 +4,8 @@
  * 
  * Features:
  * 1. 4 Order Types: Delivery (now/scheduled), Pick-up, Dine-in (table context), Reservation (min. tomorrow, same-day rejected)
+ *    Delivery scheduling uses DEVICE-LOCAL time: first slot = device now + 1 hour,
+ *    rounded UP to a 30-minute boundary (see core/delivery-schedule.js).
  * 2. Customer Identity: WhatsApp OTP authentication & verified session binding
  * 3. Pre-Payment Verification Gate: Realtime price/stock check with "Ada perubahan di pesananmu, cek dulu yuk" modal
  * 4. Dual Payment: Tunai (COD / Bayar di Kasir) & Online Payment (Midtrans Snap)
@@ -17,6 +19,10 @@
   var Store = window.Xentra.Store;
   var UI = window.Xentra.UI;
   var Router = window.Xentra.Router;
+  // Delivery schedule slot/timezone math lives in core/delivery-schedule.js and
+  // is DEVICE-LOCAL. The customer schedule picker NEVER uses the server or
+  // WordPress timezone as its current-time source.
+  var DeliverySchedule = window.Xentra && window.Xentra.DeliverySchedule;
 
   var checkoutContainer = null;
   var upsellItems = [];
@@ -1275,7 +1281,14 @@
 
     var WHEEL_ITEM_HEIGHT = 44;
 
+    // DEVICE-LOCAL schedule days (7). Today/Besok/weekday labels AND their ISO
+    // dates come from the device calendar, never from the server/WordPress
+    // timezone. The static list below is only a legacy fallback for contexts
+    // where core/delivery-schedule.js is not loaded.
     function buildScheduleDates() {
+      if (DeliverySchedule && typeof DeliverySchedule.buildScheduleDays === 'function') {
+        return DeliverySchedule.buildScheduleDays(new Date());
+      }
       var list = [];
       var now = new Date();
       var daysMap = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -1285,15 +1298,22 @@
         list.push({
           value: label,
           label: label,
-          iso: d.toISOString().slice(0, 10)
+          iso: d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2)
         });
       }
       return list;
     }
 
-    function buildScheduleSlots(dateLabel) {
-      // Generate standard 30-minute delivery slots
-      var slots = [
+    // DEVICE-LOCAL slot pools (day -> 30-min slots). First available slot =
+    // now(device) + 1 hour, ROUND UP to the next 30-min boundary (order: +1h
+    // first, round UP second). `buildDayPools` carries a past-midnight first
+    // slot onto the next device-local day. Legacy static 10:00-20:30 list is
+    // only the fallback for non-module harness contexts.
+    function buildDayPools() {
+      if (DeliverySchedule && typeof DeliverySchedule.buildDayPools === 'function') {
+        return DeliverySchedule.buildDayPools(new Date());
+      }
+      var legacy = [
         '10:00-10:30', '10:30-11:00', '11:00-11:30', '11:30-12:00',
         '12:00-12:30', '12:30-13:00', '13:00-13:30', '13:30-14:00',
         '14:00-14:30', '14:30-15:00', '15:00-15:30', '15:30-16:00',
@@ -1301,7 +1321,9 @@
         '18:00-18:30', '18:30-19:00', '19:00-19:30', '19:30-20:00',
         '20:00-20:30', '20:30-21:00'
       ];
-      return slots.map(function (s) { return { value: s, label: s }; });
+      return buildScheduleDates().map(function (d) {
+        return { day: d, slots: legacy.map(function (s) { return { value: s, label: s }; }) };
+      });
     }
 
     var sh = makeOverlay(
@@ -1492,15 +1514,17 @@
         var timeCol = schedContainer.querySelector('#x-wheel-time-col');
         var sumText = schedContainer.querySelector('#x-ful-summary-text');
 
-        var dates = buildScheduleDates();
-        var slots = buildScheduleSlots(draft.date);
-
-        if (!draft.date || !dates.some(function (d) { return d.value === draft.date; })) {
-          draft.date = dates[0].value;
-        }
-        if (!draft.timeSlot || !slots.some(function (s) { return s.value === draft.timeSlot; })) {
-          draft.timeSlot = slots[0].value;
-        }
+        // Device-local day pools. Days without any available slot (e.g. today
+        // when the first slot lands after midnight) are hidden from the wheel.
+        var pools = buildDayPools();
+        var dates = [];
+        var poolByValue = {};
+        pools.forEach(function (p) {
+          if (p.slots.length) {
+            dates.push(p.day);
+            poolByValue[p.day.value] = p;
+          }
+        });
 
         function updateSummary() {
           if (sumText) {
@@ -1508,8 +1532,27 @@
           }
         }
 
+        if (!poolByValue[draft.date]) {
+          draft.date = dates.length ? dates[0].value : 'Hari ini';
+        }
+        var pool = poolByValue[draft.date];
+        var slots = pool ? pool.slots : [];
+        if (!draft.timeSlot || !slots.some(function (s) { return s.value === draft.timeSlot; })) {
+          draft.timeSlot = slots.length ? slots[0].value : '';
+        }
+        updateSummary();
+
         buildWheel(dateCol, dates, draft.date, function (selectedDate) {
           draft.date = selectedDate.value;
+          var p = poolByValue[selectedDate.value];
+          var daySlots = p ? p.slots : [];
+          if (!daySlots.some(function (s) { return s.value === draft.timeSlot; })) {
+            draft.timeSlot = daySlots.length ? daySlots[0].value : '';
+          }
+          buildWheel(timeCol, daySlots, draft.timeSlot, function (selectedSlot) {
+            draft.timeSlot = selectedSlot.value;
+            updateSummary();
+          });
           updateSummary();
         });
 
@@ -2265,6 +2308,19 @@
 
     var pwaRuntime = (window.Xentra && window.Xentra.PwaRuntime) ? window.Xentra.PwaRuntime.getPwaRuntimeContext() : { display_mode: 'browser' };
 
+    // Canonical, DEVICE-LOCAL, timezone-aware timestamp for the selected slot.
+    // The human-readable day label ("Hari ini"/"Besok"/weekday) is resolved to
+    // a device-local ISO date; the offset is the device's own UTC offset. The
+    // value is never converted back to a server/WordPress timezone.
+    function resolveScheduledIso() {
+      if (DeliverySchedule && typeof DeliverySchedule.selectedSlotToIso === 'function') {
+        var iso = DeliverySchedule.selectedSlotToIso(new Date(), state.fulfillment.date, state.fulfillment.timeSlot);
+        if (iso && iso.start) return iso;
+      }
+      // Fallback (no module in context): keep legacy human-readable text.
+      return { start: state.fulfillment.date + ' ' + state.fulfillment.timeSlot, end: null };
+    }
+
     var payload = {
       branch_id: branchId,
       customer: {
@@ -2285,8 +2341,8 @@
       reservation_date: state.fulfillment.reservationDate || null,
       guest_count: state.fulfillment.guestCount || null,
       schedule_type: state.fulfillment.scheduled ? 'scheduled' : 'asap',
-      scheduled_slot_start: state.fulfillment.scheduled ? (state.fulfillment.date + ' ' + state.fulfillment.timeSlot) : null,
-      scheduled_slot_end: null,
+      scheduled_slot_start: state.fulfillment.scheduled ? resolveScheduledIso().start : null,
+      scheduled_slot_end: state.fulfillment.scheduled ? resolveScheduledIso().end : null,
       delivery: isDelivery ? {
         latitude: state.address.latitude,
         longitude: state.address.longitude,

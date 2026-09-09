@@ -33,6 +33,48 @@ Delivery supports **“Jadwalkan delivery”**.
 - Selected date/time becomes part of the delivery draft state.
 - A compact summary reflects the selected schedule.
 
+### LOCKED — Schedule slot & timezone rule (2026-09-09)
+
+**Current time source = device/customer local timezone.** The schedule picker
+uses the customer's device `new Date()` and its local getters. It MUST NOT use
+the WordPress/server timezone as the current-time source, and MUST NOT convert
+the device time back to a server timezone for display or slot generation.
+
+**Slot math (order is WAJIB):**
+
+1. `current_time(device) + 1 hour`
+2. Round UP to the next 30-minute boundary
+3. That is the first available slot; all slots continue every 30 minutes.
+
+Never round current time first and then add 1 hour.
+
+**Day/date transition** follows the device-local calendar. Example: device
+`23:40` → `+1h = 00:40` (next device-day) → round up → `01:00`. The first
+available slot must render on **Besok** as `01:00–01:30`; it must never render
+as “Hari ini 01:00–01:30”, and never use a server date that differs from the
+device date.
+
+**Labels** stay `Hari ini` / `Besok` / weekday, but “today” and the actual date
+are derived from the device timezone.
+
+**Operating hours** are not broken: fulfillment-type availability (e.g. a
+branch with `is_delivery_active = 0`, or an off day) still disables the type.
+Note: Xentra-Core currently has no operating-hours record (server B1 gap);
+`core/delivery-schedule.js` carries an optional open/close window + off-day
+hook so slot clamping can be enabled when operating-hours data exists.
+
+**ASAP stays the default; scheduling is optional.** No schedule → order is
+processed ASAP.
+
+**Order storage** uses a canonical, timezone-aware ISO-8601 timestamp derived
+from the device-local selection (with the device's UTC offset) in
+`scheduled_slot_start` / `scheduled_slot_end`. The backend never assumes a
+specific timezone for these fields.
+
+The math lives in `apps/customer-pwa/assets/js/core/delivery-schedule.js`
+(single source of truth; browser + Node-tested) and is consumed by
+`checkout.js`.
+
 ## Bottom actions
 
 - **Gak jadi:** dismiss/cancel without applying the draft selection.

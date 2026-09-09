@@ -225,6 +225,61 @@ test('API POST /api/v1/checkout/create-order: creates cash order without Midtran
   assert.strictEqual(unallocatedData.success, false);
 });
 
+test('Delivery schedule: no schedule sent -> order is ASAP (default), slot null (TIMEZONE RULE #12)', async () => {
+  const customerToken = await createCustomerSession('081299996001');
+
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { 'x-customer-token': customerToken },
+    body: JSON.stringify({
+      branch_id: 'branch_bangjo_barat',
+      payment_method: 'cash',
+      customer: { name: 'Asap Customer', phone: '081299996001' },
+      order_type: 'delivery',
+      delivery: { address: 'Jl. Darmo', latitude: -7.291230, longitude: 112.716750 },
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+
+  assert.strictEqual(res.status, 201);
+  const data = await res.json();
+  const row = db.prepare('SELECT fulfillment_schedule_type, scheduled_slot_start FROM orders WHERE id = ?').get(data.order_id);
+  assert.strictEqual(row.fulfillment_schedule_type, 'asap', 'Default schedule must stay ASAP');
+  assert.strictEqual(row.scheduled_slot_start, null, 'No schedule -> no slot stored');
+});
+
+test('Delivery schedule: scheduled order stores the canonical device-timezone ISO start/end (TIMEZONE RULE #13)', async () => {
+  const customerToken = await createCustomerSession('081299996002');
+  // Device-local, timezone-aware ISO derived from the customer picker
+  // (e.g. WIB +07:00). The server must persist it verbatim and must NOT
+  // assume/translate any timezone.
+  const isoStart = '2026-09-10T01:00:00+07:00';
+  const isoEnd = '2026-09-10T01:30:00+07:00';
+
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { 'x-customer-token': customerToken },
+    body: JSON.stringify({
+      branch_id: 'branch_bangjo_barat',
+      payment_method: 'cash',
+      customer: { name: 'Scheduled Customer', phone: '081299996002' },
+      order_type: 'delivery',
+      schedule_type: 'scheduled',
+      scheduled_slot_start: isoStart,
+      scheduled_slot_end: isoEnd,
+      delivery: { address: 'Jl. Darmo', latitude: -7.291230, longitude: 112.716750 },
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+
+  assert.strictEqual(res.status, 201);
+  const data = await res.json();
+  const row = db.prepare('SELECT fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end FROM orders WHERE id = ?').get(data.order_id);
+  assert.strictEqual(row.fulfillment_schedule_type, 'scheduled');
+  assert.strictEqual(row.scheduled_slot_start, isoStart, 'Server stores the device-local ISO verbatim');
+  assert.strictEqual(row.scheduled_slot_end, isoEnd);
+});
+
 test('API Admin: GET & PUT /api/v1/admin/brand updates theme color and logo', async () => {
   // Login first to get admin session token
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {

@@ -14,7 +14,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_p7f4a08';
+      var PWA_VERSION = 'v_p7f4a09';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -229,13 +229,14 @@
   <script src="/assets/js/core/router.js?v=p7f4a02"></script>
   <script src="/assets/js/core/pwa-runtime.js?v=p7f4a08"></script>
   <script src="/assets/js/core/promo-reward-cart.js?v=p7f4a03"></script>
+  <script src="/assets/js/core/delivery-schedule.js?v=p7f4a09"></script>
   <script src="/assets/js/location.js?v=p7f4a04"></script>
   <script src="/assets/js/core/discovery.js?v=p7f4a04"></script>
   <script src="/assets/js/core/location-picker.js?v=p7f4a06"></script>
 
   <!-- Page Controllers -->
   <script src="/assets/js/pages/home.js?v=p7f4a08"></script>
-  <script src="/assets/js/pages/checkout.js?v=p7f4a08"></script>
+  <script src="/assets/js/pages/checkout.js?v=p7f4a09"></script>
   <script src="/assets/js/pages/order-received.js?v=p7f4a03"></script>
   <script src="/assets/js/pages/aux-pages.js?v=p7f4a03"></script>
 
@@ -339,7 +340,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=p7f4a08').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=p7f4a09').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {
