@@ -5,9 +5,13 @@
  *
  * Runtime/domain code should depend on this interface rather than importing
  * the concrete database implementation directly. The concrete provider stays
- * behind the boundary so a future client-resident connector can satisfy the
- * same domain-oriented data access contract without leaking SQL/storage
+ * behind the boundary so a future client-resident connector can satisfy
+ * the same domain-oriented data access contract without leaking SQL/storage
  * details into business logic.
+ *
+ * NOTE: `prepare` is intentionally retained as an internal transitional seam
+ * for existing Core SQL-backed services. It is not part of the external
+ * Core ↔ Connector API and must not be exposed as arbitrary SQL over that API.
  */
 const db = require('../../server/database/db');
 
@@ -31,22 +35,24 @@ const DataAccess = {
     return this;
   },
 
-  queryOne(sql, params = []) {
+  prepare(sql) {
     assertSql(sql);
-    const statement = db.prepare(sql);
-    return statement.get(...normalizeParams(params));
+    if (!db || typeof db.prepare !== 'function') {
+      throw new Error('[DataAccess] Prepared statements are unavailable from this provider.');
+    }
+    return db.prepare(sql);
+  },
+
+  queryOne(sql, params = []) {
+    return this.prepare(sql).get(...normalizeParams(params));
   },
 
   queryMany(sql, params = []) {
-    assertSql(sql);
-    const statement = db.prepare(sql);
-    return statement.all(...normalizeParams(params));
+    return this.prepare(sql).all(...normalizeParams(params));
   },
 
   execute(sql, params = []) {
-    assertSql(sql);
-    const statement = db.prepare(sql);
-    return statement.run(...normalizeParams(params));
+    return this.prepare(sql).run(...normalizeParams(params));
   },
 
   exec(sql) {
