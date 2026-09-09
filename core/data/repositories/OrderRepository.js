@@ -78,27 +78,79 @@ class OrderRepository {
     return this.db.queryMany('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
   }
 
-  findPaymentSettlement(orderId) {
-    return this.db.queryOne(`
-      SELECT id, payment_status, amount, provider
-      FROM order_payments
-      WHERE order_id = ? AND payment_status = 'settlement'
-    `, [orderId]);
+  insertOrder({
+    id, orderNumber, clientTransactionId, brandId, branchId, customerName, customerPhone,
+    orderType, orderChannel, selectionMode, tableNumber, fulfillmentScheduleType,
+    scheduledSlotStart, scheduledSlotEnd, subtotal, discountAmount, deliveryFee,
+    grandTotal, paymentMethod, status, orderNote, diningSessionId, createdAt, updatedAt
+  }) {
+    return this.db.execute(`
+      INSERT INTO orders (
+        id, order_number, client_transaction_id, brand_id, branch_id, customer_name, customer_phone,
+        order_type, order_channel, selection_mode, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
+        subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, order_note, dining_session_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      id, orderNumber, clientTransactionId, brandId, branchId, customerName, customerPhone,
+      orderType, orderChannel, selectionMode, tableNumber, fulfillmentScheduleType,
+      scheduledSlotStart, scheduledSlotEnd, subtotal, discountAmount, deliveryFee,
+      grandTotal, paymentMethod, status, orderNote, diningSessionId, createdAt, updatedAt
+    ]);
   }
 
-  updateStatusIfCurrent({ orderId, targetStatus, currentStatus }) {
+  insertReservation({
+    id, orderNumber, brandId, branchId, customerName, customerPhone,
+    orderChannel, selectionMode, reservationDate, orderNote, createdAt, updatedAt
+  }) {
     return this.db.execute(`
-      UPDATE orders
-      SET status = ?, updated_at = datetime('now')
-      WHERE id = ? AND status = ?
-    `, [targetStatus, orderId, currentStatus]);
+      INSERT INTO orders (
+        id, order_number, brand_id, branch_id, customer_name, customer_phone,
+        order_type, order_channel, selection_mode, table_number, scheduled_slot_start,
+        subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'reservation', ?, ?, NULL, ?, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
+    `, [
+      id, orderNumber, brandId, branchId, customerName, customerPhone,
+      orderChannel, selectionMode, reservationDate, orderNote, createdAt, updatedAt
+    ]);
   }
 
-  insertStatusLog({ logId, orderId, previousStatus, newStatus, actorType, actorId, note }) {
+  insertItem({ id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note }) {
     return this.db.execute(`
-      INSERT INTO order_status_logs (id, order_id, previous_status, new_status, actor_type, actor_id, note)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [logId, orderId, previousStatus, newStatus, actorType, actorId, note]);
+      INSERT INTO order_items (
+        id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note]);
+  }
+
+  insertDelivery({
+    id, orderId, destinationAddress, destinationLatitude, destinationLongitude,
+    actualRoadDistanceMeters, actualDurationSeconds, chargeableDistanceKm,
+    freeKmApplied, ratePerKmApplied, deliveryFeeCalculated
+  }) {
+    return this.db.execute(`
+      INSERT INTO order_deliveries (
+        id, order_id, destination_address, destination_latitude, destination_longitude,
+        actual_road_distance_meters, actual_duration_seconds, chargeable_distance_km,
+        free_km_applied, rate_per_km_applied, delivery_fee_calculated
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      id, orderId, destinationAddress, destinationLatitude, destinationLongitude,
+      actualRoadDistanceMeters, actualDurationSeconds, chargeableDistanceKm,
+      freeKmApplied, ratePerKmApplied, deliveryFeeCalculated
+    ]);
+  }
+
+  ensurePendingPayment({ paymentId, orderId, provider, paymentMethod, merchantId, amount, createdAt, updatedAt }) {
+    return this.db.execute(`
+      INSERT INTO order_payments (
+        id, order_id, provider, payment_method, merchant_id, snap_token, payment_status, amount, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?)
+      ON CONFLICT(order_id) DO UPDATE SET
+        amount = excluded.amount,
+        payment_method = excluded.payment_method,
+        provider = excluded.provider,
+        updated_at = excluded.updated_at
+    `, [paymentId, orderId, provider, paymentMethod, merchantId, amount, createdAt, updatedAt]);
   }
 
   convertReservationToDineIn({ orderId, tableNumber, updatedAt }) {
@@ -132,6 +184,56 @@ class OrderRepository {
       ORDER BY created_at DESC
       LIMIT 1
     `, [branchId, String(tableNumber)]);
+  }
+
+  findPaymentSettlement(orderId) {
+    return this.db.queryOne(`
+      SELECT id, payment_status, amount, provider
+      FROM order_payments
+      WHERE order_id = ? AND payment_status = 'settlement'
+    `, [orderId]);
+  }
+
+  updateStatusIfCurrent({ orderId, targetStatus, currentStatus }) {
+    return this.db.execute(`
+      UPDATE orders
+      SET status = ?, updated_at = datetime('now')
+      WHERE id = ? AND status = ?
+    `, [targetStatus, orderId, currentStatus]);
+  }
+
+  insertStatusLog({ logId, orderId, previousStatus, newStatus, actorType, actorId, note }) {
+    return this.db.execute(`
+      INSERT INTO order_status_logs (id, order_id, previous_status, new_status, actor_type, actor_id, note)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [logId, orderId, previousStatus, newStatus, actorType, actorId, note]);
+  }
+
+  updatePaymentMethod({ orderId, paymentMethod, updatedAt }) {
+    return this.db.execute(`
+      UPDATE orders
+      SET payment_method = ?, updated_at = ?
+      WHERE id = ?
+    `, [paymentMethod, updatedAt, orderId]);
+  }
+
+  markFulfillmentException({ orderId, note, updatedAt, paymentMethod = 'midtrans' }) {
+    return this.db.execute(`
+      UPDATE orders
+      SET status = 'fulfillment_exception',
+          payment_method = ?,
+          order_note = COALESCE(order_note || ' | ', '') || ?,
+          updated_at = ?
+      WHERE id = ?
+    `, [paymentMethod, note, updatedAt, orderId]);
+  }
+
+  cancelPendingOrder({ orderId, updatedAt }) {
+    return this.db.execute(`
+      UPDATE orders
+      SET status = 'cancelled', updated_at = ?
+      WHERE id = ? AND status = 'pending'
+    `, [updatedAt, orderId]);
   }
 }
 
