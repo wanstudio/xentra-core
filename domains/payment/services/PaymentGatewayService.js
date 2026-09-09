@@ -2,18 +2,11 @@
 
 const crypto = require('crypto');
 const axios = require('axios');
-const db = require('../../../server/database/db');
+const db = require('../../../core/data/DataAccess');
 const { events } = require('../../../core');
 const PaymentModel = require('../models/PaymentModel');
 
 class PaymentGatewayService {
-  /**
-   * Resolves Midtrans configuration hierarchically (Branch -> Brand -> Environment).
-   * 
-   * @param {string} branch_id
-   * @param {string} brand_id
-   * @returns {Object} Midtrans credentials
-   */
   static resolvePaymentConfig(branch_id, brand_id) {
     if (branch_id) {
       let branch = null;
@@ -49,15 +42,6 @@ class PaymentGatewayService {
     };
   }
 
-  /**
-   * Generates a Midtrans Snap transaction token for an order.
-   * 
-   * @param {Object} params
-   * @param {Object} params.order
-   * @param {Array} params.items
-   * @param {Object} params.customer
-   * @returns {Promise<{ snap_token: string, redirect_url: string, merchant_id: string }>}
-   */
   static async createSnapTransaction(order, items = [], customer = {}) {
     const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
     const isProd = config.is_production === true;
@@ -85,562 +69,199 @@ class PaymentGatewayService {
     };
 
     if (order.delivery_fee > 0) {
-      payload.item_details.push({
-        id: 'DELIVERY_FEE',
-        price: Math.round(order.delivery_fee),
-        quantity: 1,
-        name: 'Biaya Pengantaran'
-      });
+      payload.item_details.push({ id: 'DELIVERY_FEE', price: Math.round(order.delivery_fee), quantity: 1, name: 'Biaya Pengantaran' });
     }
 
     try {
       const response = await axios.post(snapUrl, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          Authorization: authHeader
-        },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: authHeader },
         timeout: 8000
       });
-
-      return {
-        snap_token: response.data.token,
-        redirect_url: response.data.redirect_url,
-        merchant_id: config.merchant_id
-      };
+      return { snap_token: response.data.token, redirect_url: response.data.redirect_url, merchant_id: config.merchant_id };
     } catch (err) {
-      console.error('[PaymentGatewayService] Midtrans Snap error:', err.response?.data || err.message);
-      
-      // P1 PAYMENT GATEWAY HARDENING (FINDING 05): Fail-Closed in Production & Explicit Testing
-      // In production mode, NEVER issue fake simulation tokens on payment gateway exceptions
       if (isProd || process.env.NODE_ENV === 'production') {
         const errorDetail = err.response?.data?.error_messages?.join(', ') || err.message;
         throw new Error(`[Midtrans Gateway Error]: Gagal membuat transaksi pembayaran online (${errorDetail}).`);
       }
-
-      // Explicit Mock/Sandbox Simulation fallback for local development only
       const simToken = 'sim_snap_' + Date.now();
-      return {
-        snap_token: simToken,
-        redirect_url: `https://app.sandbox.midtrans.com/snap/v2/vtweb/${simToken}`,
-        merchant_id: config.merchant_id
-      };
+      return { snap_token: simToken, redirect_url: `https://app.sandbox.midtrans.com/snap/v2/vtweb/${simToken}`, merchant_id: config.merchant_id };
     }
   }
 
-  /**
-   * Verifies Midtrans Webhook SHA512 signature.
-   * Signature = SHA512(order_id + status_code + gross_amount + ServerKey)
-   * 
-   * @param {Object} webhookData
-   * @param {string} serverKey
-   * @returns {boolean}
-   */
   static verifySignature(webhookData, serverKey) {
-    if (!webhookData || !webhookData.signature_key || !serverKey) {
-      return false;
-    }
-
+    if (!webhookData || !webhookData.signature_key || !serverKey) return false;
     const { order_id, status_code, gross_amount, signature_key } = webhookData;
     const raw = `${order_id}${status_code}${gross_amount}${serverKey}`;
-    const expectedHash = crypto.createHash('sha512').update(raw).digest('hex');
-
-    return expectedHash === signature_key;
+    return crypto.createHash('sha512').update(raw).digest('hex') === signature_key;
   }
 
-  /**
-   * Processes incoming Midtrans webhook notification with idempotency and signature security.
-   * Emits payment.settled or payment.failed upon transition.
-   * 
-   * @param {Object} webhookData
-   * @param {Object} [options]
-   * @param {boolean} [options.skipSignatureCheck=false] - For local offline mock tests
-   * @returns {Object} Processed result
-   */
   static handleWebhook(webhookData, { skipSignatureCheck = false } = {}) {
-    const { order_id, transaction_status, fraud_status, payment_type, gross_amount } = webhookData;
-
+    const { order_id, transaction_status, fraud_status, gross_amount } = webhookData;
     let payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
 
-    // P1 SECURE WEBHOOK VERIFICATION: Strictly fail-closed signature verification (mandatory valid server_key & signature_key)
     if (!skipSignatureCheck) {
       const config = this.resolvePaymentConfig(order?.branch_id, order?.brand_id);
-      if (!config.server_key) {
-        throw new Error(`[PaymentGatewayService] Server Key Midtrans belum dikonfigurasi untuk brand/cabang order "${order_id}". Webhook ditolak demi keamanan.`);
-      }
-      if (!webhookData.signature_key) {
-        throw new Error(`[PaymentGatewayService] Signature key tidak disertakan pada webhook payload untuk order "${order_id}". Webhook ditolak.`);
-      }
-
-      const isValid = this.verifySignature(webhookData, config.server_key);
-      if (!isValid) {
-        throw new Error(`[PaymentGatewayService Signature Fraud]: Signature webhook Midtrans tidak valid untuk order "${order_id}". Transaksi ditolak.`);
-      }
+      if (!config.server_key) throw new Error(`[PaymentGatewayService] Server Key Midtrans belum dikonfigurasi untuk brand/cabang order "${order_id}". Webhook ditolak demi keamanan.`);
+      if (!webhookData.signature_key) throw new Error(`[PaymentGatewayService] Signature key tidak disertakan pada webhook payload untuk order "${order_id}". Webhook ditolak.`);
+      if (!this.verifySignature(webhookData, config.server_key)) throw new Error(`[PaymentGatewayService Signature Fraud]: Signature webhook Midtrans tidak valid untuk order "${order_id}". Transaksi ditolak.`);
     }
 
-    // P1 RECONCILIATION FAIL-SAFE (NEW-02):
-    // If payment row is missing due to client crash after gateway creation, self-heal local record from authoritative order
     if (!payment) {
-      if (!order) {
-        throw new Error(`[PaymentGatewayService] Data pesanan untuk Order ID "${order_id}" tidak ditemukan.`);
-      }
+      if (!order) throw new Error(`[PaymentGatewayService] Data pesanan untuk Order ID "${order_id}" tidak ditemukan.`);
       const selfHealedPaymentId = `pay_${crypto.randomBytes(6).toString('hex')}`;
       const now = new Date().toISOString();
-      db.prepare(`
-        INSERT INTO order_payments (id, order_id, provider, payment_method, merchant_id, snap_token, payment_status, amount, created_at, updated_at)
-        VALUES (?, ?, 'midtrans', 'midtrans', 'midtrans', NULL, 'pending', ?, ?, ?)
-        ON CONFLICT(order_id) DO NOTHING
-      `).run(selfHealedPaymentId, order_id, order.grand_total, now, now);
-
+      db.prepare(`INSERT INTO order_payments (id, order_id, provider, payment_method, merchant_id, snap_token, payment_status, amount, created_at, updated_at) VALUES (?, ?, 'midtrans', 'midtrans', 'midtrans', NULL, 'pending', ?, ?, ?) ON CONFLICT(order_id) DO NOTHING`).run(selfHealedPaymentId, order_id, order.grand_total, now, now);
       payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
     }
 
     let newPaymentStatus = PaymentModel.STATUSES.PENDING;
-    let shouldConfirmOrder = false;
+    const shouldSettle = transaction_status === 'settlement' || (transaction_status === 'capture' && fraud_status === 'accept');
+    if (transaction_status === 'capture' && fraud_status === 'challenge') newPaymentStatus = PaymentModel.STATUSES.CHALLENGE;
+    else if (shouldSettle) newPaymentStatus = PaymentModel.STATUSES.SETTLEMENT;
+    else if (['cancel', 'deny', 'expire'].includes(transaction_status)) newPaymentStatus = transaction_status;
 
-    if (transaction_status === 'capture') {
-      if (fraud_status === 'challenge') {
-        newPaymentStatus = PaymentModel.STATUSES.CHALLENGE;
-      } else if (fraud_status === 'accept') {
-        newPaymentStatus = PaymentModel.STATUSES.SETTLEMENT;
-        shouldConfirmOrder = true;
-      }
-    } else if (transaction_status === 'settlement') {
-      newPaymentStatus = PaymentModel.STATUSES.SETTLEMENT;
-      shouldConfirmOrder = true;
-    } else if (['cancel', 'deny', 'expire'].includes(transaction_status)) {
-      newPaymentStatus = transaction_status;
-    }
+    if (payment.payment_status === PaymentModel.STATUSES.SETTLEMENT && newPaymentStatus === PaymentModel.STATUSES.SETTLEMENT) return { success: true, idempotent: true, order_id, payment_status: PaymentModel.STATUSES.SETTLEMENT, message: 'Pembayaran sudah diselesaikan sebelumnya.' };
+    if (payment.payment_status === newPaymentStatus) return { success: true, idempotent: true, order_id, payment_status: newPaymentStatus, message: `Status pembayaran sudah berada pada "${newPaymentStatus}".` };
+    if (!PaymentModel.canTransition(payment.payment_status, newPaymentStatus)) throw new Error(`[PaymentGatewayService State Violation]: Transisi status pembayaran tidak valid dari "${payment.payment_status}" ke "${newPaymentStatus}". Status terminal tidak dapat diubah.`);
 
-    // Idempotency: Return early if already settled or in same state
-    if (payment.payment_status === PaymentModel.STATUSES.SETTLEMENT && newPaymentStatus === PaymentModel.STATUSES.SETTLEMENT) {
-      return {
-        success: true,
-        idempotent: true,
-        order_id,
-        payment_status: PaymentModel.STATUSES.SETTLEMENT,
-        message: 'Pembayaran sudah diselesaikan sebelumnya.'
-      };
-    }
+    if (order && order.status === 'cancelled' && shouldSettle) throw new Error(`[PaymentGatewayService State Violation]: Pesanan "${order_id}" sudah dibatalkan (cancelled) dan tidak dapat dikonfirmasi ulang.`);
 
-    if (payment.payment_status === newPaymentStatus) {
-      return {
-        success: true,
-        idempotent: true,
-        order_id,
-        payment_status: newPaymentStatus,
-        message: `Status pembayaran sudah berada pada "${newPaymentStatus}".`
-      };
-    }
-
-    // P1 STATE MACHINE INVARIANT (NEW-02): Prevent reviving cancelled/expired/terminal orders
-    if (!PaymentModel.canTransition(payment.payment_status, newPaymentStatus)) {
-      throw new Error(
-        `[PaymentGatewayService State Violation]: Transisi status pembayaran tidak valid dari "${payment.payment_status}" ke "${newPaymentStatus}". Status terminal tidak dapat diubah.`
-      );
-    }
-
-    if (order && order.status === 'cancelled' && shouldConfirmOrder) {
-      throw new Error(
-        `[PaymentGatewayService State Violation]: Pesanan "${order_id}" sudah dibatalkan (cancelled) dan tidak dapat dikonfirmasi ulang.`
-      );
-    }
-
-    // P1 AUTHORITATIVE FINANCIAL INTEGRITY GUARD:
-    // Strictly verify that Gateway Amount === Order Grand Total === Internal Payment Record Amount
-    if (shouldConfirmOrder || newPaymentStatus === PaymentModel.STATUSES.SETTLEMENT) {
+    if (shouldSettle || newPaymentStatus === PaymentModel.STATUSES.SETTLEMENT) {
       const gatewayAmount = Number(gross_amount);
       const orderAmount = order ? Number(order.grand_total) : null;
       const paymentAmount = Number(payment.amount);
-
-      if (
-        !Number.isFinite(gatewayAmount) ||
-        (orderAmount !== null && Math.round(gatewayAmount) !== Math.round(orderAmount)) ||
-        Math.round(gatewayAmount) !== Math.round(paymentAmount)
-      ) {
-        throw new Error(
-          `[PAYMENT_AMOUNT_MISMATCH]: Nominal pembayaran gateway (Rp ${gatewayAmount}) tidak cocok dengan tagihan order (Rp ${orderAmount}) atau payment record (Rp ${paymentAmount}). Transaksi settlement ditolak demi integritas finansial.`
-        );
-      }
+      if (!Number.isFinite(gatewayAmount) || (orderAmount !== null && Math.round(gatewayAmount) !== Math.round(orderAmount)) || Math.round(gatewayAmount) !== Math.round(paymentAmount)) throw new Error(`[PAYMENT_AMOUNT_MISMATCH]: Nominal pembayaran gateway (Rp ${gatewayAmount}) tidak cocok dengan tagihan order (Rp ${orderAmount}) atau payment record (Rp ${paymentAmount}). Transaksi settlement ditolak demi integritas finansial.`);
     }
 
     const now = new Date().toISOString();
-
-    // Tracks the authoritative Order outcome of a settlement for reporting:
-    // 'fulfillment_exception' when money is settled for an order that already
-    // left AWAITING (terminal). Settlement NEVER moves the order to 'confirmed'
-    // — R5 boundary: payment success is not Branch operational acceptance.
     let orderStatusAfterSettlement = null;
-
-    // P1 ATOMICITY INVARIANT: Unify payment update, fulfillment commitment (stock deduction + promo settlement), and terminal-order routing into single atomic transaction
     db.exec('BEGIN IMMEDIATE;');
     try {
-      // Update order_payments table
-      db.prepare(`
-        UPDATE order_payments 
-        SET payment_status = ?, payment_method = 'midtrans', raw_webhook_response = ?, settled_at = CASE WHEN ? = 'settlement' THEN ? ELSE settled_at END
-        WHERE order_id = ?
-      `).run(newPaymentStatus, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
+      db.prepare(`UPDATE order_payments SET payment_status = ?, payment_method = 'midtrans', raw_webhook_response = ?, settled_at = CASE WHEN ? = 'settlement' THEN ? ELSE settled_at END WHERE order_id = ?`).run(newPaymentStatus, JSON.stringify(webhookData), newPaymentStatus, now, order_id);
 
-      if (shouldConfirmOrder) {
-        // R5 INTEGRITY (locked contract — Payment → Branch ACCEPT → Fulfillment):
-        // Payment settlement NEVER transitions the order to 'confirmed'. Branch
-        // ACCEPT (POST /orders/:id/branch-acceptance) is the ONLY path out of
-        // 'pending' (AWAITING_BRANCH_ACCEPTANCE); payment success must never
-        // silently become Branch operational acceptance. Order state and
-        // payment state remain separate state machines. The status read happens
-        // INSIDE the BEGIN IMMEDIATE transaction, so it is deterministic
-        // against the Acceptance Timeout Worker and concurrent branch decisions.
+      if (shouldSettle) {
         const currentOrderState = db.prepare('SELECT status FROM orders WHERE id = ?').get(order_id);
         const terminalOrderStatuses = ['rejected', 'timeout', 'cancelled', 'fulfillment_exception'];
-
         if (currentOrderState && terminalOrderStatuses.includes(currentOrderState.status)) {
-          // Late settlement after a committed terminal decision (BRANCH_REJECT /
-          // BRANCH_TIMEOUT / CUSTOMER_CANCEL / earlier exception): the order is
-          // NEVER revived and fulfillment never starts. Money is settled and the
-          // order is routed to the existing recovery queue
-          // (fulfillment_exception) with a structured refund reason (R11 —
-          // preserved behavior).
           orderStatusAfterSettlement = 'fulfillment_exception';
-          db.prepare(`
-            UPDATE orders
-            SET status = 'fulfillment_exception', payment_method = 'midtrans',
-                order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ?
-            WHERE id = ?
-          `).run(
-            `[Perlu Refund]: Pembayaran diterima setelah pesanan berstatus "${currentOrderState.status}". Pesanan tidak diaktifkan ulang.`,
-            now,
-            order_id
-          );
+          db.prepare(`UPDATE orders SET status = 'fulfillment_exception', payment_method = 'midtrans', order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ? WHERE id = ?`).run(`[Perlu Refund]: Pembayaran diterima setelah pesanan berstatus "${currentOrderState.status}". Pesanan tidak diaktifkan ulang.`, now, order_id);
         } else {
-          // Order is 'pending' (stays pending — still AWAITING_BRANCH_ACCEPTANCE)
-          // or already 'confirmed' (accepted before the webhook landed). Payment
-          // completed → run the authoritative fulfillment commitment (stock
-          // deduction + promo redemption). Order status is left untouched; the
-          // status transition to 'confirmed' belongs to Branch ACCEPT only.
-        // 1. Authoritative Cross-Domain Inventory Settlement (Single Source of Truth in Commerce)
-        const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
-        OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
+          const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
+          OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
 
-        // 2. Authoritative Atomic Promotion Consumption & Concurrency Race Guard (F01 First-Settlement-Wins)
-        const promoItems = db.prepare(`
-          SELECT * FROM order_items 
-          WHERE order_id = ? AND (note LIKE '%[PROMO:%' OR product_id LIKE 'prm_%')
-        `).all(order_id);
-
-        const promoRedemptionsToRecord = [];
-        if (promoItems && promoItems.length > 0 && order && order.customer_phone) {
-          for (const it of promoItems) {
-            let promoId = null;
-            const match = it.note ? it.note.match(/\[PROMO:([^\]]+)\]/) : null;
-            if (match) {
-              promoId = match[1];
-            } else if (String(it.product_id).startsWith('prm_')) {
-              promoId = it.product_id;
+          const promoItems = db.prepare(`SELECT * FROM order_items WHERE order_id = ? AND (note LIKE '%[PROMO:%' OR product_id LIKE 'prm_%')`).all(order_id);
+          const promoRedemptionsToRecord = [];
+          if (promoItems && promoItems.length > 0 && order && order.customer_phone) {
+            for (const it of promoItems) {
+              let promoId = null;
+              const match = it.note ? it.note.match(/\[PROMO:([^\]]+)\]/) : null;
+              if (match) promoId = match[1];
+              else if (String(it.product_id).startsWith('prm_')) promoId = it.product_id;
+              if (!promoId) continue;
+              const promoRow = db.prepare('SELECT id, max_redemptions_per_customer FROM promotions WHERE id = ?').get(promoId);
+              if (!promoRow) continue;
+              const activeRedemptions = db.prepare(`SELECT COUNT(*) as count FROM promotion_redemptions WHERE promotion_id = ? AND customer_phone = ? AND status = 'active'`).get(promoId, order.customer_phone);
+              const maxLimit = Number(promoRow.max_redemptions_per_customer || 1);
+              if (activeRedemptions && activeRedemptions.count >= maxLimit) throw new Error(`[PROMO_LIMIT_EXCEEDED_RACE] Batas klaim promo "${promoId}" (${maxLimit}x) telah digunakan oleh pesanan lain milik pelanggan.`);
+              let benefitAmount = Number(it.unit_price || 0);
+              if (benefitAmount === 0) {
+                const rewardProduct = db.prepare('SELECT COALESCE(regular_price, price, 0) AS v FROM products WHERE id = ?').get(it.product_id);
+                benefitAmount = rewardProduct ? Number(rewardProduct.v || 0) : 0;
+              }
+              promoRedemptionsToRecord.push({ promo_id: promoId, benefit_amount: benefitAmount });
             }
-            if (!promoId) continue;
-
-            const promoRow = db.prepare('SELECT id, max_redemptions_per_customer FROM promotions WHERE id = ?').get(promoId);
-            if (!promoRow) continue;
-
-            // Query active customer redemptions for this promo
-            const activeRedemptions = db.prepare(`
-              SELECT COUNT(*) as count FROM promotion_redemptions 
-              WHERE promotion_id = ? AND customer_phone = ? AND status = 'active'
-            `).get(promoId, order.customer_phone);
-
-            const maxLimit = Number(promoRow.max_redemptions_per_customer || 1);
-            if (activeRedemptions && activeRedemptions.count >= maxLimit) {
-              throw new Error(`[PROMO_LIMIT_EXCEEDED_RACE] Batas klaim promo "${promoId}" (${maxLimit}x) telah digunakan oleh pesanan lain milik pelanggan.`);
-            }
-
-            // Ledger benefit follows the configured catalog price of the granted
-            // product (dynamic per reward config) — never a hardcoded amount.
-            let benefitAmount = Number(it.unit_price || 0);
-            if (benefitAmount === 0) {
-              const rewardProduct = db.prepare('SELECT COALESCE(regular_price, price, 0) AS v FROM products WHERE id = ?').get(it.product_id);
-              benefitAmount = rewardProduct ? Number(rewardProduct.v || 0) : 0;
-            }
-            promoRedemptionsToRecord.push({
-              promo_id: promoId,
-              benefit_amount: benefitAmount
-            });
           }
-        }
 
-        // (Order confirmation happened via the R11 CAS UPDATE at the top of
-        // this branch — before any stock/promo side effect — so a late
-        // settlement can never overwrite a rejected/timed-out order.)
-
-        // 4. Record Promotion Redemptions atomically
-        if (promoRedemptionsToRecord.length > 0) {
-          const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-          PromotionEngineService.recordRedemptions({
-            order_id,
-            brand_id: order?.brand_id,
-            branch_id: order?.branch_id,
-            customer_phone: order?.customer_phone,
-            promotions: promoRedemptionsToRecord
-          });
-        }
-        // 5. Authoritative Dine-in Table Settlement: Transition held tables to occupied dining session
-        if (order && order.order_type === 'dine_in') {
-          try {
-            const { DiningTableService } = require('../../pos');
-            let tableIds = [];
-            const activeHold = db.prepare("SELECT hold_reference_id, table_id FROM branch_table_holds WHERE hold_reference_id = ? AND status = 'active'").all(order.id);
-            if (activeHold && activeHold.length > 0) {
-              tableIds = activeHold.map(h => h.table_id);
-            } else if (order.table_number) {
-              // Resolve table_id from table_number
-              const tbl = db.prepare('SELECT id FROM branch_tables WHERE branch_id = ? AND (table_number = ? OR label = ?)').get(order.branch_id, order.table_number, order.table_number);
-              if (tbl) tableIds = [tbl.id];
-            }
-
-            if (tableIds.length > 0) {
-              DiningTableService.createOrAttachDiningSession({
-                branch_id: order.branch_id,
-                table_ids: tableIds,
-                order_id: order.id,
-                customer_name: order.customer_name,
-                customer_phone: order.customer_phone,
-                guest_count: 1,
-                hold_reference_id: order.id
-              });
-            }
-          } catch (dineErr) {
-            console.warn('[PaymentGatewayService] Dine-in table settlement warning:', dineErr.message);
+          if (promoRedemptionsToRecord.length > 0) {
+            const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+            PromotionEngineService.recordRedemptions({ order_id, brand_id: order?.brand_id, branch_id: order?.branch_id, customer_phone: order?.customer_phone, promotions: promoRedemptionsToRecord });
           }
-        }
-        }
-      } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
-        // P1 FAILED PAYMENT INVARIANT: Mark order as cancelled with ZERO inventory
-        // mutation & void promo redemptions atomically — but ONLY while the order
-        // is still 'pending'. A gateway cancel/deny/expire must never overwrite a
-        // terminal decision the branch/worker already committed (BRANCH_REJECT /
-        // BRANCH_TIMEOUT): those orders keep their terminal status and the
-        // payment failure is recorded on the payment record only.
-        const cancelOrderResult = db.prepare(`
-          UPDATE orders
-          SET status = 'cancelled', updated_at = ?
-          WHERE id = ? AND status = 'pending'
-        `).run(now, order_id);
 
-        if (cancelOrderResult && cancelOrderResult.changes > 0) {
-          const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-          PromotionEngineService.voidRedemptions({ order_id, reason: `Gateway status ${newPaymentStatus}` });
-
-          // Release Dine-in table hold if any
           if (order && order.order_type === 'dine_in') {
             try {
               const { DiningTableService } = require('../../pos');
-              DiningTableService.releaseHold({ branch_id: order.branch_id, hold_reference_id: order.id, reason: newPaymentStatus });
-            } catch (_) {}
+              let tableIds = [];
+              const activeHold = db.prepare("SELECT hold_reference_id, table_id FROM branch_table_holds WHERE hold_reference_id = ? AND status = 'active'").all(order.id);
+              if (activeHold && activeHold.length > 0) tableIds = activeHold.map(h => h.table_id);
+              else if (order.table_number) {
+                const tbl = db.prepare('SELECT id FROM branch_tables WHERE branch_id = ? AND (table_number = ? OR label = ?)').get(order.branch_id, order.table_number, order.table_number);
+                if (tbl) tableIds = [tbl.id];
+              }
+              if (tableIds.length > 0) DiningTableService.createOrAttachDiningSession({ branch_id: order.branch_id, table_ids: tableIds, order_id: order.id, customer_name: order.customer_name, customer_phone: order.customer_phone, guest_count: 1, hold_reference_id: order.id });
+            } catch (dineErr) { console.warn('[PaymentGatewayService] Dine-in table settlement warning:', dineErr.message); }
+          }
+        }
+      } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
+        const cancelOrderResult = db.prepare(`UPDATE orders SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'pending'`).run(now, order_id);
+        if (cancelOrderResult && cancelOrderResult.changes > 0) {
+          const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+          PromotionEngineService.voidRedemptions({ order_id, reason: `Gateway status ${newPaymentStatus}` });
+          if (order && order.order_type === 'dine_in') {
+            try { const { DiningTableService } = require('../../pos'); DiningTableService.releaseHold({ branch_id: order.branch_id, hold_reference_id: order.id, reason: newPaymentStatus }); } catch (_) {}
           }
         }
       }
-
       db.exec('COMMIT;');
     } catch (err) {
       try { db.exec('ROLLBACK;'); } catch (_) {}
-      console.error('[PaymentGatewayService] Settlement transaction error:', err.message);
-
-      // P1 FULFILLMENT EXCEPTION (Race Condition between checkout and settlement):
-      // Money has been settled by gateway but inventory or promo limit was exceeded by concurrent orders.
-      // Record payment as settlement, mark order as fulfillment_exception for refund/manual intervention.
       const isConcurrencyException = err.message && (err.message.includes('[OUT_OF_STOCK_RACE]') || err.message.includes('[PROMO_LIMIT_EXCEEDED_RACE]'));
       if (isConcurrencyException) {
         try {
           db.exec('BEGIN IMMEDIATE;');
-          db.prepare(`
-            UPDATE order_payments 
-            SET payment_status = 'settlement', payment_method = 'midtrans', raw_webhook_response = ?, settled_at = ?
-            WHERE order_id = ?
-          `).run(JSON.stringify(webhookData), now, order_id);
-
-          const notePrefix = err.message && err.message.includes('[PROMO_LIMIT_EXCEEDED_RACE]')
-            ? `[Kendala Promo / Perlu Penyesuaian/Refund]: ${err.message}`
-            : `[Kendala Stok / Perlu Refund]: ${err.message}`;
-
-          db.prepare(`
-            UPDATE orders
-            SET status = 'fulfillment_exception', payment_method = 'midtrans', order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ?
-            WHERE id = ?
-          `).run(notePrefix, now, order_id);
+          db.prepare(`UPDATE order_payments SET payment_status = 'settlement', payment_method = 'midtrans', raw_webhook_response = ?, settled_at = ? WHERE order_id = ?`).run(JSON.stringify(webhookData), now, order_id);
+          const notePrefix = err.message.includes('[PROMO_LIMIT_EXCEEDED_RACE]') ? `[Kendala Promo / Perlu Penyesuaian/Refund]: ${err.message}` : `[Kendala Stok / Perlu Refund]: ${err.message}`;
+          db.prepare(`UPDATE orders SET status = 'fulfillment_exception', payment_method = 'midtrans', order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ? WHERE id = ?`).run(notePrefix, now, order_id);
           db.exec('COMMIT;');
-
-          events.EventBus.publish({
-            type: 'payment.fulfillment_exception',
-            producer: 'payment',
-            payload: {
-              payment_id: payment.id,
-              order_id,
-              branch_id: order?.branch_id,
-              brand_id: order?.brand_id,
-              provider: 'midtrans',
-              amount: Number(gross_amount || payment.amount),
-              error: err.message,
-              settled_at: now
-            }
-          }).catch(() => {});
-
-          return {
-            success: true,
-            order_id,
-            payment_status: 'settlement',
-            order_status: 'fulfillment_exception',
-            message: 'Pembayaran berhasil diselesaikan namun terdapat kendala ketersediaan stok atau batas promosi. Pesanan dialihkan ke antrean fulfillment exception untuk rekonsiliasi refund.'
-          };
-        } catch (innerErr) {
-          try { db.exec('ROLLBACK;'); } catch (_) {}
-        }
+          events.EventBus.publish({ type: 'payment.fulfillment_exception', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: 'midtrans', amount: Number(gross_amount || payment.amount), error: err.message, settled_at: now } }).catch(() => {});
+          return { success: true, order_id, payment_status: 'settlement', order_status: 'fulfillment_exception', message: 'Pembayaran berhasil diselesaikan namun terdapat kendala ketersediaan stok atau batas promosi. Pesanan dialihkan ke antrean fulfillment exception untuk rekonsiliasi refund.' };
+        } catch (_) { try { db.exec('ROLLBACK;'); } catch (_) {} }
       }
-
       throw new Error(`[PaymentGatewayService Transaction Error]: ${err.message}`);
     }
 
-    // Publish Core Events outside of DB Transaction
-    if (shouldConfirmOrder) {
-      if (orderStatusAfterSettlement === 'fulfillment_exception') {
-        // Money settled but the order can never be fulfilled (branch rejected /
-        // timed out before settlement) — route to the refund queue.
-        events.EventBus.publish({
-          type: 'payment.fulfillment_exception',
-          producer: 'payment',
-          payload: {
-            payment_id: payment.id,
-            order_id,
-            branch_id: order?.branch_id,
-            brand_id: order?.brand_id,
-            provider: 'midtrans',
-            amount: Number(gross_amount || payment.amount),
-            error: `Settlement arrived after order left AWAITING (${orderStatusAfterSettlement}).`,
-            settled_at: now
-          }
-        }).catch(() => {});
-      } else {
-        events.EventBus.publish({
-          type: 'payment.settled',
-          producer: 'payment',
-          payload: {
-            payment_id: payment.id,
-            order_id,
-            branch_id: order?.branch_id,
-            brand_id: order?.brand_id,
-            provider: 'midtrans',
-            payment_method: 'midtrans',
-            amount: Number(gross_amount || payment.amount),
-            settled_at: now
-          }
-        }).catch(() => {});
-      }
+    if (shouldSettle) {
+      if (orderStatusAfterSettlement === 'fulfillment_exception') events.EventBus.publish({ type: 'payment.fulfillment_exception', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: 'midtrans', amount: Number(gross_amount || payment.amount), error: `Settlement arrived after order left AWAITING (${orderStatusAfterSettlement}).`, settled_at: now } }).catch(() => {});
+      else events.EventBus.publish({ type: 'payment.settled', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: 'midtrans', payment_method: 'midtrans', amount: Number(gross_amount || payment.amount), settled_at: now } }).catch(() => {});
     } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
-      events.EventBus.publish({
-        type: 'payment.failed',
-        producer: 'payment',
-        payload: {
-          payment_id: payment.id,
-          order_id,
-          branch_id: order?.branch_id,
-          provider: 'midtrans',
-          status: newPaymentStatus
-        }
-      }).catch(() => {});
+      events.EventBus.publish({ type: 'payment.failed', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id: order?.branch_id, provider: 'midtrans', status: newPaymentStatus } }).catch(() => {});
     }
 
-    return {
-      success: true,
-      order_id,
-      payment_status: newPaymentStatus,
-      ...(orderStatusAfterSettlement ? { order_status: orderStatusAfterSettlement } : {})
-    };
+    return { success: true, order_id, payment_status: newPaymentStatus, ...(orderStatusAfterSettlement ? { order_status: orderStatusAfterSettlement } : {}) };
   }
 
-  /**
-   * Authoritative Gateway Status Inquiry (NEW-01 Resolution):
-   * Queries Midtrans API directly to resolve unknown / reconciliation_pending outcomes.
-   * 
-   * @param {string} order_id
-   * @returns {Promise<Object>}
-   */
   static async checkTransactionStatus(order_id) {
     const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
-    if (!order) {
-      throw new Error(`[PaymentGatewayService] Order "${order_id}" tidak ditemukan.`);
-    }
-
+    if (!order) throw new Error(`[PaymentGatewayService] Order "${order_id}" tidak ditemukan.`);
     const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
-    if (!config.server_key) {
-      throw new Error(`[PaymentGatewayService] Server Key Midtrans belum dikonfigurasi untuk brand/cabang order "${order_id}".`);
-    }
-
+    if (!config.server_key) throw new Error(`[PaymentGatewayService] Server Key Midtrans belum dikonfigurasi untuk brand/cabang order "${order_id}".`);
     const isProd = config.is_production || process.env.MIDTRANS_IS_PRODUCTION === 'true';
     const baseUrl = isProd ? 'https://api.midtrans.com/v2' : 'https://api.sandbox.midtrans.com/v2';
-    const statusUrl = `${baseUrl}/${order_id}/status`;
-    const authHeader = 'Basic ' + Buffer.from(config.server_key + ':').toString('base64');
-
     try {
-      const response = await axios.get(statusUrl, {
-        headers: {
-          Accept: 'application/json',
-          Authorization: authHeader
-        },
-        timeout: 6000
-      });
-
-      if (response && response.data) {
-        return this.handleWebhook(response.data, { skipSignatureCheck: true });
-      }
+      const response = await axios.get(`${baseUrl}/${order_id}/status`, { headers: { Accept: 'application/json', Authorization: 'Basic ' + Buffer.from(config.server_key + ':').toString('base64') }, timeout: 6000 });
+      if (response?.data) return this.handleWebhook(response.data, { skipSignatureCheck: true });
     } catch (err) {
-      // 404 means transaction was NEVER created on gateway -> definitively safe to cancel
-      if (err.response && err.response.status === 404) {
+      if (err.response?.status === 404) {
         db.exec('BEGIN IMMEDIATE;');
         try {
           db.prepare("UPDATE order_payments SET payment_status = 'cancel', updated_at = datetime('now') WHERE order_id = ?").run(order_id);
-          // R11 CAS: gateway-cancel only applies while the order is still
-          // 'pending' — never overwrite a terminal BRANCH_REJECT/BRANCH_TIMEOUT.
           const orderCancelled = db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ? AND status = 'pending'").run(order_id);
           db.exec('COMMIT;');
-          const orderStatus = (orderCancelled && orderCancelled.changes > 0) ? 'cancelled' : null;
-          return {
-            success: true,
-            order_id,
-            payment_status: 'cancel',
-            ...(orderStatus ? { order_status: orderStatus } : {}),
-            message: orderStatus
-              ? 'Transaksi tidak ditemukan di gateway Midtrans. Pembayaran resmi dibatalkan.'
-              : 'Transaksi tidak ditemukan di gateway Midtrans. Pembayaran dicatat batal; status pesanan terminal dipertahankan.'
-          };
-        } catch (_) {
-          try { db.exec('ROLLBACK;'); } catch (_) {}
-        }
+          const orderStatus = orderCancelled?.changes > 0 ? 'cancelled' : null;
+          return { success: true, order_id, payment_status: 'cancel', ...(orderStatus ? { order_status: orderStatus } : {}), message: orderStatus ? 'Transaksi tidak ditemukan di gateway Midtrans. Pembayaran resmi dibatalkan.' : 'Transaksi tidak ditemukan di gateway Midtrans. Pembayaran dicatat batal; status pesanan terminal dipertahankan.' };
+        } catch (_) { try { db.exec('ROLLBACK;'); } catch (_) {} }
       }
       throw new Error(`[PaymentGatewayService] Gagal memeriksa status transaksi gateway: ${err.message}`);
     }
   }
 
-  /**
-   * Background Reconciliation Worker for all reconciliation_pending orders
-   * 
-   * @returns {Promise<Array<Object>>}
-   */
   static async reconcilePendingPayments() {
-    const pendingList = db.prepare(`
-      SELECT order_id FROM order_payments 
-      WHERE payment_status = 'reconciliation_pending'
-      ORDER BY created_at ASC
-    `).all();
-
+    const pendingList = db.prepare(`SELECT order_id FROM order_payments WHERE payment_status = 'reconciliation_pending' ORDER BY created_at ASC`).all();
     const results = [];
     for (const row of pendingList) {
-      try {
-        const res = await this.checkTransactionStatus(row.order_id);
-        results.push({ order_id: row.order_id, success: true, result: res });
-      } catch (err) {
-        results.push({ order_id: row.order_id, success: false, error: err.message });
-      }
+      try { results.push({ order_id: row.order_id, success: true, result: await this.checkTransactionStatus(row.order_id) }); }
+      catch (err) { results.push({ order_id: row.order_id, success: false, error: err.message }); }
     }
     return results;
   }
