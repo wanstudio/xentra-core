@@ -87,6 +87,30 @@ class PaymentRepository {
     `, [paymentStatus, updatedAt, orderId]);
   }
 
+  settleCashPayment({ paymentId, orderId, amount, settledAt, rawPayment, createdAt, updatedAt }) {
+    return this.db.execute(`
+      INSERT INTO order_payments (
+        id, order_id, provider, payment_method, amount, payment_status, settled_at,
+        raw_webhook_response, created_at, updated_at
+      ) VALUES (?, ?, 'cash', 'cash', ?, 'settlement', ?, ?, ?, ?)
+      ON CONFLICT(order_id) DO UPDATE SET
+        payment_status = 'settlement',
+        payment_method = 'cash',
+        amount = excluded.amount,
+        settled_at = excluded.settled_at,
+        raw_webhook_response = excluded.raw_webhook_response,
+        updated_at = excluded.updated_at
+    `, [paymentId, orderId, amount, settledAt, rawPayment, createdAt, updatedAt]);
+  }
+
+  markOrderPaidByCash({ orderId, updatedAt }) {
+    return this.db.execute(`
+      UPDATE orders
+      SET payment_method = 'cash', updated_at = ?
+      WHERE id = ?
+    `, [updatedAt, orderId]);
+  }
+
   findOrderStatus(orderId) {
     return this.db.queryOne('SELECT status FROM orders WHERE id = ?', [orderId]);
   }
