@@ -13,6 +13,18 @@ class InventoryRepository {
     this.db = dataAccess;
   }
 
+  beginTransaction() {
+    return this.db.exec('BEGIN IMMEDIATE;');
+  }
+
+  commitTransaction() {
+    return this.db.exec('COMMIT;');
+  }
+
+  rollbackTransaction() {
+    return this.db.exec('ROLLBACK;');
+  }
+
   findBranchProduct(branchId, productId) {
     return this.db.queryOne(
       'SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?',
