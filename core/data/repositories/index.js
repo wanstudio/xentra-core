@@ -9,6 +9,7 @@ const PosOrderRepository = require('./PosOrderRepository');
 const BranchRepository = require('./BranchRepository');
 const BrandRepository = require('./BrandRepository');
 const PosShiftRepository = require('./PosShiftRepository');
+const InventoryRepository = require('./InventoryRepository');
 
 module.exports = {
   CatalogRepository,
@@ -19,5 +20,6 @@ module.exports = {
   PosOrderRepository,
   BranchRepository,
   BrandRepository,
-  PosShiftRepository
+  PosShiftRepository,
+  InventoryRepository
 };
