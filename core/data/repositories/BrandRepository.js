@@ -14,6 +14,11 @@ class BrandRepository {
     this.db = dataAccess;
   }
 
+  async ready() {
+    await this.db.ready();
+    return this;
+  }
+
   findByCustomDomain(hostname) {
     return this.db.queryOne(`
       SELECT *
