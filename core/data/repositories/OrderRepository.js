@@ -14,6 +14,18 @@ class OrderRepository {
     this.db = dataAccess;
   }
 
+  beginTransaction() {
+    return this.db.exec('BEGIN IMMEDIATE;');
+  }
+
+  commitTransaction() {
+    return this.db.exec('COMMIT;');
+  }
+
+  rollbackTransaction() {
+    return this.db.exec('ROLLBACK;');
+  }
+
   findActiveReservation({ branchId, customerPhone, reservationDate }) {
     return this.db.queryOne(`
       SELECT id
@@ -39,6 +51,16 @@ class OrderRepository {
     return Number(row?.count || 0);
   }
 
+  findOverduePending({ timeoutSeconds }) {
+    return this.db.queryMany(`
+      SELECT id, status, branch_id, created_at
+      FROM orders
+      WHERE status = 'pending'
+        AND created_at <= datetime('now', ?)
+      ORDER BY created_at ASC
+    `, [`-${timeoutSeconds} seconds`]);
+  }
+
   findByBranchTransactionId(branchId, clientTransactionId) {
     return this.db.queryOne(`
       SELECT *
@@ -54,6 +76,29 @@ class OrderRepository {
 
   findItems(orderId) {
     return this.db.queryMany('SELECT * FROM order_items WHERE order_id = ?', [orderId]);
+  }
+
+  findPaymentSettlement(orderId) {
+    return this.db.queryOne(`
+      SELECT id, payment_status, amount, provider
+      FROM order_payments
+      WHERE order_id = ? AND payment_status = 'settlement'
+    `, [orderId]);
+  }
+
+  updateStatusIfCurrent({ orderId, targetStatus, currentStatus }) {
+    return this.db.execute(`
+      UPDATE orders
+      SET status = ?, updated_at = datetime('now')
+      WHERE id = ? AND status = ?
+    `, [targetStatus, orderId, currentStatus]);
+  }
+
+  insertStatusLog({ logId, orderId, previousStatus, newStatus, actorType, actorId, note }) {
+    return this.db.execute(`
+      INSERT INTO order_status_logs (id, order_id, previous_status, new_status, actor_type, actor_id, note)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [logId, orderId, previousStatus, newStatus, actorType, actorId, note]);
   }
 
   convertReservationToDineIn({ orderId, tableNumber, updatedAt }) {
