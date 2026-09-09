@@ -1,7 +1,9 @@
 'use strict';
 
-const db = require('../../../core/data/DataAccess');
+const { ReportingRepository } = require('../../../core/data/repositories');
 const ReportFilterModel = require('../models/ReportFilterModel');
+
+const reportingRepository = new ReportingRepository();
 
 class PosShiftReportService {
   /**
@@ -13,60 +15,10 @@ class PosShiftReportService {
   static getShiftReport(filterParams = {}) {
     const filter = ReportFilterModel.normalize(filterParams);
 
-    let whereClauses = [];
-    const params = [];
-
-    // P1 MULTI-TENANT ISOLATION: Strictly enforce brand_id scoping
-    if (filter.brand_id) {
-      whereClauses.push('s.branch_id IN (SELECT id FROM branches WHERE brand_id = ?)');
-      params.push(filter.brand_id);
-    }
-    if (filter.branch_id) {
-      whereClauses.push('s.branch_id = ?');
-      params.push(filter.branch_id);
-    }
-    if (filter.start_date) {
-      whereClauses.push('s.opened_at >= ?');
-      params.push(filter.start_date);
-    }
-    if (filter.end_date) {
-      whereClauses.push('s.opened_at <= ?');
-      params.push(filter.end_date);
-    }
-
-    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
-
-    const summary = db.prepare(`
-      SELECT 
-        COUNT(*) as total_shifts,
-        COALESCE(SUM(s.total_cash_sales), 0) as total_cash_sales,
-        COALESCE(SUM(s.total_cash_in), 0) as total_cash_in,
-        COALESCE(SUM(s.total_cash_out), 0) as total_cash_out,
-        COALESCE(SUM(s.variance), 0) as total_variance
-      FROM pos_shifts s
-      ${whereSql}
-    `).get(...params);
-
-    const shifts = db.prepare(`
-      SELECT 
-        s.id,
-        s.branch_id,
-        s.cashier_id,
-        s.starting_float,
-        s.total_cash_sales,
-        s.total_cash_in,
-        s.total_cash_out,
-        s.expected_cash,
-        s.actual_cash,
-        s.variance,
-        s.status,
-        s.opened_at,
-        s.closed_at
-      FROM pos_shifts s
-      ${whereSql}
-      ORDER BY s.opened_at DESC
-      LIMIT 100
-    `).all(...params);
+    // P1 MULTI-TENANT ISOLATION remains enforced inside the semantic
+    // reporting repository queries.
+    const summary = reportingRepository.getShiftSummary(filter);
+    const shifts = reportingRepository.getShifts(filter);
 
     return {
       report_type: 'pos_shifts',
