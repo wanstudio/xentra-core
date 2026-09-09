@@ -13,9 +13,12 @@
  * - Clean Stock Delegation: Delegated to Commerce OrderPlacementService (ACID transaction).
  */
 const crypto = require('crypto');
-const db = require('../../../server/database/db');
 const { events } = require('../../../core');
+const { OrderRepository, PosOrderRepository } = require('../../../core/data/repositories');
 const { OrderPlacementService } = require('../../commerce');
+
+const orderRepository = new OrderRepository();
+const posOrderRepository = new PosOrderRepository();
 
 class PosOrderService {
   static ORDER_TYPES = {
@@ -45,10 +48,16 @@ class PosOrderService {
     const now = new Date().toISOString();
     const payloadJson = JSON.stringify(items);
 
-    db.prepare(`
-      INSERT INTO pos_held_orders (id, branch_id, table_number, customer_name, items_payload, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'held', ?, ?)
-    `).run(heldId, branch_id, String(table_number), customer_name, payloadJson, now, now);
+    posOrderRepository.insertHeldOrder({
+      id: heldId,
+      branchId: branch_id,
+      tableNumber: table_number,
+      customerName: customer_name,
+      itemsPayload: payloadJson,
+      status: 'held',
+      createdAt: now,
+      updatedAt: now
+    });
 
     return {
       id: heldId,
@@ -77,11 +86,10 @@ class PosOrderService {
     }
 
     // Find active held bill for this table
-    const held = db.prepare(`
-      SELECT * FROM pos_held_orders 
-      WHERE branch_id = ? AND table_number = ? AND status = 'held'
-      ORDER BY created_at DESC LIMIT 1
-    `).get(branch_id, String(table_number));
+    const held = posOrderRepository.findActiveHeldByTable({
+      branchId: branch_id,
+      tableNumber: table_number
+    });
 
     if (!held) {
       // If no bill exists yet, open new held bill
@@ -96,11 +104,11 @@ class PosOrderService {
     const updatedItems = [...currentItems, ...additional_items];
     const now = new Date().toISOString();
 
-    db.prepare(`
-      UPDATE pos_held_orders
-      SET items_payload = ?, updated_at = ?
-      WHERE id = ?
-    `).run(JSON.stringify(updatedItems), now, held.id);
+    posOrderRepository.updateHeldItems({
+      heldOrderId: held.id,
+      itemsPayload: JSON.stringify(updatedItems),
+      updatedAt: now
+    });
 
     return {
       id: held.id,
@@ -127,7 +135,7 @@ class PosOrderService {
       throw new Error('[PosOrderService] "reservation_order_id" and "table_number" are required for reservation check-in.');
     }
 
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(reservation_order_id);
+    const order = orderRepository.findById(reservation_order_id);
     if (!order) {
       throw new Error(`[PosOrderService] Data reservasi dengan ID ${reservation_order_id} tidak ditemukan.`);
     }
@@ -139,14 +147,14 @@ class PosOrderService {
     const now = new Date().toISOString();
 
     // In-place conversion of the SAME order: reservation -> dine_in
-    db.prepare(`
-      UPDATE orders
-      SET order_type = 'dine_in', status = 'active_table', table_number = ?, updated_at = ?
-      WHERE id = ?
-    `).run(String(table_number), now, reservation_order_id);
+    orderRepository.convertReservationToDineIn({
+      orderId: reservation_order_id,
+      tableNumber: table_number,
+      updatedAt: now
+    });
 
-    const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(reservation_order_id);
-    const orderItems = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(reservation_order_id);
+    const updatedOrder = orderRepository.findById(reservation_order_id);
+    const orderItems = orderRepository.findItems(reservation_order_id);
 
     // Emit event: pos.reservation.checked_in
     events.EventBus.publish({
@@ -191,7 +199,7 @@ class PosOrderService {
       throw new Error('[PosOrderService] "reservation_order_id" is required.');
     }
 
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(reservation_order_id);
+    const order = orderRepository.findById(reservation_order_id);
     if (!order) {
       throw new Error(`[PosOrderService] Data reservasi dengan ID ${reservation_order_id} tidak ditemukan.`);
     }
@@ -202,11 +210,11 @@ class PosOrderService {
 
     const now = new Date().toISOString();
 
-    db.prepare(`
-      UPDATE orders
-      SET status = 'cancelled', order_note = COALESCE(order_note || ' | ', '') || ?, updated_at = ?
-      WHERE id = ?
-    `).run(reason, now, reservation_order_id);
+    orderRepository.cancelReservationNoShow({
+      orderId: reservation_order_id,
+      reason,
+      updatedAt: now
+    });
 
     // Emit event: pos.reservation.no_show_cancelled
     events.EventBus.publish({
@@ -239,7 +247,7 @@ class PosOrderService {
    * @returns {{ original_bill: Object, new_bill: Object }}
    */
   static splitBill({ held_order_id, split_items = [] }) {
-    const original = db.prepare('SELECT * FROM pos_held_orders WHERE id = ?').get(held_order_id);
+    const original = posOrderRepository.findHeldById(held_order_id);
     if (!original || original.status !== 'held') {
       throw new Error('[PosOrderService] Held order tidak ditemukan atau sudah ditutup.');
     }
@@ -253,8 +261,11 @@ class PosOrderService {
     }
 
     const now = new Date().toISOString();
-    db.prepare('UPDATE pos_held_orders SET items_payload = ?, updated_at = ? WHERE id = ?')
-      .run(JSON.stringify(remainingItems), now, held_order_id);
+    posOrderRepository.updateHeldItems({
+      heldOrderId: held_order_id,
+      itemsPayload: JSON.stringify(remainingItems),
+      updatedAt: now
+    });
 
     const newHeld = PosOrderService.holdOrder({
       branch_id: original.branch_id,
@@ -278,8 +289,8 @@ class PosOrderService {
    * @returns {Object} Merged target bill
    */
   static mergeBill({ target_held_id, source_held_id }) {
-    const target = db.prepare('SELECT * FROM pos_held_orders WHERE id = ?').get(target_held_id);
-    const source = db.prepare('SELECT * FROM pos_held_orders WHERE id = ?').get(source_held_id);
+    const target = posOrderRepository.findHeldById(target_held_id);
+    const source = posOrderRepository.findHeldById(source_held_id);
 
     if (!target || target.status !== 'held' || !source || source.status !== 'held') {
       throw new Error('[PosOrderService] Salah satu held order tidak valid atau sudah selesai.');
@@ -290,11 +301,17 @@ class PosOrderService {
     const mergedItems = [...targetItems, ...sourceItems];
 
     const now = new Date().toISOString();
-    db.prepare('UPDATE pos_held_orders SET items_payload = ?, updated_at = ? WHERE id = ?')
-      .run(JSON.stringify(mergedItems), now, target_held_id);
+    posOrderRepository.updateHeldItems({
+      heldOrderId: target_held_id,
+      itemsPayload: JSON.stringify(mergedItems),
+      updatedAt: now
+    });
 
-    db.prepare("UPDATE pos_held_orders SET status = 'cancelled', updated_at = ? WHERE id = ?")
-      .run(now, source_held_id);
+    posOrderRepository.cancelHeldOrder({
+      heldOrderId: source_held_id,
+      updatedAt: now,
+      status: 'cancelled'
+    });
 
     return {
       id: target_held_id,
@@ -340,7 +357,7 @@ class PosOrderService {
     let tableNumber = customer.table_number || null;
 
     if (held_order_id && (!orderItems || orderItems.length === 0)) {
-      const held = db.prepare('SELECT * FROM pos_held_orders WHERE id = ?').get(held_order_id);
+      const held = posOrderRepository.findHeldById(held_order_id);
       if (!held || held.status !== 'held') {
         throw new Error('[PosOrderService] Held order tidak ditemukan atau sudah selesai.');
       }
@@ -428,8 +445,11 @@ class PosOrderService {
 
     // 5. If settled from held bill, mark held order as settled
     if (held_order_id) {
-      db.prepare("UPDATE pos_held_orders SET status = 'settled', updated_at = datetime('now') WHERE id = ?")
-        .run(held_order_id);
+      posOrderRepository.cancelHeldOrder({
+        heldOrderId: held_order_id,
+        updatedAt: new Date().toISOString(),
+        status: 'settled'
+      });
     }
 
     // 6. Emit event: pos.order.settled
