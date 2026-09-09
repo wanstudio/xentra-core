@@ -64,6 +64,38 @@ Separate repositories alone do not guarantee IP protection. Deployment artifacts
 
 If any readable Xentra proprietary server-side implementation is physically present on a client-controlled server, assume the client's root/administrator can access it.
 
+## Core ↔ Connector implementation boundary — LOCKED
+
+Current repository audit establishes the following implementation split for future enterprise separation.
+
+### `xentra-core` — remains Xentra-controlled
+- Control Plane and platform administration
+- Xentra Identity / RBAC / authorization
+- Domain Registry and authoritative tenant resolution
+- Merchant/F&B business logic
+- Orders, POS, inventory, payments, delivery and reporting logic
+- Availability/routing algorithms, pricing/order orchestration and other proprietary rules
+- Security-sensitive server-side logic and platform services
+
+### `xentra-connector` — separate repository and deployment unit
+- Minimal enterprise/client integration layer
+- Client database adapter/access boundary where required
+- Client-owned storage adapter where required
+- Secure Core ↔ client communication transport
+- Versioned API/contract handling
+- Must not contain proprietary core algorithms or become a copy/fork of `xentra-core`
+
+### Current-state findings that must be remediated without unrelated rewrites
+
+1. Existing runtime services directly access the current local database layer; a formal data-access boundary is required before relocating client-owned persistence concerns.
+2. Current database bootstrap/seed state still contains historical Bangjo-specific assumptions and must become tenant/configuration driven rather than hardcoded production identity.
+3. Existing authorization foundation is reusable; Control Plane authority must extend the current identity → role → scope → permission model rather than introducing a second authentication system.
+4. `PLATFORM_ADMIN` is not yet represented in the current merchant-only role model and must be introduced as a platform authorization concern during implementation.
+
+### Required next implementation boundary
+
+Before creating the `xentra-connector` repository, define and lock the **Core ↔ Connector API Contract** and **Data Access Boundary**. Only then create the connector from that contract.
+
 ## Source-code rule
 
 Any server-side code physically deployed onto a client-controlled server must be treated as potentially readable by that client's root/administrator. Docker/containerization, filesystem permissions, minification, or obfuscation do not provide a reliable IP boundary against a client-controlled administrator.
