@@ -14,6 +14,18 @@ class DiningTableRepository {
     this.db = dataAccess;
   }
 
+  beginTransaction() {
+    return this.db.exec('BEGIN IMMEDIATE;');
+  }
+
+  commitTransaction() {
+    return this.db.exec('COMMIT;');
+  }
+
+  rollbackTransaction() {
+    return this.db.exec('ROLLBACK;');
+  }
+
   findBranchLayout(branchId) {
     return this.db.queryOne(
       'SELECT * FROM branch_dining_layouts WHERE branch_id = ?',
@@ -206,9 +218,23 @@ class DiningTableRepository {
     `, [status, updatedAt, holdId]);
   }
 
+  findDiningSession(sessionId) {
+    return this.db.queryOne(
+      'SELECT * FROM dining_sessions WHERE id = ?',
+      [sessionId]
+    );
+  }
+
   findDiningSessionById(sessionId) {
     return this.db.queryOne(
       "SELECT id, status FROM dining_sessions WHERE id = ? AND status = 'active'",
+      [sessionId]
+    );
+  }
+
+  findSessionTables(sessionId) {
+    return this.db.queryMany(
+      'SELECT table_id FROM dining_session_tables WHERE session_id = ?',
       [sessionId]
     );
   }
@@ -229,12 +255,27 @@ class DiningTableRepository {
     ]);
   }
 
+  completeDiningSession({ sessionId, closedAt, updatedAt }) {
+    return this.db.execute(`
+      UPDATE dining_sessions
+      SET status = 'completed', closed_at = ?, updated_at = ?
+      WHERE id = ?
+    `, [closedAt, updatedAt, sessionId]);
+  }
+
   attachDiningSessionTable({ mappingId, sessionId, tableId, attachedAt }) {
     return this.db.execute(`
       INSERT INTO dining_session_tables (id, session_id, table_id, attached_at)
       VALUES (?, ?, ?, ?)
       ON CONFLICT(session_id, table_id) DO NOTHING
     `, [mappingId, sessionId, tableId, attachedAt]);
+  }
+
+  deleteDiningSessionTables(sessionId) {
+    return this.db.execute(
+      'DELETE FROM dining_session_tables WHERE session_id = ?',
+      [sessionId]
+    );
   }
 
   associateOrderToDiningSession({ orderId, sessionId, updatedAt }) {
@@ -257,6 +298,28 @@ class DiningTableRepository {
       'SELECT current_session_id, operational_state FROM branch_table_states WHERE table_id = ?',
       [tableId]
     );
+  }
+
+  resolveQr(qrToken) {
+    return this.db.queryOne(`
+      SELECT
+        t.id, t.branch_id, t.table_number, t.label, t.capacity, t.section_id,
+        b.brand_id, b.name as branch_name,
+        COALESCE(s.operational_state, 'available') as operational_state,
+        s.current_session_id
+      FROM branch_tables t
+      JOIN branches b ON b.id = t.branch_id
+      LEFT JOIN branch_table_states s ON s.table_id = t.id
+      WHERE t.qr_token = ? AND t.is_active = 1
+    `, [qrToken]);
+  }
+
+  regenerateQrToken({ tableId, qrToken, updatedAt }) {
+    return this.db.execute(`
+      UPDATE branch_tables
+      SET qr_token = ?, updated_at = ?
+      WHERE id = ?
+    `, [qrToken, updatedAt, tableId]);
   }
 }
 
