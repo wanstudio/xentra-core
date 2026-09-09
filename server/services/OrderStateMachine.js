@@ -1,5 +1,7 @@
-const db = require('../../core/data/DataAccess');
+const { OrderRepository } = require('../../core/data/repositories');
 const crypto = require('crypto');
+
+const orderRepository = new OrderRepository();
 
 class OrderStateMachine {
   // P1 SEPARATION OF CONCERNS: Operational transitions strictly exclude financial 'refunded'
@@ -37,10 +39,10 @@ class OrderStateMachine {
   static transition(params) {
     const { order_id, target_status, actor_type = 'system', actor_id = null, note = '', expected_current_status = null } = params;
 
-    db.exec('BEGIN IMMEDIATE;');
+    orderRepository.beginTransaction();
     let currentStatus = null;
     try {
-      const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
+      const order = orderRepository.findById(order_id);
       if (!order) {
         throw new Error(`Pesanan dengan ID "${order_id}" tidak ditemukan.`);
       }
@@ -60,11 +62,7 @@ class OrderStateMachine {
       }
 
       if (target_status === 'cancelled' || target_status === 'rejected' || target_status === 'timeout') {
-        const settledPayment = db.prepare(`
-          SELECT id, payment_status, amount, provider
-          FROM order_payments
-          WHERE order_id = ? AND payment_status = 'settlement'
-        `).get(order_id);
+        const settledPayment = orderRepository.findPaymentSettlement(order_id);
 
         if (settledPayment) {
           const action = target_status === 'rejected'
@@ -78,30 +76,35 @@ class OrderStateMachine {
         }
       }
 
-      const updateResult = db.prepare(`
-        UPDATE orders
-        SET status = ?, updated_at = datetime('now')
-        WHERE id = ? AND status = ?
-      `).run(target_status, order_id, currentStatus);
+      const updateResult = orderRepository.updateStatusIfCurrent({
+        orderId: order_id,
+        targetStatus: target_status,
+        currentStatus
+      });
 
       if (!updateResult || updateResult.changes === 0) {
         throw new Error(`Konflik konkurensi: Status pesanan "${order_id}" telah diubah oleh proses lain.`);
       }
 
       const logId = 'log_' + crypto.randomBytes(8).toString('hex');
-      db.prepare(`
-        INSERT INTO order_status_logs (id, order_id, previous_status, new_status, actor_type, actor_id, note)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(logId, order_id, currentStatus, target_status, actor_type, actor_id, note);
+      orderRepository.insertStatusLog({
+        logId,
+        orderId: order_id,
+        previousStatus: currentStatus,
+        newStatus: target_status,
+        actorType: actor_type,
+        actorId: actor_id,
+        note
+      });
 
       if (target_status === 'cancelled' || target_status === 'rejected' || target_status === 'timeout') {
         const PromotionEngineService = require('../../domains/promotion/services/PromotionEngineService');
         PromotionEngineService.voidRedemptions({ order_id, reason: note || `Order ${target_status} by ${actor_type}` });
       }
 
-      db.exec('COMMIT;');
+      orderRepository.commitTransaction();
     } catch (txErr) {
-      try { db.exec('ROLLBACK;'); } catch (_) {}
+      try { orderRepository.rollbackTransaction(); } catch (_) {}
       throw txErr;
     }
 
