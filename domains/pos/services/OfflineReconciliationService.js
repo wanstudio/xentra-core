@@ -8,9 +8,12 @@
  * 4. Disaster Recovery Reconciliation: Resolves cash variance & un-synced paper receipt trails when cashier device is lost/damaged.
  */
 const crypto = require('crypto');
-const db = require('../../../core/data/DataAccess');
 const { events } = require('../../../core');
+const { OrderRepository, PosShiftRepository } = require('../../../core/data/repositories');
 const { OrderPlacementService } = require('../../commerce');
+
+const orderRepository = new OrderRepository();
+const posShiftRepository = new PosShiftRepository();
 
 class OfflineReconciliationService {
   static async reconcileOfflineTransaction({
@@ -29,11 +32,7 @@ class OfflineReconciliationService {
       throw new Error('[OfflineReconciliation] "client_transaction_id" tidak valid (wajib berupa string berkarakter 8-64).');
     }
 
-    const existingOrder = db.prepare(`
-      SELECT * FROM orders 
-      WHERE branch_id = ? AND client_transaction_id = ?
-      LIMIT 1
-    `).get(branch_id, client_transaction_id);
+    const existingOrder = orderRepository.findByBranchTransactionId(branch_id, client_transaction_id);
 
     if (existingOrder) {
       return {
@@ -70,9 +69,7 @@ class OfflineReconciliationService {
       });
     } catch (err) {
       if (err.message && (err.message.includes('idx_orders_branch_client_tx') || err.message.includes('UNIQUE constraint failed: orders.branch_id, orders.client_transaction_id'))) {
-        const deduplicated = db.prepare(`
-          SELECT * FROM orders WHERE branch_id = ? AND client_transaction_id = ? LIMIT 1
-        `).get(branch_id, client_transaction_id);
+        const deduplicated = orderRepository.findByBranchTransactionId(branch_id, client_transaction_id);
         if (deduplicated) {
           return {
             status: 'DUPLICATE_IGNORED',
@@ -163,7 +160,7 @@ class OfflineReconciliationService {
     paper_receipts_total,
     incident_notes = ''
   }) {
-    const initialShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+    const initialShift = posShiftRepository.findById(shift_id);
     if (!initialShift) {
       throw new Error('[OfflineReconciliation] Shift record not found for disaster recovery.');
     }
@@ -177,9 +174,9 @@ class OfflineReconciliationService {
     let disasterVariance = 0;
     let reconciledShift = null;
 
-    db.exec('BEGIN IMMEDIATE;');
+    posShiftRepository.beginTransaction();
     try {
-      const currentShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      const currentShift = posShiftRepository.findById(shift_id);
       if (!currentShift || currentShift.status !== 'open') {
         throw new Error('[OfflineReconciliation] Shift tidak ditemukan atau sudah ditutup oleh proses lain.');
       }
@@ -187,24 +184,21 @@ class OfflineReconciliationService {
       const systemExpected = Number(currentShift.expected_cash) || 0;
       disasterVariance = physicalCash - (systemExpected + paperTotal);
 
-      const closeRes = db.prepare(`
-        UPDATE pos_shifts
-        SET 
-          actual_cash = ?,
-          variance = ?,
-          status = 'closed',
-          closed_at = ?
-        WHERE id = ? AND status = 'open'
-      `).run(physicalCash, disasterVariance, now, shift_id);
+      const closeRes = posShiftRepository.closeDisasterRecovery({
+        shiftId: shift_id,
+        actualCash: physicalCash,
+        variance: disasterVariance,
+        closedAt: now
+      });
 
       if (closeRes.changes !== 1) {
         throw new Error('[OfflineReconciliation] Gagal menutup shift: status shift telah berubah.');
       }
 
       reconciledShift = currentShift;
-      db.exec('COMMIT;');
+      posShiftRepository.commitTransaction();
     } catch (err) {
-      try { db.exec('ROLLBACK;'); } catch (_) {}
+      try { posShiftRepository.rollbackTransaction(); } catch (_) {}
       throw err;
     }
 
