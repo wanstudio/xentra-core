@@ -5,19 +5,14 @@
  */
 'use strict';
 
-const db = require('../../core/data/DataAccess');
+const { OrderRepository } = require('../../core/data/repositories');
 const OrderStateMachine = require('./OrderStateMachine');
 
+const orderRepository = new OrderRepository();
 const ACCEPTANCE_TIMEOUT_SECONDS = 180;
 
 function findOverduePendingOrders() {
-  return db.prepare(`
-    SELECT id, status, branch_id, created_at
-    FROM orders
-    WHERE status = 'pending'
-      AND created_at <= datetime('now', ?)
-    ORDER BY created_at ASC
-  `).all(`-${ACCEPTANCE_TIMEOUT_SECONDS} seconds`);
+  return orderRepository.findOverduePending({ timeoutSeconds: ACCEPTANCE_TIMEOUT_SECONDS });
 }
 
 function checkAndApplyTimeouts() {
