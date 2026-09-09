@@ -53,6 +53,11 @@
           <span>Cabang & Ongkir</span>
         </button>
 
+        <button type="button" class="x-nav-item" data-tab="tim">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Tim</span>
+        </button>
+
         <button type="button" class="x-nav-item" data-tab="orders">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           <span>Pesanan Masuk</span>
@@ -431,7 +436,51 @@
         </div>
       </section>
 
-      <!-- TAB 5: ORDERS -->
+      <!-- TAB 5: TIM / WORKFORCE MANAGEMENT -->
+      <section id="tab-tim" class="x-tab-content">
+        <div class="x-card-panel">
+          <div class="x-panel-header-flex">
+            <div>
+              <h3>👥 Manajemen Tim & Akses</h3>
+              <p>Kelola akun staf, role, dan hak akses dashboard</p>
+            </div>
+            <button type="button" class="x-btn-primary" id="btn-add-user" onclick="openCreateUserModal()">+ Tambah Anggota</button>
+          </div>
+
+          <!-- Role Filter Bar -->
+          <div class="x-catalog-filters" id="tim-role-filters">
+            <button type="button" class="x-cat-filter-btn active" data-role="all" onclick="filterTimByRole('all')">Semua</button>
+            <button type="button" class="x-cat-filter-btn" data-role="owner" onclick="filterTimByRole('owner')">Owner</button>
+            <button type="button" class="x-cat-filter-btn" data-role="brand_manager" onclick="filterTimByRole('brand_manager')">Manager</button>
+            <button type="button" class="x-cat-filter-btn" data-role="branch_manager" onclick="filterTimByRole('branch_manager')">Branch Manager</button>
+            <button type="button" class="x-cat-filter-btn" data-role="cashier" onclick="filterTimByRole('cashier')">Kasir</button>
+            <button type="button" class="x-cat-filter-btn" data-role="kitchen" onclick="filterTimByRole('kitchen')">Dapur</button>
+          </div>
+
+          <!-- Users Table -->
+          <div class="x-table-responsive mt-4">
+            <table class="x-table">
+              <thead>
+                <tr>
+                  <th>Nama</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Cabang</th>
+                  <th>Status</th>
+                  <th class="text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tim-table-body">
+                <tr>
+                  <td colspan="6" class="text-center py-6">Memuat data tim...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: ORDERS -->
       <section id="tab-orders" class="x-tab-content">
         <div class="x-card-panel">
           <div class="x-panel-header-flex">
@@ -746,6 +795,76 @@
           <button type="submit" class="x-btn-primary" id="btn-save-branch-category-edit">Simpan</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE / EDIT USER (Workforce Management) -->
+  <div id="modal-user" class="x-modal-backdrop" style="display:none;">
+    <div class="x-modal-card" style="max-width: 520px;">
+      <div class="x-modal-header">
+        <h3 id="modal-user-title">Tambah Anggota Tim</h3>
+        <button type="button" class="x-modal-close" onclick="closeUserModal()">✕</button>
+      </div>
+      <form id="form-user" class="x-form">
+        <input type="hidden" id="user-id" value="">
+        <div class="x-form-group">
+          <label for="user-fullname">Nama Lengkap</label>
+          <input type="text" id="user-fullname" class="x-input" placeholder="Contoh: Siti Aminah" required>
+        </div>
+        <div class="x-form-group">
+          <label for="user-username">Username (untuk login)</label>
+          <input type="text" id="user-username" class="x-input" placeholder="Contoh: siti_aminah" required minlength="3">
+          <small class="text-muted" style="font-size:11px;">Huruf kecil, tanpa spasi. Minimal 3 karakter.</small>
+        </div>
+        <div class="x-form-group" id="user-password-group">
+          <label for="user-password">Password</label>
+          <input type="password" id="user-password" class="x-input" placeholder="Minimal 8 karakter" minlength="8">
+          <small class="text-muted" style="font-size:11px;" id="user-password-hint">Wajib diisi saat membuat akun baru.</small>
+        </div>
+        <div class="x-form-group">
+          <label for="user-email">Email (Opsional)</label>
+          <input type="email" id="user-email" class="x-input" placeholder="email@contoh.com">
+        </div>
+        <div class="x-form-row">
+          <div class="x-form-group">
+            <label for="user-role">Role</label>
+            <select id="user-role" class="x-input" required></select>
+          </div>
+          <div class="x-form-group">
+            <label for="user-branch">Cabang (Branch)</label>
+            <select id="user-branch" class="x-input"></select>
+          </div>
+        </div>
+        <div class="x-modal-footer">
+          <button type="button" class="x-btn-secondary" onclick="closeUserModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-user">Simpan Anggota</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: RESET PASSWORD (Admin Reset) -->
+  <div id="modal-reset-password" class="x-modal-backdrop" style="display:none;">
+    <div class="x-modal-card" style="max-width: 440px;">
+      <div class="x-modal-header">
+        <h3>Reset Password</h3>
+        <button type="button" class="x-modal-close" onclick="closeResetPasswordModal()">✕</button>
+      </div>
+      <div class="x-form" style="padding: 20px;">
+        <p style="font-size:13px;color:#475569;margin-bottom:12px;">Token reset akan ditampilkan <strong>satu kali saja</strong>. Bagikan ke staf melalui saluran aman (WhatsApp/面对面).</p>
+        <div class="x-form-group">
+          <label>Nama Staf</label>
+          <input type="text" id="reset-password-user-name" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+        </div>
+        <div class="x-form-group">
+          <label>Token Reset (bagikan ke staf)</label>
+          <textarea id="reset-password-token" class="x-input" rows="3" readonly style="background:#f0fdf4;font-family:monospace;font-size:13px;"></textarea>
+        </div>
+        <p style="font-size:12px;color:#64748b;margin-top:8px;">Staf harus membuka halaman login → "Lupa Password" → masukkan token ini → buat password baru.</p>
+      </div>
+      <div class="x-modal-footer">
+        <button type="button" class="x-btn-primary" onclick="closeResetPasswordModal()">Tutup</button>
+      </div>
     </div>
   </div>
 

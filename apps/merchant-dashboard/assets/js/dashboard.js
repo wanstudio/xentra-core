@@ -113,6 +113,7 @@
       brand: { title: 'Brand & Tampilan', sub: 'Kustomisasi logo, warna tema, dan identitas visual' },
       catalog: { title: 'Katalog Menu', sub: 'Kelola daftar menu makanan, harga, dan ketersediaan stok' },
       branches: { title: 'Cabang & Ongkir', sub: 'Atur lokasi outlet, radius, dan formula ongkir spasial' },
+      tim: { title: 'Manajemen Tim', sub: 'Kelola akun staf, role, dan hak akses dashboard' },
       orders: { title: 'Pesanan Masuk', sub: 'Antrean pesanan realtime dan update status dapur' },
       payments: { title: 'Integrasi Pembayaran', sub: 'Kredensial direct payment Midtrans & Tunai' }
     };
@@ -127,6 +128,7 @@
       else loadCatalog();
     }
     if (tabId === 'branches') loadBranches();
+    if (tabId === 'tim') loadTim();
     if (tabId === 'orders') loadOrders();
     if (tabId === 'overview') loadOverview();
   }
@@ -2245,6 +2247,332 @@
     // (already set above; we monkey-patch via reload override in openAdoptModal closure)
   })();
 
+  /* =========================================================================
+     MODUL: WORKFORCE / TIM MANAGEMENT
+     ========================================================================= */
+  var _timUsers = [];
+  var _timBranches = [];
+  var _timRoleFilter = 'all';
+  var _timCurrentUserRole = (getStoredUser() || {}).role;
+
+  function _canManageTim() {
+    return ['owner', 'brand_manager', 'branch_manager'].indexOf(_timCurrentUserRole) !== -1;
+  }
+
+  function _timRoleLabel(role) {
+    var labels = { owner: 'Owner', brand_manager: 'Brand Manager', branch_manager: 'Branch Manager', cashier: 'Kasir', kitchen: 'Dapur' };
+    return labels[role] || role;
+  }
+
+  function _timRoleBadgeClass(role) {
+    if (role === 'owner') return 'x-badge-info';
+    if (role === 'brand_manager') return 'x-badge-success';
+    if (role === 'branch_manager') return 'x-badge-warning';
+    return 'x-badge-muted';
+  }
+
+  function _timStatusBadge(status) {
+    if (status === 'active') return '<span class="x-badge x-badge-success">Aktif</span>';
+    return '<span class="x-badge x-badge-danger">Nonaktif</span>';
+  }
+
+  function _timBranchName(branchId) {
+    if (!branchId) return '<span class="text-muted">—</span>';
+    var b = _timBranches.find(function (x) { return x.id === branchId; });
+    return b ? esc(b.name) : esc(branchId);
+  }
+
+  async function loadTim() {
+    if (!_canManageTim()) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/users?limit=200', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (data.success) {
+        _timUsers = data.users || [];
+        renderTimTable();
+      }
+    } catch (e) {
+      console.warn('[Tim Load Error]:', e);
+    }
+    // Also load branches for branch name display
+    try {
+      var bRes = await adminFetch(API_BASE + '/admin/branches', { headers: getAuthHeaders() });
+      var bData = await bRes.json();
+      if (bData.success) _timBranches = bData.branches || [];
+    } catch (e) { /* ignore */ }
+  }
+
+  function renderTimTable() {
+    var filtered = _timUsers;
+    if (_timRoleFilter !== 'all') {
+      filtered = _timUsers.filter(function (u) { return u.role === _timRoleFilter; });
+    }
+
+    var tbody = $('tim-table-body');
+    if (!tbody) return;
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Tidak ada anggota tim ditemukan.</td></tr>';
+      return;
+    }
+
+    var myId = (getStoredUser() || {}).id;
+    var rows = filtered.map(function (u) {
+      var isMe = u.id === myId;
+      var isTargetOwner = u.role === 'owner';
+      var isLastOwner = isTargetOwner && _timUsers.filter(function (x) { return x.role === 'owner'; }).length <= 1;
+
+      var actions = '';
+      if (!isMe && !isLastOwner) {
+        actions += '<button type="button" class="x-btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px;" onclick="openEditUser(\'' + u.id + '\')">Edit</button>';
+      } else if (isMe) {
+        actions += '<span class="text-muted" style="font-size:11px;">Akun Anda</span>';
+      }
+
+      if (!isMe && u.status === 'active' && !isLastOwner) {
+        actions += '<button type="button" class="x-btn-danger-outline" style="font-size:12px;padding:4px 10px;" onclick="disableUser(\'' + u.id + '\', \'' + esc(u.full_name) + '\')">Nonaktif</button>';
+      } else if (!isMe && u.status === 'disabled') {
+        actions += '<button type="button" class="x-btn-success-outline" style="font-size:12px;padding:4px 10px;" onclick="enableUser(\'' + u.id + '\', \'' + esc(u.full_name) + '\')">Aktifkan</button>';
+      }
+
+      if (!isMe && !isLastOwner) {
+        actions += '<button type="button" class="x-btn-secondary" style="font-size:12px;padding:4px 10px;margin-left:4px;" onclick="resetUserPassword(\'' + u.id + '\', \'' + esc(u.full_name) + '\')">Reset Password</button>';
+      }
+
+      return '<tr>' +
+        '<td><strong>' + esc(u.full_name) + '</strong></td>' +
+        '<td><code style="font-size:12px;background:#f1f5f9;padding:2px 6px;border-radius:4px;">' + esc(u.username) + '</code></td>' +
+        '<td><span class="x-badge ' + _timRoleBadgeClass(u.role) + '">' + _timRoleLabel(u.role) + '</span></td>' +
+        '<td>' + _timBranchName(u.branch_id) + '</td>' +
+        '<td>' + _timStatusBadge(u.status) + '</td>' +
+        '<td class="text-right">' + actions + '</td>' +
+      '</tr>';
+    });
+
+    tbody.innerHTML = rows.join('');
+  }
+
+  function filterTimByRole(role) {
+    _timRoleFilter = role;
+    document.querySelectorAll('#tim-role-filters .x-cat-filter-btn').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.role === role);
+    });
+    renderTimTable();
+  }
+  window.filterTimByRole = filterTimByRole;
+
+  function openCreateUserModal() {
+    $('modal-user-title').textContent = 'Tambah Anggota Tim';
+    $('user-id').value = '';
+    $('user-fullname').value = '';
+    $('user-username').value = '';
+    $('user-username').readOnly = false;
+    $('user-password').value = '';
+    $('user-password-group').style.display = '';
+    $('user-password-hint').textContent = 'Wajib diisi saat membuat akun baru.';
+    $('user-email').value = '';
+    $('user-role').value = '';
+    $('user-branch').value = '';
+
+    // Populate role options based on actor role
+    var roleSelect = $('user-role');
+    roleSelect.innerHTML = '';
+    if (_timCurrentUserRole === 'owner') {
+      roleSelect.innerHTML = '<option value="brand_manager">Brand Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+    } else if (_timCurrentUserRole === 'brand_manager') {
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+    } else if (_timCurrentUserRole === 'branch_manager') {
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option>';
+    }
+
+    // Populate branch options
+    var branchSelect = $('user-branch');
+    branchSelect.innerHTML = '<option value="">— Tanpa Cabang —</option>';
+    _timBranches.forEach(function (b) {
+      branchSelect.innerHTML += '<option value="' + b.id + '">' + esc(b.name) + '</option>';
+    });
+
+    // branch_manager: lock to own branch
+    if (_timCurrentUserRole === 'branch_manager') {
+      var myBranch = (getStoredUser() || {}).branch_id;
+      if (myBranch) {
+        branchSelect.value = myBranch;
+        branchSelect.disabled = true;
+      }
+    } else {
+      branchSelect.disabled = false;
+    }
+
+    $('modal-user').style.display = 'flex';
+  }
+  window.openCreateUserModal = openCreateUserModal;
+
+  function openEditUser(userId) {
+    var user = _timUsers.find(function (u) { return u.id === userId; });
+    if (!user) return;
+
+    $('modal-user-title').textContent = 'Edit Anggota Tim';
+    $('user-id').value = user.id;
+    $('user-fullname').value = user.full_name || '';
+    $('user-username').value = user.username || '';
+    $('user-username').readOnly = true;
+    $('user-password-group').style.display = 'none';
+    $('user-email').value = user.email || '';
+
+    // Populate role options (restricted by actor role)
+    var roleSelect = $('user-role');
+    roleSelect.innerHTML = '';
+    if (_timCurrentUserRole === 'owner') {
+      roleSelect.innerHTML = '<option value="brand_manager">Manager</option><option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+    } else if (_timCurrentUserRole === 'brand_manager') {
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+    } else if (_timCurrentUserRole === 'branch_manager') {
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option>';
+    }
+    roleSelect.value = user.role;
+
+    // Branch options
+    var branchSelect = $('user-branch');
+    branchSelect.innerHTML = '<option value="">— Tanpa Cabang —</option>';
+    _timBranches.forEach(function (b) {
+      branchSelect.innerHTML += '<option value="' + b.id + '">' + esc(b.name) + '</option>';
+    });
+    branchSelect.value = user.branch_id || '';
+
+    if (_timCurrentUserRole === 'branch_manager') {
+      var myBranch = (getStoredUser() || {}).branch_id;
+      if (myBranch) {
+        branchSelect.value = myBranch;
+        branchSelect.disabled = true;
+      }
+    } else {
+      branchSelect.disabled = false;
+    }
+
+    $('modal-user').style.display = 'flex';
+  }
+  window.openEditUser = openEditUser;
+
+  function closeUserModal() {
+    $('modal-user').style.display = 'none';
+  }
+  window.closeUserModal = closeUserModal;
+
+  async function submitUserForm(e) {
+    e.preventDefault();
+    var userId = $('user-id').value;
+    var isEdit = !!userId;
+    var payload = {
+      full_name: $('user-fullname').value.trim(),
+      role: $('user-role').value,
+      branch_id: $('user-branch').value || undefined,
+      email: $('user-email').value.trim() || undefined
+    };
+
+    if (!isEdit) {
+      payload.username = $('user-username').value.trim();
+      payload.password = $('user-password').value;
+      if (!payload.username || payload.username.length < 3) {
+        showToast('Username minimal 3 karakter.');
+        return;
+      }
+      if (!payload.password || payload.password.length < 8) {
+        showToast('Password minimal 8 karakter.');
+        return;
+      }
+    }
+
+    if (!payload.full_name) {
+      showToast('Nama lengkap wajib diisi.');
+      return;
+    }
+
+    try {
+      var url = isEdit ? (API_BASE + '/admin/users/' + userId) : (API_BASE + '/admin/users');
+      var method = isEdit ? 'PUT' : 'POST';
+      var res = await adminFetch(url, {
+        method: method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast(isEdit ? 'Profil anggota tim berhasil diperbarui.' : 'Anggota tim berhasil ditambahkan.');
+        closeUserModal();
+        loadTim();
+      } else {
+        showToast('Gagal: ' + (data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+
+  async function disableUser(userId, name) {
+    if (!confirm('Nonaktifkan akun "' + name + '"? Staf ini tidak akan bisa login sampai diaktifkan kembali.')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/users/' + userId + '/disable', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('Akun "' + name + '" berhasil dinonaktifkan.');
+        loadTim();
+      } else {
+        showToast('Gagal: ' + (data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.disableUser = disableUser;
+
+  async function enableUser(userId, name) {
+    try {
+      var res = await adminFetch(API_BASE + '/admin/users/' + userId + '/enable', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('Akun "' + name + '" berhasil diaktifkan.');
+        loadTim();
+      } else {
+        showToast('Gagal: ' + (data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.enableUser = enableUser;
+
+  async function resetUserPassword(userId, name) {
+    if (!confirm('Generate token reset password untuk "' + name + '"? Token hanya ditampilkan sekali.')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/users/' + userId + '/reset-password', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success && data.reset_token) {
+        $('reset-password-user-name').value = name;
+        $('reset-password-token').value = data.reset_token;
+        $('modal-reset-password').style.display = 'flex';
+      } else {
+        showToast('Gagal: ' + (data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.resetUserPassword = resetUserPassword;
+
+  function closeResetPasswordModal() {
+    $('modal-reset-password').style.display = 'none';
+  }
+  window.closeResetPasswordModal = closeResetPasswordModal;
+
   window.__xentraInitDashboard = function () {
     checkAuth();
     validateServerSession();
@@ -2272,6 +2600,20 @@
     initAuthListeners();
     initBrandListeners();
     initCatalogListeners();
+
+    // Workforce form submit
+    var formUser = $('form-user');
+    if (formUser) {
+      formUser.addEventListener('submit', submitUserForm);
+    }
+
+    // Hide Tim tab for cashier/kitchen
+    var userRole = (getStoredUser() || {}).role;
+    if (userRole === 'cashier' || userRole === 'kitchen') {
+      document.querySelectorAll('.x-nav-item').forEach(function (btn) {
+        if (btn.dataset.tab === 'tim') btn.style.display = 'none';
+      });
+    }
 
     if ($('btn-refresh-orders')) {
       $('btn-refresh-orders').addEventListener('click', loadOrders);

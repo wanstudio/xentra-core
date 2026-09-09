@@ -1119,6 +1119,56 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE branch_categories ADD COLUMN image_url TEXT;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE branch_categories ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));"); } catch (e) {}
 
+  // WORKFORCE MANAGEMENT: user lifecycle, password security, and audit
+  // Idempotent — safe on existing databases with or without these columns.
+  try { targetDb.exec("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active';"); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER DEFAULT 0;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN locked_until TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN password_changed_at TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN last_login_at TEXT;'); } catch (e) {}
+
+  // One-time password reset tokens (single-use, time-limited)
+  try {
+    targetDb.exec(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used INTEGER DEFAULT 0,
+        created_by TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+    `);
+  } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_prt_user_id ON password_reset_tokens(user_id);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_prt_token_hash ON password_reset_tokens(token_hash);'); } catch (e) {}
+
+  // Security audit log for workforce mutations (append-only)
+  try {
+    targetDb.exec(`
+      CREATE TABLE IF NOT EXISTS security_audit_log (
+        id TEXT PRIMARY KEY,
+        actor_id TEXT,
+        actor_role TEXT,
+        action TEXT NOT NULL,
+        target_user_id TEXT,
+        target_role TEXT,
+        brand_id TEXT,
+        organization_id TEXT,
+        branch_id TEXT,
+        result TEXT NOT NULL,
+        metadata TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
+  } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_sal_actor ON security_audit_log(actor_id);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_sal_target ON security_audit_log(target_user_id);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_sal_action ON security_audit_log(action);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_sal_brand ON security_audit_log(brand_id);'); } catch (e) {}
+
   // Migrate existing branch_products:
   // 1. Fill legacy snapshot columns (product_name, etc.) idempotently from master for pre-override rows.
   // 2. Migrate legacy snapshot → override:
@@ -1264,17 +1314,17 @@ function seedData(targetDb) {
     defaultBanners
   );
 
-  // Seed default initial merchant owner if users table is empty (SHA-256 hashed)
+  // Seed default initial merchant owner if users table is empty (bcrypt hashed)
   const userCount = targetDb.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ?').get(brandId)?.cnt || 0;
   if (userCount === 0) {
-    const crypto = require('crypto');
+    const bcrypt = require('bcryptjs');
     
     // Secure default initial merchant credential
     const initPassword = process.env.INITIAL_ADMIN_PASSWORD || 'bangjo123';
-    const defaultPasswordHash = crypto.createHash('sha256').update(initPassword).digest('hex');
+    const defaultPasswordHash = bcrypt.hashSync(initPassword, 12);
     targetDb.prepare(`
-      INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role, status, password_changed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))
     `).run('usr_bangjo_owner', brandId, orgId, 'admin', 'admin@bangjo.com', defaultPasswordHash, 'Pemilik Bangjo', 'owner');
   }
 

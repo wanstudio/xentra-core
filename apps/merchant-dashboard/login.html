@@ -271,6 +271,67 @@
       color: #64748b;
       letter-spacing: 0.5px;
     }
+
+    .x-link-forgot {
+      font-size: 13px;
+      color: #94a3b8;
+      text-decoration: none;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color 0.2s;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+
+    .x-link-forgot:hover {
+      color: #475569;
+    }
+
+    .x-alert-success {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 18px;
+      display: none;
+    }
+
+    .x-link-login {
+      font-size: 13px;
+      color: #64748b;
+      text-decoration: none;
+      font-weight: 700;
+      cursor: pointer;
+      transition: color 0.2s;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+
+    .x-link-login:hover {
+      color: #334155;
+    }
+
+    .x-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 18px 0;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .x-divider::before,
+    .x-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
   </style>
 </head>
 <body>
@@ -326,6 +387,57 @@
             <span>Masuk ke Dashboard</span>
           </button>
         </form>
+
+        <div class="x-divider">atau</div>
+
+        <button type="button" class="x-link-forgot" id="btn-show-forgot" style="display:block;width:100%;text-align:center;">
+          Lupa Password? Reset via Token
+        </button>
+      </div>
+
+      <!-- FORGOT PASSWORD CARD -->
+      <div class="x-login-card" id="forgot-card" style="display:none;">
+        <h1 class="x-card-title">🔄 Reset Password</h1>
+        <p class="x-card-subtitle">Masukkan token reset dari Admin dan buat password baru Anda.</p>
+
+        <div id="forgot-error" class="x-alert-error"></div>
+        <div id="forgot-success" class="x-alert-success"></div>
+
+        <form id="form-forgot-password">
+          <div class="x-form-group">
+            <label for="reset-token">Token Reset dari Admin</label>
+            <input type="text" id="reset-token" class="x-input" placeholder="xnt_rst_..." required autocomplete="off" style="font-family:monospace;font-size:13px;">
+            <small style="display:block;margin-top:4px;font-size:11px;color:#94a3b8;">Token diberikan oleh Owner/Manager Anda melalui WhatsApp.</small>
+          </div>
+
+          <div class="x-form-group">
+            <label for="new-password">Password Baru</label>
+            <div class="x-password-wrap">
+              <input type="password" id="new-password" class="x-input" placeholder="Minimal 8 karakter" required minlength="8" autocomplete="new-password">
+              <button type="button" class="x-btn-toggle-pw" data-target="new-password" title="Tampilkan Password">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="x-form-group">
+            <label for="confirm-password">Konfirmasi Password Baru</label>
+            <div class="x-password-wrap">
+              <input type="password" id="confirm-password" class="x-input" placeholder="Ulangi password baru" required minlength="8" autocomplete="new-password">
+              <button type="button" class="x-btn-toggle-pw" data-target="confirm-password" title="Tampilkan Password">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="x-btn-submit" id="btn-reset-submit">
+            <span>Reset Password</span>
+          </button>
+        </form>
+
+        <div style="text-align:center;margin-top:18px;">
+          <button type="button" class="x-link-login" id="btn-back-to-login">← Kembali ke Login</button>
+        </div>
       </div>
 
       <!-- Navigation link back to Customer ordering page -->
@@ -424,6 +536,108 @@
         btn.disabled = false;
         btn.innerHTML = '<span>Masuk ke Dashboard</span>';
       });
+
+      // 4. Toggle Forgot Password Card
+      var loginCard = document.querySelector('.x-login-card');
+      var forgotCard = document.getElementById('forgot-card');
+      var btnShowForgot = document.getElementById('btn-show-forgot');
+      var btnBackToLogin = document.getElementById('btn-back-to-login');
+
+      if (btnShowForgot) {
+        btnShowForgot.addEventListener('click', function () {
+          loginCard.style.display = 'none';
+          forgotCard.style.display = 'block';
+          document.querySelector('.x-card-subtitle').style.display = 'none';
+        });
+      }
+
+      if (btnBackToLogin) {
+        btnBackToLogin.addEventListener('click', function () {
+          forgotCard.style.display = 'none';
+          loginCard.style.display = 'block';
+          document.querySelector('.x-card-subtitle').style.display = '';
+        });
+      }
+
+      // 5. Toggle password visibility for forgot form inputs
+      document.querySelectorAll('.x-btn-toggle-pw[data-target]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          var targetId = btn.getAttribute('data-target');
+          var input = document.getElementById(targetId);
+          if (input) {
+            input.type = input.type === 'password' ? 'text' : 'password';
+          }
+        });
+      });
+
+      // 6. Handle Forgot Password Submit
+      var forgotForm = document.getElementById('form-forgot-password');
+      var forgotError = document.getElementById('forgot-error');
+      var forgotSuccess = document.getElementById('forgot-success');
+      var btnResetSubmit = document.getElementById('btn-reset-submit');
+
+      if (forgotForm) {
+        forgotForm.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          forgotError.style.display = 'none';
+          forgotSuccess.style.display = 'none';
+          btnResetSubmit.disabled = true;
+          btnResetSubmit.innerHTML = '<span>Memproses...</span>';
+
+          var token = document.getElementById('reset-token').value.trim();
+          var newPw = document.getElementById('new-password').value;
+          var confirmPw = document.getElementById('confirm-password').value;
+
+          if (newPw.length < 8) {
+            forgotError.textContent = '❌ Password baru minimal 8 karakter.';
+            forgotError.style.display = 'block';
+            btnResetSubmit.disabled = false;
+            btnResetSubmit.innerHTML = '<span>Reset Password</span>';
+            return;
+          }
+
+          if (newPw !== confirmPw) {
+            forgotError.textContent = '❌ Konfirmasi password tidak cocok.';
+            forgotError.style.display = 'block';
+            btnResetSubmit.disabled = false;
+            btnResetSubmit.innerHTML = '<span>Reset Password</span>';
+            return;
+          }
+
+          try {
+            var res = await fetch('/api/v1/auth/reset-password', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: token, new_password: newPw })
+            });
+
+            var data = null;
+            try { data = await res.json(); } catch (_) {}
+
+            if (data && data.success) {
+              forgotSuccess.textContent = '✅ ' + (data.message || 'Password berhasil direset! Silakan login dengan password baru.');
+              forgotSuccess.style.display = 'block';
+              forgotForm.reset();
+              setTimeout(function () {
+                forgotCard.style.display = 'none';
+                loginCard.style.display = 'block';
+                document.querySelector('.x-card-subtitle').style.display = '';
+                forgotSuccess.style.display = 'none';
+              }, 3000);
+            } else {
+              forgotError.textContent = '❌ ' + ((data && data.error) || 'Token tidak valid atau sudah digunakan.');
+              forgotError.style.display = 'block';
+            }
+          } catch (err) {
+            forgotError.textContent = '❌ Kesalahan jaringan. Coba lagi.';
+            forgotError.style.display = 'block';
+          }
+
+          btnResetSubmit.disabled = false;
+          btnResetSubmit.innerHTML = '<span>Reset Password</span>';
+        });
+      }
     })();
   </script>
 </body>
