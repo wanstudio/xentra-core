@@ -1328,6 +1328,21 @@ function seedData(targetDb) {
     `).run('usr_bangjo_owner', brandId, orgId, 'admin', 'admin@bangjo.com', defaultPasswordHash, 'Pemilik Bangjo', 'owner');
   }
 
+  // Migration: force re-hash admin password to bcrypt if still using legacy hash (SHA-256/MD5/etc)
+  // This ensures the admin can always login after bcrypt migration
+  try {
+    const bcrypt = require('bcryptjs');
+    const adminUser = targetDb.prepare('SELECT id, password_hash FROM users WHERE username = ? AND brand_id = ?').get('admin', brandId);
+    if (adminUser && !adminUser.password_hash.startsWith('$2')) {
+      const initPassword = process.env.INITIAL_ADMIN_PASSWORD || 'bangjo123';
+      const newHash = bcrypt.hashSync(initPassword, 12);
+      targetDb.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\') WHERE id = ?').run(newHash, adminUser.id);
+      console.log('[Migration] Admin password re-hashed from legacy format to bcrypt.');
+    }
+  } catch (e) {
+    console.warn('[Migration] Admin password re-hash skipped:', e.message);
+  }
+
   let branch = null;
   try {
     branch = targetDb.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brandId);
