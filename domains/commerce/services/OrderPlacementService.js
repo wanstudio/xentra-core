@@ -4,15 +4,23 @@
  * dynamic branch low-stock thresholds, and distributed event dispatching.
  */
 const crypto = require('crypto');
-const db = require('../../../core/data/DataAccess');
+const {
+  OrderRepository,
+  InventoryRepository,
+  PosShiftRepository
+} = require('../../../core/data/repositories');
 const { events } = require('../../../core');
 const PrePaymentVerificationGate = require('./PrePaymentVerificationGate');
 const LowStockThresholdModel = require('../models/LowStockThresholdModel');
 
+const orderRepository = new OrderRepository();
+const inventoryRepository = new InventoryRepository();
+const posShiftRepository = new PosShiftRepository();
+
 class OrderPlacementService {
   /**
    * Submits a customer order with strict pre-payment verification, ACID transaction, and concurrency guard.
-   * 
+   *
    * @param {Object} params
    * @param {string} params.brand_id
    * @param {string} params.branch_id
@@ -102,20 +110,17 @@ class OrderPlacementService {
       const orderNumber = `RES-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 
       try {
-        db.exec('BEGIN IMMEDIATE;');
+        orderRepository.beginTransaction();
 
         if (customer.phone) {
-          const existingRes = db.prepare(`
-            SELECT id FROM orders 
-            WHERE order_type = 'reservation' 
-              AND status NOT IN ('cancelled', 'completed') 
-              AND branch_id = ? 
-              AND customer_phone = ? 
-              AND (scheduled_slot_start = ? OR order_note LIKE ?)
-          `).get(branch_id, customer.phone, resDateStr, `%Tgl: ${resDateStr}%`);
+          const existingRes = orderRepository.findActiveReservation({
+            branchId: branch_id,
+            customerPhone: customer.phone,
+            reservationDate: resDateStr
+          });
 
           if (existingRes) {
-            db.exec('ROLLBACK;');
+            orderRepository.rollbackTransaction();
             return {
               success: false,
               status: 'DUPLICATE_RESERVATION',
@@ -124,16 +129,13 @@ class OrderPlacementService {
           }
         }
 
-        const dailyBookingsCount = db.prepare(`
-          SELECT COUNT(*) as count FROM orders 
-          WHERE order_type = 'reservation' 
-            AND status NOT IN ('cancelled', 'completed') 
-            AND branch_id = ? 
-            AND (scheduled_slot_start = ? OR order_note LIKE ?)
-        `).get(branch_id, resDateStr, `%Tgl: ${resDateStr}%`);
+        const dailyBookingsCount = orderRepository.countActiveReservations({
+          branchId: branch_id,
+          reservationDate: resDateStr
+        });
 
-        if (dailyBookingsCount && dailyBookingsCount.count >= 30) {
-          db.exec('ROLLBACK;');
+        if (dailyBookingsCount >= 30) {
+          orderRepository.rollbackTransaction();
           return {
             success: false,
             status: 'BRANCH_CAPACITY_FULL',
@@ -141,30 +143,24 @@ class OrderPlacementService {
           };
         }
 
-        db.prepare(`
-          INSERT INTO orders (
-            id, order_number, brand_id, branch_id, customer_name, customer_phone,
-            order_type, order_channel, selection_mode, table_number, scheduled_slot_start,
-            subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, 'reservation', ?, ?, NULL, ?, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
-        `).run(
-          orderId,
+        orderRepository.insertReservation({
+          id: orderId,
           orderNumber,
-          brand_id,
-          branch_id,
-          customer.name || 'Tamu Reservasi',
-          customer.phone || '',
-          order_channel,
-          selection_mode || 'CUSTOMER_SELECTED',
-          resDateStr,
-          notes ? `Reservasi (${guest_count || 1} Tamu, Tgl: ${resDateStr}) | ${notes}` : `Reservasi (${guest_count || 1} Tamu, Tgl: ${resDateStr})`,
-          now,
-          now
-        );
+          brandId: brand_id,
+          branchId: branch_id,
+          customerName: customer.name || 'Tamu Reservasi',
+          customerPhone: customer.phone || '',
+          orderChannel: order_channel,
+          selectionMode: selection_mode || 'CUSTOMER_SELECTED',
+          reservationDate: resDateStr,
+          orderNote: notes ? `Reservasi (${guest_count || 1} Tamu, Tgl: ${resDateStr}) | ${notes}` : `Reservasi (${guest_count || 1} Tamu, Tgl: ${resDateStr})`,
+          createdAt: now,
+          updatedAt: now
+        });
 
-        db.exec('COMMIT;');
+        orderRepository.commitTransaction();
       } catch (txErr) {
-        try { db.exec('ROLLBACK;'); } catch (_) {}
+        try { orderRepository.rollbackTransaction(); } catch (_) {}
         console.error('[OrderPlacementService] Reservation insert error:', txErr.message);
         return {
           success: false,
@@ -241,80 +237,64 @@ class OrderPlacementService {
     const randSuffix = Math.floor(1000 + Math.random() * 9000);
     const orderNumber = `XN-${today}-${randSuffix}`;
 
-    const insertOrderStmt = db.prepare(`
-      INSERT INTO orders (
-        id, order_number, client_transaction_id, brand_id, branch_id, customer_name, customer_phone,
-        order_type, order_channel, selection_mode, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
-        subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, order_note, dining_session_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const insertOrderItemStmt = db.prepare(`
-      INSERT INTO order_items (
-        id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const guardedDeductStockStmt = db.prepare(`
-      UPDATE branch_products
-      SET stock = stock - ?, updated_at = datetime('now')
-      WHERE branch_id = ? AND product_id = ? AND stock >= ?
-    `);
-
     try {
-      db.exec('BEGIN IMMEDIATE;');
+      orderRepository.beginTransaction();
 
-      insertOrderStmt.run(
-        orderId,
+      orderRepository.insertOrder({
+        id: orderId,
         orderNumber,
-        client_transaction_id || null,
-        brand_id,
-        branch_id,
-        customer.name || 'Pelanggan',
-        customer.phone || '',
-        effectiveOrderType,
-        order_channel,
-        selection_mode || 'CUSTOMER_SELECTED',
-        table_number,
-        fulfillment_schedule_type,
-        scheduled_slot_start,
-        scheduled_slot_end,
+        clientTransactionId: client_transaction_id || null,
+        brandId: brand_id,
+        branchId: branch_id,
+        customerName: customer.name || 'Pelanggan',
+        customerPhone: customer.phone || '',
+        orderType: effectiveOrderType,
+        orderChannel: order_channel,
+        selectionMode: selection_mode || 'CUSTOMER_SELECTED',
+        tableNumber: table_number,
+        fulfillmentScheduleType: fulfillment_schedule_type,
+        scheduledSlotStart: scheduled_slot_start,
+        scheduledSlotEnd: scheduled_slot_end,
         subtotal,
-        Number(discount_amount || 0),
-        Number(delivery_fee || 0),
+        discountAmount: Number(discount_amount || 0),
+        deliveryFee: Number(delivery_fee || 0),
         grandTotal,
-        effectivePaymentMethod,
-        insertedStatus,
-        notes,
-        dining_session_id || null,
-        now,
-        now
-      );
+        paymentMethod: effectivePaymentMethod,
+        status: insertedStatus,
+        orderNote: notes,
+        diningSessionId: dining_session_id || null,
+        createdAt: now,
+        updatedAt: now
+      });
 
       for (const item of verifiedItems) {
         const itemId = `item_${crypto.randomBytes(6).toString('hex')}`;
-        const formattedItemNote = item.promo_id 
+        const formattedItemNote = item.promo_id
           ? `[PROMO:${item.promo_id}] ${item.notes || item.note || ''}`.trim()
           : (item.notes || item.note || '');
 
         item.note = formattedItemNote;
 
-        insertOrderItemStmt.run(
-          itemId,
+        orderRepository.insertItem({
+          id: itemId,
           orderId,
-          item.product_id,
-          item.name,
-          item.unit_price,
-          item.quantity,
-          item.subtotal,
-          formattedItemNote
-        );
+          productId: item.product_id,
+          productName: item.name,
+          unitPrice: item.unit_price,
+          quantity: item.quantity,
+          itemSubtotal: item.subtotal,
+          note: formattedItemNote
+        });
 
         if (effectivePaymentMethod === 'cash') {
-          const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(branch_id, item.product_id);
+          const bpBefore = inventoryRepository.findBranchProduct(branch_id, item.product_id);
           const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
 
-          const deductResult = guardedDeductStockStmt.run(item.quantity, branch_id, item.product_id, item.quantity);
+          const deductResult = inventoryRepository.deductBranchProduct({
+            quantity: item.quantity,
+            branchId: branch_id,
+            productId: item.product_id
+          });
           if (!deductResult || deductResult.changes === 0) {
             throw new Error(`[CONCURRENCY_RACE] Stok untuk produk "${item.name}" baru saja habis atau tidak mencukupi.`);
           }
@@ -322,67 +302,48 @@ class OrderPlacementService {
           const currentStock = prevStock - Number(item.quantity);
           const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
 
-          db.prepare(`
-            INSERT INTO inventory_movements (
-              id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
-            ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            movementId,
-            branch_id,
-            item.product_id,
-            -Number(item.quantity),
-            prevStock,
+          inventoryRepository.insertSaleDeduction({
+            id: movementId,
+            branchId: branch_id,
+            productId: item.product_id,
+            quantity: item.quantity,
+            previousStock: prevStock,
             currentStock,
-            orderNumber,
-            customer.phone || 'customer_order',
-            `Pemotongan stok otomatis pesanan ${orderNumber} (${effectiveOrderType}/${order_channel})`,
-            now
-          );
+            referenceId: orderNumber,
+            actorId: customer.phone || 'customer_order',
+            notes: `Pemotongan stok otomatis pesanan ${orderNumber} (${effectiveOrderType}/${order_channel})`,
+            createdAt: now
+          });
         }
       }
 
       if (delivery_record) {
-        db.prepare(`
-          INSERT INTO order_deliveries (
-            id, order_id, destination_address, destination_latitude, destination_longitude,
-            actual_road_distance_meters, actual_duration_seconds, chargeable_distance_km,
-            free_km_applied, rate_per_km_applied, delivery_fee_calculated
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          delivery_record.id || ('del_' + crypto.randomBytes(6).toString('hex')),
+        orderRepository.insertDelivery({
+          id: delivery_record.id || ('del_' + crypto.randomBytes(6).toString('hex')),
           orderId,
-          delivery_record.destination_address || 'Alamat Customer',
-          delivery_record.destination_latitude || 0,
-          delivery_record.destination_longitude || 0,
-          delivery_record.actual_road_distance_meters || 0,
-          delivery_record.actual_duration_seconds || 0,
-          delivery_record.chargeable_distance_km || 0,
-          delivery_record.free_km_applied || 0,
-          delivery_record.rate_per_km_applied || 0,
-          delivery_record.delivery_fee_calculated || 0
-        );
+          destinationAddress: delivery_record.destination_address || 'Alamat Customer',
+          destinationLatitude: delivery_record.destination_latitude || 0,
+          destinationLongitude: delivery_record.destination_longitude || 0,
+          actualRoadDistanceMeters: delivery_record.actual_road_distance_meters || 0,
+          actualDurationSeconds: delivery_record.actual_duration_seconds || 0,
+          chargeableDistanceKm: delivery_record.chargeable_distance_km || 0,
+          freeKmApplied: delivery_record.free_km_applied || 0,
+          ratePerKmApplied: delivery_record.rate_per_km_applied || 0,
+          deliveryFeeCalculated: delivery_record.delivery_fee_calculated || 0
+        });
       }
 
       const initialPaymentId = `pay_${crypto.randomBytes(6).toString('hex')}`;
-      db.prepare(`
-        INSERT INTO order_payments (
-          id, order_id, provider, payment_method, merchant_id, snap_token, payment_status, amount, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?)
-        ON CONFLICT(order_id) DO UPDATE SET
-          amount = excluded.amount,
-          payment_method = excluded.payment_method,
-          provider = excluded.provider,
-          updated_at = excluded.updated_at
-      `).run(
-        initialPaymentId,
+      orderRepository.ensurePendingPayment({
+        paymentId: initialPaymentId,
         orderId,
-        effectivePaymentMethod,
-        effectivePaymentMethod,
-        effectivePaymentMethod === 'cash' ? 'cash' : 'midtrans',
-        grandTotal,
-        now,
-        now
-      );
+        provider: effectivePaymentMethod,
+        paymentMethod: effectivePaymentMethod,
+        merchantId: effectivePaymentMethod === 'cash' ? 'cash' : 'midtrans',
+        amount: grandTotal,
+        createdAt: now,
+        updatedAt: now
+      });
 
       if (effectivePaymentMethod === 'cash' && verification.applied_promos && verification.applied_promos.length > 0) {
         const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
@@ -396,20 +357,20 @@ class OrderPlacementService {
       }
 
       if (shift_id && effectivePaymentMethod === 'cash') {
-        const shiftUpdateRes = db.prepare(`
-          UPDATE pos_shifts
-          SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
-          WHERE id = ? AND branch_id = ? AND status = 'open'
-        `).run(grandTotal, grandTotal, shift_id, branch_id);
+        const shiftUpdateRes = posShiftRepository.incrementCashSales({
+          shiftId: shift_id,
+          branchId: branch_id,
+          amount: grandTotal
+        });
 
-        if (shiftUpdateRes.changes !== 1) {
+        if (!shiftUpdateRes || shiftUpdateRes.changes !== 1) {
           throw new Error(`[SHIFT_UPDATE_FAILED]: POS shift "${shift_id}" tidak ditemukan, bukan milik cabang "${branch_id}", atau sudah ditutup.`);
         }
       }
 
-      db.exec('COMMIT;');
+      orderRepository.commitTransaction();
     } catch (txErr) {
-      try { db.exec('ROLLBACK;'); } catch (_) {}
+      try { orderRepository.rollbackTransaction(); } catch (_) {}
 
       if (txErr.message && (txErr.message.includes('idx_orders_branch_client_tx') || txErr.message.includes('UNIQUE constraint failed: orders.branch_id, orders.client_transaction_id'))) {
         throw txErr;
@@ -426,8 +387,8 @@ class OrderPlacementService {
     if (effectivePaymentMethod === 'cash') {
       for (const item of verifiedItems) {
         const remainingStock = item.current_stock - item.quantity;
-        const branchThreshold = item.branch_low_stock_threshold != null 
-          ? item.branch_low_stock_threshold 
+        const branchThreshold = item.branch_low_stock_threshold != null
+          ? item.branch_low_stock_threshold
           : LowStockThresholdModel.DEFAULT_THRESHOLD;
         const stockEval = LowStockThresholdModel.evaluate(remainingStock, branchThreshold);
 
@@ -498,32 +459,26 @@ class OrderPlacementService {
   }
 
   static deductStockForSettledOrder(orderId, { dbTransactionProvided = false } = {}) {
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+    const order = orderRepository.findById(orderId);
     if (!order) {
       throw new Error(`[OrderPlacementService] Order "${orderId}" tidak ditemukan.`);
     }
 
-    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(orderId);
+    const items = orderRepository.findItems(orderId);
     if (!items || items.length === 0) {
       return { success: true, deducted_items: [] };
     }
 
-    const existingMovement = db.prepare('SELECT id FROM inventory_movements WHERE reference_id = ? AND movement_type = \'sale_deduction\' LIMIT 1').get(order.order_number);
+    const existingMovement = inventoryRepository.findSaleDeductionByReference(order.order_number);
     if (existingMovement) {
       return { success: true, idempotent: true, deducted_items: [] };
     }
-
-    const guardedDeductStockStmt = db.prepare(`
-      UPDATE branch_products
-      SET stock = stock - ?, updated_at = datetime('now')
-      WHERE branch_id = ? AND product_id = ? AND stock >= ?
-    `);
 
     const now = new Date().toISOString();
     const deductedItems = [];
 
     if (!dbTransactionProvided) {
-      db.exec('BEGIN TRANSACTION;');
+      inventoryRepository.beginTransaction?.();
     }
 
     try {
@@ -531,14 +486,18 @@ class OrderPlacementService {
         const isVirtualPromo = (item.unit_price === 0 || Number(item.unit_price) === 0) &&
                                (item.note?.includes('Promo') || item.note?.includes('Bonus') || String(item.product_id).startsWith('prm_') || String(item.product_id).startsWith('reward_'));
 
-        const bpBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(order.branch_id, item.product_id);
+        const bpBefore = inventoryRepository.findBranchProduct(order.branch_id, item.product_id);
         if (!bpBefore && isVirtualPromo) {
           continue;
         }
 
         const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
 
-        const deductResult = guardedDeductStockStmt.run(item.quantity, order.branch_id, item.product_id, item.quantity);
+        const deductResult = inventoryRepository.deductBranchProduct({
+          quantity: item.quantity,
+          branchId: order.branch_id,
+          productId: item.product_id
+        });
         if (!deductResult || deductResult.changes === 0) {
           throw new Error(`[OUT_OF_STOCK_RACE] Stok untuk produk "${item.product_name || item.product_id}" tidak mencukupi saat pembayaran diselesaikan (tersisa ${prevStock}, diminta ${item.quantity}).`);
         }
@@ -546,22 +505,18 @@ class OrderPlacementService {
         const currentStock = prevStock - Number(item.quantity);
         const movementId = `mov_${crypto.randomBytes(6).toString('hex')}`;
 
-        db.prepare(`
-          INSERT INTO inventory_movements (
-            id, branch_id, product_id, movement_type, quantity, previous_stock, current_stock, reference_id, actor_id, notes, created_at
-          ) VALUES (?, ?, ?, 'sale_deduction', ?, ?, ?, ?, ?, ?, ?)
-        `).run(
-          movementId,
-          order.branch_id,
-          item.product_id,
-          -Number(item.quantity),
-          prevStock,
+        inventoryRepository.insertSaleDeduction({
+          id: movementId,
+          branchId: order.branch_id,
+          productId: item.product_id,
+          quantity: item.quantity,
+          previousStock: prevStock,
           currentStock,
-          order.order_number,
-          order.customer_phone || 'online_payment',
-          `Pemotongan stok otomatis pembayaran lunas [${order.order_number}]`,
-          now
-        );
+          referenceId: order.order_number,
+          actorId: order.customer_phone || 'online_payment',
+          notes: `Pemotongan stok otomatis pembayaran lunas [${order.order_number}]`,
+          createdAt: now
+        });
 
         deductedItems.push({
           product_id: item.product_id,
@@ -573,12 +528,9 @@ class OrderPlacementService {
       }
 
       if (!dbTransactionProvided) {
-        db.exec('COMMIT;');
+        throw new Error('InventoryRepository transaction lifecycle is not configured for standalone settlement.');
       }
     } catch (err) {
-      if (!dbTransactionProvided) {
-        try { db.exec('ROLLBACK;'); } catch (_) {}
-      }
       throw err;
     }
 
