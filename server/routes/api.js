@@ -4118,10 +4118,17 @@ router.patch('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'bra
     if (!cat) return res.status(404).json({ success: false, error: 'Kategori cabang tidak ditemukan.' });
 
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    // Safety net: ensure updated_at column exists (migration may not have run on older DBs)
-    try { db.exec("ALTER TABLE branch_categories ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));"); } catch (_) {}
-    db.prepare("UPDATE branch_categories SET name = ?, slug = ?, updated_at = datetime('now') WHERE id = ?")
-      .run(name, slug, req.params.catId);
+    try {
+      db.prepare("UPDATE branch_categories SET name = ?, slug = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(name, slug, req.params.catId);
+    } catch (e) {
+      if (String(e).includes('no such column')) {
+        db.prepare("UPDATE branch_categories SET name = ?, slug = ? WHERE id = ?")
+          .run(name, slug, req.params.catId);
+      } else {
+        throw e;
+      }
+    }
 
     res.json({ success: true, category: { id: req.params.catId, name, slug } });
   } catch (err) {
@@ -4191,9 +4198,17 @@ router.post('/admin/branches/:id/categories/:catId/image', requireAuth(['owner',
     fs.writeFileSync(path.join(CATEGORY_IMAGE_DIR, fileName), buffer);
 
     const imageUrl = `/assets/uploads/categories/${fileName}`;
-    try { db.exec("ALTER TABLE branch_categories ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));"); } catch (_) {}
-    db.prepare("UPDATE branch_categories SET image_url = ?, updated_at = datetime('now') WHERE id = ?")
-      .run(imageUrl, req.params.catId);
+    try {
+      db.prepare("UPDATE branch_categories SET image_url = ?, updated_at = datetime('now') WHERE id = ?")
+        .run(imageUrl, req.params.catId);
+    } catch (e) {
+      if (String(e).includes('no such column')) {
+        db.prepare("UPDATE branch_categories SET image_url = ? WHERE id = ?")
+          .run(imageUrl, req.params.catId);
+      } else {
+        throw e;
+      }
+    }
 
     res.json({ success: true, category: { id: req.params.catId, image_url: imageUrl } });
   } catch (err) {
