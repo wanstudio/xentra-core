@@ -207,7 +207,6 @@ class OrderPlacementService {
             notes: `Pemotongan stok otomatis pesanan ${orderNumber} (${effectiveOrderType}/${order_channel})`,
             createdAt: now
           });
-          item.current_stock = currentStock;
         }
       }
 
