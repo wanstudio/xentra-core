@@ -48,11 +48,10 @@
  * fail closed with BRANCH_NOT_FOUND / PRODUCT_NOT_FOUND so existence is never
  * leaked across tenant boundaries.
  */
-const db = require('../../../server/database/db');
+const db = require('../../../core/data/DataAccess');
 
 // order types whose fulfillment capability IS represented in the schema
 const CAPABILITY_REPRESENTED = { delivery: 'is_delivery_active', pickup: 'is_pickup_active' };
-// order types known to the system but without a capability flag yet (GAP)
 const KNOWN_ORDER_TYPES = new Set(['delivery', 'pickup', 'dine_in', 'reservation']);
 
 class EligibilityService {
@@ -70,14 +69,6 @@ class EligibilityService {
     INVALID_CART: 'INVALID_CART'
   };
 
-  /**
-   * Resolves the branch-level eligibility context.
-   * Deterministic order: exists & belongs to brand -> active -> open ->
-   * required fulfillment capability. A branch outside the given brand fails
-   * closed as BRANCH_NOT_FOUND (no existence leak).
-   *
-   * @returns {{ ok: true, branch: Object } | { ok: false, reason: string }}
-   */
   static _resolveBranch({ brand_id, branch_id, order_type }) {
     const branch = db.prepare(`
       SELECT b.id, b.brand_id, b.name, b.is_active, b.is_open_override,
@@ -87,26 +78,14 @@ class EligibilityService {
       WHERE b.id = ? AND b.brand_id = ?
     `).get(branch_id, brand_id);
 
-    if (!branch) {
-      return { ok: false, reason: EligibilityService.REASONS.BRANCH_NOT_FOUND };
-    }
-    if (branch.is_active !== 1) {
-      return { ok: false, reason: EligibilityService.REASONS.BRANCH_NOT_ACTIVE };
-    }
-    if (branch.is_open_override !== 1) {
-      return { ok: false, reason: EligibilityService.REASONS.BRANCH_CLOSED };
-    }
+    if (!branch) return { ok: false, reason: EligibilityService.REASONS.BRANCH_NOT_FOUND };
+    if (branch.is_active !== 1) return { ok: false, reason: EligibilityService.REASONS.BRANCH_NOT_ACTIVE };
+    if (branch.is_open_override !== 1) return { ok: false, reason: EligibilityService.REASONS.BRANCH_CLOSED };
 
-    // Fulfillment capability: only delivery/pickup are represented in the
-    // schema. Unknown order types cannot be certified -> not supported.
-    // dine_in/reservation are known but have no capability flag (GAP) -> not
-    // blocked here (never substitute another capability's flag).
     if (order_type) {
       if (CAPABILITY_REPRESENTED[order_type]) {
         const flagValue = branch[CAPABILITY_REPRESENTED[order_type]];
-        if (flagValue !== 1) {
-          return { ok: false, reason: EligibilityService.REASONS.FULFILLMENT_NOT_SUPPORTED };
-        }
+        if (flagValue !== 1) return { ok: false, reason: EligibilityService.REASONS.FULFILLMENT_NOT_SUPPORTED };
       } else if (!KNOWN_ORDER_TYPES.has(order_type)) {
         return { ok: false, reason: EligibilityService.REASONS.FULFILLMENT_NOT_SUPPORTED };
       }
@@ -115,19 +94,6 @@ class EligibilityService {
     return { ok: true, branch };
   }
 
-  /**
-   * Evaluates only the BRANCH-LEVEL eligibility facts for a requested
-   * order/fulfillment type: exists & belongs to brand, active, open, and the
-   * represented fulfillment capability. Product/assignment/stock are NOT
-   * evaluated here — combine with evaluateProduct/evaluateCart for full-cart
-   * decisions, or use this alone to validate an explicit CUSTOMER_SELECTED
-   * branch before the stronger pre-payment gate.
-   *
-   * No selection happens here: it never ranks, routes, prices, or picks a
-   * branch.
-   *
-   * @returns {{ eligible: boolean, reasons: string[], branch_id: string, brand_id: string, branch: Object|null }}
-   */
   static evaluateBranch({ brand_id, branch_id, order_type = null }) {
     const gate = EligibilityService._resolveBranch({ brand_id, branch_id, order_type });
     return {
@@ -139,17 +105,6 @@ class EligibilityService {
     };
   }
 
-  /**
-   * Evaluates a single product against one branch.
-   *
-   * @param {Object} params
-   * @param {string} params.brand_id
-   * @param {string} params.branch_id
-   * @param {string|number} params.product_id
-   * @param {number} [params.quantity=1] positive integer
-   * @param {string} [params.order_type] delivery | pickup | dine_in | reservation
-   * @returns {{ eligible: boolean, reasons: string[], branch_id: string, brand_id: string, product_id: string|number, quantity: number }}
-   */
   static evaluateProduct({ brand_id, branch_id, product_id, quantity = 1, order_type = null }) {
     const qty = Number(quantity);
 
@@ -164,135 +119,50 @@ class EligibilityService {
       };
     }
 
-    // Branch-level gate first (deterministic order; C3.15 evaluation order).
     const branchGate = EligibilityService._resolveBranch({ brand_id, branch_id, order_type });
     if (!branchGate.ok) {
-      return {
-        eligible: false,
-        reasons: [branchGate.reason],
-        branch_id,
-        brand_id,
-        product_id,
-        quantity: qty
-      };
+      return { eligible: false, reasons: [branchGate.reason], branch_id, brand_id, product_id, quantity: qty };
     }
 
-    // Quantity: positive integer only (same semantics PrePaymentVerificationGate
-    // enforces). No fractional inventory semantics are invented here.
     if (!Number.isInteger(qty) || qty <= 0) {
-      return {
-        eligible: false,
-        reasons: [EligibilityService.REASONS.INVALID_QUANTITY],
-        branch_id,
-        brand_id,
-        product_id,
-        quantity: qty
-      };
+      return { eligible: false, reasons: [EligibilityService.REASONS.INVALID_QUANTITY], branch_id, brand_id, product_id, quantity: qty };
     }
 
-    // Product master must exist within the same brand (fail closed, no leak).
     const product = db.prepare(
       'SELECT id, name, is_active FROM products WHERE id = ? AND brand_id = ?'
     ).get(product_id, brand_id);
 
     if (!product) {
-      return {
-        eligible: false,
-        reasons: [EligibilityService.REASONS.PRODUCT_NOT_FOUND],
-        branch_id,
-        brand_id,
-        product_id,
-        quantity: qty
-      };
+      return { eligible: false, reasons: [EligibilityService.REASONS.PRODUCT_NOT_FOUND], branch_id, brand_id, product_id, quantity: qty };
     }
     if (product.is_active !== 1) {
-      return {
-        eligible: false,
-        reasons: [EligibilityService.REASONS.PRODUCT_INACTIVE],
-        branch_id,
-        brand_id,
-        product_id,
-        quantity: qty
-      };
+      return { eligible: false, reasons: [EligibilityService.REASONS.PRODUCT_INACTIVE], branch_id, brand_id, product_id, quantity: qty };
     }
 
-    // Explicit (branch_id, product_id) assignment is required.
     const bp = db.prepare(
       'SELECT stock, is_available FROM branch_products WHERE branch_id = ? AND product_id = ?'
     ).get(branch_id, product_id);
 
     if (!bp) {
-      return {
-        eligible: false,
-        reasons: [EligibilityService.REASONS.PRODUCT_NOT_ASSIGNED],
-        branch_id,
-        brand_id,
-        product_id,
-        quantity: qty
-      };
+      return { eligible: false, reasons: [EligibilityService.REASONS.PRODUCT_NOT_ASSIGNED], branch_id, brand_id, product_id, quantity: qty };
     }
     if (bp.is_available !== 1) {
-      return {
-        eligible: false,
-        reasons: [EligibilityService.REASONS.PRODUCT_UNAVAILABLE],
-        branch_id,
-        brand_id,
-        product_id,
-        quantity: qty
-      };
+      return { eligible: false, reasons: [EligibilityService.REASONS.PRODUCT_UNAVAILABLE], branch_id, brand_id, product_id, quantity: qty };
     }
 
-    // Inventory fact: NULL (no recorded stock) resolves to 0 — see header note.
     const stock = bp.stock != null ? Number(bp.stock) : 0;
     if (stock < qty) {
-      return {
-        eligible: false,
-        reasons: [EligibilityService.REASONS.INSUFFICIENT_STOCK],
-        branch_id,
-        brand_id,
-        product_id,
-        quantity: qty
-      };
+      return { eligible: false, reasons: [EligibilityService.REASONS.INSUFFICIENT_STOCK], branch_id, brand_id, product_id, quantity: qty };
     }
 
-    return {
-      eligible: true,
-      reasons: [],
-      branch_id,
-      brand_id,
-      product_id,
-      quantity: qty
-    };
+    return { eligible: true, reasons: [], branch_id, brand_id, product_id, quantity: qty };
   }
 
-  /**
-   * Evaluates whether ONE branch can satisfy the COMPLETE cart.
-   * Core v1: 1 cart -> 1 fulfillment branch; no split fulfillment.
-   *
-   * @param {Object} params
-   * @param {string} params.brand_id
-   * @param {string} params.branch_id
-   * @param {Array<{ product_id?: string|number, id?: string|number, quantity?: number, qty?: number }>} params.items
-   * @param {string} [params.order_type]
-   * @returns {{ eligible: boolean, reasons: string[], branch_id: string, brand_id: string, items: Array<{ product_id: string|number, quantity: number, eligible: boolean, reasons: string[] }> }}
-   *   When `eligible` is false, top-level `reasons` aggregates the blocking
-   *   reason codes of the failed item evaluations (deduplicated, deterministic
-   *   first-seen item order). When the branch gate fails, `reasons` carries the
-   *   single branch-level reason and every item repeats it. `eligible: true`
-   *   always returns `reasons: []`.
-   */
   static evaluateCart({ brand_id, branch_id, items, order_type = null }) {
     if (!Array.isArray(items) || items.length === 0) {
-      return {
-        eligible: false,
-        reasons: [EligibilityService.REASONS.INVALID_CART],
-        branch_id: branch_id || null,
-        brand_id: brand_id || null,
-        items: []
-      };
+      return { eligible: false, reasons: [EligibilityService.REASONS.INVALID_CART], branch_id: branch_id || null, brand_id: brand_id || null, items: [] };
     }
 
-    // Branch-level gate evaluated once for the whole cart.
     const branchGate = EligibilityService._resolveBranch({ brand_id, branch_id, order_type });
     if (!branchGate.ok) {
       const reasons = [branchGate.reason];
@@ -313,48 +183,23 @@ class EligibilityService {
     const evaluatedItems = items.map((item) => {
       const productId = item.product_id != null ? item.product_id : item.id;
       const quantity = item.quantity != null ? Number(item.quantity) : Number(item.qty != null ? item.qty : 1);
-      const single = EligibilityService.evaluateProduct({
-        brand_id,
-        branch_id,
-        product_id: productId,
-        quantity,
-        order_type
-      });
-      return {
-        product_id: productId,
-        quantity,
-        eligible: single.eligible,
-        reasons: single.reasons
-      };
+      const single = EligibilityService.evaluateProduct({ brand_id, branch_id, product_id: productId, quantity, order_type });
+      return { product_id: productId, quantity, eligible: single.eligible, reasons: single.reasons };
     });
 
     const eligible = evaluatedItems.every((it) => it.eligible);
-
-    // Cart-level reason contract: whenever the cart is ineligible, the
-    // top-level `reasons` carries the deterministic blocking reason codes of
-    // the failed item evaluations (first-seen order across items, deduplicated,
-    // reusing EligibilityService.REASONS — never invented here). Item-level
-    // reasons remain intact for per-line diagnostics.
     const reasons = [];
     if (!eligible) {
       for (const item of evaluatedItems) {
         if (!item.eligible) {
           for (const reason of item.reasons) {
-            if (reason && !reasons.includes(reason)) {
-              reasons.push(reason);
-            }
+            if (reason && !reasons.includes(reason)) reasons.push(reason);
           }
         }
       }
     }
 
-    return {
-      eligible,
-      reasons,
-      branch_id,
-      brand_id,
-      items: evaluatedItems
-    };
+    return { eligible, reasons, branch_id, brand_id, items: evaluatedItems };
   }
 }
 
