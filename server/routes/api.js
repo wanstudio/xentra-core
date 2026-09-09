@@ -3,7 +3,8 @@ const router = express.Router();
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
-const db = require('../database/db');
+const RoutePersistenceRepository = require('../../core/data/repositories/RoutePersistenceRepository');
+const db = new RoutePersistenceRepository();
 const BranchMatcher = require('../services/BranchMatcher');
 const DeliveryCalculator = require('../services/DeliveryCalculator');
 const PaymentService = require('../services/PaymentService');
@@ -2162,7 +2163,7 @@ router.post('/auth/merchant/login', (req, res) => {
 
     // Use WorkforceService for authentication (bcrypt + account lockout + status check)
     const { WorkforceService } = require('../../core/identity');
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const authResult = workforce.authenticate(username, password, req.brand_id);
 
     if (!authResult.success) {
@@ -2246,7 +2247,7 @@ function getWorkforceActor(req) {
 // List users within authorized scope
 router.get('/admin/users', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const { role, branch_id, status, limit, offset } = req.query;
     
     // Branch managers can only see users in their branch
@@ -2272,7 +2273,7 @@ router.get('/admin/users', requireAuth(['owner', 'brand_manager', 'branch_manage
 // Get single user
 router.get('/admin/users/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const user = workforce.getUser(req.params.id, req.brand_id);
     
     // Branch managers can only see users in their branch
@@ -2290,7 +2291,7 @@ router.get('/admin/users/:id', requireAuth(['owner', 'brand_manager', 'branch_ma
 // Create user
 router.post('/admin/users', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const actor = getWorkforceActor(req);
     const { username, email, password, full_name, role, branch_id } = req.body;
 
@@ -2379,7 +2380,7 @@ router.post('/admin/users', requireAuth(['owner', 'brand_manager', 'branch_manag
 // Update user profile
 router.put('/admin/users/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const actor = getWorkforceActor(req);
     const target = workforce.getUser(req.params.id, req.brand_id);
 
@@ -2412,7 +2413,7 @@ router.put('/admin/users/:id', requireAuth(['owner', 'brand_manager', 'branch_ma
 // Disable user
 router.post('/admin/users/:id/disable', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const actor = getWorkforceActor(req);
 
     const disabled = workforce.disableUser(req.params.id, req.brand_id, actor);
@@ -2439,7 +2440,7 @@ router.post('/admin/users/:id/disable', requireAuth(['owner', 'brand_manager', '
 // Enable user
 router.post('/admin/users/:id/enable', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const actor = getWorkforceActor(req);
 
     const enabled = workforce.enableUser(req.params.id, req.brand_id, actor);
@@ -2463,7 +2464,7 @@ router.post('/admin/users/:id/enable', requireAuth(['owner', 'brand_manager', 'b
 // Change user role (Owner only)
 router.post('/admin/users/:id/role', requireAuth(['owner']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const actor = getWorkforceActor(req);
     const { role } = req.body;
 
@@ -2489,7 +2490,7 @@ router.post('/admin/users/:id/role', requireAuth(['owner']), (req, res) => {
 // Change user branch scope
 router.post('/admin/users/:id/scope', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const actor = getWorkforceActor(req);
     const { branch_id } = req.body;
 
@@ -2518,7 +2519,7 @@ router.post('/admin/users/:id/scope', requireAuth(['owner', 'brand_manager']), (
 // Self password change
 router.post('/auth/change-password', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const { current_password, new_password, confirm_password } = req.body;
 
     if (!current_password || !new_password || !confirm_password) {
@@ -2564,7 +2565,7 @@ router.post('/auth/change-password', requireAuth(['owner', 'brand_manager', 'bra
 // Admin reset password (generates one-time token)
 router.post('/admin/users/:id/reset-password', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const actor = getWorkforceActor(req);
 
     const result = workforce.adminResetPassword(req.params.id, req.brand_id, actor);
@@ -2595,7 +2596,7 @@ router.post('/admin/users/:id/reset-password', requireAuth(['owner', 'brand_mana
 // Complete password reset (using one-time token)
 router.post('/auth/reset-password', (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const { token, new_password } = req.body;
 
     if (!token || !new_password) {
@@ -2627,7 +2628,7 @@ router.post('/auth/logout', (req, res) => {
     if (token) {
       const session = TokenSessionStore.getSession(token);
       if (session) {
-        const workforce = new WorkforceService(db);
+        const workforce = new WorkforceService();
         workforce.logSecurityEvent({
           actor_id: session.userId || session.id,
           actor_role: session.role,
@@ -2648,7 +2649,7 @@ router.post('/auth/logout', (req, res) => {
 // Security audit log (Owner/Brand Manager only)
 router.get('/admin/security-audit', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const workforce = new WorkforceService(db);
+    const workforce = new WorkforceService();
     const { action, actor_id, target_user_id, limit, offset } = req.query;
 
     const logs = workforce.getSecurityAuditLog(req.brand_id, {

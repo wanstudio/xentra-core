@@ -1,3 +1,5 @@
+const WorkforceRepository = require('../data/repositories/WorkforceRepository');
+
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
@@ -7,8 +9,8 @@ const MAX_LOGIN_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 30;
 
 class WorkforceService {
-  constructor(db) {
-    this.db = db;
+  constructor(repository = new WorkforceRepository()) {
+    this.repository = repository instanceof WorkforceRepository ? repository : new WorkforceRepository(repository);
   }
 
   // ==================== PASSWORD HASHING ====================
@@ -53,14 +55,14 @@ class WorkforceService {
     }
 
     // Check username uniqueness within brand
-    const existing = this.db.prepare('SELECT id FROM users WHERE username = ? AND brand_id = ?').get(username, brand_id);
+    const existing = this.repository.prepare('SELECT id FROM users WHERE username = ? AND brand_id = ?').get(username, brand_id);
     if (existing) {
       throw { status: 409, code: 'USERNAME_EXISTS', message: 'Username already exists in this brand.' };
     }
 
     // Validate branch exists if provided
     if (branch_id) {
-      const branch = this.db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, brand_id);
+      const branch = this.repository.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, brand_id);
       if (!branch) {
         throw { status: 400, code: 'INVALID_BRANCH', message: 'Branch does not belong to this brand.' };
       }
@@ -70,7 +72,7 @@ class WorkforceService {
     const password_hash = this.hashPassword(password);
     const now = new Date().toISOString();
 
-    this.db.prepare(`
+    this.repository.prepare(`
       INSERT INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role, status, password_changed_at, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
     `).run(id, brand_id, organization_id, branch_id || null, username, email || null, password_hash, full_name || null, role, now, now, now);
@@ -79,7 +81,7 @@ class WorkforceService {
   }
 
   getUser(userId, brandId) {
-    const user = this.db.prepare(`
+    const user = this.repository.prepare(`
       SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status, 
              created_at, updated_at, last_login_at, password_changed_at
       FROM users WHERE id = ? AND brand_id = ?
@@ -112,7 +114,7 @@ class WorkforceService {
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    return this.db.prepare(query).all(...params);
+    return this.repository.prepare(query).all(...params);
   }
 
   updateUser(userId, brandId, updates, { actor_id, actor_role } = {}) {
@@ -143,7 +145,7 @@ class WorkforceService {
     setClauses.push('updated_at = datetime(\'now\')');
     params.push(userId, brandId);
 
-    this.db.prepare(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ? AND brand_id = ?`).run(...params);
+    this.repository.prepare(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ? AND brand_id = ?`).run(...params);
 
     return this.getUser(userId, brandId);
   }
@@ -153,7 +155,7 @@ class WorkforceService {
 
     // Last-owner protection
     if (target.role === 'owner') {
-      const ownerCount = this.db.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ? AND role = ? AND status = ?').get(brandId, 'owner', 'active');
+      const ownerCount = this.repository.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ? AND role = ? AND status = ?').get(brandId, 'owner', 'active');
       if (ownerCount.cnt <= 1) {
         throw { status: 400, code: 'LAST_OWNER_PROTECTED', message: 'Cannot disable the last Owner account.' };
       }
@@ -169,7 +171,7 @@ class WorkforceService {
       }
     }
 
-    this.db.prepare('UPDATE users SET status = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
+    this.repository.prepare('UPDATE users SET status = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
       .run('disabled', targetUserId, brandId);
 
     return { ...target, status: 'disabled' };
@@ -188,7 +190,7 @@ class WorkforceService {
       }
     }
 
-    this.db.prepare('UPDATE users SET status = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
+    this.repository.prepare('UPDATE users SET status = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
       .run('active', targetUserId, brandId);
 
     // Clean up revocation marker so the user can log in again
@@ -215,13 +217,13 @@ class WorkforceService {
 
     // Prevent demoting the last owner
     if (target.role === 'owner' && newRole !== 'owner') {
-      const ownerCount = this.db.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ? AND role = ? AND status = ?').get(brandId, 'owner', 'active');
+      const ownerCount = this.repository.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ? AND role = ? AND status = ?').get(brandId, 'owner', 'active');
       if (ownerCount.cnt <= 1) {
         throw { status: 400, code: 'LAST_OWNER_PROTECTED', message: 'Cannot demote the last Owner account.' };
       }
     }
 
-    this.db.prepare('UPDATE users SET role = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
+    this.repository.prepare('UPDATE users SET role = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
       .run(newRole, targetUserId, brandId);
 
     // Invalidate all sessions for the target user (role changed — stale sessions must not survive)
@@ -256,13 +258,13 @@ class WorkforceService {
 
     // Validate branch exists if provided
     if (newBranchId) {
-      const branch = this.db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(newBranchId, brandId);
+      const branch = this.repository.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(newBranchId, brandId);
       if (!branch) {
         throw { status: 400, code: 'INVALID_BRANCH', message: 'Branch does not belong to this brand.' };
       }
     }
 
-    this.db.prepare('UPDATE users SET branch_id = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
+    this.repository.prepare('UPDATE users SET branch_id = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
       .run(newBranchId || null, targetUserId, brandId);
 
     // Invalidate all sessions for the target user (scope changed — stale sessions must not survive)
@@ -282,7 +284,7 @@ class WorkforceService {
       throw { status: 400, code: 'PASSWORD_TOO_SHORT', message: 'Password must be at least 8 characters.' };
     }
 
-    const user = this.db.prepare('SELECT * FROM users WHERE id = ? AND brand_id = ?').get(userId, brandId);
+    const user = this.repository.prepare('SELECT * FROM users WHERE id = ? AND brand_id = ?').get(userId, brandId);
     if (!user) {
       throw { status: 404, code: 'USER_NOT_FOUND', message: 'User not found.' };
     }
@@ -296,14 +298,14 @@ class WorkforceService {
     const newHash = this.hashPassword(newPassword);
 
     // Update password
-    this.db.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
+    this.repository.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
       .run(newHash, userId, brandId);
 
     return { success: true };
   }
 
   adminResetPassword(targetUserId, brandId, { actor_id, actor_role, actor_branch_id }) {
-    const target = this.db.prepare('SELECT * FROM users WHERE id = ? AND brand_id = ?').get(targetUserId, brandId);
+    const target = this.repository.prepare('SELECT * FROM users WHERE id = ? AND brand_id = ?').get(targetUserId, brandId);
     if (!target) {
       throw { status: 404, code: 'USER_NOT_FOUND', message: 'Target user not found.' };
     }
@@ -335,10 +337,10 @@ class WorkforceService {
     const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000).toISOString();
 
     // Invalidate any existing unused tokens for this user
-    this.db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0').run(targetUserId);
+    this.repository.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0').run(targetUserId);
 
     // Store new token
-    this.db.prepare(`
+    this.repository.prepare(`
       INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, used, created_by, created_at)
       VALUES (?, ?, ?, ?, 0, ?, datetime('now'))
     `).run(tokenId, targetUserId, tokenHash, expiresAt, actor_id);
@@ -360,7 +362,7 @@ class WorkforceService {
 
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    const tokenRecord = this.db.prepare(`
+    const tokenRecord = this.repository.prepare(`
       SELECT prt.*, u.brand_id 
       FROM password_reset_tokens prt
       JOIN users u ON u.id = prt.user_id
@@ -376,11 +378,11 @@ class WorkforceService {
     }
 
     // Mark token as used
-    this.db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').run(tokenRecord.id);
+    this.repository.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').run(tokenRecord.id);
 
     // Update password
     const newHash = this.hashPassword(newPassword);
-    this.db.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
+    this.repository.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
       .run(newHash, tokenRecord.user_id);
 
     return { success: true, user_id: tokenRecord.user_id, brand_id: tokenRecord.brand_id };
@@ -400,7 +402,7 @@ class WorkforceService {
   // ==================== AUTHENTICATION ====================
 
   authenticate(username, password, brandId) {
-    const user = this.db.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id = ?')
+    const user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id = ?')
       .get(username, username, brandId);
 
     if (!user) {
@@ -428,20 +430,20 @@ class WorkforceService {
         updates.locked_until = lockUntil;
       }
 
-      this.db.prepare('UPDATE users SET failed_login_attempts = ?, locked_until = ?, updated_at = datetime(\'now\') WHERE id = ?')
+      this.repository.prepare('UPDATE users SET failed_login_attempts = ?, locked_until = ?, updated_at = datetime(\'now\') WHERE id = ?')
         .run(attempts, updates.locked_until || null, user.id);
 
       return { success: false, error: 'INVALID_CREDENTIALS' };
     }
 
     // Successful login - reset failed attempts and update last_login_at
-    this.db.prepare('UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
+    this.repository.prepare('UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
       .run(user.id);
 
     // Re-hash with bcrypt if using legacy SHA-256
     if (this.isLegacyHash(user.password_hash)) {
       const newHash = this.hashPassword(password);
-      this.db.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\') WHERE id = ?')
+      this.repository.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\') WHERE id = ?')
         .run(newHash, user.id);
     }
 
@@ -466,7 +468,7 @@ class WorkforceService {
     const id = 'sal_' + crypto.randomBytes(16).toString('hex');
     const safeMetadata = metadata ? JSON.stringify(metadata) : null;
 
-    this.db.prepare(`
+    this.repository.prepare(`
       INSERT INTO security_audit_log (id, actor_id, actor_role, action, target_user_id, target_role, brand_id, organization_id, branch_id, result, metadata, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).run(id, actor_id || null, actor_role || null, action, target_user_id || null, target_role || null,
@@ -493,7 +495,7 @@ class WorkforceService {
     query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
-    return this.db.prepare(query).all(...params);
+    return this.repository.prepare(query).all(...params);
   }
 }
 
