@@ -11,7 +11,7 @@ Xentra is a SaaS platform, conceptually similar to Shopify or WordPress. Xentra 
 - `app.<client-domain>` (for example `app.mybangjo.com`) = client runtime entry point.
 - Client domains are tenant/brand entry points, not Xentra platform identity.
 - A client does not automatically own or receive an Xentra runtime/server.
-- Default deployment remains on Xentra infrastructure and is tenant-scoped.
+- Default deployment remains on Xentra infrastructure and is tenant-scoped. Database topology is not fixed by the tenant model and may be shared or isolated based on deployment tier, scale, isolation requirements, and operational needs.
 - Dedicated runtime/server is an optional deployment topology when justified; it does not change the logical tenant model.
 
 ## 2. Two Different Surfaces
@@ -156,6 +156,8 @@ Tenant-scoped client domains
 
 A dedicated client runtime may be introduced when justified, but it remains a deployment decision rather than a change to the tenant/domain model.
 
+Database topology follows the same principle. Do **not** lock `DB-per-client` as mandatory for every client. The default may use tenant-scoped data on shared Xentra infrastructure, while an isolated database may be introduced when justified by deployment tier, isolation, scale, or operational requirements. SQLite, PostgreSQL, or another database topology is an implementation/deployment decision and must not redefine the logical tenant model.
+
 ## 9. Billing / Subscription Boundary
 
 Subscription is a platform concern:
@@ -182,7 +184,7 @@ Billing state may affect whether a client can remain active, but billing must no
 - Do not make every client a hardcoded special case.
 - Do not couple tenant identity to repository names.
 - Do not equate a custom client domain with a dedicated physical server.
-- Do not introduce VPS-per-client, DB-per-client, microservices-per-domain or Kubernetes solely to satisfy the SaaS model.
+- Do not introduce VPS-per-client, DB-per-client, microservices-per-domain or Kubernetes solely to satisfy the SaaS model. DB-per-client is allowed when justified by deployment tier, isolation, scale, or operational requirements; it is not mandatory for every client.
 - Do not move merchant business logic into the SaaS Control Plane.
 - Do not expose platform-wide client data to a client-scoped user.
 
