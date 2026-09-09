@@ -9,7 +9,7 @@ This repository uses small, task-focused agent skills rather than one giant inst
 - **Database**: SQLite via `node:sqlite` (Node 22+) or `sql.js` fallback (Node 20). Tests always use in-memory `:memory:`.
 - **Frontend**: Plain HTML/JS/CSS in `apps/` served as static files — no build step, no framework, no bundler.
 - **Node requirement**: `>=20.20.2` (see `package.json` engines).
-- **Production domain**: `app.mybangjo.com` — deploy is Passenger on CloudLinux cPanel, not Docker.
+- **Runtime topology**: Xentra Core is deployed to Xentra-controlled infrastructure. `xentra.cloud` is the SaaS Control Plane/Admin surface. Client domains are tenant/brand entry points provisioned through Xentra Domain Management; they are not hardcoded production identities and do not imply a dedicated physical server.
 
 ## Commands
 
@@ -39,7 +39,7 @@ Tests use Node's built-in test runner (`node --test`) with `--test-concurrency=1
 
 ```
 server/          Express app, routes, middleware, services, database
-domains/         Domain logic (commerce, delivery, inventory, payment, pos, promotion, reporting)
+ domains/        Domain logic (commerce, delivery, inventory, payment, pos, promotion, reporting)
 core/            Platform foundations (events, identity/RBAC, config, integration, audit)
 apps/            Static frontends (customer-pwa, kitchen-display, merchant-dashboard)
 tests/           Node built-in test runner — mirrors domains/, core/, services/, client/
@@ -65,7 +65,20 @@ Key domain boundaries: Organization → Brand → Branch. Payment credentials re
 - `.agent/skills/xentra-debugging/SKILL.md` — root-cause debugging and runtime investigation.
 - `.agent/skills/xentra-security-audit/SKILL.md` — security and integrity audit when the task is security-sensitive or requires verification.
 
-## Skill selection
+## Domain / tenant / client-domain rules
+
+- `xentra.cloud` is the Xentra SaaS Control Plane/Admin surface.
+- Client domains are first-class tenant/brand entry points managed by the Control Plane Domain Management flow.
+- The Domain Registry/managed domain configuration is authoritative for domain → tenant/brand association.
+- Adding a client domain must not require application-source changes.
+- Client-specific domains must not be hardcoded as application routing logic or special-case tenant fallbacks.
+- Infrastructure-level domain entries may exist as generated provisioning state, but must originate from Domain Management rather than hand-maintained client exceptions.
+- `tenantResolver` must resolve from authoritative domain configuration and authenticated context and fail closed for unknown domains.
+- Do not accept tenant identity from an untrusted query parameter or arbitrary client-controlled header for protected operations.
+- Do not introduce `app.mybangjo.com` (or another client domain) as a permanent production special case.
+- The historical Bangjo shared-hosting mirror deployment is legacy and is not the target runtime topology.
+
+## Skills selection
 
 Use the smallest relevant skill set. Combine skills when a change crosses boundaries; for example, a payment feature normally needs coding workflow + backend + database + integration context. Use Ponytail review when a change adds abstraction or refactoring, Ponytail audit for repository-wide complexity review, and Ponytail debt when accepting a deliberate temporary shortcut.
 
