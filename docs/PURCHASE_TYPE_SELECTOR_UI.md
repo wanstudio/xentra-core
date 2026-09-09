@@ -24,14 +24,20 @@ Each purchase type has dynamic availability and selection state:
 
 Availability must come from existing Xentra data/configuration/business logic and must not be hardcoded merely to reproduce a screenshot.
 
-## Delivery scheduling
+## Delivery & Pick-up scheduling
 
-Delivery supports **“Jadwalkan delivery”**.
+Delivery and Pick-up both support the same scheduling UI.
 
+- Delivery toggle label: **“Jadwalkan delivery”**.
+- Pick-up toggle label: **“Jadwalkan pengambilan”**.
 - Toggle OFF → date/time selector is hidden.
 - Toggle ON → date/time selector is shown.
-- Selected date/time becomes part of the delivery draft state.
+- Selected date/time becomes part of the delivery/pick-up draft state.
 - A compact summary reflects the selected schedule.
+- Switching between Delivery ↔ Pick-up keeps the schedule selection; switching
+  to Dine-in / Reservasi clears it (non-schedulable types).
+- Unscheduled pick-up stays ASAP and commits the same “Sekarang” slot as
+  delivery.
 
 ### LOCKED — Schedule slot & timezone rule (2026-09-09)
 

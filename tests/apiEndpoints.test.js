@@ -280,6 +280,35 @@ test('Delivery schedule: scheduled order stores the canonical device-timezone IS
   assert.strictEqual(row.scheduled_slot_end, isoEnd);
 });
 
+test('Pick-up schedule: scheduled pick-up order persists the device-timezone ISO like delivery', async () => {
+  const customerToken = await createCustomerSession('081299996003');
+  const isoStart = '2026-09-10T17:00:00+07:00';
+  const isoEnd = '2026-09-10T17:30:00+07:00';
+
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { 'x-customer-token': customerToken },
+    body: JSON.stringify({
+      branch_id: 'branch_bangjo_barat',
+      payment_method: 'cash',
+      customer: { name: 'Pickup Scheduled', phone: '081299996003' },
+      order_type: 'pickup',
+      schedule_type: 'scheduled',
+      scheduled_slot_start: isoStart,
+      scheduled_slot_end: isoEnd,
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+
+  assert.strictEqual(res.status, 201);
+  const data = await res.json();
+  const row = db.prepare('SELECT order_type, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end FROM orders WHERE id = ?').get(data.order_id);
+  assert.strictEqual(row.order_type, 'pickup');
+  assert.strictEqual(row.fulfillment_schedule_type, 'scheduled');
+  assert.strictEqual(row.scheduled_slot_start, isoStart, 'Scheduled pick-up stores the ISO verbatim');
+  assert.strictEqual(row.scheduled_slot_end, isoEnd);
+});
+
 test('API Admin: GET & PUT /api/v1/admin/brand updates theme color and logo', async () => {
   // Login first to get admin session token
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {

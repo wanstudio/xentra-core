@@ -14,6 +14,12 @@
  * TEST 10: Open selector with existing committed selection -> sheet initializes from current committed state
  * TEST 11: Switch away from Delivery -> no stale delivery scheduling is accidentally committed to a non-delivery type
  * TEST 12: Reload / existing persistence behavior -> committed purchase type follows existing Xentra persistence contract
+ *
+ * Pick-up scheduling contract (same UI as delivery, wording "Jadwalkan pengambilan"):
+ * TEST 13: Pick-up + schedule ON -> toggle/select/confirm schedule like delivery
+ * TEST 14: Pick-up + schedule OFF -> "Sekarang"/ASAP committed, slot cleared
+ * TEST 15: Switching between delivery <-> pick-up keeps scheduling; switching to a
+ *          non-schedulable type (dine-in/reservation) clears it
  */
 'use strict';
 
@@ -83,13 +89,15 @@ function createFulfillmentSheetController(initialState, branchConfig) {
         return false; // Rejected
       }
       draft.type = type;
-      if (type !== 'delivery') {
+      // Only the schedulable types (delivery/pickup) can keep scheduling;
+      // switching to dine-in/reservation clears it.
+      if (type !== 'delivery' && type !== 'pickup') {
         draft.scheduled = false;
       }
       return true;
     },
     toggleSchedule: () => {
-      if (draft.type !== 'delivery') return;
+      if (draft.type !== 'delivery' && draft.type !== 'pickup') return;
       draft.scheduled = !draft.scheduled;
       if (!draft.scheduled) {
         draft.date = 'Hari ini';
@@ -115,11 +123,12 @@ function createFulfillmentSheetController(initialState, branchConfig) {
       if (!availabilityMap[draft.type]) {
         throw new Error('Tipe pembelian tidak tersedia');
       }
+      const schedulable = draft.type === 'delivery' || draft.type === 'pickup';
       committedState = {
         type: draft.type,
         scheduled: Boolean(draft.scheduled),
-        date: draft.type === 'delivery' ? draft.date : 'Hari ini',
-        timeSlot: draft.type === 'delivery' ? (draft.scheduled ? draft.timeSlot : 'Sekarang (15–25 menit)') : ''
+        date: schedulable ? (draft.date || 'Hari ini') : 'Hari ini',
+        timeSlot: schedulable ? (draft.scheduled ? draft.timeSlot : 'Sekarang (15–25 menit)') : ''
       };
       return committedState;
     }
@@ -293,4 +302,58 @@ test('TEST 12: Reload / existing persistence behavior -> committed purchase type
   // Recreate Store (simulating reload)
   const ReloadedStore = freshStore();
   assert.strictEqual(ReloadedStore.getState().orderType, 'pickup');
+});
+
+test('TEST 13: Pick-up + schedule ON -> same schedule UI behavior as delivery (Jadwalkan pengambilan)', () => {
+  const ctrl = createFulfillmentSheetController(
+    { type: 'pickup', scheduled: false, date: 'Hari ini', timeSlot: 'Sekarang' }
+  );
+
+  // Schedule toggle must work for pick-up too
+  ctrl.toggleSchedule();
+  assert.strictEqual(ctrl.getDraft().scheduled, true, 'Pick-up must support scheduling like delivery');
+
+  ctrl.setSchedule('Besok', '17:00-17:30');
+  assert.strictEqual(ctrl.getDraft().date, 'Besok');
+  assert.strictEqual(ctrl.getDraft().timeSlot, '17:00-17:30');
+
+  const confirmed = ctrl.confirm();
+  assert.strictEqual(confirmed.type, 'pickup');
+  assert.strictEqual(confirmed.scheduled, true);
+  assert.strictEqual(confirmed.date, 'Besok');
+  assert.strictEqual(confirmed.timeSlot, '17:00-17:30');
+});
+
+test('TEST 14: Pick-up + schedule OFF -> ASAP default, no stale slot committed', () => {
+  const ctrl = createFulfillmentSheetController(
+    { type: 'pickup', scheduled: true, date: 'Besok', timeSlot: '18:00-18:30' }
+  );
+
+  ctrl.toggleSchedule();
+  assert.strictEqual(ctrl.getDraft().scheduled, false);
+
+  const confirmed = ctrl.confirm();
+  assert.strictEqual(confirmed.type, 'pickup');
+  assert.strictEqual(confirmed.scheduled, false);
+  assert.strictEqual(confirmed.timeSlot, 'Sekarang (15–25 menit)', 'Unscheduled pick-up must commit ASAP');
+});
+
+test('TEST 15: Switching between delivery <-> pick-up keeps scheduling; switching to a non-schedulable type clears it', () => {
+  const ctrl = createFulfillmentSheetController(
+    { type: 'delivery', scheduled: true, date: 'Besok', timeSlot: '18:00-18:30' }
+  );
+
+  // Delivery -> pick-up: schedule preserved (same schedulable concept)
+  ctrl.selectType('pickup');
+  assert.strictEqual(ctrl.getDraft().type, 'pickup');
+  assert.strictEqual(ctrl.getDraft().scheduled, true, 'Switching to pick-up must keep the schedule selection');
+
+  // Pick-up -> reservation: schedule must clear (non-schedulable type)
+  ctrl.selectType('reservation');
+  assert.strictEqual(ctrl.getDraft().type, 'reservation');
+  assert.strictEqual(ctrl.getDraft().scheduled, false, 'Non-schedulable type must clear scheduling');
+
+  const confirmed = ctrl.confirm();
+  assert.strictEqual(confirmed.type, 'reservation');
+  assert.strictEqual(confirmed.scheduled, false);
 });

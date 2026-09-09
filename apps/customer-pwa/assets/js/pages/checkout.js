@@ -3,8 +3,8 @@
  * Pixel-perfect implementation conforming to Xentra-Core Architecture & Locked Decisions.
  * 
  * Features:
- * 1. 4 Order Types: Delivery (now/scheduled), Pick-up, Dine-in (table context), Reservation (min. tomorrow, same-day rejected)
- *    Delivery scheduling uses DEVICE-LOCAL time: first slot = device now + 1 hour,
+ * 1. 4 Order Types: Delivery (now/scheduled), Pick-up (now/scheduled, same UI), Dine-in (table context), Reservation (min. tomorrow, same-day rejected)
+ *    Scheduling uses DEVICE-LOCAL time: first slot = device now + 1 hour,
  *    rounded UP to a 30-minute boundary (see core/delivery-schedule.js).
  * 2. Customer Identity: WhatsApp OTP authentication & verified session binding
  * 3. Pre-Payment Verification Gate: Realtime price/stock check with "Ada perubahan di pesananmu, cek dulu yuk" modal
@@ -633,7 +633,9 @@
     if (isPickup) {
       fulTitle = 'Pick-up (Ambil Sendiri)';
       var bName = state.matchedBranch ? state.matchedBranch.name : 'Pilih Cabang';
-      fulSub = 'Ambil di ' + bName;
+      fulSub = state.fulfillment.scheduled
+        ? (bName + ' | ' + (state.fulfillment.date || 'Hari ini') + ' | ' + (state.fulfillment.timeSlot || '12.00 - 12.30'))
+        : 'Ambil di ' + bName;
       fulIcon = '/assets/icons/pick_up.png';
     } else if (isDineIn) {
       fulTitle = 'Makan di Tempat (Dine-in)';
@@ -1378,8 +1380,9 @@
           var chosen = btn.dataset.type;
           if (!availabilityMap[chosen]) return; // Guard: rejection on unavailable
           draft.type = chosen;
-          // Switching away from delivery clears delivery scheduling
-          if (chosen !== 'delivery') {
+          // Switching away from the schedulable types (delivery/pickup) clears
+          // scheduling; switching between delivery and pickup keeps it.
+          if (chosen !== 'delivery' && chosen !== 'pickup') {
             draft.scheduled = false;
           }
           renderGrid();
@@ -1465,15 +1468,17 @@
         return;
       }
 
-      if (draft.type !== 'delivery') {
+      if (draft.type !== 'delivery' && draft.type !== 'pickup') {
         schedContainer.innerHTML = '';
         return;
       }
 
+      var scheduleLabel = draft.type === 'delivery' ? 'Jadwalkan delivery' : 'Jadwalkan pengambilan';
+
       var html =
         '<div class="x-fulfillment-divider"></div>' +
         '<div class="x-fulfillment-schedule-head">' +
-        '  <span style="font-size:14px;font-weight:600;color:#1f2937;">Jadwalkan delivery</span>' +
+        '  <span style="font-size:14px;font-weight:600;color:#1f2937;">' + scheduleLabel + '</span>' +
         '  <button type="button" class="x-fulfillment-toggle ' + (draft.scheduled ? 'on' : '') + '" id="x-ful-schedule-toggle" aria-pressed="' + (draft.scheduled ? 'true' : 'false') + '">' +
         '    <span></span>' +
         '  </button>' +
@@ -1813,7 +1818,7 @@
         // Commit to state.fulfillment
         state.fulfillment.type = draft.type;
         state.fulfillment.scheduled = Boolean(draft.scheduled);
-        if (draft.type === 'delivery') {
+        if (draft.type === 'delivery' || draft.type === 'pickup') {
           state.fulfillment.date = draft.date || 'Hari ini';
           state.fulfillment.timeSlot = draft.scheduled ? (draft.timeSlot || '16:00-16:30') : 'Sekarang (15–25 menit)';
         } else if (draft.type === 'dine_in') {
