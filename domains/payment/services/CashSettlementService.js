@@ -1,9 +1,17 @@
 'use strict';
 
 const crypto = require('crypto');
-const db = require('../../../core/data/DataAccess');
+const {
+  PaymentRepository,
+  DiningTableRepository,
+  PosShiftRepository
+} = require('../../../core/data/repositories');
 const { events } = require('../../../core');
 const PaymentModel = require('../models/PaymentModel');
+
+const paymentRepository = new PaymentRepository();
+const diningTableRepository = new DiningTableRepository();
+const posShiftRepository = new PosShiftRepository();
 
 class CashSettlementService {
   /**
@@ -27,7 +35,7 @@ class CashSettlementService {
       throw new Error(`[CashSettlementService] Validasi gagal: ${validation.errors.join(', ')}`);
     }
 
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
+    const order = paymentRepository.findOrder(order_id);
     if (!order) {
       throw new Error(`[CashSettlementService] Order "${order_id}" tidak ditemukan.`);
     }
@@ -67,7 +75,7 @@ class CashSettlementService {
       throw new Error(`[SETTLEMENT_AMOUNT_MISMATCH]: Nominal kas (Rp ${amount}) tidak sesuai dengan total tagihan pesanan (Rp ${order.grand_total}).`);
     }
 
-    const existingPayment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order_id);
+    const existingPayment = paymentRepository.findPaymentByOrderId(order_id);
     if (existingPayment) {
       if (existingPayment.provider && existingPayment.provider !== 'cash') {
         throw new Error(`[CashSettlementService Provider Conflict]: Pembayaran untuk pesanan "${order_id}" sudah terdaftar dengan provider online "${existingPayment.provider}".`);
@@ -89,7 +97,7 @@ class CashSettlementService {
     }
 
     if (shift_id) {
-      const shiftRecord = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      const shiftRecord = posShiftRepository.findById(shift_id);
       if (!shiftRecord) {
         throw new Error(`[CashSettlementService] Shift kasir dengan ID "${shift_id}" tidak ditemukan.`);
       }
@@ -109,62 +117,46 @@ class CashSettlementService {
     const actualPaymentId = existingPayment ? existingPayment.id : generatedPaymentId;
     const now = new Date().toISOString();
 
-    db.exec('BEGIN IMMEDIATE;');
+    paymentRepository.beginTransaction();
     try {
       if (shift_id) {
-        const shiftInTx = db.prepare('SELECT status FROM pos_shifts WHERE id = ?').get(shift_id);
+        const shiftInTx = posShiftRepository.findStatusById(shift_id);
         if (!shiftInTx || shiftInTx.status !== 'open') {
           throw new Error(`[SHIFT_ALREADY_CLOSED]: Shift kasir "${shift_id}" sudah ditutup dan tidak dapat menerima transaksi kas.`);
         }
 
-        const shiftUpdateRes = db.prepare(`
-          UPDATE pos_shifts
-          SET total_cash_sales = total_cash_sales + ?, expected_cash = expected_cash + ?
-          WHERE id = ? AND status = 'open'
-        `).run(amount, amount, shift_id);
+        const shiftUpdateRes = posShiftRepository.incrementCashSales({
+          shiftId: shift_id,
+          branchId: order.branch_id,
+          amount
+        });
 
         if (shiftUpdateRes.changes !== 1) {
           throw new Error(`[SHIFT_ALREADY_CLOSED]: Gagal memperbarui kas shift "${shift_id}" karena shift telah ditutup secara bersamaan.`);
         }
       }
 
-      db.prepare(`
-        INSERT INTO order_payments (
-          id, order_id, provider, payment_method, amount, payment_status, settled_at, raw_webhook_response, created_at, updated_at
-        ) VALUES (?, ?, 'cash', 'cash', ?, 'settlement', ?, ?, ?, ?)
-        ON CONFLICT(order_id) DO UPDATE SET
-          payment_status = 'settlement',
-          payment_method = 'cash',
-          amount = excluded.amount,
-          settled_at = excluded.settled_at,
-          raw_webhook_response = excluded.raw_webhook_response,
-          updated_at = excluded.updated_at
-      `).run(
-        actualPaymentId,
-        order_id,
+      paymentRepository.settleCashPayment({
+        paymentId: actualPaymentId,
+        orderId: order_id,
         amount,
-        now,
-        JSON.stringify({ amount_tendered: tendered, change, cashier_id, shift_id }),
-        now,
-        now
-      );
+        settledAt: now,
+        rawPayment: JSON.stringify({ amount_tendered: tendered, change, cashier_id, shift_id }),
+        createdAt: now,
+        updatedAt: now
+      });
 
-      db.prepare(`
-        UPDATE orders
-        SET payment_method = 'cash',
-            updated_at = ?
-        WHERE id = ?
-      `).run(now, order_id);
+      paymentRepository.markOrderPaidByCash({ orderId: order_id, updatedAt: now });
 
       if (order && order.order_type === 'dine_in') {
         try {
           const { DiningTableService } = require('../../pos');
           let tableIds = [];
-          const activeHold = db.prepare("SELECT hold_reference_id, table_id FROM branch_table_holds WHERE hold_reference_id = ? AND status = 'active'").all(order.id);
+          const activeHold = diningTableRepository.findActiveHolds(order.id);
           if (activeHold && activeHold.length > 0) {
             tableIds = activeHold.map(h => h.table_id);
           } else if (order.table_number) {
-            const tbl = db.prepare('SELECT id FROM branch_tables WHERE branch_id = ? AND (table_number = ? OR label = ?)').get(order.branch_id, order.table_number, order.table_number);
+            const tbl = diningTableRepository.findTableIdByNumberOrLabel(order.branch_id, order.table_number);
             if (tbl) tableIds = [tbl.id];
           }
 
@@ -184,9 +176,9 @@ class CashSettlementService {
         }
       }
 
-      db.exec('COMMIT;');
+      paymentRepository.commitTransaction();
     } catch (err) {
-      try { db.exec('ROLLBACK;'); } catch (_) {}
+      try { paymentRepository.rollbackTransaction(); } catch (_) {}
       throw err;
     }
 
