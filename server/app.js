@@ -5,8 +5,8 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// Initialize Database (Native or Portable)
-const db = require('./database/db');
+// Initialize Core Data Access Boundary (concrete persistence stays behind this facade)
+const DataAccess = require('../core/data/DataAccess');
 
 const tenantResolver = require('./middleware/tenantResolver');
 const apiRoutes = require('./routes/api');
@@ -85,7 +85,7 @@ app.get(/^\/dashboard(\/.*)?$/, (req, res) => {
 app.get('/health', (req, res) => {
   let isDbReady = false;
   try {
-    const testRow = db.prepare('SELECT 1 as alive').get();
+    const testRow = DataAccess.queryOne('SELECT 1 as alive');
     if (testRow && testRow.alive === 1) {
       isDbReady = true;
     }
@@ -198,8 +198,8 @@ if (process.env.NODE_ENV !== 'test') {
   };
 
   // Wait for DB migration to complete before starting server (fixes sql.js race condition)
-  if (db.readyPromise) {
-    db.readyPromise.then(() => {
+  if (DataAccess.readyPromise) {
+    DataAccess.readyPromise.then(() => {
       console.log('[Xentra Core] Database ready. Starting server...');
       startServer();
     }).catch(err => {
