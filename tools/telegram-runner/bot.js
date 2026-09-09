@@ -60,7 +60,6 @@ async function handleMessage(msg) {
 
   console.log(`[Message from @${username} (ID: ${fromId})]: ${text}`);
 
-  // 1. Security Check
   if (ALLOWED_USER_IDS.length > 0 && !ALLOWED_USER_IDS.includes(fromId)) {
     console.warn(`[Security Alert] Akses ditolak untuk User ID: ${fromId}`);
     await sendMessage(
@@ -70,7 +69,6 @@ async function handleMessage(msg) {
     return;
   }
 
-  // 2. Command Handlers
   if (text === '/start' || text === '/help') {
     const welcome = `
 🚀 *Selamat Datang di Xentra Core AI Runner!*
@@ -82,12 +80,12 @@ Kirimkan saja instruksi dalam bahasa Indonesia sehari-hari, contohnya:
 - _"Ubah warna tema primer brand jadi #b6ff00 dan ganti tagline"_
 - _"Jalankan unit test dan periksa apakah ada error"_
 - _"Buat diskon ongkir otomatis jika belanja di atas 50rb lalu deploy"_
-- _"Tolong deploy commit terbaru ke cPanel sekarang"_
+- _"Tolong deploy commit terbaru ke infrastruktur Xentra sekarang"_
 
 ⚡ *Perintah Cepat:*
 /status — Cek status bot & server
 /test — Jalankan automated unit tests
-/deploy — Commit & push ke main (deploy otomatis ke app.mybangjo.com)
+/deploy — Commit & push ke main (deployment mengikuti GitHub Actions/infrastruktur Xentra)
 `;
     await sendMessage(chatId, welcome);
     return;
@@ -96,13 +94,12 @@ Kirimkan saja instruksi dalam bahasa Indonesia sehari-hari, contohnya:
   if (text === '/status') {
     await sendMessage(
       chatId,
-      `🟢 *Xentra Core AI Runner Aktif*\n- Server: Online 24/7\n- Model: \`${process.env.GEMINI_MODEL || 'gemini-2.5-flash'}\`\n- Workspace: \`xentra-core\`\n- Target Deploy: \`app.mybangjo.com\` (via GitHub Actions)`);
+      `🟢 *Xentra Core AI Runner Aktif*\n- Server: Online 24/7\n- Model: \`${process.env.GEMINI_MODEL || 'gemini-2.5-flash'}\`\n- Workspace: \`xentra-core\`\n- Target Deploy: Infrastruktur runtime Xentra (via GitHub Actions)`);
     return;
   }
 
-  // 3. Process AI Task with Gemini Agent
   await sendTyping(chatId);
-  const statusMsg = await sendMessage(chatId, `⏳ *Menerima instruksi... Sedang menganalisis repositori Xentra Core...*`);
+  await sendMessage(chatId, `⏳ *Menerima instruksi... Sedang menganalisis repositori Xentra Core...*`);
 
   const progressUpdates = [];
   const onProgress = async (msgText) => {
@@ -129,13 +126,11 @@ Kirimkan saja instruksi dalam bahasa Indonesia sehari-hari, contohnya:
   }
 }
 
-// Long Polling Loop
 async function startPolling() {
   console.log('====================================================');
   console.log('  🤖 Xentra Core Telegram AI Runner is Starting...  ');
   console.log('====================================================');
 
-  // Verify Bot
   const me = await telegramRequest('getMe');
   if (me && me.result) {
     console.log(`[Connected] Bot Aktif: @${me.result.username} (${me.result.first_name})`);
@@ -166,7 +161,6 @@ async function startPolling() {
         }
       }
     } catch (err) {
-      // Ignore network timeout glitches on long polling
       if (!err.message.includes('timeout')) {
         console.warn('[Polling Error]:', err.message);
       }
