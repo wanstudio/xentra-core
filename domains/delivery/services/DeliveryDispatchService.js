@@ -1,9 +1,11 @@
 'use strict';
 
-const db = require('../../../core/data/DataAccess');
 const { events } = require('../../../core');
+const { OrderRepository } = require('../../../core/data/repositories');
 const DeliveryModel = require('../models/DeliveryModel');
 const BranchDriverProvider = require('../providers/BranchDriverProvider');
+
+const orderRepository = new OrderRepository();
 
 class DeliveryDispatchService {
   /**
@@ -50,26 +52,25 @@ class DeliveryDispatchService {
       throw new Error(`[DeliveryDispatchService] Delivery status "${status}" tidak valid.`);
     }
 
-    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(order_id);
+    const order = orderRepository.findById(order_id);
     if (!order) {
       throw new Error(`[DeliveryDispatchService] Order "${order_id}" tidak ditemukan.`);
     }
 
     const now = new Date().toISOString();
 
-    db.prepare(`
-      UPDATE order_deliveries
-      SET status = ?, updated_at = ?
-      WHERE order_id = ?
-    `).run(status, now, order_id);
+    orderRepository.updateDeliveryStatus({
+      orderId: order_id,
+      status,
+      updatedAt: now
+    });
 
     // If delivered, advance order status
     if (status === DeliveryModel.STATUS.DELIVERED) {
-      db.prepare(`
-        UPDATE orders
-        SET status = 'delivered', updated_at = ?
-        WHERE id = ?
-      `).run(now, order_id);
+      orderRepository.markDelivered({
+        orderId: order_id,
+        updatedAt: now
+      });
 
       events.EventBus.publish({
         type: 'delivery.completed',
@@ -98,7 +99,7 @@ class DeliveryDispatchService {
    * @returns {Object}
    */
   static getDelivery(order_id) {
-    return db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(order_id);
+    return orderRepository.findDeliveryByOrderId(order_id);
   }
 }
 
