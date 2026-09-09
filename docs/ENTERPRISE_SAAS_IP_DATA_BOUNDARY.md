@@ -92,9 +92,37 @@ Current repository audit establishes the following implementation split for futu
 3. Existing authorization foundation is reusable; Control Plane authority must extend the current identity → role → scope → permission model rather than introducing a second authentication system.
 4. `PLATFORM_ADMIN` is not yet represented in the current merchant-only role model and must be introduced as a platform authorization concern during implementation.
 
-### Required next implementation boundary
+## Core ↔ Connector API Contract — LOCKED
 
-Before creating the `xentra-connector` repository, define and lock the **Core ↔ Connector API Contract** and **Data Access Boundary**. Only then create the connector from that contract.
+The authoritative v1 contract is defined in:
+
+`docs/CORE_CONNECTOR_API_CONTRACT.md`
+
+This contract defines the hard boundary for:
+
+- Core-owned business logic and security decisions.
+- Connector-owned client DB/storage integration.
+- Versioned service-to-service communication.
+- Connector identity and tenant binding.
+- Data minimization and typed data operations.
+- Idempotency, error normalization and fail-closed behavior.
+- Prohibited arbitrary SQL/filesystem exposure.
+
+The `xentra-connector` repository MUST be created from this contract, not by copying or extracting the `xentra-core` source tree.
+
+## Data Access Boundary — LOCKED
+
+The client database/storage is a persistence boundary, not a business-logic boundary.
+
+The connector MUST isolate client-specific database schema, drivers, storage SDKs and infrastructure details from Xentra Core.
+
+Xentra Core MUST consume typed, contract-defined data operations rather than relying on client-specific SQL, direct DB credentials, direct DB network access, arbitrary SQL endpoints or arbitrary filesystem endpoints.
+
+Business decisions remain in Core. The connector executes approved persistence/integration operations and returns normalized results.
+
+## Required next implementation boundary
+
+Before creating and deploying the `xentra-connector` repository, implement the data-access seam in `xentra-core` and define the first concrete contract endpoints from `docs/CORE_CONNECTOR_API_CONTRACT.md`. Do not perform an unrelated architectural rewrite.
 
 ## Source-code rule
 
