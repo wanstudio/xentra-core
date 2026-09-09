@@ -9,7 +9,7 @@
     "test": "cross-env NODE_ENV=test node --test --test-concurrency=1 tests/*.test.js tests/**/*.test.js"
   },
   "engines": {
-    "node": ">=20.20.2"
+    "node": ">=24.20.0"
   },
   "keywords": [
     "xentra",
