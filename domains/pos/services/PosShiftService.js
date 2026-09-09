@@ -3,9 +3,13 @@
  * Orchestrates cashier shift operations: Open Shift, Cash In, Cash Out, and Close Shift with Variance Auditing.
  */
 const crypto = require('crypto');
-const db = require('../../../core/data/DataAccess');
 const { events } = require('../../../core');
+const { PosShiftRepository } = require('../../../core/data/repositories');
+const UserRepository = require('../../../core/data/repositories/UserRepository');
 const PosShiftModel = require('../models/PosShiftModel');
+
+const posShiftRepository = new PosShiftRepository();
+const userRepository = new UserRepository();
 
 class PosShiftService {
   /**
@@ -24,7 +28,7 @@ class PosShiftService {
 
     // 1. P1 Cashier Role & Branch Assignment Verification (NEW-03 & NEW-05)
     try {
-      const user = db.prepare('SELECT * FROM users WHERE id = ?').get(cashier_id);
+      const user = userRepository.findById(cashier_id);
       if (user) {
         if (user.role !== 'cashier') {
           throw new Error(`[PosShiftService Role Violation]: User "${cashier_id}" memiliki role "${user.role}". Shift kasir hanya dapat dibuka untuk user dengan role "cashier".`);
@@ -38,9 +42,7 @@ class PosShiftService {
     }
 
     // 2. P1 Global Active Shift Invariant: 1 Cashier = Max 1 Open Shift across all branches
-    const existingOpenShift = db.prepare(`
-      SELECT * FROM pos_shifts WHERE cashier_id = ? AND status = 'open'
-    `).get(cashier_id);
+    const existingOpenShift = posShiftRepository.findOpenByCashier(cashier_id);
 
     if (existingOpenShift) {
       throw new Error(`[PosShiftService] Kasir sudah memiliki shift aktif (ID: ${existingOpenShift.id}) di cabang ${existingOpenShift.branch_id}. Tutup shift lama terlebih dahulu.`);
@@ -54,12 +56,7 @@ class PosShiftService {
     const now = new Date().toISOString();
 
     try {
-      db.prepare(`
-        INSERT INTO pos_shifts (
-          id, branch_id, cashier_id, starting_float, total_cash_sales,
-          total_cash_in, total_cash_out, expected_cash, status, opened_at
-        ) VALUES (?, ?, ?, ?, 0.0, 0.0, 0.0, ?, 'open', ?)
-      `).run(shiftId, branch_id, cashier_id, startingFloat, startingFloat, now);
+      posShiftRepository.insertShift({ shiftId, branchId: branch_id, cashierId: cashier_id, startingFloat, openedAt: now });
     } catch (err) {
       if (err && err.message && (err.message.includes('UNIQUE constraint failed') || err.message.includes('constraint failed'))) {
         throw new Error(`[PosShiftService] Kasir "${cashier_id}" sudah memiliki shift aktif (Race Condition Guard). Tutup shift lama terlebih dahulu.`);
@@ -108,7 +105,7 @@ class PosShiftService {
       throw new Error('[PosShiftService] "shift_id", "type", and "amount" are required.');
     }
 
-    const shift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+    const shift = posShiftRepository.findById(shift_id);
     if (!shift || shift.status !== 'open') {
       throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup.');
     }
@@ -129,10 +126,10 @@ class PosShiftService {
 
     // P1 ATOMICITY & FINANCIAL RECONCILIATION INVARIANT (NEW-01):
     // Cash movement ledger insert and shift aggregate update MUST commit or rollback together in a single exclusive transaction.
-    db.exec('BEGIN IMMEDIATE;');
+    posShiftRepository.beginTransaction();
     try {
       // Re-verify shift state under lock
-      const currentShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      const currentShift = posShiftRepository.findById(shift_id);
       if (!currentShift || currentShift.status !== 'open') {
         throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup oleh proses lain.');
       }
@@ -150,34 +147,23 @@ class PosShiftService {
         }
       }
 
-      db.prepare(`
-        INSERT INTO pos_cash_movements (id, shift_id, type, amount, reason, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(movementId, shift_id, type, moveAmount, reason, now);
+      posShiftRepository.insertCashMovement({ movementId, shiftId: shift_id, type, amount: moveAmount, reason, createdAt: now });
 
       let updateRes;
       if (type === 'in') {
-        updateRes = db.prepare(`
-          UPDATE pos_shifts
-          SET total_cash_in = total_cash_in + ?, expected_cash = expected_cash + ?
-          WHERE id = ? AND status = 'open'
-        `).run(moveAmount, moveAmount, shift_id);
+        updateRes = posShiftRepository.incrementCashIn({ shiftId: shift_id, amount: moveAmount });
       } else {
-        updateRes = db.prepare(`
-          UPDATE pos_shifts
-          SET total_cash_out = total_cash_out + ?, expected_cash = expected_cash - ?
-          WHERE id = ? AND status = 'open'
-        `).run(moveAmount, moveAmount, shift_id);
+        updateRes = posShiftRepository.incrementCashOut({ shiftId: shift_id, amount: moveAmount });
       }
 
       if (!updateRes || updateRes.changes !== 1) {
         throw new Error('[PosShiftService] Gagal mencatat mutasi kas: status shift telah berubah.');
       }
 
-      updatedShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
-      db.exec('COMMIT;');
+      updatedShift = posShiftRepository.findById(shift_id);
+      posShiftRepository.commitTransaction();
     } catch (err) {
-      try { db.exec('ROLLBACK;'); } catch (_) {}
+      try { posShiftRepository.rollbackTransaction(); } catch (_) {}
       throw err;
     }
 
@@ -199,7 +185,7 @@ class PosShiftService {
       throw new Error('[PosShiftService] "shift_id" and "actual_cash" are required to close a shift.');
     }
 
-    const shift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+    const shift = posShiftRepository.findById(shift_id);
     if (!shift || shift.status !== 'open') {
       throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup.');
     }
@@ -214,10 +200,10 @@ class PosShiftService {
     let varianceCalc = null;
     let expectedCash = 0;
 
-    db.exec('BEGIN IMMEDIATE;');
+    posShiftRepository.beginTransaction();
     try {
       // Re-fetch under exclusive lock to guarantee atomic snapshot
-      const currentShift = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+      const currentShift = posShiftRepository.findById(shift_id);
       if (!currentShift || currentShift.status !== 'open') {
         throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup oleh transaksi lain.');
       }
@@ -231,25 +217,16 @@ class PosShiftService {
 
       varianceCalc = PosShiftModel.calculateVariance(expectedCash, actual_cash);
 
-      const closeRes = db.prepare(`
-        UPDATE pos_shifts
-        SET 
-          expected_cash = ?,
-          actual_cash = ?,
-          variance = ?,
-          status = 'closed',
-          closed_at = ?
-        WHERE id = ? AND status = 'open'
-      `).run(expectedCash, Number(actual_cash), varianceCalc.variance, now, shift_id);
+      const closeRes = posShiftRepository.closeShift({ shiftId: shift_id, expectedCash, actualCash: Number(actual_cash), variance: varianceCalc.variance, closedAt: now });
 
-      if (closeRes.changes !== 1) {
+      if (!closeRes || closeRes.changes !== 1) {
         throw new Error('[PosShiftService] Gagal menutup shift: status shift telah berubah.');
       }
 
-      closedShiftRecord = db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
-      db.exec('COMMIT;');
+      closedShiftRecord = posShiftRepository.findById(shift_id);
+      posShiftRepository.commitTransaction();
     } catch (err) {
-      try { db.exec('ROLLBACK;'); } catch (_) {}
+      try { posShiftRepository.rollbackTransaction(); } catch (_) {}
       throw err;
     }
 
@@ -271,7 +248,7 @@ class PosShiftService {
       }
     }).catch(() => {});
 
-    return db.prepare('SELECT * FROM pos_shifts WHERE id = ?').get(shift_id);
+    return closedShiftRecord;
   }
 }
 
