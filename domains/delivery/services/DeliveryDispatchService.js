@@ -1,6 +1,6 @@
 'use strict';
 
-const db = require('../../../server/database/db');
+const db = require('../../../core/data/DataAccess');
 const { events } = require('../../../core');
 const DeliveryModel = require('../models/DeliveryModel');
 const BranchDriverProvider = require('../providers/BranchDriverProvider');
