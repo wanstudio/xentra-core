@@ -1,6 +1,6 @@
 'use strict';
 
-const db = require('../../../server/database/db');
+const db = require('../../../core/data/DataAccess');
 const { events } = require('../../../core');
 const DeliveryModel = require('../models/DeliveryModel');
 
@@ -46,7 +46,6 @@ class BranchDriverProvider {
       `).run(deliveryId, order_id, driver_name.trim(), driver_phone.trim(), now, now);
     }
 
-    // Emit event: delivery.driver.assigned
     events.EventBus.publish({
       type: 'delivery.driver.assigned',
       producer: 'delivery',
