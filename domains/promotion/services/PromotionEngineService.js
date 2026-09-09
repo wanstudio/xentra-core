@@ -7,7 +7,7 @@
  * 4. Conflict Resolution (Stacking Policies)
  * 5. Final Transaction Pricing Integration
  */
-const db = require('../../../server/database/db');
+const db = require('../../../core/data/DataAccess');
 const Promotion = require('../domain/Promotion');
 const ConflictResolver = require('../domain/ConflictResolver');
 const InstallIncentiveStrategy = require('../strategies/InstallIncentiveStrategy');
