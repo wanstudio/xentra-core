@@ -12,6 +12,7 @@ const PosShiftRepository = require('./PosShiftRepository');
 const InventoryRepository = require('./InventoryRepository');
 const UserRepository = require('./UserRepository');
 const EligibilityRepository = require('./EligibilityRepository');
+const ReportingRepository = require('./ReportingRepository');
 
 module.exports = {
   CatalogRepository,
@@ -25,5 +26,6 @@ module.exports = {
   PosShiftRepository,
   InventoryRepository,
   UserRepository,
-  EligibilityRepository
+  EligibilityRepository,
+  ReportingRepository
 };
