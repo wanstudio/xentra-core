@@ -19,12 +19,35 @@ const assert = require('node:assert');
 const path = require('node:path');
 const fs = require('node:fs');
 
-const app = require('../../server/app');
+const { installConnectorMock, restoreConnectorMock, setConnectorHandler } = require('../helpers/connectorMock');
 const db = require('../../server/database/db');
 
 const BARAT = 'branch_bangjo_barat';
 const TIMUR = 'branch_bangjo_timur';
 const BRAND = 'brand_bangjo';
+
+function mockBranchCatalogHandler(op, branchId) {
+  if (op !== 'catalog.get') return { branch_id: branchId, categories: [], items: [] };
+  const categories = db.prepare(`
+    SELECT id, name, image_url, sort_order FROM branch_categories WHERE branch_id = ? ORDER BY sort_order
+  `).all(branchId);
+  const items = db.prepare(`
+    SELECT bp.product_id, bp.branch_id, bp.branch_category_id AS category_id, p.name, p.slug, p.description, p.image_url,
+           bp.price, bp.is_available, bp.stock, bp.low_stock_threshold, bc.name as category_name
+    FROM branch_products bp
+    JOIN products p ON p.id = bp.product_id
+    LEFT JOIN branch_categories bc ON bc.id = bp.branch_category_id AND bc.branch_id = bp.branch_id
+    WHERE bp.branch_id = ?
+  `).all(branchId);
+  return { branch_id: branchId, categories, items };
+}
+
+// Install mock BEFORE requiring the app so api.js picks up the mocked connector
+installConnectorMock();
+setConnectorHandler(mockBranchCatalogHandler);
+
+const app = require('../../server/app');
+const APP_PATH = require.resolve('../../server/app');
 
 async function mockFetch(pathStr, options = {}) {
   const method = options.method || 'GET';

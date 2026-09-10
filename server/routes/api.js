@@ -14,6 +14,7 @@ const { PromotionEngineService } = require('../../domains/promotion');
 const { InventoryStockService, InventoryMovementModel } = require('../../domains/inventory');
 const CatalogService = require('../../domains/commerce/services/CatalogService');
 const PricingPolicyModel = require('../../domains/commerce/models/PricingPolicyModel');
+const { XentraConnectorClient, XentraConnectorError } = require('../../core/integration/XentraConnectorClient');
 
 // 0. Active Promotions & Evaluation Endpoint
 router.get(['/promo/active', '/promotions/active'], (req, res) => {
@@ -367,7 +368,7 @@ router.post('/auth/otp/trust', (req, res) => {
 });
 
 // 5. Menu Catalog & Home
-router.get(['/catalog/menu', '/home'], (req, res) => {
+router.get(['/catalog/menu', '/home'], async (req, res) => {
   try {
     const brandId = req.brand_id;
     const branchId = req.query.branch_id || '';
@@ -387,11 +388,85 @@ router.get(['/catalog/menu', '/home'], (req, res) => {
       branchScope = branch;
     }
 
-    // P3: always reuse the canonical commerce CatalogService — both branch-scoped
-    // and brand-wide menus go through the same domain ownership path.
-    // CatalogService returns branch price override, C1 operational availability,
-    // and branch stock estimate when branch_id is provided.
-    const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: branchScope ? branchScope.id : null });
+    if (branchScope) {
+      // Branch-scoped catalog: read from Connector (client-owned data).
+      // Core must NOT fall back to Core DB for branch catalog data.
+      let connectorClient;
+      try {
+        connectorClient = new XentraConnectorClient();
+      } catch (_e) {
+        // Connector not configured — fail closed for branch catalog
+        return res.status(503).json({ success: false, error: 'branch catalog connector not configured' });
+      }
+
+      let connectorResult;
+      try {
+        connectorResult = await connectorClient.getCatalog(branchScope.id);
+      } catch (err) {
+        const statusCode = (err.code === 'TIMEOUT_ERROR' || err.code === 'ETIMEDOUT') ? 504 : 502;
+        console.error('[Connector] catalog.get failed:', err.code, err.message);
+        return res.status(statusCode).json({ success: false, error: 'connector catalog unavailable' });
+      }
+
+      // Map connector response to existing Public API response shape.
+      // Connector returns flat items with category_id + category_name,
+      // plus a categories array with branch category metadata.
+      const connectorCategories = connectorResult.categories || [];
+      const connectorItems = connectorResult.items || [];
+
+      const categories = connectorCategories.map((c) => ({
+        id: c.id,
+        name: c.name,
+        slug: c.slug || String(c.name || '').toLowerCase().replace(/\s+/g, '-'),
+        image: c.image_url || '',
+        image_url: c.image_url || '',
+        products: connectorItems
+          .filter((item) => String(item.category_id) === String(c.id))
+          .map((p) => ({
+            id: p.product_id,
+            name: p.name,
+            slug: p.slug,
+            description: p.description,
+            image: p.image_url || '',
+            image_url: p.image_url || '',
+            price: p.price,
+            regular_price: p.price,
+            is_available: Boolean(p.is_available),
+            stock_estimate: p.stock,
+            category_id: p.category_id
+          }))
+      }));
+
+      const allNormalized = connectorItems.map((p) => ({
+        id: p.product_id,
+        name: p.name,
+        slug: p.slug,
+        description: p.description,
+        image: p.image_url || '',
+        image_url: p.image_url || '',
+        price: p.price,
+        regular_price: p.price,
+        is_available: Boolean(p.is_available),
+        stock_estimate: p.stock,
+        category_id: p.category_id
+      }));
+
+      return res.json({
+        success: true,
+        categories,
+        all_products: allNormalized,
+        products: { items: allNormalized },
+        promo: {
+          enabled: true,
+          target: 50000,
+          discount: 5000,
+          label: 'Selamat, kamu berhasil dapetin diskon Rp 5.000 ketika checkout!'
+        }
+      });
+    }
+
+    // Brand-wide catalog: read from Core DB (unchanged).
+    const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: null });
 
     const categories = menu.categories.map((c) => {
       const img = c.image_url || c.icon_url || c.image || '';
