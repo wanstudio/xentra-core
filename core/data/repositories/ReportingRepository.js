@@ -54,24 +54,25 @@ class ReportingRepository {
     `, queryParams);
   }
 
-  _buildOrderFilter(filter = {}) {
-    const whereClauses = [`status IN (${COMPLETED_ORDER_STATUSES})`];
+  _buildOrderFilter(filter = {}, tablePrefix = '') {
+    const pfx = tablePrefix ? `${tablePrefix}.` : '';
+    const whereClauses = [`${pfx}status IN (${COMPLETED_ORDER_STATUSES})`];
     const params = [];
 
     if (filter.brand_id) {
-      whereClauses.push('brand_id = ?');
+      whereClauses.push(`${pfx}brand_id = ?`);
       params.push(filter.brand_id);
     }
     if (filter.branch_id) {
-      whereClauses.push('branch_id = ?');
+      whereClauses.push(`${pfx}branch_id = ?`);
       params.push(filter.branch_id);
     }
     if (filter.start_date) {
-      whereClauses.push('created_at >= ?');
+      whereClauses.push(`${pfx}created_at >= ?`);
       params.push(filter.start_date);
     }
     if (filter.end_date) {
-      whereClauses.push('created_at <= ?');
+      whereClauses.push(`${pfx}created_at <= ?`);
       params.push(filter.end_date);
     }
 
@@ -235,7 +236,7 @@ class ReportingRepository {
   }
 
   getTopProducts(filter = {}) {
-    const { whereSql, params } = this._buildOrderFilter(filter);
+    const { whereSql, params } = this._buildOrderFilter(filter, 'o');
     return this.db.queryMany(`
       SELECT
         oi.product_id,
@@ -255,7 +256,7 @@ class ReportingRepository {
   }
 
   getCategoryContribution(filter = {}) {
-    const { whereSql, params } = this._buildOrderFilter(filter);
+    const { whereSql, params } = this._buildOrderFilter(filter, 'o');
     return this.db.queryMany(`
       SELECT
         COALESCE(c.name, 'Uncategorized') as category_name,
