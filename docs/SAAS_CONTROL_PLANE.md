@@ -352,3 +352,83 @@ Implementation should proceed incrementally:
 8. Validate authentication, authorization, tenant isolation, provisioning rollback/retry, and end-to-end client runtime access.
 
 **LOCKED — Xentra SaaS Control Plane / Identity & Onboarding**
+
+## 13. 🔒 LOCKED — Xentra Platform Owner Identity & Secure Bootstrap
+
+**Added 2026-09-11 — separates Xentra platform identity from merchant/client ownership.**
+
+Xentra Platform Owner is NOT a merchant `owner` and MUST NOT be created through the public merchant/business registration flow.
+
+### 13.1 Platform vs Merchant Identity
+
+```text
+XENTRA PLATFORM
+xentra.cloud
+├── Platform Owner
+├── Platform Admin / Workforce
+└── SaaS Control Plane
+
+CLIENT / TENANT
+Business
+├── Organization
+├── Brand
+├── Branch
+└── Merchant Owner / Managers / Staff
+```
+
+Rules:
+- `xentra.cloud/register` is for new merchant/client business registration, not Xentra internal platform-owner creation.
+- Platform Owner identity is separate from tenant/merchant ownership and must not require creating a fake Xentra organization, brand, or branch.
+- Platform Owner MUST NOT be provisioned through SQL injection, public HTTP endpoints, hidden UI endpoints, or a hardcoded production credential.
+- Initial Platform Owner provisioning MUST use a controlled, auditable, one-time or tightly restricted secure bootstrap mechanism outside the public registration flow.
+- Bootstrap credentials MUST never be committed to source code, logs, audit records, or API responses.
+- Platform Owner authentication should support strong password authentication and MUST require MFA before privileged Control Plane operations are considered fully enabled.
+- Platform Owner authorization is platform-scoped and must not inherit merchant `owner` semantics accidentally.
+- Existing merchant `owner` roles remain tenant-scoped and continue to represent business ownership within Organization → Brand → Branch.
+
+### 13.2 Secure Bootstrap Direction
+
+Preferred implementation:
+```text
+Controlled deployment / secure operator environment
+              ↓
+One-time Platform Owner bootstrap
+              ↓
+Platform Owner identity
+              ↓
+MFA enrollment
+              ↓
+xentra.cloud Control Plane
+```
+
+The bootstrap mechanism must be idempotent/safe against duplicate creation, must use secure password hashing, and must emit an auditable platform-security event. After successful bootstrap, the ability to create another initial Platform Owner must be explicitly restricted or disabled according to the implementation.
+
+### 13.3 Architectural Boundary
+
+Merchant registration remains:
+```text
+xentra.cloud/register
+      ↓
+Xentra User
+      ↓
+Organization
+      ↓
+Brand
+      ↓
+Branch
+      ↓
+Merchant Owner
+```
+
+Platform identity remains:
+```text
+Secure bootstrap
+      ↓
+Platform Owner
+      ↓
+xentra.cloud/admin
+```
+
+Do not merge these flows merely to reuse the same public registration endpoint. Shared authentication primitives are allowed, but platform authorization and merchant tenancy boundaries MUST remain explicit.
+
+**LOCKED — Xentra Platform Identity / Security Architecture**
