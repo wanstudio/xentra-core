@@ -37,7 +37,7 @@ class InventoryRepository {
       UPDATE branch_products
       SET stock = ?, updated_at = ?
       WHERE branch_id = ? AND product_id = ?
-    `, [stock, updatedAt, branchId, productId]);
+    `, [String(stock), updatedAt, branchId, productId]);
   }
 
   deductBranchProduct({ branchId, productId, quantity }) {
