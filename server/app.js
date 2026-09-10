@@ -13,14 +13,20 @@ const apiRoutes = require('./routes/api');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Standard Middlewares: CORS with strict explicit origin checks (No wildcard endsWith)
+// Standard Middlewares: CORS with strict explicit origin checks (No wildcard endsWith).
+// Client-domain origins are deployment-managed configuration, not application
+// source exceptions. Same-origin requests do not require CORS permission.
+const configuredAllowedOrigins = String(process.env.XENTRA_CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 const allowedOrigins = [
-  'https://app.mybangjo.com',
   'https://xentra.cloud',
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:5173',
-  'http://127.0.0.1:3000'
+  'http://127.0.0.1:3000',
+  ...configuredAllowedOrigins,
 ];
 
 app.use(cors({
