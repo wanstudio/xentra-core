@@ -2909,5 +2909,102 @@ test('API Branch Categories: PUT /api/v1/admin/branches/:id/categories/reorder u
   assert.deepStrictEqual(menuData.categories.map(c => c.id), reversedIds);
 });
 
+// ==============================================================================
+// C1.9 Branch Catalog Sync to Connector
+// ==============================================================================
+test('SYNC CATALOG: POST /admin/branches/:id/sync-catalog syncs branch catalog to connector', async () => {
+  const owner = await b1Login('admin', 'bangjo123');
+  const testBranchId = 'branch_bangjo_barat';
+  let capturedInput = null;
+
+  installConnectorMock();
+  setConnectorHandler((op, input) => {
+    if (op === 'catalog.sync') {
+      capturedInput = input;
+      return { result: { branch_id: testBranchId, categories_upserted: 3, products_upserted: 4, branch_products_upserted: 4 }, replay: false };
+    }
+    return { branch_id: testBranchId, categories: [], items: [] };
+  });
+
+  const res = await mockFetch(`/api/v1/admin/branches/${testBranchId}/sync-catalog`, {
+    method: 'POST',
+    headers: owner.headers,
+  });
+
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.strictEqual(data.branch_id, testBranchId);
+  assert.ok(data.categories_synced > 0, 'must sync categories');
+  assert.ok(data.products_synced > 0, 'must sync products');
+  assert.ok(data.branch_products_synced > 0, 'must sync branch products');
+
+  assert.ok(capturedInput, 'connector must have been called');
+  assert.strictEqual(capturedInput.branch_id, testBranchId);
+  assert.strictEqual(capturedInput.brand_id, 'brand_bangjo');
+  assert.ok(Array.isArray(capturedInput.categories), 'categories must be array');
+  assert.ok(Array.isArray(capturedInput.products), 'products must be array');
+  assert.ok(capturedInput.categories.length > 0, 'categories non-empty');
+  assert.ok(capturedInput.products.length > 0, 'products non-empty');
+
+  for (const cat of capturedInput.categories) {
+    assert.ok(typeof cat.id === 'string' && cat.id.length > 0, 'category id required');
+    assert.ok(typeof cat.name === 'string' && cat.name.length > 0, 'category name required');
+  }
+  for (const prod of capturedInput.products) {
+    assert.ok(typeof prod.id === 'string' && prod.id.length > 0, 'product id required');
+    assert.ok(typeof prod.name === 'string' && prod.name.length > 0, 'product name required');
+    assert.strictEqual(typeof prod.price, 'number');
+    assert.ok(prod.price >= 0, 'price non-negative');
+    assert.ok('stock' in prod, 'stock must be present');
+  }
+
+  assert.ok(typeof capturedInput.mutation_id === 'string' && capturedInput.mutation_id.length > 0, 'mutation_id required');
+  restoreConnectorMock();
+});
+
+test('SYNC CATALOG: sync-catalog returns 404 for unknown branch', async () => {
+  const owner = await b1Login('admin', 'bangjo123');
+  const res = await mockFetch('/api/v1/admin/branches/branch_nonexistent/sync-catalog', {
+    method: 'POST',
+    headers: owner.headers,
+  });
+  assert.strictEqual(res.status, 404);
+});
+
+test('SYNC CATALOG: sync-catalog returns 503 when connector not configured', async () => {
+  const owner = await b1Login('admin', 'bangjo123');
+  installConnectorMock();
+  setConnectorHandler(null);
+
+  const res = await mockFetch('/api/v1/admin/branches/branch_bangjo_barat/sync-catalog', {
+    method: 'POST',
+    headers: owner.headers,
+  });
+  assert.strictEqual(res.status, 503);
+  restoreConnectorMock();
+});
+
+test('SYNC CATALOG: sync-catalog returns 400 when branch has no products', async () => {
+  const owner = await b1Login('admin', 'bangjo123');
+
+  installConnectorMock();
+  setConnectorHandler((op, input) => {
+    if (op === 'catalog.sync') return { result: { branch_id: input.branch_id, categories_upserted: 0, products_upserted: 0, branch_products_upserted: 0 }, replay: false };
+    return { branch_id: input.branch_id, categories: [], items: [] };
+  });
+
+  const testBranchId = 'branch_sync_empty_' + Date.now();
+  db.prepare(`INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override) VALUES (?, 'brand_bangjo', 'Empty Branch', ?, 'Jl. Empty', -7.0, 112.0, '0800', 1, 1)`).run(testBranchId, 'slug-' + testBranchId);
+
+  const res = await mockFetch(`/api/v1/admin/branches/${testBranchId}/sync-catalog`, {
+    method: 'POST',
+    headers: owner.headers,
+  });
+  assert.strictEqual(res.status, 400);
+  const data = await res.json();
+  assert.strictEqual(data.success, false);
+  restoreConnectorMock();
+});
 
 

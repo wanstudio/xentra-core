@@ -8,6 +8,7 @@ const SUPPORTED_OPERATIONS = Object.freeze({
   GET_CATALOG_DATA: 'catalog.get',
   GET_INVENTORY_AVAILABILITY: 'inventory.get_availability',
   PERSIST_ORDER: 'order.persist',
+  CATALOG_SYNC: 'catalog.sync',
 });
 
 class XentraConnectorError extends Error {
@@ -68,6 +69,10 @@ class XentraConnectorClient {
 
   async persistOrder(input) {
     return this.#operation(SUPPORTED_OPERATIONS.PERSIST_ORDER, input);
+  }
+
+  async syncBranchCatalog(input) {
+    return this.#operation(SUPPORTED_OPERATIONS.CATALOG_SYNC, input);
   }
 
   async #operation(operation, input) {

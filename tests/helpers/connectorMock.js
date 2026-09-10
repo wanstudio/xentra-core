@@ -28,6 +28,7 @@ function installConnectorMock() {
     async getBranchOperationalData(branchId) { return _handler('branch.get_operationalData', branchId); }
     async getInventoryAvailability(branchId) { return _handler('inventory.get_availability', branchId); }
     async persistOrder(input) { return _handler('order.persist', input); }
+    async syncBranchCatalog(input) { return _handler('catalog.sync', input); }
   };
 
   require.cache[MODULE_PATH] = {

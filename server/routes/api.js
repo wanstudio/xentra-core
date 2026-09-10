@@ -3968,6 +3968,91 @@ router.delete('/admin/branches/:id/products/:productId', requireAuth(['owner', '
   }
 });
 
+// C1.9 Sync Branch Catalog to Connector — pushes branch catalog data from Core DB to the
+// enterprise connector's client DB. Idempotent, safe to run repeatedly.
+router.post('/admin/branches/:id/sync-catalog', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const branchId = req.params.id;
+    const brandId = req.brand_id;
+
+    const branch = db.prepare('SELECT id, brand_id, name FROM branches WHERE id = ? AND brand_id = ?').get(branchId, brandId);
+    if (!branch) {
+      return res.status(404).json({ success: false, error: 'Branch not found' });
+    }
+
+    let connectorClient;
+    try {
+      connectorClient = new XentraConnectorClient();
+    } catch (_e) {
+      return res.status(503).json({ success: false, error: 'Connector not configured' });
+    }
+
+    const branchCategories = db.prepare(
+      'SELECT id, brand_id, branch_id, name, image_url, sort_order FROM branch_categories WHERE branch_id = ?'
+    ).all(branchId);
+
+    const branchProducts = db.prepare(
+      'SELECT branch_id, product_id, branch_category_id, price, stock, is_available, low_stock_threshold, created_at FROM branch_products WHERE branch_id = ?'
+    ).all(branchId);
+
+    if (branchProducts.length === 0) {
+      return res.status(400).json({ success: false, error: 'Branch has no products to sync' });
+    }
+
+    const productIds = branchProducts.map((bp) => bp.product_id);
+    const placeholders = productIds.map(() => '?').join(',');
+    const masterProducts = db.prepare(
+      `SELECT id, brand_id, name, slug, description, image_url, category_id FROM products WHERE id IN (${placeholders})`
+    ).all(...productIds);
+
+    const mutationId = `catalog_sync_${branchId}_${Date.now()}`;
+
+    const result = await connectorClient.syncBranchCatalog({
+      mutation_id: mutationId,
+      brand_id: brandId,
+      branch_id: branchId,
+      categories: branchCategories.map((c) => ({
+        id: c.id,
+        name: c.name,
+        image_url: c.image_url || null,
+        sort_order: c.sort_order || 0,
+      })),
+      products: masterProducts.map((p) => {
+        const bp = branchProducts.find((b) => b.product_id === p.id);
+        return {
+          id: p.id,
+          name: p.name,
+          slug: p.slug || '',
+          description: p.description || '',
+          image_url: p.image_url || null,
+          category_id: p.category_id || null,
+          branch_category_id: bp.branch_category_id || null,
+          name_override: null,
+          description_override: null,
+          image_override: null,
+          price: bp.price,
+          stock: bp.stock,
+          is_available: Boolean(bp.is_available),
+          low_stock_threshold: bp.low_stock_threshold,
+          created_at: bp.created_at || new Date().toISOString(),
+        };
+      }),
+    });
+
+    res.json({
+      success: true,
+      branch_id: branchId,
+      categories_synced: result.result.categories_upserted,
+      products_synced: result.result.products_upserted,
+      branch_products_synced: result.result.branch_products_upserted,
+      replay: Boolean(result.replay),
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/sync-catalog]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // C1.8-OVR Branch Product Override — set or clear per-field content overrides
 // plus pricing policy (price) and category assignment (branch_category_id).
 // NULL body field = clear override (branch falls back to live Master Product value).
