@@ -98,7 +98,7 @@ class InventoryRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id, branchId, productId, movementType, quantity, previousStock, currentStock,
-      referenceId, mutationId, actorId, notes, createdAt
+      referenceId, mutationId ?? null, actorId, notes, createdAt
     ]);
   }
 
