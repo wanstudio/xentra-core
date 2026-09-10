@@ -36,6 +36,42 @@ test.before(() => {
         ('branch_test', 'prod_range', 32000, 50, 1, 5),
         ('branch_test', 'prod_limited', NULL, 4, 1, 8) -- Manager configured low-stock threshold = 8
     `).run();
+
+    // Full order cleanup for brand_test: clears all orders (and their child rows)
+    // from prior runs so promotion eligibility checks (firstOrderOnly, countCustomerOrders)
+    // don't count stale data. Deletion order respects FK constraints.
+    const priorOrderIds = db.prepare(
+      `SELECT id FROM orders WHERE brand_id = 'brand_test'`
+    ).all().map(r => r.id);
+    if (priorOrderIds.length > 0) {
+      const placeholders = priorOrderIds.map(() => '?').join(',');
+      db.prepare(`DELETE FROM promotion_redemptions WHERE order_id IN (${placeholders})`).run(...priorOrderIds);
+      db.prepare(`DELETE FROM order_payments WHERE order_id IN (${placeholders})`).run(...priorOrderIds);
+      // order_items, order_status_history cascade automatically (ON DELETE CASCADE).
+      db.prepare(`DELETE FROM orders WHERE id IN (${placeholders})`).run(...priorOrderIds);
+    }
+
+    // Clean up test promotions inserted by Commerce 8/9 on prior runs.
+    // These accumulate as is_active=1 exclusive promos and cause ConflictResolver
+    // to prefer an old promo over the current test's promo, breaking the gate lookup.
+    // promotion_redemptions has no ON DELETE CASCADE so must be cleared first.
+    db.prepare(`
+      DELETE FROM promotion_redemptions WHERE promotion_id IN (
+        SELECT id FROM promotions WHERE brand_id = 'brand_test'
+      )
+    `).run();
+    db.prepare(`DELETE FROM promotions WHERE brand_id = 'brand_test'`).run();
+
+    // Clean up timestamped test products inserted by Commerce 8/9 on prior runs
+    // (they use 'prod_ctx_*', 'prod_e2e_*', 'prod_trace_*', etc.).
+    db.prepare(`
+      DELETE FROM branch_products WHERE branch_id = 'branch_test'
+      AND product_id NOT IN ('prod_lock', 'prod_range', 'prod_limited')
+    `).run();
+    db.prepare(`
+      DELETE FROM products WHERE brand_id = 'brand_test'
+      AND id NOT IN ('prod_lock', 'prod_range', 'prod_limited', 'prod_unassigned')
+    `).run();
   } catch (e) {
     console.error('Seed setup error:', e.message);
   }
@@ -291,9 +327,9 @@ test('Commerce 7 — Reservation: rejects same-day reservation and accepts futur
 // Commerce 8 — PWA Runtime Context: Test A (Browser Biasa) & Test B (Standalone App)
 // ==============================================================================
 test('Commerce 8 — PWA Runtime Context: Test A (Browser rejected) & Test B (Standalone accepted)', () => {
-  const brand = db.prepare('SELECT id FROM brands LIMIT 1').get() || { id: 'brand_test' };
-  const branch = db.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'branch_test' };
-  const cat = db.prepare('SELECT id FROM categories WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'cat_test' };
+  const brand = { id: 'brand_test' };
+  const branch = { id: 'branch_test' };
+  const cat = { id: 'cat_test' };
 
   const promoId = 'prm_ctx_test_' + Date.now();
   const rewardProductId = 'prod_ctx_reward_' + Date.now();
@@ -387,9 +423,15 @@ test('Commerce 8 — PWA Runtime Context: Test A (Browser rejected) & Test B (St
 // Commerce 9 — PWA Runtime Context: Test C (Legacy Flag Bypass) & Test D (End-to-End Placement)
 // ==============================================================================
 test('Commerce 9 — PWA Runtime Context: Test C (Legacy flag rejected) & Test D (End-to-End Placement)', async () => {
-  const brand = db.prepare('SELECT id FROM brands LIMIT 1').get() || { id: 'brand_test' };
-  const branch = db.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'branch_test' };
-  const cat = db.prepare('SELECT id FROM categories WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'cat_test' };
+  const brand = { id: 'brand_test' };
+  const branch = { id: 'branch_test' };
+  const cat = { id: 'cat_test' };
+
+  // Clear prior-test exclusive promos so ConflictResolver always selects this test's promo.
+  // promotion_redemptions has no ON DELETE CASCADE so must be cleared first.
+  db.prepare('DELETE FROM promotion_redemptions WHERE promotion_id IN (SELECT id FROM promotions WHERE brand_id = ?)').run(brand.id);
+  db.prepare('DELETE FROM promotions WHERE brand_id = ?').run(brand.id);
+
 
   const promoId = 'prm_e2e_pwa_' + Date.now();
   const rewardProductId = 'prod_e2e_reward_' + Date.now();
@@ -476,6 +518,7 @@ test('Commerce 9 — PWA Runtime Context: Test C (Legacy flag rejected) & Test D
     ]
   });
   assert.strictEqual(resVerifiedTabE2E.success, true, 'Verified-install reward must survive Pay end-to-end');
+
   const verifiedTabRewardItem = resVerifiedTabE2E.order.items.find(it => it.product_id === rewardProductId);
   assert.ok(verifiedTabRewardItem, 'Reward item must be converted to authoritative target_product_id');
   assert.strictEqual(verifiedTabRewardItem.unit_price, 0);
