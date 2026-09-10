@@ -2917,6 +2917,11 @@ test('SYNC CATALOG: POST /admin/branches/:id/sync-catalog syncs branch catalog t
   const testBranchId = 'branch_bangjo_barat';
   let capturedInput = null;
 
+  db.prepare(`UPDATE branch_products
+    SET name_override = ?, description_override = ?, image_override = ?
+    WHERE branch_id = ? AND product_id = ?`)
+    .run('Nama Cabang', 'Deskripsi Cabang', '/assets/branch-product.jpg', testBranchId, '272');
+
   installConnectorMock();
   setConnectorHandler((op, input) => {
     if (op === 'catalog.sync') {
@@ -2958,6 +2963,17 @@ test('SYNC CATALOG: POST /admin/branches/:id/sync-catalog syncs branch catalog t
     assert.ok(prod.price >= 0, 'price non-negative');
     assert.ok('stock' in prod, 'stock must be present');
   }
+
+  const overriddenProduct = capturedInput.products.find((prod) => prod.id === '272');
+  assert.deepStrictEqual({
+    name_override: overriddenProduct.name_override,
+    description_override: overriddenProduct.description_override,
+    image_override: overriddenProduct.image_override,
+  }, {
+    name_override: 'Nama Cabang',
+    description_override: 'Deskripsi Cabang',
+    image_override: '/assets/branch-product.jpg',
+  });
 
   assert.ok(typeof capturedInput.mutation_id === 'string' && capturedInput.mutation_id.length > 0, 'mutation_id required');
   restoreConnectorMock();

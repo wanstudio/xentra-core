@@ -3992,7 +3992,7 @@ router.post('/admin/branches/:id/sync-catalog', requireAuth(['owner', 'brand_man
     ).all(branchId);
 
     const branchProducts = db.prepare(
-      'SELECT branch_id, product_id, branch_category_id, price, stock, is_available, low_stock_threshold, created_at FROM branch_products WHERE branch_id = ?'
+      'SELECT branch_id, product_id, branch_category_id, name_override, description_override, image_override, price, stock, is_available, low_stock_threshold, created_at FROM branch_products WHERE branch_id = ?'
     ).all(branchId);
 
     if (branchProducts.length === 0) {
@@ -4002,8 +4002,12 @@ router.post('/admin/branches/:id/sync-catalog', requireAuth(['owner', 'brand_man
     const productIds = branchProducts.map((bp) => bp.product_id);
     const placeholders = productIds.map(() => '?').join(',');
     const masterProducts = db.prepare(
-      `SELECT id, brand_id, name, slug, description, image_url, category_id FROM products WHERE id IN (${placeholders})`
-    ).all(...productIds);
+      `SELECT id, brand_id, name, slug, description, image_url, category_id FROM products WHERE brand_id = ? AND id IN (${placeholders})`
+    ).all(brandId, ...productIds);
+
+    if (masterProducts.length !== branchProducts.length) {
+      return res.status(409).json({ success: false, error: 'Branch catalog contains products outside this brand' });
+    }
 
     const mutationId = `catalog_sync_${branchId}_${Date.now()}`;
 
@@ -4027,9 +4031,9 @@ router.post('/admin/branches/:id/sync-catalog', requireAuth(['owner', 'brand_man
           image_url: p.image_url || null,
           category_id: p.category_id || null,
           branch_category_id: bp.branch_category_id || null,
-          name_override: null,
-          description_override: null,
-          image_override: null,
+          name_override: bp.name_override || null,
+          description_override: bp.description_override || null,
+          image_override: bp.image_override || null,
           price: bp.price,
           stock: bp.stock,
           is_available: Boolean(bp.is_available),
