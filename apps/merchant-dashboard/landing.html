@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Xentra Cloud — Restaurant SaaS Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-lime: #b6ff00;
+      --accent-lime-dark: #8fcc00;
+      --border-color: rgba(255,255,255,0.08);
+      --radius-sm: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
+    body {
+      background-color: var(--bg-dark);
+      background-image: radial-gradient(at 15% 20%, rgba(182, 255, 0, 0.10) 0px, transparent 55%), radial-gradient(at 85% 80%, rgba(30, 41, 59, 0.6) 0px, transparent 55%);
+      min-height: 100vh; display: flex; flex-direction: column; color: var(--text-main);
+    }
+    .x-nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 1px solid var(--border-color); }
+    .x-nav-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .x-nav-logo img { height: 36px; width: auto; }
+    .x-nav-logo-text { font-size: 18px; font-weight: 800; color: var(--text-main); letter-spacing: -0.3px; }
+    .x-nav-actions { display: flex; gap: 12px; align-items: center; }
+    .x-btn-nav-signin { background: transparent; border: 1px solid var(--border-color); color: var(--text-main); padding: 9px 20px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none; }
+    .x-btn-nav-signin:hover { border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.05); }
+    .x-btn-nav-cta { background: var(--accent-lime); color: #0b0f19; border: none; padding: 9px 20px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; }
+    .x-btn-nav-cta:hover { background: var(--accent-lime-dark); }
+    .x-hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 80px 24px 60px; }
+    .x-hero-badge { display: inline-flex; align-items: center; gap: 7px; background: rgba(182, 255, 0, 0.10); border: 1px solid rgba(182, 255, 0, 0.25); color: var(--accent-lime); font-size: 12px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; padding: 6px 14px; border-radius: 100px; margin-bottom: 28px; }
+    .x-hero-badge::before { content: ''; display: inline-block; width: 7px; height: 7px; background: var(--accent-lime); border-radius: 50%; }
+    .x-hero-title { font-size: clamp(36px, 6vw, 64px); font-weight: 800; line-height: 1.1; letter-spacing: -1.5px; color: var(--text-main); max-width: 700px; margin-bottom: 20px; }
+    .x-hero-title .highlight { color: var(--accent-lime); }
+    .x-hero-subtitle { font-size: 18px; line-height: 1.6; color: var(--text-muted); max-width: 520px; margin-bottom: 40px; }
+    .x-hero-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+    .x-btn-primary { background: var(--accent-lime); color: #0b0f19; border: none; padding: 15px 32px; border-radius: var(--radius-sm); font-size: 16px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
+    .x-btn-primary:hover { background: var(--accent-lime-dark); }
+    .x-btn-secondary { background: transparent; color: var(--text-main); border: 1px solid var(--border-color); padding: 15px 32px; border-radius: var(--radius-sm); font-size: 16px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
+    .x-btn-secondary:hover { border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.05); }
+    .x-features { display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; padding: 0 24px 80px; }
+    .x-feature-item { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 14px; font-weight: 500; }
+    .x-footer { border-top: 1px solid var(--border-color); padding: 20px 40px; display: flex; justify-content: center; }
+    .x-footer-text { font-size: 12px; font-weight: 600; color: #475569; letter-spacing: 0.5px; text-transform: uppercase; }
+    @media (max-width: 480px) {
+      .x-nav { padding: 16px 20px; }
+      .x-hero-actions { flex-direction: column; align-items: stretch; }
+      .x-btn-primary, .x-btn-secondary { text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="x-nav">
+    <a href="/" class="x-nav-logo">
+      <img src="/assets/img/xentra-logo.png" onerror="this.src='/assets/icons/xentra-logo.png'" alt="Xentra">
+      <span class="x-nav-logo-text">Xentra Cloud</span>
+    </a>
+    <div class="x-nav-actions">
+      <a href="/signin" class="x-btn-nav-signin">Sign In</a>
+      <a href="/signup" class="x-btn-nav-cta">Get Started</a>
+    </div>
+  </nav>
+  <main class="x-hero">
+    <div class="x-hero-badge">Restaurant SaaS Platform</div>
+    <h1 class="x-hero-title">Run your restaurant<br>with <span class="highlight">Xentra Cloud</span></h1>
+    <p class="x-hero-subtitle">The all-in-one operating engine for modern restaurants. Orders, kitchen, payments, delivery — unified.</p>
+    <div class="x-hero-actions">
+      <a href="/signup" class="x-btn-primary">Get Started Free</a>
+      <a href="/signin" class="x-btn-secondary">Sign In</a>
+    </div>
+  </main>
+  <div class="x-features">
+    <div class="x-feature-item"><span>🍽️</span> Order Management</div>
+    <div class="x-feature-item"><span>📊</span> Real-time Analytics</div>
+    <div class="x-feature-item"><span>🚚</span> Delivery Integration</div>
+    <div class="x-feature-item"><span>💳</span> Payment Gateway</div>
+    <div class="x-feature-item"><span>🔒</span> Secure &amp; Reliable</div>
+  </div>
+  <footer class="x-footer">
+    <span class="x-footer-text">Xentra Cloud &bull; Restaurant SaaS Platform</span>
+  </footer>
+  <script>
+    (function () {
+      // Authenticated users skip the landing — go straight to dashboard
+      if (localStorage.getItem('xentra_merchant_token')) {
+        window.location.replace('/dashboard/');
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -320,14 +320,17 @@ describe('Existing Tenant Claim / Adoption Flow (Bangjo)', () => {
     assert.ok(res.raw.includes('/api/v1/onboarding/check-domain'));
     assert.ok(res.raw.includes('/api/v1/onboarding/claim'));
 
-    // 2. xentra.cloud/ root redirects to /onboarding (does NOT render customer food ordering storefront)
+    // 2. xentra.cloud/ root serves the public SaaS landing page (200) — NOT a redirect to /onboarding
+    //    and does NOT render the customer food ordering storefront
     const rootRes = await makeRequest(server, {
       method: 'GET',
       path: '/',
       headers: { Host: 'xentra.cloud' }
     });
-    assert.equal(rootRes.status, 302);
-    assert.equal(rootRes.headers.location, '/onboarding');
+    assert.equal(rootRes.status, 200);
+    // Landing page must contain Xentra branding and SaaS CTAs, not the food PWA
+    assert.ok(rootRes.raw.includes('Xentra') || rootRes.raw.includes('signin'));
+    assert.ok(!rootRes.raw.includes('xentra_cart'), '/ on xentra.cloud must not be the customer food PWA');
 
     // 3. app.mybangjo.com/dashboard/login works
     const dashLoginRes = await makeRequest(server, {
@@ -366,7 +369,7 @@ describe('Existing Tenant Claim / Adoption Flow (Bangjo)', () => {
     });
     assert.equal(onboardingRes.status, 200);
     assert.ok(onboardingRes.raw.includes('xentra_pending_claim_domain'));
-    assert.ok(onboardingRes.raw.includes('/dashboard/login?claim_domain='));
+    assert.ok(onboardingRes.raw.includes('/signin?claim_domain='));
 
     // 2. Verify dashboard login page contains claim banner and claim handling logic
     const loginRes = await makeRequest(server, {

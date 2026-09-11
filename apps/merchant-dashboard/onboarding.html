@@ -387,8 +387,19 @@
       var TOKEN_KEY = 'xentra_merchant_token';
       var USER_KEY = 'xentra_merchant_user';
 
-      var currentDomain = '';
+      // Auth guard: onboarding is a post-auth flow only.
+      // Unauthenticated visitors are sent to /signin and returned here after login.
       var activeToken = localStorage.getItem(TOKEN_KEY) || '';
+      if (!activeToken) {
+        // Preserve any pending claim domain before redirecting
+        var _urlParams = new URLSearchParams(window.location.search);
+        var _pendingDomain = _urlParams.get('domain') || sessionStorage.getItem('xentra_pending_claim_domain') || '';
+        if (_pendingDomain) sessionStorage.setItem('xentra_pending_claim_domain', _pendingDomain);
+        window.location.replace('/signin?return_to=' + encodeURIComponent(window.location.pathname + window.location.search));
+        return;
+      }
+
+      var currentDomain = '';
 
       var stepChoice = document.getElementById('step-choice');
       var stepExisting = document.getElementById('step-existing-input');
@@ -420,7 +431,7 @@
 
       optCreate.addEventListener('click', function () {
         // Redirect to new registration form
-        window.location.href = '/dashboard/login';
+        window.location.href = '/signup';
       });
 
       document.getElementById('btn-back-to-choice-1').addEventListener('click', function () {
@@ -483,10 +494,10 @@
         e.preventDefault();
         errClaim.style.display = 'none';
 
-        // When user is not authenticated, redirect to login/Google flow preserving tenant claim context
+        // When user is not authenticated, redirect to /signin preserving tenant claim context
         if (!activeToken) {
           sessionStorage.setItem('xentra_pending_claim_domain', currentDomain);
-          window.location.href = '/dashboard/login?claim_domain=' + encodeURIComponent(currentDomain) + '&mode=claim';
+          window.location.href = '/signin?claim_domain=' + encodeURIComponent(currentDomain);
           return;
         }
 

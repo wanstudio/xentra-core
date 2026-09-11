@@ -85,8 +85,33 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
   res.sendFile(path.join(__dirname, '../apps/customer-pwa/assets/pwa/service-worker.js'));
 });
 
-// Merchant Dashboard Assets & Routes
+// Merchant Dashboard Assets
 app.use('/dashboard/assets', express.static(path.join(__dirname, '../apps/merchant-dashboard/assets')));
+
+// Xentra Cloud SaaS Public Entry Points
+// These routes serve SaaS pages only when the request host is xentra.cloud (or localhost in dev).
+// On tenant domains (e.g. app.mybangjo.com) these paths fall through to the customer PWA fallback.
+function isSaaSHost(req) {
+  const host = (req.headers.host || '').split(':')[0].toLowerCase();
+  return host === 'xentra.cloud' || host === 'localhost' || host === '127.0.0.1';
+}
+
+app.get(['/', '/landing', '/landing/'], (req, res, next) => {
+  if (!isSaaSHost(req)) return next();
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/landing.html'));
+});
+app.get(['/signin', '/signin/'], (req, res, next) => {
+  if (!isSaaSHost(req)) return next();
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/signin.html'));
+});
+app.get(['/signup', '/signup/'], (req, res, next) => {
+  if (!isSaaSHost(req)) return next();
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/signup.html'));
+});
+
 app.get(['/onboarding', '/onboarding/*', '/onboarding/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/onboarding.html'));
@@ -144,14 +169,14 @@ app.get(['/order-received', '/order-received/:id', '/order-received/'], (req, re
   res.sendFile(path.join(__dirname, '../apps/customer-pwa/order-received.html'));
 });
 
-// Fallback: SaaS Control Plane redirects to onboarding; Tenant domains serve customer PWA
+// Fallback: SaaS Control Plane redirects to public landing page; Tenant domains serve customer PWA
 app.get('*', (req, res) => {
   const host = req.headers.host || '';
   const cleanHost = host.split(':')[0].toLowerCase();
 
-  // On xentra.cloud SaaS control plane, do not serve tenant food ordering storefront
+  // On xentra.cloud SaaS control plane, send unmatched paths to the public landing page
   if (cleanHost === 'xentra.cloud') {
-    return res.redirect(302, '/onboarding');
+    return res.redirect(302, '/');
   }
 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
