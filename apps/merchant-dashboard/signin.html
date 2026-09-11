@@ -21,22 +21,54 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; }
     body {
       background-color: var(--bg-dark);
-      background-image: radial-gradient(at 0% 0%, rgba(182, 255, 0, 0.08) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(30, 41, 59, 0.5) 0px, transparent 50%);
-      min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; color: var(--text-main);
+      background-image: radial-gradient(at 0% 0%, rgba(182,255,0,0.08) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(30,41,59,0.5) 0px, transparent 50%);
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px;
     }
     .x-container { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; }
     .x-brand-header { margin-bottom: 28px; text-align: center; }
     .x-xentra-logo { height: 48px; width: auto; display: block; margin: 0 auto 12px; }
     .x-badge-platform { display: inline-block; background: rgba(182,255,0,0.15); color: #b6ff00; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; padding: 4px 12px; border-radius: 100px; border: 1px solid rgba(182,255,0,0.3); }
-    .x-card { background: var(--card-bg); border-radius: var(--radius-lg); padding: 32px; width: 100%; box-shadow: 0 4px 32px rgba(0,0,0,0.4); }
+    .x-card { background: var(--card-bg); border-radius: var(--radius-lg); padding: 32px; width: 100%; box-shadow: 0 4px 32px rgba(0,0,0,0.4); color: var(--text-main); }
     .x-card-title { font-size: 22px; font-weight: 800; color: var(--text-main); margin-bottom: 6px; letter-spacing: -0.3px; }
     .x-card-subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
     .x-alert-error { display: none; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; margin-bottom: 16px; }
-    .x-google-auth-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; margin-bottom: 4px; }
-    .x-google-btn-container { width: 100%; display: flex; justify-content: center; min-height: 44px; }
-    .x-google-status { font-size: 13px; color: var(--text-muted); display: none; text-align: center; }
-    .x-divider { display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 18px 0; width: 100%; }
+
+    /* Google button area — always visible in layout */
+    .x-google-section { width: 100%; margin-bottom: 4px; }
+    .x-google-btn-container {
+      width: 100%;
+      min-height: 44px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+    /* Skeleton placeholder shown while SDK loads */
+    .x-google-skeleton {
+      width: 100%;
+      height: 44px;
+      border: 1px solid #dadce0;
+      border-radius: var(--radius-sm);
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #3c4043;
+      cursor: default;
+    }
+    .x-google-skeleton svg { flex-shrink: 0; }
+    .x-google-skeleton-text { color: #3c4043; font-size: 14px; font-weight: 600; }
+    .x-google-skeleton.loading { opacity: 0.5; }
+    .x-google-status { font-size: 13px; color: var(--text-muted); display: none; text-align: center; margin-top: 6px; }
+
+    /* Divider */
+    .x-divider { display: flex; align-items: center; gap: 12px; color: var(--text-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin: 20px 0; width: 100%; }
     .x-divider::before, .x-divider::after { content: ''; flex: 1; height: 1px; background: var(--border-color); }
+
+    /* Form */
     .x-form-group { margin-bottom: 16px; }
     .x-form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-main); margin-bottom: 6px; }
     .x-input-wrap, .x-password-wrap { position: relative; }
@@ -47,14 +79,20 @@
     .x-btn-submit { width: 100%; background: #0f172a; color: #fff; border: none; border-radius: var(--radius-sm); padding: 13px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 4px; transition: background 0.15s; }
     .x-btn-submit:hover { background: #1e293b; }
     .x-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
     .x-card-footer { margin-top: 20px; text-align: center; font-size: 13px; color: var(--text-muted); }
-    .x-card-footer a { color: #0f172a; font-weight: 700; text-decoration: none; }
+    .x-card-footer a { color: var(--text-main); font-weight: 700; text-decoration: none; }
     .x-card-footer a:hover { text-decoration: underline; }
     .x-footer-info { text-align: center; margin-top: 24px; font-size: 11px; font-weight: 700; color: #475569; letter-spacing: 0.5px; }
+    .x-back-home { display: block; text-align: center; margin-bottom: 16px; font-size: 13px; color: #94a3b8; font-weight: 600; text-decoration: none; }
+    .x-back-home:hover { color: #f1f5f9; }
   </style>
 </head>
 <body>
   <div class="x-container">
+
+    <a href="/" class="x-back-home">← Xentra Cloud</a>
+
     <div class="x-brand-header">
       <img src="/assets/img/xentra-logo.png" onerror="this.src='/assets/icons/xentra-logo.png'" alt="Xentra Logo" class="x-xentra-logo">
       <div><span class="x-badge-platform">Xentra Cloud SaaS</span></div>
@@ -66,26 +104,41 @@
 
       <div id="auth-error" class="x-alert-error"></div>
 
-      <!-- Google Sign-In (shown when configured) -->
-      <div id="google-auth-container" class="x-google-auth-wrap" style="display:none;">
-        <div id="google-btn-slot" class="x-google-btn-container"></div>
+      <!-- Google Sign-In — always rendered, SDK loads button on top of skeleton -->
+      <div class="x-google-section" id="google-section">
+        <div class="x-google-btn-container" id="google-btn-container">
+          <!-- Skeleton shown while SDK initialises -->
+          <div class="x-google-skeleton loading" id="google-skeleton" aria-label="Loading Google Sign-In" aria-hidden="true">
+            <!-- Google G logo -->
+            <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+              <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+              <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
+              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 6.294C4.672 4.169 6.656 3.58 9 3.58z" fill="#EA4335"/>
+            </svg>
+            <span class="x-google-skeleton-text">Continue with Google</span>
+          </div>
+          <!-- Real Google SDK button rendered here by initGoogleSignIn -->
+          <div id="google-btn-slot" style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;justify-content:center;align-items:center;"></div>
+        </div>
         <div id="google-auth-status" class="x-google-status">Verifying with Google...</div>
-        <div class="x-divider">or sign in with password</div>
       </div>
 
-      <!-- Password login form -->
+      <div class="x-divider" id="divider-or">or continue with email</div>
+
+      <!-- Email / password form -->
       <form id="form-signin">
         <div class="x-form-group">
           <label for="username">Username / Email</label>
           <div class="x-input-wrap">
-            <input type="text" id="username" class="x-input" placeholder="your@email.com" required autocomplete="username">
+            <input type="text" id="username" class="x-input" placeholder="you@example.com" required autocomplete="username">
           </div>
         </div>
         <div class="x-form-group">
           <label for="password">Password</label>
           <div class="x-password-wrap">
             <input type="password" id="password" class="x-input" placeholder="••••••••" required autocomplete="current-password">
-            <button type="button" class="x-btn-toggle-pw" id="btn-toggle-pw" title="Toggle Password" aria-label="Toggle Password Visibility">
+            <button type="button" class="x-btn-toggle-pw" id="btn-toggle-pw" title="Toggle password" aria-label="Toggle password visibility">
               <svg id="icon-eye-open" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
               <svg id="icon-eye-closed" style="display:none;" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
             </button>
@@ -106,29 +159,31 @@
     (function () {
       'use strict';
       var TOKEN_KEY = 'xentra_merchant_token';
-      var USER_KEY = 'xentra_merchant_user';
+      var USER_KEY  = 'xentra_merchant_user';
 
-      // Read returnTo param — used when /onboarding redirects here
-      var urlParams = new URLSearchParams(window.location.search);
-      var returnTo = urlParams.get('return_to') || '';
+      // Preserve claim context from URL params or sessionStorage
+      var urlParams   = new URLSearchParams(window.location.search);
+      var returnTo    = urlParams.get('return_to') || '';
       var claimDomain = urlParams.get('claim_domain') || sessionStorage.getItem('xentra_pending_claim_domain') || '';
       if (claimDomain) sessionStorage.setItem('xentra_pending_claim_domain', claimDomain);
 
-      // If already authenticated, redirect directly
-      var existingToken = localStorage.getItem(TOKEN_KEY);
-      if (existingToken) {
+      // Already authenticated → skip sign-in
+      if (localStorage.getItem(TOKEN_KEY)) {
         window.location.replace(returnTo || '/dashboard/');
         return;
       }
 
-      var errorBox = document.getElementById('auth-error');
-      var btn = document.getElementById('btn-signin');
+      var errorBox    = document.getElementById('auth-error');
+      var btn         = document.getElementById('btn-signin');
+      var skeleton    = document.getElementById('google-skeleton');
+      var googleSlot  = document.getElementById('google-btn-slot');
+      var googleStatus = document.getElementById('google-auth-status');
 
+      // Shared post-auth redirect logic
       function afterAuthSuccess(data) {
         localStorage.setItem(TOKEN_KEY, data.token);
         if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
         sessionStorage.removeItem('xentra_pending_claim_domain');
-        // Routing: if returnTo is set use it; otherwise new users go to /onboarding, existing to /dashboard/
         var dest = returnTo || (data.is_new_user ? '/onboarding' : '/dashboard/');
         if (data.redirect_url) dest = data.redirect_url;
         window.location.replace(dest);
@@ -136,25 +191,18 @@
 
       // Password toggle
       var btnTogglePw = document.getElementById('btn-toggle-pw');
-      var pwInput = document.getElementById('password');
-      var eyeOpen = document.getElementById('icon-eye-open');
-      var eyeClosed = document.getElementById('icon-eye-closed');
+      var pwInput     = document.getElementById('password');
       if (btnTogglePw && pwInput) {
         btnTogglePw.addEventListener('click', function (e) {
           e.preventDefault();
-          if (pwInput.type === 'password') {
-            pwInput.type = 'text';
-            if (eyeOpen) eyeOpen.style.display = 'none';
-            if (eyeClosed) eyeClosed.style.display = 'block';
-          } else {
-            pwInput.type = 'password';
-            if (eyeOpen) eyeOpen.style.display = 'block';
-            if (eyeClosed) eyeClosed.style.display = 'none';
-          }
+          var isText = pwInput.type === 'text';
+          pwInput.type = isText ? 'password' : 'text';
+          document.getElementById('icon-eye-open').style.display  = isText ? 'block' : 'none';
+          document.getElementById('icon-eye-closed').style.display = isText ? 'none'  : 'block';
         });
       }
 
-      // Password form submit
+      // Password form submit — with optional pending claim chain
       document.getElementById('form-signin').addEventListener('submit', async function (e) {
         e.preventDefault();
         errorBox.style.display = 'none';
@@ -174,7 +222,6 @@
           try { data = await res.json(); } catch (_) {}
 
           if (data && data.success && data.token) {
-            // If there is a pending claim, execute it before redirecting
             if (claimDomain) {
               btn.innerHTML = '<span>Completing business claim...</span>';
               try {
@@ -186,8 +233,11 @@
                 var claimData = await claimRes.json();
                 if (claimRes.ok && claimData && claimData.success) {
                   if (claimData.token) data.token = claimData.token;
-                  if (claimData.user) data.user = claimData.user;
-                  data.redirect_url = claimData.redirect_url || (claimData.business && claimData.business.custom_domain ? 'https://' + claimData.business.custom_domain + '/dashboard/' : '/dashboard/');
+                  if (claimData.user)  data.user  = claimData.user;
+                  data.redirect_url = claimData.redirect_url ||
+                    (claimData.business && claimData.business.custom_domain
+                      ? 'https://' + claimData.business.custom_domain + '/dashboard/'
+                      : '/dashboard/');
                 }
               } catch (_) {}
             }
@@ -202,13 +252,10 @@
         btn.innerHTML = '<span>Sign In</span>';
       });
 
-      // Google authentication
-      var googleContainer = document.getElementById('google-auth-container');
-      var googleBtnSlot = document.getElementById('google-btn-slot');
-      var googleStatus = document.getElementById('google-auth-status');
+      // ── Google Sign-In ──────────────────────────────────────────
       var isGoogleAuthenticating = false;
 
-      async function handleGoogleCredentialResponse(response) {
+      function handleGoogleCredentialResponse(response) {
         if (!response || !response.credential) return;
         if (isGoogleAuthenticating) return;
         isGoogleAuthenticating = true;
@@ -216,42 +263,41 @@
         if (googleStatus) { googleStatus.textContent = 'Verifying Google account...'; googleStatus.style.display = 'block'; }
         btn.disabled = true;
 
-        try {
-          var targetEndpoint = claimDomain ? '/api/v1/onboarding/claim' : '/api/v1/auth/google';
-          var payload = claimDomain
-            ? { domain: claimDomain, credential: response.credential }
-            : { credential: response.credential };
+        var targetEndpoint = claimDomain ? '/api/v1/onboarding/claim' : '/api/v1/auth/google';
+        var payload = claimDomain
+          ? { domain: claimDomain, credential: response.credential }
+          : { credential: response.credential };
 
-          var res = await fetch(targetEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+        fetch(targetEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (res.ok && data && data.success && data.token) {
+              if (googleStatus) { googleStatus.textContent = 'Success! Redirecting...'; googleStatus.style.color = '#166534'; }
+              afterAuthSuccess(data);
+              return;
+            }
+            var msg;
+            if (res.status === 404 && data && data.code === 'ACCOUNT_NOT_LINKED') {
+              msg = '\u26A0\uFE0F This Google account is not linked to a Xentra account. Sign in with your email and password first.';
+            } else if (res.status === 503 || (data && data.code === 'GOOGLE_SERVICE_UNAVAILABLE')) {
+              msg = '\u26A0\uFE0F Google service temporarily unavailable. Please try password login.';
+            } else {
+              msg = '\u274C ' + ((data && (data.error || data.message)) || 'Google authentication failed.');
+            }
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
           });
-          var data = null;
-          try { data = await res.json(); } catch (_) {}
-
-          if (res.ok && data && data.success && data.token) {
-            if (googleStatus) { googleStatus.textContent = 'Success! Redirecting...'; googleStatus.style.color = '#166534'; }
-            afterAuthSuccess(data);
-            return;
-          }
-
-          if (res.status === 404 && data && data.code === 'ACCOUNT_NOT_LINKED') {
-            errorBox.textContent = '\u26A0\uFE0F This Google account is not linked to a Xentra account. Sign in with your username and password first.';
-          } else if (res.status === 503 || (data && data.code === 'GOOGLE_SERVICE_UNAVAILABLE')) {
-            errorBox.textContent = '\u26A0\uFE0F Google service temporarily unavailable. Please try again or use password login.';
-          } else {
-            errorBox.textContent = '\u274C ' + ((data && (data.error || data.message)) || 'Google authentication failed.');
-          }
-          errorBox.style.display = 'block';
-        } catch (_) {
+        }).catch(function () {
           errorBox.textContent = '\u274C Network error during Google authentication. Please try again.';
           errorBox.style.display = 'block';
-        } finally {
+        }).finally(function () {
           isGoogleAuthenticating = false;
           btn.disabled = false;
           if (googleStatus) googleStatus.style.display = 'none';
-        }
+        });
       }
 
       function initGoogleSignIn(clientId) {
@@ -263,33 +309,55 @@
             auto_select: false,
             cancel_on_tap_outside: true
           });
-          if (googleBtnSlot) {
-            googleBtnSlot.innerHTML = '';
-            window.google.accounts.id.renderButton(googleBtnSlot, {
-              theme: 'outline', size: 'large', type: 'standard',
-              text: 'signin_with', shape: 'rectangular', logo_alignment: 'left', width: 320
-            });
-            if (googleContainer) googleContainer.style.display = 'flex';
-          }
-        } catch (e) { console.warn('[Google SDK init warn]:', e); }
+          // Render the real button into the slot (overlays the skeleton)
+          window.google.accounts.id.renderButton(googleSlot, {
+            theme: 'outline',
+            size: 'large',
+            type: 'standard',
+            text: 'signin_with',
+            shape: 'rectangular',
+            logo_alignment: 'left',
+            width: 356
+          });
+          // Hide skeleton now that real button is rendered
+          if (skeleton) skeleton.style.display = 'none';
+        } catch (e) {
+          console.warn('[Google SDK init warn]:', e);
+          // Skeleton stays visible as a non-functional placeholder
+        }
       }
 
-      async function setupGoogleAuth() {
-        try {
-          var res = await fetch('/api/v1/auth/config');
-          if (!res.ok) return;
-          var cfg = await res.json();
-          if (!cfg || !cfg.google_enabled || !cfg.google_client_id) return;
-          var script = document.createElement('script');
-          script.src = 'https://accounts.google.com/gsi/client';
-          script.async = true;
-          script.defer = true;
-          script.onload = function () { initGoogleSignIn(cfg.google_client_id); };
-          document.head.appendChild(script);
-        } catch (e) { console.warn('[Google Auth config warn]:', e); }
-      }
+      // Fetch runtime config and load Google SDK
+      fetch('/api/v1/auth/config').then(function (res) {
+        return res.json();
+      }).then(function (cfg) {
+        if (!cfg || !cfg.google_enabled || !cfg.google_client_id) {
+          // Google not configured on this server — hide section gracefully
+          if (skeleton) skeleton.style.display = 'none';
+          var section = document.getElementById('google-section');
+          var divider = document.getElementById('divider-or');
+          if (section) section.style.display = 'none';
+          if (divider) divider.style.display = 'none';
+          return;
+        }
+        var script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = function () { initGoogleSignIn(cfg.google_client_id); };
+        script.onerror = function () {
+          // SDK failed to load (network issue, blocker, etc) — keep skeleton but dim it
+          if (skeleton) { skeleton.style.opacity = '0.4'; skeleton.title = 'Google Sign-In unavailable'; }
+        };
+        document.head.appendChild(script);
+      }).catch(function () {
+        // Config fetch failed — hide Google section, password login still works
+        var section = document.getElementById('google-section');
+        var divider = document.getElementById('divider-or');
+        if (section) section.style.display = 'none';
+        if (divider) divider.style.display = 'none';
+      });
 
-      setupGoogleAuth();
     })();
   </script>
 </body>
