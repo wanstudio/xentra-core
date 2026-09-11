@@ -2429,10 +2429,15 @@ router.post('/auth/register', (req, res) => {
 
     const { RegistrationService, WorkforceService } = require('../../core/identity');
     const registration = new RegistrationService();
-    const result = registration.registerIdentity({
+    const result = registration.registerBusiness({
       email,
       password,
-      full_name
+      full_name,
+      business_name,
+      brand_name,
+      branch_name,
+      phone,
+      address_text
     });
 
     // Create session token for newly registered owner
@@ -2442,9 +2447,9 @@ router.post('/auth/register', (req, res) => {
       email: result.user.email,
       full_name: result.user.full_name,
       role: 'owner',
-      brand_id: null,
-      organization_id: null,
-      branch_id: null,
+      brand_id: result.brand.id,
+      organization_id: result.organization.id,
+      branch_id: result.branch.id,
       status: 'active',
       email_verified: false
     };
@@ -2483,6 +2488,67 @@ router.post('/auth/register', (req, res) => {
       success: false,
       code: err.code || 'REGISTRATION_ERROR',
       error: errorMsg
+    });
+  }
+});
+
+// 10.0.0b SaaS Identity-Only Registration (email signup without business setup)
+// Used by the new signup UX — business name collected later on /onboarding
+router.post('/auth/register-identity', (req, res) => {
+  try {
+    const { email, password, full_name } = req.body || {};
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        code: 'MISSING_FIELDS',
+        error: 'Email dan password wajib diisi.'
+      });
+    }
+
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const rateLimitKey = `register:${clientIp}`;
+    const rateCheck = RateLimiter.check(rateLimitKey, 5, 600);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'TOO_MANY_REQUESTS',
+        message: `Terlalu banyak permintaan pendaftaran. Coba lagi dalam ${rateCheck.retryAfter} detik.`
+      });
+    }
+
+    const { RegistrationService } = require('../../core/identity');
+    const registration = new RegistrationService();
+    const result = registration.registerIdentity({ email, password, full_name });
+
+    const sessionUser = {
+      id: result.user.id,
+      username: result.user.username,
+      email: result.user.email,
+      full_name: result.user.full_name,
+      role: 'owner',
+      brand_id: null,
+      organization_id: null,
+      branch_id: null,
+      status: 'active',
+      email_verified: false
+    };
+
+    const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, null);
+
+    res.status(201).json({
+      success: true,
+      message: 'Akun berhasil dibuat. Silakan lanjutkan setup bisnis.',
+      token,
+      expires_at: new Date(expiresAt).toISOString(),
+      user: result.user
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      code: err.code || 'REGISTRATION_ERROR',
+      error: err.message || 'Terjadi kesalahan sistem saat pendaftaran.'
     });
   }
 });
@@ -2895,36 +2961,99 @@ router.post('/auth/google-onboard', async (req, res) => {
       }
     }
 
-    const { RegistrationService, WorkforceService } = require('../../core/identity');
+    const { RegistrationService, WorkforceService, AuthProviderService } = require('../../core/identity');
+    const authProviderService = new AuthProviderService(db);
+    const existingIdentity = authProviderService.findIdentity('google', verifiedClaims.sub);
+    const hasBusinessName = !!(business_name || brand_name);
+
+    if (existingIdentity) {
+      if (hasBusinessName) {
+        return res.status(409).json({
+          success: false,
+          code: 'PROVIDER_ALREADY_LINKED',
+          error: 'Akun Google ini sudah terhubung ke akun pengguna Xentra lain.'
+        });
+      }
+      const user = existingIdentity.user;
+      const { token, expiresAt } = TokenSessionStore.createSession(user, user.brand_id || null);
+      RateLimiter.reset(rateLimitKey);
+      return res.json({
+        success: true,
+        message: 'Google auth berhasil.',
+        token,
+        expires_at: new Date(expiresAt).toISOString(),
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          full_name: user.full_name,
+          role: user.role,
+          branch_id: user.branch_id || null,
+          email_verified: user.email_verified,
+          brand_name: (req.brand && req.brand.name) ? req.brand.name : null
+        },
+        organization: null,
+        brand: null,
+        branch: null
+      });
+    }
+
     const registration = new RegistrationService();
+    let result;
 
-    const result = registration.registerBusinessWithGoogle({
-      googleSub: verifiedClaims.sub,
-      email: verifiedClaims.email,
-      full_name: verifiedClaims.name,
-      picture: verifiedClaims.picture,
-      business_name,
-      brand_name,
-      branch_name,
-      phone,
-      address_text
-    });
+    if (hasBusinessName) {
+      result = registration.registerBusinessWithGoogle({
+        googleSub: verifiedClaims.sub,
+        email: verifiedClaims.email,
+        full_name: verifiedClaims.name,
+        picture: verifiedClaims.picture,
+        business_name,
+        brand_name,
+        branch_name,
+        phone,
+        address_text
+      });
+    } else {
+      // Check if user with this email already exists
+      const existingEmailUser = db.prepare('SELECT id, username, email, full_name, role, status, email_verified_at, brand_id, organization_id, branch_id FROM users WHERE LOWER(email) = ?').get(verifiedClaims.email.toLowerCase());
+      if (existingEmailUser) {
+        authProviderService.linkProvider({
+          userId: existingEmailUser.id,
+          provider: 'google',
+          providerUserId: verifiedClaims.sub,
+          email: verifiedClaims.email
+        });
+        result = {
+          user: {
+            ...existingEmailUser,
+            email_verified: true
+          }
+        };
+      } else {
+        result = registration.registerIdentityWithGoogle({
+          googleSub: verifiedClaims.sub,
+          email: verifiedClaims.email,
+          full_name: verifiedClaims.name,
+          picture: verifiedClaims.picture
+        });
+      }
+    }
 
-    // Create session token for the newly onboarded owner
+    // Create session token for the owner
     const sessionUser = {
       id: result.user.id,
       username: result.user.username,
       email: result.user.email,
       full_name: result.user.full_name,
-      role: 'owner',
-      brand_id: null,
-      organization_id: null,
-      branch_id: null,
+      role: result.user.role || 'owner',
+      brand_id: result.user.brand_id || (result.brand && result.brand.id) || null,
+      organization_id: result.user.organization_id || (result.organization && result.organization.id) || null,
+      branch_id: result.user.branch_id || (result.branch && result.branch.id) || null,
       status: 'active',
       email_verified: true
     };
 
-    const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, null);
+    const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, sessionUser.brand_id);
 
     // Reset rate limiter on success
     RateLimiter.reset(rateLimitKey);
@@ -2933,33 +3062,33 @@ router.post('/auth/google-onboard', async (req, res) => {
     const workforce = new WorkforceService();
     workforce.logSecurityEvent({
       actor_id: result.user.id,
-      actor_role: 'owner',
+      actor_role: result.user.role || 'owner',
       action: 'GOOGLE_BUSINESS_ONBOARDED',
       target_user_id: result.user.id,
-      target_role: 'owner',
-      brand_id: result.brand.id,
-      organization_id: result.organization.id,
-      branch_id: result.branch.id,
+      target_role: result.user.role || 'owner',
+      brand_id: sessionUser.brand_id,
+      organization_id: sessionUser.organization_id,
+      branch_id: sessionUser.branch_id,
       result: 'success',
       metadata: {
         sub: verifiedClaims.sub,
         email: result.user.email,
-        org_name: result.organization.name
+        org_name: result.organization ? result.organization.name : null
       }
     });
 
     res.status(201).json({
       success: true,
-      message: 'Onboarding bisnis dengan Google berhasil.',
+      message: 'Onboarding akun dengan Google berhasil.',
       token,
       expires_at: new Date(expiresAt).toISOString(),
       user: {
         ...result.user,
-        brand_name: result.brand.name
+        brand_name: result.brand ? result.brand.name : null
       },
-      organization: result.organization,
-      brand: result.brand,
-      branch: result.branch
+      organization: result.organization || null,
+      brand: result.brand || null,
+      branch: result.branch || null
     });
   } catch (err) {
     const status = err.status || 500;

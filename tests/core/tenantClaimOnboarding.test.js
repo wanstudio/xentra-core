@@ -316,7 +316,7 @@ describe('Existing Tenant Claim / Adoption Flow (Bangjo)', () => {
 
     assert.equal(res.status, 200);
     assert.ok(res.raw.includes('Xentra Cloud SaaS'));
-    assert.ok(res.raw.includes('Saya Sudah Memiliki Bisnis'));
+    assert.ok(res.raw.includes('Claim Existing Business'));
     assert.ok(res.raw.includes('/api/v1/onboarding/check-domain'));
     assert.ok(res.raw.includes('/api/v1/onboarding/claim'));
 

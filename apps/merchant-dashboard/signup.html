@@ -68,19 +68,21 @@
       <div id="auth-error" class="x-alert-error"></div>
       <div id="auth-success" class="x-alert-success"></div>
 
-      <!-- Google Sign-Up (preferred) -->
+      <!-- Sign-Up Options: Continue with Google OR Continue with Email -->
       <div id="signup-options" style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
         <div id="google-auth-container" class="x-google-auth-wrap" style="display:none;">
           <div id="google-btn-slot" class="x-google-btn-container"></div>
           <div id="google-auth-status" class="x-google-status">Creating your account...</div>
         </div>
-        <div class="x-divider">or</div>
+        <div class="x-divider" id="divider-or" style="display:none;">or</div>
         <button type="button" class="x-btn-submit" id="btn-show-email-signup" style="background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1;">Continue with Email</button>
       </div>
 
-      <!-- Email/password registration form -->
+      <!-- Email/password registration form (hidden until Email option selected) -->
       <form id="form-signup" style="display:none;">
-        
+        <button type="button" id="btn-back-to-options" style="background:none; border:none; color:#64748b; font-size:13px; font-weight:600; cursor:pointer; margin-bottom:14px; display:inline-flex; align-items:center; gap:4px;">
+          ← Back to signup options
+        </button>
         <div class="x-form-group">
           <label for="email">Email Address</label>
           <div class="x-input-wrap">
@@ -153,10 +155,17 @@
 
       
       var btnShowEmail = document.getElementById('btn-show-email-signup');
+      var btnBackToOptions = document.getElementById('btn-back-to-options');
       if (btnShowEmail) {
         btnShowEmail.addEventListener('click', function() {
           document.getElementById('signup-options').style.display = 'none';
           document.getElementById('form-signup').style.display = 'block';
+        });
+      }
+      if (btnBackToOptions) {
+        btnBackToOptions.addEventListener('click', function() {
+          document.getElementById('form-signup').style.display = 'none';
+          document.getElementById('signup-options').style.display = 'flex';
         });
       }
 
@@ -173,7 +182,7 @@
         var data = null;
 
         try {
-          var res = await fetch('/api/v1/auth/register', {
+          var res = await fetch('/api/v1/auth/register-identity', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: email, password: password })
@@ -198,6 +207,7 @@
       var googleContainer = document.getElementById('google-auth-container');
       var googleBtnSlot = document.getElementById('google-btn-slot');
       var googleStatus = document.getElementById('google-auth-status');
+      var dividerOr = document.getElementById('divider-or');
       var isGoogleAuthenticating = false;
 
       async function handleGoogleCredentialResponse(response) {
@@ -258,6 +268,7 @@
               text: 'signup_with', shape: 'rectangular', logo_alignment: 'left', width: 320
             });
             if (googleContainer) googleContainer.style.display = 'flex';
+            if (dividerOr) dividerOr.style.display = 'flex';
           }
         } catch (e) { console.warn('[Google SDK init warn]:', e); }
       }

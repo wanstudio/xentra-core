@@ -921,6 +921,58 @@ describe('Google-First Authentication & Bangjo Owner Linking', () => {
     assert.equal(loginRes.body.user.role, 'owner');
   });
 
+  // X. Google signup flow safely reuses transaction context and handles nested transactions without error
+  test('X. Google signup and onboarding safely reuse transaction context without nested transaction failure', async () => {
+    const runId = Math.random().toString(36).substring(2, 8);
+    const nestedSub = `google-sub-nested-${runId}`;
+    const nestedToken = `google-token-nested-${runId}`;
+    const nestedEmail = `nested_${runId}@xentra.cloud`;
+
+    registerMockGoogleToken(nestedToken, {
+      sub: nestedSub,
+      email: nestedEmail,
+      email_verified: true,
+      aud: TEST_CLIENT_ID,
+      iss: 'https://accounts.google.com',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      name: 'Nested Owner'
+    });
+
+    // Simulate calling Google onboarding while an outer transaction is already in progress
+    db.exec('BEGIN;');
+    let onboardRes;
+    try {
+      onboardRes = await makeRequest(server, {
+        method: 'POST',
+        path: '/api/v1/auth/google-onboard'
+      }, {
+        credential: nestedToken,
+        business_name: `Nested Biz ${runId}`,
+        brand_name: `Nested Brand ${runId}`,
+        branch_name: 'Cabang Nested',
+        phone: '081234567899'
+      });
+      db.exec('COMMIT;');
+    } catch (err) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw err;
+    }
+
+    assert.equal(onboardRes.status, 201, `Expected 201 Created, got ${onboardRes.status}: ${JSON.stringify(onboardRes.body)}`);
+    assert.equal(onboardRes.body.success, true);
+    assert.ok(onboardRes.body.token);
+    assert.equal(onboardRes.body.user.email, nestedEmail);
+
+    // Verify user and auth provider rows were persisted cleanly
+    const createdUser = db.prepare('SELECT id, email, role FROM users WHERE email = ?').get(nestedEmail);
+    assert.ok(createdUser, 'User record must exist in database');
+    assert.equal(createdUser.role, 'owner');
+
+    const providerRow = db.prepare("SELECT * FROM user_auth_providers WHERE provider = 'google' AND provider_user_id = ?").get(nestedSub);
+    assert.ok(providerRow, 'Provider link must exist');
+    assert.equal(providerRow.user_id, createdUser.id);
+  });
+
   after(() => {
     if (server) {
       server.close();

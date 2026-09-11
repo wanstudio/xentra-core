@@ -351,27 +351,94 @@ const memoryStore = {
 // `exec('COMMIT;')` fail with "cannot commit - no transaction is active".
 // Track the transaction state here and defer disk exports until the user
 // transaction ends (BEGIN/COMMIT/ROLLBACK are single statements via run()).
+// Track active transaction depth across SQLite engines (native node:sqlite & sql.js)
+// to prevent "cannot start a transaction within a transaction" errors when
+// nested services or operations share the same database connection.
+let txDepth = 0;
 let sqlJsTxActive = false;
+
 const detectTransactionStatement = (sql) => {
-  const s = String(sql || '').toLowerCase().replace(/;/g, ' ');
-  if (s.includes('begin')) return 'begin';
-  if (s.includes('commit') || s.includes('end transaction')) return 'commit';
-  if (s.includes('rollback')) return 'rollback';
+  const trimmed = String(sql || '').trim().toLowerCase();
+  if (/^begin(\s+(deferred|immediate|exclusive))?(\s+transaction)?(\s*;\s*)?$/i.test(trimmed)) return 'begin';
+  if (/^(commit|end(\s+transaction)?)(\s*;\s*)?$/i.test(trimmed)) return 'commit';
+  if (/^rollback(\s+transaction)?(\s*;\s*)?$/i.test(trimmed)) return 'rollback';
   return 'none';
 };
 
 const db = {
   exec: (sql) => {
     const tx = detectTransactionStatement(sql);
-    if (dbInstance) return dbInstance.exec(sql);
-    if (rawSqlDb) {
-      const res = rawSqlDb.run(sql);
+
+    // Native node:sqlite engine
+    if (dbInstance) {
       if (tx === 'begin') {
-        sqlJsTxActive = true;
-      } else if (tx === 'commit' || tx === 'rollback') {
-        sqlJsTxActive = false;
-        saveSqlJsToDisk(false);
-      } else if (!sqlJsTxActive) {
+        if (txDepth === 0) {
+          txDepth = 1;
+          return dbInstance.exec(sql);
+        }
+        // Reuse existing outer transaction
+        txDepth++;
+        return;
+      }
+      if (tx === 'commit') {
+        if (txDepth > 1) {
+          txDepth--;
+          return;
+        }
+        if (txDepth === 1) {
+          txDepth = 0;
+          return dbInstance.exec(sql);
+        }
+        return;
+      }
+      if (tx === 'rollback') {
+        if (txDepth > 0) {
+          txDepth = 0;
+          return dbInstance.exec(sql);
+        }
+        return;
+      }
+      return dbInstance.exec(sql);
+    }
+
+    // Portable sql.js engine
+    if (rawSqlDb) {
+      if (tx === 'begin') {
+        if (txDepth === 0) {
+          txDepth = 1;
+          sqlJsTxActive = true;
+          return rawSqlDb.run(sql);
+        }
+        txDepth++;
+        return;
+      }
+      if (tx === 'commit') {
+        if (txDepth > 1) {
+          txDepth--;
+          return;
+        }
+        if (txDepth === 1) {
+          txDepth = 0;
+          sqlJsTxActive = false;
+          const res = rawSqlDb.run(sql);
+          saveSqlJsToDisk(false);
+          return res;
+        }
+        return;
+      }
+      if (tx === 'rollback') {
+        if (txDepth > 0) {
+          txDepth = 0;
+          sqlJsTxActive = false;
+          const res = rawSqlDb.run(sql);
+          saveSqlJsToDisk(false);
+          return res;
+        }
+        return;
+      }
+
+      const res = rawSqlDb.run(sql);
+      if (!sqlJsTxActive) {
         saveSqlJsToDisk(false);
       }
       return res;

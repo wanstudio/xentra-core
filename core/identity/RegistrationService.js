@@ -456,7 +456,7 @@ class RegistrationService {
       `).run(providerLinkId, userId, cleanSub, cleanEmail, providerMetadataStr, now, now, now);
       this.db.exec('COMMIT;');
     } catch (err) {
-      this.db.exec('ROLLBACK;');
+      try { this.db.exec('ROLLBACK;'); } catch (_) {}
       throw err;
     }
 
@@ -496,7 +496,7 @@ class RegistrationService {
       this.db.prepare(`UPDATE users SET brand_id = ?, organization_id = ?, branch_id = ?, updated_at = ? WHERE id = ?`).run(brandId, orgId, branchId, now, userId);
       this.db.exec('COMMIT;');
     } catch (err) {
-      this.db.exec('ROLLBACK;');
+      try { this.db.exec('ROLLBACK;'); } catch (_) {}
       throw err;
     }
 
