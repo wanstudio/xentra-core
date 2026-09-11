@@ -87,13 +87,16 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
 
 // Merchant Dashboard Assets & Routes
 app.use('/dashboard/assets', express.static(path.join(__dirname, '../apps/merchant-dashboard/assets')));
-app.get(['/onboarding', '/onboarding/'], (req, res) => {
+app.get(['/onboarding', '/onboarding/*', '/onboarding/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/onboarding.html'));
 });
 app.get(['/dashboard/login', '/dashboard/login/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/login.html'));
 });
 app.get(/^\/dashboard(\/.*)?$/, (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
 });
 
@@ -141,8 +144,16 @@ app.get(['/order-received', '/order-received/:id', '/order-received/'], (req, re
   res.sendFile(path.join(__dirname, '../apps/customer-pwa/order-received.html'));
 });
 
-// Fallback Customer PWA entry
+// Fallback: SaaS Control Plane redirects to onboarding; Tenant domains serve customer PWA
 app.get('*', (req, res) => {
+  const host = req.headers.host || '';
+  const cleanHost = host.split(':')[0].toLowerCase();
+
+  // On xentra.cloud SaaS control plane, do not serve tenant food ordering storefront
+  if (cleanHost === 'xentra.cloud') {
+    return res.redirect(302, '/onboarding');
+  }
+
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   const pwaIndex = path.join(__dirname, '../apps/customer-pwa/index.html');
   res.sendFile(pwaIndex, (err) => {

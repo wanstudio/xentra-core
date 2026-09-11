@@ -305,11 +305,13 @@ describe('Existing Tenant Claim / Adoption Flow (Bangjo)', () => {
     assert.equal(meRes.body.user.role, 'owner');
   });
 
-  // 6. UI static route verification
-  test('6. GET /onboarding serves the official Xentra Cloud onboarding UI', async () => {
+  // 6. Route Precedence & Host Separation verification
+  test('6. Route precedence: xentra.cloud serves onboarding UI and bypasses tenant resolver', async () => {
+    // 1. xentra.cloud/onboarding returns onboarding UI
     const res = await makeRequest(server, {
       method: 'GET',
-      path: '/onboarding'
+      path: '/onboarding',
+      headers: { Host: 'xentra.cloud' }
     });
 
     assert.equal(res.status, 200);
@@ -317,5 +319,40 @@ describe('Existing Tenant Claim / Adoption Flow (Bangjo)', () => {
     assert.ok(res.raw.includes('Saya Sudah Memiliki Bisnis'));
     assert.ok(res.raw.includes('/api/v1/onboarding/check-domain'));
     assert.ok(res.raw.includes('/api/v1/onboarding/claim'));
+
+    // 2. xentra.cloud/ root redirects to /onboarding (does NOT render customer food ordering storefront)
+    const rootRes = await makeRequest(server, {
+      method: 'GET',
+      path: '/',
+      headers: { Host: 'xentra.cloud' }
+    });
+    assert.equal(rootRes.status, 302);
+    assert.equal(rootRes.headers.location, '/onboarding');
+
+    // 3. app.mybangjo.com/dashboard/login works
+    const dashLoginRes = await makeRequest(server, {
+      method: 'GET',
+      path: '/dashboard/login',
+      headers: { Host: 'app.mybangjo.com' }
+    });
+    assert.equal(dashLoginRes.status, 200);
+    assert.ok(dashLoginRes.raw.includes('Merchant Login') || dashLoginRes.raw.includes('login') || dashLoginRes.raw.includes('Dashboard'));
+
+    // 4. app.mybangjo.com/dashboard/ works
+    const dashRes = await makeRequest(server, {
+      method: 'GET',
+      path: '/dashboard/',
+      headers: { Host: 'app.mybangjo.com' }
+    });
+    assert.equal(dashRes.status, 200);
+
+    // 5. app.mybangjo.com storefront resolution works (serves customer PWA)
+    const storefrontRes = await makeRequest(server, {
+      method: 'GET',
+      path: '/',
+      headers: { Host: 'app.mybangjo.com' }
+    });
+    assert.equal(storefrontRes.status, 200);
+    assert.ok(storefrontRes.raw.includes('xentra-home-view') || storefrontRes.raw.includes('Bangjo') || storefrontRes.raw.includes('pwa'));
   });
 });
