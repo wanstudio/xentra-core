@@ -1587,6 +1587,47 @@
     return true;
   }
 
+  // Check URL parameters for single-use handoff ticket from xentra.cloud.
+  // Exchanges ticket via POST, stores returned session token, and immediately scrubs the ticket from URL.
+  // CRITICAL SECURITY INVARIANT: Session tokens (xnt_auth_*) are NEVER exposed in the URL.
+  async function handleHandoffExchange() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var handoffTicket = urlParams.get('handoff');
+    if (!handoffTicket) return false;
+
+    // Immediately scrub ticket parameter from URL history to prevent URL leak or replay
+    urlParams.delete('handoff');
+    var cleanQuery = urlParams.toString();
+    var cleanUrl = window.location.pathname + (cleanQuery ? '?' + cleanQuery : '') + window.location.hash;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    try {
+      var res = await fetch(API_BASE + '/auth/handoff/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket: handoffTicket })
+      });
+      var data = await res.json();
+      if (res.ok && data && data.success && data.token) {
+        localStorage.setItem(TOKEN_KEY, data.token);
+        if (data.user) {
+          localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        }
+        return true;
+      } else {
+        console.warn('[Handoff exchange failed]:', data && (data.error || data.message));
+        clearStoredSession();
+        redirectToLogin();
+        return false;
+      }
+    } catch (err) {
+      console.error('[Handoff exchange network error]:', err);
+      clearStoredSession();
+      redirectToLogin();
+      return false;
+    }
+  }
+
   // Server-side session validation at boot: a token that exists locally but is
   // not valid on the server (401 INVALID_OR_EXPIRED_TOKEN) must force a real
   // login instead of letting the dashboard render an empty/fake state.
@@ -2608,7 +2649,7 @@
   /* =========================================================================
      INITIALIZATION ON DOM READY
      ========================================================================= */
-  document.addEventListener('DOMContentLoaded', function () {
+  document.addEventListener('DOMContentLoaded', async function () {
     // Navigation listeners
     document.querySelectorAll('.x-nav-item').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -2663,6 +2704,9 @@
         }
       });
     }
+
+    // Check for handoff ticket from xentra.cloud before initial auth check
+    await handleHandoffExchange();
 
     // Apply role-based UI before data load
     var isAuth = checkAuth();

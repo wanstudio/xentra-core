@@ -13,6 +13,7 @@ const RegistrationService = require('./RegistrationService');
 const EmailVerificationService = require('./EmailVerificationService');
 const PlatformBootstrapService = require('./PlatformBootstrapService');
 const AuthProviderService = require('./AuthProviderService');
+const HandoffService = require('./HandoffService');
 const { EmailProvider, defaultEmailProvider } = require('./EmailProvider');
 
 module.exports = {
@@ -27,6 +28,7 @@ module.exports = {
   EmailVerificationService,
   PlatformBootstrapService,
   AuthProviderService,
+  HandoffService,
   EmailProvider,
   defaultEmailProvider,
 

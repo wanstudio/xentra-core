@@ -1454,8 +1454,9 @@ function requireAuth(allowedRoles = []) {
     // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT via Core Identity
     let isTenantAuthorized = session.brandId === req.brand_id;
     if (!isTenantAuthorized && session.role === 'owner') {
-      if (req.path === '/auth/merchant/me' || (req.originalUrl && req.originalUrl.includes('/auth/merchant/me'))) {
-        // Safe profile inspection route: owner querying their own authenticated identity
+      if (req.path === '/auth/merchant/me' || (req.originalUrl && req.originalUrl.includes('/auth/merchant/me')) ||
+          req.path === '/auth/handoff/create' || (req.originalUrl && req.originalUrl.includes('/auth/handoff/create'))) {
+        // Safe profile & handoff generation: owner operating across their organization
         isTenantAuthorized = true;
       } else if (session.organizationId && req.brand && req.brand.organization_id) {
         isTenantAuthorized = session.organizationId === req.brand.organization_id;
@@ -2952,6 +2953,121 @@ router.post('/auth/google-onboard', async (req, res) => {
       success: false,
       code: err.code || 'GOOGLE_ONBOARD_ERROR',
       error: err.message || 'Terjadi kesalahan saat onboarding Google.'
+    });
+  }
+});
+
+// POST /auth/handoff/create: Issue single-use, time-limited cross-domain handoff ticket
+router.post('/auth/handoff/create', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const { brand_id } = req.body || {};
+    const targetBrandId = brand_id || req.user.brandId || req.brand_id;
+
+    if (!targetBrandId) {
+      return res.status(400).json({
+        success: false,
+        code: 'MISSING_BRAND_ID',
+        error: 'Target brand_id wajib disertakan untuk pembuatan handoff.'
+      });
+    }
+
+    const { HandoffService } = require('../../core/identity');
+    const handoffService = new HandoffService(db);
+    const userId = req.user.userId || req.user.id;
+
+    const result = handoffService.createTicket({
+      userId,
+      brandId: targetBrandId,
+      ttlSeconds: 60 // 60s TTL for secure cross-domain handoff
+    });
+
+    res.json({
+      success: true,
+      handoff_ticket: result.ticket,
+      expires_at: result.expires_at,
+      redirect_url: result.redirect_url,
+      brand_id: result.brand_id,
+      custom_domain: result.custom_domain
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      code: err.code || 'HANDOFF_CREATE_ERROR',
+      error: err.message || 'Gagal membuat tiket handoff.'
+    });
+  }
+});
+
+// POST /auth/handoff/exchange: Consume handoff ticket and issue tenant session token
+router.post('/auth/handoff/exchange', async (req, res) => {
+  try {
+    const { handoff_ticket, ticket } = req.body || {};
+    const rawTicket = handoff_ticket || ticket;
+
+    if (!rawTicket) {
+      return res.status(400).json({
+        success: false,
+        code: 'MISSING_TICKET',
+        error: 'Tiket handoff wajib disertakan.'
+      });
+    }
+
+    // Must be bound to a tenant domain context
+    const targetBrandId = req.brand_id;
+    if (!targetBrandId) {
+      return res.status(400).json({
+        success: false,
+        code: 'TENANT_REQUIRED',
+        error: 'Penukaran tiket handoff harus dilakukan pada domain tenant brand.'
+      });
+    }
+
+    const { HandoffService, WorkforceService } = require('../../core/identity');
+    const handoffService = new HandoffService(db);
+
+    const consumed = handoffService.consumeTicket({
+      ticket: rawTicket,
+      targetBrandId
+    });
+
+    // Create brand-bound session in TokenSessionStore
+    const { token, expiresAt } = TokenSessionStore.createSession(consumed.user, targetBrandId);
+
+    // Audit log
+    const workforce = new WorkforceService();
+    workforce.logSecurityEvent({
+      actor_id: consumed.user.id,
+      actor_role: consumed.user.role,
+      action: 'HANDOFF_SESSION_EXCHANGED',
+      brand_id: targetBrandId,
+      organization_id: consumed.organizationId,
+      branch_id: consumed.user.branch_id,
+      result: 'success',
+      metadata: { userId: consumed.user.id, targetBrandId }
+    });
+
+    res.json({
+      success: true,
+      token,
+      expires_at: new Date(expiresAt).toISOString(),
+      user: {
+        id: consumed.user.id,
+        username: consumed.user.username,
+        email: consumed.user.email,
+        full_name: consumed.user.full_name,
+        role: consumed.user.role,
+        branch_id: consumed.user.branch_id || null,
+        email_verified: consumed.user.email_verified,
+        brand_name: (req.brand && req.brand.name) ? req.brand.name : 'Merchant Resto'
+      }
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      code: err.code || 'HANDOFF_EXCHANGE_ERROR',
+      error: err.message || 'Gagal menukarkan tiket handoff.'
     });
   }
 });

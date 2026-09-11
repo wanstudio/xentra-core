@@ -1,6 +1,6 @@
 'use strict';
 
-const { test, describe, beforeEach } = require('node:test');
+const { test, describe, beforeEach, after } = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
 
@@ -919,6 +919,12 @@ describe('Google-First Authentication & Bangjo Owner Linking', () => {
     assert.equal(loginRes.status, 200);
     assert.equal(loginRes.body.user.id, 'usr_bangjo_owner');
     assert.equal(loginRes.body.user.role, 'owner');
+  });
+
+  after(() => {
+    if (server) {
+      server.close();
+    }
   });
 });
 
