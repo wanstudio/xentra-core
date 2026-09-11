@@ -1,66 +1,96 @@
-# 💬 Xentra Core — WhatsApp AI Agent Runner
+# Xentra Core WhatsApp Runner
 
-Daemon mandiri berbasis **Node.js**, **Baileys (WhatsApp Web Multi-Device)**, dan **Gemini Flash API** yang memungkinkan Anda mengontrol pengembangan, modifikasi kode, automated testing, dan deployment **Xentra Core** langsung dari **aplikasi WhatsApp di HP Anda** tanpa memerlukan PC menyala.
-
----
-
-## 🌟 Fitur Unggulan
-
-1. **100% Gratis & Tanpa Bayar:**
-   - Menggunakan koneksi WhatsApp Web Multi-Device resmi (gratis selamanya).
-   - Menggunakan Gemini Flash API (tier gratis dari Google AI Studio).
-2. **Kirim Instruksi via Chat WA Sehari-hari:**
-   - Cukup kirim chat biasa dari HP Anda (misal: *"Ubah diskon ongkir jadi 10rb untuk minimal belanja 50rb di cabang Surabaya Barat, jalankan test, lalu deploy ke cPanel"*).
-3. **Whitelist Keamanan Nomor HP:**
-   - Hanya nomor WhatsApp operator yang terdaftar di `ALLOWED_WHATSAPP_NUMBERS` yang dapat memerintah bot. Pesan dari orang lain otomatis diabaikan.
-4. **Automated Testing & Auto-Deploy:**
-   - Bot otomatis memverifikasi kode dengan `node --test tests/**/*.test.js` sebelum melakukan `git push`; GitHub Actions (deploy-app.yml) otomatis mendeploy ke `app.mybangjo.com`.
+Daemon mandiri berbasis **Node.js** dan **Baileys (WhatsApp Web Multi-Device)** yang memungkinkan Anda menjalankan pengujian otomatis dan deployment **Xentra Core** langsung dari **aplikasi WhatsApp di HP Anda** tanpa memerlukan PC menyala.
 
 ---
 
-## 🚀 Panduan Setup Singkat (3 Langkah)
+## Fitur
 
-### 1. Buat File `.env`
-Di folder `xentra-core/tools/whatsapp-runner/`:
+- ✅ **Jalankan Unit Test** — Eksekusi test suite Xentra Core via perintah `!test`
+- ✅ **Deployment Otomatis** — Commit & push ke main; GitHub Actions mendeploy ke app.mybangjo.com via `!deploy`
+- ✅ **Cek Status** — Monitoring kesehatan bot via `!status`
+- ✅ **Keamanan** — Whitelist nomor WhatsApp (`ALLOWED_WHATSAPP_NUMBERS`)
+- ✅ **Session Persistensi** — Otomatis menyimpan sesi autentikasi WhatsApp (multi-file auth state)
+
+---
+
+## Prasyarat
+
+- Node.js **>= 20.20.2**
+- Nomor WhatsApp untuk scan QR Code (hanya sekali saat pertama kali setup)
+- Repository Xentra Core sudah terhubung ke GitHub dengan GitHub Actions workflow `deploy-app.yml`
+
+---
+
+## Instalasi & Setup
+
 ```bash
-cp .env.example .env
-nano .env
-```
-Isi whitelist nomor WhatsApp dan Gemini API Key:
-```ini
-ALLOWED_WHATSAPP_NUMBERS=628xxxxxxxxxx
-
-GEMINI_API_KEY=AIzaSyD...your-gemini-key
-GEMINI_MODEL=gemini-2.5-flash
-```
-
-### 2. Install Dependensi & Jalankan Bot Pertama Kali
-```bash
+# 1. Masuk ke direktori runner
 cd xentra-core/tools/whatsapp-runner
+
+# 2. Install dependencies
 npm install
-node bot.js
+
+# 3. Salin file konfigurasi contoh
+cp .env.example .env
+
+# 4. Isi whitelist nomor WhatsApp:
+#    ALLOWED_WHATSAPP_NUMBERS=628xxxxxxxxxx
+#    (Bisa multi nomor dipisahkan koma: 628xxxx,628yyyy)
+
+# 5. Jalankan bot
+npm start
 ```
 
-### 3. Scan QR Code dari WhatsApp HP Anda
-1. Di terminal akan muncul **QR Code**.
-2. Buka WhatsApp di HP ➡️ Tekan **Titik Tiga** di kanan atas (atau Pengaturan) ➡️ Pilih **Perangkat Tertaut (Linked Devices)** ➡️ Tekan **Tautkan Perangkat (Link a Device)**.
-3. Scan QR Code di layar terminal.
-4. 🎉 **Selesai!** Bot langsung online dan sesi tersimpan di folder `auth_session/`. Anda tidak perlu scan lagi saat restart.
+Saat pertama kali dijalankan, bot akan menampilkan **QR Code** di terminal. Scan dengan WhatsApp di HP Anda:
+> Buka WA → Titik tiga (⋮) → Perangkat tertaut → Tautkan perangkat
 
-### 4. Jalankan 24/7 di Background Server
-Agar bot tetap berjalan di server saat PC Anda dimatikan:
-```bash
-npm install -g pm2
-pm2 start bot.js --name "xentra-wa-bot"
-pm2 save
-```
+Setelah scan berhasil, bot akan otomatis terhubung dan siap menerima perintah.
 
 ---
 
-## 📱 Contoh Perintah dari HP
+## Perintah Bot
 
-- `!status` — Memeriksa status bot dan server.
-- `!test` — Menjalankan automated test suite.
-- `!deploy` — Mendeploy perubahan codebase terbaru langsung ke cPanel.
-- *"Tolong tambahkan kategori baru 'Paket Hemat' dengan 2 menu di seeder database dan jalankan test"*
-- *"Ganti warna tema primer menjadi #b6ff00 dan perbarui tagline brand"*
+| Perintah | Deskripsi |
+|----------|-----------|
+| `!start` / `!help` | Tampilkan bantuan |
+| `!status` | Cek status bot (online, workspace, deploy target) |
+| `!test` | Jalankan full unit test suite Xentra Core |
+| `!deploy` | Commit semua perubahan & push ke main (trigger GitHub Actions deploy) |
+
+*Format fleksibel: `!test`, `! test`, `/test`, `/ test` semuanya valid.*
+
+---
+
+## Keamanan
+
+- Hanya nomor yang terdaftar di `ALLOWED_WHATSAPP_NUMBERS` yang bisa mengontrol bot
+- Jika kosong, **semua nomor diizinkan** (mode development)
+- Sesuai WhatsApp Web Multi-Device, session disimpan lokal di folder `auth_session/`
+
+---
+
+## Deployment Otomatis
+
+Perintah `!deploy` melakukan:
+1. `git add -A` — stage semua perubahan
+2. `git commit -m "<pesan>"` — commit dengan pesan default atau custom
+3. `git push origin main` — push ke GitHub
+
+GitHub Actions workflow `deploy-app.yml` akan otomatis mendeploy ke **app.mybangjo.com**.
+
+---
+
+## Logs & Debugging
+
+- Semua aktivitas dicetak ke console (stdout/stderr)
+- Error koneksi WhatsApp akan trigger reconnect otomatis
+- Gunakan `pino` untuk logging terstruktur (level: silent default)
+
+---
+
+## Catatan Penting
+
+- Bot ini **bukan AI agent** — hanya mengeksekusi perintah terstruktur
+- Untuk modifikasi kode kompleks, gunakan workflow development standar (IDE + Git)
+- Pastikan repository sudah clean (no uncommitted secrets) sebelum `!deploy`

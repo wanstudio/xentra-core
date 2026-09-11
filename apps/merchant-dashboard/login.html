@@ -332,6 +332,30 @@
       height: 1px;
       background: #e2e8f0;
     }
+
+    .x-google-auth-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin-bottom: 6px;
+    }
+
+    .x-google-btn-container {
+      width: 100%;
+      min-height: 44px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .x-google-status {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 8px;
+      display: none;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -356,6 +380,13 @@
         <p class="x-card-subtitle">Kelola menu, logo brand, cabang pengiriman, dan pantau pesanan dapur secara realtime.</p>
 
         <div id="login-error" class="x-alert-error"></div>
+
+        <!-- Google-First Authentication -->
+        <div id="google-auth-container" class="x-google-auth-wrap" style="display:none;">
+          <div id="google-btn-slot" class="x-google-btn-container"></div>
+          <div id="google-auth-status" class="x-google-status">Memproses autentikasi Google...</div>
+          <div class="x-divider" style="width:100%;">atau masuk dengan username</div>
+        </div>
 
         <form id="form-merchant-login">
           <div class="x-form-group">
@@ -638,6 +669,140 @@
           btnResetSubmit.innerHTML = '<span>Reset Password</span>';
         });
       }
+
+      // 7. Google-First Authentication Integration
+      var googleContainer = document.getElementById('google-auth-container');
+      var googleBtnSlot = document.getElementById('google-btn-slot');
+      var googleStatus = document.getElementById('google-auth-status');
+      var isGoogleAuthenticating = false;
+
+      async function handleGoogleCredentialResponse(response) {
+        if (!response || !response.credential) {
+          errorBox.textContent = '❌ Kredensial Google tidak diterima.';
+          errorBox.style.display = 'block';
+          return;
+        }
+
+        if (isGoogleAuthenticating) return; // Prevent duplicate concurrent submission
+        isGoogleAuthenticating = true;
+
+        errorBox.style.display = 'none';
+        if (googleStatus) {
+          googleStatus.textContent = 'Memverifikasi akun Google dengan Xentra...';
+          googleStatus.style.display = 'block';
+        }
+        btn.disabled = true;
+
+        try {
+          var res = await fetch('/api/v1/auth/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ credential: response.credential })
+          });
+
+          var data = null;
+          try {
+            data = await res.json();
+          } catch (_) {}
+
+          if (res.ok && data && data.success && data.token) {
+            localStorage.setItem(TOKEN_KEY, data.token);
+            localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+            if (googleStatus) {
+              googleStatus.textContent = 'Login Google berhasil! Mengalihkan...';
+              googleStatus.style.color = '#166534';
+            }
+            setTimeout(function () {
+              window.location.href = '/dashboard/';
+            }, 250);
+            return;
+          }
+
+          // Handle specific backend error codes
+          if (res.status === 404 && data && data.code === 'ACCOUNT_NOT_LINKED') {
+            errorBox.textContent = '⚠️ Akun Google ini belum terhubung ke akun Xentra Anda. Silakan login dengan username & password terlebih dahulu untuk menghubungkannya.';
+          } else if (res.status === 503 || (data && data.code === 'GOOGLE_SERVICE_UNAVAILABLE')) {
+            errorBox.textContent = '⚠️ Layanan Google sementara tidak dapat dihubungi. Silakan coba lagi beberapa saat atau gunakan login username/password.';
+          } else if (res.status === 403 && data && data.code === 'ACCOUNT_DISABLED') {
+            errorBox.textContent = '❌ Akun Xentra ini telah dinonaktifkan. Hubungi administrator.';
+          } else if (res.status === 403 && data && data.code === 'FORBIDDEN_TENANT_ACCESS') {
+            errorBox.textContent = '❌ Akun Anda tidak memiliki izin akses ke resto ini.';
+          } else {
+            errorBox.textContent = '❌ ' + ((data && (data.error || data.message)) || 'Autentikasi Google gagal.');
+          }
+          errorBox.style.display = 'block';
+        } catch (netErr) {
+          console.warn('[Google auth network error]:', netErr);
+          errorBox.textContent = '❌ Kesalahan jaringan saat autentikasi Google. Silakan coba lagi.';
+          errorBox.style.display = 'block';
+        } finally {
+          isGoogleAuthenticating = false;
+          btn.disabled = false;
+          if (googleStatus) {
+            googleStatus.style.display = 'none';
+          }
+        }
+      }
+
+      function initGoogleSignIn(clientId) {
+        if (!clientId || !window.google || !window.google.accounts || !window.google.accounts.id) {
+          return;
+        }
+
+        try {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
+
+          if (googleBtnSlot) {
+            googleBtnSlot.innerHTML = '';
+            window.google.accounts.id.renderButton(googleBtnSlot, {
+              theme: 'outline',
+              size: 'large',
+              type: 'standard',
+              text: 'continue_with',
+              shape: 'rectangular',
+              logo_alignment: 'left',
+              width: 320
+            });
+            if (googleContainer) {
+              googleContainer.style.display = 'flex';
+            }
+          }
+        } catch (e) {
+          console.warn('[Google SDK init warn]:', e);
+        }
+      }
+
+      // 8. Fetch runtime client auth configuration & dynamically load Google SDK
+      async function setupGoogleAuth() {
+        try {
+          var res = await fetch('/api/v1/auth/config');
+          if (!res.ok) return;
+          var cfg = await res.json();
+          if (!cfg || !cfg.google_enabled || !cfg.google_client_id) {
+            // Google auth not configured on server; keep legacy login exclusively visible
+            return;
+          }
+
+          var script = document.createElement('script');
+          script.src = 'https://accounts.google.com/gsi/client';
+          script.async = true;
+          script.defer = true;
+          script.onload = function () {
+            initGoogleSignIn(cfg.google_client_id);
+          };
+          document.head.appendChild(script);
+        } catch (e) {
+          console.warn('[Google Auth config check warn]:', e);
+        }
+      }
+
+      // Initialize Google Auth check
+      setupGoogleAuth();
     })();
   </script>
 </body>

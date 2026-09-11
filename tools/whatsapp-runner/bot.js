@@ -6,20 +6,10 @@ const dotenv = require('dotenv');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-const GeminiAgent = require('./geminiAgent');
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const ALLOWED_NUMBERS = (process.env.ALLOWED_WHATSAPP_NUMBERS || '')
   .split(',')
   .map(num => num.replace(/[^0-9]/g, ''))
   .filter(Boolean);
-
-if (!GEMINI_API_KEY) {
-  console.error('[Error] GEMINI_API_KEY belum diisi di file .env.');
-  process.exit(1);
-}
-
-const agent = new GeminiAgent(GEMINI_API_KEY, process.env.GEMINI_MODEL || 'gemini-2.5-flash');
 
 let currentSock = null;
 const processedMessageIds = new Set();
@@ -30,7 +20,7 @@ async function connectToWhatsApp() {
   const { version } = await fetchLatestBaileysVersion();
 
   console.log('====================================================');
-  console.log(`  🤖 Xentra Core WhatsApp AI Runner v${version.join('.')}  `);
+  console.log(`  🤖 Xentra Core WhatsApp Runner v${version.join('.')}  `);
   console.log('====================================================');
 
   if (currentSock) {
@@ -71,7 +61,6 @@ async function connectToWhatsApp() {
       console.log(`[Connection Closed] Reason: ${statusCode || 'Unknown'}. Reconnecting: ${shouldReconnect}`);
 
       if (shouldReconnect) {
-        // Wait slightly longer on 440 to allow WhatsApp server to reset stream
         const delay = statusCode === 440 ? 5000 : 3000;
         setTimeout(connectToWhatsApp, delay);
       } else {
@@ -99,7 +88,6 @@ async function connectToWhatsApp() {
       const participant = msg.key.participant || msg.participant || '';
       const senderPhone = (remoteJid + ' ' + participant).replace(/[^0-9]/g, '');
 
-      // Extract message text
       const text =
         msg.message.conversation ||
         msg.message.extendedTextMessage?.text ||
@@ -110,7 +98,6 @@ async function connectToWhatsApp() {
 
       const trimmedText = text.trim();
 
-      // Avoid processing bot's own responses
       if (
         trimmedText.startsWith('⏳ *Menerima instruksi') ||
         trimmedText.startsWith('🟢 *Xentra Core') ||
@@ -123,7 +110,6 @@ async function connectToWhatsApp() {
 
       console.log(`[Incoming WA Message]: "${trimmedText}" | fromMe: ${isFromMe} | JID: ${remoteJid}`);
 
-      // Security check: Only allow messages from verified sender or whitelisted numbers
       const isAuthorized = isFromMe || (ALLOWED_NUMBERS.length > 0 && ALLOWED_NUMBERS.some(num => senderPhone.includes(num)));
 
       if (ALLOWED_NUMBERS.length > 0 && !isAuthorized) {
@@ -142,17 +128,16 @@ async function connectToWhatsApp() {
         }
       };
 
-      // Normalized command check (supports "!test", "! test", "/test", "/ test")
       const normalizedCmd = trimmedText.toLowerCase().replace(/\s+/g, ' ');
 
       if (['!start', '! start', '!help', '! help', '/start', '/ start', '/help', '/ help'].includes(normalizedCmd)) {
-        const helpText = `*🤖 Selamat Datang di Xentra Core WhatsApp AI Runner!*\n\nBot ini siap membantu Anda memodifikasi kode, menjalankan pengujian, dan melakukan deployment langsung dari WhatsApp saat PC mati.\n\n📌 *Cara Penggunaan:*\nKirim instruksi Anda dalam bahasa Indonesia biasa, contoh:\n• _"Ganti warna tema brand Bangjo jadi #b6ff00 dan ubah tagline-nya"_\n• _"Jalankan unit test untuk memastikan tidak ada error"_\n• _"Buat diskon ongkir 10rb untuk belanja di atas 50rb lalu deploy ke cPanel"_\n\n⚡ *Perintah Cepat:*\n• *!status* — Cek status bot & environment\n• *!test* — Jalankan automated unit tests\n• *!deploy* — Commit & push ke main (deploy otomatis ke app.mybangjo.com)`;
+        const helpText = `*🤖 Selamat Datang di Xentra Core WhatsApp Runner!*\n\nBot ini siap menjalankan pengujian dan deployment langsung dari WhatsApp.\n\n⚡ *Perintah Cepat:*\n• *!status* — Cek status bot & environment\n• *!test* — Jalankan automated unit tests\n• *!deploy* — Commit & push ke main (deploy otomatis ke app.mybangjo.com)`;
         await reply(helpText);
         continue;
       }
 
       if (['!status', '! status', '/status', '/ status'].includes(normalizedCmd)) {
-        await reply(`🟢 *Xentra Core WhatsApp AI Runner Aktif*\n• Status: Online 24/7\n• Model: \`${process.env.GEMINI_MODEL || 'gemini-3.7-flash'}\`\n• Workspace: \`xentra-core\`\n• Deploy Target: \`app.mybangjo.com\` (via GitHub Actions)`);
+        await reply(`🟢 *Xentra Core WhatsApp Runner Aktif*\n• Status: Online 24/7\n• Workspace: \`xentra-core\`\n• Deploy Target: \`app.mybangjo.com\` (via GitHub Actions)`);
         continue;
       }
 
@@ -180,28 +165,7 @@ async function connectToWhatsApp() {
         continue;
       }
 
-      // Process Natural Language Task with Gemini Agent
-      await reply(`⏳ *Menerima instruksi... Sedang menganalisis repositori Xentra Core...*`);
-
-      const progressSteps = [];
-      const onProgress = async (stepInfo) => {
-        progressSteps.push(stepInfo);
-      };
-
-      try {
-        const responseText = await agent.runTask(trimmedText, onProgress);
-
-        let finalResponse = '';
-        if (progressSteps.length > 0) {
-          finalResponse += `*Langkah Eksekusi:*\n${progressSteps.slice(-4).join('\n')}\n\n---\n\n`;
-        }
-        finalResponse += responseText;
-
-        await reply(finalResponse);
-      } catch (err) {
-        console.error('[WhatsApp Agent Error]:', err);
-        await reply(`❌ *Gagal Mengeksekusi Perintah:*\n\n_${err.message}_`);
-      }
+      await reply(`❓ *Perintah tidak dikenali.*\nKirim *!help* untuk daftar perintah yang tersedia.`);
     }
   });
 }

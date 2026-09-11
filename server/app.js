@@ -60,6 +60,13 @@ app.use(express.urlencoded({ extended: true }));
 // REST API with Tenant Resolution (Support both /api/v1 and /api)
 app.use(['/api/v1', '/api'], tenantResolver, apiRoutes);
 
+// Xentra Cloud Platform: Public Email Verification Route
+app.get(['/verify-email', '/verify-email/'], (req, res, next) => {
+  // Delegate directly to the api router verification handler
+  req.url = '/verify-email' + (req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '');
+  apiRoutes(req, res, next);
+});
+
 // Serve Public Static Assets
 app.use('/assets', express.static(path.join(__dirname, '../apps/customer-pwa/assets')));
 app.use('/pwa', express.static(path.join(__dirname, '../apps/customer-pwa/assets/pwa')));

@@ -44,13 +44,23 @@ class PermissionModel {
     DELIVERY_VIEW: 'delivery:view',
 
     // Reports & Analytics
-    ANALYTICS_VIEW: 'analytics:view'
+    ANALYTICS_VIEW: 'analytics:view',
+
+    // Platform Control Plane Permissions
+    PLATFORM_MANAGE: 'platform:manage',
+    PLATFORM_TENANT_MANAGE: 'platform:tenant:manage',
+    PLATFORM_AUDIT_VIEW: 'platform:audit:view'
   };
 
   /**
    * Authoritative Role -> Permissions Matrix (Aligned with Locked Decisions)
    */
   static ROLE_PERMISSIONS_MATRIX = {
+    [RoleModel.ROLES.PLATFORM_OWNER]: [
+      'platform:manage',
+      'platform:tenant:manage',
+      'platform:audit:view'
+    ],
     [RoleModel.ROLES.OWNER]: [
       'org:manage',
       'brand:manage',

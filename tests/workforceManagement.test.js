@@ -80,8 +80,8 @@ describe('Workforce Management', () => {
     const bcrypt = require('bcryptjs');
     const adminHash = bcrypt.hashSync('bangjo123', 12);
     db.prepare(`
-      INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role, status, password_changed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))
+      INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))
     `).run('usr_test_owner', brandId, orgId, 'admin_test', 'admin@test.com', adminHash, 'Test Owner', 'owner');
 
     // Login as owner to get token

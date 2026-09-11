@@ -1328,6 +1328,7 @@ const TokenSessionStore = {
       branchId: user.branch_id || null,
       branch_id: user.branch_id || null,
       status: user.status || 'active',
+      email_verified: user.email_verified !== undefined ? Boolean(user.email_verified) : true,
       expiresAt
     });
     return { token, expiresAt };
@@ -1441,6 +1442,15 @@ function requireAuth(allowedRoles = []) {
       });
     }
 
+    // Platform Owner is platform-scoped and cannot access tenant-scoped operations as a merchant user
+    if (session.role === 'platform_owner') {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN_TENANT_ACCESS',
+        message: 'Platform Owner adalah akun platform-scoped dan tidak dapat mengakses operasi tenant secara langsung tanpa support context.'
+      });
+    }
+
     // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT via Core Identity
     let isTenantAuthorized = session.brandId === req.brand_id;
     if (!isTenantAuthorized && session.role === 'owner') {
@@ -1464,6 +1474,32 @@ function requireAuth(allowedRoles = []) {
         error: 'INSUFFICIENT_PERMISSIONS',
         message: 'Role Anda tidak memiliki izin untuk mengakses resource ini.'
       });
+    }
+
+    // EMAIL VERIFICATION ACCESS POLICY ENFORCEMENT
+    // Exclude safe identity/verification-UX routes so unverified users can inspect their status, log out, or resend
+    const verificationExemptRoutes = ['/auth/merchant/me', '/auth/logout', '/auth/resend-verification'];
+    const isExemptRoute = verificationExemptRoutes.includes(req.path);
+
+    if (!isExemptRoute && session.role === 'owner') {
+      // Check verification status from session or authoritatively from DB if session claims unverified
+      let isVerified = Boolean(session.email_verified);
+      if (!isVerified) {
+        const userRow = db.prepare('SELECT email_verified_at FROM users WHERE id = ?').get(session.userId || session.id);
+        if (userRow && userRow.email_verified_at) {
+          isVerified = true;
+          session.email_verified = true; // Heal session in place immediately
+        }
+      }
+
+      if (!isVerified) {
+        return res.status(403).json({
+          success: false,
+          code: 'EMAIL_NOT_VERIFIED',
+          error: 'EMAIL_NOT_VERIFIED',
+          message: 'Silakan verifikasi alamat email Anda terlebih dahulu untuk mengakses fitur operasional dashboard.'
+        });
+      }
     }
 
     // P1 BRANCH SCOPE BOUNDARY ENFORCEMENT (FINDING-01 & NEW-05)
@@ -1492,6 +1528,159 @@ function requireAuth(allowedRoles = []) {
     next();
   };
 }
+
+// Middleware: Require Authenticated Platform Owner (Header-Only: Bearer token or x-auth-token)
+function requirePlatformAuth() {
+  return (req, res, next) => {
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || '').trim();
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Token otentikasi platform tidak ditemukan. Silakan login ke Control Plane.'
+      });
+    }
+
+    const session = TokenSessionStore.getSession(token);
+    if (!session) {
+      return res.status(401).json({
+        success: false,
+        error: 'INVALID_OR_EXPIRED_TOKEN',
+        message: 'Sesi platform Anda telah kedaluwarsa atau tidak valid. Silakan login kembali.'
+      });
+    }
+
+    // STRICT PLATFORM SCOPE ENFORCEMENT: Merchant Owner or other merchant roles CANNOT access
+    if (session.role !== 'platform_owner') {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN_PLATFORM_ACCESS',
+        message: 'Akses ditolak: Operasi ini membutuhkan kewenangan Platform Owner.'
+      });
+    }
+
+    req.session = session;
+    req.platformUser = session;
+    next();
+  };
+}
+
+// 6.0 Platform Owner Authentication Endpoint
+router.post(['/platform/auth/login', '/api/v1/platform/auth/login'], (req, res) => {
+  try {
+    const { email, username, password } = req.body || {};
+    const identifier = (email || username || '').trim();
+
+    if (!identifier || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'Email/username dan password wajib diisi.'
+      });
+    }
+
+    // Rate limiting: 5 attempts per 5 minutes per identifier/IP
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+    const rateLimitKey = `platform_login:${clientIp}:${identifier.toLowerCase()}`;
+    const rateCheck = RateLimiter.check(rateLimitKey, 5, 300);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'TOO_MANY_REQUESTS',
+        message: `Terlalu banyak percobaan login platform. Coba lagi dalam ${rateCheck.retryAfter} detik.`
+      });
+    }
+
+    const { PlatformBootstrapService } = require('../../core/identity');
+    const platformService = new PlatformBootstrapService(db);
+    const authResult = platformService.authenticate(identifier, password);
+
+    if (!authResult.success) {
+      const statusCode = authResult.error === 'ACCOUNT_DISABLED' ? 403 : 401;
+      return res.status(statusCode).json({
+        success: false,
+        error: authResult.error || 'INVALID_CREDENTIALS',
+        message: authResult.message || 'Email atau password salah.'
+      });
+    }
+
+    // Reset rate limiter on successful authentication
+    RateLimiter.reset(rateLimitKey);
+
+    const user = authResult.user;
+
+    // Register active platform session in TokenSessionStore (brand_id is strictly null)
+    const { token, expiresAt } = TokenSessionStore.createSession(user, null);
+
+    res.json({
+      success: true,
+      message: 'Login Platform Owner berhasil.',
+      token,
+      expires_at: new Date(expiresAt).toISOString(),
+      platform_user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        status: user.status,
+        mfa_status: {
+          mfa_enrolled: Boolean(user.mfa_enabled),
+          mfa_required: true,
+          mfa_ready: true,
+          mfa_enforced: false,
+          note: 'MFA readiness established. Enforcement is reserved for future implementation.'
+        }
+      }
+    });
+  } catch (err) {
+    console.error('[Platform Login Error]:', err);
+    res.status(500).json({
+      success: false,
+      error: 'PLATFORM_AUTH_ERROR',
+      message: 'Terjadi kesalahan sistem pada autentikasi platform.'
+    });
+  }
+});
+
+// 6.1 Platform Control Plane Endpoints
+router.get(['/platform/me', '/api/v1/platform/me'], requirePlatformAuth(), (req, res) => {
+  try {
+    const userRow = db.prepare(`
+      SELECT id, username, email, full_name, role, status, mfa_enabled, mfa_enrolled_at, created_at, updated_at
+      FROM users WHERE id = ?
+    `).get(req.platformUser.id || req.platformUser.userId);
+
+    if (!userRow) {
+      return res.status(404).json({ success: false, error: 'User tidak ditemukan.' });
+    }
+
+    res.json({
+      success: true,
+      platform_user: {
+        id: userRow.id,
+        username: userRow.username,
+        email: userRow.email,
+        full_name: userRow.full_name,
+        role: userRow.role,
+        status: userRow.status,
+        mfa_status: {
+          mfa_enrolled: Boolean(userRow.mfa_enabled),
+          mfa_required: true,
+          mfa_ready: true,
+          mfa_enforced: false, // Explicit: MFA is not claimed to be enforced yet
+          note: 'MFA readiness established. Enforcement is reserved for future implementation.'
+        },
+        created_at: userRow.created_at,
+        updated_at: userRow.updated_at
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // 7. Get Order Details & Live Status (Protected by Ownership or Operator Auth - NEW-01)
 router.get('/orders/:id', (req, res) => {
@@ -2217,8 +2406,193 @@ router.post('/webhooks/midtrans', (req, res) => {
   }
 });
 
+// 10.0 SaaS Control Plane Business Registration Endpoint
+router.post('/auth/register', (req, res) => {
+  try {
+    const { email, password, full_name, business_name, brand_name, branch_name, phone, address_text } = req.body;
+
+    // Rate limiting: 5 registration attempts per 10 minutes per IP
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const rateLimitKey = `register:${clientIp}`;
+    const rateCheck = RateLimiter.check(rateLimitKey, 5, 600);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'TOO_MANY_REQUESTS',
+        message: `Terlalu banyak permintaan pendaftaran. Coba lagi dalam ${rateCheck.retryAfter} detik.`
+      });
+    }
+
+    const { RegistrationService, WorkforceService } = require('../../core/identity');
+    const registration = new RegistrationService();
+    const result = registration.registerBusiness({
+      email,
+      password,
+      full_name,
+      business_name,
+      brand_name,
+      branch_name,
+      phone,
+      address_text
+    });
+
+    // Create session token for newly registered owner
+    const sessionUser = {
+      id: result.user.id,
+      username: result.user.username,
+      email: result.user.email,
+      full_name: result.user.full_name,
+      role: 'owner',
+      brand_id: result.brand.id,
+      organization_id: result.organization.id,
+      branch_id: result.branch.id,
+      status: 'active',
+      email_verified: false
+    };
+
+    const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, result.brand.id);
+
+    // Audit log
+    const workforce = new WorkforceService();
+    workforce.logSecurityEvent({
+      actor_id: result.user.id,
+      actor_role: 'owner',
+      action: 'BUSINESS_REGISTERED',
+      target_user_id: result.user.id,
+      target_role: 'owner',
+      brand_id: result.brand.id,
+      organization_id: result.organization.id,
+      branch_id: result.branch.id,
+      result: 'success',
+      metadata: { email: result.user.email, org_name: result.organization.name }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Pendaftaran bisnis berhasil.',
+      token,
+      expires_at: new Date(expiresAt).toISOString(),
+      user: result.user,
+      organization: result.organization,
+      brand: result.brand,
+      branch: result.branch
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    const errorMsg = err.message || 'Terjadi kesalahan sistem saat pendaftaran.';
+    res.status(status).json({
+      success: false,
+      code: err.code || 'REGISTRATION_ERROR',
+      error: errorMsg
+    });
+  }
+});
+
+// 10.0.1 Email Verification Endpoints (GET /verify-email & POST /auth/verify-email)
+const handleEmailVerification = (req, res) => {
+  try {
+    const rawToken = req.query.token || req.body.token;
+
+    if (!rawToken) {
+      return res.status(400).json({
+        success: false,
+        code: 'TOKEN_REQUIRED',
+        error: 'Token verifikasi wajib disertakan.'
+      });
+    }
+
+    const { EmailVerificationService, WorkforceService } = require('../../core/identity');
+    const emailVerification = new EmailVerificationService();
+    const result = emailVerification.verifyToken(rawToken);
+
+    // Security event audit logging
+    const workforce = new WorkforceService();
+    workforce.logSecurityEvent({
+      actor_id: result.userId,
+      actor_role: result.role || 'owner',
+      action: 'EMAIL_VERIFIED',
+      target_user_id: result.userId,
+      target_role: result.role || 'owner',
+      brand_id: result.brandId,
+      organization_id: result.organizationId,
+      result: 'success',
+      metadata: { email: result.email, verified_at: result.verifiedAt }
+    });
+
+    res.json({
+      success: true,
+      message: 'Email berhasil diverifikasi.',
+      email: result.email,
+      verified_at: result.verifiedAt
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      code: err.code || 'VERIFICATION_FAILED',
+      error: err.message || 'Verifikasi email gagal.'
+    });
+  }
+};
+
+router.get('/verify-email', handleEmailVerification);
+router.get('/auth/verify-email', handleEmailVerification);
+router.post('/auth/verify-email', handleEmailVerification);
+
+// 10.0.2 Resend Email Verification Endpoint
+router.post('/auth/resend-verification', async (req, res) => {
+  try {
+    let targetEmail = req.body && req.body.email;
+
+    if (!targetEmail) {
+      const authHeader = req.headers['authorization'] || '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || '').trim();
+      if (token) {
+        const session = TokenSessionStore.getSession(token);
+        if (session && session.email) {
+          targetEmail = session.email;
+        }
+      }
+    }
+
+    if (!targetEmail) {
+      return res.status(400).json({
+        success: false,
+        code: 'EMAIL_REQUIRED',
+        error: 'Alamat email wajib disertakan.'
+      });
+    }
+
+    // Rate limiting: 3 resend attempts per 15 minutes per email/IP
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const cleanEmail = String(targetEmail).trim().toLowerCase();
+    const rateLimitKey = `resend-verify:${cleanEmail}:${clientIp}`;
+    const rateCheck = RateLimiter.check(rateLimitKey, 3, 900);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        success: false,
+        error: 'TOO_MANY_REQUESTS',
+        message: `Terlalu banyak permintaan kirim ulang. Coba lagi dalam ${rateCheck.retryAfter} detik.`
+      });
+    }
+
+    const { EmailVerificationService } = require('../../core/identity');
+    const emailVerification = new EmailVerificationService();
+    const result = await emailVerification.resendVerificationEmail(cleanEmail);
+
+    res.json(result);
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      code: err.code || 'RESEND_FAILED',
+      error: err.message || 'Gagal mengirim ulang email verifikasi.'
+    });
+  }
+});
+
 // 10.1 Merchant Auth Endpoints
-router.post('/auth/merchant/login', (req, res) => {
+const handleMerchantLogin = (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -2298,6 +2672,7 @@ router.post('/auth/merchant/login', (req, res) => {
         full_name: user.full_name,
         role: user.role,
         branch_id: user.branch_id || null,
+        email_verified: user.email_verified,
         brand_name: (req.brand && req.brand.name) ? req.brand.name : 'Bangjo Resto'
       }
     });
@@ -2305,6 +2680,233 @@ router.post('/auth/merchant/login', (req, res) => {
     console.error('[Merchant Auth Error]:', err);
     res.status(500).json({ success: false, error: 'Terjadi kesalahan sistem saat autentikasi.' });
   }
+};
+
+router.post('/auth/merchant/login', handleMerchantLogin);
+router.post('/auth/login', handleMerchantLogin);
+
+// 10.2 Google Authentication & Account Linking Endpoints
+const GoogleAuthService = require('../services/GoogleAuthService');
+const { AuthProviderService } = require('../../core/identity');
+
+// POST /auth/google: Google-First Authentication
+router.post('/auth/google', async (req, res) => {
+  try {
+    const { credential, id_token } = req.body || {};
+    const rawToken = credential || id_token;
+
+    if (!rawToken) {
+      return res.status(400).json({
+        success: false,
+        code: 'MISSING_GOOGLE_CREDENTIAL',
+        error: 'Credential token Google wajib dikirim.'
+      });
+    }
+
+    const googleAuth = new GoogleAuthService();
+    const verifiedClaims = await googleAuth.verifyIdToken(rawToken);
+
+    // Rate limiting: 10 attempts per 5 minutes per Google sub + IP
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const rateLimitKey = `google-auth:${verifiedClaims.sub}:${clientIp}`;
+    const rateCheck = RateLimiter.check(rateLimitKey, 10, 300);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        success: false,
+        code: 'TOO_MANY_REQUESTS',
+        error: `Terlalu banyak percobaan autentikasi Google. Coba lagi dalam ${rateCheck.retryAfter} detik.`
+      });
+    }
+
+    // Lookup provider identity strictly by (google, sub)
+    const authProviderService = new AuthProviderService();
+    const identity = authProviderService.findIdentity('google', verifiedClaims.sub);
+
+    if (!identity) {
+      return res.status(404).json({
+        success: false,
+        code: 'ACCOUNT_NOT_LINKED',
+        error: 'Akun Google belum terhubung ke akun Xentra.',
+        google: {
+          sub: verifiedClaims.sub,
+          email: verifiedClaims.email,
+          email_verified: verifiedClaims.email_verified
+        }
+      });
+    }
+
+    const user = identity.user;
+
+    // Check account active status
+    if (user.status === 'disabled') {
+      return res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_DISABLED',
+        error: 'Akun telah dinonaktifkan. Hubungi administrator.'
+      });
+    }
+
+    // Tenant / Branch boundary checks
+    // If tenant brand is provided on request host/context, verify accessibility
+    if (req.brand_id && user.brand_id && user.brand_id !== req.brand_id) {
+      // If user is owner, check organization match
+      let isAllowed = false;
+      if (user.role === 'owner' && user.organization_id && req.brand && req.brand.organization_id) {
+        isAllowed = user.organization_id === req.brand.organization_id;
+      }
+      if (!isAllowed) {
+        return res.status(403).json({
+          success: false,
+          code: 'FORBIDDEN_TENANT_ACCESS',
+          error: 'Akun Anda tidak memiliki akses ke tenant brand ini.'
+        });
+      }
+    }
+
+    // Branch check if branch-scoped operator
+    const effectiveBrandId = req.brand_id || user.brand_id;
+    if (user.branch_id && effectiveBrandId) {
+      const ownedBranch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(user.branch_id, effectiveBrandId);
+      if (!ownedBranch) {
+        return res.status(401).json({
+          success: false,
+          code: 'BRANCH_TENANT_MISMATCH',
+          error: 'Akun operator tidak terdaftar pada cabang brand ini.'
+        });
+      }
+    }
+
+    // Register active session using existing TokenSessionStore
+    const { token, expiresAt } = TokenSessionStore.createSession(user, effectiveBrandId);
+
+    // Reset rate limiter on success
+    RateLimiter.reset(rateLimitKey);
+
+    // Log security audit event
+    const workforce = new WorkforceService();
+    workforce.logSecurityEvent({
+      actor_id: user.id,
+      actor_role: user.role,
+      action: 'GOOGLE_LOGIN_SUCCESS',
+      brand_id: effectiveBrandId,
+      organization_id: user.organization_id,
+      branch_id: user.branch_id,
+      result: 'success',
+      metadata: { sub: verifiedClaims.sub, email: verifiedClaims.email }
+    });
+
+    res.json({
+      success: true,
+      token,
+      expires_at: new Date(expiresAt).toISOString(),
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        full_name: user.full_name,
+        role: user.role,
+        branch_id: user.branch_id || null,
+        email_verified: user.email_verified,
+        brand_name: (req.brand && req.brand.name) ? req.brand.name : 'Bangjo Resto'
+      }
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      code: err.code || 'GOOGLE_AUTH_ERROR',
+      error: err.message || 'Terjadi kesalahan saat autentikasi Google.'
+    });
+  }
+});
+
+// POST /auth/link-google: Explicit Google Account Linking for Authenticated User
+router.post('/auth/link-google', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), async (req, res) => {
+  try {
+    const { credential, id_token } = req.body || {};
+    const rawToken = credential || id_token;
+
+    if (!rawToken) {
+      return res.status(400).json({
+        success: false,
+        code: 'MISSING_GOOGLE_CREDENTIAL',
+        error: 'Credential token Google wajib dikirim.'
+      });
+    }
+
+    const googleAuth = new GoogleAuthService();
+    const verifiedClaims = await googleAuth.verifyIdToken(rawToken);
+
+    // Explicit security requirement: email_verified must be true
+    if (!verifiedClaims.email_verified) {
+      return res.status(400).json({
+        success: false,
+        code: 'UNVERIFIED_GOOGLE_EMAIL',
+        error: 'Email akun Google belum diverifikasi oleh Google. Tidak dapat menghubungkan akun.'
+      });
+    }
+
+    // Invariant: Target user is ALWAYS derived strictly from the authenticated session, never request body!
+    const targetUserId = req.user.userId || req.user.id;
+
+    const authProviderService = new AuthProviderService();
+    const linkResult = authProviderService.linkProvider({
+      userId: targetUserId,
+      provider: 'google',
+      providerUserId: verifiedClaims.sub,
+      email: verifiedClaims.email,
+      metadata: {
+        name: verifiedClaims.name,
+        picture: verifiedClaims.picture
+      }
+    });
+
+    // Log security audit event
+    const workforce = new WorkforceService();
+    workforce.logSecurityEvent({
+      actor_id: targetUserId,
+      actor_role: req.user.role,
+      action: 'GOOGLE_ACCOUNT_LINKED',
+      target_user_id: targetUserId,
+      target_role: req.user.role,
+      brand_id: req.user.brandId || req.brand_id,
+      organization_id: req.user.organizationId,
+      branch_id: req.user.branchId,
+      result: 'success',
+      metadata: {
+        sub: verifiedClaims.sub,
+        email: verifiedClaims.email,
+        already_linked: linkResult.alreadyLinked
+      }
+    });
+
+    res.json({
+      success: true,
+      message: linkResult.alreadyLinked
+        ? 'Akun Google ini sudah terhubung ke akun Anda.'
+        : 'Akun Google berhasil dihubungkan ke akun Xentra Anda.',
+      provider: 'google',
+      already_linked: linkResult.alreadyLinked,
+      linked_at: new Date().toISOString()
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      code: err.code || 'LINK_GOOGLE_ERROR',
+      error: err.message || 'Gagal menghubungkan akun Google.'
+    });
+  }
+});
+
+// GET /auth/config: Public auth provider client configuration
+router.get('/auth/config', (req, res) => {
+  const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+  res.json({
+    success: true,
+    google_enabled: Boolean(googleClientId),
+    google_client_id: googleClientId || null
+  });
 });
 
 // ==================== WORKFORCE MANAGEMENT ENDPOINTS ====================
@@ -2797,6 +3399,7 @@ router.get('/auth/merchant/me', requireAuth(), (req, res) => {
       full_name: req.user.fullName,
       role: req.user.role,
       branch_id: req.user.branchId || null,
+      email_verified: req.user.email_verified !== undefined ? req.user.email_verified : true,
       brand_name: req.brand ? req.brand.name : 'Bangjo Resto'
     },
     brand: serializePublicBrand(req.brand)

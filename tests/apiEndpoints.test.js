@@ -2141,8 +2141,8 @@ async function r5Login(username, role, branchId) {
   const crypto = require('crypto');
   const hash = crypto.createHash('sha256').update('r5pass').digest('hex');
   db.prepare(`
-    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role)
-    VALUES (?, 'brand_bangjo', 'org_xentra_holding', ?, ?, ?, ?, 'R5 User', ?)
+    INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role, email_verified_at)
+    VALUES (?, 'brand_bangjo', 'org_xentra_holding', ?, ?, ?, ?, 'R5 User', ?, datetime('now'))
   `).run('usr_' + username, branchId || null, username, username + '@bangjo.test', hash, role);
   return b1Login(username, 'r5pass');
 }

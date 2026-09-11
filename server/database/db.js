@@ -541,14 +541,16 @@ function initSchema(targetDb) {
 
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
-      brand_id TEXT NOT NULL,
-      organization_id TEXT NOT NULL,
+      brand_id TEXT,
+      organization_id TEXT,
       branch_id TEXT,
       username TEXT UNIQUE NOT NULL,
       email TEXT,
       password_hash TEXT NOT NULL,
       full_name TEXT,
       role TEXT DEFAULT 'owner',
+      mfa_enabled INTEGER DEFAULT 0,
+      mfa_enrolled_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
@@ -1055,6 +1057,23 @@ function initSchema(targetDb) {
       FOREIGN KEY (table_id) REFERENCES branch_tables(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS user_auth_providers (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      provider_user_id TEXT NOT NULL,
+      email TEXT,
+      metadata TEXT,
+      linked_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE (provider, provider_user_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_uap_user_id ON user_auth_providers(user_id);
+    CREATE INDEX IF NOT EXISTS idx_uap_provider_sub ON user_auth_providers(provider, provider_user_id);
+
     CREATE UNIQUE INDEX IF NOT EXISTS idx_order_payments_order_id ON order_payments(order_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_shifts_unique_active_cashier ON pos_shifts(cashier_id) WHERE status = 'open';
   `);
@@ -1126,6 +1145,59 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE users ADD COLUMN locked_until TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN password_changed_at TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN last_login_at TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN mfa_enabled INTEGER DEFAULT 0;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN mfa_enrolled_at TEXT;'); } catch (e) {}
+
+  // Migrate existing users table if brand_id has legacy NOT NULL constraint
+  try {
+    const usersTableInfo = targetDb.prepare('PRAGMA table_info(users);').all();
+    const brandCol = usersTableInfo.find(c => c.name === 'brand_id');
+    if (brandCol && brandCol.notnull === 1) {
+      targetDb.exec('PRAGMA foreign_keys = OFF;');
+      targetDb.exec('BEGIN TRANSACTION;');
+      targetDb.exec(`
+        CREATE TABLE users_plat_mig (
+          id TEXT PRIMARY KEY,
+          brand_id TEXT,
+          organization_id TEXT,
+          branch_id TEXT,
+          username TEXT UNIQUE NOT NULL,
+          email TEXT,
+          password_hash TEXT NOT NULL,
+          full_name TEXT,
+          role TEXT DEFAULT 'owner',
+          status TEXT DEFAULT 'active',
+          failed_login_attempts INTEGER DEFAULT 0,
+          locked_until TEXT,
+          password_changed_at TEXT,
+          last_login_at TEXT,
+          email_verified_at TEXT,
+          mfa_enabled INTEGER DEFAULT 0,
+          mfa_enrolled_at TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+          FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL
+        );
+      `);
+      targetDb.exec(`
+        INSERT INTO users_plat_mig (
+          id, brand_id, organization_id, branch_id, username, email, password_hash,
+          full_name, role, status, failed_login_attempts, locked_until, password_changed_at,
+          last_login_at, email_verified_at, created_at, updated_at
+        )
+        SELECT 
+          id, brand_id, organization_id, branch_id, username, email, password_hash,
+          full_name, role, COALESCE(status, 'active'), COALESCE(failed_login_attempts, 0),
+          locked_until, password_changed_at, last_login_at, email_verified_at, created_at, updated_at
+        FROM users;
+      `);
+      targetDb.exec('DROP TABLE users;');
+      targetDb.exec('ALTER TABLE users_plat_mig RENAME TO users;');
+      targetDb.exec('COMMIT;');
+      targetDb.exec('PRAGMA foreign_keys = ON;');
+    }
+  } catch (e) {}
 
   // One-time password reset tokens (single-use, time-limited)
   try {
@@ -1144,6 +1216,47 @@ function initSchema(targetDb) {
   } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_prt_user_id ON password_reset_tokens(user_id);'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_prt_token_hash ON password_reset_tokens(token_hash);'); } catch (e) {}
+  try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email) WHERE email IS NOT NULL;'); } catch (e) {}
+
+  // Email verification tokens (single-use, time-limited)
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT;'); } catch (e) {}
+  try { targetDb.exec("UPDATE users SET email_verified_at = datetime('now') WHERE email_verified_at IS NULL AND role != 'owner';"); } catch (e) {}
+  try {
+    targetDb.exec(`
+      CREATE TABLE IF NOT EXISTS email_verification_tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        used INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+    `);
+  } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_evt_user_id ON email_verification_tokens(user_id);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_evt_token_hash ON email_verification_tokens(token_hash);'); } catch (e) {}
+
+  // Federated auth providers mapping (Google OIDC sub, etc.)
+  try {
+    targetDb.exec(`
+      CREATE TABLE IF NOT EXISTS user_auth_providers (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        provider TEXT NOT NULL,
+        provider_user_id TEXT NOT NULL,
+        email TEXT,
+        metadata TEXT,
+        linked_at TEXT DEFAULT (datetime('now')),
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE (provider, provider_user_id)
+      );
+    `);
+  } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_uap_user_id ON user_auth_providers(user_id);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_uap_provider_sub ON user_auth_providers(provider, provider_user_id);'); } catch (e) {}
 
   // Security audit log for workforce mutations (append-only)
   try {
@@ -1323,10 +1436,15 @@ function seedData(targetDb) {
     const initPassword = process.env.INITIAL_ADMIN_PASSWORD || 'bangjo123';
     const defaultPasswordHash = bcrypt.hashSync(initPassword, 12);
     targetDb.prepare(`
-      INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role, status, password_changed_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))
+      INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))
     `).run('usr_bangjo_owner', brandId, orgId, 'admin', 'admin@bangjo.com', defaultPasswordHash, 'Pemilik Bangjo', 'owner');
   }
+
+  // Ensure existing legacy admin has email_verified_at set
+  try {
+    targetDb.prepare("UPDATE users SET email_verified_at = datetime('now') WHERE username = 'admin' AND email_verified_at IS NULL").run();
+  } catch (e) {}
 
   // Migration: force re-hash admin password to bcrypt if still using legacy hash (SHA-256/MD5/etc)
   // This ensures the admin can always login after bcrypt migration

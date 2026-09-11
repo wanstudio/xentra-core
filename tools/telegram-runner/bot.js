@@ -4,10 +4,7 @@ const dotenv = require('dotenv');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-const GeminiAgent = require('./geminiAgent');
-
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const ALLOWED_USER_IDS = (process.env.TELEGRAM_ALLOWED_USER_ID || '')
   .split(',')
   .map(id => id.trim())
@@ -15,17 +12,10 @@ const ALLOWED_USER_IDS = (process.env.TELEGRAM_ALLOWED_USER_ID || '')
 
 if (!TELEGRAM_BOT_TOKEN) {
   console.error('[Error] TELEGRAM_BOT_TOKEN belum diisi di file .env.');
-  console.error('Silakan isi TELEGRAM_BOT_TOKEN dan GEMINI_API_KEY terlebih dahulu.');
-  process.exit(1);
-}
-
-if (!GEMINI_API_KEY) {
-  console.error('[Error] GEMINI_API_KEY belum diisi di file .env.');
   process.exit(1);
 }
 
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
-const agent = new GeminiAgent(GEMINI_API_KEY, process.env.GEMINI_MODEL || 'gemini-2.5-flash');
 
 async function telegramRequest(method, payload = {}) {
   try {
@@ -71,16 +61,9 @@ async function handleMessage(msg) {
 
   if (text === '/start' || text === '/help') {
     const welcome = `
-🚀 *Selamat Datang di Xentra Core AI Runner!*
+🚀 *Selamat Datang di Xentra Core Runner!*
 
-Halo *${username}*! Bot ini siap mengeksekusi instruksi coding, perbaikan, dan deployment untuk **Xentra Core** langsung dari HP Anda.
-
-📌 *Cara Penggunaan:*
-Kirimkan saja instruksi dalam bahasa Indonesia sehari-hari, contohnya:
-- _"Ubah warna tema primer brand jadi #b6ff00 dan ganti tagline"_
-- _"Jalankan unit test dan periksa apakah ada error"_
-- _"Buat diskon ongkir otomatis jika belanja di atas 50rb lalu deploy"_
-- _"Tolong deploy commit terbaru ke infrastruktur Xentra sekarang"_
+Halo *${username}*! Bot ini siap menjalankan pengujian dan deployment untuk **Xentra Core** langsung dari HP Anda.
 
 ⚡ *Perintah Cepat:*
 /status — Cek status bot & server
@@ -94,41 +77,43 @@ Kirimkan saja instruksi dalam bahasa Indonesia sehari-hari, contohnya:
   if (text === '/status') {
     await sendMessage(
       chatId,
-      `🟢 *Xentra Core AI Runner Aktif*\n- Server: Online 24/7\n- Model: \`${process.env.GEMINI_MODEL || 'gemini-2.5-flash'}\`\n- Workspace: \`xentra-core\`\n- Target Deploy: Infrastruktur runtime Xentra (via GitHub Actions)`);
+      `🟢 *Xentra Core Runner Aktif*\n- Server: Online 24/7\n- Workspace: \`xentra-core\`\n- Target Deploy: Infrastruktur runtime Xentra (via GitHub Actions)`
+    );
     return;
   }
 
-  await sendTyping(chatId);
-  await sendMessage(chatId, `⏳ *Menerima instruksi... Sedang menganalisis repositori Xentra Core...*`);
-
-  const progressUpdates = [];
-  const onProgress = async (msgText) => {
-    progressUpdates.push(msgText);
+  if (text === '/test') {
     await sendTyping(chatId);
-  };
-
-  try {
-    const responseText = await agent.runTask(text, onProgress);
-
-    let finalMessage = '';
-    if (progressUpdates.length > 0) {
-      finalMessage += `*Riwayat Langkah:*\n${progressUpdates.slice(-4).join('\n')}\n\n---\n\n`;
+    await sendMessage(chatId, `🧪 *Menjalankan Unit Test Suite...*`);
+    const { executeTool } = require('./agentTools');
+    const testRes = await executeTool('run_tests', {});
+    if (testRes.success) {
+      await sendMessage(chatId, `✅ *Semua Unit Test Lolos!*\n\`\`\`\n${testRes.test_output}\n\`\`\``);
+    } else {
+      await sendMessage(chatId, `❌ *Test Gagal:*\n\`\`\`\n${testRes.stderr || testRes.error}\n\`\`\``);
     }
-    finalMessage += responseText;
-
-    await sendMessage(chatId, finalMessage);
-  } catch (err) {
-    console.error('[Agent Execution Error]:', err);
-    await sendMessage(
-      chatId,
-      `❌ *Terjadi Kesalahan saat Mengeksekusi Tugas:*\n\`\`\`\n${err.message}\n\`\`\``
-    );
+    return;
   }
+
+  if (text === '/deploy') {
+    await sendTyping(chatId);
+    await sendMessage(chatId, `🚀 *Memulai Deployment...*`);
+    const { executeTool } = require('./agentTools');
+    const deployRes = await executeTool('deploy_to_cpanel', { commit_message: 'Manual deploy via Telegram /deploy command' });
+    if (deployRes.success) {
+      await sendMessage(chatId, `🎉 *Deployment Berhasil!*\n\`\`\`\n${deployRes.deploy_output}\n\`\`\``);
+    } else {
+      await sendMessage(chatId, `❌ *Deploy Gagal:*\n\`\`\`\n${deployRes.stderr || deployRes.error}\n\`\`\``);
+    }
+    return;
+  }
+
+  await sendMessage(chatId, `❓ *Perintah tidak dikenali.*\nKirim */help* untuk daftar perintah yang tersedia.`);
 }
 
 async function startPolling() {
   console.log('====================================================');
-  console.log('  🤖 Xentra Core Telegram AI Runner is Starting...  ');
+  console.log('  🤖 Xentra Core Telegram Runner is Starting...  ');
   console.log('====================================================');
 
   const me = await telegramRequest('getMe');

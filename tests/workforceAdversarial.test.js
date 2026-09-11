@@ -67,10 +67,10 @@ describe('Workforce Adversarial Security Verification', () => {
     // Seed owner
     const bcrypt = require('bcryptjs');
     const ownerHash = bcrypt.hashSync('Test1234!', 12);
-    db.prepare(`INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, password_hash, full_name, role, status, password_changed_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))`).run('usr_adv_owner', brandId, orgId, 'adv_owner', ownerHash, 'Adv Owner', 'owner');
+    db.prepare(`INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, password_hash, full_name, role, status, password_changed_at, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`).run('usr_adv_owner', brandId, orgId, 'adv_owner', ownerHash, 'Adv Owner', 'owner');
 
     // Seed other-brand owner
-    db.prepare(`INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, password_hash, full_name, role, status, password_changed_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))`).run('usr_adv_other_owner', otherBrandId, otherOrgId, 'adv_other_owner', ownerHash, 'Other Owner', 'owner');
+    db.prepare(`INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, password_hash, full_name, role, status, password_changed_at, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`).run('usr_adv_other_owner', otherBrandId, otherOrgId, 'adv_other_owner', ownerHash, 'Other Owner', 'owner');
 
     // Login as owner
     const ownerLogin = await request('POST', '/api/v1/auth/merchant/login', { username: 'adv_owner', password: 'Test1234!' });
@@ -532,7 +532,7 @@ describe('Workforce Adversarial Security Verification', () => {
       // Create second owner via direct DB insert (Owner cannot create another Owner per contract)
       const bcrypt = require('bcryptjs');
       const hash = bcrypt.hashSync('Test1234!', 12);
-      db.prepare(`INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, password_hash, full_name, role, status, password_changed_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'))`).run('usr_adv_owner2', brandId, orgId, 'owner2', hash, 'Owner 2', 'owner');
+      db.prepare(`INSERT OR IGNORE INTO users (id, brand_id, organization_id, username, password_hash, full_name, role, status, password_changed_at, email_verified_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', datetime('now'), datetime('now'))`).run('usr_adv_owner2', brandId, orgId, 'owner2', hash, 'Owner 2', 'owner');
       const owner2Id = 'usr_adv_owner2';
 
       // Disable second owner - should succeed

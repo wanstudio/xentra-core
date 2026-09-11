@@ -9,6 +9,11 @@ const PermissionModel = require('./PermissionModel');
 const AuthorizationService = require('./AuthorizationService');
 const RoleBoundaryEnforcement = require('./RoleBoundaryEnforcement');
 const WorkforceService = require('./WorkforceService');
+const RegistrationService = require('./RegistrationService');
+const EmailVerificationService = require('./EmailVerificationService');
+const PlatformBootstrapService = require('./PlatformBootstrapService');
+const AuthProviderService = require('./AuthProviderService');
+const { EmailProvider, defaultEmailProvider } = require('./EmailProvider');
 
 module.exports = {
   IdentityModel,
@@ -18,6 +23,12 @@ module.exports = {
   AuthorizationService,
   RoleBoundaryEnforcement,
   WorkforceService,
+  RegistrationService,
+  EmailVerificationService,
+  PlatformBootstrapService,
+  AuthProviderService,
+  EmailProvider,
+  defaultEmailProvider,
 
   // Factory Helpers
   createIdentity: (params) => new IdentityModel(params),

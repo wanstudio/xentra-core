@@ -13,6 +13,7 @@ class RoleModel {
    * - 'customer': Customer self-service scope.
    */
   static ROLES = {
+    PLATFORM_OWNER: 'platform_owner',
     OWNER: 'owner',
     BRAND_MANAGER: 'brand_manager',
     BRANCH_MANAGER: 'branch_manager',

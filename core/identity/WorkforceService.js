@@ -73,11 +73,11 @@ class WorkforceService {
     const now = new Date().toISOString();
 
     this.repository.prepare(`
-      INSERT INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role, status, password_changed_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)
-    `).run(id, brand_id, organization_id, branch_id || null, username, email || null, password_hash, full_name || null, role, now, now, now);
+      INSERT INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
+    `).run(id, brand_id, organization_id, branch_id || null, username, email || null, password_hash, full_name || null, role, now, now, now, now);
 
-    return { id, username, email, full_name, role, branch_id: branch_id || null, status: 'active' };
+    return { id, username, email, full_name, role, branch_id: branch_id || null, status: 'active', email_verified: true };
   }
 
   getUser(userId, brandId) {
@@ -409,6 +409,11 @@ class WorkforceService {
       return { success: false, error: 'INVALID_CREDENTIALS' };
     }
 
+    // Platform Owner must never authenticate through merchant login
+    if (user.role === 'platform_owner') {
+      return { success: false, error: 'INVALID_CREDENTIALS' };
+    }
+
     // Check if account is disabled
     if (user.status === 'disabled') {
       return { success: false, error: 'ACCOUNT_DISABLED', message: 'Akun Anda telah dinonaktifkan. Hubungi administrator.' };
@@ -457,7 +462,8 @@ class WorkforceService {
         role: user.role,
         branch_id: user.branch_id,
         organization_id: user.organization_id,
-        status: 'active'
+        status: 'active',
+        email_verified: Boolean(user.email_verified_at)
       }
     };
   }

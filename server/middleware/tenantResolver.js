@@ -6,6 +6,21 @@ async function tenantResolver(req, res, next) {
   try {
     await brandRepository.ready();
 
+    // Public platform routes & Control Plane endpoints originate before a tenant/brand exists
+    // or operate at the platform level without tenant resolution.
+    const publicPaths = [
+      '/auth/register',
+      '/api/v1/auth/register',
+      '/verify-email',
+      '/api/v1/auth/verify-email',
+      '/auth/verify-email',
+      '/api/v1/auth/resend-verification',
+      '/auth/resend-verification'
+    ];
+    if (publicPaths.includes(req.path) || req.path.startsWith('/platform') || req.path.startsWith('/api/v1/platform')) {
+      return next();
+    }
+
     const host = req.headers.host || '';
     const cleanHost = host.split(':')[0].toLowerCase();
 
