@@ -752,4 +752,173 @@ describe('Google-First Authentication & Bangjo Owner Linking', () => {
       process.env.GOOGLE_CLIENT_ID = prevClientId;
     }
   });
+
+  // S. Google-First Registration & Onboarding provisions Organization, Brand, Branch, User, and Links Google sub
+  test('S. POST /auth/google-onboard provisions full tenant stack and links Google sub atomically', async () => {
+    const runId = Math.random().toString(36).substring(2, 8);
+    const onboardSub = `google-sub-onboard-${runId}`;
+    const onboardToken = `google-token-onboard-${runId}`;
+    const onboardEmail = `owner_${runId}@newresto.com`;
+
+    registerMockGoogleToken(onboardToken, {
+      sub: onboardSub,
+      email: onboardEmail,
+      email_verified: true,
+      aud: TEST_CLIENT_ID,
+      iss: 'https://accounts.google.com',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      name: 'Fresh Owner'
+    });
+
+    const res = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/auth/google-onboard'
+    }, {
+      credential: onboardToken,
+      business_name: 'Resto Baru Sedap',
+      brand_name: 'Resto Baru Sedap',
+      branch_name: 'Cabang Utama Baru',
+      phone: '081299998888',
+      address_text: 'Jl. Raya Baru No. 10'
+    });
+
+    assert.equal(res.status, 201, `Expected 201 Created, got ${res.status}: ${JSON.stringify(res.body)}`);
+    assert.equal(res.body.success, true);
+    assert.ok(res.body.token, 'Must return valid session token');
+    assert.equal(res.body.user.email, onboardEmail);
+    assert.equal(res.body.user.role, 'owner');
+    assert.equal(res.body.user.email_verified, true, 'Google email must be marked verified immediately');
+    assert.ok(res.body.organization.id);
+    assert.ok(res.body.brand.id);
+    assert.ok(res.body.branch.id);
+
+    // Verify user_auth_providers link exists and is mapped to the new user
+    const link = db.prepare("SELECT * FROM user_auth_providers WHERE provider = 'google' AND provider_user_id = ?").get(onboardSub);
+    assert.ok(link, 'Google sub link must exist in database');
+    assert.equal(link.user_id, res.body.user.id);
+    assert.equal(link.email, onboardEmail);
+
+    // Verify the returned token can access owner-protected endpoints immediately
+    const meRes = await makeRequest(server, {
+      method: 'GET',
+      path: '/api/v1/auth/merchant/me',
+      headers: { Authorization: `Bearer ${res.body.token}` }
+    });
+    assert.equal(meRes.status, 200, `Expected 200, got ${meRes.status}: ${JSON.stringify(meRes.body)}`);
+    assert.equal(meRes.body.user.id, res.body.user.id);
+    assert.equal(meRes.body.user.role, 'owner');
+
+    // Verify subsequent login with the same Google account resolves to this new user
+    const loginRes = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/auth/google',
+      headers: { Host: 'xentra.cloud' }
+    }, {
+      credential: onboardToken
+    });
+    assert.equal(loginRes.status, 200, `Expected 200, got ${loginRes.status}: ${JSON.stringify(loginRes.body)}`);
+    assert.equal(loginRes.body.user.id, res.body.user.id);
+  });
+
+  // T. POST /auth/google-onboard rejects unverified Google email
+  test('T. POST /auth/google-onboard rejects unverified Google email with 400 UNVERIFIED_GOOGLE_EMAIL', async () => {
+    const unverifiedToken = 'google-token-onboard-unverified';
+    registerMockGoogleToken(unverifiedToken, {
+      sub: 'google-sub-onboard-unverified',
+      email: 'unverified.owner@newresto.com',
+      email_verified: false,
+      aud: TEST_CLIENT_ID,
+      iss: 'https://accounts.google.com',
+      exp: Math.floor(Date.now() / 1000) + 3600
+    });
+
+    const res = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/auth/google-onboard'
+    }, {
+      credential: unverifiedToken,
+      business_name: 'Unverified Resto'
+    });
+
+    assert.equal(res.status, 400);
+    assert.equal(res.body.code, 'UNVERIFIED_GOOGLE_EMAIL');
+  });
+
+  // U. POST /auth/google-onboard rejects duplicate Google sub if already linked to any user
+  test('U. POST /auth/google-onboard rejects duplicate Google sub with 409 PROVIDER_ALREADY_LINKED', async () => {
+    const alreadyLinkedSub = 'google-sub-already-linked-owner';
+    const alreadyLinkedToken = 'google-token-already-linked-owner';
+
+    // Link to Bangjo owner first
+    const service = new AuthProviderService();
+    service.linkProvider({
+      userId: 'usr_bangjo_owner',
+      provider: 'google',
+      providerUserId: alreadyLinkedSub,
+      email: 'owner@bangjo.com'
+    });
+
+    registerMockGoogleToken(alreadyLinkedToken, {
+      sub: alreadyLinkedSub,
+      email: 'owner@bangjo.com',
+      email_verified: true,
+      aud: TEST_CLIENT_ID,
+      iss: 'https://accounts.google.com',
+      exp: Math.floor(Date.now() / 1000) + 3600
+    });
+
+    const res = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/auth/google-onboard'
+    }, {
+      credential: alreadyLinkedToken,
+      business_name: 'Duplicate Resto Attempt'
+    });
+
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'PROVIDER_ALREADY_LINKED');
+  });
+
+  // V. Email collision protection: cannot onboard a new account if email exists in users table under different user
+  test('V. POST /auth/google-onboard rejects if Google email matches existing user under different sub', async () => {
+    const collisionSub = 'google-sub-email-collision-stranger';
+    const collisionToken = 'google-token-email-collision-stranger';
+
+    // usr_bangjo_owner has email: admin@bangjo.com
+    registerMockGoogleToken(collisionToken, {
+      sub: collisionSub,
+      email: 'admin@bangjo.com', // COLLIDES with existing Bangjo owner email!
+      email_verified: true,
+      aud: TEST_CLIENT_ID,
+      iss: 'https://accounts.google.com',
+      exp: Math.floor(Date.now() / 1000) + 3600
+    });
+
+    const res = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/auth/google-onboard'
+    }, {
+      credential: collisionToken,
+      business_name: 'Hijack Attempt Resto'
+    });
+
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'EMAIL_EXISTS');
+  });
+
+  // W. Existing legacy Bangjo Owner remains completely unaffected by Google onboarding
+  test('W. Existing Bangjo Owner and legacy authentication remain fully functional after new Google onboarding', async () => {
+    const loginRes = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/auth/merchant/login'
+    }, {
+      username: 'admin',
+      password: process.env.INITIAL_ADMIN_PASSWORD || 'bangjo123'
+    });
+
+    assert.equal(loginRes.status, 200);
+    assert.equal(loginRes.body.user.id, 'usr_bangjo_owner');
+    assert.equal(loginRes.body.user.role, 'owner');
+  });
 });
+

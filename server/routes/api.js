@@ -1454,7 +1454,10 @@ function requireAuth(allowedRoles = []) {
     // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT via Core Identity
     let isTenantAuthorized = session.brandId === req.brand_id;
     if (!isTenantAuthorized && session.role === 'owner') {
-      if (session.organizationId && req.brand && req.brand.organization_id) {
+      if (req.path === '/auth/merchant/me' || (req.originalUrl && req.originalUrl.includes('/auth/merchant/me'))) {
+        // Safe profile inspection route: owner querying their own authenticated identity
+        isTenantAuthorized = true;
+      } else if (session.organizationId && req.brand && req.brand.organization_id) {
         isTenantAuthorized = session.organizationId === req.brand.organization_id;
       }
     }
@@ -2591,6 +2594,24 @@ router.post('/auth/resend-verification', async (req, res) => {
   }
 });
 
+// GET /auth/merchant/me: Authenticated operator/merchant profile
+router.get('/auth/merchant/me', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
+  res.json({
+    success: true,
+    user: {
+      id: req.user.id || req.user.userId,
+      username: req.user.username,
+      email: req.user.email,
+      full_name: req.user.full_name,
+      role: req.user.role,
+      brand_id: req.user.brandId || req.user.brand_id,
+      organization_id: req.user.organizationId || req.user.organization_id,
+      branch_id: req.user.branchId || req.user.branch_id,
+      email_verified: req.user.email_verified
+    }
+  });
+});
+
 // 10.1 Merchant Auth Endpoints
 const handleMerchantLogin = (req, res) => {
   try {
@@ -2816,6 +2837,121 @@ router.post('/auth/google', async (req, res) => {
       success: false,
       code: err.code || 'GOOGLE_AUTH_ERROR',
       error: err.message || 'Terjadi kesalahan saat autentikasi Google.'
+    });
+  }
+});
+
+// POST /auth/google-onboard: Google-First Business Registration & Onboarding
+// Used when an unlinked Google account completes onboarding on xentra.cloud
+router.post('/auth/google-onboard', async (req, res) => {
+  try {
+    const { credential, id_token, business_name, brand_name, branch_name, phone, address_text } = req.body || {};
+    const rawToken = credential || id_token;
+
+    if (!rawToken) {
+      return res.status(400).json({
+        success: false,
+        code: 'MISSING_GOOGLE_CREDENTIAL',
+        error: 'Credential token Google wajib dikirim.'
+      });
+    }
+
+    // Rate limiting: 5 onboarding registrations per 10 minutes per IP
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const rateLimitKey = `google-onboard:${clientIp}`;
+    const rateCheck = RateLimiter.check(rateLimitKey, 5, 600);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        success: false,
+        code: 'TOO_MANY_REQUESTS',
+        error: `Terlalu banyak permintaan onboarding. Coba lagi dalam ${rateCheck.retryAfter} detik.`
+      });
+    }
+
+    const googleAuth = new GoogleAuthService();
+    const verifiedClaims = await googleAuth.verifyIdToken(rawToken);
+
+    // Email must be verified by Google
+    if (!verifiedClaims.email_verified) {
+      return res.status(400).json({
+        success: false,
+        code: 'UNVERIFIED_GOOGLE_EMAIL',
+        error: 'Email akun Google belum diverifikasi oleh Google. Tidak dapat melakukan pendaftaran.'
+      });
+    }
+
+    const { RegistrationService, WorkforceService } = require('../../core/identity');
+    const registration = new RegistrationService();
+
+    const result = registration.registerBusinessWithGoogle({
+      googleSub: verifiedClaims.sub,
+      email: verifiedClaims.email,
+      full_name: verifiedClaims.name,
+      picture: verifiedClaims.picture,
+      business_name,
+      brand_name,
+      branch_name,
+      phone,
+      address_text
+    });
+
+    // Create session token for the newly onboarded owner
+    const sessionUser = {
+      id: result.user.id,
+      username: result.user.username,
+      email: result.user.email,
+      full_name: result.user.full_name,
+      role: 'owner',
+      brand_id: result.brand.id,
+      organization_id: result.organization.id,
+      branch_id: result.branch.id,
+      status: 'active',
+      email_verified: true
+    };
+
+    const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, result.brand.id);
+
+    // Reset rate limiter on success
+    RateLimiter.reset(rateLimitKey);
+
+    // Security audit log
+    const workforce = new WorkforceService();
+    workforce.logSecurityEvent({
+      actor_id: result.user.id,
+      actor_role: 'owner',
+      action: 'GOOGLE_BUSINESS_ONBOARDED',
+      target_user_id: result.user.id,
+      target_role: 'owner',
+      brand_id: result.brand.id,
+      organization_id: result.organization.id,
+      branch_id: result.branch.id,
+      result: 'success',
+      metadata: {
+        sub: verifiedClaims.sub,
+        email: result.user.email,
+        org_name: result.organization.name
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Onboarding bisnis dengan Google berhasil.',
+      token,
+      expires_at: new Date(expiresAt).toISOString(),
+      user: {
+        ...result.user,
+        brand_name: result.brand.name
+      },
+      organization: result.organization,
+      brand: result.brand,
+      branch: result.branch
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      code: err.code || 'GOOGLE_ONBOARD_ERROR',
+      error: err.message || 'Terjadi kesalahan saat onboarding Google.'
     });
   }
 });

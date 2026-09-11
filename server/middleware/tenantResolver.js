@@ -11,6 +11,10 @@ async function tenantResolver(req, res, next) {
     const publicPaths = [
       '/auth/register',
       '/api/v1/auth/register',
+      '/auth/google',
+      '/api/v1/auth/google',
+      '/auth/google-onboard',
+      '/api/v1/auth/google-onboard',
       '/verify-email',
       '/api/v1/auth/verify-email',
       '/auth/verify-email',
@@ -23,6 +27,11 @@ async function tenantResolver(req, res, next) {
 
     const host = req.headers.host || '';
     const cleanHost = host.split(':')[0].toLowerCase();
+
+    // xentra.cloud is the SaaS Control Plane surface (no tenant resolution needed for control-plane requests)
+    if (cleanHost === 'xentra.cloud') {
+      return next();
+    }
 
     let brand = null;
 
