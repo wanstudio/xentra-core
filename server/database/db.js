@@ -1427,6 +1427,15 @@ function seedData(targetDb) {
     defaultBanners
   );
 
+  // If brand_bangjo was previously set to xentra.cloud or missing custom_domain, align it with official app.mybangjo.com domain
+  try {
+    targetDb.prepare(`
+      UPDATE brands
+      SET custom_domain = 'app.mybangjo.com'
+      WHERE id = ? AND (custom_domain IS NULL OR custom_domain = 'xentra.cloud' OR custom_domain = '')
+    `).run(brandId);
+  } catch (e) {}
+
   // Seed default initial merchant owner if users table is empty (bcrypt hashed)
   const userCount = targetDb.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ?').get(brandId)?.cnt || 0;
   if (userCount === 0) {
