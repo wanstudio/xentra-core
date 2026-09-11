@@ -87,6 +87,9 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
 
 // Merchant Dashboard Assets & Routes
 app.use('/dashboard/assets', express.static(path.join(__dirname, '../apps/merchant-dashboard/assets')));
+app.get(['/onboarding', '/onboarding/'], (req, res) => {
+  res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/onboarding.html'));
+});
 app.get(['/dashboard/login', '/dashboard/login/'], (req, res) => {
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/login.html'));
 });

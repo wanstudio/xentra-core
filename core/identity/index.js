@@ -14,6 +14,9 @@ const EmailVerificationService = require('./EmailVerificationService');
 const PlatformBootstrapService = require('./PlatformBootstrapService');
 const AuthProviderService = require('./AuthProviderService');
 const HandoffService = require('./HandoffService');
+const ExistingTenantResolver = require('./ExistingTenantResolver');
+const OwnershipClaimService = require('./OwnershipClaimService');
+const TenantOwnershipTransferService = require('./TenantOwnershipTransferService');
 const { EmailProvider, defaultEmailProvider } = require('./EmailProvider');
 
 module.exports = {
@@ -29,6 +32,9 @@ module.exports = {
   PlatformBootstrapService,
   AuthProviderService,
   HandoffService,
+  ExistingTenantResolver,
+  OwnershipClaimService,
+  TenantOwnershipTransferService,
   EmailProvider,
   defaultEmailProvider,
 

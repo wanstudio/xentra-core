@@ -19,9 +19,13 @@ async function tenantResolver(req, res, next) {
       '/api/v1/auth/verify-email',
       '/auth/verify-email',
       '/api/v1/auth/resend-verification',
-      '/auth/resend-verification'
+      '/auth/resend-verification',
+      '/onboarding/check-domain',
+      '/api/v1/onboarding/check-domain',
+      '/onboarding/claim',
+      '/api/v1/onboarding/claim'
     ];
-    if (publicPaths.includes(req.path) || req.path.startsWith('/platform') || req.path.startsWith('/api/v1/platform')) {
+    if (publicPaths.includes(req.path) || req.path.startsWith('/platform') || req.path.startsWith('/api/v1/platform') || req.path.startsWith('/onboarding') || req.path.startsWith('/api/v1/onboarding')) {
       return next();
     }
 
