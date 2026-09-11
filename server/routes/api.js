@@ -2429,15 +2429,10 @@ router.post('/auth/register', (req, res) => {
 
     const { RegistrationService, WorkforceService } = require('../../core/identity');
     const registration = new RegistrationService();
-    const result = registration.registerBusiness({
+    const result = registration.registerIdentity({
       email,
       password,
-      full_name,
-      business_name,
-      brand_name,
-      branch_name,
-      phone,
-      address_text
+      full_name
     });
 
     // Create session token for newly registered owner
@@ -2447,14 +2442,14 @@ router.post('/auth/register', (req, res) => {
       email: result.user.email,
       full_name: result.user.full_name,
       role: 'owner',
-      brand_id: result.brand.id,
-      organization_id: result.organization.id,
-      branch_id: result.branch.id,
+      brand_id: null,
+      organization_id: null,
+      branch_id: null,
       status: 'active',
       email_verified: false
     };
 
-    const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, result.brand.id);
+    const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, null);
 
     // Audit log
     const workforce = new WorkforceService();
@@ -2922,14 +2917,14 @@ router.post('/auth/google-onboard', async (req, res) => {
       email: result.user.email,
       full_name: result.user.full_name,
       role: 'owner',
-      brand_id: result.brand.id,
-      organization_id: result.organization.id,
-      branch_id: result.branch.id,
+      brand_id: null,
+      organization_id: null,
+      branch_id: null,
       status: 'active',
       email_verified: true
     };
 
-    const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, result.brand.id);
+    const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, null);
 
     // Reset rate limiter on success
     RateLimiter.reset(rateLimitKey);
@@ -2972,6 +2967,43 @@ router.post('/auth/google-onboard', async (req, res) => {
       success: false,
       code: err.code || 'GOOGLE_ONBOARD_ERROR',
       error: err.message || 'Terjadi kesalahan saat onboarding Google.'
+    });
+  }
+});
+
+
+// POST /onboarding/create-business: Create new business for authenticated user
+router.post(['/onboarding/create-business', '/api/v1/onboarding/create-business'], requireAuth(), async (req, res) => {
+  try {
+    const { business_name, brand_name, branch_name, phone, address_text } = req.body;
+    const { RegistrationService } = require('../../core/identity');
+    const registration = new RegistrationService();
+    
+    const result = registration.createBusinessForUser(req.user.id, {
+      business_name,
+      brand_name,
+      branch_name,
+      phone,
+      address_text
+    });
+
+    req.user.brand_id = result.brand.id;
+    req.user.organization_id = result.organization.id;
+    req.user.branch_id = result.branch.id;
+    
+    const { token } = TokenSessionStore.createSession(req.user, result.brand.id);
+    
+    res.json({
+      success: true,
+      token,
+      user: req.user,
+      business: result.brand
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({
+      success: false,
+      error: err.code || 'INTERNAL_ERROR',
+      message: err.message || 'Gagal membuat bisnis.'
     });
   }
 });

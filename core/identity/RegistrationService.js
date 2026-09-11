@@ -385,6 +385,123 @@ class RegistrationService {
       }
     };
   }
-}
 
+  registerIdentity({ email, password, full_name }) {
+    if (!email || !isValidEmail(email)) throw { status: 400, code: 'INVALID_EMAIL', message: 'Format email tidak valid.' };
+    const cleanEmail = email.trim().toLowerCase();
+    if (!password || typeof password !== 'string' || password.length < 8) throw { status: 400, code: 'PASSWORD_TOO_SHORT', message: 'Password minimal harus 8 karakter.' };
+
+    const existingEmailUser = this.db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(cleanEmail);
+    if (existingEmailUser) throw { status: 409, code: 'EMAIL_EXISTS', message: 'Email sudah terdaftar. Silakan login atau gunakan email lain.' };
+
+    const finalFullName = (full_name || cleanEmail.split('@')[0]).trim();
+    const userId = 'usr_' + crypto.randomBytes(12).toString('hex');
+    const randHex = crypto.randomBytes(6).toString('hex');
+
+    let baseUsername = cleanEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+    if (baseUsername.length < 3) baseUsername = 'user';
+    let candidateUsername = baseUsername;
+    const existingUser = this.db.prepare('SELECT id FROM users WHERE username = ?').get(candidateUsername);
+    if (existingUser) candidateUsername = `${baseUsername}_${randHex}`;
+
+    const passwordHash = this.hashPassword(password);
+    const now = new Date().toISOString();
+
+    this.db.prepare(`
+      INSERT INTO users (id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'owner', 'active', ?, NULL, ?, ?)
+    `).run(userId, candidateUsername, cleanEmail, passwordHash, finalFullName, now, now, now);
+
+    return { user: { id: userId, email: cleanEmail, username: candidateUsername, full_name: finalFullName, role: 'owner', status: 'active', email_verified: false } };
+  }
+
+  registerIdentityWithGoogle({ googleSub, email, full_name, picture }) {
+    if (!googleSub) throw { status: 400, code: 'INVALID_GOOGLE_SUB', message: 'Google subject identifier (sub) wajib diisi.' };
+    const cleanSub = String(googleSub).trim();
+    if (!email || !isValidEmail(email)) throw { status: 400, code: 'INVALID_EMAIL', message: 'Format email tidak valid.' };
+    const cleanEmail = email.trim().toLowerCase();
+
+    const existingProvider = this.db.prepare("SELECT id, user_id FROM user_auth_providers WHERE provider = 'google' AND provider_user_id = ?").get(cleanSub);
+    if (existingProvider) throw { status: 409, code: 'PROVIDER_ALREADY_LINKED', message: 'Akun Google ini sudah terhubung ke akun pengguna Xentra lain.' };
+
+    const existingEmailUser = this.db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(cleanEmail);
+    if (existingEmailUser) throw { status: 409, code: 'EMAIL_EXISTS', message: 'Email Google sudah terdaftar di Xentra.' };
+
+    const finalFullName = (full_name || cleanEmail.split('@')[0]).trim();
+    const userId = 'usr_' + crypto.randomBytes(12).toString('hex');
+    const providerLinkId = 'uap_' + crypto.randomBytes(16).toString('hex');
+    const randHex = crypto.randomBytes(6).toString('hex');
+
+    let baseUsername = cleanEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+    if (baseUsername.length < 3) baseUsername = 'user';
+    let candidateUsername = baseUsername;
+    if (this.db.prepare('SELECT id FROM users WHERE username = ?').get(candidateUsername)) candidateUsername = `${baseUsername}_${randHex}`;
+
+    const randomPassword = crypto.randomBytes(32).toString('hex');
+    const passwordHash = this.hashPassword(randomPassword);
+    const now = new Date().toISOString();
+
+    const providerMetadataStr = JSON.stringify({ name: finalFullName, picture: picture || null, registered_via: 'google_onboarding' });
+
+    this.db.exec('BEGIN;');
+    try {
+      this.db.prepare(`
+        INSERT INTO users (id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 'owner', 'active', ?, ?, ?, ?)
+      `).run(userId, candidateUsername, cleanEmail, passwordHash, finalFullName, now, now, now, now);
+
+      this.db.prepare(`
+        INSERT INTO user_auth_providers (id, user_id, provider, provider_user_id, email, metadata, linked_at, created_at, updated_at)
+        VALUES (?, ?, 'google', ?, ?, ?, ?, ?, ?)
+      `).run(providerLinkId, userId, cleanSub, cleanEmail, providerMetadataStr, now, now, now);
+      this.db.exec('COMMIT;');
+    } catch (err) {
+      this.db.exec('ROLLBACK;');
+      throw err;
+    }
+
+    return { user: { id: userId, email: cleanEmail, username: candidateUsername, full_name: finalFullName, role: 'owner', status: 'active', email_verified: true } };
+  }
+
+  createBusinessForUser(userId, { business_name, brand_name, branch_name, phone, address_text, latitude = -7.250445, longitude = 112.768845 }) {
+    const orgName = (business_name || brand_name || '').trim();
+    if (!orgName) throw { status: 400, code: 'BUSINESS_NAME_REQUIRED', message: 'Nama bisnis wajib diisi.' };
+    const finalBrandName = (brand_name || orgName).trim();
+    const finalBranchName = (branch_name || 'Cabang Utama').trim();
+    const branchPhone = (phone || '081234567890').trim();
+    const branchAddress = (address_text || 'Alamat Belum Diatur').trim();
+
+    const crypto = require('crypto');
+    const randHex = crypto.randomBytes(6).toString('hex');
+    const orgId = 'org_' + randHex;
+    const brandId = 'brand_' + randHex;
+    const branchId = 'branch_' + randHex;
+    const bdsId = 'bds_' + randHex;
+
+    const baseSlug = generateSlug(orgName);
+    const existingOrgSlug = this.db.prepare('SELECT id FROM organizations WHERE slug = ?').get(baseSlug);
+    const orgSlug = existingOrgSlug ? `${baseSlug}-${randHex}` : baseSlug;
+    const brandSlug = orgSlug;
+    const branchSlug = generateSlug(finalBranchName);
+
+    const now = new Date().toISOString();
+
+    this.db.exec('BEGIN;');
+    try {
+      this.db.prepare(`INSERT INTO organizations (id, name, slug, plan, created_at, updated_at) VALUES (?, ?, ?, 'pro', ?, ?)`).run(orgId, orgName, orgSlug, now, now);
+      this.db.prepare(`INSERT INTO brands (id, organization_id, name, slug, primary_color, created_at, updated_at) VALUES (?, ?, ?, ?, '#b6ff00', ?, ?)`).run(brandId, orgId, finalBrandName, brandSlug, now, now);
+      this.db.prepare(`INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`).run(branchId, brandId, finalBranchName, branchSlug, branchAddress, Number(latitude), Number(longitude), branchPhone, now, now);
+      this.db.prepare(`INSERT INTO branch_delivery_settings (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount, created_at, updated_at) VALUES (?, ?, 1, 1, 10.0, 2.0, 3000.0, 15000.0, ?, ?)`).run(bdsId, branchId, now, now);
+      
+      this.db.prepare(`UPDATE users SET brand_id = ?, organization_id = ?, branch_id = ?, updated_at = ? WHERE id = ?`).run(brandId, orgId, branchId, now, userId);
+      this.db.exec('COMMIT;');
+    } catch (err) {
+      this.db.exec('ROLLBACK;');
+      throw err;
+    }
+
+    return { organization: { id: orgId, name: orgName, slug: orgSlug }, brand: { id: brandId, name: finalBrandName, slug: brandSlug }, branch: { id: branchId, name: finalBranchName, slug: branchSlug } };
+  }
+
+}
 module.exports = RegistrationService;

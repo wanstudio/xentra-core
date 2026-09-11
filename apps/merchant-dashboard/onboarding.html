@@ -367,6 +367,31 @@
       </form>
     </div>
 
+
+    <!-- Step 2C: Create New Business -->
+    <div class="x-card" id="step-create-business" style="display:none;">
+      <h1 class="x-card-title">Informasi Bisnis</h1>
+      <p class="x-card-subtitle">Masukkan detail restoran baru Anda.</p>
+      
+      <div id="create-error" class="x-alert-error"></div>
+
+      <form id="form-create-business">
+        <div class="x-form-group">
+          <label for="input-business-name">Nama Bisnis / Brand</label>
+          <input type="text" id="input-business-name" class="x-input" placeholder="contoh: Warung Sari" required autocomplete="organization">
+        </div>
+        
+        <div class="x-form-group">
+          <label for="input-branch-name">Nama Cabang (Opsional)</label>
+          <input type="text" id="input-branch-name" class="x-input" placeholder="contoh: Cabang Pusat">
+        </div>
+
+        <button type="submit" class="x-btn-primary" id="btn-submit-create">
+          <span>Buat Bisnis & Lanjutkan</span>
+        </button>
+        <button type="button" class="x-btn-secondary" id="btn-back-to-choice-2">← Kembali</button>
+      </form>
+    </div>
     <!-- Step 3: Success State -->
     <div class="x-card" id="step-success" style="display:none;">
       <h1 class="x-card-title">🎉 Selamat Datang!</h1>
@@ -405,6 +430,7 @@
       var stepExisting = document.getElementById('step-existing-input');
       var stepConfirm = document.getElementById('step-confirm-claim');
       var stepSuccess = document.getElementById('step-success');
+      var stepCreate = document.getElementById('step-create-business');
 
       var optExisting = document.getElementById('opt-existing');
       var optCreate = document.getElementById('opt-create');
@@ -421,6 +447,7 @@
         stepExisting.style.display = 'none';
         stepConfirm.style.display = 'none';
         stepSuccess.style.display = 'none';
+        if(stepCreate) stepCreate.style.display = 'none';
         if (el) el.style.display = 'block';
       }
 
@@ -430,8 +457,56 @@
       });
 
       optCreate.addEventListener('click', function () {
-        // Redirect to new registration form
-        window.location.href = '/signup';
+        showStep(stepCreate);
+      });
+      
+      document.getElementById('btn-back-to-choice-2').addEventListener('click', function () {
+        showStep(stepChoice);
+      });
+      
+      document.getElementById('form-create-business').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var errCreate = document.getElementById('create-error');
+        errCreate.style.display = 'none';
+        
+        var businessName = document.getElementById('input-business-name').value.trim();
+        var branchName = document.getElementById('input-branch-name').value.trim();
+        if(!businessName) return;
+        
+        var btn = document.getElementById('btn-submit-create');
+        btn.disabled = true;
+        btn.textContent = 'Membuat Bisnis...';
+        
+        try {
+          var res = await fetch('/api/v1/onboarding/create-business', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + activeToken
+            },
+            body: JSON.stringify({ business_name: businessName, branch_name: branchName })
+          });
+          var data = await res.json();
+          
+          if (res.ok && data.success) {
+            if (data.token) localStorage.setItem(TOKEN_KEY, data.token);
+            if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+            
+            showStep(stepSuccess);
+            setTimeout(function () {
+              window.location.href = '/dashboard/';
+            }, 1200);
+          } else {
+            errCreate.textContent = '❌ ' + ((data && (data.error || data.message)) || 'Gagal membuat bisnis.');
+            errCreate.style.display = 'block';
+          }
+        } catch (err) {
+          errCreate.textContent = '❌ Terjadi kesalahan jaringan.';
+          errCreate.style.display = 'block';
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Buat Bisnis & Lanjutkan';
+        }
       });
 
       document.getElementById('btn-back-to-choice-1').addEventListener('click', function () {

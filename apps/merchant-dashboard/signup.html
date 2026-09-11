@@ -69,20 +69,18 @@
       <div id="auth-success" class="x-alert-success"></div>
 
       <!-- Google Sign-Up (preferred) -->
-      <div id="google-auth-container" class="x-google-auth-wrap" style="display:none;">
-        <div id="google-btn-slot" class="x-google-btn-container"></div>
-        <div id="google-auth-status" class="x-google-status">Creating your account...</div>
-        <div class="x-divider">or register with email</div>
+      <div id="signup-options" style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+        <div id="google-auth-container" class="x-google-auth-wrap" style="display:none;">
+          <div id="google-btn-slot" class="x-google-btn-container"></div>
+          <div id="google-auth-status" class="x-google-status">Creating your account...</div>
+        </div>
+        <div class="x-divider">or</div>
+        <button type="button" class="x-btn-submit" id="btn-show-email-signup" style="background:#f1f5f9; color:#0f172a; border:1px solid #cbd5e1;">Continue with Email</button>
       </div>
 
       <!-- Email/password registration form -->
-      <form id="form-signup">
-        <div class="x-form-group">
-          <label for="brand_name">Business / Restaurant Name</label>
-          <div class="x-input-wrap">
-            <input type="text" id="brand_name" class="x-input" placeholder="e.g. Warung Sari" required autocomplete="organization">
-          </div>
-        </div>
+      <form id="form-signup" style="display:none;">
+        
         <div class="x-form-group">
           <label for="email">Email Address</label>
           <div class="x-input-wrap">
@@ -153,6 +151,15 @@
         });
       }
 
+      
+      var btnShowEmail = document.getElementById('btn-show-email-signup');
+      if (btnShowEmail) {
+        btnShowEmail.addEventListener('click', function() {
+          document.getElementById('signup-options').style.display = 'none';
+          document.getElementById('form-signup').style.display = 'block';
+        });
+      }
+
       // Email/password registration
       document.getElementById('form-signup').addEventListener('submit', async function (e) {
         e.preventDefault();
@@ -161,7 +168,6 @@
         btn.disabled = true;
         btn.innerHTML = '<span>Creating account...</span>';
 
-        var brandName = document.getElementById('brand_name').value.trim();
         var email = document.getElementById('email').value.trim();
         var password = document.getElementById('password').value;
         var data = null;
@@ -170,7 +176,7 @@
           var res = await fetch('/api/v1/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ brand_name: brandName, email: email, password: password })
+            body: JSON.stringify({ email: email, password: password })
           });
           try { data = await res.json(); } catch (_) {}
 
