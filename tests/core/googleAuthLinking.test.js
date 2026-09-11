@@ -705,4 +705,51 @@ describe('Google-First Authentication & Bangjo Owner Linking', () => {
     assert.ok(res.raw.includes('/api/v1/auth/google'), 'Page must wire to /api/v1/auth/google');
     assert.ok(res.raw.includes('form-merchant-login'), 'Legacy form must remain present');
   });
+
+  // R. Environment GOOGLE_CLIENT_ID is strictly enforced as expected audience
+  test('R. process.env.GOOGLE_CLIENT_ID is strictly used as the expected audience in verification', async () => {
+    const customClientId = 'custom-configured-client-id.apps.googleusercontent.com';
+    const prevClientId = process.env.GOOGLE_CLIENT_ID;
+    
+    try {
+      process.env.GOOGLE_CLIENT_ID = customClientId;
+      const svc = new GoogleAuthService();
+      assert.equal(svc.clientId, customClientId, 'Service must consume process.env.GOOGLE_CLIENT_ID');
+
+      // Mock tokeninfo returning the custom audience
+      const customToken = formatMockJwt('google-token-custom-aud');
+      registerMockGoogleToken(customToken, {
+        sub: 'sub-custom-aud',
+        email: 'custom@bangjo.com',
+        email_verified: true,
+        aud: customClientId,
+        iss: 'https://accounts.google.com',
+        exp: Math.floor(Date.now() / 1000) + 3600
+      });
+
+      const verified = await svc.verifyIdToken(customToken);
+      assert.equal(verified.sub, 'sub-custom-aud');
+
+      // Reject token with previous or mismatched audience
+      const mismatchedToken = formatMockJwt('google-token-mismatch');
+      registerMockGoogleToken(mismatchedToken, {
+        sub: 'sub-mismatch',
+        email: 'custom@bangjo.com',
+        email_verified: true,
+        aud: 'mismatched-aud.apps.googleusercontent.com',
+        iss: 'https://accounts.google.com',
+        exp: Math.floor(Date.now() / 1000) + 3600
+      });
+
+      await assert.rejects(async () => {
+        await svc.verifyIdToken(mismatchedToken);
+      }, (err) => {
+        assert.equal(err.status, 401);
+        assert.equal(err.code, 'INVALID_TOKEN_AUDIENCE');
+        return true;
+      });
+    } finally {
+      process.env.GOOGLE_CLIENT_ID = prevClientId;
+    }
+  });
 });
