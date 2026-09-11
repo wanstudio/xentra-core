@@ -377,7 +377,12 @@
         </div>
 
         <h1 class="x-card-title">Masuk ke Dashboard</h1>
-        <p class="x-card-subtitle">Kelola menu, logo brand, cabang pengiriman, dan pantau pesanan dapur secara realtime.</p>
+        <div id="claim-notice-banner" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;padding:12px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;margin-bottom:18px;line-height:1.4;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-weight:700;font-size:14px;">
+            <span>🏢</span> <span id="claim-notice-title">Klaim Kepemilikan Bisnis</span>
+          </div>
+          <div id="claim-notice-desc">Masuk dengan akun Google Anda untuk menyelesaikan klaim domain <strong id="claim-target-domain"></strong> dan menghubungkannya ke akun Anda.</div>
+        </div>
 
         <div id="login-error" class="x-alert-error"></div>
 
@@ -496,6 +501,17 @@
       // 0. Check URL for cross-domain handoff ticket (?handoff=...)
       // Exchange ticket immediately and scrub ticket from URL
       var urlParams = new URLSearchParams(window.location.search);
+      var claimDomain = urlParams.get('claim_domain') || sessionStorage.getItem('xentra_pending_claim_domain') || '';
+      if (claimDomain) {
+        sessionStorage.setItem('xentra_pending_claim_domain', claimDomain);
+        var claimNoticeBanner = document.getElementById('claim-notice-banner');
+        var claimTargetDomain = document.getElementById('claim-target-domain');
+        if (claimNoticeBanner && claimTargetDomain) {
+          claimTargetDomain.textContent = claimDomain;
+          claimNoticeBanner.style.display = 'block';
+        }
+      }
+
       var handoffTicket = urlParams.get('handoff');
       if (handoffTicket) {
         urlParams.delete('handoff');
@@ -529,8 +545,34 @@
         return;
       }
 
-      // 1. If already logged in, redirect directly to dashboard
-      if (localStorage.getItem(TOKEN_KEY)) {
+      // 1. If already logged in, redirect directly to dashboard or execute pending claim
+      var existingToken = localStorage.getItem(TOKEN_KEY);
+      if (existingToken) {
+        if (claimDomain) {
+          // User already logged in, execute claim directly
+          fetch('/api/v1/onboarding/claim', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + existingToken
+            },
+            body: JSON.stringify({ domain: claimDomain })
+          }).then(function (res) {
+            return res.json().then(function (data) {
+              if (res.ok && data && data.success) {
+                sessionStorage.removeItem('xentra_pending_claim_domain');
+                if (data.token) localStorage.setItem(TOKEN_KEY, data.token);
+                if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+                window.location.href = data.redirect_url || (data.business && data.business.custom_domain ? 'https://' + data.business.custom_domain + '/dashboard/' : '/dashboard/');
+              } else {
+                window.location.href = '/dashboard/';
+              }
+            });
+          }).catch(function () {
+            window.location.href = '/dashboard/';
+          });
+          return;
+        }
         window.location.href = '/dashboard/';
         return;
       }
@@ -585,6 +627,34 @@
           if (data && data.success && data.token) {
             localStorage.setItem(TOKEN_KEY, data.token);
             localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+
+            if (claimDomain) {
+              btn.innerHTML = '<span>Menyelesaikan klaim bisnis...</span>';
+              try {
+                var claimRes = await fetch('/api/v1/onboarding/claim', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + data.token
+                  },
+                  body: JSON.stringify({ domain: claimDomain })
+                });
+                var claimData = await claimRes.json();
+                if (claimRes.ok && claimData && claimData.success) {
+                  sessionStorage.removeItem('xentra_pending_claim_domain');
+                  if (claimData.token) localStorage.setItem(TOKEN_KEY, claimData.token);
+                  if (claimData.user) localStorage.setItem(USER_KEY, JSON.stringify(claimData.user));
+                  btn.innerHTML = '<span>Klaim berhasil! Mengalihkan...</span>';
+                  setTimeout(function () {
+                    window.location.href = claimData.redirect_url || (claimData.business && claimData.business.custom_domain ? 'https://' + claimData.business.custom_domain + '/dashboard/' : '/dashboard/');
+                  }, 250);
+                  return;
+                }
+              } catch (claimErr) {
+                console.warn('[Claim execution error]:', claimErr);
+              }
+            }
+
             btn.innerHTML = '<span>Login berhasil! Mengalihkan...</span>';
             setTimeout(function () {
               window.location.href = '/dashboard/';
@@ -730,10 +800,15 @@
         btn.disabled = true;
 
         try {
-          var res = await fetch('/api/v1/auth/google', {
+          var targetEndpoint = claimDomain ? '/api/v1/onboarding/claim' : '/api/v1/auth/google';
+          var payload = claimDomain
+            ? { domain: claimDomain, credential: response.credential }
+            : { credential: response.credential };
+
+          var res = await fetch(targetEndpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ credential: response.credential })
+            body: JSON.stringify(payload)
           });
 
           var data = null;
@@ -742,14 +817,18 @@
           } catch (_) {}
 
           if (res.ok && data && data.success && data.token) {
+            sessionStorage.removeItem('xentra_pending_claim_domain');
             localStorage.setItem(TOKEN_KEY, data.token);
-            localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+            if (data.user) {
+              localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+            }
             if (googleStatus) {
-              googleStatus.textContent = 'Login Google berhasil! Mengalihkan...';
+              googleStatus.textContent = claimDomain ? 'Klaim bisnis berhasil! Mengalihkan...' : 'Login Google berhasil! Mengalihkan...';
               googleStatus.style.color = '#166534';
             }
+            var targetUrl = data.redirect_url || (data.business && data.business.custom_domain ? 'https://' + data.business.custom_domain + '/dashboard/' : '/dashboard/');
             setTimeout(function () {
-              window.location.href = '/dashboard/';
+              window.location.href = targetUrl;
             }, 250);
             return;
           }
@@ -764,7 +843,7 @@
           } else if (res.status === 403 && data && data.code === 'FORBIDDEN_TENANT_ACCESS') {
             errorBox.textContent = '❌ Akun Anda tidak memiliki izin akses ke resto ini.';
           } else {
-            errorBox.textContent = '❌ ' + ((data && (data.error || data.message)) || 'Autentikasi Google gagal.');
+            errorBox.textContent = '❌ ' + ((data && (data.error || data.message)) || (claimDomain ? 'Gagal mengklaim bisnis dengan Google.' : 'Autentikasi Google gagal.'));
           }
           errorBox.style.display = 'block';
         } catch (netErr) {

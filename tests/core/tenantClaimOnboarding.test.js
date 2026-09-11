@@ -355,4 +355,57 @@ describe('Existing Tenant Claim / Adoption Flow (Bangjo)', () => {
     assert.equal(storefrontRes.status, 200);
     assert.ok(storefrontRes.raw.includes('xentra-home-view') || storefrontRes.raw.includes('Bangjo') || storefrontRes.raw.includes('pwa'));
   });
+
+  // 7. Unauthenticated Claim Flow & Login Claim Context preservation
+  test('7. Unauthenticated user claim flow redirects to login preserving claim domain, and login executes claim', async () => {
+    // 1. Verify onboarding.html contains redirection logic for unauthenticated claim
+    const onboardingRes = await makeRequest(server, {
+      method: 'GET',
+      path: '/onboarding',
+      headers: { Host: 'xentra.cloud' }
+    });
+    assert.equal(onboardingRes.status, 200);
+    assert.ok(onboardingRes.raw.includes('xentra_pending_claim_domain'));
+    assert.ok(onboardingRes.raw.includes('/dashboard/login?claim_domain='));
+
+    // 2. Verify dashboard login page contains claim banner and claim handling logic
+    const loginRes = await makeRequest(server, {
+      method: 'GET',
+      path: '/dashboard/login?claim_domain=app.mybangjo.com',
+      headers: { Host: 'xentra.cloud' }
+    });
+    assert.equal(loginRes.status, 200);
+    assert.ok(loginRes.raw.includes('claim-notice-banner'));
+    assert.ok(loginRes.raw.includes('Klaim Kepemilikan Bisnis'));
+    assert.ok(loginRes.raw.includes('/api/v1/onboarding/claim'));
+
+    // 3. Register mock Google token for claimant
+    const googleEmail = `unauth-claim-${Date.now()}@example.com`;
+    const googleSub = `sub-${Date.now()}`;
+    const googleToken = registerMockGoogleToken(`unauth-jwt-${Date.now()}`, {
+      sub: googleSub,
+      email: googleEmail,
+      email_verified: true,
+      aud: process.env.GOOGLE_CLIENT_ID,
+      iss: 'https://accounts.google.com',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      name: 'Unauth Claimant'
+    });
+
+    // 4. Submit Google credential directly to claim endpoint (as handleGoogleCredentialResponse does when claimDomain is set)
+    const claimRes = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/onboarding/claim'
+    }, {
+      domain: 'app.mybangjo.com',
+      credential: googleToken
+    });
+
+    assert.equal(claimRes.status, 200);
+    assert.equal(claimRes.body.success, true);
+    assert.ok(claimRes.body.token);
+    assert.equal(claimRes.body.user.role, 'owner');
+    assert.equal(claimRes.body.user.brand_id, 'brand_bangjo');
+    assert.ok(claimRes.body.redirect_url.includes('handoff='));
+  });
 });

@@ -468,10 +468,27 @@
         }
       });
 
+      // Prefill domain from URL query param if present
+      var urlParams = new URLSearchParams(window.location.search);
+      var prefillDomain = urlParams.get('domain') || sessionStorage.getItem('xentra_pending_claim_domain');
+      if (prefillDomain) {
+        var inputDomain = document.getElementById('input-domain');
+        if (inputDomain) {
+          inputDomain.value = prefillDomain;
+        }
+      }
+
       // Claim submission
       formClaimSubmit.addEventListener('submit', async function (e) {
         e.preventDefault();
         errClaim.style.display = 'none';
+
+        // When user is not authenticated, redirect to login/Google flow preserving tenant claim context
+        if (!activeToken) {
+          sessionStorage.setItem('xentra_pending_claim_domain', currentDomain);
+          window.location.href = '/dashboard/login?claim_domain=' + encodeURIComponent(currentDomain) + '&mode=claim';
+          return;
+        }
 
         var btn = document.getElementById('btn-confirm-claim');
         btn.disabled = true;
@@ -491,6 +508,7 @@
           var data = await res.json();
 
           if (res.ok && data.success) {
+            sessionStorage.removeItem('xentra_pending_claim_domain');
             if (data.token) {
               localStorage.setItem(TOKEN_KEY, data.token);
             }
