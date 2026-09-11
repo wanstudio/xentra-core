@@ -973,6 +973,105 @@ describe('Google-First Authentication & Bangjo Owner Linking', () => {
     assert.equal(providerRow.user_id, createdUser.id);
   });
 
+  // Y. Google signup creates user identity first without requiring immediate brand_id (provisional identity)
+  test('Y. Google signup creates user identity without business details and allows subsequent business setup', async () => {
+    const runId = Math.random().toString(36).substring(2, 8);
+    const identitySub = `google-sub-identity-${runId}`;
+    const identityToken = `google-token-identity-${runId}`;
+    const identityEmail = `identity_${runId}@xentra.cloud`;
+
+    registerMockGoogleToken(identityToken, {
+      sub: identitySub,
+      email: identityEmail,
+      email_verified: true,
+      aud: TEST_CLIENT_ID,
+      iss: 'https://accounts.google.com',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      name: 'Identity Owner'
+    });
+
+    // 1. Google signup with credential only (no business_name)
+    const onboardRes = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/auth/google-onboard'
+    }, {
+      credential: identityToken
+    });
+
+    assert.equal(onboardRes.status, 201, `Expected 201 Created, got ${onboardRes.status}: ${JSON.stringify(onboardRes.body)}`);
+    assert.equal(onboardRes.body.success, true);
+    assert.ok(onboardRes.body.token, 'Must return session token');
+    assert.equal(onboardRes.body.user.email, identityEmail);
+    assert.equal(onboardRes.body.user.role, 'owner');
+
+    const createdUserId = onboardRes.body.user.id;
+    const userInDb = db.prepare('SELECT id, email, brand_id, organization_id FROM users WHERE id = ?').get(createdUserId);
+    assert.ok(userInDb, 'User identity must exist in database');
+
+    // 2. Business setup choice: Create New Business
+    const createBizRes = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/onboarding/create-business',
+      headers: { Authorization: `Bearer ${onboardRes.body.token}` }
+    }, {
+      business_name: `Bisnis Baru ${runId}`,
+      branch_name: 'Cabang Pusat'
+    });
+
+    assert.equal(createBizRes.status, 200, `Expected 200 OK, got ${createBizRes.status}: ${JSON.stringify(createBizRes.body)}`);
+    assert.equal(createBizRes.body.success, true);
+    assert.ok(createBizRes.body.business.id);
+
+    // Verify user is now attached to newly created brand & organization
+    const updatedUser = db.prepare('SELECT id, email, brand_id, organization_id, branch_id FROM users WHERE id = ?').get(createdUserId);
+    assert.equal(updatedUser.brand_id, createBizRes.body.business.id);
+    assert.ok(updatedUser.organization_id);
+    assert.ok(updatedUser.branch_id);
+  });
+
+  // Z. Google signup identity can claim existing business
+  test('Z. Google signup identity can claim an existing business domain', async () => {
+    const runId = Math.random().toString(36).substring(2, 8);
+    const claimSub = `google-sub-claim-${runId}`;
+    const claimToken = `google-token-claim-${runId}`;
+    const claimEmail = `claimant_${runId}@xentra.cloud`;
+
+    registerMockGoogleToken(claimToken, {
+      sub: claimSub,
+      email: claimEmail,
+      email_verified: true,
+      aud: TEST_CLIENT_ID,
+      iss: 'https://accounts.google.com',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      name: 'Claimant Owner'
+    });
+
+    // 1. Google signup with credential only
+    const onboardRes = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/auth/google-onboard'
+    }, {
+      credential: claimToken
+    });
+
+    assert.equal(onboardRes.status, 201);
+    const sessionToken = onboardRes.body.token;
+
+    // 2. Business setup choice: Claim Existing Business (e.g. app.mybangjo.com)
+    const claimRes = await makeRequest(server, {
+      method: 'POST',
+      path: '/api/v1/onboarding/claim',
+      headers: { Authorization: `Bearer ${sessionToken}` }
+    }, {
+      domain: 'app.mybangjo.com'
+    });
+
+    assert.equal(claimRes.status, 200, `Expected 200 OK, got ${claimRes.status}: ${JSON.stringify(claimRes.body)}`);
+    assert.equal(claimRes.body.success, true);
+    assert.equal(claimRes.body.user.brand_id, 'brand_bangjo');
+    assert.equal(claimRes.body.user.organization_id, 'org_xentra_holding');
+  });
+
   after(() => {
     if (server) {
       server.close();

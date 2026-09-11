@@ -1454,9 +1454,11 @@ function requireAuth(allowedRoles = []) {
     // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT via Core Identity
     let isTenantAuthorized = session.brandId === req.brand_id;
     if (!isTenantAuthorized && session.role === 'owner') {
-      if (req.path === '/auth/merchant/me' || (req.originalUrl && req.originalUrl.includes('/auth/merchant/me')) ||
-          req.path === '/auth/handoff/create' || (req.originalUrl && req.originalUrl.includes('/auth/handoff/create'))) {
-        // Safe profile & handoff generation: owner operating across their organization
+      const isIdentityOrOnboardingRoute = req.path === '/auth/merchant/me' || (req.originalUrl && req.originalUrl.includes('/auth/merchant/me')) ||
+          req.path === '/auth/handoff/create' || (req.originalUrl && req.originalUrl.includes('/auth/handoff/create')) ||
+          req.path.includes('/onboarding/');
+      if (isIdentityOrOnboardingRoute) {
+        // Safe profile, handoff generation, and business onboarding/setup choice
         isTenantAuthorized = true;
       } else if (session.organizationId && req.brand && req.brand.organization_id) {
         isTenantAuthorized = session.organizationId === req.brand.organization_id;

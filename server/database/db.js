@@ -1215,12 +1215,15 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE users ADD COLUMN mfa_enabled INTEGER DEFAULT 0;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN mfa_enrolled_at TEXT;'); } catch (e) {}
 
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT;'); } catch (e) {}
+
   // Migrate existing users table if brand_id has legacy NOT NULL constraint
   try {
     const usersTableInfo = targetDb.prepare('PRAGMA table_info(users);').all();
     const brandCol = usersTableInfo.find(c => c.name === 'brand_id');
     if (brandCol && brandCol.notnull === 1) {
       targetDb.exec('PRAGMA foreign_keys = OFF;');
+      targetDb.exec('DROP TABLE IF EXISTS users_plat_mig;');
       targetDb.exec('BEGIN TRANSACTION;');
       targetDb.exec(`
         CREATE TABLE users_plat_mig (
