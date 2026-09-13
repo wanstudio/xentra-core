@@ -2,7 +2,8 @@
 
 **Status:** LOCKED / AUTHORITATIVE  
 **Added:** 2026-09-11  
-**M0 Locked:** 2026-09-13
+**M0 Locked:** 2026-09-13  
+**M1 Locked:** 2026-09-13
 
 ## Purpose
 Client/merchant-managed media must be uploaded through Xentra-managed media handling so the Merchant Dashboard can safely provide assets used by the Customer PWA and other client runtime surfaces.
@@ -41,7 +42,7 @@ Optimized Delivery Variants
 
 Upload limits are security guardrails. Merchants should be able to upload normal phone-camera originals without manually compressing them first.
 
-Initial M0 policy targets:
+**Locked M0 policy targets:**
 
 | Asset | Max Upload | Max Dimensions / Safety |
 |---|---:|---|
@@ -51,15 +52,16 @@ Initial M0 policy targets:
 | Banner | 20 MB | 20 MP safety ceiling; canonical ~1.94:1 |
 | Avatar | 10 MB | 20 MP safety ceiling; canonical 1:1 |
 
-Exact slot-specific dimension limits may be tightened by implementation where necessary for resource safety, but must not recreate unnecessary mobile upload friction.
+These policy limits are the authoritative product limits. M1 implementation must not silently replace them with lower slot limits. If an implementation requires a stricter temporary/resource guard, that guard must be explicitly documented and must not redefine the product upload policy.
 
-The architecture must remain compatible with future resumable/chunked uploads for unreliable mobile networks and large files. Resumable upload is not required for the first implementation slice.
+The architecture must remain compatible with future resumable/chunked uploads for unreliable mobile networks and large files. Resumable upload is not required for M1.
 
 ## Crop & Processing Contract
 
 - Users may upload non-square/non-canonical source images.
 - Product, Category, Logo and Avatar canonical crop is 1:1.
 - Banner canonical crop is approximately 1.94:1.
+- **Input uploads must not be rejected merely because their source aspect ratio is not canonical.** Non-canonical sources are expected and are handled by the crop/processing pipeline.
 - Crop positioning is user-controlled; the user may reposition the crop before confirmation.
 - Browser crop coordinates are presentation/input only. Server-side processing is authoritative.
 - Canonical processing pipeline is server-side.
@@ -67,6 +69,28 @@ The architecture must remain compatible with future resumable/chunked uploads fo
 - No upscaling.
 - Processing order is effectively: validate → crop → resize → optimize/compress → generate derivatives.
 - Delivery should prefer optimized derivatives, not the original upload.
+
+## M1 Boundary — Upload Security & Validation
+
+M1 establishes the secure media intake and lifecycle boundary. It does **not** constitute the image optimization/derivative-processing implementation.
+
+M1 responsibilities:
+
+- receive/stage the upload;
+- verify binary format and intrinsic metadata;
+- reject spoofed, malformed, unsupported, oversized, or unsafe input;
+- enforce tenant/brand authorization;
+- persist lifecycle state safely;
+- support retry and atomic entity replacement semantics;
+- make an asset eligible for attachment only when the implementation's readiness contract is satisfied.
+
+M1 must not claim that an asset has been optimized, resized, converted to WebP, or had derivatives generated unless that processing actually occurred. Those responsibilities belong to M3.
+
+### M1 Security Ceiling
+
+- M1 enforces the locked **20 MP product-policy safety ceiling** unless a newer explicit architecture decision changes it.
+- Maximum dimensions may be constrained by implementation for resource safety, but such constraints must be compatible with the locked slot policy and must not silently redefine it.
+- A lower test fixture limit is permitted only when it is clearly test-only and is not exposed as the production policy.
 
 ## Derivatives
 
@@ -224,11 +248,11 @@ Restore procedures must preserve the relationship between media records and stor
 Media System is intentionally phased:
 
 ```text
-M0 Architecture & Contract                 LOCKED
+M0 Architecture & Contract                 COMPLETE / LOCKED
  ↓
-M1 Upload Security & Validation             NEXT
+M1 Upload Security & Validation             COMPLETE / LOCKED
  ↓
-M2 Crop / Image Editor UI
+M2 Crop / Image Editor UI                   NEXT
  ↓
 M3 Image Processing Pipeline
  ↓
@@ -241,7 +265,7 @@ M6 Customer PWA Integration
 M7 Migration / Cleanup / Regression
 ```
 
-M0 locks the architecture and contracts above. It does not require all phases to be implemented immediately.
+M0 locks the architecture and contracts above. M1 implements secure upload intake and validation against those contracts. M2 and M3 provide the interactive crop and canonical server-side optimization pipeline.
 
 This requirement does not authorize building a Cloudinary-like platform in one step. Establish a clean media boundary and evolve it incrementally.
 
