@@ -17,16 +17,20 @@ const MediaLifecycle = require('./MediaLifecycle');
 const { LocalStorageProvider } = require('./StorageProvider');
 const ImageValidator = require('../domain/ImageValidator');
 const MediaRepository = require('../data/repositories/MediaRepository');
+const { ImageProcessor } = require('./ImageProcessor');
+const { CropSpec } = require('../domain/CropSpec');
 
 class MediaService {
   constructor({
     mediaRepository = new MediaRepository(),
     storageProvider = new LocalStorageProvider(),
-    validator = ImageValidator
+    validator = ImageValidator,
+    imageProcessor = new ImageProcessor()
   } = {}) {
     this.mediaRepo = mediaRepository;
     this.storage = storageProvider;
     this.validator = validator;
+    this.processor = imageProcessor;
   }
 
   /**
@@ -285,6 +289,113 @@ class MediaService {
     return this._formatAssetResponse(updated);
   }
 
+  /**
+   * Process media asset through canonical M3 pipeline:
+   * 1. Check tenant authorization and valid lifecycle transition (TEMPORARY/UPLOADED/FAILED -> PROCESSING)
+   * 2. Load source binary from storage
+   * 3. Apply CropSpec (or compute default centered crop if omitted)
+   * 4. Crop, resize, strip metadata, encode WebP derivatives without upscaling
+   * 5. Write derivatives to storage: derivatives/<brandId>/<mediaId>/<variant>.webp
+   * 6. Move source from staging to permanent original storage: originals/<brandId>/<mediaId>.<ext>
+   * 7. Persist variant metadata in media_variants
+   * 8. Transition asset to READY (or FAILED if error occurs)
+   */
+  async processMedia({ mediaId, brandId, cropSpec = null }) {
+    const asset = this.getMedia({ mediaId, brandId });
+
+    // Transition to PROCESSING
+    MediaLifecycle.assertTransition(asset.status, MediaLifecycle.STATES.PROCESSING);
+    this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.PROCESSING);
+
+    try {
+      // 1. Read source binary from storage
+      const sourceBuffer = await this.storage.read(asset.storage_key);
+
+      // 2. Consume provided cropSpec or existing cropSpec on asset, or fallback to centered default
+      const effectiveCrop = cropSpec || asset.crop_spec;
+
+      // 3. Run Sharp canonical processing pipeline
+      const result = await this.processor.process({
+        sourceBuffer,
+        assetType: asset.asset_type || 'general',
+        cropSpec: effectiveCrop
+      });
+
+      // 4. Clean up any previous variants if this was a retry
+      this.mediaRepo.deleteVariantsByMediaId(mediaId);
+
+      // 5. Store derivatives and record in media_variants
+      const savedVariants = [];
+      for (const derivative of result.derivatives) {
+        const variantId = `var_${crypto.randomBytes(8).toString('hex')}_${Date.now()}`;
+        const derivativeStorageKey = `derivatives/${brandId}/${mediaId}/${derivative.name}.webp`;
+
+        await this.storage.write(derivativeStorageKey, derivative.buffer);
+
+        this.mediaRepo.createVariant({
+          id: variantId,
+          media_id: mediaId,
+          variant_name: derivative.name,
+          width: derivative.width,
+          height: derivative.height,
+          format: derivative.format,
+          mime_type: derivative.mimeType,
+          size_bytes: derivative.sizeBytes,
+          storage_key: derivativeStorageKey
+        });
+
+        savedVariants.push({
+          id: variantId,
+          name: derivative.name,
+          width: derivative.width,
+          height: derivative.height,
+          format: derivative.format,
+          mime_type: derivative.mimeType,
+          size_bytes: derivative.sizeBytes,
+          storage_key: derivativeStorageKey,
+          url: this.storage.resolveUrl(derivativeStorageKey)
+        });
+      }
+
+      // 6. Relocate original from staging to permanent brand originals location if applicable
+      let finalKey = asset.storage_key;
+      if (asset.storage_key.startsWith('staging/')) {
+        const ext = asset.mime_type === 'image/jpeg' ? 'jpg' : (asset.mime_type === 'image/webp' ? 'webp' : 'png');
+        const permKey = `originals/${brandId}/${mediaId}.${ext}`;
+        await this.storage.write(permKey, sourceBuffer);
+        await this.storage.delete(asset.storage_key);
+        finalKey = permKey;
+
+        this.mediaRepo.db.execute(
+          'UPDATE media_assets SET storage_key = ? WHERE id = ? AND brand_id = ?',
+          [finalKey, mediaId, brandId]
+        );
+      }
+
+      // 7. Update crop spec record on asset
+      this.mediaRepo.updateCropSpec(mediaId, brandId, result.cropSpec.toJSON());
+
+      // 8. Transition asset to READY
+      MediaLifecycle.assertTransition(MediaLifecycle.STATES.PROCESSING, MediaLifecycle.STATES.READY);
+      this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.READY);
+
+      const updated = this.mediaRepo.findById(mediaId, brandId);
+      return this._formatAssetResponse(updated);
+
+    } catch (err) {
+      // Safe lifecycle failure transition
+      this.mediaRepo.updateStatus(mediaId, brandId, MediaLifecycle.STATES.FAILED, {
+        error_message: err.message || 'Image processing failed'
+      });
+      const failedAsset = this.mediaRepo.findById(mediaId, brandId);
+      const formatted = this._formatAssetResponse(failedAsset);
+      const wrappedError = new Error(`Media processing failed: ${err.message}`);
+      wrappedError.code = err.code || 'PROCESSING_FAILED';
+      wrappedError.asset = formatted;
+      throw wrappedError;
+    }
+  }
+
   _formatAssetResponse(asset) {
     if (!asset) return null;
     let parsedCropSpec = null;
@@ -294,6 +405,25 @@ class MediaService {
       } catch (_) {
         parsedCropSpec = null;
       }
+    }
+
+    // Include variants if available
+    let variants = [];
+    try {
+      const dbVariants = this.mediaRepo.getVariantsByMediaId(asset.id);
+      variants = (dbVariants || []).map(v => ({
+        id: v.id,
+        name: v.variant_name,
+        width: v.width,
+        height: v.height,
+        format: v.format,
+        mime_type: v.mime_type,
+        size_bytes: v.size_bytes,
+        storage_key: v.storage_key,
+        url: this.storage.resolveUrl(v.storage_key)
+      }));
+    } catch (_) {
+      variants = [];
     }
 
     return {
@@ -311,6 +441,7 @@ class MediaService {
       asset_type: asset.asset_type,
       status: asset.status,
       crop_spec: parsedCropSpec,
+      variants,
       attached_to_type: asset.attached_to_type,
       attached_to_id: asset.attached_to_id,
       attached_at: asset.attached_at,

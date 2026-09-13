@@ -208,6 +208,65 @@ class MediaRepository {
         AND orphaned_at < ?
     `, [cutoffIsoString]);
   }
+
+  /**
+   * Insert a processed media variant record.
+   */
+  createVariant({
+    id,
+    media_id,
+    variant_name,
+    width,
+    height,
+    format,
+    mime_type,
+    size_bytes,
+    storage_key
+  }) {
+    const now = new Date().toISOString();
+    return this.db.execute(`
+      INSERT INTO media_variants (
+        id, media_id, variant_name, width, height, format, mime_type,
+        size_bytes, storage_key, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      id,
+      media_id,
+      variant_name,
+      width,
+      height,
+      format,
+      mime_type,
+      size_bytes || 0,
+      storage_key,
+      now
+    ]);
+  }
+
+  /**
+   * Find all derivatives for a specific media asset.
+   */
+  getVariantsByMediaId(mediaId) {
+    if (!mediaId) return [];
+    return this.db.queryMany(`
+      SELECT *
+      FROM media_variants
+      WHERE media_id = ?
+      ORDER BY width ASC
+    `, [mediaId]);
+  }
+
+  /**
+   * Delete existing variants for a media asset (e.g. before re-processing / retry).
+   */
+  deleteVariantsByMediaId(mediaId) {
+    if (!mediaId) return;
+    return this.db.execute(`
+      DELETE FROM media_variants
+      WHERE media_id = ?
+    `, [mediaId]);
+  }
 }
 
 module.exports = MediaRepository;
+

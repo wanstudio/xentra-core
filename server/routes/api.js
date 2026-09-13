@@ -4298,6 +4298,33 @@ router.post('/admin/media/:id/crop', requireAuth(['owner', 'brand_manager', 'bra
   }
 });
 
+// Canonical M3 Server-Side Image Processing Pipeline
+router.post('/admin/media/:id/process', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const { crop_spec } = req.body || {};
+    const asset = await mediaService.processMedia({
+      mediaId: req.params.id,
+      brandId: req.brand_id,
+      cropSpec: crop_spec || null
+    });
+
+    res.json({
+      success: true,
+      message: 'Pemrosesan gambar kanonikal berhasil diselesaikan.',
+      asset
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'PROCESSING_ERROR',
+      asset: err.asset || null
+    });
+  }
+});
+
+
 // Transition lifecycle status
 router.post('/admin/media/:id/transition', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
   try {

@@ -1171,6 +1171,23 @@ function initSchema(targetDb) {
 
     CREATE INDEX IF NOT EXISTS idx_media_brand_status ON media_assets(brand_id, status);
     CREATE INDEX IF NOT EXISTS idx_media_status_created ON media_assets(status, created_at);
+
+    CREATE TABLE IF NOT EXISTS media_variants (
+      id TEXT PRIMARY KEY,
+      media_id TEXT NOT NULL,
+      variant_name TEXT NOT NULL,
+      width INTEGER NOT NULL,
+      height INTEGER NOT NULL,
+      format TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size_bytes INTEGER DEFAULT 0,
+      storage_key TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (media_id) REFERENCES media_assets(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_variants_media_id ON media_variants(media_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_variants_media_name ON media_variants(media_id, variant_name);
   `);
 
   try { targetDb.exec('ALTER TABLE media_assets ADD COLUMN crop_spec TEXT;'); } catch (e) {}
