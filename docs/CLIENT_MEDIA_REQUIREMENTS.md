@@ -7,7 +7,8 @@
 **M2 Locked:** 2026-09-13  
 **M3 Locked:** 2026-09-13  
 **M4 Locked:** 2026-09-13  
-**M5 Locked:** 2026-09-13
+**M5 Locked:** 2026-09-13  
+**M6 Locked:** 2026-09-13
 
 
 ## Purpose
@@ -265,10 +266,18 @@ M4 Media Storage & Asset Lifecycle          COMPLETE / LOCKED
  ↓
 M5 Dashboard Integration                    COMPLETE / LOCKED
  ↓
-M6 Customer PWA Integration                 NEXT
+M6 Customer PWA Integration                 COMPLETE / LOCKED
  ↓
-M7 Migration / Cleanup / Regression
+M7 Migration / Cleanup / Regression         NEXT
 ```
+
+### M6 Architecture Notes — Customer PWA Integration
+- **Delivery Consumer:** Customer PWA is strictly a read-only delivery consumer and never optimizes/processes original binaries.
+- **Canonical Precedence:** When an entity has a canonical `media_id` with READY derivatives, optimized WebP derivatives (`preview_url`, `srcset_variants`) take precedence over legacy `image_url`.
+- **Deterministic Fallback:** If canonical media is absent or has no ready variants, existing legacy URLs (`image_url`, `logo_url`, `banners`) are preserved seamlessly. Catalog and ordering never fail due to media state.
+- **Immutable Cache Safety:** Variant URLs under `/assets/uploads/derivatives/` are versioned by `media_id`. Service Worker caches them via Cache-First while strictly bypassing original/admin binaries. Replacement creates a new `media_id` without requiring cache-busting query strings or global cache wipes.
+- **Mobile-First Performance & CLS:** Inherent 1:1 aspect-ratio for product cards/categories and ~1.94:1 for banners are reserved in CSS and markup to eliminate cumulative layout shifts. Above-the-fold banner uses eager loading; below-the-fold assets use `loading="lazy"` and asynchronous decoding.
+
 
 M0 locks the architecture and contracts above. M1 implements secure upload intake and validation against those contracts. M2 and M3 provide the interactive crop and canonical server-side optimization pipeline.
 

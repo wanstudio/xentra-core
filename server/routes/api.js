@@ -47,6 +47,7 @@ router.get(['/promo/active', '/promotions/active'], (req, res) => {
 // 1. Get Brand Profile & Theme
 router.get('/brand/info', (req, res) => {
   try {
+    const brandId = req.brand_id;
     let banners = [];
     try {
       banners = req.brand.banners ? (typeof req.brand.banners === 'string' ? JSON.parse(req.brand.banners) : req.brand.banners) : [];
@@ -74,15 +75,33 @@ router.get('/brand/info', (req, res) => {
       ];
     }
 
+    // M6: Resolve canonical media delivery for logo (logo_media_id → derivative)
+    let logoDeliveryUrl = req.brand.logo_url || null;
+    try {
+      const brandRow = db.prepare('SELECT logo_media_id FROM brands WHERE id = ?').get(brandId);
+      if (brandRow && brandRow.logo_media_id) {
+        const logoDelivery = resolveCustomerMediaDelivery({
+          mediaId: brandRow.logo_media_id,
+          brandId,
+          assetType: 'square',
+          legacyUrl: req.brand.logo_url || null
+        });
+        if (logoDelivery.preview_url) logoDeliveryUrl = logoDelivery.preview_url;
+      }
+    } catch (_) {}
+
+    // M6: Enrich each banner with canonical media delivery (banner derivative preferred)
+    const enrichedBanners = banners.map(b => resolveBannerDelivery(b, brandId));
+
     res.json({
       success: true,
       brand: {
         id: req.brand.id,
         name: req.brand.name,
         slug: req.brand.slug,
-        logo_url: req.brand.logo_url,
+        logo_url: logoDeliveryUrl,
         primary_color: req.brand.primary_color || '#b6ff00',
-        banners
+        banners: enrichedBanners
       }
     });
   } catch (err) {
@@ -90,6 +109,7 @@ router.get('/brand/info', (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 // 2. List Branches for Brand
 router.get('/brand/branches', (req, res) => {
@@ -397,19 +417,50 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
     // and branch stock estimate when branch_id is provided.
     const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: branchScope ? branchScope.id : null });
 
+    // M6: Resolve canonical media delivery for each category
     const categories = menu.categories.map((c) => {
-      const img = c.image_url || c.icon_url || c.image || '';
+      const legacyImg = c.image_url || c.icon_url || c.image || '';
+      const delivery = resolveCustomerMediaDelivery({
+        mediaId: c.media_id || null,
+        brandId,
+        assetType: 'square',
+        legacyUrl: legacyImg || null
+      });
       return {
         ...c,
-        image: img,
-        image_url: img
+        image: delivery.preview_url || legacyImg,
+        image_url: delivery.preview_url || legacyImg,
+        media_id: delivery.media_id,
+        preview_url: delivery.preview_url,
+        srcset_variants: delivery.srcset_variants
       };
     });
     const products = menu.products;
 
     const tree = categories.map((cat) => {
       const catProducts = products.filter((p) => String(p.category_id) === String(cat.id));
-      const catImg = cat.image_url || cat.image || cat.icon_url || '';
+      const catImg = cat.preview_url || cat.image_url || cat.image || cat.icon_url || '';
+
+      // M6: Resolve canonical media delivery for each product
+      const enrichedProducts = catProducts.map((p) => {
+        const legacyImg = p.image_url || p.image || '';
+        const delivery = resolveCustomerMediaDelivery({
+          mediaId: p.media_id || null,
+          brandId,
+          assetType: 'square',
+          legacyUrl: legacyImg || null
+        });
+        return {
+          ...p,
+          image: delivery.preview_url || legacyImg,
+          image_url: delivery.preview_url || legacyImg,
+          media_id: delivery.media_id,
+          preview_url: delivery.preview_url,
+          srcset_variants: delivery.srcset_variants,
+          regular_price: p.regular_price || p.price,
+          sale_price: p.price
+        };
+      });
 
       return {
         id: cat.id,
@@ -417,23 +468,33 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
         slug: cat.slug || String(cat.name || '').toLowerCase().replace(/\s+/g, '-'),
         image: catImg,
         image_url: catImg,
-        products: catProducts.map((p) => ({
-          ...p,
-          image: p.image_url || '',
-          image_url: p.image_url || '',
-          regular_price: p.regular_price || p.price,
-          sale_price: p.price
-        }))
+        media_id: cat.media_id || null,
+        preview_url: cat.preview_url || null,
+        srcset_variants: cat.srcset_variants || [],
+        products: enrichedProducts
       };
     });
 
-    const allNormalized = products.map((p) => ({
-      ...p,
-      image: p.image_url || '',
-      image_url: p.image_url || '',
-      regular_price: p.regular_price || p.price,
-      sale_price: p.price
-    }));
+    // M6: Resolve canonical media delivery for all products (flat list)
+    const allNormalized = products.map((p) => {
+      const legacyImg = p.image_url || p.image || '';
+      const delivery = resolveCustomerMediaDelivery({
+        mediaId: p.media_id || null,
+        brandId,
+        assetType: 'square',
+        legacyUrl: legacyImg || null
+      });
+      return {
+        ...p,
+        image: delivery.preview_url || legacyImg,
+        image_url: delivery.preview_url || legacyImg,
+        media_id: delivery.media_id,
+        preview_url: delivery.preview_url,
+        srcset_variants: delivery.srcset_variants,
+        regular_price: p.regular_price || p.price,
+        sale_price: p.price
+      };
+    });
 
     res.json({
       success: true,
@@ -479,13 +540,26 @@ router.get('/products', (req, res) => {
       console.warn('[Products DB Error]:', err.message);
     }
 
-    const normalized = (products || []).map((p) => ({
-      ...p,
-      image: p.image_url || p.image || '',
-      image_url: p.image_url || p.image || '',
-      regular_price: p.regular_price || p.price,
-      sale_price: p.price
-    }));
+    // M6: Resolve canonical media delivery for each product
+    const normalized = (products || []).map((p) => {
+      const legacyImg = p.image_url || p.image || '';
+      const delivery = resolveCustomerMediaDelivery({
+        mediaId: p.media_id || null,
+        brandId,
+        assetType: 'square',
+        legacyUrl: legacyImg || null
+      });
+      return {
+        ...p,
+        image: delivery.preview_url || legacyImg,
+        image_url: delivery.preview_url || legacyImg,
+        media_id: delivery.media_id,
+        preview_url: delivery.preview_url,
+        srcset_variants: delivery.srcset_variants,
+        regular_price: p.regular_price || p.price,
+        sale_price: p.price
+      };
+    });
 
     res.json({
       success: true,
@@ -4590,6 +4664,122 @@ function resolvePreviewUrl(asset, minWidth = 320) {
   const sorted = [...asset.variants].sort((a, b) => a.width - b.width);
   const candidate = sorted.find(v => v.width >= minWidth) || sorted[sorted.length - 1];
   return candidate ? candidate.url : asset.url;
+}
+
+// ============================================================================
+// M6 CUSTOMER PWA MEDIA DELIVERY — Canonical media resolution for customer-facing data.
+// Customer PWA is a delivery consumer: it never processes originals.
+// All media resolution here is tenant-scoped and read-only (delivery-safe fields only).
+// ============================================================================
+
+/**
+ * M6 HELPER: Resolve delivery-safe canonical media representation for a customer-facing entity.
+ *
+ * Inputs:
+ *   mediaId  — the entity's canonical media_id (nullable)
+ *   brandId  — required for strict tenant isolation
+ *   assetType — 'square' or 'banner' — selects the correct derivative matrix
+ *   legacyUrl — existing image_url / logo_url / banner image_url (fallback only)
+ *
+ * Returns:
+ *   {
+ *     preview_url:     string|null  — smallest usable derivative URL (640 square, 640 banner sm)
+ *     srcset_variants: Array<{ url, width }>  — sorted derivatives for responsive delivery
+ *     media_id:        string|null  — canonical identifier (immutable, cache-safe)
+ *     legacy_url:      string|null  — preserved for backward compatibility only
+ *   }
+ *
+ * Rules:
+ *   - If canonical media exists and has READY variants → prefer derivative, never original.
+ *   - If canonical media has no ready variants → fall through to legacyUrl.
+ *   - Never expose storage_key, original binary paths, or admin metadata.
+ *   - Never allow cross-tenant access (brand_id is always enforced).
+ */
+function resolveCustomerMediaDelivery({ mediaId, brandId, assetType = 'square', legacyUrl = null }) {
+  const result = {
+    preview_url: legacyUrl || null,
+    srcset_variants: [],
+    media_id: null,
+    legacy_url: legacyUrl || null
+  };
+
+  if (!mediaId || !brandId) return result;
+
+  try {
+    // Tenant-scoped asset lookup — enforces brand isolation
+    const asset = db.prepare(
+      'SELECT id, brand_id, status FROM media_assets WHERE id = ? AND brand_id = ?'
+    ).get(mediaId, brandId);
+
+    if (!asset) return result; // Cross-tenant or missing: fall to legacy silently
+
+    // Only deliver variants from READY assets
+    if (asset.status !== 'ready') return result;
+
+    const variants = db.prepare(
+      'SELECT variant_name, width, height, storage_key FROM media_variants WHERE media_id = ? ORDER BY width ASC'
+    ).all(mediaId);
+
+    if (!variants || variants.length === 0) return result;
+
+    // Build delivery-safe variant list (URLs only, no storage keys exposed)
+    const deliveryVariants = variants.map(v => ({
+      name: v.variant_name,
+      width: v.width,
+      height: v.height,
+      url: mediaService.storage.resolveUrl(v.storage_key)
+    }));
+
+    // Select best preview_url based on asset type:
+    //   square → 640px (sufficient for product/category cards on mobile)
+    //   banner → 640×330 variant (sm)
+    let previewVariant;
+    if (assetType === 'banner') {
+      // For banners: prefer the sm variant (640), fallback to largest available
+      previewVariant = deliveryVariants.find(v => v.width >= 640) || deliveryVariants[deliveryVariants.length - 1];
+    } else {
+      // For square (product/category): prefer 640px, fallback to largest
+      previewVariant = deliveryVariants.find(v => v.width >= 640) || deliveryVariants[deliveryVariants.length - 1];
+    }
+
+    result.media_id = asset.id;
+    result.preview_url = previewVariant ? previewVariant.url : (legacyUrl || null);
+    result.srcset_variants = deliveryVariants.map(v => ({ url: v.url, width: v.width, height: v.height, name: v.name }));
+  } catch (_) {
+    // Any resolution error must not break catalog rendering — fall to legacy
+  }
+
+  return result;
+}
+
+/**
+ * M6 HELPER: Resolve canonical media for a banner entry.
+ * Banner entries may carry a media_id (canonical) or only an image_url (legacy).
+ * Returns the banner with enriched delivery fields.
+ */
+function resolveBannerDelivery(banner, brandId) {
+  if (!banner) return banner;
+  const mediaId = banner.media_id || null;
+  const legacyUrl = banner.image_url || null;
+
+  const delivery = resolveCustomerMediaDelivery({
+    mediaId,
+    brandId,
+    assetType: 'banner',
+    legacyUrl
+  });
+
+  return {
+    id: banner.id,
+    title: banner.title || '',
+    link: banner.link || '#',
+    // Canonical delivery fields:
+    preview_url: delivery.preview_url,
+    srcset_variants: delivery.srcset_variants,
+    media_id: delivery.media_id,
+    // Legacy preserved for backward compat:
+    image_url: delivery.preview_url || legacyUrl // prefer canonical derivative
+  };
 }
 
 /**

@@ -1,12 +1,15 @@
 /**
- * Xentra Customer PWA — Service Worker
+ * Xentra Customer PWA — Service Worker (M6)
  * Architecture:
  * 1. Immediate activation via skipWaiting() and clients.claim()
  * 2. Strict Network-First for HTML, JS, CSS (guarantees 0ms stale code on live connections)
  * 3. Cache-Fallback for genuine offline operation
  * 4. Automatic purge of old version caches on activation
+ * 5. M6: Immutable media derivative caching — /assets/uploads/derivatives/ paths
+ *    are versioned by media_id, so safe to cache with Cache-First strategy.
+ *    Never cache: original binaries, admin endpoints, arbitrary uploads.
  */
-const CACHE_NAME = "bangjo-pwa-p7f4a0b";
+const CACHE_NAME = "bangjo-pwa-m6a01";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -26,6 +29,7 @@ const STATIC_ASSETS = [
   "/assets/js/core/router.js",
   "/assets/js/core/pwa-runtime.js",
   "/assets/js/core/promo-reward-cart.js",
+  "/assets/js/core/media.js",
   "/assets/js/location.js",
   "/assets/js/core/discovery.js",
   "/assets/js/core/location-picker.js",
@@ -35,6 +39,9 @@ const STATIC_ASSETS = [
   "/assets/js/pages/aux-pages.js"
 ];
 
+// M6: Separate cache for immutable media derivatives (versioned by media_id)
+const MEDIA_CACHE_NAME = "bangjo-media-m6a01";
+
 // 1. Install & Pre-cache with Cache-Busting
 self.addEventListener("install", event => {
   self.skipWaiting();
@@ -42,7 +49,7 @@ self.addEventListener("install", event => {
     caches.open(CACHE_NAME).then(cache => {
       const versionedUrls = STATIC_ASSETS.map(u => {
         if (u === "/" || u === "/manifest.json" || u.includes(".png")) return u;
-        return u + "?v=" + "p7f4a02";
+        return u + "?v=" + "m6a01";
       });
       return cache.addAll(versionedUrls).catch(err => {
         console.warn("[SW Install] Cache prefetch warn:", err);
@@ -57,7 +64,8 @@ self.addEventListener("activate", event => {
     caches.keys().then(keys => {
       return Promise.all(
         keys.map(key => {
-          if (key !== CACHE_NAME) {
+          // Purge any non-current caches (old app cache AND old media cache)
+          if (key !== CACHE_NAME && key !== MEDIA_CACHE_NAME) {
             console.log("[SW Activate] Purging old cache:", key);
             return caches.delete(key);
           }
@@ -67,14 +75,42 @@ self.addEventListener("activate", event => {
   );
 });
 
-// 3. Fetch Strategy: Network-First with Live Fallback
+// 3. Fetch Strategy
 self.addEventListener("fetch", event => {
   if (event.request.method !== "GET") return;
 
   const url = new URL(event.request.url);
 
-  // Never touch API calls or Merchant Dashboard
+  // Never touch API calls or Dashboard
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/dashboard')) {
+    return;
+  }
+
+  // Never cache admin or original media paths
+  if (url.pathname.startsWith('/admin/') ||
+      url.pathname.startsWith('/assets/uploads/originals/') ||
+      url.pathname.startsWith('/assets/uploads/staging/')) {
+    return;
+  }
+
+  // M6: Cache-First for immutable media derivative URLs.
+  // Paths under /assets/uploads/derivatives/<brandId>/<mediaId>/<variant>.webp
+  // are content-addressed by media_id — safe to cache indefinitely.
+  // A media replacement creates a NEW media_id → new URL → new cache entry.
+  if (url.pathname.startsWith('/assets/uploads/derivatives/')) {
+    event.respondWith(
+      caches.open(MEDIA_CACHE_NAME).then(cache => {
+        return cache.match(event.request).then(cached => {
+          if (cached) return cached; // Cache hit — immutable derivative
+          return fetch(event.request).then(response => {
+            if (response && response.status === 200) {
+              cache.put(event.request, response.clone());
+            }
+            return response;
+          }).catch(() => cached || null);
+        });
+      })
+    );
     return;
   }
 

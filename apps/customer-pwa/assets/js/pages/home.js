@@ -11,6 +11,8 @@
   var API = window.Xentra.API;
   var Store = window.Xentra.Store;
   var UI = window.Xentra.UI;
+  // M6: XentraMedia — canonical media delivery consumer
+  var Media = (window.Xentra && window.Xentra.Media) || null;
 
   // ── State ──
   var categories = [];
@@ -154,9 +156,69 @@
   }
 
   // ======================================================================
-  //  CAROUSEL BANNER
+  //  CAROUSEL BANNER (M6: dynamic banner rendering with canonical media)
   // ======================================================================
+
+  /**
+   * M6: Load banners from /brand/info and render canonical media slides.
+   * First slide gets loading="eager" (above-the-fold); subsequent get lazy.
+   * Falls back gracefully to whatever static slides exist in the HTML.
+   * After rendering, re-initializes the carousel behavior.
+   */
+  function loadBanners() {
+    var track = $('x-carousel-track');
+    if (!track) return;
+
+    API.get('/brand/info')
+      .then(function (data) {
+        var banners = data && data.brand && Array.isArray(data.brand.banners) ? data.brand.banners : [];
+        if (!banners.length) {
+          initCarousel();
+          return;
+        }
+
+        // Clear static placeholder slides
+        // Remove existing .x-carousel-slide elements (but preserve clones too)
+        Array.from(track.querySelectorAll('.x-carousel-slide')).forEach(function (s) {
+          s.parentNode && s.parentNode.removeChild(s);
+        });
+
+        // Render banner slides using canonical media
+        banners.forEach(function (banner, idx) {
+          var slide = document.createElement('div');
+          slide.className = 'x-carousel-slide';
+
+          var imgHtml = '';
+          if (Media && typeof Media.buildBannerImg === 'function') {
+            // First slide: eager (above the fold); rest: lazy
+            imgHtml = Media.buildBannerImg(banner, idx === 0);
+          } else {
+            // Fallback if XentraMedia is unavailable
+            var src = banner.image_url || banner.preview_url || '';
+            if (src) {
+              imgHtml = '<img src="' + src + '" alt="' + (banner.title || 'Promo') + '"' +
+                (idx === 0 ? ' loading="eager"' : ' loading="lazy"') +
+                ' style="width:100%;height:auto;border-radius:20px;display:block;">';
+            }
+          }
+
+          if (imgHtml) {
+            slide.innerHTML = imgHtml;
+            track.appendChild(slide);
+          }
+        });
+
+        // Re-initialize carousel with the new slides
+        initCarousel();
+      })
+      .catch(function () {
+        // Network failure: use whatever static slides are already in the DOM
+        initCarousel();
+      });
+  }
+
   function initCarousel() {
+
     var track = $('x-carousel-track');
     var dots = $('x-carousel-dots');
     var container = track ? track.closest('.x-carousel-container') : null;
@@ -769,10 +831,14 @@
       btn.className = 'x-cat' + (String(cat.id) === String(activeCategory) ? ' active' : '');
       btn.setAttribute('data-cat-id', String(cat.id));
 
-      var catImg = cat.image_url || cat.image || cat.icon_url;
+      // M6: prefer canonical derivative via XentraMedia, fall back to legacy
+      var catImg = (Media && Media.resolveCategoryImg(cat)) || cat.image_url || cat.image || cat.icon_url || '';
+      var monogram = UI.escape(branchMonogram(cat.name));
       var imgHtml = catImg
-        ? '<img src="' + UI.escape(catImg) + '" alt="' + UI.escape(cat.name) + '" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML=\'<span class=\\\'x-cat-image-mono\\\'>' + UI.escape(branchMonogram(cat.name)) + '</span>\';">'
-        : '<span class="x-cat-image-mono">' + UI.escape(branchMonogram(cat.name)) + '</span>';
+        ? '<img src="' + UI.escape(catImg) + '" alt="' + UI.escape(cat.name) + '"' +
+          ' width="92" height="92" loading="lazy" decoding="async"' +
+          ' onerror="this.onerror=null;this.parentElement.innerHTML=\'<span class=\\\\'x-cat-image-mono\\\\'>' + monogram + '</span>\';">'
+        : '<span class="x-cat-image-mono">' + monogram + '</span>';
 
       btn.innerHTML =
         '<span class="x-cat-image">' + imgHtml + '</span>' +
@@ -863,7 +929,6 @@
 
       var price = Number(product.price || 0);
       var regPrice = Number(product.regular_price || price);
-      var image = product.image_url || product.image || '';
       var desc = product.description || '';
 
       // P3: branch-level availability is a SERVER-computed flag (is_available is
@@ -902,6 +967,20 @@
         controls = '<button type="button" class="x-add" data-add="' + product.id + '">Tambah</button>';
       }
 
+      // M6: Use XentraMedia for canonical image delivery (derivative, not original).
+      // buildProductImg generates srcset + sizes + fixed width/height for layout stability.
+      // Falls back to legacy image_url if no canonical media exists.
+      var imgHtml = '';
+      if (Media && typeof Media.buildProductImg === 'function') {
+        imgHtml = Media.buildProductImg(product, { lazy: true });
+      } else {
+        var image = product.image_url || product.image || '';
+        if (image) {
+          imgHtml = '<img class="x-product-image" src="' + UI.escape(image) + '"' +
+            ' alt="' + UI.escape(product.name) + '" width="105" height="105" loading="lazy" decoding="async">';
+        }
+      }
+
       card.innerHTML =
         '<div class="x-product-info">' +
         '  <div class="x-product-name">' + UI.escape(product.name) + '</div>' +
@@ -912,7 +991,7 @@
         '  </div>' +
         '</div>' +
         '<div class="x-product-right">' +
-        (image ? '<img class="x-product-image" src="' + UI.escape(image) + '" alt="' + UI.escape(product.name) + '" loading="lazy">' : '') +
+        imgHtml +
         controls +
         '</div>';
 
@@ -921,6 +1000,7 @@
 
     bindProductEvents();
   }
+
 
   // Scroll presisi berbasis card: hanya scroll jika bagian bawah card tertutup/terpotong oleh cart bar
   function ensureCardVisible(productId) {
@@ -1098,7 +1178,24 @@
     var unavailable = !!activeBranch && product.is_available === false;
     var price = Number(product.price || 0);
     var regPrice = Number(product.regular_price || price);
-    var image = product.image_url || product.image || '';
+    // M6: Resolve best image for the detail view (200px tall, full-width).
+    // For the detail sheet we want at least 640px wide (md quality) for crisp display.
+    var imgHtml = '';
+    var detailImgSrc = '';
+    if (Media && typeof Media.resolveProductImg === 'function') {
+      // Temporarily scale up requested size for detail view (200px height → need wider derivative)
+      var detailVariants = product.srcset_variants;
+      if (Array.isArray(detailVariants) && detailVariants.length > 0) {
+        var detailV = Media.selectVariant(detailVariants, 640, 'square');
+        if (detailV) detailImgSrc = detailV.url;
+      }
+      if (!detailImgSrc) detailImgSrc = Media.resolveProductImg(product);
+    }
+    if (!detailImgSrc) detailImgSrc = product.image_url || product.image || '';
+
+    if (detailImgSrc) {
+      imgHtml = '<div class="x-detail-image-wrap"><img src="' + UI.escape(detailImgSrc) + '" alt="' + UI.escape(product.name) + '" loading="eager" decoding="async"></div>';
+    }
 
     var scopedQty = 0;
     try {
@@ -1112,9 +1209,6 @@
       }
     } catch (_) {}
 
-    var imgHtml = image
-      ? '<div class="x-detail-image-wrap"><img src="' + UI.escape(image) + '" alt="' + UI.escape(product.name) + '"></div>'
-      : '';
     var oldPriceHtml = regPrice > price
       ? '<span class="x-detail-old-price">' + UI.money(regPrice) + '</span>'
       : '';
@@ -1127,6 +1221,7 @@
     var cartHint = scopedQty > 0
       ? '<div class="x-detail-cart-hint">Sudah ada <strong>' + scopedQty + '</strong> di keranjang untuk cabang ini.</div>'
       : '';
+
 
     var overlay = document.createElement('div');
     overlay.className = 'x-overlay x-note-overlay x-detail-overlay';
@@ -1616,8 +1711,9 @@
     updateClock();
     setInterval(updateClock, 1000);
 
-    // Carousel
-    initCarousel();
+    // M6: Load canonical banner media from /brand/info, then init carousel.
+    // Falls back to static HTML slides if the API is unavailable.
+    loadBanners();
 
     // 1. First paint without a "wrong branch" flash: when a branch context survived
     // a reload, show an honest loading state (never a brand-wide catalog inside

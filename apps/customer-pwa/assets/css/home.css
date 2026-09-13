@@ -200,13 +200,22 @@
 .x-carousel-slide {
   flex: 0 0 100%;
   scroll-snap-align: center;
+  /* M6 Layout Stability: reserve space before image loads to prevent banner height jump (CLS).
+     Banner ratio: ~640/330 ≈ 1.94:1 (matches banner derivative spec). */
+  aspect-ratio: 640 / 330;
+  overflow: hidden;
+  border-radius: 20px;
+  background: var(--x-gray-bg, #f5f5f5);
 }
 
 .x-carousel-slide img {
   width: 100%;
   height: auto;
+  /* Inline aspect-ratio from XentraMedia overrides correctly; this is a CSS fallback */
+  aspect-ratio: 640 / 330;
   border-radius: 20px;
   display: block;
+  object-fit: cover;
 }
 
 .x-carousel-dots {
@@ -406,6 +415,8 @@
 .x-product-image {
   width: 105px !important;
   height: 105px !important;
+  /* M6 Layout Stability: 1:1 aspect-ratio reserves space before image loads (CLS prevention) */
+  aspect-ratio: 1 / 1;
   object-fit: contain !important;
   border-radius: 15px !important;
   display: block;

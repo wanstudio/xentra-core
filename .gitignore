@@ -54,3 +54,8 @@ apps/customer-pwa/assets/uploads/general/*
 !apps/customer-pwa/assets/uploads/general/.gitkeep
 apps/customer-pwa/assets/uploads/product/*
 !apps/customer-pwa/assets/uploads/product/.gitkeep
+apps/customer-pwa/assets/uploads/derivatives/*
+!apps/customer-pwa/assets/uploads/derivatives/.gitkeep
+apps/customer-pwa/assets/uploads/originals/*
+!apps/customer-pwa/assets/uploads/originals/.gitkeep
+
