@@ -837,7 +837,7 @@
       var imgHtml = catImg
         ? '<img src="' + UI.escape(catImg) + '" alt="' + UI.escape(cat.name) + '"' +
           ' width="92" height="92" loading="lazy" decoding="async"' +
-          ' onerror="this.onerror=null;this.parentElement.innerHTML=\'<span class=\\\\'x-cat-image-mono\\\\'>' + monogram + '</span>\';">'
+          ' onerror="this.onerror=null;this.parentElement.innerHTML=\'<span class=\\\'x-cat-image-mono\\\'>' + monogram + '</span>\';">'
         : '<span class="x-cat-image-mono">' + monogram + '</span>';
 
       btn.innerHTML =
@@ -1851,7 +1851,7 @@
   // Expose for external use
   window.XentraHome = {
     selectCategory: function (catId) {
-      activeCategory = Number(catId);
+      activeCategory = catId != null ? (isNaN(Number(catId)) ? String(catId) : Number(catId)) : null;
       renderCategories();
       loadProducts(activeCategory);
     },

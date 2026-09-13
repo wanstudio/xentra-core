@@ -14,7 +14,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_p7f4a0b';
+      var PWA_VERSION = 'v_m6a02';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -234,10 +234,10 @@
   <script src="/assets/js/core/discovery.js?v=p7f4a04"></script>
   <script src="/assets/js/core/location-picker.js?v=p7f4a06"></script>
   <!-- M6: Canonical media delivery consumer module — must load before home.js -->
-  <script src="/assets/js/core/media.js?v=m6a01"></script>
+  <script src="/assets/js/core/media.js?v=m6a02"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=m6a01"></script>
+  <script src="/assets/js/pages/home.js?v=m6a02"></script>
   <script src="/assets/js/pages/checkout.js?v=p7f4a0b"></script>
   <script src="/assets/js/pages/order-received.js?v=p7f4a03"></script>
   <script src="/assets/js/pages/aux-pages.js?v=p7f4a03"></script>
@@ -342,7 +342,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=p7f4a0b').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=m6a02').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {
