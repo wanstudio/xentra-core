@@ -12,10 +12,13 @@ const MediaLifecycle = require('./MediaLifecycle');
 const MediaService = require('./MediaService');
 const { StorageProvider, LocalStorageProvider } = require('./StorageProvider');
 
+const { CropSpec } = require('../domain/CropSpec');
+
 module.exports = {
   MediaLifecycle,
   MediaService,
   StorageProvider,
   LocalStorageProvider,
+  CropSpec,
   createMediaService: (opts) => new MediaService(opts)
 };

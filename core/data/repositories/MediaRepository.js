@@ -35,15 +35,16 @@ class MediaRepository {
     height,
     size_bytes,
     asset_type = 'general',
-    status = 'temporary'
+    status = 'temporary',
+    crop_spec = null
   }) {
     const now = new Date().toISOString();
     return this.db.execute(`
       INSERT INTO media_assets (
         id, tenant_id, brand_id, uploaded_by, storage_key, mime_type,
         original_filename, width, height, size_bytes, asset_type, status,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        crop_spec, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id,
       tenant_id || null,
@@ -57,9 +58,24 @@ class MediaRepository {
       size_bytes || 0,
       asset_type,
       status,
+      crop_spec ? (typeof crop_spec === 'string' ? crop_spec : JSON.stringify(crop_spec)) : null,
       now,
       now
     ]);
+  }
+
+  /**
+   * Update crop specification intent on an asset.
+   */
+  updateCropSpec(id, brandId, cropSpec) {
+    const now = new Date().toISOString();
+    const serialized = cropSpec ? (typeof cropSpec === 'string' ? cropSpec : JSON.stringify(cropSpec)) : null;
+    return this.db.execute(`
+      UPDATE media_assets
+      SET crop_spec = ?,
+          updated_at = ?
+      WHERE id = ? AND brand_id = ?
+    `, [serialized, now, id, brandId]);
   }
 
   /**

@@ -1163,6 +1163,7 @@ function initSchema(targetDb) {
       attached_at TEXT,
       orphaned_at TEXT,
       error_message TEXT,
+      crop_spec TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
@@ -1172,6 +1173,7 @@ function initSchema(targetDb) {
     CREATE INDEX IF NOT EXISTS idx_media_status_created ON media_assets(status, created_at);
   `);
 
+  try { targetDb.exec('ALTER TABLE media_assets ADD COLUMN crop_spec TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN branch_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN whatsapp_number TEXT;'); } catch (e) {}

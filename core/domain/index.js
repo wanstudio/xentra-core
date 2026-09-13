@@ -8,6 +8,7 @@ const DomainLifecycle = require('./DomainLifecycle');
 const DomainRegistrationModel = require('./DomainRegistrationModel');
 const DomainRegistry = require('./DomainRegistry');
 const ImageValidator = require('./ImageValidator');
+const { CropSpec } = require('./CropSpec');
 
 module.exports = {
   DomainIdentity,
@@ -16,6 +17,7 @@ module.exports = {
   DomainRegistrationModel,
   DomainRegistry,
   ImageValidator,
+  CropSpec,
 
   // Factory helper
   createDomainRegistry: () => new (DomainRegistry.DomainRegistry || DomainRegistry)()

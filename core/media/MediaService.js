@@ -264,8 +264,38 @@ class MediaService {
     return { success: true, mediaId };
   }
 
+  /**
+   * Set or update crop specification intent on an asset (M2).
+   * Strict tenant authorization is enforced.
+   */
+  async setCropSpec({ mediaId, brandId, cropSpec }) {
+    const asset = this.getMedia({ mediaId, brandId });
+
+    // Validate cropSpec against source dimensions
+    const { CropSpec } = require('../domain/CropSpec');
+    const validatedSpec = new CropSpec({
+      ...cropSpec,
+      source_width: cropSpec.source_width || asset.width,
+      source_height: cropSpec.source_height || asset.height,
+      asset_type: cropSpec.asset_type || asset.asset_type
+    });
+
+    this.mediaRepo.updateCropSpec(mediaId, brandId, validatedSpec.toJSON());
+    const updated = this.mediaRepo.findById(mediaId, brandId);
+    return this._formatAssetResponse(updated);
+  }
+
   _formatAssetResponse(asset) {
     if (!asset) return null;
+    let parsedCropSpec = null;
+    if (asset.crop_spec) {
+      try {
+        parsedCropSpec = typeof asset.crop_spec === 'string' ? JSON.parse(asset.crop_spec) : asset.crop_spec;
+      } catch (_) {
+        parsedCropSpec = null;
+      }
+    }
+
     return {
       media_id: asset.id,
       tenant_id: asset.tenant_id,
@@ -280,6 +310,7 @@ class MediaService {
       size_bytes: asset.size_bytes,
       asset_type: asset.asset_type,
       status: asset.status,
+      crop_spec: parsedCropSpec,
       attached_to_type: asset.attached_to_type,
       attached_to_id: asset.attached_to_id,
       attached_at: asset.attached_at,

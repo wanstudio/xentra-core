@@ -4269,6 +4269,35 @@ router.post('/admin/media/:id/ready', requireAuth(['owner', 'brand_manager', 'br
   }
 });
 
+// Update crop specification intent (M2)
+router.post('/admin/media/:id/crop', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const { crop_spec } = req.body || {};
+    if (!crop_spec || typeof crop_spec !== 'object') {
+      return res.status(400).json({ success: false, error: 'crop_spec object wajib disertakan.', code: 'MISSING_CROP_SPEC' });
+    }
+
+    const asset = await mediaService.setCropSpec({
+      mediaId: req.params.id,
+      brandId: req.brand_id,
+      cropSpec: crop_spec
+    });
+
+    res.json({
+      success: true,
+      message: 'Spesifikasi crop berhasil disimpan.',
+      asset
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'CROP_SPEC_ERROR'
+    });
+  }
+});
+
 // Transition lifecycle status
 router.post('/admin/media/:id/transition', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
   try {

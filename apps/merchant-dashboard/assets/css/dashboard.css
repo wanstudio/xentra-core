@@ -2105,5 +2105,188 @@ input, button, select, textarea, optgroup {
   line-height: 1.4;
 }
 
+/* =========================================================================
+   MEDIA SYSTEM M2: REUSABLE IMAGE CROP EDITOR
+   ========================================================================= */
+.x-crop-modal-card {
+  max-width: min(580px, calc(100vw - 24px));
+  width: 100%;
+  max-height: min(94vh, calc(100dvh - 24px));
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  user-select: none;
+}
+
+.x-crop-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  background: #0f172a;
+  overflow: hidden;
+  position: relative;
+}
+
+.x-crop-viewport {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  height: 320px;
+  max-height: 52vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #020617;
+  border-radius: 8px;
+  overflow: hidden;
+  touch-action: none; /* prevent page scroll during touch drag */
+  cursor: grab;
+}
+
+.x-crop-viewport:active {
+  cursor: grabbing;
+}
+
+.x-crop-canvas-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+}
+
+.x-crop-image {
+  display: block;
+  max-width: none;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Fixed crop framing overlay */
+.x-crop-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.75);
+  border: 2px solid var(--primary-color, #b6ff00);
+  border-radius: 4px;
+  transition: border-color 0.2s;
+}
+
+.x-crop-grid {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  pointer-events: none;
+}
+
+.x-crop-grid-line-v {
+  border-right: 1px dashed rgba(255, 255, 255, 0.35);
+}
+
+.x-crop-grid-line-h {
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.35);
+}
+
+.x-crop-toolbar {
+  width: 100%;
+  background: #1e293b;
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.x-crop-slider-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.x-crop-slider-label {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.x-crop-slider {
+  flex: 1;
+  accent-color: var(--primary-color, #b6ff00);
+  cursor: pointer;
+}
+
+.x-crop-tool-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s;
+}
+
+.x-crop-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.x-crop-info-bar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #94a3b8;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .x-crop-modal-card {
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+  }
+  .x-crop-body {
+    padding: 10px;
+    gap: 10px;
+  }
+  .x-crop-viewport {
+    height: 240px;
+    max-height: 42vh;
+  }
+  .x-crop-toolbar {
+    padding: 8px 10px;
+    flex-wrap: wrap;
+  }
+  .x-crop-slider-group {
+    width: 100%;
+    order: 1;
+  }
+  .x-crop-tool-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+}
+
+
 
 
