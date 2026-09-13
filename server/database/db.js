@@ -1264,6 +1264,18 @@ function initSchema(targetDb) {
 
   try { targetDb.exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT;'); } catch (e) {}
 
+  // M5 DASHBOARD MEDIA INTEGRATION: canonical media_id reference columns.
+  // Each entity gets a nullable media_id FK referencing media_assets.id.
+  // Legacy image_url/logo_url columns are preserved for backward compatibility.
+  // Idempotent — safe on existing databases.
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN logo_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE categories ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branch_categories ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branch_products ADD COLUMN image_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_products_media_id ON products(media_id) WHERE media_id IS NOT NULL;'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_categories_media_id ON categories(media_id) WHERE media_id IS NOT NULL;'); } catch (e) {}
+
   // Migrate existing users table if brand_id has legacy NOT NULL constraint
   try {
     const usersTableInfo = targetDb.prepare('PRAGMA table_info(users);').all();

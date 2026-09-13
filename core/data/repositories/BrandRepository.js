@@ -94,6 +94,33 @@ class BrandRepository {
     `, [brandId]);
   }
 
+  /**
+   * M5: Set canonical logo_media_id and also sync logo_url to the derivative URL.
+   * Both fields are updated atomically so legacy consumers still work.
+   */
+  updateBrandLogoMedia(brandId, { mediaId, logoUrl }) {
+    return this.db.execute(`
+      UPDATE brands
+      SET logo_media_id = ?,
+          logo_url = COALESCE(?, logo_url),
+          updated_at = datetime('now')
+      WHERE id = ?
+    `, [mediaId || null, logoUrl || null, brandId]);
+  }
+
+  /**
+   * M5: Remove logo media reference (soft — retains logo_url fallback if present).
+   */
+  removeBrandLogoMedia(brandId) {
+    return this.db.execute(`
+      UPDATE brands
+      SET logo_media_id = NULL,
+          logo_url = NULL,
+          updated_at = datetime('now')
+      WHERE id = ?
+    `, [brandId]);
+  }
+
   findBySlug(slug) {
     const clean = typeof slug === 'string' ? slug.trim().toLowerCase() : slug;
     return this.db.queryOne(`
