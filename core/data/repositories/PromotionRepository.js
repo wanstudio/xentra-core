@@ -22,6 +22,82 @@ class PromotionRepository {
     `, [brandId]);
   }
 
+  findAllPromotions(brandId) {
+    const promos = this.db.queryMany(`
+      SELECT * FROM promotions
+      WHERE brand_id = ?
+      ORDER BY is_active DESC, priority_weight DESC, created_at DESC
+    `, [brandId]);
+
+    return promos.map(p => {
+      const rules = this.findRules(p.id);
+      const rewards = this.findRewards(p.id);
+      const redemptionsCount = this.db.queryOne(
+        "SELECT COUNT(*) as cnt, COALESCE(SUM(benefit_amount), 0) as total_benefit FROM promotion_redemptions WHERE promotion_id = ? AND status = 'active'",
+        [p.id]
+      );
+      return {
+        ...p,
+        rules,
+        rewards,
+        redemptions_count: redemptionsCount ? Number(redemptionsCount.cnt || 0) : 0,
+        total_benefit_amount: redemptionsCount ? Number(redemptionsCount.total_benefit || 0) : 0
+      };
+    });
+  }
+
+  findPromotionRedemptions({ brandId, branchId = null, promotionId = null, limit = 50, offset = 0 } = {}) {
+    const whereClauses = ['pr.brand_id = ?'];
+    const params = [brandId];
+
+    if (branchId) {
+      whereClauses.push('pr.branch_id = ?');
+      params.push(branchId);
+    }
+    if (promotionId) {
+      whereClauses.push('pr.promotion_id = ?');
+      params.push(promotionId);
+    }
+
+    const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
+
+    const countRow = this.db.queryOne(`
+      SELECT COUNT(*) as total
+      FROM promotion_redemptions pr
+      ${whereSql}
+    `, params);
+
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
+    const safeOffset = Math.max(0, Number(offset) || 0);
+
+    const rows = this.db.queryMany(`
+      SELECT
+        pr.id,
+        pr.promotion_id,
+        p.name as promotion_name,
+        pr.order_id,
+        pr.branch_id,
+        b.name as branch_name,
+        pr.customer_phone,
+        pr.benefit_amount,
+        pr.status,
+        pr.redeemed_at
+      FROM promotion_redemptions pr
+      JOIN promotions p ON pr.promotion_id = p.id
+      LEFT JOIN branches b ON pr.branch_id = b.id
+      ${whereSql}
+      ORDER BY pr.redeemed_at DESC
+      LIMIT ? OFFSET ?
+    `, [...params, safeLimit, safeOffset]);
+
+    return {
+      redemptions: rows,
+      total: countRow ? Number(countRow.total || 0) : 0,
+      limit: safeLimit,
+      offset: safeOffset
+    };
+  }
+
   findRules(promotionId) {
     return this.db.queryMany(
       'SELECT * FROM promotion_rules WHERE promotion_id = ?',

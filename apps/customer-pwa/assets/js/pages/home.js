@@ -401,14 +401,25 @@
       // Re-confirm the previous selection is still present; otherwise require
       // an explicit selection (the first displayed Branch is NOT an
       // authoritative fulfillment Branch).
-      if (activeBranch && !branches.some(function (b) { return String(b.id) === String(activeBranch.id); })) {
-        activeBranch = null;
-        try { Store.setBranchContext(null); } catch (_) {}
+      if (activeBranch) {
+        var freshActive = branches.find(function (b) { return String(b.id) === String(activeBranch.id); });
+        if (freshActive) {
+          activeBranch = freshActive;
+          try { Store.setBranchContext(branchContextOf(activeBranch)); } catch (_) {}
+        } else {
+          activeBranch = null;
+          try { Store.setBranchContext(null); } catch (_) {}
+          // Active branch was deleted or deactivated, reload catalog in brand-wide scope
+          loadCatalog(null);
+        }
       }
       renderBranchDiscovery();
     } else {
-      activeBranch = null;
-      try { Store.setBranchContext(null); } catch (_) {}
+      if (activeBranch) {
+        activeBranch = null;
+        try { Store.setBranchContext(null); } catch (_) {}
+        loadCatalog(null);
+      }
       renderBranchDiscovery();
     }
   }
@@ -617,7 +628,7 @@
     // 3. Background refresh with authoritative branch data (cheap DB query).
     API.get('/brand/branches')
       .then(function (res) {
-        if (res && res.success && Array.isArray(res.branches) && res.branches.length) {
+        if (res && res.success && Array.isArray(res.branches)) {
           saveDiscoveryCache(res.branches);
           applyBranchDiscovery(res.branches);
         } else if (!branches.length) {
@@ -676,9 +687,14 @@
     if (!data || !Array.isArray(data.categories) || !data.categories.length) return;
     categories = data.categories;
 
-    var initialCat = categories[0];
-    activeCategory = initialCat.id;
-    products = (initialCat.products && initialCat.products.length > 0) ? initialCat.products : [];
+    // Retain activeCategory if it still exists in the newly loaded categories
+    var catExists = categories.some(function (c) { return String(c.id) === String(activeCategory); });
+    if (!catExists) {
+      activeCategory = categories[0].id;
+    }
+
+    var currentCatObj = categories.find(function (c) { return String(c.id) === String(activeCategory); }) || categories[0];
+    products = (currentCatObj.products && currentCatObj.products.length > 0) ? currentCatObj.products : [];
 
     renderCategories();
 

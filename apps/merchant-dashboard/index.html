@@ -7,19 +7,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/assets/css/dashboard.css?v=2.1.1">
-  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=2.1.1">
+  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=2.8.0">
 </head>
 <body>
 
   <div class="x-dash-layout">
     
     <!-- Sidebar Navigation -->
-    <aside class="x-dash-sidebar">
+    <aside class="x-dash-sidebar" id="x-dash-sidebar">
       <div class="x-dash-xentra-brand">
         <a href="/dashboard/" style="display:block; text-decoration:none;">
           <img src="/assets/img/xentra-logo.png" onerror="this.src='/assets/icons/xentra-logo.png'" alt="Xentra Logo" class="x-dash-xentra-logo">
         </a>
+        <!-- Mobile hamburger close button -->
+        <button type="button" class="x-sidebar-close" id="btn-sidebar-close" aria-label="Tutup menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
       </div>
 
       <div class="x-dash-brand-header">
@@ -32,40 +35,84 @@
         </div>
       </div>
 
-      <nav class="x-dash-nav">
-        <button type="button" class="x-nav-item active" data-tab="overview">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-          <span>Ringkasan</span>
+      <nav class="x-dash-nav" id="x-dash-nav">
+        <!-- GROUP: BUSINESS -->
+        <div class="x-nav-group-label">BUSINESS</div>
+
+        <button type="button" class="x-nav-item" data-route="overview" data-tab="overview">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          <span>Overview</span>
         </button>
 
-        <button type="button" class="x-nav-item" data-tab="brand">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
-          <span>Brand & Tampilan</span>
+        <button type="button" class="x-nav-item" data-route="orders" data-tab="orders">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          <span>Orders</span>
         </button>
 
-        <button type="button" class="x-nav-item" data-tab="catalog">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
-          <span>Katalog Menu</span>
+        <!-- Catalog: expandable parent -->
+        <button type="button" class="x-nav-item x-nav-parent" data-route="catalog" data-tab="catalog" id="nav-catalog-parent" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
+          <span>Catalog</span>
+          <svg class="x-nav-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <!-- Catalog sub-nav -->
+        <div class="x-nav-sub" id="nav-catalog-sub">
+          <button type="button" class="x-nav-sub-item" data-route="catalog/products" data-tab="catalog-products">
+            <span>Products</span>
+          </button>
+          <button type="button" class="x-nav-sub-item" data-route="catalog/categories" data-tab="catalog-categories">
+            <span>Categories</span>
+          </button>
+          <button type="button" class="x-nav-sub-item" data-route="catalog/menus" data-tab="catalog-menus">
+            <span>Menus</span>
+          </button>
+        </div>
+
+        <button type="button" class="x-nav-item" data-route="branches" data-tab="branches">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+          <span>Branches</span>
         </button>
 
-        <button type="button" class="x-nav-item" data-tab="branches">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-          <span>Cabang & Ongkir</span>
+        <!-- GROUP: GROWTH -->
+        <div class="x-nav-group-label">GROWTH</div>
+
+        <button type="button" class="x-nav-item" data-route="customers" data-tab="customers">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Customers</span>
         </button>
 
-        <button type="button" class="x-nav-item" data-tab="tim">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-          <span>Tim</span>
+        <button type="button" class="x-nav-item" data-route="reports" data-tab="reports">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span>Reports</span>
         </button>
 
-        <button type="button" class="x-nav-item" data-tab="orders">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-          <span>Pesanan Masuk</span>
+        <button type="button" class="x-nav-item" data-route="marketing" data-tab="marketing">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+          <span>Marketing</span>
         </button>
 
-        <button type="button" class="x-nav-item" data-tab="payments">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-          <span>Pembayaran</span>
+        <!-- GROUP: FINANCE -->
+        <div class="x-nav-group-label">FINANCE</div>
+
+        <button type="button" class="x-nav-item" data-route="finance" data-tab="finance">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>
+          <span>Finance</span>
+        </button>
+
+        <!-- GROUP: OPERATIONS -->
+        <div class="x-nav-group-label">OPERATIONS</div>
+
+        <button type="button" class="x-nav-item" data-route="team" data-tab="tim">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Team</span>
+        </button>
+
+        <!-- GROUP: SYSTEM -->
+        <div class="x-nav-group-label">SYSTEM</div>
+
+        <button type="button" class="x-nav-item" data-route="settings" data-tab="settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span>Settings</span>
         </button>
       </nav>
 
@@ -77,20 +124,46 @@
       </div>
     </aside>
 
+    <!-- Mobile sidebar overlay -->
+    <div class="x-sidebar-overlay" id="x-sidebar-overlay"></div>
+
     <!-- Main Content Area -->
     <main class="x-dash-main">
       
       <!-- Top Navbar -->
       <header class="x-dash-topbar">
         <div class="x-topbar-left">
-          <h1 id="dash-page-title">Ringkasan Resto</h1>
-          <p id="dash-page-subtitle">Statistik penjualan dan status operasional</p>
+          <!-- Mobile hamburger button -->
+          <button type="button" class="x-hamburger" id="btn-hamburger" aria-label="Buka menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          </button>
+          <div>
+            <h1 id="dash-page-title">Overview</h1>
+            <p id="dash-page-subtitle">Ringkasan bisnis dan aktivitas terkini</p>
+          </div>
         </div>
         <div class="x-topbar-right">
-          <div class="x-live-status">
-            <span class="x-status-dot"></span>
-            <span>Server Live</span>
+          <!-- Brand context badge -->
+          <div class="x-topbar-brand-badge" id="topbar-brand-badge" title="Brand Context">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            <span id="topbar-brand-name">Bangjo Resto</span>
           </div>
+          <!-- Branch context selector -->
+          <div class="x-branch-selector" id="x-branch-selector">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+            <select id="dash-branch-context" class="x-branch-select" aria-label="Pilih cabang konteks">
+              <option value="all">All Branches</option>
+            </select>
+          </div>
+          <!-- Search entry point -->
+          <button type="button" class="x-topbar-icon-btn" id="btn-global-search" aria-label="Cari" title="Cari">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </button>
+          <!-- Notifications entry point -->
+          <button type="button" class="x-topbar-icon-btn" id="btn-notifications" aria-label="Notifikasi" title="Notifikasi">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </button>
+          <!-- User profile -->
           <div class="x-admin-profile" id="dash-user-profile">
             <div class="x-avatar" id="dash-user-avatar">A</div>
             <div class="x-user-meta">
@@ -104,16 +177,36 @@
         </div>
       </header>
 
+
       <!-- TAB 1: OVERVIEW -->
-      <section id="tab-overview" class="x-tab-content active">
+      <section id="tab-overview" class="x-tab-content active" data-tab="overview">
+        <!-- Top Controls: Date Range & Global Branch Context Status -->
+        <div class="x-filter-bar">
+          <div class="x-filter-group">
+            <label style="font-size:13px;font-weight:700;color:var(--text-muted);">Periode:</label>
+            <input type="date" id="overview-start-date" class="x-date-input" aria-label="Tanggal Mulai">
+            <span style="color:var(--text-muted);font-size:12px;">s/d</span>
+            <input type="date" id="overview-end-date" class="x-date-input" aria-label="Tanggal Selesai">
+            <button type="button" class="x-btn-secondary" id="btn-overview-filter" style="font-size:12px;padding:6px 12px;">Terapkan</button>
+            <button type="button" class="x-btn-secondary" id="btn-overview-reset" style="font-size:12px;padding:6px 10px;">Semua Waktu</button>
+          </div>
+          <div>
+            <span class="x-badge" id="overview-branch-badge" style="background:#e0e7ff;color:#3730a3;font-size:12px;padding:4px 10px;border-radius:20px;font-weight:700;">Semua Cabang</span>
+          </div>
+        </div>
+
+        <!-- Needs Attention Banner (e.g. Low stock) -->
+        <div id="overview-needs-attention-container" style="display:none;"></div>
+
+        <!-- Primary KPI Cards: Net Sales, Orders, Customers, Average Order Value (AOV) -->
         <div class="x-metrics-grid">
           <div class="x-metric-card">
             <div class="x-metric-icon bg-green">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
             </div>
             <div class="x-metric-info">
-              <span class="x-metric-label">Estimasi Omzet</span>
-              <h3 id="stat-omzet" class="x-metric-value">Rp0</h3>
+              <span class="x-metric-label">Net Sales</span>
+              <h3 id="stat-net-sales" class="x-metric-value">Rp0</h3>
             </div>
           </div>
 
@@ -122,22 +215,69 @@
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
             </div>
             <div class="x-metric-info">
-              <span class="x-metric-label">Total Pesanan</span>
-              <h3 id="stat-orders" class="x-metric-value">0</h3>
+              <span class="x-metric-label">Orders</span>
+              <h3 id="stat-orders-count" class="x-metric-value">0</h3>
             </div>
           </div>
 
           <div class="x-metric-card">
             <div class="x-metric-icon bg-amber">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
             </div>
             <div class="x-metric-info">
-              <span class="x-metric-label">Menu Aktif</span>
-              <h3 id="stat-products" class="x-metric-value">5</h3>
+              <span class="x-metric-label">Customers</span>
+              <h3 id="stat-customers-count" class="x-metric-value">0</h3>
+            </div>
+          </div>
+
+          <div class="x-metric-card">
+            <div class="x-metric-icon bg-green">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <div class="x-metric-info">
+              <span class="x-metric-label">Average Order Value (AOV)</span>
+              <h3 id="stat-aov" class="x-metric-value">Rp0</h3>
             </div>
           </div>
         </div>
 
+        <!-- Two Column Grid: Sales Performance & Top Products -->
+        <div class="x-overview-grid">
+          <!-- Sales Performance (Channel & Fulfillment Breakdown) -->
+          <div class="x-card-panel">
+            <div class="x-panel-header">
+              <h3>📈 Sales Performance</h3>
+              <p>Rincian kontribusi penjualan berdasarkan channel pesanan dan fulfillment</p>
+            </div>
+            <div class="mt-4" id="overview-sales-performance-container">
+              <div class="x-empty-state">Memuat performa penjualan...</div>
+            </div>
+          </div>
+
+          <!-- Top Products -->
+          <div class="x-card-panel">
+            <div class="x-panel-header">
+              <h3>🏆 Top Products</h3>
+              <p>Produk dengan unit terjual terbanyak pada periode ini</p>
+            </div>
+            <div class="mt-4" id="overview-top-products-container">
+              <div class="x-empty-state">Memuat data produk terlaris...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Branch Performance Leaderboard -->
+        <div class="x-card-panel mt-6" id="overview-branch-performance-panel">
+          <div class="x-panel-header">
+            <h3>🏢 Branch Performance</h3>
+            <p>Perbandingan volume transaksi dan omzet antar cabang</p>
+          </div>
+          <div class="mt-4" id="overview-branch-performance-container">
+            <div class="x-empty-state">Memuat data perbandingan cabang...</div>
+          </div>
+        </div>
+
+        <!-- Quick Actions Panel -->
         <div class="x-card-panel mt-6">
           <div class="x-panel-header">
             <h3>⚡ Aksi Cepat Pengaturan</h3>
@@ -182,12 +322,23 @@
               </div>
 
               <div class="x-form-group">
-                <label for="brand-logo">URL Foto / Ikon Logo Brand</label>
-                <div class="x-input-with-action">
-                  <input type="text" id="brand-logo" class="x-input" placeholder="/assets/pwa/icon-192.png">
-                  <button type="button" class="x-btn-secondary" id="btn-use-bangjo-logo">Pakai Logo Bangjo</button>
+                <label>Foto / Ikon Logo Brand</label>
+                <div class="x-image-upload-control">
+                  <div class="x-image-upload-preview-box" id="brand-logo-preview-box">
+                    <img id="brand-logo-preview" src="/assets/pwa/icon-192.png" alt="Logo Brand">
+                    <div id="brand-logo-empty" class="x-image-upload-empty" style="display:none;">🏬</div>
+                  </div>
+                  <div class="x-image-upload-info">
+                    <div class="x-image-upload-actions">
+                      <button type="button" class="x-btn-secondary" id="btn-brand-logo-pick" style="font-size:12px;padding:6px 12px;">📁 Unggah Logo</button>
+                      <button type="button" class="x-btn-secondary" id="btn-use-bangjo-logo" style="font-size:12px;padding:6px 12px;">Pakai Default</button>
+                      <button type="button" class="x-btn-secondary" id="btn-brand-logo-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
+                    </div>
+                    <input type="file" id="input-brand-logo-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                    <input type="hidden" id="brand-logo" value="/assets/pwa/icon-192.png">
+                    <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 2 MB · Rasio 1:1</div>
+                  </div>
                 </div>
-                <small class="x-help">Gunakan format PNG transparan atau SVG rasio 1:1.</small>
               </div>
 
               <div class="x-form-group">
@@ -300,12 +451,28 @@
             </div>
 
             <!-- Add Banner Form -->
-            <form id="form-add-banner" style="display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
-              <input type="text" id="input-banner-url" class="x-input" placeholder="Masukkan URL Foto Banner (https://...)" style="flex: 1; min-width: 240px;" required>
-              <input type="text" id="input-banner-title" class="x-input" placeholder="Judul / Promo (Opsional)" style="flex: 1; min-width: 180px;">
-              <button type="submit" class="x-btn-primary" style="white-space: nowrap;">
-                <span>＋ Tambah Banner</span>
-              </button>
+            <form id="form-add-banner" style="margin-bottom: 20px;">
+              <div class="x-image-upload-control" style="margin-bottom: 12px;">
+                <div class="x-image-upload-preview-box is-banner" id="banner-preview-box">
+                  <img id="banner-upload-preview" src="" alt="Preview Banner" style="display:none;">
+                  <div id="banner-upload-empty" class="x-image-upload-empty">🖼️</div>
+                </div>
+                <div class="x-image-upload-info">
+                  <div class="x-image-upload-actions">
+                    <button type="button" class="x-btn-secondary" id="btn-banner-pick" style="font-size:12px;padding:6px 12px;">📁 Pilih File Banner</button>
+                    <button type="button" class="x-btn-secondary" id="btn-banner-clear" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Batal Pilih</button>
+                  </div>
+                  <input type="file" id="input-banner-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                  <input type="hidden" id="input-banner-url" value="">
+                  <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 1 MB · Rasio ±1.94:1 · Rekomendasi 350 × 180 px</div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <input type="text" id="input-banner-title" class="x-input" placeholder="Judul / Promo (Opsional)" style="flex: 1; min-width: 200px;">
+                <button type="submit" class="x-btn-primary" id="btn-submit-banner" style="white-space: nowrap;">
+                  <span>＋ Tambah Banner</span>
+                </button>
+              </div>
             </form>
 
             <!-- Banners List Grid -->
@@ -420,75 +587,470 @@
       </section>
 
       <!-- TAB 4: BRANCHES & DELIVERY -->
-      <section id="tab-branches" class="x-tab-content">
-        <div class="x-card-panel">
+      <section id="tab-branches" class="x-tab-content" data-tab="branches">
+        <!-- 1. Branch List View -->
+        <div id="branch-list-view" class="x-card-panel">
           <div class="x-panel-header-flex">
             <div>
               <h3>🏬 Cabang Resto & Aturan Ongkir</h3>
-              <p>Atur titik lokasi outlet, gratis ongkir km pertama, dan tarif per km</p>
+              <p>Kelola seluruh cabang outlet, status operasional, formula ongkir, dan assortment menu.</p>
             </div>
             <button type="button" class="x-btn-primary" onclick="openBranchModal()">＋ Tambah Cabang</button>
           </div>
 
-          <div class="x-branches-grid" id="branches-list-container">
+          <!-- Search & Filter Controls -->
+          <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:center;">
+            <div style="flex:1;min-width:200px;position:relative;">
+              <input type="text" id="branch-search-input" class="x-input" placeholder="Cari nama cabang atau alamat..." style="padding-left:36px;">
+              <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+            <div style="min-width:160px;">
+              <select id="branch-filter-status" class="x-input">
+                <option value="all">Semua Status</option>
+                <option value="active">Aktif</option>
+                <option value="inactive">Nonaktif</option>
+                <option value="open">Buka Operasional</option>
+                <option value="closed">Tutup Operasional</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="x-branches-grid mt-4" id="branches-list-container">
             <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- 2. Branch Detail Shell View -->
+        <div id="branch-detail-view" class="x-card-panel" style="display:none;">
+          <!-- Top Breadcrumb & Navigation -->
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <button type="button" class="x-btn-secondary" id="btn-back-to-branches" style="padding:6px 12px;font-size:13px;" onclick="navigateTo('branches')">
+              ← Kembali ke Daftar Cabang
+            </button>
+            <span class="text-muted" style="font-size:13px;">/</span>
+            <span id="branch-detail-breadcrumb" style="font-weight:600;font-size:14px;">Detail Cabang</span>
+          </div>
+
+          <!-- Branch Header Card -->
+          <div class="x-product-detail-card" style="display:flex;gap:20px;background:#f8fafc;border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:20px;flex-wrap:wrap;align-items:center;margin-bottom:20px;">
+            <div style="width:52px;height:52px;background:#e0f2fe;color:#0284c7;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">
+              🏬
+            </div>
+            <div style="flex:1;min-width:240px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <h3 id="branch-detail-title" style="margin:0;font-size:20px;">Nama Cabang</h3>
+                <span id="branch-detail-active-badge" class="x-badge x-badge-success">Aktif</span>
+                <span id="branch-detail-open-badge" class="x-badge x-badge-info">Buka Operasional</span>
+              </div>
+              <p id="branch-detail-address" class="text-muted" style="margin:6px 0 0;font-size:13px;">Alamat Cabang</p>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="x-btn-secondary" id="btn-edit-branch-detail">✏️ Edit Profil Cabang</button>
+            </div>
+          </div>
+
+          <!-- Branch Detail Sub-Navigation Tabs -->
+          <div class="x-catalog-filters" id="branch-detail-subnav" style="border-bottom:1px solid var(--border-color);padding-bottom:12px;margin-bottom:20px;">
+            <button type="button" class="x-cat-filter-btn active" data-subtab="overview" onclick="switchBranchDetailSubtab('overview')">📌 Overview</button>
+            <button type="button" class="x-cat-filter-btn" data-subtab="operations" onclick="switchBranchDetailSubtab('operations')">⚙️ Operations</button>
+            <button type="button" class="x-cat-filter-btn" data-subtab="menu" onclick="switchBranchDetailSubtab('menu')">📋 Menu</button>
+            <button type="button" class="x-cat-filter-btn" data-subtab="team" onclick="switchBranchDetailSubtab('team')">👥 Team</button>
+            <button type="button" class="x-cat-filter-btn" data-subtab="reports" onclick="switchBranchDetailSubtab('reports')">📊 Reports</button>
+          </div>
+
+          <!-- Subtab 1: Overview -->
+          <div id="branch-subtab-overview" class="branch-subtab-content">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;margin-bottom:20px;">
+              <div class="x-card-panel" style="padding:16px;background:#ffffff;border:1px solid var(--border-color);border-radius:8px;">
+                <span class="text-muted" style="font-size:12px;font-weight:600;">STATUS OPERASIONAL</span>
+                <div id="branch-overview-op-status" style="margin-top:6px;font-size:15px;font-weight:700;">-</div>
+                <small id="branch-overview-op-sub" class="text-muted" style="font-size:11px;display:block;margin-top:4px;">-</small>
+              </div>
+              <div class="x-card-panel" style="padding:16px;background:#ffffff;border:1px solid var(--border-color);border-radius:8px;">
+                <span class="text-muted" style="font-size:12px;font-weight:600;">MENU AKTIF</span>
+                <div id="branch-overview-menu-count" style="margin-top:6px;font-size:18px;font-weight:700;">0 Menu</div>
+                <small id="branch-overview-cat-count" class="text-muted" style="font-size:11px;display:block;margin-top:4px;">0 Kategori Cabang</small>
+              </div>
+              <div class="x-card-panel" style="padding:16px;background:#ffffff;border:1px solid var(--border-color);border-radius:8px;">
+                <span class="text-muted" style="font-size:12px;font-weight:600;">STAF / TEAM CABANG</span>
+                <div id="branch-overview-staff-count" style="margin-top:6px;font-size:18px;font-weight:700;">0 Anggota</div>
+                <small class="text-muted" style="font-size:11px;display:block;margin-top:4px;">Bertugas di cabang ini</small>
+              </div>
+              <div class="x-card-panel" style="padding:16px;background:#ffffff;border:1px solid var(--border-color);border-radius:8px;">
+                <span class="text-muted" style="font-size:12px;font-weight:600;">PESANAN TOTAL</span>
+                <div id="branch-overview-orders-count" style="margin-top:6px;font-size:18px;font-weight:700;">0 Order</div>
+                <small id="branch-overview-active-orders" class="text-muted" style="font-size:11px;display:block;margin-top:4px;">0 order aktif</small>
+              </div>
+            </div>
+
+            <!-- Identity & Details Table -->
+            <div class="x-card-panel" style="background:#ffffff;border:1px solid var(--border-color);border-radius:8px;padding:16px;">
+              <h4 style="margin:0 0 12px 0;">Informasi Detail Cabang</h4>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:12px;font-size:13px;">
+                <div><span class="text-muted">Branch ID:</span> <code id="branch-overview-id" style="font-size:12px;">-</code></div>
+                <div><span class="text-muted">WhatsApp Cabang:</span> <strong id="branch-overview-wa">-</strong></div>
+                <div><span class="text-muted">Koordinat GPS:</span> <span id="branch-overview-coords">-</span></div>
+                <div><span class="text-muted">Fulfillment:</span> <span id="branch-overview-fulfillment">-</span></div>
+                <div><span class="text-muted">Radius Pengiriman:</span> <span id="branch-overview-radius">-</span></div>
+                <div><span class="text-muted">Tarif per KM:</span> <span id="branch-overview-rate">-</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subtab 2: Operations -->
+          <div id="branch-subtab-operations" class="branch-subtab-content" style="display:none;">
+            <div class="x-card-panel" style="background:#ffffff;border:1px solid var(--border-color);border-radius:8px;padding:20px;max-width:680px;">
+              <h4 style="margin:0 0 4px 0;">Kontrol Operasional & Fulfillment Cabang</h4>
+              <p class="text-muted" style="font-size:13px;margin:0 0 16px 0;">Konfigurasi status buka/tutup, layanan pesan-antar, dan pengambilan langsung.</p>
+
+              <form id="form-branch-operations">
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                  <label class="x-checkbox-label" style="padding:10px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;">
+                    <input type="checkbox" id="op-is-active" checked>
+                    <span>
+                      <strong>Status Global Cabang (Aktif di Sistem)</strong>
+                      <small style="display:block;color:#64748b;font-size:11px;">Jika nonaktif, cabang tidak akan muncul di daftar outlet pelanggan.</small>
+                    </span>
+                  </label>
+
+                  <label class="x-checkbox-label" style="padding:10px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;">
+                    <input type="checkbox" id="op-is-open-override" checked>
+                    <span>
+                      <strong>Buka Operasional Toko Hari Ini</strong>
+                      <small style="display:block;color:#64748b;font-size:11px;">Matikan untuk menutup toko sementara (misal: libur mendadak/habis bahan).</small>
+                    </span>
+                  </label>
+
+                  <label class="x-checkbox-label" style="padding:10px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;">
+                    <input type="checkbox" id="op-is-delivery" checked>
+                    <span>
+                      <strong>Layanan Pesan Antar (Delivery)</strong>
+                      <small style="display:block;color:#64748b;font-size:11px;">Izinkan pelanggan memesan dengan pengantaran ke alamat mereka.</small>
+                    </span>
+                  </label>
+
+                  <label class="x-checkbox-label" style="padding:10px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;">
+                    <input type="checkbox" id="op-is-pickup" checked>
+                    <span>
+                      <strong>Layanan Ambil Sendiri (Pickup / Takeaway)</strong>
+                      <small style="display:block;color:#64748b;font-size:11px;">Izinkan pelanggan memesan dan mengambil sendiri di outlet.</small>
+                    </span>
+                  </label>
+                </div>
+
+                <div style="margin-top:20px;display:flex;gap:10px;">
+                  <button type="submit" class="x-btn-primary" id="btn-save-branch-operations">Simpan Perubahan Operasional</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Subtab 3: Menu -->
+          <div id="branch-subtab-menu" class="branch-subtab-content" style="display:none;">
+            <div class="x-card-panel" style="background:#ffffff;border:1px solid var(--border-color);border-radius:8px;padding:20px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+                <div>
+                  <h4 style="margin:0;">Katalog Menu Jual Cabang Ini</h4>
+                  <p class="text-muted" style="font-size:13px;margin:2px 0 0;">Menampilkan produk yang diadopsi dan dijual di cabang ini.</p>
+                </div>
+                <button type="button" class="x-btn-primary" id="btn-jump-to-menus">
+                  📋 Buka Menu Editor Lengkap ➔
+                </button>
+              </div>
+
+              <!-- Compact table of branch products -->
+              <div class="x-table-responsive">
+                <table class="x-table">
+                  <thead>
+                    <tr>
+                      <th>Produk</th>
+                      <th>Kategori Cabang</th>
+                      <th>Harga Jual Cabang</th>
+                      <th>Status Stok</th>
+                      <th>Ketersediaan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="branch-menu-preview-tbody">
+                    <tr><td colspan="5" class="text-center py-4">Memuat menu cabang...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subtab 4: Team -->
+          <div id="branch-subtab-team" class="branch-subtab-content" style="display:none;">
+            <div class="x-card-panel" style="background:#ffffff;border:1px solid var(--border-color);border-radius:8px;padding:20px;">
+              <div class="x-panel-header-flex" style="margin-bottom:14px;">
+                <div>
+                  <h4 style="margin:0;">Staf & Tim Cabang</h4>
+                  <p class="text-muted" style="font-size:13px;margin:2px 0 0;">Daftar operator dan staf yang ditugaskan di cabang ini.</p>
+                </div>
+                <button type="button" class="x-btn-secondary" onclick="navigateTo('team')">Kelola Seluruh Tim ➔</button>
+              </div>
+
+              <div class="x-table-responsive">
+                <table class="x-table">
+                  <thead>
+                    <tr>
+                      <th>Nama</th>
+                      <th>Username</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="branch-team-preview-tbody">
+                    <tr><td colspan="4" class="text-center py-4">Memuat tim cabang...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subtab 5: Reports -->
+          <div id="branch-subtab-reports" class="branch-subtab-content" style="display:none;">
+            <div class="x-route-placeholder" style="padding:48px 16px;text-align:center;background:#ffffff;border:1px dashed var(--border-color);border-radius:8px;">
+              <div class="x-route-placeholder-icon" style="font-size:36px;margin-bottom:10px;">📊</div>
+              <h3 style="margin:0 0 6px 0;font-size:18px;">Laporan Penjualan Cabang</h3>
+              <p class="text-muted" style="font-size:13px;max-width:460px;margin:0 auto;">
+                Modul analitik dan laporan penjualan komprehensif per cabang akan hadir pada fase pelaporan. Data transaksi tetap tersimpan aman di sistem Core.
+              </p>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- TAB 5: TIM / WORKFORCE MANAGEMENT -->
-      <section id="tab-tim" class="x-tab-content">
-        <div class="x-card-panel">
-          <div class="x-panel-header-flex">
-            <div>
-              <h3>👥 Manajemen Tim & Akses</h3>
-              <p>Kelola akun staf, role, dan hak akses dashboard</p>
+      <section id="tab-tim" class="x-tab-content" data-tab="tim">
+        <!-- Subnav: Members, Roles, Permissions -->
+        <div class="x-subnav-tabs" id="team-subnav">
+          <button type="button" class="x-subnav-tab active" data-team-section="members" onclick="switchTeamSection('members')">Members</button>
+          <button type="button" class="x-subnav-tab" data-team-section="roles" onclick="switchTeamSection('roles')">Roles</button>
+          <button type="button" class="x-subnav-tab" data-team-section="permissions" onclick="switchTeamSection('permissions')">Permissions</button>
+        </div>
+
+        <!-- Section 1: Members -->
+        <div id="team-section-members">
+          <div class="x-card-panel">
+            <div class="x-panel-header-flex">
+              <div>
+                <h3>👥 Anggota Tim & Staf</h3>
+                <p>Kelola akun staf, penugasan role, dan cakupan cabang</p>
+              </div>
+              <button type="button" class="x-btn-primary" id="btn-add-user" onclick="openCreateUserModal()">+ Tambah Anggota</button>
             </div>
-            <button type="button" class="x-btn-primary" id="btn-add-user" onclick="openCreateUserModal()">+ Tambah Anggota</button>
-          </div>
 
-          <!-- Role Filter Bar -->
-          <div class="x-catalog-filters" id="tim-role-filters">
-            <button type="button" class="x-cat-filter-btn active" data-role="all" onclick="filterTimByRole('all')">Semua</button>
-            <button type="button" class="x-cat-filter-btn" data-role="owner" onclick="filterTimByRole('owner')">Owner</button>
-            <button type="button" class="x-cat-filter-btn" data-role="brand_manager" onclick="filterTimByRole('brand_manager')">Manager</button>
-            <button type="button" class="x-cat-filter-btn" data-role="branch_manager" onclick="filterTimByRole('branch_manager')">Branch Manager</button>
-            <button type="button" class="x-cat-filter-btn" data-role="cashier" onclick="filterTimByRole('cashier')">Kasir</button>
-            <button type="button" class="x-cat-filter-btn" data-role="kitchen" onclick="filterTimByRole('kitchen')">Dapur</button>
-          </div>
+            <!-- Role Filter Bar -->
+            <div class="x-catalog-filters" id="tim-role-filters" style="margin-top:16px;">
+              <button type="button" class="x-cat-filter-btn active" data-role="all" onclick="filterTimByRole('all')">Semua Role</button>
+              <button type="button" class="x-cat-filter-btn" data-role="owner" onclick="filterTimByRole('owner')">Owner</button>
+              <button type="button" class="x-cat-filter-btn" data-role="brand_manager" onclick="filterTimByRole('brand_manager')">Brand Manager</button>
+              <button type="button" class="x-cat-filter-btn" data-role="branch_manager" onclick="filterTimByRole('branch_manager')">Branch Manager</button>
+              <button type="button" class="x-cat-filter-btn" data-role="cashier" onclick="filterTimByRole('cashier')">Kasir</button>
+              <button type="button" class="x-cat-filter-btn" data-role="kitchen" onclick="filterTimByRole('kitchen')">Dapur</button>
+            </div>
 
-          <!-- Users Table -->
-          <div class="x-table-responsive mt-4">
-            <table class="x-table">
-              <thead>
-                <tr>
-                  <th>Nama</th>
-                  <th>Username</th>
-                  <th>Role</th>
-                  <th>Cabang</th>
-                  <th>Status</th>
-                  <th class="text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="tim-table-body">
-                <tr>
-                  <td colspan="6" class="text-center py-6">Memuat data tim...</td>
-                </tr>
-              </tbody>
-            </table>
+            <!-- Users Table -->
+            <div class="x-table-responsive mt-4">
+              <table class="x-table">
+                <thead>
+                  <tr>
+                    <th>Nama</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Cakupan Cabang</th>
+                    <th>Status</th>
+                    <th class="text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tim-table-body">
+                  <tr>
+                    <td colspan="6" class="text-center py-6">Memuat data tim...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Roles -->
+        <div id="team-section-roles" style="display:none;">
+          <div class="x-card-panel">
+            <div class="x-panel-header">
+              <h3>🛡️ Role & Hak Akses Xentra Core</h3>
+              <p>Struktur role hierarkis dan batasan scope yang terdefinisi pada sistem RBAC</p>
+            </div>
+            <div class="mt-4 x-table-responsive">
+              <table class="x-data-table">
+                <thead>
+                  <tr>
+                    <th>Role</th>
+                    <th>Scope Wewenang</th>
+                    <th>Tingkat Akses</th>
+                    <th>Deskripsi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="x-badge" style="background:#fee2e2;color:#991b1b;font-weight:700;">Owner</span></td>
+                    <td>Organisasi & Seluruh Brand</td>
+                    <td>Full Access</td>
+                    <td>Akses penuh ke seluruh brand, pengaturan toko, cabang, tim, produk, dan laporan keuangan.</td>
+                  </tr>
+                  <tr>
+                    <td><span class="x-badge" style="background:#eff6ff;color:#1e40af;font-weight:700;">Brand Manager</span></td>
+                    <td>Brand-wide</td>
+                    <td>Manajerial Brand</td>
+                    <td>Mengelola katalog master brand, operasional cabang, laporan analitik, dan anggota tim.</td>
+                  </tr>
+                  <tr>
+                    <td><span class="x-badge" style="background:#fef3c7;color:#92400e;font-weight:700;">Branch Manager</span></td>
+                    <td>Cabang Khusus (Branch-Scoped)</td>
+                    <td>Manajerial Cabang</td>
+                    <td>Mengelola katalog cabang, harga fleksibel (override), stok cabang, dan staf cabang.</td>
+                  </tr>
+                  <tr>
+                    <td><span class="x-badge" style="background:#ecfdf5;color:#065f46;font-weight:700;">Kasir (Cashier)</span></td>
+                    <td>Cabang Khusus (Branch-Scoped)</td>
+                    <td>Operasional POS</td>
+                    <td>Melayani transaksi kasir, pencatatan pesanan offline/dine-in, shift kasir, dan pembayaran tunai/QRIS.</td>
+                  </tr>
+                  <tr>
+                    <td><span class="x-badge" style="background:#f3e8ff;color:#6b21a8;font-weight:700;">Dapur (Kitchen)</span></td>
+                    <td>Cabang Khusus (Branch-Scoped)</td>
+                    <td>Display KDS</td>
+                    <td>Menerima antrean pesanan dapur, mengupdate status persiapan makanan, dan penyelesaian hidangan.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Permissions Boundary -->
+        <div id="team-section-permissions" style="display:none;">
+          <div class="x-card-panel">
+            <div class="x-panel-header">
+              <h3>🔒 Matriks Izin & Wewenang (Permissions)</h3>
+              <p>Matriks wewenang otoritas Xentra RBAC antar domain sistem</p>
+            </div>
+            <div class="mt-4 x-table-responsive">
+              <table class="x-data-table">
+                <thead>
+                  <tr>
+                    <th>Domain / Fitur</th>
+                    <th>Owner</th>
+                    <th>Brand Manager</th>
+                    <th>Branch Manager</th>
+                    <th>Kasir</th>
+                    <th>Dapur</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Master Produk & Kategori</strong></td>
+                    <td>✅ Full</td>
+                    <td>✅ Full</td>
+                    <td>👁️ Baca Saja</td>
+                    <td>❌ Tidak Ada</td>
+                    <td>❌ Tidak Ada</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Katalog Cabang & Override</strong></td>
+                    <td>✅ Full</td>
+                    <td>✅ Full</td>
+                    <td>✅ Cabang Sendiri</td>
+                    <td>❌ Tidak Ada</td>
+                    <td>❌ Tidak Ada</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Pengaturan Cabang & Radius</strong></td>
+                    <td>✅ Full</td>
+                    <td>✅ Full</td>
+                    <td>👁️ Cabang Sendiri</td>
+                    <td>❌ Tidak Ada</td>
+                    <td>❌ Tidak Ada</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Antrean Pesanan Masuk</strong></td>
+                    <td>✅ Semua Cabang</td>
+                    <td>✅ Semua Cabang</td>
+                    <td>✅ Cabang Sendiri</td>
+                    <td>✅ Cabang Sendiri</td>
+                    <td>👁️ Cabang Sendiri</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Laporan Multi-Cabang</strong></td>
+                    <td>✅ Full</td>
+                    <td>✅ Full</td>
+                    <td>❌ Dibatasi</td>
+                    <td>❌ Tidak Ada</td>
+                    <td>❌ Tidak Ada</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Manajemen Akun Tim</strong></td>
+                    <td>✅ Full</td>
+                    <td>✅ Full</td>
+                    <td>👁️ Cabang Sendiri</td>
+                    <td>❌ Tidak Ada</td>
+                    <td>❌ Tidak Ada</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- TAB 6: ORDERS -->
-      <section id="tab-orders" class="x-tab-content">
-        <div class="x-card-panel">
+      <section id="tab-orders" class="x-tab-content" data-tab="orders">
+        <!-- 1. Orders List View -->
+        <div id="orders-list-view" class="x-card-panel">
           <div class="x-panel-header-flex">
             <div>
               <h3>📋 Antrean Pesanan Masuk (Realtime)</h3>
-              <p>Pesanan yang masuk dari aplikasi pelanggan</p>
+              <p>Kelola dan pantau seluruh pesanan masuk lintas cabang, channel, dan tipe fulfillment.</p>
             </div>
-            <button type="button" class="x-btn-secondary" id="btn-refresh-orders">🔄 Refresh Data</button>
+            <button type="button" class="x-btn-secondary" id="btn-refresh-orders" onclick="loadOrders()">🔄 Refresh Data</button>
+          </div>
+
+          <!-- Filter & Search Controls -->
+          <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:center;">
+            <div style="flex:1;min-width:220px;position:relative;">
+              <input type="text" id="orders-search-input" class="x-input" placeholder="Cari No. Order, Pelanggan, atau Telepon..." style="padding-left:36px;">
+              <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+            <div style="min-width:140px;">
+              <select id="orders-filter-status" class="x-input">
+                <option value="all">Semua Status</option>
+                <option value="pending">Pending (Menunggu)</option>
+                <option value="confirmed">Confirmed (Diterima)</option>
+                <option value="preparing">Preparing (Dapur)</option>
+                <option value="ready">Ready (Siap)</option>
+                <option value="out_for_delivery">Out for Delivery</option>
+                <option value="completed">Completed (Selesai)</option>
+                <option value="cancelled">Cancelled (Batal)</option>
+              </select>
+            </div>
+            <div style="min-width:150px;">
+              <select id="orders-filter-channel" class="x-input">
+                <option value="all">Semua Channel</option>
+                <option value="customer_app">Customer App</option>
+                <option value="pos">POS / Kasir</option>
+                <option value="website">Website</option>
+                <option value="kiosk">Kiosk</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="marketplace">Marketplace</option>
+              </select>
+            </div>
+            <div style="min-width:150px;">
+              <select id="orders-filter-fulfillment" class="x-input">
+                <option value="all">Semua Fulfillment</option>
+                <option value="dine_in">Dine-In (Di Tempat)</option>
+                <option value="pickup">Pickup (Ambil Sendiri)</option>
+                <option value="delivery">Delivery (Pesan Antar)</option>
+              </select>
+            </div>
           </div>
 
           <div class="x-table-responsive mt-4">
@@ -497,20 +1059,112 @@
                 <tr>
                   <th>No. Order</th>
                   <th>Waktu</th>
+                  <th>Cabang</th>
                   <th>Pemesan</th>
-                  <th>Tipe Order</th>
+                  <th>Order Channel</th>
+                  <th>Fulfillment Type</th>
                   <th>Total</th>
-                  <th>Metode Bayar</th>
                   <th>Status</th>
                   <th class="text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody id="orders-table-body">
                 <tr>
-                  <td colspan="8" class="text-center py-6">Memuat data pesanan...</td>
+                  <td colspan="9" class="text-center py-6">Memuat data pesanan...</td>
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+
+        <!-- 2. Order Detail View -->
+        <div id="order-detail-view" class="x-card-panel" style="display:none;">
+          <!-- Header & Back Navigation -->
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+            <button type="button" class="x-btn-secondary" id="btn-back-to-orders" style="padding:6px 12px;font-size:13px;" onclick="navigateTo('orders')">
+              ← Kembali ke Daftar Pesanan
+            </button>
+            <span class="text-muted" style="font-size:13px;">/</span>
+            <span id="order-detail-breadcrumb" style="font-weight:600;font-size:14px;">Detail Pesanan</span>
+          </div>
+
+          <!-- Order Summary Card -->
+          <div class="x-product-detail-card" style="display:flex;gap:24px;background:#f8fafc;border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:20px;flex-wrap:wrap;margin-bottom:20px;">
+            <div style="flex:1;min-width:260px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <h3 id="order-detail-number" style="margin:0;font-size:20px;">#ORD-000</h3>
+                <span id="order-detail-status-badge" class="x-badge x-badge-info">STATUS</span>
+                <span id="order-detail-channel-badge" class="x-badge" style="background:#e0f2fe;color:#0369a1;">Channel</span>
+                <span id="order-detail-fulfillment-badge" class="x-badge" style="background:#fef3c7;color:#b45309;">Fulfillment</span>
+              </div>
+              <p id="order-detail-time" class="text-muted" style="margin:6px 0 0;font-size:13px;">Waktu pemesanan: -</p>
+              <div style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px;">
+                <div><span class="text-muted">Cabang:</span> <strong id="order-detail-branch">-</strong></div>
+                <div><span class="text-muted">Pemesan:</span> <strong id="order-detail-customer">-</strong></div>
+                <div><span class="text-muted">No. Telepon:</span> <span id="order-detail-phone">-</span></div>
+                <div id="order-detail-table-wrap" style="display:none;"><span class="text-muted">Meja:</span> <strong id="order-detail-table">-</strong></div>
+              </div>
+            </div>
+            <div style="text-align:right;min-width:180px;">
+              <span class="text-muted" style="font-size:11px;display:block;">TOTAL PEMBAYARAN</span>
+              <strong id="order-detail-total" style="font-size:22px;color:var(--text-main);">Rp 0</strong>
+              <div id="order-detail-payment-status" style="margin-top:4px;font-size:12px;color:#10b981;">-</div>
+            </div>
+          </div>
+
+          <!-- Dine-In Session Banner (if additions exist) -->
+          <div id="order-detail-session-box" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px 16px;margin-bottom:20px;">
+            <div style="font-weight:700;color:#166534;font-size:13px;display:flex;align-items:center;gap:6px;">
+              <span>🍽️ Sesi Dine-In Bersama</span>
+              <span id="order-detail-session-id" class="text-muted" style="font-size:11px;font-weight:normal;"></span>
+            </div>
+            <p style="margin:4px 0 8px 0;font-size:12px;color:#15803d;">Pesanan ini berbagi meja / sesi dine-in dengan pesanan tambahan berikut:</p>
+            <div id="order-detail-session-list" style="display:flex;flex-direction:column;gap:6px;font-size:12px;"></div>
+          </div>
+
+          <!-- Items Table -->
+          <div style="margin-bottom:24px;">
+            <h4 style="margin:0 0 12px 0;">Item Pesanan</h4>
+            <div class="x-table-responsive">
+              <table class="x-table">
+                <thead>
+                  <tr>
+                    <th>Produk</th>
+                    <th>Harga Satuan</th>
+                    <th>Jumlah</th>
+                    <th>Catatan</th>
+                    <th class="text-right">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody id="order-detail-items-tbody">
+                  <tr><td colspan="5" class="text-center py-4">Memuat item...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Financial Breakdown & Delivery Info -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:20px;">
+            <!-- Financial Breakdown -->
+            <div class="x-card-panel" style="padding:16px;border:1px solid var(--border-color);border-radius:8px;">
+              <h4 style="margin:0 0 12px 0;">Rincian Biaya</h4>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+                <div style="display:flex;justify-content:space-between;"><span class="text-muted">Subtotal Produk</span><span id="order-calc-subtotal">Rp 0</span></div>
+                <div style="display:flex;justify-content:space-between;"><span class="text-muted">Ongkos Kirim</span><span id="order-calc-delivery">Rp 0</span></div>
+                <div style="display:flex;justify-content:space-between;"><span class="text-muted">Diskon</span><span id="order-calc-discount">Rp 0</span></div>
+                <div style="display:flex;justify-content:space-between;border-top:1px solid #e2e8f0;padding-top:8px;font-weight:700;font-size:15px;"><span>Grand Total</span><span id="order-calc-grandtotal">Rp 0</span></div>
+              </div>
+            </div>
+
+            <!-- Delivery / Note Details -->
+            <div class="x-card-panel" style="padding:16px;border:1px solid var(--border-color);border-radius:8px;">
+              <h4 style="margin:0 0 12px 0;">Pengiriman & Catatan</h4>
+              <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+                <div><span class="text-muted">Alamat Tujuan:</span> <span id="order-detail-dest">-</span></div>
+                <div><span class="text-muted">Metode Pembayaran:</span> <strong id="order-detail-paymethod">-</strong></div>
+                <div><span class="text-muted">Catatan Pemesan:</span> <span id="order-detail-notes" style="font-style:italic;">-</span></div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -560,8 +1214,1411 @@
         </div>
       </section>
 
+      <!-- TAB: CATALOG / PRODUCTS (Master Products) -->
+      <section id="tab-catalog-products" class="x-tab-content" data-tab="catalog-products">
+        <!-- 1. Product List View -->
+        <div id="product-list-view" class="x-card-panel">
+          <div class="x-panel-header-flex">
+            <div>
+              <h3>🍔 Master Products</h3>
+              <p class="text-muted" style="font-size:13px;">Daftar identitas dan harga dasar produk master brand. Cabang mengadopsi produk dari katalog ini.</p>
+            </div>
+            <div class="x-header-buttons">
+              <button type="button" class="x-btn-primary" id="btn-add-product-main">+ Tambah Produk Baru</button>
+            </div>
+          </div>
+
+          <!-- Search & Filter Controls -->
+          <div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;align-items:center;">
+            <div style="flex:1;min-width:200px;position:relative;">
+              <input type="text" id="prod-search-input" class="x-input" placeholder="Cari nama produk..." style="padding-left:36px;">
+              <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+            <div style="min-width:180px;">
+              <select id="prod-filter-category" class="x-input">
+                <option value="all">Semua Kategori</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Category filter chips -->
+          <div class="x-catalog-filters" id="catalog-products-category-chips" style="margin-top:12px;">
+            <!-- Category buttons rendered here -->
+          </div>
+
+          <!-- Products Table -->
+          <div class="x-table-responsive mt-4">
+            <table class="x-table">
+              <thead>
+                <tr>
+                  <th>Foto</th>
+                  <th>Nama Produk</th>
+                  <th>Kategori</th>
+                  <th>Harga Dasar</th>
+                  <th>Mode Harga</th>
+                  <th>Status Master</th>
+                  <th class="text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="master-products-table-body">
+                <tr><td colspan="7" class="text-center py-6">Memuat daftar produk...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2. Product Detail View -->
+        <div id="product-detail-view" class="x-card-panel" style="display:none;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+            <button type="button" class="x-btn-secondary" id="btn-back-to-products" style="padding:6px 12px;font-size:13px;">
+              ← Kembali ke Daftar Produk
+            </button>
+            <span class="text-muted" style="font-size:13px;">/</span>
+            <span id="prod-detail-breadcrumb" style="font-weight:600;font-size:14px;">Detail Produk</span>
+          </div>
+
+          <div class="x-product-detail-card" style="display:flex;gap:24px;background:#f8fafc;border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:20px;flex-wrap:wrap;">
+            <img id="prod-detail-img" src="" alt="" style="width:120px;height:120px;border-radius:10px;object-fit:cover;background:#e2e8f0;flex-shrink:0;">
+            <div style="flex:1;min-width:240px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <h3 id="prod-detail-name" style="margin:0;font-size:20px;">Nama Produk</h3>
+                <span id="prod-detail-category-badge" class="x-badge x-badge-info">Kategori</span>
+                <span id="prod-detail-pricing-mode-badge" class="x-badge">Mode Harga</span>
+                <span id="prod-detail-status-badge" class="x-badge x-badge-success">Aktif</span>
+              </div>
+              <p id="prod-detail-desc" class="text-muted" style="margin:8px 0;font-size:13px;line-height:1.5;">Deskripsi produk</p>
+              <div style="display:flex;gap:20px;margin-top:12px;flex-wrap:wrap;">
+                <div>
+                  <span class="text-muted" style="font-size:11px;display:block;">HARGA DASAR</span>
+                  <strong id="prod-detail-price" style="font-size:16px;">Rp 0</strong>
+                </div>
+                <div id="prod-detail-range-box" style="display:none;">
+                  <span class="text-muted" style="font-size:11px;display:block;">RANGE HARGA CABANG</span>
+                  <strong id="prod-detail-range" style="font-size:16px;">Rp 0 - Rp 0</strong>
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;justify-content:center;">
+              <button type="button" class="x-btn-secondary" id="btn-edit-from-detail">✏️ Edit Produk</button>
+            </div>
+          </div>
+
+          <!-- Branch Adoptions Section -->
+          <div style="margin-top:28px;">
+            <div class="x-panel-header-flex">
+              <div>
+                <h4>📍 Status Adopsi di Cabang</h4>
+                <p class="text-muted" style="font-size:13px;">Daftar cabang yang telah mengadopsi produk ini dan kustomisasi harga/stok masing-masing.</p>
+              </div>
+            </div>
+            <div class="x-table-responsive mt-3">
+              <table class="x-table">
+                <thead>
+                  <tr>
+                    <th>Nama Cabang</th>
+                    <th>Status Adopsi</th>
+                    <th>Harga Jual Cabang</th>
+                    <th>Stok Cabang</th>
+                    <th>Ketersediaan Cabang</th>
+                    <th class="text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="prod-detail-branches-tbody">
+                  <tr><td colspan="6" class="text-center py-4">Memuat status cabang...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: CATALOG / CATEGORIES (Master Categories) -->
+      <section id="tab-catalog-categories" class="x-tab-content" data-tab="catalog-categories">
+        <div class="x-card-panel">
+          <div class="x-panel-header-flex">
+            <div>
+              <h3>🗂️ Kategori Produk Master</h3>
+              <p class="text-muted" style="font-size:13px;">Kelola kategori master produk brand. Kategori ini menjadi referensi kategori default bagi seluruh cabang.</p>
+            </div>
+            <div class="x-header-buttons">
+              <button type="button" class="x-btn-primary" id="btn-add-master-category">+ Tambah Kategori Master</button>
+            </div>
+          </div>
+
+          <div class="x-table-responsive mt-4">
+            <table class="x-table">
+              <thead>
+                <tr>
+                  <th>Nama Kategori</th>
+                  <th>Slug Identitas</th>
+                  <th>Jumlah Produk</th>
+                  <th class="text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="master-categories-table-body">
+                <tr><td colspan="4" class="text-center py-6">Memuat daftar kategori...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: CATALOG / MENUS (Branch Selling Assortment) -->
+      <section id="tab-catalog-menus" class="x-tab-content" data-tab="catalog-menus">
+        <!-- Header banner showing branch context state -->
+        <div class="x-card-panel" style="margin-bottom:16px;">
+          <div class="x-panel-header-flex">
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <h3 id="menus-context-title">📋 Branch Menus (Katalog Jual Cabang)</h3>
+                <span id="menus-context-badge" class="x-badge x-badge-info">All Branches</span>
+              </div>
+              <p id="menus-context-subtitle" class="text-muted" style="font-size:13px;margin-top:2px;">
+                Pilih cabang pada Branch Context selector untuk mengelola menu jual spesifik per cabang.
+              </p>
+            </div>
+            <div id="menus-header-actions" class="x-header-buttons" style="display:none;">
+              <button type="button" class="x-btn-secondary" id="btn-menus-add-branch-category">+ Tambah Kategori Cabang</button>
+              <button type="button" class="x-btn-secondary" id="btn-menus-switch-all">Lihat Semua Cabang</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 1: All Branches Overview (when branch selector = 'all') -->
+        <div id="menus-all-branches-view" class="x-card-panel">
+          <div class="x-catalog-section-title" style="margin-bottom:14px;">
+            <h4>Pilih Cabang untuk Mengatur Menu</h4>
+            <p class="text-muted" style="font-size:13px;margin:2px 0 0;">
+              Setiap cabang dapat memiliki assortment menu tersendiri, harga override (jika diizinkan mode Range), stok lokal, dan kategori cabang independen.
+            </p>
+          </div>
+
+          <div class="x-table-responsive mt-3">
+            <table class="x-table">
+              <thead>
+                <tr>
+                  <th>Nama Cabang</th>
+                  <th>Alamat</th>
+                  <th>Status Operasional</th>
+                  <th>Menu Diadopsi</th>
+                  <th>Kategori Cabang</th>
+                  <th class="text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="menus-branches-table-body">
+                <tr><td colspan="6" class="text-center py-6">Memuat daftar cabang...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- VIEW 2: Specific Branch Menu View (when a branch is selected) -->
+        <div id="menus-single-branch-view" style="display:none;">
+          <!-- Sub-panel A: Branch Categories -->
+          <div class="x-card-panel" style="margin-bottom:16px;">
+            <div class="x-catalog-section-title" style="margin-bottom:10px;">
+              <h4>🗂️ Kategori Cabang (<span id="menus-branch-cat-count">0</span>)</h4>
+              <p class="text-muted" style="font-size:12px;margin:2px 0 0;">
+                Kategori ini mengatur pengelompokan menu pada halaman pemesanan pelanggan cabang ini.
+              </p>
+            </div>
+            <div id="menus-branch-categories-bar" style="display:flex;flex-wrap:wrap;gap:8px;min-height:36px;align-items:center;">
+              <!-- Rendered chips -->
+            </div>
+          </div>
+
+          <!-- Sub-panel B: Active Adopted Products -->
+          <div class="x-card-panel" style="margin-bottom:16px;">
+            <div class="x-panel-header-flex">
+              <div class="x-catalog-section-title">
+                <h4>✅ Menu Aktif Cabang (<span id="menus-branch-active-count">0</span>)</h4>
+                <p class="text-muted" style="font-size:12px;margin:2px 0 0;" id="menus-branch-filter-label">Menampilkan semua kategori</p>
+              </div>
+            </div>
+            <div id="menus-branch-adopted-container" class="x-branch-catalog-grid" style="margin-top:14px;">
+              <!-- Rendered adopted product cards -->
+            </div>
+          </div>
+
+          <!-- Sub-panel C: Master Products Available for Adoption -->
+          <div class="x-card-panel">
+            <div class="x-catalog-section-title">
+              <h4>💡 Rekomendasi dari Owner / Belum Diadopsi (<span id="menus-branch-available-count">0</span>)</h4>
+              <p class="text-muted" style="font-size:12px;margin:2px 0 0;">
+                Produk master brand yang belum aktif di cabang ini. Klik adopsi untuk mulai menjual di cabang.
+              </p>
+            </div>
+            <div id="menus-branch-available-container" class="x-branch-catalog-grid" style="margin-top:14px;">
+              <!-- Rendered available product cards -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: CUSTOMERS -->
+      <section id="tab-customers" class="x-tab-content" data-tab="customers">
+        <!-- 1. Customers List View -->
+        <div id="customers-list-view">
+          <div class="x-card-panel">
+            <div class="x-panel-header-flex">
+              <div>
+                <h3>👥 Data & Loyalitas Pelanggan</h3>
+                <p>Pantau data belanja, riwayat pesanan, dan segmentasi pelanggan</p>
+              </div>
+              <button type="button" class="x-btn-secondary" id="btn-refresh-customers" onclick="loadCustomers()">🔄 Refresh Data</button>
+            </div>
+
+            <!-- Segment Subnav Tabs: All Customers, New Customers, Returning Customers, Segments -->
+            <div class="x-subnav-tabs mt-4" id="customers-segment-tabs">
+              <button type="button" class="x-subnav-tab active" data-segment="all" onclick="filterCustomersBySegment('all')">All Customers</button>
+              <button type="button" class="x-subnav-tab" data-segment="new" onclick="filterCustomersBySegment('new')">New Customers</button>
+              <button type="button" class="x-subnav-tab" data-segment="returning" onclick="filterCustomersBySegment('returning')">Returning Customers</button>
+              <button type="button" class="x-subnav-tab" data-segment="segments" onclick="filterCustomersBySegment('segments')">Segments</button>
+            </div>
+
+            <!-- Search and Filter Bar -->
+            <div style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap;align-items:center;">
+              <div style="flex:1;min-width:240px;position:relative;">
+                <input type="text" id="customers-search-input" class="x-input" placeholder="Cari nama pelanggan atau nomor WhatsApp..." style="padding-left:36px;">
+                <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </div>
+              <button type="button" class="x-btn-primary" id="btn-customers-search" onclick="searchCustomers()">Cari</button>
+            </div>
+
+            <!-- Segments Guide View (if 'segments' tab active) -->
+            <div id="customers-segments-view" style="display:none;margin-bottom:16px;">
+              <div class="x-alert-banner">
+                <span style="font-size:20px;">💡</span>
+                <div>
+                  <strong>Sistem Segmentasi Pelanggan:</strong> Segmentasi otomatis dikelompokkan menjadi <em>New Customers</em> (1 kali transaksi) dan <em>Returning Customers</em> (&gt; 1 kali transaksi) berdasarkan riwayat pesanan real.
+                </div>
+              </div>
+            </div>
+
+            <!-- Customers Table -->
+            <div class="x-table-responsive">
+              <table class="x-data-table">
+                <thead>
+                  <tr>
+                    <th>Pelanggan</th>
+                    <th>Kontak / WhatsApp</th>
+                    <th>Total Pesanan</th>
+                    <th>Total Belanja</th>
+                    <th>AOV</th>
+                    <th>Cabang Favorit</th>
+                    <th>Segmen</th>
+                    <th>Pesanan Terakhir</th>
+                    <th class="text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="customers-table-body">
+                  <tr>
+                    <td colspan="9" class="text-center py-6 text-muted">Memuat data pelanggan...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Customer Detail View -->
+        <div id="customers-detail-view" style="display:none;">
+          <div style="margin-bottom:16px;">
+            <button type="button" class="x-btn-secondary" onclick="showCustomersListView()" style="display:inline-flex;align-items:center;gap:6px;">
+              &larr; Kembali ke Daftar Pelanggan
+            </button>
+          </div>
+
+          <div class="x-card-panel" style="margin-bottom:20px;">
+            <div class="x-panel-header-flex">
+              <div>
+                <h3 id="cdetail-name">Detail Pelanggan</h3>
+                <p id="cdetail-subtitle" class="text-muted" style="margin:2px 0 0;">Profil transaksi dan riwayat belanja</p>
+              </div>
+              <span id="cdetail-segment-badge" class="x-badge">Segmen</span>
+            </div>
+
+            <!-- Metrics Grid -->
+            <div class="x-metrics-grid mt-4">
+              <div class="x-metric-card">
+                <div class="x-metric-icon bg-blue">📦</div>
+                <div class="x-metric-info">
+                  <span class="x-metric-label">Total Pesanan</span>
+                  <h3 id="cdetail-total-orders" class="x-metric-value">0</h3>
+                </div>
+              </div>
+              <div class="x-metric-card">
+                <div class="x-metric-icon bg-green">💰</div>
+                <div class="x-metric-info">
+                  <span class="x-metric-label">Total Belanja</span>
+                  <h3 id="cdetail-total-spend" class="x-metric-value">Rp0</h3>
+                </div>
+              </div>
+              <div class="x-metric-card">
+                <div class="x-metric-icon bg-amber">🎯</div>
+                <div class="x-metric-info">
+                  <span class="x-metric-label">Average Order Value</span>
+                  <h3 id="cdetail-aov" class="x-metric-value">Rp0</h3>
+                </div>
+              </div>
+              <div class="x-metric-card">
+                <div class="x-metric-icon bg-green">🏢</div>
+                <div class="x-metric-info">
+                  <span class="x-metric-label">Cabang Terfavorit</span>
+                  <h3 id="cdetail-fav-branch" class="x-metric-value" style="font-size:16px;">-</h3>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Two columns: Top Products & Order History -->
+          <div class="x-overview-grid">
+            <!-- Top Ordered Products -->
+            <div class="x-card-panel">
+              <div class="x-panel-header">
+                <h3>🍔 Menu Favorit</h3>
+                <p>Menu yang paling sering dipesan oleh pelanggan ini</p>
+              </div>
+              <div class="mt-4" id="cdetail-top-products-container">
+                <div class="x-empty-state">Belum ada data menu favorit.</div>
+              </div>
+            </div>
+
+            <!-- Saved Delivery Addresses (Buyer vs Recipient) -->
+            <div class="x-card-panel">
+              <div class="x-panel-header">
+                <h3>📍 Alamat Pengiriman Tersimpan</h3>
+                <p>Catatan alamat pengiriman pelanggan</p>
+              </div>
+              <div class="mt-4" id="cdetail-addresses-container">
+                <div class="x-empty-state">Tidak ada alamat pengiriman tersimpan.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Order History Table -->
+          <div class="x-card-panel mt-6">
+            <div class="x-panel-header">
+              <h3>📋 Riwayat Pesanan Pelanggan</h3>
+              <p>Daftar transaksi yang dilakukan oleh nomor kontak ini</p>
+            </div>
+            <div class="mt-4 x-table-responsive">
+              <table class="x-data-table">
+                <thead>
+                  <tr>
+                    <th>No. Pesanan</th>
+                    <th>Tanggal</th>
+                    <th>Cabang</th>
+                    <th>Channel</th>
+                    <th>Fulfillment</th>
+                    <th>Status</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody id="cdetail-orders-table-body">
+                  <tr>
+                    <td colspan="7" class="text-center py-6 text-muted">Memuat riwayat pesanan...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- REPORTS — Comprehensive Business Reports -->
+      <section id="tab-reports" class="x-tab-content" data-tab="reports">
+        <!-- Sub-Navigation for Reports: Overview, Sales, Orders, Products, Customers, Branches, Operations -->
+        <div class="x-subnav-tabs" id="reports-subnav">
+          <button type="button" class="x-subnav-tab active" data-report="overview">Overview</button>
+          <button type="button" class="x-subnav-tab" data-report="sales">Sales</button>
+          <button type="button" class="x-subnav-tab" data-report="orders">Orders</button>
+          <button type="button" class="x-subnav-tab" data-report="products">Products</button>
+          <button type="button" class="x-subnav-tab" data-report="customers">Customers</button>
+          <button type="button" class="x-subnav-tab" data-report="branches">Branches</button>
+          <button type="button" class="x-subnav-tab" data-report="operations">Operations</button>
+        </div>
+
+        <!-- Filter Bar: Date Range + Global Branch Indicator -->
+        <div class="x-filter-bar">
+          <div class="x-filter-group">
+            <label style="font-size:13px;font-weight:700;color:var(--text-muted);">Periode:</label>
+            <input type="date" id="report-start-date" class="x-date-input" aria-label="Tanggal Mulai Laporan">
+            <span style="color:var(--text-muted);font-size:12px;">s/d</span>
+            <input type="date" id="report-end-date" class="x-date-input" aria-label="Tanggal Selesai Laporan">
+            <button type="button" class="x-btn-secondary" id="btn-report-filter" style="font-size:12px;padding:6px 12px;">Terapkan</button>
+            <button type="button" class="x-btn-secondary" id="btn-report-reset" style="font-size:12px;padding:6px 10px;">Semua Waktu</button>
+          </div>
+          <div>
+            <span class="x-badge" id="report-branch-badge" style="background:#e0e7ff;color:#3730a3;font-size:12px;padding:4px 10px;border-radius:20px;font-weight:700;">Semua Cabang</span>
+          </div>
+        </div>
+
+        <!-- Dynamic Report Content Area -->
+        <div id="reports-content-container">
+          <!-- Summary Cards for Current Report -->
+          <div id="report-summary-cards" class="x-metrics-grid" style="margin-bottom:20px;"></div>
+
+          <!-- Main Report Data Panel -->
+          <div class="x-card-panel">
+            <div class="x-panel-header x-panel-header-flex">
+              <div>
+                <h3 id="report-table-title">Laporan Data</h3>
+                <p id="report-table-subtitle">Rincian data terperinci sesuai kriteria filter</p>
+              </div>
+            </div>
+            <div class="mt-4 x-table-responsive" id="report-table-container">
+              <div class="x-empty-state">Memuat laporan...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           PHASE 6: CLIENT OWNER DASHBOARD — FINANCE & MARKETING SECTIONS
+           Authoritative financial reports, transactions, payment methods & marketing
+           ===================================================================== -->
+
+      <!-- FINANCE TAB -->
+      <section id="tab-finance" class="x-tab-content" data-tab="finance">
+        <div class="x-content-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <div>
+            <h2 style="font-size:20px;font-weight:800;color:var(--text-main);margin:0;">Finance & Payouts</h2>
+            <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0 0;">Laporan keuangan terverifikasi, transaksi pembayaran, rekonsiliasi, dan payment methods.</p>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button type="button" class="x-btn-secondary" id="btn-refresh-finance" onclick="loadFinanceCurrentSubtab()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Finance Sub-navigation Tabs -->
+        <div class="x-subnav-tabs" id="finance-subnav-tabs">
+          <button type="button" class="x-subnav-tab active" data-subtab="overview" onclick="navigateTo('finance/overview')">Overview</button>
+          <button type="button" class="x-subnav-tab" data-subtab="transactions" onclick="navigateTo('finance/transactions')">Transactions</button>
+          <button type="button" class="x-subnav-tab" data-subtab="payouts" onclick="navigateTo('finance/payouts')">Payouts</button>
+          <button type="button" class="x-subnav-tab" data-subtab="reconciliation" onclick="navigateTo('finance/reconciliation')">Reconciliation</button>
+          <button type="button" class="x-subnav-tab" data-subtab="payment-methods" onclick="navigateTo('finance/payment-methods')">Payment Methods</button>
+        </div>
+
+        <!-- 1. Finance: Overview Subtab -->
+        <div id="finance-view-overview" class="x-finance-subview">
+          <div class="x-stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:24px;">
+            <div class="x-stat-card">
+              <div class="x-stat-label">Total Penjualan Kotor (Gross)</div>
+              <div class="x-stat-value" id="fin-gross-sales">Rp 0</div>
+              <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Berdasarkan pesanan terkonfirmasi</div>
+            </div>
+            <div class="x-stat-card">
+              <div class="x-stat-label">Total Pelunasan (Settled)</div>
+              <div class="x-stat-value" id="fin-total-settled" style="color:#059669;">Rp 0</div>
+              <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Tunai & Midtrans berhasil</div>
+            </div>
+            <div class="x-stat-card">
+              <div class="x-stat-label">Menunggu Pelunasan (Pending)</div>
+              <div class="x-stat-value" id="fin-total-pending" style="color:#d97706;">Rp 0</div>
+              <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Transaksi belum dibayar</div>
+            </div>
+            <div class="x-stat-card">
+              <div class="x-stat-label">Belum Direkonsiliasi</div>
+              <div class="x-stat-value" id="fin-unreconciled-count">0</div>
+              <div class="x-stat-sub" id="fin-unreconciled-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Status sinkronisasi gateway</div>
+            </div>
+          </div>
+
+          <!-- Channel & Payment Breakdown -->
+          <div class="x-card" style="margin-bottom:24px;">
+            <div class="x-card-header" style="padding:16px 20px;border-bottom:1px solid var(--border-color);">
+              <h3 style="font-size:15px;font-weight:700;margin:0;">Rincian Settlement per Metode Pembayaran</h3>
+            </div>
+            <div class="x-card-body" style="padding:20px;">
+              <div class="x-table-responsive">
+                <table class="x-table" id="table-fin-breakdown">
+                  <thead>
+                    <tr>
+                      <th>Metode / Provider</th>
+                      <th>Status Pembayaran</th>
+                      <th>Jumlah Transaksi</th>
+                      <th>Total Nilai Pelunasan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-fin-breakdown">
+                    <tr><td colspan="4" class="text-center py-4 text-muted">Memuat data settlement...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Finance: Transactions Subtab -->
+        <div id="finance-view-transactions" class="x-finance-subview" style="display:none;">
+          <div class="x-card">
+            <div class="x-card-header" style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color);flex-wrap:wrap;gap:12px;">
+              <h3 style="font-size:15px;font-weight:700;margin:0;">Riwayat Transaksi Keuangan (Order Payments)</h3>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <select id="fin-filter-method" class="x-input" style="font-size:12px;padding:6px 12px;" onchange="loadFinanceTransactions()">
+                  <option value="">Semua Metode</option>
+                  <option value="cash">Tunai (Cash)</option>
+                  <option value="midtrans">Midtrans</option>
+                </select>
+                <select id="fin-filter-status" class="x-input" style="font-size:12px;padding:6px 12px;" onchange="loadFinanceTransactions()">
+                  <option value="">Semua Status</option>
+                  <option value="settlement">Settlement (Lunas)</option>
+                  <option value="pending">Pending</option>
+                  <option value="reconciliation_pending">Reconciliation Pending</option>
+                  <option value="cancel">Batal / Expired</option>
+                </select>
+              </div>
+            </div>
+            <div class="x-card-body" style="padding:0;">
+              <div class="x-table-responsive">
+                <table class="x-table" id="table-fin-transactions">
+                  <thead>
+                    <tr>
+                      <th>ID Transaksi</th>
+                      <th>Waktu</th>
+                      <th>Order ID / Ref</th>
+                      <th>Cabang</th>
+                      <th>Metode</th>
+                      <th>Nominal</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-fin-transactions">
+                    <tr><td colspan="7" class="text-center py-6 text-muted">Memuat daftar transaksi...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Finance: Payouts Subtab (Honest Empty State) -->
+        <div id="finance-view-payouts" class="x-finance-subview" style="display:none;">
+          <div class="x-card" style="padding:48px 24px;text-align:center;">
+            <div style="font-size:44px;margin-bottom:16px;">🏦</div>
+            <h3 style="font-size:18px;font-weight:800;color:var(--text-main);margin-bottom:8px;">Pencairan Dana (Payouts) Belum Terintegrasi</h3>
+            <p style="font-size:14px;color:var(--text-muted);max-width:560px;margin:0 auto 20px auto;line-height:1.5;">
+              Sistem saat ini mendukung settlement langsung ke rekening merchant melalui dashboard payment gateway Midtrans dan penerimaan tunai di cabang. Fitur otomatisasi payout antar-rekening belum dikonfigurasi pada Core engine.
+            </p>
+            <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:#f1f5f9;border-radius:20px;font-size:12px;font-weight:600;color:#475569;">
+              <span>Status: Direct Settlement via Midtrans Merchant Portal</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Finance: Reconciliation Subtab -->
+        <div id="finance-view-reconciliation" class="x-finance-subview" style="display:none;">
+          <div class="x-card">
+            <div class="x-card-header" style="padding:16px 20px;border-bottom:1px solid var(--border-color);">
+              <h3 style="font-size:15px;font-weight:700;margin:0;">Status Rekonsiliasi Gateway & Transaksi Menggantung</h3>
+            </div>
+            <div class="x-card-body" style="padding:20px;">
+              <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">
+                Daftar transaksi yang berstatus <code>reconciliation_pending</code> atau <code>pending</code> yang sedang disinkronisasikan oleh worker rekonsiliasi berkala terhadap gateway Midtrans.
+              </p>
+              <div class="x-table-responsive">
+                <table class="x-table" id="table-fin-reconciliation">
+                  <thead>
+                    <tr>
+                      <th>Order ID</th>
+                      <th>Cabang</th>
+                      <th>Provider</th>
+                      <th>Nominal</th>
+                      <th>Waktu Transaksi</th>
+                      <th>Status Saat Ini</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-fin-reconciliation">
+                    <tr><td colspan="6" class="text-center py-6 text-muted">Memuat data rekonsiliasi...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Finance: Payment Methods Subtab -->
+        <div id="finance-view-payment-methods" class="x-finance-subview" style="display:none;">
+          <div class="x-card" style="margin-bottom:20px;">
+            <div class="x-card-header" style="padding:16px 20px;border-bottom:1px solid var(--border-color);">
+              <h3 style="font-size:15px;font-weight:700;margin:0;">Metode Pembayaran Resmi yang Didukung</h3>
+            </div>
+            <div class="x-card-body" style="padding:20px;">
+              <div id="fin-payment-methods-list" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;">
+                <div class="x-empty-state">Memuat konfigurasi payment methods...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MARKETING TAB -->
+      <section id="tab-marketing" class="x-tab-content" data-tab="marketing">
+        <div class="x-content-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <div>
+            <h2 style="font-size:20px;font-weight:800;color:var(--text-main);margin:0;">Marketing & Promosi</h2>
+            <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0 0;">Program promosi, insentif konversi, performa retensi, dan kampanye loyalitas brand.</p>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button type="button" class="x-btn-secondary" id="btn-refresh-marketing" onclick="loadMarketingCurrentSubtab()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Marketing Sub-navigation Tabs -->
+        <div class="x-subnav-tabs" id="marketing-subnav-tabs">
+          <button type="button" class="x-subnav-tab active" data-subtab="overview" onclick="navigateTo('marketing/overview')">Overview</button>
+          <button type="button" class="x-subnav-tab" data-subtab="promotions" onclick="navigateTo('marketing/promotions')">Promotions</button>
+          <button type="button" class="x-subnav-tab" data-subtab="discounts" onclick="navigateTo('marketing/discounts')">Discounts</button>
+          <button type="button" class="x-subnav-tab" data-subtab="campaigns" onclick="navigateTo('marketing/campaigns')">Campaigns</button>
+          <button type="button" class="x-subnav-tab" data-subtab="loyalty" onclick="navigateTo('marketing/loyalty')">Loyalty</button>
+        </div>
+
+        <!-- 1. Marketing: Overview Subtab -->
+        <div id="marketing-view-overview" class="x-marketing-subview">
+          <div class="x-stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:24px;">
+            <div class="x-stat-card">
+              <div class="x-stat-label">Total Pelanggan Terdaftar</div>
+              <div class="x-stat-value" id="mkt-total-customers">0</div>
+              <div class="x-stat-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Nomor telepon unik</div>
+            </div>
+            <div class="x-stat-card">
+              <div class="x-stat-label">Pelanggan Setia (Returning)</div>
+              <div class="x-stat-value" id="mkt-returning-customers" style="color:#2563eb;">0</div>
+              <div class="x-stat-sub" id="mkt-repeat-rate-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Repeat rate: 0%</div>
+            </div>
+            <div class="x-stat-card">
+              <div class="x-stat-label">Promosi Aktif</div>
+              <div class="x-stat-value" id="mkt-active-promotions" style="color:#059669;">0</div>
+              <div class="x-stat-sub" id="mkt-total-promotions-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Program promosi terdaftar</div>
+            </div>
+            <div class="x-stat-card">
+              <div class="x-stat-label">Total Klaim / Redemptions</div>
+              <div class="x-stat-value" id="mkt-total-redemptions">0</div>
+              <div class="x-stat-sub" id="mkt-benefit-sub" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Total manfaat diberikan</div>
+            </div>
+          </div>
+
+          <!-- Recent Promo Redemptions -->
+          <div class="x-card" style="margin-bottom:24px;">
+            <div class="x-card-header" style="padding:16px 20px;border-bottom:1px solid var(--border-color);">
+              <h3 style="font-size:15px;font-weight:700;margin:0;">Klaim Promosi Terkini</h3>
+            </div>
+            <div class="x-card-body" style="padding:0;">
+              <div class="x-table-responsive">
+                <table class="x-table" id="table-mkt-recent-redemptions">
+                  <thead>
+                    <tr>
+                      <th>Nama Promosi</th>
+                      <th>Order ID</th>
+                      <th>Cabang</th>
+                      <th>Pelanggan</th>
+                      <th>Nilai Manfaat</th>
+                      <th>Waktu Klaim</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-mkt-recent-redemptions">
+                    <tr><td colspan="6" class="text-center py-6 text-muted">Memuat data klaim promosi...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. Marketing: Promotions Subtab -->
+        <div id="marketing-view-promotions" class="x-marketing-subview" style="display:none;">
+          <div class="x-card">
+            <div class="x-card-header" style="padding:16px 20px;border-bottom:1px solid var(--border-color);">
+              <h3 style="font-size:15px;font-weight:700;margin:0;">Daftar Program Promosi Brand</h3>
+            </div>
+            <div class="x-card-body" style="padding:0;">
+              <div class="x-table-responsive">
+                <table class="x-table" id="table-mkt-promotions">
+                  <thead>
+                    <tr>
+                      <th>Nama Promosi</th>
+                      <th>Tipe Engine</th>
+                      <th>Stacking Policy</th>
+                      <th>Batas per Pelanggan</th>
+                      <th>Klaim Aktif</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-mkt-promotions">
+                    <tr><td colspan="6" class="text-center py-6 text-muted">Memuat daftar promosi...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Marketing: Discounts Subtab -->
+        <div id="marketing-view-discounts" class="x-marketing-subview" style="display:none;">
+          <div class="x-card" style="padding:40px 24px;text-align:center;">
+            <div style="font-size:40px;margin-bottom:12px;">🏷️</div>
+            <h3 style="font-size:17px;font-weight:800;color:var(--text-main);margin-bottom:6px;">Kupon Diskon Mandiri Belum Dikonfigurasi</h3>
+            <p style="font-size:13px;color:var(--text-muted);max-width:520px;margin:0 auto 16px auto;line-height:1.5;">
+              Diskon harga saat ini dikelola secara terstruktur melalui aturan Promotion Engine (misalnya insentif instalasi PWA dan diskon ongkir cabang) atau penyesuaian harga khusus di Katalog Produk.
+            </p>
+            <button type="button" class="x-btn-secondary" onclick="navigateTo('marketing/promotions')">Lihat Promosi Aktif ➔</button>
+          </div>
+        </div>
+
+        <!-- 4. Marketing: Campaigns Subtab (Honest Empty State) -->
+        <div id="marketing-view-campaigns" class="x-marketing-subview" style="display:none;">
+          <div class="x-card" style="padding:48px 24px;text-align:center;">
+            <div style="font-size:44px;margin-bottom:16px;">📢</div>
+            <h3 style="font-size:18px;font-weight:800;color:var(--text-main);margin-bottom:8px;">Kampanye Broadcast (Email/SMS/Push) Belum Dikonfigurasi</h3>
+            <p style="font-size:14px;color:var(--text-muted);max-width:560px;margin:0 auto 20px auto;line-height:1.5;">
+              Infrastruktur broadcast marketing belum diaktifkan pada Core backend saat ini. Notifikasi pesanan realtime telah berjalan melalui integrasi gateway pesan cabang.
+            </p>
+            <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:#f1f5f9;border-radius:20px;font-size:12px;font-weight:600;color:#475569;">
+              <span>Status: Marketing Automation Platform Not Installed</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Marketing: Loyalty Subtab (Honest Empty State) -->
+        <div id="marketing-view-loyalty" class="x-marketing-subview" style="display:none;">
+          <div class="x-card" style="padding:48px 24px;text-align:center;">
+            <div style="font-size:44px;margin-bottom:16px;">🎁</div>
+            <h3 style="font-size:18px;font-weight:800;color:var(--text-main);margin-bottom:8px;">Program Poin & Reward Loyalty Belum Dikonfigurasi</h3>
+            <p style="font-size:14px;color:var(--text-muted);max-width:560px;margin:0 auto 20px auto;line-height:1.5;">
+              Modul akuntansi reward points belum diimplementasikan pada database Core. Segmentasi pelanggan (New vs Returning) sudah aktif dan dapat ditinjau melalui menu Customers.
+            </p>
+            <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:#f1f5f9;border-radius:20px;font-size:12px;font-weight:600;color:#475569;">
+              <span>Status: Points & Ledger Module Coming from Core capability</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS — Comprehensive Client Owner Settings & Integrations -->
+      <section id="tab-settings" class="x-tab-content" data-tab="settings">
+        <!-- Settings Layout: Sidebar Subnav + Content Panel -->
+        <div class="settings-layout">
+          
+          <!-- Category Navigation Sidebar -->
+          <aside class="settings-sidebar">
+            <div style="font-size:11px;font-weight:800;letter-spacing:0.05em;color:#94a3b8;margin-bottom:8px;padding-left:8px;">BUSINESS</div>
+            <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:16px;">
+              <button type="button" class="settings-nav-btn active" data-settings-section="business/profile" onclick="switchSettingsSection('business/profile', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>🏷️</span><span>Brand Profile</span>
+              </button>
+              <button type="button" class="settings-nav-btn" data-settings-section="business/info" onclick="switchSettingsSection('business/info', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>🏢</span><span>Business Info</span>
+              </button>
+              <button type="button" class="settings-nav-btn" data-settings-section="business/legal" onclick="switchSettingsSection('business/legal', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>⚖️</span><span>Legal / Tax</span>
+              </button>
+            </div>
+
+            <div style="font-size:11px;font-weight:800;letter-spacing:0.05em;color:#94a3b8;margin-bottom:8px;padding-left:8px;">LOCATIONS</div>
+            <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:16px;">
+              <button type="button" class="settings-nav-btn" data-settings-section="locations" onclick="switchSettingsSection('locations', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>📍</span><span>Branch Defaults</span>
+              </button>
+            </div>
+
+            <div style="font-size:11px;font-weight:800;letter-spacing:0.05em;color:#94a3b8;margin-bottom:8px;padding-left:8px;">COMMERCE</div>
+            <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:16px;">
+              <button type="button" class="settings-nav-btn" data-settings-section="commerce/orders" onclick="switchSettingsSection('commerce/orders', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>📦</span><span>Order Settings</span>
+              </button>
+              <button type="button" class="settings-nav-btn" data-settings-section="commerce/payments" onclick="switchSettingsSection('commerce/payments', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>💳</span><span>Payment Settings</span>
+              </button>
+              <button type="button" class="settings-nav-btn" data-settings-section="commerce/fulfillment" onclick="switchSettingsSection('commerce/fulfillment', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>🛵</span><span>Fulfillment</span>
+              </button>
+            </div>
+
+            <div style="font-size:11px;font-weight:800;letter-spacing:0.05em;color:#94a3b8;margin-bottom:8px;padding-left:8px;">CHANNELS</div>
+            <div style="display:flex;flex-direction:column;gap:2px;margin-bottom:16px;">
+              <button type="button" class="settings-nav-btn" data-settings-section="channels/website" onclick="switchSettingsSection('channels/website', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>🌐</span><span>Website</span>
+              </button>
+              <button type="button" class="settings-nav-btn" data-settings-section="channels/customer-app" onclick="switchSettingsSection('channels/customer-app', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>📱</span><span>Customer App</span>
+              </button>
+              <button type="button" class="settings-nav-btn" data-settings-section="channels/pos" onclick="switchSettingsSection('channels/pos', true)" style="display:none;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>🖥️</span><span>Point of Sale (POS)</span>
+              </button>
+              <button type="button" class="settings-nav-btn" data-settings-section="channels/kiosk" onclick="switchSettingsSection('channels/kiosk', true)" style="display:none;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>📟</span><span>Kiosk Terminal</span>
+              </button>
+            </div>
+
+            <div style="font-size:11px;font-weight:800;letter-spacing:0.05em;color:#94a3b8;margin-bottom:8px;padding-left:8px;">SYSTEM &amp; INTEGRATIONS</div>
+            <div style="display:flex;flex-direction:column;gap:2px;">
+              <button type="button" class="settings-nav-btn" data-settings-section="integrations" onclick="switchSettingsSection('integrations', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>🔌</span><span>Integrations</span>
+              </button>
+              <button type="button" class="settings-nav-btn" data-settings-section="notifications" onclick="switchSettingsSection('notifications', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>🔔</span><span>Notifications</span>
+              </button>
+              <button type="button" class="settings-nav-btn" data-settings-section="security" onclick="switchSettingsSection('security', true)" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--radius-sm);border:none;background:transparent;color:#334155;font-size:13px;font-weight:600;cursor:pointer;text-align:left;width:100%;">
+                <span>🛡️</span><span>Security &amp; RBAC</span>
+              </button>
+            </div>
+          </aside>
+
+          <!-- Settings Main Content Panel -->
+          <div class="settings-content-panel" style="flex:1;min-width:0;">
+
+            <!-- 1. BRAND PROFILE PANEL -->
+            <div id="settings-panel-business-profile" class="settings-panel">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+                  <div>
+                    <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Identitas &amp; Profil Brand</h3>
+                    <p style="margin:0;font-size:13px;color:#64748b;">Pengaturan nama brand, logo, warna tema, dan tagline yang tampil di aplikasi pelanggan.</p>
+                  </div>
+                  <span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Authoritative Core</span>
+                </div>
+
+                <form id="form-settings-profile" onsubmit="saveSettingsProfile(event)" style="display:flex;flex-direction:column;gap:16px;">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div>
+                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Nama Brand</label>
+                      <input id="set-profile-name" type="text" class="x-input" required style="width:100%;">
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Tagline Brand</label>
+                      <input id="set-profile-tagline" type="text" class="x-input" style="width:100%;">
+                    </div>
+                  </div>
+
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                    <div>
+                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Foto / Ikon Logo Brand</label>
+                      <div class="x-image-upload-control" style="padding:10px;">
+                        <div class="x-image-upload-preview-box" style="width:60px;height:60px;" id="set-profile-logo-preview-box">
+                          <img id="set-profile-logo-preview" src="/assets/pwa/icon-192.png" alt="Logo Brand">
+                          <div id="set-profile-logo-empty" class="x-image-upload-empty" style="display:none;font-size:18px;">🏬</div>
+                        </div>
+                        <div class="x-image-upload-info" style="min-width:140px;">
+                          <div class="x-image-upload-actions" style="margin-top:4px;">
+                            <button type="button" class="x-btn-secondary" id="btn-set-profile-logo-pick" style="font-size:11px;padding:4px 8px;">📁 Unggah</button>
+                            <button type="button" class="x-btn-secondary" id="btn-set-profile-logo-remove" style="font-size:11px;padding:4px 8px;color:#ef4444;display:none;">Hapus</button>
+                          </div>
+                          <input type="file" id="input-set-profile-logo-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                          <input type="hidden" id="set-profile-logo" value="/assets/pwa/icon-192.png">
+                          <div class="x-image-specs-text">JPG, PNG, WebP · Maks. 2 MB · 1:1</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Warna Tema Utama (Hex)</label>
+                      <div style="display:flex;gap:8px;align-items:center;">
+                        <input id="set-profile-color" type="color" style="width:40px;height:38px;border:none;border-radius:4px;cursor:pointer;">
+                        <input id="set-profile-color-hex" type="text" class="x-input" style="flex:1;">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style="background:#f8fafc;padding:12px;border-radius:var(--radius-sm);border:1px solid #e2e8f0;font-size:12px;color:#64748b;">
+                    💡 Domain kustom (<code><span id="set-profile-domain">-</span></code>) dikelola pada tingkat Platform Host &amp; Cloud Control Plane.
+                  </div>
+
+                  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
+                    <button type="button" class="x-btn-secondary" onclick="loadSettingsProfile()">Batal</button>
+                    <button type="submit" class="x-btn-primary" id="btn-save-settings-profile">Simpan Profil</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- 2. BUSINESS INFO PANEL -->
+            <div id="settings-panel-business-info" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Informasi Legal &amp; Kontak Bisnis</h3>
+                <p style="margin:0 0 20px;font-size:13px;color:#64748b;">Rincian entitas bisnis resmi yang terdaftar pada sistem.</p>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                  <div style="padding:12px;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Organisasi / Entitas</div>
+                    <div id="set-info-org" style="font-size:14px;font-weight:700;color:#1e293b;margin-top:4px;">-</div>
+                  </div>
+                  <div style="padding:12px;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Tanggal Terdaftar</div>
+                    <div id="set-info-registered" style="font-size:14px;font-weight:700;color:#1e293b;margin-top:4px;">-</div>
+                  </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+                  <div style="padding:12px;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Alamat Kontak Utama</div>
+                    <div id="set-info-address" style="font-size:13px;color:#334155;margin-top:4px;">-</div>
+                  </div>
+                  <div style="padding:12px;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">No. WhatsApp &amp; Telepon</div>
+                    <div id="set-info-phone" style="font-size:13px;color:#334155;margin-top:4px;">-</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. LEGAL / TAX PANEL -->
+            <div id="settings-panel-business-legal" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                  <span class="x-badge" style="background:#f1f5f9;color:#64748b;font-weight:700;">Belum Dikonfigurasi</span>
+                  <h3 style="margin:0;font-size:16px;font-weight:700;">Pajak &amp; Ketentuan Legalitas</h3>
+                </div>
+                <p style="font-size:13px;color:#64748b;line-height:1.6;margin-bottom:20px;">
+                  Sistem pajak terpisah (NPWP, PPN/PB1 restaurant tax) saat ini belum diaktifkan pada Core engine v1. Seluruh nominal transaksi dihitung sebagai harga final (nett).
+                </p>
+                <div style="padding:16px;background:#f8fafc;border-radius:var(--radius-md);border:1px dashed #cbd5e1;font-size:13px;color:#475569;">
+                  ℹ️ Modul kepatuhan pajak multi-daerah dan dokumen legalitas (Terms of Service / Privacy Policy) akan dapat dikonfigurasi saat integrasi modul Accounting resmi dirilis.
+                </div>
+              </div>
+            </div>
+
+            <!-- 4. LOCATIONS / BRANCH DEFAULTS PANEL -->
+            <div id="settings-panel-locations" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Nilai Default Antar Cabang</h3>
+                <p style="margin:0 0 20px;font-size:13px;color:#64748b;">Standar konfigurasi operasional dan logistik pemenuhan untuk seluruh cabang.</p>
+
+                <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:16px;margin-bottom:20px;">
+                  <div style="padding:14px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Mata Uang &amp; Zona Waktu</div>
+                    <div style="font-size:15px;font-weight:800;color:#1e293b;margin-top:4px;">IDR (Rp) • WIB</div>
+                  </div>
+                  <div style="padding:14px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Maks. Radius Antar Default</div>
+                    <div style="font-size:18px;font-weight:800;color:#1e293b;margin-top:4px;">10.0 KM</div>
+                  </div>
+                  <div style="padding:14px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;">Tarif Ongkir Dasar Default</div>
+                    <div style="font-size:18px;font-weight:800;color:#1e293b;margin-top:4px;">Rp 2.500</div>
+                  </div>
+                </div>
+
+                <div style="font-size:12px;color:#64748b;margin-bottom:14px;">
+                  🔒 <em>Kebijakan Isolasi Override:</em> Setiap cabang dapat memiliki tarif ongkir dan radius mandiri yang dikelola di menu <a href="#branches" style="color:var(--primary);font-weight:600;">Branches</a>. Nilai default ini tidak akan menimpa override cabang yang telah tersimpan.
+                </div>
+
+                <div class="x-table-wrap">
+                  <table class="x-table">
+                    <thead>
+                      <tr>
+                        <th>Nama Cabang</th>
+                        <th>Status Layanan</th>
+                        <th>Maks Radius</th>
+                        <th>Tarif per KM</th>
+                        <th>Override Cabang</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody-set-locations-branches">
+                      <tr><td colspan="5" class="text-center py-4 text-muted">Memuat data cabang...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- 5. COMMERCE / ORDERS PANEL -->
+            <div id="settings-panel-commerce-orders" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Aturan &amp; Kebijakan Pesanan (Order Engine)</h3>
+                <p style="margin:0 0 20px;font-size:13px;color:#64748b;">Parameter validasi dan batas waktu siklus hidup pesanan Core.</p>
+
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;">
+                    <div>
+                      <div style="font-weight:700;color:#1e293b;font-size:14px;">Batas Waktu Kedaluwarsa Pesanan Menunggu Pembayaran</div>
+                      <div style="font-size:12px;color:#64748b;">Pesanan status pending dibatalkan otomatis jika tidak dibayar dalam durasi ini.</div>
+                    </div>
+                    <span class="x-badge" style="background:#e0f2fe;color:#0369a1;font-weight:700;">15 Menit (900 dtk)</span>
+                  </div>
+
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;">
+                    <div>
+                      <div style="font-weight:700;color:#1e293b;font-size:14px;">Aturan Pemesanan Meja Reservasi (Reservation Policy)</div>
+                      <div style="font-size:12px;color:#64748b;">Pemesanan reservasi hanya diperbolehkan untuk hari berikutnya (H+1 ke atas). Same-day dilarang.</div>
+                    </div>
+                    <span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Aktif &amp; Terkunci</span>
+                  </div>
+
+                  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;">
+                    <div>
+                      <div style="font-weight:700;color:#1e293b;font-size:14px;">Dimensi Independen (Channel vs Fulfillment)</div>
+                      <div style="font-size:12px;color:#64748b;">Kanal pesanan (<code>order_channel</code>) dipisahkan secara murni dari tipe pemenuhan (<code>order_type</code>).</div>
+                    </div>
+                    <span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Core Standard</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 6. COMMERCE / PAYMENTS PANEL -->
+            <div id="settings-panel-commerce-payments" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+                  <div>
+                    <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Konfigurasi Payment Gateway Midtrans</h3>
+                    <p style="margin:0;font-size:13px;color:#64748b;">Atur kredensial Midtrans Server Key dan Client Key untuk brand atau cabang spesifik.</p>
+                  </div>
+                  <span id="set-payment-scope-badge" class="x-badge" style="background:#f1f5f9;color:#475569;font-weight:700;">Brand Default</span>
+                </div>
+
+                <form id="form-settings-payments" onsubmit="saveSettingsPayments(event)" style="display:flex;flex-direction:column;gap:16px;">
+                  <div>
+                    <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Lingkup Pengaturan (Scope)</label>
+                    <select id="set-payment-scope-select" class="x-input" style="width:100%;" onchange="onPaymentScopeChange()">
+                      <option value="brand">Seluruh Brand (Default)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Midtrans Server Key</label>
+                    <input id="set-payment-server-key" type="password" class="x-input" placeholder="SB-Mid-server-..." style="width:100%;font-family:monospace;">
+                  </div>
+
+                  <div>
+                    <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Midtrans Client Key</label>
+                    <input id="set-payment-client-key" type="text" class="x-input" placeholder="SB-Mid-client-..." style="width:100%;font-family:monospace;">
+                  </div>
+
+                  <div>
+                    <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Merchant ID</label>
+                    <input id="set-payment-merchant-id" type="text" class="x-input" placeholder="G123456789" style="width:100%;font-family:monospace;">
+                  </div>
+
+                  <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid #e2e8f0;">
+                    <input id="set-payment-is-production" type="checkbox" style="width:18px;height:18px;cursor:pointer;">
+                    <div>
+                      <label for="set-payment-is-production" style="font-size:13px;font-weight:700;color:#1e293b;cursor:pointer;display:block;">Lingkungan Produksi (Production Mode)</label>
+                      <div style="font-size:11px;color:#64748b;">Centang untuk memproses transaksi uang riil Midtrans. Matikan untuk Sandbox simulasi.</div>
+                    </div>
+                  </div>
+
+                  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
+                    <button type="button" class="x-btn-secondary" onclick="loadSettingsPayments()">Batal</button>
+                    <button type="submit" class="x-btn-primary" id="btn-save-settings-payments">Simpan Kredensial</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- 7. COMMERCE / FULFILLMENT PANEL -->
+            <div id="settings-panel-commerce-fulfillment" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+                  <div>
+                    <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Pemenuhan Pesanan Cabang (Fulfillment)</h3>
+                    <p style="margin:0;font-size:13px;color:#64748b;">Atur metode pengambilan, radius antar, dan tarif ongkir untuk cabang yang dipilih.</p>
+                  </div>
+                  <span id="set-ful-branch-badge" class="x-badge" style="background:#e0f2fe;color:#0369a1;font-weight:700;">Cabang Terpilih</span>
+                </div>
+
+                <form id="form-settings-fulfillment" onsubmit="saveSettingsFulfillment(event)" style="display:flex;flex-direction:column;gap:16px;">
+                  <div>
+                    <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Pilih Cabang</label>
+                    <select id="set-ful-branch-select" class="x-input" style="width:100%;" onchange="onFulfillmentBranchChange()">
+                    </select>
+                  </div>
+
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid #e2e8f0;">
+                      <input id="set-ful-delivery-active" type="checkbox" style="width:18px;height:18px;cursor:pointer;">
+                      <label for="set-ful-delivery-active" style="font-size:13px;font-weight:700;color:#1e293b;cursor:pointer;">Layanan Pengantaran (Delivery)</label>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#f8fafc;border-radius:var(--radius-sm);border:1px solid #e2e8f0;">
+                      <input id="set-ful-pickup-active" type="checkbox" style="width:18px;height:18px;cursor:pointer;">
+                      <label for="set-ful-pickup-active" style="font-size:13px;font-weight:700;color:#1e293b;cursor:pointer;">Layanan Ambil Sendiri (Takeaway / Pickup)</label>
+                    </div>
+                  </div>
+
+                  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;">
+                    <div>
+                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Radius Maksimal (KM)</label>
+                      <input id="set-ful-max-radius" type="number" step="0.5" class="x-input" style="width:100%;">
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Gratis Ongkir s/d (KM)</label>
+                      <input id="set-ful-free-km" type="number" step="0.5" class="x-input" style="width:100%;">
+                    </div>
+                    <div>
+                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Tarif per KM (Rp)</label>
+                      <input id="set-ful-price-km" type="number" step="500" class="x-input" style="width:100%;">
+                    </div>
+                  </div>
+
+                  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
+                    <button type="button" class="x-btn-secondary" onclick="loadSettingsFulfillment()">Batal</button>
+                    <button type="submit" class="x-btn-primary" id="btn-save-settings-fulfillment">Simpan Pengaturan Cabang</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- 8. CHANNELS: WEBSITE, CUSTOMER APP, POS, KIOSK -->
+            <div id="settings-panel-channels-website" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                  <span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Aktif &amp; Terhubung</span>
+                  <h3 style="margin:0;font-size:16px;font-weight:700;">Kanal Website Pemesanan Online</h3>
+                </div>
+                <p style="font-size:13px;color:#64748b;margin-bottom:16px;">Toko online resmi merchant untuk pemesanan via browser desktop dan mobile.</p>
+                <div style="padding:14px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;">
+                  <div>
+                    <div style="font-size:12px;font-weight:700;color:#64748b;">ALAMAT SITUS WEB</div>
+                    <div id="set-ch-website-url" style="font-size:14px;font-weight:700;color:var(--primary);margin-top:2px;">-</div>
+                  </div>
+                  <a id="set-ch-website-link" href="/" target="_blank" class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Buka Web ↗</a>
+                </div>
+              </div>
+            </div>
+
+            <div id="settings-panel-channels-customer-app" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                  <span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Aktif</span>
+                  <h3 style="margin:0;font-size:16px;font-weight:700;">Customer PWA (Progressive Web App)</h3>
+                </div>
+                <p style="font-size:13px;color:#64748b;margin-bottom:16px;">Aplikasi web progresif yang dapat diinstal langsung ke homescreen smartphone pelanggan tanpa Google Play / App Store.</p>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                  <div style="padding:12px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;">MANIFEST PWA</div>
+                    <div style="font-size:13px;font-weight:700;color:#1e293b;margin-top:2px;">/manifest.json</div>
+                  </div>
+                  <div style="padding:12px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;">SERVICE WORKER SHELL</div>
+                    <div style="font-size:13px;font-weight:700;color:#059669;margin-top:2px;">Terdaftar &amp; Aktif</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div id="settings-panel-channels-pos" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                  <div style="display:flex;align-items:center;gap:12px;">
+                    <span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Aktif</span>
+                    <h3 style="margin:0;font-size:16px;font-weight:700;">Point of Sale (POS Kasir)</h3>
+                  </div>
+                  <span id="set-pos-shifts-badge" class="x-badge" style="background:#f1f5f9;color:#475569;font-weight:700;">0 Shift Aktif</span>
+                </div>
+                <p style="font-size:13px;color:#64748b;margin-bottom:16px;">Sistem kasir native terintegrasi untuk order kasir offline, pembayaran tunai, split bill, dan cetak struk.</p>
+                <div id="set-pos-shifts-list" style="font-size:13px;color:#64748b;">
+                  Memuat shift kasir...
+                </div>
+              </div>
+            </div>
+
+            <div id="settings-panel-channels-kiosk" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:28px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                  <span class="x-badge" style="background:#fef3c7;color:#92400e;font-weight:700;padding:4px 10px;">Belum Dikonfigurasi</span>
+                  <h3 style="margin:0;font-size:16px;font-weight:700;">Self-Service Kiosk Terminal</h3>
+                </div>
+                <p style="color:#475569;font-size:14px;line-height:1.6;">
+                  Terminal pemesanan mandiri (Self-Service Kiosk) belum dihubungkan pada sistem cabang ini. Integrasi dapat diaktifkan saat perangkat layar sentuh kiosk fisik terdaftar di outlet.
+                </p>
+              </div>
+            </div>
+
+            <!-- 9. INTEGRATIONS PANEL -->
+            <div id="settings-panel-integrations" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Status Integrasi Ekosistem Xentra</h3>
+                <p style="margin:0 0 20px;font-size:13px;color:#64748b;">Daftar modul integrasi resmi yang didukung oleh Xentra Core.</p>
+
+                <div id="set-integrations-list" style="display:flex;flex-direction:column;gap:12px;">
+                  <!-- Dynamically populated from /admin/settings/integrations -->
+                </div>
+              </div>
+            </div>
+
+            <!-- 10. NOTIFICATIONS PANEL (Honest Not Configured) -->
+            <div id="settings-panel-notifications" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:28px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+                  <span class="x-badge" style="background:#fef3c7;color:#92400e;font-weight:700;padding:4px 10px;">Belum Dikonfigurasi</span>
+                  <h3 style="margin:0;font-size:16px;font-weight:700;">Preferensi Notifikasi Multi-Channel</h3>
+                </div>
+                <p style="color:#475569;font-size:14px;line-height:1.6;margin-bottom:16px;">
+                  Gateway pengiriman pesan otomatis pelanggan (WhatsApp Blast, Email Gateway SMTP, Web Push Notification) belum dikonfigurasi pada Core engine v1.
+                </p>
+                <div style="padding:14px;background:#f8fafc;border-left:4px solid #3b82f6;border-radius:0 var(--radius-sm) var(--radius-sm) 0;font-size:13px;color:#64748b;">
+                  <strong>Status Operasional:</strong> Notifikasi pesanan baru tetap aktif secara realtime langsung di layar kasir dashboard melalui sinkronisasi state internal.
+                </div>
+              </div>
+            </div>
+
+            <!-- 11. SECURITY & RBAC PANEL -->
+            <div id="settings-panel-security" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Keamanan &amp; Audit Akses RBAC</h3>
+                <p style="margin:0 0 20px;font-size:13px;color:#64748b;">Informasi session aktif, hak akses role sistem, dan catatan log keamanan.</p>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+                  <div style="padding:14px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;">PENGGUNA AKTIF</div>
+                    <div id="set-sec-user" style="font-size:15px;font-weight:800;color:#1e293b;margin-top:4px;">—</div>
+                    <div id="set-sec-role" style="font-size:12px;color:#64748b;margin-top:2px;">Role: —</div>
+                  </div>
+                  <div style="padding:14px;background:#f8fafc;border-radius:var(--radius-md);border:1px solid #e2e8f0;">
+                    <div style="font-size:11px;font-weight:700;color:#64748b;">MODEL OTORISASI</div>
+                    <div style="font-size:15px;font-weight:800;color:#059669;margin-top:4px;">User → Role → Scope</div>
+                    <div style="font-size:12px;color:#64748b;margin-top:2px;">Enforced Server-Side</div>
+                  </div>
+                </div>
+
+                <h4 style="font-size:13px;font-weight:700;color:#475569;margin:0 0 10px;text-transform:uppercase;">Jejak Audit Keamanan Terakhir</h4>
+                <div class="x-table-wrap">
+                  <table class="x-table">
+                    <thead>
+                      <tr>
+                        <th>Waktu</th>
+                        <th>Aktor</th>
+                        <th>Aksi</th>
+                        <th>Target</th>
+                        <th>Hasil</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tbody-set-audit-logs">
+                      <tr><td colspan="5" class="text-center py-4 text-muted">Belum ada catatan aktivitas keamanan.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- =====================================================================
+           XENTRA PLATFORM DASHBOARD — ROUTE PLACEHOLDERS
+           Rendered when accessing xentra.cloud/dashboard or ?context=platform
+           ===================================================================== -->
+
+      <!-- PLATFORM: OVERVIEW -->
+      <section id="tab-platform-overview" class="x-tab-content">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">🌐</div>
+          <h3>Platform Overview</h3>
+          <p>Status global platform Xentra Cloud, metrik multi-tenant, dan ringkasan ekosistem.</p>
+        </div>
+      </section>
+
+      <!-- PLATFORM: ORGANIZATIONS -->
+      <section id="tab-platform-organizations" class="x-tab-content">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">🏢</div>
+          <h3>Organizations</h3>
+          <p>Kelola grup bisnis induk, entitas korporat, dan struktur multi-organisasi.</p>
+        </div>
+      </section>
+
+      <!-- PLATFORM: BRANDS -->
+      <section id="tab-platform-brands" class="x-tab-content">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">🏷️</div>
+          <h3>Brands</h3>
+          <p>Katalog brand restoran terdaftar, konfigurasi tenant, dan status operasional.</p>
+        </div>
+      </section>
+
+      <!-- PLATFORM: DOMAINS -->
+      <section id="tab-platform-domains" class="x-tab-content">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">🔗</div>
+          <h3>Domains</h3>
+          <p>Routing custom domain, verifikasi SSL/TLS otomatis, dan pemetaan ingress tenant.</p>
+        </div>
+      </section>
+
+      <!-- PLATFORM: PROVISIONING -->
+      <section id="tab-platform-provisioning" class="x-tab-content">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">🚀</div>
+          <h3>Provisioning</h3>
+          <p>Orkestrasikan peluncuran tenant baru, alokasi database, dan deployment otomatis.</p>
+        </div>
+      </section>
+
+      <!-- PLATFORM: USERS & ACCESS -->
+      <section id="tab-platform-users" class="x-tab-content">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">👥</div>
+          <h3>Users &amp; Access</h3>
+          <p>Manajemen pengguna platform control plane, role-based access control, dan kredensial root.</p>
+        </div>
+      </section>
+
+      <!-- PLATFORM: SUBSCRIPTIONS / BILLING -->
+      <section id="tab-platform-billing" class="x-tab-content">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">💳</div>
+          <h3>Subscriptions &amp; Billing</h3>
+          <p>Paket langganan merchant, faktur platform, dan integrasi penagihan berulang.</p>
+        </div>
+      </section>
+
+      <!-- PLATFORM: AUDIT LOGS -->
+      <section id="tab-platform-audit-logs" class="x-tab-content">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">📋</div>
+          <h3>Audit Logs</h3>
+          <p>Jejak audit keamanan platform, log aktivitas sistem, dan forensik akses admin.</p>
+        </div>
+      </section>
+
+      <!-- PLATFORM: INTEGRATIONS -->
+      <section id="tab-platform-integrations" class="x-tab-content">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">🔌</div>
+          <h3>Platform Integrations</h3>
+          <p>Konektor gateway pihak ketiga, webhook sistem, dan service broker global.</p>
+        </div>
+      </section>
+
+      <!-- PLATFORM: SETTINGS -->
+      <section id="tab-platform-settings" class="x-tab-content">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">⚙️</div>
+          <h3>Platform Settings</h3>
+          <p>Konfigurasi engine global Xentra Cloud, parameter jaringan, dan maintenance mode.</p>
+        </div>
+      </section>
+
     </main>
 
+
+  </div>
+
+  <!-- MODAL: ADD / EDIT MASTER CATEGORY -->
+  <div id="modal-master-category" class="x-modal-backdrop" style="display:none; z-index:1100;">
+    <div class="x-modal-card" style="max-width: 440px;">
+      <div class="x-modal-header">
+        <h3 id="modal-master-category-title">Tambah Kategori Master</h3>
+        <button type="button" class="x-modal-close" onclick="closeMasterCategoryModal()">✕</button>
+      </div>
+      <form id="form-master-category" class="x-form">
+        <input type="hidden" id="master-cat-id" value="">
+        <div class="x-form-group">
+          <label for="master-cat-name">Nama Kategori</label>
+          <input type="text" id="master-cat-name" class="x-input" placeholder="Contoh: Makanan Berat" required maxlength="50">
+        </div>
+        <div class="x-modal-footer">
+          <button type="button" class="x-btn-secondary" onclick="closeMasterCategoryModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-master-category">Simpan Kategori</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- MODAL: ADD / EDIT PRODUCT -->
@@ -613,15 +2670,21 @@
           <textarea id="prod-desc" class="x-input" rows="2" placeholder="Deskripsi bahan, rasa, porsi..."></textarea>
         </div>
         <div class="x-form-group">
-          <label>Foto Makanan</label>
-          <div class="x-product-image-picker">
-            <div class="x-product-image-box">
-              <img id="prod-image-preview" alt="Foto Makanan" style="display:none;width:96px;height:96px;object-fit:cover;border-radius:8px;">
-              <div id="prod-image-empty" style="width:96px;height:96px;border-radius:8px;background:#f1f5f9;border:1px dashed #cbd5e1;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px;text-align:center;">Belum ada foto</div>
-              <button type="button" id="btn-prod-image-pick" class="x-btn-secondary" style="margin-top:8px;">Pilih Foto</button>
+          <label>Foto Menu Makanan</label>
+          <div class="x-image-upload-control">
+            <div class="x-image-upload-preview-box" id="prod-image-preview-box" style="width:84px;height:84px;">
+              <img id="prod-image-preview" alt="Foto Makanan" style="display:none;width:100%;height:100%;object-fit:cover;">
+              <div id="prod-image-empty" class="x-image-upload-empty" style="font-size:24px;">🍲</div>
             </div>
-            <input type="file" id="prod-image-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
-            <p class="text-muted" style="font-size:12px;margin-top:6px;">Format JPG, PNG, atau WEBP — maksimal 3MB. Foto lama akan diganti saat Anda mengunggah foto baru.</p>
+            <div class="x-image-upload-info">
+              <div class="x-image-upload-actions">
+                <button type="button" id="btn-prod-image-pick" class="x-btn-secondary" style="font-size:12px;padding:6px 12px;">📁 Pilih Foto</button>
+                <button type="button" id="btn-prod-image-remove" class="x-btn-secondary" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus Foto</button>
+              </div>
+              <input type="file" id="prod-image-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+              <input type="hidden" id="prod-image-removed" value="0">
+              <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 3 MB · Rasio 1:1</div>
+            </div>
           </div>
         </div>
         <div class="x-modal-footer">
@@ -964,6 +3027,6 @@
   </div>
 
   <!-- Dashboard JavaScript -->
-  <script src="/dashboard/assets/js/dashboard.js?v=2.3.0"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=2.8.0"></script>
 </body>
 </html>

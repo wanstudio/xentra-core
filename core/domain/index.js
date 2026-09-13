@@ -7,6 +7,7 @@ const DomainCapability = require('./DomainCapability');
 const DomainLifecycle = require('./DomainLifecycle');
 const DomainRegistrationModel = require('./DomainRegistrationModel');
 const DomainRegistry = require('./DomainRegistry');
+const ImageValidator = require('./ImageValidator');
 
 module.exports = {
   DomainIdentity,
@@ -14,7 +15,9 @@ module.exports = {
   DomainLifecycle,
   DomainRegistrationModel,
   DomainRegistry,
+  ImageValidator,
 
   // Factory helper
   createDomainRegistry: () => new (DomainRegistry.DomainRegistry || DomainRegistry)()
 };
+

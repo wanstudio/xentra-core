@@ -46,6 +46,20 @@ class PaymentRepository {
     );
   }
 
+  updateBrandPaymentConfig(brandId, configJson) {
+    return this.db.execute(
+      "UPDATE brands SET default_payment_config = ?, updated_at = datetime('now') WHERE id = ?",
+      [configJson, brandId]
+    );
+  }
+
+  updateBranchPaymentConfig(branchId, configOverrideJson) {
+    return this.db.execute(
+      "UPDATE branches SET payment_config_override = ?, updated_at = datetime('now') WHERE id = ?",
+      [configOverrideJson, branchId]
+    );
+  }
+
   findOrder(orderId) {
     return this.db.queryOne('SELECT * FROM orders WHERE id = ?', [orderId]);
   }
@@ -178,6 +192,106 @@ class PaymentRepository {
       WHERE payment_status = 'reconciliation_pending'
       ORDER BY created_at ASC
     `);
+  }
+
+  findTransactions({ brandId, branchId = null, paymentMethod = null, paymentStatus = null, startDate = null, endDate = null, limit = 50, offset = 0 } = {}) {
+    const whereClauses = ['o.brand_id = ?'];
+    const params = [brandId];
+
+    if (branchId) {
+      whereClauses.push('o.branch_id = ?');
+      params.push(branchId);
+    }
+    if (paymentMethod) {
+      whereClauses.push('p.payment_method = ?');
+      params.push(paymentMethod);
+    }
+    if (paymentStatus) {
+      whereClauses.push('p.payment_status = ?');
+      params.push(paymentStatus);
+    }
+    if (startDate) {
+      whereClauses.push('p.created_at >= ?');
+      params.push(startDate);
+    }
+    if (endDate) {
+      whereClauses.push('p.created_at <= ?');
+      params.push(endDate);
+    }
+
+    const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
+
+    const countRow = this.db.queryOne(`
+      SELECT COUNT(*) as total
+      FROM order_payments p
+      JOIN orders o ON p.order_id = o.id
+      ${whereSql}
+    `, params);
+
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 50, 100));
+    const safeOffset = Math.max(0, Number(offset) || 0);
+
+    const rows = this.db.queryMany(`
+      SELECT
+        p.id,
+        p.order_id,
+        p.provider,
+        p.payment_method,
+        p.payment_status,
+        p.amount,
+        p.created_at,
+        p.settled_at,
+        o.order_number,
+        o.branch_id,
+        b.name as branch_name
+      FROM order_payments p
+      JOIN orders o ON p.order_id = o.id
+      LEFT JOIN branches b ON o.branch_id = b.id
+      ${whereSql}
+      ORDER BY p.created_at DESC
+      LIMIT ? OFFSET ?
+    `, [...params, safeLimit, safeOffset]);
+
+    return {
+      transactions: rows,
+      total: countRow ? Number(countRow.total || 0) : 0,
+      limit: safeLimit,
+      offset: safeOffset
+    };
+  }
+
+  findReconciliationRecords({ brandId, branchId = null } = {}) {
+    const whereClauses = [
+      'o.brand_id = ?',
+      "p.payment_status IN ('reconciliation_pending', 'pending')"
+    ];
+    const params = [brandId];
+
+    if (branchId) {
+      whereClauses.push('o.branch_id = ?');
+      params.push(branchId);
+    }
+
+    const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
+
+    return this.db.queryMany(`
+      SELECT
+        p.id,
+        p.order_id,
+        p.provider,
+        p.payment_method,
+        p.payment_status,
+        p.amount,
+        p.created_at,
+        o.order_number,
+        o.branch_id,
+        b.name as branch_name
+      FROM order_payments p
+      JOIN orders o ON p.order_id = o.id
+      LEFT JOIN branches b ON o.branch_id = b.id
+      ${whereSql}
+      ORDER BY p.created_at ASC
+    `, params);
   }
 }
 

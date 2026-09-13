@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authenticating with Google &bull; Xentra Centralized Auth</title>
+  <link rel="icon" href="/brand/xentra-favicon.png" type="image/png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --bg: #0b0f19;
+      --surface: #111827;
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f9fafb;
+      --text-muted: #9ca3af;
+      --primary: #3b82f6;
+      --radius: 16px;
+    }
+    body {
+      font-family: var(--font);
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .x-broker-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 40px 32px;
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .x-logo-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .x-logo-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+    }
+    .x-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    .x-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 28px;
+    }
+    .x-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .x-google-btn-slot {
+      margin-top: 16px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 44px;
+    }
+    .x-alert-error {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+      font-size: 13px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      line-height: 1.4;
+      text-align: left;
+      display: none;
+    }
+    .x-btn-return {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 16px;
+      padding: 10px 18px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+    .x-btn-return:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+    .x-footer-note {
+      margin-top: 24px;
+      font-size: 11px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <div class="x-broker-card">
+    <div class="x-logo-wrap">
+      <div class="x-logo-badge">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
+    </div>
+
+    <h1 class="x-title">Xentra Single Sign-On</h1>
+    <p class="x-subtitle" id="broker-subtitle">Connecting to Google Authentication Services...</p>
+
+    <div id="broker-error" class="x-alert-error"></div>
+
+    <div id="broker-loading">
+      <div class="x-spinner"></div>
+      <div id="broker-status" style="font-size: 13px; color: var(--text-muted);">Please wait...</div>
+    </div>
+
+    <!-- Google Button Slot (auto-prompted or user click) -->
+    <div id="google-btn-slot" class="x-google-btn-slot" style="display:none;"></div>
+
+    <div id="broker-return-wrap" style="display:none;">
+      <a id="btn-return-client" href="#" class="x-btn-return">&larr; Return to Dashboard Login</a>
+    </div>
+
+    <div class="x-footer-note">XENTRA CLOUD &bull; CENTRALIZED IDENTITY BROKER</div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var urlParams = new URLSearchParams(window.location.search);
+      var returnTo = urlParams.get('return_to') || '';
+      var claimDomain = urlParams.get('claim_domain') || '';
+
+      var errorBox = document.getElementById('broker-error');
+      var statusEl = document.getElementById('broker-status');
+      var subtitleEl = document.getElementById('broker-subtitle');
+      var loadingEl = document.getElementById('broker-loading');
+      var googleBtnSlot = document.getElementById('google-btn-slot');
+      var returnWrap = document.getElementById('broker-return-wrap');
+      var btnReturn = document.getElementById('btn-return-client');
+      var allowedHosts = ['xentra.cloud', 'localhost', '127.0.0.1'];
+      var currentHostname = window.location.hostname.toLowerCase();
+      var isControlPlane = allowedHosts.indexOf(currentHostname) !== -1 || currentHostname.endsWith('.xentra.cloud');
+
+      if (!isControlPlane) {
+        showFatalError('Centralized tenant auth broker can only run on the Xentra control-plane domain (xentra.cloud).');
+        return;
+      }
+
+      if (!returnTo) {
+        showFatalError('Missing required return_to parameter. Authentication cannot proceed without a valid return destination.');
+        return;
+      }
+
+      // Configure return button
+      if (btnReturn && returnTo) {
+        btnReturn.href = returnTo;
+      }
+
+      function showFatalError(msg) {
+        loadingEl.style.display = 'none';
+        googleBtnSlot.style.display = 'none';
+        errorBox.textContent = '❌ ' + msg;
+        errorBox.style.display = 'block';
+        returnWrap.style.display = 'block';
+      }
+
+      function returnErrorToClient(errorCode, errorDesc) {
+        if (!returnTo) {
+          showFatalError(errorDesc || errorCode);
+          return;
+        }
+        try {
+          var destUrl = new URL(returnTo);
+          destUrl.searchParams.set('error', errorCode);
+          if (errorDesc) {
+            destUrl.searchParams.set('error_description', errorDesc);
+          }
+          window.location.replace(destUrl.toString());
+        } catch (_) {
+          showFatalError(errorDesc || errorCode);
+        }
+      }
+
+      function handleGoogleCredential(credentialResponse) {
+        if (!credentialResponse || !credentialResponse.credential) {
+          showFatalError('No Google credential returned.');
+          return;
+        }
+
+        loadingEl.style.display = 'block';
+        googleBtnSlot.style.display = 'none';
+        statusEl.textContent = 'Verifying identity with Xentra...';
+
+        var payload = {
+          credential: credentialResponse.credential,
+          return_to: returnTo
+        };
+        if (claimDomain) {
+          payload.claim_domain = claimDomain;
+        }
+
+        fetch('/api/v1/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (res.ok && data && data.success && data.redirect_url) {
+              statusEl.textContent = 'Authorized! Returning to dashboard...';
+              window.location.replace(data.redirect_url);
+              return;
+            }
+
+            // Authentication failure
+            var code = (data && (data.code || data.error)) || 'AUTH_FAILED';
+            var msg = (data && (data.error || data.message)) || 'Google authentication failed.';
+            
+            // Return error back to client domain so user stays in their tenant context
+            returnErrorToClient(code, msg);
+          });
+        }).catch(function (err) {
+          returnErrorToClient('NETWORK_ERROR', 'Network error during centralized authentication.');
+        });
+      }
+
+      function initGsi(clientId) {
+        if (!clientId || !window.google || !window.google.accounts || !window.google.accounts.id) {
+          showFatalError('Google Identity Services SDK failed to initialize.');
+          return;
+        }
+
+        try {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredential,
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
+
+          // Render explicit Google button in case One Tap is closed or blocked
+          googleBtnSlot.style.display = 'flex';
+          window.google.accounts.id.renderButton(googleBtnSlot, {
+            theme: 'filled_blue',
+            size: 'large',
+            type: 'standard',
+            text: 'continue_with',
+            shape: 'rectangular',
+            logo_alignment: 'left',
+            width: 320
+          });
+
+          // Trigger One Tap prompt
+          window.google.accounts.id.prompt(function (notification) {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+              // One Tap didn't display or was skipped; explicit button is visible for manual click
+              loadingEl.style.display = 'none';
+              subtitleEl.textContent = 'Select your Google account to continue to your dashboard:';
+            }
+          });
+        } catch (err) {
+          console.error('[Broker GSI Init Error]:', err);
+          showFatalError('Failed to initialize Google Sign-In.');
+        }
+      }
+
+      // Fetch config & load GSI SDK on xentra.cloud
+      fetch('/api/v1/auth/config').then(function (res) {
+        return res.json();
+      }).then(function (cfg) {
+        if (!cfg || !cfg.google_enabled || !cfg.google_client_id) {
+          showFatalError('Google authentication is not configured on Xentra.');
+          return;
+        }
+
+        var script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = function () {
+          initGsi(cfg.google_client_id);
+        };
+        script.onerror = function () {
+          showFatalError('Failed to load Google Identity Services SDK.');
+        };
+        document.head.appendChild(script);
+      }).catch(function () {
+        showFatalError('Failed to reach Xentra authentication configuration.');
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -24,7 +24,10 @@ class SalesReportService {
     // 3. Breakdown by order_channel (pos_cashier, customer_app, etc.)
     const byChannel = reportingRepository.getSalesByChannel(filter);
 
-    // 4. Daily / Hourly distribution
+    // 4. Breakdown by fulfillment_type (delivery, pickup, dine_in)
+    const byFulfillment = reportingRepository.getSalesByFulfillment(filter);
+
+    // 5. Daily / Hourly distribution
     const timeline = reportingRepository.getSalesTimeline(filter);
 
     return {
@@ -39,6 +42,7 @@ class SalesReportService {
       },
       by_order_type: byOrderType,
       by_channel: byChannel,
+      by_fulfillment: byFulfillment,
       timeline
     };
   }

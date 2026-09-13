@@ -13,6 +13,8 @@ const config = require('./config');
 const integration = require('./integration');
 const audit = require('./audit');
 const domain = require('./domain');
+const data = require('./data');
+const media = require('./media');
 
 module.exports = {
   events,
@@ -20,5 +22,7 @@ module.exports = {
   config,
   integration,
   audit,
-  domain
+  domain,
+  data,
+  media
 };

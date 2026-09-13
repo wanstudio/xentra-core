@@ -15,6 +15,9 @@ const { InventoryStockService, InventoryMovementModel } = require('../../domains
 const CatalogService = require('../../domains/commerce/services/CatalogService');
 const PricingPolicyModel = require('../../domains/commerce/models/PricingPolicyModel');
 const { XentraConnectorClient, XentraConnectorError } = require('../../core/integration/XentraConnectorClient');
+const { ImageValidator } = require('../../core/domain');
+const { MediaService } = require('../../core/media');
+const mediaService = new MediaService();
 
 // 0. Active Promotions & Evaluation Endpoint
 router.get(['/promo/active', '/promotions/active'], (req, res) => {
@@ -388,85 +391,11 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
       branchScope = branch;
     }
 
-    if (branchScope) {
-      // Branch-scoped catalog: read from Connector (client-owned data).
-      // Core must NOT fall back to Core DB for branch catalog data.
-      let connectorClient;
-      try {
-        connectorClient = new XentraConnectorClient();
-      } catch (_e) {
-        // Connector not configured — fail closed for branch catalog
-        return res.status(503).json({ success: false, error: 'branch catalog connector not configured' });
-      }
-
-      let connectorResult;
-      try {
-        connectorResult = await connectorClient.getCatalog(branchScope.id);
-      } catch (err) {
-        const statusCode = (err.code === 'TIMEOUT_ERROR' || err.code === 'ETIMEDOUT') ? 504 : 502;
-        console.error('[Connector] catalog.get failed:', err.code, err.message);
-        return res.status(statusCode).json({ success: false, error: 'connector catalog unavailable' });
-      }
-
-      // Map connector response to existing Public API response shape.
-      // Connector returns flat items with category_id + category_name,
-      // plus a categories array with branch category metadata.
-      const connectorCategories = connectorResult.categories || [];
-      const connectorItems = connectorResult.items || [];
-
-      const categories = connectorCategories.map((c) => ({
-        id: c.id,
-        name: c.name,
-        slug: c.slug || String(c.name || '').toLowerCase().replace(/\s+/g, '-'),
-        image: c.image_url || '',
-        image_url: c.image_url || '',
-        products: connectorItems
-          .filter((item) => String(item.category_id) === String(c.id))
-          .map((p) => ({
-            id: p.product_id,
-            name: p.name,
-            slug: p.slug,
-            description: p.description,
-            image: p.image_url || '',
-            image_url: p.image_url || '',
-            price: p.price,
-            regular_price: p.price,
-            is_available: Boolean(p.is_available),
-            stock_estimate: p.stock,
-            category_id: p.category_id
-          }))
-      }));
-
-      const allNormalized = connectorItems.map((p) => ({
-        id: p.product_id,
-        name: p.name,
-        slug: p.slug,
-        description: p.description,
-        image: p.image_url || '',
-        image_url: p.image_url || '',
-        price: p.price,
-        regular_price: p.price,
-        is_available: Boolean(p.is_available),
-        stock_estimate: p.stock,
-        category_id: p.category_id
-      }));
-
-      return res.json({
-        success: true,
-        categories,
-        all_products: allNormalized,
-        products: { items: allNormalized },
-        promo: {
-          enabled: true,
-          target: 50000,
-          discount: 5000,
-          label: 'Selamat, kamu berhasil dapetin diskon Rp 5.000 ketika checkout!'
-        }
-      });
-    }
-
-    // Brand-wide catalog: read from Core DB (unchanged).
-    const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: null });
+    // P3: always reuse the canonical commerce CatalogService — both branch-scoped
+    // and brand-wide menus go through the same domain ownership path.
+    // CatalogService returns branch price override, C1 operational availability,
+    // and branch stock estimate when branch_id is provided.
+    const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: branchScope ? branchScope.id : null });
 
     const categories = menu.categories.map((c) => {
       const img = c.image_url || c.icon_url || c.image || '';
@@ -2867,20 +2796,37 @@ router.post('/auth/google', async (req, res) => {
     // Reset rate limiter on success
     RateLimiter.reset(rateLimitKey);
 
+    // If return_to is provided, create a short-lived single-use handoff ticket
+    const { return_to } = req.body || {};
+    let handoffInfo = null;
+    if (return_to) {
+      const { HandoffService } = require('../../core/identity');
+      const handoffService = new HandoffService(db);
+      handoffInfo = handoffService.createTicket({
+        userId: user.id,
+        returnTo: return_to,
+        ttlSeconds: 60
+      });
+    }
+
     // Log security audit event
     const workforce = new WorkforceService();
     workforce.logSecurityEvent({
       actor_id: user.id,
       actor_role: user.role,
       action: 'GOOGLE_LOGIN_SUCCESS',
-      brand_id: effectiveBrandId,
+      brand_id: handoffInfo ? handoffInfo.brand_id : effectiveBrandId,
       organization_id: user.organization_id,
       branch_id: user.branch_id,
       result: 'success',
-      metadata: { sub: verifiedClaims.sub, email: verifiedClaims.email }
+      metadata: {
+        sub: verifiedClaims.sub,
+        email: verifiedClaims.email,
+        has_handoff: Boolean(handoffInfo)
+      }
     });
 
-    res.json({
+    const responsePayload = {
       success: true,
       token,
       expires_at: new Date(expiresAt).toISOString(),
@@ -2894,7 +2840,14 @@ router.post('/auth/google', async (req, res) => {
         email_verified: user.email_verified,
         brand_name: (req.brand && req.brand.name) ? req.brand.name : 'Bangjo Resto'
       }
-    });
+    };
+
+    if (handoffInfo) {
+      responsePayload.handoff_ticket = handoffInfo.ticket;
+      responsePayload.redirect_url = handoffInfo.redirect_url;
+    }
+
+    res.json(responsePayload);
   } catch (err) {
     const status = err.status || 500;
     res.status(status).json({
@@ -4093,13 +4046,105 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
   }
 });
 
-// 11.1 Add/Delete Banners
+// Brand Logo Upload & Delete Endpoints
+const BRAND_LOGO_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/logos');
+const BANNER_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/banners');
+
+router.post('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const { image_base64, mime_type } = req.body || {};
+    if (!image_base64) {
+      return res.status(400).json({ success: false, error: 'Gambar logo wajib diunggah.' });
+    }
+
+    const validation = ImageValidator.validateImageUpload({
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      assetType: 'logo'
+    });
+
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, error: validation.error, code: validation.code });
+    }
+
+    fs.mkdirSync(BRAND_LOGO_DIR, { recursive: true });
+    const fileName = `logo-${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${validation.info.ext}`;
+    fs.writeFileSync(path.join(BRAND_LOGO_DIR, fileName), validation.buffer);
+
+    const logoUrl = `/assets/uploads/logos/${fileName}`;
+    coreBrandRepo.updateBrandLogo(req.brand_id, logoUrl);
+
+    if (req.brand) {
+      req.brand.logo_url = logoUrl;
+    }
+
+    res.json({
+      success: true,
+      message: 'Logo brand berhasil diunggah.',
+      logo_url: logoUrl
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/brand/logo]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    coreBrandRepo.removeBrandLogo(req.brand_id);
+    if (req.brand) {
+      req.brand.logo_url = null;
+    }
+    res.json({
+      success: true,
+      message: 'Logo brand berhasil dihapus.',
+      logo_url: null
+    });
+  } catch (err) {
+    console.error('[API Error DELETE /admin/brand/logo]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 11.1 Add/Upload/Delete Banners
+router.post('/admin/banners/upload', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const { image_base64, mime_type } = req.body || {};
+    if (!image_base64) {
+      return res.status(400).json({ success: false, error: 'Gambar banner wajib diunggah.' });
+    }
+
+    const validation = ImageValidator.validateImageUpload({
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      assetType: 'banner'
+    });
+
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, error: validation.error, code: validation.code, dimensions: validation.dimensions });
+    }
+
+    fs.mkdirSync(BANNER_IMAGE_DIR, { recursive: true });
+    const fileName = `banner-${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${validation.info.ext}`;
+    fs.writeFileSync(path.join(BANNER_IMAGE_DIR, fileName), validation.buffer);
+
+    const bannerUrl = `/assets/uploads/banners/${fileName}`;
+    res.json({
+      success: true,
+      message: 'Foto banner berhasil diunggah.',
+      image_url: bannerUrl,
+      info: validation.info
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/banners/upload]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/admin/banners', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { image_url, title = '', link = '#' } = req.body;
-    if (!image_url) {
-      return res.status(400).json({ success: false, error: 'URL gambar banner wajib diisi.' });
-    }
+    let { image_url, image_base64, mime_type, title = '', link = '#' } = req.body || {};
+
     let banners = [];
     try {
       banners = req.brand.banners ? (typeof req.brand.banners === 'string' ? JSON.parse(req.brand.banners) : req.brand.banners) : [];
@@ -4108,6 +4153,28 @@ router.post('/admin/banners', requireAuth(['owner', 'brand_manager']), (req, res
     if (banners.length >= 5) {
       return res.status(400).json({ success: false, error: 'Maksimal 5 slide banner promo.' });
     }
+
+    if (image_base64) {
+      const validation = ImageValidator.validateImageUpload({
+        imageBase64: image_base64,
+        mimeType: mime_type,
+        assetType: 'banner'
+      });
+
+      if (!validation.valid) {
+        return res.status(400).json({ success: false, error: validation.error, code: validation.code, dimensions: validation.dimensions });
+      }
+
+      fs.mkdirSync(BANNER_IMAGE_DIR, { recursive: true });
+      const fileName = `banner-${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${validation.info.ext}`;
+      fs.writeFileSync(path.join(BANNER_IMAGE_DIR, fileName), validation.buffer);
+      image_url = `/assets/uploads/banners/${fileName}`;
+    }
+
+    if (!image_url) {
+      return res.status(400).json({ success: false, error: 'URL gambar banner atau file banner wajib diunggah.' });
+    }
+
     const newBanner = {
       id: 'banner_' + Date.now(),
       image_url,
@@ -4138,6 +4205,247 @@ router.delete('/admin/banners/:id', requireAuth(['owner', 'brand_manager']), (re
     res.json({ success: true, message: 'Banner berhasil dihapus.', banners });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================================
+// CANONICAL MEDIA SYSTEM (M1) - Upload Security, Staging, Lifecycle & Attach
+// ============================================================================
+
+// Stage an upload into TEMPORARY state with binary validation
+router.post('/admin/media/upload', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const { image_base64, mime_type, original_filename, asset_type, enforce_aspect_ratio } = req.body || {};
+    if (!image_base64) {
+      return res.status(400).json({ success: false, error: 'Data gambar wajib diunggah.', code: 'MISSING_IMAGE_DATA' });
+    }
+
+    const asset = await mediaService.stageUpload({
+      brandId: req.brand_id,
+      tenantId: req.brand ? req.brand.organization_id : null,
+      userId: req.user ? req.user.id : null,
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      declaredFilename: original_filename,
+      assetType: asset_type || 'general',
+      enforceAspectRatio: Boolean(enforce_aspect_ratio)
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Media berhasil diunggah ke staging.',
+      asset
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'UPLOAD_ERROR',
+      dimensions: err.dimensions
+    });
+  }
+});
+
+// Mark asset as READY (completing upload pipeline)
+router.post('/admin/media/:id/ready', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const asset = await mediaService.markReady({
+      mediaId: req.params.id,
+      brandId: req.brand_id
+    });
+    res.json({
+      success: true,
+      message: 'Media siap digunakan.',
+      asset
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'TRANSITION_ERROR'
+    });
+  }
+});
+
+// Transition lifecycle status
+router.post('/admin/media/:id/transition', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const { target_status, error_message } = req.body || {};
+    const asset = await mediaService.transitionStatus({
+      mediaId: req.params.id,
+      brandId: req.brand_id,
+      targetStatus: target_status,
+      errorMessage: error_message
+    });
+    res.json({
+      success: true,
+      message: `Status media berhasil diubah menjadi '${target_status}'.`,
+      asset
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'TRANSITION_ERROR'
+    });
+  }
+});
+
+// Retry a failed asset
+router.post('/admin/media/:id/retry', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const asset = await mediaService.retryFailed({
+      mediaId: req.params.id,
+      brandId: req.brand_id
+    });
+    res.json({
+      success: true,
+      message: 'Aset media berhasil di-retry.',
+      asset
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'RETRY_ERROR'
+    });
+  }
+});
+
+// Attach a READY asset to an entity
+router.post('/admin/media/:id/attach', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const { entity_type, entity_id } = req.body || {};
+    if (!entity_type || !entity_id) {
+      return res.status(400).json({ success: false, error: 'entity_type dan entity_id wajib disertakan.', code: 'MISSING_ATTACH_TARGET' });
+    }
+
+    const asset = await mediaService.attachToEntity({
+      mediaId: req.params.id,
+      brandId: req.brand_id,
+      entityType: entity_type,
+      entityId: String(entity_id)
+    });
+
+    res.json({
+      success: true,
+      message: 'Media berhasil dikaitkan ke entitas.',
+      asset
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'ATTACH_ERROR'
+    });
+  }
+});
+
+// Atomic replacement of media
+router.post('/admin/media/replace', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const { new_media_id, old_media_id, entity_type, entity_id } = req.body || {};
+    if (!new_media_id || !entity_type || !entity_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'new_media_id, entity_type, dan entity_id wajib disertakan.',
+        code: 'MISSING_REPLACE_PARAMS'
+      });
+    }
+
+    const asset = await mediaService.replaceEntityMedia({
+      newMediaId: new_media_id,
+      oldMediaId: old_media_id,
+      brandId: req.brand_id,
+      entityType: entity_type,
+      entityId: String(entity_id)
+    });
+
+    res.json({
+      success: true,
+      message: 'Media berhasil diganti secara atomik.',
+      asset
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'REPLACE_ERROR'
+    });
+  }
+});
+
+// Get media by ID (Strictly tenant scoped)
+router.get('/admin/media/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const asset = mediaService.getMedia({
+      mediaId: req.params.id,
+      brandId: req.brand_id
+    });
+    res.json({
+      success: true,
+      asset
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'GET_MEDIA_ERROR'
+    });
+  }
+});
+
+// List media for current brand
+router.get('/admin/media', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { status, asset_type, limit, offset } = req.query || {};
+    const assets = mediaService.listMedia({
+      brandId: req.brand_id,
+      status,
+      assetType: asset_type,
+      limit: limit ? parseInt(limit, 10) : 50,
+      offset: offset ? parseInt(offset, 10) : 0
+    });
+    res.json({
+      success: true,
+      assets
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'LIST_MEDIA_ERROR'
+    });
+  }
+});
+
+// Delete media (Strictly tenant scoped)
+router.delete('/admin/media/:id', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    await mediaService.deleteMedia({
+      mediaId: req.params.id,
+      brandId: req.brand_id
+    });
+    res.json({
+      success: true,
+      message: 'Media berhasil dihapus.',
+      media_id: req.params.id
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'DELETE_MEDIA_ERROR'
+    });
   }
 });
 
@@ -4203,6 +4511,20 @@ router.put('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (re
 
 router.delete('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
+    const existing = db.prepare('SELECT id, name FROM categories WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Kategori tidak ditemukan.' });
+    }
+
+    // Category assignment protection: check if products are assigned
+    const assignedCount = db.prepare('SELECT COUNT(*) as count FROM products WHERE category_id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (assignedCount && assignedCount.count > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Kategori "${existing.name}" tidak dapat dihapus karena masih digunakan oleh ${assignedCount.count} produk. Pindahkan atau hapus produk terlebih dahulu.`
+      });
+    }
+
     db.prepare('DELETE FROM categories WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
     res.json({ success: true, message: 'Kategori berhasil dihapus.' });
   } catch (err) {
@@ -4224,6 +4546,40 @@ router.get('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res
       ];
     }
     res.json({ success: true, products });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const product = db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!product) {
+      return res.status(404).json({ success: false, error: 'Produk tidak ditemukan.' });
+    }
+
+    // Include branch adoption status across all active branches for this brand
+    const branchAdoptions = db.prepare(`
+      SELECT 
+        b.id AS branch_id,
+        b.name AS branch_name,
+        b.address_text AS branch_address,
+        b.is_active AS is_branch_active,
+        bp.product_id,
+        bp.price AS branch_price,
+        bp.stock AS branch_stock,
+        bp.is_available AS branch_is_available,
+        bp.branch_category_id,
+        bc.name AS branch_category_name,
+        CASE WHEN bp.product_id IS NOT NULL THEN 1 ELSE 0 END AS is_adopted
+      FROM branches b
+      LEFT JOIN branch_products bp ON bp.branch_id = b.id AND bp.product_id = ?
+      LEFT JOIN branch_categories bc ON bc.id = bp.branch_category_id
+      WHERE b.brand_id = ? AND (b.is_archived = 0 OR b.is_archived IS NULL)
+      ORDER BY b.name ASC
+    `).all(req.params.id, req.brand_id);
+
+    res.json({ success: true, product, branch_adoptions: branchAdoptions });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -4372,11 +4728,13 @@ router.get('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, res
   try {
     const branches = db.prepare(`
       SELECT 
-        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override,
-        s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order
+        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived,
+        s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order,
+        (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id) AS total_orders,
+        (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id AND o.status IN ('pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery')) AS active_orders
       FROM branches b
       LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
-      WHERE b.brand_id = ?
+      WHERE b.brand_id = ? AND (b.is_archived = 0 OR b.is_archived IS NULL)
     `).all(req.brand_id);
 
     res.json({ success: true, branches });
@@ -4434,9 +4792,11 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
     const branchPhone = (phone || rawWa).trim();
     const branchWa = rawWa;
 
+    const isOpenOverride = req.body.is_open_override !== undefined ? (req.body.is_open_override ? 1 : 0) : 1;
+
     db.prepare(`
-      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, whatsapp_number, is_active)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
     `).run(
       branchId,
       req.brand_id,
@@ -4446,7 +4806,8 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
       latitude !== undefined ? latitude : 0,
       longitude !== undefined ? longitude : 0,
       branchPhone,
-      branchWa
+      branchWa,
+      isOpenOverride
     );
 
     const deliverySettingsId = 'bds_' + branchId;
@@ -4474,7 +4835,9 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
         slug,
         phone: branchPhone,
         whatsapp_number: branchWa,
-        address_text: address_text || ''
+        address_text: address_text || '',
+        is_active: 1,
+        is_open_override: isOpenOverride
       }
     });
   } catch (err) {
@@ -4482,9 +4845,52 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
   }
 });
 
+// 14.1.1 Get Single Branch Detail
+router.get('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan untuk mengakses cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare(`
+      SELECT 
+        b.id, b.brand_id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived,
+        b.created_at, b.updated_at,
+        s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order,
+        (SELECT COUNT(*) FROM branch_products bp WHERE bp.branch_id = b.id) AS adopted_products_count,
+        (SELECT COUNT(*) FROM branch_categories bc WHERE bc.branch_id = b.id) AS branch_categories_count,
+        (SELECT COUNT(*) FROM users u WHERE u.branch_id = b.id AND u.brand_id = b.brand_id) AS staff_count,
+        (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id) AS total_orders,
+        (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id AND o.status IN ('pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery')) AS active_orders
+      FROM branches b
+      LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
+      WHERE b.id = ? AND b.brand_id = ? AND (b.is_archived = 0 OR b.is_archived IS NULL)
+    `).get(req.params.id, req.brand_id);
+
+    if (!branch) {
+      return res.status(404).json({
+        success: false,
+        error: 'BRANCH_NOT_FOUND',
+        message: 'Cabang tidak ditemukan pada brand ini.'
+      });
+    }
+
+    res.json({ success: true, branch });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
+    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
     const targetPhone = phone !== undefined ? phone : null;
     const targetWa = whatsapp_number !== undefined ? whatsapp_number : null;
 
@@ -4595,25 +5001,37 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
       );
 
       // Scoped update with explicit tenant subquery guard
+      const normToggle = (v) => {
+        if (v === undefined || v === null) return null;
+        if (v === true || v === 1 || v === '1') return 1;
+        if (v === false || v === 0 || v === '0') return 0;
+        return null;
+      };
+      const providedIsDelivery = normToggle(is_delivery_active);
+      const providedIsPickup = normToggle(is_pickup_active);
+
       db.prepare(`
-        UPDATE branch_delivery_settings
-        SET free_delivery_km = COALESCE(?, free_delivery_km),
-            price_per_km = COALESCE(?, price_per_km),
-            max_radius_km = COALESCE(?, max_radius_km),
-            promo_min_order = COALESCE(?, promo_min_order),
-            promo_delivery_discount = COALESCE(?, promo_delivery_discount)
-        WHERE branch_id = ? AND branch_id IN (
-          SELECT id FROM branches WHERE id = ? AND brand_id = ?
-        )
+        INSERT INTO branch_delivery_settings (id, branch_id, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(branch_id) DO UPDATE SET
+          is_delivery_active = COALESCE(excluded.is_delivery_active, branch_delivery_settings.is_delivery_active),
+          is_pickup_active = COALESCE(excluded.is_pickup_active, branch_delivery_settings.is_pickup_active),
+          free_delivery_km = COALESCE(excluded.free_delivery_km, branch_delivery_settings.free_delivery_km),
+          price_per_km = COALESCE(excluded.price_per_km, branch_delivery_settings.price_per_km),
+          max_radius_km = COALESCE(excluded.max_radius_km, branch_delivery_settings.max_radius_km),
+          promo_min_order = COALESCE(excluded.promo_min_order, branch_delivery_settings.promo_min_order),
+          promo_delivery_discount = COALESCE(excluded.promo_delivery_discount, branch_delivery_settings.promo_delivery_discount),
+          updated_at = datetime('now')
       `).run(
+        'bds_' + req.params.id,
+        req.params.id,
+        providedIsDelivery,
+        providedIsPickup,
         free_delivery_km !== undefined ? free_delivery_km : null,
         price_per_km !== undefined ? price_per_km : null,
         max_radius_km !== undefined ? max_radius_km : null,
         promo_min_order !== undefined ? promo_min_order : null,
-        promo_delivery_discount !== undefined ? promo_delivery_discount : null,
-        req.params.id,
-        req.params.id,
-        req.brand_id
+        promo_delivery_discount !== undefined ? promo_delivery_discount : null
       );
 
       // B1 OPERATIONAL AUDIT TRAIL (B1.10): append-only branch_operation_logs rows for every
@@ -4696,7 +5114,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
 
 router.delete('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const existing = db.prepare('SELECT id, name FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    const existing = db.prepare('SELECT id, name, is_active, is_archived FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
     if (!existing) {
       return res.status(404).json({
         success: false,
@@ -4704,14 +5122,87 @@ router.delete('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (r
       });
     }
 
-    // B1 FINANCIAL INTEGRITY: soft-delete only — branch with order history
-    // is deactivated (is_active=0) but the row stays for FK anchor.
-    db.prepare("UPDATE branches SET is_active = 0, updated_at = datetime('now') WHERE id = ? AND brand_id = ?")
-      .run(req.params.id, req.brand_id);
+    // Active orders in progress
+    const activeOrderRow = db.prepare(`
+      SELECT COUNT(*) as count FROM orders 
+      WHERE branch_id = ? AND status IN ('pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery')
+    `).get(req.params.id);
+    const activeOrders = (activeOrderRow && activeOrderRow.count) ? activeOrderRow.count : 0;
+
+    // Total order history
+    const totalOrderRow = db.prepare('SELECT COUNT(*) as count FROM orders WHERE branch_id = ?').get(req.params.id);
+    const totalOrders = (totalOrderRow && totalOrderRow.count) ? totalOrderRow.count : 0;
+
+    const isBranchActive = existing.is_active === 1 || existing.is_active === true;
+
+    // Rule 1: Cabang aktif dengan pesanan aktif -> tidak boleh dihapus.
+    if (isBranchActive && activeOrders > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Cabang "${existing.name}" masih aktif dan sedang melayani ${activeOrders} pesanan aktif. Selesaikan atau batalkan pesanan terlebih dahulu sebelum memproses cabang ini.`
+      });
+    }
+
+    const actorId = req.user ? (req.user.userId || req.user.id || req.user.username || 'system') : 'system';
+    const actorRole = req.user ? (req.user.role || 'system') : 'system';
+
+    // Rule 2: Cabang nonaktif yang memiliki riwayat transaksi -> jangan hard delete, gunakan Archive.
+    if (totalOrders > 0) {
+      db.exec('BEGIN TRANSACTION;');
+      try {
+        db.prepare('UPDATE branches SET is_archived = 1, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
+
+        db.prepare(`
+          INSERT INTO branch_operation_logs (id, branch_id, brand_id, organization_id, action, field, previous_value, new_value, actor_id, actor_role, authorized)
+          VALUES (?, ?, ?, ?, 'branch.archive', 'is_archived', '0', '1', ?, ?, 1)
+        `).run(
+          'bol_' + crypto.randomUUID(),
+          existing.id,
+          req.brand_id,
+          req.organization_id || null,
+          actorId,
+          actorRole
+        );
+
+        db.exec('COMMIT;');
+      } catch (txErr) {
+        try { db.exec('ROLLBACK;'); } catch (_) {}
+        throw txErr;
+      }
+
+      return res.json({
+        success: true,
+        archived: true,
+        message: `Cabang "${existing.name}" berhasil diarsipkan karena memiliki riwayat transaksi. Data riwayat pesanan tetap tersimpan dengan aman.`,
+        branch_id: req.params.id
+      });
+    }
+
+    // Rule 3: Cabang nonaktif tanpa riwayat transaksi -> boleh dihapus permanen.
+    db.exec('BEGIN TRANSACTION;');
+    try {
+      // Unlink users assigned to this branch
+      db.prepare('UPDATE users SET branch_id = NULL WHERE branch_id = ?').run(req.params.id);
+
+      // Clean up child tables
+      db.prepare('DELETE FROM branch_delivery_settings WHERE branch_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM branch_products WHERE branch_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM branch_categories WHERE branch_id = ?').run(req.params.id);
+      db.prepare('DELETE FROM branch_operation_logs WHERE branch_id = ?').run(req.params.id);
+
+      // Delete the branch row
+      db.prepare('DELETE FROM branches WHERE id = ? AND brand_id = ?').run(req.params.id, req.brand_id);
+
+      db.exec('COMMIT;');
+    } catch (txErr) {
+      try { db.exec('ROLLBACK;'); } catch (_) {}
+      throw txErr;
+    }
 
     res.json({
       success: true,
-      message: 'Cabang berhasil dinonaktifkan.',
+      archived: false,
+      message: `Cabang "${existing.name}" berhasil dihapus permanen.`,
       branch_id: req.params.id
     });
   } catch (err) {
@@ -5496,18 +5987,7 @@ router.patch('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'bra
 });
 
 // Upload / replace a branch category's image.
-// Follows the same storage pattern already used across Xentra for menu photos:
-// the file is persisted to disk under the app's static /assets tree and only the
-// resulting persistent URL is written to the database — never a base64 blob.
-// The size limit and MIME map are shared by the category and menu image upload
-// endpoints so both accept exactly the same files.
-const IMAGE_MAX_BYTES = 3 * 1024 * 1024; // 3MB
-const IMAGE_MIME_TO_EXT = {
-  'image/jpeg': 'jpg',
-  'image/jpg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp'
-};
+// Persisted to disk under /assets/uploads/categories and verified strictly via ImageValidator.
 const CATEGORY_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/categories');
 const PRODUCT_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/products');
 const BRANCH_PRODUCT_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/branch-products');
@@ -5530,30 +6010,19 @@ router.post('/admin/branches/:id/categories/:catId/image', requireAuth(['owner',
       return res.status(400).json({ success: false, error: 'Gambar kategori wajib diunggah.' });
     }
 
-    const ext = IMAGE_MIME_TO_EXT[String(mime_type || '').toLowerCase()];
-    if (!ext) {
-      return res.status(400).json({ success: false, error: 'Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.' });
-    }
+    const validation = ImageValidator.validateImageUpload({
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      assetType: 'category'
+    });
 
-    // Strip an optional data URL prefix (e.g. "data:image/png;base64,...") before decoding.
-    const rawBase64 = image_base64.includes(',') ? image_base64.split(',').pop() : image_base64;
-    let buffer;
-    try {
-      buffer = Buffer.from(rawBase64, 'base64');
-    } catch (decodeErr) {
-      return res.status(400).json({ success: false, error: 'Gambar tidak dapat diproses (data tidak valid).' });
-    }
-
-    if (!buffer || buffer.length === 0) {
-      return res.status(400).json({ success: false, error: 'Gambar kosong atau rusak.' });
-    }
-    if (buffer.length > IMAGE_MAX_BYTES) {
-      return res.status(400).json({ success: false, error: 'Ukuran gambar melebihi batas maksimal 3MB.' });
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, error: validation.error, code: validation.code, dimensions: validation.dimensions });
     }
 
     fs.mkdirSync(CATEGORY_IMAGE_DIR, { recursive: true });
-    const fileName = `${req.params.catId}-${Date.now()}.${ext}`;
-    fs.writeFileSync(path.join(CATEGORY_IMAGE_DIR, fileName), buffer);
+    const fileName = `${req.params.catId}-${Date.now()}.${validation.info.ext}`;
+    fs.writeFileSync(path.join(CATEGORY_IMAGE_DIR, fileName), validation.buffer);
 
     const imageUrl = `/assets/uploads/categories/${fileName}`;
     try {
@@ -5576,11 +6045,6 @@ router.post('/admin/branches/:id/categories/:catId/image', requireAuth(['owner',
 });
 
 // Upload / replace a master product (menu item) image.
-// Mirrors the branch-category image upload contract above: base64 + mime_type in
-// JSON, the same allowed formats/size, the file persisted to disk, and only the
-// resulting URL stored in the database. Writes BOTH products.image_url (consumed
-// by the customer PWA and public APIs) and products.image (consumed by the
-// owner/branch dashboard tables and the Edit Menu modal).
 router.post('/admin/products/:productId/image', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const product = db.prepare('SELECT id FROM products WHERE id = ? AND brand_id = ?')
@@ -5592,30 +6056,19 @@ router.post('/admin/products/:productId/image', requireAuth(['owner', 'brand_man
       return res.status(400).json({ success: false, error: 'Gambar menu wajib diunggah.' });
     }
 
-    const ext = IMAGE_MIME_TO_EXT[String(mime_type || '').toLowerCase()];
-    if (!ext) {
-      return res.status(400).json({ success: false, error: 'Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.' });
-    }
+    const validation = ImageValidator.validateImageUpload({
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      assetType: 'product'
+    });
 
-    // Strip an optional data URL prefix (e.g. "data:image/png;base64,...") before decoding.
-    const rawBase64 = image_base64.includes(',') ? image_base64.split(',').pop() : image_base64;
-    let buffer;
-    try {
-      buffer = Buffer.from(rawBase64, 'base64');
-    } catch (decodeErr) {
-      return res.status(400).json({ success: false, error: 'Gambar tidak dapat diproses (data tidak valid).' });
-    }
-
-    if (!buffer || buffer.length === 0) {
-      return res.status(400).json({ success: false, error: 'Gambar kosong atau rusak.' });
-    }
-    if (buffer.length > IMAGE_MAX_BYTES) {
-      return res.status(400).json({ success: false, error: 'Ukuran gambar melebihi batas maksimal 3MB.' });
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, error: validation.error, code: validation.code, dimensions: validation.dimensions });
     }
 
     fs.mkdirSync(PRODUCT_IMAGE_DIR, { recursive: true });
-    const fileName = `${req.params.productId}-${Date.now()}.${ext}`;
-    fs.writeFileSync(path.join(PRODUCT_IMAGE_DIR, fileName), buffer);
+    const fileName = `${req.params.productId}-${Date.now()}.${validation.info.ext}`;
+    fs.writeFileSync(path.join(PRODUCT_IMAGE_DIR, fileName), validation.buffer);
 
     const imageUrl = `/assets/uploads/products/${fileName}`;
     db.prepare("UPDATE products SET image_url = ?, image = ?, updated_at = datetime('now') WHERE id = ?")
@@ -5629,11 +6082,6 @@ router.post('/admin/products/:productId/image', requireAuth(['owner', 'brand_man
 });
 
 // Upload / replace an adopted (branch) product's own photo override.
-// Mirrors the branch-category and master-product image upload contract so the
-// branch UI uses the same base64 + mime_type flow and the same 3MB limit.
-// The override image is stored per branch (never touches the master product),
-// persisted to disk, and only the resulting URL is written to
-// branch_products.image_override (COALESCE pick-up in CatalogService).
 router.post('/admin/branches/:id/products/:productId/image', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
     if (req.user.role === 'branch_manager') {
@@ -5654,29 +6102,19 @@ router.post('/admin/branches/:id/products/:productId/image', requireAuth(['owner
       return res.status(400).json({ success: false, error: 'Gambar menu wajib diunggah.' });
     }
 
-    const ext = IMAGE_MIME_TO_EXT[String(mime_type || '').toLowerCase()];
-    if (!ext) {
-      return res.status(400).json({ success: false, error: 'Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.' });
-    }
+    const validation = ImageValidator.validateImageUpload({
+      imageBase64: image_base64,
+      mimeType: mime_type,
+      assetType: 'product'
+    });
 
-    const rawBase64 = image_base64.includes(',') ? image_base64.split(',').pop() : image_base64;
-    let buffer;
-    try {
-      buffer = Buffer.from(rawBase64, 'base64');
-    } catch (decodeErr) {
-      return res.status(400).json({ success: false, error: 'Gambar tidak dapat diproses (data tidak valid).' });
-    }
-
-    if (!buffer || buffer.length === 0) {
-      return res.status(400).json({ success: false, error: 'Gambar kosong atau rusak.' });
-    }
-    if (buffer.length > IMAGE_MAX_BYTES) {
-      return res.status(400).json({ success: false, error: 'Ukuran gambar melebihi batas maksimal 3MB.' });
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, error: validation.error, code: validation.code, dimensions: validation.dimensions });
     }
 
     fs.mkdirSync(BRANCH_PRODUCT_IMAGE_DIR, { recursive: true });
-    const fileName = `${req.params.id}-${req.params.productId}-${Date.now()}.${ext}`;
-    fs.writeFileSync(path.join(BRANCH_PRODUCT_IMAGE_DIR, fileName), buffer);
+    const fileName = `${req.params.id}-${req.params.productId}-${Date.now()}.${validation.info.ext}`;
+    fs.writeFileSync(path.join(BRANCH_PRODUCT_IMAGE_DIR, fileName), validation.buffer);
 
     const imageUrl = `/assets/uploads/branch-products/${fileName}`;
     db.prepare("UPDATE branch_products SET image_override = ?, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?")
@@ -5953,24 +6391,152 @@ router.patch('/admin/branches/:id/inventory/:productId', requireAuth(['owner', '
 });
 
 // 15. Admin Orders List & Analytics Summary
-router.get('/admin/orders', requireAuth(['owner', 'brand_manager']), (req, res) => {
+router.get('/admin/orders', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const orders = db.prepare(`
+    const {
+      branch_id,
+      status,
+      order_channel,
+      fulfillment_type,
+      start_date,
+      end_date,
+      search,
+      limit,
+      offset
+    } = req.query;
+
+    let query = `
       SELECT o.*, b.name as branch_name 
       FROM orders o
       LEFT JOIN branches b ON b.id = o.branch_id
       WHERE o.brand_id = ?
-      ORDER BY o.created_at DESC
-      LIMIT 50
-    `).all(req.brand_id);
+    `;
+    const params = [req.brand_id];
+
+    // Branch manager is strictly scoped to their assigned branch
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId) {
+        query += ' AND o.branch_id = ?';
+        params.push(assignedBranchId);
+      }
+    } else if (branch_id && branch_id !== 'all') {
+      query += ' AND o.branch_id = ?';
+      params.push(branch_id);
+    }
+
+    if (status && status !== 'all') {
+      query += ' AND o.status = ?';
+      params.push(status);
+    }
+
+    if (order_channel && order_channel !== 'all') {
+      query += ' AND o.order_channel = ?';
+      params.push(order_channel);
+    }
+
+    if (fulfillment_type && fulfillment_type !== 'all') {
+      query += ' AND o.fulfillment_type = ?';
+      params.push(fulfillment_type);
+    }
+
+    if (start_date) {
+      query += ' AND o.created_at >= ?';
+      params.push(start_date.includes(' ') || start_date.includes('T') ? start_date : start_date + ' 00:00:00');
+    }
+
+    if (end_date) {
+      query += ' AND o.created_at <= ?';
+      params.push(end_date.includes(' ') || end_date.includes('T') ? end_date : end_date + ' 23:59:59');
+    }
+
+    if (search && search.trim()) {
+      const q = `%${search.trim()}%`;
+      query += ' AND (o.order_number LIKE ? OR o.id LIKE ? OR o.customer_name LIKE ? OR o.customer_phone LIKE ?)';
+      params.push(q, q, q, q);
+    }
+
+    query += ' ORDER BY o.created_at DESC';
+
+    const maxLimit = limit ? Math.min(parseInt(limit, 10), 200) : 100;
+    query += ` LIMIT ${maxLimit}`;
+
+    if (offset) {
+      query += ` OFFSET ${parseInt(offset, 10)}`;
+    }
+
+    const orders = db.prepare(query).all(...params);
 
     const enriched = orders.map(ord => ({
       ...ord,
       items: db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(ord.id),
-      delivery: db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(ord.id)
+      delivery: db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(ord.id),
+      payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id)
     }));
 
     res.json({ success: true, orders: enriched });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 15.1 Admin Single Order Detail
+router.get('/admin/orders/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const order = db.prepare(`
+      SELECT o.*, b.name as branch_name
+      FROM orders o
+      LEFT JOIN branches b ON b.id = o.branch_id
+      WHERE o.id = ? AND o.brand_id = ?
+    `).get(req.params.id, req.brand_id);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        error: 'ORDER_NOT_FOUND',
+        message: 'Pesanan tidak ditemukan pada brand ini.'
+      });
+    }
+
+    // Branch manager scope guard
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== order.branch_id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya dapat mengakses pesanan cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(order.id);
+    const delivery = db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(order.id);
+    const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order.id);
+    const logs = db.prepare('SELECT previous_status, new_status, note, created_at FROM order_status_logs WHERE order_id = ? ORDER BY created_at ASC').all(order.id);
+
+    // If dine-in order with dining_session_id, retrieve all session additions
+    let sessionOrders = [];
+    if (order.dining_session_id) {
+      sessionOrders = db.prepare(`
+        SELECT id, order_number, order_channel, fulfillment_type, status, grand_total, payment_status, created_at
+        FROM orders
+        WHERE dining_session_id = ? AND brand_id = ? AND id != ?
+        ORDER BY created_at ASC
+      `).all(order.dining_session_id, req.brand_id, order.id);
+    }
+
+    res.json({
+      success: true,
+      order: {
+        ...order,
+        items: items || [],
+        delivery: delivery || null,
+        payment: payment || null,
+        status_logs: logs || [],
+        session_orders: sessionOrders
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -5995,6 +6561,83 @@ router.get('/admin/analytics/summary', requireAuth(['owner', 'brand_manager']), 
   }
 });
 
+// Phase 4: Owner Overview API — Real authoritative business metrics
+const { ReportingRepository } = require('../../core/data/repositories');
+const overviewReportingRepo = new ReportingRepository();
+
+router.get('/admin/overview', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { branch_id, start_date, end_date } = req.query;
+
+    let effectiveBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    const filter = {
+      brand_id: req.brand_id,
+      branch_id: effectiveBranchId,
+      start_date,
+      end_date
+    };
+
+    // 1. Primary KPIs
+    const salesOverview = overviewReportingRepo.getSalesOverview(filter);
+    const customerOverview = overviewReportingRepo.getCustomerOverview(filter);
+
+    const netSales = salesOverview.gross_revenue || 0;
+    const ordersCount = salesOverview.total_orders || 0;
+    const customersCount = customerOverview.total_unique_customers || 0;
+    const aov = salesOverview.average_order_value || 0;
+
+    // 2. Sales Performance
+    const timeline = overviewReportingRepo.getSalesTimeline(filter);
+    const byChannel = overviewReportingRepo.getSalesByChannel(filter);
+    const byFulfillment = overviewReportingRepo.getSalesByFulfillment(filter);
+
+    // 3. Branch Performance (Only for Owner/Brand Manager if All Branches, or scoped to branch)
+    let branchPerformance = [];
+    if (req.user.role !== 'branch_manager') {
+      branchPerformance = overviewReportingRepo.getBranchComparison({
+        brand_id: req.brand_id,
+        start_date,
+        end_date
+      });
+    }
+
+    // 4. Top Products
+    const topProducts = overviewReportingRepo.getTopProducts(filter).slice(0, 5);
+
+    // 5. Needs Attention (e.g. low stock alerts)
+    const lowStockItems = overviewReportingRepo.getLowStockItems(filter).slice(0, 10);
+
+    res.json({
+      success: true,
+      data: {
+        kpis: {
+          net_sales: netSales,
+          orders: ordersCount,
+          customers: customersCount,
+          aov: Math.round(aov)
+        },
+        sales_performance: {
+          timeline,
+          by_channel: byChannel,
+          by_fulfillment: byFulfillment
+        },
+        branch_performance: branchPerformance,
+        top_products: topProducts,
+        needs_attention: {
+          low_stock_items: lowStockItems,
+          low_stock_count: lowStockItems.length
+        }
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 16. Reporting Domain Single-Entrypoint API (Protected with Granular Per-Report RBAC Matrix)
 const { ReportingEngine } = require('../../domains/reporting');
 router.get('/reports/:report_type', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
@@ -6006,6 +6649,9 @@ router.get('/reports/:report_type', requireAuth(['owner', 'brand_manager', 'bran
     // Multi-branch comparison / leaderboard is strictly reserved for Owner & Brand Executive scope
     const REPORT_ALLOWED_ROLES = {
       sales: ['owner', 'brand_manager', 'branch_manager'],
+      orders: ['owner', 'brand_manager', 'branch_manager'],
+      customers: ['owner', 'brand_manager'],
+      operations: ['owner', 'brand_manager', 'branch_manager'],
       payment: ['owner', 'brand_manager', 'branch_manager'],
       inventory: ['owner', 'brand_manager', 'branch_manager'],
       pos_shifts: ['owner', 'brand_manager', 'branch_manager'],
@@ -6037,6 +6683,362 @@ router.get('/reports/:report_type', requireAuth(['owner', 'brand_manager', 'bran
     });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// Phase 5: Owner Dashboard Customers APIs (Authoritative Core Data)
+router.get('/admin/customers', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { branch_id, search, segment } = req.query;
+
+    let effectiveBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    const customers = overviewReportingRepo.getCustomersList({
+      brand_id: req.brand_id,
+      branch_id: effectiveBranchId,
+      search: search ? String(search).trim() : null
+    });
+
+    let filtered = customers;
+    if (segment === 'new') {
+      filtered = customers.filter(c => c.segment === 'new');
+    } else if (segment === 'returning') {
+      filtered = customers.filter(c => c.segment === 'returning');
+    }
+
+    res.json({
+      success: true,
+      customers: filtered,
+      total: filtered.length
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/admin/customers/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { id } = req.params;
+    let branchId = req.query.branch_id;
+    if (req.user.role === 'branch_manager') {
+      branchId = req.user.branch_id || req.user.branchId;
+    }
+
+    const customer = overviewReportingRepo.getCustomerDetail(req.brand_id, id, branchId);
+    if (!customer) {
+      return res.status(404).json({
+        success: false,
+        error: 'CUSTOMER_NOT_FOUND',
+        message: 'Data pelanggan tidak ditemukan untuk identifier yang diberikan.'
+      });
+    }
+
+    res.json({
+      success: true,
+      customer
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// =========================================================================
+// PHASE 6: CLIENT OWNER DASHBOARD — FINANCE & MARKETING APIS
+// Authoritative Core reuse with strict multi-tenant & RBAC scoping
+// =========================================================================
+const { PaymentRepository: CorePaymentRepo, PromotionRepository: CorePromotionRepo } = require('../../core/data/repositories');
+const corePaymentRepo = new CorePaymentRepo();
+const corePromotionRepo = new CorePromotionRepo();
+
+// 1. Finance Overview API
+router.get('/admin/finance/overview', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { branch_id, start_date, end_date } = req.query;
+    let effectiveBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    const filter = {
+      brand_id: req.brand_id,
+      branch_id: effectiveBranchId,
+      start_date,
+      end_date
+    };
+
+    // Authoritative payment breakdown & summary from PaymentReportService
+    const paymentReport = ReportingEngine.generateReport('payment', filter);
+    const salesOverview = overviewReportingRepo.getSalesOverview(filter);
+
+    // Unreconciled count
+    const pendingRecon = corePaymentRepo.findReconciliationRecords({
+      brandId: req.brand_id,
+      branchId: effectiveBranchId
+    });
+
+    const totalGrossSales = salesOverview ? (salesOverview.gross_revenue || 0) : 0;
+    const totalNetSales = salesOverview ? (salesOverview.subtotal_revenue || 0) : 0;
+    const totalSettled = paymentReport.summary?.total_settled || 0;
+    const cashSettled = paymentReport.summary?.cash_settled || 0;
+    const midtransSettled = paymentReport.summary?.midtrans_settled || 0;
+    const totalPending = paymentReport.summary?.total_pending || 0;
+
+    let totalTxCount = 0;
+    if (Array.isArray(paymentReport.breakdown)) {
+      for (const row of paymentReport.breakdown) {
+        totalTxCount += Number(row.transaction_count || 0);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          gross_sales: totalGrossSales,
+          net_sales: totalNetSales,
+          total_settled: totalSettled,
+          cash_settled: cashSettled,
+          midtrans_settled: midtransSettled,
+          total_pending: totalPending,
+          transaction_count: totalTxCount,
+          unreconciled_count: pendingRecon.length,
+          unreconciled_amount: pendingRecon.reduce((acc, r) => acc + (Number(r.amount) || 0), 0),
+          refunds: { total_amount: 0, count: 0, supported: false, status: 'not_configured' },
+          payouts: { total_amount: 0, count: 0, supported: false, status: 'not_configured' }
+        },
+        breakdown: paymentReport.breakdown || [],
+        unreconciled_records: pendingRecon
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Finance Transactions List API
+router.get('/admin/finance/transactions', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { branch_id, payment_method, payment_status, start_date, end_date, limit, offset } = req.query;
+    let effectiveBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    const result = corePaymentRepo.findTransactions({
+      brandId: req.brand_id,
+      branchId: effectiveBranchId,
+      paymentMethod: payment_method || null,
+      paymentStatus: payment_status || null,
+      startDate: start_date || null,
+      endDate: end_date || null,
+      limit,
+      offset
+    });
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Finance Reconciliation API
+router.get('/admin/finance/reconciliation', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { branch_id } = req.query;
+    let effectiveBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    const records = corePaymentRepo.findReconciliationRecords({
+      brandId: req.brand_id,
+      branchId: effectiveBranchId
+    });
+
+    res.json({
+      success: true,
+      reconciliation: {
+        pending_count: records.length,
+        total_pending_amount: records.reduce((acc, r) => acc + (Number(r.amount) || 0), 0),
+        records
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Finance Payment Methods Config API
+router.get('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { branch_id } = req.query;
+    let effectiveBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    const brandConfig = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
+    let parsedBrandConfig = null;
+    if (brandConfig && brandConfig.default_payment_config) {
+      try { parsedBrandConfig = JSON.parse(brandConfig.default_payment_config); } catch (_) {}
+    }
+
+    let branchOverride = null;
+    if (effectiveBranchId) {
+      const branchRow = corePaymentRepo.findBranchPaymentConfig(effectiveBranchId, req.brand_id);
+      if (branchRow && branchRow.payment_config_override) {
+        try { branchOverride = JSON.parse(branchRow.payment_config_override); } catch (_) {}
+      }
+    }
+
+    const midtransActive = Boolean(
+      (branchOverride && branchOverride.server_key) ||
+      (parsedBrandConfig && parsedBrandConfig.server_key) ||
+      process.env.MIDTRANS_SERVER_KEY
+    );
+
+    const isProduction = Boolean(
+      (branchOverride && branchOverride.is_production) ||
+      (parsedBrandConfig && parsedBrandConfig.is_production) ||
+      process.env.MIDTRANS_IS_PRODUCTION === 'true'
+    );
+
+    res.json({
+      success: true,
+      payment_methods: [
+        {
+          code: 'cash',
+          name: 'Tunai (Cash)',
+          provider: 'cash',
+          is_enabled: true,
+          type: 'offline',
+          settlement_mode: 'manual_cashier',
+          description: 'Pembayaran tunai langsung di kasir cabang dengan validasi shift POS'
+        },
+        {
+          code: 'midtrans',
+          name: 'Midtrans Online Payment',
+          provider: 'midtrans',
+          is_enabled: midtransActive,
+          type: 'online_gateway',
+          environment: isProduction ? 'production' : 'sandbox',
+          has_branch_override: Boolean(branchOverride),
+          description: 'Payment gateway multi-channel (QRIS, GoPay, ShopeePay, Virtual Account, Kartu Kredit)'
+        }
+      ]
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Marketing Overview API
+router.get('/admin/marketing/overview', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { branch_id, start_date, end_date } = req.query;
+    let effectiveBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    const filter = {
+      brand_id: req.brand_id,
+      branch_id: effectiveBranchId,
+      start_date,
+      end_date
+    };
+
+    const customerOverview = overviewReportingRepo.getCustomerOverview(filter);
+    const customersList = overviewReportingRepo.getCustomersList(filter);
+
+    let newCount = 0;
+    let returningCount = 0;
+    let repeatPurchaseRate = 0;
+    if (Array.isArray(customersList) && customersList.length > 0) {
+      newCount = customersList.filter(c => c.segment === 'new').length;
+      returningCount = customersList.filter(c => c.segment === 'returning').length;
+      repeatPurchaseRate = Math.round((returningCount / customersList.length) * 100);
+    }
+
+    const allPromos = corePromotionRepo.findAllPromotions(req.brand_id);
+    const redemptions = corePromotionRepo.findPromotionRedemptions({
+      brandId: req.brand_id,
+      branchId: effectiveBranchId,
+      limit: 10
+    });
+
+    const activePromosCount = allPromos.filter(p => p.is_active === 1).length;
+    const totalBenefitSum = allPromos.reduce((acc, p) => acc + (p.total_benefit_amount || 0), 0);
+    const totalRedemptionsSum = allPromos.reduce((acc, p) => acc + (p.redemptions_count || 0), 0);
+
+    res.json({
+      success: true,
+      data: {
+        customer_metrics: {
+          total_customers: customerOverview.total_unique_customers || 0,
+          new_customers: newCount,
+          returning_customers: returningCount,
+          repeat_purchase_rate_pct: repeatPurchaseRate
+        },
+        promotion_metrics: {
+          active_promotions: activePromosCount,
+          total_promotions: allPromos.length,
+          total_redemptions: totalRedemptionsSum,
+          total_benefit_amount: totalBenefitSum
+        },
+        recent_redemptions: redemptions.redemptions || [],
+        campaigns: { supported: false, status: 'not_configured' },
+        loyalty: { supported: false, status: 'not_configured' }
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6. Marketing Promotions List API
+router.get('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const promotions = corePromotionRepo.findAllPromotions(req.brand_id);
+    res.json({
+      success: true,
+      promotions,
+      total: promotions.length
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7. Marketing Promotion Redemptions API
+router.get('/admin/marketing/redemptions', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { branch_id, promotion_id, limit, offset } = req.query;
+    let effectiveBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    const result = corePromotionRepo.findPromotionRedemptions({
+      brandId: req.brand_id,
+      branchId: effectiveBranchId,
+      promotionId: promotion_id || null,
+      limit,
+      offset
+    });
+
+    res.json({
+      success: true,
+      ...result
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -6242,6 +7244,534 @@ router.put('/dine-in/layout/:branch_id', requireAuth(['owner', 'brand_manager', 
     res.json({ success: true, message: 'Tata letak meja berhasil diperbarui.' });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// =========================================================================
+// PHASE 7: CLIENT OWNER DASHBOARD — SETTINGS & INTEGRATIONS APIS
+// Authoritative Core reuse with strict multi-tenant & RBAC scoping
+// =========================================================================
+const {
+  BrandRepository: CoreBrandRepo,
+  BranchRepository: CoreBranchRepo,
+  UserRepository: CoreUserRepo
+} = require('../../core/data/repositories');
+const coreBrandRepo = new CoreBrandRepo();
+const coreBranchRepo = new CoreBranchRepo();
+const coreUserRepo = new CoreUserRepo();
+
+// 1. Settings Overview / Metadata Tree
+router.get('/admin/settings/overview', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const brand = coreBrandRepo.findById(req.brand_id) || req.brand;
+    const branches = db.prepare('SELECT id, name, is_active FROM branches WHERE brand_id = ?').all(req.brand_id);
+    const branchCount = branches ? branches.length : 0;
+
+    res.json({
+      success: true,
+      brand_id: req.brand_id,
+      brand_name: brand ? brand.name : 'Unknown Brand',
+      sections: {
+        business: { status: 'configured', subcategories: ['profile', 'info', 'legal'] },
+        locations: { status: 'configured', subcategories: ['defaults'], total_branches: branchCount },
+        commerce: { status: 'configured', subcategories: ['orders', 'payments', 'fulfillment'] },
+        channels: { status: 'configured', subcategories: ['website', 'customer-app', 'pos', 'kiosk'] },
+        system: { status: 'configured', subcategories: ['notifications', 'security'] },
+        integrations: { status: 'configured', subcategories: ['integrations'] }
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Business Settings
+// 2.1 Brand Profile (GET)
+router.get('/admin/settings/business/profile', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const brand = coreBrandRepo.findById(req.brand_id) || req.brand;
+    let banners = [];
+    try {
+      banners = brand && brand.banners ? (typeof brand.banners === 'string' ? JSON.parse(brand.banners) : brand.banners) : [];
+    } catch (_) {}
+
+    res.json({
+      success: true,
+      profile: {
+        id: brand.id,
+        name: brand.name,
+        slug: brand.slug,
+        tagline: brand.tagline || '',
+        logo_url: brand.logo_url || '/assets/pwa/icon-192.png',
+        primary_color: brand.primary_color || '#b6ff00',
+        custom_domain: brand.custom_domain || '',
+        banners: Array.isArray(banners) ? banners : []
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2.2 Brand Profile (PUT - Owner/Brand Manager only)
+router.put('/admin/settings/business/profile', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const { name, tagline, logo_url, primary_color, banners } = req.body;
+    coreBrandRepo.updateBrandProfile(req.brand_id, {
+      name,
+      tagline,
+      logo_url,
+      primary_color,
+      banners
+    });
+
+    const updated = coreBrandRepo.findById(req.brand_id);
+    res.json({
+      success: true,
+      message: 'Profil brand berhasil diperbarui.',
+      profile: {
+        id: updated.id,
+        name: updated.name,
+        slug: updated.slug,
+        tagline: updated.tagline,
+        logo_url: updated.logo_url,
+        primary_color: updated.primary_color,
+        custom_domain: updated.custom_domain
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2.3 Business Info
+router.get('/admin/settings/business/info', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const brand = coreBrandRepo.findById(req.brand_id) || req.brand;
+    const org = db.prepare('SELECT * FROM organizations WHERE id = ?').get(brand.organization_id);
+    const primaryBranch = db.prepare('SELECT address_text, phone, whatsapp_number FROM branches WHERE brand_id = ? ORDER BY created_at ASC LIMIT 1').get(req.brand_id);
+
+    res.json({
+      success: true,
+      info: {
+        brand_name: brand.name,
+        organization_name: org ? org.name : 'Xentra Merchant Group',
+        organization_slug: org ? org.slug : '',
+        primary_address: primaryBranch ? primaryBranch.address_text : '',
+        contact_phone: primaryBranch ? primaryBranch.phone : '',
+        contact_whatsapp: primaryBranch ? primaryBranch.whatsapp_number : '',
+        registered_at: brand.created_at
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2.4 Legal / Tax (Honest not-configured state)
+router.get('/admin/settings/business/legal', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  res.json({
+    success: true,
+    is_supported: false,
+    tax_configured: false,
+    npwp: null,
+    vat_percentage: 0,
+    pb1_percentage: 0,
+    terms_url: null,
+    privacy_url: null,
+    message: 'Konfigurasi pajak (PPN / PB1) dan entitas legal belum dikonfigurasi pada Core engine v1. Semua harga transaksi dianggap harga final (nett).'
+  });
+});
+
+// 3. Locations / Branch Defaults
+router.get('/admin/settings/locations/defaults', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const branches = db.prepare(`
+      SELECT b.id, b.name, b.slug, b.is_active, b.is_open_override,
+             s.is_delivery_active, s.is_pickup_active, s.max_radius_km, s.free_delivery_km, s.price_per_km, s.min_order_amount
+      FROM branches b
+      LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
+      WHERE b.brand_id = ?
+      ORDER BY b.created_at ASC
+    `).all(req.brand_id);
+
+    res.json({
+      success: true,
+      defaults: {
+        delivery_enabled_default: true,
+        pickup_enabled_default: true,
+        dine_in_enabled_default: true,
+        default_max_radius_km: 10.0,
+        default_free_delivery_km: 3.0,
+        default_price_per_km: 2500.0,
+        branches_count: branches.length,
+        branches: branches.map(b => ({
+          id: b.id,
+          name: b.name,
+          slug: b.slug,
+          is_active: b.is_active === 1,
+          is_delivery_active: b.is_delivery_active !== null ? b.is_delivery_active === 1 : true,
+          is_pickup_active: b.is_pickup_active !== null ? b.is_pickup_active === 1 : true,
+          max_radius_km: b.max_radius_km || 10.0,
+          price_per_km: b.price_per_km || 2500.0
+        }))
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Commerce Settings
+// 4.1 Order Settings
+router.get('/admin/settings/commerce/orders', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  res.json({
+    success: true,
+    policies: {
+      order_acceptance_mode: 'manual_or_pos',
+      allow_preorder: false,
+      reservation_lead_days_min: 1,
+      reservation_rule: 'Reservasi hanya dapat dipesan untuk H+1 ke atas (pemesanan hari yang sama/same-day dilarang sesuai OrderEngine)',
+      overdue_timeout_seconds: 900,
+      supported_order_types: ['delivery', 'takeaway', 'dine_in', 'reservation'],
+      supported_order_channels: ['web', 'pwa', 'pos', 'kiosk']
+    }
+  });
+});
+
+// 4.2 Payment Settings
+router.get('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { branch_id } = req.query;
+    let effectiveBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    const brandConfig = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
+    let parsedBrandConfig = null;
+    if (brandConfig && brandConfig.default_payment_config) {
+      try { parsedBrandConfig = JSON.parse(brandConfig.default_payment_config); } catch (_) {}
+    }
+
+    let branchOverride = null;
+    if (effectiveBranchId && effectiveBranchId !== 'all') {
+      const branchRow = corePaymentRepo.findBranchPaymentConfig(effectiveBranchId, req.brand_id);
+      if (branchRow && branchRow.payment_config_override) {
+        try { branchOverride = JSON.parse(branchRow.payment_config_override); } catch (_) {}
+      }
+    }
+
+    const effectiveConfig = branchOverride || parsedBrandConfig || {};
+    const hasOverride = Boolean(branchOverride);
+
+    res.json({
+      success: true,
+      payment_settings: {
+        branch_id: effectiveBranchId || null,
+        has_branch_override: hasOverride,
+        server_key_configured: Boolean(effectiveConfig.server_key || process.env.MIDTRANS_SERVER_KEY),
+        client_key_configured: Boolean(effectiveConfig.client_key || process.env.MIDTRANS_CLIENT_KEY),
+        merchant_id: effectiveConfig.merchant_id || process.env.MIDTRANS_MERCHANT_ID || '',
+        is_production: Boolean(effectiveConfig.is_production !== undefined ? effectiveConfig.is_production : (process.env.MIDTRANS_IS_PRODUCTION === 'true')),
+        methods: [
+          { code: 'cash', name: 'Tunai Kasir', enabled: true, mode: 'pos_cashier' },
+          { code: 'midtrans', name: 'Midtrans Payment Gateway', enabled: Boolean(effectiveConfig.server_key || process.env.MIDTRANS_SERVER_KEY), mode: 'online' }
+        ]
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4.3 Payment Settings (PUT - Owner/Brand Manager only)
+router.put('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const { branch_id, server_key, client_key, merchant_id, is_production } = req.body;
+    const configPayload = {
+      server_key: server_key || '',
+      client_key: client_key || '',
+      merchant_id: merchant_id || '',
+      is_production: Boolean(is_production)
+    };
+    const jsonStr = JSON.stringify(configPayload);
+
+    if (branch_id && branch_id !== 'all') {
+      // Branch-specific override
+      const belongs = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, req.brand_id);
+      if (!belongs) {
+        return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan atau bukan milik brand ini.' });
+      }
+      corePaymentRepo.updateBranchPaymentConfig(branch_id, jsonStr);
+      return res.json({ success: true, message: 'Override pembayaran cabang berhasil disimpan.', is_branch_override: true });
+    }
+
+    // Brand-level default
+    corePaymentRepo.updateBrandPaymentConfig(req.brand_id, jsonStr);
+    res.json({ success: true, message: 'Pengaturan pembayaran default brand berhasil disimpan.', is_branch_override: false });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4.4 Fulfillment Settings
+router.get('/admin/settings/commerce/fulfillment', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { branch_id } = req.query;
+    let targetBranchId = branch_id;
+    if (req.user.role === 'branch_manager') {
+      targetBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    if (!targetBranchId || targetBranchId === 'all') {
+      const firstBranch = db.prepare('SELECT id FROM branches WHERE brand_id = ? ORDER BY created_at ASC LIMIT 1').get(req.brand_id);
+      targetBranchId = firstBranch ? firstBranch.id : null;
+    }
+
+    if (!targetBranchId) {
+      return res.json({
+        success: true,
+        fulfillment: {
+          branch_id: null,
+          is_delivery_active: true,
+          is_pickup_active: true,
+          is_dine_in_active: true,
+          max_radius_km: 10.0,
+          free_delivery_km: 3.0,
+          price_per_km: 2500.0,
+          min_order_amount: 0.0,
+          promo_delivery_discount: 0.0,
+          promo_min_order: 0.0
+        }
+      });
+    }
+
+    const settings = coreBranchRepo.findBranchDeliverySettings(targetBranchId);
+    res.json({
+      success: true,
+      fulfillment: {
+        branch_id: targetBranchId,
+        branch_name: settings ? settings.branch_name : 'Cabang Utama',
+        is_delivery_active: settings ? settings.is_delivery_active === 1 : true,
+        is_pickup_active: settings ? settings.is_pickup_active === 1 : true,
+        is_dine_in_active: true,
+        max_radius_km: settings ? settings.max_radius_km : 10.0,
+        free_delivery_km: settings ? settings.free_delivery_km : 3.0,
+        price_per_km: settings ? settings.price_per_km : 2500.0,
+        min_order_amount: settings ? settings.min_order_amount : 0.0,
+        promo_delivery_discount: settings ? settings.promo_delivery_discount : 0.0,
+        promo_min_order: settings ? settings.promo_min_order : 0.0
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 4.5 Fulfillment Settings (PUT - Branch Manager / Brand Manager / Owner)
+router.put('/admin/settings/commerce/fulfillment', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    let { branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount, promo_delivery_discount, promo_min_order } = req.body;
+    if (req.user.role === 'branch_manager') {
+      branch_id = req.user.branch_id || req.user.branchId;
+    }
+
+    if (!branch_id || branch_id === 'all') {
+      return res.status(400).json({ success: false, error: 'ID cabang spesifik diperlukan untuk memperbarui pemenuhan pesanan.' });
+    }
+
+    const belongs = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, req.brand_id);
+    if (!belongs) {
+      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan atau tidak memiliki akses.' });
+    }
+
+    coreBranchRepo.updateBranchDeliverySettings(branch_id, {
+      is_delivery_active,
+      is_pickup_active,
+      max_radius_km,
+      free_delivery_km,
+      price_per_km,
+      min_order_amount,
+      promo_delivery_discount,
+      promo_min_order
+    });
+
+    res.json({ success: true, message: 'Konfigurasi pemenuhan pesanan cabang berhasil diperbarui.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Channels Status & Config
+// 5.1 Website
+router.get('/admin/settings/channels/website', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const brand = coreBrandRepo.findById(req.brand_id) || req.brand;
+    const hostHeader = (req.get('host') || '').split(':')[0];
+    const resolvedDomain = brand.custom_domain || hostHeader || 'localhost';
+    res.json({
+      success: true,
+      channel: {
+        code: 'website',
+        name: 'Official Merchant Web Ordering',
+        status: 'active',
+        domain: resolvedDomain,
+        url: 'https://' + resolvedDomain + '/',
+        features: ['Desktop Catalog', 'Checkout', 'Midtrans Gateway', 'Order Tracking']
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5.2 Customer App (PWA)
+router.get('/admin/settings/channels/customer-app', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const brand = coreBrandRepo.findById(req.brand_id) || req.brand;
+    res.json({
+      success: true,
+      channel: {
+        code: 'customer-app',
+        name: 'Customer PWA (Progressive Web App)',
+        status: 'active',
+        manifest_url: '/manifest.json',
+        pwa_icon: brand.logo_url || '/assets/pwa/icon-192.png',
+        primary_color: brand.primary_color || '#b6ff00',
+        installable: true,
+        offline_shell: true
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5.3 POS
+router.get('/admin/settings/channels/pos', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const openShifts = db.prepare(`
+      SELECT s.id, s.branch_id, b.name as branch_name, s.cashier_id, s.opened_at
+      FROM pos_shifts s
+      JOIN branches b ON s.branch_id = b.id
+      WHERE b.brand_id = ? AND s.status = 'open'
+    `).all(req.brand_id);
+
+    res.json({
+      success: true,
+      channel: {
+        code: 'pos',
+        name: 'Point of Sale (POS Kasir)',
+        status: 'active',
+        active_shifts_count: openShifts ? openShifts.length : 0,
+        open_shifts: openShifts || [],
+        features: ['Cashier Shift Management', 'Split / Merge Order', 'Cash Drawer Movements', 'Receipt Printing']
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 5.4 Kiosk (Honest not-configured state)
+router.get('/admin/settings/channels/kiosk', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  res.json({
+    success: true,
+    channel: {
+      code: 'kiosk',
+      name: 'Self-Service Kiosk Terminal',
+      status: 'not_configured',
+      is_supported: false,
+      message: 'Self-Service Ordering Kiosk belum dikonfigurasi untuk brand ini. Dapat diaktifkan saat perangkat terminal kiosk fisik terhubung.'
+    }
+  });
+});
+
+// 6. Integrations Status API
+router.get('/admin/settings/integrations', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const brandConfig = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
+    let parsedConfig = null;
+    if (brandConfig && brandConfig.default_payment_config) {
+      try { parsedConfig = JSON.parse(brandConfig.default_payment_config); } catch (_) {}
+    }
+
+    const midtransActive = Boolean(parsedConfig?.server_key || process.env.MIDTRANS_SERVER_KEY);
+    const midtransEnv = (parsedConfig?.is_production || process.env.MIDTRANS_IS_PRODUCTION === 'true') ? 'production' : 'sandbox';
+
+    res.json({
+      success: true,
+      integrations: [
+        {
+          id: 'payment_gateway_midtrans',
+          name: 'Midtrans Payment Gateway',
+          category: 'payment',
+          status: midtransActive ? 'connected' : 'disconnected',
+          environment: midtransEnv,
+          description: 'Payment gateway multi-channel untuk pembayaran online checkout PWA dan web.',
+          is_configurable: true
+        },
+        {
+          id: 'pos_cashier_engine',
+          name: 'Xentra Core POS Engine',
+          category: 'pos',
+          status: 'connected',
+          environment: 'native',
+          description: 'Sistem POS kasir terintegrasi langsung dengan manajemen shift, laci kas, dan dapur.',
+          is_configurable: false
+        },
+        {
+          id: 'xentra_connector',
+          name: 'Xentra Connector (External POS / ERP Bridge)',
+          category: 'connector',
+          status: 'on_hold',
+          description: 'Bridge penghubung ekosistem ERP dan hardware eksternal. Invariant: Status HOLD.',
+          is_configurable: false
+        }
+      ]
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7. Notifications Settings (Honest not-configured state)
+router.get('/admin/settings/notifications', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  res.json({
+    success: true,
+    is_supported: false,
+    channels: {
+      email: { enabled: false, provider: 'smtp', status: 'not_configured' },
+      whatsapp: { enabled: false, provider: 'wa_gateway', status: 'not_configured' },
+      push_notification: { enabled: false, provider: 'fcm_web_push', status: 'not_configured' }
+    },
+    message: 'Preferensi notifikasi multi-channel (WhatsApp, Email, Web Push) belum dikonfigurasi di Core persistence v1. Notifikasi pesanan saat ini berjalan secara lokal realtime di dashboard via WebSocket/polling.'
+  });
+});
+
+// 8. Security & Audit Settings
+router.get('/admin/settings/security', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const logs = coreUserRepo.findAuditLogsForBrand(req.brand_id, 15);
+    res.json({
+      success: true,
+      security: {
+        auth_mode: 'jwt_bearer_token',
+        session_ttl_hours: 24,
+        rbac_model: 'User -> Role -> Scope',
+        roles_supported: ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'],
+        current_user: {
+          id: req.user.id || req.user.userId,
+          username: req.user.username,
+          role: req.user.role,
+          branch_id: req.user.branch_id || req.user.branchId || null
+        },
+        recent_audit_logs: logs || []
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

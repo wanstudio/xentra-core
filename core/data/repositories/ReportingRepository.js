@@ -24,11 +24,11 @@ class ReportingRepository {
       queryParams.push(filter.brand_id);
     }
     if (filter.start_date) {
-      joinConditions.push('o.created_at >= ?');
+      joinConditions.push('datetime(o.created_at) >= datetime(?)');
       queryParams.push(filter.start_date);
     }
     if (filter.end_date) {
-      joinConditions.push('o.created_at <= ?');
+      joinConditions.push('datetime(o.created_at) <= datetime(?)');
       queryParams.push(filter.end_date);
     }
 
@@ -68,11 +68,11 @@ class ReportingRepository {
       params.push(filter.branch_id);
     }
     if (filter.start_date) {
-      whereClauses.push(`${pfx}created_at >= ?`);
+      whereClauses.push(`datetime(${pfx}created_at) >= datetime(?)`);
       params.push(filter.start_date);
     }
     if (filter.end_date) {
-      whereClauses.push(`${pfx}created_at <= ?`);
+      whereClauses.push(`datetime(${pfx}created_at) <= datetime(?)`);
       params.push(filter.end_date);
     }
 
@@ -336,6 +336,201 @@ class ReportingRepository {
       params
     };
   }
+
+  getSalesByFulfillment(filter = {}) {
+    const { whereSql, params } = this._buildOrderFilter(filter);
+    return this.db.queryMany(`
+      SELECT
+        COALESCE(fulfillment_type, order_type) as fulfillment_type,
+        COUNT(*) as order_count,
+        COALESCE(SUM(grand_total), 0) as total_revenue
+      FROM orders
+      ${whereSql}
+      GROUP BY COALESCE(fulfillment_type, order_type)
+    `, params);
+  }
+
+  getCustomerOverview(filter = {}) {
+    const { whereSql, params } = this._buildOrderFilter(filter);
+    const result = this.db.queryOne(`
+      SELECT
+        COUNT(DISTINCT customer_phone) as total_unique_customers,
+        COUNT(*) as total_orders,
+        COALESCE(SUM(grand_total), 0) as total_spend
+      FROM orders
+      ${whereSql}
+      AND customer_phone IS NOT NULL AND customer_phone != ''
+    `, params);
+
+    return result || { total_unique_customers: 0, total_orders: 0, total_spend: 0 };
+  }
+
+  getTopCustomers(filter = {}) {
+    const { whereSql, params } = this._buildOrderFilter(filter);
+    return this.db.queryMany(`
+      SELECT
+        customer_name,
+        customer_phone,
+        COUNT(*) as total_orders,
+        COALESCE(SUM(grand_total), 0) as total_spent,
+        MAX(created_at) as last_order_date
+      FROM orders
+      ${whereSql}
+      AND customer_phone IS NOT NULL AND customer_phone != ''
+      GROUP BY customer_phone, customer_name
+      ORDER BY total_spent DESC
+      LIMIT 50
+    `, params);
+  }
+
+  getCustomersList(filter = {}) {
+    const { whereSql, params } = this._buildOrderFilter(filter, 'o');
+    const extraConditions = ["o.customer_phone IS NOT NULL AND o.customer_phone != ''"];
+    const queryParams = [...params];
+
+    if (filter.search) {
+      extraConditions.push('(o.customer_name LIKE ? OR o.customer_phone LIKE ?)');
+      queryParams.push(`%${filter.search}%`, `%${filter.search}%`);
+    }
+
+    const whereCombined = whereSql 
+      ? `${whereSql} AND ${extraConditions.join(' AND ')}`
+      : `WHERE ${extraConditions.join(' AND ')}`;
+
+    // Subquery to get favorite/most used branch
+    const rows = this.db.queryMany(`
+      SELECT
+        o.customer_phone,
+        MAX(o.customer_name) as customer_name,
+        COUNT(o.id) as total_orders,
+        COALESCE(SUM(o.grand_total), 0) as total_spent,
+        COALESCE(AVG(o.grand_total), 0) as average_order_value,
+        MAX(o.created_at) as last_order_date,
+        MIN(o.created_at) as first_order_date
+      FROM orders o
+      ${whereCombined}
+      GROUP BY o.customer_phone
+      ORDER BY total_spent DESC
+    `, queryParams);
+
+    // Enrich with favorite branch and segment
+    return rows.map(customer => {
+      const favBranchRow = this.db.queryOne(`
+        SELECT b.id, b.name, COUNT(o.id) as branch_order_count
+        FROM orders o
+        JOIN branches b ON o.branch_id = b.id
+        WHERE o.customer_phone = ? AND o.brand_id = ?
+        GROUP BY b.id, b.name
+        ORDER BY branch_order_count DESC
+        LIMIT 1
+      `, [customer.customer_phone, filter.brand_id || 'brand_bangjo']);
+
+      // Segment: new (1 order) vs returning (>1 orders)
+      const segment = customer.total_orders > 1 ? 'returning' : 'new';
+
+      return {
+        id: customer.customer_phone,
+        name: customer.customer_name || 'Pelanggan',
+        phone: customer.customer_phone,
+        order_count: customer.total_orders,
+        total_spend: customer.total_spent,
+        average_order_value: Math.round(customer.average_order_value),
+        last_order: customer.last_order_date,
+        first_order: customer.first_order_date,
+        favorite_branch: favBranchRow ? { id: favBranchRow.id, name: favBranchRow.name } : null,
+        segment
+      };
+    });
+  }
+
+  getCustomerDetail(brandId, customerIdOrPhone, branchId = null) {
+    const whereClauses = [
+      'o.brand_id = ?',
+      '(o.customer_phone = ? OR o.id = ?)',
+      `o.status IN (${COMPLETED_ORDER_STATUSES})`
+    ];
+    const params = [brandId, customerIdOrPhone, customerIdOrPhone];
+
+    if (branchId) {
+      whereClauses.push('o.branch_id = ?');
+      params.push(branchId);
+    }
+
+    const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
+
+    const summary = this.db.queryOne(`
+      SELECT
+        o.customer_phone,
+        MAX(o.customer_name) as customer_name,
+        COUNT(o.id) as total_orders,
+        COALESCE(SUM(o.grand_total), 0) as total_spend,
+        COALESCE(AVG(o.grand_total), 0) as average_order_value,
+        MAX(o.created_at) as last_order_date,
+        MIN(o.created_at) as first_order_date
+      FROM orders o
+      ${whereSql}
+      GROUP BY o.customer_phone
+    `, params);
+
+    if (!summary) return null;
+
+    // Favorite branch
+    const favBranchRow = this.db.queryOne(`
+      SELECT b.id, b.name, COUNT(o.id) as branch_order_count
+      FROM orders o
+      JOIN branches b ON o.branch_id = b.id
+      WHERE o.customer_phone = ? AND o.brand_id = ? AND o.status IN (${COMPLETED_ORDER_STATUSES})
+      GROUP BY b.id, b.name
+      ORDER BY branch_order_count DESC
+      LIMIT 1
+    `, [summary.customer_phone, brandId]);
+
+    // Top ordered products for this customer
+    const topProducts = this.db.queryMany(`
+      SELECT oi.product_id, oi.product_name, SUM(oi.quantity) as total_quantity, SUM(COALESCE(oi.subtotal, oi.item_subtotal, oi.unit_price * oi.quantity)) as total_sales
+      FROM order_items oi
+      JOIN orders o ON oi.order_id = o.id
+      WHERE o.customer_phone = ? AND o.brand_id = ? AND o.status IN (${COMPLETED_ORDER_STATUSES})
+      GROUP BY oi.product_id, oi.product_name
+      ORDER BY total_quantity DESC
+      LIMIT 5
+    `, [summary.customer_phone, brandId]);
+
+    // Order history
+    const orderHistory = this.db.queryMany(`
+      SELECT o.id, o.order_number, o.created_at, o.status, o.order_channel, o.fulfillment_type, o.grand_total, b.name as branch_name
+      FROM orders o
+      LEFT JOIN branches b ON o.branch_id = b.id
+      WHERE o.customer_phone = ? AND o.brand_id = ?
+      ORDER BY o.created_at DESC
+      LIMIT 20
+    `, [summary.customer_phone, brandId]);
+
+    // Delivery addresses if any
+    const addresses = this.db.queryMany(`
+      SELECT id, label, address, detail, note, is_primary
+      FROM customer_addresses
+      WHERE customer_phone = ? AND brand_id = ?
+      ORDER BY is_primary DESC, created_at DESC
+    `, [summary.customer_phone, brandId]);
+
+    return {
+      id: summary.customer_phone,
+      name: summary.customer_name || 'Pelanggan',
+      phone: summary.customer_phone,
+      total_orders: summary.total_orders,
+      total_spend: summary.total_spend,
+      average_order_value: Math.round(summary.average_order_value),
+      last_order: summary.last_order_date,
+      first_order: summary.first_order_date,
+      segment: summary.total_orders > 1 ? 'returning' : 'new',
+      favorite_branch: favBranchRow ? { id: favBranchRow.id, name: favBranchRow.name } : null,
+      top_products: topProducts,
+      orders: orderHistory,
+      addresses: addresses || []
+    };
+  }
 }
 
 module.exports = ReportingRepository;
+

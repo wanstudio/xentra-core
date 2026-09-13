@@ -692,18 +692,34 @@ describe('Google-First Authentication & Bangjo Owner Linking', () => {
     assert.equal(userCountAfter, userCountBefore, 'No user record must be created for unlinked Google account');
   });
 
-  // Q. GET /dashboard/login serves login page containing Google auth integration elements
-  test('Q. GET /dashboard/login serves HTML page containing Google Sign-In container and SDK setup', async () => {
-    const res = await makeRequest(server, {
+  // Q. Centralized Google Auth Architecture: /dashboard/login has both Platform inline SDK path and Client broker path
+  test('Q. GET /dashboard/login serves page with Platform inline SDK path and Client broker path', async () => {
+    const loginRes = await makeRequest(server, {
       method: 'GET',
       path: '/dashboard/login'
     });
 
-    assert.equal(res.status, 200);
-    assert.ok(res.raw.includes('id="google-auth-container"'), 'Page must have google-auth-container');
-    assert.ok(res.raw.includes('id="google-btn-slot"'), 'Page must have google-btn-slot');
-    assert.ok(res.raw.includes('/api/v1/auth/google'), 'Page must wire to /api/v1/auth/google');
-    assert.ok(res.raw.includes('form-merchant-login'), 'Legacy form must remain present');
+    assert.equal(loginRes.status, 200);
+    assert.ok(loginRes.raw.includes('id="google-auth-container"'), 'Page must have google-auth-container');
+    assert.ok(loginRes.raw.includes('id="btn-google-login"'), 'Page must have btn-google-login');
+    assert.ok(loginRes.raw.includes('xentra.cloud/auth/broker'), 'Client/Tenant branch must route to xentra.cloud/auth/broker');
+    // Platform inline SDK: GSI URL present in JS string (dynamic load, not static <script> tag)
+    assert.ok(loginRes.raw.includes('accounts.google.com/gsi/client'), 'Platform branch must reference GSI SDK URL for inline auth');
+    assert.ok(!loginRes.raw.includes('<script src="https://accounts.google.com/gsi/client"'), 'GSI SDK must be dynamically loaded (not a static script tag)');
+    assert.ok(loginRes.raw.includes('handlePlatformGoogleCredential'), 'Platform branch must define inline credential handler');
+    assert.ok(loginRes.raw.includes('form-merchant-login'), 'Legacy form must remain present');
+
+    // Centralized broker page on xentra.cloud
+    const brokerRes = await makeRequest(server, {
+      method: 'GET',
+      path: '/auth/broker',
+      headers: { Host: 'xentra.cloud' }
+    });
+
+    assert.equal(brokerRes.status, 200);
+    assert.ok(brokerRes.raw.includes('id="google-btn-slot"'), 'Broker page must have google-btn-slot');
+    assert.ok(brokerRes.raw.includes('accounts.google.com/gsi/client'), 'Broker page must load Google GSI SDK');
+    assert.ok(brokerRes.raw.includes('/api/v1/auth/google'), 'Broker page must post to /api/v1/auth/google');
   });
 
   // R. Environment GOOGLE_CLIENT_ID is strictly enforced as expected audience

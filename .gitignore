@@ -42,3 +42,15 @@ apps/customer-pwa/assets/uploads/products/*
 # Uploaded branch-product override images (test/runtime artifacts — not source)
 apps/customer-pwa/assets/uploads/branch-products/*
 !apps/customer-pwa/assets/uploads/branch-products/.gitkeep
+
+# Uploaded logos, banners, staging, general runtime files
+apps/customer-pwa/assets/uploads/logos/*
+!apps/customer-pwa/assets/uploads/logos/.gitkeep
+apps/customer-pwa/assets/uploads/banners/*
+!apps/customer-pwa/assets/uploads/banners/.gitkeep
+apps/customer-pwa/assets/uploads/staging/*
+!apps/customer-pwa/assets/uploads/staging/.gitkeep
+apps/customer-pwa/assets/uploads/general/*
+!apps/customer-pwa/assets/uploads/general/.gitkeep
+apps/customer-pwa/assets/uploads/product/*
+!apps/customer-pwa/assets/uploads/product/.gitkeep

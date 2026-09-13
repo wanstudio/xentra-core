@@ -15,6 +15,7 @@ const EligibilityRepository = require('./EligibilityRepository');
 const ReportingRepository = require('./ReportingRepository');
 const RoutePersistenceRepository = require('./RoutePersistenceRepository');
 const WorkforceRepository = require('./WorkforceRepository');
+const MediaRepository = require('./MediaRepository');
 
 module.exports = {
   CatalogRepository,
@@ -31,5 +32,6 @@ module.exports = {
   EligibilityRepository,
   ReportingRepository,
   RoutePersistenceRepository,
-  WorkforceRepository
+  WorkforceRepository,
+  MediaRepository
 };

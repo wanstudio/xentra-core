@@ -636,6 +636,7 @@ function initSchema(targetDb) {
       is_active INTEGER DEFAULT 1,
       is_open_override INTEGER DEFAULT 1,
       payment_config_override TEXT,
+      is_archived INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
@@ -1143,11 +1144,38 @@ function initSchema(targetDb) {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_order_payments_order_id ON order_payments(order_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_shifts_unique_active_cashier ON pos_shifts(cashier_id) WHERE status = 'open';
+
+    CREATE TABLE IF NOT EXISTS media_assets (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT,
+      brand_id TEXT NOT NULL,
+      uploaded_by TEXT,
+      storage_key TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      original_filename TEXT,
+      width INTEGER,
+      height INTEGER,
+      size_bytes INTEGER DEFAULT 0,
+      asset_type TEXT DEFAULT 'general',
+      status TEXT DEFAULT 'temporary',
+      attached_to_type TEXT,
+      attached_to_id TEXT,
+      attached_at TEXT,
+      orphaned_at TEXT,
+      error_message TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_media_brand_status ON media_assets(brand_id, status);
+    CREATE INDEX IF NOT EXISTS idx_media_status_created ON media_assets(status, created_at);
   `);
 
   try { targetDb.exec('ALTER TABLE users ADD COLUMN branch_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN whatsapp_number TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE branches ADD COLUMN is_archived INTEGER DEFAULT 0;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN brand_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN slug TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN image_url TEXT;'); } catch (e) {}

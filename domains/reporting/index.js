@@ -8,6 +8,7 @@ const InventoryReportService = require('./services/InventoryReportService');
 const PosShiftReportService = require('./services/PosShiftReportService');
 const ProductReportService = require('./services/ProductReportService');
 const BranchCompareService = require('./services/BranchCompareService');
+const CustomerReportService = require('./services/CustomerReportService');
 
 const REPORTING_IDENTITY = {
   name: 'reporting',
@@ -56,17 +57,19 @@ class ReportingEngine {
   /**
    * Universal router for report queries.
    * 
-   * @param {string} reportType - 'sales' | 'payment' | 'inventory' | 'pos_shifts' | 'products' | 'branches'
+   * @param {string} reportType - 'sales' | 'payment' | 'inventory' | 'pos_shifts' | 'products' | 'branches' | 'customers' | 'orders' | 'operations'
    * @param {Object} filterParams
    * @returns {Object} Generated report payload
    */
   static generateReport(reportType, filterParams = {}) {
     switch (reportType) {
       case 'sales':
+      case 'orders':
         return SalesReportService.getSalesReport(filterParams);
       case 'payment':
         return PaymentReportService.getPaymentReport(filterParams);
       case 'inventory':
+      case 'operations':
         return InventoryReportService.getInventoryReport(filterParams);
       case 'pos_shifts':
       case 'shift':
@@ -77,6 +80,8 @@ class ReportingEngine {
       case 'branches':
       case 'branch_comparison':
         return BranchCompareService.getBranchComparisonReport(filterParams);
+      case 'customers':
+        return CustomerReportService.getCustomerReport(filterParams);
       default:
         throw new Error(`[ReportingEngine] Report type "${reportType}" tidak dikenali.`);
     }
@@ -94,5 +99,7 @@ module.exports = {
   InventoryReportService,
   PosShiftReportService,
   ProductReportService,
-  BranchCompareService
+  BranchCompareService,
+  CustomerReportService
 };
+

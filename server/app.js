@@ -13,9 +13,12 @@ const apiRoutes = require('./routes/api');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Standard Middlewares: CORS with strict explicit origin checks (No wildcard endsWith).
-// Client-domain origins are deployment-managed configuration, not application
-// source exceptions. Same-origin requests do not require CORS permission.
+const { BrandRepository } = require('../core/data/repositories');
+const brandRepository = new BrandRepository();
+
+// Standard Middlewares: CORS with strict explicit and dynamic registered origin checks.
+// Client-domain origins are dynamically verified against the authoritative Domain Registry / BrandRepository.
+// No wildcard CORS and no hardcoded client domains in application code.
 const configuredAllowedOrigins = String(process.env.XENTRA_CORS_ALLOWED_ORIGINS || '')
   .split(',')
   .map((origin) => origin.trim())
@@ -30,11 +33,11 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: function (origin, callback) {
+  origin: async function (origin, callback) {
     // Allow non-browser / internal server requests (null origin like curl, mobile app webview or SSR)
     if (!origin) return callback(null, true);
     
-    // P1 HARDENING: Check against strictly allowed explicit origins only
+    // Check against strictly allowed explicit origins (control plane, local dev, env configured)
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
@@ -44,18 +47,56 @@ app.use(cors({
       return callback(null, true);
     }
 
+    // Dynamic registered client domain verification (No hardcoded domains, No wildcard CORS)
+    try {
+      const parsedUrl = new URL(origin);
+      const protocol = parsedUrl.protocol.toLowerCase();
+      const isProduction = process.env.NODE_ENV === 'production';
+
+      // Enforce protocol boundaries: HTTPS strictly required in production; http/https in dev/test
+      if (isProduction && protocol !== 'https:') {
+        return callback(new Error('CORS policy: Origin not allowed.'));
+      }
+      if (!isProduction && protocol !== 'https:' && protocol !== 'http:') {
+        return callback(new Error('CORS policy: Origin not allowed.'));
+      }
+
+      const rawHostname = parsedUrl.hostname.toLowerCase().trim();
+      if (!rawHostname) {
+        return callback(new Error('CORS policy: Origin not allowed.'));
+      }
+
+      // Reject localhost, loopback, or internal destinations in production
+      const isLoopbackOrLocal = rawHostname === 'localhost' ||
+        rawHostname === '127.0.0.1' ||
+        rawHostname === '::1' ||
+        rawHostname.endsWith('.local') ||
+        rawHostname.endsWith('.internal');
+
+      if (isProduction && isLoopbackOrLocal) {
+        return callback(new Error('CORS policy: Origin not allowed.'));
+      }
+
+      // Authoritative check against registered client domains via BrandRepository / Domain Registry
+      await brandRepository.ready();
+      const brand = brandRepository.findByCustomDomain(rawHostname);
+      if (brand && brand.custom_domain && brand.custom_domain.toLowerCase().trim() === rawHostname) {
+        return callback(null, true);
+      }
+    } catch (_) {
+      // Malformed URL or resolution error fails closed
+    }
+
     // P1 HARDENING: Strictly reject all other origins
     return callback(new Error('CORS policy: Origin not allowed.'));
   },
   credentials: true
 }));
 
-// 6mb JSON limit: base64-encoded category/menu image uploads (see POST
-// /admin/branches/:id/categories/:catId/image) are ~33% larger than the raw
-// file, and raw files are capped at 3MB — 6mb gives comfortable headroom
-// without opening the door to arbitrarily large payloads.
-app.use(express.json({ limit: '6mb' }));
-app.use(express.urlencoded({ extended: true }));
+// 30mb JSON limit: accommodates up to 20MB raw binary media uploads (M0 locked policy)
+// encoded in base64 (~33% expansion = ~26.7MB), with safe headroom.
+app.use(express.json({ limit: '30mb' }));
+app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 
 // REST API with Tenant Resolution (Support both /api/v1 and /api)
 app.use(['/api/v1', '/api'], tenantResolver, apiRoutes);
@@ -111,16 +152,46 @@ app.get(['/signup', '/signup/'], (req, res, next) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/signup.html'));
 });
+app.get(['/auth/broker', '/auth/broker/'], (req, res, next) => {
+  if (!isSaaSHost(req)) return next();
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/auth-broker.html'));
+});
 
 app.get(['/onboarding', '/onboarding/*', '/onboarding/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/onboarding.html'));
 });
-app.get(['/dashboard/login', '/dashboard/login/'], (req, res) => {
+app.get(['/dashboard/login', '/dashboard/login/'], async (req, res) => {
+  if (!isSaaSHost(req)) {
+    const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
+    await brandRepository.ready();
+    const brand = brandRepository.findByCustomDomain(cleanHost);
+    if (!brand) {
+      return res.status(404).json({
+        success: false,
+        error: 'TENANT_NOT_FOUND',
+        message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
+      });
+    }
+  }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/login.html'));
 });
-app.get(/^\/dashboard(\/.*)?$/, (req, res) => {
+
+app.get(/^\/dashboard(\/.*)?$/, async (req, res) => {
+  if (!isSaaSHost(req)) {
+    const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
+    await brandRepository.ready();
+    const brand = brandRepository.findByCustomDomain(cleanHost);
+    if (!brand) {
+      return res.status(404).json({
+        success: false,
+        error: 'TENANT_NOT_FOUND',
+        message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
+      });
+    }
+  }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
 });
@@ -172,7 +243,7 @@ app.get(['/order-received', '/order-received/:id', '/order-received/'], (req, re
 // Fallback: SaaS Control Plane redirects to public landing page; Tenant domains serve customer PWA
 app.get('*', (req, res) => {
   const host = req.headers.host || '';
-  const cleanHost = host.split(':')[0].toLowerCase();
+  const cleanHost = host.split(':')[0].trim().toLowerCase();
 
   // On xentra.cloud SaaS control plane, send unmatched paths to the public landing page
   if (cleanHost === 'xentra.cloud') {

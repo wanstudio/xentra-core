@@ -19,7 +19,7 @@ async function tenantResolver(req, res, next) {
       '/api/v1/auth/verify-email',
       '/auth/verify-email',
       '/api/v1/auth/resend-verification',
-      '/auth/resend-verification',
+      '/auth/broker',
       '/onboarding/check-domain',
       '/api/v1/onboarding/check-domain',
       '/onboarding/claim',
@@ -30,10 +30,47 @@ async function tenantResolver(req, res, next) {
     }
 
     const host = req.headers.host || '';
-    const cleanHost = host.split(':')[0].toLowerCase();
+    const cleanHost = host.split(':')[0].trim().toLowerCase();
 
     // xentra.cloud is the SaaS Control Plane surface (no tenant resolution needed for control-plane requests)
     if (cleanHost === 'xentra.cloud') {
+      // Check if an explicit tenant brand context was provided via headers or query (e.g. customer-pwa on xentra.cloud)
+      const explicitSlug = req.headers['x-brand-slug'] || (req.query && req.query.brand_slug);
+      const explicitBrandId = req.headers['x-brand-id'] || (req.query && req.query.brand_id);
+
+      if (explicitSlug) {
+        const brandBySlug = brandRepository.findBySlug(String(explicitSlug).trim());
+        if (brandBySlug) {
+          req.brand = brandBySlug;
+          req.brand_id = brandBySlug.id;
+          req.organization_id = brandBySlug.organization_id;
+          return next();
+        }
+      }
+
+      if (explicitBrandId) {
+        const brandById = brandRepository.findById(String(explicitBrandId).trim());
+        if (brandById) {
+          req.brand = brandById;
+          req.brand_id = brandById.id;
+          req.organization_id = brandById.organization_id;
+          return next();
+        }
+      }
+
+      // If a registered client domain executes handoff exchange against xentra.cloud control-plane, resolve brand from Origin
+      if ((req.path === '/auth/handoff/exchange' || req.path === '/api/v1/auth/handoff/exchange') && req.headers.origin) {
+        try {
+          const originHost = new URL(req.headers.origin).hostname.toLowerCase().trim();
+          const originBrand = brandRepository.findByCustomDomain(originHost);
+          if (originBrand) {
+            req.brand = originBrand;
+            req.brand_id = originBrand.id;
+            req.organization_id = originBrand.organization_id;
+            return next();
+          }
+        } catch (_) {}
+      }
       return next();
     }
 
@@ -46,15 +83,14 @@ async function tenantResolver(req, res, next) {
         brand = brandRepository.findByCustomDomain(cleanHost);
       }
 
-      // Localhost/test fallback exists only to keep isolated development/test execution practical.
-      // It must never become a production tenant-selection mechanism.
-      const isLocalOrTest = !cleanHost ||
+      // Localhost fallback exists only to keep isolated local developer execution practical.
+      // It must never become a production tenant-selection mechanism or allow unknown domains to bypass resolution.
+      const isLocal = !cleanHost ||
         cleanHost === 'localhost' ||
         cleanHost === '127.0.0.1' ||
-        cleanHost === '::1' ||
-        process.env.NODE_ENV === 'test';
+        cleanHost === '::1';
 
-      if (!brand && isLocalOrTest) {
+      if (!brand && isLocal) {
         brand = brandRepository.findFirstForLocalDevelopment();
       }
     } catch (dbErr) {
