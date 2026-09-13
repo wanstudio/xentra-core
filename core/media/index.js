@@ -14,12 +14,15 @@ const { StorageProvider, LocalStorageProvider } = require('./StorageProvider');
 const { ImageProcessor, DERIVATIVE_PRESETS, DEFAULT_WEBP_OPTIONS } = require('./ImageProcessor');
 const { CropSpec } = require('../domain/CropSpec');
 
+const MediaReferenceResolver = require('./MediaReferenceResolver');
+
 module.exports = {
   MediaLifecycle,
   MediaService,
   StorageProvider,
   LocalStorageProvider,
   ImageProcessor,
+  MediaReferenceResolver,
   DERIVATIVE_PRESETS,
   DEFAULT_WEBP_OPTIONS,
   CropSpec,

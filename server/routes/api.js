@@ -4483,24 +4483,92 @@ router.get('/admin/media', requireAuth(['owner', 'brand_manager', 'branch_manage
   }
 });
 
-// Delete media (Strictly tenant scoped)
+// Delete media (Strictly tenant scoped, moves to ORPHAN or force hard delete)
 router.delete('/admin/media/:id', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
-    await mediaService.deleteMedia({
+    const force = req.query.force === 'true';
+    const result = await mediaService.deleteMedia({
       mediaId: req.params.id,
-      brandId: req.brand_id
+      brandId: req.brand_id,
+      force
     });
     res.json({
       success: true,
-      message: 'Media berhasil dihapus.',
-      media_id: req.params.id
+      message: force ? 'Media berhasil dihapus permanen.' : 'Media berhasil di-unlink dan masuk masa tenggang (orphan).',
+      result
     });
   } catch (err) {
     const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
     res.status(statusCode).json({
       success: false,
       error: err.message,
-      code: err.code || 'DELETE_MEDIA_ERROR'
+      code: err.code || 'DELETE_MEDIA_ERROR',
+      references: err.references || null
+    });
+  }
+});
+
+// Reconcile orphan assets (M4)
+router.post('/admin/media/reconcile', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const gracePeriodDays = Number(req.body && req.body.grace_period_days) || 30;
+    const result = await mediaService.reconcileOrphans({
+      gracePeriodDays,
+      brandId: req.brand_id
+    });
+    res.json({
+      success: true,
+      message: 'Rekonsiliasi aset media selesai.',
+      result
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      code: 'RECONCILIATION_ERROR'
+    });
+  }
+});
+
+// Trigger Media Garbage Collection (M4)
+router.post('/admin/media/gc', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const temporaryHours = Number(req.body && req.body.temporary_hours) || 24;
+    const orphanGraceDays = Number(req.body && req.body.orphan_grace_days) || 30;
+    const result = await mediaService.collectGarbage({
+      temporaryHours,
+      orphanGraceDays,
+      brandId: req.brand_id
+    });
+    res.json({
+      success: true,
+      message: 'Media Garbage Collection selesai.',
+      result
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      code: 'GC_ERROR'
+    });
+  }
+});
+
+// Media storage consistency check (M4)
+router.get('/admin/media/consistency', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const result = await mediaService.checkConsistency({
+      brandId: req.brand_id
+    });
+    res.json({
+      success: true,
+      result
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      code: 'CONSISTENCY_CHECK_ERROR'
     });
   }
 });

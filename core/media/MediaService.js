@@ -19,18 +19,21 @@ const ImageValidator = require('../domain/ImageValidator');
 const MediaRepository = require('../data/repositories/MediaRepository');
 const { ImageProcessor } = require('./ImageProcessor');
 const { CropSpec } = require('../domain/CropSpec');
+const MediaReferenceResolver = require('./MediaReferenceResolver');
 
 class MediaService {
   constructor({
     mediaRepository = new MediaRepository(),
     storageProvider = new LocalStorageProvider(),
     validator = ImageValidator,
-    imageProcessor = new ImageProcessor()
+    imageProcessor = new ImageProcessor(),
+    referenceResolver = new MediaReferenceResolver()
   } = {}) {
     this.mediaRepo = mediaRepository;
     this.storage = storageProvider;
     this.validator = validator;
     this.processor = imageProcessor;
+    this.resolver = referenceResolver;
   }
 
   /**
@@ -255,17 +258,252 @@ class MediaService {
   }
 
   /**
-   * Delete media with strict tenant authorization.
+   * User-facing / soft delete:
+   * Removes active entity references and transitions the asset to ORPHAN state
+   * with a 30-day grace period. Never destroys binary immediately.
    */
-  async deleteMedia({ mediaId, brandId }) {
+  async unlinkMedia({ mediaId, brandId }) {
+    const asset = this.getMedia({ mediaId, brandId });
+    this.mediaRepo.unlinkAndOrphan(mediaId, brandId);
+    const updated = this.mediaRepo.findById(mediaId, brandId);
+    return this._formatAssetResponse(updated);
+  }
+
+  /**
+   * Permanent hard deletion of a media asset and all its associated variants & binaries.
+   * STRICT SAFETY RULE: Re-checks business entity references immediately before deletion.
+   * If any active reference is detected, hard deletion is immediately ABORTED and asset is restored.
+   */
+  async hardDeleteMedia({ mediaId, brandId, force = false }) {
     const asset = this.getMedia({ mediaId, brandId });
 
-    // Remove binary file
-    await this.storage.delete(asset.storage_key);
+    // 1. Final authoritative reference re-check
+    const refCheck = await this.resolver.checkReference({ mediaId, brandId });
+    if (refCheck.isReferenced && !force) {
+      // Protect referenced asset: restore to ready
+      const firstRef = refCheck.references[0];
+      this.mediaRepo.restoreOrphanToReady(mediaId, brandId, firstRef.type, firstRef.id);
+      const err = new Error(`Aset media tidak dapat dihapus permanen karena masih aktif direferensikan oleh '${firstRef.type}' (${firstRef.id}).`);
+      err.code = 'ASSET_REFERENCED';
+      err.references = refCheck.references;
+      throw err;
+    }
 
-    // Delete DB record
+    // 2. Remove all associated variant binaries and DB records
+    const variants = this.mediaRepo.getVariantsByMediaId(mediaId);
+    for (const v of variants) {
+      if (v.storage_key) {
+        try {
+          await this.storage.delete(v.storage_key);
+        } catch (_) {}
+      }
+    }
+    this.mediaRepo.deleteVariantsByMediaId(mediaId);
+
+    // 3. Remove original binary file
+    if (asset.storage_key) {
+      try {
+        await this.storage.delete(asset.storage_key);
+      } catch (_) {}
+    }
+
+    // 4. Delete DB record
     this.mediaRepo.deleteMedia(mediaId, brandId);
-    return { success: true, mediaId };
+    return { success: true, mediaId, deletedVariants: variants.length };
+  }
+
+  /**
+   * Delete media: user-requested removal enters ORPHAN state (30-day grace).
+   * If force=true, performs immediate reference-checked hard delete.
+   */
+  async deleteMedia({ mediaId, brandId, force = false }) {
+    if (force) {
+      return this.hardDeleteMedia({ mediaId, brandId, force: true });
+    }
+    return this.unlinkMedia({ mediaId, brandId });
+  }
+
+  /**
+   * Clean up abandoned temporary or failed uploads older than cutoff (default 24h).
+   * Re-checks references and state before permanent deletion.
+   */
+  async cleanupTemporary({ olderThanHours = 24, brandId = null } = {}) {
+    const cutoffDate = new Date(Date.now() - olderThanHours * 60 * 60 * 1000);
+    const candidates = this.mediaRepo.findTemporaryBefore(cutoffDate.toISOString(), brandId);
+
+    let cleanedCount = 0;
+    let skippedCount = 0;
+    const details = [];
+
+    for (const asset of candidates) {
+      // Verify still temporary or failed
+      if (asset.status !== MediaLifecycle.STATES.TEMPORARY && asset.status !== MediaLifecycle.STATES.FAILED) {
+        skippedCount++;
+        continue;
+      }
+
+      // Check references
+      const refCheck = await this.resolver.checkReference({ mediaId: asset.id, brandId: asset.brand_id });
+      if (refCheck.isReferenced) {
+        skippedCount++;
+        continue;
+      }
+
+      // Perform clean hard deletion
+      try {
+        await this.hardDeleteMedia({ mediaId: asset.id, brandId: asset.brand_id, force: true });
+        cleanedCount++;
+        details.push({ mediaId: asset.id, status: asset.status, action: 'deleted' });
+      } catch (_) {
+        skippedCount++;
+      }
+    }
+
+    return {
+      cleanedCount,
+      skippedCount,
+      cutoff: cutoffDate.toISOString(),
+      details
+    };
+  }
+
+  /**
+   * Reconcile orphan assets:
+   * 1. If an orphan is discovered to be referenced by an active entity, restore to READY
+   * 2. If an orphan is unreferenced and has passed the 30-day grace period, permanently delete
+   */
+  async reconcileOrphans({ gracePeriodDays = 30, brandId = null } = {}) {
+    const cutoffDate = new Date(Date.now() - gracePeriodDays * 24 * 60 * 60 * 1000);
+    const orphans = this.mediaRepo.findOrphans(brandId);
+
+    let restoredCount = 0;
+    let deletedCount = 0;
+    let retainedCount = 0;
+    const details = [];
+
+    for (const orphan of orphans) {
+      // 1. Authoritative reference check
+      const refCheck = await this.resolver.checkReference({ mediaId: orphan.id, brandId: orphan.brand_id });
+
+      if (refCheck.isReferenced) {
+        // Re-referenced! Restore to READY
+        const firstRef = refCheck.references[0];
+        this.mediaRepo.restoreOrphanToReady(orphan.id, orphan.brand_id, firstRef.type, firstRef.id);
+        restoredCount++;
+        details.push({ mediaId: orphan.id, action: 'restored', references: refCheck.references });
+        continue;
+      }
+
+      // 2. Check 30-day grace period
+      const orphanedAtTime = orphan.orphaned_at ? new Date(orphan.orphaned_at).getTime() : 0;
+      const isPastGracePeriod = orphanedAtTime > 0 && orphanedAtTime < cutoffDate.getTime();
+
+      if (isPastGracePeriod) {
+        // Safe to hard delete
+        try {
+          await this.hardDeleteMedia({ mediaId: orphan.id, brandId: orphan.brand_id, force: true });
+          deletedCount++;
+          details.push({ mediaId: orphan.id, action: 'hard_deleted' });
+        } catch (_) {
+          retainedCount++;
+        }
+      } else {
+        // Still within grace period -> retain
+        retainedCount++;
+        details.push({ mediaId: orphan.id, action: 'retained_in_grace' });
+      }
+    }
+
+    return {
+      reconciledCount: orphans.length,
+      restoredCount,
+      deletedCount,
+      retainedCount,
+      graceCutoff: cutoffDate.toISOString(),
+      details
+    };
+  }
+
+  /**
+   * Check consistency of media storage and database records:
+   * Verifies that original binaries and derivative variants exist on disk.
+   */
+  async checkConsistency({ mediaId = null, brandId = null } = {}) {
+    let assets = [];
+    if (mediaId && brandId) {
+      const a = this.mediaRepo.findById(mediaId, brandId);
+      if (a) assets = [a];
+    } else if (brandId) {
+      assets = this.mediaRepo.listByBrand(brandId, { limit: 1000 });
+    } else {
+      assets = this.mediaRepo.db.queryMany('SELECT * FROM media_assets LIMIT 1000');
+    }
+
+    let healthyCount = 0;
+    const issues = [];
+
+    for (const a of assets) {
+      let isHealthy = true;
+      const originalExists = await this.storage.exists(a.storage_key);
+      if (!originalExists) {
+        isHealthy = false;
+        issues.push({
+          mediaId: a.id,
+          brandId: a.brand_id,
+          type: 'MISSING_ORIGINAL_BINARY',
+          storageKey: a.storage_key
+        });
+      }
+
+      const variants = this.mediaRepo.getVariantsByMediaId(a.id);
+      for (const v of variants) {
+        const varExists = await this.storage.exists(v.storage_key);
+        if (!varExists) {
+          isHealthy = false;
+          issues.push({
+            mediaId: a.id,
+            variantId: v.id,
+            variantName: v.variant_name,
+            brandId: a.brand_id,
+            type: 'MISSING_VARIANT_BINARY',
+            storageKey: v.storage_key
+          });
+        }
+      }
+
+      if (isHealthy) healthyCount++;
+    }
+
+    return {
+      totalAssetsChecked: assets.length,
+      healthyCount,
+      issuesCount: issues.length,
+      issues
+    };
+  }
+
+  /**
+   * Media Garbage Collector (GC):
+   * Runs complete safe maintenance cycle:
+   * 1. Cleanup abandoned temporary/failed uploads (older than 24 hours)
+   * 2. Reconcile orphan assets (restore referenced, delete unreferenced >= 30 days)
+   * 3. Consistency inspection summary
+   */
+  async collectGarbage({ temporaryHours = 24, orphanGraceDays = 30, brandId = null } = {}) {
+    const tempResult = await this.cleanupTemporary({ olderThanHours: temporaryHours, brandId });
+    const orphanResult = await this.reconcileOrphans({ gracePeriodDays: orphanGraceDays, brandId });
+    const consistency = await this.checkConsistency({ brandId });
+
+    return {
+      timestamp: new Date().toISOString(),
+      brandId: brandId || 'all_tenants',
+      temporary: tempResult,
+      orphans: orphanResult,
+      consistency: {
+        healthy: consistency.healthyCount,
+        issues: consistency.issuesCount
+      }
+    };
   }
 
   /**

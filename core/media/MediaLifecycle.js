@@ -15,7 +15,7 @@
  * - Only valid transitions are permitted; invalid transitions fail safely with Error.
  * - Entity attachment is strictly permitted ONLY when state is READY.
  * - FAILED assets may transition back to PROCESSING (retry).
- * - ORPHAN assets cannot transition back to READY or PROCESSING.
+ * - ORPHAN assets may transition back to READY only upon reconciliation if an active reference is detected.
  */
 class MediaLifecycle {
   static STATES = {
@@ -33,7 +33,7 @@ class MediaLifecycle {
     processing: ['ready', 'failed'],
     ready: ['orphan', 'failed'],
     failed: ['processing', 'temporary', 'orphan'], // retryable to processing or temporary
-    orphan: [] // terminal state for GC purge
+    orphan: ['ready'] // reversible if active reference is reconciled
   };
 
   /**

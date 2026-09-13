@@ -5,7 +5,8 @@
 **M0 Locked:** 2026-09-13  
 **M1 Locked:** 2026-09-13  
 **M2 Locked:** 2026-09-13  
-**M3 Locked:** 2026-09-13
+**M3 Locked:** 2026-09-13  
+**M4 Locked:** 2026-09-13
 
 ## Purpose
 Client/merchant-managed media must be uploaded through Xentra-managed media handling so the Merchant Dashboard can safely provide assets used by the Customer PWA and other client runtime surfaces.
@@ -258,9 +259,9 @@ M2 Crop / Image Editor UI                   COMPLETE / LOCKED
  ↓
 M3 Image Processing Pipeline                COMPLETE / LOCKED
  ↓
-M4 Media Storage & Asset Lifecycle          NEXT
+M4 Media Storage & Asset Lifecycle          COMPLETE / LOCKED
  ↓
-M5 Dashboard Integration
+M5 Dashboard Integration                    NEXT
  ↓
 M6 Customer PWA Integration
  ↓

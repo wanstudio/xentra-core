@@ -186,8 +186,18 @@ class MediaRepository {
 
   /**
    * Find abandoned temporary uploads older than cutoff date (for cleanup).
+   * Supports optional brandId filter for strict tenant isolation.
    */
-  findTemporaryBefore(cutoffIsoString) {
+  findTemporaryBefore(cutoffIsoString, brandId = null) {
+    if (brandId) {
+      return this.db.queryMany(`
+        SELECT *
+        FROM media_assets
+        WHERE brand_id = ?
+          AND status IN ('temporary', 'failed')
+          AND created_at < ?
+      `, [brandId, cutoffIsoString]);
+    }
     return this.db.queryMany(`
       SELECT *
       FROM media_assets
@@ -198,8 +208,19 @@ class MediaRepository {
 
   /**
    * Find orphan assets older than cutoff date (for 30-day grace period cleanup).
+   * Supports optional brandId filter for strict tenant isolation.
    */
-  findOrphansBefore(cutoffIsoString) {
+  findOrphansBefore(cutoffIsoString, brandId = null) {
+    if (brandId) {
+      return this.db.queryMany(`
+        SELECT *
+        FROM media_assets
+        WHERE brand_id = ?
+          AND status = 'orphan'
+          AND orphaned_at IS NOT NULL
+          AND orphaned_at < ?
+      `, [brandId, cutoffIsoString]);
+    }
     return this.db.queryMany(`
       SELECT *
       FROM media_assets
@@ -207,6 +228,57 @@ class MediaRepository {
         AND orphaned_at IS NOT NULL
         AND orphaned_at < ?
     `, [cutoffIsoString]);
+  }
+
+  /**
+   * Find all assets currently marked as orphan (for reconciliation).
+   */
+  findOrphans(brandId = null) {
+    if (brandId) {
+      return this.db.queryMany(`
+        SELECT *
+        FROM media_assets
+        WHERE brand_id = ? AND status = 'orphan'
+      `, [brandId]);
+    }
+    return this.db.queryMany(`
+      SELECT *
+      FROM media_assets
+      WHERE status = 'orphan'
+    `);
+  }
+
+  /**
+   * Restore an orphan asset back to ready status when an active reference is discovered.
+   */
+  restoreOrphanToReady(id, brandId, entityType, entityId) {
+    const now = new Date().toISOString();
+    return this.db.execute(`
+      UPDATE media_assets
+      SET status = 'ready',
+          orphaned_at = NULL,
+          attached_to_type = ?,
+          attached_to_id = ?,
+          attached_at = COALESCE(attached_at, ?),
+          updated_at = ?
+      WHERE id = ? AND brand_id = ?
+    `, [entityType, entityId, now, now, id, brandId]);
+  }
+
+  /**
+   * Unlink entity reference and transition to orphan.
+   */
+  unlinkAndOrphan(id, brandId) {
+    const now = new Date().toISOString();
+    return this.db.execute(`
+      UPDATE media_assets
+      SET status = 'orphan',
+          orphaned_at = ?,
+          attached_to_type = NULL,
+          attached_to_id = NULL,
+          updated_at = ?
+      WHERE id = ? AND brand_id = ?
+    `, [now, now, id, brandId]);
   }
 
   /**
