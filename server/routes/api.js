@@ -417,84 +417,90 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
     // and branch stock estimate when branch_id is provided.
     const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: branchScope ? branchScope.id : null });
 
-    // M6: Resolve canonical media delivery for each category
+    // Collect all media IDs across categories and products for batch resolution (O(1) roundtrips)
+    const allMediaIds = [];
+    for (const c of menu.categories) {
+      if (c.media_id) allMediaIds.push(c.media_id);
+    }
+    for (const p of menu.products) {
+      if (p.media_id) allMediaIds.push(p.media_id);
+    }
+
+    const mediaMap = batchResolveCustomerMediaDelivery({
+      mediaIds: allMediaIds,
+      brandId,
+      assetType: 'square'
+    });
+
+    // Helper to enrich any item using the batch-resolved map with legacy fallback
+    const enrichItemMedia = (item) => {
+      const legacyImg = item.image_url || item.icon_url || item.image || '';
+      const resolved = item.media_id ? mediaMap.get(item.media_id) : null;
+      const previewUrl = resolved ? resolved.preview_url : (legacyImg || null);
+      const variants = resolved ? resolved.srcset_variants : [];
+      return {
+        preview_url: previewUrl,
+        image_url: previewUrl || legacyImg,
+        image: previewUrl || legacyImg,
+        media_id: resolved ? resolved.media_id : null,
+        srcset_variants: variants
+      };
+    };
+
+    // Enrich categories
     const categories = menu.categories.map((c) => {
-      const legacyImg = c.image_url || c.icon_url || c.image || '';
-      const delivery = resolveCustomerMediaDelivery({
-        mediaId: c.media_id || null,
-        brandId,
-        assetType: 'square',
-        legacyUrl: legacyImg || null
-      });
+      const media = enrichItemMedia(c);
       return {
         ...c,
-        image: delivery.preview_url || legacyImg,
-        image_url: delivery.preview_url || legacyImg,
-        media_id: delivery.media_id,
-        preview_url: delivery.preview_url,
-        srcset_variants: delivery.srcset_variants
-      };
-    });
-    const products = menu.products;
-
-    const tree = categories.map((cat) => {
-      const catProducts = products.filter((p) => String(p.category_id) === String(cat.id));
-      const catImg = cat.preview_url || cat.image_url || cat.image || cat.icon_url || '';
-
-      // M6: Resolve canonical media delivery for each product
-      const enrichedProducts = catProducts.map((p) => {
-        const legacyImg = p.image_url || p.image || '';
-        const delivery = resolveCustomerMediaDelivery({
-          mediaId: p.media_id || null,
-          brandId,
-          assetType: 'square',
-          legacyUrl: legacyImg || null
-        });
-        return {
-          ...p,
-          image: delivery.preview_url || legacyImg,
-          image_url: delivery.preview_url || legacyImg,
-          media_id: delivery.media_id,
-          preview_url: delivery.preview_url,
-          srcset_variants: delivery.srcset_variants,
-          regular_price: p.regular_price || p.price,
-          sale_price: p.price
-        };
-      });
-
-      return {
-        id: cat.id,
-        name: cat.name,
-        slug: cat.slug || String(cat.name || '').toLowerCase().replace(/\s+/g, '-'),
-        image: catImg,
-        image_url: catImg,
-        media_id: cat.media_id || null,
-        preview_url: cat.preview_url || null,
-        srcset_variants: cat.srcset_variants || [],
-        products: enrichedProducts
+        image: media.image,
+        image_url: media.image_url,
+        media_id: media.media_id,
+        preview_url: media.preview_url,
+        srcset_variants: media.srcset_variants
       };
     });
 
-    // M6: Resolve canonical media delivery for all products (flat list)
-    const allNormalized = products.map((p) => {
-      const legacyImg = p.image_url || p.image || '';
-      const delivery = resolveCustomerMediaDelivery({
-        mediaId: p.media_id || null,
-        brandId,
-        assetType: 'square',
-        legacyUrl: legacyImg || null
-      });
+    // Enrich products ONCE into allNormalized flat list
+    const allNormalized = menu.products.map((p) => {
+      const media = enrichItemMedia(p);
       return {
         ...p,
-        image: delivery.preview_url || legacyImg,
-        image_url: delivery.preview_url || legacyImg,
-        media_id: delivery.media_id,
-        preview_url: delivery.preview_url,
-        srcset_variants: delivery.srcset_variants,
+        image: media.image,
+        image_url: media.image_url,
+        media_id: media.media_id,
+        preview_url: media.preview_url,
+        srcset_variants: media.srcset_variants,
         regular_price: p.regular_price || p.price,
         sale_price: p.price
       };
     });
+
+    // Group enriched products by category_id in O(N) time
+    const productsByCategoryId = new Map();
+    for (const p of allNormalized) {
+      const catKey = String(p.category_id);
+      if (!productsByCategoryId.has(catKey)) {
+        productsByCategoryId.set(catKey, []);
+      }
+      productsByCategoryId.get(catKey).push(p);
+    }
+
+    // Build category tree from enriched items
+    const tree = categories.map((cat) => {
+      const catProducts = productsByCategoryId.get(String(cat.id)) || [];
+      return {
+        id: cat.id,
+        name: cat.name,
+        slug: cat.slug || String(cat.name || '').toLowerCase().replace(/\s+/g, '-'),
+        image: cat.preview_url || cat.image_url || '',
+        image_url: cat.preview_url || cat.image_url || '',
+        media_id: cat.media_id || null,
+        preview_url: cat.preview_url || null,
+        srcset_variants: cat.srcset_variants || [],
+        products: catProducts
+      };
+    });
+
 
     res.json({
       success: true,
@@ -540,15 +546,17 @@ router.get('/products', (req, res) => {
       console.warn('[Products DB Error]:', err.message);
     }
 
-    // M6: Resolve canonical media delivery for each product
+    // M6: Resolve canonical media delivery in batch (avoid N+1 queries)
+    const mediaIds = (products || []).map(p => p.media_id).filter(Boolean);
+    const mediaMap = batchResolveCustomerMediaDelivery({ mediaIds, brandId, assetType: 'square' });
+
     const normalized = (products || []).map((p) => {
       const legacyImg = p.image_url || p.image || '';
-      const delivery = resolveCustomerMediaDelivery({
-        mediaId: p.media_id || null,
-        brandId,
-        assetType: 'square',
-        legacyUrl: legacyImg || null
-      });
+      const delivery = (p.media_id && mediaMap.get(p.media_id)) || {
+        media_id: p.media_id || null,
+        preview_url: legacyImg || null,
+        srcset_variants: []
+      };
       return {
         ...p,
         image: delivery.preview_url || legacyImg,
@@ -4709,51 +4717,105 @@ function resolveCustomerMediaDelivery({ mediaId, brandId, assetType = 'square', 
   if (!mediaId || !brandId) return result;
 
   try {
-    // Tenant-scoped asset lookup — enforces brand isolation
-    const asset = db.prepare(
-      'SELECT id, brand_id, status FROM media_assets WHERE id = ? AND brand_id = ?'
-    ).get(mediaId, brandId);
-
-    if (!asset) return result; // Cross-tenant or missing: fall to legacy silently
-
-    // Only deliver variants from READY assets
-    if (asset.status !== 'ready') return result;
-
-    const variants = db.prepare(
-      'SELECT variant_name, width, height, storage_key FROM media_variants WHERE media_id = ? ORDER BY width ASC'
-    ).all(mediaId);
-
-    if (!variants || variants.length === 0) return result;
-
-    // Build delivery-safe variant list (URLs only, no storage keys exposed)
-    const deliveryVariants = variants.map(v => ({
-      name: v.variant_name,
-      width: v.width,
-      height: v.height,
-      url: mediaService.storage.resolveUrl(v.storage_key)
-    }));
-
-    // Select best preview_url based on asset type:
-    //   square → 640px (sufficient for product/category cards on mobile)
-    //   banner → 640×330 variant (sm)
-    let previewVariant;
-    if (assetType === 'banner') {
-      // For banners: prefer the sm variant (640), fallback to largest available
-      previewVariant = deliveryVariants.find(v => v.width >= 640) || deliveryVariants[deliveryVariants.length - 1];
-    } else {
-      // For square (product/category): prefer 640px, fallback to largest
-      previewVariant = deliveryVariants.find(v => v.width >= 640) || deliveryVariants[deliveryVariants.length - 1];
+    const map = batchResolveCustomerMediaDelivery({
+      mediaIds: [mediaId],
+      brandId,
+      assetType
+    });
+    const resolved = map.get(mediaId);
+    if (resolved) {
+      return {
+        ...resolved,
+        preview_url: resolved.preview_url || legacyUrl || null,
+        legacy_url: legacyUrl || null
+      };
     }
-
-    result.media_id = asset.id;
-    result.preview_url = previewVariant ? previewVariant.url : (legacyUrl || null);
-    result.srcset_variants = deliveryVariants.map(v => ({ url: v.url, width: v.width, height: v.height, name: v.name }));
   } catch (_) {
-    // Any resolution error must not break catalog rendering — fall to legacy
+    // Fall back to legacy gracefully
   }
 
   return result;
 }
+
+/**
+ * M7 BUGFIX: Batch resolves canonical media delivery for multiple media_ids.
+ * Performs at most 2 bounded database queries (1 for assets, 1 for variants)
+ * instead of 2 queries per item (N+1 query elimination).
+ *
+ * @param {Object} params
+ * @param {Array<string>} params.mediaIds
+ * @param {string} params.brandId
+ * @param {string} params.assetType - 'square' | 'banner'
+ * @returns {Map<string, { preview_url: string|null, srcset_variants: Array, media_id: string }>}
+ */
+function batchResolveCustomerMediaDelivery({ mediaIds = [], brandId, assetType = 'square' }) {
+  const resultMap = new Map();
+  if (!brandId || !Array.isArray(mediaIds) || mediaIds.length === 0) {
+    return resultMap;
+  }
+
+  // Filter unique, non-empty media IDs
+  const uniqueIds = Array.from(new Set(mediaIds.filter(id => Boolean(id) && typeof id === 'string')));
+  if (uniqueIds.length === 0) return resultMap;
+
+  try {
+    // 1. Batch query assets scoped to brandId (enforces tenant boundary)
+    const placeholders = uniqueIds.map(() => '?').join(',');
+    const assets = db.prepare(
+      `SELECT id, brand_id, status FROM media_assets WHERE brand_id = ? AND status = 'ready' AND id IN (${placeholders})`
+    ).all(brandId, ...uniqueIds);
+
+    if (!assets || assets.length === 0) return resultMap;
+
+    const readyIds = assets.map(a => a.id);
+    const readyPlaceholders = readyIds.map(() => '?').join(',');
+
+    // 2. Batch query all variants for ready assets
+    const variants = db.prepare(
+      `SELECT media_id, variant_name, width, height, storage_key FROM media_variants WHERE media_id IN (${readyPlaceholders}) ORDER BY width ASC`
+    ).all(...readyIds);
+
+    // Group variants by media_id in-memory
+    const variantsByMediaId = new Map();
+    for (const v of (variants || [])) {
+      if (!variantsByMediaId.has(v.media_id)) {
+        variantsByMediaId.set(v.media_id, []);
+      }
+      variantsByMediaId.get(v.media_id).push(v);
+    }
+
+    // Build delivery objects
+    for (const asset of assets) {
+      const itemVariants = variantsByMediaId.get(asset.id) || [];
+      if (itemVariants.length === 0) continue;
+
+      const deliveryVariants = itemVariants.map(v => ({
+        name: v.variant_name,
+        width: v.width,
+        height: v.height,
+        url: mediaService.storage.resolveUrl(v.storage_key)
+      }));
+
+      let previewVariant;
+      if (assetType === 'banner') {
+        previewVariant = deliveryVariants.find(v => v.width >= 640) || deliveryVariants[deliveryVariants.length - 1];
+      } else {
+        previewVariant = deliveryVariants.find(v => v.width >= 640) || deliveryVariants[deliveryVariants.length - 1];
+      }
+
+      resultMap.set(asset.id, {
+        media_id: asset.id,
+        preview_url: previewVariant ? previewVariant.url : null,
+        srcset_variants: deliveryVariants.map(v => ({ url: v.url, width: v.width, height: v.height, name: v.name }))
+      });
+    }
+  } catch (_) {
+    // Fail-safe: empty map causes callers to seamlessly use legacyUrl
+  }
+
+  return resultMap;
+}
+
 
 /**
  * M6 HELPER: Resolve canonical media for a banner entry.

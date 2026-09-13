@@ -47,7 +47,8 @@ class CatalogRepository {
 
   findBranchCategories({ branchId, brandId }) {
     return this.db.queryMany(`
-      SELECT * FROM branch_categories
+      SELECT id, brand_id, branch_id, name, slug, image_url, sort_order, media_id
+      FROM branch_categories
       WHERE branch_id = ? AND brand_id = ?
       ORDER BY sort_order ASC, name ASC
     `, [branchId, brandId]);
@@ -76,7 +77,8 @@ class CatalogRepository {
         bp.image_override,
         p.name as master_name,
         p.description as master_description,
-        p.image_url as master_image_url
+        p.image_url as master_image_url,
+        COALESCE(bp.image_media_id, p.media_id) as media_id
       FROM branch_products bp
       INNER JOIN products p ON bp.product_id = p.id AND p.brand_id = ?
       WHERE bp.branch_id = ?
@@ -86,7 +88,8 @@ class CatalogRepository {
 
   findBrandCategories(brandId) {
     return this.db.queryMany(`
-      SELECT * FROM categories
+      SELECT id, brand_id, name, slug, image_url, image, sort_order, is_active, media_id
+      FROM categories
       WHERE brand_id = ?
       ORDER BY sort_order ASC, name ASC
     `, [brandId]);
@@ -110,12 +113,14 @@ class CatalogRepository {
         p.sort_order,
         NULL as branch_raw_price,
         NULL as branch_stock,
-        1 as branch_availability
+        1 as branch_availability,
+        p.media_id
       FROM products p
       WHERE p.brand_id = ? AND p.is_active = 1
       ORDER BY p.sort_order ASC, p.name ASC
     `, [brandId]);
   }
+
 }
 
 module.exports = CatalogRepository;

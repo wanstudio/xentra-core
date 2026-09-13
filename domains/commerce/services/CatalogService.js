@@ -76,7 +76,8 @@ class CatalogService {
         image_override: prod.image_override || null,
         master_name: prod.master_name,
         master_description: prod.master_description,
-        master_image_url: prod.master_image_url
+        master_image_url: prod.master_image_url,
+        media_id: prod.media_id || null
       };
     });
 
@@ -87,7 +88,8 @@ class CatalogService {
         name: c.name,
         slug: c.slug,
         image_url: c.image_url || null,
-        sort_order: c.sort_order
+        sort_order: c.sort_order,
+        media_id: c.media_id || null
       })),
       products: resolvedProducts
     };
@@ -123,7 +125,8 @@ class CatalogService {
         is_active: prod.is_master_active === 1,
         is_available: true,
         stock_estimate: null,
-        sort_order: prod.sort_order
+        sort_order: prod.sort_order,
+        media_id: prod.media_id || null
       };
     });
 
@@ -134,11 +137,13 @@ class CatalogService {
         name: c.name,
         slug: c.slug,
         image_url: c.image_url || null,
-        sort_order: c.sort_order
+        sort_order: c.sort_order,
+        media_id: c.media_id || null
       })),
       products: resolvedProducts
     };
   }
+
 }
 
 module.exports = CatalogService;
