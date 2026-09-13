@@ -4511,28 +4511,26 @@ router.post('/admin/media/replace', requireAuth(['owner', 'brand_manager', 'bran
   }
 });
 
-// Get media by ID (Strictly tenant scoped)
-router.get('/admin/media/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+// Media storage consistency check (M4) — defined before parameterized /:id route
+router.get('/admin/media/consistency', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
-    const asset = mediaService.getMedia({
-      mediaId: req.params.id,
+    const result = await mediaService.checkConsistency({
       brandId: req.brand_id
     });
     res.json({
       success: true,
-      asset
+      result
     });
   } catch (err) {
-    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
-    res.status(statusCode).json({
+    res.status(500).json({
       success: false,
       error: err.message,
-      code: err.code || 'GET_MEDIA_ERROR'
+      code: 'CONSISTENCY_CHECK_ERROR'
     });
   }
 });
 
-// List media for current brand
+// List media for current brand — defined before parameterized /:id route
 router.get('/admin/media', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
     const { status, asset_type, limit, offset } = req.query || {};
@@ -4556,6 +4554,28 @@ router.get('/admin/media', requireAuth(['owner', 'brand_manager', 'branch_manage
     });
   }
 });
+
+// Get media by ID (Strictly tenant scoped)
+router.get('/admin/media/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const asset = mediaService.getMedia({
+      mediaId: req.params.id,
+      brandId: req.brand_id
+    });
+    res.json({
+      success: true,
+      asset
+    });
+  } catch (err) {
+    const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : (err.code === 'MEDIA_NOT_FOUND' ? 404 : 400);
+    res.status(statusCode).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'GET_MEDIA_ERROR'
+    });
+  }
+});
+
 
 // Delete media (Strictly tenant scoped, moves to ORPHAN or force hard delete)
 router.delete('/admin/media/:id', requireAuth(['owner', 'brand_manager']), async (req, res) => {
@@ -4628,24 +4648,7 @@ router.post('/admin/media/gc', requireAuth(['owner', 'brand_manager']), async (r
   }
 });
 
-// Media storage consistency check (M4)
-router.get('/admin/media/consistency', requireAuth(['owner', 'brand_manager']), async (req, res) => {
-  try {
-    const result = await mediaService.checkConsistency({
-      brandId: req.brand_id
-    });
-    res.json({
-      success: true,
-      result
-    });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      error: err.message,
-      code: 'CONSISTENCY_CHECK_ERROR'
-    });
-  }
-});
+
 
 // ============================================================================
 // M5 DASHBOARD MEDIA INTEGRATION — Entity-specific canonical upload pipeline

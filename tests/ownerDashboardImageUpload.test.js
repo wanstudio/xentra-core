@@ -200,8 +200,17 @@ test('CLIENT OWNER DASHBOARD: SECURE IMAGE UPLOAD & VALIDATION SUITE', async (t)
   });
 
   await t.test('6. Banner: Valid ~1.94:1 ratio JPEG upload via POST /admin/banners', async () => {
+    // Ensure room for test banner
+    const existingBanners = db.prepare('SELECT banners FROM brands WHERE id = ?').get(BRAND_ID);
+    let parsed = [];
+    try { parsed = JSON.parse(existingBanners.banners || '[]'); } catch (_) {}
+    if (parsed.length >= 4) {
+      db.prepare('UPDATE brands SET banners = ? WHERE id = ?').run(JSON.stringify(parsed.slice(0, 2)), BRAND_ID);
+    }
+
     const bannerJpeg = createJpegBuffer(350, 180);
     const base64 = bannerJpeg.toString('base64');
+
 
     const res = await makeRequest(server, {
       path: '/api/v1/admin/banners',

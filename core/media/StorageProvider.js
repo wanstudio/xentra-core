@@ -83,10 +83,11 @@ class LocalStorageProvider extends StorageProvider {
   }
 
   resolveUrl(storageKey) {
-    const cleanKey = storageKey.replace(/^[/\\]+/, '').replace(/\\/g, '/');
+    const cleanKey = storageKey.replace(/\.\./g, '').replace(/^[/\\]+/, '').replace(/\\/g, '/');
     return `${this.publicPrefix}/${cleanKey}`;
   }
 }
+
 
 module.exports = {
   StorageProvider,

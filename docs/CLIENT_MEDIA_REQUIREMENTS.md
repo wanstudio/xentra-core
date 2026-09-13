@@ -8,7 +8,8 @@
 **M3 Locked:** 2026-09-13  
 **M4 Locked:** 2026-09-13  
 **M5 Locked:** 2026-09-13  
-**M6 Locked:** 2026-09-13
+**M6 Locked:** 2026-09-13  
+**M7 Locked:** 2026-09-13
 
 
 ## Purpose
@@ -268,8 +269,18 @@ M5 Dashboard Integration                    COMPLETE / LOCKED
  ↓
 M6 Customer PWA Integration                 COMPLETE / LOCKED
  ↓
-M7 Migration / Cleanup / Regression         NEXT
+M7 Migration / Cleanup / Regression         COMPLETE / LOCKED
 ```
+
+### M7 Architecture Notes — Migration, Cleanup & Final Regression
+- **Closing Milestone:** M7 is the concluding milestone of the Xentra Media System roadmap.
+- **Authoritative Identity:** Canonical `media_id` is the single source of truth across all entities (brands, products, categories, branch products, branch categories).
+- **Compatibility Preservation:** Legacy URL fields (`image_url`, `logo_url`, `banners`) are preserved exclusively as compatibility delivery mechanisms and synced with derivative URLs; no schema columns were deleted.
+- **Reference Protection:** `MediaReferenceResolver` checks both canonical `media_id` entity columns and URL patterns. Referenced assets are permanently protected from GC regardless of age.
+- **Orphan & Temporary Retention:** 30-day orphan grace period and 24-hour temporary/failed cleanup rules remain strictly enforced.
+- **Delivery Boundaries:** Admin media endpoints remain RBAC-isolated under `/admin/media/*`; Customer PWA operates strictly as an unprivileged delivery consumer via `/api/v1/brand/info`, `/catalog/menu`, and `/products`.
+- **Contract Integrity:** Sharp/libvips, WebP q82, 20MP safety ceiling, no upscaling, and UNSUPPORTED_FORMAT for HEIC remain 100% intact with zero contract drift.
+
 
 ### M6 Architecture Notes — Customer PWA Integration
 - **Delivery Consumer:** Customer PWA is strictly a read-only delivery consumer and never optimizes/processes original binaries.
