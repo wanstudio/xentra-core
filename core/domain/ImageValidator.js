@@ -203,7 +203,7 @@ function inspectImageBuffer(buf) {
  * Validates an upload payload for a specific asset type (logo, product, category, banner, general).
  * Returns { valid: true, buffer, info } or { valid: false, error, code }.
  */
-function validateImageUpload({ imageBase64, mimeType, declaredFilename, assetType = 'general', enforceAspectRatio = true }) {
+function validateImageUpload({ imageBase64, mimeType, declaredFilename, assetType = 'general', enforceAspectRatio = false }) {
   const rule = IMAGE_RULES[assetType];
   if (!rule) {
     return { valid: false, error: `Tipe aset gambar '${assetType}' tidak dikenal.`, code: 'INVALID_ASSET_TYPE' };
@@ -238,7 +238,18 @@ function validateImageUpload({ imageBase64, mimeType, declaredFilename, assetTyp
     return { valid: false, error: inspection.error || 'Gambar tidak valid atau format tidak didukung.', code: inspection.code || 'INVALID_IMAGE_FORMAT' };
   }
 
-  // 4. Dimension limits
+  // 4. Pixel count / Megapixel safety limit (20 MP safety ceiling)
+  const megaPixels = (inspection.width * inspection.height) / (1000 * 1000);
+  if (rule.maxMegaPixels && megaPixels > rule.maxMegaPixels) {
+    return {
+      valid: false,
+      error: `Jumlah pixel gambar (${megaPixels.toFixed(1)} MP) melebihi batas keamanan ${rule.maxMegaPixels} MP.`,
+      code: 'PIXEL_COUNT_TOO_LARGE',
+      dimensions: { width: inspection.width, height: inspection.height, megaPixels: Number(megaPixels.toFixed(2)) }
+    };
+  }
+
+  // 5. Dimension limits
   if (rule.maxWidth && inspection.width > rule.maxWidth) {
     return {
       valid: false,
@@ -253,17 +264,6 @@ function validateImageUpload({ imageBase64, mimeType, declaredFilename, assetTyp
       error: `Tinggi gambar (${inspection.height}px) melebihi batas maksimal ${rule.maxHeight}px.`,
       code: 'DIMENSIONS_TOO_LARGE',
       dimensions: { width: inspection.width, height: inspection.height }
-    };
-  }
-
-  // 5. Pixel count / Megapixel safety limit
-  const megaPixels = (inspection.width * inspection.height) / (1000 * 1000);
-  if (rule.maxMegaPixels && megaPixels > rule.maxMegaPixels) {
-    return {
-      valid: false,
-      error: `Jumlah pixel gambar (${megaPixels.toFixed(1)} MP) melebihi batas keamanan ${rule.maxMegaPixels} MP.`,
-      code: 'PIXEL_COUNT_TOO_LARGE',
-      dimensions: { width: inspection.width, height: inspection.height, megaPixels: Number(megaPixels.toFixed(2)) }
     };
   }
 

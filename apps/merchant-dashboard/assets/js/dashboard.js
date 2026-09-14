@@ -1159,8 +1159,8 @@
           return;
         }
 
-        if (file.size > 2 * 1024 * 1024) {
-          showToast('❌ Ukuran file melebihi batas 2 MB.');
+        if (file.size > 10 * 1024 * 1024) {
+          showToast('❌ Ukuran file melebihi batas 10 MB.');
           fileInputLogo.value = '';
           return;
         }
