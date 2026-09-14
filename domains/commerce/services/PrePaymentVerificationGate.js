@@ -157,6 +157,10 @@ class PrePaymentVerificationGate {
         errors.push(`Produk "${item.name || productId}" tidak ditemukan di sistem.`);
         continue;
       }
+      if (masterProduct.is_active === 0 || masterProduct.is_active === false) {
+        errors.push(`Produk "${masterProduct.name}" saat ini dinonaktifkan.`);
+        continue;
+      }
       if (!masterProduct.bp_branch_id) {
         errors.push(`Produk "${masterProduct.name}" belum dialokasikan untuk cabang ini.`);
         continue;

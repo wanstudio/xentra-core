@@ -15,7 +15,7 @@ class CatalogRepository {
 
   branchBelongsToBrand(branchId, brandId) {
     return Boolean(this.db.queryOne(
-      'SELECT id FROM branches WHERE id = ? AND brand_id = ?',
+      'SELECT id FROM branches WHERE id = ? AND brand_id = ? AND (is_archived = 0 OR is_archived IS NULL)',
       [branchId, brandId]
     ));
   }
@@ -54,12 +54,13 @@ class CatalogRepository {
     `, [branchId, brandId]);
   }
 
-  findBranchProducts({ branchId, brandId }) {
+  findBranchProducts({ branchId, brandId, activeOnly = true }) {
+    const activeFilter = activeOnly ? 'AND (p.is_active = 1 OR p.is_active IS NULL)' : '';
     return this.db.queryMany(`
       SELECT
         bp.product_id as id,
         p.brand_id,
-        bp.branch_category_id as category_id,
+        COALESCE(bp.branch_category_id, p.category_id) as category_id,
         COALESCE(bp.name_override, p.name) as name,
         p.slug,
         COALESCE(bp.description_override, p.description) as description,
@@ -80,17 +81,18 @@ class CatalogRepository {
         p.image_url as master_image_url,
         COALESCE(bp.image_media_id, p.media_id) as media_id
       FROM branch_products bp
-      INNER JOIN products p ON bp.product_id = p.id AND p.brand_id = ?
+      INNER JOIN products p ON bp.product_id = p.id AND p.brand_id = ? ${activeFilter}
       WHERE bp.branch_id = ?
       ORDER BY p.sort_order ASC, p.name ASC
     `, [brandId, branchId]);
   }
 
-  findBrandCategories(brandId) {
+  findBrandCategories(brandId, activeOnly = true) {
+    const activeFilter = activeOnly ? 'AND (is_active = 1 OR is_active IS NULL)' : '';
     return this.db.queryMany(`
       SELECT id, brand_id, name, slug, image_url, image, sort_order, is_active, media_id
       FROM categories
-      WHERE brand_id = ?
+      WHERE brand_id = ? ${activeFilter}
       ORDER BY sort_order ASC, name ASC
     `, [brandId]);
   }

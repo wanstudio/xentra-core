@@ -1188,6 +1188,13 @@ function initSchema(targetDb) {
 
     CREATE INDEX IF NOT EXISTS idx_variants_media_id ON media_variants(media_id);
     CREATE UNIQUE INDEX IF NOT EXISTS idx_variants_media_name ON media_variants(media_id, variant_name);
+
+    CREATE TABLE IF NOT EXISTS system_metadata (
+      key TEXT PRIMARY KEY,
+      value TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   try { targetDb.exec('ALTER TABLE media_assets ADD COLUMN crop_spec TEXT;'); } catch (e) {}
@@ -1599,10 +1606,25 @@ function seedData(targetDb) {
     console.warn('[Migration] Admin password re-hash skipped:', e.message);
   }
 
-  let branch = null;
+  // --- DEMO SEED GUARD: Only run demo seeding ONCE on a fresh / virgin database ---
+  // If demo data was already seeded OR the database already contains merchant branches / products,
+  // do NOT re-seed demo data, do NOT overwrite branch assignments, do NOT clean up custom branches.
+  let isDemoSeeded = null;
   try {
-    branch = targetDb.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brandId);
-  } catch (e) {}
+    isDemoSeeded = targetDb.prepare("SELECT value FROM system_metadata WHERE key = 'seed_demo_data_completed'").get();
+  } catch (_) {}
+
+  const hasExistingBranches = (targetDb.prepare('SELECT COUNT(*) as cnt FROM branches WHERE brand_id = ?').get(brandId)?.cnt || 0) > 0;
+  const hasExistingProducts = (targetDb.prepare('SELECT COUNT(*) as cnt FROM products WHERE brand_id = ?').get(brandId)?.cnt || 0) > 0;
+
+  if (isDemoSeeded?.value === '1' || hasExistingBranches || hasExistingProducts) {
+    // Record marker so future boots also skip without checking counts
+    try {
+      targetDb.prepare("INSERT OR IGNORE INTO system_metadata (key, value) VALUES ('seed_demo_data_completed', '1')").run();
+    } catch (_) {}
+    return;
+  }
+
   const branchBaratId = 'branch_bangjo_barat';
   const branchTimurId = 'branch_bangjo_timur';
   const branchPusatId = 'branch_bangjo_pusat';
@@ -1672,29 +1694,6 @@ function seedData(targetDb) {
       INSERT OR IGNORE INTO branch_delivery_settings (id, branch_id, max_radius_km, free_delivery_km, price_per_km, min_order_amount, promo_delivery_discount, promo_min_order)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(b.bds.id, b.id, b.bds.max_radius, b.bds.free_km, b.bds.price_km, b.bds.min_order, b.bds.promo_discount, b.bds.promo_min);
-  }
-
-  // Safe cleanup of legacy demo branches for brandId that have 0 orders
-  // Safe cleanup of non-canonical branches for brandId
-  try {
-    const targetBranchIds = demoBranches.map(b => b.id);
-    const existingBrandBranches = targetDb.prepare('SELECT id FROM branches WHERE brand_id = ?').all(brandId);
-    for (const eb of existingBrandBranches) {
-      if (!targetBranchIds.includes(eb.id)) {
-        try { targetDb.prepare('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE branch_id = ?)').run(eb.id); } catch(_) {}
-        try { targetDb.prepare('DELETE FROM order_status_logs WHERE order_id IN (SELECT id FROM orders WHERE branch_id = ?)').run(eb.id); } catch(_) {}
-        try { targetDb.prepare('DELETE FROM order_deliveries WHERE order_id IN (SELECT id FROM orders WHERE branch_id = ?)').run(eb.id); } catch(_) {}
-        try { targetDb.prepare('DELETE FROM order_payments WHERE order_id IN (SELECT id FROM orders WHERE branch_id = ?)').run(eb.id); } catch(_) {}
-        try { targetDb.prepare('DELETE FROM orders WHERE branch_id = ?').run(eb.id); } catch(_) {}
-        try { targetDb.prepare('DELETE FROM branch_products WHERE branch_id = ?').run(eb.id); } catch(_) {}
-        try { targetDb.prepare('DELETE FROM branch_categories WHERE branch_id = ?').run(eb.id); } catch(_) {}
-        try { targetDb.prepare('DELETE FROM branch_delivery_settings WHERE branch_id = ?').run(eb.id); } catch(_) {}
-        try { targetDb.prepare('DELETE FROM branch_operation_logs WHERE branch_id = ?').run(eb.id); } catch(_) {}
-        try { targetDb.prepare('DELETE FROM branches WHERE id = ?').run(eb.id); } catch(_) {}
-      }
-    }
-  } catch (e) {
-    console.warn('[db] Safe branch cleanup skipped:', e.message);
   }
 
   // MASTER CATEGORIES & PRODUCTS (Superset for all branches)
@@ -1780,42 +1779,31 @@ function seedData(targetDb) {
   ];
 
   for (const a of branchAssignments) {
-    const existing = targetDb.prepare('SELECT branch_id, product_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(a.branch, a.productId);
-    if (!existing) {
-      targetDb.prepare(`
-        INSERT INTO branch_products (branch_id, product_id, branch_category_id, product_name, product_description, product_image_url, price, stock, is_available, low_stock_threshold)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 5)
-      `).run(a.branch, a.productId, a.catId, a.name, a.desc, a.img, a.price, a.stock, a.available);
-    } else {
-      targetDb.prepare(`
-        UPDATE branch_products
-        SET branch_category_id = ?, product_name = ?, product_description = ?, product_image_url = ?, price = ?, stock = ?, is_available = ?
-        WHERE branch_id = ? AND product_id = ?
-      `).run(a.catId, a.name, a.desc, a.img, a.price, a.stock, a.available, a.branch, a.productId);
-    }
+    targetDb.prepare(`
+      INSERT OR IGNORE INTO branch_products (branch_id, product_id, branch_category_id, product_name, product_description, product_image_url, price, stock, is_available, low_stock_threshold)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 5)
+    `).run(a.branch, a.productId, a.catId, a.name, a.desc, a.img, a.price, a.stock, a.available);
   }
 
   seedInstallPromotion(targetDb, brandId);
+
+  // Mark demo seeding as completed so future starts never overwrite mutations
+  try {
+    targetDb.prepare("INSERT OR REPLACE INTO system_metadata (key, value) VALUES ('seed_demo_data_completed', '1')").run();
+  } catch (_) {}
 }
 
 function seedInstallPromotion(targetDb, brandId) {
-  // Bangjo's install incentive must belong to the same authoritative tenant
-  // resolved by app.mybangjo.com.
-  // Do not attach the promotion to whichever brand happens to be first in the DB.
   const bangjoBrand = targetDb.prepare(
     "SELECT id FROM brands WHERE slug = 'bangjo' LIMIT 1"
   ).get();
   if (bangjoBrand && bangjoBrand.id) brandId = bangjoBrand.id;
 
-  // Keep the authoritative reward product available even when the database already existed
-  // before the install-promo seed was introduced.
   const rewardCategory = targetDb.prepare(
     'SELECT id FROM categories WHERE brand_id = ? AND (slug = ? OR name = ?) LIMIT 1'
   ).get(brandId, 'minuman', 'Minuman');
   const rewardCategoryId = rewardCategory?.id || '22';
 
-  // Use product 288 (Es Teh) as the install incentive reward.
-  // Ensure it exists and is assigned to at least one active branch.
   targetDb.prepare(`
     INSERT OR IGNORE INTO products (
       id, brand_id, category_id, name, slug, description, price, regular_price, image_url, image, sort_order
@@ -1860,13 +1848,14 @@ function seedInstallPromotion(targetDb, brandId) {
       '{"requires_pwa_installed":true,"target_audience":"new_user","first_order_only":true}')
   `).run();
 
-  // Repair pre-existing rows created by the old "first brand" seeding logic.
-  targetDb.prepare(
-    "UPDATE promotions SET brand_id = ? WHERE id = 'prm_bangjo_pwa_install'"
-  ).run(brandId);
-  targetDb.prepare(
-    "UPDATE products SET brand_id = ? WHERE id = '288'"
-  ).run(brandId);
+  try {
+    targetDb.prepare(
+      "UPDATE promotions SET brand_id = ? WHERE id = 'prm_bangjo_pwa_install'"
+    ).run(brandId);
+    targetDb.prepare(
+      "UPDATE products SET brand_id = ? WHERE id = '288'"
+    ).run(brandId);
+  } catch (_) {}
 
   targetDb.prepare(`
     INSERT OR IGNORE INTO promotion_rewards (id, promotion_id, reward_type, target_product_id, amount_in_cents, presentation_payload)
@@ -1876,6 +1865,8 @@ function seedInstallPromotion(targetDb, brandId) {
 }
 
 db.readyPromise = dbReadyPromise;
+db.initSchema = initSchema;
+db.seedData = seedData;
 
 // Auto-run schema initialization for native instance (sql.js runs it in sqlJsPromise callback)
 if (dbInstance) {
