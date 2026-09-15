@@ -201,6 +201,51 @@ class WorkforceService {
     return { ...target, status: 'active' };
   }
 
+  deleteUser(targetUserId, brandId, { actor_id, actor_role, actor_branch_id }) {
+    // Authorization: Only Owner can delete team members
+    if (actor_role !== 'owner') {
+      throw { status: 403, code: 'FORBIDDEN_DELETE_MEMBER', message: 'Only Owner can delete team members.' };
+    }
+
+    const target = this.getUser(targetUserId, brandId);
+
+    // Self-deletion protection: Owner cannot delete themselves
+    if (actor_id && targetUserId === actor_id) {
+      throw { status: 400, code: 'SELF_DELETE_PROTECTED', message: 'Anda tidak dapat menghapus akun Anda sendiri.' };
+    }
+
+    // Last-owner protection: Cannot delete the last owner
+    if (target.role === 'owner') {
+      const ownerCount = this.repository.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ? AND role = ?').get(brandId, 'owner');
+      if (ownerCount.cnt <= 1) {
+        throw { status: 400, code: 'LAST_OWNER_PROTECTED', message: 'Tidak dapat menghapus Owner terakhir.' };
+      }
+    }
+
+    // Invalidate sessions immediately
+    this.invalidateUserSessions(targetUserId);
+
+    // Delete child authentication & token records (clean up explicit cascades if any)
+    try {
+      this.repository.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(targetUserId);
+    } catch (_) {}
+    try {
+      this.repository.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(targetUserId);
+    } catch (_) {}
+    try {
+      this.repository.prepare('DELETE FROM user_auth_providers WHERE user_id = ?').run(targetUserId);
+    } catch (_) {}
+
+    // Delete user
+    const result = this.repository.prepare('DELETE FROM users WHERE id = ? AND brand_id = ?').run(targetUserId, brandId);
+
+    if (result.changes === 0) {
+      throw { status: 404, code: 'USER_NOT_FOUND', message: 'User not found or already removed.' };
+    }
+
+    return { success: true, deleted_user_id: targetUserId, deleted_user_name: target.full_name, role: target.role };
+  }
+
   changeUserRole(targetUserId, brandId, newRole, { actor_id, actor_role, actor_branch_id }) {
     const target = this.getUser(targetUserId, brandId);
 
@@ -287,6 +332,11 @@ class WorkforceService {
     const user = this.repository.prepare('SELECT * FROM users WHERE id = ? AND brand_id = ?').get(userId, brandId);
     if (!user) {
       throw { status: 404, code: 'USER_NOT_FOUND', message: 'User not found.' };
+    }
+
+    // Guard: Account without password credential cannot use self password change
+    if (!user.password_hash) {
+      throw { status: 400, code: 'NO_PASSWORD_SET', message: 'Akun ini belum memiliki password. Gunakan alur reset password untuk membuat password.' };
     }
 
     // Verify current password
@@ -385,6 +435,9 @@ class WorkforceService {
     this.repository.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
       .run(newHash, tokenRecord.user_id);
 
+    // Invalidate existing sessions on password reset
+    this.invalidateUserSessions(tokenRecord.user_id);
+
     return { success: true, user_id: tokenRecord.user_id, brand_id: tokenRecord.brand_id };
   }
 
@@ -422,6 +475,23 @@ class WorkforceService {
     // Check if account is locked
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
       return { success: false, error: 'ACCOUNT_LOCKED', message: 'Akun Anda terkunci sementara. Coba lagi nanti.' };
+    }
+
+    // Guard: Account has no password credential (e.g. Google-only account)
+    if (!user.password_hash) {
+      // Track failed attempt identically to invalid password to avoid timing/enumeration leaks
+      const attempts = (user.failed_login_attempts || 0) + 1;
+      const updates = { failed_login_attempts: attempts };
+
+      if (attempts >= MAX_LOGIN_ATTEMPTS) {
+        const lockUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000).toISOString();
+        updates.locked_until = lockUntil;
+      }
+
+      this.repository.prepare('UPDATE users SET failed_login_attempts = ?, locked_until = ?, updated_at = datetime(\'now\') WHERE id = ?')
+        .run(attempts, updates.locked_until || null, user.id);
+
+      return { success: false, error: 'INVALID_CREDENTIALS' };
     }
 
     // Verify password

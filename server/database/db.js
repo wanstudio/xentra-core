@@ -613,7 +613,7 @@ function initSchema(targetDb) {
       branch_id TEXT,
       username TEXT UNIQUE NOT NULL,
       email TEXT,
-      password_hash TEXT NOT NULL,
+      password_hash TEXT,
       full_name TEXT,
       role TEXT DEFAULT 'owner',
       mfa_enabled INTEGER DEFAULT 0,
@@ -1283,11 +1283,12 @@ function initSchema(targetDb) {
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_products_media_id ON products(media_id) WHERE media_id IS NOT NULL;'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_categories_media_id ON categories(media_id) WHERE media_id IS NOT NULL;'); } catch (e) {}
 
-  // Migrate existing users table if brand_id has legacy NOT NULL constraint
+  // Migrate existing users table if brand_id or password_hash has legacy NOT NULL constraint
   try {
     const usersTableInfo = targetDb.prepare('PRAGMA table_info(users);').all();
     const brandCol = usersTableInfo.find(c => c.name === 'brand_id');
-    if (brandCol && brandCol.notnull === 1) {
+    const pwCol = usersTableInfo.find(c => c.name === 'password_hash');
+    if ((brandCol && brandCol.notnull === 1) || (pwCol && pwCol.notnull === 1)) {
       targetDb.exec('PRAGMA foreign_keys = OFF;');
       targetDb.exec('DROP TABLE IF EXISTS users_plat_mig;');
       targetDb.exec('BEGIN TRANSACTION;');
@@ -1299,7 +1300,7 @@ function initSchema(targetDb) {
           branch_id TEXT,
           username TEXT UNIQUE NOT NULL,
           email TEXT,
-          password_hash TEXT NOT NULL,
+          password_hash TEXT,
           full_name TEXT,
           role TEXT DEFAULT 'owner',
           status TEXT DEFAULT 'active',

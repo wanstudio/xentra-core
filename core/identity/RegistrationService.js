@@ -316,9 +316,7 @@ class RegistrationService {
       candidateUsername = `${baseUsername}_${randHex}`;
     }
 
-    // Unusable random password hash for Google-registered users (cannot be brute-forced via legacy login without password reset)
-    const randomPassword = crypto.randomBytes(32).toString('hex');
-    const passwordHash = this.hashPassword(randomPassword);
+    // Google-first onboarding: password credential is not established (password_hash = NULL)
     const now = new Date().toISOString();
 
     const providerMetadataStr = JSON.stringify({
@@ -354,11 +352,11 @@ class RegistrationService {
         VALUES (?, ?, 1, 1, 10.0, 2.0, 3000.0, 15000.0, ?, ?)
       `).run(bdsId, branchId, now, now);
 
-      // 5. User (Owner) - Immediately email_verified since Google verified the email
+      // 5. User (Owner) - Immediately email_verified since Google verified the email; password_hash = NULL
       this.db.prepare(`
         INSERT INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'owner', 'active', ?, ?, ?, ?)
-      `).run(userId, brandId, orgId, branchId, candidateUsername, cleanEmail, passwordHash, finalFullName, now, now, now, now);
+        VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'owner', 'active', NULL, ?, ?, ?)
+      `).run(userId, brandId, orgId, branchId, candidateUsername, cleanEmail, finalFullName, now, now, now);
 
       // 6. Link Google Auth Provider atomically
       this.db.prepare(`
@@ -463,8 +461,7 @@ class RegistrationService {
     let candidateUsername = baseUsername;
     if (this.db.prepare('SELECT id FROM users WHERE username = ?').get(candidateUsername)) candidateUsername = `${baseUsername}_${randHex}`;
 
-    const randomPassword = crypto.randomBytes(32).toString('hex');
-    const passwordHash = this.hashPassword(randomPassword);
+    // Google-first identity: password credential is not established (password_hash = NULL)
     const now = new Date().toISOString();
 
     const providerMetadataStr = JSON.stringify({ name: finalFullName, picture: picture || null, registered_via: 'google_onboarding' });
@@ -473,8 +470,8 @@ class RegistrationService {
     try {
       this.db.prepare(`
         INSERT INTO users (id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 'owner', 'active', ?, ?, ?, ?)
-      `).run(userId, candidateUsername, cleanEmail, passwordHash, finalFullName, now, now, now, now);
+        VALUES (?, ?, ?, NULL, ?, 'owner', 'active', NULL, ?, ?, ?)
+      `).run(userId, candidateUsername, cleanEmail, finalFullName, now, now, now);
 
       this.db.prepare(`
         INSERT INTO user_auth_providers (id, user_id, provider, provider_user_id, email, metadata, linked_at, created_at, updated_at)
