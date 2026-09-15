@@ -297,9 +297,34 @@ const RateLimiter = {
   attempts: new Map(),
   
   check(key, maxAttempts = 5, windowSeconds = 300) {
-    if (process.env.NODE_ENV === 'test') {
-      return { allowed: true, remaining: maxAttempts, retryAfter: 0 };
+    const now = Date.now();
+    const windowMs = windowSeconds * 1000;
+
+    // Prune stale entries if map exceeds 5000 keys to prevent unbounded memory growth
+    if (this.attempts.size > 5000) {
+      for (const [k, v] of this.attempts.entries()) {
+        if (now - (v.firstAttempt || 0) > windowMs) {
+          this.attempts.delete(k);
+        }
+      }
     }
+
+    const record = this.attempts.get(key) || { count: 0, firstAttempt: now };
+    
+    // Reset if window expired
+    if (now - record.firstAttempt > windowMs) {
+      record.count = 0;
+      record.firstAttempt = now;
+    }
+    
+    record.count++;
+    this.attempts.set(key, record);
+    
+    return {
+      allowed: record.count <= maxAttempts,
+      remaining: Math.max(0, maxAttempts - record.count),
+      retryAfter: record.count > maxAttempts ? Math.ceil((record.firstAttempt + windowMs - now) / 1000) : 0
+    };
   },
   
   reset(key) {
@@ -1699,9 +1724,10 @@ router.get(['/platform/me', '/api/v1/platform/me'], requirePlatformAuth(), (req,
 
 // 7. Get Order Details & Live Status (Protected by Ownership or Operator Auth - NEW-01)
 router.get('/orders/:id', (req, res) => {
-  // P1 TENANT ISOLATION: Join branches to strictly verify brand ownership
+  // P1 TENANT ISOLATION: Join branches to strictly verify brand ownership.
+  // branch_name is included for P7.1 Branch Acceptance Waiting surface.
   const order = db.prepare(`
-    SELECT o.*, b.brand_id 
+    SELECT o.*, b.brand_id, b.name AS branch_name
     FROM orders o
     JOIN branches b ON b.id = o.branch_id
     WHERE o.id = ? AND b.brand_id = ?
@@ -1761,7 +1787,23 @@ router.get('/orders/:id', (req, res) => {
   const logs = db.prepare('SELECT previous_status, new_status, note, created_at FROM order_status_logs WHERE order_id = ? ORDER BY created_at ASC').all(order.id);
 
   // P1 INFORMATION HIDING & PRIVACY (NEW-01 & NEW-09):
-  // Return clean DTO projection to prevent internal data/GPS leakage
+  // Return clean DTO projection to prevent internal data/GPS leakage.
+  // P7.2 BRANCH ACCEPTANCE SURFACE: branch_name, branch_id, acceptance_deadline_at
+  // are exposed to support the awaiting-acceptance waiting screen.
+  // acceptance_deadline_at is server-computed (created_at + 180s platform policy).
+  // It is a DISPLAY timestamp only — the client countdown reaching zero never
+  // transitions order state. Status is always fetched from server.
+  const ACCEPTANCE_TIMEOUT_SECONDS = 180; // 3-minute platform policy
+  let acceptanceDeadlineAt = null;
+  if (order.status === 'pending' && order.created_at) {
+    try {
+      const createdMs = new Date(order.created_at).getTime();
+      if (!isNaN(createdMs)) {
+        acceptanceDeadlineAt = new Date(createdMs + ACCEPTANCE_TIMEOUT_SECONDS * 1000).toISOString();
+      }
+    } catch (_) {}
+  }
+
   const safeOrder = {
     id: order.id,
     order_number: order.order_number,
@@ -1776,7 +1818,12 @@ router.get('/orders/:id', (req, res) => {
     payment_method: order.payment_method,
     order_note: order.order_note,
     created_at: order.created_at,
-    updated_at: order.updated_at
+    updated_at: order.updated_at,
+    // P7.2: branch context for awaiting-acceptance surface
+    branch_id: order.branch_id,
+    branch_name: order.branch_name || null,
+    // P7.2: server-authoritative acceptance deadline (display only, null when not pending)
+    acceptance_deadline_at: acceptanceDeadlineAt
   };
 
   const safeItems = (items || []).map(it => ({
@@ -2518,7 +2565,8 @@ router.post('/auth/register-identity', (req, res) => {
     }
 
     const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-    const rateLimitKey = `register:${clientIp}`;
+    const cleanEmail = String(email).trim().toLowerCase();
+    const rateLimitKey = `register:${cleanEmail}:${clientIp}`;
     const rateCheck = RateLimiter.check(rateLimitKey, 5, 600);
     if (!rateCheck.allowed) {
       return res.status(429).json({
@@ -2953,9 +3001,13 @@ router.post('/auth/google-onboard', async (req, res) => {
       });
     }
 
-    // Rate limiting: 5 onboarding registrations per 10 minutes per IP
+    const googleAuth = new GoogleAuthService();
+    const verifiedClaims = await googleAuth.verifyIdToken(rawToken);
+
+    // Rate limiting: 5 onboarding registrations per 10 minutes per email/IP
     const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-    const rateLimitKey = `google-onboard:${clientIp}`;
+    const cleanEmail = String(verifiedClaims.email || '').trim().toLowerCase();
+    const rateLimitKey = `google-onboard:${cleanEmail}:${clientIp}`;
     const rateCheck = RateLimiter.check(rateLimitKey, 5, 600);
     if (!rateCheck.allowed) {
       return res.status(429).json({
@@ -2964,9 +3016,6 @@ router.post('/auth/google-onboard', async (req, res) => {
         error: `Terlalu banyak permintaan onboarding. Coba lagi dalam ${rateCheck.retryAfter} detik.`
       });
     }
-
-    const googleAuth = new GoogleAuthService();
-    const verifiedClaims = await googleAuth.verifyIdToken(rawToken);
 
     // Email must be verified by Google
     if (!verifiedClaims.email_verified) {
