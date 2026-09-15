@@ -4020,6 +4020,19 @@ router.get('/admin/security-audit', requireAuth(['owner', 'brand_manager']), (re
   }
 });
 
+// Helper: sanitize invitation objects for the public REST API contract (prevents leaking internal provider errors or credentials)
+function sanitizePublicInvitation(invitation) {
+  if (!invitation || typeof invitation !== 'object') return invitation;
+  const safe = { ...invitation };
+  if (safe.delivery) {
+    safe.delivery = {
+      success: Boolean(safe.delivery.success),
+      error: safe.delivery.success ? null : 'EMAIL_DELIVERY_FAILED'
+    };
+  }
+  return safe;
+}
+
 // ==================== WORKFORCE INVITATIONS (PHASE 3) ====================
 // Create workforce invitation
 router.post('/admin/invitations', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
@@ -4042,7 +4055,7 @@ router.post('/admin/invitations', requireAuth(['owner', 'brand_manager', 'branch
       branch_id
     });
 
-    res.status(201).json({ success: true, invitation });
+    res.status(201).json({ success: true, invitation: sanitizePublicInvitation(invitation) });
   } catch (err) {
     const status = err.status || 500;
     res.status(status).json({ success: false, error: err.code || 'INVITATION_ERROR', message: err.message });
@@ -4083,7 +4096,7 @@ router.post('/admin/invitations/:id/resend', requireAuth(['owner', 'brand_manage
       invitation_id: req.params.id
     });
 
-    res.json({ success: true, invitation: result });
+    res.json({ success: true, invitation: sanitizePublicInvitation(result) });
   } catch (err) {
     const status = err.status || 500;
     res.status(status).json({ success: false, error: err.code || 'RESEND_ERROR', message: err.message });

@@ -84,12 +84,22 @@ class WorkforceInvitationService {
       throw { status: 400, code: 'VALIDATION_ERROR', message: 'brand_id is required.' };
     }
 
+    const actorBrandId = actor.actor_brand_id || actor.brand_id;
+    if (actorBrandId && actorBrandId !== brand_id) {
+      throw { status: 403, code: 'FORBIDDEN_BRAND_SCOPE', message: 'Actor cannot invite team members for another brand.' };
+    }
+
     const brand = this.db.prepare('SELECT id, organization_id, name FROM brands WHERE id = ?').get(brand_id);
     if (!brand) {
       throw { status: 404, code: 'BRAND_NOT_FOUND', message: 'Brand not found.' };
     }
 
     const authoritativeOrgId = brand.organization_id;
+    const actorOrgId = actor.actor_org_id || actor.organization_id;
+    if (actorOrgId && actorOrgId !== authoritativeOrgId) {
+      throw { status: 403, code: 'FORBIDDEN_ORG_SCOPE', message: 'Actor cannot invite team members for another organization.' };
+    }
+
     if (organization_id && organization_id !== authoritativeOrgId) {
       throw {
         status: 400,
@@ -149,6 +159,94 @@ class WorkforceInvitationService {
   }
 
   /**
+   * Authorizes an actor to mutate an existing invitation (resend or revoke).
+   * Enforces exact authoritative role ceiling, brand scope, and branch hierarchy.
+   *
+   * @param {Object} actor - { actor_id, actor_role, actor_branch_id, actor_brand_id, actor_org_id }
+   * @param {Object} invitation - workforce_invitations row
+   * @param {'resend'|'revoke'} actionType
+   */
+  _authorizeInvitationMutation(actor, invitation, actionType) {
+    if (!actor || !actor.actor_role) {
+      throw { status: 401, code: 'UNAUTHORIZED', message: 'Actor is missing or unauthenticated.' };
+    }
+
+    const { actor_role } = actor;
+
+    // Only Owner, Brand Manager, and Branch Manager can manage invitations
+    if (actor_role !== 'owner' && actor_role !== 'brand_manager' && actor_role !== 'branch_manager') {
+      throw {
+        status: 403,
+        code: 'FORBIDDEN_ROLE_CEILING',
+        message: `Role "${actor_role}" is not authorized to ${actionType} invitations.`
+      };
+    }
+
+    // Brand Scope enforcement
+    const actorBrandId = actor.actor_brand_id || actor.brand_id;
+    if (actorBrandId && actorBrandId !== invitation.brand_id) {
+      throw {
+        status: 403,
+        code: 'FORBIDDEN_BRAND_SCOPE',
+        message: `Actor cannot ${actionType} invitations for another brand.`
+      };
+    }
+
+    // Org Scope enforcement
+    const actorOrgId = actor.actor_org_id || actor.organization_id;
+    if (actorOrgId && actorOrgId !== invitation.organization_id) {
+      throw {
+        status: 403,
+        code: 'FORBIDDEN_ORG_SCOPE',
+        message: `Actor cannot ${actionType} invitations for another organization.`
+      };
+    }
+
+    // Role Ceiling enforcement
+    if (actor_role === 'brand_manager') {
+      // Brand Manager cannot resend or revoke owner or brand_manager invitations
+      if (invitation.role === 'owner' || invitation.role === 'brand_manager') {
+        throw {
+          status: 403,
+          code: 'FORBIDDEN_ROLE_CEILING',
+          message: `Brand Manager cannot ${actionType} invitations for role "${invitation.role}".`
+        };
+      }
+    } else if (actor_role === 'branch_manager') {
+      // Branch Manager cannot resend or revoke managerial invitations (owner, brand_manager, branch_manager)
+      if (invitation.role !== 'cashier' && invitation.role !== 'kitchen') {
+        throw {
+          status: 403,
+          code: 'FORBIDDEN_ROLE_CEILING',
+          message: `Branch Manager cannot ${actionType} managerial invitations.`
+        };
+      }
+
+      // Branch Scope enforcement: Branch Manager can only manage invitations within their authorized branch
+      const actorBranchId = actor.actor_branch_id || actor.branch_id;
+      if (!actorBranchId || invitation.branch_id !== actorBranchId) {
+        throw {
+          status: 403,
+          code: 'FORBIDDEN_BRANCH_SCOPE',
+          message: `Branch Manager cannot ${actionType} invitations outside their branch.`
+        };
+      }
+    }
+
+    // Branch hierarchy validation: If invitation is scoped to a branch, verify branch belongs to brand
+    if (invitation.branch_id) {
+      const branch = this.db.prepare('SELECT id, brand_id FROM branches WHERE id = ?').get(invitation.branch_id);
+      if (!branch || branch.brand_id !== invitation.brand_id) {
+        throw {
+          status: 400,
+          code: 'INVALID_BRANCH_HIERARCHY',
+          message: 'Branch does not belong to the target brand.'
+        };
+      }
+    }
+  }
+
+  /**
    * Creates a new workforce invitation and dispatches TEAM_INVITATION email.
    *
    * @param {Object} params
@@ -198,9 +296,8 @@ class WorkforceInvitationService {
       if (b) branchName = b.name;
     }
 
-    // Check for existing pending invitation for same email + brand + branch + role
-    // If one exists, supersede its token and update expiry
-    const existingPending = this.db.prepare(`
+    // Concurrency-safe pending invitation creation or supersession
+    let existingPending = this.db.prepare(`
       SELECT * FROM workforce_invitations
       WHERE email = ? AND brand_id = ? AND status = 'pending'
     `).get(cleanEmail, targetBrandId);
@@ -211,57 +308,107 @@ class WorkforceInvitationService {
     const now = new Date().toISOString();
 
     let invitationId;
+    let isSuperseded = false;
 
     if (existingPending) {
       invitationId = existingPending.id;
-      // Invalidate old token and update with new token hash and expiry
-      this.db.prepare(`
+      // Invalidate old token and update with new token hash and expiry atomically
+      const updateRes = this.db.prepare(`
         UPDATE workforce_invitations
         SET role = ?, branch_id = ?, token_hash = ?, expires_at = ?, invited_by_user_id = ?, updated_at = ?
-        WHERE id = ?
+        WHERE id = ? AND status = 'pending'
       `).run(role, targetBranchId, tokenHash, expiresAt, actor.actor_id, now, invitationId);
 
-      this._logSecurityEvent({
-        actor_id: actor.actor_id,
-        actor_role: actor.actor_role,
-        action: 'INVITATION_SUPERSEDED',
-        brand_id: targetBrandId,
-        organization_id: targetOrgId,
-        branch_id: targetBranchId,
-        result: 'success',
-        metadata: { invitation_id: invitationId, email: cleanEmail, role }
-      });
-    } else {
-      invitationId = 'wiv_' + crypto.randomBytes(16).toString('hex');
-      this.db.prepare(`
-        INSERT INTO workforce_invitations (
-          id, organization_id, brand_id, branch_id, email, role,
-          invited_by_user_id, status, token_hash, expires_at, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
-      `).run(
-        invitationId,
-        targetOrgId,
-        targetBrandId,
-        targetBranchId,
-        cleanEmail,
-        role,
-        actor.actor_id,
-        tokenHash,
-        expiresAt,
-        now,
-        now
-      );
+      if (updateRes.changes > 0) {
+        isSuperseded = true;
+        this._logSecurityEvent({
+          actor_id: actor.actor_id,
+          actor_role: actor.actor_role,
+          action: 'INVITATION_SUPERSEDED',
+          brand_id: targetBrandId,
+          organization_id: targetOrgId,
+          branch_id: targetBranchId,
+          result: 'success',
+          metadata: { invitation_id: invitationId, email: cleanEmail, role }
+        });
+      } else {
+        // Concurrently changed status (e.g. accepted or revoked). Treat as new insert.
+        existingPending = null;
+      }
+    }
 
-      this._logSecurityEvent({
-        actor_id: actor.actor_id,
-        actor_role: actor.actor_role,
-        action: 'INVITATION_CREATED',
-        brand_id: targetBrandId,
-        organization_id: targetOrgId,
-        branch_id: targetBranchId,
-        result: 'success',
-        metadata: { invitation_id: invitationId, email: cleanEmail, role }
-      });
+    if (!existingPending || !isSuperseded) {
+      invitationId = 'wiv_' + crypto.randomBytes(16).toString('hex');
+      try {
+        this.db.prepare(`
+          INSERT INTO workforce_invitations (
+            id, organization_id, brand_id, branch_id, email, role,
+            invited_by_user_id, status, token_hash, expires_at, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)
+        `).run(
+          invitationId,
+          targetOrgId,
+          targetBrandId,
+          targetBranchId,
+          cleanEmail,
+          role,
+          actor.actor_id,
+          tokenHash,
+          expiresAt,
+          now,
+          now
+        );
+
+        this._logSecurityEvent({
+          actor_id: actor.actor_id,
+          actor_role: actor.actor_role,
+          action: 'INVITATION_CREATED',
+          brand_id: targetBrandId,
+          organization_id: targetOrgId,
+          branch_id: targetBranchId,
+          result: 'success',
+          metadata: { invitation_id: invitationId, email: cleanEmail, role }
+        });
+      } catch (err) {
+        const isConstraint = err && (
+          err.code === 'SQLITE_CONSTRAINT' || 
+          err.code === 'SQLITE_CONSTRAINT_UNIQUE' ||
+          (typeof err.message === 'string' && err.message.toLowerCase().includes('unique constraint'))
+        );
+
+        if (isConstraint) {
+          // A concurrent request inserted a pending invitation right before us.
+          // Atomically update and supersede that row with our token.
+          const concurrentPending = this.db.prepare(`
+            SELECT * FROM workforce_invitations
+            WHERE email = ? AND brand_id = ? AND status = 'pending'
+          `).get(cleanEmail, targetBrandId);
+
+          if (concurrentPending) {
+            invitationId = concurrentPending.id;
+            this.db.prepare(`
+              UPDATE workforce_invitations
+              SET role = ?, branch_id = ?, token_hash = ?, expires_at = ?, invited_by_user_id = ?, updated_at = ?
+              WHERE id = ? AND status = 'pending'
+            `).run(role, targetBranchId, tokenHash, expiresAt, actor.actor_id, now, invitationId);
+
+            this._logSecurityEvent({
+              actor_id: actor.actor_id,
+              actor_role: actor.actor_role,
+              action: 'INVITATION_SUPERSEDED',
+              brand_id: targetBrandId,
+              organization_id: targetOrgId,
+              branch_id: targetBranchId,
+              result: 'success',
+              metadata: { invitation_id: invitationId, email: cleanEmail, role }
+            });
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
     }
 
     // Dispatched post-persistence so external transport failure does NOT rollback invitation record
@@ -351,13 +498,34 @@ class WorkforceInvitationService {
    * @returns {Promise<Object>}
    */
   async resendInvitation({ actor, invitation_id }) {
-    if (!invitation_id) {
+    if (!actor || !actor.actor_role) {
+      throw { status: 401, code: 'UNAUTHORIZED', message: 'Actor is missing or unauthenticated.' };
+    }
+
+    if (!invitation_id || typeof invitation_id !== 'string') {
       throw { status: 400, code: 'VALIDATION_ERROR', message: 'invitation_id is required.' };
     }
 
     const invitation = this.db.prepare('SELECT * FROM workforce_invitations WHERE id = ?').get(invitation_id);
     if (!invitation) {
       throw { status: 404, code: 'INVITATION_NOT_FOUND', message: 'Undangan tidak ditemukan.' };
+    }
+
+    // Authorize resend using authoritative role/scope/brand hierarchy rules
+    try {
+      this._authorizeInvitationMutation(actor, invitation, 'resend');
+    } catch (authErr) {
+      this._logSecurityEvent({
+        actor_id: actor?.actor_id,
+        actor_role: actor?.actor_role,
+        action: 'INVITATION_RESEND_DENIED',
+        brand_id: invitation.brand_id,
+        organization_id: invitation.organization_id,
+        branch_id: invitation.branch_id,
+        result: 'denied',
+        metadata: { error: authErr.message, code: authErr.code, invitation_id: invitation.id, email: invitation.email }
+      });
+      throw authErr;
     }
 
     // Evaluate expiration
@@ -374,22 +542,29 @@ class WorkforceInvitationService {
       };
     }
 
-    // Authorize resend: Inviter must have authority over the invitation's brand and branch
-    if (actor.actor_role === 'branch_manager' && invitation.branch_id !== actor.actor_branch_id) {
-      throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Branch Manager can only resend invitations for their branch.' };
-    }
-
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = this.hashToken(rawToken);
     const expiresAt = new Date(Date.now() + INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const now = new Date().toISOString();
 
-    // Invalidate old token and update with new token hash and expiry
-    this.db.prepare(`
+    // Concurrency-safe atomic state transition: update token ONLY if still pending
+    const updateResult = this.db.prepare(`
       UPDATE workforce_invitations
       SET token_hash = ?, expires_at = ?, updated_at = ?
-      WHERE id = ?
+      WHERE id = ? AND status = 'pending'
     `).run(tokenHash, expiresAt, now, invitation.id);
+
+    if (updateResult.changes === 0) {
+      const latest = this.db.prepare('SELECT status, expires_at FROM workforce_invitations WHERE id = ?').get(invitation.id);
+      if (!latest) {
+        throw { status: 404, code: 'INVITATION_NOT_FOUND', message: 'Undangan tidak ditemukan.' };
+      }
+      throw {
+        status: 400,
+        code: 'INVALID_STATE',
+        message: `Hanya undangan berstatus pending yang dapat dikirim ulang (status saat ini: ${latest.status}).`
+      };
+    }
 
     this._logSecurityEvent({
       actor_id: actor.actor_id,
@@ -495,7 +670,11 @@ class WorkforceInvitationService {
    * @returns {Object}
    */
   revokeInvitation({ actor, invitation_id }) {
-    if (!invitation_id) {
+    if (!actor || !actor.actor_role) {
+      throw { status: 401, code: 'UNAUTHORIZED', message: 'Actor is missing or unauthenticated.' };
+    }
+
+    if (!invitation_id || typeof invitation_id !== 'string') {
       throw { status: 400, code: 'VALIDATION_ERROR', message: 'invitation_id is required.' };
     }
 
@@ -504,32 +683,58 @@ class WorkforceInvitationService {
       throw { status: 404, code: 'INVITATION_NOT_FOUND', message: 'Undangan tidak ditemukan.' };
     }
 
+    // Authorize revocation with full role/scope/brand hierarchy rules
+    try {
+      this._authorizeInvitationMutation(actor, invitation, 'revoke');
+    } catch (authErr) {
+      this._logSecurityEvent({
+        actor_id: actor?.actor_id,
+        actor_role: actor?.actor_role,
+        action: 'INVITATION_REVOKE_DENIED',
+        brand_id: invitation.brand_id,
+        organization_id: invitation.organization_id,
+        branch_id: invitation.branch_id,
+        result: 'denied',
+        metadata: { error: authErr.message, code: authErr.code, invitation_id: invitation.id, email: invitation.email }
+      });
+      throw authErr;
+    }
+
     if (invitation.status === 'revoked') {
       throw { status: 400, code: 'ALREADY_REVOKED', message: 'Undangan sudah dibatalkan sebelumnya.' };
     }
     if (invitation.status === 'accepted') {
       throw { status: 400, code: 'ALREADY_ACCEPTED', message: 'Undangan yang sudah diterima tidak dapat dibatalkan.' };
     }
-
-    // Authorize revocation: Only authorized actors within scope can revoke
-    if (actor.actor_role === 'branch_manager') {
-      if (invitation.branch_id !== actor.actor_branch_id) {
-        throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Branch Manager cannot revoke invitations outside their branch.' };
-      }
-      if (invitation.role === 'branch_manager' || invitation.role === 'brand_manager' || invitation.role === 'owner') {
-        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Branch Manager cannot revoke managerial invitations.' };
-      }
-    } else if (actor.actor_role !== 'owner' && actor.actor_role !== 'brand_manager') {
-      throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Actor is not authorized to revoke invitations.' };
+    if (invitation.status === 'expired' || (invitation.status === 'pending' && new Date(invitation.expires_at) < new Date())) {
+      this.db.prepare("UPDATE workforce_invitations SET status = 'expired', updated_at = datetime('now') WHERE id = ?").run(invitation.id);
+      throw { status: 400, code: 'INVITATION_EXPIRED', message: 'Undangan telah kedaluwarsa dan tidak dapat dibatalkan.' };
     }
 
     const now = new Date().toISOString();
-    // Invalidate token hash and set status to revoked
-    this.db.prepare(`
+    // Invalidate token hash and set status to revoked atomically (pending -> revoked)
+    const updateResult = this.db.prepare(`
       UPDATE workforce_invitations
       SET status = 'revoked', revoked_at = ?, updated_at = ?
-      WHERE id = ?
+      WHERE id = ? AND status = 'pending'
     `).run(now, now, invitation.id);
+
+    if (updateResult.changes === 0) {
+      const latest = this.db.prepare('SELECT status, expires_at FROM workforce_invitations WHERE id = ?').get(invitation.id);
+      if (!latest) {
+        throw { status: 404, code: 'INVITATION_NOT_FOUND', message: 'Undangan tidak ditemukan.' };
+      }
+      if (latest.status === 'revoked') {
+        throw { status: 400, code: 'ALREADY_REVOKED', message: 'Undangan sudah dibatalkan sebelumnya.' };
+      }
+      if (latest.status === 'accepted') {
+        throw { status: 400, code: 'ALREADY_ACCEPTED', message: 'Undangan yang sudah diterima tidak dapat dibatalkan.' };
+      }
+      if (latest.status === 'expired' || new Date(latest.expires_at) < new Date()) {
+        throw { status: 400, code: 'INVITATION_EXPIRED', message: 'Undangan telah kedaluwarsa dan tidak dapat dibatalkan.' };
+      }
+      throw { status: 400, code: 'INVALID_STATE', message: `Tidak dapat membatalkan undangan dengan status ${latest.status}.` };
+    }
 
     this._logSecurityEvent({
       actor_id: actor.actor_id,

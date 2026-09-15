@@ -26,6 +26,10 @@ const testBranch2Id = 'branch_inv_test_2';
 
 let ownerUser;
 let branchManagerUser;
+let brandManagerUser;
+let cashierUser;
+let otherBrandOwner;
+const testBrand2Id = 'brand_inv_test_other';
 let ownerToken;
 let branchManagerToken;
 
@@ -88,6 +92,10 @@ describe('Phase 3: Workforce Invitation Implementation (INV-01 to INV-12)', () =
     db.prepare('INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)')
       .run(testBranch2Id, testBrandId, 'Cabang Timur', 'cabang-timur', 'Jl. Timur 2', -7.26, 112.76, now, now);
 
+    // Seed secondary brand for cross-brand isolation testing
+    db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain, primary_color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+      .run(testBrand2Id, testOrgId, 'Test Brand Other', 'test-brand-other', 'other.mybangjo.com', '#ff0055', now, now);
+
     const workforce = new WorkforceService();
     try {
       ownerUser = workforce.createUser({
@@ -120,6 +128,52 @@ describe('Phase 3: Workforce Invitation Implementation (INV-01 to INV-12)', () =
       branchManagerUser = db.prepare('SELECT * FROM users WHERE username = ?').get('bm_inv_test');
     }
 
+    try {
+      brandManagerUser = workforce.createUser({
+        brand_id: testBrandId,
+        organization_id: testOrgId,
+        username: 'brandmgr_inv_test',
+        email: 'brandmgr_inv@test.com',
+        password: 'Password123!',
+        full_name: 'Brand Manager Test',
+        role: 'brand_manager',
+        created_by: ownerUser.id
+      });
+    } catch (_) {
+      brandManagerUser = db.prepare('SELECT * FROM users WHERE username = ?').get('brandmgr_inv_test');
+    }
+
+    try {
+      cashierUser = workforce.createUser({
+        brand_id: testBrandId,
+        organization_id: testOrgId,
+        branch_id: testBranch1Id,
+        username: 'cashier_inv_test',
+        email: 'cashier_inv@test.com',
+        password: 'Password123!',
+        full_name: 'Cashier Test',
+        role: 'cashier',
+        created_by: ownerUser.id
+      });
+    } catch (_) {
+      cashierUser = db.prepare('SELECT * FROM users WHERE username = ?').get('cashier_inv_test');
+    }
+
+    try {
+      otherBrandOwner = workforce.createUser({
+        brand_id: testBrand2Id,
+        organization_id: testOrgId,
+        username: 'other_owner_inv_test',
+        email: 'other_owner@test.com',
+        password: 'Password123!',
+        full_name: 'Other Owner Test',
+        role: 'owner',
+        created_by: 'seed'
+      });
+    } catch (_) {
+      otherBrandOwner = db.prepare('SELECT * FROM users WHERE username = ?').get('other_owner_inv_test');
+    }
+
     // Login to obtain auth tokens
     const loginOwner = await request('POST', '/api/v1/auth/merchant/login', {
       username: 'owner_inv_test',
@@ -141,8 +195,8 @@ describe('Phase 3: Workforce Invitation Implementation (INV-01 to INV-12)', () =
   });
 
   beforeEach(() => {
-    db.prepare("DELETE FROM workforce_invitations WHERE brand_id = ?").run(testBrandId);
-    db.prepare("DELETE FROM security_audit_log WHERE brand_id = ?").run(testBrandId);
+    db.prepare("DELETE FROM workforce_invitations WHERE brand_id IN (?, ?)").run(testBrandId, testBrand2Id);
+    db.prepare("DELETE FROM security_audit_log WHERE brand_id IN (?, ?)").run(testBrandId, testBrand2Id);
   });
 
   // INV-01: Authorized Owner creates Branch Manager invitation
@@ -638,5 +692,347 @@ describe('Phase 3: Workforce Invitation Implementation (INV-01 to INV-12)', () =
     );
     assert.equal(revokeRes.status, 200);
     assert.equal(revokeRes.data.invitation.status, 'revoked');
+  });
+
+  // ==================== PHASE 3 REGRESSION SUITE ====================
+
+  // INV-REG-01: Cross-brand mutation authorization
+  it('INV-REG-01: Actor from different brand cannot resend or revoke invitation (FORBIDDEN_BRAND_SCOPE)', async () => {
+    const service = new WorkforceInvitationService(db);
+
+    const inv = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+      email: 'cross_brand@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      branch_id: testBranch1Id
+    });
+
+    // Other brand owner attempts resend
+    await assert.rejects(
+      async () => {
+        await service.resendInvitation({
+          actor: { actor_id: otherBrandOwner.id, actor_role: 'owner', actor_brand_id: testBrand2Id },
+          invitation_id: inv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.equal(err.code, 'FORBIDDEN_BRAND_SCOPE');
+        return true;
+      }
+    );
+
+    // Other brand owner attempts revoke
+    assert.throws(
+      () => {
+        service.revokeInvitation({
+          actor: { actor_id: otherBrandOwner.id, actor_role: 'owner', actor_brand_id: testBrand2Id },
+          invitation_id: inv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.equal(err.code, 'FORBIDDEN_BRAND_SCOPE');
+        return true;
+      }
+    );
+  });
+
+  // INV-REG-02: Cross-branch mutation authorization
+  it('INV-REG-02: Branch Manager cannot resend or revoke invitation for another branch (FORBIDDEN_BRANCH_SCOPE)', async () => {
+    const service = new WorkforceInvitationService(db);
+
+    // Create invitation for Branch 2
+    const inv = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+      email: 'cross_branch@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      branch_id: testBranch2Id
+    });
+
+    // Branch Manager 1 (scoped to testBranch1Id) attempts resend
+    await assert.rejects(
+      async () => {
+        await service.resendInvitation({
+          actor: { actor_id: branchManagerUser.id, actor_role: 'branch_manager', actor_branch_id: testBranch1Id, actor_brand_id: testBrandId },
+          invitation_id: inv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.equal(err.code, 'FORBIDDEN_BRANCH_SCOPE');
+        return true;
+      }
+    );
+
+    // Branch Manager 1 attempts revoke
+    assert.throws(
+      () => {
+        service.revokeInvitation({
+          actor: { actor_id: branchManagerUser.id, actor_role: 'branch_manager', actor_branch_id: testBranch1Id, actor_brand_id: testBrandId },
+          invitation_id: inv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.equal(err.code, 'FORBIDDEN_BRANCH_SCOPE');
+        return true;
+      }
+    );
+  });
+
+  // INV-REG-03: Role ceiling mutation authorization
+  it('INV-REG-03: Brand Manager and Branch Manager cannot resend or revoke managerial roles above ceiling', async () => {
+    const service = new WorkforceInvitationService(db);
+
+    // Create Branch Manager invitation
+    const bmInv = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+      email: 'bm_candidate@test.com',
+      role: 'branch_manager',
+      brand_id: testBrandId,
+      branch_id: testBranch1Id
+    });
+
+    // Branch Manager attempts to resend Branch Manager invitation -> Rejected
+    await assert.rejects(
+      async () => {
+        await service.resendInvitation({
+          actor: { actor_id: branchManagerUser.id, actor_role: 'branch_manager', actor_branch_id: testBranch1Id, actor_brand_id: testBrandId },
+          invitation_id: bmInv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.equal(err.code, 'FORBIDDEN_ROLE_CEILING');
+        return true;
+      }
+    );
+
+    // Branch Manager attempts to revoke Branch Manager invitation -> Rejected
+    assert.throws(
+      () => {
+        service.revokeInvitation({
+          actor: { actor_id: branchManagerUser.id, actor_role: 'branch_manager', actor_branch_id: testBranch1Id, actor_brand_id: testBrandId },
+          invitation_id: bmInv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.equal(err.code, 'FORBIDDEN_ROLE_CEILING');
+        return true;
+      }
+    );
+
+    // Create Brand Manager invitation
+    const bmMgrInv = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+      email: 'brandmgr_candidate@test.com',
+      role: 'brand_manager',
+      brand_id: testBrandId
+    });
+
+    // Brand Manager attempts to resend Brand Manager invitation -> Rejected
+    await assert.rejects(
+      async () => {
+        await service.resendInvitation({
+          actor: { actor_id: brandManagerUser.id, actor_role: 'brand_manager', actor_brand_id: testBrandId },
+          invitation_id: bmMgrInv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.equal(err.code, 'FORBIDDEN_ROLE_CEILING');
+        return true;
+      }
+    );
+
+    // Brand Manager attempts to revoke Brand Manager invitation -> Rejected
+    assert.throws(
+      () => {
+        service.revokeInvitation({
+          actor: { actor_id: brandManagerUser.id, actor_role: 'brand_manager', actor_brand_id: testBrandId },
+          invitation_id: bmMgrInv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.equal(err.code, 'FORBIDDEN_ROLE_CEILING');
+        return true;
+      }
+    );
+
+    // Cashier attempts to resend/revoke -> Rejected
+    await assert.rejects(
+      async () => {
+        await service.resendInvitation({
+          actor: { actor_id: cashierUser.id, actor_role: 'cashier', actor_branch_id: testBranch1Id, actor_brand_id: testBrandId },
+          invitation_id: bmInv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 403);
+        assert.equal(err.code, 'FORBIDDEN_ROLE_CEILING');
+        return true;
+      }
+    );
+  });
+
+  // INV-REG-04: Concurrency-safe pending invitation creation
+  it('INV-REG-04: Concurrent creation requests for same email/brand resolve to exactly one pending invitation', async () => {
+    const service = new WorkforceInvitationService(db);
+    const email = 'concurrent_invite@test.com';
+
+    // Dispatch 2 concurrent creation requests simultaneously
+    const [res1, res2] = await Promise.all([
+      service.createInvitation({
+        actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+        email,
+        role: 'cashier',
+        brand_id: testBrandId,
+        branch_id: testBranch1Id
+      }),
+      service.createInvitation({
+        actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+        email,
+        role: 'cashier',
+        brand_id: testBrandId,
+        branch_id: testBranch1Id
+      })
+    ]);
+
+    assert.ok(res1.id);
+    assert.ok(res2.id);
+    assert.equal(res1.id, res2.id, 'Concurrent creation must resolve to single invitation ID');
+
+    // Verify DB contains exactly ONE row for this email and brand
+    const rows = db.prepare('SELECT * FROM workforce_invitations WHERE email = ? AND brand_id = ?').all(email, testBrandId);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].status, 'pending');
+
+    // Token capability is valid
+    const valid = service.validateInvitationToken(res2.rawToken);
+    assert.equal(valid.valid, true);
+  });
+
+  // INV-REG-05: Atomic pending -> revoked state transition
+  it('INV-REG-05: Concurrent revocations perform atomic transition (exactly one succeeds, second returns ALREADY_REVOKED)', async () => {
+    const service = new WorkforceInvitationService(db);
+
+    const inv = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+      email: 'concurrent_revoke@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      branch_id: testBranch1Id
+    });
+
+    // First revocation succeeds
+    const firstRevoke = service.revokeInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+      invitation_id: inv.id
+    });
+    assert.equal(firstRevoke.status, 'revoked');
+
+    // Second revocation immediately fails with ALREADY_REVOKED
+    assert.throws(
+      () => {
+        service.revokeInvitation({
+          actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+          invitation_id: inv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 400);
+        assert.equal(err.code, 'ALREADY_REVOKED');
+        return true;
+      }
+    );
+
+    // Verify DB row status
+    const row = db.prepare('SELECT status, revoked_at FROM workforce_invitations WHERE id = ?').get(inv.id);
+    assert.equal(row.status, 'revoked');
+    assert.ok(row.revoked_at);
+  });
+
+  // INV-REG-06: Concurrency-safe resend state transition
+  it('INV-REG-06: Resending revoked invitation fails atomically with INVALID_STATE', async () => {
+    const service = new WorkforceInvitationService(db);
+
+    const inv = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+      email: 'resend_revoked@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      branch_id: testBranch1Id
+    });
+
+    // Revoke invitation
+    service.revokeInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+      invitation_id: inv.id
+    });
+
+    // Resend must fail with INVALID_STATE
+    await assert.rejects(
+      async () => {
+        await service.resendInvitation({
+          actor: { actor_id: ownerUser.id, actor_role: 'owner', actor_brand_id: testBrandId },
+          invitation_id: inv.id
+        });
+      },
+      (err) => {
+        assert.equal(err.status, 400);
+        assert.equal(err.code, 'INVALID_STATE');
+        return true;
+      }
+    );
+  });
+
+  // INV-REG-07: Public API contract provider error sanitization
+  it('INV-REG-07: REST API masks raw upstream provider errors in public API contract while preserving server audit log', async () => {
+    const { defaultEmailProvider } = require('../../core/identity/EmailProvider');
+    const originalSend = defaultEmailProvider.sendTeamInvitation;
+
+    defaultEmailProvider.sendTeamInvitation = async () => {
+      throw new Error('Resend upstream gateway timeout 504: backend connection dropped');
+    };
+
+    try {
+      const res = await request(
+        'POST',
+        '/api/v1/admin/invitations',
+        {
+          email: 'masked_error@test.com',
+          role: 'cashier',
+          branch_id: testBranch1Id
+        },
+        { 'Authorization': `Bearer ${ownerToken}` }
+      );
+
+      assert.equal(res.status, 201);
+      assert.equal(res.data.success, true);
+      assert.ok(res.data.invitation);
+      // Public API response MUST NOT leak raw upstream details
+      assert.equal(res.data.invitation.delivery.success, false);
+      assert.equal(res.data.invitation.delivery.error, 'EMAIL_DELIVERY_FAILED');
+      assert.equal(JSON.stringify(res.data).includes('504'), false, 'Raw provider error 504 must not be in public API response');
+      assert.equal(JSON.stringify(res.data).includes('Resend upstream'), false, 'Upstream vendor name must not be in public API response');
+
+      // Server-side audit log MUST capture the event for observability
+      const auditLog = db.prepare(`
+        SELECT * FROM security_audit_log 
+        WHERE action = 'INVITATION_SEND_FAILED' AND brand_id = ?
+        ORDER BY created_at DESC LIMIT 1
+      `).get(testBrandId);
+
+      assert.ok(auditLog);
+      assert.equal(auditLog.result, 'failed');
+      assert.ok(auditLog.metadata.includes('504'), 'Server-side audit log preserves operational observability');
+    } finally {
+      defaultEmailProvider.sendTeamInvitation = originalSend;
+    }
   });
 });

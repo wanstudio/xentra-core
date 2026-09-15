@@ -1447,6 +1447,7 @@ function initSchema(targetDb) {
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_wi_org_brand ON workforce_invitations(organization_id, brand_id);'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_wi_email ON workforce_invitations(email);'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_wi_status ON workforce_invitations(status);'); } catch (e) {}
+  try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_wi_unique_pending_email_brand ON workforce_invitations(brand_id, email) WHERE status = \'pending\';'); } catch (e) {}
 
   // Migrate existing branch_products:
   // 1. Fill legacy snapshot columns (product_name, etc.) idempotently from master for pre-override rows.
