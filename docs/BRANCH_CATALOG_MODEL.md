@@ -1,169 +1,120 @@
-# Xentra Branch Catalog Model
+# Xentra — Branch Catalog Model
 
-**Status: LOCKED — business/architecture ownership decision**
-**Decision date:** 2026-09-05
-**Authority:** Current Notion `01 — Architecture Decision Log`
+**Status: LOCKED — reconciled with Canonical Architecture & Product Library v2**  
+**Decision authority:** locked business decisions + Library v2
 
-> [!IMPORTANT]
-> **Architecture update (2026-09-07):** The "Adoption = Save Point (snapshot)" implementation model
-> described in this document has been **SUPERSEDED** by **Master Product Default + Branch Optional Override**.
-> The business ownership boundaries (Master owns identity, Branch owns operational config) remain locked.
-> Only the implementation model for content fields (name/description/image) changed:
-> adoption no longer copies data; override columns (NULL = inherit master, non-NULL = branch wins)
-> replace the snapshot columns as the resolution path. See `docs/DATABASE_SCHEMA.md` and
-> `tests/branchMenuOverride.test.js` for the current implementation.
+> The former snapshot/save-point wording is superseded. Current resolution is **Master Product Default + explicit Branch Override** for supported fields. Business ownership boundaries remain unchanged.
 
-## Core decision
+## 1. Canonical concepts
 
-Xentra distinguishes **Master Catalog** from **Branch Catalog**.
+Xentra separates:
 
-- Master Catalog is owned by the Owner/Brand and acts as the master product library.
-- Branch has operational authority over what it sells and how its selling menu is organized.
-- A Branch does not treat Master Catalog as a live operational mirror.
-- A product becomes part of a Branch Catalog through an explicit adoption/copy/save-point action.
-- Branch Catalog remains operationally present when the Owner later changes or disables the Master Catalog product.
-- Master Catalog changes must not silently delete or disable an already-adopted Branch Product.
+1. **Master Product** — Brand-owned identity/content/defaults.
+2. **Master Category** — Brand-owned master grouping.
+3. **Branch Product** — Branch selling assignment/configuration/state.
+4. **Branch Category** — Branch-controlled selling grouping.
+5. **Branch Menu** — durable Branch selling-menu configuration.
+6. **Branch Product Availability** — daily operational state.
+7. **Stock** — inventory quantity/state; not the same as availability.
 
-## Category ownership
+These concepts must not be collapsed because they appear together in the customer menu.
 
-**Branch Category is Branch-owned.** It is not a projection of Master Category.
-
-A Branch may:
-
-- create its own category;
-- rename its own category;
-- omit categories/products that it does not sell;
-- organize an adopted product under any Branch Category it chooses.
-
-Master Category and Branch Category are therefore separate concepts even when their names happen to be identical.
-
-Example:
-
-```text
-Master Catalog
-├── Makanan
-├── Mie
-└── Minuman
-
-Branch A
-├── Menu Favorit
-│   └── Ayam Geprek
-├── Mie
-│   └── Mie Goreng
-└── Minuman
-    └── Es Teh
-
-Branch B
-├── Paket Hemat
-│   └── Ayam Geprek
-└── Minuman Dingin
-    └── Es Teh
-```
-
-Branch B does not need a `Mie` category simply because `Mie` exists in the Master Catalog.
-
-If a Branch Manager puts `Ayam Geprek` into a Branch Category named `Menu Ikan`, Xentra does not automatically correct that merchandising decision unless a separately locked business rule forbids it.
-
-## Product relationship
-
-The conceptual relationship is:
+## 2. Ownership boundary
 
 ```text
 Owner / Brand
-      │
-      ▼
-Master Catalog
-      │
-      │ product available for adoption
-      ▼
-Branch Manager
-      │
-      │ adopt (override columns start NULL — branch inherits live master)
-      ▼
-Branch Catalog
-      ├── Branch Product
-      │     ├── stock
-      │     ├── availability
-      │     ├── branch price/configuration
-      │     └── branch operational state
-      │
-      └── Branch Category
-            └── branch-controlled menu grouping
+    ↓
+Master Product + Master Category
+    ↓
+Branch Menu Configuration / Branch Product
+    ↓
+Branch Manager daily Availability
+    ↓
+Customer / POS / KDS consumption
 ```
 
-This is intentionally **not** a live-reference model where Branch selling configuration is derived directly from Master Product and Master Category on every read.
+Owner manages master catalog and durable Branch Menu configuration. Branch Manager operates Branch Product availability/sold-out state. Xentra-Core enforces authorization, scope, integrity, and persistence.
 
-## Master changes
+## 3. Resolution model
 
-The following states are valid:
+For fields that support inheritance:
 
 ```text
-Master Product: DISABLED
-
-Branch A Product: ACTIVE
-Branch B Product: ACTIVE
-Branch C Product: DISABLED
+Master Product Default
+        ↓
+explicit Branch Override when present
+        ↓
+Effective Branch value
 ```
 
-The Master Product being disabled does not itself authorize Core to silently mutate all Branch Product records.
+`NULL`/absent Branch override means inherit the Master default for that supported field. A Branch override wins without mutating the Master Product.
 
-Future internal communication may inform Branches that the Owner disabled a Master Product, for example:
+Do not describe this as an immutable copied snapshot or generic save-point model.
 
-> Owner menonaktifkan product ini mulai hari ini. Selesaikan transaksi jika ada yang sedang berjalan. Jika tidak ada transaksi, silakan nonaktifkan di Branch Settings.
+## 4. Branch Category
 
-The Owner → Branch communication workflow, notification transport, synchronization/version policy, and conflict resolution are **future decisions** and are not defined by this document.
+Branch Category is independently controlled at Branch scope. A Branch may organize its selling assortment differently from the Master Category structure. Identical names do not make Master Category and Branch Category the same entity.
 
-## Database implications
+A Branch may omit products/categories it does not sell and may arrange adopted products according to its own selling-menu configuration.
 
-The current `branch_products` structure must not automatically be interpreted as complete implementation of snapshot/copy semantics merely because it references `products`.
+## 5. Availability vs Master active state vs Stock
 
-Do not invent a schema solely from this decision. In particular, this decision does **not** authorize ad-hoc creation of:
+These are three separate concepts:
 
-- `branch_categories`;
-- `categories.branch_id`;
-- `products.branch_id`;
-- `branch_catalog`.
+```text
+Master Product active state
+        ≠
+Branch Product Availability
+        ≠
+Stock quantity/state
+```
 
-The exact physical schema for Branch-owned Product/Category records, snapshot fields, versioning, and adoption semantics must be designed and explicitly locked as a separate data-model decision before implementation.
+`branch_products.is_available` remains the branch-scoped availability authority.
 
-## Domain boundary
+A Branch Manager marking a product sold out must not silently mutate Master Product `is_active`.
 
-- **Catalog domain:** Master Catalog/product library and its master catalog contract.
-- **Branch domain:** Branch operational authority and branch context.
-- **Branch Catalog:** operational selling configuration owned by the Branch, composed from products the Branch has explicitly adopted.
-- **Home/customer presentation:** when a Branch Catalog context exists, display the Branch Catalog rather than falling back to a global Master Catalog.
-- **Core:** enforces authority, scope, integrity, state, consistency, idempotency, and auditability; it does not invent business policy.
+Stock exhaustion must fail safely and must not manufacture an artificial available quantity.
 
-## Invariants
+## 6. Customer-facing rule
 
-1. Master Catalog is not a live operational mirror of every Branch.
-2. Branch must explicitly adopt a product before it becomes part of that Branch's selling catalog.
-3. Branch Category is independently controlled by the Branch.
-4. Different Branches may sell different subsets of the same Master Catalog.
-5. Different Branches may organize the same product under different Branch Categories.
-6. A Master Catalog change must not silently remove or disable an already-adopted Branch Product.
-7. A product may remain operationally available to a Branch even when it is disabled in Master Catalog until the approved Owner → Branch operational workflow is applied.
-8. Customer-facing Branch Catalog reads must not silently fall back to the global Master Catalog.
-9. No implementation may invent schema or synchronization rules that have not been separately approved.
+When a Branch context exists, customer catalog reads consume the Branch selling catalog. Customer presentation must not silently fall back to a global Master Catalog when a Branch-scoped catalog is required.
 
-## Current implementation acceptance — 2026-09-05
+Home has one active Branch context for customer presentation and must not mix products from multiple Branches in one Branch context.
 
-The current Xentra-Core checkpoint is accepted for the **main Branch Catalog architecture goal**:
+## 7. Authority matrix
 
-- the demo dataset now targets exactly five canonical Branches;
-- Branches have independent Branch Categories and Branch Product subsets;
-- shared Master Products may be adopted independently by multiple Branches;
-- CatalogService/API and Home branch context are expected to consume Branch-scoped catalog data rather than a global Master Catalog fallback;
-- the frontend must not hardcode Branch-specific product catalogs.
+| Concern | Owner | Branch Manager | Core |
+|---|---|---|---|
+| Master Product | Configure/Govern | Observe | Enforce |
+| Master Category | Configure | Observe | Enforce |
+| Branch Menu | Configure | Observe | Enforce branch scope |
+| Branch Product assignment | Configure/govern according to contract | Operate within granted scope | Enforce |
+| Branch Product Availability | Observe | Operate | Enforce |
+| Stock | Observe/report | Operate | Persist/validate |
 
-This acceptance concerns the **catalog structure and branch-scoped UI consumption**, not every operational property of the demo seed implementation.
+Visibility in a dashboard never implies mutation authority.
 
-### Deferred seed-cleanup issue
+## 8. Database boundary
 
-Commit `f80dd4cf49d95df276f2815dc5cf200f01b184f8` currently performs broad cleanup of non-canonical Branches and related records. This is explicitly **deferred** and excluded from the current architecture acceptance. A future hardening task must restrict destructive cleanup to clearly seed-owned/demo data and must never delete arbitrary persistent business data merely to converge the demo dataset to five Branches.
+This document does not authorize ad-hoc schema invention. Physical tables/columns must follow the current database contract and explicit migration decisions.
 
-The deferred cleanup concern does not alter the accepted Master Catalog / Branch Catalog ownership model or the branch-scoped Catalog → UI flow.
+In particular, do not invent duplicate catalog structures merely to make UI terminology convenient.
 
-## Relationship to previous Home decision
+## 9. Historical implementation notes
 
-The earlier Home rule remains valid at the presentation level: Home has one Branch Context and must not mix products from multiple Branches. The clarification here changes **what Branch-scoped Catalog means**: it is a Branch-owned saved/adopted catalog, not merely a projection of globally-owned categories/products through `branch_products`.
+The previous adoption-as-snapshot model is **SUPERSEDED**. Current implementation direction is Master Product Default + Branch Optional Override.
+
+Any old code/docs using snapshot/save-point terminology should be treated as legacy unless explicitly reconciled.
+
+## 10. Implementation invariant
+
+Before catalog changes:
+
+1. identify Master vs Branch concept;
+2. identify durable configuration vs operational state;
+3. identify authoritative owner and scope;
+4. reuse the canonical Library v2 vocabulary;
+5. do not use Master state as a silent Branch operational state;
+6. do not introduce a new synonym/entity to work around an existing boundary.
+
+Canonical reference: `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`.
