@@ -994,6 +994,127 @@ class WorkforceInvitationService {
       };
     }
 
+    if (userRecord.status === 'disabled') {
+      throw {
+        status: 403,
+        code: 'ACCOUNT_DISABLED',
+        message: 'Akun pengguna telah dinonaktifkan.'
+      };
+    }
+
+    // Phase 4A Reconciliation: Safe Workforce Role & Scope Attachment
+    // Prevent accidental destruction or demotion of active merchant roles
+    const hasExistingWorkforce = Boolean(userRecord.brand_id && userRecord.role);
+
+    if (hasExistingWorkforce) {
+      // 1. If user is an Owner, never silently demote or overwrite to a staff/manager role
+      if (userRecord.role === 'owner' && invitation.role !== 'owner') {
+        this._logSecurityEvent({
+          actor_id: userRecord.id,
+          actor_role: userRecord.role,
+          action: 'INVITATION_ACCEPT_DENIED',
+          brand_id: invitation.brand_id,
+          organization_id: invitation.organization_id,
+          branch_id: invitation.branch_id,
+          result: 'denied',
+          metadata: {
+            invitation_id: invitation.id,
+            reason: 'CANNOT_DEMOTE_OWNER',
+            current_role: userRecord.role,
+            invited_role: invitation.role
+          }
+        });
+        throw {
+          status: 409,
+          code: 'WORKFORCE_ROLE_CONFLICT',
+          message: 'Akun pemilik bisnis (Owner) tidak dapat menerima undangan sebagai staf atau manajer.'
+        };
+      }
+
+      // 2. If user already belongs to another brand, prevent destructive cross-brand overwrite
+      if (userRecord.brand_id !== invitation.brand_id) {
+        this._logSecurityEvent({
+          actor_id: userRecord.id,
+          actor_role: userRecord.role,
+          action: 'INVITATION_ACCEPT_DENIED',
+          brand_id: invitation.brand_id,
+          organization_id: invitation.organization_id,
+          branch_id: invitation.branch_id,
+          result: 'denied',
+          metadata: {
+            invitation_id: invitation.id,
+            reason: 'CROSS_BRAND_CONFLICT',
+            current_brand_id: userRecord.brand_id,
+            target_brand_id: invitation.brand_id
+          }
+        });
+        throw {
+          status: 409,
+          code: 'WORKFORCE_SCOPE_CONFLICT',
+          message: 'Akun pengguna telah terikat pada brand bisnis lain.'
+        };
+      }
+
+      // 3. User is in the same brand. Check if role/branch is identical (idempotent / duplicate acceptance)
+      const sameRole = userRecord.role === invitation.role;
+      const sameBranch = (userRecord.branch_id || null) === (invitation.branch_id || null);
+
+      if (sameRole && sameBranch) {
+        // User already has this exact role and scope within this brand
+        // Consume invitation deterministically without altering user
+      } else {
+        // Evaluate role transition within same brand
+        // Managerial roles cannot be silently demoted to cashier/kitchen
+        const managerialRoles = ['brand_manager', 'branch_manager'];
+        if (managerialRoles.includes(userRecord.role) && !managerialRoles.includes(invitation.role)) {
+          this._logSecurityEvent({
+            actor_id: userRecord.id,
+            actor_role: userRecord.role,
+            action: 'INVITATION_ACCEPT_DENIED',
+            brand_id: invitation.brand_id,
+            organization_id: invitation.organization_id,
+            branch_id: invitation.branch_id,
+            result: 'denied',
+            metadata: {
+              invitation_id: invitation.id,
+              reason: 'CANNOT_DEMOTE_MANAGER',
+              current_role: userRecord.role,
+              invited_role: invitation.role
+            }
+          });
+          throw {
+            status: 409,
+            code: 'WORKFORCE_ROLE_CONFLICT',
+            message: `Akun manajer tidak dapat diturunkan statusnya menjadi ${invitation.role} via undangan.`
+          };
+        }
+
+        // Branch Manager with branch A cannot be silently reassigned to branch B if branch A differs
+        if (userRecord.role === 'branch_manager' && userRecord.branch_id && invitation.branch_id && userRecord.branch_id !== invitation.branch_id) {
+          this._logSecurityEvent({
+            actor_id: userRecord.id,
+            actor_role: userRecord.role,
+            action: 'INVITATION_ACCEPT_DENIED',
+            brand_id: invitation.brand_id,
+            organization_id: invitation.organization_id,
+            branch_id: invitation.branch_id,
+            result: 'denied',
+            metadata: {
+              invitation_id: invitation.id,
+              reason: 'BRANCH_SCOPE_CONFLICT',
+              current_branch_id: userRecord.branch_id,
+              target_branch_id: invitation.branch_id
+            }
+          });
+          throw {
+            status: 409,
+            code: 'WORKFORCE_SCOPE_CONFLICT',
+            message: 'Branch Manager telah bertugas pada cabang lain dalam brand ini.'
+          };
+        }
+      }
+    }
+
     // Atomic state transition: pending -> accepted and bind user to brand/role/scope
     const now = new Date().toISOString();
 

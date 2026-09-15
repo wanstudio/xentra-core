@@ -195,6 +195,14 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
     db.prepare("DELETE FROM workforce_invitations WHERE brand_id = ?").run(testBrandId);
     db.prepare("DELETE FROM security_audit_log WHERE brand_id = ?").run(testBrandId);
 
+    // Reset existing recipient to baseline cashier role at branch 1
+    db.prepare("UPDATE users SET role = 'cashier', brand_id = ?, organization_id = ?, branch_id = ?, status = 'active' WHERE id = ?")
+      .run(testBrandId, testOrgId, testBranch1Id, existingRecipientUser.id);
+
+    // Reset wrong recipient user
+    db.prepare("UPDATE users SET role = 'cashier', brand_id = ?, organization_id = ?, branch_id = ?, status = 'active' WHERE id = ?")
+      .run(testBrandId, testOrgId, testBranch1Id, wrongRecipientUser.id);
+
     // Refresh recipient user sessions for tests that make REST requests
     const loginExisting = await request('POST', '/api/v1/auth/merchant/login', {
       username: 'alice_existing_user',
@@ -673,5 +681,227 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
       assert.equal(err.code, 'USER_NOT_FOUND');
       return true;
     });
+  });
+
+  // ==================== PHASE 4A RECONCILIATION TESTS ====================
+
+  it('ACC-REC-01: Existing user is reused without creating duplicate user identity', async () => {
+    const service = new WorkforceInvitationService();
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'alice.recipient@test.com',
+      role: 'branch_manager',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    const userCountBefore = db.prepare('SELECT COUNT(*) as count FROM users WHERE email = ?').get('alice.recipient@test.com').count;
+
+    const res = service.acceptInvitation({
+      authenticatedUser: { id: existingRecipientUser.id, email: 'alice.recipient@test.com' },
+      rawToken: created.rawToken
+    });
+
+    assert.equal(res.success, true);
+    assert.equal(res.user_id, existingRecipientUser.id);
+
+    const userCountAfter = db.prepare('SELECT COUNT(*) as count FROM users WHERE email = ?').get('alice.recipient@test.com').count;
+    assert.equal(userCountAfter, userCountBefore, 'No duplicate user identity created');
+  });
+
+  it('ACC-REC-02: Existing Owner identity cannot be demoted to staff/manager via invitation acceptance', async () => {
+    const service = new WorkforceInvitationService();
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'owner_acc@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    assert.throws(() => {
+      service.acceptInvitation({
+        authenticatedUser: { id: ownerUser.id, email: 'owner_acc@test.com' },
+        rawToken: created.rawToken
+      });
+    }, (err) => {
+      assert.equal(err.status, 409);
+      assert.equal(err.code, 'WORKFORCE_ROLE_CONFLICT');
+      return true;
+    });
+
+    // Verify Owner role preserved
+    const ownerDb = db.prepare('SELECT role FROM users WHERE id = ?').get(ownerUser.id);
+    assert.equal(ownerDb.role, 'owner');
+  });
+
+  it('ACC-REC-03: User bound to another brand cannot accept cross-brand invitation (WORKFORCE_SCOPE_CONFLICT)', async () => {
+    const service = new WorkforceInvitationService();
+
+    // Create a brand 2
+    const otherBrandId = 'brand_acc_foreign';
+    db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain, primary_color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\'), datetime(\'now\'))')
+      .run(otherBrandId, testOrgId, 'Other Foreign Brand', 'other-foreign', 'other-foreign.xentra.cloud', '#ffffff');
+
+    // Create user bound to foreign brand
+    const workforce = new WorkforceService();
+    let foreignUser;
+    try {
+      foreignUser = workforce.createUser({
+        brand_id: otherBrandId,
+        organization_id: testOrgId,
+        username: 'foreign_worker',
+        email: 'foreign.worker@test.com',
+        password: 'Password123!',
+        full_name: 'Foreign Worker',
+        role: 'cashier'
+      });
+    } catch (_) {
+      foreignUser = db.prepare('SELECT * FROM users WHERE username = ?').get('foreign_worker');
+    }
+
+    // Invitation is for main brand
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'foreign.worker@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    assert.throws(() => {
+      service.acceptInvitation({
+        authenticatedUser: { id: foreignUser.id, email: 'foreign.worker@test.com' },
+        rawToken: created.rawToken
+      });
+    }, (err) => {
+      assert.equal(err.status, 409);
+      assert.equal(err.code, 'WORKFORCE_SCOPE_CONFLICT');
+      return true;
+    });
+
+    // Foreign user's brand_id was NOT overwritten
+    const foreignDb = db.prepare('SELECT brand_id FROM users WHERE id = ?').get(foreignUser.id);
+    assert.equal(foreignDb.brand_id, otherBrandId);
+  });
+
+  it('ACC-REC-04: Manager cannot be demoted to cashier or kitchen role via invitation', async () => {
+    const service = new WorkforceInvitationService();
+
+    // Set Alice as brand_manager
+    db.prepare("UPDATE users SET role = 'brand_manager', branch_id = NULL WHERE id = ?").run(existingRecipientUser.id);
+
+    // Invitation is for cashier
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'alice.recipient@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    assert.throws(() => {
+      service.acceptInvitation({
+        authenticatedUser: { id: existingRecipientUser.id, email: 'alice.recipient@test.com' },
+        rawToken: created.rawToken
+      });
+    }, (err) => {
+      assert.equal(err.status, 409);
+      assert.equal(err.code, 'WORKFORCE_ROLE_CONFLICT');
+      return true;
+    });
+
+    // Alice remains brand_manager
+    const aliceDb = db.prepare('SELECT role FROM users WHERE id = ?').get(existingRecipientUser.id);
+    assert.equal(aliceDb.role, 'brand_manager');
+  });
+
+  it('ACC-REC-05: Branch Manager cannot be reassigned to a different branch via invitation', async () => {
+    const service = new WorkforceInvitationService();
+
+    // Set Alice as branch_manager for branch 1
+    db.prepare("UPDATE users SET role = 'branch_manager', branch_id = ? WHERE id = ?").run(testBranch1Id, existingRecipientUser.id);
+
+    // Invitation is for branch 2
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'alice.recipient@test.com',
+      role: 'branch_manager',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch2Id
+    });
+
+    assert.throws(() => {
+      service.acceptInvitation({
+        authenticatedUser: { id: existingRecipientUser.id, email: 'alice.recipient@test.com' },
+        rawToken: created.rawToken
+      });
+    }, (err) => {
+      assert.equal(err.status, 409);
+      assert.equal(err.code, 'WORKFORCE_SCOPE_CONFLICT');
+      return true;
+    });
+
+    // Alice remains at branch 1
+    const aliceDb = db.prepare('SELECT branch_id FROM users WHERE id = ?').get(existingRecipientUser.id);
+    assert.equal(aliceDb.branch_id, testBranch1Id);
+  });
+
+  it('ACC-REC-06: Disabled user account cannot accept invitations', async () => {
+    const service = new WorkforceInvitationService();
+
+    // Disable Alice
+    db.prepare("UPDATE users SET status = 'disabled' WHERE id = ?").run(existingRecipientUser.id);
+
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'alice.recipient@test.com',
+      role: 'branch_manager',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    assert.throws(() => {
+      service.acceptInvitation({
+        authenticatedUser: { id: existingRecipientUser.id, email: 'alice.recipient@test.com' },
+        rawToken: created.rawToken
+      });
+    }, (err) => {
+      assert.equal(err.status, 403);
+      assert.equal(err.code, 'ACCOUNT_DISABLED');
+      return true;
+    });
+  });
+
+  it('ACC-REC-07: Duplicate acceptance of identical membership is safe and idempotent', async () => {
+    const service = new WorkforceInvitationService();
+
+    // Set Alice to cashier at branch 1
+    db.prepare("UPDATE users SET role = 'cashier', branch_id = ? WHERE id = ?").run(testBranch1Id, existingRecipientUser.id);
+
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'alice.recipient@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    const res = service.acceptInvitation({
+      authenticatedUser: { id: existingRecipientUser.id, email: 'alice.recipient@test.com' },
+      rawToken: created.rawToken
+    });
+
+    assert.equal(res.success, true);
+    assert.equal(res.status, 'accepted');
+    assert.equal(res.role, 'cashier');
+    assert.equal(res.branch_id, testBranch1Id);
   });
 });
