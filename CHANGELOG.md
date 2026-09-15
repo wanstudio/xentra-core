@@ -1,3 +1,16 @@
+## [Unreleased] - 2026-09-15
+### Locked Owner ↔ Branch Manager dashboard boundary
+- Locked the cross-dashboard responsibility model: **Owner = CONFIGURE + GOVERN + OBSERVE**, **Branch Manager = OPERATE + OBSERVE**, and **Xentra-Core = AUTHENTICATE + AUTHORIZE + ENFORCE + PERSIST + AUDIT**.
+- Owner Dashboard remains the business control center for master catalog, branch configuration, default operating policy, floor-plan configuration, campaign governance, workforce authority, cross-branch reporting, branch health visibility, and exceptional governance overrides.
+- Branch Manager remains the daily operational control surface for one Branch: operational open/close, online-order pause, daily schedule exceptions, table state, branch product availability, branch stock, approved branch promo activation, branch order queue/acceptance, branch-scoped staff, and daily operational reporting.
+- Locked the boundary that normal daily mutations must not be duplicated into Owner Dashboard merely because Owner can observe the same entity. Owner may have explicit exceptional/emergency overrides only where separately authorized and audited.
+- Locked the catalog distinction: Master Product and durable Branch Menu configuration belong to Owner/Brand authority; `branch_products.is_available` remains the Branch Manager's branch-scoped daily availability authority.
+- Locked the table distinction: Owner/Admin configures physical floor-plan geometry; Branch Manager operates daily table state. Core must enforce reservation/table availability server-side and protect race-sensitive mutations transactionally.
+- Locked the operating-hours distinction: Owner defines default/permanent schedule; Branch Manager handles branch-scoped daily/special operational exceptions; Core resolves the effective state.
+- Locked the promotion distinction: Owner/Brand defines campaign policy; Branch Manager may activate/deactivate only approved branch-scoped promotions within explicit permission.
+- Locked the order distinction: Owner Orders is primarily cross-branch business/history/investigation; Branch Manager Orders is the operational queue. Branch Acceptance remains a dedicated authorization boundary and payment settlement must not silently become acceptance.
+- Added authoritative contract: `docs/OWNER_BRANCH_MANAGER_BOUNDARY.md`.
+
 ## [Unreleased] - 2026-09-09
 ### Locked workforce account hierarchy & credential security contract
 - Locked client workforce account authority: **Owner** may manage permitted Manager/Cashier accounts within authorized tenant/brand scope; **Manager** may manage Cashier accounts only within current Branch scope; **Cashier** has no workforce-management authority and may manage only its own credentials where permitted.
@@ -25,8 +38,8 @@
   status and rejects settlement of an unaccepted order (`ORDER_NOT_ACCEPTED`),
   so a cashier can never settle (and thereby accept) an order the branch has
   not accepted — settlement stays a payment mutation.
-- **Acceptance actor boundary (CHECK-1/CHECK-4).** The generic kitchen PATCH no
-  longer exposes `'confirmed'` (ACCEPT) or `'cancelled'` (generic post-accept
+- **Acceptance actor boundary (CHECK-1/CHECK-4).** The generic kitchen PATCH
+  no longer exposes `'confirmed'` (ACCEPT) or `'cancelled'` (generic post-accept
   cancel) to any role. ACCEPT is exclusively the branch-acceptance endpoint
   (audited, idempotent); after-ACCEPT cancellation awaits the explicit R8
   exception flow. Merchant dashboard “Ubah Status” for `pending` orders now
