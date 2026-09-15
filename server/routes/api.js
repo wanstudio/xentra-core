@@ -1816,6 +1816,7 @@ router.get('/orders/:id', (req, res) => {
     discount_amount: order.discount_amount,
     grand_total: order.grand_total,
     payment_method: order.payment_method,
+    payment_status: order.payment_status || (payment ? payment.payment_status : 'pending'),
     order_note: order.order_note,
     created_at: order.created_at,
     updated_at: order.updated_at,
@@ -1839,7 +1840,11 @@ router.get('/orders/:id', (req, res) => {
   const safeDelivery = delivery ? {
     destination_address: delivery.destination_address,
     actual_road_distance_meters: delivery.actual_road_distance_meters,
-    delivery_fee_calculated: delivery.delivery_fee_calculated
+    delivery_fee_calculated: delivery.delivery_fee_calculated,
+    driver_name: delivery.driver_name || null,
+    driver_phone: delivery.driver_phone || null,
+    tracking_url: delivery.tracking_url || null,
+    status: delivery.status || null
   } : null;
 
   const safePayment = payment ? {

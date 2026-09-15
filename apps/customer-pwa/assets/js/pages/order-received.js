@@ -31,8 +31,8 @@
   // P7.3 Platform policy: 3 minutes (matches server ACCEPTANCE_TIMEOUT_SECONDS = 180)
   var ACCEPTANCE_TIMEOUT_SECONDS = 180;
 
-  // P7.14 Terminal states — polling stops unconditionally here
-  var TERMINAL_STATES = { confirmed: 1, rejected: 1, timeout: 1, cancelled: 1, completed: 1 };
+  // P8.6 Terminal states — polling stops unconditionally here
+  var TERMINAL_STATES = { rejected: 1, timeout: 1, cancelled: 1, completed: 1, refunded: 1 };
 
   // ─── P7.4 Entry point ─────────────────────────────────────────────────────
   // Always fetches from server; never relies on window memory or local state.
@@ -358,17 +358,49 @@
     var isCash = (payment.payment_method || order.payment_method || 'cash') === 'cash';
 
     var statusTitle = 'Pesanan Diterima Cabang!';
-    var statusDesc = 'Cabang telah mengkonfirmasi pesananmu. Dapur sedang mempersiapkan makanan.';
+    var statusDesc = 'Cabang telah mengonfirmasi pesananmu. Dapur sedang menyiapkan makanan.';
+    var badgeIcon = '✓';
 
-    if (orderType === 'reservation') {
-      statusTitle = 'Reservasi Berhasil Diajukan!';
-      statusDesc = 'Reservasi mejamu sudah tercatat. Kasir akan melakukan Check-in saat kamu tiba di outlet.';
+    if (status === 'preparing') {
+      statusTitle = 'Sedang Disiapkan di Dapur';
+      statusDesc = 'Dapur cabang sedang memasak dan menyiapkan pesananmu.';
+      badgeIcon = '🍳';
+    } else if (status === 'ready') {
+      if (orderType === 'delivery') {
+        statusTitle = 'Pesanan Siap Diantar';
+        statusDesc = 'Makanan sudah selesai dimasak dan siap diserahkan kepada kurir.';
+      } else if (orderType === 'pickup') {
+        statusTitle = 'Pesanan Siap Diambil!';
+        statusDesc = 'Makananmu sudah siap. Silakan ambil di konter cabang ' + UI.escape(order.branch_name || '') + '.';
+      } else if (orderType === 'dine_in') {
+        statusTitle = 'Pesanan Siap Disajikan';
+        statusDesc = 'Makananmu sudah siap dan akan segera disajikan ke mejamu.';
+      } else {
+        statusTitle = 'Pesanan Siap';
+        statusDesc = 'Pesananmu sudah selesai disiapkan.';
+      }
+      badgeIcon = '🔔';
+    } else if (status === 'out_for_delivery') {
+      statusTitle = 'Dalam Pengantaran Kurir';
+      statusDesc = 'Kurir sedang dalam perjalanan mengantarkan pesanan ke alamat tujuan.';
+      badgeIcon = '🛵';
+    } else if (status === 'completed') {
+      statusTitle = 'Pesanan Selesai';
+      statusDesc = 'Pesanan telah selesai dinikmati. Terima kasih telah memesan di ' + UI.escape(order.branch_name || 'kami') + '!';
+      badgeIcon = '🎉';
+    } else if (orderType === 'reservation') {
+      statusTitle = 'Reservasi Berhasil Dikonfirmasi!';
+      statusDesc = 'Reservasi mejamu sudah tercatat di cabang ' + UI.escape(order.branch_name || '') + '. Kasir akan melakukan Check-in saat kamu tiba.';
     }
 
-    var stepIndex = 1;
-    if (status === 'confirmed' || status === 'preparing') stepIndex = 2;
-    if (status === 'ready' || status === 'delivery' || status === 'out_for_delivery') stepIndex = 3;
-    if (status === 'completed') stepIndex = 4;
+    // Stepper completion rules
+    var step1Done = true; // Acceptance is completed
+    var step2Done = ['preparing', 'ready', 'out_for_delivery', 'completed'].includes(status);
+    var step3Done = ['ready', 'out_for_delivery', 'completed'].includes(status);
+    if (orderType === 'delivery') {
+      step3Done = ['out_for_delivery', 'completed'].includes(status);
+    }
+    var step4Done = (status === 'completed');
 
     var itemsHtml = '';
     if (items.length > 0) {
@@ -395,18 +427,25 @@
     if (orderType === 'dine_in') orderTypeBadge = '🍽️ Dine-in ' + (order.table_number ? '(' + order.table_number + ')' : '');
     if (orderType === 'reservation') orderTypeBadge = '📅 Reservasi (' + (order.guest_count || 2) + ' Tamu)';
 
+    var paymentStatusText = isCash ? 'Bayar di Tempat' : 'Online Pay (Midtrans)';
+    if (order.payment_status === 'settlement' || order.payment_status === 'paid' || payment.payment_status === 'settlement' || payment.payment_status === 'paid') {
+      paymentStatusText += ' • Lunas';
+    }
+
     targetContainer.innerHTML =
       '<div class="x-order-status-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
 
       // 1. Status Header Card
       '  <div class="x-status-card" style="background:#fff;padding:24px 18px;margin-bottom:12px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
-      '    <div style="width:48px;height:48px;border-radius:50%;background:#f0fdf4;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#16a34a;font-size:24px;font-weight:bold;">✓</div>' +
+      '    <div style="width:48px;height:48px;border-radius:50%;background:#f0fdf4;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;color:#16a34a;font-size:24px;font-weight:bold;">' + badgeIcon + '</div>' +
       '    <h1 style="font-size:20px;font-weight:800;color:#111;margin:0 0 6px;">' + statusTitle + '</h1>' +
       '    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.4;">' + statusDesc + '</p>' +
       '    <div style="background:#f8f9fa;border-radius:14px;padding:12px 16px;display:flex;flex-direction:column;gap:8px;text-align:left;">' +
       '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Nomor Pesanan</span><strong style="color:#111;">' + UI.escape(orderNumber) + '</strong></div>' +
+      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Cabang</span><strong style="color:#111;">' + UI.escape(order.branch_name || 'Cabang Utama') + '</strong></div>' +
       '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Tipe Layanan</span><span style="font-weight:700;color:#111;">' + orderTypeBadge + '</span></div>' +
-      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Metode Bayar</span><span style="font-weight:700;color:#111;">' + (isCash ? 'Tunai (COD / Kasir)' : 'Online Pay (Midtrans)') + '</span></div>' +
+      (orderType === 'dine_in' && order.table_number ? '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Nomor Meja</span><strong style="color:#111;">' + UI.escape(order.table_number) + '</strong></div>' : '') +
+      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Metode Bayar</span><span style="font-weight:700;color:#111;">' + paymentStatusText + '</span></div>' +
       '    </div>' +
       '  </div>' +
 
@@ -415,26 +454,33 @@
       '    <h2 style="font-size:15px;font-weight:800;margin:0 0 16px;color:#111;">Status Alur Pesanan</h2>' +
       '    <div style="display:flex;flex-direction:column;gap:16px;">' +
       (orderType === 'reservation' ? (
-        renderStep(1, 'Reservasi Tercatat', 'Jadwal kedatangan sudah tercatat di sistem', stepIndex >= 1) +
-        renderStep(2, 'Menunggu Waktu Kedatangan', 'Silakan hadir sesuai jadwal reservasi', stepIndex >= 2) +
-        renderStep(3, 'Check-in di Outlet', 'Kasir melakukan Check-in dan membuka meja aktif', stepIndex >= 3) +
-        renderStep(4, 'Selesai', 'Kunjungan dan transaksi diselesaikan', stepIndex >= 4)
+        renderStep(1, 'Reservasi Tercatat', 'Jadwal kedatangan sudah tercatat di sistem', step1Done) +
+        renderStep(2, 'Menunggu Waktu Kedatangan', 'Silakan hadir sesuai jadwal reservasi', step2Done) +
+        renderStep(3, 'Check-in di Outlet', 'Kasir melakukan Check-in dan membuka meja aktif', step3Done) +
+        renderStep(4, 'Selesai', 'Kunjungan dan transaksi diselesaikan', step4Done)
       ) : (
-        renderStep(1, 'Pesanan Diterima Cabang', 'Cabang telah mengkonfirmasi penerimaan pesanan', stepIndex >= 1) +
-        renderStep(2, 'Dapur Menyiapkan', 'Restoran sedang menyiapkan makananmu', stepIndex >= 2) +
-        renderStep(3, orderType === 'delivery' ? 'Dalam Pengantaran' : 'Siap Diambil / Disajikan',
-          orderType === 'delivery' ? 'Kurir sedang dalam perjalanan ke lokasimu' : 'Pesanan siap disajikan di meja/kasir',
-          stepIndex >= 3) +
-        renderStep(4, 'Selesai', 'Pesanan telah selesai dinikmati', stepIndex >= 4)
+        renderStep(1, 'Pesanan Diterima Cabang', 'Cabang telah mengonfirmasi penerimaan pesanan', step1Done) +
+        renderStep(2, 'Dapur Menyiapkan', 'Restoran sedang menyiapkan makananmu', step2Done) +
+        renderStep(3, orderType === 'delivery' ? 'Dalam Pengantaran' : (orderType === 'pickup' ? 'Siap Diambil di Cabang' : 'Siap Disajikan di Meja'),
+          orderType === 'delivery' ? 'Kurir sedang dalam perjalanan ke lokasimu' : (orderType === 'pickup' ? 'Makanan siap diambil di konter cabang' : 'Makanan siap disajikan di mejamu'),
+          step3Done) +
+        renderStep(4, 'Selesai', 'Pesanan telah selesai dinikmati', step4Done)
       )) +
       '    </div>' +
       '  </div>' +
 
-      // 3. Delivery Address
+      // 3. Delivery Address & Driver Info
       (orderType === 'delivery' && (delivery.address_text || delivery.destination_address)
         ? '  <div style="background:#fff;padding:18px;margin:12px 14px;box-shadow:0 4px 14px rgba(0,0,0,0.06);border-radius:16px;">' +
           '    <h2 style="font-size:15px;font-weight:800;margin:0 0 10px;color:#111;">Alamat Pengantaran</h2>' +
           '    <div style="font-size:14px;color:#111;font-weight:600;line-height:1.4;">' + UI.escape(delivery.address_text || delivery.destination_address) + '</div>' +
+          (delivery.driver_name
+            ? '    <div style="margin-top:10px;padding:10px 12px;background:#f0fdf4;border-radius:10px;font-size:13px;color:#166534;">' +
+              '      🛵 Kurir: <strong>' + UI.escape(delivery.driver_name) + '</strong>' +
+              (delivery.driver_phone ? ' (' + UI.escape(delivery.driver_phone) + ')' : '') +
+              (delivery.tracking_url ? '<div style="margin-top:6px;"><a href="' + UI.escape(delivery.tracking_url) + '" target="_blank" rel="noopener noreferrer" style="color:#16a34a;font-weight:700;text-decoration:underline;">Lacak Pengiriman Langsung →</a></div>' : '') +
+              '    </div>'
+            : '') +
           '</div>'
         : '') +
 
@@ -442,6 +488,7 @@
       '  <div style="background:#fff;padding:18px;margin:12px 14px;box-shadow:0 4px 14px rgba(0,0,0,0.06);border-radius:16px;">' +
       '    <h2 style="font-size:15px;font-weight:800;margin:0 0 8px;color:#111;">Rincian Pesanan</h2>' +
       itemsHtml +
+      (order.order_note ? '    <div style="margin-top:12px;padding:10px 14px;background:#f9fafb;border-radius:10px;font-size:13px;color:#4b5563;border-left:3px solid var(--x-primary);"><strong style="color:#111;">Catatan Pesanan:</strong> ' + UI.escape(order.order_note) + '</div>' : '') +
       '  </div>' +
 
       // 5. Payment Summary
@@ -523,9 +570,17 @@
     }, 5000);
   }
 
+  function unmount() {
+    stopTimers();
+    targetContainer = null;
+    currentOrderId = null;
+    fetchSeq = 0;
+  }
+
   // ── Export ──
   window.Xentra = window.Xentra || {};
   window.Xentra.OrderReceived = {
-    mount: mount
+    mount: mount,
+    unmount: unmount
   };
 })();
