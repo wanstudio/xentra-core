@@ -1019,6 +1019,12 @@
     }
 
     // 7. In Client Context: Load merchant business data for the route
+    if (tabId === 'orders' && !isOrderDetail) {
+      startOrdersPolling();
+    } else {
+      stopOrdersPolling();
+    }
+
     if (tabId === 'overview') loadOverview();
     if (tabId === 'reports') loadReports(reportSubtype);
     if (tabId === 'customers') {
@@ -4040,11 +4046,36 @@
     if (detailView) detailView.style.display = 'block';
   }
 
-  async function loadOrders() {
+  var _ordersFetchSeq = 0;
+  var _ordersPollTimer = null;
+
+  function stopOrdersPolling() {
+    if (_ordersPollTimer) {
+      clearInterval(_ordersPollTimer);
+      _ordersPollTimer = null;
+    }
+  }
+
+  function startOrdersPolling() {
+    stopOrdersPolling();
+    _ordersPollTimer = setInterval(function () {
+      if (document.visibilityState === 'hidden') return;
+      loadOrders({ background: true });
+    }, 10000);
+  }
+
+  // Expose to window for testing and lifecycle hooks
+  window.startOrdersPolling = startOrdersPolling;
+  window.stopOrdersPolling = stopOrdersPolling;
+
+  async function loadOrders(opts) {
+    var isBg = opts && opts.background;
     var tbody = $('orders-table-body');
-    if (tbody) {
+    if (tbody && !isBg && (!state.orders || !state.orders.length)) {
       tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6">Memuat data pesanan...</td></tr>';
     }
+
+    var currentSeq = ++_ordersFetchSeq;
 
     try {
       var queryParams = [];
@@ -4067,13 +4098,22 @@
       var qs = queryParams.length ? ('?' + queryParams.join('&')) : '';
       var res = await adminFetch(API_BASE + '/admin/orders' + qs, { headers: getAuthHeaders() });
       var data = await res.json();
+
+      // Discard response if a newer fetch was initiated in the meantime
+      if (currentSeq !== _ordersFetchSeq) {
+        return;
+      }
+
       if (data.success && data.orders) {
         state.orders = data.orders;
         renderOrdersTable();
       }
     } catch (e) {
+      if (currentSeq !== _ordersFetchSeq) return;
       console.warn('[Orders Load Error]:', e);
-      if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-danger">Gagal memuat daftar pesanan.</td></tr>';
+      if (tbody && !isBg && (!state.orders || !state.orders.length)) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-6 text-danger">Gagal memuat daftar pesanan.</td></tr>';
+      }
     }
   }
 
@@ -4115,11 +4155,12 @@
           '<td class="text-right" style="white-space:nowrap;">',
             '<div class="x-item-actions" style="justify-content:flex-end;">',
               (canAdvance
-                ? '<button type="button" class="x-btn-primary" style="padding:6px 12px;font-size:12px;" onclick="advanceOrderStatus(\'' + ord.id + '\', \'' + ord.status + '\')">' + (ord.status === 'pending' ? 'Terima Pesanan' : 'Ubah Status ➔') + '</button>'
+                ? '<button type="button" class="x-btn-primary" style="padding:6px 12px;font-size:12px;" onclick="advanceOrderStatus(\'' + ord.id + '\', \'' + ord.status + '\', \'' + fulfillmentType + '\')">' + (ord.status === 'pending' ? 'Terima Pesanan' : 'Ubah Status ➔') + '</button>'
                 : ''),
               '<button type="button" class="x-action-menu-trigger" aria-label="Menu aksi pesanan ' + esc(ord.order_number || ord.id) + '" onclick="XentraActionMenu.open(this, [' +
                 '{ label: \'Lihat Rincian Pesanan\', icon: \'📄\', onClick: function() { navigateTo(\'orders/' + ord.id + '\'); } }' +
-                (canAdvance ? ',{ divider: true }, { label: \'' + (ord.status === 'pending' ? 'Terima Pesanan' : 'Lanjut Status Pesanan ➔') + '\', icon: \'⚡\', onClick: function() { advanceOrderStatus(\'' + ord.id + '\', \'' + ord.status + '\'); } }' : '') +
+                (canAdvance ? ',{ divider: true }, { label: \'' + (ord.status === 'pending' ? 'Terima Pesanan' : 'Lanjut Status Pesanan ➔') + '\', icon: \'⚡\', onClick: function() { advanceOrderStatus(\'' + ord.id + '\', \'' + ord.status + '\', \'' + fulfillmentType + '\'); } }' : '') +
+                (ord.status === 'pending' ? ',{ label: \'Tolak Pesanan\', icon: \'❌\', onClick: function() { rejectOrder(\'' + ord.id + '\'); } }' : '') +
               '])">',
                 '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
               '</button>',
@@ -4307,7 +4348,35 @@
     }
   }
 
-  window.advanceOrderStatus = async function (orderId, currentStatus) {
+  window.rejectOrder = async function (orderId) {
+    var reason = window.prompt('Masukkan alasan penolakan pesanan:');
+    if (reason === null) return; // User cancelled prompt
+    reason = reason.trim();
+    if (!reason) {
+      showToast('❌ Alasan penolakan wajib diisi.');
+      return;
+    }
+
+    var authHeaders = getAuthHeaders();
+    try {
+      var res = await adminFetch(API_BASE + '/orders/' + orderId + '/branch-acceptance', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ decision: 'reject', reason: reason, note: reason })
+      });
+      var data = await res.json();
+      if (data && data.success) {
+        showToast('Pesanan DITOLAK: ' + (data.new_status || 'rejected').toUpperCase());
+        loadOrders();
+      } else {
+        showToast((data && data.error) || 'Gagal menolak pesanan.');
+      }
+    } catch (e) {
+      showToast('Gagal menolak pesanan.');
+    }
+  };
+
+  window.advanceOrderStatus = async function (orderId, currentStatus, fulfillmentType) {
     var authHeaders = getAuthHeaders();
 
     // R5 CHECK-1: acceptance ('pending' → 'confirmed') is EXCLUSIVELY Branch
@@ -4334,10 +4403,14 @@
       return;
     }
 
+    // Fulfillment-type-aware progression:
+    // Delivery: pending → confirmed → preparing → ready → out_for_delivery → completed
+    // Pickup / Dine-in: pending → confirmed → preparing → ready → completed
+    var isDelivery = (fulfillmentType === 'delivery');
     var nextMap = {
       confirmed: 'preparing',
       preparing: 'ready',
-      ready: 'out_for_delivery',
+      ready: isDelivery ? 'out_for_delivery' : 'completed',
       out_for_delivery: 'completed'
     };
 
@@ -4352,6 +4425,8 @@
       if (data && data.success) {
         showToast('Pesanan diubah ke status: ' + nextStatus.toUpperCase());
         loadOrders();
+      } else {
+        showToast((data && data.error) || 'Gagal update status pesanan.');
       }
     } catch (e) {
       showToast('Gagal update status pesanan.');

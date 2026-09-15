@@ -6489,7 +6489,39 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
 
-    res.json({ success: true, branch_id: req.params.id, orders: [] });
+    const statusFilter = req.query.status;
+    let query = `
+      SELECT o.*, b.name as branch_name 
+      FROM orders o
+      LEFT JOIN branches b ON b.id = o.branch_id
+      WHERE o.brand_id = ? AND o.branch_id = ?
+    `;
+    const params = [req.brand_id, req.params.id];
+
+    if (statusFilter && statusFilter !== 'all') {
+      query += ' AND o.status = ?';
+      params.push(statusFilter);
+    }
+
+    query += ' ORDER BY o.created_at DESC';
+
+    const limit = req.query.limit ? Math.min(parseInt(req.query.limit, 10), 200) : 100;
+    query += ` LIMIT ${limit}`;
+
+    if (req.query.offset) {
+      query += ` OFFSET ${parseInt(req.query.offset, 10)}`;
+    }
+
+    const orders = db.prepare(query).all(...params);
+
+    const enriched = orders.map(ord => ({
+      ...ord,
+      items: db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(ord.id),
+      delivery: db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(ord.id),
+      payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id)
+    }));
+
+    res.json({ success: true, branch_id: req.params.id, orders: enriched });
   } catch (err) {
     console.error('[API Error GET /admin/branches/:id/orders]:', err);
     res.status(500).json({ success: false, error: err.message });
