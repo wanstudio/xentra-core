@@ -2432,7 +2432,7 @@ router.post('/webhooks/midtrans', (req, res) => {
 });
 
 // 10.0 SaaS Control Plane Business Registration Endpoint
-router.post('/auth/register', (req, res) => {
+router.post('/auth/register', async (req, res) => {
   try {
     const { email, password, full_name, business_name, brand_name, branch_name, phone, address_text } = req.body;
 
@@ -2450,7 +2450,7 @@ router.post('/auth/register', (req, res) => {
 
     const { RegistrationService, WorkforceService } = require('../../core/identity');
     const registration = new RegistrationService();
-    const result = registration.registerBusiness({
+    const result = await registration.registerBusiness({
       email,
       password,
       full_name,
@@ -3562,7 +3562,7 @@ router.get('/auth/config', (req, res) => {
 });
 
 // ==================== WORKFORCE MANAGEMENT ENDPOINTS ====================
-const { WorkforceService } = require('../../core/identity');
+const { WorkforceService, WorkforceInvitationService } = require('../../core/identity');
 
 // Helper: extract workforce actor context from session
 function getWorkforceActor(req) {
@@ -3790,6 +3790,31 @@ router.post('/admin/users/:id/enable', requireAuth(['owner', 'brand_manager', 'b
   }
 });
 
+// Delete user (Owner only)
+router.delete('/admin/users/:id', requireAuth(['owner']), (req, res) => {
+  try {
+    const workforce = new WorkforceService();
+    const actor = getWorkforceActor(req);
+
+    const deleted = workforce.deleteUser(req.params.id, req.brand_id, actor);
+
+    workforce.logSecurityEvent({
+      ...actor,
+      action: 'USER_DELETED',
+      target_user_id: deleted.deleted_user_id,
+      target_role: deleted.role,
+      brand_id: req.brand_id,
+      result: 'success',
+      metadata: { deleted_user_name: deleted.deleted_user_name }
+    });
+
+    res.json({ success: true, message: 'Anggota tim berhasil dihapus.', ...deleted });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ success: false, error: err.message, code: err.code });
+  }
+});
+
 // Change user role (Owner only)
 router.post('/admin/users/:id/role', requireAuth(['owner']), (req, res) => {
   try {
@@ -3995,6 +4020,106 @@ router.get('/admin/security-audit', requireAuth(['owner', 'brand_manager']), (re
   }
 });
 
+// ==================== WORKFORCE INVITATIONS (PHASE 3) ====================
+// Create workforce invitation
+router.post('/admin/invitations', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const invitationService = new WorkforceInvitationService();
+    const actor = getWorkforceActor(req);
+    const { email, role, branch_id } = req.body;
+
+    const brand = db.prepare('SELECT organization_id FROM brands WHERE id = ?').get(req.brand_id);
+    if (!brand) {
+      return res.status(404).json({ success: false, error: 'BRAND_NOT_FOUND', message: 'Brand not found.' });
+    }
+
+    const invitation = await invitationService.createInvitation({
+      actor,
+      email,
+      role,
+      brand_id: req.brand_id,
+      organization_id: brand.organization_id,
+      branch_id
+    });
+
+    res.status(201).json({ success: true, invitation });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ success: false, error: err.code || 'INVITATION_ERROR', message: err.message });
+  }
+});
+
+// List workforce invitations for brand
+router.get('/admin/invitations', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const invitationService = new WorkforceInvitationService();
+    const { status, branch_id, role } = req.query;
+
+    const effectiveBranchId = req.user.role === 'branch_manager'
+      ? (req.user.branchId || req.user.branch_id)
+      : branch_id;
+
+    const invitations = invitationService.listInvitations(req.brand_id, {
+      status,
+      branch_id: effectiveBranchId,
+      role
+    });
+
+    res.json({ success: true, invitations });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ success: false, error: err.code || 'LIST_ERROR', message: err.message });
+  }
+});
+
+// Resend workforce invitation
+router.post('/admin/invitations/:id/resend', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const invitationService = new WorkforceInvitationService();
+    const actor = getWorkforceActor(req);
+
+    const result = await invitationService.resendInvitation({
+      actor,
+      invitation_id: req.params.id
+    });
+
+    res.json({ success: true, invitation: result });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ success: false, error: err.code || 'RESEND_ERROR', message: err.message });
+  }
+});
+
+// Revoke workforce invitation
+router.post('/admin/invitations/:id/revoke', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const invitationService = new WorkforceInvitationService();
+    const actor = getWorkforceActor(req);
+
+    const result = invitationService.revokeInvitation({
+      actor,
+      invitation_id: req.params.id
+    });
+
+    res.json({ success: true, invitation: result });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ success: false, error: err.code || 'REVOKE_ERROR', message: err.message });
+  }
+});
+
+// Validate workforce invitation token capability (Public capability check)
+router.get('/invitations/validate/:token', (req, res) => {
+  try {
+    const invitationService = new WorkforceInvitationService();
+    const result = invitationService.validateInvitationToken(req.params.token);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({ success: false, error: err.code || 'VALIDATION_ERROR', message: err.message });
+  }
+});
+
 // ==================== END WORKFORCE MANAGEMENT ====================
 
 // P1 DATA SANITIZATION HELPER (SEC-02 & FINDING 10)
@@ -4087,6 +4212,22 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
     const { name, primary_color, logo_url, custom_domain, tagline, banners } = req.body;
     const bannersJson = banners ? (typeof banners === 'string' ? banners : JSON.stringify(banners)) : null;
 
+    let normalizedPrimaryColor = undefined;
+    if (primary_color !== undefined && primary_color !== null) {
+      if (typeof primary_color !== 'string') {
+        return res.status(400).json({ success: false, error: 'Format warna tema (hex) tidak valid.' });
+      }
+      let cleanHex = primary_color.trim();
+      if (!cleanHex.startsWith('#')) cleanHex = '#' + cleanHex;
+      if (/^#[0-9a-fA-F]{3}$/.test(cleanHex)) {
+        cleanHex = '#' + cleanHex[1] + cleanHex[1] + cleanHex[2] + cleanHex[2] + cleanHex[3] + cleanHex[3];
+      }
+      if (!/^#[0-9a-fA-F]{6}$/.test(cleanHex)) {
+        return res.status(400).json({ success: false, error: 'Format warna tema (hex) tidak valid. Gunakan format #RRGGBB.' });
+      }
+      normalizedPrimaryColor = cleanHex.toUpperCase();
+    }
+
     db.prepare(`
       UPDATE brands 
       SET name = COALESCE(?, name),
@@ -4099,7 +4240,7 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       WHERE id = ?
     `).run(
       name !== undefined ? name : null,
-      primary_color !== undefined ? primary_color : null,
+      normalizedPrimaryColor !== undefined ? normalizedPrimaryColor : null,
       logo_url !== undefined ? logo_url : null,
       custom_domain !== undefined ? custom_domain : null,
       tagline !== undefined ? tagline : null,
@@ -4109,7 +4250,7 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
 
     if (req.brand) {
       req.brand.name = name || req.brand.name;
-      req.brand.primary_color = primary_color || req.brand.primary_color;
+      req.brand.primary_color = normalizedPrimaryColor || req.brand.primary_color;
       req.brand.logo_url = logo_url || req.brand.logo_url;
       req.brand.custom_domain = custom_domain || req.brand.custom_domain;
       req.brand.tagline = tagline || req.brand.tagline;
@@ -8043,7 +8184,7 @@ router.get('/dine-in/layout', (req, res) => {
   try {
     let branchId = req.query.branch_id || (req.query.branchId ? req.query.branchId : null);
     if (!branchId && req.brand_id) {
-      const defaultBranch = db.prepare('SELECT id FROM branches WHERE brand_id = ? AND is_active = 1 ORDER BY is_delivery_active DESC, created_at ASC LIMIT 1').get(req.brand_id);
+      const defaultBranch = db.prepare('SELECT b.id FROM branches b LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id WHERE b.brand_id = ? AND b.is_active = 1 ORDER BY COALESCE(s.is_delivery_active, 1) DESC, b.created_at ASC LIMIT 1').get(req.brand_id);
       if (defaultBranch) branchId = defaultBranch.id;
     }
 
@@ -8063,7 +8204,7 @@ router.post('/dine-in/recommend-tables', (req, res) => {
   try {
     let { branch_id, guest_count } = req.body || {};
     if (!branch_id && req.brand_id) {
-      const defaultBranch = db.prepare('SELECT id FROM branches WHERE brand_id = ? AND is_active = 1 ORDER BY is_delivery_active DESC, created_at ASC LIMIT 1').get(req.brand_id);
+      const defaultBranch = db.prepare('SELECT b.id FROM branches b LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id WHERE b.brand_id = ? AND b.is_active = 1 ORDER BY COALESCE(s.is_delivery_active, 1) DESC, b.created_at ASC LIMIT 1').get(req.brand_id);
       if (defaultBranch) branch_id = defaultBranch.id;
     }
 

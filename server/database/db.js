@@ -1418,6 +1418,36 @@ function initSchema(targetDb) {
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_sal_action ON security_audit_log(action);'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_sal_brand ON security_audit_log(brand_id);'); } catch (e) {}
 
+  // Workforce invitations (Phase 3: single-use, time-limited, hash-only invitation capability)
+  try {
+    targetDb.exec(`
+      CREATE TABLE IF NOT EXISTS workforce_invitations (
+        id TEXT PRIMARY KEY,
+        organization_id TEXT NOT NULL,
+        brand_id TEXT NOT NULL,
+        branch_id TEXT,
+        email TEXT NOT NULL,
+        role TEXT NOT NULL,
+        invited_by_user_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        token_hash TEXT NOT NULL,
+        expires_at TEXT NOT NULL,
+        accepted_at TEXT,
+        revoked_at TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+        FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+        FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
+        FOREIGN KEY (invited_by_user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+    `);
+  } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_wi_token_hash ON workforce_invitations(token_hash);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_wi_org_brand ON workforce_invitations(organization_id, brand_id);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_wi_email ON workforce_invitations(email);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_wi_status ON workforce_invitations(status);'); } catch (e) {}
+
   // Migrate existing branch_products:
   // 1. Fill legacy snapshot columns (product_name, etc.) idempotently from master for pre-override rows.
   // 2. Migrate legacy snapshot → override:

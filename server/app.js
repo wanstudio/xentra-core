@@ -108,6 +108,12 @@ app.get(['/verify-email', '/verify-email/'], (req, res, next) => {
   apiRoutes(req, res, next);
 });
 
+// Xentra Cloud Platform: Public Workforce Invitation Validation Capability Route
+app.get(['/invitations/validate/:token', '/invitations/validate/:token/'], (req, res, next) => {
+  req.url = `/invitations/validate/${req.params.token}`;
+  apiRoutes(req, res, next);
+});
+
 // Serve Public Static Assets
 app.use('/assets', express.static(path.join(__dirname, '../apps/customer-pwa/assets')));
 app.use('/pwa', express.static(path.join(__dirname, '../apps/customer-pwa/assets/pwa')));
