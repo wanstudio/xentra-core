@@ -1,270 +1,158 @@
 # Xentra — Owner ↔ Branch Manager Dashboard Boundary
 
-**Status: LOCKED / AUTHORITATIVE**  
+**Status:** LOCKED / AUTHORITATIVE — reconciled with Canonical Architecture & Product Library v2  
 **Decision date:** 2026-09-15  
 **Scope:** Client/Owner Dashboard and Branch Manager Operational Center
 
+> **Canonical map:** `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`. This document remains the detailed cross-dashboard contract; Library v2 is the canonical map for terminology, scope, authority, lifecycle, and surface relationships.
+
 ## 1. Purpose
 
-This document locks the responsibility boundary between the Owner Dashboard and the Branch Manager Dashboard.
-
-The dashboards are complementary, not duplicate versions of the same control surface:
+The Owner Dashboard and Branch Manager Operational Center are complementary, not duplicate versions of the same control surface.
 
 - **Owner:** CONFIGURE + GOVERN + OBSERVE
 - **Branch Manager:** OPERATE + OBSERVE
 - **Xentra-Core:** AUTHENTICATE + AUTHORIZE + ENFORCE + PERSIST + AUDIT
-- **Customer/POS/KDS:** CONSUME / EXECUTE according to their authorized role and contract
+- **Customer/POS/KDS:** CONSUME / EXECUTE according to contract
 
-The same business entity may therefore be visible in both dashboards, but its mutation authority must remain semantically distinct.
+The same business entity may be visible in multiple surfaces, but mutation authority remains semantically distinct and server-enforced.
 
-## 2. Canonical Responsibility Model
+## 2. Owner Dashboard
 
-```text
-Owner / Brand Policy
-        ↓
-Xentra-Core authorization + business rules
-        ↓
-Branch Manager daily operation
-        ↓
-Branch-scoped operational state
-        ↓
-Customer PWA / POS / KDS / other consumers
-```
+Owner is responsible for durable business configuration, governance, cross-branch visibility, and explicitly authorized exceptional intervention.
 
-Owner decisions establish durable business configuration and governance. Branch Manager actions operate the current branch within those boundaries. Core remains the source of truth and must enforce scope and authorization server-side.
+Owner authority includes:
+- Master Product Catalog and Master Categories;
+- Branch Menu configuration and durable Branch Product adoption/configuration;
+- permanent/default Branch configuration and recurring operating schedule;
+- table/floor-plan geometry and structural configuration;
+- promotion/campaign creation and governance;
+- cross-branch Orders/history/reporting/performance;
+- workforce management under `User → Role → Scope` RBAC;
+- Branch Health / operational attention visibility;
+- audit/history visibility.
 
-## 3. Owner Dashboard — Authority
+Owner does **not** become the normal daily operational queue for Branch open/close, online-order pause, table blocking, Branch Product sold-out state, daily stock operation, normal Branch Acceptance, or routine approved-promo activation.
 
-Owner is responsible for business-level configuration, governance, cross-branch visibility, and exceptional intervention.
+Exceptional Owner overrides require explicit authorization, appropriate scope, reason where required, and auditability.
 
-### Owner owns
-
-- Master Product Catalog
-- Categories
-- Branch product adoption
-- Branch Menu configuration
-- Permanent/default pricing and business policy where applicable
-- Branch profile and structural configuration
-- Default recurring operating schedule
-- Table/floor-plan configuration
-- Promotion/campaign creation and governance
-- Eligible branches, products/categories, periods, limits, stacking, channels and other campaign policy
-- Workforce management according to locked `User → Role → Scope` RBAC
-- Cross-branch orders/history/reporting
-- Cross-branch business performance
-- Branch health / operational attention visibility
-- Audit/history visibility
-
-### Owner normally does not perform daily branch operations
-
-The Owner Dashboard must not become the normal operational queue for:
-
-- daily open/close
-- temporary online-order pause
-- daily table blocking
-- daily sold-out/unavailable product operation
-- daily stock operation
-- normal order ACCEPT/REJECT
-- routine branch promo activation
-
-These belong to the Branch Manager Operational Center when the actor has the required branch-scoped permission.
-
-### Exceptional Owner override
-
-Owner may have explicit emergency/governance override capabilities where a business contract requires them, such as **Force Close Branch**.
-
-Such actions are exceptional, not a second daily-operations workflow, and require:
-
-- explicit Core authorization;
-- appropriate scope/role checks;
-- reason where required;
-- audit trail;
-- authoritative downstream state.
-
-## 4. Branch Manager — Authority
+## 3. Branch Manager Dashboard
 
 Branch Manager is the operational authority for one Branch.
 
-### Branch Manager owns daily operation
-
-- Current branch open/closed operational state
-- Temporary online-order pause/throttle
-- Daily operating exceptions within the approved schedule contract
-- Table availability state
-- Reservation/occupancy operational context
-- Branch product availability / sold-out state
-- Branch stock operational state
-- Activation/deactivation of approved branch-scoped promotions
-- Branch-scoped order queue and Branch Acceptance
-- Branch operational staff within delegated scope
-- Daily operational reporting
-- Operational audit context
+Branch Manager authority includes:
+- daily Branch open/close state and approved schedule exceptions;
+- online-order pause/resume/throttle;
+- daily table state and reservation/occupancy context;
+- Branch Product availability/sold-out state;
+- Branch stock operation;
+- activation/deactivation of approved Branch-scoped promotions;
+- Branch order queue and dedicated Branch Acceptance;
+- Branch-scoped operational staff;
+- daily operational reporting and audit context.
 
 Branch Manager cannot silently create or alter brand-wide policy.
 
-## 5. Domain Boundary Matrix
+## 4. Domain boundary matrix
 
-| Domain | Owner Dashboard | Branch Manager Dashboard | Core Authority |
+| Domain | Owner | Branch Manager | Core |
 |---|---|---|---|
 | Branch profile | Configure | Observe | Enforce scope |
-| Branch status | Observe + exceptional override where approved | Operate daily state | Enforce |
-| Operating hours | Default/permanent schedule | Daily exception/temporary override | Resolve effective state |
-| Online orders | Observe + exceptional override if explicitly approved | Pause/resume/throttle | Enforce effective availability |
-| Master Products | Create/edit/manage | No master editing | Authoritative catalog |
-| Branch Menu | Configure adoption/assortment/policy | Operate availability | Enforce branch scope |
-| Stock | Observe policy/reporting | Operate branch stock | Persist + validate |
-| Tables/floor plan | Configure geometry/layout | Operate daily status | Enforce availability |
+| Branch status | Observe + exceptional override | Operate daily state | Enforce |
+| Operating hours | Default/permanent schedule | Daily/special exception | Resolve effective state |
+| Online orders | Observe + explicit exception | Pause/resume/throttle | Enforce effective availability |
+| Master Product | Create/edit/manage | Observe | Authoritative catalog enforcement |
+| Branch Menu | Configure adoption/assortment/policy | Observe | Enforce branch scope |
+| Branch Product Availability | Observe | Operate | Enforce |
+| Stock | Observe/report | Operate | Persist/validate |
+| Tables/floor plan | Configure geometry | Operate daily status | Enforce availability/concurrency |
 | Reservations | Governance/reporting | Daily operational context | Validate concurrency |
-| Promotions | Create/govern campaign | Activate/deactivate approved branch promo | Evaluate eligibility |
+| Promotions | Create/govern campaign | Activate approved Branch promo | Evaluate eligibility |
 | Orders | Cross-branch observe/investigate | Branch queue + ACCEPT/REJECT | Enforce transition authority |
-| Team | Full workforce authority per RBAC | Branch-scoped operational staff | Enforce User→Role→Scope |
-| Reports | Strategic/cross-branch | Daily branch operations | Authoritative read model |
+| Team | Full workforce authority per RBAC | Branch-scoped staff | Enforce User→Role→Scope |
+| Reports | Strategic/cross-branch | Daily Branch operations | Authoritative read model |
 | Audit | Governance/history | Operational context | Append/enforce |
 
-## 6. Catalog Boundary
+## 5. Catalog boundary
 
-The system must preserve the distinction between:
-
-1. **Master Product** — business identity/content controlled at Owner/Brand level.
-2. **Branch adoption / Menu configuration** — determines which branches sell the product and how it is presented/configured.
-3. **Branch availability** — daily operational state controlled by the Branch Manager.
-
-`branch_products.is_available` remains the branch-scoped availability authority.
-
-A Branch Manager marking an item sold out must not silently mutate Master Product `is_active`.
-
-The Owner UI may observe branch availability, but the normal daily mutation belongs to Branch Manager.
-
-## 7. Operating Hours and Online Ordering
-
-The effective branch state must be derived from the approved precedence between:
+Canonical concepts are separate:
 
 ```text
-Owner default schedule
+Master Product
+    ≠ Master Category
+    ≠ Branch Product
+    ≠ Branch Category
+    ≠ Branch Menu
+    ≠ Branch Product Availability
+    ≠ Stock
+```
+
+Owner manages Master Product and durable Branch Menu configuration. Branch Manager operates Branch Product availability. `branch_products.is_available` is the Branch-scoped availability authority.
+
+Sold-out/unavailable operation must not silently mutate Master Product `is_active`.
+
+## 6. Operating hours and online ordering
+
+```text
+Owner default/permanent schedule
         +
-Branch special schedule / daily exception
+Branch daily/special exception
         +
-Explicit operational override
+approved operational override
         ↓
-Effective branch state
-        ↓
-Customer/POS/KDS behavior
+Core-resolved effective state
 ```
 
 Restaurant closure and online-order pause are distinct concepts. `PAUSED` must not be represented as `CLOSED`.
 
-No client-side timer or dashboard UI state is authoritative for effective ordering availability.
+## 7. Tables
 
-## 8. Tables
+Owner/Admin configures physical floor-plan geometry. Branch Manager operates current table status:
 
-Owner/Admin configuration covers physical table/floor-plan geometry, such as creating, moving, deleting, numbering, capacity and dining-room layout.
+`AVAILABLE`, `RESERVED`, `OCCUPIED`, `BLOCKED`, `OUT_OF_SERVICE`.
 
-Branch Manager operates the current state of those tables:
+Core validates availability server-side and protects race-sensitive mutations.
 
-- AVAILABLE
-- RESERVED
-- OCCUPIED
-- BLOCKED
-- OUT_OF_SERVICE
+## 8. Promotions
 
-Core must validate availability at the transaction boundary and protect reservation/selection mutations against concurrent races. Frontend disabling alone is insufficient.
+Owner/Brand defines campaign policy. Branch Manager may operate only approved Branch-scoped promotions. A full promotion builder is not implied by Manager access.
 
-## 9. Promotions
+## 9. Orders
 
-Owner/Brand authority defines campaign policy. Branch Manager may only operate promotions within the branch scope and permission explicitly granted by the promotion contract.
+Owner Orders is primarily cross-branch business/history/investigation. Branch Manager Orders is the operational queue.
 
-The initial Branch Manager surface should favor activation/deactivation of approved campaigns over exposing a full promotion builder.
+Branch Acceptance remains a dedicated mutation boundary. Payment settlement is a financial mutation and must not silently become Branch Acceptance. Generic status PATCH must not be used to bypass this distinction.
 
-Do not treat legacy/example `branch_settings.promo_config` data as proof that the final promotion domain already exists.
+## 10. Workforce
 
-## 10. Orders
+Owner retains highest client workforce authority within authorized scope. Branch Manager receives only Branch-scoped operational staff authority. Core centrally enforces User → Role → Scope.
 
-Owner Orders is primarily a business/history/investigation surface across authorized branches.
+## 11. Branches and Branch Health
 
-Branch Manager Orders is an operational queue for the current branch.
+Owner `Branches` is Branch Management / Configuration & Performance, not daily Branch Operations. It may expose branch profile/configuration, manager assignment, default operating configuration, menu/adoption context, table/floor-plan configuration, performance, health, and audit/history, plus entry to Branch Manager operations.
 
-Branch Acceptance remains a dedicated mutation boundary. A generic kitchen/order status PATCH must not be used as a substitute for ACCEPT/REJECT authority.
+`Branch Health` is an observation/governance surface for closure, online-order pause, emergency state, unavailable products, low-stock attention, unresolved operational issues, and who changed state/when.
 
-Payment settlement must not silently become Branch Acceptance.
+## 12. Implementation invariant
 
-## 11. Team
+Before implementing either dashboard:
+1. consult Library v2;
+2. map the feature to the responsibility boundary;
+3. identify authoritative Core domain/API/schema;
+4. do not duplicate mutation authority because an entity is visible in another surface;
+5. enforce authorization and scope in Core;
+6. audit sensitive mutations;
+7. protect race-sensitive operations transactionally;
+8. update the affected domain contract if a genuine capability gap exists;
+9. update this document only when the business contract changes.
 
-Owner retains the locked full workforce-management authority within authorized client scope.
+## 13. Related contracts
 
-Branch Manager receives only branch-scoped operational staff authority. Access to the Branch Manager dashboard must never imply cross-branch workforce authority.
+- `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md` — canonical architecture/product map;
+- `docs/BRANCH_MANAGER_OPERATIONAL_CENTER.md` — detailed Branch Manager operational contract;
+- existing Owner Dashboard UI Blueprint in Notion;
+- existing `User → Role → Scope` RBAC/security contracts;
+- existing Catalog/Menu ownership contracts;
+- existing Branch Acceptance/payment separation contracts.
 
-RBAC is centralized in Xentra-Core; dashboard visibility is not authorization.
-
-## 12. Owner Branches Page
-
-The Owner `Branches` area remains valid, but its role is **Branch Management / Configuration & Performance**, not daily Branch Operations.
-
-It should provide:
-
-- branch list and profile;
-- branch configuration;
-- branch manager assignment;
-- default operating configuration;
-- menu/adoption context;
-- table/floor-plan configuration;
-- branch performance;
-- branch health / operational attention;
-- audit/history visibility;
-- entry point into the Branch Manager operational surface.
-
-The Owner should be able to understand current branch state without duplicating the Manager's daily control queue.
-
-## 13. Owner Branch Health / Operational Attention
-
-Add a lightweight cross-branch visibility layer to Owner Dashboard.
-
-Examples:
-
-- branch currently closed;
-- online ordering paused;
-- unusual or emergency closure;
-- unavailable products;
-- low-stock attention;
-- operational issue requiring review;
-- who changed the state and when.
-
-This is primarily an **observation/governance** surface. It should not automatically duplicate every Branch Manager mutation control.
-
-## 14. Navigation Terminology
-
-Use language that reinforces the boundary:
-
-- Owner: `Team`
-- Branch Manager: `Staff`
-- Owner: `Branch Management` / `Configuration & Performance`
-- Branch Manager: `Operasional`
-- Owner Catalog: `Master Products`, `Categories`, `Menus`, `Branch Menu Configuration`
-- Branch Manager Menu: `Availability` / `Sold Out` operational state
-
-Avoid ambiguous labels such as one shared `Operations` area or one shared `Available` toggle whose meaning changes by role.
-
-## 15. Implementation Rules
-
-Before implementing or expanding either dashboard:
-
-1. Map the feature to the responsibility boundary in this document.
-2. Identify the authoritative Core domain/API/schema.
-3. Do not duplicate mutation authority merely because both dashboards display the same entity.
-4. Extend the smallest necessary contract when a genuine capability gap exists.
-5. Enforce authorization and scope in Core.
-6. Audit sensitive operational mutations.
-7. Protect race-sensitive operations transactionally.
-8. Implement vertical slices with tests and browser smoke coverage where applicable.
-9. If UI requirements conflict with this boundary, stop and return to the decision log instead of silently weakening the contract.
-
-## 16. Relationship to Existing Locked Contracts
-
-This decision complements and does not replace:
-
-- `docs/BRANCH_MANAGER_OPERATIONAL_CENTER.md`
-- existing Owner Dashboard UI Blueprint in Notion
-- existing `User → Role → Scope` RBAC/security contracts
-- existing catalog/menu ownership contracts
-- existing Branch Acceptance / payment separation contracts
-
-Where a more specific locked contract exists, that contract remains authoritative for its domain; this document defines the cross-dashboard responsibility boundary.
+Where a more specific locked domain contract exists, that contract remains authoritative for its domain. Library v2 remains the cross-cutting canonical map.
