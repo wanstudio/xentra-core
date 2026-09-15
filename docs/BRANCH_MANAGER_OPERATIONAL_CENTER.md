@@ -1,18 +1,20 @@
 # Xentra — Branch Manager Operational Center
 
-**Status: LOCKED / AUTHORITATIVE**  
+**Status: LOCKED / AUTHORITATIVE — reconciled with Canonical Architecture & Product Library v2**  
 **Decision date:** 2026-09-15  
-**Scope:** Branch-scoped daily restaurant operations for Xentra-Core / Merchant Dashboard
+**Scope:** Branch-scoped daily restaurant operations
+
+> **Canonical map:** `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`. This document defines the Branch Manager surface in detail; it must not redefine terminology, scope, or cross-dashboard authority independently.
 
 ## 1. Purpose
 
-Branch Manager is the operational authority for a single Branch. The dashboard is an **Operational Center**, not a generic Branch Settings page.
+Branch Manager is the operational authority for a single Branch. The dashboard is an **Operational Center**, not a generic Branch Configuration page.
 
-The primary landing surface is **Hari Ini**: the manager should immediately understand whether the branch can accept online business, what needs attention, and which daily operational actions are available.
+Primary landing surface: **Hari Ini**. The manager should immediately understand whether the Branch can accept online business, what needs attention, and which daily operational actions are available.
 
-Owner/Brand-level policy remains outside this scope. Branch Manager cannot silently create or alter brand-wide business policy.
+Owner/Brand policy remains outside this scope. Branch Manager cannot silently create or alter brand-wide business policy.
 
-## 2. Canonical Dashboard Information Architecture
+## 2. Canonical information architecture
 
 ### Hari Ini
 - Branch identity + current date/time context
@@ -22,15 +24,15 @@ Owner/Brand-level policy remains outside this scope. Branch Manager cannot silen
 - Orders/new orders
 - Table availability
 - Unavailable menu items
-- Active branch promos
+- Active approved branch promos
 - Low-stock attention
 - Recent operational activity / audit context
 
 ### Operasional
 - Pesanan
 - Meja
-- Menu
-- Promo
+- Menu availability
+- Promo activation
 - Stok
 
 ### Tim
@@ -40,20 +42,38 @@ Owner/Brand-level policy remains outside this scope. Branch Manager cannot silen
 - Penjualan Hari Ini
 
 ### Pengaturan
-- Jam Operasional
+- Jam Operasional / approved branch operational exceptions
 
-The navigation may evolve visually, but the business responsibilities above remain the canonical scope.
+Visual navigation may evolve; business responsibility remains canonical.
 
-## 3. Branch Operational State
+## 3. Responsibility model
 
-The system must distinguish **restaurant open/closed** from **online-order availability**.
+```text
+Owner / Brand Policy
+        ↓
+Xentra-Core authorization + business rules
+        ↓
+Branch Manager daily operation
+        ↓
+Branch-scoped operational state
+        ↓
+Customer PWA / POS / KDS
+```
+
+Branch Manager = **OPERATE + OBSERVE**. Core = **AUTHENTICATE + AUTHORIZE + ENFORCE + PERSIST + AUDIT**.
+
+## 4. Branch operational state
+
+The system distinguishes restaurant state from online-order availability.
 
 Canonical conceptual states:
-- `OPEN` — branch is operational and online ordering may be available according to channel capability.
-- `PAUSED` — branch remains operational, but online ordering is temporarily paused/throttled.
-- `CLOSED` — branch is not operational for the relevant customer flow.
-- `SCHEDULED_CLOSED` — closed because the applicable schedule says so.
-- `EMERGENCY_CLOSED` — manually closed for an exceptional operational reason.
+- `OPEN`
+- `PAUSED`
+- `CLOSED`
+- `SCHEDULED_CLOSED`
+- `EMERGENCY_CLOSED`
+
+`PAUSED` means online ordering is temporarily paused/throttled while the Branch may remain operational. It is not equivalent to `CLOSED`.
 
 ### Manual controls
 Branch Manager may perform branch-scoped operational actions such as:
@@ -62,123 +82,122 @@ Branch Manager may perform branch-scoped operational actions such as:
 - Pause Order Online
 - Resume Order Online
 
-Sensitive manual changes require a reason where applicable and must be audit logged.
+Sensitive changes require reason where the contract requires it and must be audited.
 
-`PAUSED` must not be represented as equivalent to `CLOSED`.
+The current live schema has `branches.is_open_override` as a server-authoritative manual open/close switch. Do not invent a second competing authority without an explicit schema/API decision.
 
-### Current implementation boundary
-The current live schema already has `branches.is_open_override` as the server-authoritative manual open/close switch. Do not invent a second competing open/close authority. Any richer state machine must be introduced through an explicit schema/API contract update.
+## 5. Operating hours
 
-## 4. Operating Hours
-
-The final operational contract must support:
-- weekly recurring hours per day;
-- special dates / holidays / exceptional schedules;
-- schedule-driven open state;
+The intended contract supports:
+- weekly recurring hours;
+- special dates/holidays;
+- schedule-driven state;
 - explicit manual override precedence;
-- clear customer-facing effective status.
+- customer-facing effective status.
 
-Current Git schema documentation describes `operating_hours`, but the live SQLite implementation does not yet materialize it as an approved authoritative contract. Therefore implementation must treat this as a **data-contract gap**, not assume the documented example is already live.
+Where the live implementation lacks the final persistence contract, record a **data-contract gap** rather than hiding the gap with frontend state or ad-hoc JSON.
 
-## 5. Online Order Pause
+Authority boundary:
 
-Online ordering needs an explicit operational control separate from branch closure.
+```text
+Owner default/permanent schedule
+        +
+Branch daily/special exception
+        +
+approved operational override
+        ↓
+Core-resolved effective state
+```
+
+## 6. Online-order availability
+
+Online ordering is distinct from Branch closure.
 
 Minimum semantics:
-- pause for a bounded duration (for example 15m, 30m, 1h) or until manually resumed;
-- optional/required reason according to final UX contract;
-- server-authoritative effective state;
+- bounded pause duration or manual resume;
+- server-authoritative state;
 - audit trail;
-- customer APIs must consume the effective state rather than infer it from UI.
+- customer APIs consume effective state;
+- no client timer is authoritative.
 
-No client-side timer is authoritative for whether ordering is paused.
+Branch Manager operates this within branch scope. Owner observes and may receive exceptional override only where separately authorized.
 
-## 6. Tables
+## 7. Tables
 
-Daily Branch Manager table operations use these conceptual statuses:
-
+Daily Branch Manager table states:
 - `AVAILABLE`
 - `RESERVED`
 - `OCCUPIED`
 - `BLOCKED`
 - `OUT_OF_SERVICE`
 
-### Manager responsibilities
-- View current table state.
-- Block/unblock a table for operational reasons.
-- See reservation/occupancy context relevant to the branch.
-- Provide a reason when manually blocking a table.
+Manager responsibilities:
+- view current state;
+- block/unblock operationally;
+- see reservation/occupancy context;
+- provide reason for manual block where required.
 
-### Authority invariant
-A table that is reserved, occupied, blocked, or out of service must not be selectable by the Customer PWA when the business contract says it is unavailable.
+Owner/Admin configuration of physical floor-plan geometry is separate from daily status operation. Creating/moving/deleting tables is not implied by Manager access.
 
-**Frontend disabling is not sufficient.** Core must validate table availability server-side at the reservation/checkout transaction boundary and protect the mutation against concurrent selection/race conditions. If Customer A and Customer B race for the same table, only a valid server-authorized winner may commit.
+Core must validate availability at reservation/selection transaction boundaries and protect race-sensitive mutations.
 
-### Floor-plan boundary
-Daily state management is different from editing physical floor-plan geometry. Creating/moving/deleting tables or changing dining-room layout is an administrative configuration concern and should not be implicitly granted to Branch Manager merely because the manager can operate table status.
+## 8. Menu availability
 
-## 7. Menu Availability
-
-Branch Manager operates the Branch selling catalog, not the Master Product Catalog.
+Branch Manager operates **Branch Product Availability**, not Master Product identity.
 
 `branch_products.is_available` remains the branch-scoped availability authority.
 
-Manager may mark a Branch product:
-- available;
-- unavailable / sold out.
+Manager may mark a Branch Product available or unavailable/sold out. This must not mutate Master Product `is_active`.
 
-This must not silently mutate Master Product `is_active`.
+Stock is a separate Inventory concern. `low_stock_threshold` is Branch-scoped configuration/operational attention data.
 
-Stock remains branch-owned. `low_stock_threshold` is branch-scoped and may drive the daily attention view.
+Canonical distinction:
 
-## 8. Promotions
+```text
+Master Product
+    ≠ Branch Product
+    ≠ Branch Menu
+    ≠ Branch Product Availability
+    ≠ Stock
+```
 
-Branch Manager may operate **branch-scoped promotion activation** where permitted by the promotion contract.
+## 9. Promotions
 
-The dashboard should distinguish:
-- brand/global campaigns controlled by Owner/Brand authority;
-- branch-scoped promotions that the Branch Manager is allowed to activate/deactivate;
-- optional branch-only promotions, only if a future contract explicitly grants creation authority.
+Branch Manager may operate **approved branch-scoped promotions** where explicitly permitted.
 
-Promotion rules must be server-authoritative. Relevant dimensions may include:
-- date range;
-- day/time window;
-- eligible product/category;
-- minimum spend;
-- order channel/type;
-- usage limits;
-- stacking/exclusivity;
-- manager permission/approval.
+Owner/Brand defines campaign policy. Manager activation/deactivation is operational execution, not campaign governance.
 
-Do not treat the existing `branch_settings.promo_config` example as proof that the final promotion domain model already exists.
+Do not treat legacy `branch_settings.promo_config` data as proof that the final promotion domain already exists.
 
-## 9. Orders
+## 10. Orders and Branch Acceptance
 
 Branch Manager needs a branch-scoped operational order queue.
 
-The dashboard must support the existing acceptance boundary:
+The surface may:
 - view pending orders;
-- inspect order details;
-- ACCEPT through a dedicated branch-acceptance path;
-- REJECT through a dedicated branch-acceptance path with structured reason;
-- refresh/reconcile server-authoritative state.
+- inspect details;
+- ACCEPT through dedicated Branch Acceptance;
+- REJECT through dedicated Branch Acceptance with reason;
+- reconcile current server state.
 
-Do **not** use a generic status PATCH as a substitute for Branch Acceptance.
+Do not use generic status PATCH as a substitute for Branch Acceptance.
 
-Branch Manager is branch-scoped. Brand Manager/Owner may have broader scope according to RBAC. Cashier/Kitchen/Customer must not gain Branch Acceptance authority merely because they can see an order.
+Payment settlement is a financial mutation and must not silently become order acceptance.
 
-## 10. Staff
+Owner Orders remains a cross-branch business/history/investigation surface, not the normal Branch acceptance queue.
 
-Staff management is branch-scoped for operational users. RBAC remains centralized in Xentra-Core.
+## 11. Staff
 
-Branch Manager must not gain cross-branch workforce authority merely from access to this dashboard.
+Staff management is Branch-scoped for operational workforce. RBAC remains centralized in Core.
 
-## 11. Auditability
+Branch Manager must not gain cross-Branch workforce authority merely from access to this dashboard.
 
-Operational mutations must be append-only audited using the existing branch operation audit pattern (`branch_operation_logs`) or its approved successor.
+## 12. Auditability
 
-At minimum, sensitive actions should preserve:
-- branch;
+Operational mutations use the existing branch-operation audit pattern or its approved successor.
+
+Sensitive actions should preserve:
+- Branch;
 - actor;
 - role;
 - action/field;
@@ -186,57 +205,63 @@ At minimum, sensitive actions should preserve:
 - new value;
 - authorization result;
 - timestamp;
-- product/table context where applicable.
+- relevant product/table context.
 
-The UI should expose useful "last changed by / when" context for sensitive operational state.
+UI may expose last changed by/when, but UI state is not authoritative.
 
-## 12. Authority Model
+## 13. API/security boundary
 
-The following invariant applies to every implementation task in this dashboard:
+Every protected mutation follows the Core authorization sequence:
 
-**Authenticated Branch Manager scope → server/Core authorization → branch-scoped mutation → audit log → authoritative read model → dashboard presentation.**
+```text
+Authenticate
+→ current identity
+→ current role/permission
+→ current scope
+→ target
+→ actor-target relationship
+→ requested authority
+→ business invariants
+→ atomic mutation
+→ security side effects when required
+→ audit
+→ authoritative response
+```
 
 Client-provided `branch_id` is context/input, never sufficient authorization.
 
-Customer UI and Manager UI are consumers of Core business authority. Neither UI may invent business policy or become the source of truth for status, availability, price, stock, promotion eligibility, table availability, order acceptance, or payment state.
+## 14. Implementation gaps
 
-## 13. Known Contract Gaps Before Implementation
-
-The current Git implementation/documentation does not yet establish all APIs/schema needed for this dashboard. In particular, verify/define before coding:
-- operating-hours and special-schedule contract;
-- richer branch operational state beyond `is_open_override`;
-- online-order pause contract;
-- table/reservation state and concurrency contract;
-- Branch Manager order queue/acceptance read/mutation alignment;
+Before coding a new capability, verify/define the smallest necessary contract for:
+- operating-hours and special-schedule persistence;
+- richer Branch operational state beyond current implementation authority;
+- online-order pause;
+- table/reservation state and concurrency;
+- Branch order queue/acceptance alignment;
 - branch promotion domain/permissions;
 - exact branch-scoped staff APIs.
 
-These gaps are intentional checkpoints. Do not hide them with frontend-only state or ad-hoc JSON fields.
+These are explicit gaps. Do not hide them with frontend-only state or ad-hoc fields.
 
-## 14. Implementation Rule
+## 15. Implementation rule
 
 Before implementation:
-1. Audit the current repository and existing contracts.
-2. Map each dashboard feature to an existing authoritative domain/API/schema.
-3. Identify genuine gaps.
-4. Extend the smallest necessary contract where a new business capability is approved.
-5. Implement one independently verifiable vertical slice at a time.
-6. Add authorization, race/concurrency protection, audit logging, tests, and browser smoke coverage for operational mutations.
+1. consult Library v2;
+2. map feature to Branch Manager responsibility;
+3. identify authoritative Core domain/API/schema;
+4. identify genuine gap;
+5. extend the smallest approved contract;
+6. implement a verifiable vertical slice;
+7. add authorization, concurrency protection, audit, tests, and browser smoke coverage as appropriate.
 
-Do not rewrite unrelated architecture, customer authentication, payment, catalog authority, or multi-branch cart semantics.
+Do not rewrite unrelated authentication, payment, Catalog ownership, or Commerce semantics.
 
-## 15. Canonical Business Boundary
+## 16. Canonical relationship
 
-```text
-Owner / Brand Policy
-        ↓
-Branch Manager Operational Center
-        ↓
-Branch-scoped operational state
-        ↓
-Xentra-Core authoritative APIs/domain rules
-        ↓
-Customer PWA / POS / KDS / other consumers
-```
+This document is subordinate to:
 
-The Branch Manager dashboard is therefore the **daily operational control surface for one Branch**, while Xentra-Core remains the business authority.
+- locked business decisions;
+- `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md` for canonical terminology/scope/authority mapping;
+- more-specific locked domain contracts.
+
+If a conflict is discovered, stop implementation, reconcile the canonical decision/library, then update this document and implementation evidence.
