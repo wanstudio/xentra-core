@@ -859,6 +859,238 @@ class WorkforceInvitationService {
     return this.db.prepare(query).all(...params);
   }
 
+  /**
+   * Accepts a workforce invitation.
+   *
+   * Lifecycle & Security:
+   * - Validates token format and token hash match
+   * - Evaluates invitation state (pending, not revoked, not expired)
+   * - Enforces recipient identity verification (authenticated user email must match invitation email)
+   * - Prevents privilege escalation: role and scope are strictly derived from invitation record
+   * - Executes atomic pending -> accepted transition and user membership assignment
+   * - Appends security audit log without logging secrets or raw tokens
+   *
+   * @param {Object} params
+   * @param {Object} params.authenticatedUser - { id, email, ... } from verified session
+   * @param {string} params.rawToken - The raw invitation token presented by recipient
+   * @returns {Object} Acceptance result with membership summary
+   */
+  acceptInvitation({ authenticatedUser, rawToken }) {
+    if (!authenticatedUser || !authenticatedUser.id || !authenticatedUser.email) {
+      throw {
+        status: 401,
+        code: 'UNAUTHORIZED',
+        message: 'Pengguna harus login untuk menerima undangan.'
+      };
+    }
+
+    if (!rawToken || typeof rawToken !== 'string' || !rawToken.trim()) {
+      throw {
+        status: 400,
+        code: 'INVALID_TOKEN',
+        message: 'Token undangan tidak valid.'
+      };
+    }
+
+    const tokenHash = this.hashToken(rawToken);
+    const invitation = this.db.prepare(`
+      SELECT wi.*, b.name as brand_name, br.name as branch_name
+      FROM workforce_invitations wi
+      JOIN brands b ON b.id = wi.brand_id
+      LEFT JOIN branches br ON br.id = wi.branch_id
+      WHERE wi.token_hash = ?
+    `).get(tokenHash);
+
+    if (!invitation) {
+      throw {
+        status: 404,
+        code: 'INVITATION_NOT_FOUND',
+        message: 'Undangan tidak ditemukan atau token salah.'
+      };
+    }
+
+    // Check revoked
+    if (invitation.status === 'revoked') {
+      throw {
+        status: 410,
+        code: 'INVITATION_REVOKED',
+        message: 'Undangan ini telah dibatalkan.'
+      };
+    }
+
+    // Check already accepted
+    if (invitation.status === 'accepted') {
+      throw {
+        status: 410,
+        code: 'INVITATION_ALREADY_ACCEPTED',
+        message: 'Undangan ini telah digunakan.'
+      };
+    }
+
+    // Check expired
+    if (invitation.status === 'expired' || new Date(invitation.expires_at) < new Date()) {
+      if (invitation.status !== 'expired') {
+        this.db.prepare("UPDATE workforce_invitations SET status = 'expired', updated_at = datetime('now') WHERE id = ?").run(invitation.id);
+        this._logSecurityEvent({
+          actor_id: null,
+          actor_role: 'system',
+          action: 'INVITATION_EXPIRED',
+          brand_id: invitation.brand_id,
+          organization_id: invitation.organization_id,
+          branch_id: invitation.branch_id,
+          result: 'expired',
+          metadata: { invitation_id: invitation.id }
+        });
+      }
+      throw {
+        status: 410,
+        code: 'INVITATION_EXPIRED',
+        message: 'Undangan ini telah kadaluarsa.'
+      };
+    }
+
+    if (invitation.status !== 'pending') {
+      throw {
+        status: 400,
+        code: 'INVALID_STATE',
+        message: `Tidak dapat menerima undangan dengan status ${invitation.status}.`
+      };
+    }
+
+    // Identity check: authenticated user email must strictly match invitation email
+    const userEmail = String(authenticatedUser.email).trim().toLowerCase();
+    const inviteEmail = String(invitation.email).trim().toLowerCase();
+
+    if (userEmail !== inviteEmail) {
+      this._logSecurityEvent({
+        actor_id: authenticatedUser.id,
+        actor_role: authenticatedUser.role || null,
+        action: 'INVITATION_ACCEPT_DENIED',
+        brand_id: invitation.brand_id,
+        organization_id: invitation.organization_id,
+        branch_id: invitation.branch_id,
+        result: 'denied',
+        metadata: {
+          invitation_id: invitation.id,
+          reason: 'RECIPIENT_MISMATCH',
+          role: invitation.role
+        }
+      });
+
+      throw {
+        status: 403,
+        code: 'RECIPIENT_MISMATCH',
+        message: 'Alamat email akun Anda tidak sesuai dengan alamat email penerima undangan.'
+      };
+    }
+
+    // Check target user in database
+    const userRecord = this.db.prepare('SELECT id, role, brand_id, organization_id, branch_id, status FROM users WHERE id = ?').get(authenticatedUser.id);
+    if (!userRecord) {
+      throw {
+        status: 404,
+        code: 'USER_NOT_FOUND',
+        message: 'Akun pengguna tidak ditemukan.'
+      };
+    }
+
+    // Atomic state transition: pending -> accepted and bind user to brand/role/scope
+    const now = new Date().toISOString();
+
+    // Use transaction to ensure both invitation status update and user scope/role assignment occur atomically
+    this.db.exec('BEGIN TRANSACTION;');
+    try {
+      const updateResult = this.db.prepare(`
+        UPDATE workforce_invitations
+        SET status = 'accepted', accepted_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'pending'
+      `).run(now, now, invitation.id);
+
+      if (updateResult.changes === 0) {
+        const latest = this.db.prepare('SELECT status FROM workforce_invitations WHERE id = ?').get(invitation.id);
+        if (latest && latest.status === 'accepted') {
+          throw {
+            status: 410,
+            code: 'INVITATION_ALREADY_ACCEPTED',
+            message: 'Undangan ini telah digunakan.'
+          };
+        }
+        if (latest && latest.status === 'revoked') {
+          throw {
+            status: 410,
+            code: 'INVITATION_REVOKED',
+            message: 'Undangan ini telah dibatalkan.'
+          };
+        }
+        throw {
+          status: 400,
+          code: 'INVALID_STATE',
+          message: 'Undangan tidak lagi dalam status pending.'
+        };
+      }
+
+      // Assign role and scope to user strictly from invitation record
+      this.db.prepare(`
+        UPDATE users
+        SET role = ?,
+            brand_id = ?,
+            organization_id = ?,
+            branch_id = ?,
+            updated_at = ?
+        WHERE id = ?
+      `).run(
+        invitation.role,
+        invitation.brand_id,
+        invitation.organization_id,
+        invitation.branch_id || null,
+        now,
+        userRecord.id
+      );
+
+      this.db.exec('COMMIT;');
+    } catch (err) {
+      try {
+        this.db.exec('ROLLBACK;');
+      } catch (_) {}
+      throw err;
+    }
+
+    // Invalidate existing sessions so permissions refresh immediately
+    if (global.TokenSessionStore && global.TokenSessionStore.revokeUserSessions) {
+      global.TokenSessionStore.revokeUserSessions(userRecord.id);
+    }
+
+    this._logSecurityEvent({
+      actor_id: userRecord.id,
+      actor_role: invitation.role,
+      action: 'INVITATION_ACCEPTED',
+      brand_id: invitation.brand_id,
+      organization_id: invitation.organization_id,
+      branch_id: invitation.branch_id,
+      result: 'success',
+      metadata: {
+        invitation_id: invitation.id,
+        role: invitation.role,
+        brand_id: invitation.brand_id,
+        branch_id: invitation.branch_id
+      }
+    });
+
+    return {
+      success: true,
+      invitation_id: invitation.id,
+      user_id: userRecord.id,
+      role: invitation.role,
+      organization_id: invitation.organization_id,
+      brand_id: invitation.brand_id,
+      brand_name: invitation.brand_name,
+      branch_id: invitation.branch_id,
+      branch_name: invitation.branch_name,
+      status: 'accepted',
+      accepted_at: now
+    };
+  }
+
   _logSecurityEvent({ actor_id, actor_role, action, brand_id, organization_id, branch_id, result, metadata }) {
     try {
       const id = 'sal_' + crypto.randomBytes(16).toString('hex');

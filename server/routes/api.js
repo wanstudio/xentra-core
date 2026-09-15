@@ -1472,7 +1472,11 @@ function requireAuth(allowedRoles = []) {
 
     // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT via Core Identity
     let isTenantAuthorized = session.brandId === req.brand_id;
-    if (!isTenantAuthorized && session.role === 'owner') {
+    const isInvitationAcceptRoute = req.path === '/invitations/accept' || (req.originalUrl && req.originalUrl.includes('/invitations/accept'));
+    if (isInvitationAcceptRoute) {
+      // Recipient is accepting an invitation to join a brand/workforce; tenant authorization is governed by invitation acceptance
+      isTenantAuthorized = true;
+    } else if (!isTenantAuthorized && session.role === 'owner') {
       const isIdentityOrOnboardingRoute = req.path === '/auth/merchant/me' || (req.originalUrl && req.originalUrl.includes('/auth/merchant/me')) ||
           req.path === '/auth/handoff/create' || (req.originalUrl && req.originalUrl.includes('/auth/handoff/create')) ||
           req.path.includes('/onboarding/');
@@ -1530,7 +1534,7 @@ function requireAuth(allowedRoles = []) {
     // P1 BRANCH SCOPE BOUNDARY ENFORCEMENT (FINDING-01 & NEW-05)
     // Branch-level roles (branch_manager, cashier, kitchen) MUST be assigned to a branch and cannot access outside it
     const branchScopedRoles = ['branch_manager', 'cashier', 'kitchen'];
-    if (branchScopedRoles.includes(session.role)) {
+    if (branchScopedRoles.includes(session.role) && !isInvitationAcceptRoute) {
       if (!session.branchId) {
         return res.status(403).json({
           success: false,
@@ -4132,6 +4136,41 @@ router.get('/invitations/validate/:token', (req, res) => {
     res.status(status).json({ success: false, error: err.code || 'VALIDATION_ERROR', message: err.message });
   }
 });
+
+// Accept workforce invitation (Phase 4: Authenticated recipient acceptance)
+// Client cannot supply or alter role/brand/branch; derived strictly from invitation record
+const handleAcceptInvitation = async (req, res) => {
+  try {
+    const invitationService = new WorkforceInvitationService();
+    const authenticatedUser = req.user;
+    const { token } = req.body || {};
+
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_TOKEN',
+        message: 'Token undangan wajib diisi.'
+      });
+    }
+
+    const result = invitationService.acceptInvitation({
+      authenticatedUser,
+      rawToken: token
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      error: err.code || 'ACCEPT_ERROR',
+      message: err.message
+    });
+  }
+};
+
+router.post('/invitations/accept', requireAuth(), handleAcceptInvitation);
+router.post('/admin/invitations/accept', requireAuth(), handleAcceptInvitation);
 
 // ==================== END WORKFORCE MANAGEMENT ====================
 
