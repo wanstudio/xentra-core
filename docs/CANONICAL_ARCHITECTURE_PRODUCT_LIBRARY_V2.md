@@ -340,11 +340,60 @@ Before creating or modifying an entity, route, service, repository, table, event
 
 **Stop conditions:** duplicate entity; surface exceeds authority; payload used as authorization; legacy term promoted; configuration used as business logic; generic endpoint bypasses dedicated authorization; unresolved business rule is being guessed.
 
-## 20. Open architecture gaps
+## 20. Locked Product Universe & Bundle Authority — 2026-09-15
+
+**Status:** LOCKED / CANONICAL BUSINESS DECISION
+
+> **Owner determines what may be sold. Branch selects and operates it correctly.**
+
+Xentra will not turn Branch Manager into a mini product manager. Product complexity, package/bundle composition, and decisions about what constitutes an official sellable product belong to the Master Catalog under Owner/Brand authority.
+
+### Locked rules
+
+- **Master Catalog is the sellable product universe.** Official sellable products must originate there.
+- Master Catalog may contain both **SIMPLE** and **BUNDLE/COMPOSITE** products.
+- If a package such as `Ayam Geprek + Es Teh` must be sold as one menu/package, **Owner creates the Package/Bundle Product in Master Catalog**. Branch does not create its own bundle.
+- For the current scope, a Bundle has its own **fixed selling price**. Do not introduce a pricing-formula or promotion engine merely to support bundles.
+- Branch only **adopts/selects** products from Master Catalog and operates them at branch level.
+- Branch may still organize adopted Branch Products into **Branch Categories**. One Branch Product may belong to multiple Branch Categories without duplicating the product.
+- Category membership and bundle composition are separate relationships:
+  - `Branch Product ↔ Branch Category` = **many-to-many**.
+  - `Bundle Product → Component Products` = **Master Catalog composition**.
+- Branch Manager controls branch operational concerns such as availability/sold-out within its authority, not Master Product identity or Bundle structure.
+- If a business requirement appears to require Branch-created products or compositions, **do not invent a Branch rule**. Raise it as a new architecture/business decision for Owner/Master Catalog.
+
+### Canonical example
+
+```text
+Master Catalog (Owner)
+├── Ayam Geprek
+├── Es Teh
+└── Paket Hemat 1 [BUNDLE]
+    ├── Ayam Geprek ×1
+    └── Es Teh ×1
+
+Branch A
+├── adopt Ayam Geprek
+├── adopt Es Teh
+├── adopt Paket Hemat 1
+└── organize adopted products into Branch Categories
+    ├── Ayam → Ayam Geprek
+    ├── Promo → Ayam Geprek, Paket Hemat 1
+    ├── Serba 10rb → Es Teh
+    └── Best Seller → Ayam Geprek, Paket Hemat 1
+```
+
+### Explicit non-goal
+
+**No Branch Bundle Engine.** Do not introduce branch-owned bundle components, bundle pricing formulas, branch-created composite products, or duplicate Master Products merely to satisfy a Branch promotion/category.
+
+This lock intentionally keeps Branch operations simple and pushes product/business complexity to Owner/Master Catalog where it belongs.
+
+## 21. Open architecture gaps
 
 These remain explicit until separately locked: final promotion domain/model; final operating-hours persistence/effective-state contract; richer Branch operational state schema; table/reservation persistence and concurrency contract; complete POS lifecycle and Sale/Order integration; detailed Inventory topology; full Reporting read-model contract; future Owner → Branch notification/version/conflict workflow for Master changes.
 
-## 21. Governance
+## 22. Governance
 
 Future change flow:
 
