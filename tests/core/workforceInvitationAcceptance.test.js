@@ -904,4 +904,248 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
     assert.equal(res.role, 'cashier');
     assert.equal(res.branch_id, testBranch1Id);
   });
+
+  // ==================== SECURITY AUDIT FAILURE SEMANTICS (AUDIT-FAIL-01 to 06) ====================
+
+  it('AUDIT-FAIL-01: Normal INVITATION_ACCEPT_DENIED writes security_audit_log with authoritative metadata', async () => {
+    const service = new WorkforceInvitationService();
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'owner_acc@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    assert.throws(() => {
+      service.acceptInvitation({
+        authenticatedUser: { id: ownerUser.id, email: 'owner_acc@test.com' },
+        rawToken: created.rawToken
+      });
+    }, (err) => {
+      assert.equal(err.status, 409);
+      assert.equal(err.code, 'WORKFORCE_ROLE_CONFLICT');
+      return true;
+    });
+
+    const auditRow = db.prepare(`
+      SELECT * FROM security_audit_log 
+      WHERE action = 'INVITATION_ACCEPT_DENIED' AND actor_id = ?
+      ORDER BY created_at DESC LIMIT 1
+    `).get(ownerUser.id);
+
+    assert.ok(auditRow, 'Authoritative audit row was recorded');
+    assert.equal(auditRow.result, 'denied');
+    const metadata = JSON.parse(auditRow.metadata);
+    assert.equal(metadata.reason, 'CANNOT_DEMOTE_OWNER');
+    assert.equal(metadata.invitation_id, created.id);
+  });
+
+  it('AUDIT-FAIL-02: Simulated security_audit_log persistence failure does NOT turn a denied invitation into success', async () => {
+    const service = new WorkforceInvitationService();
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'owner_acc@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    // Mock db.prepare to simulate failure on security_audit_log INSERT
+    const origPrepare = service.db.prepare.bind(service.db);
+    service.db.prepare = function(sql) {
+      if (typeof sql === 'string' && sql.includes('INSERT INTO security_audit_log')) {
+        return {
+          run: () => {
+            throw new Error('disk I/O error or table locked');
+          }
+        };
+      }
+      return origPrepare(sql);
+    };
+
+    try {
+      // Must still be rejected and NEVER succeed
+      assert.throws(() => {
+        service.acceptInvitation({
+          authenticatedUser: { id: ownerUser.id, email: 'owner_acc@test.com' },
+          rawToken: created.rawToken
+        });
+      }, (err) => {
+        // Must fail with controlled error (AUDIT_PERSISTENCE_FAILED with 500)
+        assert.equal(err.status, 500);
+        assert.equal(err.code, 'AUDIT_PERSISTENCE_FAILED');
+        return true;
+      });
+    } finally {
+      service.db.prepare = origPrepare;
+    }
+  });
+
+  it('AUDIT-FAIL-03: Internal DB/audit error details are not exposed through API response', async () => {
+    const service = new WorkforceInvitationService();
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'alice.recipient@test.com',
+      role: 'branch_manager',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    // Simulate failure with sensitive SQLite internal details
+    const origPrepare = service.db.prepare.bind(service.db);
+    service.db.prepare = function(sql) {
+      if (typeof sql === 'string' && sql.includes('INSERT INTO security_audit_log')) {
+        return {
+          run: () => {
+            throw new Error('SQLITE_CORRUPT: database disk image is malformed at offset 0x4000');
+          }
+        };
+      }
+      return origPrepare(sql);
+    };
+
+    let caughtErr;
+    try {
+      // Wrong user Bob attempts acceptance
+      service.acceptInvitation({
+        authenticatedUser: { id: wrongRecipientUser.id, email: 'bob.wrong@test.com' },
+        rawToken: created.rawToken
+      });
+    } catch (err) {
+      caughtErr = err;
+    } finally {
+      service.db.prepare = origPrepare;
+    }
+
+    assert.ok(caughtErr);
+    assert.equal(caughtErr.status, 500);
+    assert.equal(caughtErr.code, 'AUDIT_PERSISTENCE_FAILED');
+    // Verify no raw sqlite/internal leak in message
+    assert.ok(!caughtErr.message.includes('SQLITE'));
+    assert.ok(!caughtErr.message.includes('0x4000'));
+    assert.ok(!caughtErr.message.includes('malformed'));
+  });
+
+  it('AUDIT-FAIL-04: Invitation remains pending/not accepted when the denial path is executed', async () => {
+    const service = new WorkforceInvitationService();
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'alice.recipient@test.com',
+      role: 'branch_manager',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    const origPrepare = service.db.prepare.bind(service.db);
+    service.db.prepare = function(sql) {
+      if (typeof sql === 'string' && sql.includes('INSERT INTO security_audit_log')) {
+        return {
+          run: () => {
+            throw new Error('Simulated audit error');
+          }
+        };
+      }
+      return origPrepare(sql);
+    };
+
+    try {
+      // Wrong recipient
+      assert.throws(() => {
+        service.acceptInvitation({
+          authenticatedUser: { id: wrongRecipientUser.id, email: 'bob.wrong@test.com' },
+          rawToken: created.rawToken
+        });
+      });
+    } finally {
+      service.db.prepare = origPrepare;
+    }
+
+    // Invitation remains strictly pending
+    const inv = db.prepare('SELECT status, accepted_at FROM workforce_invitations WHERE id = ?').get(created.id);
+    assert.equal(inv.status, 'pending');
+    assert.equal(inv.accepted_at, null);
+  });
+
+  it('AUDIT-FAIL-05: Existing successful invitation acceptance remains successful and records audit', async () => {
+    const service = new WorkforceInvitationService();
+    // Ensure clean state for recipient
+    db.prepare("UPDATE users SET role = 'cashier', brand_id = ?, branch_id = NULL WHERE id = ?").run(testBrandId, existingRecipientUser.id);
+
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'alice.recipient@test.com',
+      role: 'brand_manager',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: null
+    });
+
+    const res = service.acceptInvitation({
+      authenticatedUser: { id: existingRecipientUser.id, email: 'alice.recipient@test.com' },
+      rawToken: created.rawToken
+    });
+
+    assert.equal(res.success, true);
+    assert.equal(res.status, 'accepted');
+    assert.equal(res.role, 'brand_manager');
+
+    // Confirm audit was written
+    const auditRow = db.prepare(`
+      SELECT * FROM security_audit_log 
+      WHERE action = 'INVITATION_ACCEPTED' AND actor_id = ?
+      ORDER BY created_at DESC LIMIT 1
+    `).get(existingRecipientUser.id);
+
+    assert.ok(auditRow);
+    assert.equal(auditRow.result, 'success');
+  });
+
+  it('AUDIT-FAIL-06: Existing Phase 4A reconciliation tests remain passing', async () => {
+    // Cross-brand conflict test
+    const service = new WorkforceInvitationService();
+    const otherBrandId = 'brand_acc_foreign_2';
+    db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain, primary_color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\'), datetime(\'now\'))')
+      .run(otherBrandId, testOrgId, 'Other Foreign Brand 2', 'other-foreign-2', 'other-foreign-2.xentra.cloud', '#ffffff');
+
+    const workforce = new WorkforceService();
+    let foreignUser;
+    try {
+      foreignUser = workforce.createUser({
+        brand_id: otherBrandId,
+        organization_id: testOrgId,
+        username: 'foreign_worker_2',
+        email: 'foreign.worker2@test.com',
+        password: 'Password123!',
+        full_name: 'Foreign Worker 2',
+        role: 'cashier'
+      });
+    } catch (_) {
+      foreignUser = db.prepare('SELECT * FROM users WHERE username = ?').get('foreign_worker_2');
+    }
+
+    const created = await service.createInvitation({
+      actor: { actor_id: ownerUser.id, actor_role: 'owner' },
+      email: 'foreign.worker2@test.com',
+      role: 'cashier',
+      brand_id: testBrandId,
+      organization_id: testOrgId,
+      branch_id: testBranch1Id
+    });
+
+    assert.throws(() => {
+      service.acceptInvitation({
+        authenticatedUser: { id: foreignUser.id, email: 'foreign.worker2@test.com' },
+        rawToken: created.rawToken
+      });
+    }, (err) => {
+      assert.equal(err.status, 409);
+      assert.equal(err.code, 'WORKFORCE_SCOPE_CONFLICT');
+      return true;
+    });
+  });
 });

@@ -1212,7 +1212,7 @@ class WorkforceInvitationService {
     };
   }
 
-  _logSecurityEvent({ actor_id, actor_role, action, brand_id, organization_id, branch_id, result, metadata }) {
+  _logSecurityEvent({ actor_id, actor_role, action, brand_id, organization_id, branch_id, result, metadata, requirePersistence = false }) {
     try {
       const id = 'sal_' + crypto.randomBytes(16).toString('hex');
       const safeMetadata = metadata ? JSON.stringify(metadata) : null;
@@ -1234,6 +1234,13 @@ class WorkforceInvitationService {
       );
     } catch (e) {
       console.error('[WorkforceInvitationService] Failed to record security audit log:', e);
+      if (requirePersistence || action === 'INVITATION_ACCEPT_DENIED') {
+        throw {
+          status: 500,
+          code: 'AUDIT_PERSISTENCE_FAILED',
+          message: 'Gagal mencatat log audit keamanan.'
+        };
+      }
     }
   }
 }
