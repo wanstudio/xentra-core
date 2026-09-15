@@ -346,4 +346,206 @@ describe('Phase 5: Password / Auth Credential Schema Reconciliation', () => {
     assert.strictEqual(wf.verifyPassword('password', null), false);
     assert.strictEqual(wf.verifyPassword(undefined, undefined), false);
   });
+
+  // ==================== FINAL HARDENING: ATOMIC PASSWORD RESET ====================
+
+  // P5-HARDEN-01: Successful password reset consumes token and changes password atomically
+  test('P5-HARDEN-01: Successful password reset consumes token and changes password atomically', () => {
+    const wf = new WorkforceService();
+    const userId = 'usr_p5_hrd_01_' + crypto.randomBytes(4).toString('hex');
+    const username = 'hrd_01_' + crypto.randomBytes(4).toString('hex');
+    const email = `${username}@xentra.cloud`;
+
+    db.prepare(`
+      INSERT INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at)
+      VALUES (?, ?, ?, ?, ?, NULL, 'Harden User 1', 'cashier', 'active', NULL, datetime('now'))
+    `).run(userId, brandId, orgId, username, email);
+
+    const reset = wf.adminResetPassword(userId, brandId, { actor_id: 'usr_p5_owner', actor_role: 'owner' });
+    const result = wf.completePasswordReset(reset.reset_token, 'AtomicPassword123!');
+
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.user_id, userId);
+
+    // Verify token is marked used
+    const tokenHash = crypto.createHash('sha256').update(reset.reset_token).digest('hex');
+    const tokenRecord = db.prepare('SELECT used FROM password_reset_tokens WHERE token_hash = ?').get(tokenHash);
+    assert.strictEqual(tokenRecord.used, 1);
+
+    // Verify password is updated
+    const user = db.prepare('SELECT password_hash, password_changed_at FROM users WHERE id = ?').get(userId);
+    assert.ok(user.password_hash != null);
+    assert.ok(user.password_changed_at != null);
+    assert.ok(wf.verifyPassword('AtomicPassword123!', user.password_hash));
+  });
+
+  // P5-HARDEN-02: If password UPDATE fails, transaction rolls back, token remains unused, password unchanged, no sessions invalidated
+  test('P5-HARDEN-02: If password UPDATE fails, token remains unused and sessions are not invalidated', () => {
+    let sessionRevoked = false;
+    global.TokenSessionStore = {
+      revokeUserSessions: () => {
+        sessionRevoked = true;
+      }
+    };
+
+    const userId = 'usr_p5_hrd_02_' + crypto.randomBytes(4).toString('hex');
+    const username = 'hrd_02_' + crypto.randomBytes(4).toString('hex');
+    const email = `${username}@xentra.cloud`;
+    const initialHash = new WorkforceService().hashPassword('InitialSecret123!');
+
+    db.prepare(`
+      INSERT INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'Harden User 2', 'cashier', 'active', datetime('now'), datetime('now'))
+    `).run(userId, brandId, orgId, username, email, initialHash);
+
+    const wf = new WorkforceService();
+    const reset = wf.adminResetPassword(userId, brandId, { actor_id: 'usr_p5_owner', actor_role: 'owner' });
+    sessionRevoked = false; // Reset flag after token issuance; now testing completePasswordReset failure
+    const tokenHash = crypto.createHash('sha256').update(reset.reset_token).digest('hex');
+
+    // Simulate failure during user password UPDATE by intercepting prepare or throwing
+    const originalPrepare = wf.repository.prepare.bind(wf.repository);
+    wf.repository.prepare = function(sql) {
+      if (sql.includes('UPDATE users SET password_hash')) {
+        return {
+          run: () => {
+            throw new Error('Simulated disk/constraint error on users update');
+          }
+        };
+      }
+      return originalPrepare(sql);
+    };
+
+    assert.throws(() => {
+      wf.completePasswordReset(reset.reset_token, 'ShouldFail123!');
+    }, (err) => {
+      assert.ok(err.message.includes('Simulated disk/constraint error'));
+      return true;
+    });
+
+    // Verify rollback: token must STILL be unused (used = 0)
+    const tokenRecord = db.prepare('SELECT used FROM password_reset_tokens WHERE token_hash = ?').get(tokenHash);
+    assert.strictEqual(tokenRecord.used, 0, 'Token must remain unused when password update fails');
+
+    // Verify rollback: user password must still be original
+    const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId);
+    assert.strictEqual(user.password_hash, initialHash, 'Password must remain unchanged on rollback');
+
+    // Verify sessions were NOT invalidated
+    assert.strictEqual(sessionRevoked, false, 'Sessions must not be invalidated when reset fails');
+  });
+
+  // P5-HARDEN-03: If token consume/update transaction fails, token remains usable afterwards
+  test('P5-HARDEN-03: If transaction rolls back, token remains valid and can be retried successfully', () => {
+    const userId = 'usr_p5_hrd_03_' + crypto.randomBytes(4).toString('hex');
+    const username = 'hrd_03_' + crypto.randomBytes(4).toString('hex');
+    const email = `${username}@xentra.cloud`;
+
+    db.prepare(`
+      INSERT INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at)
+      VALUES (?, ?, ?, ?, ?, NULL, 'Harden User 3', 'cashier', 'active', NULL, datetime('now'))
+    `).run(userId, brandId, orgId, username, email);
+
+    const wf = new WorkforceService();
+    const reset = wf.adminResetPassword(userId, brandId, { actor_id: 'usr_p5_owner', actor_role: 'owner' });
+
+    // First attempt fails during transaction
+    const originalPrepare = wf.repository.prepare.bind(wf.repository);
+    let failOnce = true;
+    wf.repository.prepare = function(sql) {
+      if (failOnce && sql.includes('UPDATE users SET password_hash')) {
+        failOnce = false;
+        return {
+          run: () => {
+            throw new Error('Temporary glitch');
+          }
+        };
+      }
+      return originalPrepare(sql);
+    };
+
+    assert.throws(() => {
+      wf.completePasswordReset(reset.reset_token, 'RetryPassword123!');
+    });
+
+    // Restore original prepare and retry with the SAME token
+    wf.repository.prepare = originalPrepare;
+    const retryResult = wf.completePasswordReset(reset.reset_token, 'RetryPassword123!');
+    assert.strictEqual(retryResult.success, true);
+
+    const user = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId);
+    assert.ok(wf.verifyPassword('RetryPassword123!', user.password_hash));
+  });
+
+  // P5-HARDEN-04: Reset token remains single-use after successful reset
+  test('P5-HARDEN-04: Reset token is strictly single-use after successful reset', () => {
+    const wf = new WorkforceService();
+    const userId = 'usr_p5_hrd_04_' + crypto.randomBytes(4).toString('hex');
+    const username = 'hrd_04_' + crypto.randomBytes(4).toString('hex');
+    const email = `${username}@xentra.cloud`;
+
+    db.prepare(`
+      INSERT INTO users (id, brand_id, organization_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at)
+      VALUES (?, ?, ?, ?, ?, NULL, 'Harden User 4', 'cashier', 'active', NULL, datetime('now'))
+    `).run(userId, brandId, orgId, username, email);
+
+    const reset = wf.adminResetPassword(userId, brandId, { actor_id: 'usr_p5_owner', actor_role: 'owner' });
+    wf.completePasswordReset(reset.reset_token, 'FirstUsePass123!');
+
+    assert.throws(() => {
+      wf.completePasswordReset(reset.reset_token, 'SecondUsePass123!');
+    }, (err) => {
+      assert.strictEqual(err.status, 400);
+      assert.strictEqual(err.code, 'INVALID_TOKEN');
+      return true;
+    });
+  });
+
+  // ==================== FINAL HARDENING: FAIL-FAST MIGRATION ====================
+
+  // P5-HARDEN-05: Schema migration is fail-fast and surfaces errors explicitly while restoring foreign_keys state
+  test('P5-HARDEN-05: Schema migration fails fast and restores foreign_keys state when migration fails', () => {
+    // Test that initSchema fails fast when an existing table structure has an error during migration
+    // We can simulate this using a fresh SQLite in-memory DB
+    const { DatabaseSync } = require('node:sqlite');
+    const testDb = new DatabaseSync(':memory:');
+
+    // Create legacy table with NOT NULL password_hash
+    testDb.exec(`
+      CREATE TABLE brands (id TEXT PRIMARY KEY, organization_id TEXT, name TEXT, slug TEXT);
+      CREATE TABLE branches (id TEXT PRIMARY KEY, brand_id TEXT, name TEXT);
+      CREATE TABLE users (
+        id TEXT PRIMARY KEY,
+        brand_id TEXT,
+        organization_id TEXT,
+        branch_id TEXT,
+        username TEXT UNIQUE NOT NULL,
+        email TEXT,
+        password_hash TEXT NOT NULL,
+        full_name TEXT
+      );
+    `);
+
+    // We can test that if a statement in migration fails (e.g., table corrupt or invalid SQL),
+    // initSchema throws explicitly and restores foreign_keys to ON
+    const originalExec = testDb.exec.bind(testDb);
+    testDb.exec = function(sql) {
+      if (sql.includes('users_plat_mig') && sql.includes('INSERT INTO users_plat_mig')) {
+        throw new Error('Simulated disk corruption during data copy');
+      }
+      return originalExec(sql);
+    };
+
+    assert.throws(() => {
+      db.initSchema(testDb);
+    }, (err) => {
+      assert.ok(err.message.includes('Failed to migrate users schema to nullable password_hash'));
+      return true;
+    });
+
+    // Verify foreign_keys was restored to ON by finally block
+    const fkState = testDb.prepare('PRAGMA foreign_keys;').get();
+    const fkVal = fkState.foreign_keys !== undefined ? fkState.foreign_keys : Object.values(fkState)[0];
+    assert.strictEqual(fkVal, 1, 'PRAGMA foreign_keys must be restored to 1 (ON)');
+  });
 });

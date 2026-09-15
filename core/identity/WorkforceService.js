@@ -412,33 +412,48 @@ class WorkforceService {
 
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    const tokenRecord = this.repository.prepare(`
-      SELECT prt.*, u.brand_id 
-      FROM password_reset_tokens prt
-      JOIN users u ON u.id = prt.user_id
-      WHERE prt.token_hash = ? AND prt.used = 0
-    `).get(tokenHash);
+    // Execute token consumption and credential update in a single atomic transaction
+    this.repository.exec('BEGIN TRANSACTION;');
+    try {
+      // Re-validate/load token record inside transaction
+      const tokenRecord = this.repository.prepare(`
+        SELECT prt.*, u.brand_id 
+        FROM password_reset_tokens prt
+        JOIN users u ON u.id = prt.user_id
+        WHERE prt.token_hash = ? AND prt.used = 0
+      `).get(tokenHash);
 
-    if (!tokenRecord) {
-      throw { status: 400, code: 'INVALID_TOKEN', message: 'Invalid or already used reset token.' };
+      if (!tokenRecord) {
+        throw { status: 400, code: 'INVALID_TOKEN', message: 'Invalid or already used reset token.' };
+      }
+
+      if (new Date(tokenRecord.expires_at) < new Date()) {
+        throw { status: 400, code: 'TOKEN_EXPIRED', message: 'Reset token has expired.' };
+      }
+
+      // Mark token as used atomically (ensuring status transition succeeds)
+      const updateTokenRes = this.repository.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ? AND used = 0').run(tokenRecord.id);
+      if (updateTokenRes.changes === 0) {
+        throw { status: 400, code: 'INVALID_TOKEN', message: 'Invalid or already used reset token.' };
+      }
+
+      // Update password
+      const newHash = this.hashPassword(newPassword);
+      this.repository.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
+        .run(newHash, tokenRecord.user_id);
+
+      this.repository.exec('COMMIT;');
+
+      // Invalidate existing sessions ONLY after transaction commit succeeds
+      this.invalidateUserSessions(tokenRecord.user_id);
+
+      return { success: true, user_id: tokenRecord.user_id, brand_id: tokenRecord.brand_id };
+    } catch (err) {
+      try {
+        this.repository.exec('ROLLBACK;');
+      } catch (_) {}
+      throw err;
     }
-
-    if (new Date(tokenRecord.expires_at) < new Date()) {
-      throw { status: 400, code: 'TOKEN_EXPIRED', message: 'Reset token has expired.' };
-    }
-
-    // Mark token as used
-    this.repository.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').run(tokenRecord.id);
-
-    // Update password
-    const newHash = this.hashPassword(newPassword);
-    this.repository.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
-      .run(newHash, tokenRecord.user_id);
-
-    // Invalidate existing sessions on password reset
-    this.invalidateUserSessions(tokenRecord.user_id);
-
-    return { success: true, user_id: tokenRecord.user_id, brand_id: tokenRecord.brand_id };
   }
 
   // ==================== SESSION MANAGEMENT ====================

@@ -1284,12 +1284,12 @@ function initSchema(targetDb) {
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_categories_media_id ON categories(media_id) WHERE media_id IS NOT NULL;'); } catch (e) {}
 
   // Migrate existing users table if brand_id or password_hash has legacy NOT NULL constraint
-  try {
-    const usersTableInfo = targetDb.prepare('PRAGMA table_info(users);').all();
-    const brandCol = usersTableInfo.find(c => c.name === 'brand_id');
-    const pwCol = usersTableInfo.find(c => c.name === 'password_hash');
-    if ((brandCol && brandCol.notnull === 1) || (pwCol && pwCol.notnull === 1)) {
-      targetDb.exec('PRAGMA foreign_keys = OFF;');
+  const usersTableInfo = targetDb.prepare('PRAGMA table_info(users);').all();
+  const brandCol = usersTableInfo.find(c => c.name === 'brand_id');
+  const pwCol = usersTableInfo.find(c => c.name === 'password_hash');
+  if ((brandCol && brandCol.notnull === 1) || (pwCol && pwCol.notnull === 1)) {
+    targetDb.exec('PRAGMA foreign_keys = OFF;');
+    try {
       targetDb.exec('DROP TABLE IF EXISTS users_plat_mig;');
       targetDb.exec('BEGIN TRANSACTION;');
       targetDb.exec(`
@@ -1332,9 +1332,14 @@ function initSchema(targetDb) {
       targetDb.exec('DROP TABLE users;');
       targetDb.exec('ALTER TABLE users_plat_mig RENAME TO users;');
       targetDb.exec('COMMIT;');
+    } catch (migErr) {
+      try { targetDb.exec('ROLLBACK;'); } catch (_) {}
+      try { targetDb.exec('DROP TABLE IF EXISTS users_plat_mig;'); } catch (_) {}
+      throw new Error(`[Database] Failed to migrate users schema to nullable password_hash: ${migErr && migErr.message ? migErr.message : migErr}`);
+    } finally {
       targetDb.exec('PRAGMA foreign_keys = ON;');
     }
-  } catch (e) {}
+  }
 
   // One-time password reset tokens (single-use, time-limited)
   try {
