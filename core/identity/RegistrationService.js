@@ -20,9 +20,29 @@ function isValidEmail(email) {
   return /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/.test(email.trim());
 }
 
+class ThenableRegistrationResult {
+  constructor(data, promise) {
+    Object.assign(this, data);
+    this._promise = promise;
+  }
+
+  then(onFulfilled, onRejected) {
+    return this._promise.then(onFulfilled, onRejected);
+  }
+
+  catch(onRejected) {
+    return this._promise.catch(onRejected);
+  }
+
+  finally(onFinally) {
+    return this._promise.finally(onFinally);
+  }
+}
+
 class RegistrationService {
-  constructor(database = db) {
+  constructor(database = db, emailProvider = undefined) {
     this.db = database;
+    this.emailProvider = emailProvider;
   }
 
   hashPassword(password) {
@@ -38,6 +58,7 @@ class RegistrationService {
    * 5. Creates initial Branch + Delivery Settings
    * 6. Creates initial User with role = 'owner'
    * 7. Commits or rolls back transaction on error
+   * 8. Triggers and awaits post-commit email verification delivery
    */
   registerBusiness({
     email,
@@ -154,19 +175,12 @@ class RegistrationService {
     }
 
     // 4. Trigger Email Verification Token Generation and Dispatch
+    // Awaited post-commit so the database transaction is never held open during external email delivery.
+    // In accordance with Phase 2 contract: email provider failure does NOT roll back successful business persistence.
     const EmailVerificationService = require('./EmailVerificationService');
-    const emailVerification = new EmailVerificationService(this.db);
-    let verificationTokenResult = null;
-    try {
-      verificationTokenResult = emailVerification.createAndSendVerificationToken({
-        userId,
-        email: cleanEmail
-      });
-    } catch (tokenErr) {
-      console.error('[RegistrationService] Failed to dispatch verification email:', tokenErr.message);
-    }
+    const emailVerification = new EmailVerificationService(this.db, this.emailProvider);
 
-    // 5. Return sanitized response (NEVER return password, password_hash, or raw token in prod)
+    // 5. Build sanitized response (NEVER return password, password_hash, or raw token in prod)
     const response = {
       user: {
         id: userId,
@@ -195,7 +209,19 @@ class RegistrationService {
       }
     };
 
-    return response;
+    const emailPromise = (async () => {
+      try {
+        await emailVerification.createAndSendVerificationToken({
+          userId,
+          email: cleanEmail
+        });
+      } catch (tokenErr) {
+        console.error('[RegistrationService] Failed to dispatch verification email:', tokenErr && tokenErr.message ? tokenErr.message : tokenErr);
+      }
+      return response;
+    })();
+
+    return new ThenableRegistrationResult(response, emailPromise);
   }
 
   /**
