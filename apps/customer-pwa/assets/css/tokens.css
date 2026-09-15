@@ -5,10 +5,21 @@
    ========================================================================== */
 
 :root {
-  /* ── Brand Colors ── */
-  --x-lime:            #b6ff00;
-  --x-lime-dark:       #98d600;
-  --x-lime-bg:         #f7ffd9;
+  /* ── Brand Semantic Colors (Authoritative Theme Tokens) ── */
+  --x-primary:            #b6ff00;
+  --x-primary-dark:       #98d600;
+  --x-primary-bg:         #f7ffd9;
+  --x-primary-text:       #111111;
+  --x-primary-foreground: var(--x-primary-text);
+  --primary-foreground:   var(--x-primary-text);
+  --primary-text:         var(--x-primary-text);
+  --primary-color:        var(--x-primary);
+  --x-primary-shadow:     rgba(182, 255, 0, 0.3);
+
+  /* Legacy brand token aliases for backward-compatibility */
+  --x-lime:               var(--x-primary);
+  --x-lime-dark:          var(--x-primary-dark);
+  --x-lime-bg:            var(--x-primary-bg);
 
   /* ── Neutral Palette ── */
   --x-black:           #111111;

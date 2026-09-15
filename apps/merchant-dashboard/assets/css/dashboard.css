@@ -1087,6 +1087,13 @@ input, button, select, textarea, optgroup {
 .x-toggle.x-toggle-on .x-toggle-slider::before {
   transform: translateX(22px);
 }
+.x-toggle input:disabled + .x-toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.x-toggle input:disabled {
+  cursor: not-allowed;
+}
 
 .x-branch-detail-row {
   display: flex;
@@ -2012,6 +2019,22 @@ input, button, select, textarea, optgroup {
     grid-template-columns: 1fr !important;
     gap: 10px !important;
   }
+
+  /* Responsive topbar adjustments on tablet/narrow screens */
+  .x-dash-topbar {
+    padding: 14px 20px;
+    gap: 12px;
+  }
+  .x-topbar-left h1 {
+    font-size: 18px;
+  }
+  .x-topbar-right {
+    gap: 10px;
+  }
+  .x-live-status {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -2039,20 +2062,22 @@ input, button, select, textarea, optgroup {
    ========================================================================= */
 .x-image-upload-control {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
   background: #f8fafc;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 14px;
-  flex-wrap: wrap;
+  padding: 14px 16px;
+  flex-wrap: nowrap;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .x-image-upload-preview-box {
-  width: 80px;
-  height: 80px;
+  width: 76px;
+  height: 76px;
   border-radius: 12px;
-  border: 1px dashed #cbd5e1;
+  border: 1.5px dashed #cbd5e1;
   background: #ffffff;
   display: flex;
   align-items: center;
@@ -2060,6 +2085,7 @@ input, button, select, textarea, optgroup {
   overflow: hidden;
   position: relative;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .x-image-upload-preview-box.is-banner {
@@ -2087,22 +2113,40 @@ input, button, select, textarea, optgroup {
 }
 
 .x-image-upload-info {
-  flex: 1;
-  min-width: 200px;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .x-image-upload-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
-  margin-top: 8px;
   flex-wrap: wrap;
 }
 
 .x-image-specs-text {
-  font-size: 11px;
+  font-size: 11.5px;
+  font-weight: 500;
   color: #64748b;
-  margin-top: 4px;
+  margin-top: 2px;
   line-height: 1.4;
+  word-break: break-word;
+}
+
+@media (max-width: 480px) {
+  .x-image-upload-control {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+  }
+  .x-image-upload-preview-box {
+    width: 68px;
+    height: 68px;
+  }
 }
 
 /* =========================================================================
@@ -2260,6 +2304,16 @@ input, button, select, textarea, optgroup {
   box-sizing: border-box;
 }
 
+.x-crop-modal-card .x-modal-footer {
+  margin-top: 0;
+  padding: 14px 20px;
+  background: #ffffff;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 @media (max-width: 480px) {
   .x-crop-modal-card {
     max-width: calc(100vw - 16px);
@@ -2287,6 +2341,420 @@ input, button, select, textarea, optgroup {
   }
 }
 
+/* =========================================================================
+   SAAS POLISH: BRAND PROFILE & SETTINGS ENHANCEMENTS
+   ========================================================================= */
+.x-brand-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  background: #ffffff;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
 
+.x-brand-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
 
+.x-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.x-field-hint {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.x-color-picker-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f8fafc;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.x-color-swatches-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: var(--radius-sm);
+  border: 1px dashed #e2e8f0;
+}
+
+/* Polished Brand Panel Layout */
+.x-brand-split-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 28px;
+  align-items: start;
+}
+
+.x-brand-split-grid .x-card-panel {
+  padding: 28px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.x-brand-split-grid .x-panel-header h3 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+  margin: 0 0 6px 0;
+}
+
+.x-brand-split-grid .x-panel-header p {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Button & Upload Control Polish */
+.x-image-upload-control {
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.x-image-upload-control:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+}
+
+.x-image-upload-actions .x-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.x-image-upload-actions label.x-btn-secondary {
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.x-image-upload-actions .x-btn-secondary:hover:not(:disabled),
+.x-image-upload-actions label.x-btn-secondary:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.x-image-upload-actions .x-btn-secondary:active,
+.x-image-upload-actions label.x-btn-secondary:active {
+  transform: translateY(0);
+}
+
+.x-image-upload-actions .x-btn-secondary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.x-file-input-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  opacity: 0 !important;
+}
+
+/* Phone Mockup Saas Polish */
+.x-phone-mockup {
+  margin: 12px auto 0 auto;
+  box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.25);
+  border: 4px solid #0f172a;
+}
+
+/* ==========================================================================
+   MOBILE-FIRST ACTION UX SYSTEM (POPOVERS, OVERFLOW MENUS, ACTION GROUPS)
+   ========================================================================== */
+
+/* Item actions container in tables / cards */
+.x-item-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  position: relative;
+}
+
+/* Desktop-only action buttons (hidden on mobile) */
+.x-action-desktop-only {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Overflow trigger button (`⋯`) */
+.x-action-menu-trigger {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  flex-shrink: 0;
+}
+
+.x-action-menu-trigger:hover,
+.x-action-menu-trigger:focus-visible,
+.x-action-menu-trigger[aria-expanded="true"] {
+  background: #f1f5f9;
+  color: var(--text-main);
+  border-color: #e2e8f0;
+}
+
+.x-action-menu-trigger:active {
+  transform: scale(0.92);
+}
+
+.x-action-menu-trigger svg {
+  display: block;
+  pointer-events: none;
+}
+
+/* Fixed positioning popover menu attached to body */
+.x-action-popover-menu {
+  position: fixed;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 8px 10px -6px rgba(15, 23, 42, 0.1);
+  padding: 6px;
+  min-width: 180px;
+  max-width: 260px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  transform: scale(0.96);
+  transform-origin: top right;
+  transition: opacity 0.15s cubic-bezier(0.16, 1, 0.3, 1), transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.x-action-popover-menu.x-popover-open {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+  visibility: visible;
+}
+
+/* Backdrop for closing menu anywhere */
+.x-action-popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: transparent;
+  display: none;
+}
+
+.x-action-popover-backdrop.x-popover-open {
+  display: block;
+}
+
+/* Menu items inside popover */
+.x-action-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #334155;
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.x-action-menu-item:hover,
+.x-action-menu-item:focus-visible {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.x-action-menu-item:active {
+  background: #e2e8f0;
+}
+
+.x-action-menu-item.is-destructive {
+  color: #dc2626;
+}
+
+.x-action-menu-item.is-destructive:hover,
+.x-action-menu-item.is-destructive:focus-visible {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.x-action-menu-item.is-destructive:active {
+  background: #fee2e2;
+}
+
+.x-action-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.x-action-menu-item-icon svg {
+  display: block;
+  stroke: currentColor;
+}
+
+.x-action-menu-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 4px -2px;
+}
+
+/* Branch card responsive action row */
+.x-branch-actions-row {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 12px;
+}
+
+.x-branch-primary-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Product card action footer */
+.x-product-card-simple .x-product-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+/* Mobile Breakpoint Optimizations */
+@media (max-width: 768px) {
+  /* Tables on mobile: keep action column compact */
+  .x-table td.text-right,
+  .x-data-table td.text-right {
+    white-space: nowrap;
+    padding: 10px 8px;
+  }
+
+  /* In table rows on mobile, hide secondary text buttons that are now in the `⋯` menu */
+  .x-action-desktop-only {
+    display: none !important;
+  }
+
+  /* Branch card actions on mobile */
+  .x-branch-actions-row {
+    flex-wrap: nowrap;
+  }
+
+  .x-branch-primary-actions {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .x-branch-primary-actions button {
+    flex: 1 1 auto;
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Bottom sheet behavior for action menu on narrow mobile if desired */
+  .x-action-popover-menu {
+    min-width: 190px;
+  }
+}
+
+@media (max-width: 480px) {
+  .x-item-actions {
+    gap: 4px;
+  }
+
+  .x-action-menu-trigger {
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
+    min-height: 34px;
+  }
+
+  /* Header action buttons: wrap or stack cleanly */
+  .x-header-buttons {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+  }
+
+  .x-header-buttons button {
+    flex: 1 1 auto;
+    text-align: center;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 12.5px;
+  }
+}
 

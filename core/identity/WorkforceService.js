@@ -470,8 +470,14 @@ class WorkforceService {
   // ==================== AUTHENTICATION ====================
 
   authenticate(username, password, brandId) {
-    const user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id = ?')
+    let user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id = ?')
       .get(username, username, brandId);
+
+    // Fallback: identity-only users (pre-invitation) have brand_id = NULL
+    if (!user) {
+      user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id IS NULL')
+        .get(username, username);
+    }
 
     if (!user) {
       return { success: false, error: 'INVALID_CREDENTIALS' };

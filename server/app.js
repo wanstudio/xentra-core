@@ -114,6 +114,12 @@ app.get(['/invitations/validate/:token', '/invitations/validate/:token/'], (req,
   apiRoutes(req, res, next);
 });
 
+// Xentra Cloud Platform: Public Workforce Invitation Acceptance Route UI
+app.get(['/invite/:token', '/invite/:token/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/invite.html'));
+});
+
 // Serve Public Static Assets
 app.use('/assets', express.static(path.join(__dirname, '../apps/customer-pwa/assets')));
 app.use('/pwa', express.static(path.join(__dirname, '../apps/customer-pwa/assets/pwa')));

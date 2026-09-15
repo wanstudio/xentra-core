@@ -6,6 +6,7 @@
   'use strict';
 
   var PREFIX = 'xentra_v2_';
+  var BRAND_KEY = PREFIX + 'brand';
   var CART_KEY = PREFIX + 'cart';
   var NOTES_KEY = PREFIX + 'notes';
   var LOCATION_KEY = PREFIX + 'location';
@@ -34,8 +35,13 @@
     };
   }
 
+  var initialBrand = load(BRAND_KEY, null);
+  if (initialBrand && initialBrand.primary_color && window.Xentra && window.Xentra.UI && typeof window.Xentra.UI.applyTheme === 'function') {
+    window.Xentra.UI.applyTheme(initialBrand.primary_color);
+  }
+
   var state = {
-    brand: null,
+    brand: initialBrand,
     customerSession: load(SESSION_KEY, null),
     orderType: load(ORDER_TYPE_KEY, 'delivery'),
     orderContext: load(ORDER_CTX_KEY, {
@@ -113,7 +119,32 @@
 
   function setBrand(brand) {
     state.brand = brand;
-    notify();
+    save(BRAND_KEY, brand);
+    if (brand && brand.primary_color && window.Xentra && window.Xentra.UI && typeof window.Xentra.UI.applyTheme === 'function') {
+      window.Xentra.UI.applyTheme(brand.primary_color);
+    }
+    notify({ type: 'brand' });
+  }
+
+  function refreshBrand() {
+    if (window.Xentra && window.Xentra.API && typeof window.Xentra.API.get === 'function') {
+      return window.Xentra.API.get('/brand/info')
+        .then(function (data) {
+          if (data && data.brand) {
+            setBrand(data.brand);
+            return data.brand;
+          }
+        })
+        .catch(function () {});
+    }
+    return Promise.resolve(null);
+  }
+
+  // Trigger non-blocking brand theme refresh from server on startup
+  if (typeof window !== 'undefined') {
+    setTimeout(function () {
+      refreshBrand();
+    }, 0);
   }
 
   function setCustomerSession(session) {
@@ -458,6 +489,7 @@
     getState: getState,
     subscribe: subscribe,
     setBrand: setBrand,
+    refreshBrand: refreshBrand,
     setCustomerSession: setCustomerSession,
     clearCustomerSession: clearCustomerSession,
     setOrderType: setOrderType,

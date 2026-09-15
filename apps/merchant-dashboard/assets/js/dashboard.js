@@ -97,6 +97,169 @@
   }
 
   /* =========================================================================
+     MOBILE-FIRST ACTION UX SYSTEM — REUSABLE GROUPED ACTION MENU CONTROLLER
+     ========================================================================= */
+  var XentraActionMenu = (function () {
+    var _activePopover = null;
+    var _backdrop = null;
+
+    var _previousActiveElement = null;
+
+    function getBackdrop() {
+      if (!_backdrop) {
+        _backdrop = document.createElement('div');
+        _backdrop.className = 'x-action-popover-backdrop';
+        _backdrop.addEventListener('click', closeAll);
+        document.body.appendChild(_backdrop);
+      }
+      return _backdrop;
+    }
+
+    function closeAll() {
+      if (_activePopover) {
+        if (_activePopover._trigger) {
+          _activePopover._trigger.setAttribute('aria-expanded', 'false');
+        }
+        _activePopover.classList.remove('x-popover-open');
+        var popToClean = _activePopover;
+        setTimeout(function () {
+          if (popToClean && popToClean.parentNode) {
+            popToClean.parentNode.removeChild(popToClean);
+          }
+        }, 150);
+        _activePopover = null;
+      }
+      var b = getBackdrop();
+      b.classList.remove('x-popover-open');
+
+      if (_previousActiveElement && typeof _previousActiveElement.focus === 'function') {
+        try { _previousActiveElement.focus(); } catch (_) {}
+        _previousActiveElement = null;
+      }
+    }
+
+    function open(triggerEl, items) {
+      if (!triggerEl || !items || !items.length) return;
+      if (_activePopover && _activePopover._trigger === triggerEl) {
+        closeAll();
+        return;
+      }
+      closeAll();
+
+      _previousActiveElement = triggerEl;
+      triggerEl.setAttribute('aria-expanded', 'true');
+
+      var popover = document.createElement('div');
+      popover.className = 'x-action-popover-menu';
+      popover.setAttribute('role', 'menu');
+      popover.setAttribute('tabindex', '-1');
+      popover._trigger = triggerEl;
+
+      var buttons = [];
+
+      items.forEach(function (item) {
+        if (!item) return;
+        if (item.divider) {
+          var hr = document.createElement('div');
+          hr.className = 'x-action-menu-divider';
+          hr.setAttribute('role', 'separator');
+          popover.appendChild(hr);
+          return;
+        }
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('role', 'menuitem');
+        btn.className = 'x-action-menu-item' + (item.destructive ? ' is-destructive' : '');
+        var iconHtml = item.icon ? '<span class="x-action-menu-item-icon">' + item.icon + '</span>' : '';
+        btn.innerHTML = iconHtml + '<span>' + esc(item.label) + '</span>';
+
+        btn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          closeAll();
+          if (typeof item.onClick === 'function') {
+            item.onClick();
+          }
+        });
+
+        popover.appendChild(btn);
+        buttons.push(btn);
+      });
+
+      // Keyboard navigation within popover
+      popover.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          closeAll();
+          return;
+        }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          var idx = buttons.indexOf(document.activeElement);
+          if (e.key === 'ArrowDown') {
+            var nextIdx = idx < buttons.length - 1 ? idx + 1 : 0;
+            if (buttons[nextIdx]) buttons[nextIdx].focus();
+          } else {
+            var prevIdx = idx > 0 ? idx - 1 : buttons.length - 1;
+            if (buttons[prevIdx]) buttons[prevIdx].focus();
+          }
+        }
+      });
+
+      document.body.appendChild(popover);
+      _activePopover = popover;
+      getBackdrop().classList.add('x-popover-open');
+
+      // Smart positioning: flip horizontally / vertically if near edge
+      var rect = triggerEl.getBoundingClientRect();
+      var menuW = popover.offsetWidth || 200;
+      var menuH = popover.offsetHeight || (items.length * 40);
+
+      var left = rect.right - menuW;
+      if (left < 10) left = 10;
+      if (left + menuW > window.innerWidth - 10) {
+        left = window.innerWidth - menuW - 10;
+      }
+
+      var top = rect.bottom + 6;
+      if (top + menuH > window.innerHeight - 10) {
+        top = Math.max(10, rect.top - menuH - 6);
+        popover.style.transformOrigin = 'bottom right';
+      } else {
+        popover.style.transformOrigin = 'top right';
+      }
+
+      popover.style.left = Math.round(left) + 'px';
+      popover.style.top = Math.round(top) + 'px';
+
+      requestAnimationFrame(function () {
+        popover.classList.add('x-popover-open');
+        if (buttons[0]) buttons[0].focus();
+      });
+    }
+
+    // Global listeners
+    window.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && _activePopover) {
+        closeAll();
+      }
+    });
+    window.addEventListener('scroll', closeAll, true);
+    window.addEventListener('resize', closeAll);
+
+    return {
+      open: open,
+      closeAll: closeAll
+    };
+  })();
+  window.XentraActionMenu = XentraActionMenu;
+
+  window.toggleStockChecked = function (id, checked) {
+    window.toggleStock(id);
+  };
+
+  /* =========================================================================
      MEDIA SYSTEM M2 — REUSABLE CROP / IMAGE EDITOR CONTROLLER
      ========================================================================= */
   var XentraCropEditor = (function () {
@@ -884,7 +1047,11 @@
     }
     if (tabId === 'tim') {
       switchTeamSection(teamSubtab, false);
-      loadTim();
+      if (teamSubtab === 'invitations') {
+        loadInvitations();
+      } else {
+        loadTim();
+      }
     }
     if (tabId === 'finance') {
       switchFinanceSection(financeSubtab, false);
@@ -959,11 +1126,19 @@
     });
 
     // Restore previous selection if still valid
-    var validIds = ['all'].concat((_branchContextState.branches).map(function (b) { return String(b.id); }));
-    if (validIds.indexOf(_branchContextState.selected) === -1) {
-      _branchContextState.selected = 'all';
+    var user = getStoredUser();
+    if (user && user.role === 'branch_manager' && user.branch_id) {
+      _branchContextState.selected = user.branch_id;
+      sel.value = user.branch_id;
+      sel.disabled = true;
+    } else {
+      var validIds = ['all'].concat((_branchContextState.branches).map(function (b) { return String(b.id); }));
+      if (validIds.indexOf(_branchContextState.selected) === -1) {
+        _branchContextState.selected = 'all';
+      }
+      sel.value = _branchContextState.selected;
+      sel.disabled = false;
     }
-    sel.value = _branchContextState.selected;
   }
 
   function initBranchContextSelector() {
@@ -1071,6 +1246,20 @@
     $('dash-sidebar-logo').src = logoUrl;
     if ($('topbar-brand-name')) $('topbar-brand-name').textContent = brand.name || 'Bangjo Resto';
 
+    if ($('set-profile-name')) $('set-profile-name').value = brand.name || '';
+    if ($('set-profile-tagline')) $('set-profile-tagline').value = brand.tagline || '';
+    if ($('set-profile-logo')) $('set-profile-logo').value = logoUrl;
+    if ($('set-profile-logo-preview')) {
+      $('set-profile-logo-preview').src = logoUrl;
+      $('set-profile-logo-preview').style.display = 'block';
+    }
+    if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
+    if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = (logoUrl && logoUrl !== '/assets/pwa/icon-192.png') ? 'inline-block' : 'none';
+    if ($('btn-set-profile-logo-pick')) $('btn-set-profile-logo-pick').textContent = (logoUrl && logoUrl !== '/assets/pwa/icon-192.png') ? '📁 Ganti Logo' : '📁 Unggah Logo';
+    if ($('set-profile-color')) $('set-profile-color').value = brand.primary_color || '#b6ff00';
+    if ($('set-profile-color-hex')) $('set-profile-color-hex').value = brand.primary_color || '#b6ff00';
+    if ($('set-profile-domain')) $('set-profile-domain').textContent = brand.custom_domain || window.location.host || '-';
+
     if ($('auth-brand-name')) $('auth-brand-name').textContent = brand.name || 'Bangjo Resto';
     if ($('auth-logo')) $('auth-logo').src = logoUrl;
 
@@ -1138,6 +1327,91 @@
       });
     });
 
+    // Reusable Brand Logo Upload Flow (Media System M1/M2/M3)
+    async function doUploadBrandLogo(file, cropSpec, previewDataUrl, triggerBtn) {
+      if (triggerBtn) {
+        triggerBtn.disabled = true;
+        triggerBtn.textContent = 'Mengunggah...';
+      }
+
+      // Optimistic preview immediately so user sees immediate feedback
+      if (previewDataUrl) {
+        if ($('brand-logo-preview')) {
+          $('brand-logo-preview').src = previewDataUrl;
+          $('brand-logo-preview').style.display = 'block';
+        }
+        if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
+        if ($('set-profile-logo-preview')) {
+          $('set-profile-logo-preview').src = previewDataUrl;
+          $('set-profile-logo-preview').style.display = 'block';
+        }
+        if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
+        if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = previewDataUrl;
+        if (nameInput && colorPicker) {
+          updateLiveMockupPreview(nameInput.value, previewDataUrl, colorPicker.value);
+        }
+      }
+
+      try {
+        var base64 = await new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve(reader.result); };
+          reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
+          reader.readAsDataURL(file);
+        });
+
+        var payload = { image_base64: base64, mime_type: file.type };
+        if (cropSpec) payload.crop_spec = cropSpec;
+
+        var res = await adminFetch(API_BASE + '/admin/brand/logo', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify(payload)
+        });
+        var data = await res.json();
+
+        if (res.ok && data.success) {
+          showToast('✅ Logo brand berhasil diunggah.');
+          var logoUrl = data.logo_url;
+          if (logoInput) logoInput.value = logoUrl;
+          if ($('brand-logo-preview')) {
+            $('brand-logo-preview').src = logoUrl;
+            $('brand-logo-preview').style.display = 'block';
+          }
+          if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
+          if (btnRemoveLogo) btnRemoveLogo.style.display = 'inline-block';
+          if ($('btn-brand-logo-pick')) $('btn-brand-logo-pick').textContent = '📁 Ganti Logo';
+
+          if ($('set-profile-logo')) $('set-profile-logo').value = logoUrl;
+          if ($('set-profile-logo-preview')) {
+            $('set-profile-logo-preview').src = logoUrl;
+            $('set-profile-logo-preview').style.display = 'block';
+          }
+          if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
+          if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = 'inline-block';
+          if ($('btn-set-profile-logo-pick')) $('btn-set-profile-logo-pick').textContent = '📁 Ganti Logo';
+
+          if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = logoUrl;
+          if (nameInput && colorPicker) {
+            updateLiveMockupPreview(nameInput.value, logoUrl, colorPicker.value);
+          }
+          loadBrandSettings();
+          if (typeof window.loadSettingsProfile === 'function') {
+            window.loadSettingsProfile();
+          }
+        } else {
+          showToast('❌ ' + (data.error || 'Gagal mengunggah logo brand.'));
+        }
+      } catch (err) {
+        showToast('❌ Kesalahan jaringan saat mengunggah logo.');
+      } finally {
+        if (triggerBtn) {
+          triggerBtn.disabled = false;
+          triggerBtn.textContent = '📁 Ganti Logo';
+        }
+      }
+    }
+
     // Brand Logo File Picker & Upload
     var btnPickLogo = $('btn-brand-logo-pick');
     var fileInputLogo = $('input-brand-logo-file');
@@ -1165,45 +1439,30 @@
           return;
         }
 
-        btnPickLogo.disabled = true;
-        btnPickLogo.textContent = 'Mengunggah...';
-
-        try {
-          var base64 = await new Promise(function (resolve, reject) {
-            var reader = new FileReader();
-            reader.onload = function () { resolve(reader.result); };
-            reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
-            reader.readAsDataURL(file);
-          });
-
-          var res = await adminFetch(API_BASE + '/admin/brand/logo', {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ image_base64: base64, mime_type: file.type })
-          });
-          var data = await res.json();
-
-          if (res.ok && data.success) {
-            showToast('✅ Logo brand berhasil diunggah.');
-            logoInput.value = data.logo_url;
-            if ($('brand-logo-preview')) {
-              $('brand-logo-preview').src = data.logo_url;
-              $('brand-logo-preview').style.display = 'block';
+        XentraCropEditor.open({
+          source: file,
+          assetType: 'logo',
+          aspectRatio: 1.0,
+          title: 'Potong & Posisikan Logo Brand (1:1)',
+          onConfirm: async function (cropSpec, previewDataUrl) {
+            try {
+              await doUploadBrandLogo(file, cropSpec, previewDataUrl, btnPickLogo);
+            } finally {
+              fileInputLogo.value = '';
             }
-            if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
-            if (btnRemoveLogo) btnRemoveLogo.style.display = 'inline-block';
-            updateLiveMockupPreview(nameInput.value, data.logo_url, colorPicker.value);
-            loadBrandSettings();
-          } else {
-            showToast('❌ ' + (data.error || 'Gagal mengunggah logo brand.'));
+          },
+          onCancel: async function () {
+            // If user cancels crop modal, allow direct upload of the original image
+            try {
+              var reader = new FileReader();
+              reader.onload = function (ev) {
+                doUploadBrandLogo(file, null, ev.target.result, btnPickLogo);
+              };
+              reader.readAsDataURL(file);
+            } catch (_) {}
+            fileInputLogo.value = '';
           }
-        } catch (err) {
-          showToast('❌ Kesalahan jaringan saat mengunggah logo.');
-        } finally {
-          btnPickLogo.disabled = false;
-          btnPickLogo.textContent = '📁 Ganti Logo';
-          fileInputLogo.value = '';
-        }
+        });
       });
     }
 
@@ -1219,15 +1478,22 @@
           if (res.ok && data.success) {
             showToast('✅ Logo brand kustom dihapus.');
             var defaultLogo = '/assets/pwa/icon-192.png';
-            logoInput.value = defaultLogo;
+            if (logoInput) logoInput.value = defaultLogo;
             if ($('brand-logo-preview')) {
               $('brand-logo-preview').src = defaultLogo;
               $('brand-logo-preview').style.display = 'block';
             }
             btnRemoveLogo.style.display = 'none';
             if (btnPickLogo) btnPickLogo.textContent = '📁 Unggah Logo';
+            if ($('set-profile-logo')) $('set-profile-logo').value = defaultLogo;
+            if ($('set-profile-logo-preview')) $('set-profile-logo-preview').src = defaultLogo;
+            if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = 'none';
+            if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = defaultLogo;
             updateLiveMockupPreview(nameInput.value, defaultLogo, colorPicker.value);
             loadBrandSettings();
+            if (typeof window.loadSettingsProfile === 'function') {
+              window.loadSettingsProfile();
+            }
           } else {
             showToast('❌ Gagal menghapus logo.');
           }
@@ -1240,11 +1506,26 @@
     var btnUseBangjo = $('btn-use-bangjo-logo');
     if (btnUseBangjo) {
       btnUseBangjo.addEventListener('click', function () {
-        if (logoInput) logoInput.value = '/assets/pwa/icon-192.png';
-        if ($('brand-logo-preview')) $('brand-logo-preview').src = '/assets/pwa/icon-192.png';
+        var defaultLogo = '/assets/pwa/icon-192.png';
+        if (logoInput) logoInput.value = defaultLogo;
+        if ($('brand-logo-preview')) {
+          $('brand-logo-preview').src = defaultLogo;
+          $('brand-logo-preview').style.display = 'block';
+        }
+        if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
         if (btnRemoveLogo) btnRemoveLogo.style.display = 'none';
+        if (btnPickLogo) btnPickLogo.textContent = '📁 Unggah Logo';
+
+        if ($('set-profile-logo')) $('set-profile-logo').value = defaultLogo;
+        if ($('set-profile-logo-preview')) {
+          $('set-profile-logo-preview').src = defaultLogo;
+          $('set-profile-logo-preview').style.display = 'block';
+        }
+        if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = 'none';
+        if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = defaultLogo;
+
         if (nameInput && logoInput && colorPicker) {
-          updateLiveMockupPreview(nameInput.value, logoInput.value, colorPicker.value);
+          updateLiveMockupPreview(nameInput.value, defaultLogo, colorPicker.value);
         }
       });
     }
@@ -1259,11 +1540,26 @@
           btn.textContent = 'Menyimpan...';
         }
 
+      var rawColor = ($('brand-color-hex') && $('brand-color-hex').value.trim()) || ($('brand-color') && $('brand-color').value) || '#b6ff00';
+      if (!rawColor.startsWith('#')) rawColor = '#' + rawColor;
+      if (/^#[0-9a-fA-F]{3}$/.test(rawColor)) {
+        rawColor = '#' + rawColor[1] + rawColor[1] + rawColor[2] + rawColor[2] + rawColor[3] + rawColor[3];
+      }
+      if (!/^#[0-9a-fA-F]{6}$/.test(rawColor)) {
+        showToast('❌ Format warna HEX tidak valid. Gunakan format #RRGGBB (contoh: #FF5500).');
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Simpan Pengaturan Brand';
+        }
+        return;
+      }
+      rawColor = rawColor.toUpperCase();
+
       var payload = {
         name: $('brand-name').value,
         tagline: $('brand-tagline').value,
         logo_url: $('brand-logo').value,
-        primary_color: $('brand-color').value,
+        primary_color: rawColor,
         custom_domain: $('brand-domain').value
       };
 
@@ -1277,6 +1573,9 @@
         if (data.success) {
           showToast('✅ Brand dan tema berhasil disimpan!');
           applyBrandToUI(data.brand);
+          if (typeof window.loadSettingsProfile === 'function') {
+            window.loadSettingsProfile();
+          }
         } else {
           showToast('❌ Gagal menyimpan: ' + data.error);
         }
@@ -1451,34 +1750,37 @@
             '<div style="min-width:0;">',
               '<strong style="font-size:12px; color:#1e293b; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Slide ' + (idx + 1) + ': ' + esc(b.title || 'Promo Banner') + '</strong>',
             '</div>',
-            '<button type="button" class="x-btn-delete-banner" data-id="' + esc(b.id) + '" style="background:#fee2e2; color:#ef4444; border:none; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:700; cursor:pointer;">Hapus</button>',
+            '<div class="x-item-actions">',
+              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi banner ' + esc(b.title || ('Slide ' + (idx + 1))) + '" onclick="XentraActionMenu.open(this, [' +
+                '{ label: \'Hapus Banner\', icon: \'🗑️\', destructive: true, onClick: function() { deleteBannerSlide(\'' + esc(b.id) + '\'); } }' +
+              '])">',
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+              '</button>',
+            '</div>',
           '</div>',
         '</div>'
       ].join('');
     }).join('');
-
-    container.querySelectorAll('.x-btn-delete-banner').forEach(function (btn) {
-      btn.addEventListener('click', async function () {
-        var id = btn.getAttribute('data-id');
-        if (!confirm('Hapus slide banner ini?')) return;
-        try {
-          var res = await adminFetch(API_BASE + '/admin/banners/' + encodeURIComponent(id), {
-            method: 'DELETE',
-            headers: getAuthHeaders()
-          });
-          var data = await res.json();
-          if (data.success) {
-            showToast('✅ Banner berhasil dihapus.');
-            renderBannersList(data.banners);
-          } else {
-            showToast('❌ ' + data.error);
-          }
-        } catch (err) {
-          showToast('❌ Gagal menghapus banner.');
-        }
-      });
-    });
   }
+
+  window.deleteBannerSlide = async function (id) {
+    if (!confirm('Hapus slide banner ini?')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/banners/' + encodeURIComponent(id), {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('✅ Banner berhasil dihapus.');
+        renderBannersList(data.banners);
+      } else {
+        showToast('❌ ' + data.error);
+      }
+    } catch (err) {
+      showToast('❌ Gagal menghapus banner.');
+    }
+  };
 
   /* =========================================================================
      PHASE 1: CATALOG CONTROLLERS (PRODUCTS, CATEGORIES, MENUS)
@@ -1618,6 +1920,12 @@
         ? '<span class="x-badge x-badge-range">Range (' + formatMoney(prod.min_price || prod.price) + ' - ' + formatMoney(prod.max_price || prod.price) + ')</span>'
         : '<span class="x-badge x-badge-lock">Lock</span>';
 
+      var toggleSwitch = '' +
+        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + (isActive ? 'Produk aktif' : 'Produk nonaktif') + '">' +
+          '<input type="checkbox" ' + (isActive ? 'checked' : '') + ' onchange="toggleStock(\'' + prod.id + '\')" aria-label="Status aktif produk ' + esc(prod.name) + '">' +
+          '<span class="x-toggle-slider"></span>' +
+        '</label>';
+
       return [
         '<tr>',
           '<td><img src="' + esc(img) + '" alt="" class="x-table-thumb"></td>',
@@ -1628,15 +1936,18 @@
           '<td><span class="x-badge x-badge-info">' + esc(catName) + '</span></td>',
           '<td><strong>' + formatMoney(prod.price) + '</strong>' + (prod.regular_price > prod.price ? ' <del class="text-muted" style="font-size:11px;">' + formatMoney(prod.regular_price) + '</del>' : '') + '</td>',
           '<td>' + modeBadge + '</td>',
-          '<td>',
-            '<button type="button" class="x-badge ' + (isActive ? 'x-badge-success' : 'x-badge-warning') + '" style="border:none;cursor:pointer;" onclick="toggleStock(\'' + prod.id + '\')">',
-              (isActive ? '● Aktif' : '○ Nonaktif'),
-            '</button>',
-          '</td>',
+          '<td>' + toggleSwitch + '</td>',
           '<td class="text-right" style="white-space:nowrap;">',
-            '<button type="button" class="x-btn-secondary" style="padding:6px 10px;font-size:12px;margin-right:6px;" onclick="navigateTo(\'catalog/products/' + prod.id + '\')">Detail</button>',
-            '<button type="button" class="x-btn-secondary" style="padding:6px 10px;font-size:12px;margin-right:6px;" onclick="openEditProduct(\'' + prod.id + '\')">Edit</button>',
-            '<button type="button" class="x-btn-secondary" style="padding:6px 10px;font-size:12px;color:#ef4444;" onclick="deleteProduct(\'' + prod.id + '\')">Hapus</button>',
+            '<div class="x-item-actions">',
+              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi produk ' + esc(prod.name) + '" onclick="XentraActionMenu.open(this, [' +
+                '{ label: \'Lihat Detail\', icon: \'🔍\', onClick: function() { navigateTo(\'catalog/products/' + prod.id + '\'); } },' +
+                '{ label: \'Edit Produk\', icon: \'✏️\', onClick: function() { openEditProduct(\'' + prod.id + '\'); } },' +
+                '{ divider: true },' +
+                '{ label: \'Hapus Produk\', icon: \'🗑️\', destructive: true, onClick: function() { deleteProduct(\'' + prod.id + '\'); } }' +
+              '])">',
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+              '</button>',
+            '</div>',
           '</td>',
         '</tr>'
       ].join('');
@@ -1851,9 +2162,16 @@
           '<td><strong>' + esc(cat.name) + '</strong></td>',
           '<td><code style="font-size:12px;background:#f1f5f9;padding:2px 6px;border-radius:4px;">' + esc(cat.slug || '-') + '</code></td>',
           '<td><span class="x-badge x-badge-info">' + productCount + ' Produk</span></td>',
-          '<td class="text-right">',
-            '<button type="button" class="x-btn-secondary" style="padding:6px 10px;font-size:12px;margin-right:6px;" onclick="openEditMasterCategory(\'' + cat.id + '\')">Edit</button>',
-            '<button type="button" class="x-btn-secondary" style="padding:6px 10px;font-size:12px;color:#ef4444;" onclick="deleteMasterCategory(\'' + cat.id + '\', \'' + esc(cat.name) + '\', ' + productCount + ')">Hapus</button>',
+          '<td class="text-right" style="white-space:nowrap;">',
+            '<div class="x-item-actions">',
+              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi kategori ' + esc(cat.name) + '" onclick="XentraActionMenu.open(this, [' +
+                '{ label: \'Edit Kategori\', icon: \'✏️\', onClick: function() { openEditMasterCategory(\'' + cat.id + '\'); } },' +
+                '{ divider: true },' +
+                '{ label: \'Hapus Kategori\', icon: \'🗑️\', destructive: true, onClick: function() { deleteMasterCategory(\'' + cat.id + '\', \'' + esc(cat.name) + '\', ' + productCount + '); } }' +
+              '])">',
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+              '</button>',
+            '</div>',
           '</td>',
         '</tr>'
       ].join('');
@@ -2211,9 +2529,16 @@
               '<span>Deskripsi: ' + descSrc + '</span>',
             '</div>',
             '<div class="x-product-card-actions">',
-              availabilityToggle,
-              '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#0369a1;" onclick="openBranchOverrideModal(\'' + productDataJson + '\')">✏ Edit</button>',
-              '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#ef4444;" onclick="removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\')">Hapus dari Cabang</button>',
+              '<div>' + availabilityToggle + '</div>',
+              '<div class="x-item-actions">',
+                '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang ' + esc(p.name) + '" onclick="XentraActionMenu.open(this, [' +
+                  '{ label: \'Edit Menu Cabang\', icon: \'✏️\', onClick: function() { openBranchOverrideModal(\'' + productDataJson + '\'); } },' +
+                  '{ divider: true },' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\'); } }' +
+                '])">',
+                  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+                '</button>',
+              '</div>',
             '</div>',
           '</div>',
         '</div>'
@@ -2711,11 +3036,21 @@
           '<div class="x-branch-detail-row"><span>Tarif per KM:</span><span>' + formatMoney(b.price_per_km || 3000) + ' / km</span></div>',
           '<div class="x-branch-detail-row"><span>Radius Maksimal:</span><span>' + (b.max_radius_km || 12) + ' KM</span></div>',
           '<div class="x-branch-detail-row"><span>Promo Diskon Ongkir:</span><span>Diskon ' + formatMoney(b.promo_delivery_discount || 10000) + ' (Min. ' + formatMoney(b.promo_min_order || 50000) + ')</span></div>',
-          '<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid #f1f5f9;padding-top:10px;">',
-            '<button type="button" class="x-btn-secondary" style="font-size:12px;font-weight:700;color:#0284c7;" onclick="navigateTo(\'branches/' + b.id + '\')">🔍 Detail Cabang</button>',
-            '<button type="button" class="x-btn-secondary" style="font-size:12px;font-weight:700;" onclick="openBranchModal(\'' + b.id + '\')">✏️ Edit</button>',
-            '<button type="button" class="x-btn-secondary" style="font-size:12px;background:#f0fdf4;border-color:#bbf7d0;color:#15803d;font-weight:700;" onclick="openBranchCatalogModal(\'' + b.id + '\')">📋 Kelola Katalog Cabang</button>',
-            '<button type="button" class="x-btn-secondary" style="font-size:12px;color:#ef4444;border-color:#fecaca;margin-left:auto;" onclick="deleteBranch(\'' + b.id + '\')">' + (isGloballyActive ? '🗑 Hapus' : '📦 Arsipkan / Hapus') + '</button>',
+          '<div class="x-branch-actions-row">',
+            '<div class="x-branch-primary-actions">',
+              '<button type="button" class="x-btn-secondary" style="font-size:12px;font-weight:700;color:#0284c7;" onclick="navigateTo(\'branches/' + b.id + '\')">Detail Cabang ➔</button>',
+            '</div>',
+            '<div class="x-item-actions">',
+              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi cabang ' + esc(b.name) + '" onclick="XentraActionMenu.open(this, [' +
+                '{ label: \'Detail Cabang\', icon: \'🏢\', onClick: function() { navigateTo(\'branches/' + b.id + '\'); } },' +
+                '{ label: \'Edit Profil Cabang\', icon: \'✏️\', onClick: function() { openBranchModal(\'' + b.id + '\'); } },' +
+                '{ label: \'Kelola Menu Cabang\', icon: \'📋\', onClick: function() { openBranchCatalogModal(\'' + b.id + '\'); } },' +
+                '{ divider: true },' +
+                '{ label: \'' + (isGloballyActive ? 'Hapus Cabang' : 'Arsipkan / Hapus Cabang') + '\', icon: \'🗑️\', destructive: true, onClick: function() { deleteBranch(\'' + b.id + '\'); } }' +
+              '])">',
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+              '</button>',
+            '</div>',
           '</div>',
         '</div>'
       ].join('');
@@ -3109,9 +3444,16 @@
               '<span>Gambar: ' + imgSrc + '</span>',
             '</div>',
             '<div class="x-product-card-actions">',
-              availabilityToggle,
-              '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#0369a1;" onclick="openBranchOverrideModal(\'' + productDataJson + '\')">✏ Edit</button>',
-              '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#ef4444;" onclick="removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\')">Hapus dari Cabang</button>',
+              '<div>' + availabilityToggle + '</div>',
+              '<div class="x-item-actions">',
+                '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang ' + esc(p.name) + '" onclick="XentraActionMenu.open(this, [' +
+                  '{ label: \'Edit Menu Cabang\', icon: \'✏️\', onClick: function() { openBranchOverrideModal(\'' + productDataJson + '\'); } },' +
+                  '{ divider: true },' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\'); } }' +
+                '])">',
+                  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+                '</button>',
+              '</div>',
             '</div>',
           '</div>',
         '</div>'
@@ -3758,6 +4100,7 @@
       var orderChannel = ord.order_channel || 'customer_app';
       var fulfillmentType = ord.fulfillment_type || ord.order_type || 'delivery';
       var timeStr = ord.created_at ? (new Date(ord.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })) : '-';
+      var canAdvance = ord.status !== 'completed' && ord.status !== 'cancelled';
 
       return [
         '<tr>',
@@ -3770,8 +4113,17 @@
           '<td><strong>' + formatMoney(ord.grand_total) + '</strong></td>',
           '<td><span class="x-badge ' + (statusBadges[ord.status] || 'x-badge-info') + '">' + esc(ord.status.toUpperCase()) + '</span></td>',
           '<td class="text-right" style="white-space:nowrap;">',
-            '<button type="button" class="x-btn-secondary" style="padding:6px 10px;font-size:12px;margin-right:6px;" onclick="navigateTo(\'orders/' + ord.id + '\')">Detail</button>',
-            '<button type="button" class="x-btn-secondary" style="padding:6px 10px;font-size:12px;" onclick="advanceOrderStatus(\'' + ord.id + '\', \'' + ord.status + '\')">Ubah Status ➔</button>',
+            '<div class="x-item-actions" style="justify-content:flex-end;">',
+              (canAdvance
+                ? '<button type="button" class="x-btn-primary" style="padding:6px 12px;font-size:12px;" onclick="advanceOrderStatus(\'' + ord.id + '\', \'' + ord.status + '\')">' + (ord.status === 'pending' ? 'Terima Pesanan' : 'Ubah Status ➔') + '</button>'
+                : ''),
+              '<button type="button" class="x-action-menu-trigger" aria-label="Menu aksi pesanan ' + esc(ord.order_number || ord.id) + '" onclick="XentraActionMenu.open(this, [' +
+                '{ label: \'Lihat Rincian Pesanan\', icon: \'📄\', onClick: function() { navigateTo(\'orders/' + ord.id + '\'); } }' +
+                (canAdvance ? ',{ divider: true }, { label: \'' + (ord.status === 'pending' ? 'Terima Pesanan' : 'Lanjut Status Pesanan ➔') + '\', icon: \'⚡\', onClick: function() { advanceOrderStatus(\'' + ord.id + '\', \'' + ord.status + '\'); } }' : '') +
+              '])">',
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+              '</button>',
+            '</div>',
           '</td>',
         '</tr>'
       ].join('');
@@ -4611,9 +4963,15 @@
       }
     });
 
-    // Set branch_id for inline catalog if branch_manager
+    // Set branch_id for inline catalog if branch_manager and lock branch dropdown
     if (isBM && user.branch_id) {
       currentManagingBranchId = user.branch_id;
+      _branchContextState.selected = user.branch_id;
+      var branchSelector = $('dash-branch-context');
+      if (branchSelector) {
+        branchSelector.value = user.branch_id;
+        branchSelector.disabled = true;
+      }
     }
   }
 
@@ -5284,9 +5642,16 @@
             '</div>',
             '<div class="x-product-card-price">Jual: ' + formatMoney(p.price) + ' <small class="text-muted" style="font-weight:normal;">(Owner: ' + formatMoney(p.master_price) + ')</small></div>',
             '<div class="x-product-card-actions">',
-              availabilityToggle,
-              '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#0369a1;" onclick="openBranchOverrideModal(\'' + productDataJson + '\')">✏ Edit</button>',
-              '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#ef4444;" onclick="removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\')">' + 'Hapus dari Cabang</button>',
+              '<div>' + availabilityToggle + '</div>',
+              '<div class="x-item-actions">',
+                '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang ' + esc(p.name) + '" onclick="XentraActionMenu.open(this, [' +
+                  '{ label: \'Edit Menu Cabang\', icon: \'✏️\', onClick: function() { openBranchOverrideModal(\'' + productDataJson + '\'); } },' +
+                  '{ divider: true },' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\'); } }' +
+                '])">',
+                  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+                '</button>',
+              '</div>',
             '</div>',
           '</div>',
         '</div>'
@@ -5407,8 +5772,7 @@
   }
 
   function _timStatusBadge(status) {
-    if (status === 'active') return '<span class="x-badge x-badge-success">Aktif</span>';
-    return '<span class="x-badge x-badge-danger">Nonaktif</span>';
+    return '';
   }
 
   function _timBranchName(branchId) {
@@ -5460,22 +5824,53 @@
       var isMe = u.id === myId;
       var isTargetOwner = u.role === 'owner';
       var isLastOwner = isTargetOwner && _timUsers.filter(function (x) { return x.role === 'owner'; }).length <= 1;
+      var isActive = u.status === 'active';
 
+      // STATUS COLUMN: ONLY the toggle switch. Centered horizontally and vertically.
+      // Toggle ON = active, Toggle OFF = inactive.
+      // Disabling self (isMe) or the sole owner (isLastOwner) is not allowed by RBAC, so render disabled toggle.
+      var isToggleDisabled = isMe || isLastOwner;
+      var toggleTitle = '';
+      if (isMe) {
+        toggleTitle = 'Akun Anda (tidak dapat dinonaktifkan)';
+      } else if (isLastOwner) {
+        toggleTitle = 'Owner Utama (tidak dapat dinonaktifkan)';
+      } else {
+        toggleTitle = isActive ? 'Akun Aktif (klik untuk nonaktifkan)' : 'Akun Nonaktif (klik untuk aktifkan)';
+      }
+
+      var statusToggle = '' +
+        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" title="' + toggleTitle + '" style="margin:0 auto;display:inline-block;vertical-align:middle;">' +
+          '<input type="checkbox" id="tim-toggle-' + u.id + '" ' + (isActive ? 'checked ' : '') + (isToggleDisabled ? 'disabled ' : '') +
+            'onchange="toggleUserStatus(\'' + u.id + '\', \'' + esc(u.full_name) + '\', this)" aria-label="Ubah status akun ' + esc(u.full_name) + '">' +
+          '<span class="x-toggle-slider"></span>' +
+        '</label>';
+
+      // ACTIONS COLUMN: Action menu or indicator text only
       var actions = '';
-      if (!isMe && !isLastOwner) {
-        actions += '<button type="button" class="x-btn-secondary" style="font-size:12px;padding:4px 10px;margin-right:4px;" onclick="openEditUser(\'' + u.id + '\')">Edit</button>';
-      } else if (isMe) {
-        actions += '<span class="text-muted" style="font-size:11px;">Akun Anda</span>';
-      }
+      if (isMe) {
+        actions = '<span class="text-muted" style="font-size:11px;">Akun Anda</span>';
+      } else {
+        var menuItems = [
+          "{ label: 'Edit Data & Peran', icon: '✏️', onClick: function() { openEditUser('" + u.id + "'); } }",
+          "{ label: 'Reset Password', icon: '🔑', onClick: function() { resetUserPassword('" + u.id + "', '" + esc(u.full_name) + "'); } }"
+        ];
 
-      if (!isMe && u.status === 'active' && !isLastOwner) {
-        actions += '<button type="button" class="x-btn-danger-outline" style="font-size:12px;padding:4px 10px;" onclick="disableUser(\'' + u.id + '\', \'' + esc(u.full_name) + '\')">Nonaktif</button>';
-      } else if (!isMe && u.status === 'disabled') {
-        actions += '<button type="button" class="x-btn-success-outline" style="font-size:12px;padding:4px 10px;" onclick="enableUser(\'' + u.id + '\', \'' + esc(u.full_name) + '\')">Aktifkan</button>';
-      }
+        // Owner capability: Delete / Remove member (cannot delete last owner)
+        if (_timCurrentUserRole === 'owner' && !isLastOwner) {
+          menuItems.push("{ divider: true }");
+          menuItems.push("{ label: 'Hapus Anggota', icon: '🗑️', destructive: true, onClick: function() { deleteUser('" + u.id + "', '" + esc(u.full_name) + "'); } }");
+        }
 
-      if (!isMe && !isLastOwner) {
-        actions += '<button type="button" class="x-btn-secondary" style="font-size:12px;padding:4px 10px;margin-left:4px;" onclick="resetUserPassword(\'' + u.id + '\', \'' + esc(u.full_name) + '\')">Reset Password</button>';
+        actions = [
+          '<div class="x-item-actions" style="justify-content:flex-end;">',
+            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi anggota tim ' + esc(u.full_name) + '" onclick="XentraActionMenu.open(this, [' +
+              menuItems.join(',') +
+            '])">',
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+            '</button>',
+          '</div>'
+        ].join('');
       }
 
       return '<tr>' +
@@ -5483,8 +5878,8 @@
         '<td><code style="font-size:12px;background:#f1f5f9;padding:2px 6px;border-radius:4px;">' + esc(u.username) + '</code></td>' +
         '<td><span class="x-badge ' + _timRoleBadgeClass(u.role) + '">' + _timRoleLabel(u.role) + '</span></td>' +
         '<td>' + _timBranchName(u.branch_id) + '</td>' +
-        '<td>' + _timStatusBadge(u.status) + '</td>' +
-        '<td class="text-right">' + actions + '</td>' +
+        '<td class="text-center" style="vertical-align:middle;text-align:center;">' + statusToggle + '</td>' +
+        '<td class="text-right" style="white-space:nowrap;vertical-align:middle;">' + actions + '</td>' +
       '</tr>';
     });
 
@@ -5647,6 +6042,52 @@
     }
   }
 
+  async function toggleUserStatus(userId, name, inputElem) {
+    var willActivate = inputElem ? inputElem.checked : false;
+    var revert = function () {
+      if (inputElem) {
+        inputElem.checked = !willActivate;
+        inputElem.disabled = false;
+        var parentLabel = inputElem.closest('.x-toggle');
+        if (parentLabel) {
+          parentLabel.classList.toggle('x-toggle-on', !willActivate);
+        }
+      }
+    };
+
+    if (!willActivate) {
+      var confirmed = confirm('Nonaktifkan akun "' + name + '"? Staf ini tidak akan bisa login sampai diaktifkan kembali.');
+      if (!confirmed) {
+        revert();
+        return;
+      }
+    }
+
+    if (inputElem) {
+      inputElem.disabled = true;
+    }
+
+    try {
+      var endpoint = willActivate ? '/enable' : '/disable';
+      var res = await adminFetch(API_BASE + '/admin/users/' + userId + endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('Akun "' + name + '" berhasil ' + (willActivate ? 'diaktifkan.' : 'dinonaktifkan.'));
+        loadTim();
+      } else {
+        showToast('Gagal: ' + (data.error || 'Terjadi kesalahan.'));
+        revert();
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+      revert();
+    }
+  }
+  window.toggleUserStatus = toggleUserStatus;
+
   async function disableUser(userId, name) {
     if (!confirm('Nonaktifkan akun "' + name + '"? Staf ini tidak akan bisa login sampai diaktifkan kembali.')) return;
     try {
@@ -5686,6 +6127,31 @@
   }
   window.enableUser = enableUser;
 
+  async function deleteUser(userId, name) {
+    var confirmed = confirm(
+      'Hapus anggota "' + name + '"?\n\n' +
+      'Anggota akan kehilangan akses ke dashboard dan tim ini. Tindakan ini tidak dapat dibatalkan.'
+    );
+    if (!confirmed) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/users/' + userId, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Anggota "' + name + '" berhasil dihapus.');
+        loadTim();
+      } else {
+        showToast('Gagal: ' + (data.error || data.message || 'Terjadi kesalahan.'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan saat menghapus anggota.');
+    }
+  }
+  window.deleteUser = deleteUser;
+
   async function resetUserPassword(userId, name) {
     if (!confirm('Generate token reset password untuk "' + name + '"? Token hanya ditampilkan sekali.')) return;
     try {
@@ -5713,14 +6179,14 @@
   window.closeResetPasswordModal = closeResetPasswordModal;
 
   /* =========================================================================
-     MODUL: TEAM SECTION SWITCHER (Members, Roles, Permissions)
+     MODUL: TEAM SECTION SWITCHER (Members, Invitations, Roles, Permissions)
      ========================================================================= */
 
   function switchTeamSection(sectionName, updateHash) {
-    var valid = ['members', 'roles', 'permissions'];
+    var valid = ['members', 'invitations', 'roles', 'permissions'];
     var sec = valid.indexOf(sectionName) !== -1 ? sectionName : 'members';
 
-    ['members', 'roles', 'permissions'].forEach(function (name) {
+    ['members', 'invitations', 'roles', 'permissions'].forEach(function (name) {
       var el = $('team-section-' + name);
       if (el) el.style.display = name === sec ? '' : 'none';
     });
@@ -5729,11 +6195,238 @@
       tab.classList.toggle('active', tab.dataset.teamSection === sec);
     });
 
+    if (sec === 'invitations') {
+      loadInvitations();
+    }
+
     if (updateHash !== false) {
       navigateTo('team/' + sec);
     }
   }
   window.switchTeamSection = switchTeamSection;
+
+  /* =========================================================================
+     MODUL: WORKFORCE INVITATIONS (Owner & Manager Operations)
+     ========================================================================= */
+
+  var _invitationsList = [];
+
+  async function loadInvitations() {
+    var tbody = $('invitations-table-body');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Memuat data undangan...</td></tr>';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/invitations', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (data.success) {
+        _invitationsList = data.invitations || [];
+        renderInvitationsTable(_invitationsList);
+      } else {
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">' + esc(data.error || 'Gagal memuat undangan.') + '</td></tr>';
+        }
+      }
+    } catch (err) {
+      console.error('[Load Invitations Error]:', err);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat undangan.</td></tr>';
+      }
+    }
+  }
+  window.loadInvitations = loadInvitations;
+
+  function renderInvitationsTable(invitations) {
+    var tbody = $('invitations-table-body');
+    if (!tbody) return;
+
+    if (!invitations || invitations.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Belum ada undangan yang dibuat.</td></tr>';
+      return;
+    }
+
+    var rows = invitations.map(function (inv) {
+      var statusBadge = '';
+      if (inv.status === 'pending') {
+        statusBadge = '<span class="x-badge" style="background:#fef3c7;color:#92400e;font-weight:600;">Pending</span>';
+      } else if (inv.status === 'accepted') {
+        statusBadge = '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:600;">Accepted</span>';
+      } else if (inv.status === 'revoked') {
+        statusBadge = '<span class="x-badge" style="background:#fef2f2;color:#991b1b;font-weight:600;">Revoked</span>';
+      } else if (inv.status === 'expired') {
+        statusBadge = '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-weight:600;">Expired</span>';
+      }
+
+      var branchName = inv.branch_id ? _timBranchName(inv.branch_id) : '<span class="text-muted">Brand-wide</span>';
+      var expiresFormatted = inv.expires_at ? new Date(inv.expires_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+      var actions = '—';
+      if (inv.status === 'pending') {
+        actions = '<div class="x-item-actions" style="justify-content:flex-end;gap:6px;">' +
+          '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;" onclick="resendInvitation(\'' + inv.id + '\', \'' + esc(inv.email) + '\')">Kirim Ulang</button>' +
+          '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#dc2626;" onclick="revokeInvitation(\'' + inv.id + '\', \'' + esc(inv.email) + '\')">Batalkan</button>' +
+        '</div>';
+      }
+
+      return '<tr>' +
+        '<td><strong>' + esc(inv.email) + '</strong></td>' +
+        '<td><span class="x-badge ' + _timRoleBadgeClass(inv.role) + '">' + _timRoleLabel(inv.role) + '</span></td>' +
+        '<td>' + branchName + '</td>' +
+        '<td>' + statusBadge + '</td>' +
+        '<td>' + expiresFormatted + '</td>' +
+        '<td class="text-right">' + actions + '</td>' +
+      '</tr>';
+    });
+
+    tbody.innerHTML = rows.join('');
+  }
+
+  function openInviteUserModal() {
+    $('invite-input-email').value = '';
+    
+    // Populate role options for invitation
+    var roleSelect = $('invite-input-role');
+    roleSelect.innerHTML = '';
+    if (_timCurrentUserRole === 'owner') {
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="brand_manager">Brand Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+    } else if (_timCurrentUserRole === 'brand_manager') {
+      roleSelect.innerHTML = '<option value="branch_manager">Branch Manager</option><option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+    } else if (_timCurrentUserRole === 'branch_manager') {
+      roleSelect.innerHTML = '<option value="cashier">Kasir</option><option value="kitchen">Dapur</option>';
+    }
+
+    // Populate branches
+    var branchSelect = $('invite-input-branch');
+    branchSelect.innerHTML = '<option value="">— Pilih Cabang —</option>';
+    _timBranches.forEach(function (b) {
+      branchSelect.innerHTML += '<option value="' + b.id + '">' + esc(b.name) + '</option>';
+    });
+
+    if (_timCurrentUserRole === 'branch_manager') {
+      var myBranch = (getStoredUser() || {}).branch_id;
+      if (myBranch) {
+        branchSelect.value = myBranch;
+        branchSelect.disabled = true;
+      }
+    } else {
+      branchSelect.disabled = false;
+    }
+
+    handleInviteRoleChange();
+    $('modal-invite-user').style.display = 'flex';
+  }
+  window.openInviteUserModal = openInviteUserModal;
+
+  function closeInviteUserModal() {
+    $('modal-invite-user').style.display = 'none';
+  }
+  window.closeInviteUserModal = closeInviteUserModal;
+
+  function handleInviteRoleChange() {
+    var role = $('invite-input-role').value;
+    var branchGroup = $('invite-branch-group');
+    var branchSelect = $('invite-input-branch');
+    var isBranchRequired = role === 'branch_manager' || role === 'cashier' || role === 'kitchen';
+    
+    if (role === 'brand_manager') {
+      if (branchGroup) branchGroup.style.display = 'none';
+      if (branchSelect) branchSelect.required = false;
+    } else {
+      if (branchGroup) branchGroup.style.display = 'block';
+      if (branchSelect) branchSelect.required = isBranchRequired;
+    }
+  }
+  window.handleInviteRoleChange = handleInviteRoleChange;
+
+  async function submitInviteUserForm(e) {
+    e.preventDefault();
+    var email = $('invite-input-email').value.trim();
+    var role = $('invite-input-role').value;
+    var branchId = $('invite-input-branch').value || undefined;
+
+    if (!email) {
+      showToast('Alamat email wajib diisi.');
+      return;
+    }
+
+    if ((role === 'branch_manager' || role === 'cashier' || role === 'kitchen') && !branchId) {
+      showToast('Peran ' + role + ' wajib memilih cabang penugasan.');
+      return;
+    }
+
+    var btnSend = $('btn-send-invitation');
+    if (btnSend) {
+      btnSend.disabled = true;
+      btnSend.textContent = 'Mengirim...';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/invitations', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ email: email, role: role, branch_id: branchId })
+      });
+      var data = await res.json();
+
+      if (data.success) {
+        showToast('Undangan berhasil dikirim ke ' + email);
+        closeInviteUserModal();
+        switchTeamSection('invitations');
+      } else {
+        showToast('Gagal: ' + (data.message || data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan saat mengirim undangan.');
+    } finally {
+      if (btnSend) {
+        btnSend.disabled = false;
+        btnSend.textContent = 'Kirim Undangan';
+      }
+    }
+  }
+  window.submitInviteUserForm = submitInviteUserForm;
+
+  async function resendInvitation(invId, email) {
+    if (!confirm('Kirim ulang email undangan ke "' + email + '"? Token sebelumnya akan diperbarui.')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/invitations/' + invId + '/resend', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('Undangan berhasil dikirim ulang ke ' + email);
+        loadInvitations();
+      } else {
+        showToast('Gagal: ' + (data.message || data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.resendInvitation = resendInvitation;
+
+  async function revokeInvitation(invId, email) {
+    if (!confirm('Batalkan undangan untuk "' + email + '"? Tautan undangan tidak akan dapat digunakan lagi.')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/invitations/' + invId + '/revoke', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('Undangan untuk ' + email + ' berhasil dibatalkan.');
+        loadInvitations();
+      } else {
+        showToast('Gagal: ' + (data.message || data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.revokeInvitation = revokeInvitation;
+
 
   /* =========================================================================
      MODUL: CUSTOMERS & LOYALTY (Phase 5)
@@ -5809,9 +6502,14 @@
         '<td>' + formatMoney(c.average_order_value || 0) + '</td>' +
         '<td>' + favBranchText + '</td>' +
         '<td>' + segmentBadge + '</td>' +
-        '<td style="font-size:12px;color:#64748b;">' + lastOrderText + '</td>' +
-        '<td class="text-right">' +
-          '<button type="button" class="x-btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="navigateTo(\'customers/' + encodeURIComponent(c.phone || c.id) + '\')">Detail ➔</button>' +
+        '<td class="text-right" style="white-space:nowrap;">' +
+          '<div class="x-item-actions" style="justify-content:flex-end;">' +
+            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi pelanggan ' + esc(c.name || c.phone) + '" onclick="XentraActionMenu.open(this, [' +
+              '{ label: \'Lihat Profil Pelanggan\', icon: \'👤\', onClick: function() { navigateTo(\'customers/' + encodeURIComponent(c.phone || c.id) + '\'); } }' +
+            '])">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
+            '</button>' +
+          '</div>' +
         '</td>' +
       '</tr>';
     });
@@ -6398,6 +7096,7 @@
 
     initAuthListeners();
     initBrandListeners();
+    initSettingsProfileListeners();
     initCatalogListeners();
     initBranchSearchAndFilter();
     initBranchOperationsForm();
@@ -6528,7 +7227,9 @@
           $('set-profile-logo-preview').style.display = 'block';
         }
         if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
-        if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = (logoUrl && logoUrl !== '/assets/pwa/icon-192.png') ? 'inline-block' : 'none';
+        var hasCustomLogo = Boolean(logoUrl && logoUrl !== '/assets/pwa/icon-192.png');
+        if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = hasCustomLogo ? 'inline-block' : 'none';
+        if ($('btn-set-profile-logo-pick')) $('btn-set-profile-logo-pick').textContent = hasCustomLogo ? '📁 Ganti Logo' : '📁 Unggah Logo';
 
         if ($('set-profile-color')) $('set-profile-color').value = p.primary_color || '#b6ff00';
         if ($('set-profile-color-hex')) $('set-profile-color-hex').value = p.primary_color || '#b6ff00';
@@ -6539,8 +7240,8 @@
     }
     window.loadSettingsProfile = loadSettingsProfile;
 
-    // Hook settings profile logo upload
-    (function initSettingsProfileLogo() {
+    // Hook settings profile listeners (logo upload & color pickers)
+    function initSettingsProfileListeners() {
       var btnPick = $('btn-set-profile-logo-pick');
       var fileInput = $('input-set-profile-logo-file');
       var btnRemove = $('btn-set-profile-logo-remove');
@@ -6570,43 +7271,20 @@
             aspectRatio: 1.0,
             title: 'Potong & Posisikan Logo Brand (1:1)',
             onConfirm: async function (cropSpec, previewDataUrl) {
-              btnPick.disabled = true;
-              btnPick.textContent = 'Mengunggah...';
-
               try {
-                var base64 = await new Promise(function (resolve, reject) {
-                  var reader = new FileReader();
-                  reader.onload = function () { resolve(reader.result); };
-                  reader.onerror = function () { reject(new Error('Gagal membaca gambar.')); };
-                  reader.readAsDataURL(file);
-                });
-
-                var payload = { image_base64: base64, mime_type: file.type, crop_spec: cropSpec };
-                var res = await adminFetch(API_BASE + '/admin/brand/logo', {
-                  method: 'POST',
-                  headers: getAuthHeaders(),
-                  body: JSON.stringify(payload)
-                });
-                var data = await res.json();
-                if (res.ok && data.success) {
-                  showToast('✅ Logo brand berhasil diunggah.');
-                  if ($('set-profile-logo')) $('set-profile-logo').value = data.logo_url;
-                  if ($('set-profile-logo-preview')) $('set-profile-logo-preview').src = previewDataUrl || data.logo_url;
-                  if (btnRemove) btnRemove.style.display = 'inline-block';
-                  loadBrandSettings();
-                  loadSettingsProfile();
-                } else {
-                  showToast('❌ ' + (data.error || 'Gagal mengunggah logo.'));
-                }
-              } catch (err) {
-                showToast('❌ Kesalahan jaringan.');
+                await doUploadBrandLogo(file, cropSpec, previewDataUrl, btnPick);
               } finally {
-                btnPick.disabled = false;
-                btnPick.textContent = '📁 Ganti Logo';
                 fileInput.value = '';
               }
             },
-            onCancel: function () {
+            onCancel: async function () {
+              try {
+                var reader = new FileReader();
+                reader.onload = function (ev) {
+                  doUploadBrandLogo(file, null, ev.target.result, btnPick);
+                };
+                reader.readAsDataURL(file);
+              } catch (_) {}
               fileInput.value = '';
             }
           });
@@ -6628,6 +7306,14 @@
               if ($('set-profile-logo')) $('set-profile-logo').value = defaultLogo;
               if ($('set-profile-logo-preview')) $('set-profile-logo-preview').src = defaultLogo;
               btnRemove.style.display = 'none';
+              if (btnPick) btnPick.textContent = '📁 Unggah Logo';
+
+              if ($('brand-logo')) $('brand-logo').value = defaultLogo;
+              if ($('brand-logo-preview')) $('brand-logo-preview').src = defaultLogo;
+              if ($('btn-brand-logo-remove')) $('btn-brand-logo-remove').style.display = 'none';
+              if ($('btn-brand-logo-pick')) $('btn-brand-logo-pick').textContent = '📁 Unggah Logo';
+              if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = defaultLogo;
+
               loadBrandSettings();
               loadSettingsProfile();
             } else {
@@ -6638,16 +7324,51 @@
           }
         });
       }
-    })();
+
+      // Synchronize color picker and hex input in Settings Profile
+      var setColor = $('set-profile-color');
+      var setColorHex = $('set-profile-color-hex');
+      if (setColor && setColorHex) {
+        setColor.addEventListener('input', function () {
+          setColorHex.value = setColor.value;
+        });
+        setColorHex.addEventListener('input', function () {
+          if (/^#[0-9A-Fa-f]{6}$/.test(setColorHex.value)) {
+            setColor.value = setColorHex.value;
+          }
+        });
+      }
+    }
+
 
     async function saveSettingsProfile(e) {
       if (e) e.preventDefault();
+      var btn = $('btn-save-settings-profile');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Menyimpan...';
+      }
       try {
+        var rawHex = ($('set-profile-color-hex') && $('set-profile-color-hex').value.trim()) || ($('set-profile-color') && $('set-profile-color').value) || '#b6ff00';
+        if (!rawHex.startsWith('#')) rawHex = '#' + rawHex;
+        if (/^#[0-9a-fA-F]{3}$/.test(rawHex)) {
+          rawHex = '#' + rawHex[1] + rawHex[1] + rawHex[2] + rawHex[2] + rawHex[3] + rawHex[3];
+        }
+        if (!/^#[0-9a-fA-F]{6}$/.test(rawHex)) {
+          showToast('❌ Format warna HEX tidak valid. Gunakan format #RRGGBB (contoh: #FF5500).');
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = 'Simpan Profil';
+          }
+          return;
+        }
+        rawHex = rawHex.toUpperCase();
+
         var payload = {
           name: $('set-profile-name').value.trim(),
           tagline: $('set-profile-tagline').value.trim(),
           logo_url: $('set-profile-logo').value.trim(),
-          primary_color: $('set-profile-color-hex').value.trim() || $('set-profile-color').value
+          primary_color: rawHex
         };
 
         var res = await adminFetch(API_BASE + '/admin/settings/business/profile', {
@@ -6657,13 +7378,22 @@
         });
         var json = await res.json();
         if (json.success) {
-          showToast('Profil brand berhasil disimpan.');
+          showToast('✅ Profil brand berhasil disimpan.');
+          if (json.profile) {
+            applyBrandToUI(json.profile);
+          }
           loadBrandSettings();
+          loadSettingsProfile();
         } else {
-          showToast('Gagal: ' + (json.error || 'Terjadi kesalahan.'));
+          showToast('❌ Gagal: ' + (json.error || 'Terjadi kesalahan.'));
         }
       } catch (err) {
-        showToast('Kesalahan jaringan saat menyimpan profil.');
+        showToast('❌ Kesalahan jaringan saat menyimpan profil.');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Simpan Profil';
+        }
       }
     }
     window.saveSettingsProfile = saveSettingsProfile;

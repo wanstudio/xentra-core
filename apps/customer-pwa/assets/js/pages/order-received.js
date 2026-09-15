@@ -53,7 +53,7 @@
     targetContainer.style.display = 'block';
     targetContainer.innerHTML =
       '<div style="padding:60px 20px;text-align:center;color:#6b7280;font-size:15px;font-weight:600;">' +
-      '  <div style="width:40px;height:40px;border:3px solid #e5e7eb;border-top-color:#b6ff00;border-radius:50%;margin:0 auto 16px;animation:spin 1s linear infinite;"></div>' +
+      '  <div style="width:40px;height:40px;border:3px solid #e5e7eb;border-top-color:var(--x-primary);border-radius:50%;margin:0 auto 16px;animation:spin 1s linear infinite;"></div>' +
       '  Memuat status pesanan...' +
       '</div>';
   }
@@ -224,7 +224,7 @@
       // 6. Action Buttons (WhatsApp Branch & Reorder)
       '  <div style="padding:0 14px;display:flex;flex-direction:column;gap:10px;text-align:center;">' +
       '    <a href="' + waUrl + '" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:8px;height:48px;background:#25d366;color:#fff;font-size:14px;font-weight:700;border-radius:24px;text-decoration:none;box-shadow:0 4px 12px rgba(37,211,102,0.25);">💬 Hubungi WhatsApp Cabang</a>' +
-      '    <button type="button" id="x-btn-reorder" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border:none;border-radius:24px;cursor:pointer;background:#d6ff00;color:#111;box-shadow:0 4px 12px rgba(0,0,0,0.06);">Pesan Menu Lainnya</button>' +
+      '    <button type="button" id="x-btn-reorder" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border:none;border-radius:24px;cursor:pointer;background:var(--x-primary);color:var(--x-primary-text);box-shadow:0 4px 12px var(--x-primary-shadow, rgba(0,0,0,0.06));">Pesan Menu Lainnya</button>' +
       '  </div>' +
 
       '</div>';
@@ -236,8 +236,8 @@
   }
 
   function renderStep(num, title, desc, isDone) {
-    var markerBg = isDone ? '#111' : '#e5e7eb';
-    var markerColor = isDone ? '#b6ff00' : '#9ca3af';
+    var markerBg = isDone ? 'var(--x-primary)' : '#e5e7eb';
+    var markerColor = isDone ? 'var(--x-primary-text, #111)' : '#9ca3af';
     var icon = isDone ? '✓' : num;
 
     return (

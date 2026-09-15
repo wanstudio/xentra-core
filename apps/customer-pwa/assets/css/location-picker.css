@@ -1033,10 +1033,10 @@
   color: #111827;
 }
 
-/* Ubah pill button (lime green) */
+/* Ubah pill button (theme primary) */
 .x-btn-ubah-lime {
-  background: #c4ff00;
-  color: #111827;
+  background: var(--x-primary, #c4ff00);
+  color: var(--x-primary-text, #111827);
   font-size: 13px;
   font-weight: 800;
   padding: 6px 16px;
@@ -1111,12 +1111,12 @@
   gap: 8px;
 }
 
-/* Enabled: #c4ff00 lime green */
+/* Enabled: theme primary */
 .x-btn-konfirmasi-main.is-enabled,
 .x-btn-konfirmasi-main:not(:disabled) {
-  background: #c4ff00;
-  color: #111827;
-  box-shadow: 0 4px 14px rgba(196, 255, 0, 0.35);
+  background: var(--x-primary, #c4ff00);
+  color: var(--x-primary-text, #111827);
+  box-shadow: 0 4px 14px var(--x-primary-shadow, rgba(196, 255, 0, 0.35));
 }
 
 .x-btn-konfirmasi-main.is-enabled:active,

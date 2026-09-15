@@ -18,6 +18,7 @@ const orgId = 'org_test_workforce';
 function request(method, path, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const url = new URL(path, baseUrl);
+    const payload = (body !== null && body !== undefined) ? JSON.stringify(body) : null;
     const options = {
       hostname: url.hostname,
       port: url.port,
@@ -26,6 +27,7 @@ function request(method, path, body, headers = {}) {
       headers: {
         'Content-Type': 'application/json',
         'Host': 'test.mybangjo.com',
+        ...(payload != null ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
         ...headers
       }
     };
@@ -43,7 +45,7 @@ function request(method, path, body, headers = {}) {
     });
 
     req.on('error', reject);
-    if (body) req.write(JSON.stringify(body));
+    if (payload != null) req.write(payload);
     req.end();
   });
 }
@@ -398,6 +400,137 @@ describe('Workforce Management', () => {
         assert.equal(res.status, 400);
         assert.equal(res.data.error, 'Cannot disable the last Owner account.');
       }
+    });
+  });
+
+  // ==================== DELETE MEMBER ====================
+
+  describe('Delete Member', () => {
+    it('WF-DELETE-01: Owner can delete team member', async () => {
+      // Create a cashier to delete
+      const createRes = await request('POST', '/api/v1/admin/users', {
+        username: 'to_delete_user',
+        password: 'TestPassword123!',
+        full_name: 'To Delete User',
+        role: 'cashier',
+        branch_id: 'branch_a'
+      }, { 'Authorization': `Bearer ${ownerToken}` });
+
+      assert.equal(createRes.status, 201);
+      const targetId = createRes.data.user.id;
+
+      // Delete member
+      const delRes = await request('DELETE', `/api/v1/admin/users/${targetId}`, null, {
+        'Authorization': `Bearer ${ownerToken}`
+      });
+
+      assert.equal(delRes.status, 200);
+      assert.equal(delRes.data.success, true);
+      assert.equal(delRes.data.deleted_user_id, targetId);
+
+      // Verify member no longer exists in users list
+      const listRes = await request('GET', '/api/v1/admin/users', null, {
+        'Authorization': `Bearer ${ownerToken}`
+      });
+      const exists = listRes.data.users.some(u => u.id === targetId);
+      assert.equal(exists, false, 'Deleted user should not appear in user list');
+
+      // Verify GET /admin/users/:id returns 404
+      const getRes = await request('GET', `/api/v1/admin/users/${targetId}`, null, {
+        'Authorization': `Bearer ${ownerToken}`
+      });
+      assert.equal(getRes.status, 404);
+    });
+
+    it('WF-DELETE-02: Non-Owner cannot delete team member', async () => {
+      // Create another cashier
+      const createRes = await request('POST', '/api/v1/admin/users', {
+        username: 'victim_user',
+        password: 'TestPassword123!',
+        full_name: 'Victim User',
+        role: 'cashier',
+        branch_id: 'branch_a'
+      }, { 'Authorization': `Bearer ${ownerToken}` });
+      const targetId = createRes.data.user.id;
+
+      // Manager attempts delete
+      const mgrLogin = await request('POST', '/api/v1/auth/merchant/login', {
+        username: 'bm_test',
+        password: 'bangjo123'
+      });
+
+      if (mgrLogin.status === 200) {
+        const mgrToken = mgrLogin.data.token;
+        const res = await request('DELETE', `/api/v1/admin/users/${targetId}`, null, {
+          'Authorization': `Bearer ${mgrToken}`
+        });
+
+        assert.equal(res.status, 403);
+      }
+    });
+
+    it('WF-DELETE-03: Self-delete is blocked for Owner', async () => {
+      const listRes = await request('GET', '/api/v1/admin/users', null, {
+        'Authorization': `Bearer ${ownerToken}`
+      });
+      const currentOwner = listRes.data.users.find(u => u.username === 'admin_test');
+      assert.ok(currentOwner, 'Current owner must exist');
+
+      const res = await request('DELETE', `/api/v1/admin/users/${currentOwner.id}`, null, {
+        'Authorization': `Bearer ${ownerToken}`
+      });
+
+      assert.equal(res.status, 400);
+      assert.ok(res.data.error.includes('sendiri') || res.data.code === 'SELF_DELETE_PROTECTED');
+    });
+
+    it('WF-DELETE-04: Cannot delete the last Owner', async () => {
+      // Create a user and promote to second owner
+      const createOwnerRes = await request('POST', '/api/v1/admin/users', {
+        username: 'second_owner',
+        password: 'TestPassword123!',
+        full_name: 'Second Owner',
+        role: 'brand_manager'
+      }, { 'Authorization': `Bearer ${ownerToken}` });
+
+      assert.equal(createOwnerRes.status, 201);
+      const secondOwnerId = createOwnerRes.data.user.id;
+
+      // Promote to owner
+      const promoteRes = await request('POST', `/api/v1/admin/users/${secondOwnerId}/role`, {
+        role: 'owner'
+      }, { 'Authorization': `Bearer ${ownerToken}` });
+      assert.equal(promoteRes.status, 200);
+
+      // First owner deletes second owner (should succeed because there are 2 owners)
+      const delSecondRes = await request('DELETE', `/api/v1/admin/users/${secondOwnerId}`, null, {
+        'Authorization': `Bearer ${ownerToken}`
+      });
+      assert.equal(delSecondRes.status, 200);
+
+      // Now only 1 owner remains. Attempting to delete this remaining owner by another call must fail with LAST_OWNER_PROTECTED
+      // Mock call to deleteUser directly for the remaining owner with a separate actor ID
+      const WorkforceService = require('../core/identity/WorkforceService');
+      const wf = new WorkforceService();
+      let errorThrown = null;
+      try {
+        const remainingOwnerId = (await request('GET', '/api/v1/admin/users', null, { 'Authorization': `Bearer ${ownerToken}` })).data.users.find(u => u.role === 'owner').id;
+        wf.deleteUser(remainingOwnerId, brandId, {
+          actor_id: 'other_actor',
+          actor_role: 'owner'
+        });
+      } catch (err) {
+        errorThrown = err;
+      }
+      assert.ok(errorThrown, 'Should throw error when attempting to delete last owner');
+      assert.equal(errorThrown.code, 'LAST_OWNER_PROTECTED');
+    });
+
+    it('WF-DELETE-05: Deleting nonexistent user returns 404', async () => {
+      const res = await request('DELETE', '/api/v1/admin/users/nonexistent_usr_999', null, {
+        'Authorization': `Bearer ${ownerToken}`
+      });
+      assert.equal(res.status, 404);
     });
   });
 

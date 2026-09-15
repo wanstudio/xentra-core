@@ -110,8 +110,8 @@
 .x-btn-lime {
   border: 0;
   border-radius: var(--x-radius-pill);
-  background: var(--x-lime);
-  color: var(--x-black);
+  background: var(--x-primary);
+  color: var(--x-primary-text, #111111);
   font-family: var(--x-font);
   font-weight: 700;
   cursor: pointer;
@@ -183,6 +183,7 @@
   height: 42px;
   border: 0;
   border-radius: var(--x-radius-xl);
-  background: var(--x-lime);
+  background: var(--x-primary);
+  color: var(--x-primary-text, #111111);
   font-weight: 700;
 }

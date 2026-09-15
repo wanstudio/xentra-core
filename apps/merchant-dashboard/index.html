@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=2.8.0">
+  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=3.0.1">
 </head>
 <body>
 
@@ -324,19 +324,19 @@
               <div class="x-form-group">
                 <label>Foto / Ikon Logo Brand</label>
                 <div class="x-image-upload-control">
-                  <div class="x-image-upload-preview-box" id="brand-logo-preview-box">
+                  <div class="x-image-upload-preview-box" id="brand-logo-preview-box" onclick="document.getElementById('input-brand-logo-file').click()" style="cursor:pointer;" title="Klik untuk pilih logo">
                     <img id="brand-logo-preview" src="/assets/pwa/icon-192.png" alt="Logo Brand">
                     <div id="brand-logo-empty" class="x-image-upload-empty" style="display:none;">🏬</div>
                   </div>
                   <div class="x-image-upload-info">
                     <div class="x-image-upload-actions">
-                      <button type="button" class="x-btn-secondary" id="btn-brand-logo-pick" style="font-size:12px;padding:6px 12px;">📁 Unggah Logo</button>
+                      <label for="input-brand-logo-file" class="x-btn-secondary" id="btn-brand-logo-pick" role="button" tabindex="0" style="font-size:12px;padding:6px 12px;cursor:pointer;">📁 Unggah Logo</label>
                       <button type="button" class="x-btn-secondary" id="btn-use-bangjo-logo" style="font-size:12px;padding:6px 12px;">Pakai Default</button>
                       <button type="button" class="x-btn-secondary" id="btn-brand-logo-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
                     </div>
-                    <input type="file" id="input-brand-logo-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                    <input type="file" id="input-brand-logo-file" accept="image/jpeg,image/png,image/webp" class="x-file-input-hidden">
                     <input type="hidden" id="brand-logo" value="/assets/pwa/icon-192.png">
-                    <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 2 MB · Rasio 1:1</div>
+                    <div class="x-image-specs-text">JPG, PNG, WebP · Maks. 10 MB · Rasio 1:1</div>
                   </div>
                 </div>
               </div>
@@ -453,18 +453,18 @@
             <!-- Add Banner Form -->
             <form id="form-add-banner" style="margin-bottom: 20px;">
               <div class="x-image-upload-control" style="margin-bottom: 12px;">
-                <div class="x-image-upload-preview-box is-banner" id="banner-preview-box">
+                <div class="x-image-upload-preview-box is-banner" id="banner-preview-box" onclick="document.getElementById('input-banner-file').click()" style="cursor:pointer;" title="Klik untuk pilih banner">
                   <img id="banner-upload-preview" src="" alt="Preview Banner" style="display:none;">
                   <div id="banner-upload-empty" class="x-image-upload-empty">🖼️</div>
                 </div>
                 <div class="x-image-upload-info">
                   <div class="x-image-upload-actions">
-                    <button type="button" class="x-btn-secondary" id="btn-banner-pick" style="font-size:12px;padding:6px 12px;">📁 Pilih File Banner</button>
+                    <label for="input-banner-file" class="x-btn-secondary" id="btn-banner-pick" role="button" tabindex="0" style="font-size:12px;padding:6px 12px;cursor:pointer;">📁 Pilih File Banner</label>
                     <button type="button" class="x-btn-secondary" id="btn-banner-clear" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Batal Pilih</button>
                   </div>
-                  <input type="file" id="input-banner-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                  <input type="file" id="input-banner-file" accept="image/jpeg,image/png,image/webp" class="x-file-input-hidden">
                   <input type="hidden" id="input-banner-url" value="">
-                  <div class="x-image-specs-text">JPG, PNG, atau WebP · Maks. 1 MB · Rasio ±1.94:1 · Rekomendasi 350 × 180 px</div>
+                  <div class="x-image-specs-text">JPG, PNG, WebP · Maks. 20 MB · Rasio ±1.94:1 · Rekomendasi 350 × 180 px</div>
                 </div>
               </div>
               <div style="display: flex; gap: 10px; flex-wrap: wrap;">
@@ -822,9 +822,10 @@
 
       <!-- TAB 5: TIM / WORKFORCE MANAGEMENT -->
       <section id="tab-tim" class="x-tab-content" data-tab="tim">
-        <!-- Subnav: Members, Roles, Permissions -->
+        <!-- Subnav: Members, Invitations, Roles, Permissions -->
         <div class="x-subnav-tabs" id="team-subnav">
           <button type="button" class="x-subnav-tab active" data-team-section="members" onclick="switchTeamSection('members')">Members</button>
+          <button type="button" class="x-subnav-tab" data-team-section="invitations" onclick="switchTeamSection('invitations')">Undangan Tim</button>
           <button type="button" class="x-subnav-tab" data-team-section="roles" onclick="switchTeamSection('roles')">Roles</button>
           <button type="button" class="x-subnav-tab" data-team-section="permissions" onclick="switchTeamSection('permissions')">Permissions</button>
         </div>
@@ -837,7 +838,10 @@
                 <h3>👥 Anggota Tim & Staf</h3>
                 <p>Kelola akun staf, penugasan role, dan cakupan cabang</p>
               </div>
-              <button type="button" class="x-btn-primary" id="btn-add-user" onclick="openCreateUserModal()">+ Tambah Anggota</button>
+              <div style="display:flex;gap:8px;">
+                <button type="button" class="x-btn-secondary" id="btn-open-invite" onclick="openInviteUserModal()">✉️ Undang Anggota</button>
+                <button type="button" class="x-btn-primary" id="btn-add-user" onclick="openCreateUserModal()">+ Tambah Anggota</button>
+              </div>
             </div>
 
             <!-- Role Filter Bar -->
@@ -859,13 +863,46 @@
                     <th>Username</th>
                     <th>Role</th>
                     <th>Cakupan Cabang</th>
-                    <th>Status</th>
+                    <th class="text-center" style="width:100px;">Status</th>
                     <th class="text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="tim-table-body">
                   <tr>
                     <td colspan="6" class="text-center py-6">Memuat data tim...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 1.5: Invitations -->
+        <div id="team-section-invitations" style="display:none;">
+          <div class="x-card-panel">
+            <div class="x-panel-header-flex">
+              <div>
+                <h3>✉️ Undangan Tim</h3>
+                <p>Kelola undangan staf dan manajer. Penerima dapat bergabung via email atau Google.</p>
+              </div>
+              <button type="button" class="x-btn-primary" onclick="openInviteUserModal()">+ Kirim Undangan</button>
+            </div>
+
+            <div class="x-table-responsive mt-4">
+              <table class="x-table">
+                <thead>
+                  <tr>
+                    <th>Email Penerima</th>
+                    <th>Peran (Role)</th>
+                    <th>Cakupan Cabang</th>
+                    <th>Status</th>
+                    <th>Kadaluarsa</th>
+                    <th class="text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="invitations-table-body">
+                  <tr>
+                    <td colspan="6" class="text-center py-6">Memuat data undangan...</td>
                   </tr>
                 </tbody>
               </table>
@@ -2082,54 +2119,53 @@
                     <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Identitas &amp; Profil Brand</h3>
                     <p style="margin:0;font-size:13px;color:#64748b;">Pengaturan nama brand, logo, warna tema, dan tagline yang tampil di aplikasi pelanggan.</p>
                   </div>
-                  <span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Authoritative Core</span>
                 </div>
 
-                <form id="form-settings-profile" onsubmit="saveSettingsProfile(event)" style="display:flex;flex-direction:column;gap:16px;">
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-                    <div>
-                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Nama Brand</label>
-                      <input id="set-profile-name" type="text" class="x-input" required style="width:100%;">
+                <form id="form-settings-profile" onsubmit="saveSettingsProfile(event)" style="display:flex;flex-direction:column;gap:18px;">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:16px;">
+                    <div class="x-form-group">
+                      <label for="set-profile-name">Nama Brand / Restoran</label>
+                      <input id="set-profile-name" type="text" class="x-input" placeholder="Contoh: Bangjo Resto" required>
                     </div>
-                    <div>
-                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Tagline Brand</label>
-                      <input id="set-profile-tagline" type="text" class="x-input" style="width:100%;">
+                    <div class="x-form-group">
+                      <label for="set-profile-tagline">Tagline Brand</label>
+                      <input id="set-profile-tagline" type="text" class="x-input" placeholder="Contoh: Official Online Food Ordering">
                     </div>
                   </div>
 
-                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-                    <div>
-                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Foto / Ikon Logo Brand</label>
-                      <div class="x-image-upload-control" style="padding:10px;">
-                        <div class="x-image-upload-preview-box" style="width:60px;height:60px;" id="set-profile-logo-preview-box">
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;align-items:start;">
+                    <div class="x-form-group">
+                      <label>Foto / Ikon Logo Brand</label>
+                      <div class="x-image-upload-control">
+                        <div class="x-image-upload-preview-box" id="set-profile-logo-preview-box">
                           <img id="set-profile-logo-preview" src="/assets/pwa/icon-192.png" alt="Logo Brand">
-                          <div id="set-profile-logo-empty" class="x-image-upload-empty" style="display:none;font-size:18px;">🏬</div>
+                          <div id="set-profile-logo-empty" class="x-image-upload-empty" style="display:none;">🏬</div>
                         </div>
-                        <div class="x-image-upload-info" style="min-width:140px;">
-                          <div class="x-image-upload-actions" style="margin-top:4px;">
-                            <button type="button" class="x-btn-secondary" id="btn-set-profile-logo-pick" style="font-size:11px;padding:4px 8px;">📁 Unggah</button>
-                            <button type="button" class="x-btn-secondary" id="btn-set-profile-logo-remove" style="font-size:11px;padding:4px 8px;color:#ef4444;display:none;">Hapus</button>
+                        <div class="x-image-upload-info">
+                          <div class="x-image-upload-actions">
+                            <button type="button" class="x-btn-secondary" id="btn-set-profile-logo-pick" onclick="document.getElementById('input-set-profile-logo-file').click()" style="font-size:12px;padding:6px 12px;">📁 Unggah Logo</button>
+                            <button type="button" class="x-btn-secondary" id="btn-set-profile-logo-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
                           </div>
                           <input type="file" id="input-set-profile-logo-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
                           <input type="hidden" id="set-profile-logo" value="/assets/pwa/icon-192.png">
-                          <div class="x-image-specs-text">JPG, PNG, WebP · Maks. 2 MB · 1:1</div>
+                          <div class="x-image-specs-text">JPG, PNG, WebP · Maks. 10 MB · Rasio 1:1</div>
                         </div>
                       </div>
                     </div>
-                    <div>
-                      <label style="display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px;">Warna Tema Utama (Hex)</label>
-                      <div style="display:flex;gap:8px;align-items:center;">
-                        <input id="set-profile-color" type="color" style="width:40px;height:38px;border:none;border-radius:4px;cursor:pointer;">
-                        <input id="set-profile-color-hex" type="text" class="x-input" style="flex:1;">
+                    <div class="x-form-group">
+                      <label for="set-profile-color">Warna Tema Utama (Hex)</label>
+                      <div class="x-color-picker-row">
+                        <input id="set-profile-color" type="color" value="#b6ff00" class="x-color-input">
+                        <input id="set-profile-color-hex" type="text" value="#b6ff00" class="x-input x-hex-input" maxlength="7">
                       </div>
                     </div>
                   </div>
 
-                  <div style="background:#f8fafc;padding:12px;border-radius:var(--radius-sm);border:1px solid #e2e8f0;font-size:12px;color:#64748b;">
-                    💡 Domain kustom (<code><span id="set-profile-domain">-</span></code>) dikelola pada tingkat Platform Host &amp; Cloud Control Plane.
+                  <div style="background:#f8fafc;padding:12px 16px;border-radius:var(--radius-sm);border:1px solid #e2e8f0;font-size:12px;color:#64748b;display:flex;align-items:center;gap:8px;">
+                    <span>💡</span> <span>Domain kustom (<code><strong id="set-profile-domain">-</strong></code>) dikelola pada tingkat Platform Host &amp; Cloud Control Plane.</span>
                   </div>
 
-                  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;">
+                  <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:4px;">
                     <button type="button" class="x-btn-secondary" onclick="loadSettingsProfile()">Batal</button>
                     <button type="submit" class="x-btn-primary" id="btn-save-settings-profile">Simpan Profil</button>
                   </div>
@@ -2878,6 +2914,38 @@
     </div>
   </div>
 
+  <!-- MODAL: INVITE USER (Workforce Invitation - Passwordless by Owner) -->
+  <div id="modal-invite-user" class="x-modal-backdrop" style="display:none;">
+    <div class="x-modal-card" style="max-width: 480px;">
+      <div class="x-modal-header">
+        <h3>Undang Anggota Tim</h3>
+        <button type="button" class="x-modal-close" onclick="closeInviteUserModal()">✕</button>
+      </div>
+      <form id="form-invite-user" class="x-form" onsubmit="submitInviteUserForm(event)">
+        <div style="padding:12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-sm); font-size:12px; color:#1e40af; margin-bottom:14px; line-height:1.4;">
+          💡 <strong>Tanpa Password:</strong> Anda tidak perlu membuatkan password. Calon anggota akan menerima email undangan dan memilih cara masuk sendiri (Continue with Google atau Continue with Email).
+        </div>
+        <div class="x-form-group">
+          <label for="invite-input-email">Alamat Email Calon Anggota</label>
+          <input type="email" id="invite-input-email" class="x-input" placeholder="staf@gmail.com atau manajer@bisnis.com" required>
+        </div>
+        <div class="x-form-group">
+          <label for="invite-input-role">Peran (Role)</label>
+          <select id="invite-input-role" class="x-input" required onchange="handleInviteRoleChange()"></select>
+        </div>
+        <div class="x-form-group" id="invite-branch-group">
+          <label for="invite-input-branch">Cabang Penugasan</label>
+          <select id="invite-input-branch" class="x-input"></select>
+          <small class="text-muted" style="font-size:11px;" id="invite-branch-hint">Wajib dipilih untuk Branch Manager, Kasir, dan Dapur.</small>
+        </div>
+        <div class="x-modal-footer">
+          <button type="button" class="x-btn-secondary" onclick="closeInviteUserModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-send-invitation">Kirim Undangan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- MODAL: CREATE / EDIT USER (Workforce Management) -->
   <div id="modal-user" class="x-modal-backdrop" style="display:none;">
     <div class="x-modal-card" style="max-width: 520px;">
@@ -3088,6 +3156,6 @@
   </div>
 
   <!-- Dashboard JavaScript -->
-  <script src="/dashboard/assets/js/dashboard.js?v=2.8.0"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.1"></script>
 </body>
 </html>

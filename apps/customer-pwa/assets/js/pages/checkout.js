@@ -722,14 +722,14 @@
         '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;"><span>Biaya Booking Reservasi</span><span style="color:#16a34a;font-weight:700;">Gratis (Rp0)</span></div>'
       )) +
       '    <div class="x-alt-pay-methods" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'cash' ? 'is-active' : '') + '" id="x-opt-cash" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'cash' ? '#b6ff00' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'cash' ? '#f7ffd9' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
+      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'cash' ? 'is-active' : '') + '" id="x-opt-cash" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'cash' ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'cash' ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
       '        <img src="/assets/icons/cashblack.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
       '        <div style="display:flex;flex-direction:column;min-width:0;">' +
       '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Tunai (COD)</span>' +
       '          <span style="font-size:11px;color:#777;">Bayar di tempat</span>' +
       '        </div>' +
       '      </button>' +
-      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'midtrans' ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'midtrans' ? '#b6ff00' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'midtrans' ? '#f7ffd9' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
+      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'midtrans' ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'midtrans' ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'midtrans' ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
       '        <img src="/assets/icons/qrisgreen.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
       '        <div style="display:flex;flex-direction:column;min-width:0;">' +
       '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Online Pay</span>' +
@@ -744,7 +744,7 @@
       '  </div>' +
 
       // 7. Sticky Submit CTA Bar
-      '  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-lime,#b6ff00);color:#111;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + (isReservation ? 'Konfirmasi Reservasi' : 'Pesan sekarang') + '</button></div>' +
+      '  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + (isReservation ? 'Konfirmasi Reservasi' : 'Pesan sekarang') + '</button></div>' +
 
       '</div>';
 
@@ -787,9 +787,9 @@
           : '<div class="x-product-image" style="background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:24px;">🍱</div>'
         ) +
         '    <div class="x-quantity">' +
-        '      <button type="button" data-minus-item="' + item.id + '" data-branch-item="' + (item.branch_id || '') + '" aria-label="Kurang"><img src="/assets/icons/minus.svg" alt="minus" style="width:13px;height:13px;display:block;margin:auto;"></button>' +
+        '      <button type="button" data-minus-item="' + item.id + '" data-branch-item="' + (item.branch_id || '') + '" aria-label="Kurang"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:auto;pointer-events:none;"><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>' +
         '      <span class="x-quantity-value">' + qty + '</span>' +
-        '      <button type="button" data-plus-item="' + item.id + '" data-branch-item="' + (item.branch_id || '') + '" aria-label="Tambah"><img src="/assets/icons/plus.svg" alt="plus" style="width:13px;height:13px;display:block;margin:auto;"></button>' +
+        '      <button type="button" data-plus-item="' + item.id + '" data-branch-item="' + (item.branch_id || '') + '" aria-label="Tambah"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:auto;pointer-events:none;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>' +
         '    </div>' +
         '    <button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note-item="' + item.id + '">' +
         '      <img src="' + (note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="Catatan" class="x-note-icon">' +
@@ -1189,14 +1189,14 @@
     if (c) {
       var isCash = state.paymentMethod === 'cash';
       c.classList.toggle('is-active', isCash);
-      c.style.borderColor = isCash ? '#b6ff00' : '#e5e7eb';
-      c.style.background = isCash ? '#f7ffd9' : '#fff';
+      c.style.borderColor = isCash ? 'var(--x-primary)' : '#e5e7eb';
+      c.style.background = isCash ? 'var(--x-primary-bg)' : '#fff';
     }
     if (o) {
       var isOnline = state.paymentMethod === 'midtrans';
       o.classList.toggle('is-active', isOnline);
-      o.style.borderColor = isOnline ? '#b6ff00' : '#e5e7eb';
-      o.style.background = isOnline ? '#f7ffd9' : '#fff';
+      o.style.borderColor = isOnline ? 'var(--x-primary)' : '#e5e7eb';
+      o.style.background = isOnline ? 'var(--x-primary-bg)' : '#fff';
     }
   }
 
@@ -1329,7 +1329,7 @@
     }
 
     var sh = makeOverlay(
-      '<div class="x-fulfillment-sheet" style="padding:0;font-family:var(--x-font, \'Plus Jakarta Sans\', sans-serif);">' +
+      '<div class="x-fulfillment-sheet" style="padding:0 0 max(18px, calc(16px + env(safe-area-inset-bottom, 0px))) 0;font-family:var(--x-font, \'Plus Jakarta Sans\', sans-serif);">' +
       '  <h3 class="x-fulfillment-title">Pilih tipe pembelian</h3>' +
       '  <div class="x-fulfillment-types" id="x-ful-grid">' +
       '    <!-- Rendered dynamically -->' +
@@ -1468,6 +1468,9 @@
         return;
       }
 
+      // Switching away from dine_in cancels any pending dine-in table requests
+      cancelPendingDineInFetch();
+
       if (draft.type === 'reservation') {
         renderReservationSection();
         return;
@@ -1574,6 +1577,17 @@
     }
 
     var dineInLayoutData = null;
+    var dineInAbortCtrl = null;
+    var dineInFetchId = 0;
+
+    function cancelPendingDineInFetch() {
+      if (dineInAbortCtrl) {
+        try {
+          dineInAbortCtrl.abort();
+        } catch (_) {}
+        dineInAbortCtrl = null;
+      }
+    }
 
     // Reservation picker (customer app). Locked rules (notion roadmap):
     //   - reservation is a future arrival booking (tomorrow onwards); the date
@@ -1732,9 +1746,19 @@
       }
 
       function fetchLayout(bid) {
+        // Cancel any pending table fetch and increment request identity token
+        cancelPendingDineInFetch();
+        var requestId = ++dineInFetchId;
+        var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        dineInAbortCtrl = ctrl;
+
         var endpoint = bid ? ('/dine-in/layout?branch_id=' + encodeURIComponent(bid)) : '/dine-in/layout';
-        API.get(endpoint)
+        API.get(endpoint, { signal: ctrl ? ctrl.signal : undefined })
           .then(function (res) {
+            // Discard stale response if a newer request was dispatched
+            if (requestId !== dineInFetchId) return;
+            if (ctrl === dineInAbortCtrl) dineInAbortCtrl = null;
+
             if (res && res.success && res.layout) {
               dineInLayoutData = res.layout;
               if (res.layout.branch_id && (!state.matchedBranch || !state.matchedBranch.id)) {
@@ -1743,16 +1767,36 @@
               // Render layout immediately
               renderFloorCanvas();
             } else {
-              var msg = (res && res.error) ? res.error : 'Gagal memuat denah meja.';
-              schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
-                '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">' + msg + '</div>';
+              var msg = (res && res.error) ? res.error : 'Gagal memuat denah meja. Silakan coba lagi.';
+              var canvasEl = schedContainer.querySelector('#x-dinein-floor-canvas');
+              if (canvasEl) {
+                canvasEl.innerHTML =
+                  '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">' + msg + '</div>';
+              }
             }
           })
           .catch(function (err) {
+            // Discard stale response or intentional aborts
+            if (requestId !== dineInFetchId) return;
+            if (ctrl === dineInAbortCtrl) dineInAbortCtrl = null;
+
+            var isAborted = (API && typeof API.isAbortError === 'function' && API.isAbortError(err)) ||
+              (err && (err.name === 'AbortError' || (typeof err.message === 'string' && /abort/i.test(err.message))));
+
+            if (isAborted) {
+              // Silently ignore expected aborts / cancellation without rendering red error
+              return;
+            }
+
             console.warn('[Checkout] Load dine-in layout error:', err);
-            var errMsg = (err && (err.message || (err.data && err.data.error))) || 'Gagal memuat denah meja.';
-            schedContainer.querySelector('#x-dinein-floor-canvas').innerHTML =
-              '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">' + errMsg + '</div>';
+            var errMsg = (err && (err.data && err.data.error)) ||
+              (err && err.message && !/signal is aborted|abort/i.test(err.message) ? err.message : '') ||
+              'Gagal memuat denah meja. Silakan coba lagi.';
+            var canvasEl = schedContainer.querySelector('#x-dinein-floor-canvas');
+            if (canvasEl) {
+              canvasEl.innerHTML =
+                '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">' + errMsg + '</div>';
+            }
           });
       }
 
@@ -1811,6 +1855,14 @@
 
       var tables = dineInLayoutData.tables || [];
       var nonTables = dineInLayoutData.non_table_objects || [];
+
+      if (!tables.length) {
+        canvasEl.innerHTML =
+          '<div style="text-align:center;padding:30px 20px;color:#6b7280;font-size:13px;">' +
+          '  Belum ada tata letak meja yang tersedia untuk cabang ini.' +
+          '</div>';
+        return;
+      }
 
       var indoorTables = tables.filter(function (t) { return t.section_id === 'sec_indoor'; });
       var smokingTables = tables.filter(function (t) { return t.section_id === 'sec_smoking'; });
@@ -1882,17 +1934,17 @@
         (isSelected ? ' is-selected' : '') +
         (isUnavailable ? ' is-unavailable' : '');
 
-      // Dynamic SVG colors: selected => #c6ff00, unavailable => #7d8288, normal => #2d2d2d
-      var tableFill = isSelected ? '#c6ff00' : (isUnavailable ? '#7d8288' : '#2d2d2d');
-      var textFill = isSelected ? '#1f2937' : '#ffffff';
+      // Dynamic SVG colors: selected => var(--x-primary), unavailable => #7d8288, normal => #2d2d2d
+      var tableFill = isSelected ? 'var(--x-primary)' : (isUnavailable ? '#7d8288' : '#2d2d2d');
+      var textFill = isSelected ? 'var(--x-primary-text)' : '#ffffff';
       var labelText = UI.escape(t.label || ('meja ' + t.table_number));
 
       var textY = isUnavailable ? '21' : '26';
 
       var svgContent =
         '<svg class="x-table-svg" viewBox="0 0 66 48" width="100%" height="100%">' +
-        '  <rect x="0" y="0" width="66" height="48" rx="5" ry="5" fill="' + tableFill + '"/>' +
-        '  <text x="33" y="' + textY + '" fill="' + textFill + '" font-size="11" font-style="italic" font-weight="700" text-anchor="middle" dominant-baseline="middle" letter-spacing="-0.2">' + labelText + '</text>' +
+        '  <rect class="x-table-surface" x="0" y="0" width="66" height="48" rx="5" ry="5" fill="' + tableFill + '"/>' +
+        '  <text class="x-table-label" x="33" y="' + textY + '" fill="' + textFill + '" font-size="11" font-style="italic" font-weight="700" text-anchor="middle" dominant-baseline="middle" letter-spacing="-0.2">' + labelText + '</text>' +
         (isUnavailable ? '  <text x="33" y="33" fill="#e5e7eb" font-size="7" font-style="italic" font-weight="400" text-anchor="middle" dominant-baseline="middle" letter-spacing="-0.2">unavailable</text>' : '') +
         '</svg>';
 
@@ -2133,7 +2185,7 @@
       '  <textarea id="x-input-ful-note" maxlength="200" style="flex:1 1 auto;width:100%;min-height:0;padding:12px 0;border:0;outline:0;resize:none;background:transparent;color:#333;font-family:inherit;font-size:14px;line-height:21px;" placeholder="Tambahkan catatan (contoh: titip di satpam, pagar hitam)…">' + UI.escape(val) + '</textarea>' +
       '  <div class="x-note-footer" style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid #dedede;flex:0 0 auto;">' +
       '    <span id="x-ful-note-count" style="font-size:12px;color:#777;">' + val.length + '/200</span>' +
-      '    <button type="button" id="x-save-ful-note" style="width:86px;height:34px;border:0;border-radius:18px;background:#b6ff00;color:#111;font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>' +
+      '    <button type="button" id="x-save-ful-note" style="width:86px;height:34px;border:0;border-radius:18px;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>' +
       '  </div>' +
       '</div>'
     );
@@ -2166,7 +2218,7 @@
       '  <textarea id="x-input-item-note" maxlength="200" style="flex:1 1 auto;width:100%;min-height:0;padding:12px 0;border:0;outline:0;resize:none;background:transparent;color:#333;font-family:inherit;font-size:14px;line-height:21px;" placeholder="Tambahkan catatan (contoh: pedas sedang, pisah sambal)…">' + UI.escape(val) + '</textarea>' +
       '  <div class="x-note-footer" style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid #dedede;flex:0 0 auto;">' +
       '    <span id="x-item-note-count" style="font-size:12px;color:#777;">' + val.length + '/200</span>' +
-      '    <button type="button" id="x-save-item-note" style="width:86px;height:34px;border:0;border-radius:18px;background:#b6ff00;color:#111;font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>' +
+      '    <button type="button" id="x-save-item-note" style="width:86px;height:34px;border:0;border-radius:18px;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>' +
       '  </div>' +
       '</div>'
     );

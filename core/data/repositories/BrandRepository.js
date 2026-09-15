@@ -37,8 +37,20 @@ class BrandRepository {
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
       throw new Error('Nama brand harus berupa teks yang valid.');
     }
-    if (primary_color !== undefined && primary_color !== null && (typeof primary_color !== 'string' || !/^#[0-9a-fA-F]{3,8}$/.test(primary_color.trim()))) {
-      throw new Error('Format warna tema (hex) tidak valid.');
+    let normalizedPrimaryColor = undefined;
+    if (primary_color !== undefined && primary_color !== null) {
+      if (typeof primary_color !== 'string') {
+        throw new Error('Format warna tema (hex) tidak valid.');
+      }
+      let cleanHex = primary_color.trim();
+      if (!cleanHex.startsWith('#')) cleanHex = '#' + cleanHex;
+      if (/^#[0-9a-fA-F]{3}$/.test(cleanHex)) {
+        cleanHex = '#' + cleanHex[1] + cleanHex[1] + cleanHex[2] + cleanHex[2] + cleanHex[3] + cleanHex[3];
+      }
+      if (!/^#[0-9a-fA-F]{6}$/.test(cleanHex)) {
+        throw new Error('Format warna tema (hex) tidak valid. Gunakan format #RRGGBB.');
+      }
+      normalizedPrimaryColor = cleanHex.toUpperCase();
     }
     let serializedBanners = null;
     if (banners !== undefined && banners !== null) {
@@ -70,7 +82,7 @@ class BrandRepository {
       name !== undefined ? name.trim() : null,
       logo_url !== undefined ? (typeof logo_url === 'string' ? logo_url.trim() : null) : null,
       tagline !== undefined ? (typeof tagline === 'string' ? tagline.trim() : '') : null,
-      primary_color !== undefined ? (typeof primary_color === 'string' ? primary_color.trim() : null) : null,
+      normalizedPrimaryColor !== undefined ? normalizedPrimaryColor : null,
       banners !== undefined ? serializedBanners : null,
       brandId
     ]);

@@ -171,6 +171,9 @@
 
     API.get('/brand/info')
       .then(function (data) {
+        if (data && data.brand && Store && typeof Store.setBrand === 'function') {
+          Store.setBrand(data.brand);
+        }
         var banners = data && data.brand && Array.isArray(data.brand.banners) ? data.brand.banners : [];
         if (!banners.length) {
           initCarousel();
@@ -953,9 +956,9 @@
         var noteIcon = note ? ICONS.write : ICONS.file;
         controls =
           '<div class="x-quantity">' +
-          '  <button type="button" data-minus="' + product.id + '"><img src="' + ICONS.minus + '" alt="minus"></button>' +
+          '  <button type="button" data-minus="' + product.id + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:auto;pointer-events:none;"><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>' +
           '  <span class="x-quantity-value">' + qty + '</span>' +
-          '  <button type="button" data-plus="' + product.id + '"><img src="' + ICONS.plus + '" alt="plus"></button>' +
+          '  <button type="button" data-plus="' + product.id + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:auto;pointer-events:none;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>' +
           '</div>' +
           '<button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note="' + product.id + '">' +
           '  <img src="' + noteIcon + '" alt="Catatan" class="x-note-icon">' +
@@ -1096,7 +1099,7 @@
       '  <textarea id="x-note-input" maxlength="200" placeholder="Tambahkan catatan..." style="flex:1 1 auto;width:100%;min-height:0;padding:12px 0;border:0;outline:0;resize:none;background:transparent;color:#333;font-family:inherit;font-size:14px;line-height:21px;">' + UI.escape(curNote) + '</textarea>' +
       '  <div class="x-note-footer" style="display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid #dedede;flex:0 0 auto;">' +
       '    <span id="x-note-counter" style="font-size:12px;color:#777;">' + curNote.length + '/200</span>' +
-      '    <button id="x-note-save" type="button" style="width:86px;height:34px;border:0;border-radius:18px;background:#b6ff00;color:#111;font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>' +
+      '    <button id="x-note-save" type="button" style="width:86px;height:34px;border:0;border-radius:18px;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:13px;font-weight:600;cursor:pointer;">Simpan</button>' +
       '  </div>' +
       '</div>';
 
@@ -1227,21 +1230,27 @@
     overlay.className = 'x-overlay x-note-overlay x-detail-overlay';
     overlay.innerHTML =
       '<div class="x-sheet x-note-sheet x-detail-sheet">' +
-      '  <div class="x-note-handle"></div>' +
-      '  <button type="button" class="x-detail-close" aria-label="Tutup">&times;</button>' +
+      '  <div class="x-detail-topbar">' +
+      '    <div class="x-note-handle"></div>' +
+      '    <button type="button" class="x-detail-close" aria-label="Tutup">' +
+      '      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>' +
+      '    </button>' +
+      '  </div>' +
+      '  <div class="x-detail-scroll-area">' +
       imgHtml +
-      '  <div class="x-detail-body">' +
-      '    <h3 class="x-detail-name">' + UI.escape(product.name) + '</h3>' +
+      '    <div class="x-detail-body">' +
+      '      <h3 class="x-detail-name">' + UI.escape(product.name) + '</h3>' +
       branchLabelHtml +
-      '    <div class="x-detail-desc">' + UI.escape(product.description || '') + '</div>' +
+      '      <div class="x-detail-desc">' + UI.escape(product.description || '') + '</div>' +
       availabilityHtml +
-      '    <div class="x-detail-price">' + oldPriceHtml + '<span class="x-detail-current">' + UI.money(price) + '</span></div>' +
-      '    <div class="x-detail-add-area">' +
+      '      <div class="x-detail-price">' + oldPriceHtml + '<span class="x-detail-current">' + UI.money(price) + '</span></div>' +
+      '    </div>' +
+      '  </div>' +
+      '  <div class="x-detail-footer">' +
       (unavailable
         ? '<button type="button" class="x-detail-add" disabled>Habis</button>'
         : '<button type="button" class="x-detail-add">' + (scopedQty > 0 ? 'Tambah lagi' : 'Masukkan ke keranjang') + '</button>') +
       cartHint +
-      '    </div>' +
       '  </div>' +
       '</div>';
 

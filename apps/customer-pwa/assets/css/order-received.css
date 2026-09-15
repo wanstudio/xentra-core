@@ -214,15 +214,15 @@
 }
 
 .x-step-active .x-step-marker {
-	background: #b6ff00;
-	color: #0f172a;
-	box-shadow: 0 0 0 4px rgba(182, 255, 0, 0.25);
+	background: var(--x-primary);
+	color: var(--x-primary-text, #0f172a);
+	box-shadow: 0 0 0 4px var(--x-primary-shadow, rgba(182, 255, 0, 0.25));
 	animation: xPulseStep 1.8s infinite ease-in-out;
 }
 
 @keyframes xPulseStep {
-	0%, 100% { box-shadow: 0 0 0 4px rgba(182, 255, 0, 0.3); }
-	50% { box-shadow: 0 0 0 8px rgba(182, 255, 0, 0.1); }
+	0%, 100% { box-shadow: 0 0 0 4px var(--x-primary-shadow, rgba(182, 255, 0, 0.3)); }
+	50% { box-shadow: 0 0 0 8px var(--x-primary-shadow, rgba(182, 255, 0, 0.1)); }
 }
 
 .x-step-waiting .x-step-marker {

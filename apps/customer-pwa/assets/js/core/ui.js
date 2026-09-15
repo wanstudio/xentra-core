@@ -112,7 +112,7 @@
       '  <div class="x-complement-bottom">' +
       '    <div class="x-complement-price">' + money(price) + '</div>' +
       '    <button type="button" class="x-upsell-add-btn" data-add-upsell="' + product.id + '" aria-label="Tambah ' + escape(product.name || '') + '">' +
-      '      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;display:block;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+      '      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;display:block;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
       '    </button>' +
       '  </div>' +
       '</div>'
@@ -126,6 +126,97 @@
     escape: escape,
     toast: toast,
     debounce: debounce,
-    upsellCard: upsellCard
+    upsellCard: upsellCard,
+    applyTheme: applyTheme,
+    getContrastColor: getContrastColor
   };
+
+  /**
+   * Parse hex string (#RGB, #RRGGBB) to RGB object
+   */
+  function parseHex(hex) {
+    if (!hex || typeof hex !== 'string') return null;
+    var clean = hex.trim().replace(/^#/, '');
+    if (clean.length === 3) {
+      clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2];
+    }
+    if (clean.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(clean)) return null;
+    return {
+      r: parseInt(clean.substring(0, 2), 16),
+      g: parseInt(clean.substring(2, 4), 16),
+      b: parseInt(clean.substring(4, 6), 16)
+    };
+  }
+
+  /**
+   * Determine optimal high-contrast text color (black or white) based on relative luminance (WCAG)
+   */
+  function getContrastColor(hex) {
+    var rgb = parseHex(hex);
+    if (!rgb) return '#111111';
+    var lum = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+    return lum > 0.6 ? '#111111' : '#ffffff';
+  }
+
+  /**
+   * Adjust brightness: amount between -1.0 (darker) and 1.0 (lighter)
+   */
+  function adjustLightness(hex, amount) {
+    var rgb = parseHex(hex);
+    if (!rgb) return hex;
+    var r = rgb.r, g = rgb.g, b = rgb.b;
+    if (amount > 0) {
+      r = Math.round(r + (255 - r) * amount);
+      g = Math.round(g + (255 - g) * amount);
+      b = Math.round(b + (255 - b) * amount);
+    } else {
+      var factor = 1 + amount;
+      r = Math.round(r * factor);
+      g = Math.round(g * factor);
+      b = Math.round(b * factor);
+    }
+    function pad(v) { var s = Math.max(0, Math.min(255, v)).toString(16); return s.length === 1 ? '0' + s : s; }
+    return '#' + pad(r) + pad(g) + pad(b);
+  }
+
+  /**
+   * Apply brand primary theme dynamically across CSS root design tokens
+   */
+  function applyTheme(hexColor) {
+    if (!hexColor || typeof hexColor !== 'string') return;
+    var hex = hexColor.trim();
+    var rgb = parseHex(hex);
+    if (!rgb) return;
+
+    var darkHex = adjustLightness(hex, -0.15);
+    var bgHex = adjustLightness(hex, 0.90);
+    var textHex = getContrastColor(hex);
+    var shadowRgba = 'rgba(' + rgb.r + ', ' + rgb.g + ', ' + rgb.b + ', 0.3)';
+
+    var root = document.documentElement;
+    root.style.setProperty('--x-primary', hex);
+    root.style.setProperty('--x-primary-dark', darkHex);
+    root.style.setProperty('--x-primary-bg', bgHex);
+    root.style.setProperty('--x-primary-text', textHex);
+    root.style.setProperty('--x-primary-shadow', shadowRgba);
+
+    // Aliases for full backward and cross-component compatibility
+    root.style.setProperty('--x-lime', hex);
+    root.style.setProperty('--x-lime-dark', darkHex);
+    root.style.setProperty('--x-lime-bg', bgHex);
+    root.style.setProperty('--primary-color', hex);
+    root.style.setProperty('--primary-text', textHex);
+    root.style.setProperty('--primary-foreground', textHex);
+    root.style.setProperty('--x-primary-foreground', textHex);
+
+    // Dynamic contrast for elements placed directly inside the primary-colored hero header
+    var heroText = textHex === '#ffffff' ? '#ffffff' : '#0f172a';
+    var heroTextSub = textHex === '#ffffff' ? '#e2e8f0' : '#1e293b';
+    root.style.setProperty('--x-hero-text', heroText);
+    root.style.setProperty('--x-hero-text-sub', heroTextSub);
+
+    // Update <meta name="theme-color">
+    var metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', hex);
+  }
 })();

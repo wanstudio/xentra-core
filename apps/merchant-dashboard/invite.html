@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Undangan Bergabung Tim — Xentra</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-dark: #0b0f19;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-lime: #b6ff00;
+      --border-color: #e2e8f0;
+      --radius-lg: 16px;
+      --radius-sm: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(182, 255, 0, 0.08) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(30, 41, 59, 0.5) 0px, transparent 50%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: var(--text-main);
+    }
+
+    .x-invite-container {
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .x-brand-header {
+      margin-bottom: 24px;
+      text-align: center;
+    }
+
+    .x-xentra-logo {
+      height: 44px;
+      width: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4)) invert(1) brightness(1.2);
+    }
+
+    .x-invite-card {
+      background: var(--card-bg);
+      width: 100%;
+      border-radius: var(--radius-lg);
+      padding: 36px 32px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .x-card-title {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text-main);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .x-card-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+
+    .x-invite-details {
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+
+    .x-detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      font-size: 13px;
+    }
+
+    .x-detail-row:not(:last-child) {
+      border-bottom: 1px dashed #e2e8f0;
+    }
+
+    .x-detail-label {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .x-detail-value {
+      font-weight: 700;
+      color: var(--text-main);
+      text-align: right;
+    }
+
+    .x-badge-role {
+      display: inline-block;
+      background: #eff6ff;
+      color: #1e40af;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .x-alert {
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 18px;
+      line-height: 1.4;
+    }
+
+    .x-alert-error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+    }
+
+    .x-alert-success {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+    }
+
+    .x-alert-info {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+    }
+
+    .x-btn-google {
+      width: 100%;
+      min-height: 46px;
+      background: #ffffff;
+      border: 1px solid #dadce0;
+      border-radius: var(--radius-sm);
+      color: #3c4043;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .x-btn-google:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+
+    .x-btn-email {
+      width: 100%;
+      min-height: 46px;
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: var(--radius-sm);
+      color: #0f172a;
+      font-size: 14px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-top: 10px;
+    }
+
+    .x-btn-email:hover {
+      background: #e2e8f0;
+    }
+
+    .x-btn-submit {
+      width: 100%;
+      background: #0f172a;
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 13px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 12px;
+      transition: background 0.15s;
+    }
+
+    .x-btn-submit:hover {
+      background: #1e293b;
+    }
+
+    .x-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 18px 0;
+      width: 100%;
+    }
+
+    .x-divider::before, .x-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-color);
+    }
+
+    .x-form-group {
+      margin-bottom: 14px;
+    }
+
+    .x-form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+
+    .x-input {
+      width: 100%;
+      border: 1.5px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-size: 14px;
+      color: var(--text-main);
+      background: #f8fafc;
+      outline: none;
+    }
+
+    .x-input:focus {
+      border-color: #94a3b8;
+      background: #fff;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="x-invite-container">
+    <div class="x-brand-header">
+      <img src="/assets/img/xentra-logo.png" onerror="this.src='/assets/icons/xentra-logo.png'" alt="Xentra" class="x-xentra-logo">
+    </div>
+
+    <div class="x-invite-card" id="invite-card">
+      <h1 class="x-card-title">Undangan Tim</h1>
+      <p class="x-card-subtitle" id="invite-desc">Memvalidasi token undangan...</p>
+
+      <div id="invite-alert" class="x-alert" style="display:none;"></div>
+
+      <!-- Invitation Summary Box -->
+      <div class="x-invite-details" id="invite-details" style="display:none;">
+        <div class="x-detail-row">
+          <span class="x-detail-label">Brand Restoran</span>
+          <span class="x-detail-value" id="invite-brand">—</span>
+        </div>
+        <div class="x-detail-row" id="row-branch" style="display:none;">
+          <span class="x-detail-label">Cabang</span>
+          <span class="x-detail-value" id="invite-branch">—</span>
+        </div>
+        <div class="x-detail-row">
+          <span class="x-detail-label">Peran / Role</span>
+          <span class="x-detail-value"><span class="x-badge-role" id="invite-role">—</span></span>
+        </div>
+        <div class="x-detail-row">
+          <span class="x-detail-label">Email Penerima</span>
+          <span class="x-detail-value" id="invite-email">—</span>
+        </div>
+      </div>
+
+      <!-- State 1: Active User Authenticated & Email Matches -->
+      <div id="section-accept-now" style="display:none;">
+        <div class="x-alert x-alert-info">
+          Anda sedang login sebagai <strong id="logged-in-email">—</strong>. Klik tombol di bawah untuk bergabung ke tim.
+        </div>
+        <button type="button" class="x-btn-submit" id="btn-accept-invitation">
+          Terima Undangan &amp; Masuk Dashboard
+        </button>
+      </div>
+
+      <!-- State 2: Not Authenticated or Mismatch -> Auth Choice -->
+      <div id="section-auth-choice" style="display:none;">
+        <div id="auth-choice-buttons">
+          <button type="button" class="x-btn-google" id="btn-google-auth">
+            <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+              <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+              <path d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z" fill="#34A853"/>
+              <path d="M3.964 10.706A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.706V4.962H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.038l3.007-2.332z" fill="#FBBC05"/>
+              <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.962L3.964 6.294C4.672 4.169 6.656 3.58 9 3.58z" fill="#EA4335"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+
+          <button type="button" class="x-btn-email" id="btn-show-email-form">
+            <span>Continue with Email</span>
+          </button>
+        </div>
+
+        <!-- Email / Password Form for Invitation Acceptance -->
+        <form id="form-invite-email" style="display:none; margin-top:16px;">
+          <div class="x-form-group">
+            <label for="input-email">Email</label>
+            <input type="email" id="input-email" class="x-input" readonly style="background:#f1f5f9; color:#64748b;">
+          </div>
+          <div class="x-form-group">
+            <label for="input-password">Password</label>
+            <input type="password" id="input-password" class="x-input" placeholder="Masukkan password akun Anda" required minlength="8">
+          </div>
+          <button type="submit" class="x-btn-submit" id="btn-submit-email">
+            Masuk &amp; Terima Undangan
+          </button>
+          <button type="button" id="btn-back-auth" style="background:none;border:none;color:#64748b;font-size:13px;font-weight:600;cursor:pointer;margin-top:12px;display:block;width:100%;text-align:center;">
+            &larr; Kembali ke opsi login
+          </button>
+        </form>
+      </div>
+
+      <!-- State 3: Invalid / Revoked / Expired View -->
+      <div id="section-invalid" style="display:none;">
+        <a href="/signin" class="x-btn-submit" style="display:block;text-align:center;text-decoration:none;margin-top:16px;">
+          Menuju Halaman Login
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      var TOKEN_KEY = 'xentra_merchant_token';
+      var USER_KEY = 'xentra_merchant_user';
+
+      var alertBox = document.getElementById('invite-alert');
+      var descEl = document.getElementById('invite-desc');
+      var detailsEl = document.getElementById('invite-details');
+      var brandEl = document.getElementById('invite-brand');
+      var branchEl = document.getElementById('invite-branch');
+      var rowBranch = document.getElementById('row-branch');
+      var roleEl = document.getElementById('invite-role');
+      var emailEl = document.getElementById('invite-email');
+
+      var sectionAcceptNow = document.getElementById('section-accept-now');
+      var sectionAuthChoice = document.getElementById('section-auth-choice');
+      var sectionInvalid = document.getElementById('section-invalid');
+      var loggedInEmailEl = document.getElementById('logged-in-email');
+      var btnAccept = document.getElementById('btn-accept-invitation');
+
+      var formEmail = document.getElementById('form-invite-email');
+      var btnShowEmail = document.getElementById('btn-show-email-form');
+      var btnBackAuth = document.getElementById('btn-back-auth');
+      var authChoiceBtns = document.getElementById('auth-choice-buttons');
+      var inputEmail = document.getElementById('input-email');
+      var inputPassword = document.getElementById('input-password');
+
+      // Extract rawToken from URL pathname: /invite/:token
+      var pathParts = window.location.pathname.split('/');
+      var rawToken = pathParts[pathParts.length - 1] || '';
+      if (!rawToken && pathParts.length > 2) {
+        rawToken = pathParts[pathParts.length - 2];
+      }
+
+      var invitationData = null;
+
+      function showAlert(msg, type) {
+        alertBox.className = 'x-alert x-alert-' + (type || 'error');
+        alertBox.textContent = msg;
+        alertBox.style.display = 'block';
+      }
+
+      function formatRole(role) {
+        var map = {
+          'brand_manager': 'Brand Manager',
+          'branch_manager': 'Branch Manager',
+          'cashier': 'Kasir',
+          'kitchen': 'Dapur',
+          'owner': 'Owner'
+        };
+        return map[role] || role;
+      }
+
+      async function validateToken() {
+        if (!rawToken) {
+          descEl.textContent = 'Token undangan tidak valid.';
+          showAlert('Token undangan tidak ditemukan pada tautan.', 'error');
+          sectionInvalid.style.display = 'block';
+          return;
+        }
+
+        try {
+          var res = await fetch('/api/v1/invitations/validate/' + encodeURIComponent(rawToken));
+          var data = await res.json();
+
+          if (!data.success || !data.invitation) {
+            descEl.textContent = 'Tautan undangan tidak dapat digunakan.';
+            showAlert(data.message || 'Undangan telah kadaluarsa, dibatalkan, atau tidak ditemukan.', 'error');
+            sectionInvalid.style.display = 'block';
+            return;
+          }
+
+          invitationData = data.invitation;
+          descEl.textContent = 'Anda telah diundang untuk bergabung dengan tim operasional:';
+          brandEl.textContent = invitationData.brand_name || 'Restoran';
+          if (invitationData.branch_name) {
+            branchEl.textContent = invitationData.branch_name;
+            rowBranch.style.display = 'flex';
+          }
+          roleEl.textContent = formatRole(invitationData.role);
+          emailEl.textContent = invitationData.email;
+          inputEmail.value = invitationData.email;
+          detailsEl.style.display = 'block';
+
+          checkUserState();
+        } catch (err) {
+          descEl.textContent = 'Gagal memvalidasi undangan.';
+          showAlert('Kesalahan jaringan saat memvalidasi token undangan.', 'error');
+          sectionInvalid.style.display = 'block';
+        }
+      }
+
+      function checkUserState() {
+        var existingToken = localStorage.getItem(TOKEN_KEY);
+        var storedUserJson = localStorage.getItem(USER_KEY);
+        var storedUser = null;
+        try {
+          if (storedUserJson) storedUser = JSON.parse(storedUserJson);
+        } catch (_) {}
+
+        if (existingToken && storedUser && storedUser.email) {
+          var userEmail = String(storedUser.email).trim().toLowerCase();
+          var inviteEmail = String(invitationData.email).trim().toLowerCase();
+
+          if (userEmail === inviteEmail) {
+            loggedInEmailEl.textContent = storedUser.email;
+            sectionAcceptNow.style.display = 'block';
+            sectionAuthChoice.style.display = 'none';
+            return;
+          }
+        }
+
+        // Needs authentication as the invited recipient
+        sectionAcceptNow.style.display = 'none';
+        sectionAuthChoice.style.display = 'block';
+      }
+
+      // Action: Accept Invitation
+      async function acceptInvitation(authToken) {
+        var tokenToUse = authToken || localStorage.getItem(TOKEN_KEY);
+        if (!tokenToUse) {
+          showAlert('Sesi otentikasi tidak ditemukan. Silakan login terlebih dahulu.', 'error');
+          return;
+        }
+
+        btnAccept.disabled = true;
+        btnAccept.textContent = 'Memproses penerimaan...';
+
+        try {
+          var res = await fetch('/api/v1/invitations/accept', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + tokenToUse
+            },
+            body: JSON.stringify({ token: rawToken })
+          });
+          var data = await res.json();
+
+          if (data.success) {
+            showAlert('Selamat! Anda berhasil bergabung dengan tim. Mengalihkan ke dashboard...', 'success');
+            setTimeout(function () {
+              window.location.replace('/dashboard/');
+            }, 1000);
+          } else {
+            showAlert(data.message || 'Gagal menerima undangan.', 'error');
+            btnAccept.disabled = false;
+            btnAccept.textContent = 'Terima Undangan & Masuk Dashboard';
+          }
+        } catch (err) {
+          showAlert('Kesalahan jaringan saat menerima undangan.', 'error');
+          btnAccept.disabled = false;
+          btnAccept.textContent = 'Terima Undangan & Masuk Dashboard';
+        }
+      }
+
+      btnAccept.addEventListener('click', function () {
+        acceptInvitation();
+      });
+
+      // UI: Toggle Email Form
+      btnShowEmail.addEventListener('click', function () {
+        authChoiceBtns.style.display = 'none';
+        formEmail.style.display = 'block';
+      });
+
+      btnBackAuth.addEventListener('click', function () {
+        formEmail.style.display = 'none';
+        authChoiceBtns.style.display = 'block';
+      });
+
+      // Email Login & Accept
+      formEmail.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        var email = inputEmail.value.trim();
+        var password = inputPassword.value;
+        var btnSubmit = document.getElementById('btn-submit-email');
+
+        btnSubmit.disabled = true;
+        btnSubmit.textContent = 'Mengautentikasi...';
+
+        try {
+          var res = await fetch('/api/v1/auth/merchant/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: email, password: password })
+          });
+          var data = await res.json();
+
+          if (data && data.success && data.token) {
+            localStorage.setItem(TOKEN_KEY, data.token);
+            if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+            await acceptInvitation(data.token);
+          } else {
+            showAlert(data.error || 'Password salah atau akun belum terdaftar.', 'error');
+            btnSubmit.disabled = false;
+            btnSubmit.textContent = 'Masuk & Terima Undangan';
+          }
+        } catch (err) {
+          showAlert('Kesalahan jaringan saat login.', 'error');
+          btnSubmit.disabled = false;
+          btnSubmit.textContent = 'Masuk & Terima Undangan';
+        }
+      });
+
+      // Google Sign-In button redirect to broker / auth handler with return_to
+      var btnGoogle = document.getElementById('btn-google-auth');
+      if (btnGoogle) {
+        btnGoogle.addEventListener('click', function () {
+          var currentUrl = window.location.href;
+          window.location.href = '/signin?return_to=' + encodeURIComponent(currentUrl);
+        });
+      }
+
+      validateToken();
+    })();
+  </script>
+</body>
+</html>

@@ -14,7 +14,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_p6c9d12';
+      var PWA_VERSION = 'v_theme03';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -22,6 +22,41 @@
             caches.keys().then(function (names) {
               return Promise.all(names.map(function (n) { return caches.delete(n); }));
             }).catch(function () {});
+          }
+        }
+      } catch (_) {}
+
+      // Early theme bootstrap: apply saved brand primary color before CSS renders to prevent theme flash
+      try {
+        var rawBrand = localStorage.getItem('xentra_v2_brand');
+        if (rawBrand) {
+          var b = JSON.parse(rawBrand);
+          if (b && b.primary_color) {
+            var hex = b.primary_color.trim();
+            var cHex = hex.replace(/^#/, '');
+            if (cHex.length === 3) cHex = cHex[0] + cHex[0] + cHex[1] + cHex[1] + cHex[2] + cHex[2];
+            if (cHex.length === 6) {
+              var r = parseInt(cHex.substring(0, 2), 16);
+              var g = parseInt(cHex.substring(2, 4), 16);
+              var bl = parseInt(cHex.substring(4, 6), 16);
+              var lum = (0.299 * r + 0.587 * g + 0.114 * bl) / 255;
+              var textHex = lum > 0.6 ? '#111111' : '#ffffff';
+              var heroText = textHex === '#ffffff' ? '#ffffff' : '#0f172a';
+              var heroSub = textHex === '#ffffff' ? '#e2e8f0' : '#1e293b';
+
+              var rootEl = document.documentElement;
+              rootEl.style.setProperty('--x-primary', hex);
+              rootEl.style.setProperty('--x-lime', hex);
+              rootEl.style.setProperty('--primary-color', hex);
+              rootEl.style.setProperty('--x-primary-text', textHex);
+              rootEl.style.setProperty('--primary-text', textHex);
+              rootEl.style.setProperty('--primary-foreground', textHex);
+              rootEl.style.setProperty('--x-primary-foreground', textHex);
+              rootEl.style.setProperty('--x-hero-text', heroText);
+              rootEl.style.setProperty('--x-hero-text-sub', heroSub);
+              var m = document.querySelector('meta[name="theme-color"]');
+              if (m) m.setAttribute('content', hex);
+            }
           }
         }
       } catch (_) {}
@@ -42,12 +77,13 @@
   <link rel="manifest" href="/manifest.json">
 
   <!-- CSS (version-hashed for instant cache-busting) -->
-  <link rel="stylesheet" href="/assets/css/tokens.css?v=p7f4a05">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=p7f4a05">
-  <link rel="stylesheet" href="/assets/css/components.css?v=p7f4a05">
-  <link rel="stylesheet" href="/assets/css/home.css?v=p7f4a05">
-  <link rel="stylesheet" href="/assets/css/checkout.css?v=p7f4a05">
-  <link rel="stylesheet" href="/assets/css/order-received.css?v=p7f4a05">
+  <link rel="stylesheet" href="/assets/css/tokens.css?v=v_theme03">
+  <link rel="stylesheet" href="/assets/css/layout.css?v=v_theme03">
+  <link rel="stylesheet" href="/assets/css/components.css?v=v_theme03">
+  <link rel="stylesheet" href="/assets/css/home.css?v=v_theme03">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=v_theme03">
+  <link rel="stylesheet" href="/assets/css/order-received.css?v=v_theme03">
+  <link rel="stylesheet" href="/assets/css/location-picker.css?v=v_theme03">
 </head>
 <body>
 
@@ -202,7 +238,7 @@
        ═══════════════════════════════════════════════════ -->
   <script src="/assets/js/core/store.js?v=p6c9d12"></script>
   <script src="/assets/js/core/ui.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/api.js?v=p6c9d12"></script>
+  <script src="/assets/js/core/api.js?v=v_theme04"></script>
   <script src="/assets/js/core/nav.js?v=p6c9d12"></script>
   <script src="/assets/js/core/router.js?v=p6c9d12"></script>
   <script src="/assets/js/core/pwa-runtime.js?v=p6c9d12"></script>
@@ -213,9 +249,9 @@
   <script src="/assets/js/core/media.js?v=m6a02"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=m6a02"></script>
-  <script src="/assets/js/pages/checkout.js?v=p7f4a0b"></script>
-  <script src="/assets/js/pages/order-received.js?v=p7f4a06"></script>
+  <script src="/assets/js/pages/home.js?v=v_theme03"></script>
+  <script src="/assets/js/pages/checkout.js?v=v_theme04"></script>
+  <script src="/assets/js/pages/order-received.js?v=v_theme03"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
