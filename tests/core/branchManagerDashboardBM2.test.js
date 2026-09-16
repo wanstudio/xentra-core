@@ -518,18 +518,55 @@ describe('BM-2 — Branch Manager Dashboard: Pesanan + Meja / Dine-In', () => {
     assert.equal(tFree.current_session_id, null);
   });
 
-  // BM2-20: Floor layout geometry update blocked for Branch Manager
+  // BM2-20: Floor layout geometry update blocked for Branch Manager (governance boundary)
   it('BM2-20: Floor layout geometry update (PUT /dine-in/layout/:branch_id) is blocked for Branch Manager (governance boundary)', async () => {
+    // Record current layout state before mutation attempt
+    const layoutBefore = DiningTableService.getBranchLayout(BRANCH_A_ID);
+    const initialTableCount = layoutBefore.tables.length;
+
+    // 1. Branch Manager request is denied with 403 INSUFFICIENT_PERMISSIONS
     const res = await request('PUT', `/api/v1/dine-in/layout/${BRANCH_A_ID}`, {
-      canvas: { width: 1000, height: 800 },
+      canvas: { width: 1200, height: 900 },
+      sections: [{ id: 'sec_new', name: 'VIP Area' }],
+      tables: [{ table_number: '99', capacity: 10 }]
+    }, {
+      Authorization: `Bearer ${bmAToken}`
+    });
+
+    assert.equal(res.status, 403);
+    assert.equal(res.body.success, false);
+    assert.equal(res.body.error, 'INSUFFICIENT_PERMISSIONS');
+
+    // 2. Physical layout in database remains unchanged after denied request
+    const layoutAfter = DiningTableService.getBranchLayout(BRANCH_A_ID);
+    assert.equal(layoutAfter.tables.length, initialTableCount, 'Table count must not change after denied BM request');
+    assert.equal(layoutAfter.tables.find(t => t.table_number === '99'), undefined, 'Unauthorized table must not exist');
+
+    // 3. Authorized Owner can successfully update floor plan geometry
+    const brandManagerToken = seedStaffSession({ role: 'brand_manager', branchId: null, userId: 'bm2_brand_mgr' });
+    const resBrandMgr = await request('PUT', `/api/v1/dine-in/layout/${BRANCH_A_ID}`, {
+      canvas: { width: 500, height: 700 },
+      sections: [],
+      tables: layoutBefore.tables.slice(0, 5).map(t => ({
+        id: t.id,
+        table_number: t.table_number,
+        capacity: t.capacity
+      }))
+    }, {
+      Authorization: `Bearer ${brandManagerToken}`
+    });
+    assert.equal(resBrandMgr.status, 200);
+    assert.equal(resBrandMgr.body.success, true);
+
+    // 4. Branch Manager attempting to mutate another branch layout is also denied with 403
+    const resCross = await request('PUT', `/api/v1/dine-in/layout/${BRANCH_B_ID}`, {
+      canvas: { width: 600, height: 600 },
       sections: [],
       tables: []
     }, {
       Authorization: `Bearer ${bmAToken}`
     });
-
-    // Must be rejected because only Owner and Brand Manager can alter floor plan geometry
-    assert.equal(res.status, 403);
-    assert.equal(res.body.error, 'INSUFFICIENT_PERMISSIONS');
+    assert.equal(resCross.status, 403);
+    assert.equal(resCross.body.success, false);
   });
 });

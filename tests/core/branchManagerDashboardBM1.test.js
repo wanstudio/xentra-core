@@ -257,9 +257,10 @@ describe('BM-1 — Branch Manager Dashboard Shell + Access + Hari Ini', () => {
     assert.equal(resBranchB.status, 200);
   });
 
-  it('BM1-09: Branch Manager cannot mutate Owner-only governance fields (e.g. is_active)', async () => {
+  it('BM1-09: Branch Manager cannot mutate Owner-only governance fields (e.g. is_active or floor layout geometry)', async () => {
     const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID });
 
+    // Branch Manager cannot mutate branch is_active
     const res = await request('PUT', `/api/v1/admin/branches/${BRANCH_A_ID}`, {
       is_active: 0
     }, {
@@ -267,6 +268,16 @@ describe('BM-1 — Branch Manager Dashboard Shell + Access + Hari Ini', () => {
     });
     assert.equal(res.status, 403);
     assert.ok(res.body.error === 'FORBIDDEN_GOVERNANCE_MUTATION' || res.body.error === 'INSUFFICIENT_PERMISSIONS');
+
+    // Branch Manager cannot mutate physical floor-plan geometry
+    const resLayout = await request('PUT', `/api/v1/dine-in/layout/${BRANCH_A_ID}`, {
+      canvas: { width: 1000, height: 1000 },
+      tables: []
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(resLayout.status, 403);
+    assert.equal(resLayout.body.error, 'INSUFFICIENT_PERMISSIONS');
   });
 
   it('BM1-10: Refresh/re-entry reconstructs branch context from server state', async () => {
