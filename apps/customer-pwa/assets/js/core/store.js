@@ -369,14 +369,15 @@
     save(CART_KEY, state.cart);
   }
 
-  function removeItem(productId) {
-    setQty(productId, 0);
+  function removeItem(productId, branchId) {
+    setQty(productId, 0, branchId);
   }
 
-  function setNote(productId, noteText) {
+  function setNote(productId, noteText, branchId) {
+    var key = mutationScopeKey(branchId);
     var items = state.cart.items;
     for (var i = 0; i < items.length; i++) {
-      if (String(items[i].id) === String(productId)) {
+      if (String(items[i].id) === String(productId) && (key === undefined || cartGroupKey(items[i]) === key)) {
         items[i].note = noteText;
         break;
       }

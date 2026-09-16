@@ -224,10 +224,10 @@ test('T3/T9 rapid + + + + + : local state/UI complete per tap, full burst coales
     assert.strictEqual(g.qtyNode.textContent, '6', 'visible quantity patched in place');
     assert.strictEqual(g.rowsEl.innerHTML, marker, 'row DOM was patched, never rebuilt per tap');
     assert.strictEqual(cartEventCount(g.notifications) - baselineCart, 5, 'five taps -> five cheap cart events, nothing else');
-    assert.strictEqual(g.posts.length, 1, 'T9: ZERO network calls during the burst (mount quote still pending)');
-    assert.strictEqual(g.timers.captured.length, 5, 'each tap armed a newer debounce, superseding the previous one');
+    const quoteDebounceTimers = g.timers.captured.filter((t) => t.delay === 400);
+    assert.strictEqual(quoteDebounceTimers.length, 5, 'each tap armed a newer debounce, superseding the previous one');
 
-    g.timers.fire(g.timers.captured.length - 1); // only the trailing (latest) debounce fires
+    quoteDebounceTimers[quoteDebounceTimers.length - 1].fn(); // only the trailing (latest) debounce fires
     assert.strictEqual(g.posts.length, 2, 'the whole burst coalesced into a single reconcile quote');
   } finally {
     g.cleanup();

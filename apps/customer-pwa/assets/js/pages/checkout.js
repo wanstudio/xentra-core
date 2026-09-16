@@ -791,7 +791,7 @@
         '      <span class="x-quantity-value">' + qty + '</span>' +
         '      <button type="button" data-plus-item="' + item.id + '" data-branch-item="' + (item.branch_id || '') + '" aria-label="Tambah"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:auto;pointer-events:none;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>' +
         '    </div>' +
-        '    <button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note-item="' + item.id + '">' +
+        '    <button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note-item="' + item.id + '" data-note-branch="' + (item.branch_id || '') + '">' +
         '      <img src="' + (note ? '/assets/icons/write.svg' : '/assets/icons/file.svg') + '" alt="Catatan" class="x-note-icon">' +
         '      Catatan' +
         '    </button>' +
@@ -1155,7 +1155,7 @@
     var submit = $('x-btn-submit-order'); if (submit) submit.onclick = executePrePaymentAndSubmit;
 
     checkoutContainer.querySelectorAll('[data-note-item]').forEach(function (btn) {
-      btn.onclick = function () { openItemNoteSheet(btn.dataset.noteItem); };
+      btn.onclick = function () { openItemNoteSheet(btn.dataset.noteItem, btn.dataset.noteBranch !== undefined ? btn.dataset.noteBranch : currentBranchId); };
     });
   }
 
@@ -1180,7 +1180,7 @@
       };
     });
     checkoutContainer.querySelectorAll('[data-note-item]').forEach(function (btn) {
-      btn.onclick = function () { openItemNoteSheet(btn.dataset.noteItem); };
+      btn.onclick = function () { openItemNoteSheet(btn.dataset.noteItem, btn.dataset.noteBranch !== undefined ? btn.dataset.noteBranch : currentBranchId); };
     });
   }
 
@@ -2206,8 +2206,8 @@
   }
 
   // ── 4. Item Note Sheet ──
-  function openItemNoteSheet(itemId) {
-    var item = Store.findCartItem(itemId);
+  function openItemNoteSheet(itemId, branchId) {
+    var item = Store.findCartItem(itemId, branchId !== undefined ? branchId : currentBranchId);
     if (!item) return;
     var val = (state.notes && state.notes[itemId]) || item.note || '';
     var sh = makeOverlay(
@@ -2232,7 +2232,8 @@
 
     sh.overlay.querySelector('#x-save-item-note').onclick = function () {
       var noteVal = (txt ? txt.value : '').trim();
-      Store.setNote(itemId, noteVal);
+      var bScope = item.branch_id !== undefined ? item.branch_id : (branchId !== undefined ? branchId : currentBranchId);
+      Store.setNote(itemId, noteVal, bScope);
       sh.close();
       renderLayout();
       calculateTotals();
@@ -2347,14 +2348,22 @@
     );
 
     sh.overlay.querySelector('#x-btn-accept-changes').onclick = function () {
-      // Sync cart items with actual prices
+      // Sync cart items with actual prices within current branch scope
       if (Array.isArray(verificationData.verified_items)) {
+        var updated = false;
         verificationData.verified_items.forEach(function (v) {
-          var item = Store.findCartItem(v.product_id);
+          var item = Store.findCartItem(v.product_id, currentBranchId);
           if (item) {
             item.price = Number(v.price);
+            updated = true;
           }
         });
+        if (updated) {
+          try {
+            var cart = Store.getState().cart;
+            localStorage.setItem('xentra_cart', JSON.stringify(cart));
+          } catch (_) {}
+        }
       }
       sh.close();
       renderLayout();
@@ -2572,14 +2581,15 @@
       // consumed: whole cart when the checkout covered it (legacy flow, cart
       // cleared as before), otherwise drop only the ordered branch scope so an
       // independent checkout of another branch scope survives (R1.5).
+      var scopeBranchId = branchId || currentBranchId || null;
       if (currentItemId) {
-        Store.removeItem(currentItemId);
+        Store.removeItem(currentItemId, scopeBranchId);
       } else if (allCartItemsOrdered(orderedIds)) {
         Store.clearCart();
-      } else if (itemsHaveBranchProvenance && branchId) {
-        Store.removeBranchItems(branchId);
+      } else if (itemsHaveBranchProvenance && scopeBranchId) {
+        Store.removeBranchItems(scopeBranchId);
       } else {
-        orderedIds.forEach(function (id) { Store.removeItem(id); });
+        orderedIds.forEach(function (id) { Store.removeCartItem(id, scopeBranchId); });
       }
     }
 

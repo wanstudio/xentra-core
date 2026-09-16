@@ -1083,9 +1083,9 @@
   // ======================================================================
   //  NOTE SHEET (Dynamic makeOverlay execution + Compact Height + Green Simpan)
   // ======================================================================
-  function openNote(productId) {
+  function openNote(productId, branchId) {
     var numId = Number(productId);
-    var item = Store.findCartItem(numId);
+    var item = Store.findCartItem(numId, branchId);
     var curNote = (item && item.note) || Store.getState().notes[numId] || '';
 
     var overlay = document.createElement('div');
@@ -1153,7 +1153,7 @@
     if (saveBtn) {
       saveBtn.onclick = function () {
         var noteVal = (input ? input.value : '').trim();
-        Store.setNote(numId, noteVal);
+        Store.setNote(numId, noteVal, branchId);
         if (window.XentraNav && typeof window.XentraNav.close === 'function') {
           window.XentraNav.close();
         } else {
@@ -1467,7 +1467,7 @@
 
     var image = item.image_url || item.image || '';
     var noteHtml = note
-      ? '<div class="x-sheet-item-note" data-edit-note="' + item.id + '"><img src="' + ICONS.write + '" alt="Edit catatan"><span>: ' + UI.escape(note) + '</span></div>'
+      ? '<div class="x-sheet-item-note" data-edit-note="' + item.id + '" data-edit-note-branch="' + (item.branch_id || '') + '"><img src="' + ICONS.write + '" alt="Edit catatan"><span>: ' + UI.escape(note) + '</span></div>'
       : '';
 
     row.innerHTML =
@@ -1514,8 +1514,9 @@
     container.querySelectorAll('[data-edit-note]').forEach(function (el) {
       el.onclick = function (e) {
         e.stopPropagation();
+        var branchId = el.dataset.editNoteBranch || null;
         closeSheet();
-        setTimeout(function () { openNoteSheet(el.dataset.editNote); }, 400);
+        setTimeout(function () { openNoteSheet(el.dataset.editNote, branchId); }, 400);
       };
     });
 

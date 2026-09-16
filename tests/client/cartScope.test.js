@@ -402,3 +402,58 @@ test('BUGFIX quantity scope: scoped lookup returns null for a foreign scope; leg
   assert.strictEqual(Store.getCartItemsForBranch('branch_b').length, 0);
   assert.strictEqual(Store.getCartItemsForBranch('branch_a').length, 1);
 });
+
+test('P4.1/P4.2 Note isolation: setting note on one branch line does not overwrite the same SKU in another branch', () => {
+  const Store = freshStore();
+
+  Store.addItem(product('288', 'Es Kopi', 15000), 1, { branch_id: 'branch_a' });
+  Store.addItem(product('288', 'Es Kopi', 15000), 1, { branch_id: 'branch_b' });
+
+  // Update note for branch A line
+  Store.setNote('288', 'Less ice, no sugar', 'branch_a');
+
+  const lineA = Store.findCartItem('288', 'branch_a');
+  const lineB = Store.findCartItem('288', 'branch_b');
+
+  assert.strictEqual(lineA.note, 'Less ice, no sugar', 'branch A note set');
+  assert.strictEqual(lineB.note, '', 'branch B note remains empty');
+
+  // Update note for branch B line
+  Store.setNote('288', 'Extra shot espresso', 'branch_b');
+  assert.strictEqual(Store.findCartItem('288', 'branch_a').note, 'Less ice, no sugar', 'branch A unchanged');
+  assert.strictEqual(Store.findCartItem('288', 'branch_b').note, 'Extra shot espresso', 'branch B note updated');
+});
+
+test('P4.6 Branch-scoped removeItem: removeItem(id, branchId) removes only the targeted branch line', () => {
+  const Store = freshStore();
+
+  Store.addItem(product('288', 'Es Kopi', 15000), 2, { branch_id: 'branch_a' });
+  Store.addItem(product('288', 'Es Kopi', 15000), 1, { branch_id: 'branch_b' });
+
+  Store.removeItem('288', 'branch_a');
+
+  assert.strictEqual(Store.findCartItem('288', 'branch_a'), null, 'branch A line removed');
+  assert.strictEqual(Store.findCartItem('288', 'branch_b').quantity, 1, 'branch B line preserved');
+});
+
+test('P4 Matrix J: Cart state never holds authoritative fulfillment branch, delivery fee, or order authority', () => {
+  const Store = freshStore();
+
+  // Adding items to cart under various branch scopes
+  Store.addItem(product('272', 'Paket Semar', 35000), 1, { branch_id: 'branch_a', branch_name: 'Cabang A' });
+  Store.addItem(product('345', 'Mie Gurih', 15000), 2, { branch_id: 'branch_b', branch_name: 'Cabang B' });
+
+  const state = Store.getState();
+  // Ensure cart lines only have provenance data (id, product_id, name, price, quantity, note, branch_id, branch_name)
+  state.cart.items.forEach((item) => {
+    assert.strictEqual(item.fulfillment_branch_id, undefined, 'cart line must not have fulfillment_branch_id');
+    assert.strictEqual(item.delivery_fee, undefined, 'cart line must not have delivery_fee');
+    assert.strictEqual(item.order_id, undefined, 'cart line must not have order_id');
+  });
+
+  // Cart object itself has no fulfillment authority
+  assert.strictEqual(state.cart.fulfillment_branch_id, undefined);
+  assert.strictEqual(state.cart.delivery_fee, undefined);
+  assert.strictEqual(state.cart.total_delivery_fee, undefined);
+});
+
