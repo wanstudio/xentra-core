@@ -38,6 +38,7 @@ class PromotionRepository {
       );
       return {
         ...p,
+        promo_code: p.code || p.promo_code,
         rules,
         rewards,
         redemptions_count: redemptionsCount ? Number(redemptionsCount.cnt || 0) : 0,

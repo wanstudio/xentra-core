@@ -2915,29 +2915,251 @@
       </section>
 
       <!-- BM-3: Menu, Promo, Stok -->
+      <!-- TAB: BM-MENU (Branch Operational Menu Availability) -->
       <section id="tab-bm-menu" class="x-tab-content" data-tab="bm-menu">
-        <div class="x-route-placeholder">
-          <div class="x-route-placeholder-icon">🍽️</div>
-          <h3>Ketersediaan Menu Cabang</h3>
-          <p>Modul operasional ketersediaan menu cabang (buka/tutup ketersediaan produk). Dijadwalkan untuk fase BM-3.</p>
+        <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+            <div>
+              <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Ketersediaan Menu Cabang</h3>
+              <p class="text-muted" style="font-size:13px; margin:0;">
+                Kontrol ketersediaan harian menu di cabang ini (Tersedia / Habis). Master produk dan harga dasar dikelola oleh Owner/Brand.
+              </p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button type="button" class="x-btn-secondary" id="btn-bm-menu-refresh" onclick="loadBMMenu()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Segarkan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Menu Overview KPI Cards -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-color);">
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#64748b;">TOTAL MENU DIALOKASIKAN</div>
+              <div id="bm-menu-stat-total" style="font-size:22px; font-weight:800; color:#1e293b; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#15803d;">TERSEDIA (AKTIF DI CABANG)</div>
+              <div id="bm-menu-stat-available" style="font-size:22px; font-weight:800; color:#166534; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#b91c1c;">HABIS / TIDAK TERSEDIA</div>
+              <div id="bm-menu-stat-unavailable" style="font-size:22px; font-weight:800; color:#991b1b; margin-top:4px;">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter & Menu Table Panel -->
+        <div class="x-card-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; flex:1;">
+              <input type="text" id="bm-menu-search" class="x-input" placeholder="Cari nama produk..." style="font-size:13px; max-width:280px;" oninput="onBMMenuFilterChange()">
+              <select id="bm-menu-filter-status" class="x-input" style="font-size:13px; max-width:200px;" onchange="onBMMenuFilterChange()">
+                <option value="all">Semua Status Ketersediaan</option>
+                <option value="available">Hanya Tersedia (Available)</option>
+                <option value="unavailable">Hanya Habis (Unavailable)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="x-table">
+              <thead>
+                <tr>
+                  <th>Produk</th>
+                  <th>Kategori</th>
+                  <th>Harga Cabang</th>
+                  <th>Stok Saat Ini</th>
+                  <th>Status Operasional</th>
+                  <th>Status Master</th>
+                  <th style="text-align:right;">Aksi Ketersediaan</th>
+                </tr>
+              </thead>
+              <tbody id="bm-menu-tbody">
+                <tr><td colspan="7" class="text-center py-6 text-muted">Memuat daftar menu cabang...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
+      <!-- TAB: BM-PROMO (Branch Approved Promotions & Redemptions) -->
       <section id="tab-bm-promo" class="x-tab-content" data-tab="bm-promo">
-        <div class="x-route-placeholder">
-          <div class="x-route-placeholder-icon">🏷️</div>
-          <h3>Promosi Cabang</h3>
-          <p>Aktivasi dan operasional promosi khusus cabang yang disetujui Owner. Dijadwalkan untuk fase BM-3.</p>
+        <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+            <div>
+              <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Promosi &amp; Diskon Cabang</h3>
+              <p class="text-muted" style="font-size:13px; margin:0;">
+                Pantau promo resmi yang disetujui Brand/Owner dan riwayat penebusan kupon/diskon pada cabang ini.
+              </p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button type="button" class="x-btn-secondary" id="btn-bm-promo-refresh" onclick="loadBMPromotions()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Segarkan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Promo KPI Cards -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-color);">
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#15803d;">PROMOSI AKTIF BRAND</div>
+              <div id="bm-promo-stat-active" style="font-size:22px; font-weight:800; color:#166534; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#1d4ed8;">TOTAL PENEBUSAN CABANG</div>
+              <div id="bm-promo-stat-redemptions" style="font-size:22px; font-weight:800; color:#1e40af; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#b45309;">TOTAL DISKON DIBERIKAN</div>
+              <div id="bm-promo-stat-discount-given" style="font-size:22px; font-weight:800; color:#92400e; margin-top:4px;">Rp 0</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:20px;">
+          <!-- Active Promotions Card -->
+          <div class="x-card-panel">
+            <h4 style="font-size:15px; font-weight:700; margin:0 0 16px;">Promosi Aktif Brand untuk Operasional Cabang</h4>
+            <div id="bm-promo-list" style="display:flex; flex-direction:column; gap:12px;">
+              <div class="text-center py-6 text-muted">Memuat promosi...</div>
+            </div>
+          </div>
+
+          <!-- Recent Branch Redemptions Card -->
+          <div class="x-card-panel">
+            <h4 style="font-size:15px; font-weight:700; margin:0 0 16px;">Riwayat Penebusan Promo di Cabang Ini</h4>
+            <div class="table-responsive">
+              <table class="x-table">
+                <thead>
+                  <tr>
+                    <th>Pesanan</th>
+                    <th>Kode / Promo</th>
+                    <th>Nilai Diskon</th>
+                    <th>Waktu</th>
+                  </tr>
+                </thead>
+                <tbody id="bm-promo-redemptions-tbody">
+                  <tr><td colspan="4" class="text-center py-6 text-muted">Memuat riwayat penebusan...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 
+      <!-- TAB: BM-STOK (Branch Inventory Observation & Operational Adjustment) -->
       <section id="tab-bm-stok" class="x-tab-content" data-tab="bm-stok">
-        <div class="x-route-placeholder">
-          <div class="x-route-placeholder-icon">📊</div>
-          <h3>Stok & Inventaris Cabang</h3>
-          <p>Pencatatan dan pemantauan stok harian cabang. Dijadwalkan untuk fase BM-3.</p>
+        <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+            <div>
+              <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Stok &amp; Inventaris Cabang</h3>
+              <p class="text-muted" style="font-size:13px; margin:0;">
+                Pantau ketersediaan stok fisik cabang secara realtime, deteksi stok menipis, dan lakukan penyesuaian operasional (audit opname / barang rusak).
+              </p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button type="button" class="x-btn-secondary" id="btn-bm-stok-refresh" onclick="loadBMStock()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Segarkan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Stock Overview KPI Cards -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-color);">
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#64748b;">TOTAL ITEM TERDAFTAR</div>
+              <div id="bm-stock-stat-total" style="font-size:22px; font-weight:800; color:#1e293b; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#15803d;">STOK AMAN</div>
+              <div id="bm-stock-stat-safe" style="font-size:22px; font-weight:800; color:#166534; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#b45309;">STOK MENIPIS (PERLU RESTOK)</div>
+              <div id="bm-stock-stat-low" style="font-size:22px; font-weight:800; color:#92400e; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#b91c1c;">STOK HABIS (0)</div>
+              <div id="bm-stock-stat-out" style="font-size:22px; font-weight:800; color:#991b1b; margin-top:4px;">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter & Stock Table Panel -->
+        <div class="x-card-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; flex:1;">
+              <input type="text" id="bm-stock-search" class="x-input" placeholder="Cari nama produk..." style="font-size:13px; max-width:280px;" oninput="onBMStockFilterChange()">
+              <select id="bm-stock-filter-status" class="x-input" style="font-size:13px; max-width:200px;" onchange="onBMStockFilterChange()">
+                <option value="all">Semua Status Stok</option>
+                <option value="low">Hanya Stok Menipis</option>
+                <option value="out">Hanya Stok Habis (0)</option>
+                <option value="safe">Hanya Stok Aman</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="x-table">
+              <thead>
+                <tr>
+                  <th>Produk</th>
+                  <th>Harga Cabang</th>
+                  <th>Stok Saat Ini</th>
+                  <th>Batas Minimum (Threshold)</th>
+                  <th>Status Stok</th>
+                  <th style="text-align:right;">Aksi Penyesuaian</th>
+                </tr>
+              </thead>
+              <tbody id="bm-stock-tbody">
+                <tr><td colspan="6" class="text-center py-6 text-muted">Memuat inventaris cabang...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
+
+      <!-- MODAL: BM Stock Adjustment -->
+      <div id="modal-bm-stock-adjust" class="x-modal" style="display:none; position:fixed; z-index:9999; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+        <div class="x-card-panel" style="max-width:440px; width:90%; padding:24px; border-radius:12px; background:#ffffff; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h4 style="font-size:16px; font-weight:800; margin:0;">Sesuaikan Stok Operasional</h4>
+            <button type="button" onclick="closeBMStockAdjustModal()" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-muted);">&times;</button>
+          </div>
+          <form id="form-bm-stock-adjust" onsubmit="submitBMStockAdjustment(event)">
+            <input type="hidden" id="bm-adjust-product-id">
+            <div style="margin-bottom:14px;">
+              <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Nama Produk</label>
+              <div id="bm-adjust-product-name" style="font-size:14px; font-weight:700; color:var(--text-main);">-</div>
+              <div style="font-size:12px; color:var(--text-muted); margin-top:2px;">Stok Cabang Saat Ini: <strong id="bm-adjust-current-stock">0</strong></div>
+            </div>
+            <div style="margin-bottom:14px;">
+              <label for="bm-adjust-movement-type" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Jenis Mutasi Manual</label>
+              <select id="bm-adjust-movement-type" class="x-input" style="width:100%; font-size:13px;" required onchange="onBMAdjustTypeChange()">
+                <option value="audit_adjustment">Audit Stok Fisik (Opname Penyesuaian: +/-)</option>
+                <option value="waste_spoilage">Barang Rusak / Basi / Spoilage (Pengurangan: -)</option>
+              </select>
+            </div>
+            <div style="margin-bottom:14px;">
+              <label for="bm-adjust-quantity" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Jumlah Penyesuaian (Quantity)</label>
+              <input type="number" id="bm-adjust-quantity" class="x-input" style="width:100%; font-size:14px;" placeholder="Mis. +5 atau -2" required>
+              <small id="bm-adjust-qty-hint" style="font-size:11px; color:var(--text-muted); display:block; margin-top:4px;">Gunakan angka positif untuk menambah, negatif untuk mengurangi.</small>
+            </div>
+            <div style="margin-bottom:18px;">
+              <label for="bm-adjust-notes" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Catatan / Alasan Mutasi</label>
+              <textarea id="bm-adjust-notes" class="x-input" style="width:100%; font-size:13px; min-height:60px;" placeholder="Contoh: Stok opname shift pagi, telur pecah saat persiapan..."></textarea>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+              <button type="button" class="x-btn-secondary" onclick="closeBMStockAdjustModal()" style="font-size:13px; padding:8px 14px;">Batal</button>
+              <button type="submit" class="x-btn-primary" id="btn-bm-submit-adjust" style="font-size:13px; padding:8px 18px;">Simpan Penyesuaian</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <!-- BM-4: Staff & Jam Operasional -->
       <section id="tab-bm-staff" class="x-tab-content" data-tab="bm-staff">

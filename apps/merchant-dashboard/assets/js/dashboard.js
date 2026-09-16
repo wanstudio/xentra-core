@@ -1115,6 +1115,18 @@
       loadBMTables();
     }
 
+    if (tabId === 'bm-menu') {
+      loadBMMenu();
+    }
+
+    if (tabId === 'bm-stok') {
+      loadBMStock();
+    }
+
+    if (tabId === 'bm-promo') {
+      loadBMPromotions();
+    }
+
     if (tabId === 'hari-ini') {
       loadHariIni();
     }
@@ -8054,20 +8066,35 @@
       console.warn("[BM Hari Ini Layout Error]:", e);
     }
 
-    // 4. Fetch low stock inventory alerts
+    // 4. Fetch low stock inventory alerts & unavailable products
     try {
       var iRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/inventory", { headers: getAuthHeaders() });
+      var pRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/products", { headers: getAuthHeaders() });
+      
+      var lowItems = [];
+      var unavailItems = [];
+
       if (iRes.ok) {
         var iData = await iRes.json();
         if (iData.success && Array.isArray(iData.inventory)) {
-          var lowItems = iData.inventory.filter(function (item) {
+          lowItems = iData.inventory.filter(function (item) {
             return item.stock <= (item.low_stock_threshold || 5);
           });
-          renderHariIniLowStock(lowItems);
         }
       }
+
+      if (pRes.ok) {
+        var pData = await pRes.json();
+        if (pData.success && Array.isArray(pData.assignments)) {
+          unavailItems = pData.assignments.filter(function (p) {
+            return p.is_available === 0 || p.is_available === false;
+          });
+        }
+      }
+
+      renderHariIniAttention(lowItems, unavailItems);
     } catch (e) {
-      console.warn("[BM Hari Ini Inventory Error]:", e);
+      console.warn("[BM Hari Ini Inventory/Menu Error]:", e);
     }
   }
   window.loadHariIni = loadHariIni;
@@ -8108,24 +8135,49 @@
     }).join("");
   }
 
-  function renderHariIniLowStock(items) {
+  function renderHariIniAttention(lowItems, unavailItems) {
     var container = $("bm-low-stock-list");
     if (!container) return;
 
-    if (!items || items.length === 0) {
-      container.innerHTML = "<div class=\"text-muted text-center py-4\" style=\"font-size:13px;\">Semua stok produk dalam batas aman.</div>";
+    var hasLow = lowItems && lowItems.length > 0;
+    var hasUnavail = unavailItems && unavailItems.length > 0;
+
+    if (!hasLow && !hasUnavail) {
+      container.innerHTML = "<div class=\"text-muted text-center py-4\" style=\"font-size:13px;\">Semua menu tersedia &amp; stok dalam batas aman.</div>";
       return;
     }
 
-    container.innerHTML = items.slice(0, 5).map(function (it) {
-      return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fef2f2;border-radius:6px;border:1px solid #fee2e2;\">" +
-        "<div>" +
-          "<strong style=\"font-size:13px;color:#991b1b;\">" + esc(it.product_name || it.name || it.product_id) + "</strong>" +
-          "<div style=\"font-size:11px;color:#b91c1c;\">Tersisa " + esc(it.stock) + " " + esc(it.unit || "porsi") + " (Batas: " + esc(it.low_stock_threshold || 5) + ")</div>" +
-        "</div>" +
-        "<span class=\"x-badge x-badge-danger\" style=\"font-size:10px;\">STOK TIPIS</span>" +
-      "</div>";
-    }).join("");
+    var html = '';
+
+    if (hasUnavail) {
+      html += unavailItems.slice(0, 3).map(function (p) {
+        return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fef2f2;border-radius:6px;border:1px solid #fee2e2;\">" +
+          "<div>" +
+            "<strong style=\"font-size:13px;color:#991b1b;\">" + esc(p.product_name || p.name) + "</strong>" +
+            "<div style=\"font-size:11px;color:#b91c1c;\">Status: Ditandai Habis di Cabang</div>" +
+          "</div>" +
+          "<span class=\"x-badge x-badge-danger\" style=\"font-size:10px;\">MENU HABIS</span>" +
+        "</div>";
+      }).join("");
+    }
+
+    if (hasLow) {
+      html += lowItems.slice(0, 3).map(function (it) {
+        return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fffbeb;border-radius:6px;border:1px solid #fef3c7;\">" +
+          "<div>" +
+            "<strong style=\"font-size:13px;color:#92400e;\">" + esc(it.product_name || it.name || it.product_id) + "</strong>" +
+            "<div style=\"font-size:11px;color:#b45309;\">Tersisa " + esc(it.stock) + " (Batas: " + esc(it.low_stock_threshold || 5) + ")</div>" +
+          "</div>" +
+          "<span class=\"x-badge x-badge-warning\" style=\"font-size:10px;\">STOK TIPIS</span>" +
+        "</div>";
+      }).join("");
+    }
+
+    container.innerHTML = html;
+  }
+
+  function renderHariIniLowStock(items) {
+    renderHariIniAttention(items, []);
   }
 
   async function toggleBranchOpen() {
@@ -8220,6 +8272,29 @@
   var _bmTablesState = {
     tables: [],
     filterStatus: 'all',
+    fetchSeq: 0
+  };
+
+  /* =========================================================================
+     BM-3: OPERASIONAL MENU, STOK & PROMO (BRANCH MANAGER OPERATIONAL CENTER)
+     ========================================================================= */
+  var _bmMenuState = {
+    products: [],
+    searchQuery: '',
+    statusFilter: 'all',
+    fetchSeq: 0
+  };
+
+  var _bmStockState = {
+    inventory: [],
+    searchQuery: '',
+    statusFilter: 'all',
+    fetchSeq: 0
+  };
+
+  var _bmPromoState = {
+    promotions: [],
+    redemptions: [],
     fetchSeq: 0
   };
 
@@ -8784,6 +8859,468 @@
     }
   }
   window.completeBMTableSession = completeBMTableSession;
+
+  /* =========================================================================
+     BM-3: MENU OPERATIONAL CONTROLLER
+     ========================================================================= */
+  async function loadBMMenu() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var tbody = $('bm-menu-tbody');
+    if (tbody && (!_bmMenuState.products || !_bmMenuState.products.length)) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Memuat daftar menu cabang...</td></tr>';
+    }
+
+    var currentSeq = ++_bmMenuState.fetchSeq;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/products', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (currentSeq !== _bmMenuState.fetchSeq) return;
+
+      if (res.ok && data.success && Array.isArray(data.assignments)) {
+        _bmMenuState.products = data.assignments;
+        updateBMMenuStats(data.assignments);
+        renderBMMenuTable();
+      } else {
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-danger">Gagal memuat menu: ' + esc(data.error || 'Terjadi kesalahan') + '</td></tr>';
+        }
+      }
+    } catch (err) {
+      if (currentSeq !== _bmMenuState.fetchSeq) return;
+      console.warn('[BM Menu Load Error]:', err);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat menu cabang.</td></tr>';
+      }
+    }
+  }
+  window.loadBMMenu = loadBMMenu;
+
+  function updateBMMenuStats(products) {
+    var total = (products || []).length;
+    var avail = (products || []).filter(function (p) { return p.is_available === 1 || p.is_available === true; }).length;
+    var unavail = total - avail;
+
+    if ($('bm-menu-stat-total')) $('bm-menu-stat-total').textContent = total;
+    if ($('bm-menu-stat-available')) $('bm-menu-stat-available').textContent = avail;
+    if ($('bm-menu-stat-unavailable')) $('bm-menu-stat-unavailable').textContent = unavail;
+  }
+
+  function onBMMenuFilterChange() {
+    var searchEl = $('bm-menu-search');
+    var filterEl = $('bm-menu-filter-status');
+    if (searchEl) _bmMenuState.searchQuery = searchEl.value.trim().toLowerCase();
+    if (filterEl) _bmMenuState.statusFilter = filterEl.value;
+    renderBMMenuTable();
+  }
+  window.onBMMenuFilterChange = onBMMenuFilterChange;
+
+  function renderBMMenuTable() {
+    var tbody = $('bm-menu-tbody');
+    if (!tbody) return;
+
+    var filtered = (_bmMenuState.products || []).filter(function (p) {
+      var name = (p.product_name || p.name || '').toLowerCase();
+      var matchesSearch = !_bmMenuState.searchQuery || name.indexOf(_bmMenuState.searchQuery) !== -1;
+      if (!matchesSearch) return false;
+
+      var isAvail = (p.is_available === 1 || p.is_available === true);
+      if (_bmMenuState.statusFilter === 'available') return isAvail;
+      if (_bmMenuState.statusFilter === 'unavailable') return !isAvail;
+      return true;
+    });
+
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Tidak ada produk yang sesuai dengan kriteria filter.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(function (p) {
+      var isAvail = (p.is_available === 1 || p.is_available === true);
+      var isMasterActive = (p.is_master_active === 1 || p.is_master_active === true || p.is_master_active === undefined);
+
+      var branchStatusBadge = isAvail
+        ? '<span class="x-badge x-badge-success" style="font-size:11px;">TERSEDIA</span>'
+        : '<span class="x-badge x-badge-danger" style="font-size:11px;">HABIS (OFF)</span>';
+
+      var masterStatusBadge = isMasterActive
+        ? '<span class="x-badge" style="font-size:10px; background:#f1f5f9; color:#475569;">AKTIF (BRAND)</span>'
+        : '<span class="x-badge" style="font-size:10px; background:#fee2e2; color:#991b1b;">NONAKTIF (BRAND)</span>';
+
+      var toggleBtn = isAvail
+        ? '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 10px; color:#dc2626; border-color:#fecaca;" onclick="toggleBMProductAvailability(\'' + esc(p.product_id) + '\', 0)">Tandai Habis</button>'
+        : '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 10px;" onclick="toggleBMProductAvailability(\'' + esc(p.product_id) + '\', 1)">Tandai Tersedia</button>';
+
+      return '<tr>' +
+        '<td><strong>' + esc(p.product_name || p.name) + '</strong></td>' +
+        '<td><span class="text-muted" style="font-size:12px;">' + esc(p.category_name || 'Umum') + '</span></td>' +
+        '<td>' + formatMoney(p.price) + '</td>' +
+        '<td><strong>' + esc(p.stock) + '</strong></td>' +
+        '<td>' + branchStatusBadge + '</td>' +
+        '<td>' + masterStatusBadge + '</td>' +
+        '<td style="text-align:right;">' + toggleBtn + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  async function toggleBMProductAvailability(productId, nextVal) {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId), {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_available: nextVal })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast(nextVal === 1 ? 'Produk berhasil ditandai Tersedia.' : 'Produk ditandai Habis.');
+        loadBMMenu();
+      } else {
+        showToast('Gagal mengubah ketersediaan: ' + (data.error || 'Terjadi kesalahan'));
+        loadBMMenu();
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.toggleBMProductAvailability = toggleBMProductAvailability;
+
+  /* =========================================================================
+     BM-3: STOK & INVENTARIS OPERATIONAL CONTROLLER
+     ========================================================================= */
+  async function loadBMStock() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var tbody = $('bm-stock-tbody');
+    if (tbody && (!_bmStockState.inventory || !_bmStockState.inventory.length)) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Memuat inventaris cabang...</td></tr>';
+    }
+
+    var currentSeq = ++_bmStockState.fetchSeq;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (currentSeq !== _bmStockState.fetchSeq) return;
+
+      if (res.ok && data.success && Array.isArray(data.inventory)) {
+        _bmStockState.inventory = data.inventory;
+        updateBMStockStats(data.inventory);
+        renderBMStockTable();
+      } else {
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">Gagal memuat inventaris: ' + esc(data.error || 'Terjadi kesalahan') + '</td></tr>';
+        }
+      }
+    } catch (err) {
+      if (currentSeq !== _bmStockState.fetchSeq) return;
+      console.warn('[BM Stock Load Error]:', err);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat inventaris.</td></tr>';
+      }
+    }
+  }
+  window.loadBMStock = loadBMStock;
+
+  function updateBMStockStats(items) {
+    var total = (items || []).length;
+    var outOfStock = (items || []).filter(function (it) { return Number(it.stock) <= 0; }).length;
+    var lowStock = (items || []).filter(function (it) {
+      var s = Number(it.stock);
+      var th = Number(it.low_stock_threshold || 5);
+      return s > 0 && s <= th;
+    }).length;
+    var safeStock = total - outOfStock - lowStock;
+
+    if ($('bm-stock-stat-total')) $('bm-stock-stat-total').textContent = total;
+    if ($('bm-stock-stat-safe')) $('bm-stock-stat-safe').textContent = safeStock;
+    if ($('bm-stock-stat-low')) $('bm-stock-stat-low').textContent = lowStock;
+    if ($('bm-stock-stat-out')) $('bm-stock-stat-out').textContent = outOfStock;
+  }
+
+  function onBMStockFilterChange() {
+    var searchEl = $('bm-stock-search');
+    var filterEl = $('bm-stock-filter-status');
+    if (searchEl) _bmStockState.searchQuery = searchEl.value.trim().toLowerCase();
+    if (filterEl) _bmStockState.statusFilter = filterEl.value;
+    renderBMStockTable();
+  }
+  window.onBMStockFilterChange = onBMStockFilterChange;
+
+  function renderBMStockTable() {
+    var tbody = $('bm-stock-tbody');
+    if (!tbody) return;
+
+    var filtered = (_bmStockState.inventory || []).filter(function (it) {
+      var name = (it.product_name || '').toLowerCase();
+      var matchesSearch = !_bmStockState.searchQuery || name.indexOf(_bmStockState.searchQuery) !== -1;
+      if (!matchesSearch) return false;
+
+      var s = Number(it.stock);
+      var th = Number(it.low_stock_threshold || 5);
+      if (_bmStockState.statusFilter === 'out') return s <= 0;
+      if (_bmStockState.statusFilter === 'low') return s > 0 && s <= th;
+      if (_bmStockState.statusFilter === 'safe') return s > th;
+      return true;
+    });
+
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Tidak ada item inventaris yang sesuai kriteria filter.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(function (it) {
+      var s = Number(it.stock);
+      var th = Number(it.low_stock_threshold || 5);
+
+      var badge = '';
+      if (s <= 0) {
+        badge = '<span class="x-badge x-badge-danger" style="font-size:11px;">HABIS (0)</span>';
+      } else if (s <= th) {
+        badge = '<span class="x-badge x-badge-warning" style="font-size:11px;">MENIPIS (&le; ' + th + ')</span>';
+      } else {
+        badge = '<span class="x-badge x-badge-success" style="font-size:11px;">AMAN</span>';
+      }
+
+      return '<tr>' +
+        '<td><strong>' + esc(it.product_name) + '</strong></td>' +
+        '<td>' + formatMoney(it.price) + '</td>' +
+        '<td><strong style="font-size:14px;">' + s + '</strong></td>' +
+        '<td><span class="text-muted">' + th + '</span></td>' +
+        '<td>' + badge + '</td>' +
+        '<td style="text-align:right;">' +
+          '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="openBMStockAdjustmentModal(\'' + esc(it.product_id) + '\')">Sesuaikan Stok</button>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function openBMStockAdjustmentModal(productId) {
+    var item = (_bmStockState.inventory || []).find(function (it) { return it.product_id === productId; });
+    if (!item) return;
+
+    var modal = $('modal-bm-stock-adjust');
+    if (!modal) return;
+
+    if ($('bm-adjust-product-id')) $('bm-adjust-product-id').value = item.product_id;
+    if ($('bm-adjust-product-name')) $('bm-adjust-product-name').textContent = item.product_name;
+    if ($('bm-adjust-current-stock')) $('bm-adjust-current-stock').textContent = item.stock;
+
+    var selectType = $('bm-adjust-movement-type');
+    if (selectType) selectType.value = 'audit_adjustment';
+
+    var qtyInput = $('bm-adjust-quantity');
+    if (qtyInput) qtyInput.value = '';
+
+    var notesInput = $('bm-adjust-notes');
+    if (notesInput) notesInput.value = '';
+
+    onBMAdjustTypeChange();
+    modal.style.display = 'flex';
+  }
+  window.openBMStockAdjustmentModal = openBMStockAdjustmentModal;
+
+  function closeBMStockAdjustModal() {
+    var modal = $('modal-bm-stock-adjust');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closeBMStockAdjustModal = closeBMStockAdjustModal;
+
+  function onBMAdjustTypeChange() {
+    var selectType = $('bm-adjust-movement-type');
+    var hint = $('bm-adjust-qty-hint');
+    var qtyInput = $('bm-adjust-quantity');
+    if (!selectType || !hint) return;
+
+    if (selectType.value === 'waste_spoilage') {
+      hint.textContent = 'Barang rusak/basi harus bernilai pengurangan negatif (misal: -3).';
+      hint.style.color = '#dc2626';
+      if (qtyInput && Number(qtyInput.value) > 0) {
+        qtyInput.value = '-' + qtyInput.value;
+      }
+    } else {
+      hint.textContent = 'Gunakan angka positif untuk menambah, negatif untuk mengurangi.';
+      hint.style.color = 'var(--text-muted)';
+    }
+  }
+  window.onBMAdjustTypeChange = onBMAdjustTypeChange;
+
+  async function submitBMStockAdjustment(e) {
+    if (e) e.preventDefault();
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var productId = $('bm-adjust-product-id') ? $('bm-adjust-product-id').value : '';
+    var movementType = $('bm-adjust-movement-type') ? $('bm-adjust-movement-type').value : '';
+    var qty = $('bm-adjust-quantity') ? Number($('bm-adjust-quantity').value) : NaN;
+    var notes = $('bm-adjust-notes') ? $('bm-adjust-notes').value.trim() : '';
+
+    if (!productId || isNaN(qty) || qty === 0) {
+      showToast('Masukkan jumlah penyesuaian yang valid (bukan 0).');
+      return;
+    }
+
+    if (movementType === 'waste_spoilage' && qty > 0) {
+      showToast('Barang rusak (waste_spoilage) hanya menerima pengurangan stok (angka negatif).');
+      return;
+    }
+
+    var submitBtn = $('btn-bm-submit-adjust');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/inventory/' + encodeURIComponent(productId), {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          movement_type: movementType,
+          quantity: qty,
+          notes: notes
+        })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Stok operasional berhasil diperbarui!');
+        closeBMStockAdjustModal();
+        loadBMStock();
+      } else {
+        showToast('Gagal menyesuaikan stok: ' + (data.message || data.error || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+  window.submitBMStockAdjustment = submitBMStockAdjustment;
+
+  /* =========================================================================
+     BM-3: PROMOSI OPERATIONAL CONTROLLER
+     ========================================================================= */
+  async function loadBMPromotions() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+
+    var listContainer = $('bm-promo-list');
+    var redemptionsTbody = $('bm-promo-redemptions-tbody');
+
+    if (listContainer && (!_bmPromoState.promotions || !_bmPromoState.promotions.length)) {
+      listContainer.innerHTML = '<div class="text-center py-6 text-muted">Memuat promosi...</div>';
+    }
+    if (redemptionsTbody && (!_bmPromoState.redemptions || !_bmPromoState.redemptions.length)) {
+      redemptionsTbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-muted">Memuat riwayat penebusan...</td></tr>';
+    }
+
+    var currentSeq = ++_bmPromoState.fetchSeq;
+
+    try {
+      var pRes = await adminFetch(API_BASE + '/admin/marketing/promotions', { headers: getAuthHeaders() });
+      var pData = await pRes.json();
+
+      var rUrl = API_BASE + '/admin/marketing/redemptions' + (branchId ? ('?branch_id=' + encodeURIComponent(branchId)) : '');
+      var rRes = await adminFetch(rUrl, { headers: getAuthHeaders() });
+      var rData = await rRes.json();
+
+      if (currentSeq !== _bmPromoState.fetchSeq) return;
+
+      var promos = (pRes.ok && pData.success && Array.isArray(pData.promotions)) ? pData.promotions : [];
+      var redemptions = (rRes.ok && rData.success && Array.isArray(rData.redemptions)) ? rData.redemptions : [];
+
+      _bmPromoState.promotions = promos;
+      _bmPromoState.redemptions = redemptions;
+
+      updateBMPromoStats(promos, redemptions);
+      renderBMPromotionsList(promos);
+      renderBMRedemptionsTable(redemptions);
+
+    } catch (err) {
+      if (currentSeq !== _bmPromoState.fetchSeq) return;
+      console.warn('[BM Promo Load Error]:', err);
+      if (listContainer) listContainer.innerHTML = '<div class="text-center py-6 text-danger">Kesalahan jaringan saat memuat promosi.</div>';
+      if (redemptionsTbody) redemptionsTbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-danger">Kesalahan jaringan.</td></tr>';
+    }
+  }
+  window.loadBMPromotions = loadBMPromotions;
+
+  function updateBMPromoStats(promos, redemptions) {
+    var activeCount = (promos || []).filter(function (p) { return p.is_active === 1 || p.is_active === true; }).length;
+    var totalRedemptions = (redemptions || []).length;
+    var totalDiscount = (redemptions || []).reduce(function (acc, r) {
+      return acc + (Number(r.discount_amount || r.discount_applied) || 0);
+    }, 0);
+
+    if ($('bm-promo-stat-active')) $('bm-promo-stat-active').textContent = activeCount;
+    if ($('bm-promo-stat-redemptions')) $('bm-promo-stat-redemptions').textContent = totalRedemptions;
+    if ($('bm-promo-stat-discount-given')) $('bm-promo-stat-discount-given').textContent = formatMoney(totalDiscount);
+  }
+
+  function renderBMPromotionsList(promos) {
+    var container = $('bm-promo-list');
+    if (!container) return;
+
+    if (!promos || !promos.length) {
+      container.innerHTML = '<div class="text-center py-6 text-muted">Belum ada promosi aktif dari Brand untuk cabang ini.</div>';
+      return;
+    }
+
+    container.innerHTML = promos.map(function (p) {
+      var isActive = (p.is_active === 1 || p.is_active === true);
+      var badge = isActive
+        ? '<span class="x-badge x-badge-success" style="font-size:11px;">PROMO AKTIF</span>'
+        : '<span class="x-badge x-badge-secondary" style="font-size:11px;">NONAKTIF</span>';
+
+      return '<div class="x-card" style="padding:14px 16px; border:1px solid var(--border-color); border-radius:8px; background:#ffffff;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">' +
+          '<div>' +
+            '<strong style="font-size:15px; color:var(--text-main);">' + esc(p.name || p.title || 'Promosi') + '</strong>' +
+            (p.promo_code ? ('<div style="font-size:12px; margin-top:2px;">Kode Kupon: <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:700;">' + esc(p.promo_code) + '</code></div>') : '') +
+          '</div>' +
+          badge +
+        '</div>' +
+        (p.description ? ('<p style="font-size:12px; color:var(--text-muted); margin:4px 0 8px;">' + esc(p.description) + '</p>') : '') +
+        '<div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--text-muted); border-top:1px dashed var(--border-color); padding-top:8px; margin-top:6px;">' +
+          '<span>Tipe: <strong>' + esc(p.discount_type || 'Diskon') + '</strong></span>' +
+          '<span>Nilai: <strong>' + (p.discount_type === 'percentage' ? (p.discount_value + '%') : formatMoney(p.discount_value)) + '</strong></span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function renderBMRedemptionsTable(redemptions) {
+    var tbody = $('bm-promo-redemptions-tbody');
+    if (!tbody) return;
+
+    if (!redemptions || !redemptions.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center py-6 text-muted">Belum ada penebusan promo di cabang ini.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = redemptions.slice(0, 10).map(function (r) {
+      var time = (r.created_at || '').substring(0, 16).replace('T', ' ') || '—';
+      var discountVal = Number(r.discount_amount || r.discount_applied) || 0;
+      return '<tr>' +
+        '<td><strong>' + esc(r.order_number || r.order_id) + '</strong></td>' +
+        '<td><code>' + esc(r.promo_code || r.promotion_name || 'Promo') + '</code></td>' +
+        '<td><strong style="color:var(--accent-teal);">' + formatMoney(discountVal) + '</strong></td>' +
+        '<td style="font-size:12px; color:var(--text-muted);">' + time + '</td>' +
+      '</tr>';
+    }).join('');
+  }
 
 
     // Check for handoff ticket from xentra.cloud before initial auth check

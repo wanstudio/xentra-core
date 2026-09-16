@@ -6679,9 +6679,11 @@ router.get('/admin/branches/:id/products', requireAuth(['owner', 'brand_manager'
 
     const assignments = db.prepare(`
       SELECT bp.branch_id, bp.product_id, bp.price, bp.stock, bp.is_available, bp.low_stock_threshold,
-             p.name AS product_name, p.is_active AS is_master_active
+             p.name AS product_name, p.is_active AS is_master_active,
+             c.name AS category_name
       FROM branch_products bp
       JOIN products p ON p.id = bp.product_id
+      LEFT JOIN categories c ON c.id = p.category_id
       WHERE bp.branch_id = ?
       ORDER BY p.sort_order ASC, p.name ASC
     `).all(req.params.id);
