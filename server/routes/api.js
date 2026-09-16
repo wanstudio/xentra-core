@@ -1481,6 +1481,21 @@ function requireAuth(allowedRoles = []) {
       });
     }
 
+    // P9-17 AUTHORITATIVE ACCOUNT STATUS ENFORCEMENT
+    // A workforce account disabled/suspended AFTER login must not keep operating
+    // with a pre-disable session. Status is read from the DB (authoritative),
+    // never from client input or the cached session snapshot.
+    if (session.userId) {
+      const account = db.prepare('SELECT status FROM users WHERE id = ?').get(session.userId);
+      if (account && account.status && account.status !== 'active') {
+        return res.status(403).json({
+          success: false,
+          error: 'ACCOUNT_DISABLED',
+          message: 'Akun Anda telah dinonaktifkan. Hubungi administrator.'
+        });
+      }
+    }
+
     // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT via Core Identity
     let isTenantAuthorized = session.brandId === req.brand_id;
     const isInvitationAcceptRoute = req.path === '/invitations/accept' || (req.originalUrl && req.originalUrl.includes('/invitations/accept'));

@@ -91,7 +91,7 @@ function seedOrder({
   return { orderId, num, branchId, status, orderType };
 }
 
-function seedStaffSession({ role = 'branch_manager', branchId = BRANCH_A_ID, brandId = BRAND_ID, userId = 'bm_p9_test' } = {}) {
+function seedStaffSession({ role = 'branch_manager', branchId = BRANCH_A_ID, brandId = BRAND_ID, organizationId = null, userId = 'bm_p9_test' } = {}) {
   const token = 'p9token_' + crypto.randomBytes(8).toString('hex');
   const store = global.TokenSessionStore;
   const sess = {
@@ -99,6 +99,8 @@ function seedStaffSession({ role = 'branch_manager', branchId = BRANCH_A_ID, bra
     role,
     brandId,
     brand_id: brandId,
+    organizationId,
+    organization_id: organizationId,
     branchId,
     branch_id: branchId,
     userId,
@@ -589,5 +591,106 @@ describe('Phase 9 — Branch Manager Order Operations', () => {
     res = await request('PATCH', `/kitchen/orders/${pickupOrd.orderId}/status`, { status: 'completed' }, { Authorization: `Bearer ${bmAToken}` });
     assert.equal(res.status, 200);
     assert.equal(res.data.new_status, 'completed');
+  });
+
+  // ─── Canonical P9 supplemental coverage ─────────────────────────────────────
+  // The scenarios below close the remaining canonical gaps against the Phase 9
+  // test contract: cross-brand, cross-organization, stale conflicting action,
+  // disabled manager, and invalid/nonexistent target.
+
+  it('P9-10 (canonical): Cross-brand order access is rejected with FORBIDDEN_TENANT_ACCESS', async () => {
+    const crossBrandToken = seedStaffSession({
+      role: 'branch_manager',
+      branchId: 'branch_evil',
+      brandId: 'brand_evil',
+      userId: 'bm_cross_brand'
+    });
+
+    const res = await request('GET', '/admin/orders', null, {
+      Authorization: `Bearer ${crossBrandToken}`
+    });
+
+    assert.equal(res.status, 403);
+    assert.equal(res.data.error, 'FORBIDDEN_TENANT_ACCESS');
+  });
+
+  it('P9-11 (canonical): Cross-organization order access is rejected with FORBIDDEN_TENANT_ACCESS', async () => {
+    const crossOrgToken = seedStaffSession({
+      role: 'branch_manager',
+      branchId: 'branch_evil',
+      brandId: 'brand_evil',
+      organizationId: 'org_evil',
+      userId: 'bm_cross_org'
+    });
+
+    const res = await request('GET', '/admin/orders', null, {
+      Authorization: `Bearer ${crossOrgToken}`
+    });
+
+    assert.equal(res.status, 403);
+    assert.equal(res.data.error, 'FORBIDDEN_TENANT_ACCESS');
+  });
+
+  it('P9-14 (canonical): Stale conflicting action returns controlled state error', async () => {
+    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending' });
+
+    await request('POST', `/orders/${ord.orderId}/branch-acceptance`, {
+      decision: 'reject',
+      reason: 'Stok habis'
+    }, {
+      Authorization: `Bearer ${bmAToken}`
+    });
+
+    const staleAccept = await request('POST', `/orders/${ord.orderId}/branch-acceptance`, {
+      decision: 'accept'
+    }, {
+      Authorization: `Bearer ${bmAToken}`
+    });
+
+    assert.equal(staleAccept.status, 400);
+    assert.equal(staleAccept.data.success, false);
+    assert.ok(staleAccept.data.error.includes('tidak valid'));
+  });
+
+  it('P9-17 (canonical): Disabled Branch Manager cannot perform operational mutations', async () => {
+    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending' });
+    const disabledUserId = 'bm_disabled_p9';
+    db.prepare(`
+      INSERT INTO users (id, brand_id, organization_id, branch_id, username, email, full_name, role, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `).run(disabledUserId, BRAND_ID, 'org_bangjo', BRANCH_A_ID, 'bm_disabled_p9', 'disabled-p9@example.com', 'Disabled BM', 'branch_manager', 'disabled');
+
+    const disabledToken = seedStaffSession({
+      role: 'branch_manager',
+      branchId: BRANCH_A_ID,
+      userId: disabledUserId
+    });
+
+    try {
+      const res = await request('POST', `/orders/${ord.orderId}/branch-acceptance`, {
+        decision: 'accept'
+      }, {
+        Authorization: `Bearer ${disabledToken}`
+      });
+
+      assert.equal(res.status, 403);
+      assert.equal(res.data.error, 'ACCOUNT_DISABLED');
+
+      const check = db.prepare('SELECT status FROM orders WHERE id = ?').get(ord.orderId);
+      assert.equal(check.status, 'pending');
+    } finally {
+      db.prepare('DELETE FROM users WHERE id = ?').run(disabledUserId);
+    }
+  });
+
+  it('P9-18 (canonical): Invalid/nonexistent target order is handled safely', async () => {
+    const res = await request('POST', '/orders/p9_does_not_exist/branch-acceptance', {
+      decision: 'accept'
+    }, {
+      Authorization: `Bearer ${bmAToken}`
+    });
+
+    assert.equal(res.status, 404);
+    assert.equal(res.data.success, false);
   });
 });
