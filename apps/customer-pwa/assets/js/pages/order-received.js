@@ -97,7 +97,8 @@
         if (data.success && data.order) {
           stopTimers();
           renderOrder(data);
-          schedulePolling(data.order.status, data.order.acceptance_deadline_at);
+          var payStatus = (data.payment && data.payment.payment_status) || data.order.payment_status || 'pending';
+          schedulePolling(data.order.status, payStatus, data.order.acceptance_deadline_at);
         } else {
           renderNotFound(data.error || 'Pesanan tidak ditemukan.');
         }
@@ -128,11 +129,31 @@
   function renderOrder(data) {
     if (!targetContainer) return;
     var order = data.order;
+    var payment = data.payment || {};
     var status = order.status;
+    var payMethod = (order.payment_method || payment.payment_method || 'cash').toLowerCase();
+    var payStatus = (payment.payment_status || order.payment_status || 'pending').toLowerCase();
+    var isOnline = payMethod === 'midtrans';
 
-    // P7.1 AWAITING_BRANCH_ACCEPTANCE: all 'pending' orders post-checkout
-    // are awaiting branch acceptance (not "awaiting payment" — payment
-    // completion is the prerequisite for order creation).
+    // P6.5 PAYMENT FAILURE: Online payment cancelled, denied, or expired
+    if (isOnline && (payStatus === 'deny' || payStatus === 'cancel' || payStatus === 'expire')) {
+      renderPaymentFailed(data, payStatus);
+      return;
+    }
+
+    // P6.3 PAYMENT PENDING / PROCESSING: Online payment has not settled yet
+    if (isOnline && (payStatus === 'pending' || payStatus === 'reconciliation_pending')) {
+      if (status === 'cancelled') {
+        renderCancelled(order);
+        return;
+      }
+      renderPaymentPending(data);
+      return;
+    }
+
+    // P6.4 / P6.6 PAYMENT SUCCESS -> AWAITING_BRANCH_ACCEPTANCE
+    // When payment is settled (or cash), and order status is 'pending',
+    // the order is awaiting branch confirmation.
     if (status === 'pending') {
       renderWaiting(data);
       return;
@@ -160,13 +181,122 @@
     renderFulfillmentOrder(data);
   }
 
+  // ─── P6.3 PAYMENT PENDING SURFACE ─────────────────────────────────────────
+  function renderPaymentPending(data) {
+    if (!targetContainer) return;
+    var order = data.order;
+    var payment = data.payment || {};
+    var payStatus = (payment.payment_status || order.payment_status || 'pending').toLowerCase();
+    var branchName = order.branch_name || 'Cabang';
+    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var snapToken = payment.snap_token || order.snap_token || null;
+    var isRecon = payStatus === 'reconciliation_pending';
+
+    var headerTitle = isRecon ? 'Memverifikasi Pembayaran' : 'Menunggu Pembayaran';
+    var headerDesc = isRecon
+      ? 'Pembayaran online sedang diverifikasi dengan sistem gateway. Mohon tunggu sejenak.'
+      : 'Selesaikan pembayaran online sebesar <strong>' + UI.money(order.grand_total || 0) + '</strong> agar pesanan dapat diteruskan ke cabang <strong>' + UI.escape(branchName) + '</strong>.';
+
+    targetContainer.style.display = 'block';
+    targetContainer.innerHTML =
+      '<div id="x-payment-pending-screen" class="x-payment-pending-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
+      '  <div style="background:#fff;padding:28px 18px 22px;margin-bottom:12px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      '    <div style="width:56px;height:56px;border-radius:50%;background:#e0f2fe;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:28px;">💳</div>' +
+      '    <h1 id="x-pay-pending-title" style="font-size:20px;font-weight:800;color:#111;margin:0 0 8px;">' + headerTitle + '</h1>' +
+      '    <p style="font-size:13px;color:#6b7280;margin:0 0 18px;line-height:1.5;">' + headerDesc + '</p>' +
+      '    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:12px;padding:10px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:8px;">' +
+      '      <span style="font-size:14px;">' + (isRecon ? '🔄' : '⏱️') + '</span>' +
+      '      <span id="x-pay-status-label" style="font-size:13px;font-weight:700;color:#854d0e;">' + (isRecon ? 'Verifikasi Gateway Sedang Berjalan' : 'Status: Menunggu Pembayaran') + '</span>' +
+      '    </div>' +
+      '    <div style="background:#f8f9fa;border-radius:14px;padding:12px 16px;text-align:left;display:flex;flex-direction:column;gap:8px;">' +
+      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Nomor Pesanan</span><strong style="color:#111;">' + UI.escape(orderNumber) + '</strong></div>' +
+      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Cabang</span><span style="font-weight:700;color:#111;">' + UI.escape(branchName) + '</span></div>' +
+      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Metode Pembayaran</span><span style="font-weight:700;color:#111;">Online Pay (Midtrans / QRIS)</span></div>' +
+      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Total Tagihan</span><span style="font-weight:700;color:#111;">' + UI.money(order.grand_total || 0) + '</span></div>' +
+      '    </div>' +
+      '  </div>' +
+      '  <div style="padding:0 14px;display:flex;flex-direction:column;gap:10px;">' +
+      (snapToken ? '    <button type="button" id="x-btn-resume-pay" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border:none;border-radius:24px;cursor:pointer;background:var(--x-primary);color:var(--x-primary-text);">Bayar Sekarang</button>' : '') +
+      '    <button type="button" id="x-btn-cancel-pending" style="display:block;width:100%;height:44px;font-size:14px;font-weight:700;border:2px solid #e5e7eb;border-radius:24px;cursor:pointer;background:#fff;color:#6b7280;">Batalkan Pesanan</button>' +
+      '  </div>' +
+      '</div>';
+
+    var resumeBtn = document.getElementById('x-btn-resume-pay');
+    if (resumeBtn && snapToken) {
+      resumeBtn.onclick = function () {
+        if (window.snap && window.snap.pay) {
+          window.snap.pay(snapToken, {
+            onSuccess: function () { loadOrder(order.id); },
+            onPending: function () { loadOrder(order.id); },
+            onError: function () { loadOrder(order.id); },
+            onClose: function () { loadOrder(order.id); }
+          });
+        } else {
+          if (UI && UI.toast) UI.toast('Gateway pembayaran sedang dimuat, silakan coba lagi.');
+        }
+      };
+    }
+
+    var cancelBtn = document.getElementById('x-btn-cancel-pending');
+    if (cancelBtn) cancelBtn.onclick = function () { confirmCancel(order.id); };
+  }
+
+  // ─── P6.5 PAYMENT FAILURE SURFACE ─────────────────────────────────────────
+  function renderPaymentFailed(data, payStatus) {
+    if (!targetContainer) return;
+    stopTimers();
+    var order = data.order;
+    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var branchName = order.branch_name || 'Cabang';
+
+    var failTitle = 'Pembayaran Gagal';
+    var failDesc = 'Pembayaran tidak dapat diproses.';
+    if (payStatus === 'expire') {
+      failTitle = 'Waktu Pembayaran Habis';
+      failDesc = 'Batas waktu pembayaran online telah berakhir. Pesanan otomatis dibatalkan.';
+    } else if (payStatus === 'deny') {
+      failTitle = 'Pembayaran Ditolak';
+      failDesc = 'Pembayaran ditolak oleh penyedia pembayaran/bank. Saldo Anda tidak terpotong.';
+    } else if (payStatus === 'cancel') {
+      failTitle = 'Pembayaran Dibatalkan';
+      failDesc = 'Transaksi pembayaran online telah dibatalkan.';
+    }
+
+    targetContainer.style.display = 'block';
+    targetContainer.innerHTML =
+      '<div id="x-payment-failed-screen" class="x-payment-failed-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
+      '  <div style="background:#fff;padding:28px 18px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);margin-bottom:12px;">' +
+      '    <div style="font-size:48px;margin-bottom:12px;">❌</div>' +
+      '    <h1 id="x-pay-failed-title" style="font-size:20px;font-weight:800;color:#dc2626;margin:0 0 8px;">' + failTitle + '</h1>' +
+      '    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.5;">' + failDesc + '</p>' +
+      '    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 14px;font-size:13px;color:#dc2626;margin-bottom:16px;text-align:left;">' +
+      '      Pesanan tidak diproses oleh cabang karena pembayaran belum berhasil.' +
+      '    </div>' +
+      '    <div style="background:#f8f9fa;border-radius:14px;padding:12px 16px;text-align:left;display:flex;flex-direction:column;gap:8px;">' +
+      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Nomor Pesanan</span><strong style="color:#111;">' + UI.escape(orderNumber) + '</strong></div>' +
+      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Cabang</span><span style="font-weight:700;color:#111;">' + UI.escape(branchName) + '</span></div>' +
+      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Total</span><span style="font-weight:700;color:#111;">' + UI.money(order.grand_total || 0) + '</span></div>' +
+      '    </div>' +
+      '  </div>' +
+      '  <div style="padding:0 14px;">' +
+      '    <button type="button" id="x-btn-pay-retry" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border:none;border-radius:24px;cursor:pointer;background:var(--x-primary);color:var(--x-primary-text);">Pesan Lagi</button>' +
+      '  </div>' +
+      '</div>';
+
+    var btn = document.getElementById('x-btn-pay-retry');
+    if (btn && Router) btn.onclick = function () { Router.navigate('home'); };
+  }
+
   // ─── P7.1 AWAITING BRANCH ACCEPTANCE SURFACE ─────────────────────────────
   function renderWaiting(data) {
     if (!targetContainer) return;
     var order = data.order;
+    var payment = data.payment || {};
     var branchName = order.branch_name || 'Cabang';
     var orderNumber = order.order_number || ('XTR-' + order.id);
     var deadlineAt = order.acceptance_deadline_at || null;
+    var payMethod = (order.payment_method || payment.payment_method || 'cash').toLowerCase();
+    var isOnline = payMethod === 'midtrans';
 
     // P7.3 Derive seconds remaining from server-authoritative deadline
     var secsRemaining = ACCEPTANCE_TIMEOUT_SECONDS;
@@ -175,6 +305,14 @@
       secsRemaining = Math.max(0, Math.floor(msRemaining / 1000));
     }
 
+    var payBadgeHtml = isOnline
+      ? '<div id="x-badge-pay-confirmed" style="display:inline-flex;align-items:center;gap:6px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:12px;">✓ Pembayaran Berhasil Dikonfirmasi</div>'
+      : '<div id="x-badge-pay-cash" style="display:inline-flex;align-items:center;gap:6px;background:#f3f4f6;border:1px solid #e5e7eb;color:#374151;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-bottom:12px;">💵 Pembayaran Tunai (COD)</div>';
+
+    var waitingDesc = isOnline
+      ? 'Pembayaran berhasil dikonfirmasi. Cabang <strong>' + UI.escape(branchName) + '</strong> sedang memproses konfirmasi penerimaan pesanan.'
+      : 'Pesananmu sudah diterima sistem. Cabang <strong>' + UI.escape(branchName) + '</strong> sedang memproses konfirmasi penerimaan pesanan.';
+
     targetContainer.style.display = 'block';
     targetContainer.innerHTML =
       '<div id="x-waiting-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
@@ -182,8 +320,9 @@
       // Status Header Card
       '  <div style="background:#fff;padding:28px 18px 22px;margin-bottom:12px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
       '    <div style="width:56px;height:56px;border-radius:50%;background:#fef9c3;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:28px;">⏳</div>' +
+      payBadgeHtml +
       '    <h1 style="font-size:20px;font-weight:800;color:#111;margin:0 0 8px;">Menunggu Konfirmasi Cabang</h1>' +
-      '    <p style="font-size:13px;color:#6b7280;margin:0 0 18px;line-height:1.5;">Pesananmu sudah diterima sistem. Cabang <strong>' + UI.escape(branchName) + '</strong> sedang memproses konfirmasi penerimaan pesanan.</p>' +
+      '    <p style="font-size:13px;color:#6b7280;margin:0 0 18px;line-height:1.5;">' + waitingDesc + '</p>' +
 
       // P7.3 Countdown — display only, never authoritative
       '    <div style="background:#fef9c3;border-radius:14px;padding:14px 16px;margin-bottom:16px;">' +
@@ -545,8 +684,9 @@
   // ─── P7.2 Server-authoritative polling ───────────────────────────────────
   // P7.14 Stops on all terminal states.
   // P7.13 Stale responses discarded via fetchSeq.
-  function schedulePolling(currentStatus, deadlineAt) {
+  function schedulePolling(currentStatus, currentPayStatus, deadlineAt) {
     if (TERMINAL_STATES[currentStatus]) return;
+    if (['deny', 'cancel', 'expire'].includes(currentPayStatus)) return;
     if (pollingTimer) clearInterval(pollingTimer);
 
     pollingTimer = setInterval(function () {
@@ -557,17 +697,19 @@
           if (seq !== fetchSeq) return; // P7.13: stale — discard
           if (!data.success || !data.order) return;
           var newStatus = data.order.status;
-          if (newStatus !== currentStatus) {
+          var newPayStatus = (data.payment && data.payment.payment_status) || data.order.payment_status || 'pending';
+          if (newStatus !== currentStatus || newPayStatus !== currentPayStatus) {
             stopTimers();
             renderOrder(data);
             currentStatus = newStatus;
-            if (!TERMINAL_STATES[newStatus]) {
-              schedulePolling(newStatus, data.order.acceptance_deadline_at);
+            currentPayStatus = newPayStatus;
+            if (!TERMINAL_STATES[newStatus] && !['deny', 'cancel', 'expire'].includes(newPayStatus)) {
+              schedulePolling(newStatus, newPayStatus, data.order.acceptance_deadline_at);
             }
           }
         })
         .catch(function () {});
-    }, 5000);
+    }, 4000);
   }
 
   function unmount() {

@@ -1204,6 +1204,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     const placementResult = await OrderPlacementService.submitOrder({
       brand_id: req.brand_id,
       branch_id: branch.id,
+      client_transaction_id: req.body.client_transaction_id || req.body.clientTransactionId || null,
       customer: {
         name: customer.name.trim(),
         phone: customer.phone.trim()
@@ -1277,13 +1278,23 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     let snapResult = { snap_token: null, redirect_url: null, merchant_id: payment_method === 'cash' ? 'cash' : 'midtrans_default' };
 
     if (payment_method === 'midtrans') {
-      try {
-        snapResult = await PaymentService.createSnapTransaction(
-          { id: orderId, grand_total: grandTotal, branch_id: branch.id, brand_id: req.brand_id, delivery_fee: deliveryFee, discount_amount: discountAmount },
-          order.items,
-          customer
-        );
-      } catch (payErr) {
+      const existingPayment = placementResult.idempotent
+        ? db.prepare('SELECT snap_token, merchant_id FROM order_payments WHERE order_id = ?').get(orderId)
+        : null;
+      if (existingPayment && existingPayment.snap_token) {
+        snapResult = {
+          snap_token: existingPayment.snap_token,
+          redirect_url: null,
+          merchant_id: existingPayment.merchant_id || 'midtrans_default'
+        };
+      } else {
+        try {
+          snapResult = await PaymentService.createSnapTransaction(
+            { id: orderId, grand_total: grandTotal, branch_id: branch.id, brand_id: req.brand_id, delivery_fee: deliveryFee, discount_amount: discountAmount },
+            order ? order.items : items,
+            customer
+          );
+        } catch (payErr) {
         console.error('[Payment Gateway Error / Timeout]:', payErr.message);
         // P1 RECONCILIATION-AWARE FAILURE HANDLING (NEW-01 & NEW-02):
         // Mark payment as 'reconciliation_pending' so if gateway actually processed the transaction,
@@ -1301,6 +1312,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           error: 'PAYMENT_GATEWAY_TIMEOUT',
           message: `Koneksi ke gateway pembayaran online mengalami kendala (${payErr.message}). Jika Anda sudah melakukan pembayaran, transaksi akan otomatis direkonsiliasi.`
         });
+        }
       }
     }
 
@@ -1865,6 +1877,7 @@ router.get('/orders/:id', (req, res) => {
   const safePayment = payment ? {
     payment_method: payment.payment_method || payment.provider,
     payment_status: payment.payment_status,
+    snap_token: payment.snap_token || null,
     amount: payment.amount,
     settled_at: payment.settled_at,
     created_at: payment.created_at

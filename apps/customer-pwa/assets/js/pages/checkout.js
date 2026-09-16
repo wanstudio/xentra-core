@@ -2521,7 +2521,9 @@
       return { start: state.fulfillment.date + ' ' + state.fulfillment.timeSlot, end: null };
     }
 
+    var clientTxId = 'ctx_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
     var payload = {
+      client_transaction_id: clientTxId,
       branch_id: branchId,
       customer: {
         name: state.customer.name || 'Pelanggan Bangjo',

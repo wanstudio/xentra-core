@@ -52,6 +52,24 @@ class OrderPlacementService {
       ? 'confirmed'
       : 'pending';
 
+    if (client_transaction_id && branch_id) {
+      const existing = orderRepository.findByBranchTransactionId(branch_id, client_transaction_id);
+      if (existing) {
+        return {
+          success: true,
+          idempotent: true,
+          status: 'VERIFIED',
+          order_id: existing.id,
+          order_number: existing.order_number,
+          grand_total: existing.grand_total,
+          subtotal: existing.subtotal,
+          delivery_fee: existing.delivery_fee,
+          discount_amount: existing.discount_amount,
+          order: existing
+        };
+      }
+    }
+
     if (effectiveOrderType === 'reservation') {
       if (!reservation_date) {
         return { success: false, status: 'VALIDATION_ERROR', errors: ['Tanggal reservasi wajib diisi untuk tipe pesanan reservation.'] };
