@@ -8420,7 +8420,6 @@
     };
 
     var now = Date.now();
-    var ACCEPTANCE_WINDOW_MS = 180000; // 3 minutes platform timeout
 
     var rowsHtml = filtered.map(function (ord) {
       var ordType = ord.order_type || ord.fulfillment_type || 'delivery';
@@ -8434,13 +8433,32 @@
 
       var statusCol = statusBadges[ord.status] || ('<span class="x-badge">' + esc(ord.status.toUpperCase()) + '</span>');
       if (ord.status === 'pending') {
-        var createdAtMs = ord.created_at ? new Date(ord.created_at).getTime() : now;
-        var expiresAtMs = createdAtMs + ACCEPTANCE_WINDOW_MS;
-        var remainingMs = Math.max(0, expiresAtMs - now);
-        if (remainingMs > 0) {
-          statusCol += '<div style="font-size:11px; font-weight:700; color:#b45309; margin-top:3px;">⏱ ' + formatBMTimeRemaining(remainingMs) + '</div>';
+        if (!ord.acceptance_deadline_at) {
+          statusCol += '<div style="font-size:11px; font-weight:700; color:#b45309; margin-top:3px;">⏱ Memeriksa status...</div>';
+          if (!_bmOrdersState.refreshPendingTimeout) {
+            _bmOrdersState.refreshPendingTimeout = setTimeout(function () {
+              _bmOrdersState.refreshPendingTimeout = null;
+              loadBMOrders({ background: true });
+            }, 3000);
+          }
         } else {
-          statusCol += '<div style="font-size:11px; font-weight:700; color:#dc2626; margin-top:3px;">⏱ Waktu Habis</div>';
+          var expiresAtMs = new Date(ord.acceptance_deadline_at).getTime();
+          if (isNaN(expiresAtMs)) {
+            statusCol += '<div style="font-size:11px; font-weight:700; color:#6b7280; margin-top:3px;">⏱ Deadline tidak tersedia</div>';
+          } else {
+            var remainingMs = expiresAtMs - now;
+            if (remainingMs > 0) {
+              statusCol += '<div style="font-size:11px; font-weight:700; color:#b45309; margin-top:3px;">⏱ ' + formatBMTimeRemaining(remainingMs) + '</div>';
+            } else {
+              statusCol += '<div style="font-size:11px; font-weight:700; color:#dc2626; margin-top:3px;">⏱ Memeriksa status...</div>';
+              if (!_bmOrdersState.refreshPendingTimeout) {
+                _bmOrdersState.refreshPendingTimeout = setTimeout(function () {
+                  _bmOrdersState.refreshPendingTimeout = null;
+                  loadBMOrders({ background: true });
+                }, 3000);
+              }
+            }
+          }
         }
       }
 
@@ -8770,29 +8788,41 @@
       // P8: Branch Acceptance Warning Banner & Countdown
       var acceptanceBanner = $('bm-detail-acceptance-banner');
       var countdownText = $('bm-detail-countdown-text');
-      var ACCEPTANCE_WINDOW_MS = 180000;
 
       if (acceptanceBanner) {
         if (ord.status === 'pending') {
           acceptanceBanner.style.display = 'block';
-          var createdAtMs = ord.created_at ? new Date(ord.created_at).getTime() : Date.now();
-          var expiresAtMs = createdAtMs + ACCEPTANCE_WINDOW_MS;
 
-          var updateDetailCountdown = function () {
-            var diff = expiresAtMs - Date.now();
-            if (diff > 0) {
-              if (countdownText) countdownText.textContent = formatBMTimeRemaining(diff);
+          if (!ord.acceptance_deadline_at) {
+            if (countdownText) countdownText.textContent = 'Memeriksa status...';
+            _bmOrdersState.detailCountdownTimer = setTimeout(function () {
+              _bmOrdersState.detailCountdownTimer = null;
+              viewBMOrderDetail(ord.id);
+            }, 3000);
+          } else {
+            var expiresAtMs = new Date(ord.acceptance_deadline_at).getTime();
+            if (isNaN(expiresAtMs)) {
+              if (countdownText) countdownText.textContent = 'Deadline tidak tersedia';
             } else {
-              if (countdownText) countdownText.textContent = 'Waktu Habis (Timeout)';
-              if (_bmOrdersState.detailCountdownTimer) {
-                clearInterval(_bmOrdersState.detailCountdownTimer);
-                _bmOrdersState.detailCountdownTimer = null;
-              }
-            }
-          };
+              var updateDetailCountdown = function () {
+                var diff = expiresAtMs - Date.now();
+                if (diff > 0) {
+                  if (countdownText) countdownText.textContent = formatBMTimeRemaining(diff);
+                } else {
+                  if (countdownText) countdownText.textContent = 'Memeriksa status...';
+                  if (_bmOrdersState.detailCountdownTimer) {
+                    clearInterval(_bmOrdersState.detailCountdownTimer);
+                    _bmOrdersState.detailCountdownTimer = null;
+                  }
+                  // Authoritative refresh from server; never mutate locally
+                  viewBMOrderDetail(ord.id);
+                }
+              };
 
-          updateDetailCountdown();
-          _bmOrdersState.detailCountdownTimer = setInterval(updateDetailCountdown, 1000);
+              updateDetailCountdown();
+              _bmOrdersState.detailCountdownTimer = setInterval(updateDetailCountdown, 1000);
+            }
+          }
         } else {
           acceptanceBanner.style.display = 'none';
         }

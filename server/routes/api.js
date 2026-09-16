@@ -9,6 +9,7 @@ const BranchMatcher = require('../services/BranchMatcher');
 const DeliveryCalculator = require('../services/DeliveryCalculator');
 const PaymentService = require('../services/PaymentService');
 const OrderStateMachine = require('../services/OrderStateMachine');
+const AcceptanceTimeoutService = require('../services/AcceptanceTimeoutService');
 const RouteService = require('../services/RouteService');
 const { PromotionEngineService } = require('../../domains/promotion');
 const { InventoryStockService, InventoryMovementModel } = require('../../domains/inventory');
@@ -1817,19 +1818,10 @@ router.get('/orders/:id', (req, res) => {
   // Return clean DTO projection to prevent internal data/GPS leakage.
   // P7.2 BRANCH ACCEPTANCE SURFACE: branch_name, branch_id, acceptance_deadline_at
   // are exposed to support the awaiting-acceptance waiting screen.
-  // acceptance_deadline_at is server-computed (created_at + 180s platform policy).
+  // acceptance_deadline_at is server-computed via AcceptanceTimeoutService (3-minute platform policy).
   // It is a DISPLAY timestamp only — the client countdown reaching zero never
   // transitions order state. Status is always fetched from server.
-  const ACCEPTANCE_TIMEOUT_SECONDS = 180; // 3-minute platform policy
-  let acceptanceDeadlineAt = null;
-  if (order.status === 'pending' && order.created_at) {
-    try {
-      const createdMs = new Date(order.created_at).getTime();
-      if (!isNaN(createdMs)) {
-        acceptanceDeadlineAt = new Date(createdMs + ACCEPTANCE_TIMEOUT_SECONDS * 1000).toISOString();
-      }
-    } catch (_) {}
-  }
+  const acceptanceDeadlineAt = AcceptanceTimeoutService.computeAcceptanceDeadlineAt(order);
 
   const safeOrder = {
     id: order.id,
@@ -6754,6 +6746,7 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
 
     const enriched = orders.map(ord => ({
       ...ord,
+      acceptance_deadline_at: ord.acceptance_deadline_at || AcceptanceTimeoutService.computeAcceptanceDeadlineAt(ord),
       items: db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(ord.id),
       delivery: db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(ord.id),
       payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id)
@@ -8050,6 +8043,7 @@ router.get('/admin/orders/:id', requireAuth(['owner', 'brand_manager', 'branch_m
       success: true,
       order: {
         ...order,
+        acceptance_deadline_at: order.acceptance_deadline_at || AcceptanceTimeoutService.computeAcceptanceDeadlineAt(order),
         items: items || [],
         delivery: delivery || null,
         payment: payment || null,

@@ -38,8 +38,23 @@ function checkAndApplyTimeouts() {
   return { processed: overdue.length, timed_out: timedOut, skipped };
 }
 
+function computeAcceptanceDeadlineAt(order) {
+  if (!order || order.status !== 'pending' || !order.created_at) {
+    return null;
+  }
+  try {
+    const createdMs = new Date(order.created_at).getTime();
+    if (!isNaN(createdMs)) {
+      return new Date(createdMs + ACCEPTANCE_TIMEOUT_SECONDS * 1000).toISOString();
+    }
+  } catch (_) {}
+  return null;
+}
+
 module.exports = {
   ACCEPTANCE_TIMEOUT_SECONDS,
   findOverduePendingOrders,
-  checkAndApplyTimeouts
+  checkAndApplyTimeouts,
+  computeAcceptanceDeadlineAt
 };
+
