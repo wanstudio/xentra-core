@@ -332,20 +332,20 @@ describe('Real E2E Auth Flow: xentra.cloud Google Onboard → Handoff → app.my
   });
 
   // Flow 6: Platform uses inline GSI (isPlatform guard), Client/Tenant redirects to xentra.cloud broker
-  test('6. Tenant login does NOT initialize GSI and Google button redirects to xentra.cloud', () => {
+  test('6. Tenant login initializes Google SDK and authenticates directly (no xentra.cloud broker redirect)', () => {
     const fs = require('fs');
     const loginHtml = fs.readFileSync('apps/merchant-dashboard/login.html', 'utf8');
 
-    // Requirement: GSI code exists only inside the isPlatform branch — guarded so client/tenant domains never execute it
-    assert.ok(loginHtml.includes('if (isPlatform)'), 'login.html must gate Platform SDK code with isPlatform check');
-    assert.ok(loginHtml.includes('handlePlatformGoogleCredential'), 'Platform branch must have inline credential handler');
-    assert.ok(loginHtml.includes('initPlatformGoogleSignIn'), 'Platform branch must have SDK init function');
+    // Requirement: both Platform and Tenant use the same inline credential handler against this origin
+    assert.ok(loginHtml.includes('handleGoogleCredential'), 'login.html must have the inline Google credential handler');
+    assert.ok(loginHtml.includes('initGoogleSignIn'), 'login.html must have the SDK init function');
+    assert.ok(loginHtml.includes('/api/v1/auth/google'), 'login.html must POST to the same-origin /api/v1/auth/google endpoint');
 
-    // GSI SDK is present in JS (for Platform) but loaded dynamically — never as a static <script> tag
+    // GSI SDK is loaded dynamically — never as a static <script> tag
     assert.ok(!loginHtml.includes('<script src="https://accounts.google.com/gsi/client"'), 'GSI SDK must NOT be a static <script> tag in login.html');
 
-    // Requirement: Client/Tenant branch: Continue with Google navigates to xentra.cloud/auth/broker?return_to=...
-    assert.ok(loginHtml.includes("'https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent("), 'login.html must construct xentra.cloud broker redirect with encoded return_to');
+    // Regression: Client/Tenant must NOT redirect to xentra.cloud/auth/broker (that lost tenant-scoped identity resolution)
+    assert.ok(!loginHtml.includes("'https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent("), 'login.html must NOT construct a xentra.cloud broker redirect');
     assert.ok(!loginHtml.includes("xentra.cloud/signin?return_to="), 'login.html must NOT redirect any user to xentra.cloud/signin');
     assert.ok(loginHtml.includes("btn-google-login"), 'login.html must have btn-google-login button');
   });
@@ -578,15 +578,14 @@ describe('Real E2E Auth Flow: xentra.cloud Google Onboard → Handoff → app.my
     });
   });
 
-  // Flow 13: Dynamic return_to without hardcoding — verifies login.html resolves window.location.origin dynamically
-  test('13. Client login.html derives return_to dynamically from window.location.origin with no hardcoded client domain', () => {
+  // Flow 13: Tenant login authenticates Google directly on its own origin with no broker redirect
+  test('13. Client login.html authenticates Google directly on its own origin (no broker redirect or hardcoded client domain)', () => {
     const fs = require('fs');
     const loginHtml = fs.readFileSync('apps/merchant-dashboard/login.html', 'utf8');
 
-    assert.ok(loginHtml.includes('var currentOrigin = window.location.origin;'), 'login.html must read window.location.origin dynamically');
-    assert.ok(loginHtml.includes("var returnUrl = currentOrigin + '/dashboard/login';"), 'login.html must construct returnUrl from currentOrigin');
-    assert.ok(loginHtml.includes("'https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent(returnUrl)"), 'login.html must encode dynamic returnUrl to auth broker');
-    // Ensure no client-specific production domain is hardcoded in login.html redirect
+    assert.ok(loginHtml.includes('/api/v1/auth/google'), 'login.html must POST to same-origin /api/v1/auth/google');
+    assert.ok(!loginHtml.includes("'https://xentra.cloud/auth/broker?return_to='"), 'login.html must NOT construct a xentra.cloud broker redirect');
+    // Ensure no client-specific production domain is hardcoded in login.html
     assert.ok(!loginHtml.includes('app.mybangjo.com/auth/broker'), 'No client domain hardcoded in broker target');
   });
 

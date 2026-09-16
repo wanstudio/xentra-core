@@ -835,111 +835,104 @@
       }
 
       // 7. Google Authentication
-      // Platform context: inline Google SDK — calls /api/v1/auth/google directly (pre-regression behavior).
-      // Client context: btn-google-login redirects to xentra.cloud auth broker (cross-domain handoff).
+      // Google is always authenticated directly against this origin's backend.
+      // The xentra.cloud broker cannot resolve tenant-scoped provider identities
+      // and previously broke existing Google-linked restaurant accounts.
       var btnGoogleLogin = document.getElementById('btn-google-login');
       var googleBtnSlot = document.getElementById('google-btn-slot');
       var googleContainer = document.getElementById('google-auth-container');
       var googleStatus = document.getElementById('google-auth-status');
       var isGoogleAuthenticating = false;
 
-      if (isPlatform) {
-        // Platform: use inline Google SDK — same path that worked before dashboard separation.
-        // DO NOT redirect to /signin (that is the SaaS restaurant-owner sign-in page, not the Platform auth path).
-        if (btnGoogleLogin) btnGoogleLogin.style.display = 'none'; // hide static button; SDK renders its own
+      if (btnGoogleLogin) btnGoogleLogin.style.display = 'none'; // hide static button; SDK renders its own
 
-        function handlePlatformGoogleCredential(response) {
-          if (!response || !response.credential) {
-            errorBox.textContent = '❌ Kredensial Google tidak diterima.';
-            errorBox.style.display = 'block';
-            return;
-          }
-          if (isGoogleAuthenticating) return;
-          isGoogleAuthenticating = true;
-          errorBox.style.display = 'none';
-          if (googleStatus) { googleStatus.textContent = 'Memverifikasi akun Google dengan Xentra...'; googleStatus.style.display = 'block'; }
-
-          fetch('/api/v1/auth/google', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ credential: response.credential })
-          }).then(function (res) {
-            return res.json().then(function (data) {
-              if (res.ok && data && data.success && data.token) {
-                localStorage.setItem(TOKEN_KEY, data.token);
-                if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-                if (googleStatus) { googleStatus.textContent = 'Login Google berhasil! Mengalihkan...'; googleStatus.style.color = '#166534'; }
-                setTimeout(function () { window.location.href = '/dashboard/'; }, 250);
-                return;
-              }
-              var msg;
-              if (res.status === 404 && data && data.code === 'ACCOUNT_NOT_LINKED') {
-                msg = '⚠️ Akun Google ini belum terhubung ke akun Platform. Silakan hubungi administrator atau masuk menggunakan username dan password.';
-              } else if (res.status === 403 && data && data.code === 'ACCOUNT_DISABLED') {
-                msg = '❌ Akun Platform ini telah dinonaktifkan. Hubungi administrator.';
-              } else {
-                msg = '❌ ' + ((data && (data.error || data.message)) || 'Autentikasi Google gagal.');
-              }
-              errorBox.textContent = msg;
-              errorBox.style.display = 'block';
-            });
-          }).catch(function () {
-            errorBox.textContent = '❌ Kesalahan jaringan saat autentikasi Google. Silakan coba lagi.';
-            errorBox.style.display = 'block';
-          }).finally(function () {
-            isGoogleAuthenticating = false;
-            if (googleStatus) googleStatus.style.display = 'none';
-          });
+      function handleGoogleCredential(response) {
+        if (!response || !response.credential) {
+          errorBox.textContent = '❌ Kredensial Google tidak diterima.';
+          errorBox.style.display = 'block';
+          return;
         }
+        if (isGoogleAuthenticating) return;
+        isGoogleAuthenticating = true;
+        errorBox.style.display = 'none';
+        if (googleStatus) { googleStatus.textContent = 'Memverifikasi akun Google dengan Xentra...'; googleStatus.style.display = 'block'; }
 
-        function initPlatformGoogleSignIn(clientId) {
-          if (!clientId || !window.google || !window.google.accounts || !window.google.accounts.id) return;
-          try {
-            window.google.accounts.id.initialize({
-              client_id: clientId,
-              callback: handlePlatformGoogleCredential,
-              auto_select: false,
-              cancel_on_tap_outside: true
-            });
-            if (googleBtnSlot) {
-              googleBtnSlot.innerHTML = '';
-              window.google.accounts.id.renderButton(googleBtnSlot, {
-                theme: 'outline', size: 'large', type: 'standard',
-                text: 'continue_with', shape: 'rectangular', logo_alignment: 'left', width: 320
-              });
-              if (googleContainer) googleContainer.style.display = 'flex';
+        var targetEndpoint = claimDomain ? '/api/v1/onboarding/claim' : '/api/v1/auth/google';
+        var payload = claimDomain
+          ? { domain: claimDomain, credential: response.credential }
+          : { credential: response.credential };
+
+        fetch(targetEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).then(function (res) {
+          return res.json().then(function (data) {
+            if (res.ok && data && data.success && data.token) {
+              sessionStorage.removeItem('xentra_pending_claim_domain');
+              localStorage.setItem(TOKEN_KEY, data.token);
+              if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+              if (googleStatus) { googleStatus.textContent = claimDomain ? 'Klaim bisnis berhasil! Mengalihkan...' : 'Login Google berhasil! Mengalihkan...'; googleStatus.style.color = '#166534'; }
+              var targetUrl = data.redirect_url || (data.business && data.business.custom_domain ? 'https://' + data.business.custom_domain + '/dashboard/' : '/dashboard/');
+              setTimeout(function () { window.location.href = targetUrl; }, 250);
+              return;
             }
-          } catch (e) {
-            console.warn('[Platform Google SDK init warn]:', e);
-          }
-        }
-
-        fetch('/api/v1/auth/config').then(function (res) {
-          return res.json();
-        }).then(function (cfg) {
-          if (!cfg || !cfg.google_enabled || !cfg.google_client_id) return;
-          var script = document.createElement('script');
-          script.src = 'https://accounts.google.com/gsi/client';
-          script.async = true; script.defer = true;
-          script.onload = function () { initPlatformGoogleSignIn(cfg.google_client_id); };
-          document.head.appendChild(script);
-        }).catch(function () {});
-
-      } else {
-        // Client/Tenant context: redirect to xentra.cloud auth broker (cross-domain handoff).
-        if (btnGoogleLogin) {
-          btnGoogleLogin.addEventListener('click', function (e) {
-            e.preventDefault();
-            var currentOrigin = window.location.origin;
-            var returnUrl = currentOrigin + '/dashboard/login';
-            var redirectTarget = 'https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent(returnUrl);
-            if (claimDomain) {
-              redirectTarget += '&claim_domain=' + encodeURIComponent(claimDomain);
+            var msg;
+            if (res.status === 404 && data && data.code === 'ACCOUNT_NOT_LINKED') {
+              msg = isPlatform
+                ? '⚠️ Akun Google ini belum terhubung ke akun Platform. Silakan hubungi administrator atau masuk menggunakan username dan password.'
+                : '⚠️ Akun Google ini belum terhubung ke akun staf/operator restoran. Silakan masuk menggunakan username dan password terlebih dahulu.';
+            } else if (res.status === 403 && data && data.code === 'ACCOUNT_DISABLED') {
+              msg = isPlatform ? '❌ Akun Platform ini telah dinonaktifkan. Hubungi administrator.' : '❌ Akun telah dinonaktifkan. Hubungi administrator.';
+            } else if (res.status === 403 && data && data.code === 'FORBIDDEN_TENANT_ACCESS') {
+              msg = '❌ Akun Anda tidak memiliki izin akses ke resto ini.';
+            } else {
+              msg = '❌ ' + ((data && (data.error || data.message)) || (claimDomain ? 'Gagal mengklaim bisnis dengan Google.' : 'Autentikasi Google gagal.'));
             }
-            window.location.href = redirectTarget;
+            errorBox.textContent = msg;
+            errorBox.style.display = 'block';
           });
+        }).catch(function () {
+          errorBox.textContent = '❌ Kesalahan jaringan saat autentikasi Google. Silakan coba lagi.';
+          errorBox.style.display = 'block';
+        }).finally(function () {
+          isGoogleAuthenticating = false;
+          if (googleStatus) googleStatus.style.display = 'none';
+        });
+      }
+
+      function initGoogleSignIn(clientId) {
+        if (!clientId || !window.google || !window.google.accounts || !window.google.accounts.id) return;
+        try {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleCredential,
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
+          if (googleBtnSlot) {
+            googleBtnSlot.innerHTML = '';
+            window.google.accounts.id.renderButton(googleBtnSlot, {
+              theme: 'outline', size: 'large', type: 'standard',
+              text: 'continue_with', shape: 'rectangular', logo_alignment: 'left', width: 320
+            });
+            if (googleContainer) googleContainer.style.display = 'flex';
+          }
+        } catch (e) {
+          console.warn('[Google SDK init warn]:', e);
         }
       }
+
+      fetch('/api/v1/auth/config').then(function (res) {
+        return res.json();
+      }).then(function (cfg) {
+        if (!cfg || !cfg.google_enabled || !cfg.google_client_id) return;
+        var script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true; script.defer = true;
+        script.onload = function () { initGoogleSignIn(cfg.google_client_id); };
+        document.head.appendChild(script);
+      }).catch(function () {});
     })();
   </script>
 </body>

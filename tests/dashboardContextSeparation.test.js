@@ -143,19 +143,19 @@ describe('Dashboard Context Separation — Platform vs Client Owner', () => {
     assert.match(loginHtml, /isPlatform/);
   });
 
-  it('9. login.html uses inline Google SDK for Platform and broker redirect for Client tenant', () => {
+  it('9. login.html uses inline Google SDK for Platform and direct same-origin auth for Client tenant', () => {
     const loginPath = path.join(__dirname, '../apps/merchant-dashboard/login.html');
     const loginHtml = fs.readFileSync(loginPath, 'utf8');
 
-    // Platform: inline SDK path — calls /api/v1/auth/google directly (NOT a redirect to /signin)
-    assert.match(loginHtml, /handlePlatformGoogleCredential/);
+    // Inline SDK path — calls /api/v1/auth/google directly on the current origin
+    assert.match(loginHtml, /handleGoogleCredential/);
     assert.match(loginHtml, /\/api\/v1\/auth\/google/);
-    assert.match(loginHtml, /initPlatformGoogleSignIn/);
+    assert.match(loginHtml, /initGoogleSignIn/);
     // Must NOT redirect platform users to /signin
     assert.doesNotMatch(loginHtml, /\/signin\?return_to=.*\/dashboard/);
 
-    // Client/Tenant: broker redirect path
-    assert.match(loginHtml, /https:\/\/xentra\.cloud\/auth\/broker\?return_to=/);
+    // Client/Tenant: must NOT redirect to xentra.cloud broker (this broke tenant-scoped Google login)
+    assert.doesNotMatch(loginHtml, /https:\/\/xentra\.cloud\/auth\/broker\?return_to=/);
   });
 });
 
