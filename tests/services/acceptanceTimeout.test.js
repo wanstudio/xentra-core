@@ -9,11 +9,20 @@
  */
 'use strict';
 
-const test = require('node:test');
+const { test, after, before } = require('node:test');
 const assert = require('node:assert');
 const crypto = require('node:crypto');
 const db = require('../../server/database/db');
 const AcceptanceTimeoutService = require('../../server/services/AcceptanceTimeoutService');
+
+function cleanup() {
+  db.prepare("DELETE FROM order_payments WHERE order_id LIKE 'r6s_%'").run();
+  db.prepare("DELETE FROM order_status_logs WHERE order_id LIKE 'r6s_%'").run();
+  db.prepare("DELETE FROM orders WHERE id LIKE 'r6s_%'").run();
+}
+
+before(cleanup);
+after(cleanup);
 
 function seedOrder(id, { status = 'pending', ageSeconds = -200, settled = false } = {}) {
   const orderNum = 'TO-' + id + '-' + crypto.randomBytes(3).toString('hex');

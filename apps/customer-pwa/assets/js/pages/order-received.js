@@ -389,7 +389,14 @@
     countdownTimer = setInterval(function () {
       secs = Math.max(0, secs - 1);
       var el = document.getElementById('x-acceptance-countdown');
-      if (el) el.textContent = fmtCountdown(secs);
+      if (el) {
+        if (secs > 0) {
+          el.textContent = fmtCountdown(secs);
+        } else {
+          el.style.fontSize = '18px';
+          el.textContent = 'Memeriksa status pesanan...';
+        }
+      }
       if (secs <= 0) {
         clearInterval(countdownTimer);
         countdownTimer = null;
@@ -416,12 +423,12 @@
 
     targetContainer.style.display = 'block';
     targetContainer.innerHTML =
-      '<div style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
+      '<div id="x-rejected-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
       '  <div style="background:#fff;padding:28px 18px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);margin-bottom:12px;">' +
       '    <div style="font-size:48px;margin-bottom:12px;">❌</div>' +
       '    <h1 style="font-size:20px;font-weight:800;color:#dc2626;margin:0 0 8px;">Pesanan Ditolak</h1>' +
       '    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.5;">Cabang <strong>' + UI.escape(branchName) + '</strong> tidak dapat memproses pesananmu saat ini.</p>' +
-      (rejectionNote ? '    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 14px;font-size:13px;color:#dc2626;margin-bottom:16px;text-align:left;">' + UI.escape(rejectionNote) + '</div>' : '') +
+      (rejectionNote ? '    <div id="x-rejection-note" style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:12px 14px;font-size:13px;color:#dc2626;margin-bottom:16px;text-align:left;">' + UI.escape(rejectionNote) + '</div>' : '') +
       '    <div style="background:#f8f9fa;border-radius:14px;padding:12px 16px;text-align:left;">' +
       '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Nomor Pesanan</span><strong style="color:#111;">' + UI.escape(orderNumber) + '</strong></div>' +
       '    </div>' +
@@ -443,7 +450,7 @@
 
     targetContainer.style.display = 'block';
     targetContainer.innerHTML =
-      '<div style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
+      '<div id="x-timeout-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
       '  <div style="background:#fff;padding:28px 18px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);margin-bottom:12px;">' +
       '    <div style="font-size:48px;margin-bottom:12px;">⌛</div>' +
       '    <h1 style="font-size:20px;font-weight:800;color:#d97706;margin:0 0 8px;">Waktu Konfirmasi Habis</h1>' +
