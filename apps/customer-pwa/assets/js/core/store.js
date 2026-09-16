@@ -354,8 +354,13 @@
     var items = state.cart.items;
     if (qty <= 0) {
       state.cart.items = items.filter(function (i) {
-        return !(String(i.id) === String(productId) && (key === undefined || cartGroupKey(i) === key));
+        if (String(i.id) === String(productId) && (key === undefined || cartGroupKey(i) === key)) {
+          delete state.notes[noteScopeKey(i.id, i.branch_id)];
+          return false;
+        }
+        return true;
       });
+      save(NOTES_KEY, state.notes);
     } else {
       for (var i = 0; i < items.length; i++) {
         if (String(items[i].id) === String(productId) && (key === undefined || cartGroupKey(items[i]) === key)) {
@@ -373,20 +378,40 @@
     setQty(productId, 0, branchId);
   }
 
+  function noteScopeKey(productId, branchId) {
+    var bKey = (branchId == null || String(branchId) === '') ? '__unassigned__' : String(branchId);
+    return String(productId) + '::' + bKey;
+  }
+
   function setNote(productId, noteText, branchId) {
     var key = mutationScopeKey(branchId);
     var items = state.cart.items;
+    var matchedItem = null;
     for (var i = 0; i < items.length; i++) {
       if (String(items[i].id) === String(productId) && (key === undefined || cartGroupKey(items[i]) === key)) {
         items[i].note = noteText;
+        matchedItem = items[i];
         break;
       }
     }
 
+    var bScope = branchId !== undefined ? branchId : (matchedItem ? matchedItem.branch_id : null);
+    if (bScope !== undefined) {
+      state.notes[noteScopeKey(productId, bScope)] = noteText;
+    }
     state.notes[productId] = noteText;
     notify({ type: 'cart' });
     save(CART_KEY, state.cart);
     save(NOTES_KEY, state.notes);
+  }
+
+  function getNote(productId, branchId) {
+    var item = findCartItem(productId, branchId);
+    if (item && item.note) return item.note;
+    var sKey = noteScopeKey(productId, branchId);
+    if (state.notes && state.notes[sKey] !== undefined) return state.notes[sKey];
+    if (state.notes && state.notes[productId] !== undefined) return state.notes[productId];
+    return '';
   }
 
   function clearCart() {
@@ -465,10 +490,15 @@
   function removeBranchItems(branchId) {
     var key = (branchId == null || String(branchId) === '') ? '__unassigned__' : String(branchId);
     state.cart.items = (state.cart.items || []).filter(function (item) {
-      return cartGroupKey(item) !== key;
+      if (cartGroupKey(item) === key) {
+        delete state.notes[noteScopeKey(item.id, item.branch_id)];
+        return false;
+      }
+      return true;
     });
     notify({ type: 'cart' });
     save(CART_KEY, state.cart);
+    save(NOTES_KEY, state.notes);
   }
 
   // R1 branch-scoped line removal: removes ONLY the line matching productId
@@ -478,10 +508,15 @@
   function removeCartItem(productId, branchId) {
     var key = (branchId == null || String(branchId) === '') ? '__unassigned__' : String(branchId);
     state.cart.items = (state.cart.items || []).filter(function (item) {
-      return !(String(item.id) === String(productId) && cartGroupKey(item) === key);
+      if (String(item.id) === String(productId) && cartGroupKey(item) === key) {
+        delete state.notes[noteScopeKey(item.id, item.branch_id)];
+        return false;
+      }
+      return true;
     });
     notify({ type: 'cart' });
     save(CART_KEY, state.cart);
+    save(NOTES_KEY, state.notes);
   }
 
   // ── Export ──
@@ -505,6 +540,7 @@
     setQty: setQty,
     removeItem: removeItem,
     setNote: setNote,
+    getNote: getNote,
     clearCart: clearCart,
     getCartCount: getCartCount,
     getCartSubtotal: getCartSubtotal,

@@ -404,7 +404,8 @@ test('BUGFIX quantity scope: scoped lookup returns null for a foreign scope; leg
 });
 
 test('P4.1/P4.2 Note isolation: setting note on one branch line does not overwrite the same SKU in another branch', () => {
-  const Store = freshStore();
+  const sharedStorage = {};
+  const Store = freshStore(sharedStorage);
 
   Store.addItem(product('288', 'Es Kopi', 15000), 1, { branch_id: 'branch_a' });
   Store.addItem(product('288', 'Es Kopi', 15000), 1, { branch_id: 'branch_b' });
@@ -422,6 +423,33 @@ test('P4.1/P4.2 Note isolation: setting note on one branch line does not overwri
   Store.setNote('288', 'Extra shot espresso', 'branch_b');
   assert.strictEqual(Store.findCartItem('288', 'branch_a').note, 'Less ice, no sugar', 'branch A unchanged');
   assert.strictEqual(Store.findCartItem('288', 'branch_b').note, 'Extra shot espresso', 'branch B note updated');
+
+  // Verify state.notes branch isolation & getNote helper
+  const stateNotes = Store.getState().notes;
+  assert.strictEqual(stateNotes['288::branch_a'], 'Less ice, no sugar', 'branch A note stored under scoped key');
+  assert.strictEqual(stateNotes['288::branch_b'], 'Extra shot espresso', 'branch B note stored under scoped key');
+  assert.strictEqual(Store.getNote('288', 'branch_a'), 'Less ice, no sugar');
+  assert.strictEqual(Store.getNote('288', 'branch_b'), 'Extra shot espresso');
+
+  // Verify persistence across reload (simulating fresh page load)
+  const reloaded = freshStore(sharedStorage);
+  const reloadedLineA = reloaded.findCartItem('288', 'branch_a');
+  const reloadedLineB = reloaded.findCartItem('288', 'branch_b');
+  assert.strictEqual(reloadedLineA.note, 'Less ice, no sugar', 'reloaded line A preserved');
+  assert.strictEqual(reloadedLineB.note, 'Extra shot espresso', 'reloaded line B preserved');
+
+  const reloadedNotes = reloaded.getState().notes;
+  assert.strictEqual(reloadedNotes['288::branch_a'], 'Less ice, no sugar', 'reloaded state.notes for branch A preserved');
+  assert.strictEqual(reloadedNotes['288::branch_b'], 'Extra shot espresso', 'reloaded state.notes for branch B preserved');
+  assert.strictEqual(reloaded.getNote('288', 'branch_a'), 'Less ice, no sugar');
+  assert.strictEqual(reloaded.getNote('288', 'branch_b'), 'Extra shot espresso');
+
+  // Removing line from branch A cleans up scoped note
+  reloaded.removeItem('288', 'branch_a');
+  assert.strictEqual(reloaded.findCartItem('288', 'branch_a'), null);
+  assert.strictEqual(reloaded.getState().notes['288::branch_a'], undefined, 'scoped note cleaned up on removal');
+  assert.strictEqual(reloaded.findCartItem('288', 'branch_b').note, 'Extra shot espresso', 'branch B line note still intact');
+  assert.strictEqual(reloaded.getState().notes['288::branch_b'], 'Extra shot espresso', 'branch B scoped note still intact');
 });
 
 test('P4.6 Branch-scoped removeItem: removeItem(id, branchId) removes only the targeted branch line', () => {

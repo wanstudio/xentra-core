@@ -760,7 +760,9 @@
       var hasOld = item.regular_price && Number(item.regular_price) > Number(item.price);
       var img = item.image_url || item.image || '';
       var qty = Number(item.quantity || 1);
-      var note = (state.notes && state.notes[item.id]) || item.note || '';
+      var bScope = item.branch_id || currentBranchId || null;
+      var sKey = String(item.id) + '::' + (bScope || '__unassigned__');
+      var note = (item && item.note) || (state.notes && (state.notes[sKey] || state.notes[item.id])) || '';
       // Visual classification only — reward identity is canonical (flag / reward_ id),
       // never price-based, so a legitimately free catalog product is not mislabelled "Gratis".
       var isPromoFreebie = Boolean(item.is_promo_reward || String(item.id).indexOf('reward_') === 0);
@@ -2209,7 +2211,9 @@
   function openItemNoteSheet(itemId, branchId) {
     var item = Store.findCartItem(itemId, branchId !== undefined ? branchId : currentBranchId);
     if (!item) return;
-    var val = (state.notes && state.notes[itemId]) || item.note || '';
+    var bScope = item.branch_id !== undefined ? item.branch_id : (branchId !== undefined ? branchId : currentBranchId);
+    var sKey = String(itemId) + '::' + ((bScope == null || String(bScope) === '') ? '__unassigned__' : String(bScope));
+    var val = (item && item.note) || (state.notes && (state.notes[sKey] || state.notes[itemId])) || '';
     var sh = makeOverlay(
       '<div style="height:min(52dvh, 360px) !important;max-height:52dvh !important;display:flex !important;flex-direction:column;">' +
       '  <div class="x-note-header">' +

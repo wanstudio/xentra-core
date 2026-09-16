@@ -928,7 +928,9 @@
     products.forEach(function (product) {
       var item = Store.findCartItem(product.id, activeBranch ? String(activeBranch.id) : undefined);
       var qty = item ? item.quantity : 0;
-      var note = (item && item.note) || state.notes[product.id] || '';
+      var activeBranchId = activeBranch ? String(activeBranch.id) : null;
+      var scopedNoteKey = String(product.id) + '::' + (activeBranchId || '__unassigned__');
+      var note = (item && item.note) || (state.notes && (state.notes[scopedNoteKey] || state.notes[product.id])) || '';
 
       var price = Number(product.price || 0);
       var regPrice = Number(product.regular_price || price);
@@ -960,7 +962,7 @@
           '  <span class="x-quantity-value">' + qty + '</span>' +
           '  <button type="button" data-plus="' + product.id + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:auto;pointer-events:none;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>' +
           '</div>' +
-          '<button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note="' + product.id + '">' +
+          '<button type="button" class="x-note-button ' + (note ? 'has-note' : '') + '" data-note="' + product.id + '" data-note-branch="' + (activeBranchId || '') + '">' +
           '  <img src="' + noteIcon + '" alt="Catatan" class="x-note-icon">' +
           '  Catatan' +
           '</button>';
@@ -1075,7 +1077,7 @@
     document.querySelectorAll('[data-note]').forEach(function (btn) {
       btn.onclick = function (e) {
         e.stopPropagation();
-        openNote(btn.dataset.note);
+        openNote(btn.dataset.note, btn.dataset.noteBranch !== undefined ? btn.dataset.noteBranch : (activeBranch ? String(activeBranch.id) : undefined));
       };
     });
   }
@@ -1086,7 +1088,10 @@
   function openNote(productId, branchId) {
     var numId = Number(productId);
     var item = Store.findCartItem(numId, branchId);
-    var curNote = (item && item.note) || Store.getState().notes[numId] || '';
+    var bScope = branchId !== undefined ? branchId : (item ? item.branch_id : (activeBranch ? String(activeBranch.id) : null));
+    var sKey = String(numId) + '::' + ((bScope == null || String(bScope) === '') ? '__unassigned__' : String(bScope));
+    var stateNotes = Store.getState().notes || {};
+    var curNote = (item && item.note) || stateNotes[sKey] || stateNotes[numId] || '';
 
     var overlay = document.createElement('div');
     overlay.className = 'x-overlay x-note-overlay';
@@ -1459,7 +1464,9 @@
   }
 
   function buildSheetItemRow(item, state) {
-    var note = state.notes[item.id] || item.note || '';
+    var bScope = item.branch_id || null;
+    var sKey = String(item.id) + '::' + (bScope || '__unassigned__');
+    var note = (item && item.note) || (state.notes && (state.notes[sKey] || state.notes[item.id])) || '';
     var lineTotal = Number(item.price || 0) * Number(item.quantity || 0);
 
     var row = document.createElement('div');
