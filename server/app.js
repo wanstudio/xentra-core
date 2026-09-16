@@ -3,7 +3,9 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 
-dotenv.config();
+if (process.env.NODE_ENV !== 'test') {
+  dotenv.config();
+}
 
 // Initialize Core Data Access Boundary (concrete persistence stays behind this facade)
 const DataAccess = require('../core/data/DataAccess');

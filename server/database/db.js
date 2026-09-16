@@ -2,9 +2,27 @@ const path = require('path');
 const fs = require('fs');
 
 const DB_PATH = (() => {
+  // Test Environment: Hard isolation guarantee.
+  // Tests MUST NEVER write to or resolve against the production database file.
   if (process.env.NODE_ENV === 'test') {
-    return `:memory:`;
+    if (process.env.DB_PATH && process.env.DB_PATH !== ':memory:') {
+      // If a test explicitly supplies a test file, it must not be the production DB
+      const resolvedTestPath = path.resolve(process.env.DB_PATH);
+      const prodPath = path.resolve(__dirname, 'xentra.db');
+      if (resolvedTestPath === prodPath) {
+        throw new Error('[Database Safety Guard] Refusing to run tests against the production database path: ' + prodPath);
+      }
+      return process.env.DB_PATH;
+    }
+    return ':memory:';
   }
+
+  // Non-test execution must refuse to run if testing flags are detected
+  if (process.env.npm_lifecycle_event === 'test') {
+    // We were invoked by npm test or node test runner without NODE_ENV=test
+    throw new Error('[Database Safety Guard] Running tests without NODE_ENV=test is strictly prohibited. Production DB access blocked.');
+  }
+
   return process.env.DB_PATH || path.join(__dirname, 'xentra.db');
 })();
 
