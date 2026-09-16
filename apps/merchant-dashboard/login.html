@@ -544,6 +544,22 @@
         }
       }
 
+      // Handle ?google_linked=1 return from broker (Google account successfully linked)
+      var googleLinkedParam = urlParams.get('google_linked');
+      if (googleLinkedParam === '1') {
+        var successBox = document.getElementById('login-error');
+        if (successBox) {
+          successBox.textContent = '✅ Akun Google berhasil dihubungkan. Silakan login menggunakan Google atau username/password.';
+          successBox.style.cssText += ';background:rgba(22,101,52,0.12);border:1px solid rgba(22,101,52,0.3);color:#86efac;';
+          successBox.style.display = 'block';
+        }
+        urlParams.delete('google_linked');
+        var cleanUrlAfterLink = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '') + window.location.hash;
+        window.history.replaceState({}, document.title, cleanUrlAfterLink);
+        // Clear the pending link flag
+        sessionStorage.removeItem('xentra_pending_google_link');
+      }
+
       var authError = urlParams.get('error');
       if (authError) {
         var errBox = document.getElementById('login-error');
@@ -551,9 +567,13 @@
           var errorDesc = urlParams.get('error_description');
           var displayMsg;
           if (authError === 'ACCOUNT_NOT_LINKED') {
+            // Set pending link flag so password login can trigger Google linking
+            if (!isPlatform) {
+              sessionStorage.setItem('xentra_pending_google_link', '1');
+            }
             displayMsg = isPlatform
               ? '⚠️ Akun Google ini belum terhubung ke akun Platform. Silakan hubungi administrator atau masuk menggunakan username dan password.'
-              : '⚠️ Akun Google ini belum terhubung ke akun staf/operator restoran. Silakan masuk menggunakan username dan password terlebih dahulu.';
+              : '⚠️ Akun Google ini belum terhubung ke akun restoran. Silakan masuk menggunakan username dan password terlebih dahulu untuk menghubungkan akun Google Anda.';
           } else if (authError === 'FORBIDDEN_TENANT_ACCESS') {
             displayMsg = '⚠️ Akun Google Anda tidak memiliki akses ke restoran ini.';
           } else if (authError === 'ACCOUNT_DISABLED') {
@@ -714,6 +734,38 @@
             }
 
             btn.innerHTML = '<span>Login berhasil! Mengalihkan...</span>';
+
+            // If there was a pending Google link request (ACCOUNT_NOT_LINKED from broker),
+            // initiate the Google account linking flow via the broker.
+            // This is the canonical path to link Google to an existing Xentra account.
+            var pendingGoogleLink = !isPlatform && sessionStorage.getItem('xentra_pending_google_link') === '1';
+            if (pendingGoogleLink) {
+              btn.innerHTML = '<span>Menghubungkan akun Google...</span>';
+              try {
+                var linkInitRes = await fetch('/api/v1/auth/google/link-init', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + data.token
+                  }
+                });
+                var linkInitData = await linkInitRes.json();
+                if (linkInitRes.ok && linkInitData && linkInitData.success && linkInitData.link_token) {
+                  // Clear flag before redirect
+                  sessionStorage.removeItem('xentra_pending_google_link');
+                  var currentOrigin = window.location.origin;
+                  var returnUrl = currentOrigin + '/dashboard/login';
+                  var brokerUrl = 'https://xentra.cloud/auth/broker?mode=link&link_token=' + encodeURIComponent(linkInitData.link_token) + '&return_to=' + encodeURIComponent(returnUrl);
+                  window.location.href = brokerUrl;
+                  return;
+                }
+              } catch (linkErr) {
+                console.warn('[Google link-init error]:', linkErr);
+                // Fall through to normal redirect if link init fails
+              }
+              sessionStorage.removeItem('xentra_pending_google_link');
+            }
+
             setTimeout(function () {
               window.location.href = '/dashboard/';
             }, 250);

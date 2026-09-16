@@ -218,6 +218,9 @@
         }
       }
 
+      var linkToken = urlParams.get('link_token') || '';
+      var isLinkMode = urlParams.get('mode') === 'link' && Boolean(linkToken);
+
       function handleGoogleCredential(credentialResponse) {
         if (!credentialResponse || !credentialResponse.credential) {
           showFatalError('No Google credential returned.');
@@ -226,7 +229,7 @@
 
         loadingEl.style.display = 'block';
         googleBtnSlot.style.display = 'none';
-        statusEl.textContent = 'Verifying identity with Xentra...';
+        statusEl.textContent = isLinkMode ? 'Menghubungkan akun Google ke Xentra...' : 'Verifying identity with Xentra...';
 
         var payload = {
           credential: credentialResponse.credential,
@@ -235,6 +238,10 @@
         if (claimDomain) {
           payload.claim_domain = claimDomain;
         }
+        // link_token mode: pass link token so server links Google to the existing authenticated user
+        if (isLinkMode && linkToken) {
+          payload.link_token = linkToken;
+        }
 
         fetch('/api/v1/auth/google', {
           method: 'POST',
@@ -242,21 +249,38 @@
           body: JSON.stringify(payload)
         }).then(function (res) {
           return res.json().then(function (data) {
-            if (res.ok && data && data.success && data.redirect_url) {
-              statusEl.textContent = 'Authorized! Returning to dashboard...';
-              window.location.replace(data.redirect_url);
-              return;
+            if (res.ok && data && data.success) {
+              // Link mode success: if redirect_url provided, use it; otherwise return to returnTo with success
+              if (data.redirect_url) {
+                statusEl.textContent = isLinkMode ? 'Akun Google berhasil dihubungkan! Mengalihkan...' : 'Authorized! Returning to dashboard...';
+                window.location.replace(data.redirect_url);
+                return;
+              }
+              // Linked but no handoff ticket (e.g. no return_to), redirect to returnTo with success indicator
+              if (isLinkMode && returnTo) {
+                try {
+                  var successUrl = new URL(returnTo);
+                  successUrl.searchParams.set('google_linked', '1');
+                  statusEl.textContent = 'Akun Google berhasil dihubungkan! Mengalihkan...';
+                  window.location.replace(successUrl.toString());
+                } catch (_) {
+                  statusEl.textContent = 'Akun Google berhasil dihubungkan!';
+                  loadingEl.style.display = 'none';
+                  returnWrap.style.display = 'block';
+                }
+                return;
+              }
             }
 
             // Authentication failure
             var code = (data && (data.code || data.error)) || 'AUTH_FAILED';
-            var msg = (data && (data.error || data.message)) || 'Google authentication failed.';
+            var msg = (data && (data.error || data.message)) || (isLinkMode ? 'Gagal menghubungkan akun Google.' : 'Google authentication failed.');
             
             // Return error back to client domain so user stays in their tenant context
             returnErrorToClient(code, msg);
           });
         }).catch(function (err) {
-          returnErrorToClient('NETWORK_ERROR', 'Network error during centralized authentication.');
+          returnErrorToClient('NETWORK_ERROR', isLinkMode ? 'Network error during Google account linking.' : 'Network error during centralized authentication.');
         });
       }
 

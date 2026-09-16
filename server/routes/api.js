@@ -2851,6 +2851,14 @@ router.post('/auth/login', handleMerchantLogin);
 const GoogleAuthService = require('../services/GoogleAuthService');
 const { AuthProviderService } = require('../../core/identity');
 
+// In-memory store for short-lived Google account linking tokens.
+// These tokens are issued by /auth/google/link-init and consumed by /auth/google (link_token mode).
+// Each token is single-use, bound to an authenticated user, and expires in 5 minutes.
+if (!global.__googleLinkTokens) {
+  global.__googleLinkTokens = new Map();
+}
+const GoogleLinkTokenStore = global.__googleLinkTokens;
+
 // POST /auth/google: Google-First Authentication
 router.post('/auth/google', async (req, res) => {
   try {
@@ -2880,8 +2888,136 @@ router.post('/auth/google', async (req, res) => {
       });
     }
 
-    // Lookup provider identity strictly by (google, sub)
     const authProviderService = new AuthProviderService();
+
+    // link_token mode: issued by /auth/google/link-init for authenticated users who want to link Google.
+    // This path links the verified Google sub to the pre-authenticated Xentra user and then creates a session.
+    // The link_token is single-use, short-lived (5 minutes), and strictly bound to the user who created it.
+    const { link_token, return_to } = req.body || {};
+    if (link_token) {
+      const linkEntry = GoogleLinkTokenStore.get(link_token);
+      if (!linkEntry || linkEntry.used || Date.now() > linkEntry.expiresAt) {
+        // Remove stale entry
+        if (linkEntry) GoogleLinkTokenStore.delete(link_token);
+        return res.status(401).json({
+          success: false,
+          code: 'INVALID_LINK_TOKEN',
+          error: 'Link token tidak valid atau telah kedaluwarsa. Silakan mulai proses penghubungan ulang.'
+        });
+      }
+      // Mark consumed immediately (single-use)
+      linkEntry.used = true;
+      GoogleLinkTokenStore.delete(link_token);
+
+      // Verify that the user from the link token still exists and is active
+      const linkUser = db.prepare('SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status FROM users WHERE id = ?').get(linkEntry.userId);
+      if (!linkUser || linkUser.status !== 'active') {
+        return res.status(403).json({
+          success: false,
+          code: 'ACCOUNT_DISABLED',
+          error: 'Akun pengguna tidak aktif atau tidak ditemukan.'
+        });
+      }
+
+      // Check that Google email is verified before linking
+      if (!verifiedClaims.email_verified) {
+        return res.status(400).json({
+          success: false,
+          code: 'UNVERIFIED_GOOGLE_EMAIL',
+          error: 'Email akun Google belum diverifikasi oleh Google. Tidak dapat menghubungkan akun.'
+        });
+      }
+
+      // Link the verified Google sub to the authenticated user (idempotent)
+      let linkResult;
+      try {
+        linkResult = authProviderService.linkProvider({
+          userId: linkUser.id,
+          provider: 'google',
+          providerUserId: verifiedClaims.sub,
+          email: verifiedClaims.email,
+          metadata: {
+            name: verifiedClaims.name,
+            picture: verifiedClaims.picture,
+            linked_via: 'broker_link_mode'
+          }
+        });
+      } catch (linkErr) {
+        if (linkErr.code === 'PROVIDER_ALREADY_LINKED') {
+          // Already linked to a different user — security reject
+          return res.status(409).json({
+            success: false,
+            code: 'PROVIDER_ALREADY_LINKED',
+            error: 'Akun Google ini telah terhubung ke akun Xentra lain. Gunakan akun Google yang berbeda.'
+          });
+        }
+        throw linkErr;
+      }
+
+      // Log security audit
+      const workforceLink = new WorkforceService();
+      workforceLink.logSecurityEvent({
+        actor_id: linkUser.id,
+        actor_role: linkUser.role,
+        action: 'GOOGLE_ACCOUNT_LINKED',
+        target_user_id: linkUser.id,
+        target_role: linkUser.role,
+        brand_id: linkEntry.brandId || linkUser.brand_id,
+        organization_id: linkUser.organization_id,
+        branch_id: linkUser.branch_id,
+        result: 'success',
+        metadata: {
+          sub: verifiedClaims.sub,
+          email: verifiedClaims.email,
+          already_linked: linkResult.alreadyLinked,
+          linked_via: 'broker_link_mode'
+        }
+      });
+
+      // Create session for the now-linked user
+      const effectiveBrandId = linkEntry.brandId || linkUser.brand_id;
+      const { token: linkSessionToken, expiresAt: linkSessionExpiry } = TokenSessionStore.createSession(linkUser, effectiveBrandId);
+
+      // If return_to is provided, create handoff ticket to return user to tenant
+      let linkHandoffInfo = null;
+      if (return_to) {
+        try {
+          const { HandoffService } = require('../../core/identity');
+          const handoffSvc = new HandoffService(db);
+          linkHandoffInfo = handoffSvc.createTicket({
+            userId: linkUser.id,
+            returnTo: return_to,
+            ttlSeconds: 60
+          });
+        } catch (_) { /* if handoff fails, fall back to direct token */ }
+      }
+
+      RateLimiter.reset(rateLimitKey);
+
+      const linkPayload = {
+        success: true,
+        linked: true,
+        already_linked: linkResult.alreadyLinked || false,
+        token: linkSessionToken,
+        expires_at: new Date(linkSessionExpiry).toISOString(),
+        user: {
+          id: linkUser.id,
+          username: linkUser.username,
+          email: linkUser.email,
+          full_name: linkUser.full_name,
+          role: linkUser.role,
+          branch_id: linkUser.branch_id || null,
+          brand_name: (req.brand && req.brand.name) ? req.brand.name : 'Bangjo Resto'
+        }
+      };
+      if (linkHandoffInfo) {
+        linkPayload.handoff_ticket = linkHandoffInfo.ticket;
+        linkPayload.redirect_url = linkHandoffInfo.redirect_url;
+      }
+      return res.json(linkPayload);
+    }
+
+    // Normal login mode: Lookup provider identity strictly by (google, sub)
     const identity = authProviderService.findIdentity('google', verifiedClaims.sub);
 
     if (!identity) {
@@ -2945,7 +3081,6 @@ router.post('/auth/google', async (req, res) => {
     RateLimiter.reset(rateLimitKey);
 
     // If return_to is provided, create a short-lived single-use handoff ticket
-    const { return_to } = req.body || {};
     let handoffInfo = null;
     if (return_to) {
       const { HandoffService } = require('../../core/identity');
@@ -3611,6 +3746,79 @@ router.post('/auth/link-google', requireAuth(['owner', 'brand_manager', 'branch_
 });
 
 // GET /auth/config: Public auth provider client configuration
+
+// POST /auth/google/link-init: Issue a short-lived single-use link token for Google account linking.
+// Called by authenticated tenant users who want to link their Google account via the broker.
+// The returned link_token is passed to the broker (/auth/broker?mode=link&link_token=...),
+// which then calls /auth/google with both credential and link_token to complete the link.
+// The link_token is bound to the authenticated user's ID and expires in 5 minutes.
+// It is single-use and strictly server-validated; the user cannot escalate authorization via it.
+router.post('/auth/google/link-init', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
+  try {
+    const userId = req.user.userId || req.user.id;
+    const brandId = req.user.brandId || req.user.brand_id || req.brand_id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        code: 'UNAUTHENTICATED',
+        error: 'Pengguna tidak terautentikasi.'
+      });
+    }
+
+    // Verify user still exists and is active
+    const user = db.prepare('SELECT id, status FROM users WHERE id = ?').get(userId);
+    if (!user || user.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        code: 'ACCOUNT_DISABLED',
+        error: 'Akun pengguna tidak aktif atau tidak ditemukan.'
+      });
+    }
+
+    // Check if already linked to a Google account
+    const authProviderService = new AuthProviderService();
+    const linked = authProviderService.listLinkedProviders(userId);
+    const alreadyLinked = linked.some(p => p.provider === 'google');
+    if (alreadyLinked) {
+      return res.status(409).json({
+        success: false,
+        code: 'GOOGLE_ALREADY_LINKED',
+        error: 'Akun Anda sudah terhubung ke Google. Silakan login menggunakan Google atau hapus link terlebih dahulu.',
+        already_linked: true
+      });
+    }
+
+    // Issue link token: single-use, 5-minute TTL, bound to user and brand
+    const crypto = require('crypto');
+    const linkToken = 'xnt_glink_' + crypto.randomBytes(24).toString('hex');
+    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+    GoogleLinkTokenStore.set(linkToken, {
+      token: linkToken,
+      userId,
+      brandId: brandId || null,
+      expiresAt,
+      used: false
+    });
+
+    return res.json({
+      success: true,
+      link_token: linkToken,
+      expires_in: 300, // seconds
+      expires_at: new Date(expiresAt).toISOString(),
+      message: 'Link token berhasil dibuat. Gunakan token ini untuk menghubungkan akun Google melalui broker.'
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      code: 'LINK_INIT_ERROR',
+      error: err.message || 'Gagal membuat link token.'
+    });
+  }
+});
+
+
 router.get('/auth/config', (req, res) => {
   const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
   res.json({
