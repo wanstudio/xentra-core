@@ -6356,6 +6356,23 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
       return res.status(400).json({ success: false, error: 'Nilai is_open_override tidak valid. Gunakan 0 atau 1.' });
     }
 
+    // P1 TENANT WRITE BOUNDARY GUARD (FINDING 01): Verify branch ownership before ANY mutation
+    // B1: full pre-mutation snapshot is captured so every authorized change is auditable (B1.10).
+    const existingBranch = db.prepare(`
+      SELECT id, name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override
+      FROM branches WHERE id = ? AND brand_id = ?
+    `).get(req.params.id, req.brand_id);
+    if (!existingBranch) {
+      return res.status(404).json({
+        success: false,
+        error: 'Cabang tidak ditemukan pada brand ini.'
+      });
+    }
+    const existingSettings = db.prepare(`
+      SELECT free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount
+      FROM branch_delivery_settings WHERE branch_id = ?
+    `).get(req.params.id) || {};
+
     // P1 RBAC BRANCH SCOPE GUARD: Branch Manager can ONLY update their assigned branch profile
     if (req.user.role === 'branch_manager') {
       const assignedBranchId = req.user.branchId || req.user.branch_id;
@@ -6397,23 +6414,6 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         });
       }
     }
-
-    // P1 TENANT WRITE BOUNDARY GUARD (FINDING 01): Verify branch ownership before ANY mutation
-    // B1: full pre-mutation snapshot is captured so every authorized change is auditable (B1.10).
-    const existingBranch = db.prepare(`
-      SELECT id, name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override
-      FROM branches WHERE id = ? AND brand_id = ?
-    `).get(req.params.id, req.brand_id);
-    if (!existingBranch) {
-      return res.status(404).json({
-        success: false,
-        error: 'Cabang tidak ditemukan pada brand ini.'
-      });
-    }
-    const existingSettings = db.prepare(`
-      SELECT free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount
-      FROM branch_delivery_settings WHERE branch_id = ?
-    `).get(req.params.id) || {};
 
     db.exec('BEGIN TRANSACTION;');
     try {

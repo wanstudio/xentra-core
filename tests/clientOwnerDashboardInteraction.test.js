@@ -15,12 +15,14 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
   const js = fs.readFileSync(JS_PATH, 'utf8');
   const css = fs.readFileSync(CSS_PATH, 'utf8');
 
+  const createdWins = [];
   function createDashboardDOM(initialHash = '', viewportWidth = 1024) {
     const dom = new JSDOM(html, {
       url: 'https://app.mybangjo.com/dashboard/' + (initialHash ? '#' + initialHash : ''),
       runScripts: 'dangerously'
     });
     const win = dom.window;
+    createdWins.push(win);
 
     // Viewport width
     win.innerWidth = viewportWidth;
@@ -55,6 +57,13 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
 
     return { dom, win };
   }
+
+  t.after(() => {
+    createdWins.forEach(w => {
+      try { if (typeof w.stopOrdersPolling === 'function') w.stopOrdersPolling(); } catch (_) {}
+      try { w.close(); } catch (_) {}
+    });
+  });
 
   await t.test('1. Production stylesheet link is correctly scoped and cache-busted without customer-pwa conflict', () => {
     assert.doesNotMatch(html, /href=["']\/assets\/css\/dashboard\.css/, 'index.html must not link to customer-pwa /assets/css/dashboard.css');

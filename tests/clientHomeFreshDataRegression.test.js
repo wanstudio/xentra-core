@@ -9,6 +9,25 @@ const BRAND_A = 'brand_bangjo';
 const BRAND_B = 'brand_other_co';
 const BRANCH_A = 'branch_bangjo_barat';
 
+test.before(() => {
+  db.prepare(`
+    INSERT OR IGNORE INTO categories (id, brand_id, name, slug, sort_order)
+    VALUES ('34', ?, 'Default Regression Cat', 'default-reg-cat', 1)
+  `).run(BRAND_A);
+
+  db.prepare(`
+    INSERT OR IGNORE INTO organizations (id, name, slug)
+    VALUES ('org_other_tenant', 'Other Org', 'other-org')
+  `).run();
+  db.prepare(`
+    INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain)
+    VALUES (?, 'org_other_tenant', 'Other Brand', 'other-brand', 'other.tenant.com')
+  `).run(BRAND_B);
+  db.prepare(`
+    UPDATE brands SET custom_domain = 'other.tenant.com' WHERE id = ?
+  `).run(BRAND_B);
+});
+
 // Helper for mock HTTP requests against Express app
 async function mockFetch(path, options = {}) {
   const method = options.method || 'GET';
