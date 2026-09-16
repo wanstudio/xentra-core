@@ -2561,7 +2561,10 @@
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                   <span>Segarkan</span>
                 </button>
-                <button type="button" class="x-btn-primary" id="btn-bm-toggle-open" style="font-size:13px; padding:8px 16px;">
+                <button type="button" class="x-btn-secondary" id="btn-bm-toggle-online-orders" onclick="toggleBranchOnlineOrders()" style="font-size:13px; padding:8px 14px;">
+                  <span>Pesanan Online: Memuat...</span>
+                </button>
+                <button type="button" class="x-btn-primary" id="btn-bm-toggle-open" onclick="toggleBranchOpen()" style="font-size:13px; padding:8px 16px;">
                   <span>Buka Cabang</span>
                 </button>
               </div>
@@ -3176,29 +3179,298 @@
         </div>
       </div>
 
-      <!-- BM-4: Staff & Jam Operasional -->
+      <!-- MODAL: BM Add Cashier -->
+      <div id="modal-bm-add-cashier" class="x-modal" style="display:none; position:fixed; z-index:9999; inset:0; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+        <div class="x-card-panel" style="max-width:480px; width:90%; padding:24px; border-radius:12px; background:#ffffff; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h4 style="font-size:16px; font-weight:800; margin:0; color:var(--text-main);">Tambah Kasir Cabang</h4>
+            <button type="button" onclick="closeBMAddCashierModal()" style="background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-muted);">&times;</button>
+          </div>
+          <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">
+            Tambahkan akun staf operasional kasir baru. Akun akan otomatis ditugaskan pada cabang yang sedang dikelola.
+          </p>
+          <form id="form-bm-add-cashier" onsubmit="submitBMAddCashier(event)">
+            <div style="margin-bottom:14px;">
+              <label for="bm-cashier-fullname" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Nama Lengkap</label>
+              <input type="text" id="bm-cashier-fullname" class="x-input" placeholder="Contoh: Rina Kasir" required style="width:100%; font-size:13px;">
+            </div>
+            <div style="margin-bottom:14px;">
+              <label for="bm-cashier-username" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Username</label>
+              <input type="text" id="bm-cashier-username" class="x-input" placeholder="Contoh: rina_kasir" required minlength="3" style="width:100%; font-size:13px;">
+              <small style="font-size:11px; color:var(--text-muted);">Gunakan huruf kecil, tanpa spasi.</small>
+            </div>
+            <div style="margin-bottom:14px;">
+              <label for="bm-cashier-password" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Password Awal</label>
+              <input type="password" id="bm-cashier-password" class="x-input" placeholder="Minimal 8 karakter" required minlength="8" style="width:100%; font-size:13px;">
+            </div>
+            <div style="margin-bottom:14px;">
+              <label for="bm-cashier-email" style="display:block; font-size:12px; font-weight:700; margin-bottom:4px; color:var(--text-muted);">Email (Opsional)</label>
+              <input type="email" id="bm-cashier-email" class="x-input" placeholder="kasir@contoh.com" style="width:100%; font-size:13px;">
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; padding:10px 14px; border-radius:6px; margin-bottom:18px; border:1px solid var(--border-color);">
+              <span style="font-size:12px; font-weight:600; color:var(--text-muted);">Peran (Role):</span>
+              <span class="x-badge x-badge-info" style="font-size:11px;">KASIR CABANG</span>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+              <button type="button" class="x-btn-secondary" onclick="closeBMAddCashierModal()" style="font-size:13px; padding:8px 14px;">Batal</button>
+              <button type="submit" class="x-btn-primary" id="btn-bm-submit-cashier" style="font-size:13px; padding:8px 18px;">Simpan Akun</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- BM-4: Staff Operasional Cabang -->
       <section id="tab-bm-staff" class="x-tab-content" data-tab="bm-staff">
-        <div class="x-route-placeholder">
-          <div class="x-route-placeholder-icon">👥</div>
-          <h3>Staf & Operator Cabang</h3>
-          <p>Daftar staf operasional dan kasir cabang. Dijadwalkan untuk fase BM-4.</p>
+        <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+            <div>
+              <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Staf & Operator Cabang</h3>
+              <p class="text-muted" style="font-size:13px; margin:0;">
+                Kelola kasir dan staf operasional yang ditugaskan di cabang ini sesuai kewenangan Branch Manager.
+              </p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button type="button" class="x-btn-secondary" onclick="loadBMStaff()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Segarkan</span>
+              </button>
+              <button type="button" class="x-btn-primary" onclick="openBMAddCashierModal()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 16px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Tambah Kasir Cabang</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Staff KPI summary cards -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-top:20px;">
+            <div style="background:#f8fafc; border:1px solid var(--border-color); border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:var(--text-muted);">TOTAL STAF CABANG</div>
+              <div id="bm-staff-stat-total" style="font-size:22px; font-weight:800; color:var(--text-main); margin-top:4px;">0</div>
+            </div>
+            <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#047857;">AKUN AKTIF</div>
+              <div id="bm-staff-stat-active" style="font-size:22px; font-weight:800; color:#065f46; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#b91c1c;">AKUN NONAKTIF</div>
+              <div id="bm-staff-stat-inactive" style="font-size:22px; font-weight:800; color:#991b1b; margin-top:4px;">0</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="x-card-panel">
+          <div class="table-responsive">
+            <table class="x-table">
+              <thead>
+                <tr>
+                  <th>Nama Lengkap</th>
+                  <th>Username</th>
+                  <th>Role</th>
+                  <th>Email</th>
+                  <th class="text-center">Status</th>
+                  <th style="text-align:right;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="bm-staff-tbody">
+                <tr><td colspan="6" class="text-center py-6 text-muted">Memuat daftar staf cabang...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
+      <!-- BM-4: Jam Operasional Cabang -->
       <section id="tab-bm-jam-operasional" class="x-tab-content" data-tab="bm-jam-operasional">
-        <div class="x-route-placeholder">
-          <div class="x-route-placeholder-icon">⏰</div>
-          <h3>Jam Operasional & Pengecualian Cabang</h3>
-          <p>Pengaturan jam operasional dan pengecualian khusus hari libur cabang. Dijadwalkan untuk fase BM-4.</p>
+        <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+            <div>
+              <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Jam Operasional &amp; Jadwal Cabang</h3>
+              <p class="text-muted" style="font-size:13px; margin:0;">
+                Pantau jam buka reguler dan kendali switch operasional harian cabang secara langsung.
+              </p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button type="button" class="x-btn-secondary" onclick="loadBMJamOperasional()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Segarkan</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-bottom:24px;">
+          <!-- Card: Status Operasional Hari Ini -->
+          <div class="x-card-panel" style="padding:20px 24px;">
+            <h4 style="font-size:15px; font-weight:700; margin:0 0 16px; color:var(--text-main);">Kendali Operasional Hari Ini</h4>
+            <div style="display:flex; flex-direction:column; gap:14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid var(--border-color);">
+                <div>
+                  <strong style="display:block; font-size:14px; color:var(--text-main);">Status Operasional Toko</strong>
+                  <span id="bm-jam-status-text" style="font-size:12px; color:var(--text-muted);">Memeriksa status cabang...</span>
+                </div>
+                <button type="button" class="x-btn-primary" id="btn-bm-jam-toggle-open" onclick="toggleBranchOpen()" style="font-size:12px; padding:6px 14px;">
+                  Ubah Status
+                </button>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; background:#f8fafc; border-radius:8px; border:1px solid var(--border-color);">
+                <div>
+                  <strong style="display:block; font-size:14px; color:var(--text-main);">Penerimaan Pesanan Online</strong>
+                  <span id="bm-jam-delivery-text" style="font-size:12px; color:var(--text-muted);">Memeriksa layanan online...</span>
+                </div>
+                <button type="button" class="x-btn-secondary" id="btn-bm-jam-toggle-delivery" onclick="toggleBranchOnlineOrders()" style="font-size:12px; padding:6px 14px;">
+                  Ubah Layanan Online
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card: Jadwal Buka Standar Mingguan -->
+          <div class="x-card-panel" style="padding:20px 24px;">
+            <h4 style="font-size:15px; font-weight:700; margin:0 0 16px; color:var(--text-main);">Jadwal Operasional Standar Cabang</h4>
+            <div style="display:flex; flex-direction:column; gap:8px; font-size:13px;">
+              <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border-color);">
+                <span style="font-weight:600;">Senin – Jumat</span>
+                <span class="text-muted">10:00 – 22:00 WIB</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border-color);">
+                <span style="font-weight:600;">Sabtu – Minggu</span>
+                <span class="text-muted">09:00 – 23:00 WIB</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; padding:6px 0;">
+                <span style="font-weight:600;">Hari Libur Nasional</span>
+                <span class="text-muted">Mengikuti Override Buka/Tutup</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Authoritative Contract Notice Banner -->
+        <div class="x-card-panel" style="padding:16px 20px; background:#f8fafc; border-left:4px solid var(--primary-color);">
+          <div style="display:flex; align-items:flex-start; gap:12px;">
+            <span style="font-size:20px;">ℹ️</span>
+            <div>
+              <strong style="font-size:13px; color:var(--text-main);">Catatan Kontrak Operasional Cabang</strong>
+              <p style="margin:4px 0 0; font-size:12px; color:var(--text-muted); line-height:1.5;">
+                Switch Buka/Tutup Cabang dan Pause/Resume Pesanan Online adalah kendali live server-authoritative yang langsung mempengaruhi etalase pemesanan pelanggan. Pengaturan jadwal mingguan khusus dan hari libur permanen dikelola pada tingkat Brand Governance (Owner / Brand Manager).
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
-      <!-- BM-5: Reports -->
+      <!-- BM-5: Laporan Operasional Cabang -->
       <section id="tab-bm-reports" class="x-tab-content" data-tab="bm-reports">
-        <div class="x-route-placeholder">
-          <div class="x-route-placeholder-icon">📈</div>
-          <h3>Laporan Operasional Cabang</h3>
-          <p>Laporan penjualan dan operasional harian cabang. Dijadwalkan untuk fase BM-5.</p>
+        <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+            <div>
+              <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Laporan Operasional Harian Cabang</h3>
+              <p class="text-muted" style="font-size:13px; margin:0;">
+                Ringkasan kinerja penjualan, volume pesanan, dan distribusi layanan khusus cabang yang ditugaskan.
+              </p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button type="button" class="x-btn-secondary" onclick="loadBMReports()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Segarkan</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reports Metric Cards -->
+        <div class="x-metrics-grid" style="margin-bottom:24px;">
+          <div class="x-metric-card" style="border-left: 4px solid var(--accent-green);">
+            <div class="x-metric-icon bg-green">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            </div>
+            <div class="x-metric-info">
+              <span class="x-metric-label">Penjualan Bersih Hari Ini</span>
+              <h3 id="bm-report-stat-sales" class="x-metric-value">Rp0</h3>
+              <small id="bm-report-stat-sales-sub" style="font-size:11px; color:var(--text-muted);">Pesanan selesai hari ini</small>
+            </div>
+          </div>
+
+          <div class="x-metric-card" style="border-left: 4px solid var(--primary-color);">
+            <div class="x-metric-icon bg-blue">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+            </div>
+            <div class="x-metric-info">
+              <span class="x-metric-label">Total Pesanan Cabang</span>
+              <h3 id="bm-report-stat-total-orders" class="x-metric-value">0</h3>
+              <small id="bm-report-stat-completed-orders" style="font-size:11px; color:var(--text-muted);">0 pesanan selesai</small>
+            </div>
+          </div>
+
+          <div class="x-metric-card" style="border-left: 4px solid var(--accent-teal);">
+            <div class="x-metric-icon" style="background:rgba(20,184,166,0.12); color:#0d9488;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
+            </div>
+            <div class="x-metric-info">
+              <span class="x-metric-label">Rata-rata Nilai Pesanan (AOV)</span>
+              <h3 id="bm-report-stat-aov" class="x-metric-value">Rp0</h3>
+              <small style="font-size:11px; color:var(--text-muted);">Per pesanan selesai</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Channel Distribution & Recent Completed Orders -->
+        <div class="x-overview-grid" style="margin-bottom:24px;">
+          <!-- Channel Breakdown -->
+          <div class="x-card-panel" style="padding:20px 24px;">
+            <h4 style="font-size:15px; font-weight:700; margin:0 0 16px; color:var(--text-main);">Rincian Tipe Layanan (Hari Ini)</h4>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#f0f9ff; border-radius:6px; border:1px solid #e0f2fe;">
+                <div>
+                  <strong style="color:#0369a1;">Delivery Online</strong>
+                  <div style="font-size:11px; color:var(--text-muted);">Pesanan antar ke pelanggan</div>
+                </div>
+                <div style="text-align:right;">
+                  <strong id="bm-report-channel-delivery" style="font-size:16px; color:#0369a1;">0</strong>
+                  <div id="bm-report-channel-delivery-sales" style="font-size:11px; color:var(--text-muted);">Rp0</div>
+                </div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#fffbeb; border-radius:6px; border:1px solid #fef3c7;">
+                <div>
+                  <strong style="color:#92400e;">Pickup (Ambil Mandiri)</strong>
+                  <div style="font-size:11px; color:var(--text-muted);">Pelanggan ambil di kasir</div>
+                </div>
+                <div style="text-align:right;">
+                  <strong id="bm-report-channel-pickup" style="font-size:16px; color:#92400e;">0</strong>
+                  <div id="bm-report-channel-pickup-sales" style="font-size:11px; color:var(--text-muted);">Rp0</div>
+                </div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#f5f3ff; border-radius:6px; border:1px solid #ede9fe;">
+                <div>
+                  <strong style="color:#6d28d9;">Dine-In (Makan di Tempat)</strong>
+                  <div style="font-size:11px; color:var(--text-muted);">Pesanan meja pelanggan</div>
+                </div>
+                <div style="text-align:right;">
+                  <strong id="bm-report-channel-dinein" style="font-size:16px; color:#6d28d9;">0</strong>
+                  <div id="bm-report-channel-dinein-sales" style="font-size:11px; color:var(--text-muted);">Rp0</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Completed Orders Summary Table -->
+          <div class="x-card-panel" style="padding:20px 24px;">
+            <h4 style="font-size:15px; font-weight:700; margin:0 0 16px; color:var(--text-main);">Transaksi Selesai Terkini (Cabang)</h4>
+            <div class="table-responsive">
+              <table class="x-table">
+                <thead>
+                  <tr>
+                    <th>No. Pesanan</th>
+                    <th>Pelanggan</th>
+                    <th>Layanan</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody id="bm-report-completed-tbody">
+                  <tr><td colspan="4" class="text-center py-4 text-muted">Belum ada pesanan selesai hari ini.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </section>
 

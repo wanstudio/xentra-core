@@ -780,7 +780,7 @@
     var hash = window.location.hash.replace(/^#\/?/, '').trim();
     var meta = getActiveRouteMeta();
 
-    if (!hash) return 'overview';
+    if (!hash) return isBranchManager() ? 'hari-ini' : 'overview';
 
     if (!isPlatformContext()) {
       if (hash === 'catalog') return 'catalog/products';
@@ -822,8 +822,9 @@
       }
     }
 
-    // Validate the route exists, default to 'overview'
-    return meta[hash.toLowerCase()] ? hash.toLowerCase() : 'overview';
+    // Validate the route exists, default to 'overview' (or 'hari-ini' for branch manager)
+    var defaultRoute = isBranchManager() ? 'hari-ini' : 'overview';
+    return meta[hash.toLowerCase()] ? hash.toLowerCase() : defaultRoute;
   }
 
   // Navigate to a route: update URL hash, then apply the route
@@ -1129,6 +1130,18 @@
 
     if (tabId === 'hari-ini') {
       loadHariIni();
+    }
+
+    if (tabId === 'bm-staff') {
+      loadBMStaff();
+    }
+
+    if (tabId === 'bm-jam-operasional') {
+      loadBMJamOperasional();
+    }
+
+    if (tabId === 'bm-reports') {
+      loadBMReports();
     }
 
     if (tabId === 'overview') loadOverview();
@@ -5133,16 +5146,17 @@
     if (branchPanel) branchPanel.style.display = isBM ? '' : 'none';
 
     // Role-based sidebar nav item visibility
-    var isStaff = role === 'cashier' || role === 'kitchen';
-    document.querySelectorAll('.x-nav-item').forEach(function (btn) {
-      var target = btn.dataset.route || btn.dataset.tab;
-      if (isBM && (target === 'brand' || target === 'branches' || target === 'payments' || target === 'settings')) {
-        btn.style.display = 'none';
-      }
-      if (isStaff && (target === 'team' || target === 'settings' || target === 'branches' || target === 'customers')) {
-        btn.style.display = 'none';
-      }
-    });
+    if (isBM) {
+      renderBranchManagerNavigation();
+    } else {
+      var isStaff = role === 'cashier' || role === 'kitchen';
+      document.querySelectorAll('.x-nav-item').forEach(function (btn) {
+        var target = btn.dataset.route || btn.dataset.tab;
+        if (isStaff && (target === 'team' || target === 'settings' || target === 'branches' || target === 'customers')) {
+          btn.style.display = 'none';
+        }
+      });
+    }
 
     // Set branch_id for inline catalog if branch_manager and lock branch dropdown
     if (isBM && user.branch_id) {
@@ -7992,6 +8006,8 @@
           var toggleBtn = $("btn-bm-toggle-open");
 
           var isOpen = b.is_open_override === 1 || b.is_open_override === true;
+          var isDeliveryActive = b.is_delivery_active !== 0 && b.is_delivery_active !== false;
+
           if (dotEl) {
             dotEl.className = "x-status-dot " + (isOpen ? "x-status-dot-open" : "x-status-dot-closed");
           }
@@ -8002,6 +8018,15 @@
           if (toggleBtn) {
             toggleBtn.innerHTML = isOpen ? "<span>Tutup Operasional</span>" : "<span>Buka Cabang</span>";
             toggleBtn.className = isOpen ? "x-btn-secondary" : "x-btn-primary";
+          }
+
+          var onlineBtn = $("btn-bm-toggle-online-orders");
+          if (onlineBtn) {
+            onlineBtn.innerHTML = isDeliveryActive
+              ? "<span>Pesanan Online: AKTIF (Jeda)</span>"
+              : "<span>Pesanan Online: DIJEDA (Lanjutkan)</span>";
+            onlineBtn.className = isDeliveryActive ? "x-btn-secondary" : "x-btn-primary";
+            onlineBtn.style.color = isDeliveryActive ? "var(--text-main)" : "#ffffff";
           }
         }
       }
@@ -8211,6 +8236,38 @@
   }
   window.toggleBranchOpen = toggleBranchOpen;
 
+  async function toggleBranchOnlineOrders() {
+    var user = getStoredUser();
+    if (!user || !user.branch_id) return;
+    var branch = _hariIniState.branch;
+    var curDelivery = branch ? (branch.is_delivery_active !== 0 && branch.is_delivery_active !== false) : true;
+    var newDelivery = curDelivery ? 0 : 1;
+    var actionName = newDelivery ? "Lanjutkan Layanan Online" : "Jeda Sementara Pesanan Online";
+
+    if (!confirm("Apakah Anda yakin ingin melakukan " + actionName + " untuk cabang ini?")) {
+      return;
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(user.branch_id), {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_delivery_active: newDelivery })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast("Layanan pesanan online cabang berhasil " + (newDelivery ? "DIAKTIFKAN" : "DIJEDA"));
+        loadHariIni();
+        if (typeof loadBMJamOperasional === 'function') loadBMJamOperasional();
+      } else {
+        showToast("Gagal mengubah status: " + (data.error || "Terjadi kesalahan"));
+      }
+    } catch (e) {
+      showToast("Kesalahan jaringan.");
+    }
+  }
+  window.toggleBranchOnlineOrders = toggleBranchOnlineOrders;
+
   async function quickAcceptBMOrder(orderId, btnEl) {
     if (!confirm("Terima pesanan #" + orderId + "? Dapur akan mulai menyiapkan pesanan.")) return;
     if (_bmOrdersState.inFlightAccept[orderId]) return;
@@ -8254,6 +8311,316 @@
     openBMRejectModal(orderId, 'hari-ini');
   }
   window.quickRejectBMOrder = quickRejectBMOrder;
+
+  /* =========================================================================
+     BM-4: STAF OPERASIONAL CABANG (BRANCH-SCOPED WORKFORCE)
+     ========================================================================= */
+  var _bmStaffState = {
+    users: [],
+    fetchSeq: 0
+  };
+
+  async function loadBMStaff() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var tbody = $('bm-staff-tbody');
+    if (tbody && (!_bmStaffState.users || !_bmStaffState.users.length)) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Memuat daftar staf cabang...</td></tr>';
+    }
+
+    var currentSeq = ++_bmStaffState.fetchSeq;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/users?limit=100&branch_id=' + encodeURIComponent(branchId), {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (currentSeq !== _bmStaffState.fetchSeq) return;
+
+      if (res.ok && data.success && Array.isArray(data.users)) {
+        _bmStaffState.users = data.users;
+        renderBMStaffTable(data.users);
+      } else {
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">Gagal memuat staf cabang: ' + esc(data.error || 'Terjadi kesalahan') + '</td></tr>';
+        }
+      }
+    } catch (err) {
+      if (currentSeq !== _bmStaffState.fetchSeq) return;
+      console.warn('[BM Staff Load Error]:', err);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat staf.</td></tr>';
+      }
+    }
+  }
+  window.loadBMStaff = loadBMStaff;
+
+  function renderBMStaffTable(users) {
+    var tbody = $('bm-staff-tbody');
+    if (!tbody) return;
+
+    var totalCount = (users || []).length;
+    var activeCount = (users || []).filter(function (u) { return u.status === 'active'; }).length;
+    var inactiveCount = totalCount - activeCount;
+
+    if ($('bm-staff-stat-total')) $('bm-staff-stat-total').textContent = totalCount;
+    if ($('bm-staff-stat-active')) $('bm-staff-stat-active').textContent = activeCount;
+    if ($('bm-staff-stat-inactive')) $('bm-staff-stat-inactive').textContent = inactiveCount;
+
+    if (!users || !users.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Belum ada staf kasir atau operasional terdaftar di cabang ini.</td></tr>';
+      return;
+    }
+
+    var myId = (getStoredUser() || {}).id;
+
+    tbody.innerHTML = users.map(function (u) {
+      var isMe = u.id === myId;
+      var isActive = u.status === 'active';
+      var roleBadge = u.role === 'cashier'
+        ? '<span class="x-badge x-badge-warning">KASIR</span>'
+        : (u.role === 'kitchen' ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DAPUR</span>' : '<span class="x-badge x-badge-info">' + esc(u.role).toUpperCase() + '</span>');
+
+      var statusToggle = '' +
+        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" style="margin:0 auto;display:inline-block;vertical-align:middle;">' +
+          '<input type="checkbox" ' + (isActive ? 'checked ' : '') + (isMe ? 'disabled ' : '') +
+            'onchange="toggleBMStaffStatus(\'' + u.id + '\', \'' + esc(u.full_name) + '\', this)">' +
+          '<span class="x-toggle-slider"></span>' +
+        '</label>';
+
+      var actions = '';
+      if (isMe) {
+        actions = '<span class="text-muted" style="font-size:11px;">Akun Anda</span>';
+      } else {
+        actions = '<div style="display:flex; justify-content:flex-end; gap:6px;">' +
+          '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="openEditUser(\'' + u.id + '\')">Edit</button>' +
+          '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="resetBMStaffPassword(\'' + u.id + '\', \'' + esc(u.full_name) + '\')">Reset Password</button>' +
+        '</div>';
+      }
+
+      return '<tr>' +
+        '<td><strong>' + esc(u.full_name) + '</strong></td>' +
+        '<td><code style="font-size:12px;background:#f1f5f9;padding:2px 6px;border-radius:4px;">' + esc(u.username) + '</code></td>' +
+        '<td>' + roleBadge + '</td>' +
+        '<td style="color:var(--text-muted);">' + esc(u.email || '—') + '</td>' +
+        '<td class="text-center" style="vertical-align:middle;text-align:center;">' + statusToggle + '</td>' +
+        '<td class="text-right" style="white-space:nowrap;vertical-align:middle;">' + actions + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function openBMAddCashierModal() {
+    if (typeof openCreateUserModal === 'function') {
+      openCreateUserModal();
+      var roleSelect = $('user-role');
+      if (roleSelect) {
+        roleSelect.innerHTML = '<option value="cashier" selected>Kasir</option>';
+        roleSelect.value = 'cashier';
+      }
+      var branchSelect = $('user-branch');
+      var user = getStoredUser();
+      if (branchSelect && user && user.branch_id) {
+        branchSelect.value = user.branch_id;
+        branchSelect.disabled = true;
+      }
+    }
+  }
+  window.openBMAddCashierModal = openBMAddCashierModal;
+
+  async function toggleBMStaffStatus(userId, name, inputElem) {
+    var willActivate = inputElem ? inputElem.checked : false;
+    var revert = function () {
+      if (inputElem) {
+        inputElem.checked = !willActivate;
+        inputElem.disabled = false;
+        var parentLabel = inputElem.closest('.x-toggle');
+        if (parentLabel) {
+          parentLabel.classList.toggle('x-toggle-on', !willActivate);
+        }
+      }
+    };
+
+    if (!willActivate) {
+      if (!confirm('Nonaktifkan akun kasir "' + name + '"? Kasir ini tidak akan bisa login sampai diaktifkan kembali.')) {
+        revert();
+        return;
+      }
+    }
+
+    if (inputElem) inputElem.disabled = true;
+
+    try {
+      var endpoint = willActivate ? '/enable' : '/disable';
+      var res = await adminFetch(API_BASE + '/admin/users/' + userId + endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('Akun "' + name + '" berhasil ' + (willActivate ? 'diaktifkan.' : 'dinonaktifkan.'));
+        loadBMStaff();
+      } else {
+        showToast('Gagal: ' + (data.error || 'Terjadi kesalahan.'));
+        revert();
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+      revert();
+    }
+  }
+  window.toggleBMStaffStatus = toggleBMStaffStatus;
+
+  async function resetBMStaffPassword(userId, name) {
+    if (!confirm('Generate token reset password untuk kasir "' + name + '"? Token hanya dapat dilihat sekali.')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/users/' + userId + '/reset-password', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success && data.reset_token) {
+        if ($('reset-password-user-name')) $('reset-password-user-name').value = name;
+        if ($('reset-password-token')) $('reset-password-token').value = data.reset_token;
+        if ($('modal-reset-password')) $('modal-reset-password').style.display = 'flex';
+      } else {
+        showToast('Gagal: ' + (data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.resetBMStaffPassword = resetBMStaffPassword;
+
+  /* =========================================================================
+     BM-4: JAM OPERASIONAL & JADWAL CABANG
+     ========================================================================= */
+  async function loadBMJamOperasional() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId), {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success && data.branch) {
+        var b = data.branch;
+        var isOpen = b.is_open_override === 1 || b.is_open_override === true;
+        var isDeliveryActive = b.is_delivery_active !== 0 && b.is_delivery_active !== false;
+
+        var statusText = $('bm-jam-status-text');
+        var toggleOpenBtn = $('btn-bm-jam-toggle-open');
+        if (statusText) {
+          statusText.innerHTML = isOpen
+            ? '<span class="x-badge x-badge-success" style="font-size:11px;">BUKA (Operational Active)</span>'
+            : '<span class="x-badge x-badge-danger" style="font-size:11px;">TUTUP SEMENTARA</span>';
+        }
+        if (toggleOpenBtn) {
+          toggleOpenBtn.textContent = isOpen ? 'Tutup Toko' : 'Buka Toko';
+          toggleOpenBtn.className = isOpen ? 'x-btn-secondary' : 'x-btn-primary';
+        }
+
+        var deliveryText = $('bm-jam-delivery-text');
+        var toggleDeliveryBtn = $('btn-bm-jam-toggle-delivery');
+        if (deliveryText) {
+          deliveryText.innerHTML = isDeliveryActive
+            ? '<span class="x-badge x-badge-success" style="font-size:11px;">AKTIF (Menerima Pesanan Online)</span>'
+            : '<span class="x-badge x-badge-warning" style="font-size:11px;">DIJEDA (Online Orders Paused)</span>';
+        }
+        if (toggleDeliveryBtn) {
+          toggleDeliveryBtn.textContent = isDeliveryActive ? 'Jeda Pesanan Online' : 'Aktifkan Layanan Online';
+          toggleDeliveryBtn.className = isDeliveryActive ? 'x-btn-secondary' : 'x-btn-primary';
+        }
+      }
+    } catch (err) {
+      console.warn('[BM Jam Operasional Load Error]:', err);
+    }
+  }
+  window.loadBMJamOperasional = loadBMJamOperasional;
+
+  /* =========================================================================
+     BM-5: LAPORAN OPERASIONAL HARIAN CABANG
+     ========================================================================= */
+  async function loadBMReports() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/orders?status=all', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.orders)) {
+        var orders = data.orders;
+        var todayStr = new Date().toISOString().substring(0, 10);
+
+        var todayOrders = orders.filter(function (o) {
+          return (o.created_at || '').substring(0, 10) === todayStr;
+        });
+
+        var completedOrders = todayOrders.filter(function (o) {
+          return o.status === 'completed';
+        });
+
+        var netSales = completedOrders.reduce(function (acc, o) {
+          return acc + (Number(o.grand_total) || 0);
+        }, 0);
+
+        var aov = completedOrders.length > 0 ? Math.round(netSales / completedOrders.length) : 0;
+
+        if ($('bm-report-stat-sales')) $('bm-report-stat-sales').textContent = formatMoney(netSales);
+        if ($('bm-report-stat-total-orders')) $('bm-report-stat-total-orders').textContent = todayOrders.length;
+        if ($('bm-report-stat-completed-orders')) $('bm-report-stat-completed-orders').textContent = completedOrders.length + ' pesanan selesai';
+        if ($('bm-report-stat-aov')) $('bm-report-stat-aov').textContent = formatMoney(aov);
+
+        // Breakdown by channel (completed today)
+        var deliveryOrders = completedOrders.filter(function (o) { return o.order_type === 'delivery'; });
+        var pickupOrders = completedOrders.filter(function (o) { return o.order_type === 'pickup'; });
+        var dineInOrders = completedOrders.filter(function (o) { return o.order_type === 'dine_in'; });
+
+        var deliverySales = deliveryOrders.reduce(function (acc, o) { return acc + (Number(o.grand_total) || 0); }, 0);
+        var pickupSales = pickupOrders.reduce(function (acc, o) { return acc + (Number(o.grand_total) || 0); }, 0);
+        var dineInSales = dineInOrders.reduce(function (acc, o) { return acc + (Number(o.grand_total) || 0); }, 0);
+
+        if ($('bm-report-channel-delivery')) $('bm-report-channel-delivery').textContent = deliveryOrders.length;
+        if ($('bm-report-channel-delivery-sales')) $('bm-report-channel-delivery-sales').textContent = formatMoney(deliverySales);
+
+        if ($('bm-report-channel-pickup')) $('bm-report-channel-pickup').textContent = pickupOrders.length;
+        if ($('bm-report-channel-pickup-sales')) $('bm-report-channel-pickup-sales').textContent = formatMoney(pickupSales);
+
+        if ($('bm-report-channel-dinein')) $('bm-report-channel-dinein').textContent = dineInOrders.length;
+        if ($('bm-report-channel-dinein-sales')) $('bm-report-channel-dinein-sales').textContent = formatMoney(dineInSales);
+
+        // Recent completed table
+        var tbody = $('bm-report-completed-tbody');
+        if (tbody) {
+          if (!completedOrders.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">Belum ada pesanan selesai hari ini.</td></tr>';
+          } else {
+            tbody.innerHTML = completedOrders.slice(0, 5).map(function (o) {
+              var typeBadge = (o.order_type === 'delivery')
+                ? '<span class="x-badge x-badge-info">DELIVERY</span>'
+                : (o.order_type === 'dine_in' ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DINE IN</span>' : '<span class="x-badge x-badge-warning">PICKUP</span>');
+              return '<tr>' +
+                '<td><strong>' + esc(o.order_number || o.id) + '</strong></td>' +
+                '<td>' + esc(o.customer_name || 'Pelanggan') + '</td>' +
+                '<td>' + typeBadge + '</td>' +
+                '<td><strong style="color:var(--accent-teal);">' + formatMoney(o.grand_total) + '</strong></td>' +
+              '</tr>';
+            }).join('');
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[BM Reports Load Error]:', err);
+    }
+  }
+  window.loadBMReports = loadBMReports;
 
   /* =========================================================================
      BM-2: OPERASIONAL PESANAN & MEJA (BRANCH MANAGER OPERATIONAL CENTER)
@@ -9541,6 +9908,365 @@
       '</tr>';
     }).join('');
   }
+
+  /* =========================================================================
+     BM-4: STAF OPERASIONAL CABANG (BRANCH-SCOPED WORKFORCE)
+     ========================================================================= */
+  var _bmStaffState = {
+    users: [],
+    fetchSeq: 0
+  };
+
+  async function loadBMStaff() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var tbody = $('bm-staff-tbody');
+    if (tbody && (!_bmStaffState.users || !_bmStaffState.users.length)) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Memuat daftar staf cabang...</td></tr>';
+    }
+
+    var currentSeq = ++_bmStaffState.fetchSeq;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/users?limit=100&branch_id=' + encodeURIComponent(branchId), {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (currentSeq !== _bmStaffState.fetchSeq) return;
+
+      if (res.ok && data.success && Array.isArray(data.users)) {
+        _bmStaffState.users = data.users;
+        renderBMStaffTable(data.users);
+      } else {
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">Gagal memuat staf cabang: ' + esc(data.error || 'Terjadi kesalahan') + '</td></tr>';
+        }
+      }
+    } catch (err) {
+      if (currentSeq !== _bmStaffState.fetchSeq) return;
+      console.warn('[BM Staff Load Error]:', err);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat staf.</td></tr>';
+      }
+    }
+  }
+  window.loadBMStaff = loadBMStaff;
+
+  function renderBMStaffTable(users) {
+    var tbody = $('bm-staff-tbody');
+    if (!tbody) return;
+
+    var totalCount = (users || []).length;
+    var activeCount = (users || []).filter(function (u) { return u.status === 'active'; }).length;
+    var inactiveCount = totalCount - activeCount;
+
+    if ($('bm-staff-stat-total')) $('bm-staff-stat-total').textContent = totalCount;
+    if ($('bm-staff-stat-active')) $('bm-staff-stat-active').textContent = activeCount;
+    if ($('bm-staff-stat-inactive')) $('bm-staff-stat-inactive').textContent = inactiveCount;
+
+    if (!users || !users.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Belum ada staf kasir atau operasional terdaftar di cabang ini.</td></tr>';
+      return;
+    }
+
+    var myId = (getStoredUser() || {}).id;
+
+    tbody.innerHTML = users.map(function (u) {
+      var isMe = u.id === myId;
+      var isActive = u.status === 'active';
+      var roleBadge = u.role === 'cashier'
+        ? '<span class="x-badge x-badge-warning">KASIR</span>'
+        : (u.role === 'kitchen' ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DAPUR</span>' : '<span class="x-badge x-badge-info">' + esc(u.role).toUpperCase() + '</span>');
+
+      var statusToggle = '' +
+        '<label class="x-toggle' + (isActive ? ' x-toggle-on' : '') + '" style="margin:0 auto;display:inline-block;vertical-align:middle;">' +
+          '<input type="checkbox" ' + (isActive ? 'checked ' : '') + (isMe ? 'disabled ' : '') +
+            'onchange="toggleBMStaffStatus(\'' + u.id + '\', \'' + esc(u.full_name) + '\', this)">' +
+          '<span class="x-toggle-slider"></span>' +
+        '</label>';
+
+      var actions = '';
+      if (isMe) {
+        actions = '<span class="text-muted" style="font-size:11px;">Akun Anda</span>';
+      } else {
+        actions = '<div style="display:flex; justify-content:flex-end; gap:6px;">' +
+          '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="resetBMStaffPassword(\'' + u.id + '\', \'' + esc(u.full_name) + '\')">Reset Password</button>' +
+        '</div>';
+      }
+
+      return '<tr>' +
+        '<td><strong>' + esc(u.full_name) + '</strong></td>' +
+        '<td><code style="font-size:12px;background:#f1f5f9;padding:2px 6px;border-radius:4px;">' + esc(u.username) + '</code></td>' +
+        '<td>' + roleBadge + '</td>' +
+        '<td style="color:var(--text-muted);">' + esc(u.email || '—') + '</td>' +
+        '<td class="text-center" style="vertical-align:middle;text-align:center;">' + statusToggle + '</td>' +
+        '<td class="text-right" style="white-space:nowrap;vertical-align:middle;">' + actions + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  function openBMAddCashierModal() {
+    var modal = $('modal-bm-add-cashier');
+    if (modal) {
+      var form = $('form-bm-add-cashier');
+      if (form) form.reset();
+      modal.style.display = 'flex';
+    }
+  }
+  window.openBMAddCashierModal = openBMAddCashierModal;
+
+  function closeBMAddCashierModal() {
+    var modal = $('modal-bm-add-cashier');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closeBMAddCashierModal = closeBMAddCashierModal;
+
+  async function submitBMAddCashier(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) {
+      showToast('Gagal: Sesi branch manager tidak valid.');
+      return;
+    }
+
+    var fullName = ($('bm-cashier-fullname') ? $('bm-cashier-fullname').value : '').trim();
+    var username = ($('bm-cashier-username') ? $('bm-cashier-username').value : '').trim();
+    var password = ($('bm-cashier-password') ? $('bm-cashier-password').value : '').trim();
+    var email = ($('bm-cashier-email') ? $('bm-cashier-email').value : '').trim();
+
+    if (!fullName || !username || !password) {
+      showToast('Harap lengkapi semua kolom wajib.');
+      return;
+    }
+
+    var btn = $('btn-bm-submit-cashier');
+    if (btn) { btn.disabled = true; btn.textContent = 'Menyimpan...'; }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/users', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          full_name: fullName,
+          username: username,
+          password: password,
+          email: email || undefined,
+          role: 'cashier',
+          branch_id: branchId
+        })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Akun kasir ' + username + ' berhasil ditambahkan.');
+        closeBMAddCashierModal();
+        loadBMStaff();
+      } else {
+        showToast('Gagal menambahkan kasir: ' + (data.error || data.message || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Simpan Akun'; }
+    }
+  }
+  window.submitBMAddCashier = submitBMAddCashier;
+
+  async function toggleBMStaffStatus(userId, name, inputElem) {
+    var willActivate = inputElem ? inputElem.checked : false;
+    var revert = function () {
+      if (inputElem) {
+        inputElem.checked = !willActivate;
+        inputElem.disabled = false;
+        var parentLabel = inputElem.closest('.x-toggle');
+        if (parentLabel) {
+          parentLabel.classList.toggle('x-toggle-on', !willActivate);
+        }
+      }
+    };
+
+    if (!willActivate) {
+      if (!confirm('Nonaktifkan akun kasir "' + name + '"? Kasir ini tidak akan bisa login sampai diaktifkan kembali.')) {
+        revert();
+        return;
+      }
+    }
+
+    if (inputElem) inputElem.disabled = true;
+
+    try {
+      var endpoint = willActivate ? '/enable' : '/disable';
+      var res = await adminFetch(API_BASE + '/admin/users/' + userId + endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('Akun "' + name + '" berhasil ' + (willActivate ? 'diaktifkan.' : 'dinonaktifkan.'));
+        loadBMStaff();
+      } else {
+        showToast('Gagal: ' + (data.error || 'Terjadi kesalahan.'));
+        revert();
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+      revert();
+    }
+  }
+  window.toggleBMStaffStatus = toggleBMStaffStatus;
+
+  async function resetBMStaffPassword(userId, name) {
+    if (!confirm('Generate token reset password untuk kasir "' + name + '"? Token hanya dapat dilihat sekali.')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/users/' + userId + '/reset-password', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (data.success && data.reset_token) {
+        if ($('reset-password-user-name')) $('reset-password-user-name').value = name;
+        if ($('reset-password-token')) $('reset-password-token').value = data.reset_token;
+        if ($('modal-reset-password')) $('modal-reset-password').style.display = 'flex';
+      } else {
+        showToast('Gagal: ' + (data.error || 'Terjadi kesalahan.'));
+      }
+    } catch (err) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.resetBMStaffPassword = resetBMStaffPassword;
+
+  /* =========================================================================
+     BM-4: JAM OPERASIONAL & JADWAL CABANG
+     ========================================================================= */
+  async function loadBMJamOperasional() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId), {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success && data.branch) {
+        var b = data.branch;
+        _hariIniState.branch = b;
+        var isOpen = b.is_open_override === 1 || b.is_open_override === true;
+        var isDeliveryActive = b.is_delivery_active !== 0 && b.is_delivery_active !== false;
+
+        var statusText = $('bm-jam-status-text');
+        var toggleOpenBtn = $('btn-bm-jam-toggle-open');
+        if (statusText) {
+          statusText.innerHTML = isOpen
+            ? '<span class="x-badge x-badge-success" style="font-size:11px;">BUKA (Operational Active)</span>'
+            : '<span class="x-badge x-badge-danger" style="font-size:11px;">TUTUP SEMENTARA</span>';
+        }
+        if (toggleOpenBtn) {
+          toggleOpenBtn.textContent = isOpen ? 'Tutup Toko' : 'Buka Toko';
+          toggleOpenBtn.className = isOpen ? 'x-btn-secondary' : 'x-btn-primary';
+        }
+
+        var deliveryText = $('bm-jam-delivery-text');
+        var toggleDeliveryBtn = $('btn-bm-jam-toggle-delivery');
+        if (deliveryText) {
+          deliveryText.innerHTML = isDeliveryActive
+            ? '<span class="x-badge x-badge-success" style="font-size:11px;">AKTIF (Menerima Pesanan Online)</span>'
+            : '<span class="x-badge x-badge-warning" style="font-size:11px;">DIJEDA (Online Orders Paused)</span>';
+        }
+        if (toggleDeliveryBtn) {
+          toggleDeliveryBtn.textContent = isDeliveryActive ? 'Jeda Pesanan Online' : 'Aktifkan Layanan Online';
+          toggleDeliveryBtn.className = isDeliveryActive ? 'x-btn-secondary' : 'x-btn-primary';
+        }
+      }
+    } catch (err) {
+      console.warn('[BM Jam Operasional Load Error]:', err);
+    }
+  }
+  window.loadBMJamOperasional = loadBMJamOperasional;
+
+  /* =========================================================================
+     BM-5: LAPORAN OPERASIONAL HARIAN CABANG
+     ========================================================================= */
+  async function loadBMReports() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/orders?status=all', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success && Array.isArray(data.orders)) {
+        var orders = data.orders;
+        var todayStr = new Date().toISOString().substring(0, 10);
+
+        var todayOrders = orders.filter(function (o) {
+          return (o.created_at || '').substring(0, 10) === todayStr;
+        });
+
+        var completedOrders = todayOrders.filter(function (o) {
+          return o.status === 'completed';
+        });
+
+        var netSales = completedOrders.reduce(function (acc, o) {
+          return acc + (Number(o.grand_total) || 0);
+        }, 0);
+
+        var aov = completedOrders.length > 0 ? Math.round(netSales / completedOrders.length) : 0;
+
+        if ($('bm-report-stat-sales')) $('bm-report-stat-sales').textContent = formatMoney(netSales);
+        if ($('bm-report-stat-total-orders')) $('bm-report-stat-total-orders').textContent = todayOrders.length;
+        if ($('bm-report-stat-completed-orders')) $('bm-report-stat-completed-orders').textContent = completedOrders.length + ' pesanan selesai';
+        if ($('bm-report-stat-aov')) $('bm-report-stat-aov').textContent = formatMoney(aov);
+
+        // Breakdown by channel (completed today)
+        var deliveryOrders = completedOrders.filter(function (o) { return o.order_type === 'delivery'; });
+        var pickupOrders = completedOrders.filter(function (o) { return o.order_type === 'pickup'; });
+        var dineInOrders = completedOrders.filter(function (o) { return o.order_type === 'dine_in'; });
+
+        var deliverySales = deliveryOrders.reduce(function (acc, o) { return acc + (Number(o.grand_total) || 0); }, 0);
+        var pickupSales = pickupOrders.reduce(function (acc, o) { return acc + (Number(o.grand_total) || 0); }, 0);
+        var dineInSales = dineInOrders.reduce(function (acc, o) { return acc + (Number(o.grand_total) || 0); }, 0);
+
+        if ($('bm-report-channel-delivery')) $('bm-report-channel-delivery').textContent = deliveryOrders.length;
+        if ($('bm-report-channel-delivery-sales')) $('bm-report-channel-delivery-sales').textContent = formatMoney(deliverySales);
+
+        if ($('bm-report-channel-pickup')) $('bm-report-channel-pickup').textContent = pickupOrders.length;
+        if ($('bm-report-channel-pickup-sales')) $('bm-report-channel-pickup-sales').textContent = formatMoney(pickupSales);
+
+        if ($('bm-report-channel-dinein')) $('bm-report-channel-dinein').textContent = dineInOrders.length;
+        if ($('bm-report-channel-dinein-sales')) $('bm-report-channel-dinein-sales').textContent = formatMoney(dineInSales);
+
+        // Recent completed table
+        var tbody = $('bm-report-completed-tbody');
+        if (tbody) {
+          if (!completedOrders.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">Belum ada pesanan selesai hari ini.</td></tr>';
+          } else {
+            tbody.innerHTML = completedOrders.slice(0, 5).map(function (o) {
+              var typeBadge = (o.order_type === 'delivery')
+                ? '<span class="x-badge x-badge-info">DELIVERY</span>'
+                : (o.order_type === 'dine_in' ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DINE IN</span>' : '<span class="x-badge x-badge-warning">PICKUP</span>');
+              return '<tr>' +
+                '<td><strong>' + esc(o.order_number || o.id) + '</strong></td>' +
+                '<td>' + esc(o.customer_name || 'Pelanggan') + '</td>' +
+                '<td>' + typeBadge + '</td>' +
+                '<td><strong style="color:var(--accent-teal);">' + formatMoney(o.grand_total) + '</strong></td>' +
+              '</tr>';
+            }).join('');
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[BM Reports Load Error]:', err);
+    }
+  }
+  window.loadBMReports = loadBMReports;
 
 
     // Check for handoff ticket from xentra.cloud before initial auth check
