@@ -755,9 +755,24 @@
     'settings':           { title: 'Platform Settings',      sub: 'Global core engine configuration & system parameters',  tab: 'platform-settings' }
   };
 
+  // Branch Manager Operational Center routes (BM-1)
+  var BM_ROUTE_META = {
+    "hari-ini":         { title: "Hari Ini",         sub: "Ringkasan operasional harian cabang dan kendali layanan", tab: "hari-ini" },
+    "pesanan":          { title: "Pesanan",          sub: "Antrean pesanan dan branch acceptance operasional",       tab: "bm-pesanan" },
+    "meja":             { title: "Meja",             sub: "Status operasional meja dan dine-in cabang",              tab: "bm-meja" },
+    "menu":             { title: "Menu",             sub: "Ketersediaan produk dan operasional menu cabang",         tab: "bm-menu" },
+    "promo":            { title: "Promo",            sub: "Promosi dan diskon operasional aktif cabang",             tab: "bm-promo" },
+    "stok":             { title: "Stok",             sub: "Pemantauan stok dan peringatan inventaris cabang",        tab: "bm-stok" },
+    "staff":            { title: "Staff",            sub: "Daftar staf operasional dan kasir cabang",                tab: "bm-staff" },
+    "reports":          { title: "Laporan",          sub: "Laporan penjualan dan operasional harian cabang",         tab: "bm-reports" },
+    "jam-operasional":  { title: "Jam Operasional",  sub: "Jam operasional dan pengecualian libur cabang",           tab: "bm-jam-operasional" }
+  };
+
   // Active route metadata dictionary according to context
   function getActiveRouteMeta() {
-    return isPlatformContext() ? PLATFORM_ROUTE_META : CLIENT_ROUTE_META;
+    if (isPlatformContext()) return PLATFORM_ROUTE_META;
+    if (isBranchManager()) return BM_ROUTE_META;
+    return CLIENT_ROUTE_META;
   }
 
   // Parse the active route from the current URL hash
@@ -839,6 +854,70 @@
       window.location.hash = canonicalRoute;
       applyRoute(canonicalRoute);
     }
+  }
+
+  // Render Branch Manager Navigation in Sidebar (BM-1)
+  function renderBranchManagerNavigation() {
+    var nav = $("x-dash-nav");
+    if (!nav) return;
+
+    nav.innerHTML =
+      "<div class=\"x-nav-group-label\">OPERASIONAL CABANG</div>" +
+
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"hari-ini\">" +
+        "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><polyline points=\"12 6 12 12 16 14\"></polyline></svg>" +
+        "<span>Hari Ini</span>" +
+      "</button>" +
+
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"pesanan\">" +
+        "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z\"></path><line x1=\"3\" y1=\"6\" x2=\"21\" y2=\"6\"></line><path d=\"M16 10a4 4 0 0 1-8 0\"></path></svg>" +
+        "<span>Pesanan</span>" +
+      "</button>" +
+
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"meja\">" +
+        "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M4 18v3\"></path><path d=\"M20 18v3\"></path><path d=\"M4 11h16\"></path><path d=\"M4 11V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5\"></path></svg>" +
+        "<span>Meja</span>" +
+      "</button>" +
+
+      "<div class=\"x-nav-group-label\" style=\"margin-top: 10px;\">KATALOG & PROMO</div>" +
+
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"menu\">" +
+        "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M18 8h1a4 4 0 0 1 0 8h-1\"></path><path d=\"M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z\"></path><line x1=\"6\" y1=\"1\" x2=\"6\" y2=\"4\"></line><line x1=\"10\" y1=\"1\" x2=\"10\" y2=\"4\"></line><line x1=\"14\" y1=\"1\" x2=\"14\" y2=\"4\"></line></svg>" +
+        "<span>Menu</span>" +
+      "</button>" +
+
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"promo\">" +
+        "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><polygon points=\"12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2\"></polygon></svg>" +
+        "<span>Promo</span>" +
+      "</button>" +
+
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"stok\">" +
+        "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z\"></path><polyline points=\"3.27 6.96 12 12.01 20.73 6.96\"></polyline><line x1=\"12\" y1=\"22.08\" x2=\"12\" y2=\"12\"></line></svg>" +
+        "<span>Stok</span>" +
+      "</button>" +
+
+      "<div class=\"x-nav-group-label\" style=\"margin-top: 10px;\">CABANG & TIM</div>" +
+
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"staff\">" +
+        "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2\"></path><circle cx=\"9\" cy=\"7\" r=\"4\"></circle><path d=\"M23 21v-2a4 4 0 0 0-3-3.87\"></path><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"></path></svg>" +
+        "<span>Staff</span>" +
+      "</button>" +
+
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"reports\">" +
+        "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><line x1=\"18\" y1=\"20\" x2=\"18\" y2=\"10\"></line><line x1=\"12\" y1=\"20\" x2=\"12\" y2=\"4\"></line><line x1=\"6\" y1=\"20\" x2=\"6\" y2=\"14\"></line></svg>" +
+        "<span>Reports</span>" +
+      "</button>" +
+
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"jam-operasional\">" +
+        "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><polyline points=\"12 6 12 12 16 14\"></polyline></svg>" +
+        "<span>Jam Operasional</span>" +
+      "</button>";
+
+    nav.querySelectorAll(".x-nav-item[data-route]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        navigateTo(btn.dataset.route);
+      });
+    });
   }
 
   // Render Platform Navigation in Sidebar
@@ -7851,6 +7930,267 @@
     }
     window.loadSettingsSecurity = loadSettingsSecurity;
 
+  /* =========================================================================
+     BRANCH MANAGER OPERATIONAL CENTER — HARI INI (BM-1)
+     ========================================================================= */
+  var _hariIniState = {
+    branch: null,
+    orders: [],
+    layout: null,
+    inventory: []
+  };
+
+  async function loadHariIni() {
+    var user = getStoredUser();
+    if (!user || !user.branch_id) {
+      console.warn("[BM Hari Ini]: User is not a branch manager or branch_id missing");
+      return;
+    }
+    var branchId = user.branch_id;
+
+    // 1. Fetch assigned branch details
+    try {
+      var bRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId), { headers: getAuthHeaders() });
+      if (bRes.ok) {
+        var bData = await bRes.json();
+        if (bData.success && bData.branch) {
+          _hariIniState.branch = bData.branch;
+          var b = bData.branch;
+
+          var nameEl = $("bm-hero-branch-name");
+          if (nameEl) nameEl.textContent = b.name || ("Cabang " + branchId);
+
+          var dotEl = $("bm-hero-status-dot");
+          var badgeEl = $("bm-hero-status-badge");
+          var toggleBtn = $("btn-bm-toggle-open");
+
+          var isOpen = b.is_open_override === 1 || b.is_open_override === true;
+          if (dotEl) {
+            dotEl.className = "x-status-dot " + (isOpen ? "x-status-dot-open" : "x-status-dot-closed");
+          }
+          if (badgeEl) {
+            badgeEl.className = "x-badge " + (isOpen ? "x-badge-success" : "x-badge-danger");
+            badgeEl.textContent = isOpen ? "CABANG BUKA" : "CABANG TUTUP";
+          }
+          if (toggleBtn) {
+            toggleBtn.innerHTML = isOpen ? "<span>Tutup Operasional</span>" : "<span>Buka Cabang</span>";
+            toggleBtn.className = isOpen ? "x-btn-secondary" : "x-btn-primary";
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[BM Hari Ini Branch Error]:", e);
+    }
+
+    // 2. Fetch assigned branch orders
+    try {
+      var oRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/orders?status=all", { headers: getAuthHeaders() });
+      if (oRes.ok) {
+        var oData = await oRes.json();
+        if (oData.success && Array.isArray(oData.orders)) {
+          var orders = oData.orders;
+          _hariIniState.orders = orders;
+
+          var pendingList = orders.filter(function (o) { return o.status === "pending"; });
+          var activeList = orders.filter(function (o) { return ["confirmed", "preparing"].indexOf(o.status) !== -1; });
+          var readyList = orders.filter(function (o) { return o.status === "ready"; });
+
+          var todayStr = new Date().toISOString().substring(0, 10);
+          var completedToday = orders.filter(function (o) {
+            return o.status === "completed" && (o.created_at || "").substring(0, 10) === todayStr;
+          });
+
+          var completedSales = completedToday.reduce(function (acc, o) {
+            return acc + (Number(o.grand_total) || 0);
+          }, 0);
+
+          if ($("bm-stat-pending-orders")) $("bm-stat-pending-orders").textContent = pendingList.length;
+          if ($("bm-stat-active-orders")) $("bm-stat-active-orders").textContent = activeList.length;
+          if ($("bm-stat-ready-orders")) $("bm-stat-ready-orders").textContent = readyList.length;
+          if ($("bm-stat-completed-orders")) $("bm-stat-completed-orders").textContent = completedToday.length;
+          if ($("bm-stat-net-sales-today")) $("bm-stat-net-sales-today").textContent = formatMoney(completedSales) + " total penjualan";
+
+          renderHariIniPendingOrders(pendingList);
+        }
+      }
+    } catch (e) {
+      console.warn("[BM Hari Ini Orders Error]:", e);
+    }
+
+    // 3. Fetch dine-in tables layout
+    try {
+      var tRes = await adminFetch(API_BASE + "/dine-in/layout?branch_id=" + encodeURIComponent(branchId), { headers: getAuthHeaders() });
+      if (tRes.ok) {
+        var tData = await tRes.json();
+        if (tData.success && Array.isArray(tData.tables)) {
+          var tables = tData.tables;
+          var avail = tables.filter(function (t) { return (t.operational_status || t.status) === "available"; }).length;
+          var occupied = tables.filter(function (t) { return (t.operational_status || t.status) === "occupied"; }).length;
+          var held = tables.filter(function (t) { return (t.operational_status || t.status) === "held"; }).length;
+          var blocked = tables.filter(function (t) { return ["blocked", "out_of_service"].indexOf(t.operational_status || t.status) !== -1; }).length;
+
+          if ($("bm-stat-tables-available")) $("bm-stat-tables-available").textContent = avail;
+          if ($("bm-stat-tables-occupied")) $("bm-stat-tables-occupied").textContent = occupied;
+          if ($("bm-stat-tables-held")) $("bm-stat-tables-held").textContent = held;
+          if ($("bm-stat-tables-blocked")) $("bm-stat-tables-blocked").textContent = blocked;
+        }
+      }
+    } catch (e) {
+      console.warn("[BM Hari Ini Layout Error]:", e);
+    }
+
+    // 4. Fetch low stock inventory alerts
+    try {
+      var iRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/inventory", { headers: getAuthHeaders() });
+      if (iRes.ok) {
+        var iData = await iRes.json();
+        if (iData.success && Array.isArray(iData.inventory)) {
+          var lowItems = iData.inventory.filter(function (item) {
+            return item.stock <= (item.low_stock_threshold || 5);
+          });
+          renderHariIniLowStock(lowItems);
+        }
+      }
+    } catch (e) {
+      console.warn("[BM Hari Ini Inventory Error]:", e);
+    }
+  }
+  window.loadHariIni = loadHariIni;
+
+  function renderHariIniPendingOrders(orders) {
+    var tbody = $("bm-tbody-pending-orders");
+    if (!tbody) return;
+
+    if (!orders || orders.length === 0) {
+      tbody.innerHTML = "<tr><td colspan=\"7\" class=\"text-center py-6 text-muted\">Tidak ada antrean pesanan yang memerlukan tindakan saat ini.</td></tr>";
+      return;
+    }
+
+    tbody.innerHTML = orders.map(function (o) {
+      var orderNum = esc(o.order_number || o.id);
+      var cust = esc(o.customer_name || "Pelanggan");
+      var typeBadge = (o.order_type === "delivery")
+        ? "<span class=\"x-badge x-badge-info\">DELIVERY</span>"
+        : (o.order_type === "dine_in" ? "<span class=\"x-badge\" style=\"background:#ede9fe;color:#6d28d9;\">DINE IN</span>" : "<span class=\"x-badge x-badge-warning\">PICKUP</span>");
+      var time = (o.created_at || "").substring(11, 16) || "—";
+      var total = formatMoney(o.grand_total);
+      var statusBadge = "<span class=\"x-badge x-badge-warning\">MENUNGGU KONFIRMASI</span>";
+
+      return "<tr>" +
+        "<td><strong>" + orderNum + "</strong></td>" +
+        "<td>" + cust + "</td>" +
+        "<td>" + typeBadge + "</td>" +
+        "<td>" + time + "</td>" +
+        "<td><strong>" + total + "</strong></td>" +
+        "<td>" + statusBadge + "</td>" +
+        "<td>" +
+          "<div style=\"display:flex;gap:6px;\">" +
+            "<button type=\"button\" class=\"x-btn-primary\" style=\"font-size:11px;padding:4px 8px;\" onclick=\"quickAcceptBMOrder('" + esc(o.id) + "')\">Terima</button>" +
+            "<button type=\"button\" class=\"x-btn-secondary\" style=\"font-size:11px;padding:4px 8px;color:#dc2626;border-color:#fecaca;\" onclick=\"quickRejectBMOrder('" + esc(o.id) + "')\">Tolak</button>" +
+          "</div>" +
+        "</td>" +
+      "</tr>";
+    }).join("");
+  }
+
+  function renderHariIniLowStock(items) {
+    var container = $("bm-low-stock-list");
+    if (!container) return;
+
+    if (!items || items.length === 0) {
+      container.innerHTML = "<div class=\"text-muted text-center py-4\" style=\"font-size:13px;\">Semua stok produk dalam batas aman.</div>";
+      return;
+    }
+
+    container.innerHTML = items.slice(0, 5).map(function (it) {
+      return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fef2f2;border-radius:6px;border:1px solid #fee2e2;\">" +
+        "<div>" +
+          "<strong style=\"font-size:13px;color:#991b1b;\">" + esc(it.product_name || it.name || it.product_id) + "</strong>" +
+          "<div style=\"font-size:11px;color:#b91c1c;\">Tersisa " + esc(it.stock) + " " + esc(it.unit || "porsi") + " (Batas: " + esc(it.low_stock_threshold || 5) + ")</div>" +
+        "</div>" +
+        "<span class=\"x-badge x-badge-danger\" style=\"font-size:10px;\">STOK TIPIS</span>" +
+      "</div>";
+    }).join("");
+  }
+
+  async function toggleBranchOpen() {
+    var user = getStoredUser();
+    if (!user || !user.branch_id) return;
+    var branch = _hariIniState.branch;
+    var curOpen = branch ? (branch.is_open_override === 1 || branch.is_open_override === true) : true;
+    var newOpen = curOpen ? 0 : 1;
+    var actionName = newOpen ? "Buka Cabang" : "Tutup Operasional";
+
+    if (!confirm("Apakah Anda yakin ingin melakukan " + actionName + " untuk operasional hari ini?")) {
+      return;
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(user.branch_id), {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_open_override: newOpen })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast("Status operasional cabang berhasil diubah menjadi " + (newOpen ? "BUKA" : "TUTUP"));
+        loadHariIni();
+      } else {
+        showToast("Gagal mengubah status: " + (data.error || "Terjadi kesalahan"));
+      }
+    } catch (e) {
+      showToast("Kesalahan jaringan.");
+    }
+  }
+  window.toggleBranchOpen = toggleBranchOpen;
+
+  async function quickAcceptBMOrder(orderId) {
+    if (!confirm("Terima pesanan #" + orderId + "? Dapur akan mulai menyiapkan pesanan.")) return;
+    try {
+      var res = await adminFetch(API_BASE + "/orders/" + encodeURIComponent(orderId) + "/branch-acceptance", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ decision: "accept" })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast("Pesanan berhasil diterima.");
+        loadHariIni();
+      } else {
+        showToast("Gagal menerima pesanan: " + (data.error || "Terjadi kesalahan"));
+      }
+    } catch (e) {
+      showToast("Kesalahan jaringan.");
+    }
+  }
+  window.quickAcceptBMOrder = quickAcceptBMOrder;
+
+  async function quickRejectBMOrder(orderId) {
+    var reason = prompt("Masukkan alasan penolakan pesanan (misal: stok habis, resto sibuk):");
+    if (!reason || !reason.trim()) {
+      if (reason !== null) showToast("Alasan penolakan wajib diisi.");
+      return;
+    }
+    try {
+      var res = await adminFetch(API_BASE + "/orders/" + encodeURIComponent(orderId) + "/branch-acceptance", {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ decision: "reject", reason: reason.trim() })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast("Pesanan telah ditolak.");
+        loadHariIni();
+      } else {
+        showToast("Gagal menolak pesanan: " + (data.error || "Terjadi kesalahan"));
+      }
+    } catch (e) {
+      showToast("Kesalahan jaringan.");
+    }
+  }
+  window.quickRejectBMOrder = quickRejectBMOrder;
+
+
     // Check for handoff ticket from xentra.cloud before initial auth check
     await handleHandoffExchange();
 
@@ -7908,7 +8248,7 @@
       initReportsControls();
       if (isAuth) {
         if (isBranchManager()) {
-          loadInlineBranchCatalog();
+          loadHariIni();
         } else {
           loadCatalog();
         }

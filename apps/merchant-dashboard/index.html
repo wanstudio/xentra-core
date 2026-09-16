@@ -2537,6 +2537,235 @@
       </section>
 
       <!-- =====================================================================
+           BRANCH MANAGER OPERATIONAL CENTER — TABS (BM-1)
+           ===================================================================== -->
+
+      <!-- BM TAB 1: HARI INI (Operational Overview) -->
+      <section id="tab-hari-ini" class="x-tab-content" data-tab="hari-ini">
+        <div class="x-hari-ini-container">
+          <!-- Operational Status & Quick Actions Hero Banner -->
+          <div class="x-card-panel x-bm-hero-banner" style="margin-bottom: 24px; padding: 24px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+              <div>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+                  <span id="bm-hero-status-dot" class="x-status-dot"></span>
+                  <h2 id="bm-hero-branch-name" style="font-size:20px; font-weight:800; color:var(--text-main); margin:0;">Cabang Memuat...</h2>
+                  <span id="bm-hero-status-badge" class="x-badge x-badge-info" style="font-size:12px;">Memuat Status...</span>
+                </div>
+                <p id="bm-hero-context" style="font-size:13px; color:var(--text-muted); margin:0;">
+                  Ringkasan operasional harian cabang dan kendali layanan online.
+                </p>
+              </div>
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <button type="button" class="x-btn-secondary" id="btn-bm-refresh-hari-ini" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                  <span>Segarkan</span>
+                </button>
+                <button type="button" class="x-btn-primary" id="btn-bm-toggle-open" style="font-size:13px; padding:8px 16px;">
+                  <span>Buka Cabang</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="bm-operational-alerts" style="margin-top:16px; display:none;"></div>
+          </div>
+
+          <!-- Operational KPI Grid -->
+          <div class="x-metrics-grid" style="margin-bottom: 24px;">
+            <!-- Orders Needing Action (Pending) -->
+            <div class="x-metric-card" style="border-left: 4px solid var(--accent-amber);">
+              <div class="x-metric-icon bg-amber">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Perlu Konfirmasi (Pending)</span>
+                <h3 id="bm-stat-pending-orders" class="x-metric-value">0</h3>
+                <small style="font-size:11px; color:var(--text-muted);">Menunggu branch acceptance</small>
+              </div>
+            </div>
+
+            <!-- Active / Preparing Orders -->
+            <div class="x-metric-card" style="border-left: 4px solid var(--accent-blue);">
+              <div class="x-metric-icon bg-blue">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Diproses / Dapur</span>
+                <h3 id="bm-stat-active-orders" class="x-metric-value">0</h3>
+                <small style="font-size:11px; color:var(--text-muted);">Sedang disiapkan cabang</small>
+              </div>
+            </div>
+
+            <!-- Ready Orders -->
+            <div class="x-metric-card" style="border-left: 4px solid #8b5cf6;">
+              <div class="x-metric-icon" style="background:rgba(139,92,246,0.12); color:#8b5cf6;">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Siap / Siap Diambil</span>
+                <h3 id="bm-stat-ready-orders" class="x-metric-value">0</h3>
+                <small style="font-size:11px; color:var(--text-muted);">Menunggu pickup / kurir</small>
+              </div>
+            </div>
+
+            <!-- Completed Today -->
+            <div class="x-metric-card" style="border-left: 4px solid var(--accent-green);">
+              <div class="x-metric-icon bg-green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Selesai Hari Ini</span>
+                <h3 id="bm-stat-completed-orders" class="x-metric-value">0</h3>
+                <small id="bm-stat-net-sales-today" style="font-size:11px; color:var(--text-muted);">Rp0 total penjualan</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Secondary Operational Status Row -->
+          <div class="x-overview-grid" style="margin-bottom: 24px;">
+            <!-- Meja / Dine-in Snapshot -->
+            <div class="x-card-panel">
+              <div class="x-panel-header">
+                <h3>🪑 Status Operasional Meja (Dine-In)</h3>
+                <a href="#meja" style="font-size:12px; font-weight:700; color:var(--primary-color);">Buka Modul Meja &rarr;</a>
+              </div>
+              <div id="bm-tables-summary-container" style="padding:16px 0;">
+                <div style="display:flex; justify-content:space-around; text-align:center; flex-wrap:wrap; gap:12px;">
+                  <div>
+                    <span style="display:block; font-size:24px; font-weight:800; color:var(--accent-green);" id="bm-stat-tables-available">0</span>
+                    <small style="font-size:12px; color:var(--text-muted);">Tersedia</small>
+                  </div>
+                  <div>
+                    <span style="display:block; font-size:24px; font-weight:800; color:var(--accent-blue);" id="bm-stat-tables-occupied">0</span>
+                    <small style="font-size:12px; color:var(--text-muted);">Terisi / Sesi</small>
+                  </div>
+                  <div>
+                    <span style="display:block; font-size:24px; font-weight:800; color:var(--accent-amber);" id="bm-stat-tables-held">0</span>
+                    <small style="font-size:12px; color:var(--text-muted);">Ditahan</small>
+                  </div>
+                  <div>
+                    <span style="display:block; font-size:24px; font-weight:800; color:#dc2626;" id="bm-stat-tables-blocked">0</span>
+                    <small style="font-size:12px; color:var(--text-muted);">Diblokir</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Menu & Stok Attention -->
+            <div class="x-card-panel">
+              <div class="x-panel-header">
+                <h3>⚠️ Perhatian Menu & Stok Cabang</h3>
+                <a href="#menu" style="font-size:12px; font-weight:700; color:var(--primary-color);">Kelola Menu &rarr;</a>
+              </div>
+              <div id="bm-menu-stock-attention-container" style="padding:12px 0;">
+                <div id="bm-low-stock-list" style="display:flex; flex-direction:column; gap:8px;">
+                  <div class="text-muted text-center py-4" style="font-size:13px;">Memuat data menu & stok...</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pending Orders Queue for Hari Ini -->
+          <div class="x-card-panel">
+            <div class="x-panel-header">
+              <div>
+                <h3>📋 Antrean Pesanan Memerlukan Respons Segera</h3>
+                <p>Pesanan online yang menunggu konfirmasi atau penolakan cabang.</p>
+              </div>
+              <a href="#pesanan" style="font-size:12px; font-weight:700; color:var(--primary-color);">Buka Semua Pesanan &rarr;</a>
+            </div>
+            <div class="table-responsive">
+              <table class="x-table">
+                <thead>
+                  <tr>
+                    <th>No. Pesanan</th>
+                    <th>Pelanggan</th>
+                    <th>Tipe Layanan</th>
+                    <th>Waktu Pesan</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Aksi Cepat</th>
+                  </tr>
+                </thead>
+                <tbody id="bm-tbody-pending-orders">
+                  <tr><td colspan="7" class="text-center py-6 text-muted">Memuat antrean pesanan...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BM TAB PLACEHOLDERS (BM-2 through BM-5 Future Modules) -->
+      <!-- BM-2: Pesanan & Meja -->
+      <section id="tab-bm-pesanan" class="x-tab-content" data-tab="bm-pesanan">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">📦</div>
+          <h3>Antrean Pesanan Cabang</h3>
+          <p>Modul operasional pesanan dan penerimaan cabang (Branch Acceptance). Dijadwalkan untuk fase BM-2.</p>
+        </div>
+      </section>
+
+      <section id="tab-bm-meja" class="x-tab-content" data-tab="bm-meja">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">🪑</div>
+          <h3>Status Meja & Dine-In</h3>
+          <p>Modul operasional status meja, blokir operasional, dan sesi makan di tempat. Dijadwalkan untuk fase BM-2.</p>
+        </div>
+      </section>
+
+      <!-- BM-3: Menu, Promo, Stok -->
+      <section id="tab-bm-menu" class="x-tab-content" data-tab="bm-menu">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">🍽️</div>
+          <h3>Ketersediaan Menu Cabang</h3>
+          <p>Modul operasional ketersediaan menu cabang (buka/tutup ketersediaan produk). Dijadwalkan untuk fase BM-3.</p>
+        </div>
+      </section>
+
+      <section id="tab-bm-promo" class="x-tab-content" data-tab="bm-promo">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">🏷️</div>
+          <h3>Promosi Cabang</h3>
+          <p>Aktivasi dan operasional promosi khusus cabang yang disetujui Owner. Dijadwalkan untuk fase BM-3.</p>
+        </div>
+      </section>
+
+      <section id="tab-bm-stok" class="x-tab-content" data-tab="bm-stok">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">📊</div>
+          <h3>Stok & Inventaris Cabang</h3>
+          <p>Pencatatan dan pemantauan stok harian cabang. Dijadwalkan untuk fase BM-3.</p>
+        </div>
+      </section>
+
+      <!-- BM-4: Staff & Jam Operasional -->
+      <section id="tab-bm-staff" class="x-tab-content" data-tab="bm-staff">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">👥</div>
+          <h3>Staf & Operator Cabang</h3>
+          <p>Daftar staf operasional dan kasir cabang. Dijadwalkan untuk fase BM-4.</p>
+        </div>
+      </section>
+
+      <section id="tab-bm-jam-operasional" class="x-tab-content" data-tab="bm-jam-operasional">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">⏰</div>
+          <h3>Jam Operasional & Pengecualian Cabang</h3>
+          <p>Pengaturan jam operasional dan pengecualian khusus hari libur cabang. Dijadwalkan untuk fase BM-4.</p>
+        </div>
+      </section>
+
+      <!-- BM-5: Reports -->
+      <section id="tab-bm-reports" class="x-tab-content" data-tab="bm-reports">
+        <div class="x-route-placeholder">
+          <div class="x-route-placeholder-icon">📈</div>
+          <h3>Laporan Operasional Cabang</h3>
+          <p>Laporan penjualan dan operasional harian cabang. Dijadwalkan untuk fase BM-5.</p>
+        </div>
+      </section>
+
+      <!-- =====================================================================
            XENTRA PLATFORM DASHBOARD — ROUTE PLACEHOLDERS
            Rendered when accessing xentra.cloud/dashboard or ?context=platform
            ===================================================================== -->
