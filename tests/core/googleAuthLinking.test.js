@@ -692,8 +692,8 @@ describe('Google-First Authentication & Bangjo Owner Linking', () => {
     assert.equal(userCountAfter, userCountBefore, 'No user record must be created for unlinked Google account');
   });
 
-  // Q. Centralized Google Auth Architecture: /dashboard/login uses inline SDK and same-origin /auth/google
-  test('Q. GET /dashboard/login serves page with inline Google SDK and same-origin auth endpoint', async () => {
+  // Q. Centralized Google Auth Architecture: /dashboard/login has both Platform inline SDK path and Client broker path
+  test('Q. GET /dashboard/login serves page with Platform inline SDK path and Client broker path', async () => {
     const loginRes = await makeRequest(server, {
       method: 'GET',
       path: '/dashboard/login'
@@ -702,11 +702,11 @@ describe('Google-First Authentication & Bangjo Owner Linking', () => {
     assert.equal(loginRes.status, 200);
     assert.ok(loginRes.raw.includes('id="google-auth-container"'), 'Page must have google-auth-container');
     assert.ok(loginRes.raw.includes('id="btn-google-login"'), 'Page must have btn-google-login');
-    assert.ok(!loginRes.raw.includes('xentra.cloud/auth/broker'), 'Tenant login must NOT route to xentra.cloud/auth/broker');
-    // Inline SDK: GSI URL present in JS string (dynamic load, not static <script> tag)
-    assert.ok(loginRes.raw.includes('accounts.google.com/gsi/client'), 'Login page must reference GSI SDK URL for inline auth');
+    assert.ok(loginRes.raw.includes('xentra.cloud/auth/broker'), 'Client/Tenant branch must route to xentra.cloud/auth/broker');
+    // Platform inline SDK: GSI URL present in JS string (dynamic load, not static <script> tag)
+    assert.ok(loginRes.raw.includes('accounts.google.com/gsi/client'), 'Platform branch must reference GSI SDK URL for inline auth');
     assert.ok(!loginRes.raw.includes('<script src="https://accounts.google.com/gsi/client"'), 'GSI SDK must be dynamically loaded (not a static script tag)');
-    assert.ok(loginRes.raw.includes('handleGoogleCredential'), 'Login page must define inline credential handler');
+    assert.ok(loginRes.raw.includes('handlePlatformGoogleCredential'), 'Platform branch must define inline credential handler');
     assert.ok(loginRes.raw.includes('form-merchant-login'), 'Legacy form must remain present');
 
     // Centralized broker page on xentra.cloud

@@ -305,10 +305,10 @@ describe('Google Login Regression — immutable sub identity contract', () => {
     db.prepare('DELETE FROM users WHERE id = ?').run(otherUserId);
   });
 
-  test('GOOGLE-REG-12: frontend uses same-origin backend and cannot bypass identity with forged role', async () => {
+  test('GOOGLE-REG-12: frontend uses canonical broker flow and cannot bypass identity with forged role', async () => {
     const loginHtml = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/login.html'), 'utf8');
     assert.ok(loginHtml.includes('/api/v1/auth/google'));
-    assert.ok(!loginHtml.includes("'https://xentra.cloud/auth/broker?return_to='"));
+    assert.ok(loginHtml.includes("'https://xentra.cloud/auth/broker?return_to='"));
 
     registerGoogleToken('google-token-reg-12', {
       aud: TEST_CLIENT_ID,
