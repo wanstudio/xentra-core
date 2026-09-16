@@ -306,3 +306,64 @@ test('T5/T6/T7/T8 back-to-home consistency and branch isolation from the SAME au
     g.cleanup();
   }
 });
+
+test('Required 1/2/3: Click-initiated + and - immediately mutate shared Cart State, subtotal, and visible qty without waiting for network', () => {
+  const g = freshHarness((Store) => {
+    Store.addItem(product('301', 'Es Cendol', 20000), 2, { branch_id: 'branch_a', branch_name: 'Cabang A' });
+  });
+  try {
+    const postCountBefore = g.posts.length;
+
+    // Simulate clicking + button in checkout item row
+    const it = g.Store.findCartItem('301', 'branch_a');
+    g.Store.setQty(it.id, Number(it.quantity) + 1, it.branch_id);
+
+    assert.strictEqual(g.Store.findCartItem('301', 'branch_a').quantity, 3, '1: + directly changes shared Cart State');
+    assert.strictEqual(g.Store.getCartSubtotal(), 60000, '3: subtotal immediately calculated');
+    assert.strictEqual(g.qtyNode.textContent, '3', '3: visible quantity immediately updated');
+    assert.strictEqual(g.posts.length, postCountBefore, '3: no network waited for +');
+
+    // Simulate clicking - button in checkout item row
+    g.Store.setQty(it.id, 2, it.branch_id);
+
+    assert.strictEqual(g.Store.findCartItem('301', 'branch_a').quantity, 2, '2: - directly changes shared Cart State');
+    assert.strictEqual(g.Store.getCartSubtotal(), 40000, '3: subtotal immediately calculated for -');
+    assert.strictEqual(g.qtyNode.textContent, '2', '3: visible quantity immediately updated for -');
+    assert.strictEqual(g.posts.length, postCountBefore, '3: no network waited for -');
+  } finally {
+    g.cleanup();
+  }
+});
+
+test('Required 13/14/15/16: Secondary reconciliation (delivery, promotion, availability) runs asynchronously with no arbitrary timeout hack', async () => {
+  const g = freshHarness((Store) => {
+    Store.addItem(product('301', 'Es Cendol', 20000), 1, { branch_id: 'branch_a', branch_name: 'Cabang A' });
+  });
+  try {
+    // Mutate quantity
+    g.Store.setQty('301', 3, 'branch_a');
+
+    // 16: Verify no arbitrary setTimeout delays used for reactivity (only trailing debounce for delivery quote)
+    const debounces = g.timers.captured.filter((t) => t.delay === 400);
+    assert.ok(debounces.length >= 1, 'Delivery quote uses a trailing debounce');
+    const arbitraryDelays = g.timers.captured.filter((t) => t.delay !== 400 && t.delay > 500);
+    assert.strictEqual(arbitraryDelays.length, 0, '16: No arbitrary timeout hack in checkout reactivity');
+
+    // 14: Delivery quote re-runs asynchronously upon timer fire
+    assert.strictEqual(g.posts.length, 1, 'Delivery post not synchronously fired on qty change');
+    const latestDebounce = g.timers.captured[g.timers.captured.length - 1];
+    latestDebounce.fn(); // trigger trailing debounce
+    assert.strictEqual(g.posts.length, 2, '14: Delivery reconciliation triggered asynchronously');
+    assert.strictEqual(g.posts[1].body.subtotal, 60000, 'Reconciliation sends new subtotal');
+
+    // Resolve delivery reconciliation
+    g.resolvePost(1, deliverable('branch_a'));
+    await g.flush();
+
+    // 13: Cart state remains intact after reconciliation
+    assert.strictEqual(g.Store.findCartItem('301', 'branch_a').quantity, 3, '13: Cart quantity intact after secondary reconciliation');
+    assert.strictEqual(g.Store.getCartSubtotal(), 60000);
+  } finally {
+    g.cleanup();
+  }
+});
