@@ -8552,10 +8552,31 @@ router.get('/admin/marketing/redemptions', requireAuth(['owner', 'brand_manager'
 // =========================================================================
 const { DiningTableService, TableRecommendationService } = require('../../domains/pos');
 
-// Customer / Public: Get Branch Floor Plan & Operational Table State
+// Customer / Public / Staff: Get Branch Floor Plan & Operational Table State
 router.get('/dine-in/layout', (req, res) => {
   try {
+    // If an authenticated staff token is presented, enforce branch scope
+    const authHeader = req.headers['authorization'] || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || '').trim();
+    let session = null;
+    if (token) {
+      session = TokenSessionStore.getSession(token);
+    }
+
     let branchId = req.query.branch_id || (req.query.branchId ? req.query.branchId : null);
+
+    if (session && ['branch_manager', 'cashier', 'kitchen'].includes(session.role)) {
+      const assignedBranchId = session.branchId || session.branch_id;
+      if (branchId && branchId !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_ACCESS',
+          message: 'Akses ditolak: Anda hanya memiliki izin untuk mengakses cabang yang ditugaskan.'
+        });
+      }
+      branchId = assignedBranchId;
+    }
+
     if (!branchId && req.brand_id) {
       const defaultBranch = db.prepare('SELECT b.id FROM branches b LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id WHERE b.brand_id = ? AND b.is_active = 1 ORDER BY COALESCE(s.is_delivery_active, 1) DESC, b.created_at ASC LIMIT 1').get(req.brand_id);
       if (defaultBranch) branchId = defaultBranch.id;
@@ -8613,6 +8634,17 @@ router.get('/dine-in/qr/:token', (req, res) => {
 // Staff / Owner: Regenerate QR Token for a table
 router.post('/dine-in/tables/:id/regenerate-qr', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      const table = db.prepare('SELECT branch_id FROM branch_tables WHERE id = ?').get(req.params.id);
+      if (!table || table.branch_id !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada meja cabang yang ditugaskan.'
+        });
+      }
+    }
     const result = DiningTableService.regenerateQrToken(req.params.id);
     res.json({ success: true, ...result });
   } catch (err) {
@@ -8620,10 +8652,24 @@ router.post('/dine-in/tables/:id/regenerate-qr', requireAuth(['owner', 'brand_ma
   }
 });
 
-// Staff / POS: Block or Unblock a table
+// Staff / POS: Block or Unblock a table (with strict branch scope guard)
 router.post('/dine-in/tables/:id/block', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
     const { is_blocked, reason } = req.body;
+
+    // Scope check: branch_manager or cashier can operate only on assigned branch
+    if (['branch_manager', 'cashier'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      const table = db.prepare('SELECT branch_id FROM branch_tables WHERE id = ?').get(req.params.id);
+      if (!table || table.branch_id !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada meja cabang yang ditugaskan.'
+        });
+      }
+    }
+
     const result = DiningTableService.setTableBlockedState(req.params.id, Boolean(is_blocked), reason);
     res.json({ success: true, ...result });
   } catch (err) {
@@ -8634,6 +8680,17 @@ router.post('/dine-in/tables/:id/block', requireAuth(['owner', 'brand_manager', 
 // Staff / POS: Complete Active Dining Session (Releases tables)
 router.post('/dine-in/sessions/:id/complete', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
+    if (['branch_manager', 'cashier'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      const session = db.prepare('SELECT branch_id FROM dining_sessions WHERE id = ?').get(req.params.id);
+      if (!session || session.branch_id !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada sesi cabang yang ditugaskan.'
+        });
+      }
+    }
     const actorId = req.user ? (req.user.id || req.user.username) : 'staff';
     const result = DiningTableService.completeDiningSession(req.params.id, actorId);
     res.json({ success: true, ...result });
@@ -8645,6 +8702,17 @@ router.post('/dine-in/sessions/:id/complete', requireAuth(['owner', 'brand_manag
 // Staff / POS: Operational Table Reassignment for Active Dining Session
 router.post('/dine-in/sessions/:id/reassign-tables', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
+    if (['branch_manager', 'cashier'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      const session = db.prepare('SELECT branch_id FROM dining_sessions WHERE id = ?').get(req.params.id);
+      if (!session || session.branch_id !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada sesi cabang yang ditugaskan.'
+        });
+      }
+    }
     const { table_ids } = req.body;
     const result = DiningTableService.reassignSessionTables({
       session_id: req.params.id,
@@ -8656,8 +8724,9 @@ router.post('/dine-in/sessions/:id/reassign-tables', requireAuth(['owner', 'bran
   }
 });
 
-// Staff / Manager: Update Branch Dining Layout Configuration (Editor persistence)
-router.put('/dine-in/layout/:branch_id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+// Owner / Brand Governance: Update Branch Dining Layout Configuration (Geometry / Physical Structure)
+// Branch Manager operates daily table states only, does not modify physical floor layout geometry.
+router.put('/dine-in/layout/:branch_id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const branchId = req.params.branch_id;
     const { canvas, sections, non_table_objects, tables } = req.body;

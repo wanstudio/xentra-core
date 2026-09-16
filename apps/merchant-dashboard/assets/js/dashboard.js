@@ -1104,6 +1104,21 @@
       stopOrdersPolling();
     }
 
+    if (tabId === 'bm-pesanan') {
+      startBMOrdersPolling();
+      loadBMOrders();
+    } else {
+      stopBMOrdersPolling();
+    }
+
+    if (tabId === 'bm-meja') {
+      loadBMTables();
+    }
+
+    if (tabId === 'hari-ini') {
+      loadHariIni();
+    }
+
     if (tabId === 'overview') loadOverview();
     if (tabId === 'reports') loadReports(reportSubtype);
     if (tabId === 'customers') {
@@ -8189,6 +8204,586 @@
     }
   }
   window.quickRejectBMOrder = quickRejectBMOrder;
+
+  /* =========================================================================
+     BM-2: OPERASIONAL PESANAN & MEJA (BRANCH MANAGER OPERATIONAL CENTER)
+     ========================================================================= */
+  var _bmOrdersState = {
+    orders: [],
+    searchQuery: '',
+    statusFilter: 'all',
+    typeFilter: 'all',
+    pollTimer: null,
+    fetchSeq: 0
+  };
+
+  var _bmTablesState = {
+    tables: [],
+    filterStatus: 'all',
+    fetchSeq: 0
+  };
+
+  function stopBMOrdersPolling() {
+    if (_bmOrdersState.pollTimer) {
+      clearInterval(_bmOrdersState.pollTimer);
+      _bmOrdersState.pollTimer = null;
+    }
+  }
+
+  function startBMOrdersPolling() {
+    stopBMOrdersPolling();
+    _bmOrdersState.pollTimer = setInterval(function () {
+      if (document.visibilityState === 'hidden') return;
+      loadBMOrders({ background: true });
+    }, 10000);
+  }
+
+  window.startBMOrdersPolling = startBMOrdersPolling;
+  window.stopBMOrdersPolling = stopBMOrdersPolling;
+
+  async function loadBMOrders(opts) {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var isBg = opts && opts.background;
+    var tbody = $('bm-orders-tbody');
+    if (tbody && !isBg && (!_bmOrdersState.orders || !_bmOrdersState.orders.length)) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-muted">Memuat antrean pesanan cabang...</td></tr>';
+    }
+
+    var currentSeq = ++_bmOrdersState.fetchSeq;
+
+    try {
+      var queryParams = [];
+      if (_bmOrdersState.statusFilter && _bmOrdersState.statusFilter !== 'all') {
+        queryParams.push('status=' + encodeURIComponent(_bmOrdersState.statusFilter));
+      }
+      var qs = queryParams.length ? ('?' + queryParams.join('&')) : '';
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/orders' + qs, {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (currentSeq !== _bmOrdersState.fetchSeq) return;
+
+      if (res.ok && data.success && Array.isArray(data.orders)) {
+        _bmOrdersState.orders = data.orders;
+        renderBMOrdersTable();
+      } else {
+        if (tbody && !isBg) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-danger">Gagal memuat pesanan: ' + esc(data.error || 'Terjadi kesalahan') + '</td></tr>';
+        }
+      }
+    } catch (err) {
+      if (currentSeq !== _bmOrdersState.fetchSeq) return;
+      console.warn('[BM Orders Load Error]:', err);
+      if (tbody && !isBg) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat pesanan.</td></tr>';
+      }
+    }
+  }
+  window.loadBMOrders = loadBMOrders;
+
+  function onBMOrdersFilterChange() {
+    var searchEl = $('bm-orders-search');
+    var statusEl = $('bm-orders-filter-status');
+    var typeEl = $('bm-orders-filter-type');
+
+    if (searchEl) _bmOrdersState.searchQuery = searchEl.value.trim().toLowerCase();
+    if (statusEl) _bmOrdersState.statusFilter = statusEl.value;
+    if (typeEl) _bmOrdersState.typeFilter = typeEl.value;
+
+    loadBMOrders();
+  }
+  window.onBMOrdersFilterChange = onBMOrdersFilterChange;
+
+  function renderBMOrdersTable() {
+    var tbody = $('bm-orders-tbody');
+    if (!tbody) return;
+
+    var filtered = (_bmOrdersState.orders || []).filter(function (ord) {
+      if (_bmOrdersState.typeFilter && _bmOrdersState.typeFilter !== 'all') {
+        var ordType = ord.order_type || ord.fulfillment_type || 'delivery';
+        if (ordType !== _bmOrdersState.typeFilter) return false;
+      }
+      if (_bmOrdersState.searchQuery) {
+        var q = _bmOrdersState.searchQuery;
+        var num = (ord.order_number || ord.id || '').toLowerCase();
+        var cust = (ord.customer_name || '').toLowerCase();
+        var phone = (ord.customer_phone || '').toLowerCase();
+        if (num.indexOf(q) === -1 && cust.indexOf(q) === -1 && phone.indexOf(q) === -1) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-muted">Belum ada pesanan yang sesuai filter.</td></tr>';
+      return;
+    }
+
+    var statusBadges = {
+      pending: '<span class="x-badge x-badge-warning">MENUNGGU KONFIRMASI</span>',
+      confirmed: '<span class="x-badge x-badge-info">DITERIMA (CONFIRMED)</span>',
+      preparing: '<span class="x-badge x-badge-info">SEDANG DISIAPKAN</span>',
+      ready: '<span class="x-badge x-badge-success">SIAP (READY)</span>',
+      out_for_delivery: '<span class="x-badge x-badge-info">PENGIRIMAN</span>',
+      completed: '<span class="x-badge x-badge-success">SELESAI</span>',
+      rejected: '<span class="x-badge x-badge-danger">DITOLAK</span>',
+      cancelled: '<span class="x-badge x-badge-danger">DIBATALKAN</span>',
+      timeout: '<span class="x-badge x-badge-danger">TIMEOUT</span>'
+    };
+
+    var rowsHtml = filtered.map(function (ord) {
+      var ordType = ord.order_type || ord.fulfillment_type || 'delivery';
+      var typeBadge = (ordType === 'delivery')
+        ? '<span class="x-badge x-badge-info">DELIVERY</span>'
+        : (ordType === 'dine_in' ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DINE-IN</span>' : '<span class="x-badge x-badge-warning">PICKUP</span>');
+
+      var timeStr = (ord.created_at || '').substring(11, 16) || '—';
+      var tableInfo = ord.table_number ? ('Meja ' + esc(ord.table_number)) : '—';
+      var totalStr = formatMoney(ord.grand_total || ord.subtotal || 0);
+
+      var actionsHtml = '';
+      if (ord.status === 'pending') {
+        actionsHtml =
+          '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(ordType) + '\')">Terima</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px; color:#dc2626; border-color:#fecaca;" onclick="rejectBMOrder(\'' + esc(ord.id) + '\')">Tolak</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else if (ord.status === 'confirmed') {
+        actionsHtml =
+          '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'confirmed\', \'' + esc(ordType) + '\')">Mulai Masak ➔</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else if (ord.status === 'preparing') {
+        actionsHtml =
+          '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'preparing\', \'' + esc(ordType) + '\')">Tandai Siap ➔</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else if (ord.status === 'ready') {
+        var nextLabel = (ordType === 'delivery') ? 'Kirim Pesanan ➔' : 'Selesaikan ➔';
+        actionsHtml =
+          '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'ready\', \'' + esc(ordType) + '\')">' + nextLabel + '</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else if (ord.status === 'out_for_delivery') {
+        actionsHtml =
+          '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'out_for_delivery\', \'' + esc(ordType) + '\')">Selesaikan ➔</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else {
+        // Terminal states: completed, rejected, cancelled, timeout
+        actionsHtml =
+          '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
+            '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      }
+
+      return '<tr>' +
+        '<td><strong>#' + esc(ord.order_number || ord.id.substring(0, 8)) + '</strong></td>' +
+        '<td><small class="text-muted">' + timeStr + '</small></td>' +
+        '<td><strong>' + esc(ord.customer_name || 'Pelanggan') + '</strong><br><small class="text-muted">' + esc(ord.customer_phone || '—') + '</small></td>' +
+        '<td>' + typeBadge + '</td>' +
+        '<td>' + tableInfo + '</td>' +
+        '<td><strong>' + totalStr + '</strong></td>' +
+        '<td>' + (statusBadges[ord.status] || ('<span class="x-badge">' + esc(ord.status.toUpperCase()) + '</span>')) + '</td>' +
+        '<td class="text-right">' + actionsHtml + '</td>' +
+      '</tr>';
+    });
+
+    tbody.innerHTML = rowsHtml.join('');
+  }
+
+  async function advanceBMOrderStatus(orderId, currentStatus, fulfillmentType) {
+    if (currentStatus === 'pending') {
+      if (!confirm('Terima pesanan #' + orderId + '? Dapur akan mulai mempersiapkan pesanan.')) return;
+      try {
+        var res = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/branch-acceptance', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ decision: 'accept', note: 'Diterima oleh Branch Manager' })
+        });
+        var data = await res.json();
+        if (res.ok && data.success) {
+          showToast('Pesanan berhasil diterima (CONFIRMED).');
+          loadBMOrders();
+        } else {
+          showToast('Gagal menerima pesanan: ' + (data.error || 'Terjadi kesalahan'));
+          loadBMOrders();
+        }
+      } catch (e) {
+        showToast('Kesalahan jaringan.');
+      }
+      return;
+    }
+
+    var isDelivery = (fulfillmentType === 'delivery');
+    var nextMap = {
+      confirmed: 'preparing',
+      preparing: 'ready',
+      ready: isDelivery ? 'out_for_delivery' : 'completed',
+      out_for_delivery: 'completed'
+    };
+
+    var nextStatus = nextMap[currentStatus];
+    if (!nextStatus) {
+      showToast('Status tidak dapat diubah lagi.');
+      return;
+    }
+
+    try {
+      var patchRes = await adminFetch(API_BASE + '/kitchen/orders/' + encodeURIComponent(orderId) + '/status', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: nextStatus, note: 'Status diperbarui oleh Branch Manager' })
+      });
+      var patchData = await patchRes.json();
+      if (patchRes.ok && patchData.success) {
+        showToast('Status pesanan berhasil diubah menjadi ' + nextStatus.toUpperCase());
+        loadBMOrders();
+      } else {
+        showToast('Gagal mengubah status: ' + (patchData.error || 'Terjadi kesalahan'));
+        loadBMOrders();
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.advanceBMOrderStatus = advanceBMOrderStatus;
+
+  async function rejectBMOrder(orderId) {
+    var reason = prompt('Masukkan alasan penolakan pesanan (misal: Bahan baku habis, Resto tutup):');
+    if (!reason || !reason.trim()) {
+      if (reason !== null) showToast('Alasan penolakan wajib diisi untuk catatan audit.');
+      return;
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/branch-acceptance', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ decision: 'reject', reason: reason.trim() })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Pesanan telah ditolak.');
+        loadBMOrders();
+      } else {
+        showToast('Gagal menolak pesanan: ' + (data.error || 'Terjadi kesalahan'));
+        loadBMOrders();
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.rejectBMOrder = rejectBMOrder;
+
+  async function viewBMOrderDetail(orderId) {
+    var listView = $('bm-orders-list-view');
+    var detailView = $('bm-orders-detail-view');
+    if (listView) listView.style.display = 'none';
+    if (detailView) detailView.style.display = 'block';
+
+    if ($('bm-detail-order-number')) $('bm-detail-order-number').textContent = '#' + orderId;
+    if ($('bm-detail-items-tbody')) {
+      $('bm-detail-items-tbody').innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">Memuat rincian pesanan...</td></tr>';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/orders/' + encodeURIComponent(orderId), {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (!res.ok || !data.success || !data.order) {
+        showToast('Gagal memuat detail pesanan: ' + (data.error || 'Pesanan tidak ditemukan'));
+        closeBMOrderDetail();
+        return;
+      }
+
+      var ord = data.order;
+      if ($('bm-detail-order-number')) $('bm-detail-order-number').textContent = '#' + (ord.order_number || ord.id);
+      if ($('bm-detail-status-badge')) {
+        $('bm-detail-status-badge').textContent = (ord.status || '').toUpperCase();
+        $('bm-detail-status-badge').className = 'x-badge ' + (ord.status === 'completed' || ord.status === 'ready' ? 'x-badge-success' : (ord.status === 'rejected' || ord.status === 'cancelled' ? 'x-badge-danger' : 'x-badge-warning'));
+      }
+
+      var ordType = ord.order_type || ord.fulfillment_type || 'delivery';
+      if ($('bm-detail-cust-name')) $('bm-detail-cust-name').textContent = ord.customer_name || 'Pelanggan';
+      if ($('bm-detail-cust-phone')) $('bm-detail-cust-phone').textContent = ord.customer_phone || '—';
+      if ($('bm-detail-fulfillment-badge')) $('bm-detail-fulfillment-badge').textContent = ordType.toUpperCase();
+      if ($('bm-detail-order-time')) $('bm-detail-order-time').textContent = ord.created_at ? new Date(ord.created_at).toLocaleString('id-ID') : '—';
+      if ($('bm-detail-order-notes')) $('bm-detail-order-notes').textContent = ord.notes || ord.order_notes || '—';
+
+      var tableRow = $('bm-detail-table-row');
+      if (tableRow) {
+        if (ord.table_number) {
+          tableRow.style.display = 'block';
+          if ($('bm-detail-table-number')) $('bm-detail-table-number').textContent = 'Meja ' + ord.table_number;
+        } else {
+          tableRow.style.display = 'none';
+        }
+      }
+
+      if ($('bm-detail-calc-subtotal')) $('bm-detail-calc-subtotal').textContent = formatMoney(ord.subtotal || 0);
+      if ($('bm-detail-calc-delivery')) $('bm-detail-calc-delivery').textContent = formatMoney(ord.delivery_fee || 0);
+      if ($('bm-detail-calc-discount')) $('bm-detail-calc-discount').textContent = formatMoney(ord.discount_amount || 0);
+      if ($('bm-detail-calc-grandtotal')) $('bm-detail-calc-grandtotal').textContent = formatMoney(ord.grand_total || 0);
+      if ($('bm-detail-pay-status')) $('bm-detail-pay-status').textContent = ((ord.payment_method || 'Tunai') + ' (' + (ord.payment_status || 'unpaid') + ')').toUpperCase();
+
+      // Render items
+      var tbody = $('bm-detail-items-tbody');
+      if (tbody) {
+        var items = ord.items || [];
+        if (!items.length) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">Tidak ada item dalam pesanan ini.</td></tr>';
+        } else {
+          tbody.innerHTML = items.map(function (it) {
+            var sub = it.item_subtotal != null ? it.item_subtotal : ((it.unit_price || 0) * (it.quantity || 1));
+            return '<tr>' +
+              '<td><strong>' + esc(it.product_name || it.product_id) + '</strong></td>' +
+              '<td>' + formatMoney(it.unit_price || 0) + '</td>' +
+              '<td>' + (it.quantity || 1) + '</td>' +
+              '<td><small class="text-muted">' + esc(it.note || '—') + '</small></td>' +
+              '<td class="text-right"><strong>' + formatMoney(sub) + '</strong></td>' +
+            '</tr>';
+          }).join('');
+        }
+      }
+
+      // Render audit logs
+      var logsList = $('bm-detail-logs-list');
+      if (logsList) {
+        var logs = ord.status_logs || [];
+        if (!logs.length) {
+          logsList.innerHTML = '<span class="text-muted">Tidak ada catatan audit tambahan.</span>';
+        } else {
+          logsList.innerHTML = logs.map(function (l) {
+            var time = l.created_at ? new Date(l.created_at).toLocaleTimeString('id-ID') : '—';
+            return '<div style="background:#f8fafc; padding:8px 12px; border-radius:6px; border:1px solid #e2e8f0;">' +
+              '<div><strong>' + esc((l.previous_status || 'INIT') + ' ➔ ' + l.new_status) + '</strong> <small class="text-muted">(' + time + ')</small></div>' +
+              '<div style="color:var(--text-muted); margin-top:2px;">' + esc(l.note || 'Pembaruan status sistem') + '</div>' +
+            '</div>';
+          }).join('');
+        }
+      }
+
+      // Top action buttons in detail
+      var topActions = $('bm-detail-actions-top');
+      if (topActions) {
+        if (ord.status === 'pending') {
+          topActions.innerHTML =
+            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(ordType) + '\'); viewBMOrderDetail(\'' + esc(ord.id) + '\');">Terima Pesanan</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:13px; padding:6px 14px; color:#dc2626; border-color:#fecaca;" onclick="rejectBMOrder(\'' + esc(ord.id) + '\'); closeBMOrderDetail();">Tolak Pesanan</button>';
+        } else if (ord.status === 'confirmed') {
+          topActions.innerHTML =
+            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'confirmed\', \'' + esc(ordType) + '\'); viewBMOrderDetail(\'' + esc(ord.id) + '\');">Mulai Memasak ➔</button>';
+        } else if (ord.status === 'preparing') {
+          topActions.innerHTML =
+            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'preparing\', \'' + esc(ordType) + '\'); viewBMOrderDetail(\'' + esc(ord.id) + '\');">Tandai Siap ➔</button>';
+        } else if (ord.status === 'ready') {
+          var label = (ordType === 'delivery') ? 'Kirim Pesanan ➔' : 'Selesaikan Pesanan ➔';
+          topActions.innerHTML =
+            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'ready\', \'' + esc(ordType) + '\'); viewBMOrderDetail(\'' + esc(ord.id) + '\');">' + label + '</button>';
+        } else if (ord.status === 'out_for_delivery') {
+          topActions.innerHTML =
+            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'out_for_delivery\', \'' + esc(ordType) + '\'); viewBMOrderDetail(\'' + esc(ord.id) + '\');">Selesaikan Pesanan ➔</button>';
+        } else {
+          topActions.innerHTML = '';
+        }
+      }
+
+    } catch (e) {
+      console.warn('[BM Detail Load Error]:', e);
+      showToast('Kesalahan jaringan saat memuat detail.');
+      closeBMOrderDetail();
+    }
+  }
+  window.viewBMOrderDetail = viewBMOrderDetail;
+
+  function closeBMOrderDetail() {
+    var listView = $('bm-orders-list-view');
+    var detailView = $('bm-orders-detail-view');
+    if (detailView) detailView.style.display = 'none';
+    if (listView) listView.style.display = 'block';
+  }
+  window.closeBMOrderDetail = closeBMOrderDetail;
+
+  /* =========================================================================
+     BM-2: OPERASIONAL MEJA / DINE-IN CONTROLLER
+     ========================================================================= */
+  async function loadBMTables() {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) return;
+
+    var grid = $('bm-tables-grid');
+    if (grid && (!_bmTablesState.tables || !_bmTablesState.tables.length)) {
+      grid.innerHTML = '<div class="text-center py-6 text-muted" style="grid-column:1/-1;">Memuat data meja cabang...</div>';
+    }
+
+    var currentSeq = ++_bmTablesState.fetchSeq;
+
+    try {
+      var res = await adminFetch(API_BASE + '/dine-in/layout?branch_id=' + encodeURIComponent(branchId), {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+
+      if (currentSeq !== _bmTablesState.fetchSeq) return;
+
+      if (res.ok && data.success && data.layout && Array.isArray(data.layout.tables)) {
+        _bmTablesState.tables = data.layout.tables;
+        updateBMTableStats(data.layout.tables);
+        renderBMTablesGrid();
+      } else {
+        if (grid) {
+          grid.innerHTML = '<div class="text-center py-6 text-danger" style="grid-column:1/-1;">Gagal memuat meja: ' + esc(data.error || 'Terjadi kesalahan') + '</div>';
+        }
+      }
+    } catch (err) {
+      if (currentSeq !== _bmTablesState.fetchSeq) return;
+      console.warn('[BM Tables Load Error]:', err);
+      if (grid) {
+        grid.innerHTML = '<div class="text-center py-6 text-danger" style="grid-column:1/-1;">Kesalahan jaringan saat memuat meja.</div>';
+      }
+    }
+  }
+  window.loadBMTables = loadBMTables;
+
+  function updateBMTableStats(tables) {
+    var avail = 0, occupied = 0, held = 0, blocked = 0;
+    (tables || []).forEach(function (t) {
+      var st = t.operational_state || 'available';
+      if (st === 'available') avail++;
+      else if (st === 'occupied') occupied++;
+      else if (st === 'held') held++;
+      else if (st === 'blocked' || st === 'out_of_service') blocked++;
+    });
+
+    if ($('bm-tables-stat-available')) $('bm-tables-stat-available').textContent = avail;
+    if ($('bm-tables-stat-occupied')) $('bm-tables-stat-occupied').textContent = occupied;
+    if ($('bm-tables-stat-held')) $('bm-tables-stat-held').textContent = held;
+    if ($('bm-tables-stat-blocked')) $('bm-tables-stat-blocked').textContent = blocked;
+  }
+
+  function onBMTablesFilterChange() {
+    var filterEl = $('bm-tables-filter-status');
+    if (filterEl) _bmTablesState.filterStatus = filterEl.value;
+    renderBMTablesGrid();
+  }
+  window.onBMTablesFilterChange = onBMTablesFilterChange;
+
+  function renderBMTablesGrid() {
+    var grid = $('bm-tables-grid');
+    if (!grid) return;
+
+    var filtered = (_bmTablesState.tables || []).filter(function (t) {
+      var st = t.operational_state || 'available';
+      if (_bmTablesState.filterStatus === 'available') return st === 'available';
+      if (_bmTablesState.filterStatus === 'occupied') return st === 'occupied';
+      if (_bmTablesState.filterStatus === 'held') return st === 'held';
+      if (_bmTablesState.filterStatus === 'blocked') return (st === 'blocked' || st === 'out_of_service');
+      return true;
+    });
+
+    if (!filtered.length) {
+      grid.innerHTML = '<div class="text-center py-6 text-muted" style="grid-column:1/-1;">Tidak ada meja yang sesuai filter status saat ini.</div>';
+      return;
+    }
+
+    var stateCardConfigs = {
+      available: { bg: '#ffffff', border: '#bbf7d0', badge: '<span class="x-badge x-badge-success">TERSEDIA</span>' },
+      occupied: { bg: '#ffffff', border: '#bfdbfe', badge: '<span class="x-badge x-badge-info">TERISI</span>' },
+      held: { bg: '#ffffff', border: '#fde68a', badge: '<span class="x-badge x-badge-warning">DITAHAN</span>' },
+      blocked: { bg: '#fef2f2', border: '#fecaca', badge: '<span class="x-badge x-badge-danger">DIBLOKIR</span>' },
+      out_of_service: { bg: '#fef2f2', border: '#fecaca', badge: '<span class="x-badge x-badge-danger">RUSAK</span>' }
+    };
+
+    grid.innerHTML = filtered.map(function (t) {
+      var st = t.operational_state || 'available';
+      var cfg = stateCardConfigs[st] || stateCardConfigs.available;
+      var isBlocked = (st === 'blocked' || st === 'out_of_service');
+
+      var actionsHtml = '';
+      if (isBlocked) {
+        actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%; color:#166534; border-color:#bbf7d0;" onclick="toggleBMTableBlocked(\'' + esc(t.id) + '\', false)">Buka Blokir (Tersedia)</button>';
+      } else if (st === 'available') {
+        actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%; color:#dc2626; border-color:#fecaca;" onclick="toggleBMTableBlocked(\'' + esc(t.id) + '\', true)">Blokir Meja</button>';
+      } else if (st === 'occupied' && t.current_session_id) {
+        actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%;" onclick="completeBMTableSession(\'' + esc(t.current_session_id) + '\')">Selesaikan Sesi Makan</button>';
+      } else {
+        actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%;" disabled>Sedang Digunakan</button>';
+      }
+
+      return '<div class="x-card" style="padding:16px; border:1px solid ' + cfg.border + '; border-radius:10px; background:' + cfg.bg + '; display:flex; flex-direction:column; justify-content:space-between; min-height:160px;">' +
+        '<div>' +
+          '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">' +
+            '<h4 style="font-size:16px; font-weight:800; margin:0; color:var(--text-main);">' + esc(t.label || ('Meja ' + t.table_number)) + '</h4>' +
+            cfg.badge +
+          '</div>' +
+          '<div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">Kapasitas: <strong>' + (t.capacity || 4) + ' Kursi</strong></div>' +
+          (t.notes ? ('<div style="font-size:11px; color:#b91c1c; margin-bottom:8px; font-style:italic;">Catatan: ' + esc(t.notes) + '</div>') : '') +
+        '</div>' +
+        '<div style="margin-top:12px;">' + actionsHtml + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  async function toggleBMTableBlocked(tableId, isBlocked) {
+    var reason = '';
+    if (isBlocked) {
+      reason = prompt('Masukkan alasan pemblokiran meja (misal: Rusak, Renovasi, Khusus VIP):');
+      if (reason === null) return;
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/dine-in/tables/' + encodeURIComponent(tableId) + '/block', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_blocked: isBlocked, reason: reason.trim() })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast(isBlocked ? 'Meja telah diblokir.' : 'Meja dibuka kembali (Tersedia).');
+        loadBMTables();
+      } else {
+        showToast('Gagal mengubah status meja: ' + (data.error || 'Terjadi kesalahan'));
+        loadBMTables();
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.toggleBMTableBlocked = toggleBMTableBlocked;
+
+  async function completeBMTableSession(sessionId) {
+    if (!confirm('Selesaikan sesi makan ini dan kosongkan meja untuk tamu berikutnya?')) return;
+    try {
+      var res = await adminFetch(API_BASE + '/dine-in/sessions/' + encodeURIComponent(sessionId) + '/complete', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Sesi makan selesai, meja kembali tersedia.');
+        loadBMTables();
+      } else {
+        showToast('Gagal menyelesaikan sesi: ' + (data.error || 'Terjadi kesalahan'));
+        loadBMTables();
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.completeBMTableSession = completeBMTableSession;
 
 
     // Check for handoff ticket from xentra.cloud before initial auth check

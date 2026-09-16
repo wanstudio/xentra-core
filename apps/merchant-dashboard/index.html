@@ -2697,20 +2697,220 @@
       </section>
 
       <!-- BM TAB PLACEHOLDERS (BM-2 through BM-5 Future Modules) -->
-      <!-- BM-2: Pesanan & Meja -->
+      <!-- BM-2: Pesanan & Meja Operational Surfaces -->
+      <!-- TAB: BM-PESANAN (Operational Order Queue & Details) -->
       <section id="tab-bm-pesanan" class="x-tab-content" data-tab="bm-pesanan">
-        <div class="x-route-placeholder">
-          <div class="x-route-placeholder-icon">📦</div>
-          <h3>Antrean Pesanan Cabang</h3>
-          <p>Modul operasional pesanan dan penerimaan cabang (Branch Acceptance). Dijadwalkan untuk fase BM-2.</p>
+        <!-- Order Queue List View -->
+        <div id="bm-orders-list-view">
+          <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+              <div>
+                <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Antrean Pesanan Cabang</h3>
+                <p class="text-muted" style="font-size:13px; margin:0;">
+                  Kelola siklus hidup pesanan cabang: penerimaan (Branch Acceptance), proses dapur, hingga selesai.
+                </p>
+              </div>
+              <div style="display:flex; gap:10px; align-items:center;">
+                <button type="button" class="x-btn-secondary" id="btn-bm-orders-refresh" onclick="loadBMOrders()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                  <span>Segarkan</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Filters Bar -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-color);">
+              <div>
+                <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">CARI PESANAN</label>
+                <input type="text" id="bm-orders-search" placeholder="Nomor / Pelanggan / Telp..." class="x-input" style="width:100%; font-size:13px;" oninput="onBMOrdersFilterChange()">
+              </div>
+              <div>
+                <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">STATUS PESANAN</label>
+                <select id="bm-orders-filter-status" class="x-input" style="width:100%; font-size:13px;" onchange="onBMOrdersFilterChange()">
+                  <option value="all">Semua Status</option>
+                  <option value="pending">Menunggu Konfirmasi (Pending)</option>
+                  <option value="confirmed">Diterima (Confirmed)</option>
+                  <option value="preparing">Sedang Disiapkan (Preparing)</option>
+                  <option value="ready">Siap (Ready)</option>
+                  <option value="out_for_delivery">Dalam Pengiriman</option>
+                  <option value="completed">Selesai (Completed)</option>
+                  <option value="rejected">Ditolak (Rejected)</option>
+                  <option value="cancelled">Dibatalkan (Cancelled)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">TIPE PESANAN</label>
+                <select id="bm-orders-filter-type" class="x-input" style="width:100%; font-size:13px;" onchange="onBMOrdersFilterChange()">
+                  <option value="all">Semua Tipe Layanan</option>
+                  <option value="delivery">Delivery</option>
+                  <option value="pickup">Pickup</option>
+                  <option value="dine_in">Dine-In (Makan di Tempat)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Orders Table Panel -->
+          <div class="x-card-panel">
+            <div class="x-table-responsive">
+              <table class="x-table">
+                <thead>
+                  <tr>
+                    <th>No. Pesanan</th>
+                    <th>Waktu</th>
+                    <th>Pelanggan</th>
+                    <th>Tipe Layanan</th>
+                    <th>Meja</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th class="text-right">Aksi Operasional</th>
+                  </tr>
+                </thead>
+                <tbody id="bm-orders-tbody">
+                  <tr><td colspan="8" class="text-center py-6 text-muted">Memuat data pesanan cabang...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Order Detail Panel (Integrated into Tab) -->
+        <div id="bm-orders-detail-view" style="display:none;">
+          <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <button type="button" class="x-btn-secondary" onclick="closeBMOrderDetail()" style="font-size:13px; padding:6px 12px;">
+                  &larr; Kembali ke Antrean
+                </button>
+                <h3 id="bm-detail-order-number" style="margin:0; font-size:18px; font-weight:800; color:var(--text-main);">#ORD-0000</h3>
+                <span id="bm-detail-status-badge" class="x-badge x-badge-info">STATUS</span>
+              </div>
+              <div id="bm-detail-actions-top" style="display:flex; gap:8px;"></div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px;">
+            <div style="display:flex; flex-direction:column; gap:20px;">
+              <!-- Ordered Items -->
+              <div class="x-card-panel" style="padding:20px;">
+                <h4 style="font-size:15px; font-weight:700; margin:0 0 16px;">📋 Rincian Menu Pesanan</h4>
+                <div class="x-table-responsive">
+                  <table class="x-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Harga</th>
+                        <th>Qty</th>
+                        <th>Catatan</th>
+                        <th class="text-right">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody id="bm-detail-items-tbody">
+                      <tr><td colspan="5" class="text-center py-4 text-muted">Memuat item...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Status Logs Audit -->
+              <div class="x-card-panel" style="padding:20px;">
+                <h4 style="font-size:15px; font-weight:700; margin:0 0 16px;">📜 Jejak Audit Status (Status Logs)</h4>
+                <div id="bm-detail-logs-list" style="display:flex; flex-direction:column; gap:8px; font-size:12px;">
+                  <span class="text-muted">Tidak ada catatan audit tambahan.</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:20px;">
+              <!-- Customer & Fulfillment Summary -->
+              <div class="x-card-panel" style="padding:20px;">
+                <h4 style="font-size:15px; font-weight:700; margin:0 0 14px;">👤 Informasi Pemesan</h4>
+                <div style="font-size:13px; line-height:1.8;">
+                  <div><span class="text-muted">Nama:</span> <strong id="bm-detail-cust-name">-</strong></div>
+                  <div><span class="text-muted">Telepon:</span> <strong id="bm-detail-cust-phone">-</strong></div>
+                  <div><span class="text-muted">Layanan:</span> <span id="bm-detail-fulfillment-badge" class="x-badge x-badge-info">DELIVERY</span></div>
+                  <div id="bm-detail-table-row" style="display:none;"><span class="text-muted">Meja:</span> <strong id="bm-detail-table-number">-</strong></div>
+                  <div><span class="text-muted">Waktu:</span> <span id="bm-detail-order-time">-</span></div>
+                  <div><span class="text-muted">Catatan:</span> <span id="bm-detail-order-notes" style="font-style:italic;">-</span></div>
+                </div>
+              </div>
+
+              <!-- Payment Summary -->
+              <div class="x-card-panel" style="padding:20px;">
+                <h4 style="font-size:15px; font-weight:700; margin:0 0 14px;">💳 Rincian Pembayaran</h4>
+                <div style="font-size:13px; line-height:1.8;">
+                  <div style="display:flex; justify-content:space-between;"><span class="text-muted">Subtotal:</span> <span id="bm-detail-calc-subtotal">Rp 0</span></div>
+                  <div style="display:flex; justify-content:space-between;"><span class="text-muted">Ongkir:</span> <span id="bm-detail-calc-delivery">Rp 0</span></div>
+                  <div style="display:flex; justify-content:space-between;"><span class="text-muted">Diskon:</span> <span id="bm-detail-calc-discount">Rp 0</span></div>
+                  <div style="display:flex; justify-content:space-between; font-weight:800; font-size:15px; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border-color);">
+                    <span>Total Tagihan:</span> <span id="bm-detail-calc-grandtotal" style="color:var(--accent-teal);">Rp 0</span>
+                  </div>
+                  <div style="margin-top:10px;"><span class="text-muted">Metode / Status:</span> <strong id="bm-detail-pay-status">-</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
+      <!-- TAB: BM-MEJA (Operational Tables & Dine-In Management) -->
       <section id="tab-bm-meja" class="x-tab-content" data-tab="bm-meja">
-        <div class="x-route-placeholder">
-          <div class="x-route-placeholder-icon">🪑</div>
-          <h3>Status Meja & Dine-In</h3>
-          <p>Modul operasional status meja, blokir operasional, dan sesi makan di tempat. Dijadwalkan untuk fase BM-2.</p>
+        <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+            <div>
+              <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Status Meja &amp; Dine-In Cabang</h3>
+              <p class="text-muted" style="font-size:13px; margin:0;">
+                Pantau ketersediaan meja, blokir/buka meja secara operasional, dan kelola sesi tamu dine-in aktif.
+              </p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button type="button" class="x-btn-secondary" id="btn-bm-tables-refresh" onclick="loadBMTables()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Segarkan</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Table Overview KPI Cards -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-color);">
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#15803d;">TERSEDIA (AVAILABLE)</div>
+              <div id="bm-tables-stat-available" style="font-size:22px; font-weight:800; color:#166534; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#1d4ed8;">TERISI (OCCUPIED)</div>
+              <div id="bm-tables-stat-occupied" style="font-size:22px; font-weight:800; color:#1e40af; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#b45309;">DITAHAN / PEMBAYARAN (HELD)</div>
+              <div id="bm-tables-stat-held" style="font-size:22px; font-weight:800; color:#92400e; margin-top:4px;">0</div>
+            </div>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px;">
+              <div style="font-size:11px; font-weight:700; color:#b91c1c;">DIBLOKIR / RUSAK (BLOCKED)</div>
+              <div id="bm-tables-stat-blocked" style="font-size:22px; font-weight:800; color:#991b1b; margin-top:4px;">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tables Grid Card Container -->
+        <div class="x-card-panel">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h4 style="font-size:15px; font-weight:700; margin:0;">Daftar Meja Operasional Cabang</h4>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <label style="font-size:12px; font-weight:600; color:var(--text-muted);">Filter Status:</label>
+              <select id="bm-tables-filter-status" class="x-input" style="font-size:12px; padding:4px 10px;" onchange="onBMTablesFilterChange()">
+                <option value="all">Semua Meja</option>
+                <option value="available">Hanya Tersedia</option>
+                <option value="occupied">Hanya Terisi</option>
+                <option value="held">Hanya Ditahan</option>
+                <option value="blocked">Hanya Diblokir</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="bm-tables-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:16px;">
+            <div class="text-center py-6 text-muted" style="grid-column:1/-1;">Memuat data meja cabang...</div>
+          </div>
         </div>
       </section>
 
