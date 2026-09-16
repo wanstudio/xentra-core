@@ -2789,6 +2789,21 @@
             </div>
           </div>
 
+          <!-- P8: Branch Acceptance Warning Banner & Countdown for Pending Orders -->
+          <div id="bm-detail-acceptance-banner" style="display:none; margin-bottom:20px; padding:16px 20px; background:#fffbeb; border:1px solid #fde68a; border-left:4px solid #f59e0b; border-radius:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div>
+                <strong style="color:#92400e; font-size:14px;">⚠️ MENUNGGU KONFIRMASI CABANG (BRANCH ACCEPTANCE)</strong>
+                <p style="margin:4px 0 0; font-size:12px; color:#b45309;">
+                  Pelanggan telah menyelesaikan pembayaran. Tinjau ketersediaan stok & kapasitas dapur sebelum menerima atau menolak.
+                </p>
+              </div>
+              <div id="bm-detail-acceptance-timer" style="display:inline-flex; align-items:center; gap:6px; font-weight:800; font-size:13px; color:#b45309; background:#fef3c7; border:1px solid #fde68a; padding:6px 12px; border-radius:20px;">
+                ⏱ Batas Waktu: <span id="bm-detail-countdown-text">--:--</span>
+              </div>
+            </div>
+          </div>
+
           <div style="display:grid; grid-template-columns:2fr 1fr; gap:20px;">
             <div style="display:flex; flex-direction:column; gap:20px;">
               <!-- Ordered Items -->
@@ -3803,6 +3818,54 @@
         <button type="button" class="x-btn-secondary" id="btn-crop-cancel">Batal</button>
         <button type="button" class="x-btn-primary" id="btn-crop-confirm">✓ Konfirmasi Potongan</button>
       </div>
+    </div>
+  </div>
+
+  <!-- P8: Operational Modal: Branch Order Rejection -->
+  <div id="modal-bm-reject-order" class="x-modal" role="dialog" aria-modal="true" aria-labelledby="bm-reject-modal-title" style="display:none;">
+    <div class="x-modal-backdrop" onclick="closeBMRejectModal()"></div>
+    <div class="x-modal-card" style="max-width:480px; width:100%; z-index:1001; margin:auto; background:var(--card-bg, #fff); border-radius:12px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); overflow:hidden;">
+      <div class="x-modal-header" style="padding:16px 20px; border-bottom:1px solid var(--border-color, #e2e8f0); display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <h3 id="bm-reject-modal-title" style="margin:0; font-size:16px; font-weight:700; color:#dc2626;">Tolak Pesanan Cabang</h3>
+          <p id="bm-reject-order-subtitle" style="margin:2px 0 0; font-size:12px; color:var(--text-muted, #64748b);">Pesanan #ORD-0000</p>
+        </div>
+        <button type="button" class="x-btn-close" onclick="closeBMRejectModal()" aria-label="Tutup modal" style="background:transparent; border:none; font-size:20px; cursor:pointer; color:var(--text-muted, #64748b);">&times;</button>
+      </div>
+
+      <form id="form-bm-reject-order" onsubmit="submitBMRejectOrder(event)" style="padding:20px;">
+        <input type="hidden" id="bm-reject-order-id" value="">
+
+        <div style="margin-bottom:14px;">
+          <label style="display:block; font-size:12px; font-weight:700; margin-bottom:6px; color:var(--text-main, #0f172a);">
+            Pilih Alasan Cepat:
+          </label>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="setBMRejectReason('Bahan baku menu pesanan habis')">Bahan Baku Habis</button>
+            <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="setBMRejectReason('Dapur sedang overload / antrean penuh')">Dapur Overload</button>
+            <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="setBMRejectReason('Di luar jam operasional dapur')">Di Luar Jam Ops</button>
+            <button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="setBMRejectReason('Kondisi cuaca ekstrem / kendala kurir')">Kendala Kurir</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px;">
+          <label for="bm-reject-reason-input" style="display:block; font-size:12px; font-weight:700; margin-bottom:6px; color:var(--text-main, #0f172a);">
+            Alasan Penolakan <span style="color:#dc2626;">*</span>
+          </label>
+          <textarea id="bm-reject-reason-input" class="x-input" rows="3" required placeholder="Jelaskan alasan penolakan untuk catatan audit & notifikasi pelanggan..." style="width:100%; box-sizing:border-box; font-size:13px; resize:vertical; padding:8px 10px;"></textarea>
+          <div style="display:flex; justify-content:space-between; margin-top:4px;">
+            <span id="bm-reject-error" style="font-size:11px; color:#dc2626; display:none;">Alasan penolakan wajib diisi.</span>
+            <span style="font-size:11px; color:var(--text-muted, #64748b);">Wajib untuk jejak audit cabang.</span>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button type="button" class="x-btn-secondary" onclick="closeBMRejectModal()" style="font-size:13px; padding:8px 16px;">Batal</button>
+          <button type="submit" id="btn-bm-confirm-reject" class="x-btn-primary" style="background:#dc2626; border-color:#dc2626; color:#fff; font-size:13px; padding:8px 16px;">
+            <span id="bm-reject-btn-text">Konfirmasi Tolak Pesanan</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
