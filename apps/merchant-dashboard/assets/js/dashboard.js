@@ -9261,7 +9261,7 @@
     var activeCount = (promos || []).filter(function (p) { return p.is_active === 1 || p.is_active === true; }).length;
     var totalRedemptions = (redemptions || []).length;
     var totalDiscount = (redemptions || []).reduce(function (acc, r) {
-      return acc + (Number(r.discount_amount || r.discount_applied) || 0);
+      return acc + (Number(r.benefit_amount || r.discount_amount || r.discount_applied) || 0);
     }, 0);
 
     if ($('bm-promo-stat-active')) $('bm-promo-stat-active').textContent = activeCount;
@@ -9311,8 +9311,8 @@
     }
 
     tbody.innerHTML = redemptions.slice(0, 10).map(function (r) {
-      var time = (r.created_at || '').substring(0, 16).replace('T', ' ') || '—';
-      var discountVal = Number(r.discount_amount || r.discount_applied) || 0;
+      var time = (r.redeemed_at || r.created_at || '').substring(0, 16).replace('T', ' ') || '—';
+      var discountVal = Number(r.benefit_amount || r.discount_amount || r.discount_applied) || 0;
       return '<tr>' +
         '<td><strong>' + esc(r.order_number || r.order_id) + '</strong></td>' +
         '<td><code>' + esc(r.promo_code || r.promotion_name || 'Promo') + '</code></td>' +

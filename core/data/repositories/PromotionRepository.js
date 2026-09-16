@@ -76,11 +76,13 @@ class PromotionRepository {
         pr.id,
         pr.promotion_id,
         p.name as promotion_name,
+        p.code as promo_code,
         pr.order_id,
         pr.branch_id,
         b.name as branch_name,
         pr.customer_phone,
         pr.benefit_amount,
+        pr.benefit_amount as discount_amount,
         pr.status,
         pr.redeemed_at
       FROM promotion_redemptions pr

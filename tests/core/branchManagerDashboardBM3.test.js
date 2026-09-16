@@ -525,9 +525,11 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(Array.isArray(res.body.redemptions));
 
     // Must contain Branch A redemptions, NOT Branch B
-    const hasBranchA = res.body.redemptions.some(r => r.order_id === 'ord_bm3_dummy_1');
+    const itemA = res.body.redemptions.find(r => r.order_id === 'ord_bm3_dummy_1');
     const hasBranchB = res.body.redemptions.some(r => r.order_id === 'ord_bm3_dummy_2');
-    assert.equal(hasBranchA, true);
+    assert.ok(itemA, 'Should contain Branch A redemption');
+    assert.equal(itemA.benefit_amount, 10000, 'Redemption benefit_amount must match');
+    assert.equal(itemA.discount_amount, 10000, 'Redemption discount_amount alias must match');
     assert.equal(hasBranchB, false);
 
     // If query param attempts to ask for Branch B, requireAuth denies cross-branch query (403 FORBIDDEN_BRANCH_ACCESS)
