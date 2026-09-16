@@ -246,7 +246,7 @@ describe('BM-4 — Branch Manager Dashboard: Staff, Jam Operasional & Reports', 
     assert.equal(res.body.error, 'FORBIDDEN_BRANCH_SCOPE');
   });
 
-  it('BM4-09: Branch Manager can read branch operational report metrics scoped to assigned branch', async () => {
+  it('BM4-09: Branch Manager can query branch-scoped orders for client operational reporting feed', async () => {
     const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID });
     const res = await request('GET', `/api/v1/admin/branches/${BRANCH_A_ID}/orders?status=all`, null, {
       Authorization: `Bearer ${token}`
@@ -255,6 +255,10 @@ describe('BM-4 — Branch Manager Dashboard: Staff, Jam Operasional & Reports', 
     assert.equal(res.status, 200);
     assert.equal(res.body.success, true);
     assert.ok(Array.isArray(res.body.orders));
+    // Verify all returned orders strictly belong to the assigned branch
+    for (const ord of res.body.orders) {
+      assert.equal(ord.branch_id, BRANCH_A_ID, 'Order must belong to assigned branch');
+    }
   });
 
   it('BM4-10: index.html contains fully rendered UI surfaces for tab-bm-staff, tab-bm-jam-operasional, tab-bm-reports, and online toggle', () => {
