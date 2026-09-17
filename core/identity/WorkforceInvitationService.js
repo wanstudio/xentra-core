@@ -1212,20 +1212,474 @@ class WorkforceInvitationService {
     };
   }
 
-  _logSecurityEvent({ actor_id, actor_role, action, brand_id, organization_id, branch_id, result, metadata, requirePersistence = false }) {
+  /**
+   * Accepts a workforce invitation authenticated by a verified Google identity.
+   *
+   * Security Invariants:
+   * - Google credential must be verified upstream (verifiedClaims contains sub, email, email_verified).
+   * - Google sub is the immutable provider identity.
+   * - Verified Google email must strictly match the invitation recipient email.
+   * - If user doesn't exist, a new Xentra user is created.
+   * - If user exists, validates workforce role/scope compatibility before linking.
+   * - Google provider (sub) must not already belong to another user (reject with 409 PROVIDER_ALREADY_LINKED).
+   * - All mutations (user creation/reconciliation, provider linking, role/scope assignment, invitation consumption)
+   *   execute within a single atomic database transaction with full rollback on error.
+   *
+   * @param {Object} params
+   * @param {string} params.rawToken Raw invitation token
+   * @param {Object} params.verifiedGoogleClaims { sub, email, email_verified, name, picture }
+   * @returns {Object} Acceptance result with user and membership details
+   */
+  acceptInvitationWithGoogle({ rawToken, verifiedGoogleClaims }) {
+    if (!verifiedGoogleClaims || !verifiedGoogleClaims.sub || !verifiedGoogleClaims.email) {
+      throw {
+        status: 400,
+        code: 'INVALID_GOOGLE_CREDENTIAL',
+        message: 'Google identity credentials are missing or invalid.'
+      };
+    }
+
+    if (!verifiedGoogleClaims.email_verified) {
+      throw {
+        status: 400,
+        code: 'UNVERIFIED_GOOGLE_EMAIL',
+        message: 'Alamat email Google belum diverifikasi oleh Google.'
+      };
+    }
+
+    if (!rawToken || typeof rawToken !== 'string' || !rawToken.trim()) {
+      throw {
+        status: 400,
+        code: 'INVALID_TOKEN',
+        message: 'Token undangan tidak valid.'
+      };
+    }
+
+    const tokenHash = this.hashToken(rawToken);
+    const invitation = this.db.prepare(`
+      SELECT wi.*, b.name as brand_name, br.name as branch_name
+      FROM workforce_invitations wi
+      JOIN brands b ON b.id = wi.brand_id
+      LEFT JOIN branches br ON br.id = wi.branch_id
+      WHERE wi.token_hash = ?
+    `).get(tokenHash);
+
+    if (!invitation) {
+      throw {
+        status: 404,
+        code: 'INVITATION_NOT_FOUND',
+        message: 'Undangan tidak ditemukan atau token salah.'
+      };
+    }
+
+    if (invitation.status === 'revoked') {
+      throw {
+        status: 410,
+        code: 'INVITATION_REVOKED',
+        message: 'Undangan ini telah dibatalkan.'
+      };
+    }
+
+    if (invitation.status === 'accepted') {
+      throw {
+        status: 410,
+        code: 'INVITATION_ALREADY_ACCEPTED',
+        message: 'Undangan ini telah digunakan.'
+      };
+    }
+
+    if (invitation.status === 'expired' || new Date(invitation.expires_at) < new Date()) {
+      if (invitation.status !== 'expired') {
+        this.db.prepare("UPDATE workforce_invitations SET status = 'expired', updated_at = datetime('now') WHERE id = ?").run(invitation.id);
+        this._logSecurityEvent({
+          actor_id: null,
+          actor_role: 'system',
+          action: 'INVITATION_EXPIRED',
+          brand_id: invitation.brand_id,
+          organization_id: invitation.organization_id,
+          branch_id: invitation.branch_id,
+          result: 'expired',
+          metadata: { invitation_id: invitation.id }
+        });
+      }
+      throw {
+        status: 410,
+        code: 'INVITATION_EXPIRED',
+        message: 'Undangan ini telah kadaluarsa.'
+      };
+    }
+
+    if (invitation.status !== 'pending') {
+      throw {
+        status: 400,
+        code: 'INVALID_STATE',
+        message: `Tidak dapat menerima undangan dengan status ${invitation.status}.`
+      };
+    }
+
+    // Email strict comparison: normalized verified Google email must match normalized invitation email
+    const googleEmail = String(verifiedGoogleClaims.email).trim().toLowerCase();
+    const inviteEmail = String(invitation.email).trim().toLowerCase();
+
+    if (googleEmail !== inviteEmail) {
+      this._logSecurityEvent({
+        actor_id: null,
+        actor_role: null,
+        action: 'INVITATION_ACCEPT_DENIED',
+        brand_id: invitation.brand_id,
+        organization_id: invitation.organization_id,
+        branch_id: invitation.branch_id,
+        result: 'denied',
+        metadata: {
+          invitation_id: invitation.id,
+          reason: 'RECIPIENT_MISMATCH',
+          google_email: googleEmail,
+          invite_email: inviteEmail,
+          role: invitation.role
+        }
+      });
+
+      throw {
+        status: 403,
+        code: 'INVITATION_EMAIL_MISMATCH',
+        message: 'Alamat email akun Google tidak sesuai dengan alamat email penerima undangan.'
+      };
+    }
+
+    const cleanSub = String(verifiedGoogleClaims.sub).trim();
+
+    // Check if Google sub is already linked to an existing user
+    const existingProvider = this.db.prepare(
+      "SELECT id, user_id FROM user_auth_providers WHERE provider = 'google' AND provider_user_id = ?"
+    ).get(cleanSub);
+
+    // Check if a user with this email already exists
+    const existingUser = this.db.prepare(
+      'SELECT id, role, brand_id, organization_id, branch_id, status, email FROM users WHERE LOWER(email) = ?'
+    ).get(inviteEmail);
+
+    if (existingProvider) {
+      if (!existingUser || existingProvider.user_id !== existingUser.id) {
+        // Linked to a completely different user!
+        this._logSecurityEvent({
+          actor_id: existingProvider.user_id,
+          actor_role: null,
+          action: 'INVITATION_ACCEPT_DENIED',
+          brand_id: invitation.brand_id,
+          organization_id: invitation.organization_id,
+          branch_id: invitation.branch_id,
+          result: 'denied',
+          metadata: {
+            invitation_id: invitation.id,
+            reason: 'PROVIDER_ALREADY_LINKED',
+            sub: cleanSub
+          }
+        });
+        throw {
+          status: 409,
+          code: 'PROVIDER_ALREADY_LINKED',
+          message: 'Akun Google ini telah terhubung ke akun Xentra lain.'
+        };
+      }
+    }
+
+    let targetUserId;
+    let isNewUser = false;
+    let candidateUsername = null;
+    const finalFullName = (verifiedGoogleClaims.name || inviteEmail.split('@')[0]).trim();
+    const now = new Date().toISOString();
+
+    if (existingUser) {
+      targetUserId = existingUser.id;
+
+      if (existingUser.status === 'disabled') {
+        throw {
+          status: 403,
+          code: 'ACCOUNT_DISABLED',
+          message: 'Akun pengguna telah dinonaktifkan.'
+        };
+      }
+
+      // Safe Workforce Role & Scope Attachment checks
+      const hasExistingWorkforce = Boolean(existingUser.brand_id && existingUser.role);
+      if (hasExistingWorkforce) {
+        // 1. Owner cannot be demoted
+        if (existingUser.role === 'owner' && invitation.role !== 'owner') {
+          this._logSecurityEvent({
+            actor_id: existingUser.id,
+            actor_role: existingUser.role,
+            action: 'INVITATION_ACCEPT_DENIED',
+            brand_id: invitation.brand_id,
+            organization_id: invitation.organization_id,
+            branch_id: invitation.branch_id,
+            result: 'denied',
+            metadata: {
+              invitation_id: invitation.id,
+              reason: 'CANNOT_DEMOTE_OWNER',
+              current_role: existingUser.role,
+              invited_role: invitation.role
+            }
+          });
+          throw {
+            status: 409,
+            code: 'WORKFORCE_ROLE_CONFLICT',
+            message: 'Akun pemilik bisnis (Owner) tidak dapat menerima undangan sebagai staf atau manajer.'
+          };
+        }
+
+        // 2. Cross-brand conflict
+        if (existingUser.brand_id !== invitation.brand_id) {
+          this._logSecurityEvent({
+            actor_id: existingUser.id,
+            actor_role: existingUser.role,
+            action: 'INVITATION_ACCEPT_DENIED',
+            brand_id: invitation.brand_id,
+            organization_id: invitation.organization_id,
+            branch_id: invitation.branch_id,
+            result: 'denied',
+            metadata: {
+              invitation_id: invitation.id,
+              reason: 'CROSS_BRAND_CONFLICT',
+              current_brand_id: existingUser.brand_id,
+              target_brand_id: invitation.brand_id
+            }
+          });
+          throw {
+            status: 409,
+            code: 'WORKFORCE_SCOPE_CONFLICT',
+            message: 'Akun pengguna telah terikat pada brand bisnis lain.'
+          };
+        }
+
+        // 3. Demotion or branch conflict within same brand
+        const sameRole = existingUser.role === invitation.role;
+        const sameBranch = (existingUser.branch_id || null) === (invitation.branch_id || null);
+
+        if (!sameRole || !sameBranch) {
+          const managerialRoles = ['brand_manager', 'branch_manager'];
+          if (managerialRoles.includes(existingUser.role) && !managerialRoles.includes(invitation.role)) {
+            this._logSecurityEvent({
+              actor_id: existingUser.id,
+              actor_role: existingUser.role,
+              action: 'INVITATION_ACCEPT_DENIED',
+              brand_id: invitation.brand_id,
+              organization_id: invitation.organization_id,
+              branch_id: invitation.branch_id,
+              result: 'denied',
+              metadata: {
+                invitation_id: invitation.id,
+                reason: 'CANNOT_DEMOTE_MANAGER',
+                current_role: existingUser.role,
+                invited_role: invitation.role
+              }
+            });
+            throw {
+              status: 409,
+              code: 'WORKFORCE_ROLE_CONFLICT',
+              message: `Akun manajer tidak dapat diturunkan statusnya menjadi ${invitation.role} via undangan.`
+            };
+          }
+
+          if (existingUser.role === 'branch_manager' && existingUser.branch_id && invitation.branch_id && existingUser.branch_id !== invitation.branch_id) {
+            this._logSecurityEvent({
+              actor_id: existingUser.id,
+              actor_role: existingUser.role,
+              action: 'INVITATION_ACCEPT_DENIED',
+              brand_id: invitation.brand_id,
+              organization_id: invitation.organization_id,
+              branch_id: invitation.branch_id,
+              result: 'denied',
+              metadata: {
+                invitation_id: invitation.id,
+                reason: 'BRANCH_SCOPE_CONFLICT',
+                current_branch_id: existingUser.branch_id,
+                target_branch_id: invitation.branch_id
+              }
+            });
+            throw {
+              status: 409,
+              code: 'WORKFORCE_SCOPE_CONFLICT',
+              message: 'Branch Manager telah bertugas pada cabang lain dalam brand ini.'
+            };
+          }
+        }
+      }
+    } else {
+      // New user to be created
+      isNewUser = true;
+      targetUserId = 'usr_' + crypto.randomBytes(12).toString('hex');
+
+      let baseUsername = inviteEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      if (baseUsername.length < 3) baseUsername = 'user';
+      candidateUsername = baseUsername;
+      const randHex = crypto.randomBytes(4).toString('hex');
+      if (this.db.prepare('SELECT id FROM users WHERE username = ?').get(candidateUsername)) {
+        candidateUsername = `${baseUsername}_${randHex}`;
+      }
+    }
+
+    const providerMetadataStr = JSON.stringify({
+      name: finalFullName,
+      picture: verifiedGoogleClaims.picture || null,
+      linked_via: 'workforce_invitation_google'
+    });
+
+    // ATOMIC TRANSACTION:
+    // 1. Consume invitation (pending -> accepted)
+    // 2. Create user (if new) OR update user scope/role (if existing)
+    // 3. Link Google provider (if not yet linked)
+    this.db.exec('BEGIN TRANSACTION;');
+    try {
+      const updateInviteResult = this.db.prepare(`
+        UPDATE workforce_invitations
+        SET status = 'accepted', accepted_at = ?, updated_at = ?
+        WHERE id = ? AND status = 'pending'
+      `).run(now, now, invitation.id);
+
+      if (updateInviteResult.changes === 0) {
+        const latest = this.db.prepare('SELECT status FROM workforce_invitations WHERE id = ?').get(invitation.id);
+        if (latest && latest.status === 'accepted') {
+          throw { status: 410, code: 'INVITATION_ALREADY_ACCEPTED', message: 'Undangan ini telah digunakan.' };
+        }
+        if (latest && latest.status === 'revoked') {
+          throw { status: 410, code: 'INVITATION_REVOKED', message: 'Undangan ini telah dibatalkan.' };
+        }
+        throw { status: 400, code: 'INVALID_STATE', message: 'Undangan tidak lagi dalam status pending.' };
+      }
+
+      if (isNewUser) {
+        this.db.prepare(`
+          INSERT INTO users (
+            id, username, email, password_hash, full_name, role, status,
+            organization_id, brand_id, branch_id, email_verified_at, created_at, updated_at
+          ) VALUES (?, ?, ?, NULL, ?, ?, 'active', ?, ?, ?, ?, ?, ?)
+        `).run(
+          targetUserId,
+          candidateUsername,
+          inviteEmail,
+          finalFullName,
+          invitation.role,
+          invitation.organization_id,
+          invitation.brand_id,
+          invitation.branch_id || null,
+          now,
+          now,
+          now
+        );
+      } else {
+        this.db.prepare(`
+          UPDATE users
+          SET role = ?,
+              brand_id = ?,
+              organization_id = ?,
+              branch_id = ?,
+              updated_at = ?
+          WHERE id = ?
+        `).run(
+          invitation.role,
+          invitation.brand_id,
+          invitation.organization_id,
+          invitation.branch_id || null,
+          now,
+          targetUserId
+        );
+      }
+
+      // Link provider if not already linked
+      if (!existingProvider) {
+        const providerLinkId = 'uap_' + crypto.randomBytes(16).toString('hex');
+        this.db.prepare(`
+          INSERT INTO user_auth_providers (
+            id, user_id, provider, provider_user_id, email, metadata, linked_at, created_at, updated_at
+          ) VALUES (?, ?, 'google', ?, ?, ?, ?, ?, ?)
+        `).run(
+          providerLinkId,
+          targetUserId,
+          cleanSub,
+          inviteEmail,
+          providerMetadataStr,
+          now,
+          now,
+          now
+        );
+      }
+
+      this.db.exec('COMMIT;');
+    } catch (err) {
+      try {
+        this.db.exec('ROLLBACK;');
+      } catch (_) {}
+      throw err;
+    }
+
+    if (global.TokenSessionStore && global.TokenSessionStore.revokeUserSessions) {
+      global.TokenSessionStore.revokeUserSessions(targetUserId);
+    }
+
+    // Security audit log
+    this._logSecurityEvent({
+      actor_id: targetUserId,
+      actor_role: invitation.role,
+      action: 'INVITATION_ACCEPTED_VIA_GOOGLE',
+      brand_id: invitation.brand_id,
+      organization_id: invitation.organization_id,
+      branch_id: invitation.branch_id,
+      result: 'success',
+      metadata: {
+        invitation_id: invitation.id,
+        role: invitation.role,
+        brand_id: invitation.brand_id,
+        branch_id: invitation.branch_id,
+        google_sub: cleanSub,
+        is_new_user: isNewUser
+      }
+    });
+
+    const userRecord = this.db.prepare('SELECT id, username, email, full_name, role, status, organization_id, brand_id, branch_id, email_verified_at FROM users WHERE id = ?').get(targetUserId);
+
+    return {
+      success: true,
+      invitation_id: invitation.id,
+      user_id: targetUserId,
+      is_new_user: isNewUser,
+      role: invitation.role,
+      organization_id: invitation.organization_id,
+      brand_id: invitation.brand_id,
+      brand_name: invitation.brand_name,
+      branch_id: invitation.branch_id,
+      branch_name: invitation.branch_name,
+      status: 'accepted',
+      accepted_at: now,
+      user: {
+        id: userRecord.id,
+        username: userRecord.username,
+        email: userRecord.email,
+        full_name: userRecord.full_name,
+        role: userRecord.role,
+        organization_id: userRecord.organization_id,
+        brand_id: userRecord.brand_id,
+        branch_id: userRecord.branch_id || null,
+        email_verified: Boolean(userRecord.email_verified_at),
+        brand_name: invitation.brand_name
+      }
+    };
+  }
+
+  _logSecurityEvent({ actor_id, actor_role, action, target_user_id, target_role, brand_id, organization_id, branch_id, result, metadata, requirePersistence = false }) {
     try {
       const id = 'sal_' + crypto.randomBytes(16).toString('hex');
       const safeMetadata = metadata ? JSON.stringify(metadata) : null;
 
       this.db.prepare(`
         INSERT INTO security_audit_log (id, actor_id, actor_role, action, target_user_id, target_role, brand_id, organization_id, branch_id, result, metadata, created_at)
-        VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, datetime('now'))
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
       `).run(
         id,
         actor_id || null,
         actor_role || null,
         action,
-        metadata?.role || null,
+        target_user_id || null,
+        target_role || metadata?.role || null,
         brand_id || null,
         organization_id || null,
         branch_id || null,

@@ -563,12 +563,16 @@
         }
       });
 
-      // Google Sign-In button redirect to broker / auth handler with return_to
+      // Google Sign-In button redirect to broker / auth handler with return_to and invitation_token
       var btnGoogle = document.getElementById('btn-google-auth');
       if (btnGoogle) {
         btnGoogle.addEventListener('click', function () {
           var currentUrl = window.location.href;
-          window.location.href = '/signin?return_to=' + encodeURIComponent(currentUrl);
+          var signinUrl = '/signin?return_to=' + encodeURIComponent(currentUrl);
+          if (rawToken) {
+            signinUrl += '&invitation_token=' + encodeURIComponent(rawToken);
+          }
+          window.location.href = signinUrl;
         });
       }
 

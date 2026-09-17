@@ -161,11 +161,27 @@
       var TOKEN_KEY = 'xentra_merchant_token';
       var USER_KEY  = 'xentra_merchant_user';
 
-      // Preserve claim context from URL params or sessionStorage
+      // Preserve claim context and invitation token from URL params or sessionStorage
       var urlParams   = new URLSearchParams(window.location.search);
       var returnTo    = urlParams.get('return_to') || '';
       var claimDomain = urlParams.get('claim_domain') || sessionStorage.getItem('xentra_pending_claim_domain') || '';
       if (claimDomain) sessionStorage.setItem('xentra_pending_claim_domain', claimDomain);
+
+      var invitationToken = urlParams.get('invitation_token') || sessionStorage.getItem('xentra_pending_invitation_token') || '';
+      if (invitationToken) {
+        sessionStorage.setItem('xentra_pending_invitation_token', invitationToken);
+      } else if (returnTo && returnTo.indexOf('/invite/') !== -1) {
+        // Attempt to extract token from returnTo URL if present
+        try {
+          var retUrl = new URL(returnTo, window.location.origin);
+          var parts = retUrl.pathname.split('/');
+          var tok = parts[parts.length - 1] || '';
+          if (tok) {
+            invitationToken = tok;
+            sessionStorage.setItem('xentra_pending_invitation_token', invitationToken);
+          }
+        } catch (_) {}
+      }
 
       // Already authenticated → skip sign-in
       if (localStorage.getItem(TOKEN_KEY)) {
@@ -184,8 +200,18 @@
         localStorage.setItem(TOKEN_KEY, data.token);
         if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
         sessionStorage.removeItem('xentra_pending_claim_domain');
-        var dest = returnTo || (data.is_new_user ? '/onboarding' : '/dashboard/');
-        if (data.redirect_url) dest = data.redirect_url;
+        sessionStorage.removeItem('xentra_pending_invitation_token');
+
+        var isWorkforceUser = data.user && data.user.role && data.user.role !== 'owner';
+        var dest = '/dashboard/';
+        if (data.redirect_url) {
+          dest = data.redirect_url;
+        } else if (returnTo && returnTo.indexOf('/invite/') === -1) {
+          // If returnTo is an invite page, don't return back to invite since it's already consumed
+          dest = returnTo;
+        } else if (data.is_new_user && !isWorkforceUser) {
+          dest = '/onboarding';
+        }
         window.location.replace(dest);
       }
 
@@ -268,6 +294,10 @@
           ? { domain: claimDomain, credential: response.credential }
           : { credential: response.credential };
 
+        if (!claimDomain && invitationToken) {
+          payload.invitation_token = invitationToken;
+        }
+
         fetch(targetEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -282,6 +312,14 @@
             var msg;
             if (res.status === 404 && data && data.code === 'ACCOUNT_NOT_LINKED') {
               msg = '\u26A0\uFE0F This Google account is not linked to a Xentra account. Sign in with your email and password first.';
+            } else if (res.status === 403 && data && data.code === 'INVITATION_EMAIL_MISMATCH') {
+              msg = '\u26A0\uFE0F Email Google yang Anda pilih tidak sesuai dengan email penerima undangan. Gunakan akun Google dengan alamat email yang diundang.';
+            } else if (res.status === 409 && data && data.code === 'PROVIDER_ALREADY_LINKED') {
+              msg = '\u26A0\uFE0F Akun Google ini telah terhubung ke akun Xentra lain. Gunakan akun Google yang berbeda.';
+            } else if (res.status === 410 && data && data.code === 'INVITATION_EXPIRED') {
+              msg = '\u26A0\uFE0F Tautan undangan telah kadaluarsa. Hubungi pemilik bisnis untuk mengirimkan undangan baru.';
+            } else if (res.status === 410 && data && data.code === 'INVITATION_ALREADY_ACCEPTED') {
+              msg = '\u26A0\uFE0F Undangan ini telah digunakan sebelumnya. Silakan masuk menggunakan akun Anda.';
             } else if (res.status === 503 || (data && data.code === 'GOOGLE_SERVICE_UNAVAILABLE')) {
               msg = '\u26A0\uFE0F Google service temporarily unavailable. Please try password login.';
             } else {

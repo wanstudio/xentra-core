@@ -3022,8 +3022,32 @@ router.post('/auth/google', async (req, res) => {
       return res.json(linkPayload);
     }
 
-    // Normal login mode: Lookup provider identity strictly by (google, sub)
-    const identity = authProviderService.findIdentity('google', verifiedClaims.sub);
+    // Normal login or Invitation acceptance mode:
+    // Check if invitation_token was supplied (e.g. invited team member signing in via Google for first time)
+    const { invitation_token } = req.body || {};
+
+    let identity = null;
+    let acceptResult = null;
+
+    if (invitation_token) {
+      // Validate invitation and perform atomic onboarding via verified Google credential
+      const invitationService = new WorkforceInvitationService();
+      acceptResult = invitationService.acceptInvitationWithGoogle({
+        rawToken: invitation_token,
+        verifiedGoogleClaims: verifiedClaims
+      });
+
+      // Now lookup newly created / reconciled identity
+      identity = authProviderService.findIdentity('google', verifiedClaims.sub);
+      if (!identity && acceptResult.user) {
+        identity = {
+          userId: acceptResult.user_id,
+          user: acceptResult.user
+        };
+      }
+    } else {
+      identity = authProviderService.findIdentity('google', verifiedClaims.sub);
+    }
 
     if (!identity) {
       return res.status(404).json({
@@ -3129,6 +3153,13 @@ router.post('/auth/google', async (req, res) => {
         brand_name: (req.brand && req.brand.name) ? req.brand.name : 'Bangjo Resto'
       }
     };
+
+    if (acceptResult) {
+      responsePayload.is_new_user = Boolean(acceptResult.is_new_user);
+      responsePayload.invitation_accepted = true;
+      // Invited workforce members always go to dashboard, never to /onboarding
+      responsePayload.redirect_url = '/dashboard/';
+    }
 
     if (handoffInfo) {
       responsePayload.handoff_ticket = handoffInfo.ticket;
