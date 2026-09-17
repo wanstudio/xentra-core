@@ -1243,7 +1243,23 @@
   function populateBranchSelector(branches) {
     var sel = $('dash-branch-context');
     if (!sel) return;
-    _branchContextState.branches = branches || [];
+    var allBranches = branches || [];
+    var user = getStoredUser();
+
+    // Role-scoped branch list filtering:
+    // If brand_manager, only show branches matching user's brand_id
+    var scopedBranches = allBranches;
+    if (user && user.role === 'brand_manager' && user.brand_id) {
+      scopedBranches = allBranches.filter(function (b) {
+        return String(b.brand_id) === String(user.brand_id);
+      });
+    } else if (user && user.role === 'branch_manager' && user.branch_id) {
+      scopedBranches = allBranches.filter(function (b) {
+        return String(b.id) === String(user.branch_id);
+      });
+    }
+
+    _branchContextState.branches = scopedBranches;
 
     // Rebuild options
     sel.innerHTML = '<option value="all">All Branches</option>';
@@ -1255,7 +1271,6 @@
     });
 
     // Restore previous selection if still valid
-    var user = getStoredUser();
     if (user && user.role === 'branch_manager' && user.branch_id) {
       _branchContextState.selected = user.branch_id;
       sel.value = user.branch_id;
@@ -1264,11 +1279,14 @@
       // Update BM branch badge text if available
       var bmBadgeName = $('dash-bm-branch-name');
       if (bmBadgeName) {
-        var foundB = (_branchContextState.branches).find(function (b) { return String(b.id) === String(user.branch_id); });
+        var foundB = (_branchContextState.branches).find(function (b) { return String(b.id) === String(user.branch_id); }) ||
+                     allBranches.find(function (b) { return String(b.id) === String(user.branch_id); });
         if (foundB && foundB.name) {
           bmBadgeName.textContent = foundB.name;
         }
       }
+    } else if (user && (user.role === 'cashier' || user.role === 'kitchen')) {
+      sel.disabled = true;
     } else {
       var validIds = ['all'].concat((_branchContextState.branches).map(function (b) { return String(b.id); }));
       if (validIds.indexOf(_branchContextState.selected) === -1) {
@@ -1383,6 +1401,10 @@
     $('dash-brand-title').textContent = brand.name || 'Bangjo Resto';
     $('dash-sidebar-logo').src = logoUrl;
     if ($('topbar-brand-name')) $('topbar-brand-name').textContent = brand.name || 'Bangjo Resto';
+    var user = getStoredUser();
+    if (user && user.role === 'branch_manager' && $('topbar-brand-badge')) {
+      $('topbar-brand-badge').style.display = 'none';
+    }
 
     if ($('set-profile-name')) $('set-profile-name').value = brand.name || '';
     if ($('set-profile-tagline')) $('set-profile-tagline').value = brand.tagline || '';
@@ -5207,6 +5229,34 @@
       });
     }
 
+    // Role-Aware Portal Label in sidebar badge
+    var portalBadge = document.querySelector('.x-dash-badge-pro');
+    if (portalBadge) {
+      if (role === 'owner') {
+        portalBadge.textContent = 'Owner Portal';
+      } else if (role === 'brand_manager') {
+        portalBadge.textContent = 'Brand Portal';
+      } else if (role === 'branch_manager') {
+        portalBadge.textContent = 'Branch Portal';
+      } else if (role === 'cashier') {
+        portalBadge.textContent = 'Cashier Portal';
+      } else {
+        portalBadge.textContent = (role ? role.replace(/_/g, ' ') : 'Merchant') + ' Portal';
+      }
+    }
+
+    // Topbar brand badge: hide for branch_manager (redundant with sidebar), show for owner/brand_manager
+    var topbarBrandBadge = $('topbar-brand-badge');
+    if (topbarBrandBadge) {
+      topbarBrandBadge.style.display = isBM ? 'none' : 'flex';
+    }
+
+    // Global search affordance: hide non-functional affordance to avoid misleading placeholder
+    var searchBtn = $('btn-global-search');
+    if (searchBtn) {
+      searchBtn.style.display = 'none';
+    }
+
     // Set branch context visibility and locking
     var branchSelectorWrap = $('x-branch-selector');
     var bmBranchBadge = $('dash-bm-branch-badge');
@@ -5223,7 +5273,14 @@
           branchSelector.disabled = true;
         }
       }
+    } else if (role === 'cashier' || role === 'kitchen') {
+      if (branchSelectorWrap) branchSelectorWrap.style.display = 'none';
+      if (bmBranchBadge) bmBranchBadge.style.display = 'none';
+      if (branchSelector) {
+        branchSelector.disabled = true;
+      }
     } else {
+      // owner or brand_manager
       if (branchSelectorWrap) branchSelectorWrap.style.display = 'flex';
       if (bmBranchBadge) bmBranchBadge.style.display = 'none';
       if (branchSelector) {
