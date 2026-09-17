@@ -3791,7 +3791,7 @@
     }
 
     // Category row — branch categories of the currently managed branch
-    var cats = (currentBranchCatalogData && currentBranchCatalogData.categories) || [];
+    var cats = (currentBranchCatalogData && currentBranchCatalogData.categories) || (_bmMenuState && _bmMenuState.categories) || [];
     var catSelect = $('override-category-select');
     if (catSelect) {
       var catOptions = cats.map(function (c) {
@@ -3799,6 +3799,25 @@
       });
       catOptions.unshift('<option value="">Tanpa Kategori</option>');
       catSelect.innerHTML = catOptions.join('');
+    }
+
+    // M:N Category Checkbox List (Phase 3)
+    var catListEl = $('override-categories-list');
+    if (catListEl) {
+      var activeCatIds = Array.isArray(p.category_ids) && p.category_ids.length > 0
+        ? p.category_ids.map(String)
+        : (p.branch_category_id ? [String(p.branch_category_id)] : []);
+      if (!cats.length) {
+        catListEl.innerHTML = '<span class="text-muted" style="font-size:12px;">Belum ada kategori cabang dibuat.</span>';
+      } else {
+        catListEl.innerHTML = cats.map(function (c) {
+          var isChecked = activeCatIds.indexOf(String(c.id)) !== -1;
+          return '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#334155; cursor:pointer; padding:3px 0;">' +
+            '<input type="checkbox" class="override-cat-checkbox" value="' + esc(c.id) + '"' + (isChecked ? ' checked' : '') + ' style="width:16px; height:16px; accent-color:#0284c7; cursor:pointer;" />' +
+            '<span>' + esc(c.name) + '</span>' +
+          '</label>';
+        }).join('');
+      }
     }
 
     modal.style.display = 'flex';
@@ -3832,10 +3851,18 @@
       payload.price = Number($('override-price-input').value);
     }
 
-    // category — empty select clears the assignment; otherwise the chosen
-    // branch category id (server validates ownership against the branch).
-    var catVal = $('override-category-select').value;
-    payload.branch_category_id = catVal !== '' ? catVal : null;
+    // category — collect M:N checkboxes if present, otherwise fallback to select
+    var catListEl = $('override-categories-list');
+    if (catListEl && catListEl.querySelectorAll('.override-cat-checkbox').length > 0) {
+      var checkedCbs = catListEl.querySelectorAll('.override-cat-checkbox:checked');
+      var checkedIds = Array.from(checkedCbs).map(function (cb) { return cb.value; });
+      payload.category_ids = checkedIds;
+      payload.branch_category_id = checkedIds.length > 0 ? checkedIds[0] : null;
+    } else {
+      var catVal = $('override-category-select') ? $('override-category-select').value : '';
+      payload.branch_category_id = catVal !== '' ? catVal : null;
+      if (catVal !== '') payload.category_ids = [catVal];
+    }
 
     try {
       // 1. Staged photo (if any) — upload first, server returns the override URL.
@@ -3901,7 +3928,7 @@
     if (!confirm('Kembalikan semua nilai ke Master? Nama, deskripsi, foto, harga, dan kategori dikembalikan ke pengaturan asal produk Master.')) return;
     var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
       method: 'PATCH', headers: getAuthHeaders(),
-      body: JSON.stringify({ name: null, description: null, image_url: null, price: null, branch_category_id: null })
+      body: JSON.stringify({ name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] })
     });
     var data = await res.json();
     if (data.success) {
@@ -9545,6 +9572,8 @@
           return Object.assign({}, ap, p, {
             branch_category_id: ap.branch_category_id || null,
             branch_category_name: ap.branch_category_name || null,
+            category_ids: ap.category_ids || (ap.branch_category_id ? [ap.branch_category_id] : []),
+            categories: ap.categories || [],
             pricing_mode: ap.pricing_mode || 'lock',
             master_price: ap.master_price || p.price,
             min_price: ap.min_price || null,
@@ -9873,7 +9902,10 @@
       if (_bmMenuState.statusFilter === 'unavailable' && isAvail) return false;
 
       if (_bmMenuState.categoryFilter && _bmMenuState.categoryFilter !== 'all') {
-        if (String(p.branch_category_id) !== String(_bmMenuState.categoryFilter)) return false;
+        var pCatIds = Array.isArray(p.category_ids) && p.category_ids.length > 0
+          ? p.category_ids.map(String)
+          : (p.branch_category_id ? [String(p.branch_category_id)] : []);
+        if (pCatIds.indexOf(String(_bmMenuState.categoryFilter)) === -1) return false;
       }
 
       return true;
@@ -9900,7 +9932,16 @@
         ? '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 10px; color:#dc2626; border-color:#fecaca;" onclick="toggleBMProductAvailability(\'' + esc(p.product_id) + '\', 0)">Tandai Habis</button>'
         : '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 10px;" onclick="toggleBMProductAvailability(\'' + esc(p.product_id) + '\', 1)">Tandai Tersedia</button>';
 
-      var catLabel = p.branch_category_name || p.category_name || 'Umum';
+      var catBadges = '';
+      if (Array.isArray(p.categories) && p.categories.length > 0) {
+        catBadges = p.categories.map(function (c) {
+          return '<span class="x-badge x-badge-info" style="font-size:11px; margin-right:4px; display:inline-block; margin-bottom:2px;">' + esc(c.name) + '</span>';
+        }).join('');
+      } else if (p.branch_category_name || p.category_name) {
+        catBadges = '<span class="x-badge x-badge-info" style="font-size:11px;">' + esc(p.branch_category_name || p.category_name) + '</span>';
+      } else {
+        catBadges = '<span class="x-badge" style="font-size:11px; background:#f1f5f9; color:#64748b;">Umum</span>';
+      }
 
       var productDataJson = esc(JSON.stringify({
         product_id: p.product_id,
@@ -9918,12 +9959,14 @@
         pricing_mode: p.pricing_mode || 'lock',
         min_price: p.min_price,
         max_price: p.max_price,
-        branch_category_id: p.branch_category_id
+        branch_category_id: p.branch_category_id,
+        category_ids: p.category_ids || (p.branch_category_id ? [p.branch_category_id] : []),
+        categories: p.categories || []
       }));
 
       return '<tr>' +
         '<td><strong>' + esc(p.product_name || p.name) + '</strong></td>' +
-        '<td><span class="x-badge x-badge-info" style="font-size:11px;">' + esc(catLabel) + '</span></td>' +
+        '<td>' + catBadges + '</td>' +
         '<td>' + formatMoney(p.price) + '</td>' +
         '<td><strong>' + esc(p.stock != null ? p.stock : '—') + '</strong></td>' +
         '<td>' + branchStatusBadge + '</td>' +

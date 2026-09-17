@@ -56,7 +56,7 @@ class CatalogRepository {
 
   findBranchProducts({ branchId, brandId, activeOnly = true }) {
     const activeFilter = activeOnly ? 'AND (p.is_active = 1 OR p.is_active IS NULL)' : '';
-    return this.db.queryMany(`
+    const products = this.db.queryMany(`
       SELECT
         bp.product_id as id,
         p.brand_id,
@@ -85,6 +85,78 @@ class CatalogRepository {
       WHERE bp.branch_id = ?
       ORDER BY p.sort_order ASC, p.name ASC
     `, [brandId, branchId]);
+
+    let catRows = [];
+    try {
+      catRows = this.db.queryMany(`
+        SELECT bpc.product_id, bpc.branch_category_id, bc.name, bc.slug
+        FROM branch_product_categories bpc
+        JOIN branch_categories bc ON bc.id = bpc.branch_category_id
+        WHERE bpc.branch_id = ?
+        ORDER BY bc.sort_order ASC, bc.name ASC
+      `, [branchId]);
+    } catch (_) {}
+
+    const catMap = {};
+    for (const r of catRows) {
+      if (!catMap[r.product_id]) catMap[r.product_id] = [];
+      catMap[r.product_id].push({ id: r.branch_category_id, name: r.name, slug: r.slug });
+    }
+
+    return products.map(p => {
+      const assignedCats = catMap[p.id] || [];
+      const catIds = assignedCats.map(c => c.id);
+      if (catIds.length === 0 && p.category_id) {
+        catIds.push(p.category_id);
+      }
+      return {
+        ...p,
+        category_ids: catIds,
+        categories: assignedCats
+      };
+    });
+  }
+
+  findProductCategories({ branchId, productId }) {
+    return this.db.queryMany(`
+      SELECT bc.id, bc.brand_id, bc.branch_id, bc.name, bc.slug, bc.image_url, bc.sort_order, bc.media_id
+      FROM branch_product_categories bpc
+      JOIN branch_categories bc ON bc.id = bpc.branch_category_id
+      WHERE bpc.branch_id = ? AND bpc.product_id = ?
+      ORDER BY bc.sort_order ASC, bc.name ASC
+    `, [branchId, productId]);
+  }
+
+  findCategoryProducts({ branchId, branchCategoryId }) {
+    return this.db.queryMany(`
+      SELECT
+        bp.product_id as id,
+        COALESCE(bp.name_override, p.name) as name,
+        COALESCE(bp.description_override, p.description) as description,
+        COALESCE(bp.image_override, p.image_url) as image_url,
+        bp.price,
+        bp.stock,
+        bp.is_available
+      FROM branch_product_categories bpc
+      JOIN branch_products bp ON bp.branch_id = bpc.branch_id AND bp.product_id = bpc.product_id
+      JOIN products p ON p.id = bp.product_id
+      WHERE bpc.branch_id = ? AND bpc.branch_category_id = ?
+      ORDER BY p.sort_order ASC, p.name ASC
+    `, [branchId, branchCategoryId]);
+  }
+
+  assignProductCategory({ branchId, productId, branchCategoryId }) {
+    return this.db.execute(`
+      INSERT OR IGNORE INTO branch_product_categories (branch_id, product_id, branch_category_id)
+      VALUES (?, ?, ?)
+    `, [branchId, productId, branchCategoryId]);
+  }
+
+  removeProductCategory({ branchId, productId, branchCategoryId }) {
+    return this.db.execute(`
+      DELETE FROM branch_product_categories
+      WHERE branch_id = ? AND product_id = ? AND branch_category_id = ?
+    `, [branchId, productId, branchCategoryId]);
   }
 
   findBrandCategories(brandId, activeOnly = true) {

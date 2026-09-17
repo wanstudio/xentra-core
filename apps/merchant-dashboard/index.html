@@ -4034,13 +4034,16 @@
           <div id="override-price-hint" style="font-size:11px;color:#64748b;margin-top:6px;"></div>
         </div>
 
-        <!-- CATEGORY -->
+        <!-- CATEGORY (M:N MULTI-SELECT) -->
         <div>
-          <label for="override-category-select" style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">Kategori Cabang</label>
-          <select id="override-category-select" class="x-input" style="width:100%;">
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:6px;">Kategori Cabang (Dapat memilih lebih dari satu)</label>
+          <div id="override-categories-list" style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto; padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#f8fafc;">
+            <!-- Rendered dynamically as checkboxes -->
+          </div>
+          <select id="override-category-select" class="x-input" style="display:none; width:100%; margin-top:6px;">
             <option value="">Tanpa Kategori</option>
           </select>
-          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Pindahkan menu ini ke kategori cabang lain.</small>
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Centang satu atau beberapa kategori cabang untuk menu ini.</small>
         </div>
 
       </div>

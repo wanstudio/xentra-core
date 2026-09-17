@@ -106,6 +106,7 @@ class PermissionModel {
       'branch:read',
       'branch:update',
       'staff:view',
+      'menu:manage',
       'menu:view',
       'order:create',
       'order:accept',

@@ -1515,14 +1515,14 @@ function requireAuth(allowedRoles = []) {
     if (isInvitationAcceptRoute) {
       // Recipient is accepting an invitation to join a brand/workforce; tenant authorization is governed by invitation acceptance
       isTenantAuthorized = true;
-    } else if (!isTenantAuthorized && session.role === 'owner') {
-      const isIdentityOrOnboardingRoute = req.path === '/auth/merchant/me' || (req.originalUrl && req.originalUrl.includes('/auth/merchant/me')) ||
-          req.path === '/auth/handoff/create' || (req.originalUrl && req.originalUrl.includes('/auth/handoff/create')) ||
-          req.path.includes('/onboarding/');
-      if (isIdentityOrOnboardingRoute) {
-        // Safe profile, handoff generation, and business onboarding/setup choice
+    } else if (!isTenantAuthorized) {
+      const isIdentityRoute = req.path === '/auth/merchant/me' || (req.originalUrl && req.originalUrl.includes('/auth/merchant/me')) ||
+          req.path === '/auth/handoff/create' || (req.originalUrl && req.originalUrl.includes('/auth/handoff/create'));
+      const isOnboardingRoute = session.role === 'owner' && (req.path.includes('/onboarding/') || (req.originalUrl && req.originalUrl.includes('/onboarding/')));
+      if (isIdentityRoute || isOnboardingRoute) {
+        // Safe profile, handoff generation, and owner business onboarding/setup choice
         isTenantAuthorized = true;
-      } else if (session.organizationId && req.brand && req.brand.organization_id) {
+      } else if (session.role === 'owner' && session.organizationId && req.brand && req.brand.organization_id) {
         isTenantAuthorized = session.organizationId === req.brand.organization_id;
       }
     }
@@ -2800,10 +2800,11 @@ const handleMerchantLogin = (req, res) => {
     }
 
     const user = authResult.user;
+    const effectiveBrandId = req.brand_id || user.brand_id;
 
     // B1 BRANCH/BRAND INTEGRITY: branch-scoped operator must reference owned branch
-    if (user.branch_id) {
-      const ownedBranch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(user.branch_id, req.brand_id);
+    if (user.branch_id && effectiveBrandId) {
+      const ownedBranch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(user.branch_id, effectiveBrandId);
       if (!ownedBranch) {
         return res.status(401).json({
           success: false,
@@ -2814,21 +2815,40 @@ const handleMerchantLogin = (req, res) => {
     }
 
     // Register active session in TokenSessionStore
-    const { token, expiresAt } = TokenSessionStore.createSession(user, req.brand_id);
+    const { token, expiresAt } = TokenSessionStore.createSession(user, effectiveBrandId);
 
     // Reset rate limiter on successful login
     RateLimiter.reset(rateLimitKey);
+
+    // If on control plane (xentra.cloud) and brand has a custom_domain, issue handoff ticket
+    let handoffInfo = null;
+    const host = req.headers.host || '';
+    const cleanHost = host.split(':')[0].trim().toLowerCase();
+    if (cleanHost === 'xentra.cloud' && effectiveBrandId) {
+      const brandRow = db.prepare('SELECT id, custom_domain FROM brands WHERE id = ?').get(effectiveBrandId);
+      if (brandRow && brandRow.custom_domain) {
+        const { HandoffService } = require('../../core/identity');
+        const handoffService = new HandoffService(db);
+        try {
+          handoffInfo = handoffService.createTicket({
+            userId: user.id,
+            brandId: brandRow.id,
+            ttlSeconds: 60
+          });
+        } catch (_) {}
+      }
+    }
 
     // Log successful login
     workforce.logSecurityEvent({
       actor_id: user.id,
       actor_role: user.role,
       action: 'LOGIN_SUCCESS',
-      brand_id: req.brand_id,
+      brand_id: effectiveBrandId,
       result: 'success'
     });
 
-    res.json({
+    const loginResponse = {
       success: true,
       token,
       expires_at: new Date(expiresAt).toISOString(),
@@ -2842,7 +2862,14 @@ const handleMerchantLogin = (req, res) => {
         email_verified: user.email_verified,
         brand_name: (req.brand && req.brand.name) ? req.brand.name : 'Bangjo Resto'
       }
-    });
+    };
+
+    if (handoffInfo) {
+      loginResponse.handoff_ticket = handoffInfo.ticket;
+      loginResponse.redirect_url = handoffInfo.redirect_url;
+    }
+
+    res.json(loginResponse);
   } catch (err) {
     console.error('[Merchant Auth Error]:', err);
     res.status(500).json({ success: false, error: 'Terjadi kesalahan sistem saat autentikasi.' });
@@ -3114,11 +3141,32 @@ router.post('/auth/google', async (req, res) => {
     if (return_to) {
       const { HandoffService } = require('../../core/identity');
       const handoffService = new HandoffService(db);
-      handoffInfo = handoffService.createTicket({
-        userId: user.id,
-        returnTo: return_to,
-        ttlSeconds: 60
-      });
+      try {
+        handoffInfo = handoffService.createTicket({
+          userId: user.id,
+          returnTo: return_to,
+          ttlSeconds: 60
+        });
+      } catch (_) {}
+    }
+
+    // If on control plane (xentra.cloud) without a valid return_to, but the brand has a custom_domain,
+    // generate a cross-domain handoff ticket so the user lands on their tenant dashboard
+    const host = req.headers.host || '';
+    const cleanHost = host.split(':')[0].trim().toLowerCase();
+    if (!handoffInfo && cleanHost === 'xentra.cloud' && effectiveBrandId) {
+      const brandRow = db.prepare('SELECT id, custom_domain FROM brands WHERE id = ?').get(effectiveBrandId);
+      if (brandRow && brandRow.custom_domain) {
+        const { HandoffService } = require('../../core/identity');
+        const handoffService = new HandoffService(db);
+        try {
+          handoffInfo = handoffService.createTicket({
+            userId: user.id,
+            brandId: brandRow.id,
+            ttlSeconds: 60
+          });
+        } catch (_) {}
+      }
     }
 
     // Log security audit event
@@ -3158,7 +3206,7 @@ router.post('/auth/google', async (req, res) => {
       responsePayload.is_new_user = Boolean(acceptResult.is_new_user);
       responsePayload.invitation_accepted = true;
       // Invited workforce members always go to dashboard, never to /onboarding
-      responsePayload.redirect_url = '/dashboard/';
+      responsePayload.redirect_url = handoffInfo ? handoffInfo.redirect_url : '/dashboard/';
     }
 
     if (handoffInfo) {
@@ -3588,7 +3636,7 @@ router.post(['/onboarding/claim', '/api/v1/onboarding/claim'], async (req, res) 
 });
 
 // POST /auth/handoff/create: Issue single-use, time-limited cross-domain handoff ticket
-router.post('/auth/handoff/create', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+router.post('/auth/handoff/create', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), async (req, res) => {
   try {
     const { brand_id } = req.body || {};
     const targetBrandId = brand_id || req.user.brandId || req.brand_id;
@@ -4457,7 +4505,26 @@ const handleAcceptInvitation = async (req, res) => {
       rawToken: token
     });
 
-    res.json({ success: true, ...result });
+    let redirectUrl = '/dashboard/';
+    const host = req.headers.host || '';
+    const cleanHost = host.split(':')[0].trim().toLowerCase();
+    if (result.brand_id && cleanHost === 'xentra.cloud') {
+      const brandRow = db.prepare('SELECT id, custom_domain FROM brands WHERE id = ?').get(result.brand_id);
+      if (brandRow && brandRow.custom_domain) {
+        const { HandoffService } = require('../../core/identity');
+        const handoffService = new HandoffService(db);
+        try {
+          const ticketInfo = handoffService.createTicket({
+            userId: authenticatedUser.id || authenticatedUser.userId,
+            brandId: brandRow.id,
+            ttlSeconds: 60
+          });
+          redirectUrl = ticketInfo.redirect_url;
+        } catch (_) {}
+      }
+    }
+
+    res.json({ success: true, redirect_url: redirectUrl, ...result });
   } catch (err) {
     const status = err.status || 500;
     res.status(status).json({
@@ -6967,10 +7034,11 @@ router.get('/admin/branches/:id/catalog', requireAuth(['owner', 'brand_manager',
     }
 
     const branchCategories = db.prepare(`
-      SELECT id, brand_id, branch_id, name, slug, image_url, sort_order
-      FROM branch_categories
-      WHERE branch_id = ? AND brand_id = ?
-      ORDER BY sort_order ASC, name ASC
+      SELECT bc.id, bc.brand_id, bc.branch_id, bc.name, bc.slug, bc.image_url, bc.sort_order,
+        (SELECT COUNT(*) FROM branch_product_categories bpc WHERE bpc.branch_category_id = bc.id) AS product_count
+      FROM branch_categories bc
+      WHERE bc.branch_id = ? AND bc.brand_id = ?
+      ORDER BY bc.sort_order ASC, bc.name ASC
     `).all(req.params.id, req.brand_id);
 
     const adoptedProducts = db.prepare(`
@@ -7001,6 +7069,46 @@ router.get('/admin/branches/:id/catalog', requireAuth(['owner', 'brand_manager',
       ORDER BY p.sort_order ASC, p.name ASC
     `).all(req.brand_id, req.params.id);
 
+    // M:N category memberships per product
+    let productCategoryRows = [];
+    try {
+      productCategoryRows = db.prepare(`
+        SELECT bpc.product_id, bpc.branch_category_id, bc.name as category_name, bc.slug as category_slug
+        FROM branch_product_categories bpc
+        JOIN branch_categories bc ON bc.id = bpc.branch_category_id
+        WHERE bpc.branch_id = ?
+        ORDER BY bc.sort_order ASC, bc.name ASC
+      `).all(req.params.id);
+    } catch (_) {}
+
+    const productCategoriesMap = {};
+    for (const r of productCategoryRows) {
+      if (!productCategoriesMap[r.product_id]) productCategoriesMap[r.product_id] = [];
+      productCategoriesMap[r.product_id].push({
+        id: r.branch_category_id,
+        name: r.category_name,
+        slug: r.category_slug
+      });
+    }
+
+    const enrichedAdopted = adoptedProducts.map(p => {
+      const cats = productCategoriesMap[p.product_id] || [];
+      const catIds = cats.map(c => c.id);
+      if (catIds.length === 0 && p.branch_category_id) {
+        catIds.push(p.branch_category_id);
+        if (p.branch_category_name) {
+          cats.push({ id: p.branch_category_id, name: p.branch_category_name, slug: '' });
+        }
+      }
+      return {
+        ...p,
+        category_ids: catIds,
+        categories: cats,
+        branch_category_id: catIds[0] || p.branch_category_id || null,
+        branch_category_name: cats.map(c => c.name).join(', ') || p.branch_category_name || null
+      };
+    });
+
     const adoptedIds = adoptedProducts.map(ap => ap.product_id);
     const placeholders = adoptedIds.length > 0 ? adoptedIds.map(() => '?').join(',') : null;
     const masterQuery = placeholders
@@ -7015,7 +7123,7 @@ router.get('/admin/branches/:id/catalog', requireAuth(['owner', 'brand_manager',
       success: true,
       branch,
       categories: branchCategories,
-      adopted_products: adoptedProducts,
+      adopted_products: enrichedAdopted,
       available_master_products: availableMasterProducts
     });
   } catch (err) {
@@ -7085,15 +7193,22 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       });
     }
 
-    // Branch Category handling:
-    let branchCategoryId = req.body.branch_category_id ? String(req.body.branch_category_id).trim() : null;
-    if (branchCategoryId) {
-      const validCat = db.prepare('SELECT id FROM branch_categories WHERE id = ? AND branch_id = ?').get(branchCategoryId, req.params.id);
-      if (!validCat) branchCategoryId = null;
+    // Branch Category handling: supports category_ids (array) or branch_category_id (scalar)
+    let targetCategoryIds = [];
+    if (Array.isArray(req.body.category_ids) && req.body.category_ids.length > 0) {
+      for (const rawId of req.body.category_ids) {
+        const idStr = String(rawId).trim();
+        const validCat = db.prepare('SELECT id FROM branch_categories WHERE id = ? AND branch_id = ?').get(idStr, req.params.id);
+        if (validCat && !targetCategoryIds.includes(idStr)) targetCategoryIds.push(idStr);
+      }
+    } else if (req.body.branch_category_id) {
+      const idStr = String(req.body.branch_category_id).trim();
+      const validCat = db.prepare('SELECT id FROM branch_categories WHERE id = ? AND branch_id = ?').get(idStr, req.params.id);
+      if (validCat) targetCategoryIds.push(idStr);
     }
 
     // If no branch category specified, resolve or auto-create branch category from master category name
-    if (!branchCategoryId) {
+    if (targetCategoryIds.length === 0) {
       const masterCat = product.category_id ? db.prepare('SELECT name, slug FROM categories WHERE id = ?').get(product.category_id) : null;
       const catName = masterCat?.name || 'Menu Utama';
       const catSlug = masterCat?.slug || 'menu-utama';
@@ -7105,16 +7220,15 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
           INSERT INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order)
           VALUES (?, ?, ?, ?, ?, 99)
         `).run(newBcId, req.brand_id, req.params.id, catName, catSlug);
-        branchCategoryId = newBcId;
+        targetCategoryIds.push(newBcId);
       } else {
-        branchCategoryId = existingBranchCat.id;
+        targetCategoryIds.push(existingBranchCat.id);
       }
     }
 
+    const primaryBranchCategoryId = targetCategoryIds[0] || null;
+
     // Insert or adopt branch_products (override columns start NULL = inherit master).
-    // Override columns (name_override, description_override, image_override) are NOT populated
-    // here; they remain NULL so the branch inherits live Master Product values at query time.
-    // Use PATCH /admin/branches/:id/products/:productId/override to set branch-specific overrides.
     db.prepare(`
       INSERT INTO branch_products (
         branch_id, product_id, branch_category_id, price, is_available, stock
@@ -7127,9 +7241,17 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
     `).run(
       req.params.id,
       product.id,
-      branchCategoryId,
+      primaryBranchCategoryId,
       resolved.effective_price
     );
+
+    // M:N category junction
+    for (const catId of targetCategoryIds) {
+      db.prepare(`
+        INSERT OR IGNORE INTO branch_product_categories (branch_id, product_id, branch_category_id)
+        VALUES (?, ?, ?)
+      `).run(req.params.id, product.id, catId);
+    }
 
     // Audit trail
     const actorId = req.user ? (req.user.userId || req.user.id || req.user.username || 'system') : 'system';
@@ -7143,7 +7265,7 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       req.brand_id,
       req.organization_id || null,
       product.id,
-      JSON.stringify({ product_id: product.id, price: resolved.effective_price, branch_category_id: branchCategoryId }),
+      JSON.stringify({ product_id: product.id, price: resolved.effective_price, branch_category_id: primaryBranchCategoryId, category_ids: targetCategoryIds }),
       actorId,
       actorRole
     );
@@ -7155,7 +7277,8 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
         branch_id: req.params.id,
         product_id: product.id,
         price: resolved.effective_price,
-        branch_category_id: branchCategoryId
+        branch_category_id: primaryBranchCategoryId,
+        category_ids: targetCategoryIds
       }
     });
   } catch (err) {
@@ -7183,6 +7306,7 @@ router.delete('/admin/branches/:id/products/:productId', requireAuth(['owner', '
       return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
     }
 
+    db.prepare('DELETE FROM branch_product_categories WHERE branch_id = ? AND product_id = ?').run(req.params.id, req.params.productId);
     const stmt = db.prepare('DELETE FROM branch_products WHERE branch_id = ? AND product_id = ?').run(req.params.id, req.params.productId);
     if (!stmt || stmt.changes === 0) {
       return res.status(404).json({ success: false, error: 'Produk tidak ditemukan di katalog cabang ini.' });
@@ -7386,13 +7510,33 @@ router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['o
       }
     }
 
-    // branch_category_id — move the adopted product to another Branch-owned
-    // category. Empty/null clears the assignment; the value must belong to THIS
-    // branch (authoritative validation, never trust a cross-branch id).
-    if (Object.prototype.hasOwnProperty.call(req.body, 'branch_category_id')) {
+    // Category assignment handling:
+    // Supports category_ids (array for M:N) or branch_category_id (scalar for backward compatibility).
+    let hasCategoryUpdate = false;
+    let targetOverrideCatIds = null;
+    if (Array.isArray(req.body.category_ids)) {
+      hasCategoryUpdate = true;
+      targetOverrideCatIds = [];
+      for (const rawId of req.body.category_ids) {
+        const catId = String(rawId).trim();
+        const validCat = db.prepare('SELECT id FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
+          .get(catId, req.params.id, req.brand_id);
+        if (!validCat) {
+          return res.status(400).json({
+            success: false,
+            error: 'FORBIDDEN_BRANCH_SCOPE',
+            message: 'Kategori cabang tidak valid untuk cabang ini.'
+          });
+        }
+        if (!targetOverrideCatIds.includes(catId)) targetOverrideCatIds.push(catId);
+      }
+      updates.branch_category_id = targetOverrideCatIds.length > 0 ? targetOverrideCatIds[0] : null;
+    } else if (Object.prototype.hasOwnProperty.call(req.body, 'branch_category_id')) {
+      hasCategoryUpdate = true;
       const rawCat = req.body.branch_category_id;
       if (rawCat === null || rawCat === '' || rawCat === undefined) {
         updates.branch_category_id = null;
+        targetOverrideCatIds = [];
       } else {
         const catId = String(rawCat).trim();
         const validCat = db.prepare('SELECT id FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
@@ -7405,16 +7549,30 @@ router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['o
           });
         }
         updates.branch_category_id = catId;
+        targetOverrideCatIds = [catId];
       }
     }
 
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ success: false, error: 'Tidak ada field override yang disediakan (name, description, image_url, price, branch_category_id).' });
+    if (Object.keys(updates).length === 0 && !hasCategoryUpdate) {
+      return res.status(400).json({ success: false, error: 'Tidak ada field override yang disediakan (name, description, image_url, price, branch_category_id, category_ids).' });
     }
 
-    const setParts = Object.keys(updates).map(k => `${k} = ?`).join(', ');
-    const values = [...Object.values(updates), req.params.id, req.params.productId];
-    db.prepare(`UPDATE branch_products SET ${setParts}, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?`).run(...values);
+    if (Object.keys(updates).length > 0) {
+      const setParts = Object.keys(updates).map(k => `${k} = ?`).join(', ');
+      const values = [...Object.values(updates), req.params.id, req.params.productId];
+      db.prepare(`UPDATE branch_products SET ${setParts}, updated_at = datetime('now') WHERE branch_id = ? AND product_id = ?`).run(...values);
+    }
+
+    if (hasCategoryUpdate && targetOverrideCatIds !== null) {
+      db.prepare('DELETE FROM branch_product_categories WHERE branch_id = ? AND product_id = ?')
+        .run(req.params.id, req.params.productId);
+      for (const catId of targetOverrideCatIds) {
+        db.prepare(`
+          INSERT OR IGNORE INTO branch_product_categories (branch_id, product_id, branch_category_id)
+          VALUES (?, ?, ?)
+        `).run(req.params.id, req.params.productId, catId);
+      }
+    }
 
     // Read back the resolved state for the response
     const resolved = db.prepare(`
@@ -7432,6 +7590,23 @@ router.patch('/admin/branches/:id/products/:productId/override', requireAuth(['o
       LEFT JOIN branch_categories bc ON bc.id = bp.branch_category_id
       WHERE bp.branch_id = ? AND bp.product_id = ?
     `).get(req.params.id, req.params.productId);
+
+    // Attach M:N category memberships
+    const prodCats = db.prepare(`
+      SELECT bc.id, bc.name, bc.slug
+      FROM branch_product_categories bpc
+      JOIN branch_categories bc ON bc.id = bpc.branch_category_id
+      WHERE bpc.branch_id = ? AND bpc.product_id = ?
+      ORDER BY bc.sort_order ASC, bc.name ASC
+    `).all(req.params.id, req.params.productId);
+
+    if (resolved) {
+      resolved.categories = prodCats;
+      resolved.category_ids = prodCats.map(c => c.id);
+      if (prodCats.length > 0) {
+        resolved.branch_category_name = prodCats.map(c => c.name).join(', ');
+      }
+    }
 
     res.json({
       success: true,
@@ -7696,8 +7871,18 @@ router.delete('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'br
 
     db.exec('BEGIN IMMEDIATE;');
     try {
-      db.prepare('UPDATE branch_products SET branch_category_id = NULL WHERE branch_category_id = ? AND branch_id = ?')
+      db.prepare('DELETE FROM branch_product_categories WHERE branch_category_id = ? AND branch_id = ?')
         .run(req.params.catId, req.params.id);
+      db.prepare(`
+        UPDATE branch_products
+        SET branch_category_id = (
+          SELECT branch_category_id FROM branch_product_categories
+          WHERE branch_product_categories.branch_id = branch_products.branch_id
+            AND branch_product_categories.product_id = branch_products.product_id
+          LIMIT 1
+        )
+        WHERE branch_category_id = ? AND branch_id = ?
+      `).run(req.params.catId, req.params.id);
       db.prepare('DELETE FROM branch_categories WHERE id = ?').run(req.params.catId);
       remaining.forEach((c, idx) => updateSort.run(idx + 1, c.id));
       db.exec('COMMIT;');
@@ -7782,6 +7967,242 @@ router.put('/admin/branches/:id/categories/reorder', requireAuth(['owner', 'bran
     res.json({ success: true });
   } catch (err) {
     console.error('[API Error PUT /admin/branches/:id/categories/reorder]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// =========================================================================
+// M:N BRANCH PRODUCT ↔ CATEGORY MEMBERSHIP (PHASE 3)
+// Reconciled endpoints allowing multiple category assignments per product
+// =========================================================================
+
+// Retrieve all categories assigned to a branch product
+router.get('/admin/branches/:id/products/:productId/categories', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE', message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.' });
+      }
+    }
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+
+    const bp = db.prepare('SELECT product_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(req.params.id, req.params.productId);
+    if (!bp) return res.status(404).json({ success: false, error: 'Produk tidak ditemukan di katalog cabang ini.' });
+
+    const categories = db.prepare(`
+      SELECT bc.id, bc.brand_id, bc.branch_id, bc.name, bc.slug, bc.image_url, bc.sort_order
+      FROM branch_product_categories bpc
+      JOIN branch_categories bc ON bc.id = bpc.branch_category_id
+      WHERE bpc.branch_id = ? AND bpc.product_id = ?
+      ORDER BY bc.sort_order ASC, bc.name ASC
+    `).all(req.params.id, req.params.productId);
+
+    res.json({
+      success: true,
+      branch_id: req.params.id,
+      product_id: req.params.productId,
+      categories: categories || []
+    });
+  } catch (err) {
+    console.error('[API Error GET /admin/branches/:id/products/:productId/categories]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Assign product to a branch category (supports single category_id or category_ids array)
+router.post('/admin/branches/:id/products/:productId/categories', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE', message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.' });
+      }
+    }
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+
+    const bp = db.prepare('SELECT product_id, branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(req.params.id, req.params.productId);
+    if (!bp) return res.status(404).json({ success: false, error: 'Produk tidak ditemukan di katalog cabang ini.' });
+
+    const rawCatId = (req.body && (req.body.branch_category_id || req.body.category_id)) || '';
+    const catId = String(rawCatId).trim();
+    if (!catId) {
+      return res.status(400).json({ success: false, error: 'category_id wajib diisi.' });
+    }
+
+    const cat = db.prepare('SELECT id, name FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
+      .get(catId, req.params.id, req.brand_id);
+    if (!cat) {
+      return res.status(400).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE', message: 'Kategori cabang tidak valid atau bukan milik cabang ini.' });
+    }
+
+    const prevCats = db.prepare('SELECT branch_category_id FROM branch_product_categories WHERE branch_id = ? AND product_id = ?')
+      .all(req.params.id, req.params.productId).map(r => r.branch_category_id);
+
+    db.prepare(`
+      INSERT OR IGNORE INTO branch_product_categories (branch_id, product_id, branch_category_id)
+      VALUES (?, ?, ?)
+    `).run(req.params.id, req.params.productId, catId);
+
+    // Sync legacy primary column if not already populated
+    if (!bp.branch_category_id) {
+      db.prepare('UPDATE branch_products SET branch_category_id = ?, updated_at = datetime(\'now\') WHERE branch_id = ? AND product_id = ?')
+        .run(catId, req.params.id, req.params.productId);
+    }
+
+    const newCats = db.prepare(`
+      SELECT bc.id, bc.name, bc.slug
+      FROM branch_product_categories bpc
+      JOIN branch_categories bc ON bc.id = bpc.branch_category_id
+      WHERE bpc.branch_id = ? AND bpc.product_id = ?
+      ORDER BY bc.sort_order ASC, bc.name ASC
+    `).all(req.params.id, req.params.productId);
+
+    // Audit trail
+    const actorId = req.user ? (req.user.userId || req.user.id || req.user.username || 'system') : 'system';
+    const actorRole = req.user ? (req.user.role || 'system') : 'system';
+    db.prepare(`
+      INSERT INTO branch_operation_logs (id, branch_id, brand_id, organization_id, product_id, action, field, previous_value, new_value, actor_id, actor_role, authorized)
+      VALUES (?, ?, ?, ?, ?, 'branch_product_category.assign', 'branch_category_id', ?, ?, ?, ?, 1)
+    `).run(
+      'bol_' + crypto.randomUUID(),
+      req.params.id,
+      req.brand_id,
+      req.organization_id || null,
+      req.params.productId,
+      JSON.stringify(prevCats),
+      JSON.stringify(newCats.map(c => c.id)),
+      actorId,
+      actorRole
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Kategori cabang berhasil ditambahkan ke produk.',
+      branch_id: req.params.id,
+      product_id: req.params.productId,
+      assigned_category_id: catId,
+      category_ids: newCats.map(c => c.id),
+      categories: newCats
+    });
+  } catch (err) {
+    console.error('[API Error POST /admin/branches/:id/products/:productId/categories]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Remove product from a branch category
+router.delete('/admin/branches/:id/products/:productId/categories/:catId', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE', message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.' });
+      }
+    }
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+
+    const prevCats = db.prepare('SELECT branch_category_id FROM branch_product_categories WHERE branch_id = ? AND product_id = ?')
+      .all(req.params.id, req.params.productId).map(r => r.branch_category_id);
+
+    const delStmt = db.prepare('DELETE FROM branch_product_categories WHERE branch_id = ? AND product_id = ? AND branch_category_id = ?')
+      .run(req.params.id, req.params.productId, req.params.catId);
+
+    if (!delStmt || delStmt.changes === 0) {
+      return res.status(404).json({ success: false, error: 'Keanggotaan kategori produk tidak ditemukan.' });
+    }
+
+    const remainingCats = db.prepare(`
+      SELECT bc.id, bc.name, bc.slug
+      FROM branch_product_categories bpc
+      JOIN branch_categories bc ON bc.id = bpc.branch_category_id
+      WHERE bpc.branch_id = ? AND bpc.product_id = ?
+      ORDER BY bc.sort_order ASC, bc.name ASC
+    `).all(req.params.id, req.params.productId);
+
+    // Sync legacy primary column
+    const nextPrimaryCat = remainingCats.length > 0 ? remainingCats[0].id : null;
+    db.prepare('UPDATE branch_products SET branch_category_id = ?, updated_at = datetime(\'now\') WHERE branch_id = ? AND product_id = ?')
+      .run(nextPrimaryCat, req.params.id, req.params.productId);
+
+    // Audit trail
+    const actorId = req.user ? (req.user.userId || req.user.id || req.user.username || 'system') : 'system';
+    const actorRole = req.user ? (req.user.role || 'system') : 'system';
+    db.prepare(`
+      INSERT INTO branch_operation_logs (id, branch_id, brand_id, organization_id, product_id, action, field, previous_value, new_value, actor_id, actor_role, authorized)
+      VALUES (?, ?, ?, ?, ?, 'branch_product_category.remove', 'branch_category_id', ?, ?, ?, ?, 1)
+    `).run(
+      'bol_' + crypto.randomUUID(),
+      req.params.id,
+      req.brand_id,
+      req.organization_id || null,
+      req.params.productId,
+      JSON.stringify(prevCats),
+      JSON.stringify(remainingCats.map(c => c.id)),
+      actorId,
+      actorRole
+    );
+
+    res.json({
+      success: true,
+      message: 'Keanggotaan kategori berhasil dihapus dari produk.',
+      branch_id: req.params.id,
+      product_id: req.params.productId,
+      removed_category_id: req.params.catId,
+      category_ids: remainingCats.map(c => c.id),
+      categories: remainingCats
+    });
+  } catch (err) {
+    console.error('[API Error DELETE /admin/branches/:id/products/:productId/categories/:catId]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Retrieve all products belonging to a branch category
+router.get('/admin/branches/:id/categories/:catId/products', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE', message: 'Branch Manager hanya memiliki kewenangan pada cabang yang ditugaskan.' });
+      }
+    }
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
+
+    const cat = db.prepare('SELECT id, name, slug, image_url, sort_order FROM branch_categories WHERE id = ? AND branch_id = ? AND brand_id = ?')
+      .get(req.params.catId, req.params.id, req.brand_id);
+    if (!cat) return res.status(404).json({ success: false, error: 'Kategori cabang tidak ditemukan.' });
+
+    const products = db.prepare(`
+      SELECT
+        bp.product_id,
+        COALESCE(bp.name_override, p.name) as name,
+        COALESCE(bp.description_override, p.description) as description,
+        COALESCE(bp.image_override, p.image_url) as image_url,
+        bp.price,
+        p.price as master_price,
+        p.pricing_mode,
+        bp.stock,
+        bp.is_available
+      FROM branch_product_categories bpc
+      JOIN branch_products bp ON bp.branch_id = bpc.branch_id AND bp.product_id = bpc.product_id
+      JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
+      WHERE bpc.branch_id = ? AND bpc.branch_category_id = ?
+      ORDER BY p.sort_order ASC, p.name ASC
+    `).all(req.brand_id, req.params.id, req.params.catId);
+
+    res.json({
+      success: true,
+      branch_id: req.params.id,
+      category: cat,
+      products: products || []
+    });
+  } catch (err) {
+    console.error('[API Error GET /admin/branches/:id/categories/:catId/products]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

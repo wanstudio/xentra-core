@@ -318,6 +318,7 @@ const memoryStore = {
     { id: 'bc_selatan_makan', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_selatan', name: 'Menu Utama', slug: 'menu-utama', image_url: null, sort_order: 1 },
     { id: 'bc_selatan_kopi', brand_id: 'brand_bangjo', branch_id: 'branch_bangjo_selatan', name: 'Kedai Kopi & Teh', slug: 'kedai-kopi-teh', image_url: null, sort_order: 2 }
   ],
+  branch_product_categories: [],
   orders: [],
   users: [],
   promotions: [
@@ -540,6 +541,11 @@ const db = {
         if (lowerSql.includes('from branch_categories')) {
           if (params[0]) return memoryStore.branch_categories.filter(bc => bc.branch_id === params[0]);
           return memoryStore.branch_categories;
+        }
+        if (lowerSql.includes('from branch_product_categories')) {
+          if (params[0] && params[1]) return memoryStore.branch_product_categories.filter(bpc => bpc.branch_id === params[0] && bpc.product_id === params[1]);
+          if (params[0]) return memoryStore.branch_product_categories.filter(bpc => bpc.branch_id === params[0]);
+          return memoryStore.branch_product_categories;
         }
         if (lowerSql.includes('from categories')) return memoryStore.categories;
         if (lowerSql.includes('from branches')) {
@@ -941,6 +947,20 @@ function initSchema(targetDb) {
       FOREIGN KEY (branch_category_id) REFERENCES branch_categories(id) ON DELETE SET NULL
     );
 
+    -- M:N BRANCH PRODUCT CATEGORIES (PHASE 3)
+    -- Allows one branch product to belong to multiple branch categories simultaneously
+    CREATE TABLE IF NOT EXISTS branch_product_categories (
+      branch_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      branch_category_id TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (branch_id, product_id, branch_category_id),
+      FOREIGN KEY (branch_id, product_id) REFERENCES branch_products(branch_id, product_id) ON DELETE CASCADE,
+      FOREIGN KEY (branch_category_id) REFERENCES branch_categories(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_bpc_category ON branch_product_categories(branch_category_id);
+    CREATE INDEX IF NOT EXISTS idx_bpc_branch_prod ON branch_product_categories(branch_id, product_id);
+
     -- C1 BRAND CONSISTENCY (C1.3/C1.9): a Product -> Branch assignment is only valid when the
     -- product master and the branch belong to the SAME brand. Enforced at the database layer so a
     -- cross-brand assignment can never be written (app-layer guards are defense-in-depth).
@@ -1276,6 +1296,35 @@ function initSchema(targetDb) {
   // and have Home read the same persisted value. Idempotent — safe on existing DBs.
   try { targetDb.exec('ALTER TABLE branch_categories ADD COLUMN image_url TEXT;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE branch_categories ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));"); } catch (e) {}
+
+  // M:N BRANCH PRODUCT CATEGORIES (PHASE 3):
+  // Safe creation and data migration from legacy branch_products.branch_category_id
+  try {
+    targetDb.exec(`
+      CREATE TABLE IF NOT EXISTS branch_product_categories (
+        branch_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        branch_category_id TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (branch_id, product_id, branch_category_id),
+        FOREIGN KEY (branch_id, product_id) REFERENCES branch_products(branch_id, product_id) ON DELETE CASCADE,
+        FOREIGN KEY (branch_category_id) REFERENCES branch_categories(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_bpc_category ON branch_product_categories(branch_category_id);
+      CREATE INDEX IF NOT EXISTS idx_bpc_branch_prod ON branch_product_categories(branch_id, product_id);
+    `);
+  } catch (e) {}
+
+  // Migrate existing single branch_category_id assignments into branch_product_categories junction
+  try {
+    targetDb.exec(`
+      INSERT OR IGNORE INTO branch_product_categories (branch_id, product_id, branch_category_id)
+      SELECT bp.branch_id, bp.product_id, bp.branch_category_id
+      FROM branch_products bp
+      JOIN branch_categories bc ON bc.id = bp.branch_category_id
+      WHERE bp.branch_category_id IS NOT NULL AND bp.branch_category_id != '';
+    `);
+  } catch (e) {}
 
   // WORKFORCE MANAGEMENT: user lifecycle, password security, and audit
   // Idempotent — safe on existing databases with or without these columns.
@@ -1838,6 +1887,12 @@ function seedData(targetDb) {
       INSERT OR IGNORE INTO branch_products (branch_id, product_id, branch_category_id, product_name, product_description, product_image_url, price, stock, is_available, low_stock_threshold)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 5)
     `).run(a.branch, a.productId, a.catId, a.name, a.desc, a.img, a.price, a.stock, a.available);
+    if (a.catId) {
+      targetDb.prepare(`
+        INSERT OR IGNORE INTO branch_product_categories (branch_id, product_id, branch_category_id)
+        VALUES (?, ?, ?)
+      `).run(a.branch, a.productId, a.catId);
+    }
   }
 
   seedInstallPromotion(targetDb, brandId);
