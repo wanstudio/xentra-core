@@ -47,9 +47,18 @@ This document locks the verified audit baseline for Findings 01–06. It records
 - Classification: **CONFIRMED DATA-INTEGRITY RISK**
 - Severity: **MEDIUM / potentially HIGH under concurrent offline sync duplication**
 - Confidence: **HIGH**
-- Offline reconciliation currently identifies prior synchronization using `orders.order_note LIKE '%[TX_ID:<client_transaction_id>]%'` before normal order placement.
-- Concurrent retries can potentially both observe no committed match and create duplicate transactions.
-- Implementation gate: define the semantic scope of `client_transaction_id` first, then store/enforce it as an authoritative database identity/constraint.
+- **STATUS: CODE & TEST VERIFIED (F05 Remediated)**
+- Code verification:
+  - Eliminated `order_note LIKE '%[TX_ID:...%'` matching as identity authority. Identity is strictly defined by the database column `client_transaction_id` scoped to `(branch_id, client_transaction_id)`.
+  - Authoritative database identity enforced via partial unique index: `idx_orders_branch_client_tx ON orders(branch_id, client_transaction_id) WHERE client_transaction_id IS NOT NULL`.
+  - Normal online/customer orders with NULL `client_transaction_id` remain valid and unconstrained.
+  - Safe migration: Inspects existing duplicate rows per `(branch_id, client_transaction_id)` prior to index creation, reporting violations without destructive data repair.
+  - Concurrent duplicate safety: Atomic race condition handling in `OrderPlacementService` and `OfflineReconciliationService` catches database unique constraint conflicts and returns the original authoritative order without duplicate order creation, duplicate stock deduction, duplicate shift cash addition, or duplicate promo redemptions.
+  - Branch scope authorization: API endpoints (`/pos/offline-sync` and `/pos/offline-sync/batch`) enforce server-authorized branch context for cashier/branch_manager roles, rejecting client-side branch spoofing.
+- Test verification:
+  - Dedicated test suite `tests/posOfflineIdempotencyF05.test.js` (10/10 passing): covers repeated requests (F05-01), multi-branch isolation (F05-02), true concurrent sync race condition (F05-03), single stock deduction (F05-04), rollback/retry resilience (F05-05), decoupling from order_note (F05-06), NULL tolerance (F05-07), raw database constraint rejection (F05-08), authoritative order return (F05-09), and branch authorization security (F05-10).
+  - Regression verified across `tests/domains/pos.test.js`, `tests/domains/promotion.test.js`, and `tests/core/phase6Payment.test.js`.
+- VPS runtime verification: PENDING / SEPARATE GATE (requires deployment verification against VPS cPanel/CloudLinux Passenger topology; VPS runtime verification was not available from this execution environment).
 
 ## F06 — Runtime can fall back to ephemeral memoryStore
 

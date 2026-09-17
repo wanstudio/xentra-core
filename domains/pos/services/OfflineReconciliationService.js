@@ -31,6 +31,9 @@ class OfflineReconciliationService {
     if (!client_transaction_id || typeof client_transaction_id !== 'string' || client_transaction_id.trim().length < 8 || client_transaction_id.trim().length > 64) {
       throw new Error('[OfflineReconciliation] "client_transaction_id" tidak valid (wajib berupa string berkarakter 8-64).');
     }
+    if (!branch_id || typeof branch_id !== 'string') {
+      throw new Error('[OfflineReconciliation] "branch_id" wajib disertakan dan berupa string valid.');
+    }
 
     const existingOrder = orderRepository.findByBranchTransactionId(branch_id, client_transaction_id);
 
@@ -68,7 +71,15 @@ class OfflineReconciliationService {
         }
       });
     } catch (err) {
-      if (err.message && (err.message.includes('idx_orders_branch_client_tx') || err.message.includes('UNIQUE constraint failed: orders.branch_id, orders.client_transaction_id'))) {
+      const isClientTxUniqueConflict = Boolean(
+        client_transaction_id && branch_id && (
+          err.message?.includes('idx_orders_branch_client_tx') ||
+          err.message?.includes('orders.branch_id, orders.client_transaction_id') ||
+          err.message?.includes('orders.client_transaction_id') ||
+          (err.code === 'SQLITE_CONSTRAINT_UNIQUE' && err.message?.includes('client_transaction_id'))
+        )
+      );
+      if (isClientTxUniqueConflict) {
         const deduplicated = orderRepository.findByBranchTransactionId(branch_id, client_transaction_id);
         if (deduplicated) {
           return {
@@ -79,6 +90,14 @@ class OfflineReconciliationService {
         }
       }
       throw err;
+    }
+
+    if (placementResult.idempotent) {
+      return {
+        status: 'DUPLICATE_IGNORED',
+        order: placementResult.order,
+        message: 'Transaksi offline sudah pernah disinkronkan sebelumnya (Idempotent Deduplicated).'
+      };
     }
 
     if (!placementResult.success) {

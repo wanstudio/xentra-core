@@ -270,7 +270,35 @@ class OrderPlacementService {
       orderRepository.commitTransaction();
     } catch (txErr) {
       try { orderRepository.rollbackTransaction(); } catch (_) {}
-      if (txErr.message && (txErr.message.includes('idx_orders_branch_client_tx') || txErr.message.includes('UNIQUE constraint failed: orders.branch_id, orders.client_transaction_id'))) throw txErr;
+
+      const isClientTxUniqueConflict = Boolean(
+        client_transaction_id && branch_id && (
+          txErr.message?.includes('idx_orders_branch_client_tx') ||
+          txErr.message?.includes('orders.branch_id, orders.client_transaction_id') ||
+          txErr.message?.includes('orders.client_transaction_id') ||
+          (txErr.code === 'SQLITE_CONSTRAINT_UNIQUE' && txErr.message?.includes('client_transaction_id'))
+        )
+      );
+
+      if (isClientTxUniqueConflict) {
+        const existing = orderRepository.findByBranchTransactionId(branch_id, client_transaction_id);
+        if (existing) {
+          return {
+            success: true,
+            idempotent: true,
+            status: 'VERIFIED',
+            order_id: existing.id,
+            order_number: existing.order_number,
+            grand_total: existing.grand_total,
+            subtotal: existing.subtotal,
+            delivery_fee: existing.delivery_fee,
+            discount_amount: existing.discount_amount,
+            order: existing
+          };
+        }
+        throw txErr;
+      }
+
       return { success: false, status: 'OUT_OF_STOCK', errors: [txErr.message || 'Terjadi kegagalan pemesanan karena perubahan ketersediaan stok.'], price_diffs: [] };
     }
 

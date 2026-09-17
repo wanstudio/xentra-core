@@ -2487,6 +2487,73 @@ router.post('/pos/shifts/:id/close', requireAuth(['owner', 'brand_manager', 'bra
   }
 });
 
+// 9.3 POS Offline Synchronization Endpoints (F05)
+router.post('/pos/offline-sync', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), async (req, res) => {
+  try {
+    const userRole = req.user.role;
+    const userBranchId = req.user.branch_id || req.user.branchId;
+    let targetBranchId = req.body.branch_id || userBranchId;
+
+    // F05 Security Invariant: authorized branch scope cannot be bypassed by client-supplied branch_id
+    if (['cashier', 'branch_manager'].includes(userRole)) {
+      if (userBranchId && req.body.branch_id && req.body.branch_id !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: `Akses ditolak: Anda hanya berwenang melakukan sinkronisasi untuk cabang Anda (${userBranchId}).`
+        });
+      }
+      targetBranchId = userBranchId;
+    }
+
+    if (!targetBranchId) {
+      return res.status(400).json({ success: false, error: 'Cabang (branch_id) wajib ditentukan.' });
+    }
+
+    const { OfflineReconciliationService } = require('../../domains/pos');
+    const result = await OfflineReconciliationService.reconcileOfflineTransaction({
+      ...req.body,
+      brand_id: req.brand_id,
+      branch_id: targetBranchId
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/offline-sync/batch', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), async (req, res) => {
+  try {
+    const userRole = req.user.role;
+    const userBranchId = req.user.branch_id || req.user.branchId;
+    let targetBranchId = req.body.branch_id || userBranchId;
+
+    if (['cashier', 'branch_manager'].includes(userRole)) {
+      if (userBranchId && req.body.branch_id && req.body.branch_id !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: `Akses ditolak: Anda hanya berwenang melakukan sinkronisasi untuk cabang Anda (${userBranchId}).`
+        });
+      }
+      targetBranchId = userBranchId;
+    }
+
+    if (!targetBranchId) {
+      return res.status(400).json({ success: false, error: 'Cabang (branch_id) wajib ditentukan.' });
+    }
+
+    const { OfflineReconciliationService } = require('../../domains/pos');
+    const result = await OfflineReconciliationService.processBatchSync({
+      branch_id: targetBranchId,
+      transactions: req.body.transactions || []
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // 10. Midtrans Webhook
 router.post('/webhooks/midtrans', (req, res) => {
   try {

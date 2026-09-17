@@ -853,6 +853,8 @@ function initSchema(targetDb) {
       FOREIGN KEY (branch_id) REFERENCES branches(id)
     );
 
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_branch_client_tx ON orders(branch_id, client_transaction_id) WHERE client_transaction_id IS NOT NULL;
+
     CREATE TABLE IF NOT EXISTS order_items (
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL,
@@ -1353,7 +1355,45 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN table_number TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN dining_session_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN client_transaction_id TEXT;'); } catch (e) {}
-  try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_branch_client_tx ON orders(branch_id, client_transaction_id) WHERE client_transaction_id IS NOT NULL;'); } catch (e) {}
+
+  // F05 Migration Safety: inspect existing duplicate rows before establishing UNIQUE constraint
+  try {
+    const dupSql = `
+      SELECT branch_id, client_transaction_id, COUNT(*) AS dup_count
+      FROM orders
+      WHERE client_transaction_id IS NOT NULL
+      GROUP BY branch_id, client_transaction_id
+      HAVING dup_count > 1;
+    `;
+    let duplicates = [];
+    if (typeof targetDb.prepare === 'function') {
+      try {
+        duplicates = targetDb.prepare(dupSql).all();
+      } catch (_) {}
+    } else if (typeof targetDb.exec === 'function') {
+      try {
+        const res = targetDb.exec(dupSql);
+        if (Array.isArray(res) && res.length > 0 && res[0].values) {
+          duplicates = res[0].values;
+        }
+      } catch (_) {}
+    }
+
+    if (duplicates && duplicates.length > 0) {
+      console.error('[Migration Error] Cannot create unique index idx_orders_branch_client_tx: Duplicate client_transaction_id rows detected:', duplicates);
+      throw new Error(`[Migration Error] Duplicate client_transaction_id detected in orders table (${duplicates.length} duplicate group(s)). Refusing destructive cleanup.`);
+    }
+
+    targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_branch_client_tx ON orders(branch_id, client_transaction_id) WHERE client_transaction_id IS NOT NULL;');
+  } catch (idxErr) {
+    if (idxErr.message && idxErr.message.includes('[Migration Error]')) {
+      throw idxErr;
+    }
+    if (idxErr.message && idxErr.message.includes('UNIQUE constraint failed')) {
+      console.error('[Migration Error] UNIQUE constraint violation while creating idx_orders_branch_client_tx:', idxErr.message);
+      throw new Error(`[Migration Error] Failed to create idx_orders_branch_client_tx: ${idxErr.message}`);
+    }
+  }
   try { targetDb.exec("ALTER TABLE promotion_redemptions ADD COLUMN status TEXT NOT NULL DEFAULT 'active';"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE promotion_redemptions ADD COLUMN voided_at TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE promotion_redemptions ADD COLUMN void_reason TEXT;'); } catch (e) {}
