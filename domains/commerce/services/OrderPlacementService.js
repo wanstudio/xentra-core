@@ -156,7 +156,7 @@ class OrderPlacementService {
     const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const randSuffix = Math.floor(1000 + Math.random() * 9000);
+    const randSuffix = `${Math.floor(1000 + Math.random() * 9000)}-${crypto.randomBytes(3).toString('hex')}`;
     const orderNumber = `XN-${today}-${randSuffix}`;
 
     try {

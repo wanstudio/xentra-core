@@ -1389,10 +1389,8 @@ function initSchema(targetDb) {
     if (idxErr.message && idxErr.message.includes('[Migration Error]')) {
       throw idxErr;
     }
-    if (idxErr.message && idxErr.message.includes('UNIQUE constraint failed')) {
-      console.error('[Migration Error] UNIQUE constraint violation while creating idx_orders_branch_client_tx:', idxErr.message);
-      throw new Error(`[Migration Error] Failed to create idx_orders_branch_client_tx: ${idxErr.message}`);
-    }
+    console.error('[Migration Error] Failed to create idx_orders_branch_client_tx:', idxErr.message);
+    throw new Error(`[Migration Error] Failed to create idx_orders_branch_client_tx: ${idxErr.message}`);
   }
   try { targetDb.exec("ALTER TABLE promotion_redemptions ADD COLUMN status TEXT NOT NULL DEFAULT 'active';"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE promotion_redemptions ADD COLUMN voided_at TEXT;'); } catch (e) {}

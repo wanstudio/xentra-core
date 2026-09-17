@@ -337,3 +337,58 @@ test('F05-10: Authorized branch scope cannot be bypassed by changing client-supp
     });
   }, /branch_id/i);
 });
+
+test('F05-11: Cash shift effect is exactly-once when duplicate offline sync occurs with shift_id', async () => {
+  const shiftId = 'shift_f05_test_' + Date.now();
+  const cashierId = 'cashier_f05_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+  db.prepare(`
+    INSERT INTO pos_shifts (id, branch_id, cashier_id, starting_float, total_cash_sales, total_cash_in, total_cash_out, expected_cash, status, opened_at)
+    VALUES (?, 'branch_f05_a', ?, 100000, 0, 0, 0, 100000, 'open', datetime('now'))
+  `).run(shiftId, cashierId);
+
+  const clientTxId = 'tx_f05_11_shift_' + Date.now();
+  const payload = {
+    client_transaction_id: clientTxId,
+    brand_id: 'brand_f05',
+    branch_id: 'branch_f05_a',
+    shift_id: shiftId,
+    order_type: 'dine_in',
+    payment_method: 'cash',
+    items: [{ product_id: 'prod_f05_1', quantity: 2, expected_price: 25000 }], // 50,000 total
+    offline_created_at: new Date().toISOString()
+  };
+
+  // 1. Initial sync
+  const res1 = await OfflineReconciliationService.reconcileOfflineTransaction(payload);
+  assert.strictEqual(res1.status, 'PROCESSED');
+
+  const shiftAfterFirst = db.prepare('SELECT total_cash_sales, expected_cash FROM pos_shifts WHERE id = ?').get(shiftId);
+  assert.strictEqual(shiftAfterFirst.total_cash_sales, 50000);
+  assert.strictEqual(shiftAfterFirst.expected_cash, 150000);
+
+  // 2. Duplicate sync (concurrent or sequential retry)
+  const res2 = await OfflineReconciliationService.reconcileOfflineTransaction(payload);
+  assert.strictEqual(res2.status, 'DUPLICATE_IGNORED');
+
+  const shiftAfterSecond = db.prepare('SELECT total_cash_sales, expected_cash FROM pos_shifts WHERE id = ?').get(shiftId);
+  assert.strictEqual(shiftAfterSecond.total_cash_sales, 50000, 'total_cash_sales must not increase on duplicate retry');
+  assert.strictEqual(shiftAfterSecond.expected_cash, 150000, 'expected_cash must not increase on duplicate retry');
+});
+
+test('F05-12: Migration fail-closed on duplicate rows or index creation error', () => {
+  const { initSchema } = db;
+  // Mock DB with duplicate client_transaction_id
+  const mockDbWithDups = {
+    prepare: () => ({
+      all: () => [{ branch_id: 'b1', client_transaction_id: 'tx_dup', dup_count: 2 }]
+    }),
+    exec: () => {}
+  };
+
+  assert.throws(() => {
+    initSchema(mockDbWithDups);
+  }, (err) => {
+    return err.message && err.message.includes('[Migration Error]') && err.message.includes('Refusing destructive cleanup');
+  }, 'Migration must fail closed without destructive cleanup when duplicates are detected');
+});
+
