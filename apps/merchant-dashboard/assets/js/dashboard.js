@@ -827,9 +827,19 @@
     return meta[hash.toLowerCase()] ? hash.toLowerCase() : defaultRoute;
   }
 
+  function closeMobileSidebar() {
+    var sidebar = $('x-dash-sidebar');
+    var overlay = $('x-sidebar-overlay');
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  window.closeMobileSidebar = closeMobileSidebar;
+
   // Navigate to a route: update URL hash, then apply the route
   function navigateTo(route) {
     if (!route) return;
+    closeMobileSidebar();
     var legacyMap = {
       'overview': 'overview',
       'orders': 'orders',
@@ -1351,15 +1361,18 @@
     }
 
     if (btnOpen) btnOpen.addEventListener('click', openSidebar);
-    if (btnClose) btnClose.addEventListener('click', closeSidebar);
-    if (overlay) overlay.addEventListener('click', closeSidebar);
+    if (btnClose) btnClose.addEventListener('click', closeMobileSidebar);
+    if (overlay) overlay.addEventListener('click', closeMobileSidebar);
 
-    // Close sidebar on route navigation (mobile & tablet drawer)
-    document.querySelectorAll('.x-nav-item:not(.x-nav-parent)[data-route], .x-nav-sub-item').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        if (window.innerWidth < 1024) closeSidebar();
+    // Event delegation: Close sidebar whenever any nav item or sub-item is clicked (mobile & tablet drawer)
+    if (sidebar) {
+      sidebar.addEventListener('click', function (e) {
+        var navBtn = e.target.closest('.x-nav-item:not(.x-nav-parent), .x-nav-sub-item');
+        if (navBtn) {
+          closeMobileSidebar();
+        }
       });
-    });
+    }
   }
 
 
