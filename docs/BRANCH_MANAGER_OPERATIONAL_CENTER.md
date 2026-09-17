@@ -1,10 +1,11 @@
 # Xentra — Branch Manager Operational Center
 
-**Status: LOCKED / AUTHORITATIVE — reconciled with Canonical Architecture & Product Library v2**  
-**Decision date:** 2026-09-15  
-**Scope:** Branch-scoped daily restaurant operations
+**Status: LOCKED / AUTHORITATIVE — reconciled with Canonical Architecture & Product Library v2 and Branch Manager Menu Configuration v1**  
+**Decision date:** 2026-09-17  
+**Scope:** Branch-scoped daily restaurant operations + branch-local menu configuration
 
 > **Canonical map:** `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`. This document defines the Branch Manager surface in detail; it must not redefine terminology, scope, or cross-dashboard authority independently.
+> **Menu authority lock:** `docs/decisions/branch-manager-menu-configuration-v1.md`.
 
 ## 1. Purpose
 
@@ -31,7 +32,7 @@ Owner/Brand policy remains outside this scope. Branch Manager cannot silently cr
 ### Operasional
 - Pesanan
 - Meja
-- Menu availability
+- **Menu**
 - Promo activation
 - Stok
 
@@ -53,14 +54,14 @@ Owner / Brand Policy
         ↓
 Xentra-Core authorization + business rules
         ↓
-Branch Manager daily operation
+Branch Manager branch-local menu configuration + daily operation
         ↓
 Branch-scoped operational state
         ↓
 Customer PWA / POS / KDS
 ```
 
-Branch Manager = **OPERATE + OBSERVE**. Core = **AUTHENTICATE + AUTHORIZE + ENFORCE + PERSIST + AUDIT**.
+Branch Manager = **OPERATE + OBSERVE**, including approved **branch-local Menu Configuration**. Core = **AUTHENTICATE + AUTHORIZE + ENFORCE + PERSIST + AUDIT**.
 
 ## 4. Branch operational state
 
@@ -141,25 +142,82 @@ Owner/Admin configuration of physical floor-plan geometry is separate from daily
 
 Core must validate availability at reservation/selection transaction boundaries and protect race-sensitive mutations.
 
-## 8. Menu availability
+## 8. Menu — Branch Assortment & Categories
 
-Branch Manager operates **Branch Product Availability**, not Master Product identity.
+Branch Manager has explicit **branch-scoped Menu Configuration authority** for the authenticated manager's current Branch.
 
-`branch_products.is_available` remains the branch-scoped availability authority.
+### 8.1 Adopt products from Master Catalog
 
-Manager may mark a Branch Product available or unavailable/sold out. This must not mutate Master Product `is_active`.
+Master Catalog remains Owner/Brand authority. Branch Manager may **adopt/select approved Master Products** into the Branch's selling assortment.
 
-Stock is a separate Inventory concern. `low_stock_threshold` is Branch-scoped configuration/operational attention data.
+Adoption means:
+- the product already exists in the Brand Master Catalog;
+- the current Branch chooses to sell that product;
+- the resulting Branch Product is scoped to the current Branch;
+- adoption does not grant any Master Product editing authority.
 
-Canonical distinction:
+Branch Manager may not create a new Master Product merely because the Branch needs a menu item.
+
+### 8.2 Branch Categories
+
+Branch Manager may manage **Branch Categories** for the current Branch:
+- create;
+- rename;
+- reorder;
+- delete, subject to referential/data-integrity rules.
+
+Branch Categories are not Master Categories. They are branch-local selling structures and may differ between Branches.
+
+### 8.3 Category membership
+
+Branch Manager may assign/remove adopted Branch Products to/from one or more Branch Categories.
+
+The relationship is **many-to-many**:
 
 ```text
-Master Product
-    ≠ Branch Product
-    ≠ Branch Menu
-    ≠ Branch Product Availability
-    ≠ Stock
+Branch Product ↔ Branch Category
 ```
+
+The same Branch Product may appear in multiple local categories without duplicating the product.
+
+### 8.4 Operational availability
+
+Branch Manager continues to operate Branch Product availability/sold-out state.
+
+`branch_products.is_available` remains the branch-scoped availability authority. This must not mutate Master Product `is_active`.
+
+Stock is a separate Inventory concern.
+
+### 8.5 Explicit prohibitions
+
+Branch Manager must not:
+- create/edit/delete Master Products;
+- create/edit/delete Master Categories;
+- modify Bundle/Composite composition;
+- change Master Product identity/content/defaults outside approved Branch override contracts;
+- modify another Branch's assortment or categories;
+- change brand-wide catalog policy;
+- create a Branch-owned bundle/composite product.
+
+**No Branch Bundle Engine.** Bundles remain Master Catalog constructs defined by Owner/Brand.
+
+### 8.6 Branch menu resolution
+
+```text
+Master Catalog (Owner / Brand)
+        ↓ approved Master Products
+Branch adoption (Branch Manager, own Branch)
+        ↓
+Branch Products
+        ↓
+Branch Categories (Branch Manager, own Branch)
+        ↓
+Availability / stock (Branch operational state)
+        ↓
+Customer-facing Branch Menu
+```
+
+Adoption/assignment is not a snapshot boundary. Supported Master Product defaults may resolve through the canonical Master → Branch override contract. Branch operational state remains Branch-scoped.
 
 ## 9. Promotions
 
@@ -194,7 +252,7 @@ Branch Manager must not gain cross-Branch workforce authority merely from access
 
 ## 12. Auditability
 
-Operational mutations use the existing branch-operation audit pattern or its approved successor.
+Operational and branch-menu mutations use the existing branch-operation audit pattern or its approved successor.
 
 Sensitive actions should preserve:
 - Branch;
@@ -205,7 +263,7 @@ Sensitive actions should preserve:
 - new value;
 - authorization result;
 - timestamp;
-- relevant product/table context.
+- relevant product/category context.
 
 UI may expose last changed by/when, but UI state is not authoritative.
 
@@ -217,7 +275,7 @@ Every protected mutation follows the Core authorization sequence:
 Authenticate
 → current identity
 → current role/permission
-→ current scope
+→ current Branch scope
 → target
 → actor-target relationship
 → requested authority
@@ -239,14 +297,15 @@ Before coding a new capability, verify/define the smallest necessary contract fo
 - table/reservation state and concurrency;
 - Branch order queue/acceptance alignment;
 - branch promotion domain/permissions;
-- exact branch-scoped staff APIs.
+- exact branch-scoped staff APIs;
+- final API/data mapping for Branch Product adoption and Branch Category CRUD if the current implementation does not yet expose those mutations.
 
 These are explicit gaps. Do not hide them with frontend-only state or ad-hoc fields.
 
 ## 15. Implementation rule
 
 Before implementation:
-1. consult Library v2;
+1. consult Library v2 and `docs/decisions/branch-manager-menu-configuration-v1.md`;
 2. map feature to Branch Manager responsibility;
 3. identify authoritative Core domain/API/schema;
 4. identify genuine gap;
@@ -254,7 +313,7 @@ Before implementation:
 6. implement a verifiable vertical slice;
 7. add authorization, concurrency protection, audit, tests, and browser smoke coverage as appropriate.
 
-Do not rewrite unrelated authentication, payment, Catalog ownership, or Commerce semantics.
+Do not rewrite unrelated authentication, payment, Commerce, or Master Catalog authority.
 
 ## 16. Canonical relationship
 
@@ -262,6 +321,7 @@ This document is subordinate to:
 
 - locked business decisions;
 - `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md` for canonical terminology/scope/authority mapping;
+- `docs/decisions/branch-manager-menu-configuration-v1.md` for Branch-local Menu Configuration authority;
 - more-specific locked domain contracts.
 
 If a conflict is discovered, stop implementation, reconcile the canonical decision/library, then update this document and implementation evidence.
