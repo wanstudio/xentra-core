@@ -347,8 +347,12 @@ if (process.env.NODE_ENV !== 'test') {
       console.log('[Xentra Core] Database ready. Starting server...');
       startServer();
     }).catch(err => {
-      console.error('[Xentra Core] Database init failed:', err.message);
-      startServer(); // Start anyway — some routes may still work
+      console.error('[Xentra Core Fatal] Database initialization failed:', err.message);
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[Xentra Core Fatal] Refusing to start HTTP server without authoritative persistent database in production.');
+        process.exit(1);
+      }
+      startServer(); // Start anyway in non-production environments
     });
   } else {
     startServer();

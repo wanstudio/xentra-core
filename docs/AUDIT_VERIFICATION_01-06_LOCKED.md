@@ -56,10 +56,13 @@ This document locks the verified audit baseline for Findings 01–06. It records
 - Classification: **OPERATIONAL / PERSISTENCE RISK**
 - Severity: **HIGH if production reaches fallback**
 - Confidence: **HIGH on code/config mismatch; production impact requires runtime verification**
-- `server/database/db.js` contains a memory-only fallback when the authoritative SQLite runtime cannot initialize.
-- Repository evidence proves the unsafe fallback path exists; it does not by itself prove production is currently running on it.
-- Required production verification: `node -v`, `node -e "require('node:sqlite')"`, and startup confirmation that persistent DB is active.
-- Production should fail fast if the authoritative persistent database cannot initialize; memory-only fallback must not silently become production source of truth.
+- **STATUS: CLOSED (Verified)**
+- Runtime verified: Node.js `v24.21.0` with built-in native `node:sqlite` in WAL mode (`PRAGMA journal_mode = WAL`, `PRAGMA foreign_keys = ON`).
+- Fail-fast enforcement:
+  - In `NODE_ENV=production`, any failure in directory creation, persistent database file initialization (`DatabaseSync` / `sql.js`), schema initialization (`initSchema`), or statement execution (`prepare` / `exec`) fails fast via `process.exit(1)` / throwing fatal errors, strictly prohibiting silent fallback to ephemeral `memoryStore`.
+  - In `server/app.js`, HTTP server startup strictly aborts (`process.exit(1)`) if database readiness promise rejects in production.
+- Test environments (`NODE_ENV=test`) retain isolated in-memory execution.
+- Regression suite: `tests/databaseProductionFailFast.test.js`.
 
 ## Locked priority
 

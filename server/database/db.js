@@ -28,8 +28,16 @@ const DB_PATH = (() => {
 
 // Ensure db directory exists
 const dbDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+try {
+  if (DB_PATH !== ':memory:' && !fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+} catch (dirErr) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error(`[Database Fatal Error] Failed to create database directory ${dbDir} in production:`, dirErr);
+    process.exit(1);
+  }
+  throw dirErr;
 }
 
 let dbInstance = null;
@@ -50,6 +58,11 @@ try {
   console.log(`[Database] Native node:sqlite persistent storage initialized successfully (Node ${nodeVersion}, WAL mode).`);
   dbReadyPromise = Promise.resolve();
 } catch (e) {
+  if (process.env.NODE_ENV === 'production' && !e.message?.includes('Cannot find module')) {
+    // If native node:sqlite was expected but opening DB_PATH failed (e.g. permission/corruption/disk error)
+    console.error(`[Database Fatal Error] Native node:sqlite failed to initialize persistent database at ${DB_PATH} in production:`, e);
+    process.exit(1);
+  }
   try {
     const initSqlJs = require('sql.js');
     console.log(`[Database] node:sqlite not built-in on Node ${nodeVersion}. Initializing sql.js adapter...`);
@@ -472,6 +485,9 @@ const db = {
     }
     if (sqlJsPromise) {
       throw new Error('[Database] sql.js is still initializing or unavailable.');
+    }
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('[Database Fatal Error] Authoritative database connection is unavailable in production. MemoryStore fallback is strictly prohibited.');
     }
   },
   prepare: (sql) => {
@@ -1992,7 +2008,15 @@ db.seedData = seedData;
 
 // Auto-run schema initialization for native instance (sql.js runs it in sqlJsPromise callback)
 if (dbInstance) {
-  initSchema(db);
+  try {
+    initSchema(db);
+  } catch (schemaErr) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error('[Database Fatal Error] Failed to initialize schema in production:', schemaErr);
+      process.exit(1);
+    }
+    throw schemaErr;
+  }
 }
 
 module.exports = db;
