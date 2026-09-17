@@ -1538,6 +1538,12 @@ input, button, select, textarea, optgroup {
   .x-topbar-icon-btn {
     display: none;
   }
+  #btn-notifications.x-topbar-icon-btn {
+    display: flex;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
   .x-admin-profile .x-user-meta {
     display: none;
   }
