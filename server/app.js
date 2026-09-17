@@ -141,7 +141,14 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
 });
 
 // Merchant Dashboard Assets
-app.use('/dashboard/assets', express.static(path.join(__dirname, '../apps/merchant-dashboard/assets')));
+app.use('/dashboard/assets', express.static(path.join(__dirname, '../apps/merchant-dashboard/assets'), {
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // Xentra Cloud SaaS Public Entry Points
 // These routes serve SaaS pages only when the request host is xentra.cloud (or localhost in dev).

@@ -116,8 +116,8 @@ describe('BM Phase 4A — Merchant Dashboard Shell & Context UX Reconciliation',
   });
 
   it('P4A-13: Cache busting asset versions are present for dashboard.css and dashboard.js', () => {
-    assert.ok(/href="\/dashboard\/assets\/css\/dashboard\.css\?v=3\.0\.[23]"/.test(html), 'dashboard.css must use version query v=3.0.2 or newer');
-    assert.ok(/src="\/dashboard\/assets\/js\/dashboard\.js\?v=3\.0\.[23]"/.test(html), 'dashboard.js must use version query v=3.0.2 or newer');
+    assert.ok(/href="\/dashboard\/assets\/css\/dashboard\.css\?v=3\.0\.[2-9]"/.test(html), 'dashboard.css must use version query v=3.0.2 or newer');
+    assert.ok(/src="\/dashboard\/assets\/js\/dashboard\.js\?v=3\.0\.[2-9]"/.test(html), 'dashboard.js must use version query v=3.0.2 or newer');
   });
 });
 

@@ -3996,6 +3996,13 @@
     var p = currentBranchCatalogData.available_master_products.find(function (x) { return String(x.id) === String(productId); });
     if (!p) return;
 
+    var resolvedBranchId = currentManagingBranchId ||
+      (typeof getActiveBranchId === 'function' ? getActiveBranchId() : null) ||
+      (typeof getEffectiveBranchId === 'function' ? getEffectiveBranchId() : null);
+    if (resolvedBranchId) {
+      currentManagingBranchId = resolvedBranchId;
+    }
+
     $('adopt-product-id').value = p.id;
     $('adopt-product-name').value = p.name;
     $('adopt-pricing-mode').value = p.pricing_mode || 'lock';
@@ -4039,7 +4046,14 @@
   if (formAdopt) {
     formAdopt.addEventListener('submit', async function (e) {
       e.preventDefault();
-      if (!currentManagingBranchId) return;
+      var targetBranchId = currentManagingBranchId ||
+        (typeof getActiveBranchId === 'function' ? getActiveBranchId() : null) ||
+        (typeof getEffectiveBranchId === 'function' ? getEffectiveBranchId() : null);
+      if (!targetBranchId) {
+        showToast('❌ Cabang tidak valid atau belum dipilih.');
+        return;
+      }
+      currentManagingBranchId = targetBranchId;
 
       var btn = $('btn-save-adopt');
       btn.disabled = true;
@@ -9776,12 +9790,22 @@
   }
   window.completeBMTableSession = completeBMTableSession;
 
+  function getBMTargetBranchId() {
+    var user = getStoredUser();
+    var fromUser = user ? (user.branch_id || user.branchId || (user.branch && user.branch.id)) : null;
+    var fromActive = (typeof getActiveBranchId === 'function' ? getActiveBranchId() : null);
+    var fromManaging = currentManagingBranchId || null;
+    var fromEffective = (typeof getEffectiveBranchId === 'function' ? getEffectiveBranchId() : null);
+    var branchId = fromUser || fromManaging || fromActive || fromEffective || null;
+    if (branchId) currentManagingBranchId = branchId;
+    return branchId;
+  }
+
   /* =========================================================================
      BM-3: MENU OPERATIONAL CONTROLLER (PHASE 2: ADOPTION & CATEGORIES)
      ========================================================================= */
   async function loadBMMenu() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
     currentManagingBranchId = branchId;
@@ -10060,8 +10084,7 @@
   }
 
   async function saveBMBranchCategoryOrder(orderedIds) {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
     try {
@@ -10089,10 +10112,9 @@
   }
 
   window.promptAddBMBranchCategory = function () {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getBMTargetBranchId();
     if (!branchId) {
-      showToast('❌ Cabang tidak valid.');
+      showToast('❌ Cabang tidak valid atau belum dipilih.');
       return;
     }
     currentManagingBranchId = branchId;
@@ -10102,8 +10124,7 @@
   window.deleteBMBranchCategory = async function (catId, catName) {
     if (!confirm('Hapus kategori "' + catName + '"? Produk di kategori ini tidak akan dihapus, hanya dipindah ke tanpa kategori.')) return;
 
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getBMTargetBranchId();
     if (!branchId) return;
     currentManagingBranchId = branchId;
 
@@ -10163,34 +10184,20 @@
 
       var masterStatusBadge = isMasterActive
         ? '<span class="x-badge" style="font-size:10px; background:#f1f5f9; color:#475569;">AKTIF (BRAND)</span>'
-        : '<span class="x-badge" style="font-size:10px; background:#fee2e2; color:#991b1b;">NONAKTIF (BRAND)</span>';
+        : '<span class="x-badge x-badge-danger" style="font-size:10px;">NONAKTIF (BRAND)</span>';
 
-      var toggleBtn = isAvail
-        ? '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 10px; color:#dc2626; border-color:#fecaca;" onclick="toggleBMProductAvailability(\'' + esc(p.product_id) + '\', 0)">Tandai Habis</button>'
-        : '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 10px;" onclick="toggleBMProductAvailability(\'' + esc(p.product_id) + '\', 1)">Tandai Tersedia</button>';
+      var toggleBtn = '<label class="x-toggle' + (isAvail ? ' x-toggle-on' : '') + '" title="' + (isAvail ? 'Menu tersedia' : 'Menu habis') + '">' +
+        '<input type="checkbox" ' + (isAvail ? 'checked' : '') + ' onchange="toggleBMProductAvailability(\'' + esc(p.product_id) + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
+        '<span class="x-toggle-slider"></span>' +
+      '</label>';
 
-      var catBadges = '';
-      if (Array.isArray(p.categories) && p.categories.length > 0) {
-        catBadges = p.categories.map(function (c) {
-          return '<span class="x-badge x-badge-info" style="font-size:11px; margin-right:4px; display:inline-block; margin-bottom:2px;">' + esc(c.name) + '</span>';
-        }).join('');
-      } else if (p.branch_category_name || p.category_name) {
-        catBadges = '<span class="x-badge x-badge-info" style="font-size:11px;">' + esc(p.branch_category_name || p.category_name) + '</span>';
-      } else {
-        catBadges = '<span class="x-badge" style="font-size:11px; background:#f1f5f9; color:#64748b;">Umum</span>';
-      }
+      var catBadges = (p.category_names && p.category_names.length)
+        ? p.category_names.map(function (cn) { return '<span class="x-badge x-badge-info" style="font-size:10px; margin-right:4px;">' + esc(cn) + '</span>'; }).join('')
+        : (p.branch_category_name ? '<span class="x-badge x-badge-info" style="font-size:10px;">' + esc(p.branch_category_name) + '</span>' : '<span class="text-muted" style="font-size:11px;">—</span>');
 
       var productDataJson = esc(JSON.stringify({
         product_id: p.product_id,
-        name: p.name || p.product_name,
-        name_override: p.name_override,
-        master_name: p.master_name || p.product_name || p.name,
-        description: p.description,
-        description_override: p.description_override,
-        master_description: p.master_description,
-        image_url: p.image_url,
-        image_override: p.image_override,
-        master_image_url: p.master_image_url,
+        name: p.product_name || p.name,
         price: p.price,
         master_price: p.master_price || p.price,
         pricing_mode: p.pricing_mode || 'lock',
@@ -10225,8 +10232,7 @@
   }
 
   async function toggleBMProductAvailability(productId, nextVal) {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
     try {
@@ -10250,8 +10256,7 @@
   window.toggleBMProductAvailability = toggleBMProductAvailability;
 
   window.removeBMBranchProduct = async function (productId, productName) {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
@@ -10294,10 +10299,9 @@
     }
     modal.style.display = 'flex';
 
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getBMTargetBranchId();
     if (!branchId) {
-      if (container) container.innerHTML = '<div style="padding:24px; text-align:center; color:#dc2626; font-size:13px;">Cabang tidak teridentifikasi.</div>';
+      if (container) container.innerHTML = '<div style="padding:24px; text-align:center; color:#dc2626; font-size:13px;">Cabang tidak teridentifikasi. Pastikan Anda telah memilih atau ditugaskan ke cabang.</div>';
       return;
     }
 
@@ -10464,10 +10468,9 @@
   }
 
   window.submitBMAdoptCatalogBatch = async function () {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getBMTargetBranchId();
     if (!branchId) {
-      showToast('❌ Cabang tidak valid.');
+      showToast('❌ Cabang tidak valid atau belum dipilih.');
       return;
     }
 

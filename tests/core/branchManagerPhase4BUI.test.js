@@ -305,8 +305,8 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
     assert.ok(css.includes('overflow-x: hidden;'), 'overflow-x: hidden must be enforced');
   });
 
-  it('P4B-10: Cache-busting query v=3.0.3 is applied in HTML', () => {
-    assert.ok(html.includes('href="/dashboard/assets/css/dashboard.css?v=3.0.3"'), 'dashboard.css must use version query v=3.0.3');
-    assert.ok(html.includes('src="/dashboard/assets/js/dashboard.js?v=3.0.3"'), 'dashboard.js must use version query v=3.0.3');
+  it('P4B-10: Cache-busting query is applied in HTML', () => {
+    assert.ok(html.includes('href="/dashboard/assets/css/dashboard.css?v=3.0.4"'), 'dashboard.css must use version query v=3.0.4');
+    assert.ok(html.includes('src="/dashboard/assets/js/dashboard.js?v=3.0.4"'), 'dashboard.js must use version query v=3.0.4');
   });
 });
