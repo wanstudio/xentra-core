@@ -57,7 +57,9 @@
       quantity: 1,
       is_promo_reward: true,
       promotion_id: promoId,
-      reward_type: reward.reward_type || 'freebie_product'
+      reward_type: reward.reward_type || 'freebie_product',
+      branch_id: null,
+      branch_name: null
     };
   }
 

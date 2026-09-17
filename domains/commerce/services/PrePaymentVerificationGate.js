@@ -123,17 +123,18 @@ class PrePaymentVerificationGate {
           continue;
         }
         const bpCheck = catalogRepository.findRewardProduct(branch_id, targetPid);
+        const rewardDisplayName = bpCheck?.name || eligiblePromo.display?.reward_title || 'Hadiah Promo';
         if (!bpCheck) {
-          errors.push('Produk hadiah tidak tersedia di katalog cabang tujuan.');
+          errors.push(`Produk hadiah "${rewardDisplayName}" tidak tersedia di cabang yang akan memenuhi pesananmu. Pilih hadiah lain atau lanjut tanpa hadiah.`);
           continue;
         }
         if (bpCheck.is_available === 0) {
-          errors.push(`Produk hadiah "${bpCheck.name || 'Promo'}" sedang dinonaktifkan di cabang ini.`);
+          errors.push(`Produk hadiah "${rewardDisplayName}" sedang dinonaktifkan di cabang yang akan memenuhi pesananmu. Pilih hadiah lain atau lanjut tanpa hadiah.`);
           continue;
         }
         const rewardStock = bpCheck.stock != null ? Number(bpCheck.stock) : null;
         if (rewardStock !== null && rewardStock < 1) {
-          errors.push(`Stok produk hadiah "${bpCheck.name || 'Promo'}" sedang habis di cabang ini.`);
+          errors.push(`Maaf, "${rewardDisplayName}" sedang habis di cabang yang akan memenuhi pesananmu. Pilih hadiah lain atau lanjut tanpa hadiah.`);
           continue;
         }
         const authoritativeRewardPrice = Number(rewardSpec.reward_price || rewardSpec.amount_in_cents || 0);
@@ -223,8 +224,9 @@ class PrePaymentVerificationGate {
     }
 
     if (errors.length > 0) {
+      const isOutOfStock = errors.some(e => /stok|habis/i.test(e));
       return {
-        status: errors.some(e => e.includes('Stok')) ? PrePaymentVerificationGate.STATUS.OUT_OF_STOCK : PrePaymentVerificationGate.STATUS.PRODUCT_UNAVAILABLE,
+        status: isOutOfStock ? PrePaymentVerificationGate.STATUS.OUT_OF_STOCK : PrePaymentVerificationGate.STATUS.PRODUCT_UNAVAILABLE,
         is_valid: false,
         verified_items: [],
         price_diffs: [],
