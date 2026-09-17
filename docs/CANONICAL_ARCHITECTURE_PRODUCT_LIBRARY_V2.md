@@ -1,7 +1,7 @@
 # Xentra — Canonical Architecture & Product Library v2
 
 **Status:** LOCKED — CANONICAL ARCHITECTURE & PRODUCT LIBRARY v2  
-**Decision date:** 2026-09-15
+**Decision date:** 2026-09-17
 
 ## Purpose
 
@@ -36,7 +36,7 @@ Locked business decisions win conflicts. Library v2 maps and normalizes those de
 | Platform / Control Plane | Xentra platform governance and provisioning | merchant daily operations |
 | Xentra-Core | identity, authentication, authorization, scope, persistence enforcement, audit foundation, shared integrity | business UI/domain workflow owner |
 | Owner Dashboard | configure, govern, observe | branch daily operations queue |
-| Branch Manager Operational Center | operate and observe one Branch | brand-wide governance |
+| Branch Manager Operational Center | operate and observe one Branch, including approved branch-local menu configuration | brand-wide governance |
 | Customer PWA | discover, purchase, track | business configuration |
 | POS | in-store transaction execution | master business governance |
 | KDS | kitchen preparation execution | business configuration |
@@ -96,7 +96,7 @@ Cross-domain orchestration does not transfer ownership.
 - **Master Category** — Brand-owned master catalog grouping.
 - **Branch Product** — Branch selling assignment/configuration/state.
 - **Branch Category** — independently branch-controlled category.
-- **Branch Menu** — durable Branch selling-menu configuration.
+- **Branch Menu** — branch selling-menu configuration with Owner/Brand governance and Branch Manager local assortment/category operation.
 - **Branch Product Availability** — daily branch operational state.
 
 **Catalog invariant:** Master Product, Branch Product, Branch Menu, Availability, and Stock are distinct concepts. Master Product defaults may resolve into Branch values through explicit supported overrides. Branch operational availability must not silently mutate Master Product `is_active`.
@@ -175,7 +175,7 @@ Canonical responsibility model:
 
 ```text
 Owner          = CONFIGURE + GOVERN + OBSERVE
-Branch Manager = OPERATE + OBSERVE
+Branch Manager = OPERATE + OBSERVE + branch-local Menu Configuration
 Xentra-Core    = AUTHENTICATE + AUTHORIZE + ENFORCE + PERSIST + AUDIT
 Customer       = CONSUME
 POS / KDS      = EXECUTE
@@ -189,7 +189,7 @@ These are business responsibility categories, not one-to-one technical permissio
 |---|---|---|
 | Owner | authorized Organization/Brand | permitted subordinate workforce management |
 | Brand Manager | delegated Brand | delegated according to RBAC |
-| Branch Manager | one Branch | branch-scoped operational staff where permitted |
+| Branch Manager | one Branch | branch-scoped operational staff and approved branch-local menu configuration where permitted |
 | Cashier | Branch/Terminal/Shift | no workforce management |
 | Customer | customer context | no merchant administration |
 
@@ -206,10 +206,10 @@ Canonical areas: Overview, Orders, Catalog (Products/Categories/Menus), Branches
 `Branches` is Branch Management / Configuration & Performance, not a duplicate Branch Operations dashboard.
 
 ### Branch Manager Operational Center
-**Purpose:** Daily Branch Operations.  
+**Purpose:** Daily Branch Operations + branch-local Menu Configuration.  
 **Mode:** Operate + Observe.
 
-Canonical areas: Hari Ini, Pesanan, Meja, Menu availability, Promo activation, Stok, Staff, Reports, Jam Operasional.
+Canonical areas: Hari Ini, Pesanan, Meja, Menu, Promo activation, Stok, Staff, Reports, Jam Operasional.
 
 ### Customer PWA
 Discover → Purchase → Track.
@@ -224,9 +224,9 @@ Kitchen preparation execution.
 
 | Function | Owner | Branch Manager | POS/KDS | Customer |
 |---|---|---|---|---|
-| Master Products | Configure/Govern | Observe | Consume | Consume |
+| Master Products | Configure/Govern | Observe + adopt approved products | Consume | Consume |
 | Master Categories | Configure | Observe | Consume | Consume |
-| Branch Menu Configuration | Configure | Observe | Consume | Consume |
+| Branch Menu Configuration | Configure/Govern | **Operate own Branch assortment + Branch Categories** | Consume | Consume |
 | Branch Product Availability | Observe | Operate | Consume | Consume |
 | Stock | Observe | Operate | Consume | — |
 | Branch Status | Observe / exceptional override | Operate | Consume | Consume |
@@ -241,7 +241,7 @@ Kitchen preparation execution.
 ## 13. Critical cross-surface boundaries
 
 ### Catalog
-Owner manages Master Product and durable Branch Menu configuration. Branch Manager operates Branch Product availability. Sold-out must not mutate Master Product active state.
+Owner manages Master Products, Master Categories, Bundle/Composite composition, and brand-wide catalog policy. Branch Manager may adopt/select approved Master Products for the current Branch, manage Branch Categories and Branch Product ↔ Branch Category membership, and operate Branch Product availability. Branch Manager adoption/category authority is branch-scoped and does not grant Master Catalog authority. Sold-out must not mutate Master Product active state.
 
 ### Operating hours
 Owner defines default/permanent schedule. Branch Manager applies daily/special exceptions within allowed boundaries. Core resolves effective state.
@@ -354,8 +354,9 @@ Xentra will not turn Branch Manager into a mini product manager. Product complex
 - Master Catalog may contain both **SIMPLE** and **BUNDLE/COMPOSITE** products.
 - If a package such as `Ayam Geprek + Es Teh` must be sold as one menu/package, **Owner creates the Package/Bundle Product in Master Catalog**. Branch does not create its own bundle.
 - For the current scope, a Bundle has its own **fixed selling price**. Do not introduce a pricing-formula or promotion engine merely to support bundles.
-- Branch only **adopts/selects** products from Master Catalog and operates them at branch level.
-- Branch may still organize adopted Branch Products into **Branch Categories**. One Branch Product may belong to multiple Branch Categories without duplicating the product.
+- Branch **adopts/selects** products from Master Catalog and operates them at branch level.
+- Branch Manager may perform that adoption/selection for the Manager's own Branch.
+- Branch Manager may organize adopted Branch Products into **Branch Categories**. One Branch Product may belong to multiple Branch Categories without duplicating the product.
 - Category membership and bundle composition are separate relationships:
   - `Branch Product ↔ Branch Category` = **many-to-many**.
   - `Bundle Product → Component Products` = **Master Catalog composition**.
@@ -387,7 +388,7 @@ Branch A
 
 **No Branch Bundle Engine.** Do not introduce branch-owned bundle components, bundle pricing formulas, branch-created composite products, or duplicate Master Products merely to satisfy a Branch promotion/category.
 
-This lock intentionally keeps Branch operations simple and pushes product/business complexity to Owner/Master Catalog where it belongs.
+This lock intentionally keeps Branch operations simple and pushes product/business complexity to the Owner/Master Catalog where it belongs.
 
 ## 21. Open architecture gaps
 

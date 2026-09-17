@@ -1,17 +1,18 @@
 # Xentra — Owner ↔ Branch Manager Dashboard Boundary
 
-**Status:** LOCKED / AUTHORITATIVE — reconciled with Canonical Architecture & Product Library v2  
-**Decision date:** 2026-09-15  
+**Status:** LOCKED / AUTHORITATIVE — reconciled with Canonical Architecture & Product Library v2 and Branch Manager Menu Configuration v1  
+**Decision date:** 2026-09-17  
 **Scope:** Client/Owner Dashboard and Branch Manager Operational Center
 
 > **Canonical map:** `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`. This document remains the detailed cross-dashboard contract; Library v2 is the canonical map for terminology, scope, authority, lifecycle, and surface relationships.
+> **Menu authority lock:** `docs/decisions/branch-manager-menu-configuration-v1.md`.
 
 ## 1. Purpose
 
 The Owner Dashboard and Branch Manager Operational Center are complementary, not duplicate versions of the same control surface.
 
 - **Owner:** CONFIGURE + GOVERN + OBSERVE
-- **Branch Manager:** OPERATE + OBSERVE
+- **Branch Manager:** OPERATE + OBSERVE, including branch-local Menu Configuration
 - **Xentra-Core:** AUTHENTICATE + AUTHORIZE + ENFORCE + PERSIST + AUDIT
 - **Customer/POS/KDS:** CONSUME / EXECUTE according to contract
 
@@ -23,7 +24,8 @@ Owner is responsible for durable business configuration, governance, cross-branc
 
 Owner authority includes:
 - Master Product Catalog and Master Categories;
-- Branch Menu configuration and durable Branch Product adoption/configuration;
+- brand-wide catalog policy and sellable-universe governance;
+- durable Branch Menu configuration and branch-level assortment governance where applicable;
 - permanent/default Branch configuration and recurring operating schedule;
 - table/floor-plan geometry and structural configuration;
 - promotion/campaign creation and governance;
@@ -44,6 +46,9 @@ Branch Manager authority includes:
 - daily Branch open/close state and approved schedule exceptions;
 - online-order pause/resume/throttle;
 - daily table state and reservation/occupancy context;
+- **branch-local Menu Configuration:** adopt/select approved Master Products for the current Branch;
+- **branch-local Branch Category management:** create, rename, reorder, delete, and organize Branch Categories for the current Branch;
+- **Branch Product ↔ Branch Category membership** for adopted Branch Products;
 - Branch Product availability/sold-out state;
 - Branch stock operation;
 - activation/deactivation of approved Branch-scoped promotions;
@@ -61,8 +66,11 @@ Branch Manager cannot silently create or alter brand-wide policy.
 | Branch status | Observe + exceptional override | Operate daily state | Enforce |
 | Operating hours | Default/permanent schedule | Daily/special exception | Resolve effective state |
 | Online orders | Observe + explicit exception | Pause/resume/throttle | Enforce effective availability |
-| Master Product | Create/edit/manage | Observe | Authoritative catalog enforcement |
-| Branch Menu | Configure adoption/assortment/policy | Observe | Enforce branch scope |
+| Master Product | Create/edit/manage | Observe / adopt approved products only | Authoritative catalog enforcement |
+| Master Category | Create/edit/manage | Observe only | Authoritative catalog enforcement |
+| Branch Menu / Assortment | Govern + configure | **Adopt/remove approved products for own Branch** | Enforce branch scope |
+| Branch Categories | Govern model as applicable | **Create/rename/reorder/delete own Branch Categories** | Enforce branch scope |
+| Branch Product ↔ Branch Category | Observe/govern | **Manage own Branch memberships** | Enforce branch scope + integrity |
 | Branch Product Availability | Observe | Operate | Enforce |
 | Stock | Observe/report | Operate | Persist/validate |
 | Tables/floor plan | Configure geometry | Operate daily status | Enforce availability/concurrency |
@@ -87,9 +95,13 @@ Master Product
     ≠ Stock
 ```
 
-Owner manages Master Product and durable Branch Menu configuration. Branch Manager operates Branch Product availability. `branch_products.is_available` is the Branch-scoped availability authority.
+Owner manages the Master Catalog and brand-wide policy. Branch Manager has branch-local authority to adopt/select approved Master Products into the Branch assortment, manage Branch Categories, and manage category membership for adopted Branch Products.
 
-Sold-out/unavailable operation must not silently mutate Master Product `is_active`.
+Adoption does **not** grant Master Product authority. A Branch Manager may not create/edit/delete Master Products or Master Categories, modify Bundle/Composite composition, change the global sellable universe, or affect another Branch.
+
+`branch_products.is_available` remains the Branch-scoped availability authority. Sold-out/unavailable operation must not silently mutate Master Product `is_active`.
+
+Branch adoption and Branch Category membership are branch-local configuration/assortment concerns and remain distinct from operational availability and inventory stock.
 
 ## 6. Operating hours and online ordering
 
@@ -136,7 +148,7 @@ Owner `Branches` is Branch Management / Configuration & Performance, not daily B
 ## 12. Implementation invariant
 
 Before implementing either dashboard:
-1. consult Library v2;
+1. consult Library v2 and the locked Branch Manager Menu Configuration decision;
 2. map the feature to the responsibility boundary;
 3. identify authoritative Core domain/API/schema;
 4. do not duplicate mutation authority because an entity is visible in another surface;
@@ -149,6 +161,7 @@ Before implementing either dashboard:
 ## 13. Related contracts
 
 - `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md` — canonical architecture/product map;
+- `docs/decisions/branch-manager-menu-configuration-v1.md` — locked branch-local menu configuration authority;
 - `docs/BRANCH_MANAGER_OPERATIONAL_CENTER.md` — detailed Branch Manager operational contract;
 - existing Owner Dashboard UI Blueprint in Notion;
 - existing `User → Role → Scope` RBAC/security contracts;
