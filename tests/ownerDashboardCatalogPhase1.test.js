@@ -226,6 +226,13 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
 
       const row = db.prepare('SELECT is_active FROM products WHERE id = ?').get(createdProductId);
       assert.strictEqual(row.is_active, 0, 'Toggled from 1 to 0');
+
+      // Toggle back to active (1) so product remains available for subsequent branch assortment tests
+      await makeRequest(server, {
+        method: 'PATCH',
+        path: `/api/v1/admin/products/${createdProductId}/toggle`,
+        headers: { Authorization: `Bearer ${ownerToken}` }
+      });
     });
   });
 

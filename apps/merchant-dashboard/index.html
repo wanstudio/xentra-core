@@ -2945,10 +2945,16 @@
             <div>
               <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Ketersediaan Menu Cabang</h3>
               <p class="text-muted" style="font-size:13px; margin:0;">
-                Kontrol ketersediaan harian menu di cabang ini (Tersedia / Habis). Master produk dan harga dasar dikelola oleh Owner/Brand.
+                Atur menu yang dijual di cabang ini. Tambah produk dari katalog master, kelola kategori cabang, dan sesuaikan ketersediaan harian.
               </p>
             </div>
-            <div style="display:flex; gap:10px; align-items:center;">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <button type="button" class="x-btn-primary" id="btn-bm-menu-add-catalog" onclick="openBMAddCatalogModal()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                <span>＋ Tambah dari Katalog</span>
+              </button>
+              <button type="button" class="x-btn-secondary" id="btn-bm-menu-add-category" onclick="promptAddBMBranchCategory()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
+                <span>＋ Kategori Cabang</span>
+              </button>
               <button type="button" class="x-btn-secondary" id="btn-bm-menu-refresh" onclick="loadBMMenu()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                 <span>Segarkan</span>
@@ -2973,6 +2979,17 @@
           </div>
         </div>
 
+        <!-- Branch Categories Bar Panel -->
+        <div class="x-card-panel" style="margin-bottom:20px; padding:16px 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <span style="font-size:13px; font-weight:700; color:#475569;">Kategori Cabang:</span>
+            <span id="bm-menu-cat-filter-label" class="text-muted" style="font-size:12px;">Semua kategori</span>
+          </div>
+          <div id="bm-menu-categories-bar" style="display:flex; flex-wrap:wrap; gap:8px; min-height:36px; align-items:center;">
+            <span class="text-muted" style="font-size:13px;">Memuat kategori...</span>
+          </div>
+        </div>
+
         <!-- Filter & Menu Table Panel -->
         <div class="x-card-panel">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
@@ -2991,12 +3008,12 @@
               <thead>
                 <tr>
                   <th>Produk</th>
-                  <th>Kategori</th>
+                  <th>Kategori Cabang</th>
                   <th>Harga Cabang</th>
                   <th>Stok Saat Ini</th>
                   <th>Status Operasional</th>
                   <th>Status Master</th>
-                  <th style="text-align:right;">Aksi Ketersediaan</th>
+                  <th style="text-align:right;">Aksi</th>
                 </tr>
               </thead>
               <tbody id="bm-menu-tbody">
@@ -4143,6 +4160,26 @@
           </button>
         </div>
       </form>
+    </div>
+  <!-- BM-3 Phase 2: Modal Pick Available Master Products to Adopt -->
+  <div id="modal-bm-add-catalog" class="x-modal-backdrop" style="display:none; z-index: 1050;">
+    <div class="x-modal-card" style="max-width: 640px; width: 100%;">
+      <div class="x-modal-header">
+        <div>
+          <h3 style="margin:0; font-size:16px; font-weight:700;">Tambah Menu dari Katalog Master</h3>
+          <p class="text-muted" style="margin:2px 0 0; font-size:12px;">Pilih menu resmi yang tersedia untuk diadopsi ke cabang ini.</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closeBMAddCatalogModal()">✕</button>
+      </div>
+      <div style="padding:16px 20px; border-bottom:1px solid var(--border-color);">
+        <input type="text" id="bm-add-catalog-search" class="x-input" placeholder="Cari nama produk master..." style="font-size:13px; width:100%;" oninput="onBMAddCatalogFilterChange()">
+      </div>
+      <div id="bm-add-catalog-list" style="padding:16px 20px; max-height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:12px;">
+        <p class="text-muted" style="font-size:13px; text-align:center;">Memuat produk master yang tersedia...</p>
+      </div>
+      <div class="x-modal-footer">
+        <button type="button" class="x-btn-secondary" onclick="closeBMAddCatalogModal()">Tutup</button>
+      </div>
     </div>
   </div>
 

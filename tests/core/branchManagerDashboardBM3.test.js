@@ -585,4 +585,223 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(js.includes('async function loadBMPromotions()'), 'Missing loadBMPromotions');
     assert.ok(js.includes('openBMStockAdjustmentModal'), 'Missing openBMStockAdjustmentModal');
   });
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     BM-3 PHASE 2: MENU WORKSPACE, ADOPTION & BRANCH CATEGORIES
+     ───────────────────────────────────────────────────────────────────────── */
+
+  it('BM3-21: Branch Manager can query branch catalog (/admin/branches/:id/catalog) for assigned branch', async () => {
+    const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID });
+
+    const res = await request('GET', `/api/v1/admin/branches/${BRANCH_A_ID}/catalog`, null, {
+      Authorization: `Bearer ${token}`
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.ok(Array.isArray(res.body.categories));
+    assert.ok(Array.isArray(res.body.adopted_products));
+    assert.ok(Array.isArray(res.body.available_master_products));
+
+    // Cross-branch must be denied
+    const crossRes = await request('GET', `/api/v1/admin/branches/${BRANCH_B_ID}/catalog`, null, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(crossRes.status, 403);
+    assert.equal(crossRes.body.error, 'FORBIDDEN_BRANCH_SCOPE');
+  });
+
+  it('BM3-22: Branch Manager can adopt a master product into assigned branch with price policy enforcement', async () => {
+    // Seed an unadopted master product with range pricing
+    db.prepare(`
+      INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, pricing_mode, min_price, max_price, is_active, sort_order, created_at, updated_at)
+      VALUES ('prod_bm3_adoptable', ?, 'cat_bm3_1', 'Es Teh Manis Jumbo', 'es-teh-jumbo', 8000, 'range', 7000, 12000, 1, 10, datetime('now'), datetime('now'))
+    `).run(BRAND_ID);
+
+    const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID });
+
+    // 1. Invalid price below min_price must be rejected (400 INVALID_BRANCH_PRICE)
+    const failRes = await request('POST', `/api/v1/admin/branches/${BRANCH_A_ID}/adopt`, {
+      product_id: 'prod_bm3_adoptable',
+      price: 5000
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(failRes.status, 400);
+    assert.equal(failRes.body.error, 'INVALID_BRANCH_PRICE');
+
+    // 2. Cross-branch adoption must be denied (403 FORBIDDEN_BRANCH_SCOPE)
+    const crossRes = await request('POST', `/api/v1/admin/branches/${BRANCH_B_ID}/adopt`, {
+      product_id: 'prod_bm3_adoptable',
+      price: 9000
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(crossRes.status, 403);
+    assert.equal(crossRes.body.error, 'FORBIDDEN_BRANCH_SCOPE');
+
+    // 3. Valid adoption within range must succeed
+    const okRes = await request('POST', `/api/v1/admin/branches/${BRANCH_A_ID}/adopt`, {
+      product_id: 'prod_bm3_adoptable',
+      price: 9000
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(okRes.status, 201);
+    assert.equal(okRes.body.success, true);
+    assert.equal((okRes.body.adopted || okRes.body.assignment).price, 9000);
+
+    // Verify persisted in DB
+    const bp = db.prepare('SELECT * FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A_ID, 'prod_bm3_adoptable');
+    assert.ok(bp);
+    assert.equal(bp.price, 9000);
+  });
+
+  it('BM3-23: Branch Manager can create, rename, reorder, and delete branch categories', async () => {
+    const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID });
+
+    // 1. Create Category 1
+    const createRes1 = await request('POST', `/api/v1/admin/branches/${BRANCH_A_ID}/categories`, {
+      name: 'Minuman Segar'
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(createRes1.status, 201);
+    assert.equal(createRes1.body.success, true);
+    const cat1Id = createRes1.body.category.id;
+
+    // 2. Create Category 2
+    const createRes2 = await request('POST', `/api/v1/admin/branches/${BRANCH_A_ID}/categories`, {
+      name: 'Camilan Sore'
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(createRes2.status, 201);
+    const cat2Id = createRes2.body.category.id;
+
+    // Cross-branch category create denied
+    const crossCreate = await request('POST', `/api/v1/admin/branches/${BRANCH_B_ID}/categories`, {
+      name: 'Illegal Category'
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(crossCreate.status, 403);
+    assert.equal(crossCreate.body.error, 'FORBIDDEN_BRANCH_SCOPE');
+
+    // 3. Rename Category
+    const renameRes = await request('PATCH', `/api/v1/admin/branches/${BRANCH_A_ID}/categories/${cat1Id}`, {
+      name: 'Minuman Dingin & Hangat'
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(renameRes.status, 200);
+    assert.equal(renameRes.body.success, true);
+    assert.equal(renameRes.body.category.name, 'Minuman Dingin & Hangat');
+
+    // 4. Reorder Categories
+    const reorderRes = await request('PUT', `/api/v1/admin/branches/${BRANCH_A_ID}/categories/reorder`, {
+      order: [cat2Id, cat1Id]
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(reorderRes.status, 200);
+    assert.equal(reorderRes.body.success, true);
+
+    // 5. Delete Category 2
+    const delRes = await request('DELETE', `/api/v1/admin/branches/${BRANCH_A_ID}/categories/${cat2Id}`, null, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(delRes.status, 200);
+    assert.equal(delRes.body.success, true);
+
+    const checkDel = db.prepare('SELECT * FROM branch_categories WHERE id = ?').get(cat2Id);
+    assert.equal(checkDel, undefined);
+  });
+
+  it('BM3-24: Branch Manager can assign and clear category override on adopted branch product', async () => {
+    const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID });
+
+    // Create a branch category
+    const catRes = await request('POST', `/api/v1/admin/branches/${BRANCH_A_ID}/categories`, {
+      name: 'Spesial Cabang'
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(catRes.status, 201);
+    const catId = catRes.body.category.id;
+
+    // Assign category to adopted product prod_bm3_adoptable
+    const assignRes = await request('PATCH', `/api/v1/admin/branches/${BRANCH_A_ID}/products/prod_bm3_adoptable/override`, {
+      branch_category_id: catId
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(assignRes.status, 200);
+    assert.equal(assignRes.body.success, true);
+
+    const bp = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A_ID, 'prod_bm3_adoptable');
+    assert.equal(bp.branch_category_id, catId);
+
+    // Clear category assignment
+    const clearRes = await request('PATCH', `/api/v1/admin/branches/${BRANCH_A_ID}/products/prod_bm3_adoptable/override`, {
+      branch_category_id: null
+    }, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(clearRes.status, 200);
+    assert.equal(clearRes.body.success, true);
+
+    const bpCleared = db.prepare('SELECT branch_category_id FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A_ID, 'prod_bm3_adoptable');
+    assert.equal(bpCleared.branch_category_id, null);
+  });
+
+  it('BM3-25: Branch Manager can unadopt (remove) product from branch without affecting master catalog', async () => {
+    const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID, brandId: BRAND_ID });
+
+    // Cross-branch unadopt denied
+    const crossRes = await request('DELETE', `/api/v1/admin/branches/${BRANCH_B_ID}/products/prod_bm3_adoptable`, null, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(crossRes.status, 403);
+    assert.equal(crossRes.body.error, 'FORBIDDEN_BRANCH_SCOPE');
+
+    // Unadopt from own branch
+    const delRes = await request('DELETE', `/api/v1/admin/branches/${BRANCH_A_ID}/products/prod_bm3_adoptable`, null, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(delRes.status, 200);
+    assert.equal(delRes.body.success, true);
+
+    // Verify branch_product row is removed
+    const bp = db.prepare('SELECT * FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A_ID, 'prod_bm3_adoptable');
+    assert.equal(bp, undefined);
+
+    // Verify master product is completely intact
+    const master = db.prepare('SELECT * FROM products WHERE id = ?').get('prod_bm3_adoptable');
+    assert.ok(master);
+    assert.equal(master.name, 'Es Teh Manis Jumbo');
+    assert.equal(master.is_active, 1);
+  });
+
+  it('BM3-26: index.html contains UI controls for Phase 2 BM Menu workspace', () => {
+    const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    assert.ok(html.includes('id="btn-bm-menu-add-catalog"'), 'Missing btn-bm-menu-add-catalog');
+    assert.ok(html.includes('id="btn-bm-menu-add-category"'), 'Missing btn-bm-menu-add-category');
+    assert.ok(html.includes('id="bm-menu-categories-bar"'), 'Missing bm-menu-categories-bar');
+    assert.ok(html.includes('id="modal-bm-add-catalog"'), 'Missing modal-bm-add-catalog');
+    assert.ok(html.includes('id="bm-add-catalog-list"'), 'Missing bm-add-catalog-list');
+  });
+
+  it('BM3-27: dashboard.js implements Phase 2 BM Menu functions and modal triggers', () => {
+    const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+    const js = fs.readFileSync(jsPath, 'utf8');
+
+    assert.ok(js.includes('openBMAddCatalogModal'), 'Missing openBMAddCatalogModal');
+    assert.ok(js.includes('promptAddBMBranchCategory'), 'Missing promptAddBMBranchCategory');
+    assert.ok(js.includes('deleteBMBranchCategory'), 'Missing deleteBMBranchCategory');
+    assert.ok(js.includes('removeBMBranchProduct'), 'Missing removeBMBranchProduct');
+    assert.ok(js.includes('renderBMMenuCategoriesBar'), 'Missing renderBMMenuCategoriesBar');
+  });
 });
