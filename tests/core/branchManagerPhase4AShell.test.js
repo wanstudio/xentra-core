@@ -114,4 +114,10 @@ describe('BM Phase 4A — Merchant Dashboard Shell & Context UX Reconciliation',
     const mobileCss = css.slice(mobileIndex, mobileIndex + 3500);
     assert.ok(mobileCss.includes('.x-branch-context-badge'), 'Missing responsive styling for x-branch-context-badge in mobile query');
   });
+
+  it('P4A-13: Cache busting asset versions are present for dashboard.css and dashboard.js', () => {
+    assert.ok(html.includes('href="/dashboard/assets/css/dashboard.css?v=3.0.2"'), 'dashboard.css must use version query v=3.0.2');
+    assert.ok(html.includes('src="/dashboard/assets/js/dashboard.js?v=3.0.2"'), 'dashboard.js must use version query v=3.0.2');
+  });
 });
+
