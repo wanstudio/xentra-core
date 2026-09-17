@@ -26,9 +26,11 @@ router.get(['/promo/active', '/promotions/active'], (req, res) => {
     const brandId = req.brand.id;
     const isPwa = req.query.is_pwa === '1' || req.query.is_pwa === 'true';
     const phone = req.query.phone || '';
+    const branchId = req.query.branch_id || req.query.branchId || null;
 
     const evaluation = PromotionEngineService.evaluate({
       brand_id: brandId,
+      branch_id: branchId,
       is_pwa_installed: isPwa,
       customer_phone: phone
     });
@@ -9192,11 +9194,93 @@ router.get('/admin/marketing/overview', requireAuth(['owner', 'brand_manager', '
 // 6. Marketing Promotions List API
 router.get('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const promotions = corePromotionRepo.findAllPromotions(req.brand_id);
+    const isBM = req.user.role === 'branch_manager';
+    const effectiveBranchId = isBM ? (req.user.branch_id || req.user.branchId) : null;
+    const promotions = corePromotionRepo.findAllPromotions(req.brand_id, effectiveBranchId);
     res.json({
       success: true,
       promotions,
       total: promotions.length
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6.1 Assign/Update Branch Scopes for Promotion (Owner / Brand Manager only)
+router.post('/admin/marketing/promotions/:id/scopes', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const promotionId = req.params.id;
+    const { branch_ids, is_active = 1 } = req.body;
+
+    if (!Array.isArray(branch_ids) || branch_ids.length === 0) {
+      return res.status(400).json({ success: false, error: 'branch_ids must be a non-empty array.' });
+    }
+
+    const promo = corePromotionRepo.findPromotion(promotionId);
+    if (!promo) {
+      return res.status(404).json({ success: false, error: 'Promotion not found.' });
+    }
+
+    for (const branchId of branch_ids) {
+      corePromotionRepo.assignBranchScope({
+        promotionId,
+        brandId: req.brand_id,
+        branchId,
+        isActive: is_active
+      });
+    }
+
+    const scopes = corePromotionRepo.findBranchScopes(promotionId);
+    res.json({
+      success: true,
+      promotion_id: promotionId,
+      scopes
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6.2 Toggle Promotion Branch Activation (BM can only modify their own assigned branch; Owner/Brand Manager can modify any branch)
+router.patch('/admin/marketing/promotions/:id/branch-activation', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const promotionId = req.params.id;
+    const { is_active } = req.body;
+    let targetBranchId = req.body.branch_id;
+
+    if (req.user.role === 'branch_manager') {
+      const userBranchId = req.user.branch_id || req.user.branchId;
+      if (!userBranchId) {
+        return res.status(403).json({ success: false, error: 'Branch Manager must be assigned to a branch.' });
+      }
+      if (targetBranchId && String(targetBranchId) !== String(userBranchId)) {
+        return res.status(403).json({ success: false, error: 'Branch Manager cannot modify promotions for other branches.' });
+      }
+      targetBranchId = userBranchId;
+    }
+
+    if (!targetBranchId) {
+      return res.status(400).json({ success: false, error: 'branch_id is required.' });
+    }
+
+    const existingScope = corePromotionRepo.findBranchScope(promotionId, targetBranchId);
+    if (!existingScope) {
+      return res.status(404).json({ success: false, error: 'Promotion is not scoped to this branch.' });
+    }
+
+    const newActiveState = (is_active === 1 || is_active === true) ? 1 : 0;
+    corePromotionRepo.setBranchScopeActivation({
+      promotionId,
+      branchId: targetBranchId,
+      isActive: newActiveState
+    });
+
+    res.json({
+      success: true,
+      promotion_id: promotionId,
+      branch_id: targetBranchId,
+      is_active: newActiveState
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

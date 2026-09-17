@@ -27,10 +27,10 @@ class PromotionEngineService {
     }
   }
 
-  static discoverActivePromotions(brandId) {
+  static discoverActivePromotions(brandId, branchId = null) {
     if (!brandId) return [];
 
-    const promoRows = promotionRepository.findActivePromotions(brandId);
+    const promoRows = promotionRepository.findActivePromotions(brandId, branchId);
     return promoRows.map(p => new Promotion({
       ...p,
       rules: promotionRepository.findRules(p.id),
@@ -40,12 +40,13 @@ class PromotionEngineService {
 
   static evaluate({
     brand_id,
+    branch_id = null,
     is_pwa_installed = false,
     customer_phone = '',
     cart_items = [],
     cart_subtotal = 0
   }) {
-    const activePromos = this.discoverActivePromotions(brand_id);
+    const activePromos = this.discoverActivePromotions(brand_id, branch_id);
     if (!activePromos.length) {
       return { applied: [], rejected: [], discovery: [] };
     }

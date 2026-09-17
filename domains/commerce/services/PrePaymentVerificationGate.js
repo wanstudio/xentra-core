@@ -104,6 +104,7 @@ class PrePaymentVerificationGate {
         });
         const evalResult = PromotionEngineService.evaluate({
           brand_id,
+          branch_id,
           is_pwa_installed: installRequirementSatisfied,
           customer_phone: (customer && customer.phone) ? String(customer.phone).trim() : '',
           cart_items: nonRewardItems

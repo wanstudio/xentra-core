@@ -441,6 +441,15 @@ const memoryStore = {
       })
     }
   ],
+  promotion_branch_scope: [
+    {
+      id: 'pbs_bangjo_pwa_barat',
+      promotion_id: 'prm_bangjo_pwa_install',
+      brand_id: 'brand_bangjo',
+      branch_id: 'branch_barat',
+      is_active: 1
+    }
+  ],
   promotion_redemptions: []
 };
 
@@ -1002,6 +1011,23 @@ function initSchema(targetDb) {
     CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust ON promotion_redemptions(promotion_id, customer_phone);
     CREATE INDEX IF NOT EXISTS idx_prm_redemptions_cust_active ON promotion_redemptions(promotion_id, customer_phone) WHERE status = 'active';
     CREATE INDEX IF NOT EXISTS idx_prm_redemptions_order ON promotion_redemptions(order_id);
+
+    CREATE TABLE IF NOT EXISTS promotion_branch_scope (
+      id TEXT PRIMARY KEY,
+      promotion_id TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      branch_id TEXT NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      assigned_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (promotion_id) REFERENCES promotions(id) ON DELETE CASCADE,
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+      UNIQUE (promotion_id, branch_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pbs_promo ON promotion_branch_scope(promotion_id);
+    CREATE INDEX IF NOT EXISTS idx_pbs_branch_active ON promotion_branch_scope(branch_id, is_active);
+    CREATE INDEX IF NOT EXISTS idx_pbs_brand_branch ON promotion_branch_scope(brand_id, branch_id);
 
     CREATE TABLE IF NOT EXISTS branch_categories (
       id TEXT PRIMARY KEY,
@@ -2160,6 +2186,16 @@ function seedInstallPromotion(targetDb, brandId) {
     VALUES ('rew_pwa_install_01', 'prm_bangjo_pwa_install', 'freebie_product', '288', 0,
       '{"banner_title":"Install sekarang & dapatkan gratis es teh","banner_subtitle":"syarat & ketentuan berlaku","reward_title":"Selamat! Es Teh Gratis untuk pesanan pertamamu!","reward_badge_text":"✓ Bonus PWA Aktif (Rp0)","icon_url":"/assets/img/iced-tea.png"}')
   `).run();
+
+  try {
+    const brandBranches = targetDb.prepare('SELECT id FROM branches WHERE brand_id = ?').all(brandId) || [];
+    for (const b of brandBranches) {
+      targetDb.prepare(`
+        INSERT OR IGNORE INTO promotion_branch_scope (id, promotion_id, brand_id, branch_id, is_active)
+        VALUES (?, 'prm_bangjo_pwa_install', ?, ?, 1)
+      `).run(`pbs_${b.id}_pwa_install`, brandId, b.id);
+    }
+  } catch (_) {}
 }
 
 db.readyPromise = dbReadyPromise;
