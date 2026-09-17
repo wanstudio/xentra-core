@@ -26,6 +26,10 @@
   --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
 
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -901,12 +905,12 @@ input, button, select, textarea, optgroup {
   color: #ffffff;
 }
 
-/* Modal */
-/* Modal */
-.x-modal-backdrop {
+/* Modal & Overlay Architecture */
+.x-modal-backdrop,
+.x-modal {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(15, 23, 42, 0.65);
   backdrop-filter: blur(4px);
   z-index: 9999;
   display: flex;
@@ -915,7 +919,9 @@ input, button, select, textarea, optgroup {
   padding: 16px;
   box-sizing: border-box;
   font-family: var(--font-family);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .x-modal-card {
@@ -923,7 +929,7 @@ input, button, select, textarea, optgroup {
   border-radius: var(--radius-lg);
   max-width: min(520px, calc(100vw - 32px));
   width: 100%;
-  max-height: min(92vh, calc(100dvh - 32px));
+  max-height: min(90vh, calc(100dvh - 32px));
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
@@ -932,10 +938,18 @@ input, button, select, textarea, optgroup {
   font-family: var(--font-family);
   color: var(--text-main);
   box-sizing: border-box;
+  margin: auto;
+  position: relative;
 }
+
+.x-modal-card.x-modal-sm { max-width: min(440px, calc(100vw - 32px)); }
+.x-modal-card.x-modal-md { max-width: min(540px, calc(100vw - 32px)); }
+.x-modal-card.x-modal-lg { max-width: min(720px, calc(100vw - 32px)) !important; }
+.x-modal-card.x-modal-xl { max-width: min(960px, calc(100vw - 32px)) !important; }
 
 .x-modal-card * {
   font-family: inherit;
+  box-sizing: border-box;
 }
 
 @keyframes modalPop {
@@ -951,6 +965,8 @@ input, button, select, textarea, optgroup {
   align-items: center;
   flex-shrink: 0;
   background: #ffffff;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .x-modal-header h3 {
@@ -977,13 +993,18 @@ input, button, select, textarea, optgroup {
   color: var(--text-main);
 }
 
-.x-modal-card .x-form {
+.x-modal-card .x-form,
+.x-modal-scroll-body {
   padding: 20px;
   margin-top: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   flex: 1 1 auto;
   max-height: 100%;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
 }
 
 .x-modal-card label {
@@ -1001,19 +1022,74 @@ input, button, select, textarea, optgroup {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .x-modal-footer {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 10px;
   margin-top: 16px;
-  padding-top: 12px;
+  padding-top: 14px;
   border-top: 1px solid var(--border-color);
   background: #ffffff;
   position: sticky;
   bottom: 0;
   z-index: 10;
+  box-sizing: border-box;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* Normalized File Input & Upload Wrap */
+input[type="file"].x-input,
+.x-input[type="file"],
+.x-file-input {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.x-file-upload-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.x-file-upload-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-sizing: border-box;
+}
+
+.x-file-upload-info small,
+.x-file-upload-wrap small {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+}
+
+@media (max-width: 480px) {
+  .x-file-upload-wrap {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
 }
 
 /* Branches Grid */
@@ -1561,7 +1637,13 @@ input, button, select, textarea, optgroup {
     white-space: nowrap;
   }
   .x-branch-selector {
-    display: none !important;
+    max-width: 140px;
+    font-size: 12px;
+  }
+  .x-branch-select {
+    max-width: 100%;
+    font-size: 12px;
+    padding: 3px 6px;
   }
   .x-branch-context-badge {
     max-width: 140px;
@@ -2085,10 +2167,83 @@ input, button, select, textarea, optgroup {
   .x-modal-footer {
     flex-wrap: wrap;
     justify-content: stretch;
+    gap: 8px;
   }
 
   .x-modal-footer button {
     flex: 1 1 100%;
+  }
+
+  .x-toast-container {
+    left: 16px !important;
+    right: 16px !important;
+    bottom: 16px !important;
+    max-width: calc(100vw - 32px) !important;
+    box-sizing: border-box !important;
+  }
+
+  .x-toast {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    word-break: break-word !important;
+    padding: 10px 14px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* BM Add Catalog Picker Card Styles */
+.x-catalog-picker-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  gap: 12px;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.x-catalog-picker-card:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.x-catalog-picker-card.is-selected {
+  border-color: #3b82f6 !important;
+  background: #eff6ff !important;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
+
+.x-catalog-picker-card.is-adopted {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  opacity: 0.82;
+  cursor: default;
+}
+
+.x-catalog-picker-card.is-adopted:hover {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.x-catalog-picker-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  accent-color: #2563eb;
+}
+
+@media (max-width: 480px) {
+  .x-catalog-picker-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 }
 

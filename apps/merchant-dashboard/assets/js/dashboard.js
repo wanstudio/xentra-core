@@ -5700,13 +5700,43 @@
   var _bceCropSpec = null;
   var _bceCurrentCat = null;   // Active category being edited
 
+  window.openBranchCategoryCreateModal = function () {
+    _bceSelectedFile = null;
+    _bceCropSpec = null;
+    _bceCurrentCat = null;
+    if ($('bce-cat-id')) $('bce-cat-id').value = '';
+    if ($('bce-name')) $('bce-name').value = '';
+    if ($('bce-image-file')) $('bce-image-file').value = '';
+
+    var titleEl = $('branch-category-modal-title');
+    if (titleEl) titleEl.textContent = 'Tambah Kategori Cabang';
+    var saveBtn = $('btn-save-branch-category-edit');
+    if (saveBtn) saveBtn.textContent = 'Tambah Kategori';
+
+    var previewImg = $('bce-image-preview');
+    var previewMono = $('bce-image-preview-mono');
+    if (previewImg) previewImg.style.display = 'none';
+    if (previewMono) {
+      previewMono.style.display = 'block';
+      previewMono.textContent = '+';
+    }
+
+    var modal = $('modal-branch-category-edit');
+    if (modal) modal.style.display = 'flex';
+  };
+
   window.openBranchCategoryEditModal = function (cat) {
     _bceSelectedFile = null;
     _bceCropSpec = null;
     _bceCurrentCat = cat || null;
-    $('bce-cat-id').value = cat ? cat.id : '';
-    $('bce-name').value = (cat && cat.name) || '';
-    $('bce-image-file').value = '';
+    if ($('bce-cat-id')) $('bce-cat-id').value = cat ? cat.id : '';
+    if ($('bce-name')) $('bce-name').value = (cat && cat.name) || '';
+    if ($('bce-image-file')) $('bce-image-file').value = '';
+
+    var titleEl = $('branch-category-modal-title');
+    if (titleEl) titleEl.textContent = 'Ubah Kategori Cabang';
+    var saveBtn = $('btn-save-branch-category-edit');
+    if (saveBtn) saveBtn.textContent = 'Simpan';
 
     var previewImg = $('bce-image-preview');
     var previewMono = $('bce-image-preview-mono');
@@ -5807,26 +5837,43 @@
         if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Menyimpan...'; }
 
         try {
-          // 1. Rename (always sent — keeps behavior simple/predictable)
-          var renameRes = await adminFetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + catId, {
-            method: 'PATCH',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ name: newName })
-          });
-          var renameData = {};
-          try {
-            renameData = await renameRes.json();
-          } catch (_) {
-            renameData = { success: false, error: 'Respon server tidak valid saat mengubah nama kategori.' };
-          }
+          var targetCatId = catId;
 
-          if (!renameRes.ok || !renameData.success) {
-            showToast('❌ ' + (renameData.error || renameData.message || 'Gagal mengubah nama kategori.'));
-            return;
+          if (!catId) {
+            // CREATE new branch category
+            var createRes = await adminFetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories', {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ name: newName })
+            });
+            var createData = await createRes.json();
+            if (!createRes.ok || !createData.success) {
+              showToast('❌ ' + (createData.error || createData.message || 'Gagal membuat kategori cabang.'));
+              return;
+            }
+            targetCatId = createData.category && createData.category.id;
+          } else {
+            // 1. Rename existing
+            var renameRes = await adminFetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + catId, {
+              method: 'PATCH',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ name: newName })
+            });
+            var renameData = {};
+            try {
+              renameData = await renameRes.json();
+            } catch (_) {
+              renameData = { success: false, error: 'Respon server tidak valid saat mengubah nama kategori.' };
+            }
+
+            if (!renameRes.ok || !renameData.success) {
+              showToast('❌ ' + (renameData.error || renameData.message || 'Gagal mengubah nama kategori.'));
+              return;
+            }
           }
 
           // 2. Image (only if a new file was staged) — uploaded as base64 to backend
-          if (_bceSelectedFile) {
+          if (_bceSelectedFile && targetCatId) {
             var base64 = await new Promise(function (resolve, reject) {
               var reader = new FileReader();
               reader.onload = function () { resolve(reader.result); };
@@ -5839,7 +5886,7 @@
               catImgPayload.crop_spec = _bceCropSpec;
             }
 
-            var imageRes = await adminFetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + catId + '/image', {
+            var imageRes = await adminFetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + targetCatId + '/image', {
               method: 'POST',
               headers: getAuthHeaders(),
               body: JSON.stringify(catImgPayload)
@@ -5857,7 +5904,7 @@
             }
           }
 
-          showToast('✅ Kategori berhasil diperbarui!');
+          showToast(catId ? '✅ Kategori berhasil diperbarui!' : '✅ Kategori cabang berhasil dibuat!');
           closeBranchCategoryEditModal();
           if (typeof loadBMMenu === 'function' && isBranchManager()) {
             loadBMMenu();
@@ -5866,10 +5913,10 @@
             loadInlineBranchCatalog();
           }
         } catch (err) {
-          console.error('[Branch Category Edit Error]:', err);
+          console.error('[Branch Category Save Error]:', err);
           showToast('❌ ' + (err.message || 'Kesalahan jaringan saat menyimpan kategori.'));
         } finally {
-          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Simpan'; }
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = catId ? 'Simpan' : 'Tambah Kategori'; }
         }
       });
     }
@@ -10041,7 +10088,7 @@
     }
   }
 
-  window.promptAddBMBranchCategory = async function () {
+  window.promptAddBMBranchCategory = function () {
     var user = getStoredUser();
     var branchId = user ? (user.branch_id || user.branchId) : null;
     if (!branchId) {
@@ -10049,26 +10096,7 @@
       return;
     }
     currentManagingBranchId = branchId;
-
-    var name = prompt('Nama Kategori Baru untuk Cabang ini:');
-    if (!name || !name.trim()) return;
-
-    try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/categories', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ name: name.trim() })
-      });
-      var data = await res.json();
-      if (data.success) {
-        showToast('✅ Kategori cabang berhasil dibuat!');
-        loadBMMenu();
-      } else {
-        showToast('❌ ' + (data.error || 'Gagal membuat kategori cabang.'));
-      }
-    } catch (err) {
-      showToast('❌ Kesalahan jaringan.');
-    }
+    openBranchCategoryCreateModal();
   };
 
   window.deleteBMBranchCategory = async function (catId, catName) {
@@ -10245,15 +10273,77 @@
     }
   };
 
-  /* Modal Pick Available Master Products to Adopt */
-  window.openBMAddCatalogModal = function () {
+  /* Modal Pick Available Master Products to Adopt (BM Phase 4B) */
+  window.openBMAddCatalogModal = async function () {
     var modal = $('modal-bm-add-catalog');
     if (!modal) return;
+
     _bmMenuState.addCatalogSearchQuery = '';
+    _bmMenuState.selectedCatalogProductIds = new Set();
     var searchInput = $('bm-add-catalog-search');
     if (searchInput) searchInput.value = '';
-    renderBMAddCatalogList();
+
+    updateBMAddCatalogFooter();
+
+    var container = $('bm-add-catalog-list');
+    if (container) {
+      container.innerHTML = '<div style="padding:32px 16px; text-align:center; color:#64748b; font-size:13px;">' +
+        '<div style="font-size:24px; margin-bottom:8px;">⏳</div>' +
+        '<div>Memuat katalog produk master...</div>' +
+      '</div>';
+    }
     modal.style.display = 'flex';
+
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) {
+      if (container) container.innerHTML = '<div style="padding:24px; text-align:center; color:#dc2626; font-size:13px;">Cabang tidak teridentifikasi.</div>';
+      return;
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/catalog', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        currentBranchCatalogData = data;
+        _bmMenuState.availableProducts = data.available_master_products || [];
+
+        // Distinguish between already adopted and available master products
+        var unadopted = (data.available_master_products || []).map(function (p) {
+          return Object.assign({}, p, { is_adopted: false });
+        });
+
+        var adopted = (data.adopted_products || []).map(function (ap) {
+          return {
+            id: ap.product_id,
+            name: ap.name,
+            price: ap.price,
+            master_price: ap.master_price,
+            image_url: ap.image_url,
+            pricing_mode: ap.pricing_mode,
+            min_price: ap.min_price,
+            max_price: ap.max_price,
+            description: ap.description,
+            is_adopted: true
+          };
+        });
+
+        // Unadopted first, then adopted marked
+        _bmMenuState.allCatalogProducts = unadopted.concat(adopted);
+        renderBMAddCatalogList();
+      } else {
+        if (container) {
+          container.innerHTML = '<div style="padding:24px; text-align:center; color:#dc2626; font-size:13px;">Gagal memuat katalog: ' + esc(data.error || 'Terjadi kesalahan') + '</div>';
+        }
+      }
+    } catch (err) {
+      console.warn('[BM Add Catalog Load Error]:', err);
+      if (container) {
+        container.innerHTML = '<div style="padding:24px; text-align:center; color:#dc2626; font-size:13px;">Kesalahan jaringan saat memuat katalog master.</div>';
+      }
+    }
   };
 
   window.closeBMAddCatalogModal = function () {
@@ -10267,48 +10357,172 @@
     renderBMAddCatalogList();
   };
 
+  window.onBMSelectCatalogProduct = function (productId, isChecked) {
+    if (!_bmMenuState.selectedCatalogProductIds) _bmMenuState.selectedCatalogProductIds = new Set();
+    var pid = String(productId);
+    if (isChecked) {
+      _bmMenuState.selectedCatalogProductIds.add(pid);
+    } else {
+      _bmMenuState.selectedCatalogProductIds.delete(pid);
+    }
+    var card = $('catalog-pick-card-' + pid);
+    if (card) {
+      if (isChecked) card.classList.add('is-selected');
+      else card.classList.remove('is-selected');
+    }
+    updateBMAddCatalogFooter();
+  };
+
+  window.toggleBMSelectCatalogProduct = function (productId) {
+    var pid = String(productId);
+    var checkbox = $('catalog-pick-cb-' + pid);
+    if (!checkbox || checkbox.disabled) return;
+    checkbox.checked = !checkbox.checked;
+    window.onBMSelectCatalogProduct(pid, checkbox.checked);
+  };
+
+  function updateBMAddCatalogFooter() {
+    var count = (_bmMenuState.selectedCatalogProductIds && _bmMenuState.selectedCatalogProductIds.size) || 0;
+    var countEl = $('bm-add-catalog-count');
+    if (countEl) {
+      countEl.textContent = count + ' produk dipilih';
+    }
+    var submitBtn = $('btn-bm-submit-adopt-catalog');
+    if (submitBtn) {
+      submitBtn.disabled = count === 0;
+      submitBtn.textContent = count > 0 ? ('Tambahkan (' + count + ') Menu') : 'Tambahkan Menu';
+    }
+  }
+
   function renderBMAddCatalogList() {
     var container = $('bm-add-catalog-list');
     if (!container) return;
 
-    var available = _bmMenuState.availableProducts || [];
-    var q = _bmMenuState.addCatalogSearchQuery;
-    var filtered = available.filter(function (p) {
+    var all = _bmMenuState.allCatalogProducts || [];
+    var q = (_bmMenuState.addCatalogSearchQuery || '').toLowerCase();
+    var filtered = all.filter(function (p) {
       if (!q) return true;
       return (p.name || '').toLowerCase().indexOf(q) !== -1 || (p.description || '').toLowerCase().indexOf(q) !== -1;
     });
 
     if (!filtered.length) {
-      container.innerHTML = '<div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:24px; text-align:center; color:#64748b; font-size:13px;">' +
-        (q ? 'Tidak ada produk master yang sesuai dengan pencarian.' : 'Semua produk master sudah diadopsi ke cabang ini!') +
+      container.innerHTML = '<div style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:28px; text-align:center; color:#64748b; font-size:13px;">' +
+        (q ? 'Tidak ada produk master yang sesuai dengan pencarian "' + esc(q) + '".' : 'Belum ada produk master yang tersedia untuk brand ini.') +
       '</div>';
+      updateBMAddCatalogFooter();
       return;
     }
 
+    var selectedSet = _bmMenuState.selectedCatalogProductIds || new Set();
+
     container.innerHTML = filtered.map(function (p) {
+      var pid = String(p.id);
       var img = p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
       var isRange = p.pricing_mode === 'range';
       var modeBadge = isRange
-        ? '<span class="x-badge x-badge-range">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
-        : '<span class="x-badge x-badge-lock">Harga Terkunci</span>';
+        ? '<span class="x-badge x-badge-range" style="font-size:11px;">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
+        : '<span class="x-badge x-badge-lock" style="font-size:11px;">Harga Terkunci</span>';
 
-      return '<div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border:1px solid #e2e8f0; border-radius:8px; background:#fff; gap:12px;">' +
+      if (p.is_adopted) {
+        return '<div class="x-catalog-picker-card is-adopted" id="catalog-pick-card-' + esc(pid) + '">' +
+          '<div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">' +
+            '<img src="' + esc(img) + '" style="width:44px; height:44px; border-radius:6px; object-fit:cover; flex-shrink:0; border:1px solid #e2e8f0;" alt="">' +
+            '<div style="min-width:0; flex:1;">' +
+              '<div style="font-weight:700; font-size:13.5px; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(p.name) + '</div>' +
+              '<div style="display:flex; gap:6px; align-items:center; margin-top:2px; flex-wrap:wrap;">' +
+                '<span style="font-size:12px; font-weight:700; color:#64748b;">' + formatMoney(p.price || p.master_price) + '</span>' +
+                modeBadge +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">' +
+            '<span class="x-badge x-badge-success" style="font-size:11px; padding:4px 10px;">✓ Sudah Diadopsi</span>' +
+          '</div>' +
+        '</div>';
+      }
+
+      var isSelected = selectedSet.has(pid);
+      return '<div class="x-catalog-picker-card' + (isSelected ? ' is-selected' : '') + '" id="catalog-pick-card-' + esc(pid) + '" onclick="toggleBMSelectCatalogProduct(\'' + esc(pid) + '\')">' +
         '<div style="display:flex; align-items:center; gap:12px; flex:1; min-width:0;">' +
-          '<img src="' + esc(img) + '" style="width:48px; height:48px; border-radius:6px; object-fit:cover; flex-shrink:0;" alt="">' +
-          '<div style="min-width:0;">' +
-            '<div style="font-weight:700; font-size:14px; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(p.name) + '</div>' +
-            '<div style="display:flex; gap:6px; align-items:center; margin-top:2px;">' +
+          '<input type="checkbox" class="x-catalog-picker-checkbox" id="catalog-pick-cb-' + esc(pid) + '" ' + (isSelected ? 'checked' : '') + ' onclick="event.stopPropagation(); onBMSelectCatalogProduct(\'' + esc(pid) + '\', this.checked)">' +
+          '<img src="' + esc(img) + '" style="width:44px; height:44px; border-radius:6px; object-fit:cover; flex-shrink:0; border:1px solid #e2e8f0;" alt="">' +
+          '<div style="min-width:0; flex:1;">' +
+            '<div style="font-weight:700; font-size:13.5px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + esc(p.name) + '</div>' +
+            '<div style="display:flex; gap:6px; align-items:center; margin-top:2px; flex-wrap:wrap;">' +
               '<span style="font-size:12px; font-weight:700; color:var(--text-main);">' + formatMoney(p.price) + '</span>' +
               modeBadge +
             '</div>' +
           '</div>' +
         '</div>' +
-        '<button type="button" class="x-btn-primary" style="font-size:12px; padding:6px 14px; white-space:nowrap;" onclick="closeBMAddCatalogModal(); openAdoptModal(\'' + esc(p.id) + '\');">' +
-          '＋ Adopsi' +
-        '</button>' +
+        '<div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">' +
+          '<span style="font-size:12px; font-weight:600; color:' + (isSelected ? '#2563eb' : '#64748b') + ';">' + (isSelected ? '✓ Terpilih' : 'Pilih') + '</span>' +
+        '</div>' +
       '</div>';
     }).join('');
+
+    updateBMAddCatalogFooter();
   }
+
+  window.submitBMAdoptCatalogBatch = async function () {
+    var user = getStoredUser();
+    var branchId = user ? (user.branch_id || user.branchId) : null;
+    if (!branchId) {
+      showToast('❌ Cabang tidak valid.');
+      return;
+    }
+
+    var selectedSet = _bmMenuState.selectedCatalogProductIds;
+    if (!selectedSet || selectedSet.size === 0) {
+      showToast('⚠️ Pilih minimal 1 produk master untuk diadopsi.');
+      return;
+    }
+
+    var btn = $('btn-bm-submit-adopt-catalog');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Menambahkan...';
+    }
+
+    var pids = Array.from(selectedSet);
+    var successCount = 0;
+    var errorCount = 0;
+    var lastError = '';
+
+    for (var i = 0; i < pids.length; i++) {
+      var pid = pids[i];
+      try {
+        var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/adopt', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ product_id: pid })
+        });
+        var data = await res.json();
+        if (res.ok && data.success) {
+          successCount++;
+        } else {
+          errorCount++;
+          lastError = data.message || data.error || 'Gagal mengadopsi';
+        }
+      } catch (e) {
+        errorCount++;
+        lastError = 'Kesalahan jaringan';
+      }
+    }
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Tambahkan Menu';
+    }
+
+    if (successCount > 0) {
+      showToast('✅ Berhasil menambahkan ' + successCount + ' menu ke cabang!');
+      closeBMAddCatalogModal();
+      if (typeof loadBMMenu === 'function') await loadBMMenu();
+      if (typeof loadInlineBranchCatalog === 'function') loadInlineBranchCatalog();
+    } else {
+      showToast('❌ ' + (lastError || 'Gagal mengadopsi produk terpilih.'));
+    }
+  };
 
   /* =========================================================================
      BM-3: STOK & INVENTARIS OPERATIONAL CONTROLLER

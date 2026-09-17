@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=3.0.2">
+  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=3.0.3">
 </head>
 <body>
 
@@ -3932,11 +3932,11 @@
     </div>
   </div>
 
-  <!-- MODAL: EDIT BRANCH CATEGORY (name + image) -->
+  <!-- MODAL: EDIT / CREATE BRANCH CATEGORY (name + image) -->
   <div id="modal-branch-category-edit" class="x-modal-backdrop" style="display:none; z-index: 1100;">
-    <div class="x-modal-card" style="max-width: 420px;">
+    <div class="x-modal-card" style="max-width: 480px; width: 100%;">
       <div class="x-modal-header">
-        <h3>Ubah Kategori Cabang</h3>
+        <h3 id="branch-category-modal-title">Ubah Kategori Cabang</h3>
         <button type="button" class="x-modal-close" onclick="closeBranchCategoryEditModal()">✕</button>
       </div>
       <form id="form-branch-category-edit" class="x-form">
@@ -3949,12 +3949,12 @@
 
         <div class="x-form-group">
           <label>Gambar Kategori</label>
-          <div style="display:flex;align-items:center;gap:12px;">
+          <div class="x-file-upload-wrap">
             <div id="bce-image-preview-wrap" style="width:72px;height:72px;border-radius:14px;overflow:hidden;background:#f8fafc;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
               <img id="bce-image-preview" src="" alt="Preview kategori" style="width:100%;height:100%;object-fit:cover;display:none;">
               <span id="bce-image-preview-mono" style="font-weight:700;color:#94a3b8;font-size:20px;">?</span>
             </div>
-            <div style="flex:1;">
+            <div class="x-file-upload-info">
               <input type="file" id="bce-image-file" class="x-input" accept="image/png,image/jpeg,image/webp">
               <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">JPG, PNG, atau WEBP. Maks 3MB. Tampil persegi (1:1) di Home.</small>
             </div>
@@ -4089,12 +4089,12 @@
         <!-- PHOTO -->
         <div>
           <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">Foto Menu</label>
-          <div style="display:flex;align-items:center;gap:12px;">
+          <div class="x-file-upload-wrap">
             <div style="width:72px;height:72px;border-radius:14px;overflow:hidden;background:#f8fafc;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
               <img id="override-img-preview" src="" alt="Preview foto menu" style="width:100%;height:100%;object-fit:cover;display:none;">
               <span id="override-img-preview-mono" style="font-weight:700;color:#94a3b8;font-size:20px;">?</span>
             </div>
-            <div style="flex:1;">
+            <div class="x-file-upload-info">
               <input type="file" id="override-img-file" class="x-input" accept="image/png,image/jpeg,image/webp">
               <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">JPG, PNG, atau WEBP. Maks 3MB. Hanya foto menu cabang ini — tidak mengubah foto menu Master.</small>
             </div>
@@ -4259,9 +4259,9 @@
         </div>
       </form>
     </div>
-  <!-- BM-3 Phase 2: Modal Pick Available Master Products to Adopt -->
+  <!-- BM-3 Phase 4B: Modal Pick Available Master Products to Adopt -->
   <div id="modal-bm-add-catalog" class="x-modal-backdrop" style="display:none; z-index: 1050;">
-    <div class="x-modal-card" style="max-width: 640px; width: 100%;">
+    <div class="x-modal-card x-modal-lg" style="max-width: 680px; width: 100%;">
       <div class="x-modal-header">
         <div>
           <h3 style="margin:0; font-size:16px; font-weight:700;">Tambah Menu dari Katalog Master</h3>
@@ -4269,19 +4269,23 @@
         </div>
         <button type="button" class="x-modal-close" onclick="closeBMAddCatalogModal()">✕</button>
       </div>
-      <div style="padding:16px 20px; border-bottom:1px solid var(--border-color);">
-        <input type="text" id="bm-add-catalog-search" class="x-input" placeholder="Cari nama produk master..." style="font-size:13px; width:100%;" oninput="onBMAddCatalogFilterChange()">
+      <div style="padding:14px 20px; border-bottom:1px solid var(--border-color); display:flex; gap:12px; align-items:center;">
+        <input type="text" id="bm-add-catalog-search" class="x-input" placeholder="Cari nama atau deskripsi produk master..." style="font-size:13px; width:100%;" oninput="onBMAddCatalogFilterChange()">
       </div>
-      <div id="bm-add-catalog-list" style="padding:16px 20px; max-height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:12px;">
+      <div id="bm-add-catalog-list" style="padding:16px 20px; max-height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; flex:1;">
         <p class="text-muted" style="font-size:13px; text-align:center;">Memuat produk master yang tersedia...</p>
       </div>
-      <div class="x-modal-footer">
-        <button type="button" class="x-btn-secondary" onclick="closeBMAddCatalogModal()">Tutup</button>
+      <div class="x-modal-footer" style="display:flex; justify-content:space-between; align-items:center;">
+        <span id="bm-add-catalog-count" style="font-size:12px; font-weight:600; color:var(--text-muted);">0 produk dipilih</span>
+        <div style="display:flex; gap:10px; align-items:center;">
+          <button type="button" class="x-btn-secondary" onclick="closeBMAddCatalogModal()">Batal</button>
+          <button type="button" class="x-btn-primary" id="btn-bm-submit-adopt-catalog" onclick="submitBMAdoptCatalogBatch()" disabled>Tambahkan Menu</button>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Dashboard JavaScript -->
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.2"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.3"></script>
 </body>
 </html>
