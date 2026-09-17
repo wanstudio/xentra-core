@@ -8072,6 +8072,7 @@
 
           var dotEl = $("bm-hero-status-dot");
           var badgeEl = $("bm-hero-status-badge");
+          var onlineBadgeEl = $("bm-hero-online-badge");
           var toggleBtn = $("btn-bm-toggle-open");
 
           var isOpen = b.is_open_override === 1 || b.is_open_override === true;
@@ -8082,20 +8083,36 @@
           }
           if (badgeEl) {
             badgeEl.className = "x-badge " + (isOpen ? "x-badge-success" : "x-badge-danger");
-            badgeEl.textContent = isOpen ? "CABANG BUKA" : "CABANG TUTUP";
+            badgeEl.textContent = isOpen ? "CABANG: BUKA" : "CABANG: TUTUP";
+          }
+          if (onlineBadgeEl) {
+            onlineBadgeEl.className = "x-badge " + (isDeliveryActive ? "x-badge-info" : "x-badge-warning");
+            onlineBadgeEl.textContent = isDeliveryActive ? "ONLINE: AKTIF" : "ONLINE: DIJEDA";
           }
           if (toggleBtn) {
-            toggleBtn.innerHTML = isOpen ? "<span>Tutup Operasional</span>" : "<span>Buka Cabang</span>";
+            toggleBtn.innerHTML = isOpen ? "<span>Tutup Sementara</span>" : "<span>Buka Cabang</span>";
             toggleBtn.className = isOpen ? "x-btn-secondary" : "x-btn-primary";
           }
 
           var onlineBtn = $("btn-bm-toggle-online-orders");
           if (onlineBtn) {
             onlineBtn.innerHTML = isDeliveryActive
-              ? "<span>Pesanan Online: AKTIF (Jeda)</span>"
-              : "<span>Pesanan Online: DIJEDA (Lanjutkan)</span>";
+              ? "<span>Pause Order Online</span>"
+              : "<span>Resume Order Online</span>";
             onlineBtn.className = isDeliveryActive ? "x-btn-secondary" : "x-btn-primary";
             onlineBtn.style.color = isDeliveryActive ? "var(--text-main)" : "#ffffff";
+          }
+          // Live WIB date context
+          var dateEl = $("bm-hero-date");
+          if (dateEl) {
+            try {
+              var now = new Date();
+              var days = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
+              var months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+              dateEl.textContent = days[now.getDay()] + ", " + now.getDate() + " " + months[now.getMonth()] + " " + now.getFullYear() + " • WIB";
+            } catch (_) {
+              dateEl.textContent = new Date().toISOString().substring(0, 10);
+            }
           }
         }
       }
@@ -8190,15 +8207,118 @@
     } catch (e) {
       console.warn("[BM Hari Ini Inventory/Menu Error]:", e);
     }
+
+    // 5. Fetch active approved branch marketing promotions
+    try {
+      var promoRes = await adminFetch(API_BASE + "/admin/marketing/promotions", { headers: getAuthHeaders() });
+      if (promoRes.ok) {
+        var promoData = await promoRes.json();
+        if (promoData.success && Array.isArray(promoData.promotions)) {
+          var activePromos = promoData.promotions.filter(function (p) {
+            var active = (p.is_active === 1 || p.is_active === true || p.status === "active");
+            if (!active) return false;
+            // Branch scope check: null branch_id applies to all branches
+            if (!p.branch_id || p.branch_id === branchId) return true;
+            return false;
+          });
+          renderHariIniPromos(activePromos);
+        }
+      }
+    } catch (e) {
+      console.warn("[BM Hari Ini Promos Error]:", e);
+    }
+
+    // 6. Fetch authoritative recent branch operational activity logs
+    try {
+      var logsRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/operation-logs?limit=5", { headers: getAuthHeaders() });
+      if (logsRes.ok) {
+        var logsData = await logsRes.json();
+        if (logsData.success && Array.isArray(logsData.logs)) {
+          renderHariIniRecentActivity(logsData.logs);
+        }
+      }
+    } catch (e) {
+      console.warn("[BM Hari Ini Logs Error]:", e);
+    }
   }
   window.loadHariIni = loadHariIni;
 
+  function renderHariIniPromos(promos) {
+    var container = $("bm-active-promos-list");
+    if (!container) return;
+
+    if (!promos || !promos.length) {
+      container.innerHTML = "<div class=\"text-muted text-center py-4\" style=\"font-size:13px;\">Belum ada promosi aktif di cabang ini.</div>";
+      return;
+    }
+
+    container.innerHTML = promos.slice(0, 4).map(function (p) {
+      var discountStr = p.discount_type === "percentage" ? (p.discount_value + "%") : formatMoney(p.discount_value);
+      return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f0fdf4;border-radius:6px;border:1px solid #dcfce7;\">" +
+        "<div>" +
+          "<div style=\"display:flex;align-items:center;gap:6px;\">" +
+            "<strong style=\"font-size:13px;color:#166534;\">" + esc(p.name || p.title) + "</strong>" +
+            (p.code ? ("<code style=\"font-size:11px;background:#bbf7d0;color:#14532d;padding:1px 5px;border-radius:3px;\">" + esc(p.code) + "</code>") : "") +
+          "</div>" +
+          "<div style=\"font-size:11px;color:#15803d;margin-top:2px;\">" + esc(p.description || "Promosi aktif dapat digunakan pelanggan.") + "</div>" +
+        "</div>" +
+        "<span class=\"x-badge x-badge-success\" style=\"font-size:11px;\">" + discountStr + "</span>" +
+      "</div>";
+    }).join("");
+  }
+
+  function renderHariIniRecentActivity(logs) {
+    var container = $("bm-recent-activity-list");
+    if (!container) return;
+
+    if (!logs || !logs.length) {
+      container.innerHTML = "<div class=\"text-muted text-center py-4\" style=\"font-size:13px;\">Belum ada aktivitas operasional tercatat hari ini.</div>";
+      return;
+    }
+
+    container.innerHTML = logs.slice(0, 5).map(function (l) {
+      var timeStr = l.created_at ? l.created_at.substring(11, 16) : "—";
+      var actorDesc = esc(l.actor_id || "Staf") + " (" + esc(l.actor_role || "system") + ")";
+      var actionDesc = "";
+
+      if (l.field === "is_open_override") {
+        var isOpen = l.new_value === "1" || l.new_value === 1 || l.new_value === "true";
+        actionDesc = isOpen ? "Membuka operasional cabang" : "Menutup operasional cabang sementara";
+      } else if (l.field === "is_delivery_active") {
+        var isDel = l.new_value === "1" || l.new_value === 1 || l.new_value === "true";
+        actionDesc = isDel ? "Mengaktifkan layanan pesanan online" : "Menjeda pesanan online cabang";
+      } else if (l.field === "is_available") {
+        var isAvail = l.new_value === "1" || l.new_value === 1 || l.new_value === "true";
+        actionDesc = (isAvail ? "Mengaktifkan kembali menu" : "Menandai menu habis") + (l.product_id ? (" [ID: " + esc(l.product_id) + "]") : "");
+      } else {
+        actionDesc = "Perubahan " + esc(l.field) + " &rarr; " + esc(l.new_value || "null");
+      }
+
+      return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;font-size:12px;\">" +
+        "<div>" +
+          "<span style=\"font-weight:700;color:var(--text-main);\">" + actionDesc + "</span>" +
+          "<div style=\"font-size:11px;color:var(--text-muted);margin-top:2px;\">Oleh: " + actorDesc + "</div>" +
+        "</div>" +
+        "<span style=\"color:var(--text-muted);font-weight:600;font-size:11px;\">" + timeStr + "</span>" +
+      "</div>";
+    }).join("");
+  }
+
   function renderHariIniPendingOrders(orders) {
     var tbody = $("bm-tbody-pending-orders");
+    var countBadge = $("bm-badge-pending-count");
+    if (countBadge) {
+      if (orders && orders.length > 0) {
+        countBadge.textContent = orders.length + " Menunggu";
+        countBadge.style.display = "inline-block";
+      } else {
+        countBadge.style.display = "none";
+      }
+    }
     if (!tbody) return;
 
     if (!orders || orders.length === 0) {
-      tbody.innerHTML = "<tr><td colspan=\"7\" class=\"text-center py-6 text-muted\">Tidak ada antrean pesanan yang memerlukan tindakan saat ini.</td></tr>";
+      tbody.innerHTML = "<tr><td colspan=\"7\" class=\"text-center py-6 text-muted\"><span style=\"color:var(--accent-green);font-weight:700;\">✓</span> Tidak ada antrean pesanan yang memerlukan tindakan saat ini.</td></tr>";
       return;
     }
 
@@ -8230,44 +8350,76 @@
   }
 
   function renderHariIniAttention(lowItems, unavailItems) {
-    var container = $("bm-low-stock-list");
-    if (!container) return;
-
     var hasLow = lowItems && lowItems.length > 0;
     var hasUnavail = unavailItems && unavailItems.length > 0;
 
-    if (!hasLow && !hasUnavail) {
-      container.innerHTML = "<div class=\"text-muted text-center py-4\" style=\"font-size:13px;\">Semua menu tersedia &amp; stok dalam batas aman.</div>";
-      return;
+    var menuContainer = $("bm-menu-unavail-list");
+    var menuBadge = $("bm-badge-menu-unavail");
+    if (menuBadge) {
+      menuBadge.textContent = hasUnavail ? (unavailItems.length + " Habis") : "0 Habis";
+      menuBadge.className = "x-badge " + (hasUnavail ? "x-badge-danger" : "");
+      if (!hasUnavail) {
+        menuBadge.style.background = "#e2e8f0";
+        menuBadge.style.color = "var(--text-muted)";
+      } else {
+        menuBadge.style.background = "";
+        menuBadge.style.color = "";
+      }
+    }
+    if (menuContainer) {
+      if (!hasUnavail) {
+        menuContainer.innerHTML = "<div class=\"text-muted text-center py-3\" style=\"font-size:12px;\"><span style=\"color:var(--accent-green);font-weight:700;\">✓</span> Semua menu tersedia</div>";
+      } else {
+        menuContainer.innerHTML = unavailItems.slice(0, 4).map(function (p) {
+          return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#fef2f2;border-radius:6px;border:1px solid #fee2e2;\">" +
+            "<div>" +
+              "<strong style=\"font-size:12px;color:#991b1b;\">" + esc(p.product_name || p.name) + "</strong>" +
+              "<div style=\"font-size:11px;color:#b91c1c;\">Status: Ditandai Habis di Cabang</div>" +
+            "</div>" +
+            "<span class=\"x-badge x-badge-danger\" style=\"font-size:10px;\">HABIS</span>" +
+          "</div>";
+        }).join("");
+      }
     }
 
-    var html = '';
-
-    if (hasUnavail) {
-      html += unavailItems.slice(0, 3).map(function (p) {
-        return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fef2f2;border-radius:6px;border:1px solid #fee2e2;\">" +
-          "<div>" +
-            "<strong style=\"font-size:13px;color:#991b1b;\">" + esc(p.product_name || p.name) + "</strong>" +
-            "<div style=\"font-size:11px;color:#b91c1c;\">Status: Ditandai Habis di Cabang</div>" +
-          "</div>" +
-          "<span class=\"x-badge x-badge-danger\" style=\"font-size:10px;\">MENU HABIS</span>" +
-        "</div>";
-      }).join("");
+    var stockContainer = $("bm-stock-low-list");
+    var stockBadge = $("bm-badge-stock-low");
+    if (stockBadge) {
+      stockBadge.textContent = hasLow ? (lowItems.length + " Menipis") : "0 Menipis";
+      stockBadge.className = "x-badge " + (hasLow ? "x-badge-warning" : "");
+      if (!hasLow) {
+        stockBadge.style.background = "#e2e8f0";
+        stockBadge.style.color = "var(--text-muted)";
+      } else {
+        stockBadge.style.background = "";
+        stockBadge.style.color = "";
+      }
+    }
+    if (stockContainer) {
+      if (!hasLow) {
+        stockContainer.innerHTML = "<div class=\"text-muted text-center py-3\" style=\"font-size:12px;\"><span style=\"color:var(--accent-green);font-weight:700;\">✓</span> Tidak ada stok yang perlu diperhatikan</div>";
+      } else {
+        stockContainer.innerHTML = lowItems.slice(0, 4).map(function (it) {
+          return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#fffbeb;border-radius:6px;border:1px solid #fef3c7;\">" +
+            "<div>" +
+              "<strong style=\"font-size:12px;color:#92400e;\">" + esc(it.product_name || it.name || it.product_id) + "</strong>" +
+              "<div style=\"font-size:11px;color:#b45309;\">Tersisa " + esc(it.stock) + " (Batas: " + esc(it.low_stock_threshold || 5) + ")</div>" +
+            "</div>" +
+            "<span class=\"x-badge x-badge-warning\" style=\"font-size:10px;\">STOK TIPIS</span>" +
+          "</div>";
+        }).join("");
+      }
     }
 
-    if (hasLow) {
-      html += lowItems.slice(0, 3).map(function (it) {
-        return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#fffbeb;border-radius:6px;border:1px solid #fef3c7;\">" +
-          "<div>" +
-            "<strong style=\"font-size:13px;color:#92400e;\">" + esc(it.product_name || it.name || it.product_id) + "</strong>" +
-            "<div style=\"font-size:11px;color:#b45309;\">Tersisa " + esc(it.stock) + " (Batas: " + esc(it.low_stock_threshold || 5) + ")</div>" +
-          "</div>" +
-          "<span class=\"x-badge x-badge-warning\" style=\"font-size:10px;\">STOK TIPIS</span>" +
-        "</div>";
-      }).join("");
+    // Backwards compatibility for legacy container
+    var legacyContainer = $("bm-low-stock-list");
+    if (legacyContainer) {
+      if (!hasLow && !hasUnavail) {
+        legacyContainer.innerHTML = "<div class=\"text-muted text-center py-4\" style=\"font-size:13px;\">✓ Semua menu tersedia &amp; stok dalam batas aman.</div>";
+      } else {
+        legacyContainer.innerHTML = (menuContainer ? menuContainer.innerHTML : '') + (stockContainer ? stockContainer.innerHTML : '');
+      }
     }
-
-    container.innerHTML = html;
   }
 
   function renderHariIniLowStock(items) {
@@ -8280,9 +8432,9 @@
     var branch = _hariIniState.branch;
     var curOpen = branch ? (branch.is_open_override === 1 || branch.is_open_override === true) : true;
     var newOpen = curOpen ? 0 : 1;
-    var actionName = newOpen ? "Buka Cabang" : "Tutup Operasional";
+    var actionName = newOpen ? "Buka Cabang" : "Tutup Sementara";
 
-    if (!confirm("Apakah Anda yakin ingin melakukan " + actionName + " untuk operasional hari ini?")) {
+    if (!confirm("Apakah Anda yakin ingin melakukan " + actionName + " untuk operasional cabang?")) {
       return;
     }
 
@@ -8311,7 +8463,7 @@
     var branch = _hariIniState.branch;
     var curDelivery = branch ? (branch.is_delivery_active !== 0 && branch.is_delivery_active !== false) : true;
     var newDelivery = curDelivery ? 0 : 1;
-    var actionName = newDelivery ? "Lanjutkan Layanan Online" : "Jeda Sementara Pesanan Online";
+    var actionName = newDelivery ? "Resume Order Online" : "Pause Order Online";
 
     if (!confirm("Apakah Anda yakin ingin melakukan " + actionName + " untuk cabang ini?")) {
       return;
@@ -10658,135 +10810,6 @@
     }
   }
   window.resetBMStaffPassword = resetBMStaffPassword;
-
-  /* =========================================================================
-     BM-4: JAM OPERASIONAL & JADWAL CABANG
-     ========================================================================= */
-  async function loadBMJamOperasional() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
-    if (!branchId) return;
-
-    try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId), {
-        headers: getAuthHeaders()
-      });
-      var data = await res.json();
-      if (res.ok && data.success && data.branch) {
-        var b = data.branch;
-        _hariIniState.branch = b;
-        var isOpen = b.is_open_override === 1 || b.is_open_override === true;
-        var isDeliveryActive = b.is_delivery_active !== 0 && b.is_delivery_active !== false;
-
-        var statusText = $('bm-jam-status-text');
-        var toggleOpenBtn = $('btn-bm-jam-toggle-open');
-        if (statusText) {
-          statusText.innerHTML = isOpen
-            ? '<span class="x-badge x-badge-success" style="font-size:11px;">BUKA (Operational Active)</span>'
-            : '<span class="x-badge x-badge-danger" style="font-size:11px;">TUTUP SEMENTARA</span>';
-        }
-        if (toggleOpenBtn) {
-          toggleOpenBtn.textContent = isOpen ? 'Tutup Toko' : 'Buka Toko';
-          toggleOpenBtn.className = isOpen ? 'x-btn-secondary' : 'x-btn-primary';
-        }
-
-        var deliveryText = $('bm-jam-delivery-text');
-        var toggleDeliveryBtn = $('btn-bm-jam-toggle-delivery');
-        if (deliveryText) {
-          deliveryText.innerHTML = isDeliveryActive
-            ? '<span class="x-badge x-badge-success" style="font-size:11px;">AKTIF (Menerima Pesanan Online)</span>'
-            : '<span class="x-badge x-badge-warning" style="font-size:11px;">DIJEDA (Online Orders Paused)</span>';
-        }
-        if (toggleDeliveryBtn) {
-          toggleDeliveryBtn.textContent = isDeliveryActive ? 'Jeda Pesanan Online' : 'Aktifkan Layanan Online';
-          toggleDeliveryBtn.className = isDeliveryActive ? 'x-btn-secondary' : 'x-btn-primary';
-        }
-      }
-    } catch (err) {
-      console.warn('[BM Jam Operasional Load Error]:', err);
-    }
-  }
-  window.loadBMJamOperasional = loadBMJamOperasional;
-
-  /* =========================================================================
-     BM-5: LAPORAN OPERASIONAL HARIAN CABANG
-     ========================================================================= */
-  async function loadBMReports() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
-    if (!branchId) return;
-
-    try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/orders?status=all', {
-        headers: getAuthHeaders()
-      });
-      var data = await res.json();
-      if (res.ok && data.success && Array.isArray(data.orders)) {
-        var orders = data.orders;
-        var todayStr = new Date().toISOString().substring(0, 10);
-
-        var todayOrders = orders.filter(function (o) {
-          return (o.created_at || '').substring(0, 10) === todayStr;
-        });
-
-        var completedOrders = todayOrders.filter(function (o) {
-          return o.status === 'completed';
-        });
-
-        var netSales = completedOrders.reduce(function (acc, o) {
-          return acc + (Number(o.grand_total) || 0);
-        }, 0);
-
-        var aov = completedOrders.length > 0 ? Math.round(netSales / completedOrders.length) : 0;
-
-        if ($('bm-report-stat-sales')) $('bm-report-stat-sales').textContent = formatMoney(netSales);
-        if ($('bm-report-stat-total-orders')) $('bm-report-stat-total-orders').textContent = todayOrders.length;
-        if ($('bm-report-stat-completed-orders')) $('bm-report-stat-completed-orders').textContent = completedOrders.length + ' pesanan selesai';
-        if ($('bm-report-stat-aov')) $('bm-report-stat-aov').textContent = formatMoney(aov);
-
-        // Breakdown by channel (completed today)
-        var deliveryOrders = completedOrders.filter(function (o) { return o.order_type === 'delivery'; });
-        var pickupOrders = completedOrders.filter(function (o) { return o.order_type === 'pickup'; });
-        var dineInOrders = completedOrders.filter(function (o) { return o.order_type === 'dine_in'; });
-
-        var deliverySales = deliveryOrders.reduce(function (acc, o) { return acc + (Number(o.grand_total) || 0); }, 0);
-        var pickupSales = pickupOrders.reduce(function (acc, o) { return acc + (Number(o.grand_total) || 0); }, 0);
-        var dineInSales = dineInOrders.reduce(function (acc, o) { return acc + (Number(o.grand_total) || 0); }, 0);
-
-        if ($('bm-report-channel-delivery')) $('bm-report-channel-delivery').textContent = deliveryOrders.length;
-        if ($('bm-report-channel-delivery-sales')) $('bm-report-channel-delivery-sales').textContent = formatMoney(deliverySales);
-
-        if ($('bm-report-channel-pickup')) $('bm-report-channel-pickup').textContent = pickupOrders.length;
-        if ($('bm-report-channel-pickup-sales')) $('bm-report-channel-pickup-sales').textContent = formatMoney(pickupSales);
-
-        if ($('bm-report-channel-dinein')) $('bm-report-channel-dinein').textContent = dineInOrders.length;
-        if ($('bm-report-channel-dinein-sales')) $('bm-report-channel-dinein-sales').textContent = formatMoney(dineInSales);
-
-        // Recent completed table
-        var tbody = $('bm-report-completed-tbody');
-        if (tbody) {
-          if (!completedOrders.length) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-muted">Belum ada pesanan selesai hari ini.</td></tr>';
-          } else {
-            tbody.innerHTML = completedOrders.slice(0, 5).map(function (o) {
-              var typeBadge = (o.order_type === 'delivery')
-                ? '<span class="x-badge x-badge-info">DELIVERY</span>'
-                : (o.order_type === 'dine_in' ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DINE IN</span>' : '<span class="x-badge x-badge-warning">PICKUP</span>');
-              return '<tr>' +
-                '<td><strong>' + esc(o.order_number || o.id) + '</strong></td>' +
-                '<td>' + esc(o.customer_name || 'Pelanggan') + '</td>' +
-                '<td>' + typeBadge + '</td>' +
-                '<td><strong style="color:var(--accent-teal);">' + formatMoney(o.grand_total) + '</strong></td>' +
-              '</tr>';
-            }).join('');
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('[BM Reports Load Error]:', err);
-    }
-  }
-  window.loadBMReports = loadBMReports;
 
 
     // Check for handoff ticket from xentra.cloud before initial auth check

@@ -6750,6 +6750,47 @@ router.delete('/admin/branches/:id', requireAuth(['owner', 'brand_manager']), (r
   }
 });
 
+// 14.1.3 Get Branch Operational Activity Logs
+router.get('/admin/branches/:id/operation-logs', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (assignedBranchId && assignedBranchId !== req.params.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan untuk melihat log cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({
+        success: false,
+        error: 'BRANCH_NOT_FOUND',
+        message: 'Cabang tidak ditemukan pada brand ini.'
+      });
+    }
+
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
+    const logs = db.prepare(`
+      SELECT id, branch_id, brand_id, organization_id, product_id, action, field, previous_value, new_value, actor_id, actor_role, authorized, created_at
+      FROM branch_operation_logs
+      WHERE branch_id = ? AND brand_id = ?
+      ORDER BY datetime(created_at) DESC, rowid DESC
+      LIMIT ?
+    `).all(req.params.id, req.brand_id, limit);
+
+    res.json({
+      success: true,
+      logs: logs || []
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 /* =========================================================================
    C1 — PRODUCT → BRANCH ASSIGNMENT BOUNDARY
    Product Master stays brand-owned (products.brand_id). A branch_products row
