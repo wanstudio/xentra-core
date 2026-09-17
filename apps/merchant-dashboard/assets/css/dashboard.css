@@ -210,6 +210,9 @@ input, button, select, textarea, optgroup {
 
 /* Topbar */
 .x-dash-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   background: #ffffff;
   padding: 18px 32px;
   border-bottom: 1px solid var(--border-color);

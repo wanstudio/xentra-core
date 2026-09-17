@@ -306,13 +306,22 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
   });
 
   it('P4B-10: Cache-busting query is applied in HTML', () => {
-    assert.ok(html.includes('href="/dashboard/assets/css/dashboard.css?v=3.0.5"'), 'dashboard.css must use version query v=3.0.5');
-    assert.ok(html.includes('src="/dashboard/assets/js/dashboard.js?v=3.0.5"'), 'dashboard.js must use version query v=3.0.5');
+    assert.ok(html.includes('href="/dashboard/assets/css/dashboard.css?v=3.0.6"'), 'dashboard.css must use version query v=3.0.6');
+    assert.ok(html.includes('src="/dashboard/assets/js/dashboard.js?v=3.0.6"'), 'dashboard.js must use version query v=3.0.6');
   });
 
   it('P4B-11: Sidebar drawer auto-closes on menu navigation click', () => {
     assert.ok(js.includes('function closeMobileSidebar()'), 'dashboard.js must define closeMobileSidebar');
     assert.ok(js.includes('closeMobileSidebar();'), 'dashboard.js must call closeMobileSidebar on navigation');
     assert.ok(js.includes('sidebar.addEventListener(\'click\'') || js.includes('sidebar.addEventListener("click"'), 'dashboard.js must register click listener on sidebar');
+  });
+
+  it('P4B-12: Topbar navigation is sticky on top so hamburger button is always accessible', () => {
+    assert.ok(css.includes('.x-dash-topbar {'), 'dashboard.css must define .x-dash-topbar');
+    assert.ok(css.includes('position: sticky;'), 'dashboard.css must define position: sticky');
+    const topbarIndex = css.indexOf('.x-dash-topbar {');
+    const topbarBlock = css.slice(topbarIndex, topbarIndex + 200);
+    assert.ok(topbarBlock.includes('position: sticky;'), '.x-dash-topbar must have position: sticky');
+    assert.ok(topbarBlock.includes('top: 0;'), '.x-dash-topbar must have top: 0');
   });
 });
