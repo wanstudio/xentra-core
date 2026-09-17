@@ -138,6 +138,10 @@
   });
 
   window.addEventListener('popstate', function () {
+    // If an overlay was popped/handled by XentraNav, prevent switching route view
+    if (window.XentraNav && typeof window.XentraNav.isHandlingPopstate === 'function' && window.XentraNav.isHandlingPopstate()) {
+      return;
+    }
     var v = getViewFromUrl();
     var orderId = getOrderIdFromUrl();
     var itemId = getItemIdFromUrl();

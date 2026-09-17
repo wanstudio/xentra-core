@@ -22,7 +22,7 @@ class CatalogRepository {
 
   findRewardProduct(branchId, productId) {
     return this.db.queryOne(`
-      SELECT bp.is_available, p.name, p.price, p.regular_price
+      SELECT bp.is_available, bp.stock, p.name, p.price, p.regular_price
       FROM branch_products bp
       JOIN products p ON p.id = bp.product_id
       WHERE bp.branch_id = ? AND bp.product_id = ?

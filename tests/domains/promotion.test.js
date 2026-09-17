@@ -212,8 +212,8 @@ test('Promotion 5 — Non-Destructive Cancellation: voidRedemptions marks status
 test('Promotion 6 — Authoritative Zero-Trust Reward Resolution: PrePaymentVerificationGate rejects fake rewards and enforces server metadata', () => {
   const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
   const db = require('../../server/database/db');
-  const brand = db.prepare('SELECT id FROM brands LIMIT 1').get() || { id: 'brand_pos' };
-  const branch = db.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'branch_pos' };
+  const branch = db.prepare('SELECT b.id, b.brand_id FROM branches b JOIN categories c ON c.brand_id = b.brand_id JOIN branch_products bp ON bp.branch_id = b.id LIMIT 1').get() || { id: 'branch_pos', brand_id: 'brand_pos' };
+  const brand = { id: branch.brand_id };
 
   // 1. Attacker attempts to spoof arbitrary free item
   const spoofResult = PrePaymentVerificationGate.verify({
@@ -362,11 +362,10 @@ test('Promotion 10 — Fully configuration-driven reward (dynamic A/B, no source
 test('Promotion 7 — Scoped POS Offline Idempotency: True parallel sync requests against same (branch_id, client_transaction_id) yield exactly one order and one stock deduction', async () => {
   const OfflineReconciliationService = require('../../domains/pos/services/OfflineReconciliationService');
   const db = require('../../server/database/db');
-  const brand = db.prepare('SELECT id FROM brands LIMIT 1').get() || { id: 'brand_pos' };
-  const branch = db.prepare('SELECT id FROM branches WHERE brand_id = ? LIMIT 1').get(brand.id) || { id: 'branch_pos' };
-  
-  // Set deterministic initial stock
-  const product = db.prepare('SELECT p.id, p.price FROM products p JOIN branch_products bp ON bp.product_id = p.id WHERE bp.branch_id = ? LIMIT 1').get(branch.id) || { id: 'prod_pos_1', price: 20000 };
+  const row = db.prepare('SELECT b.id as branch_id, b.brand_id, p.id as product_id, p.price FROM branch_products bp JOIN branches b ON b.id = bp.branch_id JOIN products p ON p.id = bp.product_id LIMIT 1').get() || { branch_id: 'branch_pos', brand_id: 'brand_pos', product_id: 'prod_pos_1', price: 20000 };
+  const brand = { id: row.brand_id };
+  const branch = { id: row.branch_id };
+  const product = { id: row.product_id, price: row.price };
   db.prepare('UPDATE branch_products SET stock = 50 WHERE branch_id = ? AND product_id = ?').run(branch.id, product.id);
 
   const clientTxId = 'pos_tx_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);

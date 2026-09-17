@@ -77,7 +77,9 @@ class CatalogService {
         master_name: prod.master_name,
         master_description: prod.master_description,
         master_image_url: prod.master_image_url,
-        media_id: prod.media_id || null
+        media_id: prod.media_id || null,
+        category_ids: prod.category_ids || (prod.category_id ? [prod.category_id] : []),
+        categories: prod.categories || []
       };
     });
 

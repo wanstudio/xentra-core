@@ -2648,6 +2648,9 @@
     var filtered = adopted;
     if (filterCatId && filterCatId !== 'all') {
       filtered = adopted.filter(function (p) {
+        if (p.category_ids && Array.isArray(p.category_ids)) {
+          return p.category_ids.map(String).indexOf(String(filterCatId)) !== -1;
+        }
         return String(p.branch_category_id) === String(filterCatId);
       });
     }
@@ -2663,7 +2666,9 @@
     container.innerHTML = filtered.map(function (p) {
       var img = p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
       var isAvailable = p.is_available === 1 || p.is_available === true;
-      var catName = p.branch_category_name || 'Tanpa Kategori';
+      var catName = (p.category_names && p.category_names.length)
+        ? p.category_names.join(', ')
+        : (p.branch_category_name || 'Tanpa Kategori');
       var modeBadge = p.pricing_mode === 'range'
         ? '<span class="x-badge x-badge-range">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
         : '<span class="x-badge x-badge-lock">Harga Terkunci</span>';
@@ -2678,7 +2683,9 @@
         image_url: p.image_url, image_override: p.image_override, master_image_url: p.master_image_url,
         price: p.price, master_price: p.master_price, pricing_mode: p.pricing_mode,
         min_price: p.min_price, max_price: p.max_price,
-        branch_category_id: p.branch_category_id
+        branch_category_id: p.branch_category_id,
+        category_ids: p.category_ids || (p.branch_category_id ? [p.branch_category_id] : []),
+        categories: p.categories || []
       }));
 
       var availabilityToggle = '' +
@@ -3592,7 +3599,9 @@
         image_url: p.image_url, image_override: p.image_override, master_image_url: p.master_image_url,
         price: p.price, master_price: p.master_price, pricing_mode: p.pricing_mode,
         min_price: p.min_price, max_price: p.max_price,
-        branch_category_id: p.branch_category_id
+        branch_category_id: p.branch_category_id,
+        category_ids: p.category_ids || (p.branch_category_id ? [p.branch_category_id] : []),
+        categories: p.categories || []
       }));
 
       var availabilityToggle = '' +
@@ -3843,13 +3852,13 @@
         ? p.category_ids.map(String)
         : (p.branch_category_id ? [String(p.branch_category_id)] : []);
       if (!cats.length) {
-        catListEl.innerHTML = '<span class="text-muted" style="font-size:12px;">Belum ada kategori cabang dibuat.</span>';
+        catListEl.innerHTML = '<span class="text-muted" style="font-size:12px; grid-column:1/-1; padding:12px 0;">Belum ada kategori cabang dibuat. Buat kategori terlebih dahulu di tab Kategori Cabang.</span>';
       } else {
         catListEl.innerHTML = cats.map(function (c) {
           var isChecked = activeCatIds.indexOf(String(c.id)) !== -1;
-          return '<label style="display:flex; align-items:center; gap:8px; font-size:13px; color:#334155; cursor:pointer; padding:3px 0;">' +
-            '<input type="checkbox" class="override-cat-checkbox" value="' + esc(c.id) + '"' + (isChecked ? ' checked' : '') + ' style="width:16px; height:16px; accent-color:#0284c7; cursor:pointer;" />' +
-            '<span>' + esc(c.name) + '</span>' +
+          return '<label class="x-category-chip-card' + (isChecked ? ' is-checked' : '') + '">' +
+            '<input type="checkbox" class="override-cat-checkbox" value="' + esc(c.id) + '"' + (isChecked ? ' checked' : '') + ' onchange="this.closest(\'.x-category-chip-card\').classList.toggle(\'is-checked\', this.checked)" />' +
+            '<span title="' + esc(c.name) + '">' + esc(c.name) + '</span>' +
           '</label>';
         }).join('');
       }
@@ -5987,6 +5996,9 @@
     var filtered = adopted;
     if (filterCatId && filterCatId !== 'all') {
       filtered = adopted.filter(function (p) {
+        if (p.category_ids && Array.isArray(p.category_ids)) {
+          return p.category_ids.map(String).indexOf(String(filterCatId)) !== -1;
+        }
         return String(p.branch_category_id) === String(filterCatId);
       });
     }
@@ -6002,7 +6014,9 @@
     container.innerHTML = filtered.map(function (p) {
       var img = p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
       var isAvailable = p.is_available === 1 || p.is_available === true;
-      var catName = p.branch_category_name || 'Tanpa Kategori';
+      var catName = (p.category_names && p.category_names.length)
+        ? p.category_names.join(', ')
+        : (p.branch_category_name || 'Tanpa Kategori');
       var modeBadge = p.pricing_mode === 'range'
         ? '<span class="x-badge x-badge-range">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
         : '<span class="x-badge x-badge-lock">Harga Terkunci</span>';
@@ -6014,7 +6028,9 @@
         image_url: p.image_url, image_override: p.image_override, master_image_url: p.master_image_url,
         price: p.price, master_price: p.master_price, pricing_mode: p.pricing_mode,
         min_price: p.min_price, max_price: p.max_price,
-        branch_category_id: p.branch_category_id
+        branch_category_id: p.branch_category_id,
+        category_ids: p.category_ids || (p.branch_category_id ? [p.branch_category_id] : []),
+        categories: p.categories || []
       }));
 
       var availabilityToggle = '' +
@@ -10349,6 +10365,18 @@
 
         // Unadopted first, then adopted marked
         _bmMenuState.allCatalogProducts = unadopted.concat(adopted);
+
+        // Populate branch categories target dropdown
+        var catSelect = $('bm-add-catalog-target-category');
+        if (catSelect) {
+          var branchCats = data.categories || (_bmMenuState && _bmMenuState.categories) || [];
+          var opts = ['<option value="">Otomatis / Menu Utama</option>'];
+          branchCats.forEach(function (c) {
+            opts.push('<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>');
+          });
+          catSelect.innerHTML = opts.join('');
+        }
+
         renderBMAddCatalogList();
       } else {
         if (container) {
@@ -10366,6 +10394,35 @@
   window.closeBMAddCatalogModal = function () {
     var modal = $('modal-bm-add-catalog');
     if (modal) modal.style.display = 'none';
+  };
+
+  window.toggleBMAddCatalogSelectAll = function (isChecked) {
+    if (!_bmMenuState.selectedCatalogProductIds) _bmMenuState.selectedCatalogProductIds = new Set();
+    var all = _bmMenuState.allCatalogProducts || [];
+    var q = (_bmMenuState.addCatalogSearchQuery || '').toLowerCase();
+    var filtered = all.filter(function (p) {
+      if (!q) return true;
+      return (p.name || '').toLowerCase().indexOf(q) !== -1 || (p.description || '').toLowerCase().indexOf(q) !== -1;
+    });
+
+    filtered.forEach(function (p) {
+      if (p.is_adopted) return;
+      var pid = String(p.id);
+      if (isChecked) {
+        _bmMenuState.selectedCatalogProductIds.add(pid);
+      } else {
+        _bmMenuState.selectedCatalogProductIds.delete(pid);
+      }
+      var card = $('catalog-pick-card-' + pid);
+      if (card) {
+        if (isChecked) card.classList.add('is-selected');
+        else card.classList.remove('is-selected');
+      }
+      var cb = $('catalog-pick-cb-' + pid);
+      if (cb) cb.checked = isChecked;
+    });
+
+    updateBMAddCatalogFooter();
   };
 
   window.onBMAddCatalogFilterChange = function () {
@@ -10408,6 +10465,18 @@
     if (submitBtn) {
       submitBtn.disabled = count === 0;
       submitBtn.textContent = count > 0 ? ('Tambahkan (' + count + ') Menu') : 'Tambahkan Menu';
+    }
+
+    // Sync select-all checkbox state
+    var selectAllCb = $('bm-add-catalog-select-all');
+    if (selectAllCb) {
+      var all = _bmMenuState.allCatalogProducts || [];
+      var unadopted = all.filter(function (p) { return !p.is_adopted; });
+      if (unadopted.length > 0 && count >= unadopted.length) {
+        selectAllCb.checked = true;
+      } else {
+        selectAllCb.checked = false;
+      }
     }
   }
 
@@ -10493,6 +10562,9 @@
       return;
     }
 
+    var targetCatSelect = $('bm-add-catalog-target-category');
+    var targetCatId = targetCatSelect ? targetCatSelect.value : '';
+
     var btn = $('btn-bm-submit-adopt-catalog');
     if (btn) {
       btn.disabled = true;
@@ -10507,10 +10579,16 @@
     for (var i = 0; i < pids.length; i++) {
       var pid = pids[i];
       try {
+        var adoptPayload = { product_id: pid };
+        if (targetCatId) {
+          adoptPayload.branch_category_id = targetCatId;
+          adoptPayload.category_ids = [targetCatId];
+        }
+
         var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/adopt', {
           method: 'POST',
           headers: getAuthHeaders(),
-          body: JSON.stringify({ product_id: pid })
+          body: JSON.stringify(adoptPayload)
         });
         var data = await res.json();
         if (res.ok && data.success) {

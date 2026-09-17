@@ -49,24 +49,32 @@ class BranchMatcher {
     }
 
     if (Array.isArray(items) && items.length > 0) {
-      const fullCartBranches = branches.filter((br) =>
-        EligibilityService.evaluateCart({
-          brand_id,
-          branch_id: br.id,
-          items,
-          order_type: 'delivery'
-        }).eligible
-      );
+      const nonRewardItems = items.filter((it) => {
+        if (!it) return false;
+        const pid = String(it.product_id || it.id || '');
+        return !it.is_promo_reward && !it.promo_id && !it.promotion_id && !pid.startsWith('reward_');
+      });
 
-      if (fullCartBranches.length > 0) {
-        branches = fullCartBranches;
-      } else {
-        return {
-          eligible: false,
-          reason: 'Tidak ada cabang yang dapat memenuhi seluruh isi pesanan Anda saat ini.',
-          branch: null,
-          delivery: null
-        };
+      if (nonRewardItems.length > 0) {
+        const fullCartBranches = branches.filter((br) =>
+          EligibilityService.evaluateCart({
+            brand_id,
+            branch_id: br.id,
+            items: nonRewardItems,
+            order_type: 'delivery'
+          }).eligible
+        );
+
+        if (fullCartBranches.length > 0) {
+          branches = fullCartBranches;
+        } else {
+          return {
+            eligible: false,
+            reason: 'Tidak ada cabang yang dapat memenuhi seluruh isi pesanan Anda saat ini.',
+            branch: null,
+            delivery: null
+          };
+        }
       }
     }
 

@@ -4132,13 +4132,13 @@
         <!-- CATEGORY (M:N MULTI-SELECT) -->
         <div>
           <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:6px;">Kategori Cabang (Dapat memilih lebih dari satu)</label>
-          <div id="override-categories-list" style="display:flex; flex-direction:column; gap:6px; max-height:160px; overflow-y:auto; padding:10px; border:1px solid #e2e8f0; border-radius:6px; background:#f8fafc;">
-            <!-- Rendered dynamically as checkboxes -->
+          <div id="override-categories-list" class="x-category-select-grid">
+            <!-- Rendered dynamically as checkable cards -->
           </div>
           <select id="override-category-select" class="x-input" style="display:none; width:100%; margin-top:6px;">
             <option value="">Tanpa Kategori</option>
           </select>
-          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Centang satu atau beberapa kategori cabang untuk menu ini.</small>
+          <small class="text-muted" style="display:block;margin-top:6px;font-size:11px;">💡 Pilih satu atau beberapa kategori untuk mengelompokkan menu ini pada katalog cabang Anda.</small>
         </div>
 
       </div>
@@ -4271,8 +4271,23 @@
         </div>
         <button type="button" class="x-modal-close" onclick="closeBMAddCatalogModal()">✕</button>
       </div>
-      <div style="padding:14px 20px; border-bottom:1px solid var(--border-color); display:flex; gap:12px; align-items:center;">
-        <input type="text" id="bm-add-catalog-search" class="x-input" placeholder="Cari nama atau deskripsi produk master..." style="font-size:13px; width:100%;" oninput="onBMAddCatalogFilterChange()">
+      <div style="padding:14px 20px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; gap:12px; background:#f8fafc;">
+        <div style="display:flex; gap:12px; align-items:center;">
+          <input type="text" id="bm-add-catalog-search" class="x-input" placeholder="Cari nama atau deskripsi produk master..." style="font-size:13px; width:100%;" oninput="onBMAddCatalogFilterChange()">
+        </div>
+        <!-- Select All and Target Category Row -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <label style="display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:600; color:#334155; cursor:pointer; user-select:none;">
+            <input type="checkbox" id="bm-add-catalog-select-all" class="x-catalog-picker-checkbox" onchange="toggleBMAddCatalogSelectAll(this.checked)">
+            <span>Pilih Semua yang Tersedia</span>
+          </label>
+          <div style="display:inline-flex; align-items:center; gap:8px; min-width:240px;">
+            <label for="bm-add-catalog-target-category" style="font-size:12px; font-weight:600; color:#475569; white-space:nowrap;">Masukkan ke Kategori:</label>
+            <select id="bm-add-catalog-target-category" class="x-input" style="font-size:12px; padding:6px 10px; height:34px;">
+              <option value="">Otomatis / Menu Utama</option>
+            </select>
+          </div>
+        </div>
       </div>
       <div id="bm-add-catalog-list" style="padding:16px 20px; max-height:420px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; flex:1;">
         <p class="text-muted" style="font-size:13px; text-align:center;">Memuat produk master yang tersedia...</p>

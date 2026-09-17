@@ -495,14 +495,19 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
       };
     });
 
-    // Group enriched products by category_id in O(N) time
+    // Group enriched products by category_id (supports M:N categories)
     const productsByCategoryId = new Map();
     for (const p of allNormalized) {
-      const catKey = String(p.category_id);
-      if (!productsByCategoryId.has(catKey)) {
-        productsByCategoryId.set(catKey, []);
+      const catIds = (Array.isArray(p.category_ids) && p.category_ids.length > 0)
+        ? p.category_ids.map(String)
+        : (p.category_id != null ? [String(p.category_id)] : []);
+
+      for (const catKey of catIds) {
+        if (!productsByCategoryId.has(catKey)) {
+          productsByCategoryId.set(catKey, []);
+        }
+        productsByCategoryId.get(catKey).push(p);
       }
-      productsByCategoryId.get(catKey).push(p);
     }
 
     // Build category tree from enriched items

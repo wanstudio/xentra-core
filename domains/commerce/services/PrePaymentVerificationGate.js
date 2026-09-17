@@ -26,6 +26,9 @@ class PrePaymentVerificationGate {
     const provKeys = [];
     const seen = {};
     for (const item of Array.isArray(items) ? items : []) {
+      if (item && (item.is_promo_reward || item.promo_id || item.promotion_id || String(item.product_id || item.id || '').startsWith('reward_'))) {
+        continue;
+      }
       const raw = item && (item.branch_id != null && String(item.branch_id).trim() !== '') ? String(item.branch_id) : null;
       if (raw && !seen[raw]) {
         seen[raw] = true;
@@ -125,6 +128,11 @@ class PrePaymentVerificationGate {
         }
         if (bpCheck.is_available === 0) {
           errors.push(`Produk hadiah "${bpCheck.name || 'Promo'}" sedang dinonaktifkan di cabang ini.`);
+          continue;
+        }
+        const rewardStock = bpCheck.stock != null ? Number(bpCheck.stock) : null;
+        if (rewardStock !== null && rewardStock < 1) {
+          errors.push(`Stok produk hadiah "${bpCheck.name || 'Promo'}" sedang habis di cabang ini.`);
           continue;
         }
         const authoritativeRewardPrice = Number(rewardSpec.reward_price || rewardSpec.amount_in_cents || 0);

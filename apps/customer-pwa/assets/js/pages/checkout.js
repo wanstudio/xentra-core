@@ -209,7 +209,11 @@
     });
     if (!res || !res.claimed || !res.items.length) return;
 
-    Store.addItem(res.items[0], 1);
+    // Invariant: Claiming a promotional reward must NOT commit or freeze a final
+    // fulfillment Branch. Branch is strictly an internal fulfillment concern resolved
+    // at Final Checkout Verification. The reward enters the cart as pure intent (branch_id: null).
+    Store.addItem(res.items[0], 1, null);
+    renderPromoBanner();
   }
 
   // beforeinstallprompt is captured ONCE in <head> on every page (stored on
@@ -303,14 +307,20 @@
     });
   }
 
-  // Delegated install click listener on document for 100% reliable tap response.
-  // Covers BOTH install entry points: the promo card button on checkout
-  // (#x-btn-promo-install) and the persistent top "Bangjo App" banner button
-  // (#x-pwa-install) shown on every view for guests.
+  // Delegated click listener on document for 100% reliable tap response.
+  // Covers install entry points (#x-btn-promo-install, #x-pwa-install)
+  // and reward claim button (#x-btn-promo-claim).
   document.addEventListener('click', function (e) {
-    var btn = e.target.closest('#x-btn-promo-install, #x-pwa-install');
-    if (btn) {
+    var installBtn = e.target.closest('#x-btn-promo-install, #x-pwa-install');
+    if (installBtn) {
       handleInstallClick(e);
+      return;
+    }
+    var claimBtn = e.target.closest('#x-btn-promo-claim');
+    if (claimBtn) {
+      if (e && e.preventDefault) e.preventDefault();
+      if (e && e.stopPropagation) e.stopPropagation();
+      claimRewardIntoCart();
     }
   });
 
@@ -330,8 +340,18 @@
     var all;
     if (currentBranchId) {
       // Branch-scoped checkout: only this branch's cart lines, never a merge.
+      // Promo reward items are brand-wide intent (branch_id: null); include them
+      // alongside this branch's items so customer intent is preserved until final verification.
       var scopeBranchId = currentBranchId === '__unassigned__' ? null : currentBranchId;
-      all = Store.getCartItemsForBranch(scopeBranchId);
+      var branchLines = Store.getCartItemsForBranch(scopeBranchId);
+      if (scopeBranchId !== null) {
+        var unassignedRewards = (Store.getState().cart.items || []).filter(function (it) {
+          return isPromoItem(it) && (!it.branch_id || it.branch_id === '__unassigned__');
+        });
+        all = branchLines.concat(unassignedRewards);
+      } else {
+        all = branchLines;
+      }
     } else {
       all = (Store.getState().cart.items || []).slice();
     }
@@ -2594,6 +2614,12 @@
         Store.clearCart();
       } else if (itemsHaveBranchProvenance && scopeBranchId) {
         Store.removeBranchItems(scopeBranchId);
+        // Also remove any ordered promo rewards that had no branch provenance (unassigned cart intent)
+        orderedIds.forEach(function (id) {
+          if (String(id).indexOf('reward_') === 0) {
+            Store.removeCartItem(id, null);
+          }
+        });
       } else {
         orderedIds.forEach(function (id) { Store.removeCartItem(id, scopeBranchId); });
       }
