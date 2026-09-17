@@ -59,13 +59,17 @@ This document locks the verified audit baseline for Findings 01–06. It records
 - **STATUS: CODE & TEST VERIFIED (F06 Remediated)**
 - Code verification:
   - Eliminated silent replacement of corrupt/unreadable persistent DB with new empty DB in `sql.js` adapter. Explicitly distinguishes missing DB (first-run creation) from corrupt/unreadable existing DB.
-  - Eliminated silent swallowing of disk write failures in `saveSqlJsToDisk()`. Persists synchronously on transaction commit and non-transaction writes, failing fast via `process.exit(1)` in production.
+  - Corrected `sql.js` transaction persistence semantics: `COMMIT` triggers synchronous disk persistence, while `ROLLBACK` clears transaction state and discards pending saves without writing to disk.
+  - Eliminated silent swallowing of disk write failures in `saveSqlJsToDisk()`. Persists synchronously on transaction commit and non-transaction writes, failing fast via `process.exit(1)` in production upon write failure.
   - Ensured native `node:sqlite`, `sql.js`, directory creation, schema migrations, and statement preparation fail closed in production without fallback to `memoryStore`.
   - Enforced `server/app.js` aborts (`process.exit(1)`) on database readiness rejection in production.
 - Test verification:
-  - Suite: `tests/databaseProductionFailFast.test.js` (12/12 passing). Includes F06-SQLJS-01 through 06 testing unreadable DB, corrupt DB, missing DB first-run, module init failure, disk write failure, and clean persistence.
+  - Suite: `tests/databaseProductionFailFast.test.js` (14/14 passing).
+  - Includes deterministic filesystem failure injection verifying the persistence boundary (`fs.writeFileSync` EIO simulation).
+  - Includes F06-SQLJS-07 (COMMIT persists across process restarts) and F06-SQLJS-08 (ROLLBACK does not trigger persistence and leaves disk untouched).
+  - Subprocess environments sanitize test-runner lifecycle variables while strictly executing under `NODE_ENV=production`.
   - Local runtime: Node.js `v24.21.0` native `node:sqlite` WAL mode & `sql.js` adapter tested via `XENTRA_FORCE_SQLJS=1`.
-- VPS runtime verification: PENDING / SEPARATE GATE (requires deployment verification against VPS cPanel/CloudLinux Passenger topology).
+- VPS runtime verification: PENDING / SEPARATE GATE (requires deployment verification against VPS cPanel/CloudLinux Passenger topology; VPS runtime verification was not available from this execution environment).
 
 ## Locked priority
 

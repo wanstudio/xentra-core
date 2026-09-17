@@ -531,9 +531,8 @@ const db = {
         if (txDepth > 0) {
           txDepth = 0;
           sqlJsTxActive = false;
-          const res = rawSqlDb.run(sql);
-          saveSqlJsToDisk(true);
-          return res;
+          saveQueued = false; // Transaction cancelled, discard any queued save
+          return rawSqlDb.run(sql);
         }
         return;
       }
@@ -594,7 +593,7 @@ const db = {
             saveSqlJsToDisk(true);
           } else if (tx === 'rollback') {
             sqlJsTxActive = false;
-            saveSqlJsToDisk(true);
+            saveQueued = false; // Transaction cancelled, do NOT persist
           } else if (!sqlJsTxActive) {
             saveSqlJsToDisk(true);
           }
