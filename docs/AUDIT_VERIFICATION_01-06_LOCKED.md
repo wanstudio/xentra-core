@@ -56,13 +56,16 @@ This document locks the verified audit baseline for Findings 01–06. It records
 - Classification: **OPERATIONAL / PERSISTENCE RISK**
 - Severity: **HIGH if production reaches fallback**
 - Confidence: **HIGH on code/config mismatch; production impact requires runtime verification**
-- **STATUS: CLOSED (Verified)**
-- Runtime verified: Node.js `v24.21.0` with built-in native `node:sqlite` in WAL mode (`PRAGMA journal_mode = WAL`, `PRAGMA foreign_keys = ON`).
-- Fail-fast enforcement:
-  - In `NODE_ENV=production`, any failure in directory creation, persistent database file initialization (`DatabaseSync` / `sql.js`), schema initialization (`initSchema`), or statement execution (`prepare` / `exec`) fails fast via `process.exit(1)` / throwing fatal errors, strictly prohibiting silent fallback to ephemeral `memoryStore`.
-  - In `server/app.js`, HTTP server startup strictly aborts (`process.exit(1)`) if database readiness promise rejects in production.
-- Test environments (`NODE_ENV=test`) retain isolated in-memory execution.
-- Regression suite: `tests/databaseProductionFailFast.test.js`.
+- **STATUS: CODE & TEST VERIFIED (F06 Remediated)**
+- Code verification:
+  - Eliminated silent replacement of corrupt/unreadable persistent DB with new empty DB in `sql.js` adapter. Explicitly distinguishes missing DB (first-run creation) from corrupt/unreadable existing DB.
+  - Eliminated silent swallowing of disk write failures in `saveSqlJsToDisk()`. Persists synchronously on transaction commit and non-transaction writes, failing fast via `process.exit(1)` in production.
+  - Ensured native `node:sqlite`, `sql.js`, directory creation, schema migrations, and statement preparation fail closed in production without fallback to `memoryStore`.
+  - Enforced `server/app.js` aborts (`process.exit(1)`) on database readiness rejection in production.
+- Test verification:
+  - Suite: `tests/databaseProductionFailFast.test.js` (12/12 passing). Includes F06-SQLJS-01 through 06 testing unreadable DB, corrupt DB, missing DB first-run, module init failure, disk write failure, and clean persistence.
+  - Local runtime: Node.js `v24.21.0` native `node:sqlite` WAL mode & `sql.js` adapter tested via `XENTRA_FORCE_SQLJS=1`.
+- VPS runtime verification: PENDING / SEPARATE GATE (requires deployment verification against VPS cPanel/CloudLinux Passenger topology).
 
 ## Locked priority
 

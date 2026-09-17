@@ -46,46 +46,97 @@ let rawSqlDb = null;
 
 // Runtime Persistence Invariant:
 // In Node.js >= 22.x LTS, native node:sqlite is used with WAL mode.
-// On Node.js <= 20.x LTS (e.g. cPanel CloudLinux Passenger), sql.js / memoryStore is used as compatible fallback.
+// On Node.js <= 20.x LTS (e.g. cPanel CloudLinux Passenger), sql.js is used as compatible fallback.
+// In tests, XENTRA_FORCE_SQLJS=1 can force testing of the sql.js adapter path.
 let dbReadyPromise = null;
 const nodeVersion = process.version;
-try {
-  const { DatabaseSync } = require('node:sqlite');
-  dbInstance = new DatabaseSync(DB_PATH);
-  dbInstance.exec('PRAGMA foreign_keys = ON;');
-  dbInstance.exec('PRAGMA journal_mode = WAL;');
-  dbInstance.exec('PRAGMA busy_timeout = 5000;');
-  console.log(`[Database] Native node:sqlite persistent storage initialized successfully (Node ${nodeVersion}, WAL mode).`);
-  dbReadyPromise = Promise.resolve();
-} catch (e) {
-  if (process.env.NODE_ENV === 'production' && !e.message?.includes('Cannot find module')) {
-    // If native node:sqlite was expected but opening DB_PATH failed (e.g. permission/corruption/disk error)
-    console.error(`[Database Fatal Error] Native node:sqlite failed to initialize persistent database at ${DB_PATH} in production:`, e);
-    process.exit(1);
+const forceSqlJs = process.env.XENTRA_FORCE_SQLJS === '1';
+
+if (!forceSqlJs) {
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    dbInstance = new DatabaseSync(DB_PATH);
+    dbInstance.exec('PRAGMA foreign_keys = ON;');
+    dbInstance.exec('PRAGMA journal_mode = WAL;');
+    dbInstance.exec('PRAGMA busy_timeout = 5000;');
+    console.log(`[Database] Native node:sqlite persistent storage initialized successfully (Node ${nodeVersion}, WAL mode).`);
+    dbReadyPromise = Promise.resolve();
+  } catch (e) {
+    if (process.env.NODE_ENV === 'production' && !e.message?.includes('Cannot find module')) {
+      // If native node:sqlite was expected but opening DB_PATH failed (e.g. permission/corruption/disk error)
+      console.error(`[Database Fatal Error] Native node:sqlite failed to initialize persistent database at ${DB_PATH} in production:`, e);
+      process.exit(1);
+    }
   }
+}
+
+if (!dbInstance) {
   try {
     const initSqlJs = require('sql.js');
-    console.log(`[Database] node:sqlite not built-in on Node ${nodeVersion}. Initializing sql.js adapter...`);
+    console.log(`[Database] Initializing sql.js adapter (Node ${nodeVersion})...`);
     sqlJsPromise = initSqlJs().then(SQL => {
-      if (fs.existsSync(DB_PATH)) {
+      if (DB_PATH !== ':memory:' && fs.existsSync(DB_PATH)) {
+        // Existing persistent DB file: must read and parse successfully.
+        let fileBuffer;
         try {
-          const fileBuffer = fs.readFileSync(DB_PATH);
+          fileBuffer = fs.readFileSync(DB_PATH);
+        } catch (readErr) {
+          if (process.env.NODE_ENV === 'production') {
+            console.error(`[Database Fatal Error] Failed to read existing persistent database file at ${DB_PATH} in production:`, readErr);
+            process.exit(1);
+          }
+          throw new Error(`[Database Read Error] Cannot read persistent database file at ${DB_PATH}: ${readErr.message}`);
+        }
+
+        try {
           rawSqlDb = new SQL.Database(fileBuffer);
-        } catch (_) {
-          rawSqlDb = new SQL.Database();
+          // Verify database integrity/parse by running quick check or pragma
+          rawSqlDb.run('PRAGMA foreign_keys = ON;');
+        } catch (parseErr) {
+          if (process.env.NODE_ENV === 'production') {
+            console.error(`[Database Fatal Error] Failed to parse existing persistent SQLite database at ${DB_PATH} in production:`, parseErr);
+            process.exit(1);
+          }
+          throw new Error(`[Database Parse Error] Existing database file at ${DB_PATH} is corrupted or not a valid SQLite database: ${parseErr.message}`);
         }
       } else {
-        rawSqlDb = new SQL.Database();
+        // Legitimate first-run creation or :memory:
+        try {
+          rawSqlDb = new SQL.Database();
+          rawSqlDb.run('PRAGMA foreign_keys = ON;');
+          if (DB_PATH !== ':memory:') {
+            // Write initial database file immediately to establish persistent storage
+            saveSqlJsToDisk(true);
+          }
+        } catch (createErr) {
+          if (process.env.NODE_ENV === 'production') {
+            console.error(`[Database Fatal Error] Failed to create new persistent SQLite database at ${DB_PATH} in production:`, createErr);
+            process.exit(1);
+          }
+          throw createErr;
+        }
       }
-      rawSqlDb.run('PRAGMA foreign_keys = ON;');
+
       console.log(`[Database] sql.js database adapter ready on Node ${nodeVersion} (PRAGMA foreign_keys = ON).`);
-      initSchema(db);
+      try {
+        initSchema(db);
+        if (DB_PATH !== ':memory:') {
+          saveSqlJsToDisk(true);
+        }
+      } catch (schemaErr) {
+        if (process.env.NODE_ENV === 'production') {
+          console.error('[Database Fatal Error] Failed to initialize schema in sql.js production:', schemaErr);
+          process.exit(1);
+        }
+        throw schemaErr;
+      }
     }).catch(err => {
       if (process.env.NODE_ENV === 'production') {
         console.error('[Database Fatal Error] Failed to initialize sql.js adapter in production:', err);
         process.exit(1);
       }
       console.warn('[Database] sql.js fallback error, using memoryStore:', err.message);
+      throw err;
     });
     dbReadyPromise = sqlJsPromise;
   } catch (sqlJsErr) {
@@ -117,7 +168,11 @@ function saveSqlJsToDisk(immediate = false) {
       fs.writeFileSync(tmpPath, Buffer.from(data));
       fs.renameSync(tmpPath, DB_PATH);
     } catch (err) {
-      console.error('[Database] Failed to write sql.js to disk (sync):', err);
+      console.error('[Database Fatal Error] Failed to persist sql.js to disk (sync):', err);
+      if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+      }
+      throw err;
     }
   };
 
@@ -135,7 +190,10 @@ function saveSqlJsToDisk(immediate = false) {
     try {
       data = rawSqlDb.export();
     } catch (err) {
-      console.error('[Database] Failed to export sql.js:', err);
+      console.error('[Database Fatal Error] Failed to export sql.js:', err);
+      if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+      }
       return;
     }
 
@@ -147,10 +205,13 @@ function saveSqlJsToDisk(immediate = false) {
     fs.promises.writeFile(tmpPath, buffer)
       .then(() => fs.promises.rename(tmpPath, DB_PATH))
       .catch((err) => {
-        console.error('[Database] Failed to write sql.js to disk (async):', err);
+        console.error('[Database Fatal Error] Failed to persist sql.js to disk (async):', err);
         try {
           if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
         } catch (_) {}
+        if (process.env.NODE_ENV === 'production') {
+          process.exit(1);
+        }
       })
       .finally(() => {
         isSaving = false;
@@ -461,7 +522,7 @@ const db = {
           txDepth = 0;
           sqlJsTxActive = false;
           const res = rawSqlDb.run(sql);
-          saveSqlJsToDisk(false);
+          saveSqlJsToDisk(true);
           return res;
         }
         return;
@@ -471,7 +532,7 @@ const db = {
           txDepth = 0;
           sqlJsTxActive = false;
           const res = rawSqlDb.run(sql);
-          saveSqlJsToDisk(false);
+          saveSqlJsToDisk(true);
           return res;
         }
         return;
@@ -479,7 +540,7 @@ const db = {
 
       const res = rawSqlDb.run(sql);
       if (!sqlJsTxActive) {
-        saveSqlJsToDisk(false);
+        saveSqlJsToDisk(true);
       }
       return res;
     }
@@ -528,11 +589,14 @@ const db = {
 
           if (tx === 'begin') {
             sqlJsTxActive = true;
-          } else if (tx === 'commit' || tx === 'rollback') {
+          } else if (tx === 'commit') {
             sqlJsTxActive = false;
-            saveSqlJsToDisk(false);
+            saveSqlJsToDisk(true);
+          } else if (tx === 'rollback') {
+            sqlJsTxActive = false;
+            saveSqlJsToDisk(true);
           } else if (!sqlJsTxActive) {
-            saveSqlJsToDisk(false);
+            saveSqlJsToDisk(true);
           }
 
           const changes = rawSqlDb.getRowsModified();
