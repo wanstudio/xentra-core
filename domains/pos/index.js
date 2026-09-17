@@ -59,6 +59,7 @@ try {
 
 const DiningTableService = require('./services/DiningTableService');
 const TableRecommendationService = require('./services/TableRecommendationService');
+const PosLocalOperationService = require('./services/PosLocalOperationService');
 
 module.exports = {
   identity: POS_IDENTITY,
@@ -71,5 +72,6 @@ module.exports = {
   PosHardwareRouter,
   OfflineReconciliationService,
   DiningTableService,
-  TableRecommendationService
+  TableRecommendationService,
+  PosLocalOperationService
 };

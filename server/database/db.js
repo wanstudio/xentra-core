@@ -1132,6 +1132,59 @@ function initSchema(targetDb) {
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS pos_terminals (
+      id TEXT PRIMARY KEY,
+      branch_id TEXT NOT NULL,
+      device_name TEXT NOT NULL,
+      device_identifier TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active', -- 'active' | 'deactivated'
+      config_version INTEGER NOT NULL DEFAULT 1,
+      last_sync_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS pos_sync_queue (
+      id TEXT PRIMARY KEY,
+      terminal_id TEXT NOT NULL,
+      branch_id TEXT NOT NULL,
+      client_transaction_id TEXT NOT NULL,
+      operation_type TEXT NOT NULL, -- 'sale' | 'product_availability' | 'shift_closure'
+      payload TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'syncing' | 'synced' | 'failed' | 'conflict'
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      reconciled_reference_id TEXT,
+      conflict_id TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      synced_at TEXT,
+      FOREIGN KEY (terminal_id) REFERENCES pos_terminals(id) ON DELETE CASCADE,
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS pos_inventory_conflicts (
+      id TEXT PRIMARY KEY,
+      branch_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      terminal_id TEXT,
+      client_transaction_id TEXT,
+      pos_sale_reference TEXT,
+      affected_order_ids TEXT, -- JSON array of competing order ids
+      pos_demand_quantity INTEGER NOT NULL,
+      online_demand_quantity INTEGER NOT NULL,
+      available_stock_at_reconciliation INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending_review', -- 'pending_review' | 'resolved'
+      resolution_decision TEXT, -- e.g. 'prioritize_pos' | 'prioritize_online'
+      resolved_by TEXT,
+      resolution_reason TEXT,
+      resolved_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS inventory_purchase_orders (
       id TEXT PRIMARY KEY,
       po_number TEXT NOT NULL UNIQUE,
@@ -1650,6 +1703,12 @@ function initSchema(targetDb) {
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_wi_email ON workforce_invitations(email);'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_wi_status ON workforce_invitations(status);'); } catch (e) {}
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_wi_unique_pending_email_brand ON workforce_invitations(brand_id, email) WHERE status = \'pending\';'); } catch (e) {}
+
+  // POS Phase 1: Operational Foundation indexes
+  try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_terminals_branch_active ON pos_terminals(branch_id) WHERE status = \'active\';'); } catch (e) {}
+  try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_sync_queue_branch_client_tx ON pos_sync_queue(branch_id, client_transaction_id);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_pos_sync_queue_terminal_status ON pos_sync_queue(terminal_id, status);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_pos_inventory_conflicts_branch_status ON pos_inventory_conflicts(branch_id, status);'); } catch (e) {}
 
   // Migrate existing branch_products:
   // 1. Fill legacy snapshot columns (product_name, etc.) idempotently from master for pre-override rows.

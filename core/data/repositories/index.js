@@ -16,6 +16,7 @@ const ReportingRepository = require('./ReportingRepository');
 const RoutePersistenceRepository = require('./RoutePersistenceRepository');
 const WorkforceRepository = require('./WorkforceRepository');
 const MediaRepository = require('./MediaRepository');
+const PosOperationalRepository = require('./PosOperationalRepository');
 
 module.exports = {
   CatalogRepository,
@@ -33,5 +34,6 @@ module.exports = {
   ReportingRepository,
   RoutePersistenceRepository,
   WorkforceRepository,
-  MediaRepository
+  MediaRepository,
+  PosOperationalRepository
 };

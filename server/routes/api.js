@@ -2554,6 +2554,114 @@ router.post('/pos/offline-sync/batch', requireAuth(['owner', 'brand_manager', 'b
   }
 });
 
+// 9.4 POS Phase 1: Local Operational Foundation Endpoints
+router.post('/pos/terminal/register', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const userRole = req.user.role;
+    const userBranchId = req.user.branch_id || req.user.branchId;
+    let targetBranchId = req.body.branch_id || userBranchId;
+
+    if (['branch_manager'].includes(userRole)) {
+      if (userBranchId && req.body.branch_id && req.body.branch_id !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: `Akses ditolak: Anda hanya berwenang mendaftarkan terminal untuk cabang Anda (${userBranchId}).`
+        });
+      }
+      targetBranchId = userBranchId;
+    }
+
+    if (!targetBranchId) {
+      return res.status(400).json({ success: false, error: 'Cabang (branch_id) wajib ditentukan.' });
+    }
+
+    const { PosLocalOperationService } = require('../../domains/pos');
+    const terminal = PosLocalOperationService.registerTerminal({
+      branch_id: targetBranchId,
+      device_name: req.body.device_name,
+      device_identifier: req.body.device_identifier,
+      config_version: req.body.config_version || 1
+    });
+
+    res.json({ success: true, terminal });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/local/sale', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), async (req, res) => {
+  try {
+    const userRole = req.user.role;
+    const userBranchId = req.user.branch_id || req.user.branchId;
+    let targetBranchId = req.body.branch_id || userBranchId;
+
+    if (['cashier', 'branch_manager'].includes(userRole)) {
+      if (userBranchId && req.body.branch_id && req.body.branch_id !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: `Akses ditolak: Anda hanya berwenang mencatat penjualan untuk cabang Anda (${userBranchId}).`
+        });
+      }
+      targetBranchId = userBranchId;
+    }
+
+    const { PosLocalOperationService } = require('../../domains/pos');
+    const result = PosLocalOperationService.recordOfflineSale({
+      ...req.body,
+      brand_id: req.brand_id,
+      branch_id: targetBranchId
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/local/sync-outbox', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), async (req, res) => {
+  try {
+    const userRole = req.user.role;
+    const userBranchId = req.user.branch_id || req.user.branchId;
+    let targetBranchId = req.body.branch_id || userBranchId;
+
+    if (['cashier', 'branch_manager'].includes(userRole)) {
+      if (userBranchId && req.body.branch_id && req.body.branch_id !== userBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: `Akses ditolak: Anda hanya berwenang menyinkronkan antrean untuk cabang Anda (${userBranchId}).`
+        });
+      }
+      targetBranchId = userBranchId;
+    }
+
+    const { PosLocalOperationService } = require('../../domains/pos');
+    const result = await PosLocalOperationService.syncOutboxQueue({
+      terminal_id: req.body.terminal_id,
+      branch_id: targetBranchId
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/inventory-conflicts/:id/resolve', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
+  try {
+    const { PosLocalOperationService } = require('../../domains/pos');
+    const result = PosLocalOperationService.resolveInventoryConflict({
+      conflict_id: req.params.id,
+      resolution_decision: req.body.resolution_decision,
+      resolved_by: req.user.id || req.user.username || 'manager',
+      reason: req.body.reason
+    });
+
+    res.json({ success: true, conflict: result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // 10. Midtrans Webhook
 router.post('/webhooks/midtrans', (req, res) => {
   try {
