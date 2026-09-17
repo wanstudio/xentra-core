@@ -602,6 +602,12 @@ test('Payment 9 — Webhook Concurrency Race & Idempotent Retry: First settlemen
   const customerPhone = '081299990099';
   const promoId = 'prm_race_limit_1';
 
+  // Clean up any stale data from previous test runs
+  db.prepare('DELETE FROM promotion_redemptions WHERE customer_phone = ?').run(customerPhone);
+  db.prepare('DELETE FROM order_payments WHERE order_id IN (SELECT id FROM orders WHERE customer_phone = ?)').run(customerPhone);
+  db.prepare('DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE customer_phone = ?)').run(customerPhone);
+  db.prepare('DELETE FROM orders WHERE customer_phone = ?').run(customerPhone);
+
   // 1. Create promo with max 1 claim per customer and ensure stock
   db.prepare(`
     INSERT OR REPLACE INTO promotions (id, brand_id, name, capability_type, stacking_policy, max_redemptions_per_customer, is_active)
@@ -621,28 +627,31 @@ test('Payment 9 — Webhook Concurrency Race & Idempotent Retry: First settlemen
   `).run();
 
   // 2. Create Order A and Order B (both pending with promo applied)
-  const orderIdA = `ord_race_A_${Date.now()}`;
-  const orderIdB = `ord_race_B_${Date.now()}`;
+  const ts = Date.now();
+  const orderIdA = `ord_race_A_${ts}`;
+  const orderIdB = `ord_race_B_${ts}`;
+  const orderNumA = `ORD-RACE-A-${ts}`;
+  const orderNumB = `ORD-RACE-B-${ts}`;
 
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, subtotal, grand_total, payment_method, status)
-    VALUES (?, 'ORD-RACE-A', ?, ?, 'Customer Race', ?, 'delivery', 25000, 25000, 'midtrans', 'pending'),
-           (?, 'ORD-RACE-B', ?, ?, 'Customer Race', ?, 'delivery', 25000, 25000, 'midtrans', 'pending')
-  `).run(orderIdA, brandId, branchId, customerPhone, orderIdB, brandId, branchId, customerPhone);
+    VALUES (?, ?, ?, ?, 'Customer Race', ?, 'delivery', 25000, 25000, 'midtrans', 'pending'),
+           (?, ?, ?, ?, 'Customer Race', ?, 'delivery', 25000, 25000, 'midtrans', 'pending')
+  `).run(orderIdA, orderNumA, brandId, branchId, customerPhone, orderIdB, orderNumB, brandId, branchId, customerPhone);
 
   db.prepare(`
     INSERT INTO order_items (id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note)
-    VALUES ('it_A1', ?, 'prod_pay_1', 'Bebek Goreng', 25000, 1, 25000, ''),
-           ('it_A2', ?, ?, 'Hadiah Es Teh', 0, 1, 0, 'Bonus Promo PWA'),
-           ('it_B1', ?, 'prod_pay_1', 'Bebek Goreng', 25000, 1, 25000, ''),
-           ('it_B2', ?, ?, 'Hadiah Es Teh', 0, 1, 0, 'Bonus Promo PWA')
-  `).run(orderIdA, orderIdA, promoId, orderIdB, orderIdB, promoId);
+    VALUES (?, ?, 'prod_pay_1', 'Bebek Goreng', 25000, 1, 25000, ''),
+           (?, ?, ?, 'Hadiah Es Teh', 0, 1, 0, 'Bonus Promo PWA'),
+           (?, ?, 'prod_pay_1', 'Bebek Goreng', 25000, 1, 25000, ''),
+           (?, ?, ?, 'Hadiah Es Teh', 0, 1, 0, 'Bonus Promo PWA')
+  `).run(`it_A1_${ts}`, orderIdA, `it_A2_${ts}`, orderIdA, promoId, `it_B1_${ts}`, orderIdB, `it_B2_${ts}`, orderIdB, promoId);
 
   db.prepare(`
     INSERT INTO order_payments (id, order_id, provider, payment_method, merchant_id, snap_token, payment_status, amount)
-    VALUES ('pay_A', ?, 'midtrans', 'midtrans', 'midtrans_default', 'snap_A', 'pending', 25000),
-           ('pay_B', ?, 'midtrans', 'midtrans', 'midtrans_default', 'snap_B', 'pending', 25000)
-  `).run(orderIdA, orderIdB);
+    VALUES (?, ?, 'midtrans', 'midtrans', 'midtrans_default', 'snap_A', 'pending', 25000),
+           (?, ?, 'midtrans', 'midtrans', 'midtrans_default', 'snap_B', 'pending', 25000)
+  `).run(`pay_A_${ts}`, orderIdA, `pay_B_${ts}`, orderIdB);
 
   // 3. Webhook settlement for Order A (Wins)
   const webhookPayloadA = {

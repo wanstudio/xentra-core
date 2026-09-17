@@ -138,6 +138,12 @@ class PrePaymentVerificationGate {
         const authoritativeRewardPrice = Number(rewardSpec.reward_price || rewardSpec.amount_in_cents || 0);
         const authoritativeRewardName = bpCheck.name || eligiblePromo.display?.reward_title || 'Hadiah Promo Spesial';
         const catalogRewardPrice = Number(bpCheck.regular_price || bpCheck.price || authoritativeRewardPrice);
+        // Architectural Invariant: One campaign identity applies at most once per order
+        if (appliedPromos.some(ap => ap.promo_id === authoritativePromoId)) {
+          // Promo already applied for this order; ignore/reject duplicate reward lines
+          continue;
+        }
+
         verifiedItems.push({
           product_id: targetPid,
           promo_id: authoritativePromoId,

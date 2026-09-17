@@ -68,10 +68,18 @@ try {
       console.log(`[Database] sql.js database adapter ready on Node ${nodeVersion} (PRAGMA foreign_keys = ON).`);
       initSchema(db);
     }).catch(err => {
+      if (process.env.NODE_ENV === 'production') {
+        console.error('[Database Fatal Error] Failed to initialize sql.js adapter in production:', err);
+        process.exit(1);
+      }
       console.warn('[Database] sql.js fallback error, using memoryStore:', err.message);
     });
     dbReadyPromise = sqlJsPromise;
-  } catch (_) {
+  } catch (sqlJsErr) {
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[Database Fatal Error] Native node:sqlite and sql.js persistent storage unavailable on Node ${nodeVersion} in production. Refusing silent memoryStore fallback:`, sqlJsErr);
+      process.exit(1);
+    }
     console.log(`[Database] node:sqlite and sql.js unavailable on Node ${nodeVersion}. Using memoryStore.`);
     dbReadyPromise = Promise.resolve();
   }
@@ -523,6 +531,10 @@ const db = {
           return { changes, lastInsertRowid };
         }
       };
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('[Database Fatal Error] Authoritative database connection is unavailable in production. MemoryStore fallback is strictly prohibited.');
     }
 
     // Memory Store Emulation (FAIL-CLOSED: Never default to first brand / first user if query param mismatch)

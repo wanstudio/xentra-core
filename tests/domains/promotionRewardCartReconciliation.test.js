@@ -292,20 +292,58 @@ describe('Promotion / Reward Cart Reconciliation & Invariants', () => {
     assert.strictEqual(verification.applied_promos[0].promo_id, promoId);
   });
 
-  test('Invariant 7: Multi-branch participating campaign grants at most 1 order entitlement', () => {
+  test('Invariant 7: Multi-branch participating campaign grants at most 1 order entitlement across 5 branches', () => {
     const customer = { phone: '08123456789', name: 'Budi Test' };
     const pwa_runtime = { display_mode: 'standalone', install_requirement_satisfied: true };
 
-    // Attacker attempts to submit two reward lines for the same campaign in one order
-    const evalResult = PromotionEngineService.evaluate({
-      brand_id: brandId,
-      is_pwa_installed: true,
-      customer_phone: customer.phone,
-      cart_items: [{ product_id: foodProductId, quantity: 1 }]
-    });
+    // Seed 3 additional branches (C, D, E) to make 5 participating branches in total
+    const branchIds = ['branch_rec_C', 'branch_rec_D', 'branch_rec_E'];
+    for (let i = 0; i < branchIds.length; i++) {
+      const bId = branchIds[i];
+      db.prepare('INSERT OR REPLACE INTO branches (id, brand_id, name, slug, address_text, is_active, latitude, longitude) VALUES (?, ?, ?, ?, ?, 1, -5.39, 105.29)')
+        .run(bId, brandId, `Bangjo Cabang ${String.fromCharCode(67 + i)}`, `bangjo-${bId}`, 'Jl. Test No. ' + (i + 3));
+      db.prepare('INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, ?, ?, ?, 1)')
+        .run(bId, foodProductId, 25000, 20);
+      db.prepare('INSERT OR REPLACE INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES (?, ?, ?, ?, 1)')
+        .run(bId, rewardProductId, 5000, 15);
+    }
 
-    assert.strictEqual(evalResult.applied.length, 1, 'Campaign applies at most once per order');
-    assert.strictEqual(evalResult.applied[0].reward.product_id, rewardProductId);
+    try {
+      // 1. Engine evaluation yields exactly 1 applied promo entitlement, not 5
+      const evalResult = PromotionEngineService.evaluate({
+        brand_id: brandId,
+        is_pwa_installed: true,
+        customer_phone: customer.phone,
+        cart_items: [{ product_id: foodProductId, quantity: 1 }]
+      });
+
+      assert.strictEqual(evalResult.applied.length, 1, 'Campaign applies at most once per order, never multiplied by branch count');
+      assert.strictEqual(evalResult.applied[0].reward.product_id, rewardProductId);
+
+      // 2. Client sending multiple reward items for the same promoId is capped to 1 verified reward
+      const verification = PrePaymentVerificationGate.verify({
+        branch_id: branchAId,
+        brand_id: brandId,
+        items: [
+          { product_id: 'reward_' + promoId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 },
+          { product_id: 'reward_' + promoId, is_promo_reward: true, promo_id: promoId, quantity: 1, expected_price: 0 },
+          { product_id: foodProductId, is_promo_reward: false, quantity: 1, expected_price: 25000 }
+        ],
+        customer,
+        pwa_runtime
+      });
+
+      // Verification succeeds for valid items, but applied_promos must have exactly 1 entitlement
+      assert.strictEqual(verification.applied_promos.length, 1, 'Applied promos contains exactly 1 campaign entitlement');
+    } finally {
+      // Cleanup branches C, D, E
+      for (const bId of branchIds) {
+        try {
+          db.prepare('DELETE FROM branch_products WHERE branch_id = ?').run(bId);
+          db.prepare('DELETE FROM branches WHERE id = ?').run(bId);
+        } catch (_) {}
+      }
+    }
   });
 
   test('Invariant 8 & 9: Reward becomes cleanly invalid if out of stock in resolved branch; creates NO order or payment commit', async () => {
