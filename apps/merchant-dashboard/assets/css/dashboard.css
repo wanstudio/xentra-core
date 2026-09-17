@@ -1348,6 +1348,21 @@ input, button, select, textarea, optgroup {
   flex-shrink: 0;
 }
 
+/* Branch context badge (BM locked branch context) */
+.x-branch-context-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  flex-shrink: 0;
+}
+
 .x-branch-select {
   border: none;
   background: transparent;

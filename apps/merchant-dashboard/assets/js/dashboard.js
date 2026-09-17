@@ -863,12 +863,14 @@
     if (!nav) return;
 
     nav.innerHTML =
-      "<div class=\"x-nav-group-label\">OPERASIONAL CABANG</div>" +
+      "<div class=\"x-nav-group-label\">HARI INI</div>" +
 
       "<button type=\"button\" class=\"x-nav-item\" data-route=\"hari-ini\">" +
         "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><polyline points=\"12 6 12 12 16 14\"></polyline></svg>" +
         "<span>Hari Ini</span>" +
       "</button>" +
+
+      "<div class=\"x-nav-group-label\" style=\"margin-top: 10px;\">OPERASIONAL</div>" +
 
       "<button type=\"button\" class=\"x-nav-item\" data-route=\"pesanan\">" +
         "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z\"></path><line x1=\"3\" y1=\"6\" x2=\"21\" y2=\"6\"></line><path d=\"M16 10a4 4 0 0 1-8 0\"></path></svg>" +
@@ -879,8 +881,6 @@
         "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M4 18v3\"></path><path d=\"M20 18v3\"></path><path d=\"M4 11h16\"></path><path d=\"M4 11V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5\"></path></svg>" +
         "<span>Meja</span>" +
       "</button>" +
-
-      "<div class=\"x-nav-group-label\" style=\"margin-top: 10px;\">KATALOG & PROMO</div>" +
 
       "<button type=\"button\" class=\"x-nav-item\" data-route=\"menu\">" +
         "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M18 8h1a4 4 0 0 1 0 8h-1\"></path><path d=\"M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z\"></path><line x1=\"6\" y1=\"1\" x2=\"6\" y2=\"4\"></line><line x1=\"10\" y1=\"1\" x2=\"10\" y2=\"4\"></line><line x1=\"14\" y1=\"1\" x2=\"14\" y2=\"4\"></line></svg>" +
@@ -897,17 +897,21 @@
         "<span>Stok</span>" +
       "</button>" +
 
-      "<div class=\"x-nav-group-label\" style=\"margin-top: 10px;\">CABANG & TIM</div>" +
+      "<div class=\"x-nav-group-label\" style=\"margin-top: 10px;\">TIM</div>" +
 
       "<button type=\"button\" class=\"x-nav-item\" data-route=\"staff\">" +
         "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2\"></path><circle cx=\"9\" cy=\"7\" r=\"4\"></circle><path d=\"M23 21v-2a4 4 0 0 0-3-3.87\"></path><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"></path></svg>" +
         "<span>Staff</span>" +
       "</button>" +
 
+      "<div class=\"x-nav-group-label\" style=\"margin-top: 10px;\">LAPORAN</div>" +
+
       "<button type=\"button\" class=\"x-nav-item\" data-route=\"reports\">" +
         "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><line x1=\"18\" y1=\"20\" x2=\"18\" y2=\"10\"></line><line x1=\"12\" y1=\"20\" x2=\"12\" y2=\"4\"></line><line x1=\"6\" y1=\"20\" x2=\"6\" y2=\"14\"></line></svg>" +
-        "<span>Reports</span>" +
+        "<span>Penjualan Hari Ini</span>" +
       "</button>" +
+
+      "<div class=\"x-nav-group-label\" style=\"margin-top: 10px;\">PENGATURAN</div>" +
 
       "<button type=\"button\" class=\"x-nav-item\" data-route=\"jam-operasional\">" +
         "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><polyline points=\"12 6 12 12 16 14\"></polyline></svg>" +
@@ -1256,6 +1260,15 @@
       _branchContextState.selected = user.branch_id;
       sel.value = user.branch_id;
       sel.disabled = true;
+
+      // Update BM branch badge text if available
+      var bmBadgeName = $('dash-bm-branch-name');
+      if (bmBadgeName) {
+        var foundB = (_branchContextState.branches).find(function (b) { return String(b.id) === String(user.branch_id); });
+        if (foundB && foundB.name) {
+          bmBadgeName.textContent = foundB.name;
+        }
+      }
     } else {
       var validIds = ['all'].concat((_branchContextState.branches).map(function (b) { return String(b.id); }));
       if (validIds.indexOf(_branchContextState.selected) === -1) {
@@ -5158,14 +5171,27 @@
       });
     }
 
-    // Set branch_id for inline catalog if branch_manager and lock branch dropdown
-    if (isBM && user.branch_id) {
-      currentManagingBranchId = user.branch_id;
-      _branchContextState.selected = user.branch_id;
-      var branchSelector = $('dash-branch-context');
+    // Set branch context visibility and locking
+    var branchSelectorWrap = $('x-branch-selector');
+    var bmBranchBadge = $('dash-bm-branch-badge');
+    var branchSelector = $('dash-branch-context');
+
+    if (isBM) {
+      if (branchSelectorWrap) branchSelectorWrap.style.display = 'none';
+      if (bmBranchBadge) bmBranchBadge.style.display = 'flex';
+      if (user.branch_id) {
+        currentManagingBranchId = user.branch_id;
+        _branchContextState.selected = user.branch_id;
+        if (branchSelector) {
+          branchSelector.value = user.branch_id;
+          branchSelector.disabled = true;
+        }
+      }
+    } else {
+      if (branchSelectorWrap) branchSelectorWrap.style.display = 'flex';
+      if (bmBranchBadge) bmBranchBadge.style.display = 'none';
       if (branchSelector) {
-        branchSelector.value = user.branch_id;
-        branchSelector.disabled = true;
+        branchSelector.disabled = false;
       }
     }
   }
@@ -8001,6 +8027,9 @@
           var nameEl = $("bm-hero-branch-name");
           if (nameEl) nameEl.textContent = b.name || ("Cabang " + branchId);
 
+          var topbarBMBranchEl = $("dash-bm-branch-name");
+          if (topbarBMBranchEl) topbarBMBranchEl.textContent = b.name || ("Cabang " + branchId);
+
           var dotEl = $("bm-hero-status-dot");
           var badgeEl = $("bm-hero-status-badge");
           var toggleBtn = $("btn-bm-toggle-open");
@@ -10302,7 +10331,23 @@
       // Check platform session/auth
       var isAuth = checkAuth();
       if (isAuth) {
-        validateServerSession();
+        validateServerSession().then(function (isValid) {
+          if (!isValid) return;
+          var storedUser = getStoredUser();
+          if (storedUser && storedUser.role !== 'platform_superadmin' && storedUser.brand_id) {
+            fetch(API_BASE + '/auth/handoff/create', {
+              method: 'POST',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ brand_id: storedUser.brand_id })
+            }).then(function (res) {
+              return res.json();
+            }).then(function (data) {
+              if (data && data.success && data.redirect_url) {
+                window.location.replace(data.redirect_url);
+              }
+            }).catch(function () {});
+          }
+        });
       }
 
       // Apply initial route from URL hash

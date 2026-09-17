@@ -356,4 +356,30 @@ describe('BM-1 — Branch Manager Dashboard Shell + Access + Hari Ini', () => {
       assert.ok(js.includes(`"${r}"`), `Missing route in JS: ${r}`);
     });
   });
+
+  it('BM1-15: Navigation IA & Branch Context element match locked contract for Branch Manager', () => {
+    const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    // Index.html contains branch selector for owner and branch context badge for BM
+    assert.ok(html.includes('id="x-branch-selector"'), 'Missing x-branch-selector for owner');
+    assert.ok(html.includes('id="dash-bm-branch-badge"'), 'Missing dash-bm-branch-badge for branch manager');
+    assert.ok(html.includes('id="dash-bm-branch-name"'), 'Missing dash-bm-branch-name for branch manager');
+
+    const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+    const js = fs.readFileSync(jsPath, 'utf8');
+
+    // BM navigation must contain canonical labels: Hari Ini, Operasional (Pesanan, Meja, Menu, Promo, Stok), Tim (Staff), Laporan (Penjualan Hari Ini), Pengaturan (Jam Operasional)
+    assert.ok(js.includes('>HARI INI</div>'), 'Missing HARI INI group label in BM nav');
+    assert.ok(js.includes('>OPERASIONAL</div>'), 'Missing OPERASIONAL group label in BM nav');
+    assert.ok(js.includes('>TIM</div>'), 'Missing TIM group label in BM nav');
+    assert.ok(js.includes('>LAPORAN</div>'), 'Missing LAPORAN group label in BM nav');
+    assert.ok(js.includes('>PENGATURAN</div>'), 'Missing PENGATURAN group label in BM nav');
+    assert.ok(js.includes('>Penjualan Hari Ini</span>'), 'Missing Penjualan Hari Ini item in BM nav');
+    assert.ok(js.includes('>Jam Operasional</span>'), 'Missing Jam Operasional item in BM nav');
+
+    // Branch context switching: BM hides selector, displays badge; Owner shows selector, hides badge
+    assert.ok(js.includes("dash-bm-branch-badge"), 'Missing dash-bm-branch-badge reference in JS');
+    assert.ok(js.includes("dash-bm-branch-name"), 'Missing dash-bm-branch-name reference in JS');
+  });
 });
