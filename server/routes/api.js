@@ -279,7 +279,7 @@ const OtpChallengeStore = {
   rateLimits: new Map(), // key: brandId:phone -> lastSentTimestamp
   
   checkRateLimit(phone, brandId, minIntervalSeconds = 60) {
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env.NODE_ENV === 'test' && !process.env.TEST_OTP_RATE_LIMIT && !phone.endsWith('109')) {
       return { allowed: true, retryAfter: 0 };
     }
     const key = `${brandId}:${phone}`;
@@ -1039,16 +1039,33 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     // P1 CUSTOMER IDENTITY BINDING (NEW-02): Extract customer session token
     const authHeader = req.headers['authorization'] || '';
     const customerToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || req.headers['x-customer-token'] || '').trim();
-    const customerSession = customerToken ? TokenSessionStore.getSession(customerToken) : null;
+
+    if (!customerToken) {
+      return res.status(401).json({
+        success: false,
+        error: 'CUSTOMER_AUTH_REQUIRED',
+        message: 'Checkout memerlukan otentikasi. Silakan login atau verifikasi nomor WhatsApp Anda.'
+      });
+    }
+
+    const customerSession = TokenSessionStore.getSession(customerToken);
 
     // CUSTOMER AUTH BOUNDARY: Checkout requires a valid OTP-verified customer session.
     // The server is the sole authority for customer identity — client-provided phone
     // is never trusted as the sole identity source for order creation.
-    if (!customerSession || (customerSession.type !== 'customer' && customerSession.role !== 'customer') || customerSession.brandId !== req.brand_id) {
+    if (!customerSession || (customerSession.type !== 'customer' && customerSession.role !== 'customer')) {
       return res.status(401).json({
         success: false,
-        error: 'CUSTOMER_AUTH_REQUIRED',
-        message: 'Checkout memerlukan verifikasi OTP. Silakan verifikasi nomor WhatsApp Anda.'
+        error: 'INVALID_OR_EXPIRED_CUSTOMER_SESSION',
+        message: 'Sesi akun customer Anda tidak valid atau telah kedaluwarsa. Silakan verifikasi OTP kembali.'
+      });
+    }
+
+    if (customerSession.brandId !== req.brand_id) {
+      return res.status(403).json({
+        success: false,
+        error: 'TENANT_MISMATCH',
+        message: 'Sesi customer tidak valid untuk brand ini.'
       });
     }
 
@@ -1520,7 +1537,7 @@ const TokenSessionStore = {
   createCustomerSession(phone, brand_id, ttlSeconds = 2592000) {
     const token = 'xnt_cust_' + crypto.randomBytes(24).toString('hex');
     const expiresAt = Date.now() + ttlSeconds * 1000;
-    this.sessions.set(token, {
+    const sessionData = {
       type: 'customer',
       role: 'customer',
       phone: phone.trim(),
@@ -1528,24 +1545,76 @@ const TokenSessionStore = {
       brandId: brand_id,
       brand_id: brand_id,
       expiresAt
-    });
+    };
+    this.sessions.set(token, sessionData);
+
+    try {
+      db.prepare(`
+        INSERT OR REPLACE INTO customer_sessions (token, phone, brand_id, expires_at, created_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+      `).run(token, phone.trim(), brand_id, expiresAt);
+    } catch (dbErr) {
+      console.error('[TokenSessionStore] Failed to persist customer session to SQLite:', dbErr.message);
+    }
+
     return { token, expiresAt };
   },
   getSession(token) {
     if (!token) return null;
     if (this.revokedTokens.has(token)) return null;
-    const session = this.sessions.get(token);
-    if (!session) return null;
-    if (Date.now() > session.expiresAt) {
-      this.sessions.delete(token);
-      return null;
+
+    // L1: In-memory cache
+    const cachedSession = this.sessions.get(token);
+    if (cachedSession) {
+      if (Date.now() > cachedSession.expiresAt) {
+        this.sessions.delete(token);
+        // Clean up expired in SQLite if it was customer token
+        if (token.startsWith('xnt_cust_')) {
+          try { db.prepare('DELETE FROM customer_sessions WHERE token = ?').run(token); } catch (_) {}
+        }
+        return null;
+      }
+      return cachedSession;
     }
-    return session;
+
+    // L2: SQLite backing for customer sessions
+    if (token.startsWith('xnt_cust_')) {
+      try {
+        const row = db.prepare('SELECT token, phone, brand_id, expires_at FROM customer_sessions WHERE token = ?').get(token);
+        if (!row) return null;
+
+        if (Date.now() > Number(row.expires_at)) {
+          try { db.prepare('DELETE FROM customer_sessions WHERE token = ?').run(token); } catch (_) {}
+          return null;
+        }
+
+        const hydrated = {
+          type: 'customer',
+          role: 'customer',
+          phone: row.phone,
+          customerPhone: row.phone,
+          brandId: row.brand_id,
+          brand_id: row.brand_id,
+          expiresAt: Number(row.expires_at)
+        };
+        // Hydrate L1 memory cache
+        this.sessions.set(token, hydrated);
+        return hydrated;
+      } catch (dbErr) {
+        console.error('[TokenSessionStore] SQLite session lookup failed:', dbErr.message);
+        return null;
+      }
+    }
+
+    return null;
   },
   destroySession(token) {
     if (token) {
       this.sessions.delete(token);
       this.revokedTokens.add(token);
+      if (token.startsWith('xnt_cust_')) {
+        try { db.prepare('DELETE FROM customer_sessions WHERE token = ?').run(token); } catch (_) {}
+      }
     }
   },
   revokeUserSessions(userId) {

@@ -481,3 +481,93 @@ test('SEC-17: Valid OTP session allows /checkout/verify to succeed', async () =>
   assert.strictEqual(data.success, true);
   assert.ok(Array.isArray(data.verified_items));
 });
+
+test('SEC-18: Customer session persists to SQLite and survives memory cache wipe (PM2 restart simulation)', async () => {
+  addTestBranch('branch_sec_18');
+  const phone = '089000000018';
+  const token = await createCustomerSession(phone);
+  assert.ok(token, 'token must be created');
+
+  // Verify record exists in SQLite
+  const row = db.prepare('SELECT token, phone, brand_id, expires_at FROM customer_sessions WHERE token = ?').get(token);
+  assert.ok(row, 'session must be persisted in SQLite customer_sessions');
+  assert.strictEqual(row.phone, phone);
+
+  // SIMULATE PM2 / SERVER RESTART: wipe in-memory cache
+  global.TokenSessionStore.sessions.clear();
+
+  // Next checkout request using the token must restore session from SQLite (L2 -> L1)
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { 'x-customer-token': token },
+    body: JSON.stringify({
+      branch_id: 'branch_sec_18',
+      payment_method: 'cash',
+      customer: { name: 'Restart Survivor', phone },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res.status, 201, 'order must succeed with restored session');
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+  assert.ok(data.order_id, 'order_id must be present');
+
+  // Verify memory cache was re-hydrated
+  assert.ok(global.TokenSessionStore.sessions.has(token), 'session must be re-hydrated into L1 memory cache');
+});
+
+test('SEC-19: Expired customer session in SQLite is rejected and cleaned up', async () => {
+  const expiredToken = 'xnt_cust_testexpired_' + Date.now();
+  const pastTime = Date.now() - 10000;
+  db.prepare(`
+    INSERT INTO customer_sessions (token, phone, brand_id, expires_at, created_at)
+    VALUES (?, '089000000019', 'brand_bangjo', ?, datetime('now'))
+  `).run(expiredToken, pastTime);
+
+  // Clear memory cache so it looks up SQLite
+  global.TokenSessionStore.sessions.clear();
+
+  const session = global.TokenSessionStore.getSession(expiredToken);
+  assert.strictEqual(session, null, 'expired session must return null');
+
+  // Verify it was cleaned up
+  const row = db.prepare('SELECT token FROM customer_sessions WHERE token = ?').get(expiredToken);
+  assert.strictEqual(row, undefined, 'expired record must be deleted from SQLite');
+});
+
+test('SEC-20: Unauthenticated checkout returns CUSTOMER_AUTH_REQUIRED, while invalid token returns INVALID_OR_EXPIRED_CUSTOMER_SESSION', async () => {
+  addTestBranch('branch_sec_20');
+
+  // Case 1: No token
+  const noTokenRes = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    body: JSON.stringify({
+      branch_id: 'branch_sec_20',
+      payment_method: 'cash',
+      customer: { name: 'No Token', phone: '089000000020' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(noTokenRes.status, 401);
+  const noTokenData = await noTokenRes.json();
+  assert.strictEqual(noTokenData.error, 'CUSTOMER_AUTH_REQUIRED');
+
+  // Case 2: Invalid / forged token
+  const invalidTokenRes = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { 'x-customer-token': 'xnt_cust_nonexistent_token_12345' },
+    body: JSON.stringify({
+      branch_id: 'branch_sec_20',
+      payment_method: 'cash',
+      customer: { name: 'Invalid Token', phone: '089000000020' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(invalidTokenRes.status, 401);
+  const invalidTokenData = await invalidTokenRes.json();
+  assert.strictEqual(invalidTokenData.error, 'INVALID_OR_EXPIRED_CUSTOMER_SESSION');
+});
+

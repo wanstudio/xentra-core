@@ -150,13 +150,13 @@
   function setCustomerSession(session) {
     state.customerSession = session;
     save(SESSION_KEY, session);
-    notify();
+    notify({ type: 'customerSession' });
   }
 
   function clearCustomerSession() {
     state.customerSession = null;
     try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
-    notify();
+    notify({ type: 'customerSession' });
   }
 
   function setOrderType(type) {

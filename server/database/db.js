@@ -953,6 +953,17 @@ function initSchema(targetDb) {
     );
     CREATE INDEX IF NOT EXISTS idx_customer_addresses_phone ON customer_addresses(brand_id, customer_phone);
 
+    CREATE TABLE IF NOT EXISTS customer_sessions (
+      token TEXT PRIMARY KEY,
+      phone TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_customer_sessions_brand_phone ON customer_sessions(brand_id, phone);
+    CREATE INDEX IF NOT EXISTS idx_customer_sessions_expires_at ON customer_sessions(expires_at);
+
 
     CREATE TABLE IF NOT EXISTS promotions (
       id TEXT PRIMARY KEY,
