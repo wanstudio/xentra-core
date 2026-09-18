@@ -7700,11 +7700,13 @@
     ];
 
     if (assignment) {
-      actions.push({
-        label: 'Atur Penempatan / Jadwal',
-        icon: '🗓️',
-        onClick: function () { openMarketingBannerAssignmentEditor(row, false); }
-      });
+      if (!(user.role === 'branch_manager' && assignment.governance_locked)) {
+        actions.push({
+          label: 'Atur Penempatan / Jadwal',
+          icon: '🗓️',
+          onClick: function () { openMarketingBannerAssignmentEditor(row, false); }
+        });
+      }
 
       if (user.role === 'owner' || user.role === 'brand_manager') {
         actions.push({
@@ -7714,7 +7716,8 @@
         });
       }
 
-      if (assignment.effective_status === 'ENDED') {
+      if (assignment.effective_status === 'ENDED' &&
+          !(user.role === 'branch_manager' && assignment.governance_locked)) {
         actions.push({
           label: 'Gunakan Lagi',
           icon: '↻',
@@ -7723,13 +7726,23 @@
       }
 
       if (publicationStatus === 'PUBLISHED' && user.role !== 'branch_manager') {
-        actions.push({
-          divider: true
-        });
+        actions.push({ divider: true });
         actions.push({
           label: 'Tambah Penempatan Cabang',
           icon: '＋',
           onClick: function () { openMarketingBannerAssignmentEditor({ banner_id: row.banner_id || row.id }, false); }
+        });
+      }
+
+      if (!(user.role === 'branch_manager' && assignment.governance_locked)) {
+        actions.push({
+          divider: true
+        });
+        actions.push({
+          label: 'Hapus Penempatan',
+          icon: '🗑️',
+          destructive: true,
+          onClick: function () { removeMarketingBannerAssignment(assignment.id); }
         });
       }
     } else {
@@ -7823,7 +7836,7 @@
       if (subtitle) subtitle.textContent = 'Buat content draft lalu pilih penempatan dan publikasi.';
       if (placement) placement.style.display = '';
       if (saveBtn) saveBtn.textContent = 'Simpan Draft';
-      if (publishBtn) publishBtn.textContent = 'Publish Sekarang';
+      if (publishBtn) publishBtn.textContent = ($('mkt-banner-schedule-enabled') && $('mkt-banner-schedule-enabled').checked) ? 'Publikasikan & Jadwalkan' : 'Publish Sekarang';
       if (stateEl) stateEl.textContent = 'Mode baru · Content + penempatan opsional';
     } else {
       var detail = _marketingBannerEditor.detail && _marketingBannerEditor.detail.draft_revision
@@ -8596,9 +8609,21 @@
   }
 
   async function toggleMarketingBannerAssignment(assignmentId, active) {
+    var row = _marketingBannersState.rows.find(function (item) {
+      return item.assignment && String(item.assignment.id) === String(assignmentId);
+    });
+
+    if (!row || !row.assignment) return;
+
+    if (isMarketingBannerBranchManager() && row.assignment.governance_locked) {
+      showToast('⚠️ Assignment ini dikunci Owner.');
+      await loadMarketingBanners();
+      return;
+    }
+
     try {
       var res = await adminFetch(
-        API_BASE + '/admin/marketing/banners/unknown/assignments/' + encodeURIComponent(assignmentId),
+        API_BASE + '/admin/marketing/banners/' + encodeURIComponent(row.banner_id || row.id) + '/assignments/' + encodeURIComponent(assignmentId),
         {
           method: 'PATCH',
           headers: getAuthHeaders(),
@@ -8723,6 +8748,10 @@
       schedule.dataset.bound = '1';
       schedule.addEventListener('change', function () {
         if (scheduleFields) scheduleFields.style.display = schedule.checked ? '' : 'none';
+        var publishAction = $('mkt-banner-publish-action');
+        if (publishAction && _marketingBannerEditor.mode === 'create') {
+          publishAction.textContent = schedule.checked ? 'Publikasikan & Jadwalkan' : 'Publish Sekarang';
+        }
       });
     }
 
