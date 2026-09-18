@@ -1915,15 +1915,15 @@
 
         <!-- Marketing Sub-navigation Tabs -->
         <div class="x-subnav-tabs" id="marketing-subnav-tabs">
-          <button type="button" class="x-subnav-tab active" data-subtab="overview" onclick="navigateTo('marketing/overview')">Overview</button>
-          <button type="button" class="x-subnav-tab" data-subtab="promotions" onclick="navigateTo('marketing/promotions')">Promotions</button>
+          <button type="button" class="x-subnav-tab" data-subtab="overview" onclick="navigateTo('marketing/overview')">Overview</button>
+          <button type="button" class="x-subnav-tab active" data-subtab="promotions" onclick="navigateTo('marketing/promotions')">Promotions</button>
           <button type="button" class="x-subnav-tab" data-subtab="discounts" onclick="navigateTo('marketing/discounts')">Discounts</button>
           <button type="button" class="x-subnav-tab" data-subtab="campaigns" onclick="navigateTo('marketing/campaigns')">Campaigns</button>
           <button type="button" class="x-subnav-tab" data-subtab="loyalty" onclick="navigateTo('marketing/loyalty')">Loyalty</button>
         </div>
 
         <!-- 1. Marketing: Overview Subtab -->
-        <div id="marketing-view-overview" class="x-marketing-subview">
+        <div id="marketing-view-overview" class="x-marketing-subview" style="display:none;">
           <div class="x-stat-grid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:24px;">
             <div class="x-stat-card">
               <div class="x-stat-label">Total Pelanggan Terdaftar</div>
@@ -1975,7 +1975,7 @@
         </div>
 
         <!-- 2. Marketing: Promotions Subtab -->
-        <div id="marketing-view-promotions" class="x-marketing-subview" style="display:none;">
+        <div id="marketing-view-promotions" class="x-marketing-subview">
           <div class="x-card">
             <div class="x-card-header" style="padding:16px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
               <div>

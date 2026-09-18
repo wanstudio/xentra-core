@@ -853,7 +853,7 @@
       'customers': 'customers',
       'reports': 'reports',
       'finance': 'finance/overview',
-      'marketing': 'marketing/overview',
+      'marketing': 'marketing/promotions',
       'settings': 'settings',
       'brand': 'brand',
       'payments': 'payments'
@@ -866,6 +866,7 @@
       applyRoute(canonicalRoute);
     }
   }
+  window.navigateTo = navigateTo;
 
   // Render Branch Manager Navigation in Sidebar (BM-1)
   function renderBranchManagerNavigation() {
@@ -1015,6 +1016,16 @@
       return;
     }
 
+    if (!isPlatform && route === 'marketing') {
+      navigateTo('marketing/promotions');
+      return;
+    }
+
+    if (isBranchManager() && (route === 'marketing' || route.indexOf('marketing/') === 0)) {
+      navigateTo('promo');
+      return;
+    }
+
     var isProductDetail = !isPlatform && route.indexOf('catalog/products/') === 0;
     var productDetailId = isProductDetail ? route.split('catalog/products/')[1] : null;
 
@@ -1039,7 +1050,7 @@
     var financeSubtab = isFinanceRoute ? (route.indexOf('finance/') === 0 ? route.split('finance/')[1] : 'overview') : 'overview';
 
     var isMarketingRoute = !isPlatform && (route === 'marketing' || route.indexOf('marketing/') === 0);
-    var marketingSubtab = isMarketingRoute ? (route.indexOf('marketing/') === 0 ? route.split('marketing/')[1] : 'overview') : 'overview';
+    var marketingSubtab = isMarketingRoute ? (route.indexOf('marketing/') === 0 ? route.split('marketing/')[1] : 'promotions') : 'promotions';
 
     var isSettingsRoute = !isPlatform && (route === 'settings' || route.indexOf('settings/') === 0);
     var settingsSubtab = isSettingsRoute ? (route.indexOf('settings/') === 0 ? route.split('settings/')[1] : 'business/profile') : 'business/profile';
@@ -5259,10 +5270,16 @@
       var isStaff = role === 'cashier' || role === 'kitchen';
       document.querySelectorAll('.x-nav-item').forEach(function (btn) {
         var target = btn.dataset.route || btn.dataset.tab;
-        if (isStaff && (target === 'team' || target === 'settings' || target === 'branches' || target === 'customers')) {
+        if (isStaff && (target === 'team' || target === 'settings' || target === 'branches' || target === 'customers' || target === 'marketing' || target === 'finance')) {
           btn.style.display = 'none';
         }
       });
+    }
+
+    // Marketing campaign builder button is exclusive to Owner
+    var btnCreatePromo = $('btn-mkt-create-promo');
+    if (btnCreatePromo) {
+      btnCreatePromo.style.display = (role === 'owner') ? 'inline-flex' : 'none';
     }
 
     // Role-Aware Portal Label in sidebar badge
@@ -7081,7 +7098,7 @@
      ========================================================================= */
 
   var _activeFinanceSubtab = 'overview';
-  var _activeMarketingSubtab = 'overview';
+  var _activeMarketingSubtab = 'promotions';
 
   function switchFinanceSection(subtab, updateHash) {
     if (!subtab) subtab = 'overview';
@@ -7424,12 +7441,16 @@
       var promos = json.promotions || [];
       _marketingPromotionsState.promotions = promos;
 
+      var user = getStoredUser();
+      var isOwner = user && user.role === 'owner';
+
       if (promos.length === 0) {
+        var createFirstBtn = isOwner ? '<button type="button" class="x-btn-primary" onclick="openCreatePromotionModal()" style="font-size:12px;padding:6px 14px;">+ Buat Promo Pertama</button>' : '';
         tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8">' +
           '<div style="font-size:36px;margin-bottom:8px;">🎁</div>' +
           '<div style="font-weight:700;color:var(--text-main);margin-bottom:4px;">Belum Ada Program Promosi</div>' +
-          '<p class="text-muted" style="font-size:12px;margin:0 0 12px;">Mulai buat promosi pertama seperti Insentif Instalasi PWA untuk mendorong retensi pelanggan.</p>' +
-          '<button type="button" class="x-btn-primary" onclick="openCreatePromotionModal()" style="font-size:12px;padding:6px 14px;">+ Buat Promo Pertama</button>' +
+          '<p class="text-muted" style="font-size:12px;margin:0 0 12px;">' + (isOwner ? 'Mulai buat promosi pertama seperti Insentif Instalasi PWA untuk mendorong retensi pelanggan.' : 'Belum ada program promosi.') + '</p>' +
+          createFirstBtn +
           '</td></tr>';
         return;
       }
@@ -7471,6 +7492,17 @@
         if (p.capability_type === 'install_incentive') capLabel = '📱 Insentif PWA';
         else if (p.capability_type === 'first_order') capLabel = '🥇 First Order';
 
+        var actionBtns = '';
+        if (isOwner) {
+          actionBtns += '<button type="button" class="x-btn-secondary" onclick="openEditPromotionModal(\'' + esc(p.id) + '\')" style="padding:4px 8px;font-size:11px;margin-right:4px;">Edit</button>';
+        }
+        actionBtns += '<button type="button" class="x-btn-secondary" onclick="toggleMarketingPromotionActive(\'' + esc(p.id) + '\', ' + (p.is_active === 1 ? 0 : 1) + ')" style="padding:4px 8px;font-size:11px;margin-right:4px;">' +
+          (p.is_active === 1 ? 'Nonaktifkan' : 'Aktifkan') +
+        '</button>';
+        if (isOwner) {
+          actionBtns += '<button type="button" class="x-btn-secondary" onclick="deleteMarketingPromotion(\'' + esc(p.id) + '\')" style="padding:4px 8px;font-size:11px;color:#dc2626;">Hapus</button>';
+        }
+
         return '<tr>' +
           '<td><strong>' + esc(p.name) + '</strong>' + (p.code ? ' <code style="font-size:11px;background:#f1f5f9;padding:2px 4px;border-radius:4px;">' + esc(p.code) + '</code>' : '') + '</td>' +
           '<td><span class="x-badge" style="background:#f0f9ff;color:#0369a1;font-size:11px;">' + capLabel + '</span><br><code style="font-size:10px;color:#64748b;">' + esc(p.stacking_policy) + '</code></td>' +
@@ -7478,13 +7510,7 @@
           '<td>' + scopeSummary + '</td>' +
           '<td><strong>' + (p.redemptions_count || 0) + '</strong> klaim</td>' +
           '<td>' + statusBadge + '</td>' +
-          '<td style="text-align:right;white-space:nowrap;">' +
-            '<button type="button" class="x-btn-secondary" onclick="openEditPromotionModal(\'' + esc(p.id) + '\')" style="padding:4px 8px;font-size:11px;margin-right:4px;">Edit</button>' +
-            '<button type="button" class="x-btn-secondary" onclick="toggleMarketingPromotionActive(\'' + esc(p.id) + '\', ' + (p.is_active === 1 ? 0 : 1) + ')" style="padding:4px 8px;font-size:11px;margin-right:4px;">' +
-              (p.is_active === 1 ? 'Nonaktifkan' : 'Aktifkan') +
-            '</button>' +
-            '<button type="button" class="x-btn-secondary" onclick="deleteMarketingPromotion(\'' + esc(p.id) + '\')" style="padding:4px 8px;font-size:11px;color:#dc2626;">Hapus</button>' +
-          '</td>' +
+          '<td style="text-align:right;white-space:nowrap;">' + actionBtns + '</td>' +
         '</tr>';
       });
 
@@ -7590,6 +7616,12 @@
   }
 
   async function openCreatePromotionModal() {
+    var user = getStoredUser();
+    if (!user || user.role !== 'owner') {
+      showToast('Akses ditolak: Hanya Owner yang berwenang membuat program promosi.');
+      return;
+    }
+
     var modal = $('modal-mkt-promotion');
     if (!modal) return;
 
@@ -7617,6 +7649,12 @@
   window.openCreatePromotionModal = openCreatePromotionModal;
 
   async function openEditPromotionModal(promoId) {
+    var user = getStoredUser();
+    if (!user || user.role !== 'owner') {
+      showToast('Akses ditolak: Hanya Owner yang berwenang mengubah program promosi.');
+      return;
+    }
+
     var modal = $('modal-mkt-promotion');
     if (!modal) return;
 
@@ -7796,6 +7834,12 @@
   window.toggleMarketingPromotionActive = toggleMarketingPromotionActive;
 
   async function deleteMarketingPromotion(promoId) {
+    var user = getStoredUser();
+    if (!user || user.role !== 'owner') {
+      showToast('Akses ditolak: Hanya Owner yang berwenang menghapus program promosi.');
+      return;
+    }
+
     if (!confirm('Apakah Anda yakin ingin menghapus program promosi ini? Tindakan ini tidak dapat dibatalkan.')) return;
 
     try {
