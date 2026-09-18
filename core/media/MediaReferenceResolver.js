@@ -92,6 +92,30 @@ class MediaReferenceResolver {
       }
     }
 
+    // 2b. Check canonical Storefront Banner Content revisions.
+    // Published revisions remain customer-visible history and therefore protect
+    // their media from garbage collection even when a draft revision points at
+    // another asset.
+    const bannerRevision = this.db.queryOne(`
+      SELECT r.id, r.banner_id, r.revision_status, b.brand_id
+      FROM storefront_banner_revisions r
+      JOIN storefront_banners b ON b.id = r.banner_id
+      WHERE r.media_id = ?
+        AND b.brand_id = ?
+      LIMIT 1
+    `, [mediaId, brandId]);
+
+    if (bannerRevision) {
+      references.push({
+        type: 'banner_content_revision',
+        id: bannerRevision.id,
+        field: 'media_id'
+      });
+    }
+
+    // 2c. Storefront Banner Assignment does not own media. It references
+    // Banner Content, so there is intentionally no direct media lookup here.
+
     // 3. Check Products table (canonical media_id or image_url/image)
     let prodSql = 'SELECT id, brand_id, media_id, image_url, image FROM products WHERE (media_id = ? OR image_url LIKE ? OR image LIKE ?)';
     const prodParams = [mediaId, mediaIdPattern, mediaIdPattern];

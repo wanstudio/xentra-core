@@ -38,6 +38,7 @@
   var catalogLoadSeq = 0;
   var productLoadSeq = 0;
   var catalogBranchId = null;
+  var bannerLoadSeq = 0;
 
   var ICONS = {
     minus: '/assets/icons/minus.svg',
@@ -193,59 +194,238 @@
    * Falls back gracefully to whatever static slides exist in the HTML.
    * After rendering, re-initializes the carousel behavior.
    */
-  function loadBanners() {
+  function loadBanners(branchId) {
     var track = $('x-carousel-track');
     if (!track) return;
 
-    API.get('/brand/info')
+    var seq = ++bannerLoadSeq;
+    var query = branchId ? '?branch_id=' + encodeURIComponent(String(branchId)) : '';
+
+    API.get('/brand/info' + query)
       .then(function (data) {
+        if (seq !== bannerLoadSeq) return;
+
         if (data && data.brand && Store && typeof Store.setBrand === 'function') {
           Store.setBrand(data.brand);
         }
+
         var banners = data && data.brand && Array.isArray(data.brand.banners) ? data.brand.banners : [];
+
+        // Clear prior carousel content, including clones, before rendering the
+        // authoritative branch-specific response.
+        Array.from(track.querySelectorAll('.x-carousel-slide')).forEach(function (s) {
+          s.parentNode && s.parentNode.removeChild(s);
+        });
+
         if (!banners.length) {
           initCarousel();
           return;
         }
 
-        // Clear static placeholder slides
-        // Remove existing .x-carousel-slide elements (but preserve clones too)
-        Array.from(track.querySelectorAll('.x-carousel-slide')).forEach(function (s) {
-          s.parentNode && s.parentNode.removeChild(s);
-        });
-
-        // Render banner slides using canonical media
         banners.forEach(function (banner, idx) {
           var slide = document.createElement('div');
           slide.className = 'x-carousel-slide';
 
           var imgHtml = '';
           if (Media && typeof Media.buildBannerImg === 'function') {
-            // First slide: eager (above the fold); rest: lazy
             imgHtml = Media.buildBannerImg(banner, idx === 0);
           } else {
-            // Fallback if XentraMedia is unavailable
             var src = banner.image_url || banner.preview_url || '';
             if (src) {
-              imgHtml = '<img src="' + src + '" alt="' + (banner.title || 'Promo') + '"' +
+              imgHtml = '<img src="' + UI.escape(src) + '" alt="' + UI.escape(banner.title || 'Banner') + '"' +
                 (idx === 0 ? ' loading="eager"' : ' loading="lazy"') +
                 ' style="width:100%;height:auto;border-radius:20px;display:block;">';
             }
           }
 
-          if (imgHtml) {
-            slide.innerHTML = imgHtml;
-            track.appendChild(slide);
-          }
+          if (!imgHtml) return;
+
+          slide.innerHTML = imgHtml;
+          bindBannerCta(slide, banner);
+          track.appendChild(slide);
         });
 
-        // Re-initialize carousel with the new slides
         initCarousel();
       })
-      .catch(function () {
-        // Network failure: use whatever static slides are already in the DOM
+      .catch(function (err) {
+        if (seq !== bannerLoadSeq) return;
+        console.warn('[Home] Banner load warn:', err);
         initCarousel();
       });
+  }
+
+  function currentCustomerBranchId() {
+    return activeBranch ? String(activeBranch.id) : null;
+  }
+
+  function findCurrentProductForBanner(productId) {
+    var targetId = String(productId || '');
+    var local = products.find(function (product) {
+      return String(product.id) === targetId;
+    });
+    if (local) return local;
+
+    for (var i = 0; i < categories.length; i++) {
+      var items = Array.isArray(categories[i].products) ? categories[i].products : [];
+      var hit = items.find(function (product) {
+        return String(product.id) === targetId;
+      });
+      if (hit) return hit;
+    }
+
+    return null;
+  }
+
+  function goToBannerCategory(categoryId) {
+    var target = null;
+    var track = $('x-cat-track');
+    if (track) {
+      var buttons = track.querySelectorAll('[data-cat-id]');
+      buttons.forEach(function (button) {
+        if (!target && String(button.getAttribute('data-cat-id')) === String(categoryId)) {
+          target = button;
+        }
+      });
+    }
+
+    if (target) {
+      target.click();
+      return true;
+    }
+
+    UI.toast('Kategori Banner belum tersedia di menu cabang ini.');
+    return false;
+  }
+
+  function goToBannerProduct(productId) {
+    var localProduct = findCurrentProductForBanner(productId);
+    if (localProduct) {
+      openProductDetail(localProduct);
+      return Promise.resolve(true);
+    }
+
+    var branchId = currentCustomerBranchId();
+    var endpoint = branchId
+      ? '/catalog/menu?branch_id=' + encodeURIComponent(branchId)
+      : '/catalog/menu';
+
+    return API.get(endpoint).then(function (data) {
+      var hit = null;
+      var cats = data && Array.isArray(data.categories) ? data.categories : [];
+
+      cats.some(function (cat) {
+        var items = Array.isArray(cat.products) ? cat.products : [];
+        var found = items.find(function (product) {
+          return String(product.id) === String(productId);
+        });
+        if (found) {
+          hit = found;
+          return true;
+        }
+        return false;
+      });
+
+      if (hit) {
+        openProductDetail(hit);
+        return true;
+      }
+
+      UI.toast('Produk Banner tidak tersedia di cabang ini.');
+      return false;
+    }).catch(function () {
+      UI.toast('Produk Banner tidak dapat dibuka saat ini.');
+      return false;
+    });
+  }
+
+  function goToBannerPromotion(promotionId) {
+    var branchId = currentCustomerBranchId();
+
+    // Promotion CTA is presentation only. The Promotion domain remains the
+    // authority for eligibility/redemption, so the Banner never applies a
+    // discount itself. Opening Checkout lets the existing promotion evaluation
+    // run against the current branch/cart context.
+    var branchQuery = branchId ? '?branch_id=' + encodeURIComponent(branchId) : '';
+
+    return API.get('/promo/active' + branchQuery)
+      .then(function (res) {
+        var all = []
+          .concat(Array.isArray(res && res.promotions) ? res.promotions : [])
+          .concat(Array.isArray(res && res.applied) ? res.applied : []);
+
+        var found = all.some(function (item) {
+          return String(item && (item.promo_id || item.promotion_id || item.id)) === String(promotionId);
+        });
+
+        if (!found) {
+          UI.toast('Promo ini sedang tidak tersedia untuk cabang atau kondisi saat ini.');
+          return false;
+        }
+
+        if (window.Xentra && window.Xentra.Router) {
+          window.Xentra.Router.navigate('checkout');
+          return true;
+        }
+
+        UI.toast('Promo tersedia. Lanjutkan ke Checkout untuk memeriksa ketentuan.');
+        return true;
+      })
+      .catch(function () {
+        UI.toast('Promo belum dapat diverifikasi saat ini.');
+        return false;
+      });
+  }
+
+  function bindBannerCta(slide, banner) {
+    if (!slide || !banner) return;
+
+    var ctaType = String(banner.cta_type || 'NONE').toUpperCase();
+    if (ctaType === 'NONE') return;
+
+    slide.classList.add('x-carousel-slide-clickable');
+    slide.setAttribute('role', 'link');
+    slide.setAttribute('tabindex', '0');
+
+    var activate = function () {
+      if (ctaType === 'URL') {
+        var raw = String(banner.cta_url || banner.link || '').trim();
+        if (!raw) return;
+
+        var safeUrl = null;
+        try {
+          var parsed = new URL(raw, window.location.origin);
+          if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            safeUrl = parsed.href;
+          }
+        } catch (_) {}
+
+        if (safeUrl) window.location.href = safeUrl;
+        else UI.toast('Tautan Banner tidak valid.');
+        return;
+      }
+
+      if (ctaType === 'CATEGORY') {
+        goToBannerCategory(banner.cta_target_id);
+        return;
+      }
+
+      if (ctaType === 'PRODUCT') {
+        goToBannerProduct(banner.cta_target_id);
+        return;
+      }
+
+      if (ctaType === 'PROMOTION') {
+        goToBannerPromotion(banner.promotion_id);
+      }
+    };
+
+    slide.addEventListener('click', activate);
+    slide.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        activate();
+      }
+    });
   }
 
   function initCarousel() {
@@ -512,6 +692,7 @@
         activeBranch = null;
         try { Store.setBranchContext(null); } catch (_) {}
         loadCatalog(null);
+        loadBanners(null);
       }
       renderBranchDiscovery();
     }
@@ -532,6 +713,7 @@
     // horizontal scroll position. Full render only when the branch list changes.
     updateBranchActiveState();
     loadCatalog(activeBranch ? activeBranch.id : null);
+    loadBanners(activeBranch ? activeBranch.id : null);
     if (activeBranch && !quiet && UI && typeof UI.toast === 'function') {
       UI.toast('Kamu memesan dari ' + activeBranch.name);
     }
@@ -1774,20 +1956,22 @@
     updateClock();
     setInterval(updateClock, 1000);
 
-    // M6: Load canonical banner media from /brand/info, then init carousel.
-    // Falls back to static HTML slides if the API is unavailable.
-    loadBanners();
-
-    // 1. First paint without a "wrong branch" flash: when a branch context survived
-    // a reload, show an honest loading state (never a brand-wide catalog inside
-    // a branch context). Without one, the brand-wide menu is the legitimate
-    // first paint and comes from the cache/first-paint fallback.
+    // 1. Determine persisted branch context before loading branch-specific
+    // banner content. Home discovery later refreshes the context authoritatively.
     var bootBranchId = null;
     try {
       var persistedCtx = Store.getState().branchContext;
       if (persistedCtx && persistedCtx.branch_id != null) bootBranchId = String(persistedCtx.branch_id);
     } catch (_) {}
 
+    // M6: Load canonical banner media for the persisted Branch when available;
+    // otherwise legacy Brand banner fallback remains the initial presentation.
+    loadBanners(bootBranchId);
+
+    // 2. First paint without a "wrong branch" flash: when a branch context survived
+    // a reload, show an honest loading state (never a brand-wide catalog inside
+    // a branch context). Without one, the brand-wide menu is the legitimate
+    // first paint and comes from the cache/first-paint fallback.
     if (bootBranchId) {
       clearCatalogForBranch('Memuat menu cabang...');
     } else {

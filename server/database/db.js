@@ -761,6 +761,7 @@ function initSchema(targetDb) {
       is_open_override INTEGER DEFAULT 1,
       payment_config_override TEXT,
       is_archived INTEGER DEFAULT 0,
+      timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
@@ -1028,6 +1029,93 @@ function initSchema(targetDb) {
     CREATE INDEX IF NOT EXISTS idx_pbs_promo ON promotion_branch_scope(promotion_id);
     CREATE INDEX IF NOT EXISTS idx_pbs_branch_active ON promotion_branch_scope(branch_id, is_active);
     CREATE INDEX IF NOT EXISTS idx_pbs_brand_branch ON promotion_branch_scope(brand_id, branch_id);
+
+    /* =====================================================================
+       STOREFRONT BANNER CONTENT DOMAIN
+       Content/publication only. Placement/assignment/schedule/active state
+       intentionally live in a separate branch-scoped assignment boundary.
+       ===================================================================== */
+    CREATE TABLE IF NOT EXISTS storefront_banners (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      publication_status TEXT NOT NULL DEFAULT 'DRAFT'
+        CHECK (publication_status IN ('DRAFT', 'PUBLISHED')),
+      created_by TEXT,
+      updated_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS storefront_banner_revisions (
+      id TEXT PRIMARY KEY,
+      banner_id TEXT NOT NULL,
+      revision_number INTEGER NOT NULL,
+      revision_status TEXT NOT NULL DEFAULT 'DRAFT'
+        CHECK (revision_status IN ('DRAFT', 'PUBLISHED')),
+      title TEXT NOT NULL DEFAULT '',
+      alt_text TEXT NOT NULL DEFAULT '',
+      media_id TEXT NOT NULL,
+      cta_type TEXT NOT NULL DEFAULT 'NONE'
+        CHECK (cta_type IN ('NONE', 'PROMOTION', 'PRODUCT', 'CATEGORY', 'URL')),
+      cta_target_id TEXT,
+      cta_url TEXT,
+      promotion_id TEXT,
+      created_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      published_at TEXT,
+      FOREIGN KEY (banner_id) REFERENCES storefront_banners(id) ON DELETE CASCADE,
+      UNIQUE (banner_id, revision_number)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_storefront_banner_one_draft
+      ON storefront_banner_revisions(banner_id)
+      WHERE revision_status = 'DRAFT';
+
+    CREATE INDEX IF NOT EXISTS idx_storefront_banner_brand
+      ON storefront_banners(brand_id, updated_at);
+
+    CREATE INDEX IF NOT EXISTS idx_storefront_banner_revision_banner
+      ON storefront_banner_revisions(banner_id, revision_number DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_storefront_banner_revision_media
+      ON storefront_banner_revisions(media_id);
+
+    CREATE TABLE IF NOT EXISTS storefront_banner_assignments (
+      id TEXT PRIMARY KEY,
+      banner_id TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      branch_id TEXT NOT NULL,
+      placement TEXT NOT NULL DEFAULT 'HOME_BANNER_CAROUSEL'
+        CHECK (placement IN ('HOME_BANNER_CAROUSEL')),
+      position INTEGER NOT NULL DEFAULT 1 CHECK (position >= 1),
+      active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+      starts_at TEXT,
+      ends_at TEXT,
+      timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta',
+      governance_locked INTEGER NOT NULL DEFAULT 0 CHECK (governance_locked IN (0, 1)),
+      created_by TEXT,
+      updated_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (banner_id) REFERENCES storefront_banners(id) ON DELETE CASCADE,
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+      CHECK (ends_at IS NULL OR starts_at IS NOT NULL),
+      CHECK (ends_at IS NULL OR starts_at IS NULL OR ends_at > starts_at)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_storefront_banner_assignment_branch
+      ON storefront_banner_assignments(brand_id, branch_id, placement, position);
+
+    CREATE INDEX IF NOT EXISTS idx_storefront_banner_assignment_banner
+      ON storefront_banner_assignments(banner_id, branch_id);
+
+    CREATE INDEX IF NOT EXISTS idx_storefront_banner_assignment_visibility
+      ON storefront_banner_assignments(branch_id, placement, position, active);
+
+
 
     CREATE TABLE IF NOT EXISTS branch_categories (
       id TEXT PRIMARY KEY,
@@ -1412,6 +1500,8 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN whatsapp_number TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN is_archived INTEGER DEFAULT 0;'); } catch (e) {}
+  // Storefront banner schedule timezone follows the target Branch.
+  try { targetDb.exec("ALTER TABLE branches ADD COLUMN timezone TEXT NOT NULL DEFAULT 'Asia/Jakarta';"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN brand_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN slug TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN image_url TEXT;'); } catch (e) {}

@@ -43,6 +43,10 @@ class PermissionModel {
     DELIVERY_MANAGE: 'delivery:manage',
     DELIVERY_VIEW: 'delivery:view',
 
+    // Storefront Marketing / Banner
+    BANNER_MANAGE: 'banner:manage',
+    BANNER_VIEW: 'banner:view',
+
     // Reports & Analytics
     ANALYTICS_VIEW: 'analytics:view',
 
@@ -82,6 +86,8 @@ class PermissionModel {
       'inventory:view',
       'delivery:manage',
       'delivery:view',
+      'banner:manage',
+      'banner:view',
       'analytics:view'
     ],
     [RoleModel.ROLES.BRAND_MANAGER]: [
@@ -100,6 +106,8 @@ class PermissionModel {
       'inventory:view',
       'delivery:manage',
       'delivery:view',
+      'banner:manage',
+      'banner:view',
       'analytics:view'
     ],
     [RoleModel.ROLES.BRANCH_MANAGER]: [
@@ -119,6 +127,8 @@ class PermissionModel {
       'inventory:view',
       'delivery:manage',
       'delivery:view',
+      'banner:manage',
+      'banner:view',
       'analytics:view'
     ],
     [RoleModel.ROLES.CASHIER]: [

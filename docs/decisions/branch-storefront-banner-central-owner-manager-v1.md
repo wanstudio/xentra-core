@@ -1,5 +1,9 @@
 # Xentra — Branch Storefront Banner: Central Owner Manager & Branch Slots v1
 
+**Status: SUPERSEDED BY** `docs/decisions/storefront-banner-placement-promotion-boundary-v2.md`  
+**Superseded date:** 2026-09-18  
+**Use this document only for historical context; do not implement its fixed five-slot invariant.**
+
 **Status:** SUPERSEDED  
 **Decision date:** 2026-09-17  
 **Superseded by:** `docs/decisions/storefront-banner-placement-promotion-boundary-v2.md` (2026-09-18)

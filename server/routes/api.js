@@ -18,7 +18,10 @@ const PricingPolicyModel = require('../../domains/commerce/models/PricingPolicyM
 const { XentraConnectorClient, XentraConnectorError } = require('../../core/integration/XentraConnectorClient');
 const { ImageValidator } = require('../../core/domain');
 const { MediaService } = require('../../core/media');
+const { BannerContentService, BannerAssignmentService } = require('../../domains/banner');
 const mediaService = new MediaService();
+const bannerContentService = new BannerContentService({ media: mediaService });
+const bannerAssignmentService = new BannerAssignmentService();
 
 // 0. Active Promotions & Evaluation Endpoint
 router.get(['/promo/active', '/promotions/active'], (req, res) => {
@@ -48,40 +51,79 @@ router.get(['/promo/active', '/promotions/active'], (req, res) => {
 });
 
 // 1. Get Brand Profile & Theme
+function resolveCustomerBannerPayload(req, brandId) {
+  const legacy = parseLegacyBrandBanners(req.brand);
+  const requestedBranchId = req.query.branch_id || req.query.branchId || null;
+
+  if (!requestedBranchId) {
+    return legacy.map(b => resolveBannerDelivery(b, brandId));
+  }
+
+  const branch = db.prepare(`
+    SELECT id, timezone
+    FROM branches
+    WHERE id = ?
+      AND brand_id = ?
+      AND is_active = 1
+      AND (is_archived = 0 OR is_archived IS NULL)
+    LIMIT 1
+  `).get(String(requestedBranchId), brandId);
+
+  if (!branch) {
+    return legacy.map(b => resolveBannerDelivery(b, brandId));
+  }
+
+  // Explicit reconciliation rule:
+  // legacy Brand banners remain the fallback until the Branch has at least one
+  // new Banner Assignment. Once the Branch uses the new assignment system, that
+  // system becomes authoritative for the Branch, including the intentional
+  // zero-visible-banner case (all paused/future/ended).
+  const assignmentCount = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM storefront_banner_assignments
+    WHERE brand_id = ? AND branch_id = ?
+  `).get(brandId, branch.id);
+
+  if (!assignmentCount || Number(assignmentCount.count || 0) === 0) {
+    return legacy.map(b => resolveBannerDelivery(b, brandId));
+  }
+
+  const resolved = bannerAssignmentService.listCustomerBanners({
+    brandId,
+    branchId: branch.id
+  });
+
+  return resolved.map(banner => {
+    const delivery = bannerMediaDelivery(brandId, banner.media_id);
+    return {
+      id: banner.id,
+      assignment_id: banner.assignment_id,
+      branch_id: banner.branch_id,
+      placement: banner.placement,
+      position: banner.position,
+      active: banner.active,
+      starts_at: banner.starts_at,
+      ends_at: banner.ends_at,
+      timezone: banner.timezone || branch.timezone || 'Asia/Jakarta',
+      publication_status: banner.publication_status,
+      effective_status: banner.effective_status,
+      title: banner.title,
+      alt_text: banner.alt_text,
+      media_id: banner.media_id,
+      preview_url: delivery.preview_url,
+      srcset_variants: delivery.srcset_variants,
+      cta_type: banner.cta_type,
+      cta_target_id: banner.cta_target_id,
+      cta_url: banner.cta_url,
+      promotion_id: banner.promotion_id,
+      link: banner.cta_type === 'URL' ? banner.cta_url : '#'
+    };
+  });
+}
+
 router.get('/brand/info', (req, res) => {
   try {
     const brandId = req.brand_id;
-    let banners = [];
-    const hasExplicitBanners = req.brand && req.brand.banners !== null && req.brand.banners !== undefined && req.brand.banners !== '';
-    if (hasExplicitBanners) {
-      try {
-        banners = typeof req.brand.banners === 'string' ? JSON.parse(req.brand.banners) : req.brand.banners;
-      } catch (e) {
-        banners = [];
-      }
-      if (!Array.isArray(banners)) banners = [];
-    } else {
-      banners = [
-        {
-          id: 'banner_1',
-          image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80',
-          title: 'Slalu ada sensasi di setiap gigitan',
-          link: '#'
-        },
-        {
-          id: 'banner_2',
-          image_url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80',
-          title: 'Paket Spesial Diskon 20%',
-          link: '#'
-        },
-        {
-          id: 'banner_3',
-          image_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80',
-          title: 'Ayam Tulang Lunak Khas Bangjo',
-          link: '#'
-        }
-      ];
-    }
 
     // M6: Resolve canonical media delivery for logo (logo_media_id → derivative)
     let logoDeliveryUrl = req.brand.logo_url || null;
@@ -98,8 +140,7 @@ router.get('/brand/info', (req, res) => {
       }
     } catch (_) {}
 
-    // M6: Enrich each banner with canonical media delivery (banner derivative preferred)
-    const enrichedBanners = banners.map(b => resolveBannerDelivery(b, brandId));
+    const enrichedBanners = resolveCustomerBannerPayload(req, brandId);
 
     res.json({
       success: true,
@@ -126,7 +167,7 @@ router.get('/brand/branches', (req, res) => {
       .prepare(`
         SELECT 
           b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone,
-          b.is_active, b.is_open_override,
+          b.is_active, b.is_open_override, b.timezone,
           s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km,
           s.promo_delivery_discount, s.promo_min_order
         FROM branches b
@@ -6528,7 +6569,7 @@ router.get('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, res
   try {
     const branches = db.prepare(`
       SELECT 
-        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived,
+        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived, b.timezone,
         s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order,
         (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id) AS total_orders,
         (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id AND o.status IN ('pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery')) AS active_orders
@@ -6557,7 +6598,8 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
       price_per_km,
       max_radius_km,
       promo_min_order,
-      promo_delivery_discount
+      promo_delivery_discount,
+      timezone
     } = req.body;
 
     const rawWa = (whatsapp_number || phone || '').trim();
@@ -6593,10 +6635,16 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
     const branchWa = rawWa;
 
     const isOpenOverride = req.body.is_open_override !== undefined ? (req.body.is_open_override ? 1 : 0) : 1;
+    const branchTimezone = String(timezone || 'Asia/Jakarta').trim();
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: branchTimezone }).format(new Date());
+    } catch (_) {
+      return res.status(400).json({ success: false, error: 'Timezone cabang tidak valid. Gunakan IANA timezone seperti Asia/Jakarta.' });
+    }
 
     db.prepare(`
-      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, timezone)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     `).run(
       branchId,
       req.brand_id,
@@ -6607,7 +6655,8 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
       longitude !== undefined ? longitude : 0,
       branchPhone,
       branchWa,
-      isOpenOverride
+      isOpenOverride,
+      branchTimezone
     );
 
     const deliverySettingsId = 'bds_' + branchId;
@@ -6637,7 +6686,8 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
         whatsapp_number: branchWa,
         address_text: address_text || '',
         is_active: 1,
-        is_open_override: isOpenOverride
+        is_open_override: isOpenOverride,
+        timezone: branchTimezone
       }
     });
   } catch (err) {
@@ -6661,7 +6711,7 @@ router.get('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
 
     const branch = db.prepare(`
       SELECT 
-        b.id, b.brand_id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived,
+        b.id, b.brand_id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived, b.timezone,
         b.created_at, b.updated_at,
         s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order,
         (SELECT COUNT(*) FROM branch_products bp WHERE bp.branch_id = b.id) AS adopted_products_count,
@@ -6690,7 +6740,7 @@ router.get('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
 
 router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
+    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount, timezone } = req.body;
     const targetPhone = phone !== undefined ? phone : null;
     const targetWa = whatsapp_number !== undefined ? whatsapp_number : null;
 
@@ -6717,7 +6767,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
     // P1 TENANT WRITE BOUNDARY GUARD (FINDING 01): Verify branch ownership before ANY mutation
     // B1: full pre-mutation snapshot is captured so every authorized change is auditable (B1.10).
     const existingBranch = db.prepare(`
-      SELECT id, name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override
+      SELECT id, name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, timezone
       FROM branches WHERE id = ? AND brand_id = ?
     `).get(req.params.id, req.brand_id);
     if (!existingBranch) {
@@ -6726,6 +6776,33 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         error: 'Cabang tidak ditemukan pada brand ini.'
       });
     }
+
+    let normalizedTimezone = timezone === undefined
+      ? (existingBranch.timezone || 'Asia/Jakarta')
+      : String(timezone || '').trim();
+
+    if (!normalizedTimezone) normalizedTimezone = 'Asia/Jakarta';
+
+    if (timezone !== undefined) {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: normalizedTimezone }).format(new Date());
+      } catch (_) {
+        return res.status(400).json({
+          success: false,
+          error: 'Timezone cabang tidak valid. Gunakan IANA timezone seperti Asia/Jakarta.'
+        });
+      }
+    }
+
+    if (req.user.role === 'branch_manager' &&
+        timezone !== undefined &&
+        normalizedTimezone !== (existingBranch.timezone || 'Asia/Jakarta')) {
+      return res.status(403).json({
+        success: false,
+        error: 'Branch Manager tidak berwenang mengubah timezone cabang.'
+      });
+    }
+
     const existingSettings = db.prepare(`
       SELECT free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount
       FROM branch_delivery_settings WHERE branch_id = ?
@@ -6785,6 +6862,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
             whatsapp_number = COALESCE(?, whatsapp_number),
             is_active = COALESCE(?, is_active),
             is_open_override = COALESCE(?, is_open_override),
+            timezone = COALESCE(?, timezone),
             updated_at = datetime('now')
         WHERE id = ? AND brand_id = ?
       `).run(
@@ -6796,6 +6874,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         targetWa !== undefined ? targetWa : null,
         providedIsActive,
         providedIsOpenOverride,
+        timezone !== undefined ? normalizedTimezone : null,
         req.params.id,
         req.brand_id
       );
@@ -6857,7 +6936,8 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         { field: 'phone', prev: existingBranch.phone, next: targetPhone !== undefined ? String(targetPhone) : existingBranch.phone, isNum: false },
         { field: 'whatsapp_number', prev: existingBranch.whatsapp_number || null, next: targetWa !== undefined ? String(targetWa) : (existingBranch.whatsapp_number || null), isNum: false },
         { field: 'is_active', prev: existingBranch.is_active, next: providedIsActive !== null ? providedIsActive : existingBranch.is_active, isNum: true },
-        { field: 'is_open_override', prev: prevOpen, next: providedIsOpenOverride !== null ? providedIsOpenOverride : prevOpen, isNum: true }
+        { field: 'is_open_override', prev: prevOpen, next: providedIsOpenOverride !== null ? providedIsOpenOverride : prevOpen, isNum: true },
+        { field: 'timezone', prev: existingBranch.timezone || 'Asia/Jakarta', next: timezone !== undefined ? normalizedTimezone : (existingBranch.timezone || 'Asia/Jakarta'), isNum: false }
       ];
 
       const hadSettingsRow = Boolean(db.prepare('SELECT 1 FROM branch_delivery_settings WHERE branch_id = ?').get(req.params.id));
@@ -6904,7 +6984,8 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
       branch: {
         id: existingBranch.id,
         is_active: providedIsActive !== null ? providedIsActive : existingBranch.is_active,
-        is_open_override: providedIsOpenOverride !== null ? providedIsOpenOverride : (existingBranch.is_open_override == null ? 1 : existingBranch.is_open_override)
+        is_open_override: providedIsOpenOverride !== null ? providedIsOpenOverride : (existingBranch.is_open_override == null ? 1 : existingBranch.is_open_override),
+        timezone: timezone !== undefined ? normalizedTimezone : (existingBranch.timezone || 'Asia/Jakarta')
       }
     });
   } catch (err) {
@@ -9297,6 +9378,507 @@ router.get('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager',
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+
+// 6.00 STOREFRONT BANNERS — Content + Placement/Assignment APIs
+// Content is Brand-scoped. Assignment is Branch-scoped. Promotion remains separate.
+// ============================================================================
+function bannerActor(req) {
+  return {
+    id: req.user && (req.user.userId || req.user.id),
+    userId: req.user && (req.user.userId || req.user.id),
+    role: req.user && req.user.role,
+    branch_id: req.user && (req.user.branch_id || req.user.branchId),
+    branchId: req.user && (req.user.branch_id || req.user.branchId),
+    organization_id: req.brand && req.brand.organization_id
+  };
+}
+
+function bannerMediaDelivery(brandId, mediaId) {
+  if (!mediaId) {
+    return { media_id: null, preview_url: null, srcset_variants: [] };
+  }
+
+  try {
+    const asset = mediaService.getMedia({ mediaId, brandId });
+    const variants = Array.isArray(asset.variants) ? asset.variants : [];
+    const preview = variants.find(v => Number(v.width) >= 640) || variants[variants.length - 1] || null;
+    return {
+      media_id: mediaId,
+      preview_url: preview ? preview.url : asset.url,
+      srcset_variants: variants.map(v => ({
+        url: v.url,
+        width: v.width,
+        height: v.height,
+        name: v.name
+      }))
+    };
+  } catch (_) {
+    return { media_id: mediaId, preview_url: null, srcset_variants: [] };
+  }
+}
+
+function parseLegacyBrandBanners(brand) {
+  if (!brand || brand.banners === null || brand.banners === undefined || brand.banners === '') return [];
+  try {
+    const parsed = typeof brand.banners === 'string' ? JSON.parse(brand.banners) : brand.banners;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function bannerRowToAdminDto(row) {
+  const published = row.published_revision_id ? {
+    id: row.published_revision_id,
+    revision_number: row.published_revision_number,
+    title: row.published_title || '',
+    alt_text: row.published_alt_text || '',
+    media_id: row.published_media_id,
+    cta_type: row.published_cta_type || 'NONE',
+    cta_target_id: row.published_cta_target_id || null,
+    cta_url: row.published_cta_url || null,
+    promotion_id: row.published_promotion_id || null
+  } : null;
+
+  const draft = row.draft_revision_id ? {
+    id: row.draft_revision_id,
+    revision_number: row.draft_revision_number,
+    title: row.draft_title || '',
+    alt_text: row.draft_alt_text || '',
+    media_id: row.draft_media_id,
+    cta_type: row.draft_cta_type || 'NONE',
+    cta_target_id: row.draft_cta_target_id || null,
+    cta_url: row.draft_cta_url || null,
+    promotion_id: row.draft_promotion_id || null
+  } : null;
+
+  const liveContent = published || draft;
+  const media = bannerMediaDelivery(row.brand_id, liveContent ? liveContent.media_id : null);
+
+  return {
+    id: row.banner_id,
+    banner_id: row.banner_id,
+    title: liveContent ? liveContent.title : '',
+    alt_text: liveContent ? liveContent.alt_text : '',
+    publication_status: row.banner_publication_status || 'DRAFT',
+    has_draft_changes: Boolean(draft && published),
+    published_revision: published,
+    draft_revision: draft,
+    media,
+    assignment: {
+      id: row.id,
+      branch_id: row.branch_id,
+      branch_name: row.branch_name,
+      branch_timezone: row.branch_timezone || 'Asia/Jakarta',
+      placement: row.placement,
+      position: Number(row.position),
+      active: Number(row.active) === 1,
+      starts_at: row.starts_at || null,
+      ends_at: row.ends_at || null,
+      timezone: row.branch_timezone || row.timezone || 'Asia/Jakarta',
+      governance_locked: Number(row.governance_locked) === 1,
+      effective_status: require('../../domains/banner/services/BannerDateTime').effectiveStatus({
+        published: row.banner_publication_status === 'PUBLISHED' && Boolean(row.published_revision_id),
+        active: Number(row.active) === 1,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at
+      })
+    }
+  };
+}
+
+router.get('/admin/marketing/banners', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const requestedBranchId = req.query.branch_id || null;
+    const rows = bannerAssignmentService.listAssignments({
+      brandId: req.brand_id,
+      branchId: requestedBranchId,
+      actor
+    });
+
+    const contentItems = bannerContentService.listBanners({ brandId: req.brand_id });
+    const result = rows.map(bannerRowToAdminDto);
+    const assignedBannerIds = new Set(result.map(item => item.banner_id));
+
+    const includeUnassignedContent = actor.role !== 'branch_manager' && !requestedBranchId;
+
+    for (const content of contentItems) {
+      if (assignedBannerIds.has(content.id)) continue;
+      if (!includeUnassignedContent) continue;
+      const published = content.published_revision;
+      const draft = content.draft_revision;
+      const live = published || draft;
+      const media = bannerMediaDelivery(req.brand_id, live ? live.media_id : null);
+      result.push({
+        id: content.id,
+        banner_id: content.id,
+        title: live ? live.title : '',
+        alt_text: live ? live.alt_text : '',
+        publication_status: content.publication_status,
+        has_draft_changes: Boolean(draft && published),
+        published_revision: published ? {
+          id: published.id,
+          revision_number: published.revision_number,
+          title: published.title || '',
+          alt_text: published.alt_text || '',
+          media_id: published.media_id,
+          cta_type: published.cta_type || 'NONE',
+          cta_target_id: published.cta_target_id || null,
+          cta_url: published.cta_url || null,
+          promotion_id: published.promotion_id || null
+        } : null,
+        draft_revision: draft ? {
+          id: draft.id,
+          revision_number: draft.revision_number,
+          title: draft.title || '',
+          alt_text: draft.alt_text || '',
+          media_id: draft.media_id,
+          cta_type: draft.cta_type || 'NONE',
+          cta_target_id: draft.cta_target_id || null,
+          cta_url: draft.cta_url || null,
+          promotion_id: draft.promotion_id || null
+        } : null,
+        media,
+        assignment: null
+      });
+    }
+
+    result.sort((a, b) => {
+      const an = (a.assignment && a.assignment.branch_name) || '';
+      const bn = (b.assignment && b.assignment.branch_name) || '';
+      return an.localeCompare(bn) || Number(a.assignment?.position || 9999) - Number(b.assignment?.position || 9999);
+    });
+
+    var branches = bannerAssignmentService.repository.listBranches(req.brand_id);
+    if (actor.role === 'branch_manager') {
+      const ownBranchId = actor.branch_id || actor.branchId;
+      branches = ownBranchId
+        ? branches.filter(function (branch) { return String(branch.id) === String(ownBranchId); })
+        : [];
+    }
+
+    const legacy = parseLegacyBrandBanners(req.brand);
+    res.json({
+      success: true,
+      placement: 'HOME_BANNER_CAROUSEL',
+      banners: result,
+      branches,
+      legacy: {
+        available: legacy.length > 0,
+        count: legacy.length,
+        fallback_active: true
+      }
+    });
+  } catch (err) {
+    const status = ['FORBIDDEN_BRANCH_SCOPE', 'BRANCH_NOT_FOUND', 'ASSIGNMENT_GOVERNANCE_LOCKED'].includes(err.code) ? 403 : 500;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'BANNER_LIST_ERROR' });
+  }
+});
+
+router.get('/admin/marketing/banners/:bannerId', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const content = bannerContentService.getBanner({
+      brandId: req.brand_id,
+      bannerId: req.params.bannerId
+    });
+    const assignments = bannerAssignmentService.listAssignments({
+      brandId: req.brand_id,
+      branchId: actor.role === 'branch_manager' ? actor.branch_id : null,
+      actor
+    }).filter(row => row.banner_id === req.params.bannerId);
+
+    if (actor.role === 'branch_manager' && assignments.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN_BRANCH_SCOPE',
+        message: 'Banner tidak ditugaskan pada cabang Branch Manager.'
+      });
+    }
+
+    res.json({
+      success: true,
+      banner: {
+        id: content.id,
+        brand_id: content.brand_id,
+        publication_status: content.publication_status,
+        published_revision: content.published_revision,
+        draft_revision: content.draft_revision,
+        revisions: content.revisions || [],
+        assignments: assignments.map(bannerRowToAdminDto).map(item => item.assignment),
+        media: bannerMediaDelivery(
+          req.brand_id,
+          content.draft_revision?.media_id || content.published_revision?.media_id || null
+        )
+      }
+    });
+  } catch (err) {
+    const status = err.code === 'BANNER_NOT_FOUND' || err.code === 'ASSIGNMENT_NOT_FOUND' ? 404 : (err.code ? 403 : 500);
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'BANNER_DETAIL_ERROR' });
+  }
+});
+
+router.post('/admin/marketing/banners', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const {
+      media_id,
+      title = '',
+      alt_text = '',
+      cta_type = 'NONE',
+      cta_target_id = null,
+      cta_url = null,
+      promotion_id = null
+    } = req.body || {};
+
+    const banner = await bannerContentService.createDraft({
+      brandId: req.brand_id,
+      actorId: actor.id,
+      actorRole: actor.role,
+      mediaId: media_id,
+      title,
+      altText: alt_text,
+      ctaType: cta_type,
+      ctaTargetId: cta_target_id,
+      ctaUrl: cta_url,
+      promotionId: promotion_id
+    });
+
+    res.status(201).json({ success: true, banner });
+  } catch (err) {
+    const status = ['BANNER_NOT_FOUND', 'INVALID_PRODUCT_REFERENCE', 'INVALID_CATEGORY_REFERENCE', 'INVALID_PROMOTION_REFERENCE'].includes(err.code)
+      ? 404
+      : 400;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'BANNER_CREATE_ERROR' });
+  }
+});
+
+router.patch('/admin/marketing/banners/:bannerId/draft', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const {
+      media_id,
+      title = '',
+      alt_text = '',
+      cta_type = 'NONE',
+      cta_target_id = null,
+      cta_url = null,
+      promotion_id = null
+    } = req.body || {};
+
+    const banner = await bannerContentService.updateDraft({
+      brandId: req.brand_id,
+      bannerId: req.params.bannerId,
+      actorId: actor.id,
+      actorRole: actor.role,
+      mediaId: media_id,
+      title,
+      altText: alt_text,
+      ctaType: cta_type,
+      ctaTargetId: cta_target_id,
+      ctaUrl: cta_url,
+      promotionId: promotion_id
+    });
+
+    res.json({ success: true, banner });
+  } catch (err) {
+    const status = err.code === 'BANNER_NOT_FOUND' ? 404 : 400;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'BANNER_DRAFT_UPDATE_ERROR' });
+  }
+});
+
+router.post('/admin/marketing/banners/:bannerId/publish', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const banner = await bannerContentService.publishDraft({
+      brandId: req.brand_id,
+      bannerId: req.params.bannerId,
+      actorId: actor.id,
+      actorRole: actor.role
+    });
+    res.json({ success: true, banner });
+  } catch (err) {
+    const status = err.code === 'BANNER_NOT_FOUND' || err.code === 'DRAFT_NOT_FOUND' ? 404
+      : err.code === 'BANNER_POSITION_CONFLICT' ? 409
+      : 400;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'BANNER_PUBLISH_ERROR', conflict: err.conflict || null });
+  }
+});
+
+router.post('/admin/marketing/banners/:bannerId/discard-draft', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const banner = await bannerContentService.discardDraft({
+      brandId: req.brand_id,
+      bannerId: req.params.bannerId,
+      actorId: actor.id,
+      actorRole: actor.role
+    });
+    res.json({ success: true, banner });
+  } catch (err) {
+    const status = err.code === 'BANNER_NOT_FOUND' || err.code === 'DRAFT_NOT_FOUND' ? 404
+      : err.code === 'DISCARD_REQUIRES_PUBLISHED' ? 409
+      : 400;
+    res.status(status).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'BANNER_DISCARD_DRAFT_ERROR'
+    });
+  }
+});
+
+router.delete('/admin/marketing/banners/:bannerId', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const result = await bannerContentService.deleteDraft({
+      brandId: req.brand_id,
+      bannerId: req.params.bannerId,
+      actorId: actor.id,
+      actorRole: actor.role
+    });
+    res.json(result);
+  } catch (err) {
+    const status = err.code === 'BANNER_NOT_FOUND' ? 404
+      : ['BANNER_ASSIGNMENTS_EXIST', 'PUBLISHED_BANNER_DELETE_FORBIDDEN'].includes(err.code) ? 409
+      : 400;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'BANNER_DELETE_ERROR' });
+  }
+});
+
+router.post('/admin/marketing/banners/:bannerId/assignments', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const assignment = bannerAssignmentService.createAssignment({
+      brandId: req.brand_id,
+      bannerId: req.params.bannerId,
+      actor,
+      branchId: req.body && req.body.branch_id,
+      placement: req.body && req.body.placement,
+      position: req.body && req.body.position,
+      active: req.body && req.body.active !== undefined ? req.body.active : true,
+      startsAtLocal: req.body && (req.body.starts_at_local || req.body.startsAtLocal),
+      endsAtLocal: req.body && (req.body.ends_at_local || req.body.endsAtLocal),
+      governanceLocked: req.body && req.body.governance_locked
+    });
+    res.status(201).json({
+      success: true,
+      assignment: bannerAssignmentDtoForResponse(req.brand_id, assignment)
+    });
+  } catch (err) {
+    const status = err.code === 'BANNER_POSITION_CONFLICT' ? 409
+      : ['BRANCH_NOT_FOUND', 'BANNER_NOT_FOUND'].includes(err.code) ? 404
+      : err.code && String(err.code).indexOf('FORBIDDEN') === 0 ? 403
+      : 400;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'ASSIGNMENT_CREATE_ERROR', conflict: err.conflict || null });
+  }
+});
+
+router.post('/admin/marketing/banners/:bannerId/assignments/bulk', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const assignments = bannerAssignmentService.createAssignmentsBulk({
+      brandId: req.brand_id,
+      bannerId: req.params.bannerId,
+      actor,
+      branchIds: req.body && req.body.branch_ids,
+      placement: req.body && req.body.placement,
+      position: req.body && req.body.position,
+      active: req.body && req.body.active !== undefined ? req.body.active : true,
+      startsAtLocal: req.body && (req.body.starts_at_local || req.body.startsAtLocal),
+      endsAtLocal: req.body && (req.body.ends_at_local || req.body.endsAtLocal),
+      governanceLocked: req.body && req.body.governance_locked
+    });
+
+    res.status(201).json({
+      success: true,
+      assignments: assignments.map(item => bannerAssignmentDtoForResponse(req.brand_id, item))
+    });
+  } catch (err) {
+    const status = err.code === 'BANNER_POSITION_CONFLICT' ? 409
+      : ['BRANCH_NOT_FOUND', 'BANNER_NOT_FOUND'].includes(err.code) ? 404
+      : 400;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'ASSIGNMENT_BULK_ERROR', conflict: err.conflict || null });
+  }
+});
+
+router.patch('/admin/marketing/banners/:bannerId/assignments/:assignmentId', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const current = bannerAssignmentService.getBannerAssignment(req.brand_id, req.params.assignmentId);
+    if (current.banner_id !== req.params.bannerId) {
+      return res.status(404).json({ success: false, error: 'Banner Assignment tidak ditemukan.', code: 'ASSIGNMENT_NOT_FOUND' });
+    }
+
+    const assignment = bannerAssignmentService.updateAssignment({
+      brandId: req.brand_id,
+      assignmentId: req.params.assignmentId,
+      actor,
+      position: req.body && req.body.position !== undefined ? req.body.position : null,
+      active: req.body && req.body.active !== undefined ? req.body.active : null,
+      startsAtLocal: req.body && (req.body.starts_at_local !== undefined ? req.body.starts_at_local : undefined),
+      endsAtLocal: req.body && (req.body.ends_at_local !== undefined ? req.body.ends_at_local : undefined),
+      governanceLocked: req.body && req.body.governance_locked !== undefined ? req.body.governance_locked : null
+    });
+    res.json({ success: true, assignment: bannerAssignmentDtoForResponse(req.brand_id, assignment) });
+  } catch (err) {
+    const status = err.code === 'BANNER_POSITION_CONFLICT' ? 409
+      : err.code === 'ASSIGNMENT_NOT_FOUND' ? 404
+      : err.code === 'ASSIGNMENT_GOVERNANCE_LOCKED' ? 403
+      : err.code && String(err.code).indexOf('FORBIDDEN') === 0 ? 403
+      : 400;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'ASSIGNMENT_UPDATE_ERROR', conflict: err.conflict || null });
+  }
+});
+
+router.delete('/admin/marketing/banners/:bannerId/assignments/:assignmentId', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const current = bannerAssignmentService.getBannerAssignment(req.brand_id, req.params.assignmentId);
+    if (current.banner_id !== req.params.bannerId) {
+      return res.status(404).json({ success: false, error: 'Banner Assignment tidak ditemukan.', code: 'ASSIGNMENT_NOT_FOUND' });
+    }
+    const result = bannerAssignmentService.deleteAssignment({
+      brandId: req.brand_id,
+      assignmentId: req.params.assignmentId,
+      actor
+    });
+    res.json(result);
+  } catch (err) {
+    const status = err.code === 'ASSIGNMENT_NOT_FOUND' ? 404
+      : err.code === 'ASSIGNMENT_GOVERNANCE_LOCKED' ? 403
+      : err.code && String(err.code).indexOf('FORBIDDEN') === 0 ? 403
+      : 400;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'ASSIGNMENT_DELETE_ERROR' });
+  }
+});
+
+// Helper kept local to the API boundary for response consistency.
+function bannerAssignmentDtoForResponse(brandId, assignment) {
+  const row = bannerAssignmentService.getBannerAssignment(brandId, assignment.id);
+  const published = row.banner_publication_status === 'PUBLISHED';
+  return {
+    id: row.id,
+    banner_id: row.banner_id,
+    branch_id: row.branch_id,
+    branch_name: row.branch_name,
+    branch_timezone: row.branch_timezone || 'Asia/Jakarta',
+    placement: row.placement,
+    position: Number(row.position),
+    active: Number(row.active) === 1,
+    starts_at: row.starts_at || null,
+    ends_at: row.ends_at || null,
+    timezone: row.branch_timezone || row.timezone || 'Asia/Jakarta',
+    governance_locked: Number(row.governance_locked) === 1,
+    effective_status: require('../../domains/banner/services/BannerDateTime').effectiveStatus({
+      published: published,
+      active: Number(row.active) === 1,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at
+    })
+  };
+}
 
 // 6.01 Create Marketing Promotion (Owner / Brand Manager)
 router.post('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager']), (req, res) => {
