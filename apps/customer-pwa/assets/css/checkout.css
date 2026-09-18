@@ -2126,10 +2126,11 @@
 	padding:14px 18px calc(20px + env(safe-area-inset-bottom)) !important;
 	box-shadow:0 -10px 35px rgba(0,0,0,.15) !important;
 	transform:translateY(105%) !important;
-	transition:transform 0.38s cubic-bezier(0.22, 0.61, 0.36, 1) !important;
+	transition:transform 0.38s cubic-bezier(0.22, 0.61, 0.36, 1), margin-bottom 0.18s ease !important;
 	will-change:transform !important;
 	touch-action:pan-y !important;
 	box-sizing:border-box !important;
+	overscroll-behavior:contain !important;
 }
 
 .x-sheet.open,

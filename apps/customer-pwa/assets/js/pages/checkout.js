@@ -1244,26 +1244,59 @@
     });
 
     var isClosing = false;
+    var vpHandler = null;
+
     function close() {
       if (isClosing) return;
       isClosing = true;
       overlay.classList.remove('open');
+      // Restore sheet bottom offset when closing
+      var sheet = overlay.querySelector('.x-alt-sheet, .x-sheet');
+      if (sheet) sheet.style.marginBottom = '';
+      // Tear down visualViewport listener
+      if (window.visualViewport && vpHandler) {
+        window.visualViewport.removeEventListener('resize', vpHandler);
+        window.visualViewport.removeEventListener('scroll', vpHandler);
+      }
       setTimeout(function () {
         if (overlay.parentNode) overlay.remove();
       }, 380);
+    }
+
+    // ── visualViewport: push sheet above soft keyboard ──────────────────────
+    // When the on-screen keyboard opens, visualViewport.height shrinks.
+    // We add a bottom margin to the sheet equal to the keyboard height so
+    // the CTA button stays visible above the keyboard at all times.
+    if (window.visualViewport) {
+      vpHandler = function () {
+        var sheet = overlay.querySelector('.x-alt-sheet, .x-sheet');
+        if (!sheet || isClosing) return;
+        var offsetFromBottom = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+        sheet.style.marginBottom = offsetFromBottom > 0 ? offsetFromBottom + 'px' : '';
+      };
+      window.visualViewport.addEventListener('resize', vpHandler);
+      window.visualViewport.addEventListener('scroll', vpHandler);
     }
 
     if (window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
       window.XentraNav.pushClose(close);
     }
 
+    // ── Backdrop close — suppressed while soft keyboard is open ─────────────
+    // On mobile, swiping down to dismiss the keyboard fires a touchend that
+    // can land on the backdrop and incorrectly close the sheet.
+    // Guard: if visualViewport is significantly smaller than window.innerHeight
+    // the keyboard is likely still open — skip close so only the keyboard
+    // is dismissed, not the sheet.
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) {
-        if (window.XentraNav && typeof window.XentraNav.close === 'function') {
-          window.XentraNav.close();
-        } else {
-          close();
-        }
+      if (e.target !== overlay) return;
+      var keyboardLikelyOpen = window.visualViewport &&
+        (window.innerHeight - window.visualViewport.height) > 100;
+      if (keyboardLikelyOpen) return;
+      if (window.XentraNav && typeof window.XentraNav.close === 'function') {
+        window.XentraNav.close();
+      } else {
+        close();
       }
     });
 
@@ -2096,6 +2129,15 @@
         if (UI && UI.toast) UI.toast('Gagal mengirim kode OTP. Periksa koneksi Anda.');
       });
     };
+
+    // Enter / Go key on keyboard triggers CTA directly
+    var nameInput = sh.overlay.querySelector('#x-otp-input-name');
+    var phoneInput = sh.overlay.querySelector('#x-otp-input-phone');
+    function onPhoneEnter(e) {
+      if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); sendBtn.click(); }
+    }
+    if (nameInput) nameInput.addEventListener('keydown', onPhoneEnter);
+    if (phoneInput) phoneInput.addEventListener('keydown', onPhoneEnter);
   }
 
   function renderOtpVerifyStep(phone, name, challengeId, retryAfter, onSuccess) {
@@ -2204,6 +2246,19 @@
         if (UI && UI.toast) UI.toast('Gagal mengirim ulang OTP. Periksa koneksi Anda.');
       });
     };
+
+    // Enter / Go key on keyboard triggers verify directly
+    if (codeInput) {
+      codeInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); verifyBtn.click(); }
+      });
+      // Auto-submit when all 6 digits are entered (best UX — no tap needed)
+      codeInput.addEventListener('input', function () {
+        if (codeInput.value.replace(/\D/g, '').length === 6) {
+          setTimeout(function () { verifyBtn.click(); }, 120);
+        }
+      });
+    }
   }
 
   // ── 3. Fulfillment Note Sheet ──
