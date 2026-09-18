@@ -354,8 +354,8 @@ class BannerAssignmentService {
     actor,
     position = null,
     active = null,
-    startsAtLocal = null,
-    endsAtLocal = null,
+    startsAtLocal,
+    endsAtLocal,
     governanceLocked = null
   }) {
     const current = this.getBannerAssignment(brandId, assignmentId);
