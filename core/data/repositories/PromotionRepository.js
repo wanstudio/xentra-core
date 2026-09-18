@@ -464,6 +464,17 @@ class PromotionRepository {
       WHERE order_id = ? AND status = 'active'
     `, [reason, orderId]);
   }
+
+  deletePromotion(promotionId, brandId) {
+    const promo = this.findPromotionById(promotionId);
+    if (!promo || promo.brand_id !== brandId) return false;
+
+    this.db.execute('DELETE FROM promotion_rewards WHERE promotion_id = ?', [promotionId]);
+    this.db.execute('DELETE FROM promotion_rules WHERE promotion_id = ?', [promotionId]);
+    this.db.execute('DELETE FROM promotion_branch_scope WHERE promotion_id = ?', [promotionId]);
+    this.db.execute('DELETE FROM promotions WHERE id = ? AND brand_id = ?', [promotionId, brandId]);
+    return true;
+  }
 }
 
 module.exports = PromotionRepository;

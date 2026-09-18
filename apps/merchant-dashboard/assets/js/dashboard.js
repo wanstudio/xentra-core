@@ -7434,10 +7434,18 @@
         return;
       }
 
+      var nowIso = new Date().toISOString();
       var rows = promos.map(function (p) {
-        var statusBadge = (p.is_active === 1 || p.is_active === true)
-          ? '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Aktif</span>'
-          : '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-weight:600;">Nonaktif</span>';
+        var statusBadge = '';
+        if (p.is_active !== 1 && p.is_active !== true) {
+          statusBadge = '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-weight:600;">Nonaktif</span>';
+        } else if (p.start_at && p.start_at > nowIso) {
+          statusBadge = '<span class="x-badge" style="background:#fef3c7;color:#b45309;font-weight:700;">Terjadwal</span>';
+        } else if (p.end_at && p.end_at < nowIso) {
+          statusBadge = '<span class="x-badge" style="background:#fee2e2;color:#b91c1c;font-weight:700;">Berakhir</span>';
+        } else {
+          statusBadge = '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Aktif</span>';
+        }
 
         // Format Reward summary
         var rewardSummary = '—';
@@ -7569,6 +7577,18 @@
   }
   window.onPromotionCapabilityChange = onPromotionCapabilityChange;
 
+  function formatDateTimeLocal(isoStr) {
+    if (!isoStr) return '';
+    try {
+      var d = new Date(isoStr);
+      if (isNaN(d.getTime())) return '';
+      var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    } catch (e) {
+      return '';
+    }
+  }
+
   async function openCreatePromotionModal() {
     var modal = $('modal-mkt-promotion');
     if (!modal) return;
@@ -7582,6 +7602,8 @@
     $('mkt-promo-limit-per-user').value = '1';
     $('mkt-promo-limit-total').value = '';
     $('mkt-promo-status').value = '1';
+    if ($('mkt-promo-start-at')) $('mkt-promo-start-at').value = '';
+    if ($('mkt-promo-end-at')) $('mkt-promo-end-at').value = '';
     $('mkt-promo-reward-type').value = 'freebie_product';
     if ($('mkt-promo-branches-all')) $('mkt-promo-branches-all').checked = true;
 
@@ -7613,6 +7635,8 @@
     $('mkt-promo-limit-per-user').value = promo.max_redemptions_per_customer || 1;
     $('mkt-promo-limit-total').value = promo.max_redemptions_total || '';
     $('mkt-promo-status').value = promo.is_active === 1 ? '1' : '0';
+    if ($('mkt-promo-start-at')) $('mkt-promo-start-at').value = formatDateTimeLocal(promo.start_at);
+    if ($('mkt-promo-end-at')) $('mkt-promo-end-at').value = formatDateTimeLocal(promo.end_at);
 
     var targetProdId = null;
     if (Array.isArray(promo.rewards) && promo.rewards.length > 0) {
@@ -7651,6 +7675,8 @@
     var limitPerUser = parseInt($('mkt-promo-limit-per-user').value, 10) || 1;
     var limitTotal = parseInt($('mkt-promo-limit-total').value, 10) || null;
     var isActive = $('mkt-promo-status').value === '1' ? 1 : 0;
+    var startAtVal = $('mkt-promo-start-at') ? $('mkt-promo-start-at').value : '';
+    var endAtVal = $('mkt-promo-end-at') ? $('mkt-promo-end-at').value : '';
     var rewardType = $('mkt-promo-reward-type').value;
     var targetProductId = $('mkt-promo-target-product').value;
 
@@ -7661,6 +7687,14 @@
     if (!targetProductId) {
       showToast('Pilih produk hadiah dari katalog master.');
       return;
+    }
+    if (startAtVal && endAtVal) {
+      var sTime = new Date(startAtVal).getTime();
+      var eTime = new Date(endAtVal).getTime();
+      if (eTime < sTime) {
+        showToast('Tanggal berakhir promosi tidak boleh lebih awal dari tanggal mulai.');
+        return;
+      }
     }
 
     var branchBoxes = document.querySelectorAll('input[name="mkt-promo-branch"]:checked');
@@ -7699,6 +7733,8 @@
       priority_weight: capability === 'install_incentive' ? 100 : 50,
       max_redemptions_total: limitTotal,
       max_redemptions_per_customer: limitPerUser,
+      start_at: startAtVal ? new Date(startAtVal).toISOString() : null,
+      end_at: endAtVal ? new Date(endAtVal).toISOString() : null,
       is_active: isActive,
       rules: rules,
       rewards: rewards,

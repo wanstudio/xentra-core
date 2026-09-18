@@ -8942,6 +8942,19 @@ const { PaymentRepository: CorePaymentRepo, PromotionRepository: CorePromotionRe
 const corePaymentRepo = new CorePaymentRepo();
 const corePromotionRepo = new CorePromotionRepo();
 
+function logPromotionSecurityEvent({ actor_id, actor_role, action, brand_id, organization_id = null, branch_id = null, result, metadata }) {
+  try {
+    const id = 'sal_' + crypto.randomBytes(16).toString('hex');
+    const safeMetadata = metadata ? JSON.stringify(metadata) : null;
+    db.prepare(`
+      INSERT INTO security_audit_log (id, actor_id, actor_role, action, target_user_id, target_role, brand_id, organization_id, branch_id, result, metadata, created_at)
+      VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(id, actor_id || null, actor_role || null, action, brand_id || null, organization_id || null, branch_id || null, result, safeMetadata);
+  } catch (e) {
+    console.warn('[Promotion Audit Log Error]:', e.message);
+  }
+}
+
 // 1. Finance Overview API
 router.get('/admin/finance/overview', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
@@ -9231,6 +9244,26 @@ router.post('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager'
       return res.status(400).json({ success: false, error: 'Nama promosi wajib diisi.' });
     }
 
+    if (start_at && end_at) {
+      const sTime = new Date(start_at).getTime();
+      const eTime = new Date(end_at).getTime();
+      if (eTime < sTime) {
+        return res.status(400).json({ success: false, error: 'Tanggal berakhir promosi tidak boleh lebih awal dari tanggal mulai.' });
+      }
+    }
+
+    const safeBranchIds = Array.isArray(branch_ids) ? branch_ids : [];
+    if (safeBranchIds.length > 0) {
+      const placeholders = safeBranchIds.map(() => '?').join(',');
+      const rows = db.prepare(`SELECT id FROM branches WHERE brand_id = ? AND id IN (${placeholders})`).all(req.brand_id, ...safeBranchIds);
+      if (rows.length !== safeBranchIds.length) {
+        return res.status(403).json({
+          success: false,
+          error: 'Satu atau lebih cabang tidak valid atau bukan milik brand ini.'
+        });
+      }
+    }
+
     const created = corePromotionRepo.createPromotion({
       id,
       brandId: req.brand_id,
@@ -9246,7 +9279,20 @@ router.post('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager'
       isActive: is_active !== undefined ? (is_active ? 1 : 0) : 1,
       rules: Array.isArray(rules) ? rules : [],
       rewards: Array.isArray(rewards) ? rewards : [],
-      branchIds: Array.isArray(branch_ids) ? branch_ids : []
+      branchIds: safeBranchIds
+    });
+
+    logPromotionSecurityEvent({
+      actor_id: req.user?.id || req.session?.userId,
+      actor_role: req.user?.role,
+      action: 'PROMOTION_CREATED',
+      brand_id: req.brand_id,
+      result: 'SUCCESS',
+      metadata: {
+        promotion_id: created.id,
+        name: created.name,
+        branch_ids: safeBranchIds
+      }
     });
 
     res.status(201).json({
@@ -9283,6 +9329,27 @@ router.put('/admin/marketing/promotions/:id', requireAuth(['owner', 'brand_manag
       branch_ids
     } = req.body;
 
+    const effectiveStartAt = start_at !== undefined ? start_at : existing.start_at;
+    const effectiveEndAt = end_at !== undefined ? end_at : existing.end_at;
+    if (effectiveStartAt && effectiveEndAt) {
+      const sTime = new Date(effectiveStartAt).getTime();
+      const eTime = new Date(effectiveEndAt).getTime();
+      if (eTime < sTime) {
+        return res.status(400).json({ success: false, error: 'Tanggal berakhir promosi tidak boleh lebih awal dari tanggal mulai.' });
+      }
+    }
+
+    if (Array.isArray(branch_ids) && branch_ids.length > 0) {
+      const placeholders = branch_ids.map(() => '?').join(',');
+      const rows = db.prepare(`SELECT id FROM branches WHERE brand_id = ? AND id IN (${placeholders})`).all(req.brand_id, ...branch_ids);
+      if (rows.length !== branch_ids.length) {
+        return res.status(403).json({
+          success: false,
+          error: 'Satu atau lebih cabang tidak valid atau bukan milik brand ini.'
+        });
+      }
+    }
+
     const updated = corePromotionRepo.updatePromotion(promotionId, req.brand_id, {
       name: name !== undefined ? name.trim() : undefined,
       code: code !== undefined ? (code ? code.trim().toUpperCase() : null) : undefined,
@@ -9296,6 +9363,18 @@ router.put('/admin/marketing/promotions/:id', requireAuth(['owner', 'brand_manag
       rules,
       rewards,
       branchIds: branch_ids
+    });
+
+    logPromotionSecurityEvent({
+      actor_id: req.user?.id || req.session?.userId,
+      actor_role: req.user?.role,
+      action: 'PROMOTION_UPDATED',
+      brand_id: req.brand_id,
+      result: 'SUCCESS',
+      metadata: {
+        promotion_id: promotionId,
+        is_active: is_active !== undefined ? (is_active ? 1 : 0) : undefined
+      }
     });
 
     res.json({
@@ -9316,10 +9395,25 @@ router.delete('/admin/marketing/promotions/:id', requireAuth(['owner', 'brand_ma
       return res.status(404).json({ success: false, error: 'Promosi tidak ditemukan.' });
     }
 
-    db.prepare('DELETE FROM promotion_rewards WHERE promotion_id = ?').run(promotionId);
-    db.prepare('DELETE FROM promotion_rules WHERE promotion_id = ?').run(promotionId);
-    db.prepare('DELETE FROM promotion_branch_scope WHERE promotion_id = ?').run(promotionId);
-    db.prepare('DELETE FROM promotions WHERE id = ? AND brand_id = ?').run(promotionId, req.brand_id);
+    // Safety Audit: block hard delete if redemptions exist to preserve immutable audit trail
+    const redemptionRow = db.prepare('SELECT COUNT(*) as count FROM promotion_redemptions WHERE promotion_id = ?').get(promotionId);
+    if (redemptionRow && Number(redemptionRow.count) > 0) {
+      return res.status(409).json({
+        success: false,
+        error: 'Promosi tidak dapat dihapus karena memiliki riwayat penebusan pesanan. Silakan nonaktifkan promosi sebagai gantinya.'
+      });
+    }
+
+    corePromotionRepo.deletePromotion(promotionId, req.brand_id);
+
+    logPromotionSecurityEvent({
+      actor_id: req.user?.id || req.session?.userId,
+      actor_role: req.user?.role,
+      action: 'PROMOTION_DELETED',
+      brand_id: req.brand_id,
+      result: 'SUCCESS',
+      metadata: { promotion_id: promotionId, name: existing.name }
+    });
 
     res.json({
       success: true,
@@ -9341,8 +9435,18 @@ router.post('/admin/marketing/promotions/:id/scopes', requireAuth(['owner', 'bra
     }
 
     const promo = corePromotionRepo.findPromotion(promotionId);
-    if (!promo) {
-      return res.status(404).json({ success: false, error: 'Promotion not found.' });
+    if (!promo || promo.brand_id !== req.brand_id) {
+      return res.status(404).json({ success: false, error: 'Promosi tidak ditemukan.' });
+    }
+
+    // Strict validation: every branch_id must belong to req.brand_id
+    const placeholders = branch_ids.map(() => '?').join(',');
+    const rows = db.prepare(`SELECT id FROM branches WHERE brand_id = ? AND id IN (${placeholders})`).all(req.brand_id, ...branch_ids);
+    if (rows.length !== branch_ids.length) {
+      return res.status(403).json({
+        success: false,
+        error: 'Satu atau lebih cabang tidak valid atau bukan milik brand ini.'
+      });
     }
 
     for (const branchId of branch_ids) {
@@ -9353,6 +9457,15 @@ router.post('/admin/marketing/promotions/:id/scopes', requireAuth(['owner', 'bra
         isActive: is_active
       });
     }
+
+    logPromotionSecurityEvent({
+      actor_id: req.user?.id || req.session?.userId,
+      actor_role: req.user?.role,
+      action: 'PROMOTION_SCOPE_ASSIGNED',
+      brand_id: req.brand_id,
+      result: 'SUCCESS',
+      metadata: { promotion_id: promotionId, branch_ids, is_active }
+    });
 
     const scopes = corePromotionRepo.findBranchScopes(promotionId);
     res.json({
@@ -9372,6 +9485,11 @@ router.patch('/admin/marketing/promotions/:id/branch-activation', requireAuth(['
     const { is_active } = req.body;
     let targetBranchId = req.body.branch_id;
 
+    const promo = corePromotionRepo.findPromotion(promotionId);
+    if (!promo || promo.brand_id !== req.brand_id) {
+      return res.status(404).json({ success: false, error: 'Promosi tidak ditemukan.' });
+    }
+
     if (req.user.role === 'branch_manager') {
       const userBranchId = req.user.branch_id || req.user.branchId;
       if (!userBranchId) {
@@ -9387,6 +9505,12 @@ router.patch('/admin/marketing/promotions/:id/branch-activation', requireAuth(['
       return res.status(400).json({ success: false, error: 'branch_id is required.' });
     }
 
+    // Verify target branch belongs to caller's brand
+    const branchRecord = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(targetBranchId, req.brand_id);
+    if (!branchRecord) {
+      return res.status(403).json({ success: false, error: 'Cabang bukan milik brand ini.' });
+    }
+
     const existingScope = corePromotionRepo.findBranchScope(promotionId, targetBranchId);
     if (!existingScope) {
       return res.status(404).json({ success: false, error: 'Promotion is not scoped to this branch.' });
@@ -9397,6 +9521,16 @@ router.patch('/admin/marketing/promotions/:id/branch-activation', requireAuth(['
       promotionId,
       branchId: targetBranchId,
       isActive: newActiveState
+    });
+
+    logPromotionSecurityEvent({
+      actor_id: req.user?.id || req.session?.userId,
+      actor_role: req.user?.role,
+      action: 'PROMOTION_BRANCH_ACTIVATED',
+      brand_id: req.brand_id,
+      branch_id: targetBranchId,
+      result: 'SUCCESS',
+      metadata: { promotion_id: promotionId, is_active: newActiveState }
     });
 
     res.json({
