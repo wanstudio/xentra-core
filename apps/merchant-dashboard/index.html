@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=3.0.6">
+  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=3.0.7">
 </head>
 <body>
 
@@ -1918,6 +1918,7 @@
           <button type="button" class="x-subnav-tab active" data-subtab="overview" onclick="navigateTo('marketing/overview')">Overview</button>
           <button type="button" class="x-subnav-tab" data-subtab="promotions" onclick="navigateTo('marketing/promotions')">Promotions</button>
           <button type="button" class="x-subnav-tab" data-subtab="discounts" onclick="navigateTo('marketing/discounts')">Discounts</button>
+          <button type="button" class="x-subnav-tab" data-subtab="banners" onclick="navigateTo('marketing/banners')">Banners</button>
           <button type="button" class="x-subnav-tab" data-subtab="campaigns" onclick="navigateTo('marketing/campaigns')">Campaigns</button>
           <button type="button" class="x-subnav-tab" data-subtab="loyalty" onclick="navigateTo('marketing/loyalty')">Loyalty</button>
         </div>
@@ -2022,7 +2023,56 @@
           </div>
         </div>
 
-        <!-- 4. Marketing: Campaigns Subtab (Honest Empty State) -->
+
+        <!-- 4. Marketing: Storefront Banners -->
+        <div id="marketing-view-banners" class="x-marketing-subview" style="display:none;">
+          <div class="x-card x-marketing-banner-panel">
+            <div class="x-card-header x-marketing-banner-header">
+              <div>
+                <h3>🖼️ Storefront Banners</h3>
+                <p class="text-muted">Kelola banner storefront, publikasi, penempatan, jadwal tampil, dan visibilitas ke pelanggan.</p>
+              </div>
+              <button type="button" class="x-btn-primary" id="btn-mkt-create-banner-skeleton" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:8px 16px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                + Tambah Banner
+              </button>
+            </div>
+
+            <div class="x-marketing-banner-toolbar">
+              <div class="x-marketing-banner-toolbar-copy">
+                <strong>Homepage Banner</strong>
+                <span>Placement v1 untuk storefront customer.</span>
+              </div>
+              <div class="x-marketing-banner-filter" aria-hidden="true">
+                <span class="x-marketing-banner-filter-label">Scope</span>
+                <span class="x-marketing-banner-filter-value">Semua Cabang</span>
+              </div>
+            </div>
+
+            <div class="x-table-responsive">
+              <table class="x-table x-marketing-banner-table">
+                <thead>
+                  <tr>
+                    <th>Banner</th>
+                    <th>Placement</th>
+                    <th>Cabang / Scope</th>
+                    <th>Publikasi</th>
+                    <th>Jadwal</th>
+                    <th>Visibility</th>
+                    <th style="text-align:right;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="mkt-banners-table-body">
+                  <tr>
+                    <td colspan="7" class="text-center py-6 text-muted">Memuat struktur banner...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. Marketing: Campaigns Subtab (Honest Empty State) -->
         <div id="marketing-view-campaigns" class="x-marketing-subview" style="display:none;">
           <div class="x-card" style="padding:48px 24px;text-align:center;">
             <div style="font-size:44px;margin-bottom:16px;">📢</div>
@@ -4435,6 +4485,6 @@
   </div>
 
   <!-- Dashboard JavaScript -->
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.6"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.7"></script>
 </body>
 </html>
