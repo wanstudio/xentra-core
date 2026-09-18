@@ -5,6 +5,7 @@ const BannerContent = require('../domain/BannerContent');
 const BannerContentRepository = require('../../../core/data/repositories/BannerContentRepository');
 const { MediaService } = require('../../../core/media');
 const BannerAssignmentRepository = require('../../../core/data/repositories/BannerAssignmentRepository');
+const WorkforceService = require('../../../core/identity/WorkforceService');
 
 const mediaService = new MediaService();
 
@@ -17,6 +18,7 @@ class BannerContentService {
     this.repository = repository;
     this.media = media;
     this.assignmentRepository = assignmentRepository;
+    this.workforce = new WorkforceService();
   }
 
   static createId(prefix) {
@@ -355,6 +357,59 @@ class BannerContentService {
     }
 
     return this.repository.getBannerAggregate(brandId, bannerId);
+  }
+
+  deleteDraft({ brandId, bannerId, actorId = null }) {
+    const banner = this.repository.getBannerAggregate(brandId, bannerId);
+    if (!banner) {
+      const err = new Error('Banner tidak ditemukan.');
+      err.code = 'BANNER_NOT_FOUND';
+      throw err;
+    }
+
+    if (banner.published_revision) {
+      const err = new Error('Banner yang sudah pernah dipublish tidak dapat dihapus. Buat Draft baru atau kelola Assignment-nya.');
+      err.code = 'PUBLISHED_BANNER_DELETE_FORBIDDEN';
+      throw err;
+    }
+
+    const assignments = this.assignmentRepository.listByBanner(brandId, bannerId);
+    if (assignments.length > 0) {
+      const err = new Error('Hapus Assignment terlebih dahulu sebelum menghapus Draft Banner.');
+      err.code = 'BANNER_ASSIGNMENTS_EXIST';
+      throw err;
+    }
+
+    const draftMediaId = banner.draft_revision ? banner.draft_revision.media_id : null;
+
+    this.repository.beginTransaction();
+    try {
+      if (draftMediaId) {
+        this.media.unlinkMedia({ mediaId: draftMediaId, brandId });
+      }
+      this.repository.deleteBanner(brandId, bannerId);
+      this.repository.commitTransaction();
+    } catch (err) {
+      try { this.repository.rollbackTransaction(); } catch (_) {}
+      throw err;
+    }
+
+    try {
+      this.workforce.logSecurityEvent({
+        actor_id: actorId,
+        actor_role: 'owner',
+        action: 'BANNER_CONTENT_DELETED',
+        target_user_id: null,
+        target_role: null,
+        brand_id: brandId,
+        organization_id: null,
+        branch_id: null,
+        result: 'success',
+        metadata: { banner_id: bannerId }
+      });
+    } catch (_) {}
+
+    return { success: true, banner_id: bannerId };
   }
 
   getBanner({ brandId, bannerId }) {
