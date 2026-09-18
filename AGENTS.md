@@ -39,7 +39,7 @@ Tests use Node's built-in test runner (`node --test`) with `--test-concurrency=1
 
 ```
 server/          Express app, routes, middleware, services, database
- domains/        Domain logic (commerce, delivery, inventory, payment, pos, promotion, reporting)
+ domains/        Domain logic (commerce, delivery, inventory, payment, pos, promotion, reporting, affiliate)
 core/            Platform foundations (events, identity/RBAC, config, integration, audit)
 apps/            Static frontends (customer-pwa, kitchen-display, merchant-dashboard)
 tests/           Node built-in test runner — mirrors domains/, core/, services/, client/
