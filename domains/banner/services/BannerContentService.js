@@ -160,9 +160,10 @@ class BannerContentService {
     }
   }
 
-  createDraft({
+  async createDraft({
     brandId,
     actorId = null,
+    actorRole = null,
     mediaId,
     title = '',
     altText = '',
@@ -215,13 +216,35 @@ class BannerContentService {
       throw err;
     }
 
+    this.writeSecurityAudit({
+      brandId,
+      actorId,
+      actorRole,
+      action: 'BANNER_CONTENT_CREATED',
+      metadata: { banner_id: bannerId, revision_id: revisionId, publication_status: 'DRAFT' }
+    });
+    this.writeSecurityAudit({
+      brandId,
+      actorId,
+      actorRole,
+      action: 'BANNER_CONTENT_DRAFT_UPDATED',
+      metadata: { banner_id: bannerId, draft_revision_id: this.repository.findDraftRevision(brandId, bannerId)?.id || null }
+    });
+    this.writeSecurityAudit({
+      brandId,
+      actorId,
+      actorRole,
+      action: 'BANNER_CONTENT_PUBLISHED',
+      metadata: { banner_id: bannerId, published_revision_id: draft.id }
+    });
     return this.repository.getBannerAggregate(brandId, bannerId);
   }
 
-  updateDraft({
+  async updateDraft({
     brandId,
     bannerId,
     actorId = null,
+    actorRole = null,
     mediaId,
     title = '',
     altText = '',
@@ -314,7 +337,7 @@ class BannerContentService {
     return this.repository.getBannerAggregate(brandId, bannerId);
   }
 
-  publishDraft({ brandId, bannerId, actorId = null }) {
+  async publishDraft({ brandId, bannerId, actorId = null, actorRole = null }) {
     const banner = this.repository.findBannerById(brandId, bannerId);
     if (!banner) {
       const err = new Error('Banner tidak ditemukan.');
@@ -359,7 +382,7 @@ class BannerContentService {
     return this.repository.getBannerAggregate(brandId, bannerId);
   }
 
-  deleteDraft({ brandId, bannerId, actorId = null }) {
+  async deleteDraft({ brandId, bannerId, actorId = null, actorRole = null }) {
     const banner = this.repository.getBannerAggregate(brandId, bannerId);
     if (!banner) {
       const err = new Error('Banner tidak ditemukan.');
@@ -385,7 +408,7 @@ class BannerContentService {
     this.repository.beginTransaction();
     try {
       if (draftMediaId) {
-        this.media.unlinkMedia({ mediaId: draftMediaId, brandId });
+        await this.media.unlinkMedia({ mediaId: draftMediaId, brandId });
       }
       this.repository.deleteBanner(brandId, bannerId);
       this.repository.commitTransaction();
@@ -397,7 +420,7 @@ class BannerContentService {
     try {
       this.workforce.logSecurityEvent({
         actor_id: actorId,
-        actor_role: 'owner',
+        actor_role: actorRole || 'owner',
         action: 'BANNER_CONTENT_DELETED',
         target_user_id: null,
         target_role: null,
@@ -410,6 +433,27 @@ class BannerContentService {
     } catch (_) {}
 
     return { success: true, banner_id: bannerId };
+  }
+
+  writeSecurityAudit({ brandId, actorId = null, actorRole = null, action, branchId = null, metadata = {} }) {
+    try {
+      const brand = this.repository.db.queryOne(
+        'SELECT organization_id FROM brands WHERE id = ? LIMIT 1',
+        [brandId]
+      );
+      this.workforce.logSecurityEvent({
+        actor_id: actorId,
+        actor_role: actorRole,
+        action,
+        target_user_id: null,
+        target_role: null,
+        brand_id: brandId,
+        organization_id: brand ? brand.organization_id : null,
+        branch_id: branchId,
+        result: 'success',
+        metadata
+      });
+    } catch (_) {}
   }
 
   getBanner({ brandId, bannerId }) {
