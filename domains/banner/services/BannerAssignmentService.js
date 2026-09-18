@@ -167,6 +167,9 @@ class BannerAssignmentService {
 
     const assignmentId = BannerAssignmentService.createId();
     const createdBy = actor && (actor.userId || actor.id);
+    const effectiveGovernanceLocked = actor && actor.role === 'branch_manager'
+      ? false
+      : Boolean(governanceLocked);
 
     const bannerPublished = this.repository.db.queryOne(
       `SELECT sb.publication_status, EXISTS (
@@ -207,9 +210,18 @@ class BannerAssignmentService {
       startsAt: window.startsAt,
       endsAt: window.endsAt,
       timezone: branch.timezone || 'Asia/Jakarta',
-      governanceLocked,
+      governanceLocked: effectiveGovernanceLocked,
       createdBy,
       updatedBy: createdBy
+    });
+    this.writeOperationalAudit({
+      brandId,
+      branch,
+      actor,
+      assignmentId,
+      action: 'banner_assignment.create',
+      previousValue: null,
+      newValue: { banner_id: bannerId, placement: normalizedPlacement, position: normalizedPosition, active: Boolean(active), starts_at: window.startsAt, ends_at: window.endsAt, governance_locked: effectiveGovernanceLocked }
     });
 
     return this.getBannerAssignment(brandId, assignmentId);
@@ -295,9 +307,18 @@ class BannerAssignmentService {
           startsAt: window.startsAt,
           endsAt: window.endsAt,
           timezone: branch.timezone || 'Asia/Jakarta',
-          governanceLocked,
+            governanceLocked: Boolean(governanceLocked),
           createdBy,
           updatedBy: createdBy
+        });
+        this.writeOperationalAudit({
+          brandId,
+          branch,
+          actor,
+          assignmentId,
+          action: 'banner_assignment.create',
+          previousValue: null,
+          newValue: { banner_id: bannerId, placement: normalizedPlacement, position: normalizedPosition, active: Boolean(active), starts_at: window.startsAt, ends_at: window.endsAt, governance_locked: Boolean(governanceLocked) }
         });
         assignments.push(this.getBannerAssignment(brandId, assignmentId));
       }
@@ -378,6 +399,14 @@ class BannerAssignmentService {
       nextLocked = null;
     }
 
+    const previousValue = {
+      position: Number(current.position),
+      active: Number(current.active) === 1,
+      starts_at: current.starts_at,
+      ends_at: current.ends_at,
+      governance_locked: Number(current.governance_locked) === 1
+    };
+
     this.repository.updateAssignment({
       brandId,
       assignmentId,
@@ -390,7 +419,23 @@ class BannerAssignmentService {
       updatedBy: updaterId
     });
 
-    return this.getBannerAssignment(brandId, assignmentId);
+    const updatedAssignment = this.getBannerAssignment(brandId, assignmentId);
+    this.writeOperationalAudit({
+      brandId,
+      branch,
+      actor,
+      assignmentId,
+      action: 'banner_assignment.update',
+      previousValue,
+      newValue: {
+        position: Number(updatedAssignment.position),
+        active: Number(updatedAssignment.active) === 1,
+        starts_at: updatedAssignment.starts_at,
+        ends_at: updatedAssignment.ends_at,
+        governance_locked: Number(updatedAssignment.governance_locked) === 1
+      }
+    });
+    return updatedAssignment;
   }
 
   deleteAssignment({ brandId, assignmentId, actor }) {
@@ -402,7 +447,24 @@ class BannerAssignmentService {
       throw err;
     }
 
+    const branch = this.repository.findBranch(brandId, current.branch_id);
     this.repository.deleteAssignment(brandId, assignmentId);
+    this.writeOperationalAudit({
+      brandId,
+      branch,
+      actor,
+      assignmentId,
+      action: 'banner_assignment.delete',
+      previousValue: {
+        banner_id: current.banner_id,
+        position: Number(current.position),
+        active: Number(current.active) === 1,
+        starts_at: current.starts_at,
+        ends_at: current.ends_at,
+        governance_locked: Number(current.governance_locked) === 1
+      },
+      newValue: null
+    });
     return { success: true, assignment_id: assignmentId };
   }
 
