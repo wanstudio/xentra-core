@@ -7542,7 +7542,7 @@
         '<div style="font-size:36px;margin-bottom:8px;">🖼️</div>' +
         '<div style="font-weight:700;color:var(--text-main);margin-bottom:4px;">Belum ada Banner</div>' +
         '<p class="text-muted" style="font-size:12px;margin:0 0 14px;">Buat Banner Content pertama, lalu Publish dan tempatkan ke cabang yang diinginkan.</p>' +
-        '<button type="button" class="x-btn-primary" onclick="openMarketingBannerCreate()">+ Tambah Banner</button>' +
+        '<button type="button" class="x-btn-primary" onclick="openMarketingBannerCreate()">Tambah Banner</button>' +
       '</td></tr>';
       return;
     }
@@ -7604,7 +7604,7 @@
             '<span class="x-marketing-banner-visibility-label">' + esc(visibilityText) + '</span>' +
           '</div>' +
         '</td>' +
-        '<td data-label="Aksi">' +
+        '<td class="text-right" data-label="Aksi" style="white-space:nowrap;">' +
           '<div class="x-item-actions">' +
             '<button type="button" class="x-action-menu-trigger" aria-label="Aksi banner ' + esc(row.title || 'Banner') + '" data-banner-action-key="' + esc(key) + '">' +
               '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
@@ -9051,7 +9051,7 @@
       var isOwner = user && user.role === 'owner';
 
       if (promos.length === 0) {
-        var createFirstBtn = isOwner ? '<button type="button" class="x-btn-primary" onclick="openCreatePromotionModal()" style="font-size:12px;padding:6px 14px;">+ Buat Promo Pertama</button>' : '';
+        var createFirstBtn = isOwner ? '<button type="button" class="x-btn-primary" onclick="openCreatePromotionModal()" style="font-size:12px;padding:6px 14px;">Buat Promo Pertama</button>' : '';
         tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8">' +
           '<div style="font-size:36px;margin-bottom:8px;">🎁</div>' +
           '<div style="font-weight:700;color:var(--text-main);margin-bottom:4px;">Belum Ada Program Promosi</div>' +
