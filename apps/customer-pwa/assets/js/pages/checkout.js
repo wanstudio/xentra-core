@@ -2590,7 +2590,8 @@
       return;
     }
 
-    var branchId = state.matchedBranch ? state.matchedBranch.id : undefined;
+    var fulBranch = getFulfillmentBranch();
+    var branchId = (state.matchedBranch && state.matchedBranch.id) || (fulBranch && fulBranch.id) || (currentBranchId && currentBranchId !== '__unassigned__' ? currentBranchId : undefined);
 
     // R1 CART/CHECKOUT BOUNDARY — this page submits ONE single-branch checkout
     // scope. A multi-branch cart is allowed at cart level, but a checkout must
@@ -2698,8 +2699,9 @@
         btn.textContent = state.fulfillment.type === 'reservation' ? 'Konfirmasi Reservasi' : 'Pesan Sekarang';
         btn.style.opacity = '1';
       }
+      var msg = (errObj && (errObj.message || errObj.error)) || (verifyErr && verifyErr.message) || 'Gagal memverifikasi pesanan. Periksa koneksi lalu coba lagi.';
       if (UI && UI.toast) {
-        UI.toast('Gagal memverifikasi pesanan. Periksa koneksi lalu coba lagi.');
+        UI.toast(msg);
       }
     });
   }
@@ -2722,7 +2724,8 @@
     var items = getCheckoutItems();
     var orderedIds = items.map(function (i) { return String(i.id); });
     var itemsHaveBranchProvenance = items.some(function (i) { return Boolean(i.branch_id); });
-    var branchId = state.matchedBranch ? state.matchedBranch.id : undefined;
+    var fulBranch = getFulfillmentBranch();
+    var branchId = (state.matchedBranch && state.matchedBranch.id) || (fulBranch && fulBranch.id) || (currentBranchId && currentBranchId !== '__unassigned__' ? currentBranchId : undefined);
     var fulType = state.fulfillment.type;
     var isDelivery = fulType === 'delivery';
     var isReservation = fulType === 'reservation';
