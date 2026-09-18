@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Bangjo — Spesial Ayam Tulang Lunak</title>
   <meta name="description" content="Pesan ayam tulang lunak spesial Bangjo langsung dari HP. Delivery & Pick-up tersedia!">
   <meta name="theme-color" content="#b6ff00">
@@ -14,7 +14,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_p4a7f28';
+      var PWA_VERSION = 'v_20260918_otp';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -212,7 +212,7 @@
 
   <!-- Page Controllers -->
   <script src="/assets/js/pages/home.js?v=p4a7f28"></script>
-  <script src="/assets/js/pages/checkout.js?v=p4a7f28"></script>
+  <script src="/assets/js/pages/checkout.js?v=v_20260918_otp"></script>
   <script src="/assets/js/pages/order-received.js?v=p4a7f28"></script>
 
   <!-- ═══════════════════════════════════════════════════
@@ -291,7 +291,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=p4a7f28').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=v_20260918_otp').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {

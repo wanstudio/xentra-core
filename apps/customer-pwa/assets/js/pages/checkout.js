@@ -1250,10 +1250,7 @@
       if (isClosing) return;
       isClosing = true;
       overlay.classList.remove('open');
-      // Restore sheet bottom offset when closing
-      var sheet = overlay.querySelector('.x-alt-sheet, .x-sheet');
-      if (sheet) sheet.style.marginBottom = '';
-      // Tear down visualViewport listener
+      overlay.style.removeProperty('--x-overlay-bottom');
       if (window.visualViewport && vpHandler) {
         window.visualViewport.removeEventListener('resize', vpHandler);
         window.visualViewport.removeEventListener('scroll', vpHandler);
@@ -1263,36 +1260,52 @@
       }, 380);
     }
 
-    // ── visualViewport: push sheet above soft keyboard ──────────────────────
-    // When the on-screen keyboard opens, visualViewport.height shrinks.
-    // We add a bottom margin to the sheet equal to the keyboard height so
-    // the CTA button stays visible above the keyboard at all times.
+    // Dynamic Visual Viewport tracking for mobile keyboards:
+    // When the on-screen keyboard opens, visualViewport shrinks.
+    // We adjust overlay's bottom edge so the sheet sits directly above the keyboard.
     if (window.visualViewport) {
       vpHandler = function () {
+        if (isClosing) return;
+        var vv = window.visualViewport;
+        var keyboardGap = window.innerHeight - vv.height - (vv.offsetTop || 0);
+        if (keyboardGap > 60) {
+          overlay.style.setProperty('--x-overlay-bottom', Math.round(keyboardGap) + 'px');
+        } else {
+          overlay.style.removeProperty('--x-overlay-bottom');
+        }
+
         var sheet = overlay.querySelector('.x-alt-sheet, .x-sheet');
-        if (!sheet || isClosing) return;
-        var offsetFromBottom = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
-        sheet.style.marginBottom = offsetFromBottom > 0 ? offsetFromBottom + 'px' : '';
+        if (sheet) {
+          var active = document.activeElement;
+          if (active && sheet.contains(active)) {
+            try {
+              active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            } catch (_) {}
+          }
+        }
       };
       window.visualViewport.addEventListener('resize', vpHandler);
       window.visualViewport.addEventListener('scroll', vpHandler);
+      vpHandler();
     }
 
     if (window.XentraNav && typeof window.XentraNav.pushClose === 'function') {
       window.XentraNav.pushClose(close);
     }
 
-    // ── Backdrop close — suppressed while soft keyboard is open ─────────────
-    // On mobile, swiping down to dismiss the keyboard fires a touchend that
-    // can land on the backdrop and incorrectly close the sheet.
-    // Guard: if visualViewport is significantly smaller than window.innerHeight
-    // the keyboard is likely still open — skip close so only the keyboard
-    // is dismissed, not the sheet.
+    // Dismiss handling:
+    // If user taps/swipes outside while an input is focused, only blur the input (closes keyboard)
+    // and DO NOT close the overlay!
     overlay.addEventListener('click', function (e) {
       if (e.target !== overlay) return;
-      var keyboardLikelyOpen = window.visualViewport &&
-        (window.innerHeight - window.visualViewport.height) > 100;
-      if (keyboardLikelyOpen) return;
+      var active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) {
+        active.blur();
+        return;
+      }
+      if (window.visualViewport && (window.innerHeight - window.visualViewport.height) > 100) {
+        return;
+      }
       if (window.XentraNav && typeof window.XentraNav.close === 'function') {
         window.XentraNav.close();
       } else {
@@ -2091,28 +2104,43 @@
 
   function renderOtpPhoneStep(phone, name, onSuccess) {
     var sh = makeOverlay(
-      '<h3 class="x-alt-sheet-title">Verifikasi Nomor WhatsApp</h3>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
+        '<h3 class="x-alt-sheet-title" style="margin:0;">Verifikasi Nomor WhatsApp</h3>' +
+        '<button type="button" class="x-otp-close-btn" style="background:none;border:0;font-size:24px;color:#9ca3af;cursor:pointer;line-height:1;padding:4px 8px;">&times;</button>' +
+      '</div>' +
       '<div style="font-size:13px;color:#6b7280;margin-bottom:12px;">Masukkan nomor WhatsApp aktif untuk menerima kode verifikasi.</div>' +
-      '<div class="x-alt-sheet-label">Nama Lengkap</div>' +
-      '<input type="text" id="x-otp-input-name" class="x-alt-input" placeholder="Contoh: Budi Santoso" value="' + UI.escape(name) + '">' +
-      '<div class="x-alt-sheet-label" style="margin-top:10px;">Nomor WhatsApp</div>' +
-      '<input type="tel" id="x-otp-input-phone" class="x-alt-input" placeholder="081234567890" value="' + UI.escape(phone) + '">' +
-      '<button type="button" class="x-alt-submit-btn" id="x-otp-send-btn" style="margin-top:16px;">Kirim Kode OTP</button>'
+      '<form id="x-otp-phone-form" action="javascript:void(0);" style="margin:0;padding:0;">' +
+        '<div class="x-alt-sheet-label">Nama Lengkap</div>' +
+        '<input type="text" id="x-otp-input-name" class="x-alt-input" placeholder="Contoh: Budi Santoso" value="' + UI.escape(name) + '" enterkeyhint="next" autocomplete="name">' +
+        '<div class="x-alt-sheet-label" style="margin-top:10px;">Nomor WhatsApp</div>' +
+        '<input type="tel" id="x-otp-input-phone" class="x-alt-input" placeholder="081234567890" value="' + UI.escape(phone) + '" enterkeyhint="go" autocomplete="tel">' +
+        '<button type="submit" class="x-alt-submit-btn" id="x-otp-send-btn" style="margin-top:16px;">Kirim Kode OTP</button>' +
+      '</form>'
     );
 
-    var sendBtn = sh.overlay.querySelector('#x-otp-send-btn');
+    var closeBtn = sh.overlay.querySelector('.x-otp-close-btn');
+    if (closeBtn) {
+      closeBtn.onclick = function () { sh.close(); };
+    }
 
-    sendBtn.onclick = function () {
-      var n = sh.overlay.querySelector('#x-otp-input-name').value.trim();
-      var p = sh.overlay.querySelector('#x-otp-input-phone').value.trim();
+    var form = sh.overlay.querySelector('#x-otp-phone-form');
+    var sendBtn = sh.overlay.querySelector('#x-otp-send-btn');
+    var nameInput = sh.overlay.querySelector('#x-otp-input-name');
+    var phoneInput = sh.overlay.querySelector('#x-otp-input-phone');
+
+    function doSendOtp() {
+      var n = nameInput ? nameInput.value.trim() : '';
+      var p = phoneInput ? phoneInput.value.trim() : '';
 
       if (!p) {
         if (UI && UI.toast) UI.toast('Nomor WhatsApp wajib diisi.');
+        if (phoneInput) phoneInput.focus();
         return;
       }
 
       sendBtn.disabled = true;
       sendBtn.textContent = 'Mengirim kode…';
+      if (phoneInput) phoneInput.blur();
 
       API.post('/auth/otp/send', { phone: p }).then(function (res) {
         if (res && res.success && res.challenge_id) {
@@ -2128,28 +2156,48 @@
         sendBtn.textContent = 'Kirim Kode OTP';
         if (UI && UI.toast) UI.toast('Gagal mengirim kode OTP. Periksa koneksi Anda.');
       });
+    }
+
+    form.onsubmit = function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      doSendOtp();
+      return false;
     };
 
-    // Enter / Go key on keyboard triggers CTA directly
-    var nameInput = sh.overlay.querySelector('#x-otp-input-name');
-    var phoneInput = sh.overlay.querySelector('#x-otp-input-phone');
-    function onPhoneEnter(e) {
-      if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); sendBtn.click(); }
+    if (nameInput) {
+      nameInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          e.preventDefault();
+          if (phoneInput) phoneInput.focus();
+        }
+      });
     }
-    if (nameInput) nameInput.addEventListener('keydown', onPhoneEnter);
-    if (phoneInput) phoneInput.addEventListener('keydown', onPhoneEnter);
   }
 
   function renderOtpVerifyStep(phone, name, challengeId, retryAfter, onSuccess) {
     var sh = makeOverlay(
-      '<h3 class="x-alt-sheet-title">Masukkan Kode OTP</h3>' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
+        '<h3 class="x-alt-sheet-title" style="margin:0;">Masukkan Kode OTP</h3>' +
+        '<button type="button" class="x-otp-close-btn" style="background:none;border:0;font-size:24px;color:#9ca3af;cursor:pointer;line-height:1;padding:4px 8px;">&times;</button>' +
+      '</div>' +
       '<div style="font-size:13px;color:#6b7280;margin-bottom:12px;">Kode verifikasi telah dikirim ke <b>' + UI.escape(phone) + '</b>.</div>' +
-      '<div class="x-alt-sheet-label">Kode OTP (6 digit)</div>' +
-      '<input type="tel" id="x-otp-input-code" class="x-alt-input" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="letter-spacing:6px;text-align:center;font-size:18px;font-weight:700;">' +
-      '<button type="button" class="x-alt-submit-btn" id="x-otp-verify-btn" style="margin-top:16px;">Verifikasi</button>' +
-      '<button type="button" id="x-otp-resend-btn" style="width:100%;margin-top:12px;padding:10px;border:0;background:transparent;color:#6b7280;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Kirim Ulang OTP</button>'
+      '<form id="x-otp-verify-form" action="javascript:void(0);" style="margin:0;padding:0;">' +
+        '<div class="x-alt-sheet-label">Kode OTP (6 digit)</div>' +
+        '<input type="tel" id="x-otp-input-code" class="x-alt-input" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code" enterkeyhint="go" style="letter-spacing:6px;text-align:center;font-size:18px;font-weight:700;">' +
+        '<button type="submit" class="x-alt-submit-btn" id="x-otp-verify-btn" style="margin-top:16px;">Verifikasi</button>' +
+        '<button type="button" id="x-otp-resend-btn" style="width:100%;margin-top:12px;padding:10px;border:0;background:transparent;color:#6b7280;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">Kirim Ulang OTP</button>' +
+      '</form>'
     );
 
+    var closeBtn = sh.overlay.querySelector('.x-otp-close-btn');
+    if (closeBtn) {
+      closeBtn.onclick = function () {
+        if (countdownTimer) clearTimeout(countdownTimer);
+        sh.close();
+      };
+    }
+
+    var form = sh.overlay.querySelector('#x-otp-verify-form');
     var verifyBtn = sh.overlay.querySelector('#x-otp-verify-btn');
     var resendBtn = sh.overlay.querySelector('#x-otp-resend-btn');
     var codeInput = sh.overlay.querySelector('#x-otp-input-code');
@@ -2178,8 +2226,8 @@
       setTimeout(function () { codeInput.focus(); }, 400);
     }
 
-    verifyBtn.onclick = function () {
-      var code = codeInput ? codeInput.value.trim() : '';
+    function doVerify() {
+      var code = codeInput ? codeInput.value.replace(/\D/g, '') : '';
 
       if (!code || code.length < 4) {
         if (UI && UI.toast) UI.toast('Masukkan kode OTP yang valid.');
@@ -2188,6 +2236,7 @@
 
       verifyBtn.disabled = true;
       verifyBtn.textContent = 'Memverifikasi…';
+      if (codeInput) codeInput.blur();
 
       API.post('/auth/otp/verify', {
         challenge_id: challengeId,
@@ -2224,7 +2273,22 @@
         verifyBtn.textContent = 'Verifikasi';
         if (UI && UI.toast) UI.toast('Gagal memverifikasi. Periksa koneksi Anda.');
       });
+    }
+
+    form.onsubmit = function (e) {
+      if (e && e.preventDefault) e.preventDefault();
+      doVerify();
+      return false;
     };
+
+    if (codeInput) {
+      codeInput.addEventListener('input', function () {
+        var clean = codeInput.value.replace(/\D/g, '');
+        if (clean.length === 6) {
+          setTimeout(function () { doVerify(); }, 120);
+        }
+      });
+    }
 
     resendBtn.onclick = function () {
       resendBtn.disabled = true;
@@ -2246,19 +2310,6 @@
         if (UI && UI.toast) UI.toast('Gagal mengirim ulang OTP. Periksa koneksi Anda.');
       });
     };
-
-    // Enter / Go key on keyboard triggers verify directly
-    if (codeInput) {
-      codeInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); verifyBtn.click(); }
-      });
-      // Auto-submit when all 6 digits are entered (best UX — no tap needed)
-      codeInput.addEventListener('input', function () {
-        if (codeInput.value.replace(/\D/g, '').length === 6) {
-          setTimeout(function () { verifyBtn.click(); }, 120);
-        }
-      });
-    }
   }
 
   // ── 3. Fulfillment Note Sheet ──
