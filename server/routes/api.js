@@ -9505,6 +9505,14 @@ router.get('/admin/marketing/banners/:bannerId', requireAuth(['owner', 'brand_ma
       actor
     }).filter(row => row.banner_id === req.params.bannerId);
 
+    if (actor.role === 'branch_manager' && assignments.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN_BRANCH_SCOPE',
+        message: 'Banner tidak ditugaskan pada cabang Branch Manager.'
+      });
+    }
+
     res.json({
       success: true,
       banner: {
