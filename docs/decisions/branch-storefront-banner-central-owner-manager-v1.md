@@ -1,12 +1,13 @@
 # Xentra — Branch Storefront Banner: Central Owner Manager & Branch Slots v1
 
-**Status:** LOCKED / AUTHORITATIVE  
+**Status:** SUPERSEDED  
 **Decision date:** 2026-09-17  
+**Superseded by:** `docs/decisions/storefront-banner-placement-promotion-boundary-v2.md` (2026-09-18)
 **Scope:** Merchant Dashboard / Branch Storefront presentation / media governance
 
 ## Decision
 
-Xentra uses a **Branch Storefront Banner** model with exactly **5 banner slots per Branch**.
+This v1 decision is retained for historical traceability only. Its fixed **5 banner slots per Branch** model is superseded by v2.
 
 Banner content is Branch-scoped, while Owner has centralized governance across authorized Branches. Owner does not need to enter each Branch dashboard individually to manage banners.
 
@@ -152,7 +153,7 @@ Owner lock/unlock and protected Branch banner mutations should be auditable usin
 - No automatic conversion of Banner into Promotion/Campaign.
 - No deletion or silent reinterpretation of existing Brand banner infrastructure solely because this decision is introduced.
 
-## Implementation gate
+## Historical implementation gate
 
 Implementation must first reconcile the current Brand-level `brands.banners` path with this Branch Storefront Banner contract. Any schema/API change for Branch slots must preserve tenant isolation, media lifecycle guarantees, and explicit per-slot lock semantics.
 
