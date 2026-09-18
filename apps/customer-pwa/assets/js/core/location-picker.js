@@ -1015,6 +1015,10 @@
           var title = '';
           var addr = '';
 
+          // Prefer structured title from backend Search Box Reverse / Geocoding v6
+          var resTitle = (res && res.title) || '';
+          if (resTitle && /^\d{4,6}$/.test(resTitle.trim())) resTitle = '';
+
           // Prefer structured fields from Mapbox Geocoding v6 or Nominatim
           var road = (res && res.road) || (res && res.address && res.address.road) || '';
           var neighborhood = (res && res.neighborhood) || (res && res.address && res.address.neighborhood) || '';
@@ -1025,7 +1029,11 @@
           if (road && /^\d{4,6}$/.test(road.trim())) road = '';
           if (neighborhood && /^\d{4,6}$/.test(neighborhood.trim())) neighborhood = '';
 
-          if (road || neighborhood) {
+          if (resTitle) {
+            title = resTitle.trim();
+            var subParts = [road && road !== resTitle ? road : '', neighborhood && neighborhood !== road && neighborhood !== resTitle ? neighborhood : '', locality, city].filter(Boolean);
+            addr = subParts.length ? subParts.join(', ') : full;
+          } else if (road || neighborhood) {
             title = (road || neighborhood).trim();
             var subParts = [neighborhood !== road ? neighborhood : '', locality, city].filter(Boolean);
             addr = subParts.length ? subParts.join(', ') : full;

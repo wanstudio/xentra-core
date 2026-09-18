@@ -96,3 +96,244 @@ test('RouteService reverseGeocode — country/region feature cannot leak into ro
   const res = await RouteService.reverseGeocode(-7.2912, 112.7154);
   assert.strictEqual(res.road, '', 'non-addressable country feature must not become the road');
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 1: Search Box Reverse Candidate Prioritization & Fallback Hierarchy
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function mockSearchBox(features) {
+  axios.get = async (url) => {
+    if (url.includes('/searchbox/v1/reverse')) {
+      return { data: { features: features || [] } };
+    }
+    if (url.includes('/geocode/v6/reverse')) {
+      return { data: { features: [] } };
+    }
+    return { data: {} };
+  };
+}
+
+test('Case A — POI candidate takes priority over neighborhood in Search Box Reverse', async () => {
+  mockSearchBox([
+    {
+      geometry: { coordinates: [104.98108, -5.36219] },
+      properties: {
+        feature_type: 'poi',
+        name: 'MU STATIONERY',
+        address: 'Jl. Melati 3',
+        full_address: 'Jl. Melati 3, Pringsewu, 35371, Indonesia',
+        place_formatted: 'Pringsewu, 35371, Indonesia',
+        context: {
+          street: { name: 'Jl. Melati 3' },
+          neighborhood: { name: 'Pringsewu Timur' },
+          place: { name: 'Pringsewu' }
+        }
+      }
+    },
+    {
+      geometry: { coordinates: [104.98108, -5.36219] },
+      properties: {
+        feature_type: 'neighborhood',
+        name: 'Pringsewu Timur',
+        full_address: 'Pringsewu Timur, Pringsewu, Indonesia',
+        place_formatted: 'Pringsewu, Indonesia'
+      }
+    }
+  ]);
+
+  const res = await RouteService.reverseGeocode(-5.3621, 104.9812);
+  assert.strictEqual(res.title, 'MU STATIONERY', 'POI name must become the title');
+  assert.strictEqual(res.provider, 'mapbox_searchbox');
+  assert.ok(res.address.includes('MU STATIONERY') || res.address.includes('Jl. Melati 3'));
+  assert.notStrictEqual(res.title, 'Pringsewu Timur', 'Must not fall back to neighborhood when POI exists');
+});
+
+test('Case B — Address candidate takes priority over district/region', async () => {
+  mockSearchBox([
+    {
+      geometry: { coordinates: [106.8456, -6.2088] },
+      properties: {
+        feature_type: 'address',
+        name: 'Jl. Pegangsaan Timur No. 56',
+        full_address: 'Jl. Pegangsaan Timur No. 56, Menteng, Jakarta Pusat',
+        context: {
+          street: { name: 'Jl. Pegangsaan Timur' },
+          neighborhood: { name: 'Menteng' },
+          place: { name: 'Jakarta Pusat' }
+        }
+      }
+    },
+    {
+      geometry: { coordinates: [106.8456, -6.2088] },
+      properties: {
+        feature_type: 'district',
+        name: 'Jakarta Pusat',
+        full_address: 'Jakarta Pusat, DKI Jakarta'
+      }
+    }
+  ]);
+
+  const res = await RouteService.reverseGeocode(-6.2088, 106.8456);
+  assert.strictEqual(res.title, 'Jl. Pegangsaan Timur No. 56');
+  assert.strictEqual(res.road, 'Jl. Pegangsaan Timur');
+  assert.notStrictEqual(res.title, 'Jakarta Pusat');
+});
+
+test('Case C — Only street available resolves to street name', async () => {
+  mockSearchBox([
+    {
+      geometry: { coordinates: [104.9812, -5.3621] },
+      properties: {
+        feature_type: 'street',
+        name: 'Jl. Jenderal Sudirman',
+        full_address: 'Jl. Jenderal Sudirman, Pringsewu',
+        context: {
+          neighborhood: { name: 'Pringsewu Barat' },
+          place: { name: 'Pringsewu' }
+        }
+      }
+    }
+  ]);
+
+  const res = await RouteService.reverseGeocode(-5.3621, 104.9812);
+  assert.strictEqual(res.title, 'Jl. Jenderal Sudirman');
+  assert.strictEqual(res.road, 'Jl. Jenderal Sudirman');
+  assert.strictEqual(res.neighborhood, 'Pringsewu Barat');
+});
+
+test('Case D — Only neighborhood available in Geocoding v6 is accepted as broad context', async () => {
+  axios.get = async (url) => {
+    if (url.includes('/searchbox/v1/reverse')) {
+      return { data: { features: [] } };
+    }
+    if (url.includes('/geocode/v6/reverse')) {
+      return {
+        data: {
+          features: [
+            {
+              properties: {
+                feature_type: 'neighborhood',
+                name: 'Pringsewu Timur',
+                full_address: 'Pringsewu Timur, Pringsewu, Lampung',
+                context: {
+                  locality: { name: 'Pringsewu' },
+                  place: { name: 'Pringsewu' }
+                }
+              }
+            }
+          ]
+        }
+      };
+    }
+    return { data: {} };
+  };
+
+  const res = await RouteService.reverseGeocode(-5.3621, 104.9812);
+  assert.strictEqual(res.title, 'Pringsewu Timur');
+  assert.strictEqual(res.neighborhood, 'Pringsewu Timur');
+  assert.strictEqual(res.provider, 'mapbox_geocoding_v6');
+});
+
+test('Case E — District-only feature in Geocoding v6 must not leak into road', async () => {
+  axios.get = async (url) => {
+    if (url.includes('/searchbox/v1/reverse')) {
+      return { data: { features: [] } };
+    }
+    if (url.includes('/geocode/v6/reverse')) {
+      return {
+        data: {
+          features: [
+            {
+              properties: {
+                feature_type: 'district',
+                name: 'Pringsewu',
+                full_address: 'Pringsewu, Lampung, Indonesia'
+              }
+            }
+          ]
+        }
+      };
+    }
+    return { data: {} };
+  };
+
+  const res = await RouteService.reverseGeocode(-5.3621, 104.9812);
+  assert.strictEqual(res.road, '', 'district must not leak into road');
+});
+
+test('Case F — Postcode in Search Box Reverse must never become road or title', async () => {
+  mockSearchBox([
+    {
+      geometry: { coordinates: [112.7154, -7.2912] },
+      properties: {
+        feature_type: 'postcode',
+        name: '60225',
+        full_address: '60225, Surabaya'
+      }
+    }
+  ]);
+
+  const res = await RouteService.reverseGeocode(-7.2912, 112.7154);
+  assert.notStrictEqual(res.title, '60225');
+  assert.notStrictEqual(res.road, '60225');
+});
+
+test('Case G — Country/Region in Search Box Reverse must never become road or title', async () => {
+  mockSearchBox([
+    {
+      geometry: { coordinates: [112.7154, -7.2912] },
+      properties: {
+        feature_type: 'country',
+        name: 'Indonesia',
+        full_address: 'Indonesia'
+      }
+    }
+  ]);
+
+  const res = await RouteService.reverseGeocode(-7.2912, 112.7154);
+  assert.notStrictEqual(res.road, 'Indonesia');
+  assert.strictEqual(res.road, '');
+});
+
+test('Case H — When Search Box Reverse throws, falls back gracefully to Geocoding v6', async () => {
+  axios.get = async (url) => {
+    if (url.includes('/searchbox/v1/reverse')) {
+      throw new Error('SearchBox 503 Service Unavailable');
+    }
+    if (url.includes('/geocode/v6/reverse')) {
+      return {
+        data: {
+          features: [
+            {
+              properties: {
+                feature_type: 'street',
+                name: 'Jl. Ahmad Yani',
+                full_address: 'Jl. Ahmad Yani, Pringsewu',
+                context: {
+                  place: { name: 'Pringsewu' }
+                }
+              }
+            }
+          ]
+        }
+      };
+    }
+    return { data: {} };
+  };
+
+  const res = await RouteService.reverseGeocode(-5.3621, 104.9812);
+  assert.strictEqual(res.title, 'Jl. Ahmad Yani');
+  assert.strictEqual(res.road, 'Jl. Ahmad Yani');
+  assert.strictEqual(res.provider, 'mapbox_geocoding_v6');
+});
+
+test('Case I — When all remote providers fail, returns safe coordinate-only fallback', async () => {
+  axios.get = async () => {
+    throw new Error('Network timeout');
+  };
+
+  const res = await RouteService.reverseGeocode(-5.3621, 104.9812);
+  assert.strictEqual(res.title, 'Titik Terpilih');
+  assert.strictEqual(res.provider, 'coordinate_fallback');
+  assert.ok(res.address.includes('-5.3621') && res.address.includes('104.9812'));
+});

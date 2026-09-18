@@ -130,23 +130,114 @@ class RouteService {
 
   /**
    * Reverse geocodes coordinates into human-readable address.
-   * Prioritizes Mapbox Geocoding v6 for high-accuracy Indonesian POIs & roads,
-   * falling back gracefully to Nominatim.
+   * Prioritizes Mapbox Search Box Reverse for high-accuracy Indonesian POIs & roads,
+   * falling back gracefully to Mapbox Geocoding v6, Nominatim, and coordinate formatting.
    * 
    * @param {number} lat
    * @param {number} lon
-   * @returns {Promise<{ address: string, display_name: string }>}
+   * @returns {Promise<{ address: string, display_name: string, title?: string, road?: string, neighborhood?: string, locality?: string, city?: string, provider?: string }>}
    */
   static async reverseGeocode(lat, lon) {
     if (!lat || !lon) return { address: '', display_name: '' };
 
+    const nLat = Number(lat);
+    const nLon = Number(lon);
+    if (!Number.isFinite(nLat) || !Number.isFinite(nLon)) {
+      return { address: '', display_name: '' };
+    }
+
     const mapboxToken = process.env.MAPBOX_TOKEN ||
       'pk.eyJ1IjoiaWtod2FucyIsImEiOiJjbXQ5c2cwMzYwOW15MnpxdXdpeWU3am45In0.YcX49DH0uXP70aBxVDC-TA';
 
-    // 1. Mapbox Geocoding v6 Reverse (sub-second, Indonesian road & place accuracy)
+    // 1. Mapbox Search Box Reverse (high-granularity POIs, addresses, streets)
     if (mapboxToken) {
       try {
-        const mboxUrl = `https://api.mapbox.com/search/geocode/v6/reverse?longitude=${encodeURIComponent(lon)}&latitude=${encodeURIComponent(lat)}&access_token=${mapboxToken}&limit=1`;
+        const sbUrl = `https://api.mapbox.com/search/searchbox/v1/reverse?longitude=${encodeURIComponent(nLon)}&latitude=${encodeURIComponent(nLat)}&access_token=${mapboxToken}&types=poi,address,street`;
+        const sbRes = await axios.get(sbUrl, { timeout: 3000 });
+        const features = (sbRes.data && Array.isArray(sbRes.data.features)) ? sbRes.data.features : [];
+
+        if (features.length > 0) {
+          const candidates = features.map((feat) => {
+            const props = feat.properties || {};
+            const ctx = props.context || {};
+            const featGeom = feat.geometry && Array.isArray(feat.geometry.coordinates) ? feat.geometry.coordinates : null;
+            const cLon = featGeom ? featGeom[0] : (props.coordinates && props.coordinates.longitude);
+            const cLat = featGeom ? featGeom[1] : (props.coordinates && props.coordinates.latitude);
+            const distMeters = (cLat != null && cLon != null) ? this.calculateHaversineMeters(nLat, nLon, cLat, cLon) : 0;
+
+            const name = (props.name || '').trim();
+            const address = (props.address || '').trim();
+            const fullAddress = (props.full_address || '').trim();
+            const placeFormatted = (props.place_formatted || '').trim();
+            const fType = (props.feature_type || '').toLowerCase();
+
+            const streetName = (ctx.street && ctx.street.name) || (ctx.address && ctx.address.street_name) || (fType === 'street' ? name : '');
+            const neighborhood = (ctx.neighborhood && ctx.neighborhood.name) || '';
+            const locality = (ctx.place && ctx.place.name) || (ctx.locality && ctx.locality.name) || '';
+            const city = (ctx.region && ctx.region.name) || locality || '';
+
+            return {
+              feature_type: fType,
+              name,
+              address,
+              full_address: fullAddress,
+              place_formatted: placeFormatted,
+              street: streetName,
+              neighborhood,
+              locality,
+              city,
+              distance_meters: distMeters
+            };
+          });
+
+          const NON_ADDRESSABLE = ['postcode', 'country', 'region', 'district'];
+
+          // Filter out candidates that are non-addressable or have empty/numeric names
+          const validCandidates = candidates.filter((c) => {
+            if (!c.name || /^\d{4,6}$/.test(c.name)) return false;
+            if (NON_ADDRESSABLE.includes(c.feature_type)) return false;
+            return true;
+          });
+
+          if (validCandidates.length > 0) {
+            // Rank candidates: POI (weight 100) -> Address (weight 90) -> Street (weight 80) -> Other
+            // Heavily penalize distance if farther than 1km
+            validCandidates.sort((a, b) => {
+              const typeWeight = (t) => {
+                if (t === 'poi') return 100;
+                if (t === 'address') return 90;
+                if (t === 'street') return 80;
+                return 50;
+              };
+              const scoreA = typeWeight(a.feature_type) - Math.min(a.distance_meters / 50, 40);
+              const scoreB = typeWeight(b.feature_type) - Math.min(b.distance_meters / 50, 40);
+              return scoreB - scoreA;
+            });
+
+            const winner = validCandidates[0];
+            const title = winner.name;
+            const road = winner.street || (winner.feature_type === 'street' ? winner.name : '') || winner.address || '';
+            const full = winner.full_address || [winner.name, winner.place_formatted].filter(Boolean).join(', ') || title;
+
+            return {
+              title: title,
+              address: full,
+              display_name: full,
+              road: road || (winner.feature_type === 'street' || winner.feature_type === 'address' ? title : (winner.street || '')),
+              neighborhood: winner.neighborhood,
+              locality: winner.locality,
+              city: winner.city,
+              provider: 'mapbox_searchbox'
+            };
+          }
+        }
+      } catch (err) {
+        // Fallback to Mapbox Geocoding v6
+      }
+
+      // 2. Mapbox Geocoding v6 Reverse Fallback (sub-second Indonesian road & place accuracy)
+      try {
+        const mboxUrl = `https://api.mapbox.com/search/geocode/v6/reverse?longitude=${encodeURIComponent(nLon)}&latitude=${encodeURIComponent(nLat)}&access_token=${mapboxToken}&limit=1`;
         const mboxRes = await axios.get(mboxUrl, { timeout: 3000 });
         const feat = mboxRes.data && mboxRes.data.features && mboxRes.data.features[0];
         if (feat && feat.properties) {
@@ -162,13 +253,16 @@ class RouteService {
           const name = props.name || props.full_address || props.place_formatted || '';
           const full = props.full_address || [name, props.place_formatted].filter(Boolean).join(', ') || name;
           if (name || full) {
+            const chosenRoad = road || neighborhood || (isNonAddressable ? '' : name);
             return {
+              title: (!isNonAddressable ? name : (road || neighborhood || '')),
               address: full || name,
               display_name: full || name,
-              road: road || neighborhood || (isNonAddressable ? '' : name),
+              road: chosenRoad,
               neighborhood: neighborhood,
               locality: locality,
-              city: city
+              city: city,
+              provider: 'mapbox_geocoding_v6'
             };
           }
         }
@@ -177,8 +271,8 @@ class RouteService {
       }
     }
 
-    // 2. Nominatim fallback
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`;
+    // 3. Nominatim fallback
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${encodeURIComponent(nLat)}&lon=${encodeURIComponent(nLon)}`;
 
     try {
       const response = await axios.get(url, {
@@ -193,17 +287,25 @@ class RouteService {
 
       if (shortAddr || data.display_name) {
         return {
+          title: road || data.display_name ? (data.display_name.split(',')[0] || '').trim() : '',
           address: shortAddr || data.display_name,
-          display_name: data.display_name || shortAddr
+          display_name: data.display_name || shortAddr,
+          road: road,
+          city: city,
+          provider: 'nominatim'
         };
       }
     } catch (err) {
       console.error('[RouteService] Reverse geocoding failed:', err.message);
     }
 
+    // 4. Coordinate fallback
     return {
-      address: `Lokasi Terpilih (${Number(lat).toFixed(4)}, ${Number(lon).toFixed(4)})`,
-      display_name: `Lokasi Terpilih (${Number(lat).toFixed(4)}, ${Number(lon).toFixed(4)})`
+      title: 'Titik Terpilih',
+      address: `Lokasi Terpilih (${nLat.toFixed(4)}, ${nLon.toFixed(4)})`,
+      display_name: `Lokasi Terpilih (${nLat.toFixed(4)}, ${nLon.toFixed(4)})`,
+      road: '',
+      provider: 'coordinate_fallback'
     };
   }
 }
