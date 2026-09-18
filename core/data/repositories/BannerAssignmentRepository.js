@@ -315,8 +315,8 @@ class BannerAssignmentRepository {
         AND a.branch_id = ?
         AND a.placement = 'HOME_BANNER_CAROUSEL'
         AND a.active = 1
-        AND (a.starts_at IS NULL OR a.starts_at <= datetime('now'))
-        AND (a.ends_at IS NULL OR datetime('now') < a.ends_at)
+        AND (a.starts_at IS NULL OR datetime(a.starts_at) <= datetime('now'))
+        AND (a.ends_at IS NULL OR datetime('now') < datetime(a.ends_at))
       ORDER BY a.position ASC, r.revision_number DESC, a.created_at ASC
     `, [brandId, branchId]);
   }
