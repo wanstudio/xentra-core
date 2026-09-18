@@ -12,6 +12,74 @@ Customer identity is requested only when the transaction actually requires an au
 
 The UX concept is **deferred identity**, not a traditional mandatory registration/onboarding step.
 
+## 🔒 Locked Clarification — OTP Is Xentra Login, Not Per-Order OTP
+
+**Decision Date:** 2026-09-19  
+**Status:** LOCKED / AUTHORITATIVE
+
+The human/customer mental model for the existing Deferred Customer Identity contract is simple:
+
+> **OTP is Xentra's login method using the customer's WhatsApp number.**
+
+This does **not** mean the Customer must enter OTP for every purchase. Once a valid authenticated Customer session exists, normal subsequent orders do not require another OTP merely because a new order is being placed.
+
+If the authenticated session is no longer valid, the Customer is treated as logged out for authenticated actions and is asked to **log in again with WhatsApp + OTP**. This is login/session recovery, not a special OTP requirement for each transaction.
+
+### Human-facing flow
+
+```
+Belum login
+  ↓
+Checkout reaches a point where authenticated Customer identity is required
+  ↓
+Masuk dengan WhatsApp
+  ↓
+OTP
+  ↓
+Login berhasil
+  ↓
+Final checkout verification
+  ↓
+Create order / payment
+```
+
+Returning Customer with a valid session skips the OTP/login step. A stale/expired/invalid session must stop the authenticated transaction path; it must never fall through to order creation or payment. The Customer may be asked to log in again, while still-valid checkout state such as cart, destination, purchase type, and recipient should not be discarded merely because the login session ended.
+
+### Customer-facing language
+
+Backend error codes and implementation terminology must not be exposed as customer-facing copy. Do not show `INVALID_OR_EXPIRED_CUSTOMER_SESSION`, `customer session invalid`, `authentication required`, token details, or similar machine language.
+
+Preferred semantic language:
+- **Masuk dengan WhatsApp**
+- **Masukkan kode verifikasi**
+- When login is no longer valid: **Yuk, masuk lagi** / **Silakan masuk lagi untuk melanjutkan.**
+
+Exact wording may be refined by UI/UX work, but the meaning must remain: **login again, not OTP for every purchase.**
+
+### Agent interpretation rule
+
+When this contract says **Identity Gate**, interpret it as the internal architecture/business term for the point where Xentra asks an unauthenticated Customer to **log in with WhatsApp + OTP**. Do not implement it as a per-order OTP challenge.
+
+Do not invent a mandatory refresh-token architecture, fixed expiry duration, logout lifecycle, or provider-specific authentication behavior unless separately contracted or required by the actual implementation. Preserve the existing server-authoritative `xnt_cust_` session model.
+
+### Authentication failure invariant
+
+```
+Invalid/expired login session
+        ↓
+Stop authenticated transaction
+        ↓
+Login again with WhatsApp + OTP
+        ↓
+New authenticated session
+        ↓
+Canonical checkout revalidation
+        ↓
+Create order / payment
+```
+
+**Never:** authentication/verification failure → fallback/catch → `create-order`.
+
 ## Canonical Customer Flow
 
 ```text
