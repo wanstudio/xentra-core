@@ -9384,8 +9384,11 @@ router.get('/admin/marketing/banners', requireAuth(['owner', 'brand_manager', 'b
     const result = rows.map(bannerRowToAdminDto);
     const assignedBannerIds = new Set(result.map(item => item.banner_id));
 
+    const includeUnassignedContent = actor.role !== 'branch_manager' && !requestedBranchId;
+
     for (const content of contentItems) {
       if (assignedBannerIds.has(content.id)) continue;
+      if (!includeUnassignedContent) continue;
       const published = content.published_revision;
       const draft = content.draft_revision;
       const live = published || draft;
@@ -9484,7 +9487,7 @@ router.get('/admin/marketing/banners/:bannerId', requireAuth(['owner', 'brand_ma
   }
 });
 
-router.post('/admin/marketing/banners', requireAuth(['owner', 'brand_manager']), (req, res) => {
+router.post('/admin/marketing/banners', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
     const actor = bannerActor(req);
     const {
@@ -9497,9 +9500,10 @@ router.post('/admin/marketing/banners', requireAuth(['owner', 'brand_manager']),
       promotion_id = null
     } = req.body || {};
 
-    const banner = bannerContentService.createDraft({
+    const banner = await bannerContentService.createDraft({
       brandId: req.brand_id,
       actorId: actor.id,
+      actorRole: actor.role,
       mediaId: media_id,
       title,
       altText: alt_text,
@@ -9518,7 +9522,7 @@ router.post('/admin/marketing/banners', requireAuth(['owner', 'brand_manager']),
   }
 });
 
-router.patch('/admin/marketing/banners/:bannerId/draft', requireAuth(['owner', 'brand_manager']), (req, res) => {
+router.patch('/admin/marketing/banners/:bannerId/draft', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
     const actor = bannerActor(req);
     const {
@@ -9531,7 +9535,7 @@ router.patch('/admin/marketing/banners/:bannerId/draft', requireAuth(['owner', '
       promotion_id = null
     } = req.body || {};
 
-    const banner = bannerContentService.updateDraft({
+    const banner = await bannerContentService.updateDraft({
       brandId: req.brand_id,
       bannerId: req.params.bannerId,
       actorId: actor.id,
@@ -9551,13 +9555,14 @@ router.patch('/admin/marketing/banners/:bannerId/draft', requireAuth(['owner', '
   }
 });
 
-router.post('/admin/marketing/banners/:bannerId/publish', requireAuth(['owner', 'brand_manager']), (req, res) => {
+router.post('/admin/marketing/banners/:bannerId/publish', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
     const actor = bannerActor(req);
-    const banner = bannerContentService.publishDraft({
+    const banner = await bannerContentService.publishDraft({
       brandId: req.brand_id,
       bannerId: req.params.bannerId,
-      actorId: actor.id
+      actorId: actor.id,
+      actorRole: actor.role
     });
     res.json({ success: true, banner });
   } catch (err) {
@@ -9565,6 +9570,24 @@ router.post('/admin/marketing/banners/:bannerId/publish', requireAuth(['owner', 
       : err.code === 'BANNER_POSITION_CONFLICT' ? 409
       : 400;
     res.status(status).json({ success: false, error: err.message, code: err.code || 'BANNER_PUBLISH_ERROR', conflict: err.conflict || null });
+  }
+});
+
+router.delete('/admin/marketing/banners/:bannerId', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const result = await bannerContentService.deleteDraft({
+      brandId: req.brand_id,
+      bannerId: req.params.bannerId,
+      actorId: actor.id,
+      actorRole: actor.role
+    });
+    res.json(result);
+  } catch (err) {
+    const status = err.code === 'BANNER_NOT_FOUND' ? 404
+      : ['BANNER_ASSIGNMENTS_EXIST', 'PUBLISHED_BANNER_DELETE_FORBIDDEN'].includes(err.code) ? 409
+      : 400;
+    res.status(status).json({ success: false, error: err.message, code: err.code || 'BANNER_DELETE_ERROR' });
   }
 });
 
