@@ -1052,7 +1052,7 @@ function initSchema(targetDb) {
       banner_id TEXT NOT NULL,
       revision_number INTEGER NOT NULL,
       revision_status TEXT NOT NULL DEFAULT 'DRAFT'
-        CHECK (revision_status IN ('DRAFT', 'PUBLISHED')),
+        CHECK (revision_status IN ('DRAFT', 'PUBLISHED', 'SUPERSEDED')),
       title TEXT NOT NULL DEFAULT '',
       alt_text TEXT NOT NULL DEFAULT '',
       media_id TEXT NOT NULL,
