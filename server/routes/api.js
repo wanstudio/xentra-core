@@ -9473,7 +9473,14 @@ router.get('/admin/marketing/banners', requireAuth(['owner', 'brand_manager', 'b
       return an.localeCompare(bn) || Number(a.assignment?.position || 9999) - Number(b.assignment?.position || 9999);
     });
 
-    const branches = bannerAssignmentService.repository.listBranches(req.brand_id);
+    var branches = bannerAssignmentService.repository.listBranches(req.brand_id);
+    if (actor.role === 'branch_manager') {
+      const ownBranchId = actor.branch_id || actor.branchId;
+      branches = ownBranchId
+        ? branches.filter(function (branch) { return String(branch.id) === String(ownBranchId); })
+        : [];
+    }
+
     const legacy = parseLegacyBrandBanners(req.brand);
     res.json({
       success: true,
