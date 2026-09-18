@@ -89,6 +89,23 @@ class BannerContentService {
         err.code = 'CTA_TARGET_REQUIRED';
         throw err;
       }
+
+      const rawUrl = ctaUrl.trim();
+      let parsedUrl;
+      try {
+        parsedUrl = new URL(rawUrl, 'https://xentra.invalid');
+      } catch (_) {
+        const err = new Error('CTA URL tidak valid.');
+        err.code = 'INVALID_CTA_URL';
+        throw err;
+      }
+
+      if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+        const err = new Error('CTA URL hanya boleh menggunakan http atau https.');
+        err.code = 'INVALID_CTA_URL';
+        throw err;
+      }
+
       if (ctaTargetId || promotionId) {
         const err = new Error('CTA URL tidak boleh memiliki target id atau promotion_id.');
         err.code = 'INVALID_CTA_TARGET';
