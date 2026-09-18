@@ -1365,7 +1365,7 @@
     // R1 CART SHEET: >1 branch scopes → the dock labels the multi-branch state
     // (N Pesanan · dari N cabang) and its CTA routes through the Branch Order
     // Switcher instead of a (rejected, mixed-scope) merged #checkout.
-    var groups = Store.getCartBranchGroups();
+    var groups = (Store.getConcreteCheckoutBranchGroups ? Store.getConcreteCheckoutBranchGroups() : Store.getCartBranchGroups());
     var multi = groups.length > 1;
 
     if (countEl) countEl.textContent = multi ? groups.length + ' Pesanan' : count + ' Item';
@@ -1446,25 +1446,33 @@
     container.innerHTML = '';
 
     var state = Store.getState();
-    var groups = Store.getCartBranchGroups();
+    var allItems = state.cart.items || [];
 
-    if (!groups.length) {
+    if (!allItems.length) {
       container.innerHTML = '<div class="x-empty">Keranjang kosong.</div>';
       setSheetSummaryVisible(false);
       setMultiCta(false);
       return;
     }
 
-    var multi = groups.length > 1;
+    var concreteGroups = (Store.getConcreteCheckoutBranchGroups ? Store.getConcreteCheckoutBranchGroups() : Store.getCartBranchGroups());
+    var multi = concreteGroups.length > 1;
 
-    groups.forEach(function (group, gi) {
-      if (gi > 0) {
-        var divider = document.createElement('div');
-        divider.className = 'x-sheet-group-divider';
-        container.appendChild(divider);
-      }
+    if (!multi) {
+      allItems.forEach(function (item) {
+        container.appendChild(buildSheetItemRow(item, state));
+      });
+      renderCartSummary();
+      setSheetSummaryVisible(true);
+      setMultiCta(false);
+    } else {
+      concreteGroups.forEach(function (group, gi) {
+        if (gi > 0) {
+          var divider = document.createElement('div');
+          divider.className = 'x-sheet-group-divider';
+          container.appendChild(divider);
+        }
 
-      if (multi) {
         var heading = document.createElement('div');
         heading.className = 'x-sheet-branch';
         var gcount = group.items.reduce(function (s, it) { return s + Number(it.quantity || 0); }, 0);
@@ -1472,20 +1480,36 @@
           '<span class="x-sheet-branch-name">' + UI.escape(branchLabel(group, gi)) + '</span>' +
           '<span class="x-sheet-branch-count">' + gcount + ' item</span>';
         container.appendChild(heading);
+
+        group.items.forEach(function (item) {
+          container.appendChild(buildSheetItemRow(item, state));
+        });
+      });
+
+      var unassignedRewards = allItems.filter(function (it) {
+        var isPromo = Store.isPromoRewardItem ? Store.isPromoRewardItem(it) : Boolean(it.is_promo_reward);
+        return isPromo && (!it.branch_id || it.branch_id === '__unassigned__');
+      });
+
+      if (unassignedRewards.length > 0) {
+        var rewardDivider = document.createElement('div');
+        rewardDivider.className = 'x-sheet-group-divider';
+        container.appendChild(rewardDivider);
+
+        var rewardHeading = document.createElement('div');
+        rewardHeading.className = 'x-sheet-branch';
+        rewardHeading.innerHTML =
+          '<span class="x-sheet-branch-name">Hadiah Promo</span>' +
+          '<span class="x-sheet-branch-count">' + unassignedRewards.length + ' item</span>';
+        container.appendChild(rewardHeading);
+
+        unassignedRewards.forEach(function (item) {
+          container.appendChild(buildSheetItemRow(item, state));
+        });
       }
 
-      group.items.forEach(function (item) {
-        container.appendChild(buildSheetItemRow(item, state));
-      });
-    });
-
-    if (multi) {
       setSheetSummaryVisible(false);
       setMultiCta(true);
-    } else {
-      renderCartSummary();
-      setSheetSummaryVisible(true);
-      setMultiCta(false);
     }
 
     bindSheetItemEvents(container);
@@ -1588,11 +1612,9 @@
     var sheetContent = document.querySelector('#x-sheet .x-sheet-content');
     if (!show || !sheetContent) return;
 
-    var groups = Store.getCartBranchGroups();
+    var groups = (Store.getConcreteCheckoutBranchGroups ? Store.getConcreteCheckoutBranchGroups() : Store.getCartBranchGroups());
     var count = groups.length;
-    var total = groups.reduce(function (sum, g) {
-      return sum + g.items.reduce(function (s, it) { return s + Number(it.price || 0) * Number(it.quantity || 0); }, 0);
-    }, 0);
+    var total = Store.getCartSubtotal();
 
     multiCtaEl = document.createElement('div');
     multiCtaEl.className = 'x-sheet-multi-cta';
@@ -1628,7 +1650,7 @@
   // scope → that branch's #checkout directly. More than one scope → Branch
   // Order Switcher (no silent-select, no merged checkout).
   function openCheckoutFlow() {
-    var groups = Store.getCartBranchGroups();
+    var groups = (Store.getConcreteCheckoutBranchGroups ? Store.getConcreteCheckoutBranchGroups() : Store.getCartBranchGroups());
     closeSheet();
     if (groups.length > 1) {
       openBranchSwitcher();
@@ -1640,7 +1662,7 @@
   // Branch Order Switcher: the multi-branch gateway. The customer explicitly
   // picks ONE branch order; each row carries its own single-branch checkout.
   function openBranchSwitcher() {
-    var groups = Store.getCartBranchGroups();
+    var groups = (Store.getConcreteCheckoutBranchGroups ? Store.getConcreteCheckoutBranchGroups() : Store.getCartBranchGroups());
     if (!groups.length) return;
 
     var existing = document.querySelector('.x-branch-switcher-overlay');

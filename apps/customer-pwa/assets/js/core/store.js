@@ -475,6 +475,50 @@
     return groups;
   }
 
+  function isPromoRewardItem(item) {
+    if (!item) return false;
+    var globalObj = typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null);
+    var bridge = globalObj && globalObj.Xentra && globalObj.Xentra.PromotionRewardCart;
+    if (bridge && typeof bridge.isRewardItem === 'function') {
+      return bridge.isRewardItem(item);
+    }
+    return Boolean(
+      item.is_promo_reward ||
+      item.promotion_id ||
+      item.promo_id ||
+      (item.id && String(item.id).indexOf('reward_') === 0)
+    );
+  }
+
+  // Groups cart lines for CHECKOUT CTA / BRANCH RESOLUTION:
+  // - Concrete branch_id => counts as a branch.
+  // - Normal legacy items without branch_id (null / empty / '__unassigned__')
+  //   form the legacy unassigned branch group.
+  // - Unassigned promo reward items (branch_id: null / '__unassigned__') MUST NOT
+  //   create a branch count, because promo rewards are brand-wide cart intent
+  //   awaiting fulfillment resolution, not a separate branch.
+  // - A reward-only cart returns 0 concrete branch groups.
+  function getConcreteCheckoutBranchGroups() {
+    var groups = [];
+    var byKey = {};
+    (state.cart.items || []).forEach(function (item) {
+      if (isPromoRewardItem(item) && (!item.branch_id || item.branch_id === '__unassigned__')) {
+        return;
+      }
+      var key = cartGroupKey(item);
+      if (!byKey[key]) {
+        byKey[key] = {
+          branch_id: (item && item.branch_id) || null,
+          branch_name: (item && item.branch_name) || null,
+          items: []
+        };
+        groups.push(byKey[key]);
+      }
+      byKey[key].items.push(item);
+    });
+    return groups;
+  }
+
   // Items belonging to ONE branch scope (branch_id === null => legacy/unassigned).
   // This is the read boundary a single-branch CHECKOUT consumes from the cart.
   function getCartItemsForBranch(branchId) {
@@ -546,6 +590,8 @@
     getCartSubtotal: getCartSubtotal,
     findCartItem: findCartItem,
     getCartBranchGroups: getCartBranchGroups,
+    getConcreteCheckoutBranchGroups: getConcreteCheckoutBranchGroups,
+    isPromoRewardItem: isPromoRewardItem,
     getCartItemsForBranch: getCartItemsForBranch,
     removeBranchItems: removeBranchItems,
     removeCartItem: removeCartItem
