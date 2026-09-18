@@ -3049,4 +3049,353 @@ input[type="file"].x-input,
   box-shadow: 0 0 8px var(--accent-amber, #f59e0b) !important;
 }
 
+/* ==========================================================================
+   MARKETING — STOREFRONT BANNER UI SCAFFOLD
+   ========================================================================== */
+
+.x-marketing-banner-panel {
+  overflow: visible;
+}
+
+.x-marketing-banner-header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.x-marketing-banner-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.x-marketing-banner-header p {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.x-marketing-banner-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: #f8fafc;
+  flex-wrap: wrap;
+}
+
+.x-marketing-banner-toolbar-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.x-marketing-banner-toolbar-copy strong {
+  font-size: 12px;
+  color: var(--text-main);
+}
+
+.x-marketing-banner-toolbar-copy span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.x-marketing-banner-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.x-marketing-banner-filter-label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.x-marketing-banner-filter-value {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.x-marketing-banner-table {
+  min-width: 980px;
+}
+
+.x-marketing-banner-table td {
+  vertical-align: middle;
+}
+
+.x-marketing-banner-primary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 270px;
+}
+
+.x-marketing-banner-preview {
+  width: 132px;
+  height: 68px;
+  flex: 0 0 132px;
+  border-radius: 9px;
+  overflow: hidden;
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(182,255,0,.22), rgba(15,23,42,.92)),
+    linear-gradient(135deg, #0f172a, #334155);
+  border: 1px solid #cbd5e1;
+  box-shadow: var(--shadow-sm);
+}
+
+.x-marketing-banner-preview::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 78% 24%, rgba(255,255,255,.22), transparent 26%),
+    linear-gradient(120deg, transparent 30%, rgba(255,255,255,.08) 30%, rgba(255,255,255,.08) 68%, transparent 68%);
+  pointer-events: none;
+}
+
+.x-marketing-banner-preview-overlay {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: linear-gradient(transparent, rgba(15,23,42,.9));
+  color: #ffffff;
+}
+
+.x-marketing-banner-preview-overlay strong {
+  font-size: 10px;
+  line-height: 1.2;
+  letter-spacing: .03em;
+}
+
+.x-marketing-banner-preview-overlay span {
+  font-size: 9px;
+  line-height: 1.25;
+  opacity: .85;
+}
+
+.x-marketing-banner-name {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.x-marketing-banner-name strong {
+  font-size: 13px;
+  color: var(--text-main);
+  line-height: 1.35;
+}
+
+.x-marketing-banner-secondary {
+  font-size: 12px;
+  color: var(--text-main);
+  line-height: 1.45;
+}
+
+.x-marketing-banner-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.x-marketing-banner-status.is-draft {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.x-marketing-banner-status.is-scheduled {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.x-marketing-banner-status.is-active {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.x-marketing-banner-status.is-paused {
+  background: #fff7ed;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+
+.x-marketing-banner-status.is-ended {
+  background: #f1f5f9;
+  color: #64748b;
+  border-color: #cbd5e1;
+}
+
+.x-marketing-banner-visibility {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.x-toggle.x-toggle-compact {
+  width: 42px;
+  height: 24px;
+}
+
+.x-toggle.x-toggle-compact .x-toggle-slider::before {
+  width: 18px;
+  height: 18px;
+  top: 3px;
+  left: 3px;
+}
+
+.x-toggle.x-toggle-compact input:checked + .x-toggle-slider::before {
+  transform: translateX(18px);
+}
+
+.x-marketing-banner-visibility-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .x-marketing-banner-header {
+    align-items: stretch;
+  }
+
+  .x-marketing-banner-header > div:first-child {
+    min-width: 0;
+  }
+
+  .x-marketing-banner-header .x-btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .x-marketing-banner-toolbar {
+    padding: 12px 16px;
+  }
+
+  .x-marketing-banner-table {
+    min-width: 0;
+  }
+
+  .x-marketing-banner-table,
+  .x-marketing-banner-table tbody,
+  .x-marketing-banner-table tr,
+  .x-marketing-banner-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .x-marketing-banner-table thead {
+    display: none;
+  }
+
+  .x-marketing-banner-table tbody {
+    padding: 10px 12px 14px;
+  }
+
+  .x-marketing-banner-table tr {
+    margin-bottom: 12px;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+    overflow: visible;
+  }
+
+  .x-marketing-banner-table td {
+    border-bottom: 1px solid #f1f5f9;
+    padding: 11px 14px;
+  }
+
+  .x-marketing-banner-table td:last-child {
+    border-bottom: none;
+  }
+
+  .x-marketing-banner-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .x-marketing-banner-primary {
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .x-marketing-banner-preview {
+    width: 120px;
+    height: 62px;
+    flex-basis: 120px;
+  }
+
+  .x-marketing-banner-secondary {
+    display: block;
+  }
+
+  .x-marketing-banner-visibility {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .x-marketing-banner-table td[data-label="Aksi"] .x-item-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .x-marketing-banner-primary {
+    flex-direction: column;
+  }
+
+  .x-marketing-banner-preview {
+    width: 100%;
+    height: 110px;
+    flex-basis: auto;
+  }
+
+  .x-marketing-banner-name {
+    width: 100%;
+  }
+
+  .x-marketing-banner-toolbar {
+    align-items: stretch;
+  }
+
+  .x-marketing-banner-filter {
+    justify-content: space-between;
+    width: 100%;
+  }
+}
 
