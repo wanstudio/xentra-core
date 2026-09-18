@@ -45,7 +45,7 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
     cleanup();
   });
 
-  await t.test('1. Create Draft with READY canonical banner media', () => {
+  await t.test('1. Create Draft with READY canonical banner media', async () => {
     db.prepare(`
       INSERT INTO media_assets (
         id, tenant_id, brand_id, uploaded_by, storage_key, mime_type,
@@ -68,7 +68,7 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
     );
 
     const service = new BannerContentService();
-    const banner = service.createDraft({
+    const banner = await service.createDraft({
       brandId: BRAND_ID,
       actorId: 'usr_bangjo_owner',
       mediaId: TEST_PREFIX + 'media_1',
@@ -88,13 +88,13 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
     assert.equal(attached.attached_to_id, banner.draft_revision.id);
   });
 
-  await t.test('2. Publish does not mutate the published content implicitly; live version is explicit', () => {
+  await t.test('2. Publish does not mutate the published content implicitly; live version is explicit', async () => {
     const service = new BannerContentService();
     const bannerId = db.prepare(
       `SELECT id FROM storefront_banners WHERE brand_id = ? ORDER BY created_at DESC LIMIT 1`
     ).get(BRAND_ID).id;
 
-    const published = service.publishDraft({
+    const published = await service.publishDraft({
       brandId: BRAND_ID,
       bannerId,
       actorId: 'usr_bangjo_owner'
@@ -105,7 +105,7 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
     assert.equal(published.draft_revision, null);
   });
 
-  await t.test('3. Editing a published banner creates a separate Draft Revision', () => {
+  await t.test('3. Editing a published banner creates a separate Draft Revision', async () => {
     const service = new BannerContentService();
 
     const bannerId = db.prepare(
@@ -133,7 +133,7 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
       new Date().toISOString()
     );
 
-    const updated = service.updateDraft({
+    const updated = await service.updateDraft({
       brandId: BRAND_ID,
       bannerId,
       actorId: 'usr_bangjo_owner',
@@ -160,7 +160,7 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
     assert.equal(media2.attached_to_id, updated.draft_revision.id);
   });
 
-  await t.test('4. Cross-brand Promotion/Product/Category CTA references are rejected', () => {
+  await t.test('4. Cross-brand Promotion/Product/Category CTA references are rejected', async () => {
     cleanup();
     db.prepare(`
       INSERT INTO brands (id, organization_id, name, slug, custom_domain, banners)
@@ -188,8 +188,8 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
 
     const service = new BannerContentService();
 
-    assert.throws(() => {
-      service.createDraft({
+    await assert.rejects(async () => {
+      await service.createDraft({
         brandId: BRAND_ID,
         actorId: 'usr_bangjo_owner',
         mediaId,
@@ -202,7 +202,7 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
     cleanup();
   });
 
-  await t.test('5. Non-READY media and invalid CTA contracts are rejected', () => {
+  await t.test('5. Non-READY media and invalid CTA contracts are rejected', async () => {
     const mediaId = TEST_PREFIX + 'media_not_ready';
     db.prepare(`
       INSERT INTO media_assets (
@@ -218,8 +218,8 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
 
     const service = new BannerContentService();
 
-    assert.throws(() => {
-      service.createDraft({
+    await assert.rejects(async () => {
+      await service.createDraft({
         brandId: BRAND_ID,
         mediaId,
         title: 'Not Ready',
@@ -240,8 +240,8 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
       1920, 990, 1024, new Date().toISOString(), new Date().toISOString()
     );
 
-    assert.throws(() => {
-      service.createDraft({
+    await assert.rejects(async () => {
+      await service.createDraft({
         brandId: BRAND_ID,
         mediaId: readyId,
         title: 'Bad CTA',
