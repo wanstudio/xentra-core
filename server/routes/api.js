@@ -6520,7 +6520,8 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
       price_per_km,
       max_radius_km,
       promo_min_order,
-      promo_delivery_discount
+      promo_delivery_discount,
+      timezone
     } = req.body;
 
     const rawWa = (whatsapp_number || phone || '').trim();
@@ -6556,10 +6557,16 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
     const branchWa = rawWa;
 
     const isOpenOverride = req.body.is_open_override !== undefined ? (req.body.is_open_override ? 1 : 0) : 1;
+    const branchTimezone = String(timezone || 'Asia/Jakarta').trim();
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: branchTimezone }).format(new Date());
+    } catch (_) {
+      return res.status(400).json({ success: false, error: 'Timezone cabang tidak valid. Gunakan IANA timezone seperti Asia/Jakarta.' });
+    }
 
     db.prepare(`
-      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+      INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, timezone)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
     `).run(
       branchId,
       req.brand_id,
@@ -6570,7 +6577,8 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
       longitude !== undefined ? longitude : 0,
       branchPhone,
       branchWa,
-      isOpenOverride
+      isOpenOverride,
+      branchTimezone
     );
 
     const deliverySettingsId = 'bds_' + branchId;
@@ -6600,7 +6608,8 @@ router.post('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, re
         whatsapp_number: branchWa,
         address_text: address_text || '',
         is_active: 1,
-        is_open_override: isOpenOverride
+        is_open_override: isOpenOverride,
+        timezone: branchTimezone
       }
     });
   } catch (err) {
@@ -6653,7 +6662,7 @@ router.get('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
 
 router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount } = req.body;
+    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount, timezone } = req.body;
     const targetPhone = phone !== undefined ? phone : null;
     const targetWa = whatsapp_number !== undefined ? whatsapp_number : null;
 
@@ -6680,7 +6689,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
     // P1 TENANT WRITE BOUNDARY GUARD (FINDING 01): Verify branch ownership before ANY mutation
     // B1: full pre-mutation snapshot is captured so every authorized change is auditable (B1.10).
     const existingBranch = db.prepare(`
-      SELECT id, name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override
+      SELECT id, name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, timezone
       FROM branches WHERE id = ? AND brand_id = ?
     `).get(req.params.id, req.brand_id);
     if (!existingBranch) {
