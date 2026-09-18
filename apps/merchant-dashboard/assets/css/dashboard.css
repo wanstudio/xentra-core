@@ -1191,12 +1191,12 @@ input[type="file"].x-input,
   font-weight: 700;
 }
 
-/* Toast Container */
+/* Toast Container — sits above every modal layer (highest modal: 12030) */
 .x-toast-container {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 10000;
+  z-index: 13000;
   display: flex;
   flex-direction: column;
   gap: 10px;

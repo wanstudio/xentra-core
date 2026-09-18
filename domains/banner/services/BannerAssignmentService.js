@@ -4,10 +4,12 @@ const crypto = require('crypto');
 const BannerAssignment = require('../domain/BannerAssignment');
 const BannerDateTime = require('./BannerDateTime');
 const BannerAssignmentRepository = require('../../../core/data/repositories/BannerAssignmentRepository');
+const WorkforceService = require('../../../core/identity/WorkforceService');
 
 class BannerAssignmentService {
   constructor({ repository = new BannerAssignmentRepository() } = {}) {
     this.repository = repository;
+    this.workforce = new WorkforceService();
   }
 
   static createId() {
@@ -142,6 +144,47 @@ class BannerAssignmentService {
       throw err;
     }
     return result;
+  }
+
+  /**
+   * Operational audit for protected Banner Assignment mutations.
+   *
+   * Uses the same approved mechanism as BannerContentService.writeSecurityAudit:
+   * WorkforceService.logSecurityEvent -> security_audit_log (shared DataAccess
+   * connection, so the audit row commits/rolls back atomically with the
+   * surrounding mutation transaction). Brand/branch scoped, actor-aware, and
+   * preserves previous/new state as required by the Banner v2 contract.
+   * Audit write failures are non-blocking, matching the existing Banner
+   * domain audit contract (see BannerContentService.writeSecurityAudit).
+   */
+  writeOperationalAudit({ brandId, branch, actor, assignmentId, action, previousValue = null, newValue = null }) {
+    try {
+      let organizationId = actor ? actor.organization_id : null;
+      if (!organizationId) {
+        const brand = this.repository.db.queryOne(
+          'SELECT organization_id FROM brands WHERE id = ? LIMIT 1',
+          [brandId]
+        );
+        organizationId = brand ? brand.organization_id : null;
+      }
+
+      this.workforce.logSecurityEvent({
+        actor_id: actor ? (actor.userId || actor.id) : null,
+        actor_role: actor ? actor.role : null,
+        action,
+        target_user_id: null,
+        target_role: null,
+        brand_id: brandId,
+        organization_id: organizationId,
+        branch_id: branch ? branch.id : null,
+        result: 'success',
+        metadata: {
+          assignment_id: assignmentId,
+          previous_value: previousValue,
+          new_value: newValue
+        }
+      });
+    } catch (_) {}
   }
 
   createAssignment({

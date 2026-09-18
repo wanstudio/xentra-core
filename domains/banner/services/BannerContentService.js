@@ -177,6 +177,39 @@ class BannerContentService {
     }
   }
 
+  /**
+   * Publishing can make existing active assignments customer-visible, so
+   * every affected Branch/Placement/Position must pass the visibility overlap
+   * guard against already-published banners. Mirrors the error contract of
+   * BannerAssignmentService.assertPublishedConflict (BANNER_POSITION_CONFLICT
+   * -> HTTP 409 with conflict payload, consumed by the dashboard publish flow).
+   */
+  assertPublishPlacementConflicts(brandId, bannerId) {
+    const assignments = this.assignmentRepository.listByBanner(brandId, bannerId);
+    for (const assignment of assignments) {
+      if (!Number(assignment.active)) continue;
+
+      const conflict = this.assignmentRepository.findConflict({
+        brandId,
+        branchId: assignment.branch_id,
+        placement: assignment.placement,
+        position: Number(assignment.position),
+        startsAt: assignment.starts_at,
+        endsAt: assignment.ends_at,
+        excludeAssignmentId: assignment.id,
+        requirePublished: true
+      });
+
+      if (conflict) {
+        const err = new Error('Posisi banner pada Branch tersebut bentrok dengan Banner lain pada visibility window yang overlap.');
+        err.code = 'BANNER_POSITION_CONFLICT';
+        err.assignment_id = assignment.id;
+        err.conflict = conflict;
+        throw err;
+      }
+    }
+  }
+
   async createDraft({
     brandId,
     actorId = null,

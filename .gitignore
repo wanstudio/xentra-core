@@ -11,6 +11,7 @@ node_modules/
 *.db-shm
 *.db-wal
 *.db-journal
+*.db*backup*
 
 # Logs
 logs/

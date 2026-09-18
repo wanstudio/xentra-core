@@ -10177,6 +10177,47 @@ router.patch('/admin/marketing/promotions/:id/branch-activation', requireAuth(['
     }
 
     const newActiveState = (is_active === 1 || is_active === true) ? 1 : 0;
+
+    // Prerequisite validation when activating: reward products must be available in target branch catalog
+    if (newActiveState === 1) {
+      const rewards = corePromotionRepo.findRewards(promotionId);
+      for (const reward of rewards) {
+        if (reward.reward_type === 'freebie_product' || reward.target_product_id) {
+          const targetPid = reward.target_product_id;
+          if (!targetPid) {
+            return res.status(422).json({
+              success: false,
+              error: 'Promo belum dapat diaktifkan karena definisi produk hadiah tidak valid.'
+            });
+          }
+
+          const product = db.prepare('SELECT id, name, brand_id, is_active FROM products WHERE id = ? AND brand_id = ?').get(targetPid, req.brand_id);
+          if (!product || product.is_active === 0) {
+            const prodName = product?.name || `ID ${targetPid}`;
+            return res.status(422).json({
+              success: false,
+              error: `Promo belum dapat diaktifkan karena produk hadiah '${prodName}' belum tersedia di katalog brand ini.`
+            });
+          }
+
+          const bp = db.prepare('SELECT is_available, stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(targetBranchId, targetPid);
+          if (!bp) {
+            return res.status(422).json({
+              success: false,
+              error: `Promo belum dapat diaktifkan karena produk hadiah '${product.name}' belum tersedia di katalog cabang ini.`
+            });
+          }
+
+          if (bp.is_available !== 1) {
+            return res.status(422).json({
+              success: false,
+              error: `Promo belum dapat diaktifkan karena produk hadiah '${product.name}' sedang dinonaktifkan di cabang ini.`
+            });
+          }
+        }
+      }
+    }
+
     corePromotionRepo.setBranchScopeActivation({
       promotionId,
       branchId: targetBranchId,

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=3.0.8">
+  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=3.0.9">
 </head>
 <body>
 
@@ -1960,7 +1960,7 @@
               </div>
               <button type="button" class="x-btn-primary" id="btn-mkt-create-promo" onclick="openCreatePromotionModal()" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:8px 16px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                + Buat Promo Baru
+                Buat Promo Baru
               </button>
             </div>
             <div class="x-card-body" style="padding:0;">
@@ -1974,7 +1974,7 @@
                       <th>Cakupan Cabang</th>
                       <th>Klaim Aktif</th>
                       <th>Status</th>
-                      <th style="text-align:right;">Aksi</th>
+                      <th class="text-right">Aksi</th>
                     </tr>
                   </thead>
                   <tbody id="tbody-mkt-promotions">
@@ -2009,7 +2009,7 @@
               </div>
               <button type="button" class="x-btn-primary" id="btn-mkt-create-banner" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:8px 16px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                + Tambah Banner
+                Tambah Banner
               </button>
             </div>
 
@@ -2037,7 +2037,7 @@
                     <th>Publikasi</th>
                     <th>Jadwal</th>
                     <th>Visibility</th>
-                    <th style="text-align:right;">Aksi</th>
+                    <th class="text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="mkt-banners-table-body">
@@ -4329,8 +4329,8 @@
           </div>
 
           <div class="x-marketing-banner-publish-note">
-            <strong>Publish adalah batas publikasi.</strong>
-            <span>Draft tidak tampil. Published baru dapat tampil jika Assignment valid, Active ON, dan window jadwal sedang efektif.</span>
+            <strong>Publikasikan Banner</strong>
+            <span>Draft hanya tersimpan di dashboard dan belum tampil ke customer. Setelah dipublikasikan, banner dapat tampil jika Assignment sudah valid, Active ON, dan jadwal visibilitas sedang berlaku.</span>
           </div>
         </div>
 
@@ -4348,7 +4348,7 @@
   </div>
 
   <!-- MODAL: BANNER ASSIGNMENT / SCHEDULE -->
-  <div id="modal-marketing-banner-assignment" class="x-modal-backdrop" onclick="if (event.target === this) closeMarketingBannerAssignmentModal()" style="display:none; z-index:12010;" role="dialog" aria-modal="true" aria-labelledby="modal-banner-assignment-title">
+  <div id="modal-marketing-banner-assignment" class="x-modal-backdrop" onclick="if (event.target === this) closeMarketingBannerAssignmentModal()" style="display:none; z-index:12020;" role="dialog" aria-modal="true" aria-labelledby="modal-banner-assignment-title">
     <div class="x-modal-card" style="max-width:560px;width:100%;">
       <div class="x-modal-header">
         <div>
@@ -4416,7 +4416,7 @@
   </div>
 
   <!-- MODAL: BANNER PREVIEW -->
-  <div id="modal-marketing-banner-preview" class="x-modal-backdrop" onclick="if (event.target === this) closeMarketingBannerPreview()" style="display:none; z-index:12020;">
+  <div id="modal-marketing-banner-preview" class="x-modal-backdrop" onclick="if (event.target === this) closeMarketingBannerPreview()" style="display:none; z-index:12030;">
     <div class="x-modal-card" style="max-width:720px;width:100%;">
       <div class="x-modal-header">
         <div>
@@ -4433,7 +4433,7 @@
   </div>
 
   <!-- MODAL: REUSABLE IMAGE CROP EDITOR (MEDIA SYSTEM M2) -->
-  <div id="modal-crop-editor" class="x-modal-backdrop" style="display:none; z-index: 10000;" role="dialog" aria-modal="true" aria-labelledby="crop-editor-title">
+  <div id="modal-crop-editor" class="x-modal-backdrop" style="display:none; z-index: 12010;" role="dialog" aria-modal="true" aria-labelledby="crop-editor-title">
     <div class="x-crop-modal-card">
       <div class="x-modal-header">
         <div>
@@ -4707,6 +4707,6 @@
   </div>
 
   <!-- Dashboard JavaScript -->
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.8"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.9"></script>
 </body>
 </html>

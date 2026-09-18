@@ -83,7 +83,7 @@
 
     var toast = document.createElement('div');
     toast.className = 'x-toast';
-    toast.innerHTML = '<span>⚡</span> <span>' + message + '</span>';
+    toast.innerHTML = '<span>⚡</span> <span>' + esc(message) + '</span>';
     container.appendChild(toast);
 
     setTimeout(function () {
@@ -278,6 +278,10 @@
     var _onConfirmCallback = null;
     var _onCancelCallback = null;
 
+    // Bind-once guard: pointer/wheel/keyboard listeners must only ever be
+    // attached a single time even though open() re-runs initElements().
+    var _interactionBound = false;
+
     // State
     var _sourceImg = null;
     var _naturalWidth = 0;
@@ -341,8 +345,11 @@
         };
       }
 
-      // Pointer/touch interaction on viewport
-      if (_viewport) {
+      // Pointer/touch/wheel/keyboard interaction — bound exactly once for the
+      // lifetime of this singleton editor (open/close cycles never re-bind).
+      if (_viewport && !_interactionBound) {
+        _interactionBound = true;
+
         _viewport.addEventListener('pointerdown', handlePointerDown);
         window.addEventListener('pointermove', handlePointerMove);
         window.addEventListener('pointerup', handlePointerUp);
@@ -365,6 +372,16 @@
           else if (e.key === '+' || e.key === '=') { setZoom(Math.min(3.0, _zoom + 0.1)); e.preventDefault(); }
           else if (e.key === '-' || e.key === '_') { setZoom(Math.max(1.0, _zoom - 0.1)); e.preventDefault(); }
           else if (e.key === 'Escape') { cancel(); e.preventDefault(); }
+        });
+
+        // Global Escape close for when the viewport is not focused. Safe against
+        // double-cancel: the viewport handler runs first and hides the modal,
+        // so this handler sees display==='none' and skips.
+        document.addEventListener('keydown', function (e) {
+          if (e.key !== 'Escape') return;
+          if (!_modal || _modal.style.display === 'none') return;
+          cancel();
+          e.preventDefault();
         });
       }
     }
@@ -483,6 +500,9 @@
      */
     function open(options) {
       initElements();
+      // Fresh interaction state for every open (safety against a pointerup
+      // that was lost while the modal was closing).
+      _isDragging = false;
       _activeConfig = options || {};
       _onConfirmCallback = _activeConfig.onConfirm || null;
       _onCancelCallback = _activeConfig.onCancel || null;
@@ -7389,9 +7409,13 @@
     bannerId: null,
     mediaId: null,
     mediaFile: null,
+    mediaReady: false,
     cropSpec: null,
     detail: null
   };
+
+  // Re-entrancy guard: blocks concurrent save/publish requests (double click).
+  var _marketingBannerSaving = false;
 
   var _marketingBannerAssignmentEditor = {
     bannerId: null,
@@ -7902,6 +7926,10 @@
 
     if (ctaEl) ctaEl.value = revision ? (revision.cta_type || 'NONE') : 'NONE';
 
+    // State isolation: never carry a previously selected File into this session.
+    var fileEl = $('mkt-banner-file');
+    if (fileEl) fileEl.value = '';
+
     setMarketingBannerEditorPreview(
       detail && detail.media && detail.media.preview_url
         ? detail.media.preview_url
@@ -7933,6 +7961,7 @@
 
   function clearMarketingBannerMedia() {
     _marketingBannerEditor.mediaFile = null;
+    _marketingBannerEditor.mediaReady = false;
     _marketingBannerEditor.mediaId = _marketingBannerEditor.detail
       ? (_marketingBannerEditor.detail.draft_revision
         ? _marketingBannerEditor.detail.draft_revision.media_id
@@ -8028,6 +8057,7 @@
 
     _marketingBannerEditor.mediaFile = file;
     _marketingBannerEditor.cropSpec = null;
+    _marketingBannerEditor.mediaReady = false;
 
     XentraCropEditor.open({
       source: file,
@@ -8238,22 +8268,28 @@
   }
 
   async function saveMarketingBannerDraft(shouldPublish) {
+    if (_marketingBannerSaving) return;
     var submitBtn = $('mkt-banner-save-draft');
     var publishBtn = $('mkt-banner-publish-action');
 
+    _marketingBannerSaving = true;
     if (submitBtn) submitBtn.disabled = true;
     if (publishBtn) publishBtn.disabled = true;
 
     try {
       var mediaId = _marketingBannerEditor.mediaId;
 
-      if (_marketingBannerEditor.mediaFile) {
+      // Reuse the READY asset from a previous successful processing attempt
+      // instead of re-uploading the same File (prevents orphaned READY assets
+      // when a retry happens after a downstream failure).
+      if (_marketingBannerEditor.mediaFile && !_marketingBannerEditor.mediaReady) {
         var asset = await processMarketingBannerMedia(
           _marketingBannerEditor.mediaFile,
           _marketingBannerEditor.cropSpec
         );
         mediaId = asset.media_id || asset.id;
         _marketingBannerEditor.mediaId = mediaId;
+        _marketingBannerEditor.mediaReady = true;
       }
 
       if (!mediaId) {
@@ -8264,17 +8300,35 @@
       var banner;
 
       if (_marketingBannerEditor.mode === 'create') {
-        var createRes = await adminFetch(API_BASE + '/admin/marketing/banners', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload)
-        });
-        var createJson = await createRes.json();
-        if (!createRes.ok || !createJson.success) {
-          throw new Error(createJson.error || 'Gagal membuat Banner.');
+        if (!_marketingBannerEditor.bannerId) {
+          var createRes = await adminFetch(API_BASE + '/admin/marketing/banners', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(payload)
+          });
+          var createJson = await createRes.json();
+          if (!createRes.ok || !createJson.success) {
+            throw new Error(createJson.error || 'Gagal membuat Banner.');
+          }
+          banner = createJson.banner;
+          _marketingBannerEditor.bannerId = banner.id;
+        } else {
+          // Retry after a failed placement: the Banner content already exists,
+          // so update its draft instead of creating a duplicate banner.
+          var retryRes = await adminFetch(
+            API_BASE + '/admin/marketing/banners/' + encodeURIComponent(_marketingBannerEditor.bannerId) + '/draft',
+            {
+              method: 'PATCH',
+              headers: getAuthHeaders(),
+              body: JSON.stringify(payload)
+            }
+          );
+          var retryJson = await retryRes.json();
+          if (!retryRes.ok || !retryJson.success) {
+            throw new Error(retryJson.error || 'Gagal menyimpan Draft Banner.');
+          }
+          banner = retryJson.banner;
         }
-        banner = createJson.banner;
-        _marketingBannerEditor.bannerId = banner.id;
 
         var placementPayload = getMarketingBannerPlacementPayload();
         if (!placementPayload.branch_ids.length &&
@@ -8284,7 +8338,7 @@
 
         if (placementPayload.branch_ids.length) {
           var assignRes = await adminFetch(
-            API_BASE + '/admin/marketing/banners/' + encodeURIComponent(banner.id) + '/assignments/bulk',
+            API_BASE + '/admin/marketing/banners/' + encodeURIComponent(_marketingBannerEditor.bannerId) + '/assignments/bulk',
             {
               method: 'POST',
               headers: getAuthHeaders(),
@@ -8337,6 +8391,7 @@
       console.error('[Banner] save error:', err);
       showToast('❌ ' + (err.message || 'Gagal menyimpan Banner.'));
     } finally {
+      _marketingBannerSaving = false;
       if (submitBtn) submitBtn.disabled = false;
       if (publishBtn) publishBtn.disabled = false;
     }
@@ -8421,7 +8476,10 @@
 
     var title = $('mkt-banner-title-field') ? $('mkt-banner-title-field').value.trim() : 'Banner';
     var alt = $('mkt-banner-alt-field') ? $('mkt-banner-alt-field').value.trim() : title;
-    var src = $('mkt-banner-preview') ? $('mkt-banner-preview').src : '';
+    // An empty img.src resolves to the document URL when read back, so only
+    // trust src while the preview image is actually visible.
+    var previewImg = $('mkt-banner-preview');
+    var src = previewImg && previewImg.style.display !== 'none' ? previewImg.src : '';
     var ctaType = $('mkt-banner-cta-type') ? $('mkt-banner-cta-type').value : 'NONE';
     var scheduleEnabled = $('mkt-banner-schedule-enabled') ? $('mkt-banner-schedule-enabled').checked : false;
     var startsAt = scheduleEnabled && $('mkt-banner-starts-at') ? $('mkt-banner-starts-at').value : '';
@@ -9040,16 +9098,15 @@
         if (p.capability_type === 'install_incentive') capLabel = '📱 Insentif PWA';
         else if (p.capability_type === 'first_order') capLabel = '🥇 First Order';
 
-        var actionBtns = '';
-        if (isOwner) {
-          actionBtns += '<button type="button" class="x-btn-secondary" onclick="openEditPromotionModal(\'' + esc(p.id) + '\')" style="padding:4px 8px;font-size:11px;margin-right:4px;">Edit</button>';
-        }
-        actionBtns += '<button type="button" class="x-btn-secondary" onclick="toggleMarketingPromotionActive(\'' + esc(p.id) + '\', ' + (p.is_active === 1 ? 0 : 1) + ')" style="padding:4px 8px;font-size:11px;margin-right:4px;">' +
-          (p.is_active === 1 ? 'Nonaktifkan' : 'Aktifkan') +
-        '</button>';
-        if (isOwner) {
-          actionBtns += '<button type="button" class="x-btn-secondary" onclick="deleteMarketingPromotion(\'' + esc(p.id) + '\')" style="padding:4px 8px;font-size:11px;color:#dc2626;">Hapus</button>';
-        }
+        var isPromoActive = p.is_active === 1 || p.is_active === true;
+        var toggleSwitch = '' +
+          '<div style="display:inline-flex;align-items:center;gap:8px;">' +
+            '<label class="x-toggle x-toggle-compact' + (isPromoActive ? ' x-toggle-on' : '') + '" title="' + (isPromoActive ? 'Promosi aktif' : 'Promosi nonaktif') + '">' +
+              '<input type="checkbox" ' + (isPromoActive ? 'checked' : '') + ' onchange="toggleMarketingPromotionActive(\'' + esc(p.id) + '\', this.checked ? 1 : 0)" aria-label="Status aktif promosi ' + esc(p.name) + '">' +
+              '<span class="x-toggle-slider"></span>' +
+            '</label>' +
+            statusBadge +
+          '</div>';
 
         return '<tr>' +
           '<td><strong>' + esc(p.name) + '</strong>' + (p.code ? ' <code style="font-size:11px;background:#f1f5f9;padding:2px 4px;border-radius:4px;">' + esc(p.code) + '</code>' : '') + '</td>' +
@@ -9057,8 +9114,18 @@
           '<td>' + rewardSummary + '</td>' +
           '<td>' + scopeSummary + '</td>' +
           '<td><strong>' + (p.redemptions_count || 0) + '</strong> klaim</td>' +
-          '<td>' + statusBadge + '</td>' +
-          '<td style="text-align:right;white-space:nowrap;">' + actionBtns + '</td>' +
+          '<td>' + toggleSwitch + '</td>' +
+          '<td class="text-right" style="white-space:nowrap;">' +
+            '<div class="x-item-actions">' +
+              '<button type="button" class="x-action-menu-trigger" aria-label="Aksi promosi ' + esc(p.name) + '" onclick="XentraActionMenu.open(this, [' +
+                (isOwner ? '{ label: \'Edit Promosi\', icon: \'✏️\', onClick: function() { openEditPromotionModal(\'' + esc(p.id) + '\'); } },' : '') +
+                '{ label: \'' + (isPromoActive ? 'Nonaktifkan' : 'Aktifkan') + '\', icon: \'' + (isPromoActive ? '⏸️' : '▶️') + '\', onClick: function() { toggleMarketingPromotionActive(\'' + esc(p.id) + '\', ' + (isPromoActive ? 0 : 1) + '); } }' +
+                (isOwner ? ', { divider: true }, { label: \'Hapus Promosi\', icon: \'🗑️\', destructive: true, onClick: function() { deleteMarketingPromotion(\'' + esc(p.id) + '\'); } }' : '') +
+              '])">' +
+                '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
+              '</button>' +
+            '</div>' +
+          '</td>' +
         '</tr>';
       });
 
