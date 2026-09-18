@@ -7695,9 +7695,16 @@
     var publicationStatus = String(row.publication_status || 'DRAFT').toUpperCase();
     var user = getMarketingBannerUser();
     var actions = [
-      { label: 'Lihat Preview', icon: '👁️', onClick: function () { openMarketingBannerPreview(key); } },
-      { label: 'Edit Content', icon: '✏️', onClick: function () { openMarketingBannerEditor(row.banner_id || row.id); } }
+      { label: 'Lihat Preview', icon: '👁️', onClick: function () { openMarketingBannerPreview(key); } }
     ];
+
+    if (user.role !== 'branch_manager') {
+      actions.push({
+        label: 'Edit Content',
+        icon: '✏️',
+        onClick: function () { openMarketingBannerEditor(row.banner_id || row.id); }
+      });
+    }
 
     if (assignment) {
       if (!(user.role === 'branch_manager' && assignment.governance_locked)) {
@@ -7767,6 +7774,17 @@
       });
     }
 
+    if (publicationStatus === 'PUBLISHED' &&
+        row.has_draft_changes &&
+        user.role !== 'branch_manager') {
+      actions.push({
+        label: 'Buang Draft Perubahan',
+        icon: '↩️',
+        destructive: true,
+        onClick: function () { discardMarketingBannerDraft(row.banner_id || row.id); }
+      });
+    }
+
     window.XentraActionMenu.open(trigger, actions);
   }
 
@@ -7783,6 +7801,12 @@
     setMarketingBannerEditorFields(null);
     populateMarketingBannerTargets(null);
     renderMarketingBannerEditorBranches(null);
+    if ($('mkt-banner-schedule-enabled')) $('mkt-banner-schedule-enabled').checked = false;
+    if ($('mkt-banner-schedule-fields')) $('mkt-banner-schedule-fields').style.display = 'none';
+    if ($('mkt-banner-starts-at')) $('mkt-banner-starts-at').value = '';
+    if ($('mkt-banner-ends-at')) $('mkt-banner-ends-at').value = '';
+    if ($('mkt-banner-active')) $('mkt-banner-active').checked = true;
+    if ($('mkt-banner-governance-lock')) $('mkt-banner-governance-lock').checked = false;
     setMarketingBannerEditorMode('create');
 
     var modal = $('modal-marketing-banner');
@@ -8341,6 +8365,32 @@
     }
   }
   window.publishMarketingBanner = publishMarketingBanner;
+
+  async function discardMarketingBannerDraft(bannerId) {
+    if (!confirm('Buang Draft perubahan ini? Versi Banner yang sedang Published akan tetap digunakan.')) return;
+
+    try {
+      var res = await adminFetch(
+        API_BASE + '/admin/marketing/banners/' + encodeURIComponent(bannerId) + '/discard-draft',
+        {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: '{}'
+        }
+      );
+
+      var json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Gagal membuang Draft perubahan.');
+      }
+
+      await loadMarketingBanners();
+      showToast('✅ Draft perubahan dibuang. Versi Published tetap aktif.');
+    } catch (err) {
+      showToast('❌ ' + (err.message || 'Gagal membuang Draft perubahan.'));
+    }
+  }
+  window.discardMarketingBannerDraft = discardMarketingBannerDraft;
 
   async function deleteMarketingBanner(bannerId) {
     if (!confirm('Hapus Draft Banner ini? Banner yang sudah pernah dipublish tidak dapat dihapus dari menu ini.')) return;
