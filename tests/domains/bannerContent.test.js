@@ -17,7 +17,7 @@ function cleanup() {
   db.exec("DELETE FROM promotions WHERE id LIKE 'prm_banner_content_test_%'");
   db.exec("DELETE FROM products WHERE id LIKE 'prod_banner_content_test_%'");
   db.exec("DELETE FROM categories WHERE id LIKE 'cat_banner_content_test_%'");
-  db.exec("DELETE FROM brands WHERE id = ?", [OTHER_BRAND_ID]);
+  db.prepare('DELETE FROM brands WHERE id = ?').run(OTHER_BRAND_ID);
 }
 
 test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t) => {
