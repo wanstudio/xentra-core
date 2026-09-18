@@ -228,13 +228,28 @@ router.post('/delivery/match-branch', async (req, res) => {
   }
 });
 
-// 4. Address Search Suggestion (Nominatim with proximity ranking)
+// 4. Address Search Suggestion (Mapbox Search Box Suggest with Nominatim fallback)
 router.get('/location/search', async (req, res) => {
   const q = req.query.q || '';
   const lat = req.query.lat || req.query.latitude;
   const lng = req.query.lng || req.query.longitude;
-  const results = await RouteService.searchAddress(q, lat, lng);
+  const sessionToken = req.query.session_token;
+  const results = await RouteService.searchAddress(q, lat, lng, sessionToken);
   res.json({ success: true, results });
+});
+
+// 4.0.1 Address Search Retrieve (Fetch canonical coordinates & details for selected mapbox_id)
+router.get('/location/retrieve', async (req, res) => {
+  const mapboxId = req.query.mapbox_id || req.query.id;
+  const sessionToken = req.query.session_token;
+  if (!mapboxId) {
+    return res.status(400).json({ success: false, error: 'mapbox_id wajib dikirim' });
+  }
+  const result = await RouteService.retrieveAddress(mapboxId, sessionToken);
+  if (!result) {
+    return res.status(404).json({ success: false, error: 'Lokasi tidak ditemukan' });
+  }
+  res.json({ success: true, result });
 });
 
 // 4.1 Reverse Geocode (Coordinates -> Address Text)

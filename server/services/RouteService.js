@@ -65,25 +65,90 @@ class RouteService {
   }
 
   /**
-   * Searches for address suggestions using Nominatim with optional proximity bias and distance ranking.
+   * Searches for address suggestions using Mapbox Search Box Suggest as primary,
+   * falling back gracefully to Nominatim with optional proximity bias and distance ranking.
    * 
    * @param {string} query
    * @param {number|string} [proximityLat]
    * @param {number|string} [proximityLon]
-   * @returns {Promise<Array<{ display_name: string, title: string, address: string, latitude: number, longitude: number, distance_meters?: number }>>}
+   * @param {string} [sessionToken]
+   * @returns {Promise<Array<{ display_name: string, title: string, address: string, latitude: number|null, longitude: number|null, mapbox_id?: string, feature_type?: string, distance_meters?: number, provider?: string }>>}
    */
-  static async searchAddress(query, proximityLat, proximityLon) {
+  static async searchAddress(query, proximityLat, proximityLon, sessionToken) {
     if (!query || query.trim().length < 3) return [];
 
+    const mapboxToken = process.env.MAPBOX_TOKEN ||
+      'pk.eyJ1IjoiaWtod2FucyIsImEiOiJjbXQ5c2cwMzYwOW15MnpxdXdpeWU3am45In0.YcX49DH0uXP70aBxVDC-TA';
+
+    const pLat = proximityLat != null && !isNaN(Number(proximityLat)) ? Number(proximityLat) : null;
+    const pLon = proximityLon != null && !isNaN(Number(proximityLon)) ? Number(proximityLon) : null;
+    const sess = sessionToken || `sess_${Math.random().toString(36).slice(2, 10)}`;
+
+    // 1. Primary: Mapbox Search Box Suggest API
+    if (mapboxToken) {
+      try {
+        let mboxUrl = `https://api.mapbox.com/search/searchbox/v1/suggest?q=${encodeURIComponent(query.trim())}&country=id&limit=8&access_token=${mapboxToken}&session_token=${encodeURIComponent(sess)}`;
+        if (pLat !== null && pLon !== null) {
+          mboxUrl += `&proximity=${encodeURIComponent(pLon)},${encodeURIComponent(pLat)}`;
+        }
+
+        const mboxRes = await axios.get(mboxUrl, { timeout: 4000 });
+        const suggestions = (mboxRes.data && Array.isArray(mboxRes.data.suggestions)) ? mboxRes.data.suggestions : [];
+
+        if (suggestions.length > 0) {
+          const list = [];
+          for (const s of suggestions) {
+            const title = (s.name || s.address || 'Lokasi').trim();
+            const addr = (s.full_address || s.place_formatted || s.address || '').trim();
+            const disp = addr ? (title && !addr.startsWith(title) ? `${title}, ${addr}` : addr) : title;
+            const fType = s.feature_type || 'poi';
+
+            list.push({
+              mapbox_id: s.mapbox_id,
+              title: title,
+              address: addr || title,
+              display_name: disp,
+              feature_type: fType,
+              latitude: null, // hydrated upon retrieve or selection
+              longitude: null,
+              provider: 'mapbox_searchbox'
+            });
+          }
+
+          // Hydrate top candidates' coordinates in parallel if needed (up to 5)
+          const topToHydrate = list.slice(0, 5);
+          await Promise.all(
+            topToHydrate.map(async (item) => {
+              if (item.mapbox_id) {
+                try {
+                  const retr = await this.retrieveAddress(item.mapbox_id, sess);
+                  if (retr && retr.latitude != null && retr.longitude != null) {
+                    item.latitude = retr.latitude;
+                    item.longitude = retr.longitude;
+                    if (retr.address) item.address = retr.address;
+                    if (retr.display_name) item.display_name = retr.display_name;
+                    if (pLat !== null && pLon !== null) {
+                      item.distance_meters = this.calculateHaversineMeters(pLat, pLon, item.latitude, item.longitude);
+                    }
+                  }
+                } catch (_) {}
+              }
+            })
+          );
+
+          return list;
+        }
+      } catch (err) {
+        // Fallback to Nominatim
+      }
+    }
+
+    // 2. Secondary fallback: Nominatim with proximity ranking
     let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
       query.trim()
     )}&countrycodes=id&limit=15`;
 
-    const pLat = proximityLat != null && !isNaN(Number(proximityLat)) ? Number(proximityLat) : null;
-    const pLon = proximityLon != null && !isNaN(Number(proximityLon)) ? Number(proximityLon) : null;
-
     if (pLat !== null && pLon !== null) {
-      // Bias towards ~1 degree bounding box (~110km) around current location
       const delta = 1.0;
       const viewbox = `${pLon - delta},${pLat + delta},${pLon + delta},${pLat - delta}`;
       url += `&viewbox=${viewbox}&bounded=0`;
@@ -107,7 +172,8 @@ class RouteService {
           title: title,
           address: address,
           latitude: itemLat,
-          longitude: itemLon
+          longitude: itemLon,
+          provider: 'nominatim'
         };
 
         if (pLat !== null && pLon !== null) {
@@ -126,6 +192,49 @@ class RouteService {
       console.error('[RouteService] Geocoding search failed:', err.message);
       return [];
     }
+  }
+
+  /**
+   * Retrieves full details and exact coordinates for a selected Mapbox Search Box result.
+   * 
+   * @param {string} mapboxId
+   * @param {string} [sessionToken]
+   * @returns {Promise<{ title: string, address: string, display_name: string, latitude: number, longitude: number, provider: string }|null>}
+   */
+  static async retrieveAddress(mapboxId, sessionToken) {
+    if (!mapboxId) return null;
+
+    const mapboxToken = process.env.MAPBOX_TOKEN ||
+      'pk.eyJ1IjoiaWtod2FucyIsImEiOiJjbXQ5c2cwMzYwOW15MnpxdXdpeWU3am45In0.YcX49DH0uXP70aBxVDC-TA';
+
+    if (!mapboxToken) return null;
+
+    try {
+      const sess = sessionToken || `sess_${Math.random().toString(36).slice(2, 10)}`;
+      const url = `https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(mapboxId)}?access_token=${mapboxToken}&session_token=${encodeURIComponent(sess)}`;
+      const res = await axios.get(url, { timeout: 4000 });
+      const feat = res.data && res.data.features && res.data.features[0];
+
+      if (feat && feat.geometry && Array.isArray(feat.geometry.coordinates)) {
+        const lng = feat.geometry.coordinates[0];
+        const lat = feat.geometry.coordinates[1];
+        const props = feat.properties || {};
+        const title = props.name || 'Lokasi Terpilih';
+        const full = props.full_address || props.place_formatted || props.address || title;
+
+        return {
+          title: title,
+          address: full,
+          display_name: full,
+          latitude: lat,
+          longitude: lng,
+          provider: 'mapbox_searchbox'
+        };
+      }
+    } catch (err) {
+      console.error('[RouteService] Retrieve address failed:', err.message);
+    }
+    return null;
   }
 
   /**

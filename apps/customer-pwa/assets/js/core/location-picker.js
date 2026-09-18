@@ -434,6 +434,8 @@
 
     var searchTimer = null;
     var searchSeq = 0;
+    var searchSessionToken = 'sess_' + Math.random().toString(36).slice(2, 10);
+
     input.addEventListener('input', function () {
       var q = input.value.trim();
       clearTimeout(searchTimer);
@@ -446,7 +448,16 @@
       resultsBox.innerHTML = '<div style="padding:20px;text-align:center;font-size:13px;color:#64748b;"><span class="x-loc-spinner"></span> Mencari alamat…</div>';
 
       searchTimer = setTimeout(function () {
-        API.get('/location/search?q=' + encodeURIComponent(q))
+        var proxQuery = '';
+        try {
+          var activeDest = Store && Store.getActiveDestination && Store.getActiveDestination();
+          if (activeDest && activeDest.latitude != null && activeDest.longitude != null) {
+            proxQuery = '&lat=' + encodeURIComponent(activeDest.latitude) + '&lng=' + encodeURIComponent(activeDest.longitude);
+          }
+        } catch (_) {}
+
+        var searchUrl = '/location/search?q=' + encodeURIComponent(q) + proxQuery + '&session_token=' + encodeURIComponent(searchSessionToken);
+        API.get(searchUrl)
           .then(function (res) {
             if (currentSeq !== searchSeq) return; // Stale async reply superseded
             var list = (res && res.results) || [];
@@ -457,12 +468,20 @@
 
             var html = '';
             list.forEach(function (it, idx) {
-              var name = it.display_name ? it.display_name.split(',')[0] : (it.address || 'Alamat');
-              var desc = it.display_name || it.address || '';
+              var name = it.title || (it.display_name ? it.display_name.split(',')[0] : (it.address || 'Alamat'));
+              var desc = it.address || it.display_name || '';
+              var fType = it.feature_type || '';
+              var iconBadge = '';
+              if (fType === 'poi' || fType === 'brand') {
+                iconBadge = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FA3E3E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+              } else {
+                iconBadge = '<svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5" stroke="#FA3E3E" stroke-width="5"/></svg>';
+              }
+
               html +=
                 '<button type="button" class="x-loc-search-item" data-idx="' + idx + '">' +
                 '  <div class="x-loc-search-item-icon">' +
-                '    <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="6.5" stroke="#FA3E3E" stroke-width="5"/></svg>' +
+                     iconBadge +
                 '  </div>' +
                 '  <div class="x-loc-search-item-info">' +
                 '    <div class="x-loc-search-item-name">' + UI.escape(name) + '</div>' +
@@ -476,18 +495,40 @@
               btn.onclick = function () {
                 var selected = list[Number(btn.getAttribute('data-idx'))];
                 if (!selected) return;
-                sh.close();
 
-                // Open Address Detail / Confirmation
-                openAddressDetailSheet({
-                  address: selected.display_name || selected.address,
-                  latitude: Number(selected.latitude || selected.lat),
-                  longitude: Number(selected.longitude || selected.lon),
-                  label: (selected.display_name ? selected.display_name.split(',')[0] : 'Lokasi Terpilih').slice(0, 30),
-                  detail: '',
-                  source: 'search',
-                  onSelect: options.onSelect
-                });
+                function proceedWithCoords(lat, lng, fullAddr, titleName) {
+                  sh.close();
+                  openAddressDetailSheet({
+                    address: fullAddr || selected.address || selected.display_name,
+                    latitude: Number(lat),
+                    longitude: Number(lng),
+                    label: (titleName || selected.title || (selected.display_name ? selected.display_name.split(',')[0] : 'Lokasi Terpilih')).slice(0, 30),
+                    detail: '',
+                    source: 'search',
+                    onSelect: options.onSelect
+                  });
+                }
+
+                if (selected.latitude != null && selected.longitude != null) {
+                  proceedWithCoords(selected.latitude, selected.longitude, selected.address, selected.title);
+                } else if (selected.mapbox_id) {
+                  // Retrieve exact coordinates using session token
+                  btn.style.opacity = '0.6';
+                  API.get('/location/retrieve?mapbox_id=' + encodeURIComponent(selected.mapbox_id) + '&session_token=' + encodeURIComponent(searchSessionToken))
+                    .then(function (rRes) {
+                      var rData = rRes && rRes.result;
+                      if (rData && rData.latitude != null && rData.longitude != null) {
+                        proceedWithCoords(rData.latitude, rData.longitude, rData.address || selected.address, rData.title || selected.title);
+                      } else {
+                        proceedWithCoords(DEFAULT_LAT, DEFAULT_LNG, selected.address, selected.title);
+                      }
+                    })
+                    .catch(function () {
+                      proceedWithCoords(DEFAULT_LAT, DEFAULT_LNG, selected.address, selected.title);
+                    });
+                } else {
+                  proceedWithCoords(selected.latitude || DEFAULT_LAT, selected.longitude || DEFAULT_LNG, selected.address, selected.title);
+                }
               };
             });
           })
@@ -738,12 +779,14 @@
     var searchDropdown = mapOverlay.querySelector('#x-map-search-dropdown');
     var mapSearchTimer = null;
     var mapSearchSeq = 0;
+    var mapSearchSessionToken = 'sess_' + Math.random().toString(36).slice(2, 10);
 
     function hideDropdown() {
       if (searchDropdown) {
         searchDropdown.classList.remove('is-open');
         searchDropdown.innerHTML = '';
       }
+      mapSearchSessionToken = 'sess_' + Math.random().toString(36).slice(2, 10);
     }
 
     if (searchInput) {
@@ -771,7 +814,7 @@
 
           // Prefer client-side Mapbox Search Box API (from xentra-mvp) for instant sub-second local results
           if (MAPBOX_TOKEN) {
-            var sessionToken = 'sess_' + Math.random().toString(36).slice(2, 10);
+            var sessionToken = mapSearchSessionToken;
             var mboxUrl = 'https://api.mapbox.com/search/searchbox/v1/suggest?q=' + encodeURIComponent(query) +
               '&proximity=' + encodeURIComponent(pLng) + ',' + encodeURIComponent(pLat) +
               '&country=id&limit=8&access_token=' + MAPBOX_TOKEN +
