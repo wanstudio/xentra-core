@@ -325,3 +325,46 @@ This document is subordinate to:
 - more-specific locked domain contracts.
 
 If a conflict is discovered, stop implementation, reconcile the canonical decision/library, then update this document and implementation evidence.
+
+
+## 17. 🔒 LOCKED — Human-Readable Business/System Activity Presentation
+
+The Branch Manager dashboard's **Aktivitas Terkini**, Business Log, and System Log must be presented as human-readable operational narratives. Raw database identifiers and structured audit payloads are evidence, not the primary user-facing language.
+
+### Presentation boundary
+
+The authoritative audit record remains structured and append-oriented. Do **not** remove or replace technical fields such as `branch_id`, `product_id`, `actor_id`, `action`, `field`, `previous_value`, `new_value`, and `created_at`.
+
+Instead, the read/presentation layer must translate those records into understandable Indonesian business language.
+
+Example:
+
+- Raw: `action=branch_product.update`, `field=price`, `product_id=...`, `previous_value=40000`, `new_value=44000`
+- UI: **Harga Ayam Goreng diubah dari Rp40.000 menjadi Rp44.000** — Budi · Branch Manager · 07:52
+
+Other expected narratives include:
+
+- **Ayam Goreng ditandai tidak tersedia** — Budi · Branch Manager · 07:52
+- **Ayam Goreng dipindahkan ke kategori Makanan** — Budi · Branch Manager · 07:52
+- **Pesanan #XN-... dibatalkan** — Budi · Branch Manager · 08:14
+- **Pesanan #XN-... ditolak** — Budi · Branch Manager · 08:20
+- **Status cabang diubah menjadi Tutup Sementara** — Budi · Branch Manager · 08:21
+- **Stok Ayam Goreng diubah dari 12 menjadi 8** — Budi · Branch Manager · 08:32
+
+### Business Log vs System Log
+
+**Business Log** explains the business action/decision in language that an Owner or Branch Manager can immediately understand: what happened, which business object was affected, who performed it, and the reason when applicable.
+
+**System Log** explains the corresponding system/operational event in human-readable language. It may expose technical details only in an expandable detail/technical-reference context.
+
+Neither log should render raw JSON, UUIDs, internal action constants, or database field names as the primary activity sentence.
+
+### Technical traceability
+
+Technical identifiers remain available for investigation and audit traceability through a secondary **Detail Teknis / Reference** view when appropriate. This may include Log ID, Branch ID, Product ID, Order ID, actor ID, internal action, field, before/after values, and correlation/reference information.
+
+The rule is therefore:
+
+**Structured authoritative evidence → semantic log formatter/read model → human-readable dashboard presentation → optional technical detail.**
+
+This is a presentation/read-model concern, not a new Activity domain and not a replacement for the existing audit trail.
