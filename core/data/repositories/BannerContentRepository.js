@@ -262,6 +262,20 @@ class BannerContentRepository {
     `, [publicationStatus, updatedBy, now, bannerId, brandId]);
   }
 
+  deleteDraftRevision(brandId, revisionId) {
+    return this.db.execute(`
+      DELETE FROM storefront_banner_revisions
+      WHERE id = ?
+        AND revision_status = 'DRAFT'
+        AND EXISTS (
+          SELECT 1
+          FROM storefront_banners b
+          WHERE b.id = storefront_banner_revisions.banner_id
+            AND b.brand_id = ?
+        )
+    `, [revisionId, brandId]);
+  }
+
   deleteBanner(brandId, bannerId) {
     return this.db.execute(
       'DELETE FROM storefront_banners WHERE id = ? AND brand_id = ?',
