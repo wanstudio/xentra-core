@@ -36,6 +36,9 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
       db.prepare("DELETE FROM promotion_branch_scope WHERE brand_id IN (?, ?)").run(brandId, otherBrandId);
       db.prepare("DELETE FROM promotion_rewards WHERE promotion_id IN (?, ?, ?)").run(promoGlobalMulti, promoExclusiveA, promoPausedBranchB);
       db.prepare("DELETE FROM promotion_rules WHERE promotion_id IN (?, ?, ?)").run(promoGlobalMulti, promoExclusiveA, promoPausedBranchB);
+      db.prepare("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE brand_id IN (?, ?))").run(brandId, otherBrandId);
+      db.prepare("DELETE FROM order_payments WHERE order_id IN (SELECT id FROM orders WHERE brand_id IN (?, ?))").run(brandId, otherBrandId);
+      db.prepare("DELETE FROM orders WHERE brand_id IN (?, ?)").run(brandId, otherBrandId);
       db.prepare("DELETE FROM promotions WHERE brand_id IN (?, ?)").run(brandId, otherBrandId);
       db.prepare("DELETE FROM branch_products WHERE branch_id IN (?, ?, ?, ?)").run(branchA, branchB, branchC, branchForeign);
       db.prepare("DELETE FROM products WHERE brand_id IN (?, ?)").run(brandId, otherBrandId);
@@ -48,11 +51,11 @@ describe('Promotion Phase 1 — Campaign <-> Branch Scope Domain Audit & Impleme
     cleanup();
 
     // 1. Seed Organizations & Brands
-    db.prepare('INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, ?, ?)').run('org_test', 'Test Org', 'test-org');
-    db.prepare('INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, ?, ?)').run('org_test_other', 'Other Org', 'other-org');
+    db.prepare('INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, ?, ?)').run('org_promo_test_1', 'Test Org Promo', 'test-org-promo-1');
+    db.prepare('INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, ?, ?)').run('org_promo_test_2', 'Other Org Promo', 'test-org-promo-2');
 
-    db.prepare('INSERT INTO brands (id, organization_id, name, slug) VALUES (?, ?, ?, ?)').run(brandId, 'org_test', 'Promo Brand Test', 'promo-brand');
-    db.prepare('INSERT INTO brands (id, organization_id, name, slug) VALUES (?, ?, ?, ?)').run(otherBrandId, 'org_test_other', 'Other Brand Test', 'other-brand');
+    db.prepare('INSERT INTO brands (id, organization_id, name, slug) VALUES (?, ?, ?, ?)').run(brandId, 'org_promo_test_1', 'Promo Brand Test', 'promo-brand');
+    db.prepare('INSERT INTO brands (id, organization_id, name, slug) VALUES (?, ?, ?, ?)').run(otherBrandId, 'org_promo_test_2', 'Other Brand Test', 'other-brand');
 
     // 2. Seed Branches
     db.prepare('INSERT INTO branches (id, brand_id, name, slug, address_text, is_active, latitude, longitude) VALUES (?, ?, ?, ?, ?, 1, -5.35, 105.25)')

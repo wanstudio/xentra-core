@@ -107,6 +107,34 @@
       });
     }
 
+    if (installBtn && !installBtn.__xentraBound) {
+      installBtn.__xentraBound = true;
+      installBtn.addEventListener('click', function (e) {
+        if (e && e.preventDefault) e.preventDefault();
+        var pwaRt = window.Xentra && window.Xentra.PwaRuntime;
+        if (!pwaRt || typeof pwaRt.promptInstall !== 'function') {
+          if (typeof showPwaGuideSheet === 'function') {
+            showPwaGuideSheet(navigator.userAgent.match(/iPhone|iPad|iPod/i) ? 'ios' : 'android');
+          } else {
+            alert('Silakan pasang aplikasi melalui menu browser Anda ("Tambahkan ke Layar Utama" / "Add to Home Screen").');
+          }
+          return;
+        }
+
+        pwaRt.promptInstall().then(function (res) {
+          if (res && res.accepted) {
+            if (window.UI && window.UI.toast) window.UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
+          } else if (!res || !res.prompted) {
+            if (typeof showPwaGuideSheet === 'function') {
+              showPwaGuideSheet(navigator.userAgent.match(/iPhone|iPad|iPod/i) ? 'ios' : 'android');
+            } else {
+              alert('Silakan pasang aplikasi melalui menu browser Anda ("Tambahkan ke Layar Utama" / "Add to Home Screen").');
+            }
+          }
+        });
+      });
+    }
+
     // Do not require login/WhatsApp registration to discover this promo.
     API.get('/promotions/active?is_pwa=0&phone=')
       .then(function (res) {

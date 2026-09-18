@@ -44,12 +44,17 @@ class PromotionRepository {
     let promos;
     if (branchId) {
       promos = this.db.queryMany(`
-        SELECT p.*, pbs.is_active as branch_is_active
+        SELECT p.*,
+          COALESCE(pbs.is_active, p.is_active) as branch_is_active
         FROM promotions p
-        JOIN promotion_branch_scope pbs ON pbs.promotion_id = p.id
-        WHERE p.brand_id = ? AND pbs.branch_id = ?
+        LEFT JOIN promotion_branch_scope pbs ON pbs.promotion_id = p.id AND pbs.branch_id = ?
+        WHERE p.brand_id = ?
+          AND (
+            pbs.branch_id IS NOT NULL
+            OR NOT EXISTS (SELECT 1 FROM promotion_branch_scope pbs_all WHERE pbs_all.promotion_id = p.id)
+          )
         ORDER BY p.is_active DESC, p.priority_weight DESC, p.created_at DESC
-      `, [brandId, branchId]);
+      `, [branchId, brandId]);
     } else {
       promos = this.db.queryMany(`
         SELECT * FROM promotions
@@ -219,10 +224,196 @@ class PromotionRepository {
   }
 
   findPromotion(promotionId) {
-    return this.db.queryOne(
-      'SELECT id, max_redemptions_per_customer FROM promotions WHERE id = ?',
+    return this.findPromotionById(promotionId);
+  }
+
+  findPromotionById(promotionId) {
+    const promo = this.db.queryOne(
+      'SELECT * FROM promotions WHERE id = ?',
       [promotionId]
     );
+    if (!promo) return null;
+
+    const rules = this.findRules(promo.id);
+    const rewards = this.findRewards(promo.id);
+    const scopes = this.findBranchScopes(promo.id);
+    const redemptionsCount = this.db.queryOne(
+      "SELECT COUNT(*) as cnt, COALESCE(SUM(benefit_amount), 0) as total_benefit FROM promotion_redemptions WHERE promotion_id = ? AND status = 'active'",
+      [promo.id]
+    );
+
+    return {
+      ...promo,
+      promo_code: promo.code || promo.promo_code,
+      rules,
+      rewards,
+      scopes,
+      redemptions_count: redemptionsCount ? Number(redemptionsCount.cnt || 0) : 0,
+      total_benefit_amount: redemptionsCount ? Number(redemptionsCount.total_benefit || 0) : 0
+    };
+  }
+
+  createPromotion({
+    id,
+    brandId,
+    name,
+    code = null,
+    capabilityType = 'install_incentive',
+    stackingPolicy = 'exclusive',
+    priorityWeight = 100,
+    maxRedemptionsTotal = null,
+    maxRedemptionsPerCustomer = 1,
+    startAt = null,
+    endAt = null,
+    isActive = 1,
+    rules = [],
+    rewards = [],
+    branchIds = []
+  }) {
+    const promoId = id || `prm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    
+    this.db.execute(`
+      INSERT INTO promotions (
+        id, brand_id, name, code, capability_type, stacking_policy, priority_weight,
+        max_redemptions_total, max_redemptions_per_customer, start_at, end_at, is_active,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `, [
+      promoId, brandId, name, code || null, capabilityType, stackingPolicy, priorityWeight,
+      maxRedemptionsTotal || null, maxRedemptionsPerCustomer || null, startAt || null, endAt || null, isActive ? 1 : 0
+    ]);
+
+    for (let i = 0; i < rules.length; i++) {
+      const r = rules[i];
+      const ruleId = r.id || `rul_${promoId}_${i + 1}`;
+      const payloadStr = typeof r.rule_payload === 'object' ? JSON.stringify(r.rule_payload) : (r.rule_payload || '{}');
+      this.db.execute(`
+        INSERT INTO promotion_rules (id, promotion_id, rule_type, rule_payload, created_at)
+        VALUES (?, ?, ?, ?, datetime('now'))
+      `, [ruleId, promoId, r.rule_type || 'eligibility', payloadStr]);
+    }
+
+    for (let i = 0; i < rewards.length; i++) {
+      const rw = rewards[i];
+      const rewId = rw.id || `rew_${promoId}_${i + 1}`;
+      const presStr = typeof rw.presentation_payload === 'object' ? JSON.stringify(rw.presentation_payload) : (rw.presentation_payload || null);
+      this.db.execute(`
+        INSERT INTO promotion_rewards (
+          id, promotion_id, reward_type, target_product_id, amount_in_cents, max_discount_in_cents, presentation_payload, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `, [
+        rewId, promoId, rw.reward_type || 'freebie_product', rw.target_product_id || null,
+        Number(rw.amount_in_cents || 0), rw.max_discount_in_cents || null, presStr
+      ]);
+    }
+
+    if (Array.isArray(branchIds)) {
+      for (const bId of branchIds) {
+        this.assignBranchScope({
+          promotionId: promoId,
+          brandId,
+          branchId: bId,
+          isActive: 1
+        });
+      }
+    }
+
+    return this.findPromotionById(promoId);
+  }
+
+  updatePromotion(promotionId, brandId, {
+    name,
+    code = null,
+    stackingPolicy,
+    priorityWeight,
+    maxRedemptionsTotal,
+    maxRedemptionsPerCustomer,
+    startAt,
+    endAt,
+    isActive,
+    branchIds,
+    rules,
+    rewards
+  }) {
+    const existing = this.findPromotionById(promotionId);
+    if (!existing || existing.brand_id !== brandId) return null;
+
+    const updates = [];
+    const params = [];
+
+    if (name !== undefined) { updates.push('name = ?'); params.push(name); }
+    if (code !== undefined) { updates.push('code = ?'); params.push(code || null); }
+    if (stackingPolicy !== undefined) { updates.push('stacking_policy = ?'); params.push(stackingPolicy); }
+    if (priorityWeight !== undefined) { updates.push('priority_weight = ?'); params.push(Number(priorityWeight)); }
+    if (maxRedemptionsTotal !== undefined) { updates.push('max_redemptions_total = ?'); params.push(maxRedemptionsTotal || null); }
+    if (maxRedemptionsPerCustomer !== undefined) { updates.push('max_redemptions_per_customer = ?'); params.push(maxRedemptionsPerCustomer || null); }
+    if (startAt !== undefined) { updates.push('start_at = ?'); params.push(startAt || null); }
+    if (endAt !== undefined) { updates.push('end_at = ?'); params.push(endAt || null); }
+    if (isActive !== undefined) { updates.push('is_active = ?'); params.push(isActive ? 1 : 0); }
+
+    updates.push("updated_at = datetime('now')");
+
+    if (updates.length > 0) {
+      params.push(promotionId, brandId);
+      this.db.execute(`
+        UPDATE promotions
+        SET ${updates.join(', ')}
+        WHERE id = ? AND brand_id = ?
+      `, params);
+    }
+
+    if (Array.isArray(rules)) {
+      this.db.execute('DELETE FROM promotion_rules WHERE promotion_id = ?', [promotionId]);
+      for (let i = 0; i < rules.length; i++) {
+        const r = rules[i];
+        const ruleId = r.id || `rul_${promotionId}_${i + 1}`;
+        const payloadStr = typeof r.rule_payload === 'object' ? JSON.stringify(r.rule_payload) : (r.rule_payload || '{}');
+        this.db.execute(`
+          INSERT INTO promotion_rules (id, promotion_id, rule_type, rule_payload, created_at)
+          VALUES (?, ?, ?, ?, datetime('now'))
+        `, [ruleId, promotionId, r.rule_type || 'eligibility', payloadStr]);
+      }
+    }
+
+    if (Array.isArray(rewards)) {
+      this.db.execute('DELETE FROM promotion_rewards WHERE promotion_id = ?', [promotionId]);
+      for (let i = 0; i < rewards.length; i++) {
+        const rw = rewards[i];
+        const rewId = rw.id || `rew_${promotionId}_${i + 1}`;
+        const presStr = typeof rw.presentation_payload === 'object' ? JSON.stringify(rw.presentation_payload) : (rw.presentation_payload || null);
+        this.db.execute(`
+          INSERT INTO promotion_rewards (
+            id, promotion_id, reward_type, target_product_id, amount_in_cents, max_discount_in_cents, presentation_payload, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        `, [
+          rewId, promotionId, rw.reward_type || 'freebie_product', rw.target_product_id || null,
+          Number(rw.amount_in_cents || 0), rw.max_discount_in_cents || null, presStr
+        ]);
+      }
+    }
+
+    if (Array.isArray(branchIds)) {
+      const currentScopes = this.findBranchScopes(promotionId);
+      const currentBranchIds = currentScopes.map(s => s.branch_id);
+      
+      // Remove scopes not in branchIds
+      for (const cBId of currentBranchIds) {
+        if (!branchIds.includes(cBId)) {
+          this.removeBranchScope({ promotionId, branchId: cBId });
+        }
+      }
+      // Add or preserve scopes in branchIds
+      for (const bId of branchIds) {
+        this.assignBranchScope({
+          promotionId,
+          brandId,
+          branchId: bId,
+          isActive: 1
+        });
+      }
+    }
+
+    return this.findPromotionById(promotionId);
   }
 
   findRewardProductPrice(productId) {

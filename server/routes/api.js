@@ -9207,6 +9207,129 @@ router.get('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager',
   }
 });
 
+// 6.01 Create Marketing Promotion (Owner / Brand Manager)
+router.post('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const {
+      id,
+      name,
+      code,
+      capability_type,
+      stacking_policy,
+      priority_weight,
+      max_redemptions_total,
+      max_redemptions_per_customer,
+      start_at,
+      end_at,
+      is_active,
+      rules,
+      rewards,
+      branch_ids
+    } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, error: 'Nama promosi wajib diisi.' });
+    }
+
+    const created = corePromotionRepo.createPromotion({
+      id,
+      brandId: req.brand_id,
+      name: name.trim(),
+      code: code ? code.trim().toUpperCase() : null,
+      capabilityType: capability_type || 'install_incentive',
+      stackingPolicy: stacking_policy || 'exclusive',
+      priorityWeight: priority_weight !== undefined ? Number(priority_weight) : 100,
+      maxRedemptionsTotal: max_redemptions_total ? Number(max_redemptions_total) : null,
+      maxRedemptionsPerCustomer: max_redemptions_per_customer !== undefined ? Number(max_redemptions_per_customer) : 1,
+      startAt: start_at || null,
+      endAt: end_at || null,
+      isActive: is_active !== undefined ? (is_active ? 1 : 0) : 1,
+      rules: Array.isArray(rules) ? rules : [],
+      rewards: Array.isArray(rewards) ? rewards : [],
+      branchIds: Array.isArray(branch_ids) ? branch_ids : []
+    });
+
+    res.status(201).json({
+      success: true,
+      promotion: created
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6.02 Update Marketing Promotion (Owner / Brand Manager)
+router.put('/admin/marketing/promotions/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const promotionId = req.params.id;
+    const existing = corePromotionRepo.findPromotion(promotionId);
+    if (!existing || existing.brand_id !== req.brand_id) {
+      return res.status(404).json({ success: false, error: 'Promosi tidak ditemukan.' });
+    }
+
+    const {
+      name,
+      code,
+      capability_type,
+      stacking_policy,
+      priority_weight,
+      max_redemptions_total,
+      max_redemptions_per_customer,
+      start_at,
+      end_at,
+      is_active,
+      rules,
+      rewards,
+      branch_ids
+    } = req.body;
+
+    const updated = corePromotionRepo.updatePromotion(promotionId, req.brand_id, {
+      name: name !== undefined ? name.trim() : undefined,
+      code: code !== undefined ? (code ? code.trim().toUpperCase() : null) : undefined,
+      stackingPolicy: stacking_policy,
+      priorityWeight: priority_weight,
+      maxRedemptionsTotal: max_redemptions_total !== undefined ? (max_redemptions_total ? Number(max_redemptions_total) : null) : undefined,
+      maxRedemptionsPerCustomer: max_redemptions_per_customer !== undefined ? (max_redemptions_per_customer ? Number(max_redemptions_per_customer) : null) : undefined,
+      startAt: start_at,
+      endAt: end_at,
+      isActive: is_active !== undefined ? (is_active ? 1 : 0) : undefined,
+      rules,
+      rewards,
+      branchIds: branch_ids
+    });
+
+    res.json({
+      success: true,
+      promotion: updated
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6.03 Delete / Deactivate Marketing Promotion (Owner / Brand Manager)
+router.delete('/admin/marketing/promotions/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const promotionId = req.params.id;
+    const existing = corePromotionRepo.findPromotion(promotionId);
+    if (!existing || existing.brand_id !== req.brand_id) {
+      return res.status(404).json({ success: false, error: 'Promosi tidak ditemukan.' });
+    }
+
+    db.prepare('DELETE FROM promotion_rewards WHERE promotion_id = ?').run(promotionId);
+    db.prepare('DELETE FROM promotion_rules WHERE promotion_id = ?').run(promotionId);
+    db.prepare('DELETE FROM promotion_branch_scope WHERE promotion_id = ?').run(promotionId);
+    db.prepare('DELETE FROM promotions WHERE id = ? AND brand_id = ?').run(promotionId, req.brand_id);
+
+    res.json({
+      success: true,
+      message: 'Promosi berhasil dihapus.'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 6.1 Assign/Update Branch Scopes for Promotion (Owner / Brand Manager only)
 router.post('/admin/marketing/promotions/:id/scopes', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {

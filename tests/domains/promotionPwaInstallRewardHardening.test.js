@@ -46,7 +46,8 @@ describe('PWA Install Reward Flow Hardening', () => {
       db.prepare("DELETE FROM promotions WHERE brand_id = ?").run(brandId);
       db.prepare("DELETE FROM branch_products WHERE branch_id IN (?, ?)").run(branchA, branchB);
       db.prepare("DELETE FROM products WHERE brand_id = ?").run(brandId);
-      db.prepare("DELETE FROM branch_delivery_settings WHERE branch_id IN (?, ?)").run(branchA, branchB);
+      db.prepare("DELETE FROM order_items WHERE order_id IN (SELECT id FROM orders WHERE brand_id = ?)").run(brandId);
+      db.prepare("DELETE FROM order_payments WHERE order_id IN (SELECT id FROM orders WHERE brand_id = ?)").run(brandId);
       db.prepare("DELETE FROM orders WHERE brand_id = ?").run(brandId);
       db.prepare("DELETE FROM branches WHERE id IN (?, ?)").run(branchA, branchB);
       db.prepare("DELETE FROM brands WHERE id = ?").run(brandId);

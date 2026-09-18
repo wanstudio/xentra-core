@@ -2359,6 +2359,21 @@
       errHtml += '<div style="color:#dc2626;font-size:12px;margin-top:4px;">• ' + UI.escape(e) + '</div>';
     });
 
+    // Detect if verification error is related to reward unavailability
+    var isRewardError = errors.some(function (e) {
+      var s = String(e).toLowerCase();
+      return s.indexOf('hadiah') !== -1 || s.indexOf('promo') !== -1 || s.indexOf('reward') !== -1 || s.indexOf('stok') !== -1;
+    });
+
+    var hasRewardInCart = (Store.getState().cart.items || []).some(function (it) {
+      return Boolean(it.is_promo_reward || it.promotion_id || String(it.id).indexOf('reward_') === 0);
+    });
+
+    var removeRewardBtnHtml = '';
+    if (isRewardError && hasRewardInCart) {
+      removeRewardBtnHtml = '<button type="button" class="x-alt-submit-btn" id="x-btn-remove-reward-continue" style="margin-top:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">Lanjut Tanpa Hadiah Promo</button>';
+    }
+
     var sh = makeOverlay(
       '<div style="text-align:center;margin-bottom:12px;">' +
       '  <div style="font-size:36px;margin-bottom:8px;">⚠️</div>' +
@@ -2368,8 +2383,36 @@
       '<div style="background:#f9fafb;border-radius:14px;padding:12px 14px;margin:12px 0;">' +
       diffHtml + errHtml +
       '</div>' +
-      '<button type="button" class="x-alt-submit-btn" id="x-btn-accept-changes" style="margin-top:14px;">Perbarui Pesanan &amp; Lanjutkan</button>'
+      '<button type="button" class="x-alt-submit-btn" id="x-btn-accept-changes" style="margin-top:14px;">Perbarui Pesanan &amp; Lanjutkan</button>' +
+      removeRewardBtnHtml
     );
+
+    var removeBtn = sh.overlay.querySelector('#x-btn-remove-reward-continue');
+    if (removeBtn) {
+      removeBtn.onclick = function () {
+        var cartState = Store.getState().cart;
+        var currentItems = cartState.items || [];
+        var bridge = window.Xentra && window.Xentra.PromotionRewardCart;
+        var filteredItems;
+        if (bridge && typeof bridge.remove === 'function') {
+          filteredItems = currentItems.filter(function (it) {
+            return !Boolean(it.is_promo_reward || it.promotion_id || String(it.id).indexOf('reward_') === 0);
+          });
+        } else {
+          filteredItems = currentItems.filter(function (it) {
+            return !Boolean(it.is_promo_reward || it.promotion_id || String(it.id).indexOf('reward_') === 0);
+          });
+        }
+        cartState.items = filteredItems;
+        try {
+          localStorage.setItem('xentra_cart', JSON.stringify(cartState));
+        } catch (_) {}
+        sh.close();
+        renderLayout();
+        calculateTotals();
+        if (typeof onConfirm === 'function') onConfirm();
+      };
+    }
 
     sh.overlay.querySelector('#x-btn-accept-changes').onclick = function () {
       // Sync cart items with actual prices within current branch scope

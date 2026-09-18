@@ -1367,7 +1367,7 @@
     // Event delegation: Close sidebar whenever any nav item or sub-item is clicked (mobile & tablet drawer)
     if (sidebar) {
       sidebar.addEventListener('click', function (e) {
-        var navBtn = e.target.closest('.x-nav-item:not(.x-nav-parent), .x-nav-sub-item');
+        var navBtn = e.target.closest('.x-nav-item:not(.x-nav-parent)[data-route], .x-nav-sub-item');
         if (navBtn) {
           closeMobileSidebar();
         }
@@ -7403,10 +7403,18 @@
   }
   window.loadMarketingOverview = loadMarketingOverview;
 
+  var _marketingPromotionsState = {
+    promotions: [],
+    masterProducts: [],
+    branches: []
+  };
+
   async function loadMarketingPromotions() {
     try {
       var tbody = $('tbody-mkt-promotions');
       if (!tbody) return;
+
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Memuat daftar promosi...</td></tr>';
 
       var res = await adminFetch('/api/v1/admin/marketing/promotions', { headers: getAuthHeaders() });
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -7414,23 +7422,61 @@
       if (!json.success || !json.promotions) return;
 
       var promos = json.promotions || [];
+      _marketingPromotionsState.promotions = promos;
+
       if (promos.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Belum ada promosi yang terdaftar di Core engine.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8">' +
+          '<div style="font-size:36px;margin-bottom:8px;">🎁</div>' +
+          '<div style="font-weight:700;color:var(--text-main);margin-bottom:4px;">Belum Ada Program Promosi</div>' +
+          '<p class="text-muted" style="font-size:12px;margin:0 0 12px;">Mulai buat promosi pertama seperti Insentif Instalasi PWA untuk mendorong retensi pelanggan.</p>' +
+          '<button type="button" class="x-btn-primary" onclick="openCreatePromotionModal()" style="font-size:12px;padding:6px 14px;">+ Buat Promo Pertama</button>' +
+          '</td></tr>';
         return;
       }
 
       var rows = promos.map(function (p) {
-        var statusBadge = p.is_active === 1
+        var statusBadge = (p.is_active === 1 || p.is_active === true)
           ? '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Aktif</span>'
           : '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-weight:600;">Nonaktif</span>';
 
+        // Format Reward summary
+        var rewardSummary = '—';
+        if (Array.isArray(p.rewards) && p.rewards.length > 0) {
+          var r0 = p.rewards[0];
+          if (r0.reward_type === 'freebie_product') {
+            rewardSummary = '<span style="font-weight:600;color:#0369a1;">🎁 ' + esc(r0.target_product_name || r0.target_product_id || 'Produk Gratis') + '</span>';
+          } else {
+            rewardSummary = esc(r0.reward_type);
+          }
+        }
+
+        // Format Branch Scopes summary
+        var scopeSummary = '<span class="x-badge" style="background:#f1f5f9;color:#475569;font-size:11px;">Semua Cabang</span>';
+        if (Array.isArray(p.scopes) && p.scopes.length > 0) {
+          var activeScopes = p.scopes.filter(function (s) { return s.is_active === 1; });
+          scopeSummary = '<span class="x-badge" style="background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:600;">' +
+            activeScopes.length + ' Cabang Aktif</span>';
+        }
+
+        // Capability display
+        var capLabel = esc(p.capability_type || 'general');
+        if (p.capability_type === 'install_incentive') capLabel = '📱 Insentif PWA';
+        else if (p.capability_type === 'first_order') capLabel = '🥇 First Order';
+
         return '<tr>' +
           '<td><strong>' + esc(p.name) + '</strong>' + (p.code ? ' <code style="font-size:11px;background:#f1f5f9;padding:2px 4px;border-radius:4px;">' + esc(p.code) + '</code>' : '') + '</td>' +
-          '<td><span class="x-badge" style="background:#f0f9ff;color:#0369a1;font-size:11px;">' + esc(p.capability_type) + '</span></td>' +
-          '<td><code>' + esc(p.stacking_policy) + '</code></td>' +
-          '<td>' + (p.max_redemptions_per_customer ? p.max_redemptions_per_customer + ' kali' : 'Tidak terbatas') + '</td>' +
+          '<td><span class="x-badge" style="background:#f0f9ff;color:#0369a1;font-size:11px;">' + capLabel + '</span><br><code style="font-size:10px;color:#64748b;">' + esc(p.stacking_policy) + '</code></td>' +
+          '<td>' + rewardSummary + '</td>' +
+          '<td>' + scopeSummary + '</td>' +
           '<td><strong>' + (p.redemptions_count || 0) + '</strong> klaim</td>' +
           '<td>' + statusBadge + '</td>' +
+          '<td style="text-align:right;white-space:nowrap;">' +
+            '<button type="button" class="x-btn-secondary" onclick="openEditPromotionModal(\'' + esc(p.id) + '\')" style="padding:4px 8px;font-size:11px;margin-right:4px;">Edit</button>' +
+            '<button type="button" class="x-btn-secondary" onclick="toggleMarketingPromotionActive(\'' + esc(p.id) + '\', ' + (p.is_active === 1 ? 0 : 1) + ')" style="padding:4px 8px;font-size:11px;margin-right:4px;">' +
+              (p.is_active === 1 ? 'Nonaktifkan' : 'Aktifkan') +
+            '</button>' +
+            '<button type="button" class="x-btn-secondary" onclick="deleteMarketingPromotion(\'' + esc(p.id) + '\')" style="padding:4px 8px;font-size:11px;color:#dc2626;">Hapus</button>' +
+          '</td>' +
         '</tr>';
       });
 
@@ -7441,6 +7487,297 @@
     }
   }
   window.loadMarketingPromotions = loadMarketingPromotions;
+
+  async function ensureMarketingDependenciesLoaded() {
+    try {
+      if (!_marketingPromotionsState.masterProducts.length) {
+        var pRes = await adminFetch('/api/v1/admin/catalog/products', { headers: getAuthHeaders() });
+        if (pRes.ok) {
+          var pData = await pRes.json();
+          _marketingPromotionsState.masterProducts = (pData && (pData.products || pData.data)) || [];
+        }
+      }
+      if (!_marketingPromotionsState.branches.length) {
+        var bRes = await adminFetch('/api/v1/admin/branches', { headers: getAuthHeaders() });
+        if (bRes.ok) {
+          var bData = await bRes.json();
+          _marketingPromotionsState.branches = (bData && (bData.branches || bData.data)) || [];
+        }
+      }
+    } catch (e) {
+      console.warn('[Marketing Dependencies Load Warn]:', e);
+    }
+  }
+
+  function renderPromoProductOptions(selectedProductId) {
+    var selectEl = $('mkt-promo-target-product');
+    if (!selectEl) return;
+
+    var prods = _marketingPromotionsState.masterProducts || [];
+    if (!prods.length) {
+      selectEl.innerHTML = '<option value="">-- Tidak ada produk katalog master ditemukan --</option>';
+      return;
+    }
+
+    var html = '<option value="">-- Pilih Produk Hadiah --</option>';
+    prods.forEach(function (p) {
+      var isSel = String(p.id) === String(selectedProductId) ? ' selected' : '';
+      var priceText = p.price ? ' (' + formatMoney(p.price) + ')' : '';
+      html += '<option value="' + esc(p.id) + '"' + isSel + '>' + esc(p.name) + priceText + '</option>';
+    });
+    selectEl.innerHTML = html;
+  }
+
+  function renderPromoBranchCheckboxes(selectedBranchIds) {
+    var container = $('mkt-promo-branches-list');
+    if (!container) return;
+
+    var branches = _marketingPromotionsState.branches || [];
+    if (!branches.length) {
+      container.innerHTML = '<span class="text-muted" style="font-size:12px;">Tidak ada cabang ditemukan.</span>';
+      return;
+    }
+
+    var selSet = {};
+    (selectedBranchIds || []).forEach(function (id) { selSet[String(id)] = true; });
+
+    var html = '';
+    branches.forEach(function (b) {
+      var checked = (selectedBranchIds === null || selectedBranchIds === undefined || selSet[String(b.id)]) ? ' checked' : '';
+      html += '<label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;background:#f8fafc;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;">' +
+        '<input type="checkbox" name="mkt-promo-branch" value="' + esc(b.id) + '"' + checked + '> ' +
+        '<span>' + esc(b.name) + '</span>' +
+      '</label>';
+    });
+    container.innerHTML = html;
+  }
+
+  function togglePromoSelectAllBranches(checked) {
+    var boxes = document.querySelectorAll('input[name="mkt-promo-branch"]');
+    boxes.forEach(function (box) { box.checked = Boolean(checked); });
+  }
+  window.togglePromoSelectAllBranches = togglePromoSelectAllBranches;
+
+  function onPromotionCapabilityChange() {
+    var cap = $('mkt-promo-capability').value;
+    var nameEl = $('mkt-promo-name');
+    var codeEl = $('mkt-promo-code');
+    if (cap === 'install_incentive' && (!nameEl.value || nameEl.value.indexOf('Hadiah') !== -1)) {
+      if (!nameEl.value) nameEl.value = 'Hadiah Instalasi Aplikasi PWA';
+      if (!codeEl.value) codeEl.value = 'PWABANGJO';
+    }
+  }
+  window.onPromotionCapabilityChange = onPromotionCapabilityChange;
+
+  async function openCreatePromotionModal() {
+    var modal = $('modal-mkt-promotion');
+    if (!modal) return;
+
+    $('modal-mkt-promo-title').textContent = 'Buat Program Promosi Baru';
+    $('mkt-promo-id').value = '';
+    $('mkt-promo-name').value = '';
+    $('mkt-promo-code').value = '';
+    $('mkt-promo-capability').value = 'install_incentive';
+    $('mkt-promo-stacking').value = 'exclusive';
+    $('mkt-promo-limit-per-user').value = '1';
+    $('mkt-promo-limit-total').value = '';
+    $('mkt-promo-status').value = '1';
+    $('mkt-promo-reward-type').value = 'freebie_product';
+    if ($('mkt-promo-branches-all')) $('mkt-promo-branches-all').checked = true;
+
+    modal.style.display = 'flex';
+
+    await ensureMarketingDependenciesLoaded();
+    renderPromoProductOptions(null);
+    renderPromoBranchCheckboxes(null); // default all selected
+    onPromotionCapabilityChange();
+  }
+  window.openCreatePromotionModal = openCreatePromotionModal;
+
+  async function openEditPromotionModal(promoId) {
+    var modal = $('modal-mkt-promotion');
+    if (!modal) return;
+
+    var promo = (_marketingPromotionsState.promotions || []).find(function (p) { return p.id === promoId; });
+    if (!promo) {
+      showToast('Data promosi tidak ditemukan.');
+      return;
+    }
+
+    $('modal-mkt-promo-title').textContent = 'Edit Program Promosi';
+    $('mkt-promo-id').value = promo.id;
+    $('mkt-promo-name').value = promo.name || '';
+    $('mkt-promo-code').value = promo.code || '';
+    $('mkt-promo-capability').value = promo.capability_type || 'install_incentive';
+    $('mkt-promo-stacking').value = promo.stacking_policy || 'exclusive';
+    $('mkt-promo-limit-per-user').value = promo.max_redemptions_per_customer || 1;
+    $('mkt-promo-limit-total').value = promo.max_redemptions_total || '';
+    $('mkt-promo-status').value = promo.is_active === 1 ? '1' : '0';
+
+    var targetProdId = null;
+    if (Array.isArray(promo.rewards) && promo.rewards.length > 0) {
+      targetProdId = promo.rewards[0].target_product_id;
+      $('mkt-promo-reward-type').value = promo.rewards[0].reward_type || 'freebie_product';
+    }
+
+    var selectedBranchIds = [];
+    if (Array.isArray(promo.scopes) && promo.scopes.length > 0) {
+      selectedBranchIds = promo.scopes.map(function (s) { return s.branch_id; });
+    }
+
+    modal.style.display = 'flex';
+
+    await ensureMarketingDependenciesLoaded();
+    renderPromoProductOptions(targetProdId);
+    renderPromoBranchCheckboxes(selectedBranchIds.length ? selectedBranchIds : null);
+  }
+  window.openEditPromotionModal = openEditPromotionModal;
+
+  function closePromotionModal() {
+    var modal = $('modal-mkt-promotion');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closePromotionModal = closePromotionModal;
+
+  async function submitPromotionForm(e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    var submitBtn = $('btn-mkt-submit-promo');
+    var promoId = $('mkt-promo-id').value;
+    var name = $('mkt-promo-name').value.trim();
+    var code = $('mkt-promo-code').value.trim();
+    var capability = $('mkt-promo-capability').value;
+    var stacking = $('mkt-promo-stacking').value;
+    var limitPerUser = parseInt($('mkt-promo-limit-per-user').value, 10) || 1;
+    var limitTotal = parseInt($('mkt-promo-limit-total').value, 10) || null;
+    var isActive = $('mkt-promo-status').value === '1' ? 1 : 0;
+    var rewardType = $('mkt-promo-reward-type').value;
+    var targetProductId = $('mkt-promo-target-product').value;
+
+    if (!name) {
+      showToast('Nama promosi wajib diisi.');
+      return;
+    }
+    if (!targetProductId) {
+      showToast('Pilih produk hadiah dari katalog master.');
+      return;
+    }
+
+    var branchBoxes = document.querySelectorAll('input[name="mkt-promo-branch"]:checked');
+    var branchIds = Array.from(branchBoxes).map(function (b) { return b.value; });
+
+    var rules = [];
+    if (capability === 'install_incentive') {
+      rules.push({
+        rule_type: 'eligibility',
+        rule_payload: {
+          requires_pwa_installed: true,
+          target_audience: 'anonymous_or_registered',
+          first_order_only: true
+        }
+      });
+    } else if (capability === 'first_order') {
+      rules.push({
+        rule_type: 'eligibility',
+        rule_payload: {
+          first_order_only: true
+        }
+      });
+    }
+
+    var rewards = [{
+      reward_type: rewardType,
+      target_product_id: targetProductId,
+      amount_in_cents: 0
+    }];
+
+    var payload = {
+      name: name,
+      code: code || null,
+      capability_type: capability,
+      stacking_policy: stacking,
+      priority_weight: capability === 'install_incentive' ? 100 : 50,
+      max_redemptions_total: limitTotal,
+      max_redemptions_per_customer: limitPerUser,
+      is_active: isActive,
+      rules: rules,
+      rewards: rewards,
+      branch_ids: branchIds
+    };
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Menyimpan...';
+    }
+
+    try {
+      var url = promoId ? ('/api/v1/admin/marketing/promotions/' + encodeURIComponent(promoId)) : '/api/v1/admin/marketing/promotions';
+      var method = promoId ? 'PUT' : 'POST';
+
+      var res = await adminFetch(url, {
+        method: method,
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+      var json = await res.json();
+
+      if (!res.ok || !json.success) {
+        throw new Error((json && json.error) || 'Gagal menyimpan promosi.');
+      }
+
+      showToast(promoId ? 'Promosi berhasil diperbarui.' : 'Program promosi baru berhasil dibuat.');
+      closePromotionModal();
+      loadMarketingPromotions();
+    } catch (err) {
+      console.error('[Submit Promotion Error]:', err);
+      showToast(err.message || 'Gagal menyimpan promosi.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Simpan Program Promosi';
+      }
+    }
+  }
+  window.submitPromotionForm = submitPromotionForm;
+
+  async function toggleMarketingPromotionActive(promoId, newStatus) {
+    try {
+      var res = await adminFetch('/api/v1/admin/marketing/promotions/' + encodeURIComponent(promoId), {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_active: newStatus })
+      });
+      var json = await res.json();
+      if (!res.ok || !json.success) throw new Error((json && json.error) || 'Gagal memperbarui status promosi.');
+
+      showToast(newStatus === 1 ? 'Promosi diaktifkan.' : 'Promosi dinonaktifkan.');
+      loadMarketingPromotions();
+    } catch (err) {
+      console.error('[Toggle Marketing Promotion Error]:', err);
+      showToast(err.message || 'Gagal mengubah status promosi.');
+    }
+  }
+  window.toggleMarketingPromotionActive = toggleMarketingPromotionActive;
+
+  async function deleteMarketingPromotion(promoId) {
+    if (!confirm('Apakah Anda yakin ingin menghapus program promosi ini? Tindakan ini tidak dapat dibatalkan.')) return;
+
+    try {
+      var res = await adminFetch('/api/v1/admin/marketing/promotions/' + encodeURIComponent(promoId), {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
+      var json = await res.json();
+      if (!res.ok || !json.success) throw new Error((json && json.error) || 'Gagal menghapus promosi.');
+
+      showToast('Promosi berhasil dihapus.');
+      loadMarketingPromotions();
+    } catch (err) {
+      console.error('[Delete Marketing Promotion Error]:', err);
+      showToast(err.message || 'Gagal menghapus promosi.');
+    }
+  }
+  window.deleteMarketingPromotion = deleteMarketingPromotion;
 
   window.__xentraInitDashboard = function () {
     checkAuth();
@@ -10902,28 +11239,100 @@
       return;
     }
 
+    var now = new Date().toISOString();
+
     container.innerHTML = promos.map(function (p) {
-      var isActive = (p.is_active === 1 || p.is_active === true);
-      var badge = isActive
-        ? '<span class="x-badge x-badge-success" style="font-size:11px;">PROMO AKTIF</span>'
-        : '<span class="x-badge x-badge-secondary" style="font-size:11px;">NONAKTIF</span>';
+      // Branch-level activation state
+      var isBranchActive = p.branch_is_active !== undefined ? (p.branch_is_active === 1 || p.branch_is_active === true) : (p.is_active === 1 || p.is_active === true);
+      var isBrandActive = (p.is_active === 1 || p.is_active === true);
+
+      // Operational Status derivation
+      var statusBadge = '';
+      var canToggle = true;
+
+      if (!isBrandActive) {
+        statusBadge = '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-size:11px;">NONAKTIF (BRAND)</span>';
+        canToggle = false;
+      } else if (p.end_at && p.end_at < now) {
+        statusBadge = '<span class="x-badge" style="background:#fee2e2;color:#991b1b;font-size:11px;">KADALUARSA</span>';
+        canToggle = false;
+      } else if (p.start_at && p.start_at > now) {
+        statusBadge = '<span class="x-badge" style="background:#fef3c7;color:#92400e;font-size:11px;">TERJADWAL</span>';
+      } else if (isBranchActive) {
+        statusBadge = '<span class="x-badge x-badge-success" style="font-size:11px;font-weight:700;">AKTIF DI CABANG</span>';
+      } else {
+        statusBadge = '<span class="x-badge" style="background:#f1f5f9;color:#475569;font-size:11px;">NONAKTIF (CABANG)</span>';
+      }
+
+      // Action button
+      var actionBtnHtml = '';
+      if (canToggle) {
+        if (isBranchActive) {
+          actionBtnHtml = '<button type="button" class="x-btn-secondary" onclick="toggleBMPromoActivation(\'' + esc(p.id) + '\', 0, this)" style="padding:5px 12px;font-size:12px;color:#dc2626;border-color:#fca5a5;">Nonaktifkan di Cabang</button>';
+        } else {
+          actionBtnHtml = '<button type="button" class="x-btn-primary" onclick="toggleBMPromoActivation(\'' + esc(p.id) + '\', 1, this)" style="padding:5px 12px;font-size:12px;">Aktifkan di Cabang</button>';
+        }
+      } else {
+        actionBtnHtml = '<span style="font-size:11px;color:#94a3b8;font-style:italic;">Dikelola Pusat</span>';
+      }
+
+      // Rewards summary text
+      var rewardText = '';
+      if (Array.isArray(p.rewards) && p.rewards.length > 0) {
+        var rw = p.rewards[0];
+        rewardText = (rw.reward_type === 'freebie_product' ? 'Gratis: ' : '') + (rw.target_product_name || rw.target_product_id || 'Produk Promo');
+      } else if (p.discount_type) {
+        rewardText = p.discount_type === 'percentage' ? (p.discount_value + '%') : formatMoney(p.discount_value);
+      } else {
+        rewardText = 'Insentif Promo';
+      }
+
+      var promoCode = p.code || p.promo_code;
 
       return '<div class="x-card" style="padding:14px 16px; border:1px solid var(--border-color); border-radius:8px; background:#ffffff;">' +
-        '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">' +
           '<div>' +
             '<strong style="font-size:15px; color:var(--text-main);">' + esc(p.name || p.title || 'Promosi') + '</strong>' +
-            (p.promo_code ? ('<div style="font-size:12px; margin-top:2px;">Kode Kupon: <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:700;">' + esc(p.promo_code) + '</code></div>') : '') +
+            (promoCode ? ('<div style="font-size:12px; margin-top:3px;">Kode: <code style="background:#f1f5f9; padding:2px 6px; border-radius:4px; font-weight:700;">' + esc(promoCode) + '</code></div>') : '') +
           '</div>' +
-          badge +
+          statusBadge +
         '</div>' +
         (p.description ? ('<p style="font-size:12px; color:var(--text-muted); margin:4px 0 8px;">' + esc(p.description) + '</p>') : '') +
-        '<div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--text-muted); border-top:1px dashed var(--border-color); padding-top:8px; margin-top:6px;">' +
-          '<span>Tipe: <strong>' + esc(p.discount_type || 'Diskon') + '</strong></span>' +
-          '<span>Nilai: <strong>' + (p.discount_type === 'percentage' ? (p.discount_value + '%') : formatMoney(p.discount_value)) + '</strong></span>' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; border-top:1px dashed var(--border-color); padding-top:10px; margin-top:8px;">' +
+          '<div>Benefit: <strong style="color:var(--accent-teal);">' + esc(rewardText) + '</strong></div>' +
+          actionBtnHtml +
         '</div>' +
       '</div>';
     }).join('');
   }
+
+  async function toggleBMPromoActivation(promoId, newStatus, btnEl) {
+    if (btnEl) {
+      btnEl.disabled = true;
+      btnEl.textContent = 'Memproses...';
+    }
+
+    try {
+      var res = await adminFetch('/api/v1/admin/marketing/promotions/' + encodeURIComponent(promoId) + '/branch-activation', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ is_active: newStatus })
+      });
+      var json = await res.json();
+      if (!res.ok || !json.success) throw new Error((json && json.error) || 'Gagal mengubah status aktivasi promo di cabang.');
+
+      showToast(newStatus === 1 ? 'Promo berhasil diaktifkan untuk operasional cabang ini.' : 'Promo berhasil dinonaktifkan di cabang ini.');
+      loadBMPromotions();
+    } catch (err) {
+      console.error('[BM Promo Toggle Error]:', err);
+      showToast(err.message || 'Gagal mengubah status promosi.');
+      if (btnEl) {
+        btnEl.disabled = false;
+        btnEl.textContent = newStatus === 1 ? 'Aktifkan di Cabang' : 'Nonaktifkan di Cabang';
+      }
+    }
+  }
+  window.toggleBMPromoActivation = toggleBMPromoActivation;
 
   function renderBMRedemptionsTable(redemptions) {
     var tbody = $('bm-promo-redemptions-tbody');
