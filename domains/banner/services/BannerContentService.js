@@ -197,7 +197,7 @@ class BannerContentService {
         createdBy: actorId
       });
 
-      this.media.attachToEntity({
+      await this.media.attachToEntity({
         mediaId: content.mediaId,
         brandId,
         entityType: 'banner_content_revision',
@@ -269,7 +269,7 @@ class BannerContentService {
           createdBy: actorId
         });
 
-        this.media.attachToEntity({
+        await this.media.attachToEntity({
           mediaId: content.mediaId,
           brandId,
           entityType: 'banner_content_revision',
@@ -277,7 +277,7 @@ class BannerContentService {
         });
       } else {
         if (draft.media_id !== content.mediaId) {
-          this.media.replaceEntityMedia({
+          await this.media.replaceEntityMedia({
             newMediaId: content.mediaId,
             oldMediaId: draft.media_id,
             brandId,
