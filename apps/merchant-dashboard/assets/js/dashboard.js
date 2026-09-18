@@ -851,11 +851,24 @@
   function closeMobileSidebar() {
     var sidebar = $('x-dash-sidebar');
     var overlay = $('x-sidebar-overlay');
+    var btnOpen = $('btn-hamburger');
     if (sidebar) sidebar.classList.remove('open');
     if (overlay) overlay.classList.remove('open');
+    if (btnOpen) btnOpen.setAttribute('aria-expanded', 'false');
     document.body.style.overflow = '';
   }
   window.closeMobileSidebar = closeMobileSidebar;
+
+  function openMobileSidebar() {
+    var sidebar = $('x-dash-sidebar');
+    var overlay = $('x-sidebar-overlay');
+    var btnOpen = $('btn-hamburger');
+    if (sidebar) sidebar.classList.add('open');
+    if (overlay) overlay.classList.add('open');
+    if (btnOpen) btnOpen.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+  }
+  window.openMobileSidebar = openMobileSidebar;
 
   // Navigate to a route: update URL hash, then apply the route
   function navigateTo(route) {
@@ -1380,19 +1393,7 @@
     var btnOpen = $('btn-hamburger');
     var btnClose = $('btn-sidebar-close');
 
-    function openSidebar() {
-      if (sidebar) sidebar.classList.add('open');
-      if (overlay) overlay.classList.add('open');
-      document.body.style.overflow = 'hidden';
-    }
-
-    function closeSidebar() {
-      if (sidebar) sidebar.classList.remove('open');
-      if (overlay) overlay.classList.remove('open');
-      document.body.style.overflow = '';
-    }
-
-    if (btnOpen) btnOpen.addEventListener('click', openSidebar);
+    if (btnOpen) btnOpen.addEventListener('click', openMobileSidebar);
     if (btnClose) btnClose.addEventListener('click', closeMobileSidebar);
     if (overlay) overlay.addEventListener('click', closeMobileSidebar);
 
@@ -1405,6 +1406,20 @@
         }
       });
     }
+
+    // Dismiss drawer on Escape key
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && sidebar && sidebar.classList.contains('open')) {
+        closeMobileSidebar();
+      }
+    });
+
+    // Automatically close mobile drawer when viewport crosses to desktop breakpoint
+    window.addEventListener('resize', function () {
+      if (window.innerWidth >= 1024) {
+        closeMobileSidebar();
+      }
+    });
   }
 
 
@@ -7597,11 +7612,10 @@
           '<div class="x-marketing-banner-visibility">' +
             (assignment ? (
               '<label class="x-toggle x-toggle-compact" title="' + esc(visibilityText) + '">' +
-                '<input type="checkbox" ' + (checked ? 'checked' : '') + toggleDisabled + ' data-banner-toggle-key="' + esc(key) + '">' +
+                '<input type="checkbox" ' + (checked ? 'checked' : '') + toggleDisabled + ' data-banner-toggle-key="' + esc(key) + '" aria-label="' + esc(visibilityText) + '">' +
                 '<span class="x-toggle-slider"></span>' +
               '</label>'
             ) : '<span class="x-marketing-banner-no-assignment">—</span>') +
-            '<span class="x-marketing-banner-visibility-label">' + esc(visibilityText) + '</span>' +
           '</div>' +
         '</td>' +
         '<td class="text-right" data-label="Aksi" style="white-space:nowrap;">' +

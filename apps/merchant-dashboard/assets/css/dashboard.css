@@ -1351,6 +1351,9 @@ input[type="file"].x-input,
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   z-index: 99;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
 }
 
 /* Hamburger button (hidden on desktop) */
@@ -1365,6 +1368,13 @@ input[type="file"].x-input,
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.x-hamburger svg {
+  pointer-events: none;
 }
 
 .x-hamburger:hover {
@@ -1532,6 +1542,7 @@ input[type="file"].x-input,
     transform: translateX(-100%);
     transition: transform 0.25s ease;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     border-bottom: none;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
@@ -1594,24 +1605,44 @@ input[type="file"].x-input,
     box-sizing: border-box;
   }
   .x-topbar-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+  .x-hamburger {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    cursor: pointer !important;
+  }
+  .x-topbar-left > div {
     min-width: 0;
     flex: 1;
     overflow: hidden;
   }
   .x-topbar-left h1 {
-    font-size: 17px;
+    font-size: 16px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    margin: 0;
   }
   .x-topbar-left p {
-    display: none;
+    display: none !important;
   }
   .x-topbar-right {
-    width: auto;
-    flex-shrink: 0;
-    justify-content: flex-end;
-    gap: 6px;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
   }
   .x-topbar-icon-btn {
     display: none;
@@ -2141,14 +2172,20 @@ input[type="file"].x-input,
 
   /* Responsive topbar adjustments on tablet/narrow screens */
   .x-dash-topbar {
-    padding: 14px 20px;
-    gap: 12px;
+    padding: 12px 14px;
+    gap: 10px;
   }
   .x-topbar-left h1 {
-    font-size: 18px;
+    font-size: 17px;
   }
   .x-topbar-right {
-    gap: 10px;
+    gap: 8px;
+  }
+  #topbar-brand-badge {
+    display: none !important;
+  }
+  #x-branch-selector {
+    display: none !important;
   }
   .x-live-status {
     padding: 3px 8px;
@@ -3753,8 +3790,7 @@ input[type="file"].x-input,
   }
 
   .x-marketing-banner-visibility {
-    justify-content: space-between;
-    width: 100%;
+    justify-content: flex-start;
   }
 
   .x-marketing-banner-table td[data-label="Aksi"] .x-item-actions {
