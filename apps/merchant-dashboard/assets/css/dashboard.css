@@ -3053,6 +3053,349 @@ input[type="file"].x-input,
    MARKETING — STOREFRONT BANNER UI SCAFFOLD
    ========================================================================== */
 
+
+/* ==========================================================================
+   MARKETING — STOREFRONT BANNER EDITOR
+   ========================================================================== */
+.x-marketing-banner-editor-modal {
+  overflow: hidden;
+}
+
+.x-marketing-banner-editor-body {
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.x-marketing-banner-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.x-marketing-banner-editor-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.x-marketing-banner-section-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.x-marketing-banner-section-title strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.x-marketing-banner-section-title span {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.x-marketing-banner-upload-box {
+  width: 100%;
+  min-height: 190px;
+  aspect-ratio: 1.94 / 1;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.x-marketing-banner-upload-box img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.x-marketing-banner-upload-empty {
+  font-size: 44px;
+  opacity: .55;
+}
+
+.x-marketing-banner-upload-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.x-marketing-banner-help {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.x-marketing-banner-branch-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.x-marketing-banner-branch-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 190px;
+  overflow: auto;
+  padding: 4px;
+}
+
+.x-marketing-banner-branch-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.x-marketing-banner-branch-check input {
+  margin-top: 2px;
+}
+
+.x-marketing-banner-branch-check span {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.x-marketing-banner-branch-check small {
+  grid-column: 2;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: -3px;
+}
+
+.x-marketing-banner-placement-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.x-marketing-banner-schedule-toggle,
+.x-marketing-banner-create-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.x-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.x-checkbox-label input {
+  margin: 0;
+}
+
+.x-marketing-banner-publish-note {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 9px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.x-marketing-banner-publish-note strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.x-marketing-banner-legacy-notice {
+  padding: 10px 20px;
+  border-bottom: 1px solid #fde68a;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.x-marketing-banner-branch-filter {
+  min-width: 170px;
+  max-width: 240px;
+}
+
+.x-marketing-banner-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.x-marketing-banner-preview-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 24px;
+}
+
+.x-marketing-banner-no-assignment {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.x-marketing-banner-draft-hint {
+  font-size: 10px;
+  color: #b45309;
+  font-weight: 700;
+}
+
+.x-marketing-banner-preview-stage {
+  position: relative;
+  aspect-ratio: 1.94 / 1;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #f1f5f9;
+}
+
+.x-marketing-banner-preview-stage img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.x-marketing-banner-preview-stage-empty {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.x-marketing-banner-preview-stage-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: linear-gradient(transparent, rgba(15,23,42,.86));
+  color: #fff;
+}
+
+.x-marketing-banner-preview-stage-caption strong {
+  font-size: 13px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.x-marketing-banner-preview-stage-caption span {
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  opacity: .88;
+}
+
+.x-marketing-banner-preview-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.x-marketing-banner-preview-meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 10px;
+  background: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+}
+
+.x-marketing-banner-preview-meta span {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.x-marketing-banner-preview-meta strong {
+  font-size: 11px;
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+
+.x-carousel-slide-clickable {
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .x-marketing-banner-editor-grid,
+  .x-marketing-banner-placement-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .x-marketing-banner-branch-list {
+    grid-template-columns: 1fr;
+  }
+
+  .x-marketing-banner-preview-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .x-marketing-banner-editor-body {
+    padding: 16px;
+  }
+
+  .x-marketing-banner-schedule-toggle,
+  .x-marketing-banner-create-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .x-marketing-banner-branch-filter {
+    width: 100%;
+    max-width: none;
+  }
+}
+
 .x-marketing-banner-panel {
   overflow: visible;
 }
