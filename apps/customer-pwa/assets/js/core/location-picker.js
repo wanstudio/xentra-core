@@ -27,6 +27,27 @@
   var MAPBOX_TOKEN = (window.XentraConfig && window.XentraConfig.mapboxToken) ||
     'pk.eyJ1IjoiaWtod2FucyIsImEiOiJjbXQ5c2cwMzYwOW15MnpxdXdpeWU3am45In0.YcX49DH0uXP70aBxVDC-TA';
 
+  // Calculate distance between two coordinates in meters (Haversine formula)
+  function haversineMeters(c1, c2) {
+    if (!c1 || !c2 || c1.lat == null || c1.lng == null || c2.lat == null || c2.lng == null) return Infinity;
+    var dLat = (Number(c2.lat) - Number(c1.lat)) * Math.PI / 180;
+    var dLng = (Number(c2.lng) - Number(c1.lng)) * Math.PI / 180;
+    var lat1 = Number(c1.lat) * Math.PI / 180;
+    var lat2 = Number(c2.lat) * Math.PI / 180;
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return 6371000 * c; // Earth radius in meters
+  }
+
+  // Calculate target zoom level based on GPS accuracy (in meters)
+  function calculateZoomFromAccuracy(accuracy) {
+    if (typeof accuracy !== 'number' || isNaN(accuracy) || accuracy <= 0) return 17.2;
+    if (accuracy <= 30) return 17.5;   // High accuracy (street/building level)
+    if (accuracy <= 100) return 16.5;  // Moderate accuracy (block level)
+    return 15.5;                       // Low accuracy (neighborhood level)
+  }
+
   // Dynamic Mapbox GL JS & CSS Loader
   function loadMapboxGL() {
     return new Promise(function (resolve, reject) {
@@ -611,13 +632,15 @@
     options = options || {};
     var isAddingFav = options.isAddingFavorite === true;
 
-    // Get starting coordinates from active destination or default
+    // Get starting coordinates and zoom from active destination or GPS or default
     var initialCoords = { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
+    var initialZoom = 17.2;
     try {
       var dest = Store && Store.getActiveDestination && Store.getActiveDestination();
       if (dest && dest.latitude != null && dest.longitude != null) {
         initialCoords.lat = Number(dest.latitude);
         initialCoords.lng = Number(dest.longitude);
+        initialZoom = (dest.accuracy != null) ? calculateZoomFromAccuracy(dest.accuracy) : 17.2;
       }
     } catch (_) {}
 
@@ -694,6 +717,7 @@
 
     var currentPinCoords = { lat: initialCoords.lat, lng: initialCoords.lng };
     var currentResolvedAddress = { title: 'Lokasi Terpilih', address: '' };
+    var lastResolvedCoords = { lat: initialCoords.lat, lng: initialCoords.lng };
 
     function closeMap() {
       mapOverlay.classList.remove('open');
@@ -718,6 +742,7 @@
       };
       if (coords && coords.lat && coords.lng) {
         currentPinCoords = { lat: Number(coords.lat), lng: Number(coords.lng) };
+        lastResolvedCoords = { lat: currentPinCoords.lat, lng: currentPinCoords.lng };
       }
 
       var titleEl = mapOverlay.querySelector('#x-map-loc-title');
@@ -740,6 +765,13 @@
         // do not trigger reverse geocoding as the user has already explicitly picked this location!
         if (wasProgrammatic) return;
 
+        // Micro-movement protection: if map moved less than 5 meters from last resolved coordinates,
+        // preserve the resolved address to prevent jitter, network thrashing, and unnecessary UI flashing.
+        if (lastResolvedCoords && haversineMeters(lastResolvedCoords, newCoords) < 5) {
+          return;
+        }
+
+        lastResolvedCoords = { lat: newCoords.lat, lng: newCoords.lng };
         updateLocationDetailsFromCoords(newCoords, mapOverlay, function (resolved) {
           currentResolvedAddress = resolved;
         });
@@ -749,7 +781,8 @@
         var pTitle = poi.name;
         var pAddr = poi.address || poi.full_address || poi.place_formatted || poi.name;
         setSelectedLocation(pTitle, pAddr, { lat: poi.lat, lng: poi.lng });
-      }
+      },
+      initialZoom
     );
 
     // Initial reverse geocode
@@ -971,18 +1004,32 @@
       });
     }
 
-    // Re-center on GPS
+    // Re-center on GPS with accuracy-based camera zoom
     mapOverlay.querySelector('#x-map-gps-fab').onclick = function () {
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function (pos) {
-          currentPinCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          if (mapController && typeof mapController.panTo === 'function') {
-            mapController.panTo(currentPinCoords);
-          }
-          updateLocationDetailsFromCoords(currentPinCoords, mapOverlay, function (resolved) {
-            currentResolvedAddress = resolved;
-          });
-        });
+        var gpsBtn = mapOverlay.querySelector('#x-map-gps-fab');
+        if (gpsBtn) gpsBtn.style.opacity = '0.5';
+        navigator.geolocation.getCurrentPosition(
+          function (pos) {
+            if (gpsBtn) gpsBtn.style.opacity = '1';
+            var targetZoom = calculateZoomFromAccuracy(pos.coords.accuracy);
+            currentPinCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            lastResolvedCoords = { lat: currentPinCoords.lat, lng: currentPinCoords.lng };
+            if (mapController && typeof mapController.panTo === 'function') {
+              mapController.panTo(currentPinCoords, targetZoom);
+            }
+            updateLocationDetailsFromCoords(currentPinCoords, mapOverlay, function (resolved) {
+              currentResolvedAddress = resolved;
+            });
+          },
+          function (err) {
+            if (gpsBtn) gpsBtn.style.opacity = '1';
+            var msg = 'Gagal mengakses GPS';
+            if (err && err.code === 1) msg = 'Izin lokasi tidak diberikan';
+            if (UI && UI.toast) UI.toast(msg);
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
       }
     };
 
@@ -1122,8 +1169,8 @@
   // POI Cache across movements matching xentra-mvp
   var XENTRA_POI_CACHE = new Map();
 
-  function initInteractiveMapCanvas(viewportEl, canvasContainer, centerCoords, onCenterChanged, onPoiClick) {
-    var zoom = 17.2;
+  function initInteractiveMapCanvas(viewportEl, canvasContainer, centerCoords, onCenterChanged, onPoiClick, initialZoom) {
+    var zoom = (typeof initialZoom === 'number' && !isNaN(initialZoom) && initialZoom > 0) ? initialZoom : 17.2;
     var currentLat = centerCoords.lat;
     var currentLng = centerCoords.lng;
     var renderedPoiMarkers = new Map();
@@ -1354,12 +1401,12 @@
       });
 
     return {
-      panTo: function (coords) {
+      panTo: function (coords, targetZoom) {
         currentLat = coords.lat;
         currentLng = coords.lng;
         isProgrammaticMove = true;
         if (mapInst) {
-          var curZ = (typeof mapInst.getZoom === 'function') ? mapInst.getZoom() : 17.2;
+          var curZ = (typeof targetZoom === 'number' && !isNaN(targetZoom)) ? targetZoom : ((typeof mapInst.getZoom === 'function') ? mapInst.getZoom() : 17.2);
           mapInst.flyTo({
             center: [coords.lng, coords.lat],
             zoom: Math.max(curZ, 14),
@@ -1822,7 +1869,9 @@
     openSearch: openSearchFlow,
     openMap: openMapPickerFlow,
     openDetail: openAddressDetailSheet,
-    updateBar: updateHomeLocationBar
+    updateBar: updateHomeLocationBar,
+    haversineMeters: haversineMeters,
+    calculateZoomFromAccuracy: calculateZoomFromAccuracy
   };
 
   // Auto-init bar update when store changes

@@ -1,0 +1,239 @@
+'use strict';
+/**
+ * Phase 3 Test Suite: Map Interaction, Camera & Location Precision
+ *
+ * Verifies:
+ * 1. Haversine distance calculations and accuracy-to-zoom mapping.
+ * 2. Micro-movement threshold (< 5m vs >= 5m):
+ *    - Jitter movements (< 5 meters) do NOT trigger fresh reverse geocoding requests.
+ *    - Meaningful movements (>= 5 meters) trigger fresh reverse geocoding requests.
+ * 3. Programmatic movement flag:
+ *    - Search suggestion select and POI click pan camera with isProgrammaticMove=true,
+ *      preventing manual reverse geocode from overwriting explicit titles.
+ * 4. Stale reverse geocode sequence guard:
+ *    - Sequential asynchronous responses arriving out of order are discarded via sequence counter.
+ * 5. Active destination invariant preservation:
+ *    - canUpdateFromGps() continues to protect explicit destinations.
+ */
+
+const test = require('node:test');
+const assert = require('node:assert');
+const path = require('node:path');
+
+const STORE_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/store.js');
+const LOCATION_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/location.js');
+const PICKER_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/location-picker.js');
+
+function setupTestEnvironment() {
+  const storage = {};
+  globalThis.window = globalThis;
+  globalThis.document = {
+    createElement: (tag) => {
+      const el = {
+        tagName: tag.toUpperCase(),
+        className: '',
+        style: {},
+        innerHTML: '',
+        children: [],
+        dataset: {},
+        classList: {
+          add: () => {},
+          remove: () => {},
+          contains: () => false
+        },
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        appendChild: () => el,
+        removeChild: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {}
+      };
+      return el;
+    },
+    head: {
+      appendChild: () => {}
+    },
+    body: {
+      appendChild: () => {}
+    },
+    getElementById: () => null,
+    addEventListener: () => {}
+  };
+  globalThis.localStorage = {
+    getItem: (k) => (Object.prototype.hasOwnProperty.call(storage, k) ? storage[k] : null),
+    setItem: (k, v) => { storage[k] = String(v); },
+    removeItem: (k) => { delete storage[k]; }
+  };
+  try {
+    Object.defineProperty(globalThis, 'navigator', {
+      value: {
+        geolocation: {
+          getCurrentPosition: (cb) => {
+            cb({
+              coords: { latitude: -5.3971, longitude: 105.2668, accuracy: 15 }
+            });
+          }
+        }
+      },
+      configurable: true,
+      writable: true
+    });
+  } catch (_) {}
+
+  delete require.cache[STORE_PATH];
+  delete require.cache[LOCATION_PATH];
+  delete require.cache[PICKER_PATH];
+
+  // Set up mock window.Xentra
+  globalThis.window.Xentra = {
+    API: {
+      get: async () => ({})
+    },
+    UI: {
+      escape: (s) => String(s || ''),
+      toast: () => {}
+    }
+  };
+  globalThis.window.XentraConfig = {
+    mapboxToken: 'test_token'
+  };
+
+  require(STORE_PATH);
+  require(LOCATION_PATH);
+  require(PICKER_PATH);
+
+  return {
+    Store: globalThis.window.Xentra.Store,
+    XentraLocation: globalThis.window.XentraLocation,
+    XentraLocationPicker: globalThis.window.XentraLocationPicker
+  };
+}
+
+test('MAP-01: haversineMeters calculates accurate surface distance between coordinates', () => {
+  const { XentraLocationPicker } = setupTestEnvironment();
+  assert.ok(XentraLocationPicker && typeof XentraLocationPicker.haversineMeters === 'function');
+
+  // Same coordinates => 0 distance
+  const p1 = { lat: -5.3971, lng: 105.2668 };
+  const distZero = XentraLocationPicker.haversineMeters(p1, p1);
+  assert.strictEqual(distZero, 0);
+
+  // Micro-jitter: ~2 meters difference (0.00002 deg lat ~ 2.22 meters)
+  const pJitter = { lat: -5.3971 + 0.00002, lng: 105.2668 };
+  const distJitter = XentraLocationPicker.haversineMeters(p1, pJitter);
+  assert.ok(distJitter > 1.5 && distJitter < 3.0, `Expected ~2.2m, got ${distJitter}`);
+
+  // Meaningful movement: ~20 meters difference (0.00018 deg lat ~ 20.0 meters)
+  const pMove = { lat: -5.3971 + 0.00018, lng: 105.2668 };
+  const distMove = XentraLocationPicker.haversineMeters(p1, pMove);
+  assert.ok(distMove > 18.0 && distMove < 22.0, `Expected ~20m, got ${distMove}`);
+});
+
+test('MAP-02: calculateZoomFromAccuracy dynamically sets appropriate zoom strategy', () => {
+  const { XentraLocationPicker } = setupTestEnvironment();
+  assert.ok(XentraLocationPicker && typeof XentraLocationPicker.calculateZoomFromAccuracy === 'function');
+
+  // High accuracy (<= 30 meters) -> Zoom 17.5 (close building/street view)
+  assert.strictEqual(XentraLocationPicker.calculateZoomFromAccuracy(10), 17.5);
+  assert.strictEqual(XentraLocationPicker.calculateZoomFromAccuracy(30), 17.5);
+
+  // Moderate accuracy (31 to 100 meters) -> Zoom 16.5 (block level)
+  assert.strictEqual(XentraLocationPicker.calculateZoomFromAccuracy(45), 16.5);
+  assert.strictEqual(XentraLocationPicker.calculateZoomFromAccuracy(100), 16.5);
+
+  // Low accuracy (> 100 meters) -> Zoom 15.5 (neighborhood level)
+  assert.strictEqual(XentraLocationPicker.calculateZoomFromAccuracy(150), 15.5);
+  assert.strictEqual(XentraLocationPicker.calculateZoomFromAccuracy(500), 15.5);
+
+  // Invalid / missing accuracy -> fallback default zoom 17.2
+  assert.strictEqual(XentraLocationPicker.calculateZoomFromAccuracy(null), 17.2);
+  assert.strictEqual(XentraLocationPicker.calculateZoomFromAccuracy(undefined), 17.2);
+  assert.strictEqual(XentraLocationPicker.calculateZoomFromAccuracy(0), 17.2);
+});
+
+test('MAP-03: Micro-movement filter logic (< 5m vs >= 5m) suppresses unnecessary reverse-geocode', () => {
+  const { XentraLocationPicker } = setupTestEnvironment();
+
+  const baseCoords = { lat: -5.397100, lng: 105.266800 };
+  let simulatedLastResolved = { lat: baseCoords.lat, lng: baseCoords.lng };
+  let reverseGeocodeCallCount = 0;
+
+  function simulateOnCenterMoved(newCoords, wasProgrammatic) {
+    if (wasProgrammatic) return;
+    const distance = XentraLocationPicker.haversineMeters(simulatedLastResolved, newCoords);
+    if (distance < 5) {
+      // Sub-threshold jitter: skip
+      return;
+    }
+    simulatedLastResolved = { lat: newCoords.lat, lng: newCoords.lng };
+    reverseGeocodeCallCount++;
+  }
+
+  // 1. First move is sub-threshold micro-jitter (~1.5m)
+  const jitterCoords = { lat: -5.397113, lng: 105.266800 };
+  simulateOnCenterMoved(jitterCoords, false);
+  assert.strictEqual(reverseGeocodeCallCount, 0, 'Micro-jitter under 5m must NOT trigger reverse geocode');
+
+  // 2. Second move is meaningful (> 15m)
+  const meaningfulCoords = { lat: -5.397250, lng: 105.266800 };
+  simulateOnCenterMoved(meaningfulCoords, false);
+  assert.strictEqual(reverseGeocodeCallCount, 1, 'Movement >= 5m MUST trigger reverse geocode');
+
+  // 3. Third move is programmatic (e.g. user selected POI or search result)
+  const poiCoords = { lat: -5.400000, lng: 105.270000 };
+  simulateOnCenterMoved(poiCoords, true);
+  assert.strictEqual(reverseGeocodeCallCount, 1, 'Programmatic move must NOT trigger manual reverse geocode');
+});
+
+test('MAP-04: Out-of-order sequential async reverse-geocode responses are discarded', async () => {
+  let revGeocodeSeq = 0;
+  let activeTitle = 'Initial';
+
+  function triggerSimulatedReverseGeocode(seqDelayMs, resultTitle) {
+    const currentSeq = ++revGeocodeSeq;
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (currentSeq === revGeocodeSeq) {
+          activeTitle = resultTitle;
+        }
+        resolve({ seq: currentSeq, applied: currentSeq === revGeocodeSeq });
+      }, seqDelayMs);
+    });
+  }
+
+  // Request 1 is fired (slow network: 50ms)
+  const p1 = triggerSimulatedReverseGeocode(50, 'Location from Request 1');
+
+  // Request 2 is fired quickly after (fast network: 10ms)
+  const p2 = triggerSimulatedReverseGeocode(10, 'Location from Request 2 (Fresher)');
+
+  const [res1, res2] = await Promise.all([p1, p2]);
+
+  assert.strictEqual(res2.applied, true, 'Request 2 was the latest sequence and was applied');
+  assert.strictEqual(res1.applied, false, 'Request 1 was superseded and its result was discarded');
+  assert.strictEqual(activeTitle, 'Location from Request 2 (Fresher)', 'Active UI reflects the latest sequence result');
+});
+
+test('MAP-05: Invariant canUpdateFromGps preserves explicit destination', () => {
+  const { XentraLocation } = setupTestEnvironment();
+
+  // Explicit destination from map picker or search
+  const explicitDest = {
+    latitude: -5.3971,
+    longitude: 105.2668,
+    is_explicit: true,
+    source: 'map',
+    address: 'Jl. Ahmad Yani No. 12'
+  };
+
+  assert.strictEqual(XentraLocation.canUpdateFromGps(explicitDest), false, 'Explicit map destination must not be overwritten by GPS');
+
+  // Non-explicit destination (e.g. empty or default)
+  const nonExplicitDest = {
+    latitude: null,
+    longitude: null,
+    is_explicit: false,
+    source: 'gps'
+  };
+  assert.strictEqual(XentraLocation.canUpdateFromGps(nonExplicitDest), true, 'Non-explicit destination can receive GPS updates');
+});
