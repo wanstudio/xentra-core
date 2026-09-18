@@ -957,8 +957,7 @@
       var item = Store.findCartItem(product.id, activeBranch ? String(activeBranch.id) : undefined);
       var qty = item ? item.quantity : 0;
       var activeBranchId = activeBranch ? String(activeBranch.id) : null;
-      var scopedNoteKey = String(product.id) + '::' + (activeBranchId || '__unassigned__');
-      var note = (item && item.note) || (state.notes && (state.notes[scopedNoteKey] || state.notes[product.id])) || '';
+      var note = (item && item.note) || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(product.id, activeBranchId) : '') || '';
 
       var price = Number(product.price || 0);
       var regPrice = Number(product.regular_price || price);
@@ -1117,9 +1116,7 @@
     var numId = Number(productId);
     var item = Store.findCartItem(numId, branchId);
     var bScope = branchId !== undefined ? branchId : (item ? item.branch_id : (activeBranch ? String(activeBranch.id) : null));
-    var sKey = String(numId) + '::' + ((bScope == null || String(bScope) === '') ? '__unassigned__' : String(bScope));
-    var stateNotes = Store.getState().notes || {};
-    var curNote = (item && item.note) || stateNotes[sKey] || stateNotes[numId] || '';
+    var curNote = (item && item.note) || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(numId, bScope) : '') || '';
 
     var overlay = document.createElement('div');
     overlay.className = 'x-overlay x-note-overlay';
@@ -1517,8 +1514,7 @@
 
   function buildSheetItemRow(item, state) {
     var bScope = item.branch_id || null;
-    var sKey = String(item.id) + '::' + (bScope || '__unassigned__');
-    var note = (item && item.note) || (state.notes && (state.notes[sKey] || state.notes[item.id])) || '';
+    var note = (item && item.note) || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(item.id, bScope) : '') || '';
     var lineTotal = Number(item.price || 0) * Number(item.quantity || 0);
 
     var row = document.createElement('div');

@@ -396,9 +396,13 @@
       if (savedDest.detail) state.address.detail = savedDest.detail;
     }
 
-    // Restore order type
+    // Restore order type & fulfillment note
     if (storeState.orderType) {
       state.fulfillment.type = storeState.orderType;
+    }
+    var orderCtx = storeState.orderContext && storeState.orderContext[state.fulfillment.type];
+    if (orderCtx && typeof orderCtx.note === 'string') {
+      state.fulfillment.note = orderCtx.note;
     }
 
     // Load available branches & active promotions (targeted update, zero blinking)
@@ -505,7 +509,11 @@
       if (!rowsEl) { calculateTotals(); return; }
     }
 
-    var keys = items.map(itemRowKey).join('|');
+    var keys = items.map(function (i) {
+      var bScope = i.branch_id || currentBranchId || null;
+      var n = i.note || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(i.id, bScope) : '') || '';
+      return itemRowKey(i) + '#n:' + n;
+    }).join('|');
     var discount = Number(state.discount) || 0;
     if (rowsEl && (keys !== lastRowKeys || discount !== lastRowDiscount)) {
       rowsEl.innerHTML = renderItemsHtml(items);
@@ -781,8 +789,7 @@
       var img = item.image_url || item.image || '';
       var qty = Number(item.quantity || 1);
       var bScope = item.branch_id || currentBranchId || null;
-      var sKey = String(item.id) + '::' + (bScope || '__unassigned__');
-      var note = (item && item.note) || (state.notes && (state.notes[sKey] || state.notes[item.id])) || '';
+      var note = (item && item.note) || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(item.id, bScope) : '') || '';
       // Visual classification only — reward identity is canonical (flag / reward_ id),
       // never price-based, so a legitimately free catalog product is not mislabelled "Gratis".
       var isPromoFreebie = Boolean(item.is_promo_reward || String(item.id).indexOf('reward_') === 0);
@@ -2026,7 +2033,10 @@
           state.fulfillment.scheduled = false;
         }
 
+        var savedCtx = (Store.getState().orderContext && Store.getState().orderContext[draft.type]) || {};
+        state.fulfillment.note = typeof savedCtx.note === 'string' ? savedCtx.note : '';
         Store.setOrderType(draft.type);
+        Store.setOrderContext(draft.type, { note: state.fulfillment.note });
 
         sh.close();
         var y = window.scrollY;
@@ -2220,7 +2230,11 @@
     }
 
     sh.overlay.querySelector('#x-save-ful-note').onclick = function () {
-      state.fulfillment.note = (txt ? txt.value : '').trim();
+      var noteVal = (txt ? txt.value : '').trim();
+      state.fulfillment.note = noteVal;
+      if (typeof Store !== 'undefined' && Store.setOrderContext) {
+        Store.setOrderContext(state.fulfillment.type, { note: noteVal });
+      }
       sh.close();
       renderLayout();
       calculateTotals();
@@ -2232,8 +2246,7 @@
     var item = Store.findCartItem(itemId, branchId !== undefined ? branchId : currentBranchId);
     if (!item) return;
     var bScope = item.branch_id !== undefined ? item.branch_id : (branchId !== undefined ? branchId : currentBranchId);
-    var sKey = String(itemId) + '::' + ((bScope == null || String(bScope) === '') ? '__unassigned__' : String(bScope));
-    var val = (item && item.note) || (state.notes && (state.notes[sKey] || state.notes[itemId])) || '';
+    var val = (item && item.note) || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(itemId, bScope) : '') || '';
     var sh = makeOverlay(
       '<div style="height:min(52dvh, 360px) !important;max-height:52dvh !important;display:flex !important;flex-direction:column;">' +
       '  <div class="x-note-header">' +
@@ -2625,7 +2638,7 @@
           product_id: i.id,
           quantity: Number(i.quantity) || 1,
           expected_price: Number(i.price) || 0,
-          note: i.note || '',
+          note: i.note || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(i.id, i.branch_id) : '') || '',
           branch_id: i.branch_id || null
         };
       }),

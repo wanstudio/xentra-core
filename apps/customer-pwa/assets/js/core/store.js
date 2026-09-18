@@ -319,7 +319,7 @@
         image_url: product.image_url || '',
         description: product.description || '',
         quantity: qty,
-        note: '',
+        note: (product && product.note) || getNote(product.id, branchId) || '',
         is_promo_reward: isPromo,
         promotion_id: product.promotion_id || product.promo_id || null,
         reward_type: product.reward_type || null,
@@ -384,22 +384,35 @@
   }
 
   function setNote(productId, noteText, branchId) {
+    var normalizedNote = (noteText == null ? '' : String(noteText)).trim();
     var key = mutationScopeKey(branchId);
     var items = state.cart.items;
     var matchedItem = null;
     for (var i = 0; i < items.length; i++) {
       if (String(items[i].id) === String(productId) && (key === undefined || cartGroupKey(items[i]) === key)) {
-        items[i].note = noteText;
+        items[i].note = normalizedNote;
         matchedItem = items[i];
         break;
       }
     }
 
     var bScope = branchId !== undefined ? branchId : (matchedItem ? matchedItem.branch_id : null);
-    if (bScope !== undefined) {
-      state.notes[noteScopeKey(productId, bScope)] = noteText;
+    if (!normalizedNote) {
+      if (bScope !== undefined) {
+        delete state.notes[noteScopeKey(productId, bScope)];
+      }
+      if (branchId === undefined) {
+        delete state.notes[noteScopeKey(productId, null)];
+        delete state.notes[String(productId)];
+      }
+    } else {
+      if (bScope !== undefined) {
+        state.notes[noteScopeKey(productId, bScope)] = normalizedNote;
+      }
+      if (branchId === undefined) {
+        state.notes[String(productId)] = normalizedNote;
+      }
     }
-    state.notes[productId] = noteText;
     notify({ type: 'cart' });
     save(CART_KEY, state.cart);
     save(NOTES_KEY, state.notes);
@@ -408,9 +421,13 @@
   function getNote(productId, branchId) {
     var item = findCartItem(productId, branchId);
     if (item && item.note) return item.note;
-    var sKey = noteScopeKey(productId, branchId);
-    if (state.notes && state.notes[sKey] !== undefined) return state.notes[sKey];
-    if (state.notes && state.notes[productId] !== undefined) return state.notes[productId];
+    if (branchId !== undefined) {
+      var sKey = noteScopeKey(productId, branchId);
+      return (state.notes && state.notes[sKey]) || '';
+    }
+    var unassignedKey = noteScopeKey(productId, null);
+    if (state.notes && state.notes[unassignedKey]) return state.notes[unassignedKey];
+    if (state.notes && state.notes[String(productId)]) return state.notes[String(productId)];
     return '';
   }
 
