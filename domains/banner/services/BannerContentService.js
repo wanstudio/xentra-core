@@ -409,6 +409,75 @@ class BannerContentService {
     return this.repository.getBannerAggregate(brandId, bannerId);
   }
 
+  async discardDraft({ brandId, bannerId, actorId = null, actorRole = null }) {
+    const banner = this.repository.getBannerAggregate(brandId, bannerId);
+    if (!banner) {
+      const err = new Error('Banner tidak ditemukan.');
+      err.code = 'BANNER_NOT_FOUND';
+      throw err;
+    }
+
+    if (!banner.draft_revision) {
+      const err = new Error('Tidak ada Draft Revision yang dapat dibuang.');
+      err.code = 'DRAFT_NOT_FOUND';
+      throw err;
+    }
+
+    if (!banner.published_revision) {
+      const err = new Error('Banner belum pernah dipublish. Gunakan Hapus Draft untuk menghapus Banner baru.');
+      err.code = 'DISCARD_REQUIRES_PUBLISHED';
+      throw err;
+    }
+
+    const draftMediaId = banner.draft_revision.media_id;
+    const publishedMediaId = banner.published_revision.media_id;
+    const publishedRevisionId = banner.published_revision.id;
+    const draftRevisionId = banner.draft_revision.id;
+
+    this.repository.beginTransaction();
+    try {
+      this.repository.deleteDraftRevision(brandId, draftRevisionId);
+
+      if (draftMediaId && draftMediaId !== publishedMediaId) {
+        await this.media.unlinkMedia({
+          mediaId: draftMediaId,
+          brandId
+        });
+      } else if (draftMediaId === publishedMediaId) {
+        await this.media.attachToEntity({
+          mediaId: publishedMediaId,
+          brandId,
+          entityType: 'banner_content_revision',
+          entityId: publishedRevisionId
+        });
+      }
+
+      this.repository.touchBanner({
+        brandId,
+        bannerId,
+        updatedBy: actorId
+      });
+
+      this.repository.commitTransaction();
+    } catch (err) {
+      try { this.repository.rollbackTransaction(); } catch (_) {}
+      throw err;
+    }
+
+    this.writeSecurityAudit({
+      brandId,
+      actorId,
+      actorRole,
+      action: 'BANNER_CONTENT_DRAFT_DISCARDED',
+      metadata: {
+        banner_id: bannerId,
+        discarded_revision_id: draftRevisionId
+      }
+    });
+
+    return this.repository.getBannerAggregate(brandId, bannerId);
+  }
+
   async deleteDraft({ brandId, bannerId, actorId = null, actorRole = null }) {
     const banner = this.repository.getBannerAggregate(brandId, bannerId);
     if (!banner) {
