@@ -51,7 +51,7 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
         id, tenant_id, brand_id, uploaded_by, storage_key, mime_type,
         original_filename, width, height, size_bytes, asset_type, status,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'banner', 'ready', ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'banner', 'ready', ?, ?)
     `).run(
       TEST_PREFIX + 'media_1',
       'org_xentra_holding',
@@ -209,7 +209,7 @@ test('BANNER CONTENT DOMAIN — draft, revision and publish boundary', async (t)
         id, tenant_id, brand_id, uploaded_by, storage_key, mime_type,
         original_filename, width, height, size_bytes, asset_type, status,
         created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'banner', 'temporary', ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'banner', 'temporary', ?, ?)
     `).run(
       mediaId, 'org_xentra_holding', BRAND_ID, 'usr_bangjo_owner',
       'staging/' + BRAND_ID + '/temp.jpg', 'image/jpeg', 'temp.jpg',
