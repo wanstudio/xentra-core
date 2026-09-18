@@ -2151,10 +2151,11 @@
           sendBtn.textContent = 'Kirim Kode OTP';
           if (UI && UI.toast) UI.toast((res && res.message) || 'Gagal mengirim kode OTP.');
         }
-      }).catch(function () {
+      }).catch(function (err) {
         sendBtn.disabled = false;
         sendBtn.textContent = 'Kirim Kode OTP';
-        if (UI && UI.toast) UI.toast('Gagal mengirim kode OTP. Periksa koneksi Anda.');
+        var errMsg = (err && err.data && (err.data.message || err.data.error)) || (err && err.message) || 'Gagal mengirim kode OTP. Periksa koneksi Anda.';
+        if (UI && UI.toast) UI.toast(errMsg);
       });
     }
 
@@ -2268,10 +2269,11 @@
           if (UI && UI.toast) UI.toast((res && res.message) || 'Kode OTP tidak valid.');
           if (codeInput) { codeInput.value = ''; codeInput.focus(); }
         }
-      }).catch(function () {
+      }).catch(function (err) {
         verifyBtn.disabled = false;
         verifyBtn.textContent = 'Verifikasi';
-        if (UI && UI.toast) UI.toast('Gagal memverifikasi. Periksa koneksi Anda.');
+        var errMsg = (err && err.data && (err.data.message || err.data.error)) || (err && err.message) || 'Gagal memverifikasi. Periksa koneksi Anda.';
+        if (UI && UI.toast) UI.toast(errMsg);
       });
     }
 
@@ -2304,10 +2306,11 @@
           resendBtn.textContent = 'Kirim Ulang OTP';
           if (UI && UI.toast) UI.toast((res && res.message) || 'Gagal mengirim ulang OTP.');
         }
-      }).catch(function () {
+      }).catch(function (err) {
         resendBtn.disabled = false;
         resendBtn.textContent = 'Kirim Ulang OTP';
-        if (UI && UI.toast) UI.toast('Gagal mengirim ulang OTP. Periksa koneksi Anda.');
+        var errMsg = (err && err.data && (err.data.message || err.data.error)) || (err && err.message) || 'Gagal mengirim ulang OTP. Periksa koneksi Anda.';
+        if (UI && UI.toast) UI.toast(errMsg);
       });
     };
   }
