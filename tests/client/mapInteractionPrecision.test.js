@@ -237,3 +237,75 @@ test('MAP-05: Invariant canUpdateFromGps preserves explicit destination', () => 
   };
   assert.strictEqual(XentraLocation.canUpdateFromGps(nonExplicitDest), true, 'Non-explicit destination can receive GPS updates');
 });
+
+test('MAP-06: formatLocationMetadata extracts granular POI and structured road title without shifting coordinates', () => {
+  const { XentraLocationPicker } = setupTestEnvironment();
+  assert.ok(typeof XentraLocationPicker.formatLocationMetadata === 'function');
+
+  const coords = { lat: -5.39712, lng: 105.26685 };
+  const mockSearchBoxRes = {
+    title: 'MU Sweet & Bakery Pringsewu',
+    road: 'Jl. Jenderal Sudirman',
+    neighborhood: 'Pringsewu Barat',
+    locality: 'Pringsewu',
+    city: 'Kabupaten Pringsewu',
+    address: 'MU Sweet & Bakery Pringsewu, Jl. Jenderal Sudirman, Pringsewu Barat, Pringsewu',
+    provider: 'mapbox_searchbox'
+  };
+
+  const meta = XentraLocationPicker.formatLocationMetadata(mockSearchBoxRes, coords);
+  assert.strictEqual(meta.title, 'MU Sweet & Bakery Pringsewu', 'Granular POI name must be preferred as title');
+  assert.ok(meta.address.includes('Jl. Jenderal Sudirman'), 'Structured road must be included in formatted address');
+  assert.strictEqual(meta.provider, 'mapbox_searchbox');
+});
+
+test('MAP-07: formatLocationMetadata handles postal-code and administrative fallback gracefully', () => {
+  const { XentraLocationPicker } = setupTestEnvironment();
+
+  const coords = { lat: -5.39712, lng: 105.26685 };
+
+  // Case 1: First part is a numeric postal code (e.g. "35373, Pringsewu Timur, Kabupaten Pringsewu")
+  const postalFirstRes = {
+    address: { formatted_address: '35373, Pringsewu Timur, Kabupaten Pringsewu' },
+    provider: 'mapbox_geocoding_v6'
+  };
+  const meta1 = XentraLocationPicker.formatLocationMetadata(postalFirstRes, coords);
+  assert.strictEqual(meta1.title, 'Pringsewu Timur', 'Numeric postcode must be skipped in favor of meaningful address part');
+
+  // Case 2: Only pure postal code returned -> fallback to Titik Terpilih + coordinates
+  const lonePostalRes = {
+    address: { formatted_address: '35373' },
+    provider: 'mapbox_geocoding_v6'
+  };
+  const meta2 = XentraLocationPicker.formatLocationMetadata(lonePostalRes, coords);
+  assert.strictEqual(meta2.title, 'Titik Terpilih');
+  assert.strictEqual(meta2.address, 'Koordinat: -5.39712, 105.26685');
+
+  // Case 3: Empty or null response -> graceful fallback to coordinate display
+  const nullRes = null;
+  const meta3 = XentraLocationPicker.formatLocationMetadata(nullRes, coords);
+  assert.strictEqual(meta3.title, 'Titik Terpilih');
+  assert.strictEqual(meta3.address, 'Koordinat: -5.39712, 105.26685');
+});
+
+test('MAP-08: Coordinate authority is preserved and never shifted during reverse geocoding', () => {
+  const { XentraLocationPicker } = setupTestEnvironment();
+
+  const userExactCoords = { lat: -5.3971234, lng: 105.2668567 };
+  // Backend returns metadata from a centroid or nearest feature that might have slightly different coordinates
+  const backendRes = {
+    title: 'Warung Pojok',
+    road: 'Jl. Kenanga',
+    locality: 'Pringsewu',
+    city: 'Lampung',
+    address: 'Warung Pojok, Jl. Kenanga, Pringsewu',
+    provider: 'mapbox_searchbox'
+  };
+
+  const meta = XentraLocationPicker.formatLocationMetadata(backendRes, userExactCoords);
+  // Formatter must format metadata without altering user coordinates
+  assert.strictEqual(userExactCoords.lat, -5.3971234, 'User pin latitude must remain strictly unchanged');
+  assert.strictEqual(userExactCoords.lng, 105.2668567, 'User pin longitude must remain strictly unchanged');
+  assert.strictEqual(meta.title, 'Warung Pojok');
+});
+

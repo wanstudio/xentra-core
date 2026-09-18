@@ -48,6 +48,94 @@
     return 15.5;                       // Low accuracy (neighborhood level)
   }
 
+  // Authoritative location metadata parser for reverse geocoding responses.
+  // Guarantees exact coordinate preservation, extracts granular POI/street titles,
+  // formats structured address subparts, and handles administrative/postal fallbacks cleanly.
+  function formatLocationMetadata(res, coords) {
+    var lat = coords && (coords.lat != null ? Number(coords.lat) : Number(coords.latitude));
+    var lng = coords && (coords.lng != null ? Number(coords.lng) : Number(coords.longitude));
+    var coordFallbackAddr = (lat != null && lng != null && !isNaN(lat) && !isNaN(lng)) ?
+      ('Koordinat: ' + lat.toFixed(5) + ', ' + lng.toFixed(5)) : '';
+
+    if (!res) {
+      return {
+        title: 'Titik Terpilih',
+        address: coordFallbackAddr || 'Alamat Terpilih',
+        road: '',
+        neighborhood: '',
+        locality: '',
+        city: '',
+        provider: 'coordinate_fallback'
+      };
+    }
+
+    var full = (res && res.address && (res.address.formatted_address || res.address.display_name)) ||
+      (res && res.address_text) || '';
+
+    // Prefer structured title from backend Search Box Reverse / Geocoding v6
+    var resTitle = (res && res.title) || '';
+    if (resTitle && /^\d{4,6}$/.test(resTitle.trim())) resTitle = '';
+
+    // Prefer structured fields from Mapbox Geocoding v6, Search Box, or Nominatim
+    var road = (res && res.road) || (res && res.address && res.address.road) || '';
+    var neighborhood = (res && res.neighborhood) || (res && res.address && res.address.neighborhood) || '';
+    var locality = (res && res.locality) || (res && res.address && res.address.locality) || '';
+    var city = (res && res.city) || (res && res.address && res.address.city) || '';
+    var provider = (res && res.provider) || '';
+
+    // Guard: pure-numeric or postcode-only strings are not valid address titles
+    if (road && /^\d{4,6}$/.test(road.trim())) road = '';
+    if (neighborhood && /^\d{4,6}$/.test(neighborhood.trim())) neighborhood = '';
+
+    var title = '';
+    var addr = '';
+
+    if (resTitle) {
+      title = resTitle.trim();
+      var subParts = [
+        road && road !== resTitle ? road : '',
+        neighborhood && neighborhood !== road && neighborhood !== resTitle ? neighborhood : '',
+        locality,
+        city
+      ].filter(Boolean);
+      addr = subParts.length ? subParts.join(', ') : full;
+    } else if (road || neighborhood) {
+      title = (road || neighborhood).trim();
+      var subParts = [neighborhood !== road ? neighborhood : '', locality, city].filter(Boolean);
+      addr = subParts.length ? subParts.join(', ') : full;
+    } else if (full && !/^titik koordinat/i.test(full) && !/^lokasi terpilih/i.test(full)) {
+      var parts = full.split(',');
+      var firstPart = (parts[0] || '').trim();
+      var isPostcodeFirst = /^\d{4,6}$/.test(firstPart);
+      if (isPostcodeFirst && parts.length > 1) {
+        // Skip pure-numeric first parts (postal codes) — use next meaningful part
+        firstPart = (parts[1] || '').trim();
+        title = firstPart || 'Alamat Terpilih';
+        addr = [parts[0].trim()].concat(parts.slice(2)).join(',').trim() || full;
+      } else if (isPostcodeFirst) {
+        // Lone postal code is not an address title — degrade to coordinates
+        title = 'Titik Terpilih';
+        addr = coordFallbackAddr || full;
+      } else {
+        title = firstPart || 'Alamat Terpilih';
+        addr = parts.slice(1).join(',').trim() || full;
+      }
+    } else {
+      title = 'Titik Terpilih';
+      addr = coordFallbackAddr || 'Alamat Terpilih';
+    }
+
+    return {
+      title: title || 'Titik Terpilih',
+      address: addr || full || title || coordFallbackAddr,
+      road: road,
+      neighborhood: neighborhood,
+      locality: locality,
+      city: city,
+      provider: provider
+    };
+  }
+
   // Dynamic Mapbox GL JS & CSS Loader
   function loadMapboxGL() {
     return new Promise(function (resolve, reject) {
@@ -584,15 +672,15 @@
         API.get('/delivery/reverse-geocode?lat=' + lat + '&lng=' + lng)
           .then(function (res) {
             if (gpsDesc) gpsDesc.textContent = 'Deteksi otomatis via GPS perangkat';
-            var addrText = (res && res.address && (res.address.formatted_address || res.address.display_name)) ||
-              (res && res.address_text) || 'Lokasi Saya Saat Ini';
+            var meta = formatLocationMetadata(res, { lat: lat, lng: lng });
 
             // Open Detail / Confirmation (GPS MUST NOT auto-create favorite)
             openAddressDetailSheet({
-              address: addrText,
+              title: meta.title,
+              address: meta.address,
               latitude: lat,
               longitude: lng,
-              label: 'Lokasi Sekarang',
+              label: meta.title && meta.title !== 'Titik Terpilih' ? meta.title : 'Lokasi Sekarang',
               detail: '',
               source: 'gps',
               isFavorite: false,
@@ -601,8 +689,10 @@
           })
           .catch(function () {
             if (gpsDesc) gpsDesc.textContent = 'Deteksi otomatis via GPS perangkat';
+            var meta = formatLocationMetadata(null, { lat: lat, lng: lng });
             openAddressDetailSheet({
-              address: 'Koordinat: ' + lat.toFixed(5) + ', ' + lng.toFixed(5),
+              title: meta.title,
+              address: meta.address,
               latitude: lat,
               longitude: lng,
               label: 'Lokasi Sekarang',
@@ -1099,69 +1189,20 @@
       API.get('/delivery/reverse-geocode?lat=' + coords.lat + '&lng=' + coords.lng)
         .then(function (res) {
           if (currentSeq !== revGeocodeSeq) return; // Discard superseded reply
-          var full = (res && res.address && (res.address.formatted_address || res.address.display_name)) ||
-            (res && res.address_text) || '';
-          
-          var title = '';
-          var addr = '';
+          var meta = formatLocationMetadata(res, coords);
 
-          // Prefer structured title from backend Search Box Reverse / Geocoding v6
-          var resTitle = (res && res.title) || '';
-          if (resTitle && /^\d{4,6}$/.test(resTitle.trim())) resTitle = '';
-
-          // Prefer structured fields from Mapbox Geocoding v6 or Nominatim
-          var road = (res && res.road) || (res && res.address && res.address.road) || '';
-          var neighborhood = (res && res.neighborhood) || (res && res.address && res.address.neighborhood) || '';
-          var locality = (res && res.locality) || (res && res.address && res.address.locality) || '';
-          var city = (res && res.city) || (res && res.address && res.address.city) || '';
-
-          // Guard: pure-numeric or postcode-only strings are not valid address titles
-          if (road && /^\d{4,6}$/.test(road.trim())) road = '';
-          if (neighborhood && /^\d{4,6}$/.test(neighborhood.trim())) neighborhood = '';
-
-          if (resTitle) {
-            title = resTitle.trim();
-            var subParts = [road && road !== resTitle ? road : '', neighborhood && neighborhood !== road && neighborhood !== resTitle ? neighborhood : '', locality, city].filter(Boolean);
-            addr = subParts.length ? subParts.join(', ') : full;
-          } else if (road || neighborhood) {
-            title = (road || neighborhood).trim();
-            var subParts = [neighborhood !== road ? neighborhood : '', locality, city].filter(Boolean);
-            addr = subParts.length ? subParts.join(', ') : full;
-          } else if (full && !/^titik koordinat/i.test(full) && !/^lokasi terpilih/i.test(full)) {
-            var parts = full.split(',');
-            var firstPart = (parts[0] || '').trim();
-            var isPostcodeFirst = /^\d{4,6}$/.test(firstPart);
-            if (isPostcodeFirst && parts.length > 1) {
-              // Skip pure-numeric first parts (postal codes) — use next meaningful part
-              firstPart = (parts[1] || '').trim();
-              title = firstPart || 'Alamat Terpilih';
-              addr = [parts[0].trim()].concat(parts.slice(2)).join(',').trim() || full;
-            } else if (isPostcodeFirst) {
-              // Lone postal code is not an address title — degrade to coordinates.
-              title = 'Titik Terpilih';
-              addr = 'Koordinat: ' + Number(coords.lat).toFixed(5) + ', ' + Number(coords.lng).toFixed(5);
-            } else {
-              title = firstPart || 'Alamat Terpilih';
-              addr = parts.slice(1).join(',').trim() || full;
-            }
-          } else {
-            title = 'Titik Terpilih';
-            addr = 'Koordinat: ' + Number(coords.lat).toFixed(5) + ', ' + Number(coords.lng).toFixed(5);
-          }
-
-          if (titleEl) titleEl.textContent = title;
-          if (addrEl) addrEl.textContent = addr;
-          if (badgeEl) badgeEl.textContent = title;
-          if (typeof onResolved === 'function') onResolved({ title: title, address: addr || full || title });
+          if (titleEl) titleEl.textContent = meta.title;
+          if (addrEl) addrEl.textContent = meta.address;
+          if (badgeEl) badgeEl.textContent = meta.title;
+          if (typeof onResolved === 'function') onResolved(meta);
         })
         .catch(function () {
           if (currentSeq !== revGeocodeSeq) return;
-          var fallbackTitle = 'Titik Terpilih';
-          var fallbackAddr = 'Koordinat: ' + Number(coords.lat).toFixed(5) + ', ' + Number(coords.lng).toFixed(5);
-          if (titleEl) titleEl.textContent = fallbackTitle;
-          if (addrEl) addrEl.textContent = fallbackAddr;
-          if (badgeEl) badgeEl.textContent = fallbackTitle;
-          if (typeof onResolved === 'function') onResolved({ title: fallbackTitle, address: fallbackAddr });
+          var meta = formatLocationMetadata(null, coords);
+          if (titleEl) titleEl.textContent = meta.title;
+          if (addrEl) addrEl.textContent = meta.address;
+          if (badgeEl) badgeEl.textContent = meta.title;
+          if (typeof onResolved === 'function') onResolved(meta);
         });
     }, 400);
   }
@@ -1871,7 +1912,8 @@
     openDetail: openAddressDetailSheet,
     updateBar: updateHomeLocationBar,
     haversineMeters: haversineMeters,
-    calculateZoomFromAccuracy: calculateZoomFromAccuracy
+    calculateZoomFromAccuracy: calculateZoomFromAccuracy,
+    formatLocationMetadata: formatLocationMetadata
   };
 
   // Auto-init bar update when store changes
