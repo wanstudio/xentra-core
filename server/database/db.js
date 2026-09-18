@@ -1029,6 +1029,60 @@ function initSchema(targetDb) {
     CREATE INDEX IF NOT EXISTS idx_pbs_branch_active ON promotion_branch_scope(branch_id, is_active);
     CREATE INDEX IF NOT EXISTS idx_pbs_brand_branch ON promotion_branch_scope(brand_id, branch_id);
 
+    /* =====================================================================
+       STOREFRONT BANNER CONTENT DOMAIN
+       Content/publication only. Placement/assignment/schedule/active state
+       intentionally live in a separate branch-scoped assignment boundary.
+       ===================================================================== */
+    CREATE TABLE IF NOT EXISTS storefront_banners (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      publication_status TEXT NOT NULL DEFAULT 'DRAFT'
+        CHECK (publication_status IN ('DRAFT', 'PUBLISHED')),
+      created_by TEXT,
+      updated_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS storefront_banner_revisions (
+      id TEXT PRIMARY KEY,
+      banner_id TEXT NOT NULL,
+      revision_number INTEGER NOT NULL,
+      revision_status TEXT NOT NULL DEFAULT 'DRAFT'
+        CHECK (revision_status IN ('DRAFT', 'PUBLISHED')),
+      title TEXT NOT NULL DEFAULT '',
+      alt_text TEXT NOT NULL DEFAULT '',
+      media_id TEXT NOT NULL,
+      cta_type TEXT NOT NULL DEFAULT 'NONE'
+        CHECK (cta_type IN ('NONE', 'PROMOTION', 'PRODUCT', 'CATEGORY', 'URL')),
+      cta_target_id TEXT,
+      cta_url TEXT,
+      promotion_id TEXT,
+      created_by TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      published_at TEXT,
+      FOREIGN KEY (banner_id) REFERENCES storefront_banners(id) ON DELETE CASCADE,
+      UNIQUE (banner_id, revision_number)
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_storefront_banner_one_draft
+      ON storefront_banner_revisions(banner_id)
+      WHERE revision_status = 'DRAFT';
+
+    CREATE INDEX IF NOT EXISTS idx_storefront_banner_brand
+      ON storefront_banners(brand_id, updated_at);
+
+    CREATE INDEX IF NOT EXISTS idx_storefront_banner_revision_banner
+      ON storefront_banner_revisions(banner_id, revision_number DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_storefront_banner_revision_media
+      ON storefront_banner_revisions(media_id);
+
+
+
     CREATE TABLE IF NOT EXISTS branch_categories (
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
