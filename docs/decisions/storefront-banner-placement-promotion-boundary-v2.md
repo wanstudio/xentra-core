@@ -250,6 +250,202 @@ Where relevant, evidence should preserve:
 
 Human-readable presentation belongs to the established semantic log/read-model layer; raw IDs and internal constants are not the primary customer/merchant activity sentence.
 
+## 🔒 Locked Update — Banner Publication, Scheduling & Visibility Lifecycle v1
+
+**Decision date:** 2026-09-18  
+**Status:** LOCKED / AUTHORITATIVE  
+**Applies to:** Banner Content publication + Banner Assignment visibility
+
+Xentra adopts a social-publishing-style lifecycle for Banner, while keeping Banner Content and Banner Assignment/Placement as separate concepts.
+
+### Publication boundary
+
+A Banner Content item must support a review boundary before it becomes customer-visible.
+
+```text
+CREATE
+  ↓
+DRAFT
+  ↓
+REVIEW / PREVIEW
+  ↓
+PUBLISH NOW
+      or
+SCHEDULE PUBLISH
+  ↓
+PUBLISHED
+```
+
+- **DRAFT** means the content/revision is not customer-visible.
+- **PUBLISHED** means the current content/revision has crossed the publication boundary and may become customer-visible according to its Assignment and visibility controls.
+- Publishing may happen immediately (**Publish Now**) or by a future schedule (**Schedule Publish**).
+- There is no mandatory human approval chain in v1. The review step is a product workflow boundary before Publish; Owner may review the preview and then publish.
+- Editing an already-published Banner must not silently change the customer-visible version. Changes to published content must be represented as a draft revision/change set and become customer-visible only when the updated revision is explicitly published.
+
+### Schedule is optional
+
+Scheduling is not a required mode.
+
+**Without a schedule:**
+
+```text
+PUBLISHED + Active ON  → customer-visible
+PUBLISHED + Active OFF → not customer-visible (paused)
+```
+
+**With a schedule:**
+
+```text
+PUBLISHED + Active ON
+  + now < starts_at
+  → SCHEDULED
+
+PUBLISHED + Active ON
+  + starts_at <= now
+  + (ends_at is null OR now < ends_at)
+  → ACTIVE
+
+PUBLISHED + Active ON
+  + ends_at is not null
+  + now >= ends_at
+  → ENDED
+```
+
+`starts_at` is required when scheduling is used. `ends_at` is optional. A schedule with no `ends_at` remains eligible indefinitely after `starts_at`, subject to the Active control.
+
+### Branch timezone
+
+Schedule input and customer-facing schedule evaluation use the target **Branch timezone**.
+
+Persisted timestamps may use the system's canonical timestamp representation, but the effective schedule must be interpreted in the assigned Branch's timezone.
+
+### Active = pause / play visibility control
+
+`active` is a manual visibility control on the Banner Assignment.
+
+- `active = true` means the assignment is allowed to be visible when publication and schedule conditions are satisfied.
+- `active = false` means the assignment is paused and must not be customer-visible.
+- Turning Active OFF does not unpublish or delete the Banner.
+- Turning Active ON resumes the assignment subject to the current publication state and schedule.
+
+Active is therefore **not** a substitute for Publish.
+
+### Effective status
+
+The dashboard may present a derived status such as:
+
+```text
+DRAFT
+SCHEDULED
+ACTIVE
+PAUSED
+ENDED
+```
+
+These labels are derived from publication state, Active state, schedule, and current Branch-local time. They are not all separate mutable database states.
+
+Recommended precedence:
+
+```text
+Not published                 → DRAFT
+Published + Active OFF        → PAUSED
+Published + Active ON + future start → SCHEDULED
+Published + Active ON + active window → ACTIVE
+Published + Active ON + end reached → ENDED
+```
+
+`ENDED` is a schedule condition, not deletion and not permanent retirement of the Banner.
+
+### Ended Banner is reusable
+
+When a schedule reaches `ends_at`, the Banner and Assignment record remain stored.
+
+The record becomes effectively non-visible for the expired schedule, but may be reused by:
+
+- editing its schedule to a new visibility window;
+- removing the schedule and using it as an unscheduled Banner;
+- publishing a new content revision when content changes;
+- changing its Active state.
+
+An ended Banner must not be automatically deleted merely because its visibility window has finished.
+
+### Position conflict with scheduling
+
+Position ordering remains explicit.
+
+For the same:
+
+```text
+Branch + Placement + Position
+```
+
+two assignments may use the same position at different non-overlapping schedule windows.
+
+A scheduling/publish/activate/resume mutation must be rejected when it would create an effective visibility overlap at the same Branch, Placement, and Position.
+
+Draft content may be prepared without consuming a customer-visible position. A paused assignment does not produce current customer visibility, but re-activation/resume must re-run the conflict check before becoming visible.
+
+Do not auto-shift positions or silently replace another Banner. Return an explicit conflict so the Owner can choose the intended placement/schedule.
+
+### Customer visibility invariant
+
+Customer visibility requires all of the following:
+
+```text
+Published content
++
+Authorized Assignment
++
+Active = true
++
+Schedule is absent OR current Branch-local time is inside the schedule window
+```
+
+A Banner that is merely drafted, merely scheduled but not yet started, paused, or past its end time must not be treated as customer-visible.
+
+### Lifecycle examples
+
+**Evergreen Banner:**
+
+```text
+Publish Now
+→ Active ON
+→ no schedule
+→ customer-visible until Owner pauses it
+```
+
+**Ramadan Banner:**
+
+```text
+Draft
+→ Review / Preview
+→ Schedule Publish
+→ starts_at = Ramadan start
+→ ends_at = Ramadan end
+→ Branch timezone
+→ Active ON
+→ automatic customer visibility during the window
+→ ENDED after end time
+→ record remains reusable
+```
+
+**Temporary pause:**
+
+```text
+ACTIVE
+→ Active OFF
+→ PAUSED
+→ Active ON
+→ returns to the applicable schedule state
+```
+
+### Lifecycle non-goals
+
+- No automatic deletion after `ends_at`.
+- No requirement to create a new Banner record for every seasonal campaign.
+- No scheduler worker is required merely to flip a persisted state from SCHEDULED to ACTIVE; effective visibility may be calculated from timestamps and Branch timezone.
+- No silent position shifting or replacement on conflict.
+
 ## Legacy infrastructure reconciliation
 
 The existing Brand-level `brands.banners` path is **legacy infrastructure and must not be silently deleted or reinterpreted**.
