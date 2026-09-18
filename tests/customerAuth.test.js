@@ -571,3 +571,67 @@ test('SEC-20: Unauthenticated checkout returns CUSTOMER_AUTH_REQUIRED, while inv
   assert.strictEqual(invalidTokenData.error, 'INVALID_OR_EXPIRED_CUSTOMER_SESSION');
 });
 
+test('SEC-21: Returning customer with existing valid session creates multiple consecutive orders WITHOUT re-OTP', async () => {
+  addTestBranch('branch_sec_21');
+  const phone = '089000000021';
+  // Step 1: Customer authenticates ONCE with WhatsApp OTP
+  const token = await createCustomerSession(phone);
+  assert.ok(token, 'authenticated session token must be issued');
+
+  // Step 2: First order created using existing session token
+  const res1 = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { 'x-customer-token': token },
+    body: JSON.stringify({
+      branch_id: 'branch_sec_21',
+      payment_method: 'cash',
+      customer: { name: 'Returning Customer', phone },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+  assert.strictEqual(res1.status, 201, 'first order succeeds with existing valid session');
+  const data1 = await res1.json();
+  assert.ok(data1.order_id);
+
+  // Step 3: Second order created subsequently with the SAME existing session token (NO new OTP required)
+  const res2 = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { 'x-customer-token': token },
+    body: JSON.stringify({
+      branch_id: 'branch_sec_21',
+      payment_method: 'cash',
+      customer: { name: 'Returning Customer', phone },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 2 }]
+    })
+  });
+  assert.strictEqual(res2.status, 201, 'second order also succeeds immediately without re-OTP');
+  const data2 = await res2.json();
+  assert.ok(data2.order_id);
+  assert.notStrictEqual(data1.order_id, data2.order_id, 'must be two distinct orders');
+});
+
+test('SEC-22: Invalid or expired customer session cannot initiate Midtrans payment commit', async () => {
+  addTestBranch('branch_sec_22');
+  const invalidToken = 'xnt_cust_expired_fake_999999';
+
+  const res = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { 'x-customer-token': invalidToken },
+    body: JSON.stringify({
+      branch_id: 'branch_sec_22',
+      payment_method: 'midtrans',
+      customer: { name: 'Payment Attempter', phone: '089000000022' },
+      order_type: 'pickup',
+      items: [{ id: '272', quantity: 1 }]
+    })
+  });
+
+  assert.strictEqual(res.status, 401, 'unauthenticated/expired session must fail closed at 401');
+  const data = await res.json();
+  assert.strictEqual(data.error, 'INVALID_OR_EXPIRED_CUSTOMER_SESSION');
+  assert.strictEqual(data.snap_token, undefined, 'no snap_token or payment intent may be created');
+  assert.strictEqual(data.order_id, undefined, 'no order_id may be generated');
+});
+

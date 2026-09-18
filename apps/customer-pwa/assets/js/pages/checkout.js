@@ -2105,10 +2105,10 @@
   function renderOtpPhoneStep(phone, name, onSuccess) {
     var sh = makeOverlay(
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
-        '<h3 class="x-alt-sheet-title" style="margin:0;">Verifikasi Nomor WhatsApp</h3>' +
+        '<h3 class="x-alt-sheet-title" style="margin:0;">Masuk dengan WhatsApp</h3>' +
         '<button type="button" class="x-otp-close-btn" style="background:none;border:0;font-size:24px;color:#9ca3af;cursor:pointer;line-height:1;padding:4px 8px;">&times;</button>' +
       '</div>' +
-      '<div style="font-size:13px;color:#6b7280;margin-bottom:12px;">Masukkan nomor WhatsApp aktif untuk menerima kode verifikasi.</div>' +
+      '<div style="font-size:13px;color:#6b7280;margin-bottom:12px;">Masukkan nomor WhatsApp aktif Anda untuk masuk dan melanjutkan pesanan.</div>' +
       '<form id="x-otp-phone-form" action="javascript:void(0);" style="margin:0;padding:0;">' +
         '<div class="x-alt-sheet-label">Nama Lengkap</div>' +
         '<input type="text" id="x-otp-input-name" class="x-alt-input" placeholder="Contoh: Budi Santoso" value="' + UI.escape(name) + '" enterkeyhint="next" autocomplete="name">' +
@@ -2632,7 +2632,7 @@
         Store.clearCustomerSession();
       }
       if (UI && UI.toast) {
-        UI.toast('Sesi otentikasi berakhir. Silakan verifikasi nomor WhatsApp Anda kembali.');
+        UI.toast('Sesi Anda telah berakhir. Silakan masuk lagi dengan WhatsApp untuk melanjutkan.');
       }
       // Step 2: Open customer authentication sheet with automatic retry on success
       openCustomerAuthSheet(function () {
@@ -2849,7 +2849,7 @@
           Store.clearCustomerSession();
         }
         if (UI && UI.toast) {
-          UI.toast('Sesi otentikasi berakhir. Silakan verifikasi nomor WhatsApp Anda kembali.');
+          UI.toast('Sesi Anda telah berakhir. Silakan masuk lagi dengan WhatsApp untuk melanjutkan.');
         }
         openCustomerAuthSheet(function () {
           setTimeout(function () {

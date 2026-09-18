@@ -438,3 +438,46 @@ test('CVG-09: cart preserved on verify failure', async () => {
     assert.deepStrictEqual(after, before, 'cart must be preserved after verify failure');
   } finally { g.cleanup(); }
 });
+
+// ---------------------------------------------------------------------------
+// CVG-10: state preservation — branch context, orderType, destination, and notes
+//         are strictly preserved on auth invalidation / re-login
+// ---------------------------------------------------------------------------
+test('CVG-10: branch, orderType, destination, and notes preserved across auth failure', async () => {
+  const g = mkHarness({ token: 'xnt_cust_stale_010', branch: 'branch_cvg10' });
+  try {
+    // Set custom order type and active destination in store
+    g.Store.setOrderType('delivery');
+    g.Store.setActiveDestination({
+      address: 'Jl. Melati No. 45',
+      latitude: -7.28,
+      longitude: 112.72,
+      label: 'Kantor',
+      detail: 'Lantai 2'
+    });
+    g.Store.setOrderContext('delivery', { note: 'Jangan pakai sambal' });
+
+    const storeBefore = g.Store.getState();
+    assert.strictEqual(storeBefore.orderType, 'delivery');
+    assert.strictEqual(storeBefore.activeDestination.address, 'Jl. Melati No. 45');
+    assert.strictEqual(storeBefore.orderContext.delivery.note, 'Jangan pakai sambal');
+
+    g.submitBtn.onclick();
+    await g.flush();
+
+    const vi = g.postIdx('/checkout/verify');
+    assert.ok(vi >= 0);
+
+    // Verify reports expired customer session (401)
+    g.rejectPost(vi, 401, { error: 'INVALID_OR_EXPIRED_CUSTOMER_SESSION', message: 'Sesi akun customer Anda tidak valid atau telah kedaluwarsa.' });
+    await g.flush();
+
+    // Verify that session was cleared from Store, but all transaction context was preserved
+    const storeAfter = g.Store.getState();
+    assert.strictEqual(storeAfter.customerSession, null, 'stale customerSession must be cleared');
+    assert.strictEqual(storeAfter.orderType, 'delivery', 'orderType must be preserved');
+    assert.strictEqual(storeAfter.activeDestination.address, 'Jl. Melati No. 45', 'destination address must be preserved');
+    assert.strictEqual(storeAfter.orderContext.delivery.note, 'Jangan pakai sambal', 'fulfillment note must be preserved');
+    assert.deepStrictEqual(storeAfter.cart.items, storeBefore.cart.items, 'cart items must be preserved');
+  } finally { g.cleanup(); }
+});
