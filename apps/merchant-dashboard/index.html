@@ -436,53 +436,28 @@
 
           </div>
 
-          <!-- Panel: Banner Promo Carousel -->
+          <!-- Legacy Banner Infrastructure Notice -->
           <div class="x-card-panel" style="grid-column: 1 / -1; margin-top: 18px;">
             <div class="x-panel-header">
-              <h3>🖼️ Banner Promo Carousel</h3>
-              <p>Kelola slide banner yang tampil bergulir otomatis di halaman utama pelanggan</p>
+              <h3>🖼️ Banner Storefront</h3>
+              <p>Manajemen Banner sekarang dipusatkan di Marketing → Banners.</p>
             </div>
-
-            <!-- Guideline Specs Box -->
-            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 14px 16px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 12px;">
-              <span style="font-size: 20px;">💡</span>
-              <div style="font-size: 13px; color: #166534; line-height: 1.5;">
-                <strong>Panduan Spesifikasi Gambar Banner:</strong><br>
-                • Maksimal <strong>5 slide</strong> per restoran.<br>
-                • Ukuran proporsional: <strong>350 × 180 px</strong> (rasio ~1.94:1).<br>
-                • Ukuran file: Maksimal <strong>1 MB</strong> per gambar (format JPG/PNG/WebP).<br>
-                • Banner bergulir otomatis setiap <strong>5 detik</strong> (repeat seamless).
+            <div class="x-marketing-banner-legacy-settings-notice">
+              <div>
+                <strong>Gunakan menu Marketing → Banners</strong>
+                <p>
+                  Banner Content, Publish, CTA, penempatan cabang, position, Active/Pause,
+                  jadwal, dan governance lock dikelola dari satu surface agar tidak ada
+                  dua sumber perubahan yang saling bertentangan.
+                </p>
               </div>
+              <button type="button" class="x-btn-primary" onclick="navigateTo('marketing/banners')">
+                Buka Banner Management
+              </button>
             </div>
-
-            <!-- Add Banner Form -->
-            <form id="form-add-banner" style="margin-bottom: 20px;">
-              <div class="x-image-upload-control" style="margin-bottom: 12px;">
-                <div class="x-image-upload-preview-box is-banner" id="banner-preview-box" onclick="document.getElementById('input-banner-file').click()" style="cursor:pointer;" title="Klik untuk pilih banner">
-                  <img id="banner-upload-preview" src="" alt="Preview Banner" style="display:none;">
-                  <div id="banner-upload-empty" class="x-image-upload-empty">🖼️</div>
-                </div>
-                <div class="x-image-upload-info">
-                  <div class="x-image-upload-actions">
-                    <label for="input-banner-file" class="x-btn-secondary" id="btn-banner-pick" role="button" tabindex="0" style="font-size:12px;padding:6px 12px;cursor:pointer;">📁 Pilih File Banner</label>
-                    <button type="button" class="x-btn-secondary" id="btn-banner-clear" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Batal Pilih</button>
-                  </div>
-                  <input type="file" id="input-banner-file" accept="image/jpeg,image/png,image/webp" class="x-file-input-hidden">
-                  <input type="hidden" id="input-banner-url" value="">
-                  <div class="x-image-specs-text">JPG, PNG, WebP · Maks. 20 MB · Rasio ±1.94:1 · Rekomendasi 350 × 180 px</div>
-                </div>
-              </div>
-              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                <input type="text" id="input-banner-title" class="x-input" placeholder="Judul / Promo (Opsional)" style="flex: 1; min-width: 200px;">
-                <button type="submit" class="x-btn-primary" id="btn-submit-banner" style="white-space: nowrap;">
-                  <span>＋ Tambah Banner</span>
-                </button>
-              </div>
-            </form>
-
-            <!-- Banners List Grid -->
-            <div id="dash-banners-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px;">
-              <!-- Dynamic banner items injected by dashboard.js -->
+            <div class="x-marketing-banner-legacy-footnote">
+              Infrastruktur `brands.banners` lama tetap dipertahankan selama fase rekonsiliasi.
+              Jangan gunakan surface legacy ini untuk membuat atau mengedit Banner baru.
             </div>
           </div>
 
