@@ -3239,6 +3239,51 @@ input[type="file"].x-input,
   margin-bottom: 2px;
 }
 
+
+.x-marketing-banner-legacy-settings-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  background: #f8fafc;
+  border-radius: 10px;
+}
+
+.x-marketing-banner-legacy-settings-notice strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text-main);
+}
+
+.x-marketing-banner-legacy-settings-notice p {
+  margin: 4px 0 0;
+  max-width: 720px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.x-marketing-banner-legacy-footnote {
+  margin-top: 10px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+@media (max-width: 720px) {
+  .x-marketing-banner-legacy-settings-notice {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .x-marketing-banner-legacy-settings-notice .x-btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .x-marketing-banner-legacy-notice {
   padding: 10px 20px;
   border-bottom: 1px solid #fde68a;
