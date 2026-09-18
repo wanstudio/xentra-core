@@ -262,7 +262,7 @@ class BannerContentRepository {
     `, [publicationStatus, updatedBy, now, bannerId, brandId]);
   }
 
-  deleteBannerForTestOnly(brandId, bannerId) {
+  deleteBanner(brandId, bannerId) {
     return this.db.execute(
       'DELETE FROM storefront_banners WHERE id = ? AND brand_id = ?',
       [bannerId, brandId]
