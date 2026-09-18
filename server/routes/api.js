@@ -9629,6 +9629,28 @@ router.post('/admin/marketing/banners/:bannerId/publish', requireAuth(['owner', 
   }
 });
 
+router.post('/admin/marketing/banners/:bannerId/discard-draft', requireAuth(['owner', 'brand_manager']), async (req, res) => {
+  try {
+    const actor = bannerActor(req);
+    const banner = await bannerContentService.discardDraft({
+      brandId: req.brand_id,
+      bannerId: req.params.bannerId,
+      actorId: actor.id,
+      actorRole: actor.role
+    });
+    res.json({ success: true, banner });
+  } catch (err) {
+    const status = err.code === 'BANNER_NOT_FOUND' || err.code === 'DRAFT_NOT_FOUND' ? 404
+      : err.code === 'DISCARD_REQUIRES_PUBLISHED' ? 409
+      : 400;
+    res.status(status).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'BANNER_DISCARD_DRAFT_ERROR'
+    });
+  }
+});
+
 router.delete('/admin/marketing/banners/:bannerId', requireAuth(['owner', 'brand_manager']), async (req, res) => {
   try {
     const actor = bannerActor(req);
