@@ -6491,7 +6491,7 @@ router.get('/admin/branches', requireAuth(['owner', 'brand_manager']), (req, res
   try {
     const branches = db.prepare(`
       SELECT 
-        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived,
+        b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived, b.timezone,
         s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order,
         (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id) AS total_orders,
         (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id AND o.status IN ('pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery')) AS active_orders
@@ -6633,7 +6633,7 @@ router.get('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
 
     const branch = db.prepare(`
       SELECT 
-        b.id, b.brand_id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived,
+        b.id, b.brand_id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone, b.whatsapp_number, b.is_active, b.is_open_override, b.is_archived, b.timezone,
         b.created_at, b.updated_at,
         s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order,
         (SELECT COUNT(*) FROM branch_products bp WHERE bp.branch_id = b.id) AS adopted_products_count,
@@ -6698,6 +6698,33 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         error: 'Cabang tidak ditemukan pada brand ini.'
       });
     }
+
+    let normalizedTimezone = timezone === undefined
+      ? (existingBranch.timezone || 'Asia/Jakarta')
+      : String(timezone || '').trim();
+
+    if (!normalizedTimezone) normalizedTimezone = 'Asia/Jakarta';
+
+    if (timezone !== undefined) {
+      try {
+        new Intl.DateTimeFormat('en-US', { timeZone: normalizedTimezone }).format(new Date());
+      } catch (_) {
+        return res.status(400).json({
+          success: false,
+          error: 'Timezone cabang tidak valid. Gunakan IANA timezone seperti Asia/Jakarta.'
+        });
+      }
+    }
+
+    if (req.user.role === 'branch_manager' &&
+        timezone !== undefined &&
+        normalizedTimezone !== (existingBranch.timezone || 'Asia/Jakarta')) {
+      return res.status(403).json({
+        success: false,
+        error: 'Branch Manager tidak berwenang mengubah timezone cabang.'
+      });
+    }
+
     const existingSettings = db.prepare(`
       SELECT free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount
       FROM branch_delivery_settings WHERE branch_id = ?
@@ -6757,6 +6784,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
             whatsapp_number = COALESCE(?, whatsapp_number),
             is_active = COALESCE(?, is_active),
             is_open_override = COALESCE(?, is_open_override),
+            timezone = COALESCE(?, timezone),
             updated_at = datetime('now')
         WHERE id = ? AND brand_id = ?
       `).run(
@@ -6768,6 +6796,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         targetWa !== undefined ? targetWa : null,
         providedIsActive,
         providedIsOpenOverride,
+        timezone !== undefined ? normalizedTimezone : null,
         req.params.id,
         req.brand_id
       );
@@ -6829,7 +6858,8 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         { field: 'phone', prev: existingBranch.phone, next: targetPhone !== undefined ? String(targetPhone) : existingBranch.phone, isNum: false },
         { field: 'whatsapp_number', prev: existingBranch.whatsapp_number || null, next: targetWa !== undefined ? String(targetWa) : (existingBranch.whatsapp_number || null), isNum: false },
         { field: 'is_active', prev: existingBranch.is_active, next: providedIsActive !== null ? providedIsActive : existingBranch.is_active, isNum: true },
-        { field: 'is_open_override', prev: prevOpen, next: providedIsOpenOverride !== null ? providedIsOpenOverride : prevOpen, isNum: true }
+        { field: 'is_open_override', prev: prevOpen, next: providedIsOpenOverride !== null ? providedIsOpenOverride : prevOpen, isNum: true },
+        { field: 'timezone', prev: existingBranch.timezone || 'Asia/Jakarta', next: timezone !== undefined ? normalizedTimezone : (existingBranch.timezone || 'Asia/Jakarta'), isNum: false }
       ];
 
       const hadSettingsRow = Boolean(db.prepare('SELECT 1 FROM branch_delivery_settings WHERE branch_id = ?').get(req.params.id));
@@ -6876,7 +6906,8 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
       branch: {
         id: existingBranch.id,
         is_active: providedIsActive !== null ? providedIsActive : existingBranch.is_active,
-        is_open_override: providedIsOpenOverride !== null ? providedIsOpenOverride : (existingBranch.is_open_override == null ? 1 : existingBranch.is_open_override)
+        is_open_override: providedIsOpenOverride !== null ? providedIsOpenOverride : (existingBranch.is_open_override == null ? 1 : existingBranch.is_open_override),
+        timezone: timezone !== undefined ? normalizedTimezone : (existingBranch.timezone || 'Asia/Jakarta')
       }
     });
   } catch (err) {
