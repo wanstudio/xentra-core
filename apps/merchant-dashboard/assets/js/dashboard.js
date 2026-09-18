@@ -7904,9 +7904,11 @@
   function clearMarketingBannerMedia() {
     _marketingBannerEditor.mediaFile = null;
     _marketingBannerEditor.mediaId = _marketingBannerEditor.detail
-      ? (_marketingBannerEditor.detail.published_revision
-        ? _marketingBannerEditor.detail.published_revision.media_id
-        : null)
+      ? (_marketingBannerEditor.detail.draft_revision
+        ? _marketingBannerEditor.detail.draft_revision.media_id
+        : (_marketingBannerEditor.detail.published_revision
+          ? _marketingBannerEditor.detail.published_revision.media_id
+          : null))
       : null;
     _marketingBannerEditor.cropSpec = null;
     var file = $('mkt-banner-file');
@@ -8245,6 +8247,11 @@
         _marketingBannerEditor.bannerId = banner.id;
 
         var placementPayload = getMarketingBannerPlacementPayload();
+        if (!placementPayload.branch_ids.length &&
+            (placementPayload.starts_at_local || placementPayload.ends_at_local)) {
+          throw new Error('Jadwal tayang membutuhkan minimal satu cabang target.');
+        }
+
         if (placementPayload.branch_ids.length) {
           var assignRes = await adminFetch(
             API_BASE + '/admin/marketing/banners/' + encodeURIComponent(banner.id) + '/assignments/bulk',
