@@ -335,7 +335,7 @@ const RateLimiter = {
   }
 };
 
-router.post('/auth/otp/send', (req, res) => {
+router.post('/auth/otp/send', async (req, res) => {
   const { phone } = req.body;
   if (!phone || !phone.trim()) {
     return res.status(400).json({ success: false, error: 'Nomor WhatsApp / telepon wajib diisi.' });
@@ -358,6 +358,84 @@ router.post('/auth/otp/send', (req, res) => {
   const otpCode = process.env.NODE_ENV === 'production' 
     ? crypto.randomInt(100000, 1000000).toString() 
     : '123456';
+
+  const maskedPhone = cleanPhone.replace(/(\d{4})\d+(\d{2})$/, '$1******$2');
+  console.log(`[OTP_SEND_REQUEST] brand=${req.brand_id} phone=${maskedPhone}`);
+
+  // Dispatch OTP via Wablas before creating the challenge.
+  // In test environment, skip the real transport so unit tests stay isolated.
+  if (process.env.NODE_ENV !== 'test') {
+    const wablasApiKey = process.env.WABLAS_API_KEY;
+    const wablasDeviceId = process.env.WABLAS_DEVICE_ID;
+    const wablasApiUrl = process.env.WABLAS_API_URL || 'https://kudus.wablas.com/api/send-message';
+
+    if (!wablasApiKey) {
+      console.error('[OTP_SEND_FAILURE] WABLAS_API_KEY is not configured in runtime environment.');
+      return res.status(503).json({
+        success: false,
+        error: 'OTP_TRANSPORT_UNAVAILABLE',
+        message: 'Layanan pengiriman OTP belum dikonfigurasi. Hubungi administrator.'
+      });
+    }
+
+    if (!wablasDeviceId) {
+      console.error('[OTP_SEND_FAILURE] WABLAS_DEVICE_ID is not configured in runtime environment.');
+      return res.status(503).json({
+        success: false,
+        error: 'OTP_TRANSPORT_UNAVAILABLE',
+        message: 'Perangkat WhatsApp pengirim OTP belum dikonfigurasi. Hubungi administrator.'
+      });
+    }
+
+    try {
+      console.log(`[OTP_TRANSPORT_SELECTED] transport=wablas device=${wablasDeviceId}`);
+      console.log(`[WABLAS_REQUEST_STARTED] phone=${maskedPhone} device=${wablasDeviceId}`);
+
+      const axios = require('axios');
+      const otpMessage = `Kode OTP Anda: *${otpCode}*\n\nKode berlaku selama 5 menit. Jangan bagikan kode ini kepada siapa pun.`;
+
+      const wablasRes = await axios.post(
+        wablasApiUrl,
+        { phone: cleanPhone, message: otpMessage, device: wablasDeviceId },
+        {
+          headers: { Authorization: wablasApiKey },
+          validateStatus: () => true,
+          timeout: 15000
+        }
+      );
+
+      console.log(`[WABLAS_RESPONSE_STATUS] status=${wablasRes.status}`);
+
+      if (wablasRes.status < 200 || wablasRes.status >= 300) {
+        console.error(`[WABLAS_REQUEST_FAILED] status=${wablasRes.status} response=${JSON.stringify(wablasRes.data)}`);
+        return res.status(502).json({
+          success: false,
+          error: 'OTP_DELIVERY_FAILED',
+          message: 'Gagal mengirim OTP ke WhatsApp. Pastikan nomor Anda aktif dan coba lagi.'
+        });
+      }
+
+      // Wablas may return status=true in body even with HTTP 200 when the device is offline
+      const wablasBody = wablasRes.data;
+      if (wablasBody && wablasBody.status === false) {
+        console.error(`[WABLAS_REQUEST_FAILED] wablas_status=false message=${wablasBody.message || 'unknown'}`);
+        return res.status(502).json({
+          success: false,
+          error: 'OTP_DELIVERY_FAILED',
+          message: 'Perangkat WhatsApp pengirim tidak aktif. Coba lagi nanti.'
+        });
+      }
+
+      console.log(`[OTP_SEND_SUCCESS] brand=${req.brand_id} phone=${maskedPhone}`);
+    } catch (transportErr) {
+      console.error(`[WABLAS_REQUEST_FAILED] ${transportErr.message}`);
+      return res.status(503).json({
+        success: false,
+        error: 'OTP_TRANSPORT_ERROR',
+        message: 'Gagal menghubungi layanan WhatsApp. Periksa koneksi dan coba lagi.'
+      });
+    }
+  }
 
   const { challengeId } = OtpChallengeStore.createChallenge(cleanPhone, req.brand_id, otpCode);
   res.json({

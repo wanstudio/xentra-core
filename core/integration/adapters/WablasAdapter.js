@@ -6,6 +6,7 @@ const BaseAdapter = require('../BaseAdapter');
 const IntegrationContract = require('../IntegrationContract');
 const FailureClassifier = require('../FailureClassifier');
 const SecretBoundary = require('../SecretBoundary');
+const axios = require('axios');
 
 class WablasAdapter extends BaseAdapter {
   /**
@@ -61,9 +62,12 @@ class WablasAdapter extends BaseAdapter {
     // 3. Dispatch outbound request with timeout
     try {
       const executeHttp = async () => {
+        const wablasUrl = process.env.WABLAS_API_URL || 'https://kudus.wablas.com/api/send-message';
+
+        // fetchClient injection is used by tests; production always uses axios
         if (this.fetchClient) {
           return await this.fetchClient({
-            url: 'https://kudus.wablas.com/api/send-message',
+            url: wablasUrl,
             method: 'POST',
             headers: {
               Authorization: this.serverSecret
@@ -75,7 +79,24 @@ class WablasAdapter extends BaseAdapter {
             }
           });
         }
-        return { status: 200, data: { status: true, message: 'Message queued' } };
+
+        // Production path: real HTTP POST to Wablas via axios (built-in project dependency)
+        console.log(`[WABLAS_REQUEST_STARTED] phone=${String(payload.recipient_phone || '').replace(/(\d{4})\d+(\d{2})/, '$1******$2')} device=${channel.wablas_device_id} url=${wablasUrl}`);
+        const axiosRes = await axios.post(
+          wablasUrl,
+          {
+            phone: payload.recipient_phone,
+            message: payload.message,
+            device: channel.wablas_device_id
+          },
+          {
+            headers: { Authorization: this.serverSecret },
+            validateStatus: () => true,
+            timeout: request.timeout_ms || 10000
+          }
+        );
+        console.log(`[WABLAS_RESPONSE_STATUS] status=${axiosRes.status}`);
+        return { status: axiosRes.status, data: axiosRes.data };
       };
 
       const rawRes = await FailureClassifier.withTimeout(executeHttp(), request.timeout_ms, 'Wablas send_message');
