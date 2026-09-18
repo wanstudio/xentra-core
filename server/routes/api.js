@@ -51,40 +51,79 @@ router.get(['/promo/active', '/promotions/active'], (req, res) => {
 });
 
 // 1. Get Brand Profile & Theme
+function resolveCustomerBannerPayload(req, brandId) {
+  const legacy = parseLegacyBrandBanners(req.brand);
+  const requestedBranchId = req.query.branch_id || req.query.branchId || null;
+
+  if (!requestedBranchId) {
+    return legacy.map(b => resolveBannerDelivery(b, brandId));
+  }
+
+  const branch = db.prepare(`
+    SELECT id, timezone
+    FROM branches
+    WHERE id = ?
+      AND brand_id = ?
+      AND is_active = 1
+      AND (is_archived = 0 OR is_archived IS NULL)
+    LIMIT 1
+  `).get(String(requestedBranchId), brandId);
+
+  if (!branch) {
+    return legacy.map(b => resolveBannerDelivery(b, brandId));
+  }
+
+  // Explicit reconciliation rule:
+  // legacy Brand banners remain the fallback until the Branch has at least one
+  // new Banner Assignment. Once the Branch uses the new assignment system, that
+  // system becomes authoritative for the Branch, including the intentional
+  // zero-visible-banner case (all paused/future/ended).
+  const assignmentCount = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM storefront_banner_assignments
+    WHERE brand_id = ? AND branch_id = ?
+  `).get(brandId, branch.id);
+
+  if (!assignmentCount || Number(assignmentCount.count || 0) === 0) {
+    return legacy.map(b => resolveBannerDelivery(b, brandId));
+  }
+
+  const resolved = bannerAssignmentService.listCustomerBanners({
+    brandId,
+    branchId: branch.id
+  });
+
+  return resolved.map(banner => {
+    const delivery = bannerMediaDelivery(brandId, banner.media_id);
+    return {
+      id: banner.id,
+      assignment_id: banner.assignment_id,
+      branch_id: banner.branch_id,
+      placement: banner.placement,
+      position: banner.position,
+      active: banner.active,
+      starts_at: banner.starts_at,
+      ends_at: banner.ends_at,
+      timezone: banner.timezone || branch.timezone || 'Asia/Jakarta',
+      publication_status: banner.publication_status,
+      effective_status: banner.effective_status,
+      title: banner.title,
+      alt_text: banner.alt_text,
+      media_id: banner.media_id,
+      preview_url: delivery.preview_url,
+      srcset_variants: delivery.srcset_variants,
+      cta_type: banner.cta_type,
+      cta_target_id: banner.cta_target_id,
+      cta_url: banner.cta_url,
+      promotion_id: banner.promotion_id,
+      link: banner.cta_type === 'URL' ? banner.cta_url : '#'
+    };
+  });
+}
+
 router.get('/brand/info', (req, res) => {
   try {
     const brandId = req.brand_id;
-    let banners = [];
-    const hasExplicitBanners = req.brand && req.brand.banners !== null && req.brand.banners !== undefined && req.brand.banners !== '';
-    if (hasExplicitBanners) {
-      try {
-        banners = typeof req.brand.banners === 'string' ? JSON.parse(req.brand.banners) : req.brand.banners;
-      } catch (e) {
-        banners = [];
-      }
-      if (!Array.isArray(banners)) banners = [];
-    } else {
-      banners = [
-        {
-          id: 'banner_1',
-          image_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&auto=format&fit=crop&q=80',
-          title: 'Slalu ada sensasi di setiap gigitan',
-          link: '#'
-        },
-        {
-          id: 'banner_2',
-          image_url: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80',
-          title: 'Paket Spesial Diskon 20%',
-          link: '#'
-        },
-        {
-          id: 'banner_3',
-          image_url: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=80',
-          title: 'Ayam Tulang Lunak Khas Bangjo',
-          link: '#'
-        }
-      ];
-    }
 
     // M6: Resolve canonical media delivery for logo (logo_media_id → derivative)
     let logoDeliveryUrl = req.brand.logo_url || null;
@@ -101,8 +140,7 @@ router.get('/brand/info', (req, res) => {
       }
     } catch (_) {}
 
-    // M6: Enrich each banner with canonical media delivery (banner derivative preferred)
-    const enrichedBanners = banners.map(b => resolveBannerDelivery(b, brandId));
+    const enrichedBanners = resolveCustomerBannerPayload(req, brandId);
 
     res.json({
       success: true,
@@ -129,7 +167,7 @@ router.get('/brand/branches', (req, res) => {
       .prepare(`
         SELECT 
           b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone,
-          b.is_active, b.is_open_override,
+          b.is_active, b.is_open_override, b.timezone,
           s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km,
           s.promo_delivery_discount, s.promo_min_order
         FROM branches b
