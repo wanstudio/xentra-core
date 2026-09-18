@@ -9548,6 +9548,7 @@ router.patch('/admin/marketing/banners/:bannerId/draft', requireAuth(['owner', '
       brandId: req.brand_id,
       bannerId: req.params.bannerId,
       actorId: actor.id,
+      actorRole: actor.role,
       mediaId: media_id,
       title,
       altText: alt_text,
