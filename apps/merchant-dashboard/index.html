@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=3.0.7">
+  <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=3.0.8">
 </head>
 <body>
 
@@ -2032,7 +2032,7 @@
                 <h3>🖼️ Storefront Banners</h3>
                 <p class="text-muted">Kelola banner storefront, publikasi, penempatan, jadwal tampil, dan visibilitas ke pelanggan.</p>
               </div>
-              <button type="button" class="x-btn-primary" id="btn-mkt-create-banner-skeleton" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:8px 16px;">
+              <button type="button" class="x-btn-primary" id="btn-mkt-create-banner" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:8px 16px;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
                 + Tambah Banner
               </button>
@@ -2041,13 +2041,16 @@
             <div class="x-marketing-banner-toolbar">
               <div class="x-marketing-banner-toolbar-copy">
                 <strong>Homepage Banner</strong>
-                <span>Placement v1 untuk storefront customer.</span>
+                <span>Konten, penempatan, jadwal, dan visibilitas dikelola terpisah sesuai kontrak Banner v2.</span>
               </div>
-              <div class="x-marketing-banner-filter" aria-hidden="true">
-                <span class="x-marketing-banner-filter-label">Scope</span>
-                <span class="x-marketing-banner-filter-value">Semua Cabang</span>
+              <div class="x-marketing-banner-filter">
+                <label for="mkt-banners-branch-filter" class="x-marketing-banner-filter-label">Cabang</label>
+                <select id="mkt-banners-branch-filter" class="x-input x-marketing-banner-branch-filter">
+                  <option value="">Semua Cabang</option>
+                </select>
               </div>
             </div>
+            <div id="mkt-banners-legacy-notice" class="x-marketing-banner-legacy-notice" style="display:none;"></div>
 
             <div class="x-table-responsive">
               <table class="x-table x-marketing-banner-table">
@@ -4210,6 +4213,249 @@
     </div>
   </div>
 
+  <!-- MODAL: STOREFRONT BANNER CONTENT / PUBLISH -->
+  <div id="modal-marketing-banner" class="x-modal-backdrop" onclick="if (event.target === this) closeMarketingBannerModal()" style="display:none; z-index:12000;" role="dialog" aria-modal="true" aria-labelledby="modal-marketing-banner-title">
+    <div class="x-modal-card x-modal-lg x-marketing-banner-editor-modal" style="max-width:760px; width:100%; max-height:92vh; display:flex; flex-direction:column;">
+      <div class="x-modal-header" style="border-bottom:1px solid var(--border-color);">
+        <div>
+          <h3 id="modal-marketing-banner-title" style="margin:0;font-size:16px;font-weight:800;">Tambah Banner</h3>
+          <p id="modal-marketing-banner-subtitle" class="text-muted" style="margin:3px 0 0;font-size:12px;">Draft konten Banner storefront.</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closeMarketingBannerModal()" aria-label="Tutup">✕</button>
+      </div>
+
+      <form id="form-marketing-banner" style="display:flex;flex-direction:column;min-height:0;flex:1;">
+        <input type="hidden" id="mkt-banner-id" value="">
+        <div class="x-modal-scroll-body x-marketing-banner-editor-body">
+
+          <div class="x-marketing-banner-editor-grid">
+            <div class="x-marketing-banner-editor-media">
+              <div class="x-form-group">
+                <label>Media Banner <span style="color:#dc2626;">*</span></label>
+                <div class="x-marketing-banner-upload-box">
+                  <img id="mkt-banner-preview" alt="Preview Banner" style="display:none;">
+                  <div id="mkt-banner-preview-empty" class="x-marketing-banner-upload-empty">🖼️</div>
+                </div>
+                <div class="x-marketing-banner-upload-actions">
+                  <button type="button" id="mkt-banner-pick" class="x-btn-secondary">📁 Pilih Gambar</button>
+                  <button type="button" id="mkt-banner-clear" class="x-btn-secondary" style="display:none;color:#dc2626;">Hapus</button>
+                  <input type="file" id="mkt-banner-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                </div>
+                <small class="text-muted x-marketing-banner-help">JPG, PNG, WebP · Maks. 20 MB · source bebas rasio · output canonical ±1.94:1 melalui Media System.</small>
+              </div>
+            </div>
+
+            <div>
+              <div class="x-form-group">
+                <label for="mkt-banner-title-field">Judul Banner</label>
+                <input type="text" id="mkt-banner-title-field" class="x-input" maxlength="160" placeholder="Contoh: Promo Ramadan">
+              </div>
+              <div class="x-form-group">
+                <label for="mkt-banner-alt-field">Alt Text</label>
+                <input type="text" id="mkt-banner-alt-field" class="x-input" maxlength="160" placeholder="Deskripsi gambar untuk aksesibilitas">
+              </div>
+
+              <div class="x-form-group">
+                <label for="mkt-banner-cta-type">CTA</label>
+                <select id="mkt-banner-cta-type" class="x-input">
+                  <option value="NONE">Tanpa CTA</option>
+                  <option value="PROMOTION">Promotion</option>
+                  <option value="PRODUCT">Product</option>
+                  <option value="CATEGORY">Category</option>
+                  <option value="URL">URL</option>
+                </select>
+              </div>
+
+              <div id="mkt-banner-cta-promotion-wrap" class="x-form-group" style="display:none;">
+                <label for="mkt-banner-cta-promotion">Promotion</label>
+                <select id="mkt-banner-cta-promotion" class="x-input">
+                  <option value="">Pilih Promotion</option>
+                </select>
+              </div>
+
+              <div id="mkt-banner-cta-product-wrap" class="x-form-group" style="display:none;">
+                <label for="mkt-banner-cta-product">Product</label>
+                <select id="mkt-banner-cta-product" class="x-input">
+                  <option value="">Pilih Product</option>
+                </select>
+              </div>
+
+              <div id="mkt-banner-cta-category-wrap" class="x-form-group" style="display:none;">
+                <label for="mkt-banner-cta-category">Category</label>
+                <select id="mkt-banner-cta-category" class="x-input">
+                  <option value="">Pilih Category</option>
+                </select>
+              </div>
+
+              <div id="mkt-banner-cta-url-wrap" class="x-form-group" style="display:none;">
+                <label for="mkt-banner-cta-url">URL</label>
+                <input type="url" id="mkt-banner-cta-url" class="x-input" placeholder="https://contoh.com/promo">
+              </div>
+            </div>
+          </div>
+
+          <div id="mkt-banner-create-placement" class="x-marketing-banner-editor-section">
+            <div class="x-marketing-banner-section-title">
+              <div>
+                <strong>Penempatan Awal</strong>
+                <span>Opsional. Tanpa cabang, Banner tetap dapat disimpan sebagai content draft/published tanpa tampil di storefront.</span>
+              </div>
+            </div>
+
+            <div class="x-marketing-banner-branch-selector-header">
+              <label class="x-checkbox-label">
+                <input type="checkbox" id="mkt-banner-all-branches">
+                <span>Pilih Semua Cabang</span>
+              </label>
+              <span id="mkt-banner-branch-selection-count" class="text-muted" style="font-size:12px;">0 cabang dipilih</span>
+            </div>
+            <div id="mkt-banner-branch-list" class="x-marketing-banner-branch-list"></div>
+
+            <div class="x-marketing-banner-placement-grid">
+              <div class="x-form-group">
+                <label for="mkt-banner-position">Position</label>
+                <input type="number" id="mkt-banner-position" class="x-input" min="1" value="1">
+              </div>
+              <div class="x-form-group">
+                <label>Placement</label>
+                <input type="text" class="x-input" value="Homepage Banner" readonly>
+              </div>
+            </div>
+
+            <div class="x-marketing-banner-schedule-toggle">
+              <label class="x-checkbox-label">
+                <input type="checkbox" id="mkt-banner-schedule-enabled">
+                <span>Atur jadwal tayang</span>
+              </label>
+              <span class="text-muted" style="font-size:11px;">Timezone mengikuti Branch yang dipilih.</span>
+            </div>
+
+            <div id="mkt-banner-schedule-fields" class="x-marketing-banner-placement-grid" style="display:none;">
+              <div class="x-form-group">
+                <label for="mkt-banner-starts-at">Mulai</label>
+                <input type="datetime-local" id="mkt-banner-starts-at" class="x-input">
+              </div>
+              <div class="x-form-group">
+                <label for="mkt-banner-ends-at">Berakhir <span class="text-muted">(opsional)</span></label>
+                <input type="datetime-local" id="mkt-banner-ends-at" class="x-input">
+              </div>
+            </div>
+
+            <div class="x-marketing-banner-create-controls">
+              <label class="x-checkbox-label">
+                <input type="checkbox" id="mkt-banner-active" checked>
+                <span>Active ON</span>
+              </label>
+              <label id="mkt-banner-governance-wrap" class="x-checkbox-label">
+                <input type="checkbox" id="mkt-banner-governance-lock">
+                <span>Kunci Assignment untuk Branch Manager</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="x-marketing-banner-publish-note">
+            <strong>Publish adalah batas publikasi.</strong>
+            <span>Draft tidak tampil. Published baru dapat tampil jika Assignment valid, Active ON, dan window jadwal sedang efektif.</span>
+          </div>
+        </div>
+
+        <div class="x-modal-footer" style="justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <div id="mkt-banner-editor-state" class="text-muted" style="font-size:11px;"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="x-btn-secondary" onclick="closeMarketingBannerModal()">Batal</button>
+            <button type="submit" class="x-btn-secondary" id="mkt-banner-save-draft">Simpan Draft</button>
+            <button type="button" class="x-btn-primary" id="mkt-banner-publish-action">Publish Sekarang</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: BANNER ASSIGNMENT / SCHEDULE -->
+  <div id="modal-marketing-banner-assignment" class="x-modal-backdrop" onclick="if (event.target === this) closeMarketingBannerAssignmentModal()" style="display:none; z-index:12010;" role="dialog" aria-modal="true" aria-labelledby="modal-banner-assignment-title">
+    <div class="x-modal-card" style="max-width:560px;width:100%;">
+      <div class="x-modal-header">
+        <div>
+          <h3 id="modal-banner-assignment-title" style="margin:0;font-size:16px;font-weight:800;">Atur Penempatan Banner</h3>
+          <p id="modal-banner-assignment-subtitle" class="text-muted" style="margin:3px 0 0;font-size:12px;">Branch, position, Active, dan jadwal.</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closeMarketingBannerAssignmentModal()">✕</button>
+      </div>
+      <form id="form-marketing-banner-assignment" class="x-form">
+        <input type="hidden" id="mkt-assignment-banner-id" value="">
+        <input type="hidden" id="mkt-assignment-id" value="">
+
+        <div class="x-form-group">
+          <label for="mkt-assignment-branch">Cabang</label>
+          <select id="mkt-assignment-branch" class="x-input"></select>
+          <small id="mkt-assignment-timezone" class="text-muted" style="display:block;margin-top:4px;font-size:11px;"></small>
+        </div>
+
+        <div class="x-marketing-banner-placement-grid">
+          <div class="x-form-group">
+            <label for="mkt-assignment-position">Position</label>
+            <input type="number" id="mkt-assignment-position" class="x-input" min="1" value="1">
+          </div>
+          <div class="x-form-group">
+            <label>Placement</label>
+            <input type="text" class="x-input" value="Homepage Banner" readonly>
+          </div>
+        </div>
+
+        <div class="x-marketing-banner-schedule-toggle">
+          <label class="x-checkbox-label">
+            <input type="checkbox" id="mkt-assignment-schedule-enabled">
+            <span>Atur jadwal tayang</span>
+          </label>
+        </div>
+
+        <div id="mkt-assignment-schedule-fields" class="x-marketing-banner-placement-grid" style="display:none;">
+          <div class="x-form-group">
+            <label for="mkt-assignment-starts-at">Mulai</label>
+            <input type="datetime-local" id="mkt-assignment-starts-at" class="x-input">
+          </div>
+          <div class="x-form-group">
+            <label for="mkt-assignment-ends-at">Berakhir <span class="text-muted">(opsional)</span></label>
+            <input type="datetime-local" id="mkt-assignment-ends-at" class="x-input">
+          </div>
+        </div>
+
+        <div class="x-marketing-banner-create-controls">
+          <label class="x-checkbox-label">
+            <input type="checkbox" id="mkt-assignment-active" checked>
+            <span>Active ON</span>
+          </label>
+          <label id="mkt-assignment-governance-wrap" class="x-checkbox-label">
+            <input type="checkbox" id="mkt-assignment-governance-lock">
+            <span>Kunci untuk Branch Manager</span>
+          </label>
+        </div>
+
+        <div class="x-modal-footer">
+          <button type="button" class="x-btn-secondary" onclick="closeMarketingBannerAssignmentModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-banner-assignment">Simpan Penempatan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: BANNER PREVIEW -->
+  <div id="modal-marketing-banner-preview" class="x-modal-backdrop" onclick="if (event.target === this) closeMarketingBannerPreview()" style="display:none; z-index:12020;">
+    <div class="x-modal-card" style="max-width:720px;width:100%;">
+      <div class="x-modal-header">
+        <div>
+          <h3 id="modal-banner-preview-title" style="margin:0;font-size:16px;font-weight:800;">Preview Banner</h3>
+          <p id="modal-banner-preview-subtitle" class="text-muted" style="margin:3px 0 0;font-size:12px;">Customer-facing preview.</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closeMarketingBannerPreview()">✕</button>
+      </div>
+      <div style="padding:20px;">
+        <div id="mkt-banner-preview-stage" class="x-marketing-banner-preview-stage"></div>
+        <div id="mkt-banner-preview-meta" class="x-marketing-banner-preview-meta"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: REUSABLE IMAGE CROP EDITOR (MEDIA SYSTEM M2) -->
   <div id="modal-crop-editor" class="x-modal-backdrop" style="display:none; z-index: 10000;" role="dialog" aria-modal="true" aria-labelledby="crop-editor-title">
     <div class="x-crop-modal-card">
@@ -4485,6 +4731,6 @@
   </div>
 
   <!-- Dashboard JavaScript -->
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.7"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.8"></script>
 </body>
 </html>
