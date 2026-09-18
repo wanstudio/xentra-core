@@ -4,16 +4,19 @@ const crypto = require('crypto');
 const BannerContent = require('../domain/BannerContent');
 const BannerContentRepository = require('../../../core/data/repositories/BannerContentRepository');
 const { MediaService } = require('../../../core/media');
+const BannerAssignmentRepository = require('../../../core/data/repositories/BannerAssignmentRepository');
 
 const mediaService = new MediaService();
 
 class BannerContentService {
   constructor({
     repository = new BannerContentRepository(),
-    media = mediaService
+    media = mediaService,
+    assignmentRepository = new BannerAssignmentRepository()
   } = {}) {
     this.repository = repository;
     this.media = media;
+    this.assignmentRepository = assignmentRepository;
   }
 
   static createId(prefix) {
@@ -325,6 +328,9 @@ class BannerContentService {
     }
 
     this.assertMediaReady(brandId, draft.media_id);
+    // Publishing can make existing active assignments customer-visible, so
+    // every affected Branch/Placement/Position must pass the visibility overlap guard.
+    this.assertPublishPlacementConflicts(brandId, bannerId);
 
     this.repository.beginTransaction();
     try {
