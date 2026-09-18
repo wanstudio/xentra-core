@@ -310,7 +310,14 @@ class BannerAssignmentRepository {
       JOIN storefront_banners sb
         ON sb.id = a.banner_id AND sb.brand_id = a.brand_id
       JOIN storefront_banner_revisions r
-        ON r.banner_id = sb.id AND r.revision_status = 'PUBLISHED'
+        ON r.id = (
+          SELECT r2.id
+          FROM storefront_banner_revisions r2
+          WHERE r2.banner_id = sb.id
+            AND r2.revision_status = 'PUBLISHED'
+          ORDER BY r2.revision_number DESC
+          LIMIT 1
+        )
       WHERE a.brand_id = ?
         AND a.branch_id = ?
         AND a.placement = 'HOME_BANNER_CAROUSEL'
