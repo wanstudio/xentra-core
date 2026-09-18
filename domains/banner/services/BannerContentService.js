@@ -223,20 +223,6 @@ class BannerContentService {
       action: 'BANNER_CONTENT_CREATED',
       metadata: { banner_id: bannerId, revision_id: revisionId, publication_status: 'DRAFT' }
     });
-    this.writeSecurityAudit({
-      brandId,
-      actorId,
-      actorRole,
-      action: 'BANNER_CONTENT_DRAFT_UPDATED',
-      metadata: { banner_id: bannerId, draft_revision_id: this.repository.findDraftRevision(brandId, bannerId)?.id || null }
-    });
-    this.writeSecurityAudit({
-      brandId,
-      actorId,
-      actorRole,
-      action: 'BANNER_CONTENT_PUBLISHED',
-      metadata: { banner_id: bannerId, published_revision_id: draft.id }
-    });
     return this.repository.getBannerAggregate(brandId, bannerId);
   }
 
@@ -334,6 +320,18 @@ class BannerContentService {
       throw err;
     }
 
+    this.writeSecurityAudit({
+      brandId,
+      actorId,
+      actorRole,
+      action: 'BANNER_CONTENT_DRAFT_UPDATED',
+      metadata: {
+        banner_id: bannerId,
+        draft_revision_id: this.repository.findDraftRevision(brandId, bannerId)?.id || null
+      }
+    });
+
+
     return this.repository.getBannerAggregate(brandId, bannerId);
   }
 
@@ -378,6 +376,18 @@ class BannerContentService {
       try { this.repository.rollbackTransaction(); } catch (_) {}
       throw err;
     }
+
+    this.writeSecurityAudit({
+      brandId,
+      actorId,
+      actorRole,
+      action: 'BANNER_CONTENT_PUBLISHED',
+      metadata: {
+        banner_id: bannerId,
+        published_revision_id: draft.id
+      }
+    });
+
 
     return this.repository.getBannerAggregate(brandId, bannerId);
   }
