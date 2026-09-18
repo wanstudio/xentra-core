@@ -2619,6 +2619,30 @@
 
     var pwaRuntime = (window.Xentra && window.Xentra.PwaRuntime) ? window.Xentra.PwaRuntime.getPwaRuntimeContext() : { display_mode: 'browser' };
 
+    function handleAuthFailure(errData) {
+      state.isSubmitting = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = state.fulfillment.type === 'reservation' ? 'Konfirmasi Reservasi' : 'Pesan Sekarang';
+        btn.style.opacity = '1';
+      }
+      // Step 1: Clear stale session from Store and client state (keeps cart, address, fulfillment, paymentMethod intact)
+      state.customer.isVerified = false;
+      if (Store && typeof Store.clearCustomerSession === 'function') {
+        Store.clearCustomerSession();
+      }
+      if (UI && UI.toast) {
+        UI.toast('Sesi otentikasi berakhir. Silakan verifikasi nomor WhatsApp Anda kembali.');
+      }
+      // Step 2: Open customer authentication sheet with automatic retry on success
+      openCustomerAuthSheet(function () {
+        // Step 5 & 6: Automatic retry original checkout submission
+        setTimeout(function () {
+          executePrePaymentAndSubmit();
+        }, 100);
+      });
+    }
+
     // Call Pre-Payment Verification Gate first
     API.post('/checkout/verify', {
       branch_id: branchId,
@@ -2651,9 +2675,29 @@
 
       // Pre-payment check passed → Proceed with Order Placement
       proceedCreateOrder();
-    }).catch(function () {
-      // If verify route fails or network glitch, attempt create-order directly (backend has authoritative guard)
-      proceedCreateOrder();
+    }).catch(function (verifyErr) {
+      var errObj = (verifyErr && verifyErr.data) || {};
+      var errCode = errObj.error || verifyErr.message || '';
+      var statusCode = verifyErr && verifyErr.status;
+
+      // Classify auth error: if unauthenticated or session expired, trigger re-authentication immediately
+      if (statusCode === 401 || errCode === 'CUSTOMER_AUTH_REQUIRED' || errCode === 'INVALID_OR_EXPIRED_CUSTOMER_SESSION') {
+        handleAuthFailure(errObj);
+        return;
+      }
+
+      // Non-auth / network / server error: verification outcome is unknown.
+      // NEVER fall through to create-order — an unverified order must not be placed.
+      // Restore button and show retry message so the customer can try again.
+      state.isSubmitting = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = state.fulfillment.type === 'reservation' ? 'Konfirmasi Reservasi' : 'Pesan Sekarang';
+        btn.style.opacity = '1';
+      }
+      if (UI && UI.toast) {
+        UI.toast('Gagal memverifikasi pesanan. Periksa koneksi lalu coba lagi.');
+      }
     });
   }
 
@@ -2695,8 +2739,8 @@
     // a device-local ISO date; the offset is the device's own UTC offset. The
     // value is never converted back to a server/WordPress timezone.
     function resolveScheduledIso() {
-      if (DeliverySchedule && typeof DeliverySchedule.selectedSlotToIso === 'function') {
-        var iso = DeliverySchedule.selectedSlotToIso(new Date(), state.fulfillment.date, state.fulfillment.timeSlot);
+      if (DeliverySchedule && typeof DeliverySchedule.toIsoRange === 'function') {
+        var iso = DeliverySchedule.toIsoRange(state.fulfillment.date, state.fulfillment.timeSlot);
         if (iso && iso.start) return iso;
       }
       // Fallback (no module in context): keep legacy human-readable text.
@@ -2795,6 +2839,26 @@
         btn.style.opacity = '1';
       }
 
+      var errCode = (errData && errData.error) || '';
+      var statusCode = errData && errData.status;
+
+      // Handle auth session invalidation / expiration seamlessly
+      if (statusCode === 401 || errCode === 'CUSTOMER_AUTH_REQUIRED' || errCode === 'INVALID_OR_EXPIRED_CUSTOMER_SESSION') {
+        state.customer.isVerified = false;
+        if (Store && typeof Store.clearCustomerSession === 'function') {
+          Store.clearCustomerSession();
+        }
+        if (UI && UI.toast) {
+          UI.toast('Sesi otentikasi berakhir. Silakan verifikasi nomor WhatsApp Anda kembali.');
+        }
+        openCustomerAuthSheet(function () {
+          setTimeout(function () {
+            executePrePaymentAndSubmit();
+          }, 100);
+        });
+        return;
+      }
+
       if (errData && (errData.status === 'PRICE_CHANGED' || errData.status === 'OUT_OF_STOCK' || (errData.price_diffs && errData.price_diffs.length > 0))) {
         showPrePaymentVerificationDialog(errData, function () {
           executePrePaymentAndSubmit();
@@ -2817,22 +2881,34 @@
         onFail(res);
       }
     }).catch(function (err) {
-      onFail(err && err.data ? err.data : { error: err.message });
+      var data = (err && err.data) ? err.data : { error: err.message, status: err.status };
+      if (!data.status && err && err.status) data.status = err.status;
+      onFail(data);
     });
   }
 
   // ── Sync with Store changes ──
-  // Registered ONCE at module scope. Reacts only to cart / location mutations
-  // (the ops that actually change checkout rows or delivery eligibility) and
-  // delegates rendering to syncRowsFromItems (targeted qty patch / full rebuild
-  // when the line set changed). Delivery re-quote is scheduled (debounced +
-  // latest-wins), never fired synchronously from here.
+  // Registered ONCE at module scope. Reacts to cart, location, and customerSession mutations
+  // and delegates rendering to syncRowsFromItems. Delivery re-quote is scheduled.
   Store.subscribe(function (mutation) {
     if (!checkoutContainer || state.isSubmitting) return;
     if (Router && Router.getCurrentView && Router.getCurrentView() !== 'checkout') return;
     if (checkoutContainer.style.display === 'none') return;
     var mt = mutation && mutation.type;
-    if (mt !== 'cart' && mt !== 'location' && mt !== 'activeDestination') return;
+    if (mt !== 'cart' && mt !== 'location' && mt !== 'activeDestination' && mt !== 'customerSession') return;
+
+    if (mt === 'customerSession') {
+      var sess = Store.getState().customerSession;
+      if (sess) {
+        if (sess.phone) state.customer.phone = sess.phone;
+        if (sess.name) state.customer.name = sess.name;
+        state.customer.isVerified = Boolean(sess.token && sess.token.indexOf('xnt_cust_') === 0);
+      } else {
+        state.customer.isVerified = false;
+      }
+      renderLayout();
+      return;
+    }
 
     if (mt === 'location' || mt === 'activeDestination') {
       var savedDest = (Store.getActiveDestination && Store.getActiveDestination()) || Store.getState().activeDestination || Store.getState().location;
