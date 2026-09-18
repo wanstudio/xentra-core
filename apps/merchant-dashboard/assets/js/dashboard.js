@@ -716,6 +716,7 @@
     'marketing/overview':          { title: 'Marketing Overview', sub: 'Metrik retensi pelanggan dan performa promosi aktif', tab: 'marketing' },
     'marketing/promotions':        { title: 'Promotions',       sub: 'Daftar program promosi dan aturan insentif brand', tab: 'marketing' },
     'marketing/discounts':         { title: 'Discounts',        sub: 'Aturan diskon harga dan kupon potongan pesanan', tab: 'marketing' },
+    'marketing/banners':          { title: 'Banners',          sub: 'Kelola banner storefront, penempatan, jadwal, dan visibilitas pelanggan', tab: 'marketing' },
     'marketing/campaigns':         { title: 'Campaigns',        sub: 'Kampanye broadcast dan pesan pemasaran multi-channel', tab: 'marketing' },
     'marketing/loyalty':           { title: 'Loyalty',          sub: 'Program poin pelanggan setia dan reward belanja', tab: 'marketing' },
     'settings':                    { title: 'Settings',          sub: 'Konfigurasi brand, cabang, pemenuhan, dan integrasi sistem', tab: 'settings' },
@@ -7328,6 +7329,7 @@
       'overview': 'marketing-view-overview',
       'promotions': 'marketing-view-promotions',
       'discounts': 'marketing-view-discounts',
+      'banners': 'marketing-view-banners',
       'campaigns': 'marketing-view-campaigns',
       'loyalty': 'marketing-view-loyalty'
     };
@@ -7340,6 +7342,7 @@
     // Load data for subtab
     if (subtab === 'overview') loadMarketingOverview();
     else if (subtab === 'promotions') loadMarketingPromotions();
+    else if (subtab === 'banners') renderMarketingBannersSkeleton();
   }
   window.switchMarketingSection = switchMarketingSection;
 
@@ -7347,6 +7350,203 @@
     switchMarketingSection(_activeMarketingSubtab, false);
   }
   window.loadMarketingCurrentSubtab = loadMarketingCurrentSubtab;
+
+
+  /* =========================================================================
+     MARKETING — STOREFRONT BANNER UI SKELETON
+     UI-only scaffold. No Banner domain/API mutation is introduced here.
+     ========================================================================= */
+  var _marketingBannerUiState = {
+    'banner-ramadan': true,
+    'banner-qris': true,
+    'banner-ended': true,
+    'banner-draft': false
+  };
+
+  var _marketingBannerMockData = [
+    {
+      id: 'banner-ramadan',
+      title: 'Promo Ramadan',
+      placement: 'Homepage Banner',
+      scope: 'Semua Cabang',
+      publication: 'Published',
+      schedule: '01 Okt 2026, 00:00 → 31 Okt 2026, 23:59',
+      status: 'SCHEDULED',
+      previewTitle: 'PROMO RAMADAN',
+      previewText: 'Siapkan banner, tayang otomatis sesuai jadwal.'
+    },
+    {
+      id: 'banner-qris',
+      title: 'QRIS Sekarang Tersedia',
+      placement: 'Homepage Banner',
+      scope: 'Bangjo Pusat',
+      publication: 'Published',
+      schedule: 'Tanpa jadwal',
+      status: 'ACTIVE',
+      previewTitle: 'QRIS TERSEDIA',
+      previewText: 'Banner evergreen yang dikontrol dengan Active ON/OFF.'
+    },
+    {
+      id: 'banner-ended',
+      title: 'Promo Grand Opening',
+      placement: 'Homepage Banner',
+      scope: 'Bangjo Timur',
+      publication: 'Published',
+      schedule: '01 Sep 2026, 00:00 → 15 Sep 2026, 23:59',
+      status: 'ENDED',
+      previewTitle: 'GRAND OPENING',
+      previewText: 'Siklus selesai, record tetap tersedia untuk digunakan lagi.'
+    },
+    {
+      id: 'banner-draft',
+      title: 'Menu Baru Oktober',
+      placement: 'Homepage Banner',
+      scope: 'Bangjo Pusat',
+      publication: 'Draft',
+      schedule: 'Belum dipublish',
+      status: 'DRAFT',
+      previewTitle: 'MENU BARU',
+      previewText: 'Masih review sebelum Publish atau Schedule Publish.'
+    }
+  ];
+
+  function getMarketingBannerEffectiveStatus(item) {
+    if (!item || item.publication !== 'Published') return 'DRAFT';
+    if (_marketingBannerUiState[item.id] === false) return 'PAUSED';
+    return item.status || 'ACTIVE';
+  }
+
+  function marketingBannerStatusBadge(status) {
+    var meta = {
+      'DRAFT':    { label: 'Draft',     cls: 'is-draft' },
+      'SCHEDULED':{ label: 'Terjadwal', cls: 'is-scheduled' },
+      'ACTIVE':   { label: 'Aktif',     cls: 'is-active' },
+      'PAUSED':   { label: 'Dijeda',    cls: 'is-paused' },
+      'ENDED':    { label: 'Berakhir',  cls: 'is-ended' }
+    }[status] || { label: status || '—', cls: '' };
+    return '<span class="x-marketing-banner-status ' + meta.cls + '">' + esc(meta.label) + '</span>';
+  }
+
+  function renderMarketingBannerPreview(item) {
+    return '<div class="x-marketing-banner-preview">' +
+      '<div class="x-marketing-banner-preview-overlay">' +
+        '<strong>' + esc(item.previewTitle) + '</strong>' +
+        '<span>' + esc(item.previewText) + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderMarketingBannersSkeleton() {
+    var tbody = $('mkt-banners-table-body');
+    var createBtn = $('btn-mkt-create-banner-skeleton');
+    if (createBtn && !createBtn.dataset.bound) {
+      createBtn.dataset.bound = '1';
+      createBtn.addEventListener('click', function () {
+        showToast('Banner UI scaffold siap. Form Banner Content akan dibangun pada phase berikutnya.');
+      });
+    }
+
+    if (!tbody) return;
+
+    tbody.innerHTML = _marketingBannerMockData.map(function (item) {
+      var effectiveStatus = getMarketingBannerEffectiveStatus(item);
+      var isDraft = item.publication !== 'Published';
+      var checked = _marketingBannerUiState[item.id] !== false && !isDraft;
+      var toggleDisabled = isDraft ? ' disabled' : '';
+      var actions = [];
+
+      if (isDraft) {
+        actions.push("{ label: 'Lihat Preview', icon: '👁️', onClick: function() { showToast('Preview Banner: " + esc(item.title) + "'); } }");
+        actions.push("{ label: 'Edit Draft', icon: '✏️', onClick: function() { showToast('Edit Draft placeholder.'); } }");
+        actions.push("{ label: 'Atur Jadwal', icon: '🗓️', onClick: function() { showToast('Scheduling UI akan masuk phase berikutnya.'); } }");
+        actions.push("{ label: 'Publish', icon: '🚀', onClick: function() { showToast('Publish workflow akan masuk phase berikutnya.'); } }");
+        actions.push("{ label: 'Hapus Draft', icon: '🗑️', destructive: true, onClick: function() { showToast('Delete placeholder.'); } }");
+      } else if (effectiveStatus === 'ENDED') {
+        actions.push("{ label: 'Lihat Preview', icon: '👁️', onClick: function() { showToast('Preview Banner: " + esc(item.title) + "'); } }");
+        actions.push("{ label: 'Gunakan Lagi', icon: '↻', onClick: function() { showToast('Re-use / reschedule placeholder.'); } }");
+        actions.push("{ label: 'Edit Banner', icon: '✏️', onClick: function() { showToast('Edit Banner placeholder.'); } }");
+        actions.push("{ label: 'Hapus', icon: '🗑️', destructive: true, onClick: function() { showToast('Delete placeholder.'); } }");
+      } else {
+        actions.push("{ label: 'Lihat Preview', icon: '👁️', onClick: function() { showToast('Preview Banner: " + esc(item.title) + "'); } }");
+        actions.push("{ label: 'Edit Banner', icon: '✏️', onClick: function() { showToast('Published edit / draft revision placeholder.'); } }");
+        actions.push("{ label: 'Atur Jadwal', icon: '🗓️', onClick: function() { showToast('Schedule editor placeholder.'); } }");
+        actions.push("{ label: 'Unpublish', icon: '↩️', onClick: function() { showToast('Unpublish placeholder.'); } }");
+      }
+
+      return '<tr>' +
+        '<td data-label="Banner">' +
+          '<div class="x-marketing-banner-primary">' +
+            renderMarketingBannerPreview(item) +
+            '<div class="x-marketing-banner-name">' +
+              '<strong>' + esc(item.title) + '</strong>' +
+              marketingBannerStatusBadge(effectiveStatus) +
+            '</div>' +
+          '</div>' +
+        '</td>' +
+        '<td data-label="Placement"><span class="x-marketing-banner-secondary">' + esc(item.placement) + '</span></td>' +
+        '<td data-label="Cabang / Scope"><span class="x-marketing-banner-secondary">' + esc(item.scope) + '</span></td>' +
+        '<td data-label="Publikasi"><span class="x-marketing-banner-secondary">' + esc(item.publication) + '</span></td>' +
+        '<td data-label="Jadwal"><span class="x-marketing-banner-secondary">' + esc(item.schedule) + '</span></td>' +
+        '<td data-label="Visibility">' +
+          '<div class="x-marketing-banner-visibility">' +
+            '<label class="x-toggle x-toggle-compact" title="' + (checked ? 'Tampil ke customer' : 'Dijeda') + '">' +
+              '<input type="checkbox" ' + (checked ? 'checked' : '') + toggleDisabled + ' data-banner-toggle="' + esc(item.id) + '">' +
+              '<span class="x-toggle-slider"></span>' +
+            '</label>' +
+            '<span class="x-marketing-banner-visibility-label">' + (isDraft ? 'Belum dipublish' : (checked ? 'Play' : 'Pause')) + '</span>' +
+          '</div>' +
+        '</td>' +
+        '<td data-label="Aksi">' +
+          '<div class="x-item-actions">' +
+            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi banner ' + esc(item.title) + '" data-banner-action="' + esc(item.id) + '">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
+            '</button>' +
+          '</div>' +
+        '</td>' +
+      '</tr>';
+    }).join('');
+
+    tbody.querySelectorAll('[data-banner-toggle]').forEach(function (input) {
+      input.addEventListener('change', function () {
+        _marketingBannerUiState[input.dataset.bannerToggle] = input.checked;
+        renderMarketingBannersSkeleton();
+      });
+    });
+
+    tbody.querySelectorAll('[data-banner-action]').forEach(function (trigger) {
+      var item = _marketingBannerMockData.find(function (entry) { return entry.id === trigger.dataset.bannerAction; });
+      if (!item) return;
+      trigger.addEventListener('click', function () {
+        var effectiveStatus = getMarketingBannerEffectiveStatus(item);
+        var actions = [];
+        if (item.publication !== 'Published') {
+          actions = [
+            { label: 'Lihat Preview', icon: '👁️', onClick: function () { showToast('Preview Banner: ' + item.title); } },
+            { label: 'Edit Draft', icon: '✏️', onClick: function () { showToast('Edit Draft placeholder.'); } },
+            { label: 'Atur Jadwal', icon: '🗓️', onClick: function () { showToast('Scheduling UI placeholder.'); } },
+            { label: 'Publish', icon: '🚀', onClick: function () { showToast('Publish workflow placeholder.'); } },
+            { label: 'Hapus Draft', icon: '🗑️', destructive: true, onClick: function () { showToast('Delete placeholder.'); } }
+          ];
+        } else if (effectiveStatus === 'ENDED') {
+          actions = [
+            { label: 'Lihat Preview', icon: '👁️', onClick: function () { showToast('Preview Banner: ' + item.title); } },
+            { label: 'Gunakan Lagi', icon: '↻', onClick: function () { showToast('Re-use / reschedule placeholder.'); } },
+            { label: 'Edit Banner', icon: '✏️', onClick: function () { showToast('Edit Banner placeholder.'); } },
+            { label: 'Hapus', icon: '🗑️', destructive: true, onClick: function () { showToast('Delete placeholder.'); } }
+          ];
+        } else {
+          actions = [
+            { label: 'Lihat Preview', icon: '👁️', onClick: function () { showToast('Preview Banner: ' + item.title); } },
+            { label: 'Edit Banner', icon: '✏️', onClick: function () { showToast('Published edit / draft revision placeholder.'); } },
+            { label: 'Atur Jadwal', icon: '🗓️', onClick: function () { showToast('Schedule editor placeholder.'); } },
+            { label: 'Unpublish', icon: '↩️', onClick: function () { showToast('Unpublish placeholder.'); } }
+          ];
+        }
+        window.XentraActionMenu.open(trigger, actions);
+      });
+    });
+  }
+  window.renderMarketingBannersSkeleton = renderMarketingBannersSkeleton;
 
   async function loadMarketingOverview() {
     try {
