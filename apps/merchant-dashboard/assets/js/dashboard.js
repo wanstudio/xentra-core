@@ -7828,6 +7828,12 @@
     var subtitle = $('modal-marketing-banner-subtitle');
     var placement = $('mkt-banner-create-placement');
     var saveBtn = $('mkt-banner-save-draft');
+    var editorPreviewBtn = $('mkt-banner-preview-from-editor');
+    if (editorPreviewBtn && !editorPreviewBtn.dataset.bound) {
+      editorPreviewBtn.dataset.bound = '1';
+      editorPreviewBtn.addEventListener('click', previewMarketingBannerEditor);
+    }
+
     var publishBtn = $('mkt-banner-publish-action');
     var stateEl = $('mkt-banner-editor-state');
 
@@ -8355,6 +8361,54 @@
     }
   }
   window.deleteMarketingBanner = deleteMarketingBanner;
+
+  function previewMarketingBannerEditor() {
+    var modal = $('modal-marketing-banner-preview');
+    var stage = $('mkt-banner-preview-stage');
+    var meta = $('mkt-banner-preview-meta');
+
+    if (!modal || !stage) return;
+
+    var title = $('mkt-banner-title-field') ? $('mkt-banner-title-field').value.trim() : 'Banner';
+    var alt = $('mkt-banner-alt-field') ? $('mkt-banner-alt-field').value.trim() : title;
+    var src = $('mkt-banner-preview') ? $('mkt-banner-preview').src : '';
+    var ctaType = $('mkt-banner-cta-type') ? $('mkt-banner-cta-type').value : 'NONE';
+    var scheduleEnabled = $('mkt-banner-schedule-enabled') ? $('mkt-banner-schedule-enabled').checked : false;
+    var startsAt = scheduleEnabled && $('mkt-banner-starts-at') ? $('mkt-banner-starts-at').value : '';
+    var endsAt = scheduleEnabled && $('mkt-banner-ends-at') ? $('mkt-banner-ends-at').value : '';
+    var selectedBranches = getSelectedMarketingBannerBranchIds();
+
+    $('modal-banner-preview-title').textContent = title || 'Preview Banner';
+    $('modal-banner-preview-subtitle').textContent = 'Review / Preview · Belum dipublish';
+
+    var img = src
+      ? '<img src="' + esc(src) + '" alt="' + esc(alt || title || 'Banner') + '">'
+      : '<div class="x-marketing-banner-preview-stage-empty">Belum ada media preview.</div>';
+
+    stage.innerHTML =
+      img +
+      '<div class="x-marketing-banner-preview-stage-caption">' +
+        '<strong>' + esc(title || 'Tanpa judul') + '</strong>' +
+        '<span>' + esc(ctaType || 'NONE') + '</span>' +
+      '</div>';
+
+    var branchNames = [];
+    (_marketingBannersState.branches || []).forEach(function (branch) {
+      if (selectedBranches.indexOf(String(branch.id)) >= 0) {
+        branchNames.push(branch.name || branch.id);
+      }
+    });
+
+    meta.innerHTML = [
+      '<div><span>Mode</span><strong>Draft / Review</strong></div>',
+      '<div><span>CTA</span><strong>' + esc(ctaType || 'NONE') + '</strong></div>',
+      '<div><span>Cabang</span><strong>' + esc(branchNames.length ? branchNames.join(', ') : 'Belum ditempatkan') + '</strong></div>',
+      '<div><span>Schedule</span><strong>' + esc(scheduleEnabled ? ((startsAt || 'Mulai belum diisi') + (endsAt ? ' → ' + endsAt : '')) : 'Tanpa jadwal') + '</strong></div>'
+    ].join('');
+
+    modal.style.display = 'flex';
+  }
+  window.previewMarketingBannerEditor = previewMarketingBannerEditor;
 
   function openMarketingBannerPreview(key) {
     var row = findMarketingBannerRow(key);
