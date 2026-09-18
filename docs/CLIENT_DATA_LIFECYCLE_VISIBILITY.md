@@ -111,3 +111,31 @@ Do not assume browser cache first. Prove the state across:
 5. cache/revalidation.
 
 Only after those are proven correct should the issue be classified as a client cache problem.
+
+
+## 🔒 Locked Addendum — Production DB / Demo Seed Isolation & npm test Safety
+
+**Decision Date: 2026-09-19**  
+**Status: LOCKED / AUTHORITATIVE**
+
+### Production Rule
+Normal production startup may initialize schema and execute required migrations, but MUST NOT execute demo/dummy seed logic. Demo seed must be an explicit development/demo operation and must never be coupled to production startup.
+
+### Empty Is Not Virgin
+A production database containing zero branches/products is still a production database. Empty state MUST NOT trigger demo seeding. Deleting the final client-owned entity and restarting must leave the production state empty.
+
+### Test Isolation Rule
+`npm test` MUST be isolated from the production database. Tests must use `:memory:` or an explicitly isolated temporary DB. Production DB paths must be rejected even when supplied through `DB_PATH`, inherited environment, subprocesses, wrappers, or lifecycle variables.
+
+### Bootstrap Boundary
+Separate schema/migration initialization from demo provisioning. Do not use record-count heuristics as the authoritative signal for whether production may seed demo data.
+
+### Preservation Rule
+The fix MUST NOT reset, replace, truncate, or reseed the existing production DB. Existing client/owner data, auth, catalog, promotions, media, history, and other business state must remain intact.
+
+### Acceptance
+- Production restart never creates/recreates demo branches, categories, products, assignments, banners, promotions, or fixtures.
+- Deliberately empty production state remains empty after restart.
+- `npm test` cannot mutate production DB.
+- Explicit demo seeding remains possible only via intentional development/demo invocation.
+- Tests cover fresh DB, deliberately empty DB, restart, production startup, npm test, subprocess isolation, and explicit demo seed.
