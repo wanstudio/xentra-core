@@ -8,6 +8,7 @@
 
   var navStack = [];
   var isHandlingPopstate = false;
+  var suppressNextPopstate = 0;
 
   window.XentraNav = {
     pushClose: function (fn) {
@@ -25,13 +26,17 @@
           try { fn(); } catch (e) { console.warn(e); }
         }
         // If closed manually via button or backdrop (not via back gesture),
-        // unwind one history state so history stays in sync
+        // unwind one history state so history stays in sync, and suppress
+        // the resulting popstate event so it does not pop another overlay.
         if (!isHandlingPopstate) {
+          suppressNextPopstate++;
           try {
             if (window.history && typeof window.history.back === 'function') {
               window.history.back();
             }
-          } catch (_) {}
+          } catch (_) {
+            suppressNextPopstate = Math.max(0, suppressNextPopstate - 1);
+          }
         }
         return true;
       }
@@ -47,6 +52,10 @@
 
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('popstate', function (e) {
+      if (suppressNextPopstate > 0) {
+        suppressNextPopstate--;
+        return;
+      }
       if (window.XentraNav.hasOpen()) {
         isHandlingPopstate = true;
         try {

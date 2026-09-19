@@ -526,6 +526,111 @@ test('LOC-09: Navigation stack contract — overlays close in LIFO order without
   assert.strictEqual(c4, false);
 });
 
+test('LOC-09-B: Nested Navigation Regression Tests — Manual close and popstate suppression', () => {
+  const NAV_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/nav.js');
+  delete require.cache[NAV_PATH];
+
+  const listeners = {};
+  const historyStack = ['initial'];
+  const mockWindow = {
+    addEventListener: (ev, cb) => { listeners[ev] = cb; },
+    history: {
+      pushState: (state) => { historyStack.push(state); },
+      back: () => {
+        historyStack.pop();
+        if (typeof listeners['popstate'] === 'function') {
+          listeners['popstate']({ state: historyStack[historyStack.length - 1] });
+        }
+      }
+    }
+  };
+
+  globalThis.window = mockWindow;
+  require(NAV_PATH);
+
+  const XNav = mockWindow.XentraNav;
+  assert.strictEqual(XNav.hasOpen(), false);
+
+  // Case 6: No stack -> XentraNav.close() returns false
+  assert.strictEqual(XNav.close(), false);
+
+  // Setup Stack:
+  // A = Checkout Address Sheet
+  // B = Map Picker
+  // C = Detail Alamat
+  let closedA = false;
+  let closedB = false;
+  let closedC = false;
+
+  XNav.pushClose(() => { closedA = true; });
+  XNav.pushClose(() => { closedB = true; });
+  XNav.pushClose(() => { closedC = true; });
+
+  assert.strictEqual(XNav.hasOpen(), true);
+
+  // Case 1: Manual XentraNav.close() on stack [A, B, C]
+  // Expected: C closed, A + B remain, B must NOT be closed (history.back popstate suppressed)
+  const resC = XNav.close();
+  assert.strictEqual(resC, true);
+  assert.strictEqual(closedC, true, 'C must be closed');
+  assert.strictEqual(closedB, false, 'B must NOT be closed');
+  assert.strictEqual(closedA, false, 'A must NOT be closed');
+  assert.strictEqual(XNav.hasOpen(), true, 'Stack still has remaining overlays');
+
+  // Case 2: Manual close B after C already closed
+  // Expected: B closed, A remains
+  const resB = XNav.close();
+  assert.strictEqual(resB, true);
+  assert.strictEqual(closedB, true, 'B must be closed');
+  assert.strictEqual(closedA, false, 'A must NOT be closed');
+  assert.strictEqual(XNav.hasOpen(), true, 'A remains in stack');
+
+  // Clean up remaining overlay A
+  const resA = XNav.close();
+  assert.strictEqual(resA, true);
+  assert.strictEqual(closedA, true);
+  assert.strictEqual(XNav.hasOpen(), false);
+
+  // Test browser popstate / back event sequence (Cases 3, 4, 5)
+  // Re-initialize stack: A, B, C
+  let popClosedA = 0;
+  let popClosedB = 0;
+  let popClosedC = 0;
+
+  XNav.pushClose(() => { popClosedA++; });
+  XNav.pushClose(() => { popClosedB++; });
+  XNav.pushClose(() => { popClosedC++; });
+
+  assert.strictEqual(XNav.hasOpen(), true);
+
+  // Case 3: Browser popstate/back event with stack A+B+C
+  // Expected: only C closes
+  listeners['popstate']({ state: historyStack[historyStack.length - 1] });
+  assert.strictEqual(popClosedC, 1, 'C must close on first back event');
+  assert.strictEqual(popClosedB, 0, 'B must NOT close on first back event');
+  assert.strictEqual(popClosedA, 0, 'A must NOT close on first back event');
+  assert.strictEqual(XNav.hasOpen(), true);
+
+  // Case 4: Next back event
+  // Expected: only B closes
+  listeners['popstate']({ state: historyStack[historyStack.length - 1] });
+  assert.strictEqual(popClosedC, 1, 'C close count unchanged');
+  assert.strictEqual(popClosedB, 1, 'B must close on second back event');
+  assert.strictEqual(popClosedA, 0, 'A must NOT close on second back event');
+  assert.strictEqual(XNav.hasOpen(), true);
+
+  // Case 5: Next back event
+  // Expected: only A closes
+  listeners['popstate']({ state: historyStack[historyStack.length - 1] });
+  assert.strictEqual(popClosedC, 1);
+  assert.strictEqual(popClosedB, 1);
+  assert.strictEqual(popClosedA, 1, 'A must close on third back event');
+  assert.strictEqual(XNav.hasOpen(), false, 'Nav stack must be empty after all overlays closed');
+
+  // Case 6 again: Calling close when stack empty returns false
+  assert.strictEqual(XNav.close(), false);
+});
+
 test('LOC-10: Location Picker Flow D — Detail Alamat validation and separation of Active Destination vs Favorite Address', () => {
   const client = freshClientContext();
   const Store = client.Store;
