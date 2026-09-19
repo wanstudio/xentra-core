@@ -30,6 +30,7 @@ class OrderPlacementService {
     scheduled_slot_start = null,
     scheduled_slot_end = null,
     payment_method = 'midtrans',
+    cash_tendered = null,
     order_channel = 'customer_app',
     order_type = 'delivery',
     selection_mode = null,
@@ -184,6 +185,7 @@ class OrderPlacementService {
         status: insertedStatus,
         orderNote: notes,
         diningSessionId: dining_session_id || null,
+        cashTendered: (effectivePaymentMethod === 'cash' && cash_tendered !== null && cash_tendered !== undefined) ? Number(cash_tendered) : null,
         createdAt: now,
         updatedAt: now
       });
@@ -328,7 +330,7 @@ class OrderPlacementService {
     return {
       success: true,
       status: 'VERIFIED',
-      order: { id: orderId, order_number: orderNumber, brand_id, branch_id, order_type: effectiveOrderType, order_channel, table_number, reservation_date, guest_count, subtotal, delivery_fee, grand_total: grandTotal, status: insertedStatus, items: verifiedItems, created_at: now }
+      order: { id: orderId, order_number: orderNumber, brand_id, branch_id, order_type: effectiveOrderType, order_channel, table_number, reservation_date, guest_count, subtotal, delivery_fee, grand_total: grandTotal, payment_method: effectivePaymentMethod, cash_tendered: (effectivePaymentMethod === 'cash' && cash_tendered !== null && cash_tendered !== undefined) ? Number(cash_tendered) : null, status: insertedStatus, items: verifiedItems, created_at: now }
     };
   }
 

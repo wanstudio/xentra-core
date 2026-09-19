@@ -546,6 +546,97 @@ router.post('/auth/otp/trust', (req, res) => {
   });
 });
 
+// 4.3 Customer Google Authentication Gate
+// POST /customer/auth/google
+// Verifies a Google ID token and issues a Xentra customer session (xnt_cust_).
+// This route is STRICTLY customer-only and MUST NOT issue workforce sessions.
+// Google ID token → verifiedClaims → xnt_cust_ token via createCustomerSession.
+// The Google sub/email are NEVER used as an internal customer ID.
+// This is separate from the workforce /auth/google route (line 3311) which
+// resolves user_auth_providers and issues xnt_auth_ workforce sessions.
+router.post('/customer/auth/google', async (req, res) => {
+  try {
+    const { credential, id_token } = req.body || {};
+    const rawToken = credential || id_token;
+
+    if (!rawToken) {
+      return res.status(400).json({
+        success: false,
+        code: 'MISSING_GOOGLE_CREDENTIAL',
+        error: 'Credential token Google wajib dikirim.'
+      });
+    }
+
+    // Rate limiting: 10 attempts per 5 minutes per IP
+    const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+    const rateLimitKey = `customer-google-auth:${req.brand_id}:${clientIp}`;
+    const rateCheck = RateLimiter.check(rateLimitKey, 10, 300);
+    if (!rateCheck.allowed) {
+      return res.status(429).json({
+        success: false,
+        code: 'TOO_MANY_REQUESTS',
+        error: `Terlalu banyak percobaan autentikasi Google. Coba lagi dalam ${rateCheck.retryAfter} detik.`
+      });
+    }
+
+    // Verify Google ID token using the shared GoogleAuthService
+    const googleAuth = new GoogleAuthService();
+    let verifiedClaims;
+    try {
+      verifiedClaims = await googleAuth.verifyIdToken(rawToken);
+    } catch (verifyErr) {
+      const status = verifyErr.status || 401;
+      return res.status(status).json({
+        success: false,
+        code: verifyErr.code || 'INVALID_GOOGLE_TOKEN',
+        error: verifyErr.message || 'Token Google tidak valid.'
+      });
+    }
+
+    // Customer MUST have a verified Google email to proceed
+    if (!verifiedClaims.email_verified) {
+      return res.status(400).json({
+        success: false,
+        code: 'UNVERIFIED_GOOGLE_EMAIL',
+        error: 'Email akun Google belum diverifikasi. Harap verifikasi email Google Anda terlebih dahulu.'
+      });
+    }
+
+    // Issue a Xentra customer session — using Google email as the customer identity key.
+    // The token prefix is xnt_cust_ (same as OTP-issued sessions), so requireCustomerAuth()
+    // and all downstream routes accept it without modification.
+    // Google sub is stored as google_sub in the session for audit; it is NEVER the internal customer ID.
+    const displayName = verifiedClaims.name || verifiedClaims.email.split('@')[0] || 'Pelanggan';
+    const customerSession = TokenSessionStore.createCustomerSession(
+      verifiedClaims.email,
+      req.brand_id,
+      2592000,  // 30 days TTL (same as OTP sessions)
+      { name: displayName, email: verifiedClaims.email, google_sub: verifiedClaims.sub }
+    );
+
+    RateLimiter.reset(rateLimitKey);
+
+    console.log(`[CUSTOMER_GOOGLE_AUTH] brand=${req.brand_id} email=${verifiedClaims.email.replace(/@.*/, '@...')} sub=${verifiedClaims.sub.substring(0, 8)}...`);
+
+    return res.json({
+      success: true,
+      token: customerSession.token,
+      expires_at: new Date(customerSession.expiresAt).toISOString(),
+      customer: {
+        name: displayName,
+        email: verifiedClaims.email
+      }
+    });
+  } catch (err) {
+    console.error('[CUSTOMER_GOOGLE_AUTH] Unexpected error:', err);
+    return res.status(500).json({
+      success: false,
+      code: 'AUTH_ERROR',
+      error: 'Terjadi kesalahan saat autentikasi. Coba lagi.'
+    });
+  }
+});
+
 // 5. Menu Catalog & Home
 router.get(['/catalog/menu', '/home'], async (req, res) => {
   try {
@@ -1009,6 +1100,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       address,
       items = [],
       payment_method = 'cash',
+      cash_tendered = null,
       note = '',
       order_note = ''
     } = req.body;
@@ -1036,6 +1128,23 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       });
     }
 
+    // COD CASH TENDER VALIDATION:
+    // If cash payment, cash_tendered must be a valid positive number if provided,
+    // and non-negative / non-empty when custom tender is specified.
+    let parsedCashTendered = null;
+    if (payment_method === 'cash') {
+      if (cash_tendered !== null && cash_tendered !== undefined && cash_tendered !== '') {
+        const numTendered = Number(cash_tendered);
+        if (!Number.isFinite(numTendered) || numTendered < 0 || isNaN(numTendered)) {
+          return res.status(400).json({
+            success: false,
+            error: 'Nominal uang tunai (cash_tendered) tidak valid. Masukkan angka yang valid.'
+          });
+        }
+        parsedCashTendered = Math.round(numTendered);
+      }
+    }
+
     // P1 CUSTOMER IDENTITY BINDING (NEW-02): Extract customer session token
     const authHeader = req.headers['authorization'] || '';
     const customerToken = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : (req.headers['x-auth-token'] || req.headers['x-customer-token'] || '').trim();
@@ -1050,14 +1159,15 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
 
     const customerSession = TokenSessionStore.getSession(customerToken);
 
-    // CUSTOMER AUTH BOUNDARY: Checkout requires a valid OTP-verified customer session.
+    // CUSTOMER AUTH BOUNDARY: Checkout requires a valid authenticated customer session.
+    // Sessions may be issued via OTP (xnt_cust_ prefix) or Google Identity Gate (also xnt_cust_ prefix).
     // The server is the sole authority for customer identity — client-provided phone
     // is never trusted as the sole identity source for order creation.
     if (!customerSession || (customerSession.type !== 'customer' && customerSession.role !== 'customer')) {
       return res.status(401).json({
         success: false,
         error: 'INVALID_OR_EXPIRED_CUSTOMER_SESSION',
-        message: 'Sesi akun customer Anda tidak valid atau telah kedaluwarsa. Silakan verifikasi OTP kembali.'
+        message: 'Sesi akun customer Anda tidak valid atau telah kedaluwarsa. Silakan masuk kembali untuk melanjutkan.'
       });
     }
 
@@ -1069,8 +1179,15 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       });
     }
 
-    // Authoritative phone from OTP session — never from request body
+    // Authoritative identity from customer session — never from request body.
+    // For OTP sessions: phone is the WhatsApp number.
+    // For Google sessions: phone field holds the Google email (used as contact identifier).
     customer.phone = customerSession.phone;
+
+    // For Google-auth sessions, also propagate name from session if request body name is missing.
+    if (!customer.name && customerSession.name) {
+      customer.name = customerSession.name;
+    }
 
     // Locked Decision: Customer information must be valid
     if (!customer.phone || !customer.phone.trim()) {
@@ -1079,6 +1196,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     if (!customer.name || !customer.name.trim()) {
       return res.status(400).json({ success: false, error: 'Nama customer wajib diisi.' });
     }
+
 
     // P1 RECONCILIATION-AWARE CHECKOUT RECOVERY (NEW-01 & NEW-03):
     // If this customer already has an existing order in 'reconciliation_pending', query gateway before creating duplicate orders
@@ -1376,6 +1494,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       scheduled_slot_start: scheduled_slot_start || null,
       scheduled_slot_end: scheduled_slot_end || null,
       payment_method,
+      cash_tendered: parsedCashTendered,
       order_channel: 'customer_app',
       order_type,
       selection_mode,
@@ -1491,8 +1610,12 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       subtotal,
       delivery_fee: deliveryFee,
       discount_amount: discountAmount,
+      cash_tendered: parsedCashTendered,
+      expected_change: (payment_method === 'cash' && parsedCashTendered !== null) ? Math.max(0, parsedCashTendered - grandTotal) : null,
       payment: {
         method: payment_method,
+        cash_tendered: parsedCashTendered,
+        expected_change: (payment_method === 'cash' && parsedCashTendered !== null) ? Math.max(0, parsedCashTendered - grandTotal) : null,
         snap_token: snapResult.snap_token,
         redirect_url: snapResult.redirect_url
       },
@@ -1534,7 +1657,7 @@ const TokenSessionStore = {
     });
     return { token, expiresAt };
   },
-  createCustomerSession(phone, brand_id, ttlSeconds = 2592000) {
+  createCustomerSession(phone, brand_id, ttlSeconds = 2592000, extra = {}) {
     const token = 'xnt_cust_' + crypto.randomBytes(24).toString('hex');
     const expiresAt = Date.now() + ttlSeconds * 1000;
     const sessionData = {
@@ -1546,6 +1669,14 @@ const TokenSessionStore = {
       brand_id: brand_id,
       expiresAt
     };
+
+    // Optional extra fields for Google-authenticated customers
+    if (extra && typeof extra === 'object') {
+      if (extra.name)       sessionData.name = String(extra.name);
+      if (extra.email)      sessionData.email = String(extra.email);
+      if (extra.google_sub) sessionData.google_sub = String(extra.google_sub);
+    }
+
     this.sessions.set(token, sessionData);
 
     try {
@@ -1643,7 +1774,7 @@ function requireCustomerAuth() {
       return res.status(401).json({
         success: false,
         error: 'CUSTOMER_AUTH_REQUIRED',
-        message: 'Akses ditolak: Nomor WhatsApp bukan kredensial. Harap login dan verifikasi OTP untuk mengakses data alamat pribadi Anda.'
+        message: 'Akses ditolak: Sesi customer tidak ditemukan. Harap masuk terlebih dahulu untuk mengakses layanan ini.'
       });
     }
 
@@ -1652,7 +1783,7 @@ function requireCustomerAuth() {
       return res.status(401).json({
         success: false,
         error: 'INVALID_OR_EXPIRED_CUSTOMER_SESSION',
-        message: 'Sesi akun customer Anda tidak valid atau telah kedaluwarsa. Silakan verifikasi OTP kembali.'
+        message: 'Sesi akun customer Anda tidak valid atau telah kedaluwarsa. Silakan masuk kembali untuk melanjutkan.'
       });
     }
 
@@ -2046,6 +2177,10 @@ router.get('/orders/:id', (req, res) => {
     grand_total: order.grand_total,
     payment_method: order.payment_method,
     payment_status: order.payment_status || (payment ? payment.payment_status : 'pending'),
+    cash_tendered: order.cash_tendered !== null && order.cash_tendered !== undefined ? Number(order.cash_tendered) : null,
+    expected_change: (order.payment_method === 'cash' && order.cash_tendered !== null && order.cash_tendered !== undefined)
+      ? Math.max(0, Number(order.cash_tendered) - Number(order.grand_total))
+      : null,
     order_note: order.order_note,
     created_at: order.created_at,
     updated_at: order.updated_at,
@@ -2079,6 +2214,10 @@ router.get('/orders/:id', (req, res) => {
   const safePayment = payment ? {
     payment_method: payment.payment_method || payment.provider,
     payment_status: payment.payment_status,
+    cash_tendered: order.cash_tendered !== null && order.cash_tendered !== undefined ? Number(order.cash_tendered) : null,
+    expected_change: (order.payment_method === 'cash' && order.cash_tendered !== null && order.cash_tendered !== undefined)
+      ? Math.max(0, Number(order.cash_tendered) - Number(order.grand_total))
+      : null,
     snap_token: payment.snap_token || null,
     amount: payment.amount,
     settled_at: payment.settled_at,

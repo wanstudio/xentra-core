@@ -4095,3 +4095,185 @@ body:has(#x-checkout-note-overlay.open){
   transform:scale(0.98) !important;
   opacity:0.9 !important;
 }
+
+/* =========================================================
+   COD CASH TENDER BOTTOM SHEET
+   ========================================================= */
+.x-tender-sheet {
+  padding: 4px 18px max(20px, calc(16px + env(safe-area-inset-bottom, 0px))) 18px;
+  font-family: var(--x-font, 'Plus Jakarta Sans', sans-serif);
+}
+
+.x-tender-header {
+  margin-bottom: 20px;
+}
+
+.x-tender-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 6px 0;
+}
+
+.x-tender-subtitle {
+  font-size: 13.5px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.x-tender-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.x-tender-preset-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.x-tender-preset-card:active {
+  transform: scale(0.98);
+}
+
+.x-tender-preset-card.is-selected {
+  border-color: var(--x-primary, #00a637);
+  background: var(--x-primary-bg, #f0fdf4);
+}
+
+.x-tender-preset-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.x-tender-custom-card {
+  border-radius: 14px;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.x-tender-custom-card.is-selected {
+  border-color: var(--x-primary, #00a637);
+  background: var(--x-primary-bg, #f0fdf4);
+}
+
+.x-tender-custom-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.x-tender-custom-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.x-tender-radio {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: #fff;
+  transition: border-color 0.15s;
+}
+
+.x-tender-radio-inner {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background-color 0.15s;
+}
+
+.is-selected .x-tender-radio {
+  border-color: var(--x-primary, #00a637);
+}
+
+.is-selected .x-tender-radio-inner {
+  background: var(--x-primary, #00a637);
+}
+
+.x-tender-custom-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.x-tender-custom-prefix {
+  position: absolute;
+  left: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #4b5563;
+  pointer-events: none;
+}
+
+.x-tender-custom-input {
+  width: 100%;
+  height: 46px;
+  border-radius: 10px;
+  border: 1.5px solid #d1d5db;
+  background: #fff;
+  padding: 0 14px 0 42px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+}
+
+.x-tender-custom-input:focus {
+  border-color: var(--x-primary, #00a637);
+  box-shadow: 0 0 0 3px rgba(0, 166, 55, 0.12);
+}
+
+.x-tender-confirm-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: 999px;
+  border: none;
+  background: var(--x-primary, #00a637);
+  color: var(--x-primary-text, #fff);
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+  font-family: inherit;
+}
+
+.x-tender-confirm-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.x-tender-confirm-btn:not(:disabled):active {
+  transform: scale(0.98);
+}
+

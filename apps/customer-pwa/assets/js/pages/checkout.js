@@ -62,7 +62,8 @@
     discount: 0,
     matchedBranch: null,
     deliveryQuote: null,
-    paymentMethod: 'cash',
+    paymentMethod: null,
+    cashTendered: null,
     isSubmitting: false
   };
 
@@ -765,6 +766,15 @@
       '        </div>' +
       '      </button>' +
       '    </div>' +
+      (state.paymentMethod === 'cash' && state.cashTendered ? (
+        '    <div id="x-tender-selected-summary" style="margin-top:12px;padding:10px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;display:flex;align-items:center;justify-content:space-between;">' +
+        '      <div style="display:flex;flex-direction:column;">' +
+        '        <span style="font-size:11.5px;color:#6b7280;font-weight:500;">Uang Tunai Disiapkan</span>' +
+        '        <span style="font-size:14px;font-weight:800;color:#111827;">' + fmtIDR(state.cashTendered) + '</span>' +
+        '      </div>' +
+        '      <button type="button" id="x-btn-change-tender" style="border:none;background:#e5e7eb;color:#374151;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit;">Ubah</button>' +
+        '    </div>'
+      ) : '') +
       '    <div class="x-alt-trust" style="font-size:11.5px;color:#6b7280;text-align:center;margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:3px;">' +
       '      <div style="display:flex;align-items:center;gap:4px;"><span>🔒</span><span>Transaksi aman dan terenkripsi</span></div>' +
       '      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#888;"><span>Diproses oleh</span><span style="color:#00a3e0;font-weight:700;">midtrans</span></div>' +
@@ -1178,8 +1188,30 @@
     var btnAddr = $('x-btn-change-address'); if (btnAddr) btnAddr.onclick = openAddressSheet;
     var addrCard = $('x-card-address'); if (addrCard) addrCard.addEventListener('click', function (e) { if (e.target.closest('button')) return; openAddressSheet(); });
 
-    var optCash = $('x-opt-cash'); if (optCash) optCash.onclick = function () { state.paymentMethod = 'cash'; syncPayVisual(); };
-    var optOn = $('x-opt-online'); if (optOn) optOn.onclick = function () { state.paymentMethod = 'midtrans'; syncPayVisual(); };
+    var optCash = $('x-opt-cash');
+    if (optCash) {
+      optCash.onclick = function () {
+        openCashTenderSheet();
+      };
+    }
+
+    var btnChangeTender = $('x-btn-change-tender');
+    if (btnChangeTender) {
+      btnChangeTender.onclick = function (e) {
+        if (e) e.stopPropagation();
+        openCashTenderSheet();
+      };
+    }
+
+    var optOn = $('x-opt-online');
+    if (optOn) {
+      optOn.onclick = function () {
+        state.paymentMethod = 'midtrans';
+        state.cashTendered = null;
+        renderLayout();
+        syncPayVisual();
+      };
+    }
 
     var submit = $('x-btn-submit-order'); if (submit) submit.onclick = executePrePaymentAndSubmit;
 
@@ -2094,12 +2126,199 @@
       };
     }
   }
+  // ── 2. Customer Auth — Google Identity Gate ──
+  // R3: Google is the primary Customer authentication method.
+  // OTP infrastructure (renderOtpPhoneStep / renderOtpVerifyStep) is preserved
+  // below for recovery / future step-up auth flows, but is NOT called from the
+  // normal checkout gate.
+  //
+  // Flow:
+  //   openCustomerAuthSheet(onSuccess)
+  //     → renders lightweight Google sign-in sheet
+  //     → customer clicks "Lanjutkan dengan Google"
+  //     → Google GSI prompt opens (or One Tap)
+  //     → credential callback: google.accounts.id.initialize handler
+  //     → POST /customer/auth/google { credential }
+  //     → server verifies Google token → issues xnt_cust_ session
+  //     → Store.setCustomerSession({ name, token })
+  //     → sh.close()
+  //     → onSuccess()
+  //
+  // Safety invariants:
+  //   - Auth failure → STOP. Button re-enabled. NO order created.
+  //   - Google popup close / cancel → sheet stays open or re-enables. NO order.
+  //   - Google ID token is NEVER stored as customerSession.token.
+  //   - Double-click protected by inFlight flag.
+  //   - Enter key follows same path as CTA click.
+  var _googleAuthInFlight = false;
 
-  // ── 2. Customer Auth / OTP Verification Sheet ──
-  // Two-step flow: phone entry → OTP entry. Server OTP endpoints are the sole
-  // authority for customer identity. Client never generates tokens.
   function openCustomerAuthSheet(onSuccess) {
-    renderOtpPhoneStep(state.customer.phone || '', state.customer.name || '', onSuccess);
+    _googleAuthInFlight = false;
+    renderGoogleIdentityGate(onSuccess);
+  }
+
+  function renderGoogleIdentityGate(onSuccess) {
+    var sh = makeOverlay(
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">' +
+        '<h3 class="x-alt-sheet-title" style="margin:0;font-size:17px;">Satu langkah lagi</h3>' +
+        '<button type="button" class="x-ggate-close-btn" style="background:none;border:0;font-size:24px;color:#9ca3af;cursor:pointer;line-height:1;padding:4px 8px;">&times;</button>' +
+      '</div>' +
+      '<p style="font-size:14px;color:#6b7280;margin:0 0 20px;line-height:1.5;">Masuk dengan Google untuk melanjutkan pesananmu. Keranjang dan detail pengiriman tetap tersimpan.</p>' +
+      '<button type="button" id="x-btn-google-auth" style="' +
+        'width:100%;display:flex;align-items:center;justify-content:center;gap:10px;' +
+        'padding:13px 16px;border:1.5px solid #e5e7eb;border-radius:10px;' +
+        'background:#fff;color:#111;font-size:15px;font-weight:600;cursor:pointer;' +
+        'font-family:inherit;transition:background 0.15s;' +
+      '">' +
+        '<svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">' +
+          '<path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-21.5 0-1.4-.1-2.7-.5-4.5z"/>' +
+        '</svg>' +
+        'Lanjutkan dengan Google' +
+      '</button>' +
+      '<div id="x-ggate-error" style="display:none;margin-top:12px;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:13px;color:#dc2626;"></div>'
+    );
+
+    var closeBtn = sh.overlay.querySelector('.x-ggate-close-btn');
+    if (closeBtn) {
+      closeBtn.onclick = function () {
+        // Cancel → return to checkout. No order created.
+        _googleAuthInFlight = false;
+        sh.close();
+      };
+    }
+
+    var googleBtn = sh.overlay.querySelector('#x-btn-google-auth');
+    var errorEl   = sh.overlay.querySelector('#x-ggate-error');
+
+    function showGateError(msg) {
+      _googleAuthInFlight = false;
+      if (googleBtn) {
+        googleBtn.disabled = false;
+        googleBtn.textContent = 'Lanjutkan dengan Google';
+      }
+      if (errorEl) {
+        errorEl.textContent = msg || 'Autentikasi Google gagal. Silakan coba lagi.';
+        errorEl.style.display = 'block';
+      }
+      if (UI && UI.toast) UI.toast(msg || 'Autentikasi Google gagal. Silakan coba lagi.');
+    }
+
+    // Handle the Google credential callback
+    function handleGoogleCredential(response) {
+      if (_googleAuthInFlight) return; // double-submit guard
+      if (!response || !response.credential) {
+        showGateError('Google tidak mengembalikan credential. Silakan coba lagi.');
+        return;
+      }
+      _googleAuthInFlight = true;
+      if (googleBtn) {
+        googleBtn.disabled = true;
+        googleBtn.textContent = 'Memverifikasi…';
+      }
+      if (errorEl) errorEl.style.display = 'none';
+
+      // Exchange Google credential for Xentra customer session.
+      // The Google token is NEVER stored directly — it is exchanged server-side.
+      API.post('/customer/auth/google', { credential: response.credential })
+        .then(function (res) {
+          if (res && res.success && res.token) {
+            var customerName = (res.customer && res.customer.name) || state.customer.name || 'Pelanggan';
+            var customerEmail = (res.customer && res.customer.email) || '';
+
+            // Store Xentra customer session (xnt_cust_ token), NOT the Google credential
+            Store.setCustomerSession({
+              name: customerName,
+              phone: customerEmail,   // phone field carries Google email for Google-auth sessions
+              token: res.token
+            });
+
+            state.customer.name = customerName;
+            state.customer.isVerified = true;
+
+            _googleAuthInFlight = false;
+            sh.close();
+
+            // Re-render to reflect authenticated state
+            renderLayout();
+            calculateTotals();
+
+            if (UI && UI.toast) UI.toast('Berhasil masuk dengan Google!');
+
+            // Invoke caller's success callback (typically re-triggers checkout submission)
+            if (typeof onSuccess === 'function') {
+              try { onSuccess(); } catch (e) { console.error('[Google Auth Callback]', e); }
+            }
+          } else {
+            // Backend returned a non-success body — fail closed
+            var errMsg = (res && (res.error || res.message)) || 'Autentikasi Google gagal. Coba lagi.';
+            showGateError(errMsg);
+          }
+        })
+        .catch(function (err) {
+          // Network/server error — fail closed. NO order created.
+          var msg = (err && err.data && (err.data.error || err.data.message)) ||
+                    (err && err.message) ||
+                    'Gagal menghubungi server. Periksa koneksi lalu coba lagi.';
+          showGateError(msg);
+        });
+    }
+
+    // Attach click handler — also serves as the Enter-key equivalent (button is focusable)
+    if (googleBtn) {
+      googleBtn.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+          e.preventDefault();
+          googleBtn.click();
+        }
+      });
+
+      googleBtn.onclick = function () {
+        if (_googleAuthInFlight) return; // double-click guard
+
+        // Attempt to use Google GSI library if available.
+        // GSI renders a prompt/button; the credential arrives in handleGoogleCredential().
+        var gsi = window.google && window.google.accounts && window.google.accounts.id;
+        if (gsi) {
+          _googleAuthInFlight = true;
+          if (googleBtn) {
+            googleBtn.disabled = true;
+            googleBtn.textContent = 'Membuka Google…';
+          }
+          try {
+            var googleClientId = (window.XentraConfig && window.XentraConfig.googleClientId) || '';
+            gsi.initialize({
+              client_id: googleClientId,
+              callback: function (credResponse) {
+                // credential arrives asynchronously after user picks account
+                _googleAuthInFlight = false;
+                handleGoogleCredential(credResponse);
+              },
+              cancel_on_tap_outside: false
+            });
+            gsi.prompt(function (notification) {
+              if (notification.isSkippedMoment() || notification.isDismissedMoment()) {
+                // User closed popup — remain on checkout, re-enable button
+                _googleAuthInFlight = false;
+                if (googleBtn) {
+                  googleBtn.disabled = false;
+                  googleBtn.textContent = 'Lanjutkan dengan Google';
+                }
+              }
+            });
+          } catch (gsiErr) {
+            _googleAuthInFlight = false;
+            if (googleBtn) {
+              googleBtn.disabled = false;
+              googleBtn.textContent = 'Lanjutkan dengan Google';
+            }
+            showGateError('Gagal membuka Google Sign-In. Periksa koneksi lalu coba lagi.');
+          }
+        } else {
+          // GSI library not loaded yet — show a clear error, remain on checkout
+          showGateError('Library Google Sign-In belum dimuat. Periksa koneksi internet Anda lalu muat ulang halaman.');
+        }
+      };
+    }
   }
 
   function renderOtpPhoneStep(phone, name, onSuccess) {
@@ -2462,6 +2681,148 @@
     };
   }
 
+  // ── 5b. COD Cash Tender Selection Sheet ──
+  function openCashTenderSheet() {
+    var selectedType = '100k';
+    var customValue = '';
+
+    if (state.cashTendered === 50000) {
+      selectedType = '50k';
+    } else if (state.cashTendered === 100000) {
+      selectedType = '100k';
+    } else if (state.cashTendered != null && Number(state.cashTendered) > 0) {
+      selectedType = 'custom';
+      customValue = String(Math.floor(Number(state.cashTendered)));
+    }
+
+    var sheetHtml =
+      '<div class="x-tender-sheet">' +
+      '  <div class="x-tender-header">' +
+      '    <h3 class="x-tender-title">Bayar dengan uang berapa?</h3>' +
+      '    <p class="x-tender-subtitle">Driver akan menyiapkan uang kembalian.</p>' +
+      '  </div>' +
+      '  <div class="x-tender-presets">' +
+      '    <div class="x-tender-preset-card' + (selectedType === '50k' ? ' is-selected' : '') + '" id="x-preset-50k">' +
+      '      <span class="x-tender-preset-val">Rp50.000</span>' +
+      '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
+      '    </div>' +
+      '    <div class="x-tender-preset-card' + (selectedType === '100k' ? ' is-selected' : '') + '" id="x-preset-100k">' +
+      '      <span class="x-tender-preset-val">Rp100.000</span>' +
+      '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
+      '    </div>' +
+      '  </div>' +
+      '  <div class="x-tender-custom-card' + (selectedType === 'custom' ? ' is-selected' : '') + '" id="x-tender-custom-box">' +
+      '    <div class="x-tender-custom-header" id="x-tender-custom-toggle">' +
+      '      <span class="x-tender-custom-label">Custom</span>' +
+      '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
+      '    </div>' +
+      '    <div class="x-tender-custom-input-wrap">' +
+      '      <span class="x-tender-custom-prefix">Rp</span>' +
+      '      <input type="number" inputmode="numeric" id="x-tender-custom-input" class="x-tender-custom-input" placeholder="0" value="' + UI.escape(customValue) + '">' +
+      '    </div>' +
+      '  </div>' +
+      '  <button type="button" class="x-tender-confirm-btn" id="x-btn-confirm-tender">Konfirmasi</button>' +
+      '</div>';
+
+    var sh = makeOverlay(sheetHtml);
+    var overlay = sh.overlay;
+
+    var elPreset50k = overlay.querySelector('#x-preset-50k');
+    var elPreset100k = overlay.querySelector('#x-preset-100k');
+    var elCustomBox = overlay.querySelector('#x-tender-custom-box');
+    var elCustomToggle = overlay.querySelector('#x-tender-custom-toggle');
+    var elCustomInput = overlay.querySelector('#x-tender-custom-input');
+    var elBtnConfirm = overlay.querySelector('#x-btn-confirm-tender');
+
+    function updateUi() {
+      if (elPreset50k) elPreset50k.classList.toggle('is-selected', selectedType === '50k');
+      if (elPreset100k) elPreset100k.classList.toggle('is-selected', selectedType === '100k');
+      if (elCustomBox) elCustomBox.classList.toggle('is-selected', selectedType === 'custom');
+
+      var isValid = false;
+      if (selectedType === '50k' || selectedType === '100k') {
+        isValid = true;
+      } else if (selectedType === 'custom') {
+        var num = parseInt(customValue, 10);
+        if (!isNaN(num) && num > 0) {
+          isValid = true;
+        }
+      }
+      if (elBtnConfirm) {
+        elBtnConfirm.disabled = !isValid;
+      }
+    }
+
+    if (elPreset50k) {
+      elPreset50k.onclick = function () {
+        selectedType = '50k';
+        updateUi();
+      };
+    }
+
+    if (elPreset100k) {
+      elPreset100k.onclick = function () {
+        selectedType = '100k';
+        updateUi();
+      };
+    }
+
+    function selectCustom() {
+      selectedType = 'custom';
+      updateUi();
+    }
+
+    if (elCustomToggle) {
+      elCustomToggle.onclick = function () {
+        selectCustom();
+        if (elCustomInput) elCustomInput.focus();
+      };
+    }
+
+    if (elCustomInput) {
+      elCustomInput.onfocus = function () {
+        selectCustom();
+      };
+      elCustomInput.onclick = function () {
+        selectCustom();
+      };
+      elCustomInput.oninput = function () {
+        selectCustom();
+        var val = elCustomInput.value.replace(/[^0-9]/g, '');
+        customValue = val;
+        elCustomInput.value = val;
+        updateUi();
+      };
+    }
+
+    if (elBtnConfirm) {
+      elBtnConfirm.onclick = function () {
+        var tendered = null;
+        if (selectedType === '50k') {
+          tendered = 50000;
+        } else if (selectedType === '100k') {
+          tendered = 100000;
+        } else if (selectedType === 'custom') {
+          var num = parseInt(customValue, 10);
+          if (!isNaN(num) && num > 0) {
+            tendered = num;
+          }
+        }
+
+        if (tendered === null) return;
+
+        state.paymentMethod = 'cash';
+        state.cashTendered = tendered;
+
+        sh.close();
+        renderLayout();
+        syncPayVisual();
+      };
+    }
+
+    updateUi();
+  }
+
   // ── 6. Pre-Payment Verification Gate Modal Dialog ──
   function showPrePaymentVerificationDialog(verificationData, onConfirm) {
     var diffs = verificationData.price_diffs || [];
@@ -2577,16 +2938,27 @@
       return;
     }
 
-    if (!state.customer.phone) {
-      if (UI && UI.toast) UI.toast('Silakan masukkan nomor WhatsApp pemesan.');
-      openCustomerAuthSheet();
+    if (!state.paymentMethod) {
+      if (UI && UI.toast) UI.toast('Silakan pilih metode pembayaran terlebih dahulu.');
       return;
     }
 
+    if (state.paymentMethod === 'cash' && (!state.cashTendered || Number(state.cashTendered) <= 0)) {
+      openCashTenderSheet();
+      return;
+    }
+
+    // R3: Auth gate — no phone-only pre-check; Google auth customers have no WhatsApp phone.
+    // The canonical gate is: does the customer have a valid xnt_cust_ session?
     var activeSession = Store.getState().customerSession;
     if (!activeSession || !activeSession.token || activeSession.token.indexOf('xnt_cust_') !== 0) {
-      if (UI && UI.toast) UI.toast('Silakan verifikasi nomor WhatsApp Anda terlebih dahulu.');
-      openCustomerAuthSheet();
+      // No valid session → open Google Identity Gate
+      openCustomerAuthSheet(function () {
+        // After successful Google auth, automatically retry the checkout submission
+        setTimeout(function () {
+          executePrePaymentAndSubmit();
+        }, 100);
+      });
       return;
     }
 
@@ -2636,7 +3008,7 @@
         Store.clearCustomerSession();
       }
       if (UI && UI.toast) {
-        UI.toast('Sesi Anda telah berakhir. Silakan masuk lagi dengan WhatsApp untuk melanjutkan.');
+        UI.toast('Sesi Anda telah berakhir. Silakan masuk kembali dengan Google untuk melanjutkan.');
       }
       // Step 2: Open customer authentication sheet with automatic retry on success
       openCustomerAuthSheet(function () {
@@ -2799,6 +3171,7 @@
         };
       }),
       payment_method: state.paymentMethod || 'cash',
+      cash_tendered: state.paymentMethod === 'cash' ? state.cashTendered : null,
       order_note: state.fulfillment.note || '',
       note: state.fulfillment.note || ''
     };
@@ -2855,7 +3228,7 @@
           Store.clearCustomerSession();
         }
         if (UI && UI.toast) {
-          UI.toast('Sesi Anda telah berakhir. Silakan masuk lagi dengan WhatsApp untuk melanjutkan.');
+          UI.toast('Sesi Anda telah berakhir. Silakan masuk kembali dengan Google untuk melanjutkan.');
         }
         openCustomerAuthSheet(function () {
           setTimeout(function () {

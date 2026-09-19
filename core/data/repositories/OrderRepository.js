@@ -123,19 +123,19 @@ class OrderRepository {
     id, orderNumber, clientTransactionId, brandId, branchId, customerName, customerPhone,
     orderType, orderChannel, selectionMode, tableNumber, fulfillmentScheduleType,
     scheduledSlotStart, scheduledSlotEnd, subtotal, discountAmount, deliveryFee,
-    grandTotal, paymentMethod, status, orderNote, diningSessionId, createdAt, updatedAt
+    grandTotal, paymentMethod, status, orderNote, diningSessionId, cashTendered = null, createdAt, updatedAt
   }) {
     return this.db.execute(`
       INSERT INTO orders (
         id, order_number, client_transaction_id, brand_id, branch_id, customer_name, customer_phone,
         order_type, order_channel, selection_mode, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
-        subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, order_note, dining_session_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, cash_tendered, order_note, dining_session_id, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id, orderNumber, clientTransactionId, brandId, branchId, customerName, customerPhone,
       orderType, orderChannel, selectionMode, tableNumber, fulfillmentScheduleType,
       scheduledSlotStart, scheduledSlotEnd, subtotal, discountAmount, deliveryFee,
-      grandTotal, paymentMethod, status, orderNote, diningSessionId, createdAt, updatedAt
+      grandTotal, paymentMethod, status, (cashTendered !== null && cashTendered !== undefined) ? Number(cashTendered) : null, orderNote, diningSessionId, createdAt, updatedAt
     ]);
   }
 

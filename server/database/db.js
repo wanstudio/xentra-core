@@ -865,6 +865,7 @@ function initSchema(targetDb) {
       total_amount REAL,
       payment_method TEXT DEFAULT 'cash',
       payment_status TEXT DEFAULT 'pending',
+      cash_tendered REAL,
       order_note TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
@@ -1544,6 +1545,7 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN table_number TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN dining_session_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN client_transaction_id TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE orders ADD COLUMN cash_tendered REAL;'); } catch (e) {}
 
   // F05 Migration Safety: inspect existing duplicate rows before establishing UNIQUE constraint
   try {

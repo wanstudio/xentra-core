@@ -13,7 +13,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_20260919_nav';
+      var PWA_VERSION = 'v_20260919_tender';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -40,7 +40,7 @@
   <link rel="stylesheet" href="/assets/css/layout.css?v=p4a7f28">
   <link rel="stylesheet" href="/assets/css/components.css?v=p4a7f28">
   <link rel="stylesheet" href="/assets/css/home.css?v=p4a7f28">
-  <link rel="stylesheet" href="/assets/css/checkout.css?v=p4a7f28">
+  <link rel="stylesheet" href="/assets/css/checkout.css?v=v_20260919_tender">
   <link rel="stylesheet" href="/assets/css/order-received.css?v=p4a7f28">
 </head>
 <body>
@@ -191,7 +191,7 @@
 
   <!-- Page Controllers -->
   <script src="/assets/js/pages/home.js?v=p4a7f28"></script>
-  <script src="/assets/js/pages/checkout.js?v=p4a7f28"></script>
+  <script src="/assets/js/pages/checkout.js?v=v_20260919_tender"></script>
   <script src="/assets/js/pages/order-received.js?v=p4a7f28"></script>
 
   <!-- ═══════════════════════════════════════════════════
@@ -269,7 +269,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=v_20260919_nav').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=v_20260919_tender').then(function (reg) {
         // Trigger immediate background update check on app launch
         reg.update();
 
