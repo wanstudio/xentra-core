@@ -4,6 +4,75 @@
 **Decision Date:** 2026-09-19  
 **Authority:** Current Notion locked decisions
 
+## 🔒 LOCKED — Google Identity Gate Placement in Checkout v1
+
+**Status:** LOCKED / AUTHORITATIVE  
+**Decision Date:** 2026-09-19
+
+This decision locks where and how Google Sign-In / Google One Tap appears in the customer ordering flow so authentication does not feel like an early registration wall or disrupt normal food ordering.
+
+### Canonical placement
+
+Do **not** place “Continue with Google” on Home, before browsing, before catalog exploration, or immediately when the customer enters Checkout.
+
+The preferred identity gate is **late in Checkout, after the customer has completed the meaningful ordering work and immediately before the transaction requires an authenticated Customer identity**.
+
+Canonical flow:
+
+```text
+Home → Location / Branch Context → Catalog → Product → Cart → Checkout
+→ Address + Recipient + Delivery / Purchase Details → Order Review
+→ Lanjutkan Pesanan / Bayar → Identity Gate (only if required)
+→ Continue with Google → Google authentication
+→ Return to the same valid Checkout context → Final Checkout Verification
+→ Create Order / Payment / COD
+```
+
+### UX principle
+
+Google authentication is a **transaction identity gate**, not a registration/onboarding screen.
+
+The customer should first feel: “Saya sudah selesai memilih makanan dan mengisi pesanan; tinggal satu langkah untuk melanjutkan.”
+
+Therefore:
+- Checkout CTA remains an ordering action such as **Lanjutkan Pesanan** or **Bayar**, not “Login”.
+- Only after that action requires authenticated Customer identity should the Google prompt appear.
+- Suggested copy: **“Satu langkah lagi — Masuk untuk melanjutkan pesananmu.”**
+- Primary action: **Continue with Google**.
+- A valid authenticated session skips the Identity Gate and continues directly to Final Checkout Verification.
+- Authentication must preserve cart, Branch, destination, recipient, promotion, delivery mode, and payment state.
+- Server-side canonical transaction state must be revalidated after authentication before order/payment commit.
+
+### What must NOT happen
+
+- No Google login wall on Home.
+- No forced Google login before browsing.
+- No “Register first” flow before menu exploration.
+- No authentication prompt merely because Checkout was opened.
+- No authentication prompt on every order when a valid session already exists.
+- No authentication failure fallback to create-order or payment commit.
+- No silent Branch rematch or checkout-state mutation caused by authentication.
+
+### Canonical distinction
+
+**SHOPPING** — Home → Catalog → Product → Cart → Checkout
+
+**TRANSACTION** — Address → Recipient → Order Review → Lanjutkan / Bayar
+
+**IDENTITY — only when required** — Continue with Google
+
+**SECURITY** — Final Checkout Verification
+
+**COMMIT** — Create Order → Payment / COD → Branch Acceptance → Fulfillment
+
+### Agent / implementation rule
+
+When implementing or auditing Customer authentication UX, treat this placement as authoritative. Do not move Google authentication earlier in the shopping flow merely because authentication is technically available. Preserve the deferred-identity principle and place the identity gate at the least disruptive transaction boundary.
+
+**Status: LOCKED / AUTHORITATIVE for Customer Checkout UX.**
+
+---
+
 ## 🔒 SUPERSEDING DECISION — Customer Authentication & OTP Role
 
 **Status:** LOCKED / AUTHORITATIVE  
