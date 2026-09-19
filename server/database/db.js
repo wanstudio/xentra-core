@@ -4,12 +4,21 @@ const fs = require('fs');
 const DB_PATH = (() => {
   // Test Environment: Hard isolation guarantee.
   // Tests MUST NEVER write to or resolve against the production database file.
+  const prodPath = path.resolve(__dirname, 'xentra.db');
+  const prodReal = fs.existsSync(prodPath) ? fs.realpathSync(prodPath) : prodPath;
+
   if (process.env.NODE_ENV === 'test') {
     if (process.env.DB_PATH && process.env.DB_PATH !== ':memory:') {
       // If a test explicitly supplies a test file, it must not be the production DB
       const resolvedTestPath = path.resolve(process.env.DB_PATH);
-      const prodPath = path.resolve(__dirname, 'xentra.db');
-      if (resolvedTestPath === prodPath) {
+      let realTestPath = resolvedTestPath;
+      try {
+        if (fs.existsSync(resolvedTestPath)) {
+          realTestPath = fs.realpathSync(resolvedTestPath);
+        }
+      } catch (_) {}
+
+      if (resolvedTestPath === prodPath || realTestPath === prodReal || path.basename(resolvedTestPath) === 'xentra.db') {
         throw new Error('[Database Safety Guard] Refusing to run tests against the production database path: ' + prodPath);
       }
       return process.env.DB_PATH;
@@ -1943,10 +1952,13 @@ function initSchema(targetDb) {
     throw e;
   }
 
-  seedData(targetDb);
+  // Authoritative separation: Schema initialization only provisions essential tenant structure
+  // (organization, brand, initial merchant owner if absent).
+  // Demo fixtures (demo branches, demo products, demo promotions) are NEVER automatically seeded on startup.
+  bootstrapEssentialTenant(targetDb);
 }
 
-function seedData(targetDb) {
+function bootstrapEssentialTenant(targetDb) {
   let brand = null;
   try {
     brand = targetDb.prepare('SELECT id, organization_id FROM brands LIMIT 1').get();
@@ -2024,25 +2036,27 @@ function seedData(targetDb) {
   } catch (e) {
     console.warn('[Migration] Admin password re-hash skipped:', e.message);
   }
+}
 
-  // --- DEMO SEED GUARD: Only run demo seeding ONCE on a fresh / virgin database ---
-  // If demo data was already seeded OR the database already contains merchant branches / products,
-  // do NOT re-seed demo data, do NOT overwrite branch assignments, do NOT clean up custom branches.
-  let isDemoSeeded = null;
-  try {
-    isDemoSeeded = targetDb.prepare("SELECT value FROM system_metadata WHERE key = 'seed_demo_data_completed'").get();
-  } catch (_) {}
-
-  const hasExistingBranches = (targetDb.prepare('SELECT COUNT(*) as cnt FROM branches WHERE brand_id = ?').get(brandId)?.cnt || 0) > 0;
-  const hasExistingProducts = (targetDb.prepare('SELECT COUNT(*) as cnt FROM products WHERE brand_id = ?').get(brandId)?.cnt || 0) > 0;
-
-  if (isDemoSeeded?.value === '1' || hasExistingBranches || hasExistingProducts) {
-    // Record marker so future boots also skip without checking counts
-    try {
-      targetDb.prepare("INSERT OR IGNORE INTO system_metadata (key, value) VALUES ('seed_demo_data_completed', '1')").run();
-    } catch (_) {}
-    return;
+/**
+ * Explicit demo seed function.
+ * Must only be invoked intentionally via dev/demo tools (e.g. npm run db:seed-demo).
+ * Strictly blocked in production unless ALLOW_PRODUCTION_DEMO_SEED=1 is explicitly set.
+ */
+function seedDemoData(targetDb, explicitBrandId) {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PRODUCTION_DEMO_SEED !== '1') {
+    throw new Error('[Demo Seed Guard] Refusing to seed demo fixtures into production database. Demo fixtures must remain isolated from production.');
   }
+
+  // Ensure essential tenant exists before seeding demo entities
+  bootstrapEssentialTenant(targetDb);
+
+  let brand = null;
+  try {
+    brand = targetDb.prepare('SELECT id, organization_id FROM brands LIMIT 1').get();
+  } catch (e) {}
+
+  const brandId = explicitBrandId || brand?.id || 'brand_bangjo';
 
   const branchBaratId = 'branch_bangjo_barat';
   const branchTimurId = 'branch_bangjo_timur';
@@ -2308,8 +2322,16 @@ function seedInstallPromotion(targetDb, brandId) {
   } catch (_) {}
 }
 
+// Backwards compatibility for tests explicitly calling db.seedData(db)
+function seedData(targetDb, explicitBrandId) {
+  bootstrapEssentialTenant(targetDb);
+  seedDemoData(targetDb, explicitBrandId);
+}
+
 db.readyPromise = dbReadyPromise;
 db.initSchema = initSchema;
+db.bootstrapEssentialTenant = bootstrapEssentialTenant;
+db.seedDemoData = seedDemoData;
 db.seedData = seedData;
 
 // Auto-run schema initialization for native instance (sql.js runs it in sqlJsPromise callback)

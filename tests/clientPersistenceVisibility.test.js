@@ -9,6 +9,9 @@ process.env.NODE_ENV = 'test';
 const app = require('../server/app');
 const db = require('../server/database/db');
 
+// Ensure test fixture branches exist for client persistence tests
+db.seedDemoData(db);
+
 // Helper to make mock requests to Express app
 async function mockFetch(path, options = {}) {
   const method = options.method || 'GET';
