@@ -47,9 +47,18 @@ class CustomerIdentityService {
     const cleanEmail = email ? String(email).trim().toLowerCase() : null;
     const cleanName = name ? String(name).trim() : (cleanEmail ? cleanEmail.split('@')[0] : 'Pelanggan');
 
-    // Fast path: Check existing link by provider + sub
+    // Fast path: Check existing link by provider + sub.
+    // Customer identity is tenant-scoped by brand_id. The current contract keeps
+    // provider+sub globally unique, so a Google identity already bound to another
+    // brand must fail closed rather than silently reuse a cross-brand Customer.
     const existing = this.customerRepo.findCustomerWithProvider('google', cleanSub);
     if (existing) {
+      if (String(existing.brand_id) !== String(brand_id)) {
+        const err = new Error('Google account is already registered to another brand.');
+        err.status = 403;
+        err.code = 'CUSTOMER_IDENTITY_BRAND_MISMATCH';
+        throw err;
+      }
       let customerNeedsUpdate = false;
       let providerNeedsUpdate = false;
 
