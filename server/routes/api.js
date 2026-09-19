@@ -650,13 +650,20 @@ router.post('/customer/auth/google', async (req, res) => {
     });
   } catch (err) {
     console.error('[CUSTOMER_GOOGLE_AUTH] Unexpected error:', err);
+    const status = Number(err && err.status);
+    if (status >= 400 && status < 500) {
+      return res.status(status).json({
+        success: false,
+        code: err.code || 'CUSTOMER_AUTH_ERROR',
+        error: err.message || 'Autentikasi Customer ditolak.'
+      });
+    }
     return res.status(500).json({
       success: false,
       code: 'AUTH_ERROR',
       error: 'Terjadi kesalahan saat autentikasi. Coba lagi.'
     });
-  }
-});
+  }});
 
 // 5. Menu Catalog & Home
 router.get(['/catalog/menu', '/home'], async (req, res) => {
