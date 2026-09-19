@@ -204,3 +204,63 @@ Karena itu:
 
 ### Scope / future work
 This decision locks the ownership and relationship model. It does **not yet** lock the exact physical database schema, versioning fields, synchronization/version policy, conflict resolution, notification transport, or Owner → Branch communication workflow. Those require separate explicit decisions before implementation.
+
+
+## 🔒 LOCKED — COD Cash Tender Selection UI & Driver Change Preparation (2026-09-19)
+
+### Decision
+COD / Tunai must NOT appear visually pre-selected by default in Customer Checkout.
+
+When the Customer explicitly selects **Tunai (COD)**, Checkout opens a Bottom Sheet to ask how much physical cash the Customer intends to hand to the Driver.
+
+### Locked customer UI
+Bottom Sheet:
+- Title: **Tunai (COD)**
+- Primary copy: **Bayar dengan uang berapa?**
+- Supporting copy: **Driver akan menyiapkan uang kembalian.**
+- Preset radio options: **Rp50.000** and **Rp100.000**, displayed side-by-side where responsive space allows.
+- Custom is also a radio option and contains a numeric input.
+
+### Interaction contract
+1. Initial Checkout payment UI has no payment option visually selected.
+2. Tapping Tunai (COD) opens the Bottom Sheet.
+3. Tapping Rp50.000 selects that radio option.
+4. Tapping Rp100.000 selects that radio option.
+5. Focusing/tapping the Custom numeric input automatically selects the Custom radio option.
+6. Custom input accepts numbers only and uses a numeric mobile keypad.
+7. If Custom is selected but empty/invalid, Konfirmasi remains disabled.
+8. Confirming a valid preset or Custom amount closes the sheet and stores the selected cash tender amount.
+9. Customer can reopen/edit the amount through Ubah.
+10. Cash selection is not fully configured until a valid cash tender amount exists.
+
+### Canonical data meaning
+Example:
+- Order total = Rp37.000
+- Customer selects = Rp50.000
+- payment_method = CASH
+- cash_tendered = 50000
+- Expected change = Rp13.000
+
+cash_tendered represents the physical cash the Customer intends to give to the Driver. It is not the order total and does not mean cash has already been collected.
+
+### Driver-facing purpose
+The operational order context should expose enough information to derive:
+- order total;
+- customer cash tendered;
+- expected change.
+
+Example:
+**COD Rp37.000 — Customer menyiapkan Rp50.000 — Kembalian Rp13.000**
+
+This must not be interpreted as cash already collected before actual delivery settlement.
+
+### Critical invariants
+- Checkout UI must not silently select COD merely because cash is a backend/default value.
+- UI selection state must remain distinct from backend fallback/default semantics.
+- A Cash order following this UX contract must not proceed with an unknown cash tender amount.
+- No additional cash denomination or payment business rule is introduced by implementation without a new locked decision.
+
+### Implementation note
+The existing customer PWA currently sends payment_method from state with a cash fallback. This existing fallback is a known implementation detail and must be reconciled with the locked UI decision so that backend fallback does not cause the UI to appear as if the Customer explicitly selected COD.
+
+**Status: LOCKED / AUTHORITATIVE**
