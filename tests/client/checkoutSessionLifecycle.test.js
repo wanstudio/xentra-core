@@ -188,6 +188,12 @@ function mkHarness(opts) {
   // Mount with a minimal container
   window.Xentra.Checkout.mount(fakeEl({ querySelectorAll: () => [], querySelector: () => null, style: {} }));
 
+  // Seed paymentMethod so executePrePaymentAndSubmit reaches the auth/verify gate.
+  // Use 'midtrans' to avoid the cashTendered guard (cash requires a tendered amount).
+  if (window.Xentra.Checkout._setPaymentMethod) {
+    window.Xentra.Checkout._setPaymentMethod('midtrans');
+  }
+
   // Helpers
   function postIdx(fragment) {
     return posts.findIndex(p => p.url.includes(fragment));

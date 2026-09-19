@@ -2152,7 +2152,17 @@
   //   - Enter key follows same path as CTA click.
   var _googleAuthInFlight = false;
 
+  // Delegate slot: allows test harnesses to intercept the auth sheet call
+  // without changing production behaviour. Defaults to the real implementation.
+  // Override via window.Xentra.Checkout._overrideAuthSheet = fn; in tests only.
+  var _authSheetDelegate = null;
+
   function openCustomerAuthSheet(onSuccess) {
+    // If a test override is installed, call it instead of the real sheet.
+    if (typeof _authSheetDelegate === 'function') {
+      _authSheetDelegate(onSuccess);
+      return;
+    }
     _googleAuthInFlight = false;
     renderGoogleIdentityGate(onSuccess);
   }
@@ -3359,7 +3369,13 @@
     openCustomerAuthSheet: openCustomerAuthSheet,
     // Test-only hook: seed paymentMethod without going through the DOM.
     // MUST NOT be called in production paths.
-    _setPaymentMethod: function (method) { state.paymentMethod = method; }
+    _setPaymentMethod: function (method) { state.paymentMethod = method; },
+    // Test-only hook: install/remove an auth sheet intercept.
+    // When set to a function, openCustomerAuthSheet() will call it instead of
+    // the real Google Identity Gate. Set to null to restore real behaviour.
+    // MUST NOT be called in production paths.
+    _overrideAuthSheet: function (fn) { _authSheetDelegate = fn || null; }
   };
   window.openCustomerAuthSheet = openCustomerAuthSheet;
+
 })();

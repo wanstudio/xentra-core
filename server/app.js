@@ -293,13 +293,28 @@ app.get('*', (req, res) => {
 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   const pwaIndex = path.join(__dirname, '../apps/customer-pwa/index.html');
-  res.sendFile(pwaIndex, (err) => {
+  const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
+  if (!googleClientId) {
+    return res.sendFile(pwaIndex, (err) => {
+      if (err) {
+        res.json({
+          system: 'Xentra Core Standalone Engine v2.2.7',
+          message: 'Customer PWA is initializing. API is ready at /api/v1'
+        });
+      }
+    });
+  }
+  const fs = require('fs');
+  fs.readFile(pwaIndex, 'utf8', (err, html) => {
     if (err) {
-      res.json({
-        system: 'Xentra Core Standalone Engine v2.2.7',
-        message: 'Customer PWA is initializing. API is ready at /api/v1'
-      });
+      return res.sendFile(pwaIndex);
     }
+    const injected = html.replace(
+      '<meta name="x-google-client-id" content="">',
+      `<meta name="x-google-client-id" content="${googleClientId}">`
+    );
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(injected);
   });
 });
 

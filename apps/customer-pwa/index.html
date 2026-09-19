@@ -7,6 +7,8 @@
   <meta name="description" content="Pesan ayam tulang lunak spesial Bangjo langsung dari HP. Delivery & Pick-up tersedia!">
   <meta name="theme-color" content="#b6ff00">
   <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline' https:; img-src * data: blob: https: http:; connect-src * https: http: ws: wss:;">
+  <!-- R3: Google Client ID for Customer Google Identity Gate — set by server at request time -->
+  <meta name="x-google-client-id" content="">
 
   <!-- ══════════════════════════════════════════════════════════════
        PWA VERSION SENTINEL & EARLY INSTALL PROMPT CAPTURE
@@ -84,6 +86,8 @@
   <link rel="stylesheet" href="/assets/css/checkout.css?v=v_20260919_codfmt">
   <link rel="stylesheet" href="/assets/css/order-received.css?v=v_theme03">
   <link rel="stylesheet" href="/assets/css/location-picker.css?v=v_theme03">
+  <!-- Google Identity Services — loaded async, required for Customer Google Auth Gate (R3) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
@@ -255,8 +259,19 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════
-       JS CORE & CONTROLLERS (Version Hashed v2.3.6)
+       XENTRA RUNTIME CONFIG — R3 Google Identity Gate
+       googleClientId is set server-side via the x-google-client-id meta tag.
+       Checkout.js reads window.XentraConfig.googleClientId when initializing GSI.
        ═══════════════════════════════════════════════════ -->
+  <script>
+    (function () {
+      var meta = document.querySelector('meta[name="x-google-client-id"]');
+      window.XentraConfig = window.XentraConfig || {};
+      window.XentraConfig.googleClientId = (meta && meta.getAttribute('content')) || '';
+    })();
+  </script>
+
+  <!-- JS CORE & CONTROLLERS (Version Hashed v2.3.6) -->
   <script src="/assets/js/core/store.js?v=v_791b187"></script>
   <script src="/assets/js/core/ui.js?v=v_theme02"></script>
   <script src="/assets/js/core/api.js?v=v_theme04"></script>
