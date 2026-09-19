@@ -604,10 +604,12 @@ router.post('/customer/auth/google', async (req, res) => {
 
     // Resolve or create Customer and CustomerAuthProvider using Google sub as immutable key.
     // Customer domain is strictly separated from workforce (no users / user_auth_providers touched).
+    // Customer identity is organization-scoped (Organization Scope v1).
     const { CustomerIdentityService } = require('../../core/identity');
     const customerIdentityService = new CustomerIdentityService();
     const resolvedCustomer = customerIdentityService.findOrCreateFromGoogle({
       brand_id: req.brand_id,
+      organization_id: req.organization_id || (req.brand && req.brand.organization_id),
       sub: verifiedClaims.sub,
       email: verifiedClaims.email,
       name: verifiedClaims.name,
@@ -627,6 +629,8 @@ router.post('/customer/auth/google', async (req, res) => {
       {
         customerId: customerRecord.id,
         customer_id: customerRecord.id,
+        organizationId: customerRecord.organization_id || req.organization_id,
+        organization_id: customerRecord.organization_id || req.organization_id,
         name: displayName,
         email: customerRecord.email || verifiedClaims.email,
         google_sub: verifiedClaims.sub
@@ -888,15 +892,25 @@ router.post(['/cart/sync', '/checkout/session'], (req, res) => {
   });
 });
 
-// 5.3 Addresses (Protected by Customer OTP Session - Finding 1)
+// 5.3 Addresses (Protected by Customer Session - Brand scoped data)
 router.get('/addresses', requireCustomerAuth(), (req, res) => {
   try {
     const customerPhone = req.customer.phone;
-    const addresses = db.prepare(`
-      SELECT * FROM customer_addresses 
-      WHERE brand_id = ? AND customer_phone = ? 
-      ORDER BY is_primary DESC, updated_at DESC, created_at DESC
-    `).all(req.brand_id, customerPhone);
+    const customerId = req.customer.customerId || req.customer.customer_id;
+    let addresses;
+    if (customerId) {
+      addresses = db.prepare(`
+        SELECT * FROM customer_addresses 
+        WHERE brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?))
+        ORDER BY is_primary DESC, updated_at DESC, created_at DESC
+      `).all(req.brand_id, customerId, customerPhone);
+    } else {
+      addresses = db.prepare(`
+        SELECT * FROM customer_addresses 
+        WHERE brand_id = ? AND customer_phone = ? 
+        ORDER BY is_primary DESC, updated_at DESC, created_at DESC
+      `).all(req.brand_id, customerPhone);
+    }
 
     res.json({ success: true, addresses: addresses || [] });
   } catch (err) {
@@ -908,6 +922,7 @@ router.post('/addresses', requireCustomerAuth(), (req, res) => {
   try {
     const { label = 'Rumah', address = '', detail = '', note = '', latitude, longitude, is_primary } = req.body;
     const customerPhone = req.customer.phone;
+    const customerId = req.customer.customerId || req.customer.customer_id || null;
 
     if (latitude == null || longitude == null || isNaN(Number(latitude)) || isNaN(Number(longitude))) {
       return res.status(400).json({
@@ -924,7 +939,9 @@ router.post('/addresses', requireCustomerAuth(), (req, res) => {
     }
 
     const addrId = 'addr_' + crypto.randomBytes(6).toString('hex');
-    const existingCount = db.prepare('SELECT COUNT(*) as cnt FROM customer_addresses WHERE brand_id = ? AND customer_phone = ?').get(req.brand_id, customerPhone);
+    const existingCount = customerId
+      ? db.prepare('SELECT COUNT(*) as cnt FROM customer_addresses WHERE brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?))').get(req.brand_id, customerId, customerPhone)
+      : db.prepare('SELECT COUNT(*) as cnt FROM customer_addresses WHERE brand_id = ? AND customer_phone = ?').get(req.brand_id, customerPhone);
     
     let isPrimary = 0;
     if (is_primary !== undefined) {
@@ -935,17 +952,22 @@ router.post('/addresses', requireCustomerAuth(), (req, res) => {
 
     // If marked as primary, demote any existing primary addresses for this customer & brand
     if (isPrimary === 1) {
-      db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_phone = ?').run(req.brand_id, customerPhone);
+      if (customerId) {
+        db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?))').run(req.brand_id, customerId, customerPhone);
+      } else {
+        db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_phone = ?').run(req.brand_id, customerPhone);
+      }
     }
 
     const now = new Date().toISOString();
     db.prepare(`
       INSERT INTO customer_addresses (
-        id, brand_id, customer_phone, label, address, detail, note, latitude, longitude, is_primary, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, brand_id, customer_id, customer_phone, label, address, detail, note, latitude, longitude, is_primary, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       addrId,
       req.brand_id,
+      customerId,
       customerPhone,
       (label || 'Rumah').trim(),
       String(address).trim(),
@@ -961,6 +983,7 @@ router.post('/addresses', requireCustomerAuth(), (req, res) => {
     const created = {
       id: addrId,
       brand_id: req.brand_id,
+      customer_id: customerId,
       customer_phone: customerPhone,
       label: (label || 'Rumah').trim(),
       address: String(address).trim(),
@@ -982,7 +1005,10 @@ router.post('/addresses', requireCustomerAuth(), (req, res) => {
 router.put('/addresses/:id', requireCustomerAuth(), (req, res) => {
   try {
     const customerPhone = req.customer.phone;
-    const existing = db.prepare('SELECT * FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').get(req.params.id, req.brand_id, customerPhone);
+    const customerId = req.customer.customerId || req.customer.customer_id;
+    const existing = customerId
+      ? db.prepare('SELECT * FROM customer_addresses WHERE id = ? AND brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?))').get(req.params.id, req.brand_id, customerId, customerPhone)
+      : db.prepare('SELECT * FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').get(req.params.id, req.brand_id, customerPhone);
     if (!existing) {
       return res.status(404).json({ success: false, error: 'Alamat tidak ditemukan atau Anda tidak memiliki akses.' });
     }
@@ -1017,7 +1043,11 @@ router.put('/addresses/:id', requireCustomerAuth(), (req, res) => {
     if (is_primary !== undefined) {
       newIsPrimary = (is_primary === 1 || is_primary === true || is_primary === '1') ? 1 : 0;
       if (newIsPrimary === 1) {
-        db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_phone = ? AND id != ?').run(req.brand_id, customerPhone, req.params.id);
+        if (customerId) {
+          db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?)) AND id != ?').run(req.brand_id, customerId, customerPhone, req.params.id);
+        } else {
+          db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_phone = ? AND id != ?').run(req.brand_id, customerPhone, req.params.id);
+        }
       }
     }
 
@@ -1025,7 +1055,7 @@ router.put('/addresses/:id', requireCustomerAuth(), (req, res) => {
     db.prepare(`
       UPDATE customer_addresses
       SET label = ?, address = ?, detail = ?, note = ?, latitude = ?, longitude = ?, is_primary = ?, updated_at = ?
-      WHERE id = ? AND brand_id = ? AND customer_phone = ?
+      WHERE id = ? AND brand_id = ?
     `).run(
       newLabel,
       newAddress,
@@ -1036,13 +1066,13 @@ router.put('/addresses/:id', requireCustomerAuth(), (req, res) => {
       newIsPrimary,
       now,
       req.params.id,
-      req.brand_id,
-      customerPhone
+      req.brand_id
     );
 
     const updated = {
       id: req.params.id,
       brand_id: req.brand_id,
+      customer_id: existing.customer_id || customerId,
       customer_phone: customerPhone,
       label: newLabel,
       address: newAddress,
@@ -1064,7 +1094,10 @@ router.put('/addresses/:id', requireCustomerAuth(), (req, res) => {
 router.delete('/addresses/:id', requireCustomerAuth(), (req, res) => {
   try {
     const customerPhone = req.customer.phone;
-    const result = db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').run(req.params.id, req.brand_id, customerPhone);
+    const customerId = req.customer.customerId || req.customer.customer_id;
+    const result = customerId
+      ? db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?))').run(req.params.id, req.brand_id, customerId, customerPhone)
+      : db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').run(req.params.id, req.brand_id, customerPhone);
     if (result.changes === 0) {
       return res.status(404).json({ success: false, error: 'Alamat tidak ditemukan atau Anda tidak memiliki akses.' });
     }
@@ -1690,11 +1723,21 @@ const TokenSessionStore = {
     const token = 'xnt_cust_' + crypto.randomBytes(24).toString('hex');
     const expiresAt = Date.now() + ttlSeconds * 1000;
     const customerId = (extra && (extra.customerId || extra.customer_id)) || null;
+    let organizationId = (extra && (extra.organizationId || extra.organization_id)) || null;
+    if (!organizationId && brand_id) {
+      try {
+        const b = db.prepare('SELECT organization_id FROM brands WHERE id = ?').get(brand_id);
+        if (b) organizationId = b.organization_id;
+      } catch (_) {}
+    }
+
     const sessionData = {
       type: 'customer',
       role: 'customer',
       customerId: customerId,
       customer_id: customerId,
+      organizationId: organizationId,
+      organization_id: organizationId,
       phone: phone ? phone.trim() : '',
       customerPhone: phone ? phone.trim() : '',
       brandId: brand_id,
@@ -1713,9 +1756,9 @@ const TokenSessionStore = {
 
     try {
       db.prepare(`
-        INSERT OR REPLACE INTO customer_sessions (token, customer_id, phone, brand_id, expires_at, created_at)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
-      `).run(token, customerId, phone ? phone.trim() : '', brand_id, expiresAt);
+        INSERT OR REPLACE INTO customer_sessions (token, customer_id, organization_id, phone, brand_id, expires_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+      `).run(token, customerId, organizationId, phone ? phone.trim() : '', brand_id, expiresAt);
     } catch (dbErr) {
       console.error('[TokenSessionStore] Failed to persist customer session to SQLite:', dbErr.message);
     }
@@ -1743,7 +1786,7 @@ const TokenSessionStore = {
     // L2: SQLite backing for customer sessions
     if (token.startsWith('xnt_cust_')) {
       try {
-        const row = db.prepare('SELECT token, customer_id, phone, brand_id, expires_at FROM customer_sessions WHERE token = ?').get(token);
+        const row = db.prepare('SELECT token, customer_id, organization_id, phone, brand_id, expires_at FROM customer_sessions WHERE token = ?').get(token);
         if (!row) return null;
 
         if (Date.now() > Number(row.expires_at)) {
@@ -1756,6 +1799,8 @@ const TokenSessionStore = {
           role: 'customer',
           customerId: row.customer_id || null,
           customer_id: row.customer_id || null,
+          organizationId: row.organization_id || null,
+          organization_id: row.organization_id || null,
           phone: row.phone,
           customerPhone: row.phone,
           brandId: row.brand_id,

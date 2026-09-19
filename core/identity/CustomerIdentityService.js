@@ -22,14 +22,15 @@ class CustomerIdentityService {
    * 5. Atomically handles concurrent requests for the same Google `sub` to prevent duplicates.
    *
    * @param {Object} params
-   * @param {string} params.brand_id Tenant brand ID
+   * @param {string} params.brand_id Tenant brand ID (current commerce context)
+   * @param {string} [params.organization_id] Tenant organization ID (canonical customer boundary)
    * @param {string} params.sub Google subject identifier (unique immutable provider ID)
    * @param {string} params.email Google verified email
    * @param {string} [params.name] Google account name
    * @param {string} [params.picture] Google profile picture
    * @returns {Object} { customer, authProvider, isNew }
    */
-  findOrCreateFromGoogle({ brand_id, sub, email, name, picture }) {
+  findOrCreateFromGoogle({ brand_id, organization_id, sub, email, name, picture }) {
     if (!brand_id) {
       const err = new Error('brand_id is required for customer resolution.');
       err.status = 400;
@@ -43,22 +44,42 @@ class CustomerIdentityService {
       throw err;
     }
 
+    // Resolve authoritative organization_id if not explicitly provided
+    let resolvedOrgId = organization_id;
+    if (!resolvedOrgId) {
+      const brandRow = this.db.prepare('SELECT organization_id FROM brands WHERE id = ?').get(brand_id);
+      if (!brandRow || !brandRow.organization_id) {
+        const err = new Error('Organization not found for brand.');
+        err.status = 404;
+        err.code = 'ORGANIZATION_NOT_FOUND';
+        throw err;
+      }
+      resolvedOrgId = brandRow.organization_id;
+    }
+
     const cleanSub = String(sub).trim();
     const cleanEmail = email ? String(email).trim().toLowerCase() : null;
     const cleanName = name ? String(name).trim() : (cleanEmail ? cleanEmail.split('@')[0] : 'Pelanggan');
 
     // Fast path: Check existing link by provider + sub.
-    // Customer identity is tenant-scoped by brand_id. The current contract keeps
-    // provider+sub globally unique, so a Google identity already bound to another
-    // brand must fail closed rather than silently reuse a cross-brand Customer.
+    // Customer identity is tenant-scoped by organization_id (Organization Scope v1).
+    // The same Google account resolves to the SAME canonical Customer across brands within
+    // the same organization. A Google account from another organization must fail closed.
     const existing = this.customerRepo.findCustomerWithProvider('google', cleanSub);
     if (existing) {
-      if (String(existing.brand_id) !== String(brand_id)) {
-        const err = new Error('Google account is already registered to another brand.');
+      let existingOrgId = existing.organization_id;
+      if (!existingOrgId && existing.brand_id) {
+        const b = this.db.prepare('SELECT organization_id FROM brands WHERE id = ?').get(existing.brand_id);
+        existingOrgId = b ? b.organization_id : null;
+      }
+
+      if (String(existingOrgId) !== String(resolvedOrgId)) {
+        const err = new Error('Google account is already registered to another organization.');
         err.status = 403;
-        err.code = 'CUSTOMER_IDENTITY_BRAND_MISMATCH';
+        err.code = 'CUSTOMER_IDENTITY_ORGANIZATION_MISMATCH';
         throw err;
       }
+
       let customerNeedsUpdate = false;
       let providerNeedsUpdate = false;
 
@@ -92,6 +113,7 @@ class CustomerIdentityService {
       return {
         customer: {
           id: existing.id,
+          organization_id: resolvedOrgId,
           brand_id: existing.brand_id,
           display_name: cleanName || existing.display_name,
           email: cleanEmail || existing.email,
@@ -123,9 +145,23 @@ class CustomerIdentityService {
       const raceCheck = this.customerRepo.findCustomerWithProvider('google', cleanSub);
       if (raceCheck) {
         this.db.exec('COMMIT;');
+        let raceOrgId = raceCheck.organization_id;
+        if (!raceOrgId && raceCheck.brand_id) {
+          const b = this.db.prepare('SELECT organization_id FROM brands WHERE id = ?').get(raceCheck.brand_id);
+          raceOrgId = b ? b.organization_id : null;
+        }
+
+        if (String(raceOrgId) !== String(resolvedOrgId)) {
+          const err = new Error('Google account is already registered to another organization.');
+          err.status = 403;
+          err.code = 'CUSTOMER_IDENTITY_ORGANIZATION_MISMATCH';
+          throw err;
+        }
+
         return {
           customer: {
             id: raceCheck.id,
+            organization_id: resolvedOrgId,
             brand_id: raceCheck.brand_id,
             display_name: raceCheck.display_name,
             email: raceCheck.email,
@@ -143,9 +179,10 @@ class CustomerIdentityService {
         };
       }
 
-      // Insert customer record
+      // Insert customer record with organization_id and initial brand_id
       this.customerRepo.insertCustomer({
         id: customerId,
+        organizationId: resolvedOrgId,
         brandId: brand_id,
         displayName: cleanName,
         email: cleanEmail,
@@ -172,6 +209,7 @@ class CustomerIdentityService {
       return {
         customer: {
           id: customerId,
+          organization_id: resolvedOrgId,
           brand_id,
           display_name: cleanName,
           email: cleanEmail,
@@ -194,9 +232,23 @@ class CustomerIdentityService {
       if (txErr.message && (txErr.message.includes('UNIQUE constraint failed') || txErr.message.includes('constraint'))) {
         const fallback = this.customerRepo.findCustomerWithProvider('google', cleanSub);
         if (fallback) {
+          let fallbackOrgId = fallback.organization_id;
+          if (!fallbackOrgId && fallback.brand_id) {
+            const b = this.db.prepare('SELECT organization_id FROM brands WHERE id = ?').get(fallback.brand_id);
+            fallbackOrgId = b ? b.organization_id : null;
+          }
+
+          if (String(fallbackOrgId) !== String(resolvedOrgId)) {
+            const err = new Error('Google account is already registered to another organization.');
+            err.status = 403;
+            err.code = 'CUSTOMER_IDENTITY_ORGANIZATION_MISMATCH';
+            throw err;
+          }
+
           return {
             customer: {
               id: fallback.id,
+              organization_id: resolvedOrgId,
               brand_id: fallback.brand_id,
               display_name: fallback.display_name,
               email: fallback.email,

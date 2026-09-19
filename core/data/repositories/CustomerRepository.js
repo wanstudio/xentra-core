@@ -42,6 +42,7 @@ class CustomerRepository {
     return this.db.queryOne(`
       SELECT 
         c.id,
+        c.organization_id,
         c.brand_id,
         c.display_name,
         c.email,
@@ -60,12 +61,13 @@ class CustomerRepository {
     `, [String(provider).trim().toLowerCase(), String(providerUserId).trim()]);
   }
 
-  insertCustomer({ id, brandId, displayName, email, phone, createdAt, updatedAt }) {
+  insertCustomer({ id, organizationId, brandId, displayName, email, phone, createdAt, updatedAt }) {
     return this.db.execute(`
-      INSERT INTO customers (id, brand_id, display_name, email, phone, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO customers (id, organization_id, brand_id, display_name, email, phone, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id,
+      organizationId,
       brandId,
       displayName || null,
       email ? String(email).trim().toLowerCase() : null,

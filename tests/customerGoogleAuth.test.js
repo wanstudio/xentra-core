@@ -639,8 +639,8 @@ test('CGA-17: Order created with Google customer session records customer_id', a
   assert.strictEqual(cancelData.decision, 'customer_cancel');
 });
 
-// ── CGA-19: Cross-brand Google identity must fail closed ───────────────────
-test('CGA-19: Same Google sub cannot be silently reused across brands', async () => {
+// ── CGA-19: Cross-organization Google identity must fail closed ───────────────────
+test('CGA-19: Same Google sub cannot be reused across different organizations', async () => {
   const otherOrgId = 'org_cga19_other';
   const otherBrandId = 'brand_cga19_other';
 
@@ -649,14 +649,14 @@ test('CGA-19: Same Google sub cannot be silently reused across brands', async ()
   db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain) VALUES (?, ?, ?, ?, ?)')
     .run(otherBrandId, otherOrgId, 'CGA 19 Other Brand', 'cga19-other-brand', 'cga19.other.test');
 
-  const tok = registerMockGoogleToken('tok_cga19_cross_brand', {
-    sub: 'sub_cga19_cross_brand',
+  const tok = registerMockGoogleToken('tok_cga19_cross_org', {
+    sub: 'sub_cga19_cross_org',
     email: 'cga19@example.com',
     email_verified: 'true',
-    name: 'Cross Brand Customer'
+    name: 'Cross Org Customer'
   });
 
-  // First registration on the default Bangjo tenant.
+  // First registration on the default Bangjo tenant (org_bangjo / brand_bangjo).
   const firstRes = await mockFetch('/api/v1/customer/auth/google', {
     method: 'POST',
     body: JSON.stringify({ credential: tok })
@@ -666,9 +666,9 @@ test('CGA-19: Same Google sub cannot be silently reused across brands', async ()
   assert.ok(firstData.customer && firstData.customer.id);
   assert.ok(firstData.token);
 
-  // Attempt to authenticate the same Google identity against another tenant.
+  // Attempt to authenticate the same Google identity against another organization.
   // Tenant context is explicitly selected through the control-plane host.
-  const crossBrandRes = await mockFetch('/api/v1/customer/auth/google', {
+  const crossOrgRes = await mockFetch('/api/v1/customer/auth/google', {
     method: 'POST',
     headers: {
       host: 'xentra.cloud',
@@ -676,20 +676,133 @@ test('CGA-19: Same Google sub cannot be silently reused across brands', async ()
     },
     body: JSON.stringify({ credential: tok })
   });
-  const crossBrandData = await crossBrandRes.json();
+  const crossOrgData = await crossOrgRes.json();
 
-  assert.strictEqual(crossBrandRes.status, 403);
-  assert.strictEqual(crossBrandData.success, false);
-  assert.strictEqual(crossBrandData.code, 'CUSTOMER_IDENTITY_BRAND_MISMATCH');
-  assert.ok(!crossBrandData.token, 'Cross-brand mismatch must never issue a customer session');
+  assert.strictEqual(crossOrgRes.status, 403);
+  assert.strictEqual(crossOrgData.success, false);
+  assert.strictEqual(crossOrgData.code, 'CUSTOMER_IDENTITY_ORGANIZATION_MISMATCH');
+  assert.ok(!crossOrgData.token, 'Cross-org mismatch must never issue a customer session');
 
   const providerRows = db.prepare(
-    'SELECT cap.customer_id, c.brand_id FROM customer_auth_providers cap JOIN customers c ON c.id = cap.customer_id WHERE cap.provider = ? AND cap.provider_user_id = ?'
-  ).all('google', 'sub_cga19_cross_brand');
+    'SELECT cap.customer_id, c.organization_id FROM customer_auth_providers cap JOIN customers c ON c.id = cap.customer_id WHERE cap.provider = ? AND cap.provider_user_id = ?'
+  ).all('google', 'sub_cga19_cross_org');
 
   assert.strictEqual(providerRows.length, 1, 'The Google sub must remain bound to exactly one Customer');
   assert.strictEqual(providerRows[0].customer_id, firstData.customer.id);
-  assert.strictEqual(providerRows[0].brand_id, 'brand_bangjo');
+});
+
+// ── CGA-20: Organization-scoped identity allows same Customer across Brands in same Organization ──
+test('CGA-20: Same Google sub across Brands in the SAME Organization resolves to the SAME Customer ID', async () => {
+  // Find current organization for brand_bangjo
+  const bangjoBrand = db.prepare('SELECT organization_id FROM brands WHERE id = ?').get('brand_bangjo');
+  const orgId = bangjoBrand.organization_id;
+
+  const sisterBrandId = 'brand_bangjo_sister';
+  db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain) VALUES (?, ?, ?, ?, ?)')
+    .run(sisterBrandId, orgId, 'Bangjo Sister Brand', 'bangjo-sister', 'sister.mybangjo.com');
+
+  const tok = registerMockGoogleToken('tok_cga20_same_org', {
+    sub: 'sub_cga20_same_org_multi_brand',
+    email: 'sameorg@example.com',
+    email_verified: 'true',
+    name: 'Multi Brand Customer'
+  });
+
+  // Login via Brand 1 (brand_bangjo)
+  const res1 = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tok })
+  });
+  const data1 = await res1.json();
+  assert.strictEqual(res1.status, 200);
+  const custId1 = data1.customer.id;
+  assert.ok(custId1);
+
+  // Login via Brand 2 (sisterBrandId, same Organization)
+  const res2 = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    headers: {
+      host: 'sister.mybangjo.com'
+    },
+    body: JSON.stringify({ credential: tok })
+  });
+  const data2 = await res2.json();
+  assert.strictEqual(res2.status, 200, `Expected 200 on sister brand, got ${res2.status}: ${JSON.stringify(data2)}`);
+  assert.strictEqual(data2.customer.id, custId1, 'Must resolve to the canonical customer ID across sister brands');
+  assert.ok(data2.token, 'Must issue a valid session for sister brand');
+
+  // Verify only 1 row exists in customers table for this Google sub
+  const providerRows = db.prepare(
+    'SELECT cap.customer_id, c.organization_id FROM customer_auth_providers cap JOIN customers c ON c.id = cap.customer_id WHERE cap.provider = ? AND cap.provider_user_id = ?'
+  ).all('google', 'sub_cga20_same_org_multi_brand');
+
+  assert.strictEqual(providerRows.length, 1, 'Exactly one customer row must exist for this Google identity');
+  assert.strictEqual(providerRows[0].customer_id, custId1);
+  assert.strictEqual(providerRows[0].organization_id, orgId);
+
+  // Address Isolation check: Add address in Brand 1
+  const addrRes = await mockFetch('/api/v1/addresses', {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + data1.token },
+    body: JSON.stringify({
+      label: 'Kantor Bangjo 1',
+      address: 'Jl. Sudirman No 1',
+      latitude: -7.2912,
+      longitude: 112.7154,
+      is_primary: 1
+    })
+  });
+  assert.strictEqual(addrRes.status, 201);
+
+  // Address must be visible in Brand 1
+  const list1 = await mockFetch('/api/v1/addresses', {
+    headers: { authorization: 'Bearer ' + data1.token }
+  });
+  const listData1 = await list1.json();
+  assert.strictEqual(list1.status, 200);
+  assert.strictEqual(listData1.addresses.length, 1);
+  assert.strictEqual(listData1.addresses[0].label, 'Kantor Bangjo 1');
+
+  // Address must NOT be visible in Brand 2 (Brand commerce scope preserved)
+  const list2 = await mockFetch('/api/v1/addresses', {
+    headers: {
+      host: 'sister.mybangjo.com',
+      authorization: 'Bearer ' + data2.token
+    }
+  });
+  const listData2 = await list2.json();
+  assert.strictEqual(list2.status, 200);
+  assert.strictEqual(listData2.addresses.length, 0, 'Addresses from Brand 1 must not leak to Brand 2');
+});
+
+// ── CGA-21: Session issued for Org A Brand cannot checkout on Org B Brand ──
+test('CGA-21: Session issued for Brand in Org A is rejected on Brand in Org B', async () => {
+  const tok = registerMockGoogleToken('tok_cga21_cross_org_session', {
+    sub: 'sub_cga21_cross_org_session',
+    email: 'cga21@example.com',
+    email_verified: 'true',
+    name: 'Org Session Test'
+  });
+
+  const authRes = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tok })
+  });
+  const authData = await authRes.json();
+  assert.strictEqual(authRes.status, 200);
+
+  // Verify that accessing a brand in another organization with this session fails TENANT_MISMATCH
+  const verifyRes = await mockFetch('/api/v1/checkout/verify', {
+    method: 'POST',
+    headers: {
+      host: 'cga19.other.test',
+      authorization: 'Bearer ' + authData.token
+    },
+    body: JSON.stringify({ branch_id: 'branch_cga10', order_type: 'pickup', items: [] })
+  });
+  assert.strictEqual(verifyRes.status, 403);
+  const verifyData = await verifyRes.json();
+  assert.strictEqual(verifyData.error, 'TENANT_MISMATCH');
 });
 
 // ── CGA-18: Invalid or Expired Customer Session fails closed ────────────────
