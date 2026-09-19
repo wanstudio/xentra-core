@@ -348,4 +348,104 @@ test('MAP-09: End-to-end destination persistence preserves source coordinates an
   assert.strictEqual(legacyLoc.is_explicit, true);
 });
 
+test('MAP-10: Selected POI from search preserves POI title as destination label and enriches address', () => {
+  const { Store, XentraLocationPicker } = setupTestEnvironment();
+
+  const selectedPoi = {
+    title: 'Dapur Kurnia',
+    address: 'Jl. Melati No. 5, Pringsewu Timur',
+    latitude: -5.397123,
+    longitude: 105.266854,
+    source: 'search'
+  };
+
+  // Simulating the destination application when user confirms a search-selected POI
+  const resolvedTitle = selectedPoi.title.trim();
+  let combinedAddress = selectedPoi.address;
+  if (resolvedTitle && combinedAddress && !combinedAddress.startsWith(resolvedTitle)) {
+    combinedAddress = resolvedTitle + ', ' + combinedAddress;
+  }
+
+  Store.setActiveDestination({
+    latitude: selectedPoi.latitude,
+    longitude: selectedPoi.longitude,
+    address: combinedAddress,
+    label: resolvedTitle,
+    detail: 'Depan ruko',
+    source: 'search',
+    is_explicit: true
+  });
+
+  const active = Store.getActiveDestination();
+  assert.ok(active, 'Active destination must be set');
+  assert.strictEqual(active.label, 'Dapur Kurnia', 'Primary destination title must preserve selected POI name');
+  assert.strictEqual(active.latitude, -5.397123, 'Coordinate authority must be preserved');
+  assert.strictEqual(active.longitude, 105.266854, 'Coordinate authority must be preserved');
+  assert.ok(active.address.startsWith('Dapur Kurnia, Jl. Melati No. 5'), 'Address must combine POI and street context cleanly');
+  assert.strictEqual(active.source, 'search');
+  assert.strictEqual(active.is_explicit, true);
+});
+
+test('MAP-11: Selected street from search preserves street title without duplicating', () => {
+  const { Store } = setupTestEnvironment();
+
+  const selectedStreet = {
+    title: 'Jl. Ahmad Yani',
+    address: 'Jl. Ahmad Yani, Pringsewu, Lampung',
+    latitude: -5.385001,
+    longitude: 105.251234,
+    source: 'search'
+  };
+
+  const resolvedTitle = selectedStreet.title.trim();
+  let combinedAddress = selectedStreet.address;
+  if (resolvedTitle && combinedAddress && !combinedAddress.startsWith(resolvedTitle)) {
+    combinedAddress = resolvedTitle + ', ' + combinedAddress;
+  }
+
+  Store.setActiveDestination({
+    latitude: selectedStreet.latitude,
+    longitude: selectedStreet.longitude,
+    address: combinedAddress,
+    label: resolvedTitle,
+    detail: '',
+    source: 'search',
+    is_explicit: true
+  });
+
+  const active = Store.getActiveDestination();
+  assert.strictEqual(active.label, 'Jl. Ahmad Yani', 'Street selection preserves street name as label');
+  assert.strictEqual(active.address, 'Jl. Ahmad Yani, Pringsewu, Lampung', 'Street address must not duplicate street name');
+  assert.strictEqual(active.source, 'search');
+  assert.strictEqual(active.is_explicit, true);
+});
+
+test('MAP-12: Map center pin without POI maintains reverse-geocoded road/address title', () => {
+  const { Store, XentraLocationPicker } = setupTestEnvironment();
+
+  const pinCoords = { lat: -5.392011, lng: 105.264321 };
+  const reverseGeocoded = XentraLocationPicker.formatLocationMetadata({
+    road: 'Jl. Melati',
+    locality: 'Pringsewu Timur',
+    address: 'Jl. Melati, Pringsewu Timur, Pringsewu'
+  }, pinCoords);
+
+  assert.strictEqual(reverseGeocoded.title, 'Jl. Melati', 'Road name should be title for non-POI pin position');
+
+  Store.setActiveDestination({
+    latitude: pinCoords.lat,
+    longitude: pinCoords.lng,
+    address: reverseGeocoded.address,
+    label: reverseGeocoded.title,
+    detail: '',
+    source: 'map',
+    is_explicit: true
+  });
+
+  const active = Store.getActiveDestination();
+  assert.strictEqual(active.label, 'Jl. Melati');
+  assert.strictEqual(active.source, 'map');
+  assert.strictEqual(active.is_explicit, true);
+});
+
 

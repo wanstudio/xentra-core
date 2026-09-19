@@ -607,10 +607,14 @@
 
                 function proceedWithCoords(lat, lng, fullAddr, titleName) {
                   sh.close();
-                  var resolvedTitle = (titleName || selected.title || (selected.display_name ? selected.display_name.split(',')[0] : 'Lokasi Terpilih')).slice(0, 30);
+                  var resolvedTitle = (titleName || selected.title || (selected.display_name ? selected.display_name.split(',')[0] : 'Lokasi Terpilih')).trim();
+                  var combinedAddress = fullAddr || selected.address || selected.display_name || resolvedTitle;
+                  if (resolvedTitle && combinedAddress && !combinedAddress.startsWith(resolvedTitle)) {
+                    combinedAddress = resolvedTitle + ', ' + combinedAddress;
+                  }
                   openAddressDetailSheet({
                     title: resolvedTitle,
-                    address: fullAddr || selected.address || selected.display_name,
+                    address: combinedAddress,
                     latitude: Number(lat),
                     longitude: Number(lng),
                     label: resolvedTitle,
@@ -629,7 +633,7 @@
                     .then(function (rRes) {
                       var rData = rRes && rRes.result;
                       if (rData && rData.latitude != null && rData.longitude != null) {
-                        proceedWithCoords(rData.latitude, rData.longitude, rData.address || selected.address, rData.title || selected.title);
+                        proceedWithCoords(rData.latitude, rData.longitude, rData.address || selected.address, selected.title || rData.title);
                       } else {
                         proceedWithCoords(DEFAULT_LAT, DEFAULT_LNG, selected.address, selected.title);
                       }
@@ -1624,8 +1628,8 @@
     if (params.title && addressText.startsWith(params.title)) {
       var remaining = addressText.slice(params.title.length).replace(/^[\s,]+/, '');
       if (remaining) addressPreview = remaining;
-    } else if (parts.length > 1) {
-      addressPreview = parts.slice(1).join(',').trim();
+    } else if (params.title && parts[0] && parts[0].trim() === params.title.trim()) {
+      addressPreview = parts.slice(1).join(',').trim() || addressText;
     }
 
     var detailHtml =
