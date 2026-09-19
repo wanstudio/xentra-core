@@ -541,3 +541,142 @@ test('CSA-12: Order history is strictly isolated between different customers', a
   assert.strictEqual(resB.status, 200);
   assert.ok(!dataB.orders.some(o => o.id === ordA), 'Customer B must never see Customer A order');
 });
+
+// ── CSA-13: Same phone with different customer_id does NOT grant order ownership ──
+test('CSA-13: Same phone number on different customer accounts does NOT grant order access', async () => {
+  const { orgBangjo } = setupFixtures();
+  const sharedPhone = '081299990099';
+  const custOriginal = 'cst_csa_13_orig';
+  const custNew = 'cst_csa_13_new';
+
+  db.prepare('INSERT OR REPLACE INTO customers (id, organization_id, brand_id, phone, display_name, email) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(custOriginal, orgBangjo, 'brand_bangjo', sharedPhone, 'Original Owner', 'orig@example.com');
+  db.prepare('INSERT OR REPLACE INTO customers (id, organization_id, brand_id, phone, display_name, email) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(custNew, orgBangjo, 'brand_bangjo', sharedPhone, 'New Account Same Phone', 'new@example.com');
+
+  const sessOriginal = global.TokenSessionStore.createCustomerSession(sharedPhone, 'brand_bangjo', 3600, {
+    customerId: custOriginal,
+    organizationId: orgBangjo
+  });
+  const sessNew = global.TokenSessionStore.createCustomerSession(sharedPhone, 'brand_bangjo', 3600, {
+    customerId: custNew,
+    organizationId: orgBangjo
+  });
+
+  // Order created by Original Customer with sharedPhone
+  const ordId = 'ord_csa_13_test';
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_id, customer_phone, customer_name, order_type, subtotal, delivery_fee, discount_amount, grand_total, payment_method, status, created_at, updated_at)
+    VALUES (?, ?, 'brand_bangjo', 'branch_csa_bangjo', ?, ?, 'Original Owner', 'pickup', 20000, 0, 0, 20000, 'cash', 'pending', datetime('now'), datetime('now'))
+  `).run(ordId, 'ORD-CSA-13', custOriginal, sharedPhone);
+
+  // 1. Order list: custNew must NOT see ordId even though phone is identical
+  const listRes = await mockFetch('/api/v1/customer/orders', {
+    method: 'GET',
+    headers: {
+      host: 'app.mybangjo.com',
+      authorization: 'Bearer ' + sessNew.token
+    }
+  });
+  const listData = await listRes.json();
+  assert.strictEqual(listRes.status, 200);
+  assert.ok(!listData.orders.some(o => o.id === ordId), 'New customer must not see order of another customer sharing same phone');
+
+  // 2. Order cancel: custNew cannot cancel ordId even though phone matches
+  const cancelRes = await mockFetch(`/api/v1/orders/${ordId}/cancel`, {
+    method: 'POST',
+    headers: {
+      host: 'app.mybangjo.com',
+      authorization: 'Bearer ' + sessNew.token
+    },
+    body: JSON.stringify({ reason: 'Malicious cancellation attempt' })
+  });
+  assert.strictEqual(cancelRes.status, 403, 'Cancelling another customer order sharing same phone must be rejected 403');
+  const cancelData = await cancelRes.json();
+  assert.strictEqual(cancelData.error, 'FORBIDDEN_ORDER_OWNERSHIP');
+
+  // 3. Order detail: custNew cannot view ordId
+  const detailRes = await mockFetch(`/api/v1/orders/${ordId}`, {
+    method: 'GET',
+    headers: {
+      host: 'app.mybangjo.com',
+      authorization: 'Bearer ' + sessNew.token
+    }
+  });
+  assert.strictEqual(detailRes.status, 403, 'Detail of another customer order sharing same phone must be rejected (403)');
+  const detailData = await detailRes.json();
+  assert.strictEqual(detailData.error, 'FORBIDDEN_ORDER_ACCESS');
+});
+
+// ── CSA-14: Same phone with different customer_id does NOT grant address ownership ──
+test('CSA-14: Same phone number on different customer accounts does NOT grant address access or mutation', async () => {
+  const { orgBangjo } = setupFixtures();
+  const sharedPhone = '081299990088';
+  const cust1 = 'cst_csa_14_1';
+  const cust2 = 'cst_csa_14_2';
+
+  db.prepare('INSERT OR REPLACE INTO customers (id, organization_id, brand_id, phone, display_name, email) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(cust1, orgBangjo, 'brand_bangjo', sharedPhone, 'User 1', 'u1@example.com');
+  db.prepare('INSERT OR REPLACE INTO customers (id, organization_id, brand_id, phone, display_name, email) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(cust2, orgBangjo, 'brand_bangjo', sharedPhone, 'User 2 Same Phone', 'u2@example.com');
+
+  const sess1 = global.TokenSessionStore.createCustomerSession(sharedPhone, 'brand_bangjo', 3600, {
+    customerId: cust1,
+    organizationId: orgBangjo
+  });
+  const sess2 = global.TokenSessionStore.createCustomerSession(sharedPhone, 'brand_bangjo', 3600, {
+    customerId: cust2,
+    organizationId: orgBangjo
+  });
+
+  // User 1 creates address
+  const createRes = await mockFetch('/api/v1/addresses', {
+    method: 'POST',
+    headers: {
+      host: 'app.mybangjo.com',
+      authorization: 'Bearer ' + sess1.token
+    },
+    body: JSON.stringify({
+      label: 'Rumah U1',
+      address: 'Jl. Melati No 1',
+      latitude: -7.2,
+      longitude: 112.7
+    })
+  });
+  assert.strictEqual(createRes.status, 201);
+  const createData = await createRes.json();
+  const addrId = createData.address.id;
+
+  // User 2 lists addresses -> must NOT see addrId
+  const listRes = await mockFetch('/api/v1/addresses', {
+    method: 'GET',
+    headers: {
+      host: 'app.mybangjo.com',
+      authorization: 'Bearer ' + sess2.token
+    }
+  });
+  const listData = await listRes.json();
+  assert.strictEqual(listRes.status, 200);
+  assert.ok(!listData.addresses.some(a => a.id === addrId), 'User 2 must not see address of User 1 even with same phone');
+
+  // User 2 attempts to edit addrId -> 404
+  const putRes = await mockFetch(`/api/v1/addresses/${addrId}`, {
+    method: 'PUT',
+    headers: {
+      host: 'app.mybangjo.com',
+      authorization: 'Bearer ' + sess2.token
+    },
+    body: JSON.stringify({ label: 'Hijacked Label' })
+  });
+  assert.strictEqual(putRes.status, 404, 'User 2 cannot edit User 1 address');
+
+  // User 2 attempts to delete addrId -> 404
+  const delRes = await mockFetch(`/api/v1/addresses/${addrId}`, {
+    method: 'DELETE',
+    headers: {
+      host: 'app.mybangjo.com',
+      authorization: 'Bearer ' + sess2.token
+    }
+  });
+  assert.strictEqual(delRes.status, 404, 'User 2 cannot delete User 1 address');
+});

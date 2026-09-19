@@ -17,6 +17,10 @@ class CustomerRepository {
     return this.db.queryOne('SELECT * FROM customers WHERE id = ?', [customerId]);
   }
 
+  /**
+   * Operational search by brand and email (e.g. contact search).
+   * NOTE: This is an operational helper, NOT a canonical identity or authorization resolver.
+   */
   findByBrandAndEmail(brandId, email) {
     return this.db.queryOne(
       'SELECT * FROM customers WHERE brand_id = ? AND LOWER(email) = LOWER(?)',
@@ -24,6 +28,10 @@ class CustomerRepository {
     );
   }
 
+  /**
+   * Operational search by brand and phone (e.g. contact search).
+   * NOTE: This is an operational helper, NOT a canonical identity or authorization resolver.
+   */
   findByBrandAndPhone(brandId, phone) {
     return this.db.queryOne(
       'SELECT * FROM customers WHERE brand_id = ? AND phone = ?',

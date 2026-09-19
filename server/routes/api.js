@@ -899,15 +899,17 @@ router.get('/addresses', requireCustomerAuth(), (req, res) => {
     const customerId = req.customer.customerId || req.customer.customer_id;
     let addresses;
     if (customerId) {
+      // Canonical ownership: addresses strictly belong to customer_id within the requested brand
       addresses = db.prepare(`
         SELECT * FROM customer_addresses 
-        WHERE brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?))
+        WHERE brand_id = ? AND customer_id = ?
         ORDER BY is_primary DESC, updated_at DESC, created_at DESC
-      `).all(req.brand_id, customerId, customerPhone);
+      `).all(req.brand_id, customerId);
     } else {
+      // Legacy fallback: unlinked addresses without customer_id
       addresses = db.prepare(`
         SELECT * FROM customer_addresses 
-        WHERE brand_id = ? AND customer_phone = ? 
+        WHERE brand_id = ? AND customer_id IS NULL AND customer_phone = ? 
         ORDER BY is_primary DESC, updated_at DESC, created_at DESC
       `).all(req.brand_id, customerPhone);
     }
@@ -940,8 +942,8 @@ router.post('/addresses', requireCustomerAuth(), (req, res) => {
 
     const addrId = 'addr_' + crypto.randomBytes(6).toString('hex');
     const existingCount = customerId
-      ? db.prepare('SELECT COUNT(*) as cnt FROM customer_addresses WHERE brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?))').get(req.brand_id, customerId, customerPhone)
-      : db.prepare('SELECT COUNT(*) as cnt FROM customer_addresses WHERE brand_id = ? AND customer_phone = ?').get(req.brand_id, customerPhone);
+      ? db.prepare('SELECT COUNT(*) as cnt FROM customer_addresses WHERE brand_id = ? AND customer_id = ?').get(req.brand_id, customerId)
+      : db.prepare('SELECT COUNT(*) as cnt FROM customer_addresses WHERE brand_id = ? AND customer_id IS NULL AND customer_phone = ?').get(req.brand_id, customerPhone);
     
     let isPrimary = 0;
     if (is_primary !== undefined) {
@@ -953,9 +955,9 @@ router.post('/addresses', requireCustomerAuth(), (req, res) => {
     // If marked as primary, demote any existing primary addresses for this customer & brand
     if (isPrimary === 1) {
       if (customerId) {
-        db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?))').run(req.brand_id, customerId, customerPhone);
+        db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_id = ?').run(req.brand_id, customerId);
       } else {
-        db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_phone = ?').run(req.brand_id, customerPhone);
+        db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_id IS NULL AND customer_phone = ?').run(req.brand_id, customerPhone);
       }
     }
 
@@ -1007,8 +1009,8 @@ router.put('/addresses/:id', requireCustomerAuth(), (req, res) => {
     const customerPhone = req.customer.phone;
     const customerId = req.customer.customerId || req.customer.customer_id;
     const existing = customerId
-      ? db.prepare('SELECT * FROM customer_addresses WHERE id = ? AND brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?))').get(req.params.id, req.brand_id, customerId, customerPhone)
-      : db.prepare('SELECT * FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').get(req.params.id, req.brand_id, customerPhone);
+      ? db.prepare('SELECT * FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_id = ?').get(req.params.id, req.brand_id, customerId)
+      : db.prepare('SELECT * FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_id IS NULL AND customer_phone = ?').get(req.params.id, req.brand_id, customerPhone);
     if (!existing) {
       return res.status(404).json({ success: false, error: 'Alamat tidak ditemukan atau Anda tidak memiliki akses.' });
     }
@@ -1044,9 +1046,9 @@ router.put('/addresses/:id', requireCustomerAuth(), (req, res) => {
       newIsPrimary = (is_primary === 1 || is_primary === true || is_primary === '1') ? 1 : 0;
       if (newIsPrimary === 1) {
         if (customerId) {
-          db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?)) AND id != ?').run(req.brand_id, customerId, customerPhone, req.params.id);
+          db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_id = ? AND id != ?').run(req.brand_id, customerId, req.params.id);
         } else {
-          db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_phone = ? AND id != ?').run(req.brand_id, customerPhone, req.params.id);
+          db.prepare('UPDATE customer_addresses SET is_primary = 0 WHERE brand_id = ? AND customer_id IS NULL AND customer_phone = ? AND id != ?').run(req.brand_id, customerPhone, req.params.id);
         }
       }
     }
@@ -1096,8 +1098,8 @@ router.delete('/addresses/:id', requireCustomerAuth(), (req, res) => {
     const customerPhone = req.customer.phone;
     const customerId = req.customer.customerId || req.customer.customer_id;
     const result = customerId
-      ? db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND (customer_id = ? OR (customer_id IS NULL AND customer_phone = ?))').run(req.params.id, req.brand_id, customerId, customerPhone)
-      : db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_phone = ?').run(req.params.id, req.brand_id, customerPhone);
+      ? db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_id = ?').run(req.params.id, req.brand_id, customerId)
+      : db.prepare('DELETE FROM customer_addresses WHERE id = ? AND brand_id = ? AND customer_id IS NULL AND customer_phone = ?').run(req.params.id, req.brand_id, customerPhone);
     if (result.changes === 0) {
       return res.status(404).json({ success: false, error: 'Alamat tidak ditemukan atau Anda tidak memiliki akses.' });
     }
@@ -2300,12 +2302,20 @@ router.get('/orders/:id', (req, res) => {
 
   if (session) {
     if (session.type === 'customer' || session.role === 'customer') {
-      // Customer must own the order and match tenant brand (by customer_id or customer_phone)
-      if (session.brandId === req.brand_id && (
-        (session.customerId && order.customer_id && session.customerId === order.customer_id) ||
-        (session.phone && order.customer_phone && session.phone === order.customer_phone)
-      )) {
-        isAuthorized = true;
+      // Customer must own the order by canonical customer_id and match tenant organization
+      const custId = session.customerId || session.customer_id;
+      const orderCustId = order.customer_id;
+      const reqOrgId = req.organization_id || (req.brand && req.brand.organization_id);
+      const sessionOrgId = session.organization_id || session.organizationId;
+      const isOrgMatch = sessionOrgId && reqOrgId && String(sessionOrgId) === String(reqOrgId);
+
+      if (isOrgMatch && order.brand_id === req.brand_id) {
+        if (custId && orderCustId && String(custId) === String(orderCustId)) {
+          isAuthorized = true;
+        } else if (!orderCustId && !custId && session.phone && order.customer_phone && session.phone === order.customer_phone) {
+          // Controlled legacy compatibility only when order has no customer_id and session is legacy unmigrated
+          isAuthorized = true;
+        }
       }
     } else if (['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'].includes(session.role)) {
       // Operator must match tenant brand
@@ -2428,22 +2438,24 @@ router.get('/customer/orders', requireCustomerAuth(), (req, res) => {
     const customerId = req.customer.customerId || req.customer.customer_id;
     let orders;
     if (customerId) {
+      // Canonical ownership: customer only sees orders explicitly belonging to their customer_id
       orders = db.prepare(`
         SELECT o.id, o.order_number, o.status, o.order_type, o.subtotal, o.delivery_fee, o.discount_amount,
                o.grand_total, o.payment_method, o.created_at, b.name as branch_name
         FROM orders o
         JOIN branches b ON b.id = o.branch_id
-        WHERE b.brand_id = ? AND (o.customer_id = ? OR (o.customer_id IS NULL AND o.customer_phone = ?))
+        WHERE b.brand_id = ? AND o.customer_id = ?
         ORDER BY o.created_at DESC
         LIMIT 50
-      `).all(req.brand_id, customerId, customerPhone);
+      `).all(req.brand_id, customerId);
     } else {
+      // Legacy session without customer_id: only access unlinked legacy orders with no customer_id
       orders = db.prepare(`
         SELECT o.id, o.order_number, o.status, o.order_type, o.subtotal, o.delivery_fee, o.discount_amount,
                o.grand_total, o.payment_method, o.created_at, b.name as branch_name
         FROM orders o
         JOIN branches b ON b.id = o.branch_id
-        WHERE b.brand_id = ? AND o.customer_phone = ?
+        WHERE b.brand_id = ? AND o.customer_id IS NULL AND o.customer_phone = ?
         ORDER BY o.created_at DESC
         LIMIT 50
       `).all(req.brand_id, customerPhone);
@@ -2670,8 +2682,9 @@ router.post('/orders/:id/cancel', requireCustomerAuth(), (req, res) => {
     if (!order) {
       return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
     }
-    const isOwner = (req.customer.customerId && order.customer_id && String(req.customer.customerId) === String(order.customer_id)) ||
-                    (req.customer.phone && order.customer_phone && String(req.customer.phone) === String(order.customer_phone));
+    const custId = req.customer.customerId || req.customer.customer_id;
+    const isOwner = (custId && order.customer_id && String(custId) === String(order.customer_id)) ||
+                    (!custId && !order.customer_id && req.customer.phone && order.customer_phone && String(req.customer.phone) === String(order.customer_phone));
     if (!isOwner) {
       return res.status(403).json({
         success: false,
