@@ -6,7 +6,7 @@
  * 1. Distinct location concepts: GPS, Search, Map, Favorite Address, Active Destination
  * 2. Active Destination: can exist for guest, originates from any source, not silently overwritten by GPS when explicit
  * 3. Selecting Favorite Address makes it Active Destination
- * 4. Favorite Address: persisted in customer_addresses, bound to (brand_id, customer_phone)
+ * 4. Favorite Address: persisted in customer_addresses, bound to (brand_id, customer_id) with legacy phone compatibility
  * 5. Full CRUD on /api/v1/addresses (GET, POST, PUT, DELETE) with requireCustomerAuth()
  * 6. Historical order freezing: past order delivery data is frozen and unaffected by favorite address mutations
  */

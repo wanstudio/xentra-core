@@ -1232,11 +1232,12 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       });
     }
 
-    if (customerSession.brandId !== req.brand_id) {
-      return res.status(403).json({
+    const authCheck = authorizeCustomerSession(customerSession, req);
+    if (!authCheck.ok) {
+      return res.status(authCheck.status).json({
         success: false,
-        error: 'TENANT_MISMATCH',
-        message: 'Sesi customer tidak valid untuk brand ini.'
+        error: authCheck.error,
+        message: authCheck.message
       });
     }
 
@@ -1724,11 +1725,46 @@ const TokenSessionStore = {
     const expiresAt = Date.now() + ttlSeconds * 1000;
     const customerId = (extra && (extra.customerId || extra.customer_id)) || null;
     let organizationId = (extra && (extra.organizationId || extra.organization_id)) || null;
-    if (!organizationId && brand_id) {
+
+    // Resolve authoritative brand organization if available
+    let brandOrgId = null;
+    if (brand_id) {
       try {
         const b = db.prepare('SELECT organization_id FROM brands WHERE id = ?').get(brand_id);
-        if (b) organizationId = b.organization_id;
+        if (b) brandOrgId = b.organization_id;
       } catch (_) {}
+    }
+
+    if (!organizationId) {
+      organizationId = brandOrgId;
+    }
+
+    // Invariant: If customerId is provided, verify customer exists and belongs to the same organization
+    if (customerId) {
+      try {
+        const cust = db.prepare('SELECT organization_id FROM customers WHERE id = ?').get(customerId);
+        if (cust) {
+          if (cust.organization_id && organizationId && String(cust.organization_id) !== String(organizationId)) {
+            const err = new Error('Customer organization does not match session organization.');
+            err.status = 403;
+            err.code = 'CUSTOMER_ORGANIZATION_MISMATCH';
+            throw err;
+          }
+          if (cust.organization_id && !organizationId) {
+            organizationId = cust.organization_id;
+          }
+        }
+      } catch (custErr) {
+        if (custErr.code === 'CUSTOMER_ORGANIZATION_MISMATCH') throw custErr;
+      }
+    }
+
+    // Invariant: Brand organization must match session organization
+    if (brandOrgId && organizationId && String(brandOrgId) !== String(organizationId)) {
+      const err = new Error('Brand organization does not match session organization.');
+      err.status = 403;
+      err.code = 'BRAND_ORGANIZATION_MISMATCH';
+      throw err;
     }
 
     const sessionData = {
@@ -1843,6 +1879,74 @@ const TokenSessionStore = {
 // Expose globally for WorkforceService
 global.TokenSessionStore = TokenSessionStore;
 
+// Authoritative customer session organization authorization
+function authorizeCustomerSession(session, req) {
+  const reqOrgId = req.organization_id || (req.brand && req.brand.organization_id);
+  if (!reqOrgId || !req.brand_id) {
+    return {
+      status: 403,
+      error: 'TENANT_NOT_RESOLVED',
+      message: 'Tenant tidak dapat diselesaikan secara otoritatif.'
+    };
+  }
+
+  let sessionOrgId = session.organization_id || session.organizationId;
+  const customerId = session.customerId || session.customer_id;
+
+  // Verify against authoritative database records
+  if (customerId) {
+    try {
+      const cust = db.prepare('SELECT id, organization_id FROM customers WHERE id = ?').get(customerId);
+      if (!cust) {
+        return {
+          status: 401,
+          error: 'CUSTOMER_NOT_FOUND',
+          message: 'Data customer tidak ditemukan.'
+        };
+      }
+      if (!sessionOrgId) {
+        sessionOrgId = cust.organization_id;
+        session.organization_id = cust.organization_id;
+        session.organizationId = cust.organization_id;
+      } else if (String(cust.organization_id) !== String(sessionOrgId)) {
+        return {
+          status: 403,
+          error: 'TENANT_MISMATCH',
+          message: 'Sesi customer tidak valid untuk organisasi ini.'
+        };
+      }
+    } catch (dbErr) {
+      console.error('[authorizeCustomerSession] Customer DB verification error:', dbErr.message);
+      return {
+        status: 500,
+        error: 'DATABASE_ERROR',
+        message: 'Gagal memverifikasi identitas customer.'
+      };
+    }
+  } else if (!sessionOrgId && session.brandId) {
+    // Legacy session fallback: resolve organization from session brand
+    try {
+      const b = db.prepare('SELECT organization_id FROM brands WHERE id = ?').get(session.brandId);
+      if (b && b.organization_id) {
+        sessionOrgId = b.organization_id;
+        session.organization_id = b.organization_id;
+        session.organizationId = b.organization_id;
+      }
+    } catch (_) {}
+  }
+
+  // Authoritative check: Customer Organization must match Request Organization
+  if (!sessionOrgId || String(sessionOrgId) !== String(reqOrgId)) {
+    return {
+      status: 403,
+      error: 'TENANT_MISMATCH',
+      message: 'Sesi customer tidak valid untuk organisasi ini.'
+    };
+  }
+
+  return { ok: true, sessionOrgId };
+}
+
 // Middleware: Require Authenticated Customer Session (Finding 1)
 function requireCustomerAuth() {
   return (req, res, next) => {
@@ -1866,11 +1970,12 @@ function requireCustomerAuth() {
       });
     }
 
-    if (session.brandId !== req.brand_id) {
-      return res.status(403).json({
+    const authCheck = authorizeCustomerSession(session, req);
+    if (!authCheck.ok) {
+      return res.status(authCheck.status).json({
         success: false,
-        error: 'TENANT_MISMATCH',
-        message: 'Sesi customer tidak valid untuk brand ini.'
+        error: authCheck.error,
+        message: authCheck.message
       });
     }
 
@@ -2320,15 +2425,29 @@ router.get('/orders/:id', (req, res) => {
 router.get('/customer/orders', requireCustomerAuth(), (req, res) => {
   try {
     const customerPhone = req.customer.phone;
-    const orders = db.prepare(`
-      SELECT o.id, o.order_number, o.status, o.order_type, o.subtotal, o.delivery_fee, o.discount_amount,
-             o.grand_total, o.payment_method, o.created_at, b.name as branch_name
-      FROM orders o
-      JOIN branches b ON b.id = o.branch_id
-      WHERE b.brand_id = ? AND o.customer_phone = ?
-      ORDER BY o.created_at DESC
-      LIMIT 50
-    `).all(req.brand_id, customerPhone);
+    const customerId = req.customer.customerId || req.customer.customer_id;
+    let orders;
+    if (customerId) {
+      orders = db.prepare(`
+        SELECT o.id, o.order_number, o.status, o.order_type, o.subtotal, o.delivery_fee, o.discount_amount,
+               o.grand_total, o.payment_method, o.created_at, b.name as branch_name
+        FROM orders o
+        JOIN branches b ON b.id = o.branch_id
+        WHERE b.brand_id = ? AND (o.customer_id = ? OR (o.customer_id IS NULL AND o.customer_phone = ?))
+        ORDER BY o.created_at DESC
+        LIMIT 50
+      `).all(req.brand_id, customerId, customerPhone);
+    } else {
+      orders = db.prepare(`
+        SELECT o.id, o.order_number, o.status, o.order_type, o.subtotal, o.delivery_fee, o.discount_amount,
+               o.grand_total, o.payment_method, o.created_at, b.name as branch_name
+        FROM orders o
+        JOIN branches b ON b.id = o.branch_id
+        WHERE b.brand_id = ? AND o.customer_phone = ?
+        ORDER BY o.created_at DESC
+        LIMIT 50
+      `).all(req.brand_id, customerPhone);
+    }
 
     const enriched = orders.map(ord => ({
       ...ord,

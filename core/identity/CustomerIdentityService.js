@@ -44,18 +44,23 @@ class CustomerIdentityService {
       throw err;
     }
 
-    // Resolve authoritative organization_id if not explicitly provided
-    let resolvedOrgId = organization_id;
-    if (!resolvedOrgId) {
-      const brandRow = this.db.prepare('SELECT organization_id FROM brands WHERE id = ?').get(brand_id);
-      if (!brandRow || !brandRow.organization_id) {
-        const err = new Error('Organization not found for brand.');
-        err.status = 404;
-        err.code = 'ORGANIZATION_NOT_FOUND';
-        throw err;
-      }
-      resolvedOrgId = brandRow.organization_id;
+    // Verify authoritative organization_id from database
+    const brandRow = this.db.prepare('SELECT id, organization_id FROM brands WHERE id = ?').get(brand_id);
+    if (!brandRow || !brandRow.organization_id) {
+      const err = new Error('Organization not found for brand.');
+      err.status = 404;
+      err.code = 'ORGANIZATION_NOT_FOUND';
+      throw err;
     }
+
+    if (organization_id && String(brandRow.organization_id) !== String(organization_id)) {
+      const err = new Error('Brand organization does not match provided organization.');
+      err.status = 403;
+      err.code = 'BRAND_ORGANIZATION_MISMATCH';
+      throw err;
+    }
+
+    const resolvedOrgId = brandRow.organization_id;
 
     const cleanSub = String(sub).trim();
     const cleanEmail = email ? String(email).trim().toLowerCase() : null;
