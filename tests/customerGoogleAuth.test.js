@@ -639,6 +639,59 @@ test('CGA-17: Order created with Google customer session records customer_id', a
   assert.strictEqual(cancelData.decision, 'customer_cancel');
 });
 
+// ── CGA-19: Cross-brand Google identity must fail closed ───────────────────
+test('CGA-19: Same Google sub cannot be silently reused across brands', async () => {
+  const otherOrgId = 'org_cga19_other';
+  const otherBrandId = 'brand_cga19_other';
+
+  db.prepare('INSERT OR IGNORE INTO organizations (id, name, slug) VALUES (?, ?, ?)')
+    .run(otherOrgId, 'CGA 19 Other Org', 'cga19-other-org');
+  db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain) VALUES (?, ?, ?, ?, ?)')
+    .run(otherBrandId, otherOrgId, 'CGA 19 Other Brand', 'cga19-other-brand', 'cga19.other.test');
+
+  const tok = registerMockGoogleToken('tok_cga19_cross_brand', {
+    sub: 'sub_cga19_cross_brand',
+    email: 'cga19@example.com',
+    email_verified: 'true',
+    name: 'Cross Brand Customer'
+  });
+
+  // First registration on the default Bangjo tenant.
+  const firstRes = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tok })
+  });
+  const firstData = await firstRes.json();
+  assert.strictEqual(firstRes.status, 200);
+  assert.ok(firstData.customer && firstData.customer.id);
+  assert.ok(firstData.token);
+
+  // Attempt to authenticate the same Google identity against another tenant.
+  // Tenant context is explicitly selected through the control-plane host.
+  const crossBrandRes = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    headers: {
+      host: 'xentra.cloud',
+      'x-brand-id': otherBrandId
+    },
+    body: JSON.stringify({ credential: tok })
+  });
+  const crossBrandData = await crossBrandRes.json();
+
+  assert.strictEqual(crossBrandRes.status, 403);
+  assert.strictEqual(crossBrandData.success, false);
+  assert.strictEqual(crossBrandData.code, 'CUSTOMER_IDENTITY_BRAND_MISMATCH');
+  assert.ok(!crossBrandData.token, 'Cross-brand mismatch must never issue a customer session');
+
+  const providerRows = db.prepare(
+    'SELECT cap.customer_id, c.brand_id FROM customer_auth_providers cap JOIN customers c ON c.id = cap.customer_id WHERE cap.provider = ? AND cap.provider_user_id = ?'
+  ).all('google', 'sub_cga19_cross_brand');
+
+  assert.strictEqual(providerRows.length, 1, 'The Google sub must remain bound to exactly one Customer');
+  assert.strictEqual(providerRows[0].customer_id, firstData.customer.id);
+  assert.strictEqual(providerRows[0].brand_id, 'brand_bangjo');
+});
+
 // ── CGA-18: Invalid or Expired Customer Session fails closed ────────────────
 test('CGA-18: Invalid or expired customer session rejected fail-closed', async () => {
   const invalidRes = await mockFetch('/api/v1/checkout/verify', {
