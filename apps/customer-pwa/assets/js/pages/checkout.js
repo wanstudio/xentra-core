@@ -2695,6 +2695,8 @@
       customValue = String(Math.floor(Number(state.cashTendered)));
     }
 
+    var initialDisplayVal = (customValue && Number(customValue) > 0) ? fmtIDR(customValue) : '';
+
     var sheetHtml =
       '<div class="x-tender-sheet">' +
       '  <div class="x-tender-header">' +
@@ -2718,7 +2720,7 @@
       '    </div>' +
       '    <div class="x-tender-custom-input-wrap">' +
       '      <span class="x-tender-custom-prefix">Rp</span>' +
-      '      <input type="number" inputmode="numeric" id="x-tender-custom-input" class="x-tender-custom-input" placeholder="0" value="' + UI.escape(customValue) + '">' +
+      '      <input type="text" inputmode="numeric" id="x-tender-custom-input" class="x-tender-custom-input" placeholder="0" value="' + UI.escape(initialDisplayVal) + '">' +
       '    </div>' +
       '  </div>' +
       '  <button type="button" class="x-tender-confirm-btn" id="x-btn-confirm-tender">Konfirmasi</button>' +
@@ -2788,9 +2790,51 @@
       };
       elCustomInput.oninput = function () {
         selectCustom();
-        var val = elCustomInput.value.replace(/[^0-9]/g, '');
-        customValue = val;
-        elCustomInput.value = val;
+        var rawVal = elCustomInput.value || '';
+        var rawCursor = typeof elCustomInput.selectionEnd === 'number' ? elCustomInput.selectionEnd : rawVal.length;
+        var digitsBeforeCursor = rawVal.slice(0, rawCursor).replace(/\D/g, '').length;
+
+        var digits = rawVal.replace(/\D/g, '');
+        if (!digits) {
+          customValue = '';
+          elCustomInput.value = '';
+          updateUi();
+          return;
+        }
+
+        var num = parseInt(digits, 10);
+        if (isNaN(num) || num <= 0) {
+          customValue = '';
+          elCustomInput.value = '';
+          updateUi();
+          return;
+        }
+
+        customValue = String(num);
+        var formatted = fmtIDR(num);
+        elCustomInput.value = formatted;
+
+        // Restore caret/cursor position smoothly without jumpy offset
+        if (typeof elCustomInput.setSelectionRange === 'function') {
+          var targetCursor = 0;
+          if (digitsBeforeCursor === 0) {
+            targetCursor = 0;
+          } else {
+            var count = 0;
+            for (var idx = 0; idx < formatted.length; idx++) {
+              if (/\d/.test(formatted.charAt(idx))) {
+                count++;
+              }
+              if (count === digitsBeforeCursor) {
+                targetCursor = idx + 1;
+                break;
+              }
+            }
+            if (targetCursor === 0) targetCursor = formatted.length;
+          }
+          elCustomInput.setSelectionRange(targetCursor, targetCursor);
+        }
+
         updateUi();
       };
     }
@@ -3312,7 +3356,10 @@
   window.Xentra = window.Xentra || {};
   window.Xentra.Checkout = {
     mount: mount,
-    openCustomerAuthSheet: openCustomerAuthSheet
+    openCustomerAuthSheet: openCustomerAuthSheet,
+    // Test-only hook: seed paymentMethod without going through the DOM.
+    // MUST NOT be called in production paths.
+    _setPaymentMethod: function (method) { state.paymentMethod = method; }
   };
   window.openCustomerAuthSheet = openCustomerAuthSheet;
 })();
