@@ -120,19 +120,19 @@ class OrderRepository {
   }
 
   insertOrder({
-    id, orderNumber, clientTransactionId, brandId, branchId, customerName, customerPhone,
+    id, orderNumber, clientTransactionId, brandId, branchId, customerId = null, customerName, customerPhone,
     orderType, orderChannel, selectionMode, tableNumber, fulfillmentScheduleType,
     scheduledSlotStart, scheduledSlotEnd, subtotal, discountAmount, deliveryFee,
     grandTotal, paymentMethod, status, orderNote, diningSessionId, cashTendered = null, createdAt, updatedAt
   }) {
     return this.db.execute(`
       INSERT INTO orders (
-        id, order_number, client_transaction_id, brand_id, branch_id, customer_name, customer_phone,
+        id, order_number, client_transaction_id, brand_id, branch_id, customer_id, customer_name, customer_phone,
         order_type, order_channel, selection_mode, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
         subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, cash_tendered, order_note, dining_session_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      id, orderNumber, clientTransactionId, brandId, branchId, customerName, customerPhone,
+      id, orderNumber, clientTransactionId, brandId, branchId, customerId || null, customerName, customerPhone,
       orderType, orderChannel, selectionMode, tableNumber, fulfillmentScheduleType,
       scheduledSlotStart, scheduledSlotEnd, subtotal, discountAmount, deliveryFee,
       grandTotal, paymentMethod, status, (cashTendered !== null && cashTendered !== undefined) ? Number(cashTendered) : null, orderNote, diningSessionId, createdAt, updatedAt
@@ -140,17 +140,17 @@ class OrderRepository {
   }
 
   insertReservation({
-    id, orderNumber, brandId, branchId, customerName, customerPhone,
+    id, orderNumber, brandId, branchId, customerId = null, customerName, customerPhone,
     orderChannel, selectionMode, reservationDate, orderNote, createdAt, updatedAt
   }) {
     return this.db.execute(`
       INSERT INTO orders (
-        id, order_number, brand_id, branch_id, customer_name, customer_phone,
+        id, order_number, brand_id, branch_id, customer_id, customer_name, customer_phone,
         order_type, order_channel, selection_mode, table_number, scheduled_slot_start,
         subtotal, delivery_fee, grand_total, payment_method, status, order_note, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 'reservation', ?, ?, NULL, ?, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reservation', ?, ?, NULL, ?, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
     `, [
-      id, orderNumber, brandId, branchId, customerName, customerPhone,
+      id, orderNumber, brandId, branchId, customerId || null, customerName, customerPhone,
       orderChannel, selectionMode, reservationDate, orderNote, createdAt, updatedAt
     ]);
   }

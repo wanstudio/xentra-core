@@ -19,6 +19,7 @@ const MediaRepository = require('./MediaRepository');
 const PosOperationalRepository = require('./PosOperationalRepository');
 const BannerContentRepository = require('./BannerContentRepository');
 const BannerAssignmentRepository = require('./BannerAssignmentRepository');
+const CustomerRepository = require('./CustomerRepository');
 
 module.exports = {
   CatalogRepository,
@@ -39,5 +40,6 @@ module.exports = {
   MediaRepository,
   PosOperationalRepository,
   BannerContentRepository,
-  BannerAssignmentRepository
+  BannerAssignmentRepository,
+  CustomerRepository
 };

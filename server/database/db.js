@@ -946,6 +946,36 @@ function initSchema(targetDb) {
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS customers (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      display_name TEXT,
+      email TEXT,
+      phone TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_customers_brand_id ON customers(brand_id);
+    CREATE INDEX IF NOT EXISTS idx_customers_brand_email ON customers(brand_id, email);
+    CREATE INDEX IF NOT EXISTS idx_customers_brand_phone ON customers(brand_id, phone);
+
+    CREATE TABLE IF NOT EXISTS customer_auth_providers (
+      id TEXT PRIMARY KEY,
+      customer_id TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      provider_user_id TEXT NOT NULL,
+      email TEXT,
+      metadata TEXT,
+      linked_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE CASCADE,
+      UNIQUE (provider, provider_user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_cap_customer_id ON customer_auth_providers(customer_id);
+    CREATE INDEX IF NOT EXISTS idx_cap_provider_sub ON customer_auth_providers(provider, provider_user_id);
+
     CREATE TABLE IF NOT EXISTS customer_addresses (
       id TEXT PRIMARY KEY,
       brand_id TEXT NOT NULL,
@@ -965,6 +995,7 @@ function initSchema(targetDb) {
 
     CREATE TABLE IF NOT EXISTS customer_sessions (
       token TEXT PRIMARY KEY,
+      customer_id TEXT,
       phone TEXT NOT NULL,
       brand_id TEXT NOT NULL,
       expires_at INTEGER NOT NULL,
@@ -1847,6 +1878,12 @@ function initSchema(targetDb) {
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_sync_queue_branch_client_tx ON pos_sync_queue(branch_id, client_transaction_id);'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_pos_sync_queue_terminal_status ON pos_sync_queue(terminal_id, status);'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_pos_inventory_conflicts_branch_status ON pos_inventory_conflicts(branch_id, status);'); } catch (e) {}
+
+  // Customer Identity Foundation: customer_id linkage
+  try { targetDb.exec('ALTER TABLE customer_sessions ADD COLUMN customer_id TEXT;'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_customer_sessions_customer_id ON customer_sessions(customer_id);'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE orders ADD COLUMN customer_id TEXT;'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);'); } catch (e) {}
 
   // Migrate existing branch_products:
   // 1. Fill legacy snapshot columns (product_name, etc.) idempotently from master for pre-override rows.

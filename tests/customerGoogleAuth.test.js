@@ -409,6 +409,248 @@ test('CGA-10: Customer Google session is brand-scoped (tenant isolation)', async
     'Token issued for brand_bangjo must not fail TENANT_MISMATCH on brand_bangjo');
 });
 
+// ── CGA-11: Database Persistence — creates Customer and CustomerAuthProvider ─
+test('CGA-11: Successful Google auth creates Customer and CustomerAuthProvider records', async () => {
+  const tok = registerMockGoogleToken('tok_cga11', {
+    sub: 'sub_cga11_unique',
+    email: 'cga11@example.com',
+    email_verified: 'true',
+    name: 'CGA 11 User'
+  });
+
+  const res = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tok })
+  });
+  const data = await res.json();
+  assert.strictEqual(res.status, 200);
+  assert.ok(data.customer && data.customer.id);
+  assert.ok(data.customer.id.startsWith('cst_'));
+
+  const custRow = db.prepare('SELECT * FROM customers WHERE id = ?').get(data.customer.id);
+  assert.ok(custRow, 'Customer row must exist in customers table');
+  assert.strictEqual(custRow.email, 'cga11@example.com');
+  assert.strictEqual(custRow.display_name, 'CGA 11 User');
+
+  const provRow = db.prepare('SELECT * FROM customer_auth_providers WHERE customer_id = ? AND provider = ?').get(data.customer.id, 'google');
+  assert.ok(provRow, 'CustomerAuthProvider row must exist in customer_auth_providers table');
+  assert.strictEqual(provRow.provider_user_id, 'sub_cga11_unique');
+  assert.strictEqual(provRow.email, 'cga11@example.com');
+});
+
+// ── CGA-12: Sub Immutability — Same sub returns same Customer ID ───────────
+test('CGA-12: Subsequent login with same Google sub resolves to same Customer ID', async () => {
+  const tok1 = registerMockGoogleToken('tok_cga12_1', {
+    sub: 'sub_cga12_fixed',
+    email: 'cga12@example.com',
+    email_verified: 'true',
+    name: 'Initial Name'
+  });
+  const res1 = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tok1 })
+  });
+  const data1 = await res1.json();
+  assert.strictEqual(res1.status, 200);
+
+  const tok2 = registerMockGoogleToken('tok_cga12_2', {
+    sub: 'sub_cga12_fixed',
+    email: 'cga12@example.com',
+    email_verified: 'true',
+    name: 'Initial Name'
+  });
+  const res2 = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tok2 })
+  });
+  const data2 = await res2.json();
+  assert.strictEqual(res2.status, 200);
+  assert.strictEqual(data2.customer.id, data1.customer.id, 'Customer ID must remain identical for same Google sub');
+});
+
+// ── CGA-13: Email Change on Google — sub preserves Customer ID ─────────────
+test('CGA-13: Google email change with same sub updates email without changing Customer ID', async () => {
+  const tok1 = registerMockGoogleToken('tok_cga13_old', {
+    sub: 'sub_cga13_fixed',
+    email: 'oldemail@example.com',
+    email_verified: 'true',
+    name: 'Old User'
+  });
+  const res1 = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tok1 })
+  });
+  const data1 = await res1.json();
+  const customerId = data1.customer.id;
+
+  const tok2 = registerMockGoogleToken('tok_cga13_new', {
+    sub: 'sub_cga13_fixed',
+    email: 'newemail@example.com',
+    email_verified: 'true',
+    name: 'Updated User'
+  });
+  const res2 = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tok2 })
+  });
+  const data2 = await res2.json();
+  assert.strictEqual(res2.status, 200);
+  assert.strictEqual(data2.customer.id, customerId, 'Customer ID must not change when Google email changes');
+  assert.strictEqual(data2.customer.email, 'newemail@example.com');
+
+  const updatedCust = db.prepare('SELECT email FROM customers WHERE id = ?').get(customerId);
+  assert.strictEqual(updatedCust.email, 'newemail@example.com');
+});
+
+// ── CGA-14: Different Google sub creates distinct Customer ─────────────────
+test('CGA-14: Different Google sub creates distinct Customer', async () => {
+  const tokA = registerMockGoogleToken('tok_cga14_a', {
+    sub: 'sub_cga14_user_a',
+    email: 'usera@example.com',
+    email_verified: 'true',
+    name: 'User A'
+  });
+  const tokB = registerMockGoogleToken('tok_cga14_b', {
+    sub: 'sub_cga14_user_b',
+    email: 'userb@example.com',
+    email_verified: 'true',
+    name: 'User B'
+  });
+
+  const resA = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tokA })
+  });
+  const resB = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tokB })
+  });
+
+  const dataA = await resA.json();
+  const dataB = await resB.json();
+
+  assert.notStrictEqual(dataA.customer.id, dataB.customer.id);
+  assert.notStrictEqual(dataA.token, dataB.token);
+});
+
+// ── CGA-15: Concurrency / Race Safety on Google Sub ────────────────────────
+test('CGA-15: Concurrent Google auth requests with same sub resolve cleanly without duplicate Customer', async () => {
+  const tok = registerMockGoogleToken('tok_cga15_concurrent', {
+    sub: 'sub_cga15_concurrent',
+    email: 'concurrent@example.com',
+    email_verified: 'true',
+    name: 'Concurrent User'
+  });
+
+  const [res1, res2] = await Promise.all([
+    mockFetch('/api/v1/customer/auth/google', { method: 'POST', body: JSON.stringify({ credential: tok }) }),
+    mockFetch('/api/v1/customer/auth/google', { method: 'POST', body: JSON.stringify({ credential: tok }) })
+  ]);
+
+  const data1 = await res1.json();
+  const data2 = await res2.json();
+
+  assert.strictEqual(res1.status, 200);
+  assert.strictEqual(res2.status, 200);
+  assert.strictEqual(data1.customer.id, data2.customer.id, 'Both concurrent calls must resolve to the same Customer ID');
+
+  const count = db.prepare('SELECT COUNT(*) as cnt FROM customer_auth_providers WHERE provider_user_id = ?').get('sub_cga15_concurrent');
+  assert.strictEqual(Number(count.cnt), 1, 'Only one customer_auth_providers row must exist for this sub');
+});
+
+// ── CGA-16: Strict Separation from Workforce Users ─────────────────────────
+test('CGA-16: Customer Google auth NEVER touches workforce users or user_auth_providers table', async () => {
+  const workforceUsersBefore = Number(db.prepare('SELECT COUNT(*) as cnt FROM users').get().cnt);
+  const workforceAuthBefore = Number(db.prepare('SELECT COUNT(*) as cnt FROM user_auth_providers').get().cnt);
+
+  const tok = registerMockGoogleToken('tok_cga16_separation', {
+    sub: 'sub_cga16_separation',
+    email: 'separation@example.com',
+    email_verified: 'true',
+    name: 'Separation Customer'
+  });
+
+  const res = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tok })
+  });
+  assert.strictEqual(res.status, 200);
+
+  const workforceUsersAfter = Number(db.prepare('SELECT COUNT(*) as cnt FROM users').get().cnt);
+  const workforceAuthAfter = Number(db.prepare('SELECT COUNT(*) as cnt FROM user_auth_providers').get().cnt);
+
+  assert.strictEqual(workforceUsersAfter, workforceUsersBefore, 'users table count must not change');
+  assert.strictEqual(workforceAuthAfter, workforceAuthBefore, 'user_auth_providers table count must not change');
+});
+
+// ── CGA-17: Order customer_id tracking on Checkout Submission ───────────────
+test('CGA-17: Order created with Google customer session records customer_id', async () => {
+  const tok = registerMockGoogleToken('tok_cga17_order', {
+    sub: 'sub_cga17_order',
+    email: 'cga17_order@example.com',
+    email_verified: 'true',
+    name: 'Order Customer 17'
+  });
+
+  const authRes = await mockFetch('/api/v1/customer/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ credential: tok })
+  });
+  const authData = await authRes.json();
+  assert.strictEqual(authRes.status, 200);
+  const customerId = authData.customer.id;
+
+  addTestBranch('branch_cga17');
+  const orderRes = await mockFetch('/api/v1/checkout/create-order', {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + authData.token },
+    body: JSON.stringify({
+      branch_id: 'branch_cga17',
+      order_type: 'pickup',
+      payment_method: 'cash',
+      customer: { name: 'Order Customer 17', phone: '081999999017' },
+      items: [{ id: '272', product_id: '272', quantity: 1, expected_price: 35000, branch_id: 'branch_cga17' }]
+    })
+  });
+  const orderData = await orderRes.json();
+  assert.ok(orderRes.status === 200 || orderRes.status === 201, `Order creation failed: ${JSON.stringify(orderData)}`);
+  assert.ok(orderData.order_id);
+
+  const orderRow = db.prepare('SELECT id, customer_id, customer_name, customer_phone FROM orders WHERE id = ?').get(orderData.order_id);
+  assert.ok(orderRow);
+  assert.strictEqual(orderRow.customer_id, customerId, 'Order must store customer_id from authenticated session');
+
+  // Verify ownership check on GET /orders/:id using customer_id
+  const getRes = await mockFetch(`/api/v1/orders/${orderData.order_id}`, {
+    headers: { authorization: 'Bearer ' + authData.token }
+  });
+  const getData = await getRes.json();
+  assert.strictEqual(getRes.status, 200);
+  assert.strictEqual(getData.order && getData.order.id, orderData.order_id);
+
+  // Verify customer cancellation on /orders/:id/cancel using customer_id
+  const cancelRes = await mockFetch(`/api/v1/orders/${orderData.order_id}/cancel`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + authData.token },
+    body: JSON.stringify({ reason: 'Changed mind' })
+  });
+  const cancelData = await cancelRes.json();
+  assert.strictEqual(cancelRes.status, 200, `Order cancel failed: ${JSON.stringify(cancelData)}`);
+  assert.strictEqual(cancelData.decision, 'customer_cancel');
+});
+
+// ── CGA-18: Invalid or Expired Customer Session fails closed ────────────────
+test('CGA-18: Invalid or expired customer session rejected fail-closed', async () => {
+  const invalidRes = await mockFetch('/api/v1/checkout/verify', {
+    method: 'POST',
+    headers: { authorization: 'Bearer xnt_cust_nonexistent1234567890' },
+    body: JSON.stringify({ branch_id: 'branch_cga10', order_type: 'pickup', items: [] })
+  });
+  assert.strictEqual(invalidRes.status, 401);
+  const invalidData = await invalidRes.json();
+  assert.strictEqual(invalidData.error, 'INVALID_OR_EXPIRED_CUSTOMER_SESSION');
+});
+
 test.after(() => {
   axios.get = _originalAxiosGet;
 });

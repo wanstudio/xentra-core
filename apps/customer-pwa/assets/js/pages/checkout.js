@@ -2234,11 +2234,15 @@
           if (res && res.success && res.token) {
             var customerName = (res.customer && res.customer.name) || state.customer.name || 'Pelanggan';
             var customerEmail = (res.customer && res.customer.email) || '';
+            var customerId = (res.customer && res.customer.id) || '';
 
             // Store Xentra customer session (xnt_cust_ token), NOT the Google credential
             Store.setCustomerSession({
               name: customerName,
-              phone: customerEmail,   // phone field carries Google email for Google-auth sessions
+              phone: customerEmail,   // phone field carries Google email for contact/display fallback
+              email: customerEmail,
+              customerId: customerId,
+              customer_id: customerId,
               token: res.token
             });
 

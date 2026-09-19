@@ -602,29 +602,50 @@ router.post('/customer/auth/google', async (req, res) => {
       });
     }
 
-    // Issue a Xentra customer session — using Google email as the customer identity key.
-    // The token prefix is xnt_cust_ (same as OTP-issued sessions), so requireCustomerAuth()
-    // and all downstream routes accept it without modification.
-    // Google sub is stored as google_sub in the session for audit; it is NEVER the internal customer ID.
-    const displayName = verifiedClaims.name || verifiedClaims.email.split('@')[0] || 'Pelanggan';
+    // Resolve or create Customer and CustomerAuthProvider using Google sub as immutable key.
+    // Customer domain is strictly separated from workforce (no users / user_auth_providers touched).
+    const { CustomerIdentityService } = require('../../core/identity');
+    const customerIdentityService = new CustomerIdentityService();
+    const resolvedCustomer = customerIdentityService.findOrCreateFromGoogle({
+      brand_id: req.brand_id,
+      sub: verifiedClaims.sub,
+      email: verifiedClaims.email,
+      name: verifiedClaims.name,
+      picture: verifiedClaims.picture
+    });
+
+    const customerRecord = resolvedCustomer.customer;
+    const displayName = customerRecord.display_name || verifiedClaims.name || (verifiedClaims.email ? verifiedClaims.email.split('@')[0] : 'Pelanggan');
+
+    // Issue a Xentra customer session bound to customer_id.
+    // The token prefix is xnt_cust_, verified by requireCustomerAuth().
+    // Google sub is stored as google_sub for audit; it is NEVER the internal customer ID.
     const customerSession = TokenSessionStore.createCustomerSession(
-      verifiedClaims.email,
+      customerRecord.phone || verifiedClaims.email,
       req.brand_id,
-      2592000,  // 30 days TTL (same as OTP sessions)
-      { name: displayName, email: verifiedClaims.email, google_sub: verifiedClaims.sub }
+      2592000,  // 30 days TTL
+      {
+        customerId: customerRecord.id,
+        customer_id: customerRecord.id,
+        name: displayName,
+        email: customerRecord.email || verifiedClaims.email,
+        google_sub: verifiedClaims.sub
+      }
     );
 
     RateLimiter.reset(rateLimitKey);
 
-    console.log(`[CUSTOMER_GOOGLE_AUTH] brand=${req.brand_id} email=${verifiedClaims.email.replace(/@.*/, '@...')} sub=${verifiedClaims.sub.substring(0, 8)}...`);
+    console.log(`[CUSTOMER_GOOGLE_AUTH] brand=${req.brand_id} customer_id=${customerRecord.id} email=${(customerRecord.email || verifiedClaims.email).replace(/@.*/, '@...')} sub=${verifiedClaims.sub.substring(0, 8)}...`);
 
     return res.json({
       success: true,
       token: customerSession.token,
       expires_at: new Date(customerSession.expiresAt).toISOString(),
       customer: {
+        id: customerRecord.id,
         name: displayName,
-        email: verifiedClaims.email
+        email: customerRecord.email || verifiedClaims.email,
+        phone: customerRecord.phone || null
       }
     });
   } catch (err) {
@@ -1483,6 +1504,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       branch_id: branch.id,
       client_transaction_id: req.body.client_transaction_id || req.body.clientTransactionId || null,
       customer: {
+        id: customerSession.customerId || customerSession.customer_id || null,
         name: customer.name.trim(),
         phone: customer.phone.trim()
       },
@@ -1660,11 +1682,14 @@ const TokenSessionStore = {
   createCustomerSession(phone, brand_id, ttlSeconds = 2592000, extra = {}) {
     const token = 'xnt_cust_' + crypto.randomBytes(24).toString('hex');
     const expiresAt = Date.now() + ttlSeconds * 1000;
+    const customerId = (extra && (extra.customerId || extra.customer_id)) || null;
     const sessionData = {
       type: 'customer',
       role: 'customer',
-      phone: phone.trim(),
-      customerPhone: phone.trim(),
+      customerId: customerId,
+      customer_id: customerId,
+      phone: phone ? phone.trim() : '',
+      customerPhone: phone ? phone.trim() : '',
       brandId: brand_id,
       brand_id: brand_id,
       expiresAt
@@ -1681,9 +1706,9 @@ const TokenSessionStore = {
 
     try {
       db.prepare(`
-        INSERT OR REPLACE INTO customer_sessions (token, phone, brand_id, expires_at, created_at)
-        VALUES (?, ?, ?, ?, datetime('now'))
-      `).run(token, phone.trim(), brand_id, expiresAt);
+        INSERT OR REPLACE INTO customer_sessions (token, customer_id, phone, brand_id, expires_at, created_at)
+        VALUES (?, ?, ?, ?, ?, datetime('now'))
+      `).run(token, customerId, phone ? phone.trim() : '', brand_id, expiresAt);
     } catch (dbErr) {
       console.error('[TokenSessionStore] Failed to persist customer session to SQLite:', dbErr.message);
     }
@@ -1711,7 +1736,7 @@ const TokenSessionStore = {
     // L2: SQLite backing for customer sessions
     if (token.startsWith('xnt_cust_')) {
       try {
-        const row = db.prepare('SELECT token, phone, brand_id, expires_at FROM customer_sessions WHERE token = ?').get(token);
+        const row = db.prepare('SELECT token, customer_id, phone, brand_id, expires_at FROM customer_sessions WHERE token = ?').get(token);
         if (!row) return null;
 
         if (Date.now() > Number(row.expires_at)) {
@@ -1722,6 +1747,8 @@ const TokenSessionStore = {
         const hydrated = {
           type: 'customer',
           role: 'customer',
+          customerId: row.customer_id || null,
+          customer_id: row.customer_id || null,
           phone: row.phone,
           customerPhone: row.phone,
           brandId: row.brand_id,
@@ -2116,8 +2143,11 @@ router.get('/orders/:id', (req, res) => {
 
   if (session) {
     if (session.type === 'customer' || session.role === 'customer') {
-      // Customer must own the order and match tenant brand
-      if (session.brandId === req.brand_id && session.phone === order.customer_phone) {
+      // Customer must own the order and match tenant brand (by customer_id or customer_phone)
+      if (session.brandId === req.brand_id && (
+        (session.customerId && order.customer_id && session.customerId === order.customer_id) ||
+        (session.phone && order.customer_phone && session.phone === order.customer_phone)
+      )) {
         isAuthorized = true;
       }
     } else if (['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'].includes(session.role)) {
@@ -2464,12 +2494,14 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
 router.post('/orders/:id/cancel', requireCustomerAuth(), (req, res) => {
   try {
     const reason = String(req.body.reason || req.body.note || '').trim();
-    const order = db.prepare('SELECT id, status, customer_phone FROM orders WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    const order = db.prepare('SELECT id, status, customer_id, customer_phone FROM orders WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
 
     if (!order) {
       return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
     }
-    if (String(order.customer_phone) !== String(req.customer.phone)) {
+    const isOwner = (req.customer.customerId && order.customer_id && String(req.customer.customerId) === String(order.customer_id)) ||
+                    (req.customer.phone && order.customer_phone && String(req.customer.phone) === String(order.customer_phone));
+    if (!isOwner) {
       return res.status(403).json({
         success: false,
         error: 'FORBIDDEN_ORDER_OWNERSHIP',
