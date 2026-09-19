@@ -13,7 +13,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_20260918_otp';
+      var PWA_VERSION = 'v_20260919_poi';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -225,7 +225,7 @@
   <script src="/assets/js/core/delivery-schedule.js?v=p7f4a09"></script>
   <script src="/assets/js/location.js?v=p4a7f28"></script>
   <script src="/assets/js/core/discovery.js?v=p4a7f28"></script>
-  <script src="/assets/js/core/location-picker.js?v=p7f4a06"></script>
+  <script src="/assets/js/core/location-picker.js?v=v_20260919_poi"></script>
   <script src="/assets/js/core/media.js?v=m6a02"></script>
 
   <!-- Page Controllers -->
@@ -309,7 +309,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=v_20260918_otp').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=v_20260919_poi').then(function (reg) {
         reg.update();
 
         document.addEventListener('visibilitychange', function () {
