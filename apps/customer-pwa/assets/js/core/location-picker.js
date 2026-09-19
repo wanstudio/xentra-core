@@ -607,11 +607,13 @@
 
                 function proceedWithCoords(lat, lng, fullAddr, titleName) {
                   sh.close();
+                  var resolvedTitle = (titleName || selected.title || (selected.display_name ? selected.display_name.split(',')[0] : 'Lokasi Terpilih')).slice(0, 30);
                   openAddressDetailSheet({
+                    title: resolvedTitle,
                     address: fullAddr || selected.address || selected.display_name,
                     latitude: Number(lat),
                     longitude: Number(lng),
-                    label: (titleName || selected.title || (selected.display_name ? selected.display_name.split(',')[0] : 'Lokasi Terpilih')).slice(0, 30),
+                    label: resolvedTitle,
                     detail: '',
                     source: 'search',
                     onSelect: options.onSelect
@@ -1146,6 +1148,7 @@
           longitude: currentPinCoords.lng,
           label: titleText,
           detail: '',
+          source: 'map',
           isFavorite: true,
           onSelect: function () {
             closeMap();
@@ -1161,6 +1164,7 @@
           longitude: currentPinCoords.lng,
           label: titleText,
           detail: '',
+          source: 'map',
           isFavorite: false,
           onSelect: function () {
             closeMap();

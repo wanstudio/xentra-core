@@ -309,3 +309,43 @@ test('MAP-08: Coordinate authority is preserved and never shifted during reverse
   assert.strictEqual(meta.title, 'Warung Pojok');
 });
 
+test('MAP-09: End-to-end destination persistence preserves source coordinates and canonical metadata', () => {
+  const { Store, XentraLocationPicker } = setupTestEnvironment();
+
+  // 1. Map selection coordinates
+  const pinCoords = { lat: -5.3978912, lng: 105.2661234 };
+  const metadata = XentraLocationPicker.formatLocationMetadata({
+    title: 'Geprek Bensu Pringsewu',
+    road: 'Jl. Jendral Sudirman',
+    address: 'Geprek Bensu Pringsewu, Jl. Jendral Sudirman, Pringsewu'
+  }, pinCoords);
+
+  // Directly apply destination as done by location-picker confirmation
+  Store.setActiveDestination({
+    latitude: pinCoords.lat,
+    longitude: pinCoords.lng,
+    address: metadata.address,
+    label: metadata.title,
+    detail: 'Sebelah minimarket',
+    source: 'map',
+    is_explicit: true
+  });
+
+  const active = Store.getActiveDestination();
+  assert.ok(active, 'Active destination must be persisted');
+  assert.strictEqual(active.latitude, -5.3978912, 'Persisted latitude must strictly equal source coordinates');
+  assert.strictEqual(active.longitude, 105.2661234, 'Persisted longitude must strictly equal source coordinates');
+  assert.strictEqual(active.label, 'Geprek Bensu Pringsewu');
+  assert.strictEqual(active.source, 'map');
+  assert.strictEqual(active.is_explicit, true);
+
+  // 2. Verify legacy synchronized location shape
+  const legacyLoc = Store.getState().location;
+  assert.ok(legacyLoc, 'Legacy location must be synchronized');
+  assert.strictEqual(legacyLoc.latitude, -5.3978912);
+  assert.strictEqual(legacyLoc.longitude, 105.2661234);
+  assert.strictEqual(legacyLoc.source, 'map');
+  assert.strictEqual(legacyLoc.is_explicit, true);
+});
+
+
