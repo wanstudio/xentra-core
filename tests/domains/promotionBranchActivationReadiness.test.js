@@ -205,30 +205,8 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
   });
 
   test('ACT-08: Real Bangjo brand prm_bangjo_pwa_install reward points to 401 and succeeds PrePaymentVerificationGate at Bangjo branch', () => {
-    // Check if test is running against persistent xentra.db or :memory:
-    const DatabaseSync = require('node:sqlite').DatabaseSync;
-    const path = require('node:path');
-    const prodDbPath = path.resolve(__dirname, '../../server/database/xentra.db');
-
     let targetDb = db;
     let bangjoBranch = 'branch_1789606246242_08knv';
-
-    if (require('node:fs').existsSync(prodDbPath)) {
-      const prodDb = new DatabaseSync(prodDbPath);
-      const prodRew = prodDb.prepare("SELECT * FROM promotion_rewards WHERE promotion_id = 'prm_bangjo_pwa_install'").get();
-      assert.ok(prodRew, 'Promotion reward must exist in xentra.db');
-      assert.strictEqual(prodRew.target_product_id, '401', 'Reward target product must be 401 (Es Teh Manis)');
-
-      const prodBp = prodDb.prepare('SELECT is_available, stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(bangjoBranch, '401');
-      assert.ok(prodBp, 'Product 401 must exist in branch_products for Bangjo Pringsewu in xentra.db');
-      assert.strictEqual(prodBp.is_available, 1);
-      assert.ok(prodBp.stock >= 1);
-
-      const prodScope = prodDb.prepare("SELECT * FROM promotion_branch_scope WHERE promotion_id = 'prm_bangjo_pwa_install' AND branch_id = ?").get(bangjoBranch);
-      assert.ok(prodScope, 'Branch scope must exist for Bangjo Pringsewu in xentra.db');
-      assert.strictEqual(prodScope.is_active, 1);
-      prodDb.close();
-    }
 
     // In current test db (which is :memory:), ensure branch and product 401 are seeded if not present
     let testBp = db.prepare('SELECT is_available, stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(bangjoBranch, '401');

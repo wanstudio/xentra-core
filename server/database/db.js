@@ -2042,12 +2042,15 @@ function bootstrapEssentialTenant(targetDb) {
     `).run(brandId);
   } catch (e) {}
 
-  // Seed default initial merchant owner if users table is empty (bcrypt hashed)
+  // In test environment only: seed default test merchant owner if users table is empty
+  // so existing in-memory test suites have their standard fixture.
+  // In production: server boot/restart MUST NEVER auto-create business users or owners.
+  // Production owners are provisioned explicitly via RegistrationService or PlatformBootstrapService.
   const userCount = targetDb.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ?').get(brandId)?.cnt || 0;
-  if (userCount === 0) {
+  if (userCount === 0 && process.env.NODE_ENV === 'test') {
     const bcrypt = require('bcryptjs');
     
-    // Secure default initial merchant credential
+    // Secure default initial merchant credential for test fixtures
     const initPassword = process.env.INITIAL_ADMIN_PASSWORD || 'bangjo123';
     const defaultPasswordHash = bcrypt.hashSync(initPassword, 12);
     targetDb.prepare(`

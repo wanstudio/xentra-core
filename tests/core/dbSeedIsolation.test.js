@@ -54,7 +54,7 @@ test('Database Seed & Test Isolation Suite', async (t) => {
       // Essential tenant bootstrap must be present
       assert.strictEqual(data.orgs, 1, 'Essential organization must be created');
       assert.strictEqual(data.brands, 1, 'Essential brand must be created');
-      assert.strictEqual(data.users, 1, 'Initial admin user must be created');
+      assert.strictEqual(data.users, 0, 'Production boot must NOT auto-create admin/owner user');
 
       // Demo fixtures MUST NOT be seeded
       assert.strictEqual(data.branches, 0, 'Production boot must NOT seed demo branches');
@@ -271,4 +271,45 @@ test('Database Seed & Test Isolation Suite', async (t) => {
     }
   });
 
+  await t.test('11. Production restart on zero-user DB does not create usr_bangjo_owner and preserves entity immutability', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'xentra-prod-zero-user-'));
+    const testDbFile = path.join(tmpDir, 'zero-user.db');
+
+    try {
+      const env = { ...process.env, NODE_ENV: 'production', DB_PATH: testDbFile };
+      delete env.npm_lifecycle_event;
+
+      // Boot 1
+      const script1 = `
+        const db = require('./server/database/db');
+        const users = db.prepare('SELECT count(*) as c FROM users').get().c;
+        const branches = db.prepare('SELECT count(*) as c FROM branches').get().c;
+        console.log(JSON.stringify({ users, branches }));
+      `;
+      const res1 = spawnSync('node', ['-e', script1], { cwd: rootDir, env, encoding: 'utf8' });
+      assert.strictEqual(res1.status, 0, `Boot 1 failed: ${res1.stderr}`);
+      const data1 = JSON.parse(res1.stdout.trim().split('\n').pop());
+      assert.strictEqual(data1.users, 0, 'Initial boot must have 0 users');
+      assert.strictEqual(data1.branches, 0, 'Initial boot must have 0 branches');
+
+      // Boot 2 (simulate PM2 restart / server reboot)
+      const script2 = `
+        const db = require('./server/database/db');
+        const users = db.prepare('SELECT count(*) as c FROM users').get().c;
+        const branches = db.prepare('SELECT count(*) as c FROM branches').get().c;
+        const bangjoOwner = db.prepare("SELECT * FROM users WHERE id = 'usr_bangjo_owner'").get();
+        console.log(JSON.stringify({ users, branches, hasBangjoOwner: !!bangjoOwner }));
+      `;
+      const res2 = spawnSync('node', ['-e', script2], { cwd: rootDir, env, encoding: 'utf8' });
+      assert.strictEqual(res2.status, 0, `Boot 2 failed: ${res2.stderr}`);
+      const data2 = JSON.parse(res2.stdout.trim().split('\n').pop());
+      assert.strictEqual(data2.users, 0, 'Restart on zero users must NOT create users');
+      assert.strictEqual(data2.branches, 0, 'Restart must NOT create branches');
+      assert.strictEqual(data2.hasBangjoOwner, false, 'usr_bangjo_owner must not be created on restart');
+    } finally {
+      try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (_) {}
+    }
+  });
+
 });
+
