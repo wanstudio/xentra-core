@@ -11047,6 +11047,8 @@
     pollTimer: null,
     fetchSeq: 0,
     inFlightAccept: {},
+    inFlightStatus: {},
+    currentDetailOrderId: null,
     detailCountdownTimer: null
   };
 
@@ -11328,7 +11330,7 @@
           loadBMOrders();
           if (typeof loadHariIni === 'function') loadHariIni();
           var detailView = $('bm-orders-detail-view');
-          if (detailView && detailView.style.display !== 'none' && $('bm-detail-order-number') && $('bm-detail-order-number').textContent.indexOf(orderId) !== -1) {
+          if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
             viewBMOrderDetail(orderId);
           }
         } else {
@@ -11336,7 +11338,7 @@
           loadBMOrders();
           if (typeof loadHariIni === 'function') loadHariIni();
           var detailView = $('bm-orders-detail-view');
-          if (detailView && detailView.style.display !== 'none' && $('bm-detail-order-number') && $('bm-detail-order-number').textContent.indexOf(orderId) !== -1) {
+          if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
             viewBMOrderDetail(orderId);
           }
         }
@@ -11366,6 +11368,11 @@
       return;
     }
 
+    // In-flight / double-click protection for status updates
+    _bmOrdersState.inFlightStatus = _bmOrdersState.inFlightStatus || {};
+    if (_bmOrdersState.inFlightStatus[orderId]) return;
+    _bmOrdersState.inFlightStatus[orderId] = true;
+
     if (btnEl) {
       btnEl.disabled = true;
       btnEl.dataset.originalText = btnEl.innerHTML;
@@ -11382,17 +11389,24 @@
       if (patchRes.ok && patchData.success) {
         showToast('Status pesanan berhasil diubah menjadi ' + nextStatus.toUpperCase());
         loadBMOrders();
+        if (typeof loadHariIni === 'function') loadHariIni();
         var detailView = $('bm-orders-detail-view');
-        if (detailView && detailView.style.display !== 'none' && $('bm-detail-order-number') && $('bm-detail-order-number').textContent.indexOf(orderId) !== -1) {
+        if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
           viewBMOrderDetail(orderId);
         }
       } else {
-        showToast('Gagal mengubah status: ' + (patchData.error || 'Terjadi kesalahan'));
+        showToast('Gagal mengubah status: ' + (patchData.message || patchData.error || 'Terjadi kesalahan'));
         loadBMOrders();
+        if (typeof loadHariIni === 'function') loadHariIni();
+        var detailView = $('bm-orders-detail-view');
+        if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
+          viewBMOrderDetail(orderId);
+        }
       }
     } catch (e) {
-      showToast('Kesalahan jaringan.');
+      showToast('Kesalahan jaringan saat memperbarui status.');
     } finally {
+      delete _bmOrdersState.inFlightStatus[orderId];
       if (btnEl) {
         btnEl.disabled = false;
         if (btnEl.dataset.originalText) btnEl.innerHTML = btnEl.dataset.originalText;
@@ -11514,6 +11528,7 @@
   window.rejectBMOrder = rejectBMOrder;
 
   async function viewBMOrderDetail(orderId) {
+    _bmOrdersState.currentDetailOrderId = orderId;
     var listView = $('bm-orders-list-view');
     var detailView = $('bm-orders-detail-view');
     if (listView) listView.style.display = 'none';
@@ -11663,7 +11678,7 @@
             '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'confirmed\', \'' + esc(ordType) + '\', this);">Mulai Memasak ➔</button>';
         } else if (ord.status === 'preparing') {
           topActions.innerHTML =
-            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'preparing\', \'' + esc(ordType) + '\', this)">Tandai Siap ➔</button>';
+            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'preparing\', \'' + esc(ordType) + '\', this);">Tandai Siap ➔</button>';
         } else if (ord.status === 'ready') {
           var label = (ordType === 'delivery') ? 'Kirim Pesanan ➔' : 'Selesaikan Pesanan ➔';
           topActions.innerHTML =
@@ -11685,6 +11700,7 @@
   window.viewBMOrderDetail = viewBMOrderDetail;
 
   function closeBMOrderDetail() {
+    _bmOrdersState.currentDetailOrderId = null;
     if (_bmOrdersState.detailCountdownTimer) {
       clearInterval(_bmOrdersState.detailCountdownTimer);
       _bmOrdersState.detailCountdownTimer = null;
