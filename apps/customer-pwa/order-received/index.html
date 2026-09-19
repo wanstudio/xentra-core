@@ -13,7 +13,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_20260919_poi';
+      var PWA_VERSION = 'v_20260919_nav';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -182,7 +182,7 @@
   <script src="/assets/js/core/store.js?v=p4a7f28"></script>
   <script src="/assets/js/core/ui.js?v=p4a7f28"></script>
   <script src="/assets/js/core/api.js?v=p4a7f28"></script>
-  <script src="/assets/js/core/nav.js?v=p4a7f28"></script>
+  <script src="/assets/js/core/nav.js?v=v_20260919_nav"></script>
   <script src="/assets/js/core/router.js?v=p4a7f28"></script>
   <script src="/assets/js/core/pwa-runtime.js?v=p4a7f28"></script>
   <script src="/assets/js/core/promo-reward-cart.js?v=p4a7f28"></script>
@@ -269,7 +269,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=v_20260919_poi').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=v_20260919_nav').then(function (reg) {
         // Trigger immediate background update check on app launch
         reg.update();
 

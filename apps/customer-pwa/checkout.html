@@ -14,7 +14,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_20260919_poi';
+      var PWA_VERSION = 'v_20260919_nav';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -239,7 +239,7 @@
   <script src="/assets/js/core/store.js?v=v_791b187"></script>
   <script src="/assets/js/core/ui.js?v=p6c9d12"></script>
   <script src="/assets/js/core/api.js?v=v_theme04"></script>
-  <script src="/assets/js/core/nav.js?v=p6c9d12"></script>
+  <script src="/assets/js/core/nav.js?v=v_20260919_nav"></script>
   <script src="/assets/js/core/router.js?v=p6c9d12"></script>
   <script src="/assets/js/core/pwa-runtime.js?v=p6c9d12"></script>
   <script src="/assets/js/core/promo-reward-cart.js?v=v_791b187"></script>
@@ -330,7 +330,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=v_20260919_poi').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=v_20260919_nav').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {
