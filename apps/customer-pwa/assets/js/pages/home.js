@@ -125,24 +125,49 @@
         var isIos = navigator.userAgent.match(/iPhone|iPad|iPod/i);
         var platform = isIos ? 'ios' : 'android';
 
-        pwaRt.promptInstall().then(function (res) {
+        function showManualGuide() {
+          if (typeof showPwaGuideSheet === 'function') {
+            showPwaGuideSheet(platform);
+          } else {
+            alert('Silakan pasang aplikasi melalui menu browser Anda ("Tambahkan ke Layar Utama" / "Add to Home Screen").');
+          }
+        }
+
+        function handlePromptResult(res) {
           if (res && res.prompted) {
             if (res.accepted) {
               if (window.UI && window.UI.toast) window.UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
             }
             return;
           }
-          // Native prompt not available right now — show manual guide immediately.
-          if (typeof showPwaGuideSheet === 'function') {
-            showPwaGuideSheet(platform);
-          } else {
-            alert('Silakan pasang aplikasi melalui menu browser Anda ("Tambahkan ke Layar Utama" / "Add to Home Screen").');
-          }
-        }).then(function (res) {
-          if (res && res.accepted) {
-            if (window.UI && window.UI.toast) window.UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
-          }
-        });
+          showManualGuide();
+        }
+
+        // Fast path: native beforeinstallprompt is already captured and ready -> prompt immediately in user gesture
+        if (typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady()) {
+          pwaRt.promptInstall().then(handlePromptResult);
+          return;
+        }
+
+        // iOS never fires beforeinstallprompt -> immediate manual guide
+        if (isIos) {
+          showManualGuide();
+          return;
+        }
+
+        // Android race condition: clicked before beforeinstallprompt fired.
+        // Bounded wait using existing waitForPrompt() mechanism.
+        if (typeof pwaRt.waitForPrompt === 'function') {
+          pwaRt.waitForPrompt(2000).then(function (ready) {
+            if (ready && pwaRt.isNativePromptReady()) {
+              return pwaRt.promptInstall().then(handlePromptResult);
+            }
+            showManualGuide();
+          }).catch(showManualGuide);
+          return;
+        }
+
+        showManualGuide();
       });
     }
 

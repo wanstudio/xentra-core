@@ -151,57 +151,143 @@ test('AC-H12: Viewport layout budget preserves CTA visibility across 320px, 360p
   }
 });
 
-// ── B. Install flow: no delayed prompt after click ─────────────────
+// ── B. Install flow: Android race mitigation & prompt lifecycle ───
 
-test('AC-B1: home.js Install click does NOT call waitForPrompt', () => {
-  // Find the installBtn click handler block
+test('AC-B1: home.js checks isNativePromptReady() and calls promptInstall() directly on fast path', () => {
   const clickIdx = HOME_JS.indexOf("installBtn.addEventListener('click'");
   assert.ok(clickIdx !== -1, 'home.js must have installBtn click handler');
-  const block = HOME_JS.substring(clickIdx, clickIdx + 1800);
-  assert.ok(!/waitForPrompt/.test(block),
-    'home.js click handler must not use waitForPrompt (delayed prompt after click)');
-});
-
-test('AC-B2: home.js click handler calls promptInstall() directly', () => {
-  const clickIdx = HOME_JS.indexOf("installBtn.addEventListener('click'");
-  const block = HOME_JS.substring(clickIdx, clickIdx + 900);
+  const block = HOME_JS.substring(clickIdx, clickIdx + 2500);
+  assert.ok(/isNativePromptReady/.test(block),
+    'home.js must check isNativePromptReady()');
   assert.ok(/\bpromptInstall\(\)/.test(block),
-    'home.js click must call promptInstall() directly');
+    'home.js click must call promptInstall() directly when ready');
 });
 
-test('AC-B3: home.js fallback when prompt not ready is immediate manual guide', () => {
+test('AC-B2: home.js uses bounded waitForPrompt() when prompt is not yet ready (Android race mitigation)', () => {
   const clickIdx = HOME_JS.indexOf("installBtn.addEventListener('click'");
-  const block = HOME_JS.substring(clickIdx, clickIdx + 1400);
-  assert.ok(/showPwaGuideSheet|alert/.test(block),
-    'home.js must fall back to manual guide immediately when prompt unavailable');
-  assert.ok(!/setTimeout|setInterval|waitForPrompt/.test(block),
-    'home.js must not delay fallback');
+  const block = HOME_JS.substring(clickIdx, clickIdx + 2500);
+  assert.ok(/waitForPrompt/.test(block),
+    'home.js must use waitForPrompt() to handle prompt race condition');
 });
 
-test('AC-B4: checkout.js Install click does NOT call waitForPrompt', () => {
-  const clickIdx = CHECKOUT_JS.indexOf("installBtn.addEventListener('click'");
-  // checkout uses delegated click; find handleInstallClick instead
-  const handlerIdx = CHECKOUT_JS.indexOf('function handleInstallClick');
-  assert.ok(handlerIdx !== -1, 'checkout.js must have handleInstallClick');
-  const block = CHECKOUT_JS.substring(handlerIdx, handlerIdx + 1400);
-  assert.ok(!/waitForPrompt/.test(block),
-    'checkout.js click handler must not use waitForPrompt');
+test('AC-B3: home.js falls back to manual guide when prompt unavailable after bounded timeout', () => {
+  const clickIdx = HOME_JS.indexOf("installBtn.addEventListener('click'");
+  const block = HOME_JS.substring(clickIdx, clickIdx + 2500);
+  assert.ok(/showManualGuide|showPwaGuideSheet/.test(block),
+    'home.js must fall back to manual guide when prompt never arrives');
 });
 
-test('AC-B5: checkout.js click calls promptInstall() directly', () => {
-  const handlerIdx = CHECKOUT_JS.indexOf('function handleInstallClick');
-  const block = CHECKOUT_JS.substring(handlerIdx, handlerIdx + 900);
-  assert.ok(/\bpromptInstall\(\)/.test(block),
-    'checkout.js click must call promptInstall() directly');
+function createMockPwaWindow(deferredPrompt) {
+  return {
+    __xentra_deferred_prompt: deferredPrompt || null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => true,
+    matchMedia: () => ({ matches: false }),
+    localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} }
+  };
+}
+
+test('AC-B4: Proof 1 — prompt already ready -> native prompt called immediately', async () => {
+  let promptCalled = false;
+  const fakeEvent = {
+    prompt: () => { promptCalled = true; return Promise.resolve({ outcome: 'accepted' }); },
+    userChoice: Promise.resolve({ outcome: 'accepted' })
+  };
+  globalThis.window = createMockPwaWindow(fakeEvent);
+  globalThis.localStorage = globalThis.window.localStorage;
+  delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
+  const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
+
+  assert.strictEqual(PwaRt.isNativePromptReady(), true, 'prompt must be ready');
+  const res = await PwaRt.promptInstall();
+  assert.strictEqual(promptCalled, true, 'native prompt must be called');
+  assert.strictEqual(res.prompted, true);
+  assert.strictEqual(res.accepted, true);
 });
 
-test('AC-B6: checkout.js fallback is immediate manual guide, no delay', () => {
-  const handlerIdx = CHECKOUT_JS.indexOf('function handleInstallClick');
-  const block = CHECKOUT_JS.substring(handlerIdx, handlerIdx + 1400);
-  assert.ok(/showPwaGuideSheet/.test(block),
-    'checkout.js must fall back to showPwaGuideSheet immediately');
-  assert.ok(!/setTimeout|setInterval|waitForPrompt/.test(block),
-    'checkout.js must not delay fallback');
+test('AC-B5: Proof 2 — prompt not ready at click -> event arrives within timeout -> native prompt used', async () => {
+  let promptCalled = false;
+  globalThis.window = createMockPwaWindow(null);
+  globalThis.localStorage = globalThis.window.localStorage;
+  delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
+  const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
+
+  assert.strictEqual(PwaRt.isNativePromptReady(), false, 'prompt not ready initially');
+
+  const waitPromise = PwaRt.waitForPrompt(1000);
+
+  // Event arrives after 150ms
+  setTimeout(() => {
+    globalThis.window.__xentra_deferred_prompt = {
+      prompt: () => { promptCalled = true; return Promise.resolve({ outcome: 'accepted' }); },
+      userChoice: Promise.resolve({ outcome: 'accepted' })
+    };
+  }, 150);
+
+  const ready = await waitPromise;
+  assert.strictEqual(ready, true, 'waitForPrompt must resolve true when event arrives');
+  assert.strictEqual(PwaRt.isNativePromptReady(), true);
+
+  const res = await PwaRt.promptInstall();
+  assert.strictEqual(promptCalled, true, 'native prompt must be called');
+  assert.strictEqual(res.prompted, true);
+  assert.strictEqual(res.accepted, true);
+});
+
+test('AC-B6: Proof 3 — event never arrives -> bounded wait times out, manual fallback', async () => {
+  globalThis.window = createMockPwaWindow(null);
+  globalThis.localStorage = globalThis.window.localStorage;
+  delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
+  const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
+
+  const start = Date.now();
+  const ready = await PwaRt.waitForPrompt(300);
+  const elapsed = Date.now() - start;
+
+  assert.strictEqual(ready, false, 'waitForPrompt must resolve false on timeout');
+  assert.strictEqual(PwaRt.isNativePromptReady(), false);
+  assert.ok(elapsed >= 250, 'must have waited for bounded timeout');
+});
+
+test('AC-B7: Proof 4 — native prompt event is consumed only once', async () => {
+  let callCount = 0;
+  const fakePrompt = {
+    prompt: () => { callCount++; return Promise.resolve({ outcome: 'accepted' }); },
+    userChoice: Promise.resolve({ outcome: 'accepted' })
+  };
+  globalThis.window = createMockPwaWindow(fakePrompt);
+  globalThis.localStorage = globalThis.window.localStorage;
+  delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
+  const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
+
+  const res1 = await PwaRt.promptInstall();
+  assert.strictEqual(res1.prompted, true);
+  assert.strictEqual(callCount, 1);
+
+  // Event is now consumed and cleared
+  assert.strictEqual(PwaRt.isNativePromptReady(), false);
+  const res2 = await PwaRt.promptInstall();
+  assert.strictEqual(res2.prompted, false, 'second prompt call must not re-prompt');
+  assert.strictEqual(callCount, 1, 'prompt() must only be called once');
+});
+
+test('AC-B8: Proof 5 — accepted != installed (acceptance does not satisfy install requirement)', async () => {
+  const fakePrompt = {
+    prompt: () => Promise.resolve({ outcome: 'accepted' }),
+    userChoice: Promise.resolve({ outcome: 'accepted' })
+  };
+  globalThis.window = createMockPwaWindow(fakePrompt);
+  globalThis.localStorage = globalThis.window.localStorage;
+  delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
+  const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
+
+  const res = await PwaRt.promptInstall();
+  assert.strictEqual(res.accepted, true);
+
+  const ctx = PwaRt.getPwaRuntimeContext();
+  assert.strictEqual(ctx.install_state, 'accepted');
+  assert.strictEqual(ctx.install_requirement_satisfied, false, 'accepted must NEVER satisfy install requirement');
 });
 
 // ── C. State machine / security invariants ─────────────────────────
@@ -233,10 +319,8 @@ test('AC-C4: promptInstall returns { prompted, outcome, accepted }', () => {
     'promptInstall must return prompted/outcome/accepted shape');
 });
 
-test('AC-C5: waitForPrompt exists but is NOT called from install click handlers', () => {
-  // Utility may exist but must not be used to delay prompt after click
+test('AC-C5: waitForPrompt exists in PwaRuntime API', () => {
   assert.ok(/waitForPrompt/.test(PWA_RUNTIME_JS), 'waitForPrompt utility must exist in runtime');
-  // Home/checkout click blocks already verified above (AC-B1/B4)
 });
 
 // ── D. Session / identity safety ────────────────────────────────────

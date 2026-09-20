@@ -135,22 +135,37 @@
       var interval = 100;
       var elapsed = 0;
 
+      function cleanup() {
+        if (timer) clearInterval(timer);
+        if (typeof window !== 'undefined' && window.removeEventListener) {
+          window.removeEventListener('beforeinstallprompt', onEvent);
+        }
+      }
+
+      function onEvent() {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          resolve(true);
+        }
+      }
+
       var timer = setInterval(function () {
         if (isNativePromptReady()) {
-          clearInterval(timer);
-          if (!resolved) {
-            resolved = true;
-            resolve(true);
-          }
+          onEvent();
         } else if (elapsed >= timeout) {
-          clearInterval(timer);
           if (!resolved) {
             resolved = true;
+            cleanup();
             resolve(false);
           }
         }
         elapsed += interval;
       }, interval);
+
+      if (typeof window !== 'undefined' && window.addEventListener) {
+        window.addEventListener('beforeinstallprompt', onEvent, { once: true });
+      }
     });
   }
 
