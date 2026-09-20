@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 const test = require('node:test');
 const assert = require('node:assert');
 const app = require('../server/app');
@@ -67,6 +68,10 @@ async function createCustomerSession(phone) {
 }
 
 function addTestBranch(id) {
+  db.prepare(`INSERT OR IGNORE INTO products
+    (id, brand_id, name, slug, description, price, is_active)
+    VALUES ('272', 'brand_bangjo', 'Test Product 272', 'test-product-272', 'Test', 35000, 1)`)
+    .run();
   db.prepare(`INSERT OR REPLACE INTO branches
     (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, is_open_override)
     VALUES (?, 'brand_bangjo', ?, ?, 'Jl. Test', -7.2912, 112.7154, '081000000001', 1, 1)`)
