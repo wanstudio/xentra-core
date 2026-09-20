@@ -39,6 +39,15 @@
   var productLoadSeq = 0;
   var catalogBranchId = null;
   var bannerLoadSeq = 0;
+  var carouselTimer = null;
+
+  // Lightweight performance instrumentation (gated by debug or ?perf=1)
+  function perfLog(mark, label) {
+    if (typeof window !== 'undefined' && (window.__XENTRA_DEBUG || (window.location && window.location.search && window.location.search.indexOf('perf=1') !== -1))) {
+      var ts = (typeof performance !== 'undefined' && performance.now) ? Math.round(performance.now()) : Date.now();
+      console.log('[PERF][' + ts + 'ms] ' + mark + (label ? ': ' + label : ''));
+    }
+  }
 
   var ICONS = {
     minus: '/assets/icons/minus.svg',
@@ -185,42 +194,52 @@
       });
     }
 
-    // Do not require login/WhatsApp registration to discover this promo.
-    API.get('/promotions/active?is_pwa=0&phone=')
-      .then(function (res) {
-        if (!res || !res.success) return;
-        var promo = (Array.isArray(res.promotions) ? res.promotions : []).find(function (p) {
-          return p && p.should_show_banner === true;
-        });
+    // Defer promo discovery: non-critical background enhancement.
+    // Do not block initial render or compete with catalog and banners.
+    var deferTask = (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function')
+      ? function (cb) { window.requestIdleCallback(cb, { timeout: 1500 }); }
+      : function (cb) { setTimeout(cb, 120); };
 
-        if (!promo || !promo.display) {
+    deferTask(function () {
+      perfLog('promo_discovery_start');
+      // Do not require login/WhatsApp registration to discover this promo.
+      API.get('/promotions/active?is_pwa=0&phone=')
+        .then(function (res) {
+          if (!res || !res.success) return;
+          var promo = (Array.isArray(res.promotions) ? res.promotions : []).find(function (p) {
+            return p && p.should_show_banner === true;
+          });
+
+          if (!promo || !promo.display) {
+            activePromo = null;
+            evaluateBannerVisibility();
+            return;
+          }
+
+          activePromo = promo;
+          var display = promo.display;
+          var iconEl = banner.querySelector('.x-pwa-banner-icon');
+          if (titleEl) titleEl.textContent = display.banner_title || 'Install & dapatkan promo spesial';
+          if (subtitleEl) subtitleEl.textContent = display.banner_subtitle || 'Gratis untuk pesanan pertama • S&K berlaku';
+          if (iconEl) {
+            iconEl.src = display.icon_url || '/assets/pwa/icon-192.png';
+            iconEl.onerror = function () {
+              this.onerror = null;
+              this.src = '/assets/pwa/icon-192.png';
+            };
+          }
+          if (installBtn) installBtn.textContent = display.cta_text || 'Install';
+
+          evaluateBannerVisibility();
+          perfLog('promo_discovery_done');
+        })
+        .catch(function (err) {
+          // Network/API failure must not fabricate an entitlement.
           activePromo = null;
           evaluateBannerVisibility();
-          return;
-        }
-
-        activePromo = promo;
-        var display = promo.display;
-        var iconEl = banner.querySelector('.x-pwa-banner-icon');
-        if (titleEl) titleEl.textContent = display.banner_title || 'Install & dapatkan promo spesial';
-        if (subtitleEl) subtitleEl.textContent = display.banner_subtitle || 'Gratis untuk pesanan pertama • S&K berlaku';
-        if (iconEl) {
-          iconEl.src = display.icon_url || '/assets/pwa/icon-192.png';
-          iconEl.onerror = function () {
-            this.onerror = null;
-            this.src = '/assets/pwa/icon-192.png';
-          };
-        }
-        if (installBtn) installBtn.textContent = display.cta_text || 'Install';
-
-        evaluateBannerVisibility();
-      })
-      .catch(function (err) {
-        // Network/API failure must not fabricate an entitlement.
-        activePromo = null;
-        evaluateBannerVisibility();
-        console.warn('[Home] Install promo discovery warn:', err);
-      });
+          console.warn('[Home] Install promo discovery warn:', err);
+        });
+    });
   }
 
   // ======================================================================
@@ -249,6 +268,51 @@
   // ======================================================================
 
   /**
+   * Render an array of banners into the carousel track.
+   * Cleans up existing slides, renders new ones, and re-initializes carousel.
+   */
+  function renderBanners(banners) {
+    var track = $('x-carousel-track');
+    if (!track) return;
+
+    // Clear prior carousel content, including clones or skeletons, before rendering
+    Array.from(track.querySelectorAll('.x-carousel-slide')).forEach(function (s) {
+      s.parentNode && s.parentNode.removeChild(s);
+    });
+
+    if (!banners || !banners.length) {
+      initCarousel();
+      return;
+    }
+
+    banners.forEach(function (banner, idx) {
+      var slide = document.createElement('div');
+      slide.className = 'x-carousel-slide';
+
+      var imgHtml = '';
+      if (Media && typeof Media.buildBannerImg === 'function') {
+        imgHtml = Media.buildBannerImg(banner, idx === 0);
+      } else {
+        var src = banner.image_url || banner.preview_url || '';
+        if (src) {
+          imgHtml = '<img src="' + UI.escape(src) + '" alt="' + UI.escape(banner.title || 'Banner') + '"' +
+            (idx === 0 ? ' loading="eager"' : ' loading="lazy"') +
+            ' style="width:100%;height:auto;border-radius:20px;display:block;">';
+        }
+      }
+
+      if (!imgHtml) return;
+
+      slide.innerHTML = imgHtml;
+      bindBannerCta(slide, banner);
+      track.appendChild(slide);
+    });
+
+    initCarousel();
+    perfLog('banner_paint', 'rendered ' + banners.length + ' banners');
+  }
+
+  /**
    * M6: Load banners from /brand/info and render canonical media slides.
    * First slide gets loading="eager" (above-the-fold); subsequent get lazy.
    * Falls back gracefully to whatever static slides exist in the HTML.
@@ -270,42 +334,7 @@
         }
 
         var banners = data && data.brand && Array.isArray(data.brand.banners) ? data.brand.banners : [];
-
-        // Clear prior carousel content, including clones, before rendering the
-        // authoritative branch-specific response.
-        Array.from(track.querySelectorAll('.x-carousel-slide')).forEach(function (s) {
-          s.parentNode && s.parentNode.removeChild(s);
-        });
-
-        if (!banners.length) {
-          initCarousel();
-          return;
-        }
-
-        banners.forEach(function (banner, idx) {
-          var slide = document.createElement('div');
-          slide.className = 'x-carousel-slide';
-
-          var imgHtml = '';
-          if (Media && typeof Media.buildBannerImg === 'function') {
-            imgHtml = Media.buildBannerImg(banner, idx === 0);
-          } else {
-            var src = banner.image_url || banner.preview_url || '';
-            if (src) {
-              imgHtml = '<img src="' + UI.escape(src) + '" alt="' + UI.escape(banner.title || 'Banner') + '"' +
-                (idx === 0 ? ' loading="eager"' : ' loading="lazy"') +
-                ' style="width:100%;height:auto;border-radius:20px;display:block;">';
-            }
-          }
-
-          if (!imgHtml) return;
-
-          slide.innerHTML = imgHtml;
-          bindBannerCta(slide, banner);
-          track.appendChild(slide);
-        });
-
-        initCarousel();
+        renderBanners(banners);
       })
       .catch(function (err) {
         if (seq !== bannerLoadSeq) return;
@@ -636,7 +665,8 @@
       track.addEventListener('pointerleave', function () { isUserInteracting = false; });
 
       // Always slide to the left continuously (forward direction)
-      setInterval(nextSlide, 4000);
+      if (carouselTimer) clearInterval(carouselTimer);
+      carouselTimer = setInterval(nextSlide, 4000);
     }
 
     setupInfiniteLoop();
@@ -2011,6 +2041,8 @@
   //  INITIALIZATION
   // ======================================================================
   function init() {
+    perfLog('home_init_start');
+
     // Clock
     updateClock();
     setInterval(updateClock, 1000);
@@ -2022,6 +2054,17 @@
       var persistedCtx = Store.getState().branchContext;
       if (persistedCtx && persistedCtx.branch_id != null) bootBranchId = String(persistedCtx.branch_id);
     } catch (_) {}
+
+    // Safe Banner First Paint: If no branch context is active, render cached
+    // brand banners immediately for instant 0ms above-the-fold paint.
+    if (!bootBranchId) {
+      try {
+        var brandState = Store.getState().brand;
+        if (brandState && Array.isArray(brandState.banners) && brandState.banners.length > 0) {
+          renderBanners(brandState.banners);
+        }
+      } catch (_) {}
+    }
 
     // M6: Load canonical banner media for the persisted Branch when available;
     // otherwise legacy Brand banner fallback remains the initial presentation.
@@ -2039,6 +2082,7 @@
         if (rawCached) {
           var parsed = JSON.parse(rawCached);
           applyCatalog(parsed);
+          perfLog('catalog_cached_first_paint');
         }
       } catch (_) {}
     }

@@ -141,7 +141,8 @@
   }
 
   // Trigger non-blocking brand theme refresh from server on startup
-  if (typeof window !== 'undefined') {
+  // Skip on Home page because Home explicitly fetches /brand/info with its own seq/branch tracking
+  if (typeof window !== 'undefined' && !window.__XENTRA_HOME_V2) {
     setTimeout(function () {
       refreshBrand();
     }, 0);

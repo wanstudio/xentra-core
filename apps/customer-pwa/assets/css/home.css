@@ -208,6 +208,17 @@
   background: var(--x-gray-bg, #f5f5f5);
 }
 
+.x-carousel-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e6e6e6 37%, #f0f0f0 63%);
+  background-size: 400% 100%;
+  animation: x-skeleton-pulse 1.4s ease infinite;
+}
+
+@keyframes x-skeleton-pulse {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
 .x-carousel-slide img {
   width: 100%;
   height: auto;
