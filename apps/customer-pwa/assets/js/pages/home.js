@@ -5,8 +5,10 @@
  */
 (function () {
   'use strict';
-  if (window.__XENTRA_HOME_V2) return;
-  window.__XENTRA_HOME_V2 = true;
+  // __XENTRA_HOME_V2 is set in index.html before store.js loads (to suppress
+  // Store's automatic /brand/info startup request). Guard against re-evaluation.
+  if (window.__XENTRA_HOME_V2_INIT) return;
+  window.__XENTRA_HOME_V2_INIT = true;
 
   var API = window.Xentra.API;
   var Store = window.Xentra.Store;
@@ -686,15 +688,36 @@
     };
   }
 
+  // Branch cache is presentation-only. Data older than 10 min is not shown
+  // (prevents stale/inactive branches from appearing before API response arrives).
+  var DISCOVERY_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
   function saveDiscoveryCache(list) {
-    try { localStorage.setItem(DISCOVERY_CACHE_KEY, JSON.stringify(list)); } catch (_) {}
+    try {
+      var entry = { ts: Date.now(), branches: list };
+      localStorage.setItem(DISCOVERY_CACHE_KEY, JSON.stringify(entry));
+    } catch (_) {}
   }
 
   function readDiscoveryCache() {
     try {
       var raw = localStorage.getItem(DISCOVERY_CACHE_KEY);
-      var list = raw ? JSON.parse(raw) : null;
-      return Array.isArray(list) ? list : null;
+      if (!raw) return null;
+      var entry = JSON.parse(raw);
+      // Support both old format (bare array) and new format ({ts, branches})
+      if (Array.isArray(entry)) {
+        // Old format (no timestamp): treat as stale — discard to prevent showing
+        // previously-cached inactive/seed branches until authoritative API responds
+        return null;
+      }
+      if (!entry || typeof entry.ts !== 'number' || !Array.isArray(entry.branches)) {
+        return null;
+      }
+      if (Date.now() - entry.ts > DISCOVERY_CACHE_TTL_MS) {
+        // Cache is expired — do not display potentially stale branch data
+        return null;
+      }
+      return entry.branches;
     } catch (_) {
       return null;
     }
@@ -2091,8 +2114,14 @@
     // reload, the catalog follows that same context (server-scoped menu).
     loadCatalog(bootBranchId);
 
-    // P2: Branch discovery (fast, non-blocking — presentation only).
-    initBranchDiscovery();
+    // P2: Branch discovery deferred — does not compete with catalog load.
+    // /brand/branches is presentation-only; catalog must not wait for it.
+    var deferDiscovery = (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function')
+      ? function (cb) { window.requestIdleCallback(cb, { timeout: 1200 }); }
+      : function (cb) { setTimeout(cb, 80); };
+    deferDiscovery(function () {
+      initBranchDiscovery();
+    });
 
     // Discover install incentive for anonymous browser guests.
     initInstallPromo();

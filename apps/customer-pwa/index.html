@@ -246,6 +246,9 @@
   </div>
 
   <!-- JS CORE & CONTROLLERS (Version Hashed v2.3.6) -->
+  <!-- Home ownership marker: set BEFORE store.js so Store suppresses its own /brand/info startup request.
+       Home controller owns the /brand/info fetch (via loadBanners) with branch-aware sequencing. -->
+  <script>window.__XENTRA_HOME_V2 = true;</script>
   <script src="/assets/js/core/store.js?v=v_791b187"></script>
   <script src="/assets/js/core/ui.js?v=v_theme02"></script>
   <script src="/assets/js/core/api.js?v=v_theme04"></script>
