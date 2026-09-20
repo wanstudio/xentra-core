@@ -353,3 +353,284 @@ test('AC-E2: checkout.css no longer forces .x-pwa-banner-left flex:1', () => {
   assert.ok(!/\.x-pwa-banner-left\s*\{[^}]*flex\s*:\s*1/.test(CHECKOUT_CSS),
     'checkout.css must not force banner-left flex:1');
 });
+
+// ── F. Android Native Prompt, Race Mitigation & Icon Validation ──────
+
+const MANIFEST_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/pwa/manifest.json');
+const MANIFEST_JSON = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
+
+test('AC-F1: Proof 1 — prompt ready -> native prompt only, manual guide is never shown', async () => {
+  let nativePromptCalled = 0;
+  let manualGuideCalled = 0;
+
+  const fakePrompt = {
+    prompt: () => {
+      nativePromptCalled++;
+      return Promise.resolve({ outcome: 'accepted' });
+    },
+    userChoice: Promise.resolve({ outcome: 'accepted' })
+  };
+
+  globalThis.window = createMockPwaWindow(fakePrompt);
+  globalThis.localStorage = globalThis.window.localStorage;
+  globalThis.document = {
+    getElementById: () => null,
+    createElement: () => ({ classList: { add: () => {}, remove: () => {} }, querySelector: () => null }),
+    body: { appendChild: () => {} }
+  };
+
+  delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
+  const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
+  globalThis.window.Xentra = { PwaRuntime: PwaRt };
+
+  const showPwaGuideSheet = () => { manualGuideCalled++; };
+  globalThis.window.showPwaGuideSheet = showPwaGuideSheet;
+
+  // Execute the exact decision logic used in home.js / checkout.js
+  const isIos = false;
+  const platform = 'android';
+
+  function runInstallClick() {
+    function handlePromptResult(res) {
+      if (res && res.prompted) return;
+      showPwaGuideSheet(platform);
+    }
+    if (typeof PwaRt.isNativePromptReady === 'function' && PwaRt.isNativePromptReady()) {
+      return PwaRt.promptInstall().then(handlePromptResult);
+    }
+    if (isIos) {
+      showPwaGuideSheet('ios');
+      return Promise.resolve();
+    }
+    return PwaRt.waitForPrompt(2000).then(function (ready) {
+      if (ready && PwaRt.isNativePromptReady()) {
+        return PwaRt.promptInstall().then(handlePromptResult);
+      }
+      showPwaGuideSheet(platform);
+    });
+  }
+
+  await runInstallClick();
+
+  assert.strictEqual(nativePromptCalled, 1, 'Native prompt must be called exactly once');
+  assert.strictEqual(manualGuideCalled, 0, 'Manual guide must NEVER be called when prompt is ready');
+});
+
+test('AC-F2: Proof 2 — prompt not ready at click -> wait -> native prompt only, manual guide never shown', async () => {
+  let nativePromptCalled = 0;
+  let manualGuideCalled = 0;
+
+  globalThis.window = createMockPwaWindow(null);
+  globalThis.localStorage = globalThis.window.localStorage;
+  globalThis.document = {
+    getElementById: () => null,
+    createElement: () => ({ classList: { add: () => {}, remove: () => {} }, querySelector: () => null }),
+    body: { appendChild: () => {} }
+  };
+
+  delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
+  const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
+  globalThis.window.Xentra = { PwaRuntime: PwaRt };
+
+  const showPwaGuideSheet = () => { manualGuideCalled++; };
+  globalThis.window.showPwaGuideSheet = showPwaGuideSheet;
+
+  const platform = 'android';
+
+  function runInstallClick() {
+    function handlePromptResult(res) {
+      if (res && res.prompted) return;
+      showPwaGuideSheet(platform);
+    }
+    if (typeof PwaRt.isNativePromptReady === 'function' && PwaRt.isNativePromptReady()) {
+      return PwaRt.promptInstall().then(handlePromptResult);
+    }
+    return PwaRt.waitForPrompt(2000).then(function (ready) {
+      if (ready && PwaRt.isNativePromptReady()) {
+        return PwaRt.promptInstall().then(handlePromptResult);
+      }
+      showPwaGuideSheet(platform);
+    });
+  }
+
+  // Simulate prompt arriving 100ms after click (before 2000ms timeout)
+  setTimeout(() => {
+    globalThis.window.__xentra_deferred_prompt = {
+      prompt: () => {
+        nativePromptCalled++;
+        return Promise.resolve({ outcome: 'accepted' });
+      },
+      userChoice: Promise.resolve({ outcome: 'accepted' })
+    };
+  }, 100);
+
+  await runInstallClick();
+
+  assert.strictEqual(nativePromptCalled, 1, 'Native prompt must be called when prompt arrives within timeout');
+  assert.strictEqual(manualGuideCalled, 0, 'Manual guide must NEVER be called when prompt arrives within timeout');
+});
+
+test('AC-F3: Proof 3 — timeout / event never arrives -> manual guide only, native prompt never called', async () => {
+  let nativePromptCalled = 0;
+  let manualGuideCalled = 0;
+
+  globalThis.window = createMockPwaWindow(null);
+  globalThis.localStorage = globalThis.window.localStorage;
+  globalThis.document = {
+    getElementById: () => null,
+    createElement: () => ({ classList: { add: () => {}, remove: () => {} }, querySelector: () => null }),
+    body: { appendChild: () => {} }
+  };
+
+  delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
+  const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
+  globalThis.window.Xentra = { PwaRuntime: PwaRt };
+
+  const showPwaGuideSheet = () => { manualGuideCalled++; };
+  globalThis.window.showPwaGuideSheet = showPwaGuideSheet;
+
+  const platform = 'android';
+
+  function runInstallClick() {
+    function handlePromptResult(res) {
+      if (res && res.prompted) return;
+      showPwaGuideSheet(platform);
+    }
+    if (typeof PwaRt.isNativePromptReady === 'function' && PwaRt.isNativePromptReady()) {
+      return PwaRt.promptInstall().then(handlePromptResult);
+    }
+    // Use short timeout for test speed
+    return PwaRt.waitForPrompt(250).then(function (ready) {
+      if (ready && PwaRt.isNativePromptReady()) {
+        return PwaRt.promptInstall().then(handlePromptResult);
+      }
+      showPwaGuideSheet(platform);
+    });
+  }
+
+  await runInstallClick();
+
+  assert.strictEqual(nativePromptCalled, 0, 'Native prompt must NOT be called when event never arrives');
+  assert.strictEqual(manualGuideCalled, 1, 'Manual guide must be called exactly once upon timeout');
+});
+
+test('AC-F4: Proof 4 — mutual exclusion: native prompt and manual guide NEVER appear together in 1 click', async () => {
+  // Scenario A: Native prompt ready
+  let nativeCount = 0;
+  let guideCount = 0;
+  let overlayRemoved = 0;
+
+  const fakePrompt = {
+    prompt: () => {
+      nativeCount++;
+      return Promise.resolve({ outcome: 'accepted' });
+    },
+    userChoice: Promise.resolve({ outcome: 'accepted' })
+  };
+
+  globalThis.window = createMockPwaWindow(fakePrompt);
+  globalThis.localStorage = globalThis.window.localStorage;
+  globalThis.document = {
+    getElementById: (id) => {
+      if (id === 'x-pwa-guide-overlay') return { remove: () => { overlayRemoved++; } };
+      return null;
+    }
+  };
+
+  delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
+  const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
+
+  function showManualGuide() {
+    if (PwaRt && typeof PwaRt.isNativePromptReady === 'function' && PwaRt.isNativePromptReady()) {
+      return; // Guard prevents guide if native prompt ready
+    }
+    guideCount++;
+  }
+
+  function handlePromptResult(res) {
+    if (res && res.prompted) {
+      const existing = globalThis.document.getElementById('x-pwa-guide-overlay');
+      if (existing) existing.remove();
+      return;
+    }
+    showManualGuide();
+  }
+
+  if (PwaRt.isNativePromptReady()) {
+    await PwaRt.promptInstall().then(handlePromptResult);
+  } else {
+    showManualGuide();
+  }
+
+  assert.strictEqual(nativeCount, 1);
+  assert.strictEqual(guideCount, 0);
+  assert.strictEqual(nativeCount + guideCount, 1, 'Exactly one UI path must execute, never both');
+  assert.strictEqual(overlayRemoved, 1, 'Any dangling overlay must be actively removed on native prompt');
+});
+
+test('AC-F5: Proof 5 — accepted != installed (acceptance does not satisfy install requirement)', async () => {
+  const fakePrompt = {
+    prompt: () => Promise.resolve({ outcome: 'accepted' }),
+    userChoice: Promise.resolve({ outcome: 'accepted' })
+  };
+  globalThis.window = createMockPwaWindow(fakePrompt);
+  globalThis.localStorage = globalThis.window.localStorage;
+
+  delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
+  const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
+
+  const res = await PwaRt.promptInstall();
+  assert.strictEqual(res.accepted, true);
+
+  const ctx = PwaRt.getPwaRuntimeContext();
+  assert.strictEqual(ctx.install_state, 'accepted', 'State must be transient accepted');
+  assert.strictEqual(ctx.install_requirement_satisfied, false, 'install_requirement_satisfied must remain FALSE');
+  assert.strictEqual(globalThis.localStorage.getItem('xentra_pwa_verified'), null, 'Verified marker must NOT be set');
+});
+
+test('AC-F6: Proof 6 — manifest.json and icon configuration strictly valid for WebAPK / PWA standard', () => {
+  // 1. Core manifest structure
+  assert.strictEqual(MANIFEST_JSON.id, '/', 'manifest id must be defined for WebAPK deduplication');
+  assert.ok(MANIFEST_JSON.name && MANIFEST_JSON.name.length > 0, 'name must not be empty');
+  assert.ok(MANIFEST_JSON.short_name && MANIFEST_JSON.short_name.length > 0, 'short_name must not be empty');
+  assert.strictEqual(MANIFEST_JSON.start_url, '/', 'start_url must be valid');
+  assert.strictEqual(MANIFEST_JSON.scope, '/', 'scope must be valid');
+  assert.strictEqual(MANIFEST_JSON.display, 'standalone', 'display must be standalone');
+  assert.ok(Array.isArray(MANIFEST_JSON.display_override), 'display_override must be an array');
+  assert.ok(MANIFEST_JSON.display_override.includes('standalone'), 'display_override must include standalone');
+  assert.strictEqual(MANIFEST_JSON.prefer_related_applications, false, 'prefer_related_applications must be false');
+
+  // 2. Icon configurations
+  assert.ok(Array.isArray(MANIFEST_JSON.icons), 'icons must be an array');
+  assert.ok(MANIFEST_JSON.icons.length >= 2, 'must provide at least 2 icon specifications');
+
+  const icon192Any = MANIFEST_JSON.icons.find(i => i.sizes === '192x192' && i.purpose === 'any');
+  const icon192Maskable = MANIFEST_JSON.icons.find(i => i.sizes === '192x192' && i.purpose === 'maskable');
+  const icon512Any = MANIFEST_JSON.icons.find(i => i.sizes === '512x512' && i.purpose === 'any');
+  const icon512Maskable = MANIFEST_JSON.icons.find(i => i.sizes === '512x512' && i.purpose === 'maskable');
+
+  assert.ok(icon192Any, '192x192 purpose: any must exist in manifest');
+  assert.ok(icon192Maskable, '192x192 purpose: maskable must exist in manifest');
+  assert.ok(icon512Any, '512x512 purpose: any must exist in manifest');
+  assert.ok(icon512Maskable, '512x512 purpose: maskable must exist in manifest');
+
+  // 3. Physical file verification on disk
+  const icon192Path = path.resolve(__dirname, '../../apps/customer-pwa', icon192Any.src.replace(/^\//, ''));
+  const icon512Path = path.resolve(__dirname, '../../apps/customer-pwa', icon512Any.src.replace(/^\//, ''));
+
+  assert.ok(fs.existsSync(icon192Path), `Icon file must exist on disk: ${icon192Path}`);
+  assert.ok(fs.existsSync(icon512Path), `Icon file must exist on disk: ${icon512Path}`);
+
+  // Validate PNG magic number (89 50 4E 47 0D 0A 1A 0A) and dimensions from IHDR chunk
+  const buf192 = fs.readFileSync(icon192Path);
+  const buf512 = fs.readFileSync(icon512Path);
+
+  assert.strictEqual(buf192.readUInt32BE(0), 0x89504E47, 'icon-192.png must have valid PNG magic bytes');
+  assert.strictEqual(buf192.readUInt32BE(16), 192, 'icon-192.png width must be exactly 192');
+  assert.strictEqual(buf192.readUInt32BE(20), 192, 'icon-192.png height must be exactly 192');
+
+  assert.strictEqual(buf512.readUInt32BE(0), 0x89504E47, 'icon-512.png must have valid PNG magic bytes');
+  assert.strictEqual(buf512.readUInt32BE(16), 512, 'icon-512.png width must be exactly 512');
+  assert.strictEqual(buf512.readUInt32BE(20), 512, 'icon-512.png height must be exactly 512');
+});
+

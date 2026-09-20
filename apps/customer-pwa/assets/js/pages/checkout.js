@@ -231,6 +231,12 @@
   });
 
   function showPwaGuideSheet(platform) {
+    // Invariant: If native prompt is ready or prompted, never show manual guide sheet
+    var pwaRt = window.Xentra && window.Xentra.PwaRuntime;
+    if (pwaRt && typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady()) {
+      return;
+    }
+
     var existing = document.getElementById('x-pwa-guide-overlay');
     if (existing) existing.remove();
 
@@ -278,6 +284,9 @@
     if (btn) btn.addEventListener('click', closeGuide);
   }
 
+  // Expose globally so home.js and other controllers can invoke the standardized guide
+  window.showPwaGuideSheet = showPwaGuideSheet;
+
   function handleInstallClick(e) {
     if (e && e.preventDefault) e.preventDefault();
     if (e && e.stopPropagation) e.stopPropagation();
@@ -295,8 +304,11 @@
 
     var platform = isIosPwa ? 'ios' : 'android';
 
-    pwaRt.promptInstall().then(function (res) {
+    function handlePromptResult(res) {
       if (res && res.prompted) {
+        // Native prompt displayed: dismiss any guide sheet immediately so native prompt and guide never coexist
+        var existing = document.getElementById('x-pwa-guide-overlay');
+        if (existing) existing.remove();
         if (res.accepted) {
           // Accepted only means the user accepted the prompt — the requirement
           // is NOT satisfied yet. Stay on the install/discovery state until the
@@ -306,21 +318,46 @@
         }
         return;
       }
-      // Native prompt not available right now — show manual guide immediately.
       showPwaGuideSheet(platform);
-    }).then(function (res) {
-      if (res && res.accepted) {
-        if (UI && UI.toast) UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
-      }
-    });
+    }
+
+    // Fast path: native beforeinstallprompt is already captured and ready -> prompt immediately
+    if (typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady()) {
+      pwaRt.promptInstall().then(handlePromptResult);
+      return;
+    }
+
+    // iOS never fires beforeinstallprompt -> immediate manual guide
+    if (isIosPwa) {
+      showPwaGuideSheet('ios');
+      return;
+    }
+
+    // Android race condition: clicked before beforeinstallprompt fired.
+    // Bounded wait using existing waitForPrompt() mechanism.
+    if (typeof pwaRt.waitForPrompt === 'function') {
+      pwaRt.waitForPrompt(2000).then(function (ready) {
+        if (ready && pwaRt.isNativePromptReady()) {
+          return pwaRt.promptInstall().then(handlePromptResult);
+        }
+        showPwaGuideSheet(platform);
+      }).catch(function () {
+        showPwaGuideSheet(platform);
+      });
+      return;
+    }
+
+    showPwaGuideSheet(platform);
   }
 
   // Delegated click listener on document for 100% reliable tap response.
   // Covers install entry points (#x-btn-promo-install, #x-pwa-install)
   // and reward claim button (#x-btn-promo-claim).
   document.addEventListener('click', function (e) {
+    if (e.defaultPrevented) return;
     var installBtn = e.target.closest('#x-btn-promo-install, #x-pwa-install');
     if (installBtn) {
+      if (installBtn.__xentraHandling) return;
       handleInstallClick(e);
       return;
     }

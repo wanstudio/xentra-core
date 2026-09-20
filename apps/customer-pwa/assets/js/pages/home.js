@@ -112,29 +112,38 @@
       installBtn.__xentraBound = true;
       installBtn.addEventListener('click', function (e) {
         if (e && e.preventDefault) e.preventDefault();
-        var pwaRt = window.Xentra && window.Xentra.PwaRuntime;
-        if (!pwaRt || typeof pwaRt.promptInstall !== 'function') {
-          if (typeof showPwaGuideSheet === 'function') {
-            showPwaGuideSheet(navigator.userAgent.match(/iPhone|iPad|iPod/i) ? 'ios' : 'android');
-          } else {
-            alert('Silakan pasang aplikasi melalui menu browser Anda ("Tambahkan ke Layar Utama" / "Add to Home Screen").');
-          }
-          return;
-        }
+        if (e && e.stopPropagation) e.stopPropagation();
+        installBtn.__xentraHandling = true;
+        setTimeout(function () { installBtn.__xentraHandling = false; }, 500);
 
+        var pwaRt = window.Xentra && window.Xentra.PwaRuntime;
         var isIos = navigator.userAgent.match(/iPhone|iPad|iPod/i);
         var platform = isIos ? 'ios' : 'android';
 
         function showManualGuide() {
-          if (typeof showPwaGuideSheet === 'function') {
+          // Never show manual guide if native prompt is ready or prompted
+          if (pwaRt && typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady()) {
+            return;
+          }
+          if (typeof window.showPwaGuideSheet === 'function') {
+            window.showPwaGuideSheet(platform);
+          } else if (typeof showPwaGuideSheet === 'function') {
             showPwaGuideSheet(platform);
           } else {
             alert('Silakan pasang aplikasi melalui menu browser Anda ("Tambahkan ke Layar Utama" / "Add to Home Screen").');
           }
         }
 
+        if (!pwaRt || typeof pwaRt.promptInstall !== 'function') {
+          showManualGuide();
+          return;
+        }
+
         function handlePromptResult(res) {
           if (res && res.prompted) {
+            // Dismiss any open guide sheet immediately so native prompt and guide never coexist
+            var existing = document.getElementById('x-pwa-guide-overlay');
+            if (existing) existing.remove();
             if (res.accepted) {
               if (window.UI && window.UI.toast) window.UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
             }
