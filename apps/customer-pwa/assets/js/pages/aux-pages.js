@@ -101,8 +101,8 @@
           '<div style="padding:48px 20px;text-align:center;">' +
           '  <div style="font-size:44px;margin-bottom:12px;">📑</div>' +
           '  <h3 style="font-size:16px;font-weight:700;color:#111;margin-bottom:6px;">Masuk untuk Melihat Riwayat</h3>' +
-          '  <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Verifikasi nomor WhatsApp Anda untuk melacak dan melihat semua riwayat pesanan.</p>' +
-          '  <button type="button" class="x-aux-action-btn" id="x-history-login-btn" style="max-width:240px;margin:0 auto;">Verifikasi Nomor WhatsApp</button>' +
+          '  <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Masuk ke akun Anda untuk melacak dan melihat semua riwayat pesanan.</p>' +
+          '  <button type="button" class="x-aux-action-btn" id="x-history-login-btn" style="max-width:240px;margin:0 auto;">Masuk dengan Google</button>' +
           '</div>';
 
         var loginBtn = listWrap.querySelector('#x-history-login-btn');
@@ -189,8 +189,44 @@
   function mountProfile(container) {
     if (!container) return;
     var session = Store ? Store.getState().customerSession : null;
-    var phone = (session && session.phone) || '';
-    var name = (session && session.name) || (phone ? 'Pelanggan Bangjo' : 'Tamu');
+    var isAuthenticated = Boolean(session && session.token);
+    var name = (session && session.name) || 'Pelanggan Bangjo';
+
+    var cardHtml = '';
+    if (isAuthenticated) {
+      cardHtml =
+        '    <div class="x-profile-card">' +
+        '      <div class="x-profile-avatar">' +
+        '        <img src="/assets/icons/black_flowbite_user-solid.svg" alt="Avatar" width="32" height="32">' +
+        '      </div>' +
+        '      <div class="x-profile-info">' +
+        '        <div class="x-profile-name">' + UI.escape(name) + '</div>' +
+        '        <div class="x-profile-phone">Akun Google</div>' +
+        '      </div>' +
+        '    </div>';
+    } else {
+      cardHtml =
+        '    <div class="x-profile-card" style="flex-direction:column;align-items:center;text-align:center;padding:24px 20px;">' +
+        '      <div class="x-profile-avatar" style="margin-bottom:12px;width:60px;height:60px;">' +
+        '        <img src="/assets/icons/black_flowbite_user-solid.svg" alt="Avatar" width="36" height="36">' +
+        '      </div>' +
+        '      <div class="x-profile-name" style="font-size:17px;margin-bottom:4px;">Masuk ke akunmu</div>' +
+        '      <div class="x-profile-subtitle" style="font-size:13px;color:#64748b;line-height:1.5;">Simpan alamat, lihat riwayat pesanan, dan kelola akun.</div>' +
+        '    </div>';
+    }
+
+    var actionHtml = '';
+    if (isAuthenticated) {
+      actionHtml = '    <button type="button" class="x-profile-logout-btn" id="x-profile-logout">Keluar dari Akun</button>';
+    } else {
+      actionHtml =
+        '    <button type="button" class="x-profile-google-btn" id="x-profile-login">' +
+        '      <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">' +
+        '        <path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-21.5 0-1.4-.1-2.7-.5-4.5z"/>' +
+        '      </svg>' +
+        '      Masuk dengan Google' +
+        '    </button>';
+    }
 
     container.innerHTML =
       '<div class="x-aux-page">' +
@@ -201,15 +237,7 @@
       '    <h1 class="x-aux-title">Profil Saya</h1>' +
       '  </div>' +
       '  <div class="x-aux-body">' +
-      '    <div class="x-profile-card">' +
-      '      <div class="x-profile-avatar">' +
-      '        <img src="/assets/icons/black_flowbite_user-solid.svg" alt="Avatar" width="32" height="32">' +
-      '      </div>' +
-      '      <div class="x-profile-info">' +
-      '        <div class="x-profile-name">' + UI.escape(name) + '</div>' +
-      '        <div class="x-profile-phone">' + UI.escape(phone || 'Belum terverifikasi') + '</div>' +
-      '      </div>' +
-      '    </div>' +
+      cardHtml +
       '    <div class="x-profile-menu-list">' +
       '      <button type="button" class="x-profile-menu-item" id="x-profile-btn-addresses">' +
       '        <div class="left"><span class="icon">📍</span><span>Alamat Favorit Saya</span></div>' +
@@ -224,9 +252,7 @@
       '        <img src="/assets/icons/arrowback.svg" alt="" style="transform:rotate(180deg);width:14px;opacity:0.4;">' +
       '      </button>' +
       '    </div>' +
-      (session && session.token
-        ? '    <button type="button" class="x-profile-logout-btn" id="x-profile-logout">Keluar dari Akun</button>'
-        : '    <button type="button" class="x-aux-action-btn" id="x-profile-login" style="margin-top:24px;">Masuk / Verifikasi WhatsApp</button>') +
+      actionHtml +
       '  </div>' +
       '</div>';
 
@@ -259,11 +285,75 @@
     var loginBtn = container.querySelector('#x-profile-login');
     if (loginBtn) {
       loginBtn.onclick = function () {
-        if (typeof window.openCustomerAuthSheet === 'function') {
-          window.openCustomerAuthSheet(function () {
-            mountProfile(container);
-          });
+        function executeGoogleLogin() {
+          var gsi = window.google && window.google.accounts && window.google.accounts.id;
+          if (gsi) {
+            loginBtn.disabled = true;
+            var originalText = loginBtn.innerHTML;
+            loginBtn.innerHTML = 'Membuka Google…';
+            try {
+              var googleClientId = (window.XentraConfig && window.XentraConfig.googleClientId) || '';
+              gsi.initialize({
+                client_id: googleClientId,
+                callback: function (credResponse) {
+                  if (!credResponse || !credResponse.credential) {
+                    loginBtn.disabled = false;
+                    loginBtn.innerHTML = originalText;
+                    if (UI && UI.toast) UI.toast('Google tidak mengembalikan credential.');
+                    return;
+                  }
+                  loginBtn.innerHTML = 'Memverifikasi…';
+                  API.post('/customer/auth/google', { credential: credResponse.credential })
+                    .then(function (res) {
+                      if (res && res.success && res.token) {
+                        var customerName = (res.customer && res.customer.name) || 'Pelanggan Bangjo';
+                        var customerEmail = (res.customer && res.customer.email) || '';
+                        var customerId = (res.customer && res.customer.id) || '';
+                        Store.setCustomerSession({
+                          name: customerName,
+                          phone: customerEmail,
+                          email: customerEmail,
+                          customerId: customerId,
+                          customer_id: customerId,
+                          token: res.token
+                        });
+                        if (UI && UI.toast) UI.toast('Berhasil masuk dengan Google!');
+                        mountProfile(container);
+                      } else {
+                        loginBtn.disabled = false;
+                        loginBtn.innerHTML = originalText;
+                        if (UI && UI.toast) UI.toast((res && (res.error || res.message)) || 'Autentikasi Google gagal.');
+                      }
+                    })
+                    .catch(function (err) {
+                      loginBtn.disabled = false;
+                      loginBtn.innerHTML = originalText;
+                      var msg = (err && err.data && (err.data.error || err.data.message)) || (err && err.message) || 'Gagal menghubungi server.';
+                      if (UI && UI.toast) UI.toast(msg);
+                    });
+                },
+                cancel_on_tap_outside: false
+              });
+              gsi.prompt(function (notification) {
+                if (notification && (notification.isSkippedMoment() || notification.isDismissedMoment())) {
+                  loginBtn.disabled = false;
+                  loginBtn.innerHTML = originalText;
+                }
+              });
+            } catch (gsiErr) {
+              loginBtn.disabled = false;
+              loginBtn.innerHTML = originalText;
+              if (UI && UI.toast) UI.toast('Gagal membuka Google Sign-In.');
+            }
+          } else if (typeof window.openCustomerAuthSheet === 'function') {
+            window.openCustomerAuthSheet(function () {
+              mountProfile(container);
+            });
+          } else {
+            if (UI && UI.toast) UI.toast('Library Google Sign-In belum dimuat.');
+          }
         }
+        executeGoogleLogin();
       };
     }
 
