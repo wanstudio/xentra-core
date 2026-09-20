@@ -190,3 +190,96 @@ test('Checkout Integration: Item Note and Fulfillment Note rendering and icon st
   assert.strictEqual(Store.getNote('delivery', 'b1'), '');
   assert.strictEqual(Store.getState().orderContext['501'], undefined);
 });
+
+test('Item Note: string product ID (e.g. prod_abc123) correctly persists and updates icon state across Home and Checkout', () => {
+  const { Store, storage } = freshStore();
+  const stringProductId = 'prod_abc123';
+  const branchId = 'branch_pringsewu_01';
+
+  // 1. Add item with non-numeric string ID
+  Store.addItem({ id: stringProductId, name: 'Paket Geprek Spesial', price: 28000 }, 1, { branch_id: branchId });
+
+  // Initial state: no note
+  assert.strictEqual(Store.getNote(stringProductId, branchId), '');
+  const initialItem = Store.findCartItem(stringProductId, branchId);
+  assert.ok(initialItem);
+  assert.strictEqual(initialItem.note, '');
+
+  // Icon state before note: file.svg without has-note
+  const noteEmpty = (initialItem && initialItem.note) || Store.getNote(stringProductId, branchId) || '';
+  const initialIcon = noteEmpty ? '/assets/icons/write.svg' : '/assets/icons/file.svg';
+  const initialClass = noteEmpty ? 'has-note' : '';
+  assert.strictEqual(initialIcon, '/assets/icons/file.svg');
+  assert.strictEqual(initialClass, '');
+
+  // 2. Customer types note on Home and clicks Simpan (exact flow: Store.setNote(stringProductId, noteVal, branchId))
+  const noteContent = 'Pedas level 5, ayam bagian paha atas';
+  Store.setNote(stringProductId, noteContent, branchId);
+
+  // Note must be reflected on Store.getNote and findCartItem().note
+  assert.strictEqual(Store.getNote(stringProductId, branchId), noteContent);
+  const updatedItem = Store.findCartItem(stringProductId, branchId);
+  assert.strictEqual(updatedItem.note, noteContent);
+
+  // Icon state after note: write.svg with has-note
+  const notePresent = (updatedItem && updatedItem.note) || Store.getNote(stringProductId, branchId) || '';
+  const activeIcon = notePresent ? '/assets/icons/write.svg' : '/assets/icons/file.svg';
+  const activeClass = notePresent ? 'has-note' : '';
+  assert.strictEqual(activeIcon, '/assets/icons/write.svg');
+  assert.strictEqual(activeClass, 'has-note');
+
+  // 3. Navigation to Checkout: Checkout reads item.note || Store.getNote(item.id, bScope)
+  const bScope = updatedItem.branch_id || branchId;
+  const checkoutNote = (updatedItem && updatedItem.note) || Store.getNote(updatedItem.id, bScope) || '';
+  assert.strictEqual(checkoutNote, noteContent);
+
+  // Checkout note icon must also be write.svg with has-note
+  const checkoutIcon = checkoutNote ? '/assets/icons/write.svg' : '/assets/icons/file.svg';
+  const checkoutClass = checkoutNote ? 'has-note' : '';
+  assert.strictEqual(checkoutIcon, '/assets/icons/write.svg');
+  assert.strictEqual(checkoutClass, 'has-note');
+
+  // 4. Persistence across full page reload
+  const reloaded = freshStore(storage._dump());
+  assert.strictEqual(reloaded.Store.getNote(stringProductId, branchId), noteContent);
+  const reloadedItem = reloaded.Store.findCartItem(stringProductId, branchId);
+  assert.ok(reloadedItem);
+  assert.strictEqual(reloadedItem.note, noteContent);
+
+  // 5. Customer clears note: Store.setNote(stringProductId, '', branchId)
+  reloaded.Store.setNote(stringProductId, '', branchId);
+  assert.strictEqual(reloaded.Store.getNote(stringProductId, branchId), '');
+  assert.strictEqual(reloaded.Store.findCartItem(stringProductId, branchId).note, '');
+  assert.strictEqual(reloaded.Store.getState().notes[`${stringProductId}::${branchId}`], undefined);
+
+  // Icon returns to empty state
+  const noteCleared = (reloaded.Store.findCartItem(stringProductId, branchId).note) || reloaded.Store.getNote(stringProductId, branchId) || '';
+  const clearedIcon = noteCleared ? '/assets/icons/write.svg' : '/assets/icons/file.svg';
+  const clearedClass = noteCleared ? 'has-note' : '';
+  assert.strictEqual(clearedIcon, '/assets/icons/file.svg');
+  assert.strictEqual(clearedClass, '');
+});
+
+test('Item Note: branch isolation holds for string product IDs across multiple branches', () => {
+  const { Store } = freshStore();
+  const prodId = 'sku_dimsum_mentai';
+  const branchA = 'branch_a';
+  const branchB = 'branch_b';
+
+  Store.addItem({ id: prodId, name: 'Dimsum Mentai', price: 20000 }, 1, { branch_id: branchA });
+  Store.addItem({ id: prodId, name: 'Dimsum Mentai', price: 20000 }, 1, { branch_id: branchB });
+
+  Store.setNote(prodId, 'banyak saus di A', branchA);
+  assert.strictEqual(Store.getNote(prodId, branchA), 'banyak saus di A');
+  assert.strictEqual(Store.findCartItem(prodId, branchA).note, 'banyak saus di A');
+
+  // Branch B must have empty note
+  assert.strictEqual(Store.getNote(prodId, branchB), '');
+  assert.strictEqual(Store.findCartItem(prodId, branchB).note, '');
+
+  // Updating branch B does not affect branch A
+  Store.setNote(prodId, 'saus terpisah di B', branchB);
+  assert.strictEqual(Store.getNote(prodId, branchA), 'banyak saus di A');
+  assert.strictEqual(Store.getNote(prodId, branchB), 'saus terpisah di B');
+});
+

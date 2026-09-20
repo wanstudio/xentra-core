@@ -1295,10 +1295,9 @@
   //  NOTE SHEET (Dynamic makeOverlay execution + Compact Height + Green Simpan)
   // ======================================================================
   function openNote(productId, branchId) {
-    var numId = Number(productId);
-    var item = Store.findCartItem(numId, branchId);
+    var item = Store.findCartItem(productId, branchId);
     var bScope = branchId !== undefined ? branchId : (item ? item.branch_id : (activeBranch ? String(activeBranch.id) : null));
-    var curNote = (item && item.note) || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(numId, bScope) : '') || '';
+    var curNote = (item && item.note) || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(productId, bScope) : '') || '';
 
     var overlay = document.createElement('div');
     overlay.className = 'x-overlay x-note-overlay';
@@ -1365,7 +1364,7 @@
     if (saveBtn) {
       saveBtn.onclick = function () {
         var noteVal = (input ? input.value : '').trim();
-        Store.setNote(numId, noteVal, branchId);
+        Store.setNote(productId, noteVal, branchId);
         if (window.XentraNav && typeof window.XentraNav.close === 'function') {
           window.XentraNav.close();
         } else {
