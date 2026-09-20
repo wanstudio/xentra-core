@@ -220,6 +220,10 @@
 
       var linkToken = urlParams.get('link_token') || '';
       var isLinkMode = urlParams.get('mode') === 'link' && Boolean(linkToken);
+      // Customer mode: broker handles Google auth for customer tenant (app.mybangjo.com etc.)
+      // instead of merchant dashboard. Credential goes to /customer/auth/broker/google.
+      var isCustomerMode = urlParams.get('mode') === 'customer';
+      var customerBrandId = urlParams.get('brand_id') || '';
 
       function handleGoogleCredential(credentialResponse) {
         if (!credentialResponse || !credentialResponse.credential) {
@@ -229,6 +233,42 @@
 
         loadingEl.style.display = 'block';
         googleBtnSlot.style.display = 'none';
+
+        if (isCustomerMode) {
+          // ── Customer mode ──────────────────────────────────────────────────
+          // POST credential to /customer/auth/broker/google (customer-only endpoint).
+          // Never calls /auth/google (merchant/workforce endpoint).
+          statusEl.textContent = 'Memverifikasi identitas pelanggan...';
+          if (!customerBrandId) {
+            returnErrorToClient('MISSING_BRAND_ID', 'brand_id diperlukan untuk autentikasi pelanggan.');
+            return;
+          }
+          fetch('/api/v1/customer/auth/broker/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              credential: credentialResponse.credential,
+              brand_id: customerBrandId,
+              return_to: returnTo
+            })
+          }).then(function (res) {
+            return res.json().then(function (data) {
+              if (res.ok && data && data.success && data.redirect_url) {
+                statusEl.textContent = 'Berhasil! Mengalihkan kembali...';
+                window.location.replace(data.redirect_url);
+                return;
+              }
+              var code = (data && (data.code || data.error)) || 'CUSTOMER_AUTH_FAILED';
+              var msg = (data && (data.error || data.message)) || 'Autentikasi pelanggan gagal.';
+              returnErrorToClient(code, msg);
+            });
+          }).catch(function () {
+            returnErrorToClient('NETWORK_ERROR', 'Network error selama autentikasi pelanggan.');
+          });
+          return;
+        }
+
+        // ── Merchant / link mode (existing, unchanged) ──────────────────────
         statusEl.textContent = isLinkMode ? 'Menghubungkan akun Google ke Xentra...' : 'Verifying identity with Xentra...';
 
         var payload = {
@@ -315,7 +355,9 @@
             if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
               // One Tap didn't display or was skipped; explicit button is visible for manual click
               loadingEl.style.display = 'none';
-              subtitleEl.textContent = 'Select your Google account to continue to your dashboard:';
+              subtitleEl.textContent = isCustomerMode
+                ? 'Pilih akun Google untuk masuk ke akunmu:'
+                : 'Select your Google account to continue to your dashboard:';
             }
           });
         } catch (err) {

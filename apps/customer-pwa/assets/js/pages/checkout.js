@@ -2288,49 +2288,37 @@
 
       googleBtn.onclick = function () {
         if (_googleAuthInFlight) return; // double-click guard
+        _googleAuthInFlight = true;
+        if (googleBtn) {
+          googleBtn.disabled = true;
+          googleBtn.textContent = 'Membuka...';
+        }
 
-        // Attempt to use Google GSI library if available.
-        // GSI renders a prompt/button; the credential arrives in handleGoogleCredential().
-        var gsi = window.google && window.google.accounts && window.google.accounts.id;
-        if (gsi) {
-          _googleAuthInFlight = true;
-          if (googleBtn) {
-            googleBtn.disabled = true;
-            googleBtn.textContent = 'Membuka Google…';
-          }
-          try {
-            var googleClientId = (window.XentraConfig && window.XentraConfig.googleClientId) || '';
-            gsi.initialize({
-              client_id: googleClientId,
-              callback: function (credResponse) {
-                // credential arrives asynchronously after user picks account
-                _googleAuthInFlight = false;
-                handleGoogleCredential(credResponse);
-              },
-              cancel_on_tap_outside: false
-            });
-            gsi.prompt(function (notification) {
-              if (notification.isSkippedMoment() || notification.isDismissedMoment()) {
-                // User closed popup — remain on checkout, re-enable button
-                _googleAuthInFlight = false;
-                if (googleBtn) {
-                  googleBtn.disabled = false;
-                  googleBtn.textContent = 'Lanjutkan dengan Google';
-                }
+        // Save return destination so broker return handler knows to come back to checkout
+        try { sessionStorage.setItem('xnt_auth_return_hash', '#checkout'); } catch (_) {}
+
+        // Redirect to centralized Xentra Auth Broker — no GSI on tenant origin.
+        API.post('/customer/auth/broker/init', {})
+          .then(function (res) {
+            if (res && res.success && res.broker_url) {
+              window.location.href = res.broker_url;
+            } else {
+              _googleAuthInFlight = false;
+              if (googleBtn) {
+                googleBtn.disabled = false;
+                googleBtn.textContent = 'Lanjutkan dengan Google';
               }
-            });
-          } catch (gsiErr) {
+              showGateError((res && res.error) || 'Gagal menginisialisasi Google Sign-In. Coba lagi.');
+            }
+          })
+          .catch(function () {
             _googleAuthInFlight = false;
             if (googleBtn) {
               googleBtn.disabled = false;
               googleBtn.textContent = 'Lanjutkan dengan Google';
             }
-            showGateError('Gagal membuka Google Sign-In. Periksa koneksi lalu coba lagi.');
-          }
-        } else {
-          // GSI library not loaded yet — show a clear error, remain on checkout
-          showGateError('Library Google Sign-In belum dimuat. Periksa koneksi internet Anda lalu muat ulang halaman.');
-        }
+            showGateError('Gagal menghubungi server. Periksa koneksi internet lalu coba lagi.');
+          });
       };
     }
   }

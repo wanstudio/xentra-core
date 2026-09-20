@@ -101,6 +101,20 @@ function setupHarness(initialStorage) {
     },
     post: (url, body) => {
       posts.push({ url, body });
+      if (url.includes('/customer/auth/broker/init')) {
+        return Promise.resolve({
+          success: true,
+          broker_url: 'https://xentra.cloud/auth/broker?mode=customer&return_to=https%3A%2F%2Fapp.mybangjo.com%2F&brand_id=brand_bangjo',
+          return_to: 'https://app.mybangjo.com/'
+        });
+      }
+      if (url.includes('/customer/auth/broker/exchange')) {
+        return Promise.resolve({
+          success: true,
+          token: 'xnt_cust_broker_session_99999',
+          customer: { id: 'cust_broker_01', name: 'Ahmad Dahlan', email: 'ahmad@example.com' }
+        });
+      }
       if (url.includes('/customer/auth/google')) {
         return Promise.resolve({
           success: true,
@@ -211,8 +225,12 @@ test('Profile Authenticated: renders customer name, "Akun Google", and "Keluar d
   assert.strictEqual(capturedHtml.includes('Masuk / Verifikasi WhatsApp'), false, 'Must NOT contain WhatsApp login CTA');
 });
 
-// ── Test 3: Google Auth Lifecycle & Token Contract ───────────────────────
+// ── Test 3: Google Auth Lifecycle — Broker Redirect Contract ─────────────
 test('Google Auth Lifecycle: POST /customer/auth/google returns xnt_cust_ token and updates Store.customerSession', async () => {
+  // Architecture change: Profile login now redirects to centralized broker via
+  // POST /customer/auth/broker/init, then browser returns with ?customer_code.
+  // This test verifies: (a) broker/init is called, (b) browser is redirected to broker,
+  // (c) GSI is NOT initialized directly on tenant origin.
   const { AuxPages, Store, posts } = setupHarness();
 
   let capturedHtml = '';
@@ -233,16 +251,13 @@ test('Google Auth Lifecycle: POST /customer/auth/google returns xnt_cust_ token 
     }
   };
 
-  // Setup mock Google GSI object
-  let gsiCallback = null;
-  globalThis.google = {
-    accounts: {
-      id: {
-        initialize: (cfg) => { gsiCallback = cfg.callback; },
-        prompt: (fn) => {}
-      }
-    }
-  };
+  // Track location changes (broker redirect)
+  let redirectedTo = null;
+  const origLocation = globalThis.window && globalThis.window.location;
+  Object.defineProperty(globalThis, 'location', {
+    writable: true,
+    value: { href: 'https://app.mybangjo.com/', hash: '#home' }
+  });
 
   AuxPages.mountProfile(container);
   assert.ok(typeof loginButtonHandler === 'function', 'Login button onclick handler must be attached');
@@ -250,30 +265,29 @@ test('Google Auth Lifecycle: POST /customer/auth/google returns xnt_cust_ token 
   // Click login
   loginButtonHandler();
 
-  // Simulate Google credential response
-  assert.ok(typeof gsiCallback === 'function', 'GSI callback must be initialized');
-  gsiCallback({ credential: 'google_jwt_credential_xyz' });
-
-  // Flush promises
+  // Flush promises (broker/init POST resolves)
   for (let i = 0; i < 10; i++) await Promise.resolve();
 
-  // Verify API call was made to exchange credential
-  const authPost = posts.find(p => p.url === '/customer/auth/google');
-  assert.ok(authPost, 'Must post to /customer/auth/google');
-  assert.strictEqual(authPost.body.credential, 'google_jwt_credential_xyz');
+  // Verify broker/init was called (not GSI, not /customer/auth/google directly)
+  const brokerInitPost = posts.find(p => p.url === '/customer/auth/broker/init');
+  assert.ok(brokerInitPost, 'Profile login must POST to /customer/auth/broker/init');
 
-  // Verify Store session
-  const session = Store.getState().customerSession;
-  assert.ok(session, 'customerSession must be populated in Store');
-  assert.strictEqual(session.name, 'Ahmad Dahlan');
-  assert.strictEqual(session.token, 'xnt_cust_session_token_12345');
-  assert.ok(session.token.startsWith('xnt_cust_'), 'Session token must have xnt_cust_ prefix');
-  assert.notStrictEqual(session.token, 'google_jwt_credential_xyz', 'Google credential must NEVER be stored as token');
+  // Verify GSI was NOT initialized on tenant origin
+  const directGsiPost = posts.find(p => p.url === '/customer/auth/google');
+  assert.ok(!directGsiPost, 'Profile login must NOT directly call /customer/auth/google (deprecated for broker flow)');
 
-  // Verify Profile automatically re-rendered to authenticated state
-  assert.ok(capturedHtml.includes('Ahmad Dahlan'), 'Profile view must now show customer name');
-  assert.ok(capturedHtml.includes('Akun Google'), 'Profile view must now show "Akun Google"');
-  assert.ok(capturedHtml.includes('Keluar dari Akun'), 'Profile view must now show logout button');
+  // Verify browser was redirected to broker (xentra.cloud/auth/broker)
+  // setupHarness mock returns success=true with broker_url for broker/init
+  const locationAfter = globalThis.location && globalThis.location.href;
+  assert.ok(
+    locationAfter && locationAfter.includes('xentra.cloud') && locationAfter.includes('mode=customer'),
+    'Browser must be redirected to xentra.cloud auth broker with mode=customer'
+  );
+
+  // Restore
+  if (origLocation !== undefined) {
+    try { Object.defineProperty(globalThis, 'location', { writable: true, value: origLocation }); } catch (_) {}
+  }
 });
 
 // ── Test 4: Reload Persistence ───────────────────────────────────────────

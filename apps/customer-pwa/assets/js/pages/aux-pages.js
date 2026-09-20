@@ -285,75 +285,37 @@
     var loginBtn = container.querySelector('#x-profile-login');
     if (loginBtn) {
       loginBtn.onclick = function () {
-        function executeGoogleLogin() {
-          var gsi = window.google && window.google.accounts && window.google.accounts.id;
-          if (gsi) {
-            loginBtn.disabled = true;
-            var originalText = loginBtn.innerHTML;
-            loginBtn.innerHTML = 'Membuka Google…';
-            try {
-              var googleClientId = (window.XentraConfig && window.XentraConfig.googleClientId) || '';
-              gsi.initialize({
-                client_id: googleClientId,
-                callback: function (credResponse) {
-                  if (!credResponse || !credResponse.credential) {
-                    loginBtn.disabled = false;
-                    loginBtn.innerHTML = originalText;
-                    if (UI && UI.toast) UI.toast('Google tidak mengembalikan credential.');
-                    return;
-                  }
-                  loginBtn.innerHTML = 'Memverifikasi…';
-                  API.post('/customer/auth/google', { credential: credResponse.credential })
-                    .then(function (res) {
-                      if (res && res.success && res.token) {
-                        var customerName = (res.customer && res.customer.name) || 'Pelanggan Bangjo';
-                        var customerEmail = (res.customer && res.customer.email) || '';
-                        var customerId = (res.customer && res.customer.id) || '';
-                        Store.setCustomerSession({
-                          name: customerName,
-                          phone: customerEmail,
-                          email: customerEmail,
-                          customerId: customerId,
-                          customer_id: customerId,
-                          token: res.token
-                        });
-                        if (UI && UI.toast) UI.toast('Berhasil masuk dengan Google!');
-                        mountProfile(container);
-                      } else {
-                        loginBtn.disabled = false;
-                        loginBtn.innerHTML = originalText;
-                        if (UI && UI.toast) UI.toast((res && (res.error || res.message)) || 'Autentikasi Google gagal.');
-                      }
-                    })
-                    .catch(function (err) {
-                      loginBtn.disabled = false;
-                      loginBtn.innerHTML = originalText;
-                      var msg = (err && err.data && (err.data.error || err.data.message)) || (err && err.message) || 'Gagal menghubungi server.';
-                      if (UI && UI.toast) UI.toast(msg);
-                    });
-                },
-                cancel_on_tap_outside: false
-              });
-              gsi.prompt(function (notification) {
-                if (notification && (notification.isSkippedMoment() || notification.isDismissedMoment())) {
-                  loginBtn.disabled = false;
-                  loginBtn.innerHTML = originalText;
-                }
-              });
-            } catch (gsiErr) {
+        // Redirect to centralized Xentra Auth Broker — no GSI on tenant origin.
+        // The broker (xentra.cloud) handles Google GSI, then returns with ?customer_code.
+        loginBtn.disabled = true;
+        var originalHtml = loginBtn.innerHTML;
+        loginBtn.innerHTML = 'Membuka...';
+        API.post('/customer/auth/broker/init', {})
+          .then(function (res) {
+            if (res && res.success && res.broker_url) {
+              // Save current hash so we can restore it after auth
+              try { sessionStorage.setItem('xnt_auth_return_hash', window.location.hash || '#home'); } catch (_) {}
+              window.location.href = res.broker_url;
+            } else {
               loginBtn.disabled = false;
-              loginBtn.innerHTML = originalText;
-              if (UI && UI.toast) UI.toast('Gagal membuka Google Sign-In.');
+              loginBtn.innerHTML = originalHtml;
+              // Fallback to checkout auth sheet if broker not configured
+              if (typeof window.openCustomerAuthSheet === 'function') {
+                window.openCustomerAuthSheet(function () { mountProfile(container); });
+              } else {
+                if (UI && UI.toast) UI.toast((res && res.error) || 'Gagal menginisialisasi Google Sign-In.');
+              }
             }
-          } else if (typeof window.openCustomerAuthSheet === 'function') {
-            window.openCustomerAuthSheet(function () {
-              mountProfile(container);
-            });
-          } else {
-            if (UI && UI.toast) UI.toast('Library Google Sign-In belum dimuat.');
-          }
-        }
-        executeGoogleLogin();
+          })
+          .catch(function () {
+            loginBtn.disabled = false;
+            loginBtn.innerHTML = originalHtml;
+            if (typeof window.openCustomerAuthSheet === 'function') {
+              window.openCustomerAuthSheet(function () { mountProfile(container); });
+            } else {
+              if (UI && UI.toast) UI.toast('Gagal menghubungi server. Periksa koneksi internet.');
+            }
+          });
       };
     }
 

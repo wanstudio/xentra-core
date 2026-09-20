@@ -384,6 +384,77 @@
           }
         };
       }
+
+      // ── Customer Broker Return Handler ──────────────────────────────────
+      // After the Xentra Auth Broker returns from Google, the browser lands
+      // back on this page with ?customer_code=xnt_chdf_* in the URL.
+      // We exchange that one-time code for a proper xnt_cust_ session token,
+      // then clean the URL and navigate to the saved return destination.
+      (function handleCustomerBrokerReturn() {
+        var urlParams = new URLSearchParams(window.location.search);
+        var customerCode = urlParams.get('customer_code') || '';
+        var authError = urlParams.get('error') || '';
+
+        if (authError) {
+          // Broker returned an error — clean URL and stay on home
+          try {
+            var cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('error');
+            cleanUrl.searchParams.delete('error_description');
+            window.history.replaceState({}, '', cleanUrl.toString());
+          } catch (_) {}
+          var errDesc = urlParams.get('error_description') || 'Autentikasi Google gagal.';
+          var Store = window.Xentra && window.Xentra.Store;
+          var UI = window.Xentra && window.Xentra.UI;
+          if (UI && UI.toast) UI.toast(errDesc);
+          return;
+        }
+
+        if (!customerCode || !customerCode.startsWith('xnt_chdf_')) return;
+
+        // Clean ?customer_code from URL immediately
+        try {
+          var cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('customer_code');
+          window.history.replaceState({}, '', cleanUrl.toString());
+        } catch (_) {}
+
+        var Store = window.Xentra && window.Xentra.Store;
+        var API = window.Xentra && window.Xentra.API;
+        var UI = window.Xentra && window.Xentra.UI;
+
+        if (!API || !Store) return;
+
+        API.post('/customer/auth/broker/exchange', { code: customerCode })
+          .then(function (res) {
+            if (res && res.success && res.token) {
+              var customerName = (res.customer && res.customer.name) || 'Pelanggan';
+              var customerEmail = (res.customer && res.customer.email) || '';
+              var customerId = (res.customer && res.customer.id) || '';
+              Store.setCustomerSession({
+                name: customerName,
+                phone: customerEmail,
+                email: customerEmail,
+                customerId: customerId,
+                customer_id: customerId,
+                token: res.token
+              });
+              if (UI && UI.toast) UI.toast('Berhasil masuk dengan Google!');
+              // Navigate to the saved return view
+              var returnHash = '';
+              try { returnHash = sessionStorage.getItem('xnt_auth_return_hash') || '#profile'; } catch (_) { returnHash = '#profile'; }
+              try { sessionStorage.removeItem('xnt_auth_return_hash'); } catch (_) {}
+              // Navigate to saved hash view (strip '#' prefix for Router)
+              var targetView = returnHash.replace(/^#/, '') || 'profile';
+              Router.navigate(targetView);
+            } else {
+              if (UI && UI.toast) UI.toast((res && res.error) || 'Gagal menyelesaikan Google Sign-In.');
+            }
+          })
+          .catch(function () {
+            if (UI && UI.toast) UI.toast('Gagal menghubungi server saat menyelesaikan login Google.');
+          });
+      })();
     })();
   </script>
 
