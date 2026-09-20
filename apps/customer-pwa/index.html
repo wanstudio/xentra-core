@@ -16,7 +16,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_20260920_pwa-install-fix';
+      var PWA_VERSION = 'v_20260920_pwa-cache-fix';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -277,7 +277,7 @@
   <script src="/assets/js/core/api.js?v=v_theme04"></script>
   <script src="/assets/js/core/nav.js?v=v_20260919_nav"></script>
   <script src="/assets/js/core/router.js?v=v_theme05"></script>
-  <script src="/assets/js/core/pwa-runtime.js?v=v_20260920_pwa-install-fix"></script>
+  <script src="/assets/js/core/pwa-runtime.js?v=v_20260920_pwa-cache-fix"></script>
   <script src="/assets/js/core/promo-reward-cart.js?v=v_theme02"></script>
   <script src="/assets/js/core/delivery-schedule.js?v=v_theme02"></script>
   <script src="/assets/js/location.js?v=v_theme02"></script>
@@ -287,8 +287,8 @@
   <script src="/assets/js/core/media.js?v=v_theme02"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=v_20260920_pwa-install-fix"></script>
-  <script src="/assets/js/pages/checkout.js?v=v_20260920_pwa-install-fix"></script>
+  <script src="/assets/js/pages/home.js?v=v_20260920_pwa-cache-fix"></script>
+  <script src="/assets/js/pages/checkout.js?v=v_20260920_pwa-cache-fix"></script>
   <script src="/assets/js/pages/order-received.js?v=v_theme03"></script>
   <script src="/assets/js/pages/aux-pages.js?v=v_theme03"></script>
 
@@ -463,7 +463,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=v_20260920_pwa-install-fix').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=v_20260920_pwa-cache-fix').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {
