@@ -104,3 +104,110 @@ The next business/state contract must explicitly define failure/exception flows:
 - payment settlement attempted after order completion.
 
 Only after these states and transition guards are locked should database/API/Driver App implementation begin.
+## Merchant Mobile Order Center — UX Direction v1 (LOCKED)
+
+This section locks the operational UX direction for the Branch Manager / Merchant order center based on the source audit and the agreed GoFood/GrabMerchant-style operational pattern. It is a UX/interaction contract, not a copy of any third-party UI.
+
+### Mobile-First Order Queue
+
+The mobile Branch Manager order queue MUST NOT present the operational order list as a desktop table that relies on horizontal scrolling.
+
+On mobile:
+- Each order is presented as an operational card.
+- The card prioritizes order number, elapsed/new state, customer, service type, item count, total, current operational state, and the next permitted action.
+- Tapping an order opens its operational detail view.
+- Search/filter controls must not consume most of the initial viewport.
+- Horizontal scrolling MUST NOT be required to perform core order operations.
+
+Desktop/tablet may retain a table representation where appropriate.
+
+### New Order Attention
+
+A newly received branch order is an operational event, not something the merchant should discover only by manual refresh.
+
+When a new pending order is detected:
+- show a prominent new-order visual state/badge;
+- play an audible new-order alert when browser/device policy permits;
+- place the new order at the top of the relevant queue;
+- allow the merchant to open the order and accept/reject it;
+- preserve the existing Branch Acceptance contract and endpoint semantics.
+
+Polling may remain as a compatibility/fallback mechanism, but the UX MUST NOT depend on a visible Refresh button for normal order discovery.
+
+### Operational State Presentation
+
+The merchant-facing order center MUST represent the separation between Order lifecycle and Delivery Job lifecycle.
+
+Order lifecycle:
+pending → confirmed → preparing → ready → out_for_delivery → completed
+
+Delivery Job lifecycle:
+unassigned → assigned → picked_up → on_delivery → delivered
+
+The following mapping is LOCKED:
+- pending: new order requiring Branch Manager acceptance/rejection.
+- confirmed: accepted and awaiting/under kitchen processing.
+- preparing: kitchen is preparing the order.
+- ready: food is ready for driver pickup; this MUST NOT mean already delivered.
+- out_for_delivery: delivery execution has started after pickup.
+- completed: canonical fulfillment-complete Order state.
+- delivered: Delivery Job state only; it MUST NOT become the canonical Order status.
+
+### Driver Handoff / In-House Driver
+
+Xentra uses its internal/branch driver flow for this contract.
+
+After an order becomes ready:
+- Branch Manager may assign an available driver through the existing Delivery domain.
+- The operational UI must show unassigned / assigned delivery state distinctly from Order state.
+- There is NO merchant-side driver code/PIN entry requirement in this flow.
+- Do not introduce a third-party driver verification step merely to imitate an external marketplace.
+- Driver pickup, on-delivery, and delivered transitions belong to the Driver interface/Delivery domain.
+
+### Role Boundaries
+
+Branch Manager:
+- accept/reject orders;
+- monitor operational order lifecycle;
+- assign/dispatch driver;
+- monitor delivery progress.
+
+Head Kitchen/KDS:
+- preparing;
+- ready.
+
+Driver:
+- receive assigned job;
+- pickup;
+- on delivery;
+- delivered;
+- COD cash collection/custody.
+
+Cashier/POS:
+- COD cash handover;
+- cash verification;
+- payment settlement.
+
+The Branch Manager UI MUST NOT become the authority for driver pickup/on-delivery/delivered transitions merely for UI convenience.
+
+### COD Boundary
+
+Delivery completion and COD cash settlement remain separate events.
+
+delivered MUST NOT imply payment settlement.
+
+A delivered COD order may remain payment-pending while cash is held by the Driver and awaiting handover to Cashier/POS.
+
+### Implementation Guardrails
+
+The implementation MUST:
+- reuse the existing Order state model and Delivery domain where possible;
+- avoid creating a second/duplicate delivery state machine;
+- avoid renaming canonical states;
+- avoid changing payment/COD contracts;
+- avoid changing Branch Acceptance semantics;
+- avoid deleting or reseeding existing branches, menus, products, or customer data;
+- avoid unrelated changes to Google authentication, PWA boot, promo, or checkout flows;
+- preserve desktop usability while introducing a genuinely mobile-first operational presentation.
+
+This UX direction is locked as the target for the next source-code audit and implementation phase.
