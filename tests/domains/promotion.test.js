@@ -2,8 +2,9 @@
  * Xentra Promotion Domain Comprehensive Tests
  * Validates domain registration, normalized rules/rewards, stacking conflict resolution, and immutable redemptions.
  */
-const { test, describe } = require('node:test');
+const { test, describe, before } = require('node:test');
 const assert = require('node:assert');
+const db = require('../../server/database/db');
 const { domain } = require('../../core');
 const {
   Promotion,
@@ -11,6 +12,16 @@ const {
   InstallIncentiveStrategy,
   PromotionEngineService
 } = require('../../domains/promotion');
+
+before(() => {
+  db.prepare("INSERT OR IGNORE INTO organizations (id, name, slug) VALUES ('org_prm_test', 'Promo Test Org', 'promo-test-org')").run();
+  db.prepare("INSERT OR IGNORE INTO brands (id, organization_id, name, slug) VALUES ('brand_bangjo', 'org_prm_test', 'Bangjo', 'bangjo')").run();
+  db.prepare("INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, is_active, latitude, longitude) VALUES ('branch_pedurungan', 'brand_bangjo', 'Bangjo Pedurungan', 'bangjo-pedurungan', 'Jl. Pedurungan', 1, -5.35, 105.25)").run();
+  db.prepare("INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, is_active, latitude, longitude) VALUES ('branch_pos', 'brand_bangjo', 'Bangjo POS', 'bangjo-pos', 'Jl. POS', 1, -5.35, 105.25)").run();
+  db.prepare("INSERT OR IGNORE INTO categories (id, brand_id, name, slug) VALUES ('cat_pos', 'brand_bangjo', 'Makanan', 'makanan')").run();
+  db.prepare("INSERT OR IGNORE INTO products (id, brand_id, category_id, name, slug, price, is_active) VALUES ('prod_pos_1', 'brand_bangjo', 'cat_pos', 'Ayam Goreng', 'ayam-goreng', 20000, 1)").run();
+  db.prepare("INSERT OR IGNORE INTO branch_products (branch_id, product_id, price, stock, is_available) VALUES ('branch_pos', 'prod_pos_1', 20000, 50, 1)").run();
+});
 
 test('Promotion 1 — Domain Registration: registered cleanly in DomainRegistry', () => {
   const registered = domain.DomainRegistry.getDomain('promotion');

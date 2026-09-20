@@ -208,7 +208,13 @@ describe('Promotion Branch Activation ↔ Reward Catalog Readiness', () => {
     let targetDb = db;
     let bangjoBranch = 'branch_1789606246242_08knv';
 
-    // In current test db (which is :memory:), ensure branch and product 401 are seeded if not present
+    // In current test db (which is :memory:), ensure brand, branch, product 401 and promo exist
+    db.prepare("INSERT OR IGNORE INTO organizations (id, name, slug) VALUES ('org_bangjo', 'Bangjo Group', 'bangjo-group')").run();
+    db.prepare("INSERT OR IGNORE INTO brands (id, organization_id, name, slug) VALUES ('brand_bangjo', 'org_bangjo', 'Bangjo', 'bangjo')").run();
+    db.prepare("INSERT OR IGNORE INTO products (id, brand_id, name, slug, price, is_active) VALUES ('401', 'brand_bangjo', 'Es Teh Manis', 'es-teh-manis', 7500, 1)").run();
+    db.prepare("INSERT OR IGNORE INTO promotions (id, brand_id, name, code, capability_type, stacking_policy, priority_weight, is_active) VALUES ('prm_bangjo_pwa_install', 'brand_bangjo', 'Promo Hadiah Install PWA Es Teh', NULL, 'install_incentive', 'exclusive', 100, 1)").run();
+    db.prepare("INSERT OR IGNORE INTO promotion_rules (id, promotion_id, rule_type, rule_payload) VALUES ('rul_pwa_install_01', 'prm_bangjo_pwa_install', 'eligibility', '{\"requires_pwa_installed\":true,\"target_audience\":\"new_user\",\"first_order_only\":true}')").run();
+
     let testBp = db.prepare('SELECT is_available, stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(bangjoBranch, '401');
     if (!testBp) {
       // Use existing seeded branch in :memory: that has product 401 (e.g. branch_bangjo_utara)

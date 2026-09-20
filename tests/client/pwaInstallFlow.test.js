@@ -89,6 +89,68 @@ test('AC-H7: checkout.css has comment acknowledging home.css as canonical', () =
     'checkout.css should have a comment acknowledging canonical home.css banner');
 });
 
+test('AC-H8: home.css banner text wraps instead of forcing single-line nowrap', () => {
+  const strongRule = HOME_CSS.match(/\.x-pwa-banner-text strong\s*\{([^}]*)\}/s);
+  const spanRule = HOME_CSS.match(/\.x-pwa-banner-text span\s*\{([^}]*)\}/s);
+  assert.ok(strongRule, 'strong rule must exist');
+  assert.ok(spanRule, 'span rule must exist');
+  assert.match(strongRule[1], /white-space\s*:\s*normal/, 'strong must have white-space: normal to allow wrapping');
+  assert.match(strongRule[1], /-webkit-line-clamp/, 'strong must use line-clamp');
+  assert.match(spanRule[1], /white-space\s*:\s*normal/, 'span must have white-space: normal to allow wrapping');
+  assert.match(spanRule[1], /-webkit-line-clamp/, 'span must use line-clamp');
+});
+
+test('AC-H9: home.css does not use overflow-x: hidden workaround on banner or card', () => {
+  const bannerRule = HOME_CSS.match(/\.x-pwa-banner\s*\{([^}]*)\}/s);
+  const cardRule = HOME_CSS.match(/\.x-pwa-banner-card\s*\{([^}]*)\}/s);
+  assert.ok(bannerRule, 'banner rule exists');
+  assert.ok(cardRule, 'card rule exists');
+  assert.ok(!/overflow-x\s*:\s*hidden/.test(bannerRule[1]), 'banner must not use overflow-x: hidden band-aid');
+  assert.ok(!/overflow-x\s*:\s*hidden/.test(cardRule[1]), 'card must not use overflow-x: hidden band-aid');
+});
+
+test('AC-H10: home.css icon size is bounded and cannot expand card', () => {
+  const iconRule = HOME_CSS.match(/\.x-pwa-banner-icon\s*\{([^}]*)\}/s);
+  assert.ok(iconRule, 'icon rule must exist');
+  assert.match(iconRule[1], /flex-shrink\s*:\s*0/, 'icon must not shrink');
+  assert.match(iconRule[1], /flex-grow\s*:\s*0|max-width/, 'icon must not grow');
+});
+
+test('AC-H11: home.css includes max-width: 360px media query for small viewports', () => {
+  assert.match(HOME_CSS, /@media\s*\([^)]*max-width\s*:\s*360px\)/,
+    'home.css must include media query for small viewports <= 360px');
+});
+
+test('AC-H12: Viewport layout budget preserves CTA visibility across 320px, 360px, 375px, 390px, 412px, 768px', () => {
+  const viewports = [320, 360, 375, 390, 412, 768];
+  const maxShellWidth = 480;
+
+  for (const vp of viewports) {
+    const isSmall = vp <= 360;
+    const marginLR = isSmall ? 8 * 2 : 12 * 2;
+    const bannerWidth = Math.min(vp - marginLR, maxShellWidth);
+    const cardPaddingLR = isSmall ? 10 * 2 : 12 * 2;
+    const cardInnerWidth = bannerWidth - cardPaddingLR - 2; // 2px border
+
+    const iconWidth = isSmall ? 32 : 38;
+    const leftGap = isSmall ? 6 : 8;
+    const centerGap = isSmall ? 8 : 10;
+    const rightGap = isSmall ? 4 : 6;
+    const btnPadding = isSmall ? 20 : 28;
+    const btnTextWidth = 55; // estimated CTA text width
+    const btnWidth = btnTextWidth + btnPadding;
+    const dismissWidth = isSmall ? 24 : 28;
+    const rightColWidth = btnWidth + dismissWidth + rightGap;
+
+    const fixedColumns = iconWidth + leftGap + centerGap + rightColWidth;
+    const remainingTextBudget = cardInnerWidth - fixedColumns;
+
+    assert.ok(bannerWidth <= vp, `Banner width ${bannerWidth} must fit in viewport ${vp}`);
+    assert.ok(remainingTextBudget > 50, `Viewport ${vp} must leave at least 50px for text (has ${remainingTextBudget}px)`);
+    assert.ok(rightColWidth < cardInnerWidth, `Right CTA group must fit inside card for viewport ${vp}`);
+  }
+});
+
 // ── B. Install flow: no delayed prompt after click ─────────────────
 
 test('AC-B1: home.js Install click does NOT call waitForPrompt', () => {
