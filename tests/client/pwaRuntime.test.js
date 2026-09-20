@@ -258,3 +258,139 @@ test('PWA Runtime H — verified marker persists across reload into a plain brow
   assert.strictEqual(ctx.install_requirement_satisfied, true, 'verified install must survive a reload into a non-standalone tab');
   assert.strictEqual(fresh.mod.getInstallState(), 'installed');
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+//  REGRESSION TESTS — Android native install flow bounded readiness
+// ════════════════════════════════════════════════════════════════════════════
+
+test('PWA Runtime I — beforeinstallprompt not ready when Install clicked: does not immediately return native unavailable', async (t) => {
+  const h = loadPwaRuntime({});
+  t.after(() => h.cleanup());
+
+  // Prompt not set — simulates clicking Install before beforeinstallprompt fired
+  assert.strictEqual(h.world.window.__xentra_deferred_prompt, null);
+  assert.strictEqual(h.mod.isNativePromptReady(), false);
+
+  const res = await h.mod.promptInstall();
+  assert.strictEqual(res.prompted, false, 'promptInstall returns prompted:false when event not ready');
+  assert.strictEqual(res.accepted, false);
+
+  // The key regression: prompted:false does NOT mean native install is unavailable.
+  // waitForPrompt should be used to wait for the event.
+  assert.strictEqual(h.mod.isNativePromptReady(), false);
+});
+
+test('PWA Runtime J — beforeinstallprompt arrives within bounded wait window: native prompt used', async (t) => {
+  const h = loadPwaRuntime({});
+  t.after(() => h.cleanup());
+
+  // Start waiting, then simulate beforeinstallprompt arriving after 200ms
+  const waitPromise = h.mod.waitForPrompt(3000);
+
+  setTimeout(function () {
+    h.world.setDeferredPrompt('accepted');
+  }, 200);
+
+  const ready = await waitPromise;
+  assert.strictEqual(ready, true, 'waitForPrompt resolves true when event arrives within timeout');
+  assert.strictEqual(h.mod.isNativePromptReady(), true);
+
+  // Now promptInstall should succeed
+  const res = await h.mod.promptInstall();
+  assert.strictEqual(res.prompted, true);
+  assert.strictEqual(res.accepted, true);
+});
+
+test('PWA Runtime K — beforeinstallprompt never arrives: bounded wait times out, manual fallback allowed', async (t) => {
+  const h = loadPwaRuntime({});
+  t.after(() => h.cleanup());
+
+  // Never set the deferred prompt — timeout after 500ms
+  const start = Date.now();
+  const ready = await h.mod.waitForPrompt(500);
+  const elapsed = Date.now() - start;
+
+  assert.strictEqual(ready, false, 'waitForPrompt resolves false on timeout');
+  assert.strictEqual(h.mod.isNativePromptReady(), false);
+  assert.ok(elapsed >= 400, 'bounded wait respects timeout (at least ~400ms elapsed)');
+  assert.ok(elapsed < 2000, 'bounded wait does not hang indefinitely');
+});
+
+test('PWA Runtime L — prompt accepted is NOT verified installed: accepted != installed', async (t) => {
+  const h = loadPwaRuntime({});
+  t.after(() => h.cleanup());
+  h.world.setDeferredPrompt('accepted');
+
+  const res = await h.mod.promptInstall();
+  assert.strictEqual(res.prompted, true);
+  assert.strictEqual(res.accepted, true);
+
+  const ctx = h.mod.getPwaRuntimeContext();
+  assert.strictEqual(ctx.install_state, 'accepted');
+  assert.strictEqual(ctx.install_requirement_satisfied, false, 'prompt acceptance must NOT satisfy install requirement');
+  assert.strictEqual(h.world.getVerifiedMarker(), null, 'no verified marker written on acceptance');
+});
+
+test('PWA Runtime M — appinstalled event produces verified install', (t) => {
+  const h = loadPwaRuntime({ xentra: { Store: {} } });
+  t.after(() => h.cleanup());
+
+  assert.strictEqual(h.mod.getPwaRuntimeContext().install_requirement_satisfied, false);
+  h.world.fireAppInstalled();
+
+  assert.strictEqual(h.world.getVerifiedMarker(), '1');
+  const ctx = h.mod.getPwaRuntimeContext();
+  assert.strictEqual(ctx.install_state, 'installed');
+  assert.strictEqual(ctx.install_requirement_satisfied, true);
+});
+
+test('PWA Runtime N — already standalone: install CTA does not start native/manual install flow', (t) => {
+  const h = loadPwaRuntime({ standalone: true });
+  t.after(() => h.cleanup());
+
+  const ctx = h.mod.getPwaRuntimeContext();
+  assert.strictEqual(ctx.display_mode, 'standalone');
+  assert.strictEqual(ctx.install_requirement_satisfied, true);
+
+  // waitForPrompt should resolve false immediately (no need to prompt)
+  return h.mod.waitForPrompt(1000).then(function (ready) {
+    assert.strictEqual(ready, false, 'no prompt wait needed when already standalone');
+  });
+});
+
+test('PWA Runtime O — iOS: manual Add to Home Screen flow available (no native prompt, no crash)', async (t) => {
+  const h = loadPwaRuntime({});
+  t.after(() => h.cleanup());
+
+  // iOS never fires beforeinstallprompt — promptInstall returns prompted:false
+  const res = await h.mod.promptInstall();
+  assert.strictEqual(res.prompted, false, 'iOS has no native prompt');
+
+  // waitForPrompt times out (no event will arrive)
+  const ready = await h.mod.waitForPrompt(500);
+  assert.strictEqual(ready, false, 'iOS timeout: caller should show manual guide');
+
+  // Context remains valid
+  const ctx = h.mod.getPwaRuntimeContext();
+  assert.strictEqual(ctx.install_requirement_satisfied, false);
+});
+
+test('PWA Runtime P — prompt consumed only once: second promptInstall after clear returns prompted:false', async (t) => {
+  const h = loadPwaRuntime({});
+  t.after(() => h.cleanup());
+  h.world.setDeferredPrompt('accepted');
+
+  // First prompt — consumes the event
+  const res1 = await h.mod.promptInstall();
+  assert.strictEqual(res1.prompted, true);
+  assert.strictEqual(res1.accepted, true);
+
+  // Event is now cleared
+  assert.strictEqual(h.world.window.__xentra_deferred_prompt, null);
+  assert.strictEqual(h.mod.isNativePromptReady(), false);
+
+  // Second prompt — event consumed, returns prompted:false
+  const res2 = await h.mod.promptInstall();
+  assert.strictEqual(res2.prompted, false, 'second promptInstall after consumption returns prompted:false');
+  assert.strictEqual(res2.accepted, false);
+});

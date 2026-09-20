@@ -96,6 +96,65 @@
   }
 
   /**
+   * Returns true when a native beforeinstallprompt event has been captured and
+   * is ready to be consumed by promptInstall(). Distinguishes "not yet ready"
+   * from "not available" — the core fix for the Android install flow race.
+   */
+  function isNativePromptReady() {
+    var e = getDeferredInstallPrompt();
+    return !!(e && typeof e.prompt === 'function');
+  }
+
+  /**
+   * Bounded readiness wait: polls for the native beforeinstallprompt event to
+   * become available within `timeout` ms (default 3000). Resolves true if the
+   * prompt becomes ready, false on timeout.
+   *
+   * When the user clicks Install BEFORE beforeinstallprompt has fired, the
+   * callers MUST NOT immediately fall back to the manual guide. Instead they
+   * call waitForPrompt() which polls window.__xentra_deferred_prompt at 100ms
+   * intervals. If the event arrives within the bounded window, the caller
+   * retries promptInstall() to show the native Chrome dialog.
+   *
+   * The interval is cleared on resolution to prevent leaks.
+   */
+  function waitForPrompt(timeout) {
+    timeout = (typeof timeout === 'number' && timeout > 0) ? timeout : 3000;
+
+    if (isNativePromptReady()) {
+      return Promise.resolve(true);
+    }
+
+    // If prompt was already consumed or standalone is detected, no point waiting.
+    if (getStandalone() || hasVerifiedInstall()) {
+      return Promise.resolve(false);
+    }
+
+    return new Promise(function (resolve) {
+      var resolved = false;
+      var interval = 100;
+      var elapsed = 0;
+
+      var timer = setInterval(function () {
+        if (isNativePromptReady()) {
+          clearInterval(timer);
+          if (!resolved) {
+            resolved = true;
+            resolve(true);
+          }
+        } else if (elapsed >= timeout) {
+          clearInterval(timer);
+          if (!resolved) {
+            resolved = true;
+            resolve(false);
+          }
+        }
+        elapsed += interval;
+      }, interval);
+    });
+  }
+
+  /**
    * Shows the native install prompt when the browser offers one.
    * Resolves { prompted, outcome, accepted }. When the platform does not
    * provide a native prompt (iOS Safari, unsupported browser) it resolves
@@ -105,6 +164,11 @@
    * A resolved `accepted: true` only records the transient 'accepted' state.
    * It does NOT write the verified marker: actual installation is confirmed
    * solely by the appinstalled event / standalone detection.
+   *
+   * IMPORTANT: When { prompted: false } is returned, the caller MUST use
+   * waitForPrompt(timeout) before falling back to manual guide. A null
+   * deferred prompt may mean "not yet ready" (race condition), not
+   * "not available".
    */
   function promptInstall() {
     var promptEvent = getDeferredInstallPrompt();
@@ -168,6 +232,8 @@
     isStandalone: isStandalone,
     getInstallState: getInstallState,
     getDeferredInstallPrompt: getDeferredInstallPrompt,
+    isNativePromptReady: isNativePromptReady,
+    waitForPrompt: waitForPrompt,
     promptInstall: promptInstall
   };
 
@@ -178,6 +244,8 @@
       isStandalone: isStandalone,
       getInstallState: getInstallState,
       getDeferredInstallPrompt: getDeferredInstallPrompt,
+      isNativePromptReady: isNativePromptReady,
+      waitForPrompt: waitForPrompt,
       promptInstall: promptInstall
     };
   }

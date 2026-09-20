@@ -9,7 +9,7 @@
  *    are versioned by media_id, so safe to cache with Cache-First strategy.
  *    Never cache: original binaries, admin endpoints, arbitrary uploads.
  */
-const CACHE_NAME = "bangjo-pwa-v_20260919_codfmt";
+const CACHE_NAME = "bangjo-pwa-v_20260920_pwa-install-fix";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -50,7 +50,7 @@ self.addEventListener("install", event => {
     caches.open(CACHE_NAME).then(cache => {
       const versionedUrls = STATIC_ASSETS.map(u => {
         if (u === "/" || u === "/manifest.json" || u.includes(".png")) return u;
-        return u + "?v=" + "v_20260919_codfmt";
+        return u + "?v=" + "v_20260920_pwa-install-fix";
       });
       return cache.addAll(versionedUrls).catch(err => {
         console.warn("[SW Install] Cache prefetch warn:", err);

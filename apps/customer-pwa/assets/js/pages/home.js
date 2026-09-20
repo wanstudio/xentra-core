@@ -122,15 +122,32 @@
           return;
         }
 
+        var isIos = navigator.userAgent.match(/iPhone|iPad|iPod/i);
+        var platform = isIos ? 'ios' : 'android';
+
         pwaRt.promptInstall().then(function (res) {
-          if (res && res.accepted) {
-            if (window.UI && window.UI.toast) window.UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
-          } else if (!res || !res.prompted) {
+          if (res && res.prompted) {
+            if (res.accepted) {
+              if (window.UI && window.UI.toast) window.UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
+            }
+            return;
+          }
+
+          // Native prompt not yet ready — bounded wait before manual fallback.
+          return pwaRt.waitForPrompt(3000).then(function (ready) {
+            if (ready) {
+              return pwaRt.promptInstall();
+            }
+            // Truly unavailable after bounded wait — manual guide fallback.
             if (typeof showPwaGuideSheet === 'function') {
-              showPwaGuideSheet(navigator.userAgent.match(/iPhone|iPad|iPod/i) ? 'ios' : 'android');
+              showPwaGuideSheet(platform);
             } else {
               alert('Silakan pasang aplikasi melalui menu browser Anda ("Tambahkan ke Layar Utama" / "Add to Home Screen").');
             }
+          });
+        }).then(function (res) {
+          if (res && res.accepted) {
+            if (window.UI && window.UI.toast) window.UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
           }
         });
       });

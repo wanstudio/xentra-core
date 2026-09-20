@@ -293,17 +293,31 @@
       return;
     }
 
+    var platform = isIosPwa ? 'ios' : 'android';
+
     pwaRt.promptInstall().then(function (res) {
+      if (res && res.prompted) {
+        if (res.accepted) {
+          // Accepted only means the user accepted the prompt — the requirement
+          // is NOT satisfied yet. Stay on the install/discovery state until the
+          // appinstalled broadcast (verified install) refreshes the banner into
+          // the claim/reward state. Never treat prompt acceptance as entitlement.
+          if (UI && UI.toast) UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
+        }
+        return;
+      }
+
+      // Native prompt not yet ready — bounded wait before manual fallback.
+      return pwaRt.waitForPrompt(3000).then(function (ready) {
+        if (ready) {
+          return pwaRt.promptInstall();
+        }
+        // Truly unavailable after bounded wait — manual guide fallback.
+        showPwaGuideSheet(platform);
+      });
+    }).then(function (res) {
       if (res && res.accepted) {
-        // Accepted only means the user accepted the prompt — the requirement
-        // is NOT satisfied yet. Stay on the install/discovery state until the
-        // appinstalled broadcast (verified install) refreshes the banner into
-        // the claim/reward state. Never treat prompt acceptance as entitlement.
         if (UI && UI.toast) UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
-      } else if (!res || !res.prompted) {
-        // No native prompt available (iOS Safari / unsupported): guide instead
-        // of pretending the install happened.
-        showPwaGuideSheet(isIosPwa ? 'ios' : 'android');
       }
     });
   }
