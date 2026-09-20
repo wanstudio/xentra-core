@@ -4681,6 +4681,61 @@
             </div>
           </div>
 
+          <!-- Floating PWA Install Presentation Box (Marketing Driven) -->
+          <div id="mkt-promo-presentation-box" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px;">
+            <div style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              📱 Presentasi Floating Install PWA (Customer View)
+            </div>
+            <p class="text-muted" style="margin: 0 0 14px; font-size: 12px;">Atur tampilan banner floating install yang dilihat pelanggan di Customer Web App.</p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div>
+                <label for="mkt-promo-banner-title" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Judul Banner (Headline) <span style="color:red;">*</span></label>
+                <input type="text" id="mkt-promo-banner-title" class="x-input" placeholder="Misal: Install sekarang & dapatkan promo spesial" maxlength="100" style="width: 100%; font-size: 13px;" oninput="updatePromotionPresentationPreview()">
+              </div>
+              <div>
+                <label for="mkt-promo-banner-subtitle" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Sub-headline (S&K Singkat)</label>
+                <input type="text" id="mkt-promo-banner-subtitle" class="x-input" placeholder="Misal: Gratis untuk pesanan pertama • S&K berlaku" maxlength="120" style="width: 100%; font-size: 13px;" oninput="updatePromotionPresentationPreview()">
+              </div>
+            </div>
+
+            <!-- Icon / Media Selection -->
+            <div style="margin-top: 14px; display: flex; gap: 16px; align-items: center;">
+              <input type="hidden" id="mkt-promo-media-id" value="">
+              <input type="hidden" id="mkt-promo-icon-url" value="">
+              <div style="width: 52px; height: 52px; border-radius: 10px; border: 1px solid var(--border-color); background: #f8fafc; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <img id="mkt-promo-icon-preview" src="/assets/pwa/icon-192.png" alt="Promo Icon" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/assets/pwa/icon-192.png'">
+              </div>
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Icon Banner</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <button type="button" class="x-btn-secondary" style="padding: 5px 12px; font-size: 12px;" onclick="document.getElementById('mkt-promo-icon-file').click()">Ganti Icon Media</button>
+                  <button type="button" class="x-btn-ghost" style="padding: 5px 10px; font-size: 12px; color: #ef4444;" onclick="resetPromotionIconToDefault()">Gunakan Default</button>
+                  <input type="file" id="mkt-promo-icon-file" accept="image/png,image/jpeg,image/webp" style="display: none;" onchange="onPromotionIconFileSelected(this.files[0])">
+                </div>
+                <span id="mkt-promo-icon-status" style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1 disarankan).</span>
+              </div>
+            </div>
+
+            <!-- Live Preview Card -->
+            <div style="margin-top: 14px; background: #f1f5f9; border-radius: 8px; padding: 12px;">
+              <span style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">Live Preview Floating Card di Customer:</span>
+              <div style="background: #ffffff; border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 400px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">
+                  <img id="mkt-promo-live-icon" src="/assets/pwa/icon-192.png" alt="" style="width: 38px; height: 38px; border-radius: 8px; object-fit: cover; flex-shrink: 0;" onerror="this.src='/assets/pwa/icon-192.png'">
+                  <div style="min-width: 0; flex: 1;">
+                    <div id="mkt-promo-live-title" style="font-size: 12px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Install & dapatkan promo spesial</div>
+                    <div id="mkt-promo-live-subtitle" style="font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Gratis untuk pesanan pertama • S&K berlaku</div>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px; margin-left: 8px;">
+                  <button type="button" disabled style="background: var(--primary-color, #16a34a); color: #fff; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: default;">Install</button>
+                  <span style="color: #94a3b8; font-size: 12px; cursor: default;">✕</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Branch Availability Scoping Box -->
           <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -4707,6 +4762,6 @@
   </div>
 
   <!-- Dashboard JavaScript -->
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.11"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.12"></script>
 </body>
 </html>

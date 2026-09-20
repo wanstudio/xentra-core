@@ -380,7 +380,18 @@ class PromotionRepository {
       for (let i = 0; i < rewards.length; i++) {
         const rw = rewards[i];
         const rewId = rw.id || `rew_${promotionId}_${i + 1}`;
-        const presStr = typeof rw.presentation_payload === 'object' ? JSON.stringify(rw.presentation_payload) : (rw.presentation_payload || null);
+        let presStr = null;
+        if (rw.presentation_payload !== undefined) {
+          presStr = typeof rw.presentation_payload === 'object' ? JSON.stringify(rw.presentation_payload) : (rw.presentation_payload || null);
+        } else {
+          // Preserve existing presentation_payload for this reward if it existed
+          const existingRw = (existing.rewards || []).find(r => r.id === rewId || r.target_product_id === rw.target_product_id);
+          if (existingRw && existingRw.presentation_payload) {
+            presStr = typeof existingRw.presentation_payload === 'object'
+              ? JSON.stringify(existingRw.presentation_payload)
+              : existingRw.presentation_payload;
+          }
+        }
         this.db.execute(`
           INSERT INTO promotion_rewards (
             id, promotion_id, reward_type, target_product_id, amount_in_cents, max_discount_in_cents, presentation_payload, created_at
@@ -412,6 +423,43 @@ class PromotionRepository {
         });
       }
     }
+
+    return this.findPromotionById(promotionId);
+  }
+
+  updatePresentationPayload(promotionId, brandId, presentationUpdates = {}) {
+    const promo = this.findPromotionById(promotionId);
+    if (!promo || promo.brand_id !== brandId) return null;
+
+    const rewards = this.findRewards(promotionId);
+    if (!rewards.length) return null;
+
+    const primaryReward = rewards[0];
+    let currentPresentation = {};
+    if (primaryReward.presentation_payload) {
+      try {
+        currentPresentation = typeof primaryReward.presentation_payload === 'string'
+          ? JSON.parse(primaryReward.presentation_payload)
+          : primaryReward.presentation_payload;
+      } catch (_) {}
+    }
+
+    const mergedPresentation = {
+      ...currentPresentation,
+      ...presentationUpdates
+    };
+
+    this.db.execute(`
+      UPDATE promotion_rewards
+      SET presentation_payload = ?
+      WHERE id = ?
+    `, [JSON.stringify(mergedPresentation), primaryReward.id]);
+
+    this.db.execute(`
+      UPDATE promotions
+      SET updated_at = datetime('now')
+      WHERE id = ? AND brand_id = ?
+    `, [promotionId, brandId]);
 
     return this.findPromotionById(promotionId);
   }

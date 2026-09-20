@@ -9225,12 +9225,131 @@
     var cap = $('mkt-promo-capability').value;
     var nameEl = $('mkt-promo-name');
     var codeEl = $('mkt-promo-code');
+    var presBox = $('mkt-promo-presentation-box');
+    if (presBox) {
+      presBox.style.display = cap === 'install_incentive' ? 'block' : 'none';
+    }
     if (cap === 'install_incentive' && (!nameEl.value || nameEl.value.indexOf('Hadiah') !== -1)) {
       if (!nameEl.value) nameEl.value = 'Hadiah Instalasi Aplikasi PWA';
       if (!codeEl.value) codeEl.value = 'PWABANGJO';
     }
   }
   window.onPromotionCapabilityChange = onPromotionCapabilityChange;
+
+  function updatePromotionPresentationPreview() {
+    var titleInput = $('mkt-promo-banner-title');
+    var subtitleInput = $('mkt-promo-banner-subtitle');
+    var iconUrlInput = $('mkt-promo-icon-url');
+
+    var title = (titleInput && titleInput.value.trim()) || 'Install sekarang & dapatkan promo spesial';
+    var subtitle = (subtitleInput && subtitleInput.value.trim()) || 'Gratis untuk pesanan pertama • S&K berlaku';
+    var iconUrl = (iconUrlInput && iconUrlInput.value.trim()) || '/assets/pwa/icon-192.png';
+
+    var liveTitle = $('mkt-promo-live-title');
+    var liveSubtitle = $('mkt-promo-live-subtitle');
+    var liveIcon = $('mkt-promo-live-icon');
+    var previewIcon = $('mkt-promo-icon-preview');
+
+    if (liveTitle) liveTitle.textContent = title;
+    if (liveSubtitle) liveSubtitle.textContent = subtitle;
+    if (liveIcon) liveIcon.src = iconUrl;
+    if (previewIcon) previewIcon.src = iconUrl;
+  }
+  window.updatePromotionPresentationPreview = updatePromotionPresentationPreview;
+
+  function resetPromotionIconToDefault() {
+    var mediaIdInput = $('mkt-promo-media-id');
+    var iconUrlInput = $('mkt-promo-icon-url');
+    var statusEl = $('mkt-promo-icon-status');
+
+    if (mediaIdInput) mediaIdInput.value = '';
+    if (iconUrlInput) iconUrlInput.value = '/assets/pwa/icon-192.png';
+    if (statusEl) {
+      statusEl.textContent = 'Menggunakan icon default sistem (/assets/pwa/icon-192.png).';
+      statusEl.style.color = 'var(--text-muted)';
+    }
+    updatePromotionPresentationPreview();
+  }
+  window.resetPromotionIconToDefault = resetPromotionIconToDefault;
+
+  async function onPromotionIconFileSelected(file) {
+    if (!file) return;
+    var statusEl = $('mkt-promo-icon-status');
+    var mediaIdInput = $('mkt-promo-media-id');
+    var iconUrlInput = $('mkt-promo-icon-url');
+
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('Ukuran file maksimal 10 MB.');
+      return;
+    }
+
+    try {
+      if (statusEl) {
+        statusEl.textContent = 'Mengunggah & memproses aset media...';
+        statusEl.style.color = '#3b82f6';
+      }
+
+      // Convert to base64
+      var base64 = await new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // 1. Stage upload via /admin/media/upload
+      var uploadRes = await adminFetch(API_BASE + '/admin/media/upload', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          image_base64: base64,
+          mime_type: file.type,
+          original_filename: file.name,
+          asset_type: 'general',
+          enforce_aspect_ratio: false
+        })
+      });
+
+      var uploadJson = await uploadRes.json();
+      if (!uploadRes.ok || !uploadJson.success || !uploadJson.asset) {
+        throw new Error(uploadJson.error || 'Upload media icon gagal.');
+      }
+
+      var mediaId = uploadJson.asset.media_id || uploadJson.asset.id;
+
+      // 2. Process to ready state via /admin/media/:id/process
+      var procRes = await adminFetch(API_BASE + '/admin/media/' + encodeURIComponent(mediaId) + '/process', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ crop_spec: null })
+      });
+
+      var procJson = await procRes.json();
+      if (!procRes.ok || !procJson.success || !procJson.asset) {
+        throw new Error(procJson.error || 'Proses media icon gagal.');
+      }
+
+      var processedAsset = procJson.asset;
+      if (mediaIdInput) mediaIdInput.value = processedAsset.media_id || processedAsset.id;
+      if (iconUrlInput) iconUrlInput.value = processedAsset.url;
+
+      if (statusEl) {
+        statusEl.textContent = '✓ Icon media berhasil diunggah dan siap digunakan.';
+        statusEl.style.color = '#16a34a';
+      }
+
+      updatePromotionPresentationPreview();
+      showToast('Icon promosi berhasil diunggah.');
+    } catch (err) {
+      console.error('[Promotion Icon Upload Error]:', err);
+      if (statusEl) {
+        statusEl.textContent = 'Gagal mengunggah icon: ' + err.message;
+        statusEl.style.color = '#ef4444';
+      }
+      showToast(err.message || 'Gagal memproses file icon.');
+    }
+  }
+  window.onPromotionIconFileSelected = onPromotionIconFileSelected;
 
   function formatDateTimeLocal(isoStr) {
     if (!isoStr) return '';
@@ -9268,12 +9387,23 @@
     $('mkt-promo-reward-type').value = 'freebie_product';
     if ($('mkt-promo-branches-all')) $('mkt-promo-branches-all').checked = true;
 
+    // Reset Presentation inputs
+    if ($('mkt-promo-banner-title')) $('mkt-promo-banner-title').value = '';
+    if ($('mkt-promo-banner-subtitle')) $('mkt-promo-banner-subtitle').value = '';
+    if ($('mkt-promo-media-id')) $('mkt-promo-media-id').value = '';
+    if ($('mkt-promo-icon-url')) $('mkt-promo-icon-url').value = '/assets/pwa/icon-192.png';
+    if ($('mkt-promo-icon-status')) {
+      $('mkt-promo-icon-status').textContent = 'Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1 disarankan).';
+      $('mkt-promo-icon-status').style.color = 'var(--text-muted)';
+    }
+
     modal.style.display = 'flex';
 
     await ensureMarketingDependenciesLoaded();
     renderPromoProductOptions(null);
     renderPromoBranchCheckboxes(null); // default all selected
     onPromotionCapabilityChange();
+    updatePromotionPresentationPreview();
   }
   window.openCreatePromotionModal = openCreatePromotionModal;
 
@@ -9306,9 +9436,35 @@
     if ($('mkt-promo-end-at')) $('mkt-promo-end-at').value = formatDateTimeLocal(promo.end_at);
 
     var targetProdId = null;
+    var presPayload = {};
     if (Array.isArray(promo.rewards) && promo.rewards.length > 0) {
-      targetProdId = promo.rewards[0].target_product_id;
-      $('mkt-promo-reward-type').value = promo.rewards[0].reward_type || 'freebie_product';
+      var primaryReward = promo.rewards[0];
+      targetProdId = primaryReward.target_product_id;
+      $('mkt-promo-reward-type').value = primaryReward.reward_type || 'freebie_product';
+      if (primaryReward.presentation) {
+        presPayload = primaryReward.presentation;
+      } else if (primaryReward.presentation_payload) {
+        try {
+          presPayload = typeof primaryReward.presentation_payload === 'string'
+            ? JSON.parse(primaryReward.presentation_payload)
+            : primaryReward.presentation_payload;
+        } catch (_) {}
+      }
+    }
+
+    // Populate Presentation fields
+    if ($('mkt-promo-banner-title')) $('mkt-promo-banner-title').value = presPayload.banner_title || '';
+    if ($('mkt-promo-banner-subtitle')) $('mkt-promo-banner-subtitle').value = presPayload.banner_subtitle || '';
+    if ($('mkt-promo-media-id')) $('mkt-promo-media-id').value = presPayload.media_id || '';
+    if ($('mkt-promo-icon-url')) $('mkt-promo-icon-url').value = presPayload.icon_url || '/assets/pwa/icon-192.png';
+    if ($('mkt-promo-icon-status')) {
+      if (presPayload.media_id) {
+        $('mkt-promo-icon-status').textContent = '✓ Menggunakan media kustom (ID: ' + presPayload.media_id + ')';
+        $('mkt-promo-icon-status').style.color = '#16a34a';
+      } else {
+        $('mkt-promo-icon-status').textContent = 'Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1 disarankan).';
+        $('mkt-promo-icon-status').style.color = 'var(--text-muted)';
+      }
     }
 
     var selectedBranchIds = [];
@@ -9321,6 +9477,8 @@
     await ensureMarketingDependenciesLoaded();
     renderPromoProductOptions(targetProdId);
     renderPromoBranchCheckboxes(selectedBranchIds.length ? selectedBranchIds : null);
+    onPromotionCapabilityChange();
+    updatePromotionPresentationPreview();
   }
   window.openEditPromotionModal = openEditPromotionModal;
 
@@ -9386,10 +9544,26 @@
       });
     }
 
+    // Build presentation payload
+    var bannerTitle = $('mkt-promo-banner-title') ? $('mkt-promo-banner-title').value.trim() : '';
+    var bannerSubtitle = $('mkt-promo-banner-subtitle') ? $('mkt-promo-banner-subtitle').value.trim() : '';
+    var mediaId = $('mkt-promo-media-id') ? $('mkt-promo-media-id').value.trim() : '';
+    var iconUrl = $('mkt-promo-icon-url') ? $('mkt-promo-icon-url').value.trim() : '';
+
+    var presentationPayload = {
+      banner_title: bannerTitle || 'Install sekarang & dapatkan promo spesial',
+      banner_subtitle: bannerSubtitle || 'Gratis untuk pesanan pertama • S&K berlaku',
+      reward_title: 'Selamat! Hadiah spesial untuk pesanan pertamamu!',
+      reward_badge_text: '✓ Bonus PWA Aktif (Rp0)',
+      media_id: mediaId || null,
+      icon_url: iconUrl || '/assets/pwa/icon-192.png'
+    };
+
     var rewards = [{
       reward_type: rewardType,
       target_product_id: targetProductId,
-      amount_in_cents: 0
+      amount_in_cents: 0,
+      presentation_payload: presentationPayload
     }];
 
     var payload = {

@@ -172,6 +172,29 @@ class MediaReferenceResolver {
       }
     } catch (_) {}
 
+    // 7. Check Promotion Rewards table (presentation_payload containing media_id or icon_url)
+    try {
+      let promoSql = `
+        SELECT pr.id, pr.promotion_id, p.brand_id, pr.presentation_payload
+        FROM promotion_rewards pr
+        JOIN promotions p ON pr.promotion_id = p.id
+        WHERE pr.presentation_payload LIKE ?
+      `;
+      const promoParams = [mediaIdPattern];
+      if (brandId) {
+        promoSql += ' AND p.brand_id = ?';
+        promoParams.push(brandId);
+      }
+      const promoRewards = this.db.queryMany(promoSql, promoParams);
+      for (const pr of promoRewards) {
+        references.push({
+          type: 'promotion_reward_presentation',
+          id: pr.id,
+          field: 'presentation_payload'
+        });
+      }
+    } catch (_) {}
+
 
     return {
       isReferenced: references.length > 0,

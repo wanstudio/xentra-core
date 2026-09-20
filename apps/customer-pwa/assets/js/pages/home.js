@@ -160,8 +160,16 @@
         }
 
         var display = promo.display;
+        var iconEl = banner.querySelector('.x-pwa-banner-icon');
         if (titleEl) titleEl.textContent = display.banner_title || 'Install & dapatkan promo spesial';
         if (subtitleEl) subtitleEl.textContent = display.banner_subtitle || 'Gratis untuk pesanan pertama • S&K berlaku';
+        if (iconEl) {
+          iconEl.src = display.icon_url || '/assets/pwa/icon-192.png';
+          iconEl.onerror = function () {
+            this.onerror = null;
+            this.src = '/assets/pwa/icon-192.png';
+          };
+        }
         if (installBtn) installBtn.textContent = 'Install';
 
         banner.classList.add('x-pwa-banner-show');

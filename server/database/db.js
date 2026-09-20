@@ -2392,7 +2392,7 @@ function seedInstallPromotion(targetDb, brandId) {
       '{"banner_title":"Install sekarang & dapatkan gratis es teh","banner_subtitle":"syarat & ketentuan berlaku","reward_title":"Selamat! Es Teh Gratis untuk pesanan pertamamu!","reward_badge_text":"✓ Bonus PWA Aktif (Rp0)","icon_url":"/assets/img/iced-tea.png"}')
     ON CONFLICT(id) DO UPDATE SET
       target_product_id = excluded.target_product_id,
-      presentation_payload = excluded.presentation_payload
+      presentation_payload = COALESCE(promotion_rewards.presentation_payload, excluded.presentation_payload)
   `).run(targetRewardProductId);
 
   try {

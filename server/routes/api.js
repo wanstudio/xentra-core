@@ -10000,10 +10000,35 @@ router.get('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager',
     const isBM = req.user.role === 'branch_manager';
     const effectiveBranchId = isBM ? (req.user.branch_id || req.user.branchId) : null;
     const promotions = corePromotionRepo.findAllPromotions(req.brand_id, effectiveBranchId);
+    const enrichedPromotions = promotions.map(p => {
+      const rewards = (p.rewards || []).map(r => {
+        let pres = {};
+        if (r.presentation_payload) {
+          try {
+            pres = typeof r.presentation_payload === 'string'
+              ? JSON.parse(r.presentation_payload)
+              : r.presentation_payload;
+          } catch (_) {}
+        }
+        let delivery = null;
+        if (pres.media_id) {
+          delivery = bannerMediaDelivery(req.brand_id, pres.media_id);
+        }
+        return {
+          ...r,
+          presentation: pres,
+          presentation_delivery: delivery
+        };
+      });
+      return {
+        ...p,
+        rewards
+      };
+    });
     res.json({
       success: true,
-      promotions,
-      total: promotions.length
+      promotions: enrichedPromotions,
+      total: enrichedPromotions.length
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -10668,9 +10693,147 @@ router.put('/admin/marketing/promotions/:id', requireAuth(['owner', 'brand_manag
       }
     });
 
+    const enrichedUpdated = {
+      ...updated,
+      rewards: (updated.rewards || []).map(r => {
+        let pres = {};
+        if (r.presentation_payload) {
+          try {
+            pres = typeof r.presentation_payload === 'string'
+              ? JSON.parse(r.presentation_payload)
+              : r.presentation_payload;
+          } catch (_) {}
+        }
+        let delivery = null;
+        if (pres.media_id) {
+          delivery = bannerMediaDelivery(req.brand_id, pres.media_id);
+        }
+        return {
+          ...r,
+          presentation: pres,
+          presentation_delivery: delivery
+        };
+      })
+    };
+
     res.json({
       success: true,
-      promotion: updated
+      promotion: enrichedUpdated
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6.02b Update Promotion Presentation Payload specifically (Owner / Brand Manager)
+router.patch('/admin/marketing/promotions/:id/presentation', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const promotionId = req.params.id;
+    const existing = corePromotionRepo.findPromotion(promotionId);
+    if (!existing || existing.brand_id !== req.brand_id) {
+      return res.status(404).json({ success: false, error: 'Promosi tidak ditemukan.' });
+    }
+
+    const {
+      banner_title,
+      banner_subtitle,
+      reward_title,
+      reward_badge_text,
+      media_id,
+      icon_url
+    } = req.body || {};
+
+    const presentationUpdates = {};
+
+    if (banner_title !== undefined) {
+      presentationUpdates.banner_title = typeof banner_title === 'string' ? banner_title.trim() : '';
+    }
+    if (banner_subtitle !== undefined) {
+      presentationUpdates.banner_subtitle = typeof banner_subtitle === 'string' ? banner_subtitle.trim() : '';
+    }
+    if (reward_title !== undefined) {
+      presentationUpdates.reward_title = typeof reward_title === 'string' ? reward_title.trim() : '';
+    }
+    if (reward_badge_text !== undefined) {
+      presentationUpdates.reward_badge_text = typeof reward_badge_text === 'string' ? reward_badge_text.trim() : '';
+    }
+
+    // Media verification if media_id is provided
+    if (media_id !== undefined) {
+      if (media_id) {
+        let asset = null;
+        try {
+          asset = mediaService.getMedia({ mediaId: media_id, brandId: req.brand_id });
+        } catch (mediaErr) {
+          const status = mediaErr.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+          return res.status(status).json({
+            success: false,
+            error: mediaErr.message || 'Aset media tidak valid.',
+            code: mediaErr.code || 'MEDIA_ERROR'
+          });
+        }
+
+        if (asset.status !== 'ready') {
+          return res.status(400).json({
+            success: false,
+            error: 'Aset media belum selesai diproses (status harus READY).',
+            code: 'MEDIA_NOT_READY'
+          });
+        }
+
+        presentationUpdates.media_id = media_id;
+        presentationUpdates.icon_url = asset.url;
+      } else {
+        presentationUpdates.media_id = null;
+        presentationUpdates.icon_url = icon_url || null;
+      }
+    } else if (icon_url !== undefined) {
+      presentationUpdates.icon_url = icon_url;
+    }
+
+    const updated = corePromotionRepo.updatePresentationPayload(promotionId, req.brand_id, presentationUpdates);
+    if (!updated) {
+      return res.status(404).json({ success: false, error: 'Gagal memperbarui presentasi promosi.' });
+    }
+
+    logPromotionSecurityEvent({
+      actor_id: req.user?.id || req.session?.userId,
+      actor_role: req.user?.role,
+      action: 'PROMOTION_PRESENTATION_UPDATED',
+      brand_id: req.brand_id,
+      result: 'SUCCESS',
+      metadata: {
+        promotion_id: promotionId,
+        presentation_keys: Object.keys(presentationUpdates)
+      }
+    });
+
+    const enrichedUpdated = {
+      ...updated,
+      rewards: (updated.rewards || []).map(r => {
+        let pres = {};
+        if (r.presentation_payload) {
+          try {
+            pres = typeof r.presentation_payload === 'string'
+              ? JSON.parse(r.presentation_payload)
+              : r.presentation_payload;
+          } catch (_) {}
+        }
+        let delivery = null;
+        if (pres.media_id) {
+          delivery = bannerMediaDelivery(req.brand_id, pres.media_id);
+        }
+        return {
+          ...r,
+          presentation: pres,
+          presentation_delivery: delivery
+        };
+      })
+    };
+
+    res.json({
+      success: true,
+      promotion: enrichedUpdated
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
