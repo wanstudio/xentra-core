@@ -294,27 +294,22 @@
           .then(function (res) {
             if (res && res.success && res.broker_url) {
               // Save current hash so we can restore it after auth
-              try { sessionStorage.setItem('xnt_auth_return_hash', window.location.hash || '#home'); } catch (_) {}
+              try { sessionStorage.setItem('xnt_auth_return_hash', '#profile'); } catch (_) {}
               window.location.href = res.broker_url;
             } else {
               loginBtn.disabled = false;
               loginBtn.innerHTML = originalHtml;
-              // Fallback to checkout auth sheet if broker not configured
-              if (typeof window.openCustomerAuthSheet === 'function') {
-                window.openCustomerAuthSheet(function () { mountProfile(container); });
-              } else {
-                if (UI && UI.toast) UI.toast((res && res.error) || 'Gagal menginisialisasi Google Sign-In.');
-              }
+              var errMsg = (res && (res.error || res.message)) || 'Gagal menginisialisasi Google Sign-In. Silakan coba lagi.';
+              if (UI && UI.toast) UI.toast(errMsg);
             }
           })
-          .catch(function () {
+          .catch(function (err) {
             loginBtn.disabled = false;
             loginBtn.innerHTML = originalHtml;
-            if (typeof window.openCustomerAuthSheet === 'function') {
-              window.openCustomerAuthSheet(function () { mountProfile(container); });
-            } else {
-              if (UI && UI.toast) UI.toast('Gagal menghubungi server. Periksa koneksi internet.');
-            }
+            var msg = (err && err.data && (err.data.error || err.data.message)) ||
+                      (err && err.message) ||
+                      'Gagal menghubungi server. Periksa koneksi internet lalu coba lagi.';
+            if (UI && UI.toast) UI.toast(msg);
           });
       };
     }

@@ -263,29 +263,9 @@ app.get('/debug', (req, res) => {
 });
 
 // Customer PWA Routes
-// R3: /checkout injects GOOGLE_CLIENT_ID into the x-google-client-id meta tag so that
-// checkout.js can initialize the Google GSI library without hardcoding the client ID.
 app.get(['/checkout', '/checkout/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  const checkoutHtmlPath = path.join(__dirname, '../apps/customer-pwa/checkout.html');
-  const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
-  if (!googleClientId) {
-    // No client ID configured — serve as-is; the gate will show an error if the user tries to auth
-    return res.sendFile(checkoutHtmlPath);
-  }
-  const fs = require('fs');
-  fs.readFile(checkoutHtmlPath, 'utf8', (err, html) => {
-    if (err) {
-      return res.sendFile(checkoutHtmlPath);
-    }
-    // Replace the placeholder meta tag content with the actual Google Client ID
-    const injected = html.replace(
-      '<meta name="x-google-client-id" content="">',
-      `<meta name="x-google-client-id" content="${googleClientId}">`
-    );
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(injected);
-  });
+  res.sendFile(path.join(__dirname, '../apps/customer-pwa/checkout.html'));
 });
 app.get(['/order-received', '/order-received/:id', '/order-received/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -304,28 +284,13 @@ app.get('*', (req, res) => {
 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   const pwaIndex = path.join(__dirname, '../apps/customer-pwa/index.html');
-  const googleClientId = process.env.GOOGLE_CLIENT_ID || '';
-  if (!googleClientId) {
-    return res.sendFile(pwaIndex, (err) => {
-      if (err) {
-        res.json({
-          system: 'Xentra Core Standalone Engine v2.2.7',
-          message: 'Customer PWA is initializing. API is ready at /api/v1'
-        });
-      }
-    });
-  }
-  const fs = require('fs');
-  fs.readFile(pwaIndex, 'utf8', (err, html) => {
+  res.sendFile(pwaIndex, (err) => {
     if (err) {
-      return res.sendFile(pwaIndex);
+      res.json({
+        system: 'Xentra Core Standalone Engine v2.2.7',
+        message: 'Customer PWA is initializing. API is ready at /api/v1'
+      });
     }
-    const injected = html.replace(
-      '<meta name="x-google-client-id" content="">',
-      `<meta name="x-google-client-id" content="${googleClientId}">`
-    );
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(injected);
   });
 });
 

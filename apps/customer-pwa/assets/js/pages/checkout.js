@@ -427,6 +427,20 @@
     syncRowsFromItems(getCheckoutItems());
     loadUpsell();
     quoteNow();
+
+    // Automatic retry checkout submission after successful auth broker return
+    if (state.customer.isVerified) {
+      var autoRetry = false;
+      try {
+        autoRetry = sessionStorage.getItem('xnt_auth_auto_retry_checkout') === '1';
+        if (autoRetry) sessionStorage.removeItem('xnt_auth_auto_retry_checkout');
+      } catch (_) {}
+      if (autoRetry) {
+        setTimeout(function () {
+          executePrePaymentAndSubmit();
+        }, 300);
+      }
+    }
   }
 
   function loadBranches() {
@@ -2133,28 +2147,26 @@
       };
     }
   }
-  // ── 2. Customer Auth — Google Identity Gate ──
-  // R3: Google is the primary Customer authentication method.
-  // OTP infrastructure (renderOtpPhoneStep / renderOtpVerifyStep) is preserved
-  // below for recovery / future step-up auth flows, but is NOT called from the
-  // normal checkout gate.
+  // ── 2. Customer Auth — Centralized Google Auth Broker ──
+  // Google is the primary Customer authentication method.
+  // The Customer PWA never loads or initializes Google GSI SDK directly.
+  // Instead, auth is delegated to the centralized broker at xentra.cloud.
   //
   // Flow:
   //   openCustomerAuthSheet(onSuccess)
   //     → renders lightweight Google sign-in sheet
-  //     → customer clicks "Lanjutkan dengan Google"
-  //     → Google GSI prompt opens (or One Tap)
-  //     → credential callback: google.accounts.id.initialize handler
-  //     → POST /customer/auth/google { credential }
-  //     → server verifies Google token → issues xnt_cust_ session
+  //     → customer clicks "Lanjutkan dengan Google" (or presses Enter)
+  //     → POST /customer/auth/broker/init
+  //     → browser redirects to https://xentra.cloud/auth/broker?mode=customer...
+  //     → broker initializes Google GSI and verifies credential with backend
+  //     → redirect back to customer tenant with ?customer_code=xnt_chdf_*
+  //     → index.html exchanges code via /customer/auth/broker/exchange → xnt_cust_ session
   //     → Store.setCustomerSession({ name, token })
-  //     → sh.close()
-  //     → onSuccess()
+  //     → returns to checkout and auto-resumes order submission
   //
   // Safety invariants:
   //   - Auth failure → STOP. Button re-enabled. NO order created.
-  //   - Google popup close / cancel → sheet stays open or re-enables. NO order.
-  //   - Google ID token is NEVER stored as customerSession.token.
+  //   - Sheet cancel / close → returns to checkout. NO order created.
   //   - Double-click protected by inFlight flag.
   //   - Enter key follows same path as CTA click.
   var _googleAuthInFlight = false;
@@ -2171,6 +2183,9 @@
       return;
     }
     _googleAuthInFlight = false;
+    if (typeof onSuccess === 'function') {
+      try { sessionStorage.setItem('xnt_auth_auto_retry_checkout', '1'); } catch (_) {}
+    }
     renderGoogleIdentityGate(onSuccess);
   }
 
@@ -2200,6 +2215,7 @@
       closeBtn.onclick = function () {
         // Cancel → return to checkout. No order created.
         _googleAuthInFlight = false;
+        try { sessionStorage.removeItem('xnt_auth_auto_retry_checkout'); } catch (_) {}
         sh.close();
       };
     }
@@ -2218,70 +2234,6 @@
         errorEl.style.display = 'block';
       }
       if (UI && UI.toast) UI.toast(msg || 'Autentikasi Google gagal. Silakan coba lagi.');
-    }
-
-    // Handle the Google credential callback
-    function handleGoogleCredential(response) {
-      if (_googleAuthInFlight) return; // double-submit guard
-      if (!response || !response.credential) {
-        showGateError('Google tidak mengembalikan credential. Silakan coba lagi.');
-        return;
-      }
-      _googleAuthInFlight = true;
-      if (googleBtn) {
-        googleBtn.disabled = true;
-        googleBtn.textContent = 'Memverifikasi…';
-      }
-      if (errorEl) errorEl.style.display = 'none';
-
-      // Exchange Google credential for Xentra customer session.
-      // The Google token is NEVER stored directly — it is exchanged server-side.
-      API.post('/customer/auth/google', { credential: response.credential })
-        .then(function (res) {
-          if (res && res.success && res.token) {
-            var customerName = (res.customer && res.customer.name) || state.customer.name || 'Pelanggan';
-            var customerEmail = (res.customer && res.customer.email) || '';
-            var customerId = (res.customer && res.customer.id) || '';
-
-            // Store Xentra customer session (xnt_cust_ token), NOT the Google credential
-            Store.setCustomerSession({
-              name: customerName,
-              phone: customerEmail,   // phone field carries Google email for contact/display fallback
-              email: customerEmail,
-              customerId: customerId,
-              customer_id: customerId,
-              token: res.token
-            });
-
-            state.customer.name = customerName;
-            state.customer.isVerified = true;
-
-            _googleAuthInFlight = false;
-            sh.close();
-
-            // Re-render to reflect authenticated state
-            renderLayout();
-            calculateTotals();
-
-            if (UI && UI.toast) UI.toast('Berhasil masuk dengan Google!');
-
-            // Invoke caller's success callback (typically re-triggers checkout submission)
-            if (typeof onSuccess === 'function') {
-              try { onSuccess(); } catch (e) { console.error('[Google Auth Callback]', e); }
-            }
-          } else {
-            // Backend returned a non-success body — fail closed
-            var errMsg = (res && (res.error || res.message)) || 'Autentikasi Google gagal. Coba lagi.';
-            showGateError(errMsg);
-          }
-        })
-        .catch(function (err) {
-          // Network/server error — fail closed. NO order created.
-          var msg = (err && err.data && (err.data.error || err.data.message)) ||
-                    (err && err.message) ||
-                    'Gagal menghubungi server. Periksa koneksi lalu coba lagi.';
-          showGateError(msg);
-        });
     }
 
     // Attach click handler — also serves as the Enter-key equivalent (button is focusable)
@@ -3339,6 +3291,18 @@
         state.customer.isVerified = false;
       }
       renderLayout();
+      if (state.customer.isVerified) {
+        var autoRetrySub = false;
+        try {
+          autoRetrySub = sessionStorage.getItem('xnt_auth_auto_retry_checkout') === '1';
+          if (autoRetrySub) sessionStorage.removeItem('xnt_auth_auto_retry_checkout');
+        } catch (_) {}
+        if (autoRetrySub) {
+          setTimeout(function () {
+            executePrePaymentAndSubmit();
+          }, 300);
+        }
+      }
       return;
     }
 

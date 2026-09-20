@@ -505,6 +505,71 @@ test('CBAUTH-17: Source code does not call google.accounts.id.initialize directl
   );
 });
 
+// CBAUTH-18: Architecture contract — Customer PWA zero direct GSI
+test('CBAUTH-18: Customer PWA has ZERO direct Google GSI SDK, meta client-id, or /customer/auth/google calls', async () => {
+  const fs = require('fs');
+  const path = require('path');
+
+  const customerFiles = [
+    path.join(__dirname, '../../apps/customer-pwa/index.html'),
+    path.join(__dirname, '../../apps/customer-pwa/checkout.html'),
+    path.join(__dirname, '../../apps/customer-pwa/assets/js/pages/checkout.js'),
+    path.join(__dirname, '../../apps/customer-pwa/assets/js/pages/aux-pages.js')
+  ];
+
+  const prohibitedPatterns = [
+    'accounts.google.com/gsi/client',
+    'google.accounts.id.initialize',
+    'google.accounts.id.renderButton',
+    'google.accounts.id.prompt',
+    'x-google-client-id',
+    'XentraConfig.googleClientId',
+    '/customer/auth/google'
+  ];
+
+  for (const filePath of customerFiles) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    for (const pattern of prohibitedPatterns) {
+      assert.ok(
+        !content.includes(pattern),
+        `Customer PWA file ${path.basename(filePath)} must NOT contain "${pattern}"`
+      );
+    }
+  }
+});
+
+// CBAUTH-19: Architecture contract — Google GSI ONLY initialized in centralized auth broker
+test('CBAUTH-19: Centralized broker handles Google GSI initialization and customer mode delegation', async () => {
+  const fs = require('fs');
+  const path = require('path');
+
+  const brokerHtml = fs.readFileSync(
+    path.join(__dirname, '../../apps/merchant-dashboard/auth-broker.html'),
+    'utf8'
+  );
+
+  assert.ok(
+    brokerHtml.includes('accounts.google.com/gsi/client'),
+    'auth-broker.html must load Google GSI SDK'
+  );
+  assert.ok(
+    brokerHtml.includes('google.accounts.id.initialize'),
+    'auth-broker.html must initialize Google GSI'
+  );
+  assert.ok(
+    brokerHtml.includes('/api/v1/auth/config'),
+    'auth-broker.html must fetch client ID from /api/v1/auth/config'
+  );
+  assert.ok(
+    brokerHtml.includes('isCustomerMode'),
+    'auth-broker.html must support customer mode'
+  );
+  assert.ok(
+    brokerHtml.includes('/api/v1/customer/auth/broker/google'),
+    'auth-broker.html must send customer credentials to /api/v1/customer/auth/broker/google'
+  );
+});
+
 test('Teardown: close server', async () => {
   if (server) await new Promise((resolve) => server.close(resolve));
 });
