@@ -64,12 +64,20 @@
     deliveryQuote: null,
     paymentMethod: null,
     cashTendered: null,
+    cashTenderedType: null,
     isSubmitting: false
   };
 
   // ── Helper formatters ──
   function $(id) { return document.getElementById(id); }
-  function fmtIDR(n) { return (Number(n) || 0).toLocaleString('id-ID'); }
+  function fmtIDR(n) {
+    if (UI && typeof UI.formatNumber === 'function') {
+      return UI.formatNumber(n);
+    }
+    var num = Math.floor(Number(n) || 0);
+    var formatted = String(Math.abs(num)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (num < 0 ? '-' : '') + formatted;
+  }
 
   // ── PWA Install Detection Logic ──
   // PwaRuntime (core/pwa-runtime.js) is the single source of truth for the
@@ -1266,6 +1274,7 @@
       optOn.onclick = function () {
         state.paymentMethod = 'midtrans';
         state.cashTendered = null;
+        state.cashTenderedType = null;
         renderLayout();
         syncPayVisual();
       };
@@ -2681,16 +2690,20 @@
 
   // ── 5b. COD Cash Tender Selection Sheet ──
   function openCashTenderSheet() {
-    var selectedType = '100k';
+    var selectedType = state.cashTenderedType || '100k';
     var customValue = '';
 
-    if (state.cashTendered === 50000) {
-      selectedType = '50k';
-    } else if (state.cashTendered === 100000) {
-      selectedType = '100k';
-    } else if (state.cashTendered != null && Number(state.cashTendered) > 0) {
-      selectedType = 'custom';
+    if (state.cashTendered != null && Number(state.cashTendered) > 0) {
       customValue = String(Math.floor(Number(state.cashTendered)));
+      if (!state.cashTenderedType) {
+        if (state.cashTendered === 50000) {
+          selectedType = '50k';
+        } else if (state.cashTendered === 100000) {
+          selectedType = '100k';
+        } else {
+          selectedType = 'custom';
+        }
+      }
     }
 
     var initialDisplayVal = (customValue && Number(customValue) > 0) ? fmtIDR(customValue) : '';
@@ -2786,6 +2799,28 @@
       elCustomInput.onclick = function () {
         selectCustom();
       };
+
+      // Seamless backspace navigation across dot separators
+      elCustomInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Backspace' && elCustomInput.selectionStart === elCustomInput.selectionEnd) {
+          var pos = elCustomInput.selectionStart;
+          var val = elCustomInput.value;
+          if (pos > 1 && val.charAt(pos - 1) === '.') {
+            e.preventDefault();
+            var newVal = val.slice(0, pos - 2) + val.slice(pos);
+            elCustomInput.value = newVal;
+            elCustomInput.setSelectionRange(pos - 2, pos - 2);
+            elCustomInput.dispatchEvent(new Event('input'));
+          }
+        }
+      });
+
+      elCustomInput.addEventListener('paste', function () {
+        setTimeout(function () {
+          if (elCustomInput) elCustomInput.dispatchEvent(new Event('input'));
+        }, 0);
+      });
+
       elCustomInput.oninput = function () {
         selectCustom();
         var rawVal = elCustomInput.value || '';
@@ -2855,6 +2890,7 @@
 
         state.paymentMethod = 'cash';
         state.cashTendered = tendered;
+        state.cashTenderedType = selectedType;
 
         sh.close();
         renderLayout();

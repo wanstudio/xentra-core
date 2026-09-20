@@ -6,13 +6,25 @@
   'use strict';
 
   /**
-   * Format number as Indonesian Rupiah.
+   * Format number as Indonesian Rupiah with deterministic dot separator.
    * money(25000)  → "Rp25.000"
    * money(0)      → "Rp0"
    */
   function money(val) {
-    var n = Number(val) || 0;
-    return 'Rp' + n.toLocaleString('id-ID');
+    var n = Math.floor(Number(val) || 0);
+    var str = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (n < 0 ? '-Rp' : 'Rp') + str;
+  }
+
+  /**
+   * Format number with Indonesian dot thousands separator.
+   * formatNumber(50000)   → "50.000"
+   * formatNumber(1500000) → "1.500.000"
+   */
+  function formatNumber(val) {
+    var n = Math.floor(Number(val) || 0);
+    var str = String(Math.abs(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return (n < 0 ? '-' : '') + str;
   }
 
   /**
@@ -123,6 +135,8 @@
   window.Xentra = window.Xentra || {};
   window.Xentra.UI = {
     money: money,
+    formatNumber: formatNumber,
+    formatRupiah: money,
     escape: escape,
     toast: toast,
     debounce: debounce,
