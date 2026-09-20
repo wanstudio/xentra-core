@@ -24,6 +24,15 @@
           }
         }
       } catch (_) {}
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__xentra_deferred_prompt = e;
+        try {
+          window.dispatchEvent(new CustomEvent('xentra:pwa-prompt-ready', { detail: e }));
+          document.dispatchEvent(new CustomEvent('xentra:pwa-prompt-ready', { detail: e }));
+        } catch (_) {}
+      });
     })();
   </script>
 

@@ -66,45 +66,80 @@
     var banner = $('x-pwa-banner');
     if (!banner) return;
 
-    // Users whose promotion install requirement is satisfied (VERIFIED install:
-    // appinstalled / standalone marker, never mere prompt acceptance) must not
-    // see the acquisition banner. The marker is UI-only; entitlement and
-    // redemption stay authoritative on the server.
-    var requirementSatisfied = false;
-    try {
-      var pwaCtx = (window.Xentra && window.Xentra.PwaRuntime && window.Xentra.PwaRuntime.getPwaRuntimeContext)
-        ? window.Xentra.PwaRuntime.getPwaRuntimeContext()
-        : null;
-      requirementSatisfied = Boolean(pwaCtx ? pwaCtx.install_requirement_satisfied : (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
-    } catch (_) {}
-
-    if (requirementSatisfied) {
-      banner.classList.remove('x-pwa-banner-show');
-      return;
-    }
-
-    // Hide the acquisition banner the moment the install completes, including
-    // in this same browser tab (marker written by PwaRuntime on appinstalled,
-    // which broadcasts the xentra:pwa-installed event).
-    document.addEventListener('xentra:pwa-installed', function () {
-      banner.classList.remove('x-pwa-banner-show');
-    });
-
-    // Dismissal is session-scoped, not an entitlement/identity flag.
-    try {
-      if (sessionStorage.getItem('xentra_install_promo_dismissed') === '1') return;
-    } catch (_) {}
-
     var installBtn = $('x-pwa-install');
     var dismissBtn = $('x-pwa-dismiss');
     var titleEl = banner.querySelector('.x-pwa-banner-text strong');
     var subtitleEl = banner.querySelector('.x-pwa-banner-text span');
+    var activePromo = null;
+
+    function isRequirementSatisfied() {
+      try {
+        var pwaCtx = (window.Xentra && window.Xentra.PwaRuntime && window.Xentra.PwaRuntime.getPwaRuntimeContext)
+          ? window.Xentra.PwaRuntime.getPwaRuntimeContext()
+          : null;
+        return Boolean(pwaCtx ? pwaCtx.install_requirement_satisfied : (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches));
+      } catch (_) {
+        return false;
+      }
+    }
+
+    var isDismissedInCurrentPresentation = false;
+
+    function evaluateBannerVisibility() {
+      // 1. If install requirement is already verified (standalone or appinstalled marker), never show banner
+      if (isRequirementSatisfied()) {
+        banner.classList.remove('x-pwa-banner-show');
+        return;
+      }
+
+      // 2. Presentation dismissal (in-memory presentation only — NO cooldown, NO sessionStorage, NO custom suppression policy)
+      if (isDismissedInCurrentPresentation) {
+        banner.classList.remove('x-pwa-banner-show');
+        return;
+      }
+
+      // 3. Must have active banner promo configuration
+      if (!activePromo || !activePromo.display) {
+        banner.classList.remove('x-pwa-banner-show');
+        return;
+      }
+
+      // 4. BROWSER CAPABILITY CHECK (LOCKED CONTRACT):
+      // Floating Install CTA is only exposed if the platform has native install prompt READY,
+      // or iOS Safari where manual Add to Home Screen is available.
+      var pwaRt = window.Xentra && window.Xentra.PwaRuntime;
+      var isNativeReady = Boolean(pwaRt && typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady());
+      var isIos = Boolean(navigator.userAgent && navigator.userAgent.match(/iPhone|iPad|iPod/i));
+
+      if (isNativeReady || isIos) {
+        banner.classList.add('x-pwa-banner-show');
+      } else {
+        banner.classList.remove('x-pwa-banner-show');
+      }
+    }
+
+    // Hide immediately on verified install completion
+    document.addEventListener('xentra:pwa-installed', function () {
+      banner.classList.remove('x-pwa-banner-show');
+    });
+
+    // Dynamic visibility transitions: when browser fires beforeinstallprompt post-load
+    function onPromptReady() {
+      // If the browser emits a new beforeinstallprompt event, capability is updated
+      isDismissedInCurrentPresentation = false;
+      evaluateBannerVisibility();
+    }
+    window.addEventListener('beforeinstallprompt', onPromptReady);
+    window.addEventListener('xentra:pwa-prompt-ready', onPromptReady);
+    document.addEventListener('xentra:pwa-prompt-ready', onPromptReady);
 
     if (dismissBtn && !dismissBtn.__xentraBound) {
       dismissBtn.__xentraBound = true;
       dismissBtn.addEventListener('click', function () {
+        // Presentation action only: hide UI for current presentation.
+        // No custom cooldown, no persistent suppression timers, no re-triggering.
+        isDismissedInCurrentPresentation = true;
         banner.classList.remove('x-pwa-banner-show');
-        try { sessionStorage.setItem('xentra_install_promo_dismissed', '1'); } catch (_) {}
       });
     }
 
@@ -117,66 +152,36 @@
         setTimeout(function () { installBtn.__xentraHandling = false; }, 500);
 
         var pwaRt = window.Xentra && window.Xentra.PwaRuntime;
-        var isIos = navigator.userAgent.match(/iPhone|iPad|iPod/i);
-        var platform = isIos ? 'ios' : 'android';
+        var isIos = navigator.userAgent && navigator.userAgent.match(/iPhone|iPad|iPod/i);
 
-        function showManualGuide() {
-          // Never show manual guide if native prompt is ready or prompted
-          if (pwaRt && typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady()) {
-            return;
-          }
+        // Native install prompt path: prompt directly from user gesture
+        if (pwaRt && typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady()) {
+          pwaRt.promptInstall().then(function (res) {
+            if (res && res.prompted) {
+              var existing = document.getElementById('x-pwa-guide-overlay');
+              if (existing) existing.remove();
+              if (res.accepted) {
+                if (window.UI && window.UI.toast) window.UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
+              }
+            }
+            evaluateBannerVisibility();
+          });
+          return;
+        }
+
+        // iOS Safari manual guide path
+        if (isIos) {
           if (typeof window.showPwaGuideSheet === 'function') {
-            window.showPwaGuideSheet(platform);
+            window.showPwaGuideSheet('ios');
           } else if (typeof showPwaGuideSheet === 'function') {
-            showPwaGuideSheet(platform);
+            showPwaGuideSheet('ios');
           } else {
             alert('Silakan pasang aplikasi melalui menu browser Anda ("Tambahkan ke Layar Utama" / "Add to Home Screen").');
           }
-        }
-
-        if (!pwaRt || typeof pwaRt.promptInstall !== 'function') {
-          showManualGuide();
           return;
         }
 
-        function handlePromptResult(res) {
-          if (res && res.prompted) {
-            // Dismiss any open guide sheet immediately so native prompt and guide never coexist
-            var existing = document.getElementById('x-pwa-guide-overlay');
-            if (existing) existing.remove();
-            if (res.accepted) {
-              if (window.UI && window.UI.toast) window.UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
-            }
-            return;
-          }
-          showManualGuide();
-        }
-
-        // Fast path: native beforeinstallprompt is already captured and ready -> prompt immediately in user gesture
-        if (typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady()) {
-          pwaRt.promptInstall().then(handlePromptResult);
-          return;
-        }
-
-        // iOS never fires beforeinstallprompt -> immediate manual guide
-        if (isIos) {
-          showManualGuide();
-          return;
-        }
-
-        // Android race condition: clicked before beforeinstallprompt fired.
-        // Bounded wait using existing waitForPrompt() mechanism.
-        if (typeof pwaRt.waitForPrompt === 'function') {
-          pwaRt.waitForPrompt(2000).then(function (ready) {
-            if (ready && pwaRt.isNativePromptReady()) {
-              return pwaRt.promptInstall().then(handlePromptResult);
-            }
-            showManualGuide();
-          }).catch(showManualGuide);
-          return;
-        }
-
-        showManualGuide();
+        // Prohibited: No delayed waiting / retry loops if prompt is not ready at click
       });
     }
 
@@ -189,10 +194,12 @@
         });
 
         if (!promo || !promo.display) {
-          banner.classList.remove('x-pwa-banner-show');
+          activePromo = null;
+          evaluateBannerVisibility();
           return;
         }
 
+        activePromo = promo;
         var display = promo.display;
         var iconEl = banner.querySelector('.x-pwa-banner-icon');
         if (titleEl) titleEl.textContent = display.banner_title || 'Install & dapatkan promo spesial';
@@ -206,11 +213,12 @@
         }
         if (installBtn) installBtn.textContent = display.cta_text || 'Install';
 
-        banner.classList.add('x-pwa-banner-show');
+        evaluateBannerVisibility();
       })
       .catch(function (err) {
         // Network/API failure must not fabricate an entitlement.
-        banner.classList.remove('x-pwa-banner-show');
+        activePromo = null;
+        evaluateBannerVisibility();
         console.warn('[Home] Install promo discovery warn:', err);
       });
   }

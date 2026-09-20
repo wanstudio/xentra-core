@@ -98,7 +98,7 @@
   /**
    * Returns true when a native beforeinstallprompt event has been captured and
    * is ready to be consumed by promptInstall(). Distinguishes "not yet ready"
-   * from "not available" — the core fix for the Android install flow race.
+   * from "not available" — the source of truth for browser capability.
    */
   function isNativePromptReady() {
     var e = getDeferredInstallPrompt();
@@ -106,17 +106,26 @@
   }
 
   /**
-   * Bounded readiness wait: polls for the native beforeinstallprompt event to
-   * become available within `timeout` ms (default 3000). Resolves true if the
-   * prompt becomes ready, false on timeout.
-   *
-   * When the user clicks Install BEFORE beforeinstallprompt has fired, the
-   * callers MUST NOT immediately fall back to the manual guide. Instead they
-   * call waitForPrompt() which polls window.__xentra_deferred_prompt at 100ms
-   * intervals. If the event arrives within the bounded window, the caller
-   * retries promptInstall() to show the native Chrome dialog.
-   *
-   * The interval is cleared on resolution to prevent leaks.
+   * Broadcasts prompt readiness to any listening page controller (Home / Checkout).
+   */
+  function broadcastPromptReady(promptEvent) {
+    if (typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent('xentra:pwa-prompt-ready', { detail: promptEvent }));
+      } catch (_) {}
+    }
+    if (typeof document !== 'undefined') {
+      try {
+        document.dispatchEvent(new CustomEvent('xentra:pwa-prompt-ready', { detail: promptEvent }));
+      } catch (_) {}
+    }
+  }
+
+  /**
+   * Bounded readiness wait for testing / background checks.
+   * LOCKED CONTRACT: Never call this from user click handlers to delay prompt()!
+   * The install CTA is capability-driven: it only becomes visible when
+   * isNativePromptReady() is true. If clicked when not ready, callers do not wait.
    */
   function waitForPrompt(timeout) {
     timeout = (typeof timeout === 'number' && timeout > 0) ? timeout : 3000;
@@ -180,10 +189,8 @@
    * It does NOT write the verified marker: actual installation is confirmed
    * solely by the appinstalled event / standalone detection.
    *
-   * IMPORTANT: When { prompted: false } is returned, the caller MUST use
-   * waitForPrompt(timeout) before falling back to manual guide. A null
-   * deferred prompt may mean "not yet ready" (race condition), not
-   * "not available".
+   * LOCKED CONTRACT: User click must invoke promptInstall() directly.
+   * Single-use consumption: clear window.__xentra_deferred_prompt immediately.
    */
   function promptInstall() {
     var promptEvent = getDeferredInstallPrompt();
@@ -216,6 +223,14 @@
       return { prompted: true, outcome: choice ? choice.outcome : null, accepted: accepted };
     }).catch(function () {
       return { prompted: true, outcome: 'dismissed', accepted: false };
+    });
+  }
+
+  // Early listener in pwa-runtime.js (in addition to <head>) to capture and broadcast
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeinstallprompt', function (e) {
+      window.__xentra_deferred_prompt = e;
+      broadcastPromptReady(e);
     });
   }
 

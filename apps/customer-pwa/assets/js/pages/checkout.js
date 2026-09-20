@@ -134,7 +134,11 @@
     var bannerPromo = getBannerPromo();
     var rewardPromo = getAppliedRewardPromo();
 
-    if (bannerPromo && bannerPromo.display) {
+    var pwaRt = window.Xentra && window.Xentra.PwaRuntime;
+    var isNativeReady = Boolean(pwaRt && typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady());
+    var canShowInstall = !checkIsPwaInstalled() && (isNativeReady || isIosPwa);
+
+    if (bannerPromo && bannerPromo.display && canShowInstall) {
       var b = bannerPromo.display;
       return (
         '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
@@ -238,6 +242,14 @@
     });
   });
 
+  // Re-evaluate promo banner if beforeinstallprompt fires dynamically
+  function onPromptReadyCheckout() {
+    renderPromoBanner();
+  }
+  window.addEventListener('beforeinstallprompt', onPromptReadyCheckout);
+  window.addEventListener('xentra:pwa-prompt-ready', onPromptReadyCheckout);
+  document.addEventListener('xentra:pwa-prompt-ready', onPromptReadyCheckout);
+
   function showPwaGuideSheet(platform) {
     // Invariant: If native prompt is ready or prompted, never show manual guide sheet
     var pwaRt = window.Xentra && window.Xentra.PwaRuntime;
@@ -305,33 +317,19 @@
     }
 
     var pwaRt = window.Xentra && window.Xentra.PwaRuntime;
-    if (!pwaRt || typeof pwaRt.promptInstall !== 'function') {
-      showPwaGuideSheet(isIosPwa ? 'ios' : 'android');
-      return;
-    }
 
-    var platform = isIosPwa ? 'ios' : 'android';
-
-    function handlePromptResult(res) {
-      if (res && res.prompted) {
-        // Native prompt displayed: dismiss any guide sheet immediately so native prompt and guide never coexist
-        var existing = document.getElementById('x-pwa-guide-overlay');
-        if (existing) existing.remove();
-        if (res.accepted) {
-          // Accepted only means the user accepted the prompt — the requirement
-          // is NOT satisfied yet. Stay on the install/discovery state until the
-          // appinstalled broadcast (verified install) refreshes the banner into
-          // the claim/reward state. Never treat prompt acceptance as entitlement.
-          if (UI && UI.toast) UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
+    // Native install prompt path: prompt directly from user gesture
+    if (pwaRt && typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady()) {
+      pwaRt.promptInstall().then(function (res) {
+        if (res && res.prompted) {
+          var existing = document.getElementById('x-pwa-guide-overlay');
+          if (existing) existing.remove();
+          if (res.accepted) {
+            if (UI && UI.toast) UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');
+          }
         }
-        return;
-      }
-      showPwaGuideSheet(platform);
-    }
-
-    // Fast path: native beforeinstallprompt is already captured and ready -> prompt immediately
-    if (typeof pwaRt.isNativePromptReady === 'function' && pwaRt.isNativePromptReady()) {
-      pwaRt.promptInstall().then(handlePromptResult);
+        renderPromoBanner();
+      });
       return;
     }
 
@@ -341,21 +339,7 @@
       return;
     }
 
-    // Android race condition: clicked before beforeinstallprompt fired.
-    // Bounded wait using existing waitForPrompt() mechanism.
-    if (typeof pwaRt.waitForPrompt === 'function') {
-      pwaRt.waitForPrompt(2000).then(function (ready) {
-        if (ready && pwaRt.isNativePromptReady()) {
-          return pwaRt.promptInstall().then(handlePromptResult);
-        }
-        showPwaGuideSheet(platform);
-      }).catch(function () {
-        showPwaGuideSheet(platform);
-      });
-      return;
-    }
-
-    showPwaGuideSheet(platform);
+    // Prohibited: No delayed waiting / retry loops if prompt is not ready at click
   }
 
   // Delegated click listener on document for 100% reliable tap response.

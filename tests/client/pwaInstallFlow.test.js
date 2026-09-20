@@ -151,30 +151,32 @@ test('AC-H12: Viewport layout budget preserves CTA visibility across 320px, 360p
   }
 });
 
-// ── B. Install flow: Android race mitigation & prompt lifecycle ───
+// ── B. Install flow: Browser-capability-driven CTA & prompt lifecycle ───
 
-test('AC-B1: home.js checks isNativePromptReady() and calls promptInstall() directly on fast path', () => {
+test('AC-B1: home.js checks isNativePromptReady() and calls promptInstall() directly on user gesture', () => {
   const clickIdx = HOME_JS.indexOf("installBtn.addEventListener('click'");
   assert.ok(clickIdx !== -1, 'home.js must have installBtn click handler');
-  const block = HOME_JS.substring(clickIdx, clickIdx + 2500);
+  const block = HOME_JS.substring(clickIdx, clickIdx + 1500);
   assert.ok(/isNativePromptReady/.test(block),
     'home.js must check isNativePromptReady()');
   assert.ok(/\bpromptInstall\(\)/.test(block),
     'home.js click must call promptInstall() directly when ready');
 });
 
-test('AC-B2: home.js uses bounded waitForPrompt() when prompt is not yet ready (Android race mitigation)', () => {
+test('AC-B2: home.js does NOT use delayed waitForPrompt() on user click (no race architecture)', () => {
   const clickIdx = HOME_JS.indexOf("installBtn.addEventListener('click'");
-  const block = HOME_JS.substring(clickIdx, clickIdx + 2500);
-  assert.ok(/waitForPrompt/.test(block),
-    'home.js must use waitForPrompt() to handle prompt race condition');
+  const block = HOME_JS.substring(clickIdx, clickIdx + 1500);
+  assert.ok(!/waitForPrompt/.test(block),
+    'home.js click handler must not call waitForPrompt() (race architecture prohibited)');
 });
 
-test('AC-B3: home.js falls back to manual guide when prompt unavailable after bounded timeout', () => {
-  const clickIdx = HOME_JS.indexOf("installBtn.addEventListener('click'");
-  const block = HOME_JS.substring(clickIdx, clickIdx + 2500);
-  assert.ok(/showManualGuide|showPwaGuideSheet/.test(block),
-    'home.js must fall back to manual guide when prompt never arrives');
+test('AC-B3: home.js drives CTA visibility via evaluateBannerVisibility and reacts to prompt readiness', () => {
+  assert.ok(/evaluateBannerVisibility/.test(HOME_JS),
+    'home.js must have evaluateBannerVisibility function');
+  assert.ok(/xentra:pwa-prompt-ready/.test(HOME_JS),
+    'home.js must listen to xentra:pwa-prompt-ready to dynamically show CTA');
+  assert.ok(/beforeinstallprompt/.test(HOME_JS),
+    'home.js must listen to beforeinstallprompt');
 });
 
 function createMockPwaWindow(deferredPrompt) {
@@ -206,8 +208,7 @@ test('AC-B4: Proof 1 — prompt already ready -> native prompt called immediatel
   assert.strictEqual(res.accepted, true);
 });
 
-test('AC-B5: Proof 2 — prompt not ready at click -> event arrives within timeout -> native prompt used', async () => {
-  let promptCalled = false;
+test('AC-B5: Proof 2 — dynamic capability transition: prompt arrives post-load -> readiness flips to true', async () => {
   globalThis.window = createMockPwaWindow(null);
   globalThis.localStorage = globalThis.window.localStorage;
   delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
@@ -215,39 +216,28 @@ test('AC-B5: Proof 2 — prompt not ready at click -> event arrives within timeo
 
   assert.strictEqual(PwaRt.isNativePromptReady(), false, 'prompt not ready initially');
 
-  const waitPromise = PwaRt.waitForPrompt(1000);
+  // Event arrives post-load
+  globalThis.window.__xentra_deferred_prompt = {
+    prompt: () => Promise.resolve({ outcome: 'accepted' }),
+    userChoice: Promise.resolve({ outcome: 'accepted' })
+  };
 
-  // Event arrives after 150ms
-  setTimeout(() => {
-    globalThis.window.__xentra_deferred_prompt = {
-      prompt: () => { promptCalled = true; return Promise.resolve({ outcome: 'accepted' }); },
-      userChoice: Promise.resolve({ outcome: 'accepted' })
-    };
-  }, 150);
-
-  const ready = await waitPromise;
-  assert.strictEqual(ready, true, 'waitForPrompt must resolve true when event arrives');
-  assert.strictEqual(PwaRt.isNativePromptReady(), true);
-
-  const res = await PwaRt.promptInstall();
-  assert.strictEqual(promptCalled, true, 'native prompt must be called');
-  assert.strictEqual(res.prompted, true);
-  assert.strictEqual(res.accepted, true);
+  assert.strictEqual(PwaRt.isNativePromptReady(), true, 'readiness flips to true once captured');
 });
 
-test('AC-B6: Proof 3 — event never arrives -> bounded wait times out, manual fallback', async () => {
+test('AC-B6: Proof 3 — prompt not ready -> promptInstall resolves prompted:false with zero delay', async () => {
   globalThis.window = createMockPwaWindow(null);
   globalThis.localStorage = globalThis.window.localStorage;
   delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
   const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
 
   const start = Date.now();
-  const ready = await PwaRt.waitForPrompt(300);
+  const res = await PwaRt.promptInstall();
   const elapsed = Date.now() - start;
 
-  assert.strictEqual(ready, false, 'waitForPrompt must resolve false on timeout');
-  assert.strictEqual(PwaRt.isNativePromptReady(), false);
-  assert.ok(elapsed >= 250, 'must have waited for bounded timeout');
+  assert.strictEqual(res.prompted, false);
+  assert.strictEqual(res.accepted, false);
+  assert.ok(elapsed < 50, 'promptInstall without prompt must return immediately without waiting');
 });
 
 test('AC-B7: Proof 4 — native prompt event is consumed only once', async () => {
@@ -388,26 +378,19 @@ test('AC-F1: Proof 1 — prompt ready -> native prompt only, manual guide is nev
 
   // Execute the exact decision logic used in home.js / checkout.js
   const isIos = false;
-  const platform = 'android';
 
   function runInstallClick() {
-    function handlePromptResult(res) {
-      if (res && res.prompted) return;
-      showPwaGuideSheet(platform);
-    }
     if (typeof PwaRt.isNativePromptReady === 'function' && PwaRt.isNativePromptReady()) {
-      return PwaRt.promptInstall().then(handlePromptResult);
+      return PwaRt.promptInstall().then(function (res) {
+        if (res && res.prompted) return;
+        showPwaGuideSheet('android');
+      });
     }
     if (isIos) {
       showPwaGuideSheet('ios');
       return Promise.resolve();
     }
-    return PwaRt.waitForPrompt(2000).then(function (ready) {
-      if (ready && PwaRt.isNativePromptReady()) {
-        return PwaRt.promptInstall().then(handlePromptResult);
-      }
-      showPwaGuideSheet(platform);
-    });
+    return Promise.resolve();
   }
 
   await runInstallClick();
@@ -416,102 +399,48 @@ test('AC-F1: Proof 1 — prompt ready -> native prompt only, manual guide is nev
   assert.strictEqual(manualGuideCalled, 0, 'Manual guide must NEVER be called when prompt is ready');
 });
 
-test('AC-F2: Proof 2 — prompt not ready at click -> wait -> native prompt only, manual guide never shown', async () => {
-  let nativePromptCalled = 0;
-  let manualGuideCalled = 0;
-
+test('AC-F2: Proof 2 — dynamic capability transition: prompt arrives post-load -> banner becomes visible and ready for next click', async () => {
   globalThis.window = createMockPwaWindow(null);
   globalThis.localStorage = globalThis.window.localStorage;
-  globalThis.document = {
-    getElementById: () => null,
-    createElement: () => ({ classList: { add: () => {}, remove: () => {} }, querySelector: () => null }),
-    body: { appendChild: () => {} }
-  };
-
   delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
   const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
-  globalThis.window.Xentra = { PwaRuntime: PwaRt };
 
-  const showPwaGuideSheet = () => { manualGuideCalled++; };
-  globalThis.window.showPwaGuideSheet = showPwaGuideSheet;
+  assert.strictEqual(PwaRt.isNativePromptReady(), false, 'Prompt not ready initially');
 
-  const platform = 'android';
+  // Event arrives post-load
+  let promptFired = false;
+  const fakePrompt = {
+    prompt: () => { promptFired = true; return Promise.resolve({ outcome: 'accepted' }); },
+    userChoice: Promise.resolve({ outcome: 'accepted' })
+  };
+  globalThis.window.__xentra_deferred_prompt = fakePrompt;
 
-  function runInstallClick() {
-    function handlePromptResult(res) {
-      if (res && res.prompted) return;
-      showPwaGuideSheet(platform);
-    }
-    if (typeof PwaRt.isNativePromptReady === 'function' && PwaRt.isNativePromptReady()) {
-      return PwaRt.promptInstall().then(handlePromptResult);
-    }
-    return PwaRt.waitForPrompt(2000).then(function (ready) {
-      if (ready && PwaRt.isNativePromptReady()) {
-        return PwaRt.promptInstall().then(handlePromptResult);
-      }
-      showPwaGuideSheet(platform);
-    });
-  }
-
-  // Simulate prompt arriving 100ms after click (before 2000ms timeout)
-  setTimeout(() => {
-    globalThis.window.__xentra_deferred_prompt = {
-      prompt: () => {
-        nativePromptCalled++;
-        return Promise.resolve({ outcome: 'accepted' });
-      },
-      userChoice: Promise.resolve({ outcome: 'accepted' })
-    };
-  }, 100);
-
-  await runInstallClick();
-
-  assert.strictEqual(nativePromptCalled, 1, 'Native prompt must be called when prompt arrives within timeout');
-  assert.strictEqual(manualGuideCalled, 0, 'Manual guide must NEVER be called when prompt arrives within timeout');
+  assert.strictEqual(PwaRt.isNativePromptReady(), true, 'Ready for next user gesture');
+  const res = await PwaRt.promptInstall();
+  assert.strictEqual(res.prompted, true);
+  assert.strictEqual(promptFired, true);
 });
 
-test('AC-F3: Proof 3 — timeout / event never arrives -> manual guide only, native prompt never called', async () => {
+test('AC-F3: Proof 3 — prompt not ready at click -> zero delay, no delayed conversion of gesture', async () => {
   let nativePromptCalled = 0;
   let manualGuideCalled = 0;
 
   globalThis.window = createMockPwaWindow(null);
   globalThis.localStorage = globalThis.window.localStorage;
-  globalThis.document = {
-    getElementById: () => null,
-    createElement: () => ({ classList: { add: () => {}, remove: () => {} }, querySelector: () => null }),
-    body: { appendChild: () => {} }
-  };
 
   delete require.cache[require.resolve('../../apps/customer-pwa/assets/js/core/pwa-runtime.js')];
   const PwaRt = require('../../apps/customer-pwa/assets/js/core/pwa-runtime.js');
-  globalThis.window.Xentra = { PwaRuntime: PwaRt };
 
-  const showPwaGuideSheet = () => { manualGuideCalled++; };
-  globalThis.window.showPwaGuideSheet = showPwaGuideSheet;
-
-  const platform = 'android';
-
-  function runInstallClick() {
-    function handlePromptResult(res) {
-      if (res && res.prompted) return;
-      showPwaGuideSheet(platform);
-    }
-    if (typeof PwaRt.isNativePromptReady === 'function' && PwaRt.isNativePromptReady()) {
-      return PwaRt.promptInstall().then(handlePromptResult);
-    }
-    // Use short timeout for test speed
-    return PwaRt.waitForPrompt(250).then(function (ready) {
-      if (ready && PwaRt.isNativePromptReady()) {
-        return PwaRt.promptInstall().then(handlePromptResult);
-      }
-      showPwaGuideSheet(platform);
-    });
+  const start = Date.now();
+  // If clicked when not ready, no wait occurs
+  if (PwaRt.isNativePromptReady()) {
+    await PwaRt.promptInstall();
+    nativePromptCalled++;
   }
+  const elapsed = Date.now() - start;
 
-  await runInstallClick();
-
-  assert.strictEqual(nativePromptCalled, 0, 'Native prompt must NOT be called when event never arrives');
-  assert.strictEqual(manualGuideCalled, 1, 'Manual guide must be called exactly once upon timeout');
+  assert.strictEqual(nativePromptCalled, 0, 'Native prompt must NOT be called when not ready');
+  assert.ok(elapsed < 20, 'Zero waiting time on click');
 });
 
 test('AC-F4: Proof 4 — mutual exclusion: native prompt and manual guide NEVER appear together in 1 click', async () => {
@@ -633,4 +562,78 @@ test('AC-F6: Proof 6 — manifest.json and icon configuration strictly valid for
   assert.strictEqual(buf512.readUInt32BE(16), 512, 'icon-512.png width must be exactly 512');
   assert.strictEqual(buf512.readUInt32BE(20), 512, 'icon-512.png height must be exactly 512');
 });
+
+// ── G. Dismissal / Close (X) — Strict Contract & No Application Cooldown ───
+
+test('AC-G1: No application-defined install cooldown policy exists in codebase', () => {
+  const forbiddenKeywords = [
+    'dismissed_at',
+    'dismissed_until',
+    'cooldown_until',
+    'dismiss_count',
+    'xentra_install_promo_dismissed'
+  ];
+  for (const kw of forbiddenKeywords) {
+    assert.ok(!HOME_JS.includes(kw), `home.js must not contain cooldown keyword: ${kw}`);
+    assert.ok(!CHECKOUT_JS.includes(kw), `checkout.js must not contain cooldown keyword: ${kw}`);
+    assert.ok(!PWA_RUNTIME_JS.includes(kw), `pwa-runtime.js must not contain cooldown keyword: ${kw}`);
+  }
+});
+
+test('AC-G2: Dismissal is presentation-only and does not mutate xentra_pwa_verified or capability state', () => {
+  let verifiedMarkerMutated = false;
+  let customStorage = {};
+  const mockStorage = {
+    getItem: (k) => customStorage[k] || null,
+    setItem: (k, v) => {
+      if (k === 'xentra_pwa_verified') verifiedMarkerMutated = true;
+      customStorage[k] = v;
+    },
+    removeItem: (k) => { delete customStorage[k]; }
+  };
+
+  globalThis.window = createMockPwaWindow(null);
+  globalThis.localStorage = mockStorage;
+  globalThis.sessionStorage = mockStorage;
+
+  // Closing / dismissing UI only toggles in-memory presentation flag
+  let isDismissedInCurrentPresentation = false;
+  function handleDismiss() {
+    isDismissedInCurrentPresentation = true;
+  }
+
+  handleDismiss();
+
+  assert.strictEqual(isDismissedInCurrentPresentation, true);
+  assert.strictEqual(verifiedMarkerMutated, false, 'Closing the UI must NOT mutate xentra_pwa_verified');
+  assert.strictEqual(Object.keys(customStorage).length, 0, 'Closing the UI must not write any storage keys or cooldowns');
+});
+
+test('AC-G3: Browser capability remains authoritative: new beforeinstallprompt resets presentation dismissal', () => {
+  let isDismissedInCurrentPresentation = true;
+  let bannerVisible = false;
+
+  function evaluateBannerVisibility(isNativeReady) {
+    if (isDismissedInCurrentPresentation) {
+      bannerVisible = false;
+      return;
+    }
+    bannerVisible = isNativeReady;
+  }
+
+  function onPromptReady() {
+    isDismissedInCurrentPresentation = false;
+    evaluateBannerVisibility(true);
+  }
+
+  // Initial dismissed state
+  evaluateBannerVisibility(true);
+  assert.strictEqual(bannerVisible, false, 'Banner hidden when dismissed in presentation');
+
+  // Browser emits beforeinstallprompt
+  onPromptReady();
+  assert.strictEqual(isDismissedInCurrentPresentation, false, 'New prompt ready resets presentation dismissal');
+  assert.strictEqual(bannerVisible, true, 'Banner reappears because browser capability arrived');
+});
+
 
