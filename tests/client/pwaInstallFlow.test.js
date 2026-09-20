@@ -671,20 +671,20 @@ test('AC-H2: All Customer PWA entry points reference the canonical pwa-runtime.j
     'apps/customer-pwa/order-received/index.html'
   ];
 
-  const canonicalRuntimeRegex = /src="\/assets\/js\/core\/pwa-runtime\.js\?v=v_20260920_customer-auth-broker"/;
-  const canonicalSwRegex = /register\('\/sw\.js\?v=v_20260920_customer-auth-broker'\)/;
-  const canonicalRelRegex = /var PWA_VERSION = 'v_20260920_customer-auth-broker'/;
+  const canonicalRuntimeRegex = /src="\/assets\/js\/core\/pwa-runtime\.js\?v=v_20260920_pwa_bootfix"/;
+  const canonicalSwRegex = /register\('\/sw\.js\?v=v_20260920_pwa_bootfix'\)/;
+  const canonicalRelRegex = /var PWA_VERSION = 'v_20260920_pwa_bootfix'/;
 
   for (const relPath of htmlFiles) {
     const fullPath = path.resolve(__dirname, '../../', relPath);
     const content = fs.readFileSync(fullPath, 'utf8');
 
     assert.match(content, canonicalRuntimeRegex,
-      `${relPath} must reference canonical pwa-runtime.js?v=v_20260920_customer-auth-broker`);
+      `${relPath} must reference canonical pwa-runtime.js?v=v_20260920_pwa_bootfix`);
     assert.match(content, canonicalSwRegex,
-      `${relPath} must reference canonical /sw.js?v=v_20260920_customer-auth-broker`);
+      `${relPath} must reference canonical /sw.js?v=v_20260920_pwa_bootfix`);
     assert.match(content, canonicalRelRegex,
-      `${relPath} must define canonical PWA_VERSION = 'v_20260920_customer-auth-broker'`);
+      `${relPath} must define canonical PWA_VERSION = 'v_20260920_pwa_bootfix'`);
   }
 });
 

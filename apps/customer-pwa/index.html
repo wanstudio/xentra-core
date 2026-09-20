@@ -13,7 +13,7 @@
        ══════════════════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_20260920_customer-auth-broker';
+      var PWA_VERSION = 'v_20260920_pwa_bootfix';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -254,7 +254,7 @@
   <script src="/assets/js/core/api.js?v=v_theme04"></script>
   <script src="/assets/js/core/nav.js?v=v_20260919_nav"></script>
   <script src="/assets/js/core/router.js?v=v_theme05"></script>
-  <script src="/assets/js/core/pwa-runtime.js?v=v_20260920_customer-auth-broker"></script>
+  <script src="/assets/js/core/pwa-runtime.js?v=v_20260920_pwa_bootfix"></script>
   <script src="/assets/js/core/promo-reward-cart.js?v=v_theme02"></script>
   <script src="/assets/js/core/delivery-schedule.js?v=v_theme02"></script>
   <script src="/assets/js/location.js?v=v_theme02"></script>
@@ -264,10 +264,10 @@
   <script src="/assets/js/core/media.js?v=v_theme02"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=v_20260920_pwa_pres"></script>
-  <script src="/assets/js/pages/checkout.js?v=v_20260920_customer-auth-broker"></script>
+  <script src="/assets/js/pages/home.js?v=v_20260920_pwa_bootfix"></script>
+  <script src="/assets/js/pages/checkout.js?v=v_20260920_pwa_bootfix"></script>
   <script src="/assets/js/pages/order-received.js?v=v_theme03"></script>
-  <script src="/assets/js/pages/aux-pages.js?v=v_20260920_customer-auth-broker"></script>
+  <script src="/assets/js/pages/aux-pages.js?v=v_20260920_pwa_bootfix"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -440,7 +440,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=v_20260920_customer-auth-broker').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js?v=v_20260920_pwa_bootfix').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {
