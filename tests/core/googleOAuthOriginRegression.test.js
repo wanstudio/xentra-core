@@ -78,7 +78,15 @@ describe('Google OAuth Origin Regression — tenant/platform canonical flow', ()
       server = http.createServer(app);
       await new Promise((resolve) => server.listen(0, resolve));
     }
-    db.prepare('DELETE FROM user_auth_providers').run();
+     db.prepare('DELETE FROM user_auth_providers').run();
+     // Ensure demo branch fixture exists for workforce-invitation/manager tests (FK: branches must exist)
+     if (!db.prepare("SELECT 1 FROM branches WHERE id = 'branch_bangjo_barat' LIMIT 1").get()) {
+       const b = db.prepare("SELECT id FROM brands WHERE id = 'brand_bangjo' LIMIT 1").get();
+       if (b) db.prepare(`
+         INSERT OR IGNORE INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active)
+         VALUES ('branch_bangjo_barat', 'brand_bangjo', 'Bangjo Surabaya Barat', 'surabaya-barat', 'Jl. Mayjen Sungkono No. 88', -7.2912, 112.7154, '081234567890', 1)
+       `).run();
+     }
   });
 
   after(() => {
