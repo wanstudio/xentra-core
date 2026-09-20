@@ -4679,6 +4679,10 @@
                   <select id="mkt-promo-target-product" class="x-input" required style="width: 100%; font-size: 13px;" onchange="onPromotionProductSelected()">
                     <option value="">-- Pilih Produk dari Menu Master --</option>
                   </select>
+                  <div id="mkt-promo-target-product-retry-container" style="display:none; margin-top: 4px;">
+                    <span style="font-size: 11px; color: #ef4444;">Gagal memuat produk dari server. </span>
+                    <button type="button" class="x-btn-ghost" style="padding: 2px 6px; font-size: 11px; color: #0284c7; text-decoration: underline;" onclick="retryLoadPromoProducts()">Coba Lagi</button>
+                  </div>
                   <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Diambil dari menu master resmi brand.</small>
                 </div>
                 <div>

@@ -119,7 +119,11 @@ describe('Promotion Install Floating Presentation Suite', () => {
     db.prepare('INSERT OR REPLACE INTO brands (id, organization_id, name, slug, custom_domain) VALUES (?, ?, ?, ?, ?)').run(BRAND_A, ORG_A, 'Bangjo Resto', 'bangjo', 'app.mybangjo.com');
     db.prepare('INSERT OR REPLACE INTO brands (id, organization_id, name, slug, custom_domain) VALUES (?, ?, ?, ?, ?)').run(BRAND_B, ORG_B, 'Other Brand', 'other-brand', 'other.tenant.com');
 
-    // Seed test media assets
+    // Seed master product 401 for BRAND_A
+    db.prepare(`INSERT OR REPLACE INTO categories (id, brand_id, name, slug, sort_order, created_at)
+      VALUES ('cat_pres_a', ?, 'Minuman', 'minuman', 1, datetime('now'))`).run(BRAND_A);
+    db.prepare(`INSERT OR REPLACE INTO products (id, brand_id, category_id, name, slug, price, is_active, sort_order, created_at, updated_at)
+      VALUES ('401', ?, 'cat_pres_a', 'Es Teh Manis', 'es-teh', 7500, 1, 1, datetime('now'), datetime('now'))`).run(BRAND_A);
     db.prepare(`
       INSERT OR REPLACE INTO media_assets (id, tenant_id, brand_id, storage_key, mime_type, status, asset_type, width, height, size_bytes, created_at, updated_at)
       VALUES (?, ?, ?, ?, 'image/png', 'ready', 'general', 192, 192, 1024, datetime('now'), datetime('now'))

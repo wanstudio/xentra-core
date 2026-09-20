@@ -552,4 +552,70 @@ describe('Promotion Security & RBAC Scope Authorization Suite', () => {
     const deleteAudit = db.prepare("SELECT * FROM security_audit_log WHERE brand_id = ? AND action = 'PROMOTION_DELETED' ORDER BY created_at DESC LIMIT 1").get(BRAND_A);
     assert.ok(deleteAudit);
   });
+
+  // PROMO-AUTH-15: Reward target_product_id must exist in master catalog (400 if nonexistent)
+  it('PROMO-AUTH-15: Nonexistent reward target_product_id is rejected with 400', async () => {
+    const tokenOwnerA = seedStaffSession({ role: 'owner', brandId: BRAND_A, userId: 'owner_a' });
+
+    // 1. POST create
+    const createRes = await request('POST', '/api/v1/admin/marketing/promotions', {
+      name: 'Invalid Product Promo',
+      capability_type: 'install_incentive',
+      rewards: [{
+        reward_type: 'freebie_product',
+        target_product_id: 'nonexistent_prod_99999',
+        amount_in_cents: 0
+      }]
+    }, {
+      Authorization: `Bearer ${tokenOwnerA}`
+    });
+
+    assert.equal(createRes.status, 400);
+    assert.equal(createRes.body.success, false);
+    assert.ok(createRes.body.error.includes('Produk reward tidak valid'));
+
+    // 2. PUT update
+    const promoValidId = 'promo_sec_a_for_put_prod';
+    db.prepare(`INSERT OR REPLACE INTO promotions (id, brand_id, name, capability_type, is_active, created_at, updated_at)
+      VALUES (?, ?, 'Valid Promo', 'install_incentive', 1, datetime('now'), datetime('now'))`).run(promoValidId, BRAND_A);
+
+    const updateRes = await request('PUT', `/api/v1/admin/marketing/promotions/${promoValidId}`, {
+      rewards: [{
+        reward_type: 'freebie_product',
+        target_product_id: 'nonexistent_prod_88888',
+        amount_in_cents: 0
+      }]
+    }, {
+      Authorization: `Bearer ${tokenOwnerA}`
+    });
+
+    assert.equal(updateRes.status, 400);
+    assert.equal(updateRes.body.success, false);
+    assert.ok(updateRes.body.error.includes('Produk reward tidak valid'));
+  });
+
+  // PROMO-AUTH-16: Reward target_product_id cannot belong to foreign brand (400)
+  it('PROMO-AUTH-16: Cross-tenant foreign reward target_product_id is rejected with 400', async () => {
+    const foreignProdId = 'prod_foreign_brand_b';
+    db.prepare(`INSERT OR REPLACE INTO products (id, brand_id, name, slug, price, is_active, sort_order, created_at, updated_at)
+      VALUES (?, ?, 'Foreign Product B', 'foreign-b', 15000, 1, 1, datetime('now'), datetime('now'))`).run(foreignProdId, BRAND_B);
+
+    const tokenOwnerA = seedStaffSession({ role: 'owner', brandId: BRAND_A, userId: 'owner_a' });
+
+    const createRes = await request('POST', '/api/v1/admin/marketing/promotions', {
+      name: 'Cross Brand Promo Hack',
+      capability_type: 'install_incentive',
+      rewards: [{
+        reward_type: 'freebie_product',
+        target_product_id: foreignProdId,
+        amount_in_cents: 0
+      }]
+    }, {
+      Authorization: `Bearer ${tokenOwnerA}`
+    });
+
+    assert.equal(createRes.status, 400);
+    assert.equal(createRes.body.success, false);
+    assert.ok(createRes.body.error.includes('Produk reward tidak valid atau bukan milik brand ini'));
+  });
 });

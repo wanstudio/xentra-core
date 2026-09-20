@@ -9043,7 +9043,9 @@
   var _marketingPromotionsState = {
     promotions: [],
     masterProducts: [],
-    branches: []
+    branches: [],
+    productsLoadStatus: 'idle', // 'idle' | 'loading' | 'success' | 'error'
+    productsLoadError: null
   };
 
   async function loadMarketingPromotions() {
@@ -9151,45 +9153,114 @@
   }
   window.loadMarketingPromotions = loadMarketingPromotions;
 
-  async function ensureMarketingDependenciesLoaded() {
-    try {
-      if (!_marketingPromotionsState.masterProducts.length) {
-        var pRes = await adminFetch('/api/v1/admin/catalog/products', { headers: getAuthHeaders() });
-        if (pRes.ok) {
-          var pData = await pRes.json();
-          _marketingPromotionsState.masterProducts = (pData && (pData.products || pData.data)) || [];
-        }
+  async function ensureMarketingDependenciesLoaded(forceReload) {
+    var selectEl = $('mkt-promo-target-product');
+    var retryContainer = $('mkt-promo-target-product-retry-container');
+
+    if (!forceReload && _marketingPromotionsState.masterProducts.length > 0 && _marketingPromotionsState.branches.length > 0) {
+      return;
+    }
+
+    if (forceReload || !_marketingPromotionsState.masterProducts.length) {
+      _marketingPromotionsState.productsLoadStatus = 'loading';
+      _marketingPromotionsState.productsLoadError = null;
+      if (selectEl) {
+        selectEl.disabled = true;
+        selectEl.innerHTML = '<option value="">Memuat produk katalog...</option>';
       }
-      if (!_marketingPromotionsState.branches.length) {
-        var bRes = await adminFetch('/api/v1/admin/branches', { headers: getAuthHeaders() });
+      if (retryContainer) retryContainer.style.display = 'none';
+
+      try {
+        var pRes = await adminFetch(API_BASE + '/admin/products', { headers: getAuthHeaders() });
+        if (!pRes.ok) {
+          throw new Error('Gagal memuat produk (HTTP ' + pRes.status + ')');
+        }
+        var pData = await pRes.json();
+        if (!pData || !pData.success) {
+          throw new Error((pData && pData.error) || 'Gagal memuat produk dari server.');
+        }
+        _marketingPromotionsState.masterProducts = Array.isArray(pData.products) ? pData.products : [];
+        _marketingPromotionsState.productsLoadStatus = 'success';
+      } catch (err) {
+        console.error('[Marketing Products Load Error]:', err);
+        _marketingPromotionsState.productsLoadStatus = 'error';
+        _marketingPromotionsState.productsLoadError = err.message || 'Gagal memuat produk';
+      }
+    }
+
+    if (forceReload || !_marketingPromotionsState.branches.length) {
+      try {
+        var bRes = await adminFetch(API_BASE + '/admin/branches', { headers: getAuthHeaders() });
         if (bRes.ok) {
           var bData = await bRes.json();
           _marketingPromotionsState.branches = (bData && (bData.branches || bData.data)) || [];
         }
+      } catch (e) {
+        console.warn('[Marketing Branches Load Warn]:', e);
       }
-    } catch (e) {
-      console.warn('[Marketing Dependencies Load Warn]:', e);
     }
   }
 
   function renderPromoProductOptions(selectedProductId) {
     var selectEl = $('mkt-promo-target-product');
+    var retryContainer = $('mkt-promo-target-product-retry-container');
     if (!selectEl) return;
 
-    var prods = _marketingPromotionsState.masterProducts || [];
-    if (!prods.length) {
-      selectEl.innerHTML = '<option value="">-- Tidak ada produk katalog master ditemukan --</option>';
+    // Handle Error State
+    if (_marketingPromotionsState.productsLoadStatus === 'error') {
+      selectEl.disabled = true;
+      selectEl.innerHTML = '<option value="">Gagal memuat produk katalog</option>';
+      if (retryContainer) retryContainer.style.display = 'block';
       return;
     }
 
+    if (retryContainer) retryContainer.style.display = 'none';
+
+    // Handle Loading State
+    if (_marketingPromotionsState.productsLoadStatus === 'loading') {
+      selectEl.disabled = true;
+      selectEl.innerHTML = '<option value="">Memuat produk katalog...</option>';
+      return;
+    }
+
+    var prods = _marketingPromotionsState.masterProducts || [];
+
+    // Handle Empty State
+    if (!prods.length) {
+      selectEl.disabled = true;
+      selectEl.innerHTML = '<option value="">Belum ada produk di Master Catalog</option>';
+      return;
+    }
+
+    // Success State
+    selectEl.disabled = false;
     var html = '<option value="">-- Pilih Produk Hadiah --</option>';
+    var foundSavedProduct = false;
+
     prods.forEach(function (p) {
-      var isSel = String(p.id) === String(selectedProductId) ? ' selected' : '';
-      var priceText = p.price ? ' (' + formatMoney(p.price) + ')' : '';
-      html += '<option value="' + esc(p.id) + '"' + isSel + '>' + esc(p.name) + priceText + '</option>';
+      var isSel = (selectedProductId !== null && selectedProductId !== undefined && String(p.id) === String(selectedProductId));
+      if (isSel) foundSavedProduct = true;
+      var priceText = (p.price !== undefined && p.price !== null) ? ' (' + formatMoney(p.price) + ')' : '';
+      var skuText = p.sku ? ' [SKU: ' + esc(p.sku) + ']' : '';
+      html += '<option value="' + esc(p.id) + '"' + (isSel ? ' selected' : '') + '>' + esc(p.name) + skuText + priceText + '</option>';
     });
+
+    // If a saved product ID was supplied but is no longer in the master catalog, display warning option
+    if (selectedProductId && !foundSavedProduct) {
+      html = '<option value="' + esc(selectedProductId) + '" selected disabled style="color:#ef4444;">⚠️ Produk reward tersimpan (ID: ' + esc(selectedProductId) + ') tidak lagi tersedia di Master Catalog</option>' + html;
+    }
+
     selectEl.innerHTML = html;
   }
+
+  async function retryLoadPromoProducts() {
+    await ensureMarketingDependenciesLoaded(true);
+    var targetInput = $('mkt-promo-target-product');
+    var currentVal = targetInput ? targetInput.value : null;
+    renderPromoProductOptions(currentVal);
+    onPromotionProductSelected();
+  }
+  window.retryLoadPromoProducts = retryLoadPromoProducts;
 
   function renderPromoBranchCheckboxes(selectedBranchIds) {
     var container = $('mkt-promo-branches-list');

@@ -10580,6 +10580,20 @@ router.post('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager'
       }
     }
 
+    if (Array.isArray(rewards) && rewards.length > 0) {
+      for (const rw of rewards) {
+        if (rw.target_product_id) {
+          const prod = db.prepare('SELECT id FROM products WHERE id = ? AND brand_id = ?').get(rw.target_product_id, req.brand_id);
+          if (!prod) {
+            return res.status(400).json({
+              success: false,
+              error: 'Produk reward tidak valid atau bukan milik brand ini.'
+            });
+          }
+        }
+      }
+    }
+
     const created = corePromotionRepo.createPromotion({
       id,
       brandId: req.brand_id,
@@ -10663,6 +10677,20 @@ router.put('/admin/marketing/promotions/:id', requireAuth(['owner', 'brand_manag
           success: false,
           error: 'Satu atau lebih cabang tidak valid atau bukan milik brand ini.'
         });
+      }
+    }
+
+    if (Array.isArray(rewards) && rewards.length > 0) {
+      for (const rw of rewards) {
+        if (rw.target_product_id) {
+          const prod = db.prepare('SELECT id FROM products WHERE id = ? AND brand_id = ?').get(rw.target_product_id, req.brand_id);
+          if (!prod) {
+            return res.status(400).json({
+              success: false,
+              error: 'Produk reward tidak valid atau bukan milik brand ini.'
+            });
+          }
+        }
       }
     }
 
