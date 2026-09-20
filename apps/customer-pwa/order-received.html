@@ -13,7 +13,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_20260919_codfmt';
+      var PWA_VERSION = 'v_20260920_customer-auth-broker';
       try {
         if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
           localStorage.setItem('__xentra_rel', PWA_VERSION);
@@ -63,10 +63,6 @@
       window.addEventListener('beforeinstallprompt', function (e) {
         e.preventDefault();
         window.__xentra_deferred_prompt = e;
-        try {
-          window.dispatchEvent(new CustomEvent('xentra:pwa-prompt-ready', { detail: e }));
-          document.dispatchEvent(new CustomEvent('xentra:pwa-prompt-ready', { detail: e }));
-        } catch (_) {}
       });
     })();
   </script>
@@ -221,25 +217,23 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════
-       JS CORE & CONTROLLERS (Version Hashed v2.2.7)
-       ═══════════════════════════════════════════════════ -->
+  <!-- JS CORE & CONTROLLERS (Version Hashed v2.3.6) -->
   <script src="/assets/js/core/store.js?v=v_791b187"></script>
-  <script src="/assets/js/core/ui.js?v=p4a7f28"></script>
+  <script src="/assets/js/core/ui.js?v=p6c9d12"></script>
   <script src="/assets/js/core/api.js?v=v_theme04"></script>
   <script src="/assets/js/core/nav.js?v=v_20260919_nav"></script>
-  <script src="/assets/js/core/router.js?v=p4a7f28"></script>
-  <script src="/assets/js/core/pwa-runtime.js?v=p4a7f28"></script>
+  <script src="/assets/js/core/router.js?v=p6c9d12"></script>
+  <script src="/assets/js/core/pwa-runtime.js?v=v_20260920_customer-auth-broker"></script>
   <script src="/assets/js/core/promo-reward-cart.js?v=v_791b187"></script>
   <script src="/assets/js/core/delivery-schedule.js?v=p7f4a09"></script>
-  <script src="/assets/js/location.js?v=p4a7f28"></script>
-  <script src="/assets/js/core/discovery.js?v=p4a7f28"></script>
+  <script src="/assets/js/location.js?v=p6c9d12"></script>
+  <script src="/assets/js/core/discovery.js?v=p6c9d12"></script>
   <script src="/assets/js/core/location-picker.js?v=v_20260919_poi"></script>
   <script src="/assets/js/core/media.js?v=m6a02"></script>
 
   <!-- Page Controllers -->
   <script src="/assets/js/pages/home.js?v=v_791b187"></script>
-  <script src="/assets/js/pages/checkout.js?v=v_20260919_codfmt"></script>
+  <script src="/assets/js/pages/checkout.js?v=v_20260920_customer-auth-broker"></script>
   <script src="/assets/js/pages/order-received.js?v=v_theme03"></script>
 
   <!-- ═══════════════════════════════════════════════════
@@ -318,22 +312,13 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=v_20260919_codfmt').then(function (reg) {
-        reg.update();
-
-        document.addEventListener('visibilitychange', function () {
-          if (document.visibilityState === 'visible') {
-            reg.update();
-          }
-        });
-
+      navigator.serviceWorker.register('/sw.js?v=v_20260920_customer-auth-broker').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', function () {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[PWA] New version ready. Applying update...');
-                window.location.reload();
+                newWorker.postMessage({ action: 'skipWaiting' });
               }
             });
           }
@@ -342,10 +327,10 @@
         console.warn('[PWA] Registration warn:', err);
       });
 
-      var hasRefreshed = false;
+      var refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', function () {
-        if (!hasRefreshed) {
-          hasRefreshed = true;
+        if (!refreshing) {
+          refreshing = true;
           window.location.reload();
         }
       });

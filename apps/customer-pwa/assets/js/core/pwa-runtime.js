@@ -226,12 +226,17 @@
     });
   }
 
-  // Early listener in pwa-runtime.js (in addition to <head>) to capture and broadcast
+  // Capture beforeinstallprompt and broadcast readiness to page controllers (Home / Checkout)
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeinstallprompt', function (e) {
       window.__xentra_deferred_prompt = e;
       broadcastPromptReady(e);
     });
+
+    // If early listener in <head> already captured the prompt before pwa-runtime loaded:
+    if (window.__xentra_deferred_prompt) {
+      broadcastPromptReady(window.__xentra_deferred_prompt);
+    }
   }
 
   // appinstalled is the authoritative browser/OS "installation completed"

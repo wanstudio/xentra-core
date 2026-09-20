@@ -636,4 +636,63 @@ test('AC-G3: Browser capability remains authoritative: new beforeinstallprompt r
   assert.strictEqual(bannerVisible, true, 'Banner reappears because browser capability arrived');
 });
 
+// ── H. Unified beforeinstallprompt Capture & Asset Version Alignment ─────────
+
+test('AC-H1: Early head scripts in all HTML entry points use pure capture without duplicate custom event dispatch', () => {
+  const htmlFiles = [
+    'apps/customer-pwa/index.html',
+    'apps/customer-pwa/checkout.html',
+    'apps/customer-pwa/checkout/index.html',
+    'apps/customer-pwa/order-received.html',
+    'apps/customer-pwa/order-received/index.html'
+  ];
+
+  for (const relPath of htmlFiles) {
+    const fullPath = path.resolve(__dirname, '../../', relPath);
+    const content = fs.readFileSync(fullPath, 'utf8');
+
+    // Head script must capture beforeinstallprompt into window.__xentra_deferred_prompt
+    assert.match(content, /window\.__xentra_deferred_prompt\s*=\s*e;/,
+      `${relPath} must store prompt event into window.__xentra_deferred_prompt`);
+
+    // Head script must NOT dispatch xentra:pwa-prompt-ready (ownership belongs to pwa-runtime.js)
+    const headContent = content.substring(0, content.indexOf('</head>'));
+    assert.ok(!headContent.includes('xentra:pwa-prompt-ready'),
+      `${relPath} <head> must not dispatch xentra:pwa-prompt-ready (runtime owns dispatch)`);
+  }
+});
+
+test('AC-H2: All Customer PWA entry points reference the canonical pwa-runtime.js version', () => {
+  const htmlFiles = [
+    'apps/customer-pwa/index.html',
+    'apps/customer-pwa/checkout.html',
+    'apps/customer-pwa/checkout/index.html',
+    'apps/customer-pwa/order-received.html',
+    'apps/customer-pwa/order-received/index.html'
+  ];
+
+  const canonicalRuntimeRegex = /src="\/assets\/js\/core\/pwa-runtime\.js\?v=v_20260920_customer-auth-broker"/;
+  const canonicalSwRegex = /register\('\/sw\.js\?v=v_20260920_customer-auth-broker'\)/;
+  const canonicalRelRegex = /var PWA_VERSION = 'v_20260920_customer-auth-broker'/;
+
+  for (const relPath of htmlFiles) {
+    const fullPath = path.resolve(__dirname, '../../', relPath);
+    const content = fs.readFileSync(fullPath, 'utf8');
+
+    assert.match(content, canonicalRuntimeRegex,
+      `${relPath} must reference canonical pwa-runtime.js?v=v_20260920_customer-auth-broker`);
+    assert.match(content, canonicalSwRegex,
+      `${relPath} must reference canonical /sw.js?v=v_20260920_customer-auth-broker`);
+    assert.match(content, canonicalRelRegex,
+      `${relPath} must define canonical PWA_VERSION = 'v_20260920_customer-auth-broker'`);
+  }
+});
+
+test('AC-H3: pwa-runtime.js broadcasts readiness if prompt was captured early in head', () => {
+  // In pwa-runtime.js, if window.__xentra_deferred_prompt exists on load, it broadcasts prompt ready
+  assert.match(PWA_RUNTIME_JS, /if\s*\(\s*window\.__xentra_deferred_prompt\s*\)\s*\{\s*broadcastPromptReady\(window\.__xentra_deferred_prompt\);?\s*\}/,
+    'pwa-runtime.js must broadcast readiness on load if window.__xentra_deferred_prompt was pre-captured');
+});
+
+
 
