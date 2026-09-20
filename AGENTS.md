@@ -43,7 +43,7 @@ server/          Express app, routes, middleware, services, database
 core/            Platform foundations (events, identity/RBAC, config, integration, audit)
 apps/            Static frontends (customer-pwa, kitchen-display, merchant-dashboard)
 tests/           Node built-in test runner — mirrors domains/, core/, services/, client/
-tools/           Utility runners (telegram-runner, whatsapp-runner)
+tools/           Developer and administrative utility scripts (seed-demo, bootstrap, reset-admin)
 docs/notion/     Pinned Notion decision snapshots
 ```
 

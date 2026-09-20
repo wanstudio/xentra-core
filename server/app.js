@@ -3,7 +3,18 @@ const cors = require('cors');
 const path = require('path');
 const dotenv = require('dotenv');
 
-if (process.env.NODE_ENV !== 'test') {
+function isTestExecution() {
+  if (process.env.NODE_ENV === 'test') return true;
+  if (process.env.npm_lifecycle_event === 'test') return true;
+  if (Array.isArray(process.execArgv) && process.execArgv.some(a => typeof a === 'string' && a.startsWith('--test'))) return true;
+  if (Array.isArray(process.argv) && process.argv.slice(1).some(a => typeof a === 'string' && (a === '--test' || a.startsWith('--test-') || a.endsWith('.test.js') || a.endsWith('.spec.js')))) return true;
+  if (Array.isArray(process.moduleLoadList) && process.moduleLoadList.some(m => m.includes('test_runner') || m === 'NativeModule test')) return true;
+  return false;
+}
+
+if (isTestExecution()) {
+  process.env.NODE_ENV = 'test';
+} else if (process.env.NODE_ENV !== 'test') {
   dotenv.config();
 }
 

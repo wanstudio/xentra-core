@@ -1,13 +1,37 @@
 const path = require('path');
 const fs = require('fs');
 
+function isTestExecution() {
+  if (process.env.NODE_ENV === 'test') return true;
+  if (Array.isArray(process.execArgv) && process.execArgv.some(a => typeof a === 'string' && a.startsWith('--test'))) return true;
+  if (Array.isArray(process.argv) && process.argv.slice(1).some(a => typeof a === 'string' && (a === '--test' || a.startsWith('--test-') || a.endsWith('.test.js') || a.endsWith('.spec.js')))) return true;
+  if (Array.isArray(process.moduleLoadList) && process.moduleLoadList.some(m => m.includes('test_runner') || m === 'NativeModule test')) return true;
+  return false;
+}
+
 const DB_PATH = (() => {
   // Test Environment: Hard isolation guarantee.
   // Tests MUST NEVER write to or resolve against the production database file.
   const prodPath = path.resolve(__dirname, 'xentra.db');
-  const prodReal = fs.existsSync(prodPath) ? fs.realpathSync(prodPath) : prodPath;
+  let prodReal = prodPath;
+  try {
+    if (fs.existsSync(prodPath)) {
+      prodReal = fs.realpathSync(prodPath);
+    }
+  } catch (_) {}
 
-  if (process.env.NODE_ENV === 'test') {
+  // Explicit fail-closed invariant:
+  // Subprocess or test invocation with npm_lifecycle_event=test without NODE_ENV=test fails fast
+  if (process.env.npm_lifecycle_event === 'test' && process.env.NODE_ENV !== 'test') {
+    throw new Error('[Database Safety Guard] Running tests without NODE_ENV=test is strictly prohibited. Production DB access blocked.');
+  }
+
+  const isTest = isTestExecution();
+
+  if (isTest) {
+    // If running in test context, enforce NODE_ENV=test
+    process.env.NODE_ENV = 'test';
+
     if (process.env.DB_PATH && process.env.DB_PATH !== ':memory:') {
       // If a test explicitly supplies a test file, it must not be the production DB
       const resolvedTestPath = path.resolve(process.env.DB_PATH);
@@ -26,10 +50,9 @@ const DB_PATH = (() => {
     return ':memory:';
   }
 
-  // Non-test execution must refuse to run if testing flags are detected
-  if (process.env.npm_lifecycle_event === 'test') {
-    // We were invoked by npm test or node test runner without NODE_ENV=test
-    throw new Error('[Database Safety Guard] Running tests without NODE_ENV=test is strictly prohibited. Production DB access blocked.');
+  // Double check: if target DB is production, but somehow test execution is detected
+  if (isTestExecution()) {
+    throw new Error('[Database Safety Guard] Test runner detected attempting to access production database. Execution blocked.');
   }
 
   return process.env.DB_PATH || path.join(__dirname, 'xentra.db');

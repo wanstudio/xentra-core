@@ -23,13 +23,8 @@ npm-debug.log*
 Thumbs.db
 tmp/
 
-# WhatsApp authentication/session runtime artifacts
-tools/whatsapp-runner/auth_session/*
-!tools/whatsapp-runner/auth_session/.gitkeep
 tools/**/.env
 tools/**/.env.local
-auth_session/
-*.session
 
 
 # Uploaded category images (test/runtime artifacts — not source)
