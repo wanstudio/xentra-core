@@ -10739,6 +10739,7 @@ router.patch('/admin/marketing/promotions/:id/presentation', requireAuth(['owner
       banner_subtitle,
       reward_title,
       reward_badge_text,
+      cta_text,
       media_id,
       icon_url
     } = req.body || {};
@@ -10750,6 +10751,9 @@ router.patch('/admin/marketing/promotions/:id/presentation', requireAuth(['owner
     }
     if (banner_subtitle !== undefined) {
       presentationUpdates.banner_subtitle = typeof banner_subtitle === 'string' ? banner_subtitle.trim() : '';
+    }
+    if (cta_text !== undefined) {
+      presentationUpdates.cta_text = typeof cta_text === 'string' ? cta_text.trim() : '';
     }
     if (reward_title !== undefined) {
       presentationUpdates.reward_title = typeof reward_title === 'string' ? reward_title.trim() : '';

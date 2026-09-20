@@ -4582,180 +4582,280 @@
     </div>
   </div>
 
-  <!-- Modal: Owner Promotion Campaign Builder / Editor -->
+  <!-- Modal: Owner Promotion Campaign Builder / Editor (Reworked UX) -->
   <div id="modal-mkt-promotion" class="x-modal-backdrop" onclick="if (event.target === this) closePromotionModal()" style="display:none; z-index: 1050;">
-    <div class="x-modal-card x-modal-lg" style="max-width: 720px; width: 100%; max-height: 90vh; display: flex; flex-direction: column;">
-      <div class="x-modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+    <div class="x-modal-card x-modal-lg" style="max-width: 760px; width: 100%; max-height: 92vh; display: flex; flex-direction: column; background: #ffffff; border-radius: 14px; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.22); overflow: hidden;">
+      
+      <!-- Modal Header -->
+      <div class="x-modal-header" style="padding: 18px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
         <div>
-          <h3 id="modal-mkt-promo-title" style="margin: 0; font-size: 16px; font-weight: 700;">Buat Program Promosi Baru</h3>
-          <p class="text-muted" style="margin: 2px 0 0; font-size: 12px;">Konfigurasi aturan kampanye, hadiah produk master, dan cakupan cabang.</p>
+          <h3 id="modal-mkt-promo-title" style="margin: 0; font-size: 17px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">Buat Program Promosi Baru</h3>
+          <p class="text-muted" style="margin: 3px 0 0; font-size: 12px; color: #64748b;">Atur keuntungan pelanggan, syarat berlakunya promo, dan tampilan banner.</p>
         </div>
-        <button type="button" class="x-modal-close" onclick="closePromotionModal()">✕</button>
+        <button type="button" class="x-modal-close" onclick="closePromotionModal()" style="font-size: 18px; color: #64748b; background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px;">✕</button>
       </div>
+
+      <!-- Form Body -->
       <form id="form-mkt-promotion" onsubmit="submitPromotionForm(event)" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
         <input type="hidden" id="mkt-promo-id" value="">
-        <div style="padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; flex: 1;">
-          <!-- Basic Info -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-            <div>
-              <label for="mkt-promo-name" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Nama Kampanye / Promo <span style="color:red;">*</span></label>
-              <input type="text" id="mkt-promo-name" class="x-input" placeholder="Misal: Hadiah Instalasi Aplikasi PWA" required style="width: 100%; font-size: 13px;">
-            </div>
-            <div>
-              <label for="mkt-promo-code" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Kode Promo / Kupon (Opsional)</label>
-              <input type="text" id="mkt-promo-code" class="x-input" placeholder="Misal: PWABANGJO" style="width: 100%; font-size: 13px; text-transform: uppercase;">
-            </div>
-          </div>
 
-          <!-- Engine Capability & Stacking Policy -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-            <div>
-              <label for="mkt-promo-capability" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Tipe Kemampuan Promosi</label>
-              <select id="mkt-promo-capability" class="x-input" style="width: 100%; font-size: 13px;" onchange="onPromotionCapabilityChange()">
-                <option value="install_incentive">Insentif Instalasi PWA (Install Incentive)</option>
-                <option value="first_order">Pesanan Pertama (First Order Only)</option>
-                <option value="general">Promosi Umum (General Campaign)</option>
-              </select>
+        <div style="padding: 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; flex: 1; background: #f8fafc;">
+          
+          <!-- SECTION A: INFORMASI PROMO -->
+          <div class="x-promo-section-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 12px;">A</span>
+              <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">Informasi Promo</h4>
             </div>
-            <div>
-              <label for="mkt-promo-stacking" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Kebijakan Stacking Diskon</label>
-              <select id="mkt-promo-stacking" class="x-input" style="width: 100%; font-size: 13px;">
-                <option value="exclusive">Eksklusif (Exclusive - Tidak bisa digabung)</option>
-                <option value="combinable">Dapat Digabung (Combinable)</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Limits & Status -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
-            <div>
-              <label for="mkt-promo-limit-per-user" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Batas per Pelanggan</label>
-              <input type="number" id="mkt-promo-limit-per-user" class="x-input" value="1" min="1" style="width: 100%; font-size: 13px;">
-            </div>
-            <div>
-              <label for="mkt-promo-limit-total" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Batas Total Klaim (Opsional)</label>
-              <input type="number" id="mkt-promo-limit-total" class="x-input" placeholder="Tidak terbatas" min="1" style="width: 100%; font-size: 13px;">
-            </div>
-            <div>
-              <label for="mkt-promo-status" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Status Aktivasi Brand</label>
-              <select id="mkt-promo-status" class="x-input" style="width: 100%; font-size: 13px;">
-                <option value="1">Aktif (Enabled)</option>
-                <option value="0">Nonaktif (Disabled)</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- Promotion Schedule (Start / End Date) -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-            <div>
-              <label for="mkt-promo-start-at" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Mulai Promosi (Opsional)</label>
-              <input type="datetime-local" id="mkt-promo-start-at" class="x-input" style="width: 100%; font-size: 13px;">
-              <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Kosongkan jika langsung aktif.</small>
-            </div>
-            <div>
-              <label for="mkt-promo-end-at" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Berakhir Promosi (Opsional)</label>
-              <input type="datetime-local" id="mkt-promo-end-at" class="x-input" style="width: 100%; font-size: 13px;">
-              <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Kosongkan jika berlaku tanpa batas waktu.</small>
-            </div>
-          </div>
-
-          <!-- Reward Configuration Box -->
-          <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px;">
-            <div style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
-              🎁 Konfigurasi Hadiah (Reward)
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 14px;">
-              <div>
-                <label for="mkt-promo-reward-type" style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px;">Bentuk Hadiah</label>
-                <select id="mkt-promo-reward-type" class="x-input" style="width: 100%; font-size: 13px;">
-                  <option value="freebie_product">Produk Gratis (Freebie Item)</option>
-                </select>
-              </div>
-              <div>
-                <label for="mkt-promo-target-product" style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px;">Pilih Menu dari Master Katalog <span style="color:red;">*</span></label>
-                <select id="mkt-promo-target-product" class="x-input" required style="width: 100%; font-size: 13px;">
-                  <option value="">-- Memuat Produk Katalog --</option>
-                </select>
-                <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 3px;">Produk hadiah diambil dari katalog master resmi, bukan synthetic data.</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Floating PWA Install Presentation Box (Marketing Driven) -->
-          <div id="mkt-promo-presentation-box" style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px;">
-            <div style="font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-              📱 Presentasi Floating Install PWA (Customer View)
-            </div>
-            <p class="text-muted" style="margin: 0 0 14px; font-size: 12px;">Atur tampilan banner floating install yang dilihat pelanggan di Customer Web App.</p>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-              <div>
-                <label for="mkt-promo-banner-title" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Judul Banner (Headline) <span style="color:red;">*</span></label>
-                <input type="text" id="mkt-promo-banner-title" class="x-input" placeholder="Misal: Install sekarang & dapatkan promo spesial" maxlength="100" style="width: 100%; font-size: 13px;" oninput="updatePromotionPresentationPreview()">
+              <div style="grid-column: span 2;">
+                <label for="mkt-promo-name" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 5px;">Nama Promo <span style="color:#ef4444;">*</span></label>
+                <input type="text" id="mkt-promo-name" class="x-input" placeholder="Contoh: Hadiah Instalasi Aplikasi PWA" required style="width: 100%; font-size: 13px;">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Nama program untuk identifikasi di dashboard dan laporan.</small>
               </div>
+
               <div>
-                <label for="mkt-promo-banner-subtitle" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Sub-headline (S&K Singkat)</label>
-                <input type="text" id="mkt-promo-banner-subtitle" class="x-input" placeholder="Misal: Gratis untuk pesanan pertama • S&K berlaku" maxlength="120" style="width: 100%; font-size: 13px;" oninput="updatePromotionPresentationPreview()">
+                <label for="mkt-promo-capability" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 5px;">Jenis Promo</label>
+                <select id="mkt-promo-capability" class="x-input" style="width: 100%; font-size: 13px;" onchange="onPromotionCapabilityChange()">
+                  <option value="install_incentive">Hadiah Pemasangan Aplikasi PWA</option>
+                  <option value="first_order">Pesanan Pertama Pelanggan Baru</option>
+                  <option value="general">Promosi Umum</option>
+                </select>
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Menentukan momen pemicu promo.</small>
+              </div>
+
+              <div>
+                <label for="mkt-promo-status" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 5px;">Status Promo</label>
+                <select id="mkt-promo-status" class="x-input" style="width: 100%; font-size: 13px;">
+                  <option value="1">Aktif</option>
+                  <option value="0">Nonaktif</option>
+                </select>
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Pelanggan hanya dapat melihat & mengklaim promo yang aktif.</small>
+              </div>
+
+              <div style="grid-column: span 2;">
+                <label for="mkt-promo-code" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 5px;">Kode Promo / Kupon <span style="font-size:11px; font-weight:400; color:#64748b;">(Opsional)</span></label>
+                <input type="text" id="mkt-promo-code" class="x-input" placeholder="Misal: PWABANGJO" style="width: 100%; font-size: 13px; text-transform: uppercase;">
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION B: BENEFIT / KEUNTUNGAN CUSTOMER -->
+          <div class="x-promo-section-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: #dcfce7; color: #15803d; font-weight: 700; font-size: 12px;">B</span>
+                <div>
+                  <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">Customer Mendapat Apa?</h4>
+                  <span style="font-size: 11px; color: #64748b;">Pilih bentuk keuntungan yang langsung dinikmati pelanggan.</span>
+                </div>
+              </div>
+              <span class="x-badge" style="background: #f0fdf4; color: #16a34a; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; border: 1px solid #bbf7d0;">Benefit Promo</span>
+            </div>
+
+            <!-- Benefit Selector Buttons / Radios -->
+            <div style="margin-bottom: 14px;">
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 6px;">Bentuk Keuntungan</label>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <label style="display: inline-flex; align-items: center; gap: 8px; border: 2px solid #0f172a; background: #f8fafc; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: #0f172a;">
+                  <input type="radio" name="mkt-promo-benefit-type-ui" value="freebie_product" checked onchange="onPromotionBenefitTypeUiChange('freebie_product')">
+                  🎁 Produk Gratis
+                </label>
+                <!-- Disabled note for unsupported backend types -->
+                <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8; padding: 8px 10px; background: #f1f5f9; border-radius: 8px; border: 1px dashed #cbd5e1;" title="Fitur diskon persentase dan potongan nota sedang dalam roadmap pengembangan.">
+                  <span>🏷️ Diskon / Potongan Nota</span>
+                  <span style="font-size: 10px; background: #e2e8f0; color: #64748b; padding: 1px 6px; border-radius: 4px; font-weight: 600;">Segera Hadir</span>
+                </div>
+              </div>
+              <input type="hidden" id="mkt-promo-reward-type" value="freebie_product">
+            </div>
+
+            <!-- Freebie Product Details Box -->
+            <div id="mkt-promo-benefit-freebie-box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px;">
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px;">
+                <div>
+                  <label for="mkt-promo-target-product" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Produk yang Diberikan <span style="color:#ef4444;">*</span></label>
+                  <select id="mkt-promo-target-product" class="x-input" required style="width: 100%; font-size: 13px;" onchange="onPromotionProductSelected()">
+                    <option value="">-- Pilih Produk dari Menu Master --</option>
+                  </select>
+                  <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Diambil dari menu master resmi brand.</small>
+                </div>
+                <div>
+                  <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Jumlah Diberikan</label>
+                  <input type="text" class="x-input" value="1 porsi / item" readonly disabled style="width: 100%; font-size: 13px; background: #e2e8f0; color: #475569; font-weight: 600;">
+                  <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">1 item per klaim valid.</small>
+                </div>
+              </div>
+
+              <!-- Product Price Summary Callout -->
+              <div id="mkt-promo-product-summary" style="margin-top: 12px; padding: 10px 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
+                <div>
+                  <span class="text-muted">Harga normal produk: </span>
+                  <strong id="mkt-promo-product-normal-price" style="color: #475569;">-</strong>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="text-muted">Biaya untuk customer: </span>
+                  <span class="x-badge" style="background: #dcfce7; color: #15803d; font-weight: 700; font-size: 12px; padding: 3px 10px; border-radius: 6px;">Rp0 (GRATIS)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION C: SYARAT & PEMBERLAKUAN (KETENTUAN PROMO) -->
+          <div class="x-promo-section-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: #fef3c7; color: #b45309; font-weight: 700; font-size: 12px;">C</span>
+              <div>
+                <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">Ketentuan Promo</h4>
+                <span style="font-size: 11px; color: #64748b;">Batasan kuota, penggabungan promo, jadwal aktif, dan cabang yang berlaku.</span>
               </div>
             </div>
 
-            <!-- Icon / Media Selection -->
-            <div style="margin-top: 14px; display: flex; gap: 16px; align-items: center;">
+            <!-- Stacking & Usage Limits -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+              <div>
+                <label for="mkt-promo-stacking" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Kebijakan dengan Promo Lain</label>
+                <select id="mkt-promo-stacking" class="x-input" style="width: 100%; font-size: 13px;">
+                  <option value="exclusive">Tidak dapat digabung (Eksklusif)</option>
+                  <option value="combinable">Dapat digabung dengan promo lain</option>
+                </select>
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Aturan saat ada promo aktif lain.</small>
+              </div>
+
+              <div>
+                <label for="mkt-promo-limit-per-user" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Batas per Pelanggan</label>
+                <input type="number" id="mkt-promo-limit-per-user" class="x-input" value="1" min="1" style="width: 100%; font-size: 13px;">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Maksimal klaim tiap pelanggan.</small>
+              </div>
+
+              <div>
+                <label for="mkt-promo-limit-total" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Batas Total Penggunaan <span style="font-size:11px; font-weight:400; color:#64748b;">(Opsional)</span></label>
+                <input type="number" id="mkt-promo-limit-total" class="x-input" placeholder="Tidak terbatas" min="1" style="width: 100%; font-size: 13px;">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Kosongkan bila tanpa kuota total.</small>
+              </div>
+            </div>
+
+            <!-- Promotion Schedule -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
+              <div style="font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">🗓️ Periode Berlaku Promo</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div>
+                  <label for="mkt-promo-start-at" style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Mulai Promo</label>
+                  <input type="datetime-local" id="mkt-promo-start-at" class="x-input" style="width: 100%; font-size: 12px;">
+                  <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Kosongkan jika langsung aktif.</small>
+                </div>
+                <div>
+                  <label for="mkt-promo-end-at" style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Berakhir Promo</label>
+                  <input type="datetime-local" id="mkt-promo-end-at" class="x-input" style="width: 100%; font-size: 12px;">
+                  <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Kosongkan jika berlaku selamanya.</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Branch Availability Scoping Box -->
+            <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div>
+                  <div style="font-size: 12px; font-weight: 700; color: #1e293b;">🏢 Cabang yang Ikut Promo</div>
+                  <div style="font-size: 11px; color: #64748b;">Promo hanya berlaku di cabang yang dicentang.</div>
+                </div>
+                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; cursor: pointer; color: #0f172a;">
+                  <input type="checkbox" id="mkt-promo-branches-all" onchange="togglePromoSelectAllBranches(this.checked)">
+                  Pilih Semua Cabang
+                </label>
+              </div>
+              <div id="mkt-promo-branches-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; max-height: 140px; overflow-y: auto; padding: 2px;">
+                <span class="text-muted" style="font-size: 12px;">Memuat cabang...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION D: YANG DILIHAT CUSTOMER (PRESENTASI BANNER) -->
+          <div id="mkt-promo-presentation-box" class="x-promo-section-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: #ede9fe; color: #6d28d9; font-weight: 700; font-size: 12px;">D</span>
+                <div>
+                  <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">Yang Dilihat Customer</h4>
+                  <span style="font-size: 11px; color: #64748b;">Atur pesan banner floating install yang muncul di layar pelanggan.</span>
+                </div>
+              </div>
+              <span class="x-badge" style="background: #f5f3ff; color: #7c3aed; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; border: 1px solid #ddd6fe;">Floating Install PWA</span>
+            </div>
+
+            <!-- Headline, Subtitle, & CTA Text -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+              <div style="grid-column: span 2;">
+                <label for="mkt-promo-banner-title" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Headline Banner <span style="color:#ef4444;">*</span></label>
+                <input type="text" id="mkt-promo-banner-title" class="x-input" placeholder="Contoh: Install sekarang & dapatkan gratis es teh" maxlength="100" style="width: 100%; font-size: 13px;" oninput="updatePromotionPresentationPreview()">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Judul utama yang langsung dibaca pelanggan.</small>
+              </div>
+
+              <div>
+                <label for="mkt-promo-cta-text" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Teks Tombol (CTA)</label>
+                <input type="text" id="mkt-promo-cta-text" class="x-input" value="Install" placeholder="Install" maxlength="20" style="width: 100%; font-size: 13px;" oninput="updatePromotionPresentationPreview()">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Default: Install</small>
+              </div>
+
+              <div style="grid-column: span 3;">
+                <label for="mkt-promo-banner-subtitle" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Sub-headline (Keterangan / S&K Singkat)</label>
+                <input type="text" id="mkt-promo-banner-subtitle" class="x-input" placeholder="Contoh: syarat & ketentuan berlaku" maxlength="120" style="width: 100%; font-size: 13px;" oninput="updatePromotionPresentationPreview()">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Teks sekunder di bawah judul banner.</small>
+              </div>
+            </div>
+
+            <!-- Icon / Logo Selection -->
+            <div style="display: flex; gap: 16px; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
               <input type="hidden" id="mkt-promo-media-id" value="">
               <input type="hidden" id="mkt-promo-icon-url" value="">
-              <div style="width: 52px; height: 52px; border-radius: 10px; border: 1px solid var(--border-color); background: #f8fafc; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <div style="width: 48px; height: 48px; border-radius: 10px; border: 1px solid #cbd5e1; background: #ffffff; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
                 <img id="mkt-promo-icon-preview" src="/assets/pwa/icon-192.png" alt="Promo Icon" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/assets/pwa/icon-192.png'">
               </div>
               <div style="flex: 1;">
-                <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Icon Banner</label>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                  <button type="button" class="x-btn-secondary" style="padding: 5px 12px; font-size: 12px;" onclick="document.getElementById('mkt-promo-icon-file').click()">Ganti Icon Media</button>
+                <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Logo / Icon Promo</label>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <button type="button" class="x-btn-secondary" style="padding: 5px 12px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById('mkt-promo-icon-file').click()">Ganti Logo</button>
                   <button type="button" class="x-btn-ghost" style="padding: 5px 10px; font-size: 12px; color: #ef4444;" onclick="resetPromotionIconToDefault()">Gunakan Default</button>
                   <input type="file" id="mkt-promo-icon-file" accept="image/png,image/jpeg,image/webp" style="display: none;" onchange="onPromotionIconFileSelected(this.files[0])">
                 </div>
-                <span id="mkt-promo-icon-status" style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1 disarankan).</span>
+                <span id="mkt-promo-icon-status" style="font-size: 11px; color: #64748b; display: block; margin-top: 4px;">Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1).</span>
               </div>
             </div>
 
-            <!-- Live Preview Card -->
-            <div style="margin-top: 14px; background: #f1f5f9; border-radius: 8px; padding: 12px;">
-              <span style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;">Live Preview Floating Card di Customer:</span>
-              <div style="background: #ffffff; border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 12px rgba(0,0,0,0.08); max-width: 400px; border: 1px solid #e2e8f0;">
+            <!-- Realtime Live Preview Card -->
+            <div style="background: #f1f5f9; border-radius: 8px; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">Preview Real-Time di Layar Customer:</span>
+                <span style="font-size: 10px; color: #64748b;">Styling tombol terkunci sesuai standar platform</span>
+              </div>
+              <!-- Floating Banner Card with locked CTA styling (Dark Gray CTA + White Text) -->
+              <div style="background: #ffffff; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0; max-width: 480px;">
                 <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">
                   <img id="mkt-promo-live-icon" src="/assets/pwa/icon-192.png" alt="" style="width: 38px; height: 38px; border-radius: 8px; object-fit: cover; flex-shrink: 0;" onerror="this.src='/assets/pwa/icon-192.png'">
                   <div style="min-width: 0; flex: 1;">
-                    <div id="mkt-promo-live-title" style="font-size: 12px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Install & dapatkan promo spesial</div>
-                    <div id="mkt-promo-live-subtitle" style="font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Gratis untuk pesanan pertama • S&K berlaku</div>
+                    <div id="mkt-promo-live-title" style="font-size: 12px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Install sekarang & dapatkan gratis es teh</div>
+                    <div id="mkt-promo-live-subtitle" style="font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">syarat & ketentuan berlaku</div>
                   </div>
                 </div>
-                <div style="display: flex; align-items: center; gap: 6px; margin-left: 8px;">
-                  <button type="button" disabled style="background: var(--primary-color, #16a34a); color: #fff; border: none; border-radius: 6px; padding: 5px 10px; font-size: 11px; font-weight: 600; cursor: default;">Install</button>
-                  <span style="color: #94a3b8; font-size: 12px; cursor: default;">✕</span>
+                <!-- Locked CTA Button: Dark Gray Background (#0f172a) + White Text (#ffffff) -->
+                <div style="display: flex; align-items: center; gap: 8px; margin-left: 10px; flex-shrink: 0;">
+                  <button type="button" disabled style="background: #0f172a; color: #ffffff; border: none; border-radius: 20px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: default; letter-spacing: 0.01em;">
+                    <span id="mkt-promo-live-cta-btn">Install</span>
+                  </button>
+                  <span style="color: #94a3b8; font-size: 13px; cursor: default; padding: 2px;">✕</span>
                 </div>
               </div>
             </div>
+
           </div>
 
-          <!-- Branch Availability Scoping Box -->
-          <div style="border: 1px solid var(--border-color); border-radius: 8px; padding: 14px 16px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <div>
-                <div style="font-size: 13px; font-weight: 700; color: #1e293b;">🏢 Ketersediaan Cabang (Branch Scope)</div>
-                <div style="font-size: 11px; color: var(--text-muted);">Pilih cabang mana saja yang berpartisipasi dan melayani hadiah promosi ini.</div>
-              </div>
-              <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; cursor: pointer;">
-                <input type="checkbox" id="mkt-promo-branches-all" onchange="togglePromoSelectAllBranches(this.checked)">
-                Pilih Semua Cabang
-              </label>
-            </div>
-            <div id="mkt-promo-branches-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; max-height: 160px; overflow-y: auto; padding: 4px 0;">
-              <span class="text-muted" style="font-size: 12px;">Memuat cabang...</span>
-            </div>
-          </div>
         </div>
-        <div class="x-modal-footer" style="padding: 14px 20px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-          <button type="button" class="x-btn-secondary" onclick="closePromotionModal()">Batal</button>
-          <button type="submit" id="btn-mkt-submit-promo" class="x-btn-primary">Simpan Program Promosi</button>
+
+        <!-- Modal Sticky Footer -->
+        <div class="x-modal-footer" style="padding: 14px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
+          <button type="button" class="x-btn-secondary" onclick="closePromotionModal()" style="padding: 9px 18px; font-size: 13px; border-radius: 8px;">Batal</button>
+          <button type="submit" id="btn-mkt-submit-promo" class="x-btn-primary" style="padding: 9px 20px; font-size: 13px; border-radius: 8px; font-weight: 700;">Simpan Promo</button>
         </div>
       </form>
     </div>

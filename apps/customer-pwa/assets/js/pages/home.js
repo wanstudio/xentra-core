@@ -170,7 +170,7 @@
             this.src = '/assets/pwa/icon-192.png';
           };
         }
-        if (installBtn) installBtn.textContent = 'Install';
+        if (installBtn) installBtn.textContent = display.cta_text || 'Install';
 
         banner.classList.add('x-pwa-banner-show');
       })

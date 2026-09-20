@@ -83,7 +83,8 @@ class InstallIncentiveStrategy extends BasePromotionStrategy {
         display: {
           banner_title: presentation.banner_title || 'Install sekarang & dapatkan promo spesial',
           banner_subtitle: presentation.banner_subtitle || 'syarat & ketentuan berlaku',
-          icon_url: presentation.icon_url || '/assets/pwa/icon-192.png'
+          icon_url: presentation.icon_url || '/assets/pwa/icon-192.png',
+          cta_text: presentation.cta_text || 'Install'
         }
       };
     }

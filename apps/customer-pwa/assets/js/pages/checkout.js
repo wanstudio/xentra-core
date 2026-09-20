@@ -132,7 +132,7 @@
         '  <div class="x-alt-promo-banner" id="x-promo-banner">' +
         '    <img class="x-alt-promo-img" src="' + UI.escape(b.icon_url || '/assets/pwa/icon-192.png') + '" alt="" onerror="this.style.display=\'none\'">' +
         '    <div class="x-alt-promo-copy"><div class="x-alt-promo-title">' + UI.escape(b.banner_title || 'Promo Menarik') + '</div><div class="x-alt-promo-snk">' + UI.escape(b.banner_subtitle || '') + '</div></div>' +
-        '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-install">Install</button>' +
+        '    <button type="button" class="x-alt-promo-install" id="x-btn-promo-install">' + UI.escape(b.cta_text || 'Install') + '</button>' +
         '  </div>'
       );
     } else if (rewardPromo && rewardPromo.display) {

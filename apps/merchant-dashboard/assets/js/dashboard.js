@@ -9236,22 +9236,57 @@
   }
   window.onPromotionCapabilityChange = onPromotionCapabilityChange;
 
+  function onPromotionBenefitTypeUiChange(type) {
+    var rewardTypeInput = $('mkt-promo-reward-type');
+    if (rewardTypeInput) rewardTypeInput.value = type || 'freebie_product';
+    var freebieBox = $('mkt-promo-benefit-freebie-box');
+    if (freebieBox) {
+      freebieBox.style.display = (type === 'freebie_product') ? 'block' : 'none';
+    }
+  }
+  window.onPromotionBenefitTypeUiChange = onPromotionBenefitTypeUiChange;
+
+  function onPromotionProductSelected() {
+    var selectEl = $('mkt-promo-target-product');
+    var normalPriceEl = $('mkt-promo-product-normal-price');
+    if (!selectEl || !normalPriceEl) return;
+
+    var prodId = selectEl.value;
+    if (!prodId) {
+      normalPriceEl.textContent = '-';
+      return;
+    }
+
+    var prods = _marketingPromotionsState.masterProducts || [];
+    var prod = prods.find(function (p) { return String(p.id) === String(prodId); });
+    if (prod && prod.price !== undefined && prod.price !== null) {
+      normalPriceEl.textContent = formatMoney(prod.price);
+    } else {
+      normalPriceEl.textContent = '-';
+    }
+  }
+  window.onPromotionProductSelected = onPromotionProductSelected;
+
   function updatePromotionPresentationPreview() {
     var titleInput = $('mkt-promo-banner-title');
     var subtitleInput = $('mkt-promo-banner-subtitle');
+    var ctaInput = $('mkt-promo-cta-text');
     var iconUrlInput = $('mkt-promo-icon-url');
 
     var title = (titleInput && titleInput.value.trim()) || 'Install sekarang & dapatkan promo spesial';
-    var subtitle = (subtitleInput && subtitleInput.value.trim()) || 'Gratis untuk pesanan pertama • S&K berlaku';
+    var subtitle = (subtitleInput && subtitleInput.value.trim()) || 'syarat & ketentuan berlaku';
+    var ctaText = (ctaInput && ctaInput.value.trim()) || 'Install';
     var iconUrl = (iconUrlInput && iconUrlInput.value.trim()) || '/assets/pwa/icon-192.png';
 
     var liveTitle = $('mkt-promo-live-title');
     var liveSubtitle = $('mkt-promo-live-subtitle');
+    var liveCtaBtn = $('mkt-promo-live-cta-btn');
     var liveIcon = $('mkt-promo-live-icon');
     var previewIcon = $('mkt-promo-icon-preview');
 
     if (liveTitle) liveTitle.textContent = title;
     if (liveSubtitle) liveSubtitle.textContent = subtitle;
+    if (liveCtaBtn) liveCtaBtn.textContent = ctaText;
     if (liveIcon) liveIcon.src = iconUrl;
     if (previewIcon) previewIcon.src = iconUrl;
   }
@@ -9390,17 +9425,19 @@
     // Reset Presentation inputs
     if ($('mkt-promo-banner-title')) $('mkt-promo-banner-title').value = '';
     if ($('mkt-promo-banner-subtitle')) $('mkt-promo-banner-subtitle').value = '';
+    if ($('mkt-promo-cta-text')) $('mkt-promo-cta-text').value = 'Install';
     if ($('mkt-promo-media-id')) $('mkt-promo-media-id').value = '';
     if ($('mkt-promo-icon-url')) $('mkt-promo-icon-url').value = '/assets/pwa/icon-192.png';
     if ($('mkt-promo-icon-status')) {
-      $('mkt-promo-icon-status').textContent = 'Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1 disarankan).';
-      $('mkt-promo-icon-status').style.color = 'var(--text-muted)';
+      $('mkt-promo-icon-status').textContent = 'Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1).';
+      $('mkt-promo-icon-status').style.color = '#64748b';
     }
 
     modal.style.display = 'flex';
 
     await ensureMarketingDependenciesLoaded();
     renderPromoProductOptions(null);
+    onPromotionProductSelected();
     renderPromoBranchCheckboxes(null); // default all selected
     onPromotionCapabilityChange();
     updatePromotionPresentationPreview();
@@ -9455,6 +9492,7 @@
     // Populate Presentation fields
     if ($('mkt-promo-banner-title')) $('mkt-promo-banner-title').value = presPayload.banner_title || '';
     if ($('mkt-promo-banner-subtitle')) $('mkt-promo-banner-subtitle').value = presPayload.banner_subtitle || '';
+    if ($('mkt-promo-cta-text')) $('mkt-promo-cta-text').value = presPayload.cta_text || 'Install';
     if ($('mkt-promo-media-id')) $('mkt-promo-media-id').value = presPayload.media_id || '';
     if ($('mkt-promo-icon-url')) $('mkt-promo-icon-url').value = presPayload.icon_url || '/assets/pwa/icon-192.png';
     if ($('mkt-promo-icon-status')) {
@@ -9462,8 +9500,8 @@
         $('mkt-promo-icon-status').textContent = '✓ Menggunakan media kustom (ID: ' + presPayload.media_id + ')';
         $('mkt-promo-icon-status').style.color = '#16a34a';
       } else {
-        $('mkt-promo-icon-status').textContent = 'Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1 disarankan).';
-        $('mkt-promo-icon-status').style.color = 'var(--text-muted)';
+        $('mkt-promo-icon-status').textContent = 'Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1).';
+        $('mkt-promo-icon-status').style.color = '#64748b';
       }
     }
 
@@ -9476,6 +9514,7 @@
 
     await ensureMarketingDependenciesLoaded();
     renderPromoProductOptions(targetProdId);
+    onPromotionProductSelected();
     renderPromoBranchCheckboxes(selectedBranchIds.length ? selectedBranchIds : null);
     onPromotionCapabilityChange();
     updatePromotionPresentationPreview();
@@ -9510,9 +9549,18 @@
       return;
     }
     if (!targetProductId) {
-      showToast('Pilih produk hadiah dari katalog master.');
+      showToast('Pilih produk gratis dari menu master.');
       return;
     }
+
+    if (capability === 'install_incentive') {
+      var checkBannerTitle = $('mkt-promo-banner-title') ? $('mkt-promo-banner-title').value.trim() : '';
+      if (!checkBannerTitle) {
+        showToast('Headline banner wajib diisi.');
+        return;
+      }
+    }
+
     if (startAtVal && endAtVal) {
       var sTime = new Date(startAtVal).getTime();
       var eTime = new Date(endAtVal).getTime();
@@ -9547,12 +9595,14 @@
     // Build presentation payload
     var bannerTitle = $('mkt-promo-banner-title') ? $('mkt-promo-banner-title').value.trim() : '';
     var bannerSubtitle = $('mkt-promo-banner-subtitle') ? $('mkt-promo-banner-subtitle').value.trim() : '';
+    var ctaText = $('mkt-promo-cta-text') ? $('mkt-promo-cta-text').value.trim() : '';
     var mediaId = $('mkt-promo-media-id') ? $('mkt-promo-media-id').value.trim() : '';
     var iconUrl = $('mkt-promo-icon-url') ? $('mkt-promo-icon-url').value.trim() : '';
 
     var presentationPayload = {
       banner_title: bannerTitle || 'Install sekarang & dapatkan promo spesial',
-      banner_subtitle: bannerSubtitle || 'Gratis untuk pesanan pertama • S&K berlaku',
+      banner_subtitle: bannerSubtitle || 'syarat & ketentuan berlaku',
+      cta_text: ctaText || 'Install',
       reward_title: 'Selamat! Hadiah spesial untuk pesanan pertamamu!',
       reward_badge_text: '✓ Bonus PWA Aktif (Rp0)',
       media_id: mediaId || null,

@@ -195,7 +195,7 @@ describe('Promotion Install Floating Presentation Suite', () => {
     assert.equal(parsed.banner_title, 'Custom Marketing Headline', 'Preserved custom marketing headline');
   });
 
-  it('2. PATCH /admin/marketing/promotions/:id/presentation updates headline, subtitle, and ready icon', async () => {
+  it('2. PATCH /admin/marketing/promotions/:id/presentation updates headline, subtitle, cta_text, and ready icon', async () => {
     const ownerToken = seedStaffSession({ role: 'owner', brandId: BRAND_A });
     const res = await request(
       'PATCH',
@@ -203,6 +203,7 @@ describe('Promotion Install Floating Presentation Suite', () => {
       {
         banner_title: 'Dapatkan Hadiah Spesial!',
         banner_subtitle: 'Khusus pengguna aplikasi PWA',
+        cta_text: 'Ambil Hadiah',
         media_id: mediaReadyBrandA
       },
       { 'Authorization': `Bearer ${ownerToken}` }
@@ -213,6 +214,7 @@ describe('Promotion Install Floating Presentation Suite', () => {
     const reward = res.body.promotion.rewards[0];
     assert.equal(reward.presentation.banner_title, 'Dapatkan Hadiah Spesial!');
     assert.equal(reward.presentation.banner_subtitle, 'Khusus pengguna aplikasi PWA');
+    assert.equal(reward.presentation.cta_text, 'Ambil Hadiah');
     assert.equal(reward.presentation.media_id, mediaReadyBrandA);
     assert.ok(reward.presentation.icon_url, 'Icon URL populated');
     assert.ok(reward.presentation_delivery, 'Presentation delivery resolved');
@@ -276,7 +278,7 @@ describe('Promotion Install Floating Presentation Suite', () => {
     assert.equal(promo.rewards[0].presentation.banner_title, 'Dapatkan Hadiah Spesial!');
   });
 
-  it('7. Customer GET /promotions/active returns configured banner_title, banner_subtitle, and icon_url', async () => {
+  it('7. Customer GET /promotions/active returns configured banner_title, banner_subtitle, cta_text, and icon_url', async () => {
     const res = await request(
       'GET',
       '/api/v1/promotions/active?is_pwa=0&phone=',
@@ -290,6 +292,7 @@ describe('Promotion Install Floating Presentation Suite', () => {
     if (testDiscovery) {
       assert.equal(testDiscovery.display.banner_title, 'Dapatkan Hadiah Spesial!');
       assert.equal(testDiscovery.display.banner_subtitle, 'Khusus pengguna aplikasi PWA');
+      assert.equal(testDiscovery.display.cta_text, 'Ambil Hadiah');
       assert.ok(testDiscovery.display.icon_url);
     }
   });
