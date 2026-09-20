@@ -457,6 +457,23 @@
     loadUpsell();
     quoteNow();
 
+    // Restore payment state persisted before Google Auth redirect.
+    // The broker return handler navigates to #checkout which re-creates this
+    // controller with paymentMethod=null; the pending context restores it.
+    try {
+      var pendingRaw = sessionStorage.getItem('xnt_pending_checkout_payment');
+      if (pendingRaw) {
+        sessionStorage.removeItem('xnt_pending_checkout_payment');
+        var pending = JSON.parse(pendingRaw);
+        // 5-minute TTL: ignore stale pending state
+        if (pending && pending.ts && (Date.now() - pending.ts) < 5 * 60 * 1000) {
+          if (pending.paymentMethod) state.paymentMethod = pending.paymentMethod;
+          if (pending.cashTendered) state.cashTendered = pending.cashTendered;
+          if (pending.cashTenderedType) state.cashTenderedType = pending.cashTenderedType;
+        }
+      }
+    } catch (_) {}
+
     // Automatic retry checkout submission after successful auth broker return
     if (state.customer.isVerified) {
       var autoRetry = false;
@@ -2215,6 +2232,18 @@
     _googleAuthInFlight = false;
     if (typeof onSuccess === 'function') {
       try { sessionStorage.setItem('xnt_auth_auto_retry_checkout', '1'); } catch (_) {}
+      // Persist payment context so it survives the full browser redirect to
+      // the Google Auth Broker. The broker return handler navigates to
+      // #checkout which re-creates this controller with paymentMethod=null.
+      try {
+        var pending = {
+          paymentMethod: state.paymentMethod || null,
+          cashTendered: state.cashTendered || null,
+          cashTenderedType: state.cashTenderedType || null,
+          ts: Date.now()
+        };
+        sessionStorage.setItem('xnt_pending_checkout_payment', JSON.stringify(pending));
+      } catch (_) {}
     }
     renderGoogleIdentityGate(onSuccess);
   }
@@ -2246,6 +2275,7 @@
         // Cancel → return to checkout. No order created.
         _googleAuthInFlight = false;
         try { sessionStorage.removeItem('xnt_auth_auto_retry_checkout'); } catch (_) {}
+        try { sessionStorage.removeItem('xnt_pending_checkout_payment'); } catch (_) {}
         sh.close();
       };
     }
