@@ -306,15 +306,8 @@
         }
         return;
       }
-
-      // Native prompt not yet ready — bounded wait before manual fallback.
-      return pwaRt.waitForPrompt(3000).then(function (ready) {
-        if (ready) {
-          return pwaRt.promptInstall();
-        }
-        // Truly unavailable after bounded wait — manual guide fallback.
-        showPwaGuideSheet(platform);
-      });
+      // Native prompt not available right now — show manual guide immediately.
+      showPwaGuideSheet(platform);
     }).then(function (res) {
       if (res && res.accepted) {
         if (UI && UI.toast) UI.toast('Terima kasih! Selesaikan pemasangan aplikasi.');

@@ -1386,6 +1386,8 @@
   gap: 12px;
   box-shadow: var(--x-shadow-xl), var(--x-shadow-sm);
   border: 1px solid var(--x-gray-75);
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .x-pwa-banner-left {
