@@ -3138,52 +3138,78 @@
       return Boolean(it.is_promo_reward || it.promotion_id || String(it.id).indexOf('reward_') === 0);
     });
 
+    // Install-gated reward: server rejects with "syarat promo belum terpenuhi"
+    // when the app is not installed. Retrying the same submit would loop the
+    // sheet forever — offer Install instead.
+    var isInstallGated = isRewardError && hasRewardInCart && (function () {
+      var mentioned = errors.some(function (e) {
+        return String(e).toLowerCase().indexOf('syarat promo') !== -1;
+      });
+      var installed = false;
+      try { installed = checkIsPwaInstalled(); } catch (_) {}
+      return mentioned && !installed;
+    })();
+
+    // Single helper: strip invalid reward lines so neither CTA can loop the
+    // sheet. Accepting "changes" without removing a rejected reward would
+    // re-submit the same cart → same rejection → sheet reopens forever.
+    function stripRewardFromCart() {
+      var cartState = Store.getState().cart;
+      cartState.items = (cartState.items || []).filter(function (it) {
+        return !Boolean(it.is_promo_reward || it.promotion_id || String(it.id).indexOf('reward_') === 0);
+      });
+      try {
+        localStorage.setItem('xentra_cart', JSON.stringify(cartState));
+      } catch (_) {}
+    }
+
+    var titleHtml = 'Ada perubahan di pesananmu, cek dulu yuk';
+    var descHtml = 'Beberapa harga atau ketersediaan menu baru saja diperbarui oleh restoran.';
+    var acceptLabel = 'Perbarui Pesanan &amp; Lanjutkan';
+    if (isInstallGated) {
+      titleHtml = 'Hadiah khusus pengguna aplikasi';
+      descHtml = 'Hadiah promo ini hanya berlaku jika aplikasi sudah ter-install di perangkatmu. Install dulu, hadiah otomatis bisa diklaim.';
+      acceptLabel = 'Install Aplikasi';
+    }
+
     var removeRewardBtnHtml = '';
-    if (isRewardError && hasRewardInCart) {
+    if (isRewardError && hasRewardInCart && !isInstallGated) {
       removeRewardBtnHtml = '<button type="button" class="x-alt-submit-btn" id="x-btn-remove-reward-continue" style="margin-top:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">Lanjut Tanpa Hadiah Promo</button>';
+    } else if (isInstallGated) {
+      removeRewardBtnHtml = '<button type="button" class="x-alt-submit-btn" id="x-btn-remove-reward-continue" style="margin-top:8px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;">Lanjut Tanpa Hadiah</button>';
     }
 
     var sh = makeOverlay(
       '<div style="text-align:center;margin-bottom:12px;">' +
       '  <div style="font-size:36px;margin-bottom:8px;">⚠️</div>' +
-      '  <h3 class="x-alt-sheet-title" style="margin:0 0 6px;">Ada perubahan di pesananmu, cek dulu yuk</h3>' +
-      '  <p style="font-size:13px;color:#6b7280;margin:0;">Beberapa harga atau ketersediaan menu baru saja diperbarui oleh restoran.</p>' +
+      '  <h3 class="x-alt-sheet-title" style="margin:0 0 6px;">' + titleHtml + '</h3>' +
+      '  <p style="font-size:13px;color:#6b7280;margin:0;">' + descHtml + '</p>' +
       '</div>' +
       '<div style="background:#f9fafb;border-radius:14px;padding:12px 14px;margin:12px 0;">' +
       diffHtml + errHtml +
       '</div>' +
-      '<button type="button" class="x-alt-submit-btn" id="x-btn-accept-changes" style="margin-top:14px;">Perbarui Pesanan &amp; Lanjutkan</button>' +
+      '<button type="button" class="x-alt-submit-btn" id="x-btn-accept-changes" style="margin-top:14px;">' + acceptLabel + '</button>' +
       removeRewardBtnHtml
     );
 
     var removeBtn = sh.overlay.querySelector('#x-btn-remove-reward-continue');
     if (removeBtn) {
       removeBtn.onclick = function () {
-        var cartState = Store.getState().cart;
-        var currentItems = cartState.items || [];
-        var bridge = window.Xentra && window.Xentra.PromotionRewardCart;
-        var filteredItems;
-        if (bridge && typeof bridge.remove === 'function') {
-          filteredItems = currentItems.filter(function (it) {
-            return !Boolean(it.is_promo_reward || it.promotion_id || String(it.id).indexOf('reward_') === 0);
-          });
-        } else {
-          filteredItems = currentItems.filter(function (it) {
-            return !Boolean(it.is_promo_reward || it.promotion_id || String(it.id).indexOf('reward_') === 0);
-          });
-        }
-        cartState.items = filteredItems;
-        try {
-          localStorage.setItem('xentra_cart', JSON.stringify(cartState));
-        } catch (_) {}
+        stripRewardFromCart();
         sh.close();
         renderLayout();
         calculateTotals();
-        if (typeof onConfirm === 'function') onConfirm();
+        if (!isInstallGated && typeof onConfirm === 'function') onConfirm();
       };
     }
 
     sh.overlay.querySelector('#x-btn-accept-changes').onclick = function () {
+      // Install-gated reward: primary CTA drives installation, not submit.
+      if (isInstallGated) {
+        sh.close();
+        if (typeof handleInstallClick === 'function') handleInstallClick();
+        return;
+      }
       // Sync cart items with actual prices within current branch scope
       if (Array.isArray(verificationData.verified_items)) {
         var updated = false;
@@ -3200,6 +3226,11 @@
             localStorage.setItem('xentra_cart', JSON.stringify(cart));
           } catch (_) {}
         }
+      }
+      // A rejected reward can never be fulfilled by re-submitting the same
+      // cart — strip it so accept cannot loop back into this same sheet.
+      if (isRewardError && hasRewardInCart) {
+        stripRewardFromCart();
       }
       sh.close();
       renderLayout();
