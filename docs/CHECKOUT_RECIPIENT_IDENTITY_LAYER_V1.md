@@ -175,3 +175,51 @@ Boundary:
 
 Checkout may be the contextual place where a missing phone is collected, but the resulting phone must be persisted to Customer Profile/Identity and then used as the authoritative SELF Recipient value.
 
+## Customer Phone Completion UI & Flow
+
+**Locked:** 2026-09-21
+
+Customer phone completion uses a **Bottom Sheet**, not a floating form.
+
+### Profile / Signup
+After Google Signup/Auth succeeds, if the Customer Profile has no valid phone:
+1. Open the Phone Completion Bottom Sheet.
+2. Require the customer to enter their WhatsApp/phone number.
+3. Save the number to Customer Profile/Identity.
+4. Continue to the Profile flow.
+
+The phone is not merely checkout state.
+
+### Checkout / Transaction Identity Gate
+If Google Auth is triggered from Checkout and the authenticated Customer has no phone:
+1. Open the same Phone Completion Bottom Sheet.
+2. Collect and save the phone to Customer Profile/Identity.
+3. Return to the same Checkout intent.
+4. Preserve cart, address, branch, recipient, promotion, payment method, and COD cash amount.
+
+Use transaction-appropriate continuation copy such as **“Simpan & Lanjutkan Pesanan”**.
+
+### UX boundary
+- Phone Completion = Customer Profile/Identity concern.
+- Recipient editing = Checkout Recipient concern.
+- SELF Recipient reads name + phone from Customer Profile.
+- OTHER Recipient remains independently editable in the Recipient bottom sheet.
+- Do not create a floating form or a second phone-capture system.
+
+### Canonical flow
+```
+Google Signup/Auth
+  ↓
+Customer identity resolved
+  ↓
+Phone exists?
+  ├─ YES → continue
+  └─ NO  → Phone Completion Bottom Sheet
+              ↓
+           Save Profile
+              ↓
+           Continue
+```
+
+When originating from Checkout, continuation must return to the same valid Checkout context without losing transaction state.
+
