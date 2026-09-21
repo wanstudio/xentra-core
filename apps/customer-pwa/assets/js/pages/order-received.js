@@ -369,7 +369,6 @@
     var status = order.status;
 
     var phase = resolveOrderPhase(status, orderType);
-    var orderNumber = order.order_number || ('XTR-' + order.id);
     var branchName = order.branch_name || 'Restoran';
     var isCash = (payment.payment_method || order.payment_method || 'cash') === 'cash';
     var payLabel = isCash ? '💵 Tunai (COD)' : 'Online Pay';
@@ -446,15 +445,10 @@
       '    <h1 class="x-aux-title">Pesanan</h1>' +
       '  </div>' +
 
-      // Header + dynamic status title
-      '  <div style="background:#fff;padding:24px 18px 20px;margin-bottom:10px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
-      '    <div style="font-size:12px;color:#6b7280;margin-bottom:2px;">Pesanan <strong style="color:#111;">' + UI.escape(orderNumber) + '</strong> • ' + UI.escape(branchName) + '</div>' +
-      '    <div style="width:52px;height:52px;border-radius:50%;background:#f0fdf4;display:flex;align-items:center;justify-content:center;margin:12px auto;font-size:26px;">' + phase.badge + '</div>' +
-      '    <h1 id="x-order-phase-title" style="font-size:20px;font-weight:800;color:#111;margin:0;">' + phase.title + '</h1>' +
-      '  </div>' +
-
-      // Progress
-      '  <div style="background:#fff;padding:16px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      // Header: dynamic status title + progress phases in ONE card.
+      // Order meta (number/branch) and badge icon are hidden by design.
+      '  <div style="background:#fff;padding:20px 18px;margin-bottom:10px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      '    <h1 id="x-order-phase-title" style="font-size:20px;font-weight:800;color:#111;margin:0 0 14px;">' + phase.title + '</h1>' +
       renderPhaseProgress(phase) +
       '  </div>' +
 
