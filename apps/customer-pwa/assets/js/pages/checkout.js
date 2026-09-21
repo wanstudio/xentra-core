@@ -863,7 +863,6 @@
       ) : '') +
       '    <div class="x-alt-trust" style="font-size:11.5px;color:#6b7280;text-align:center;margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:3px;">' +
       '      <div style="display:flex;align-items:center;gap:4px;"><span>🔒</span><span>Transaksi aman dan terenkripsi</span></div>' +
-      '      <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#888;"><span>Diproses oleh</span><span style="color:#00a3e0;font-weight:700;">midtrans</span></div>' +
       '    </div>' +
       '  </div>' +
 
