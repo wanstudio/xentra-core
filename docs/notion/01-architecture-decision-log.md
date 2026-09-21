@@ -264,3 +264,82 @@ This must not be interpreted as cash already collected before actual delivery se
 The existing customer PWA currently sends payment_method from state with a cash fallback. This existing fallback is a known implementation detail and must be reconciled with the locked UI decision so that backend fallback does not cause the UI to appear as if the Customer explicitly selected COD.
 
 **Status: LOCKED / AUTHORITATIVE**
+
+
+## 🔒 LOCKED — Customer Order Detail / Tracking UX v1 — 2026-09-21
+
+**Status: LOCKED / AUTHORITATIVE**
+
+- Customer order tracking is one **Order Detail / Tracking** experience whose content changes by authoritative Order state. Do not create a separate customer-facing waiting-for-branch page.
+- Never expose the internal term **Branch / Cabang** in customer-facing copy.
+- The operational fulfillment object may remain a Branch internally.
+- The Branch Owner-defined **name** is the customer-facing location/merchant display name. If the Owner names it **Bangjo Pringsewu**, customer UI displays exactly **Bangjo Pringsewu**.
+- Do not introduce a masking layer, alternate customer display name, or `customer_display_name` solely for this purpose.
+- Customer UI must not expose `branch_id`, `fulfillment_branch`, tenant, connector, or internal acceptance terminology.
+- Owner Branch name helper text: **"Nama ini akan terlihat oleh pelanggan pada pesanan dan struk."**
+- The same Owner-defined Branch name is the source of truth for customer-facing order/location/receipt presentation.
+
+### Canonical customer Order Detail structure
+1. Header: **Pesanan**
+2. Status Hero: current human-readable status + Owner-defined location name + short explanation + acceptance timer only while awaiting acceptance.
+3. Status Progress: **Pesanan dibuat → Menunggu konfirmasi → Sedang disiapkan → Siap / Diantar → Selesai**; stages may vary by fulfillment mode.
+4. **Dikirim kepada**: recipient name + phone/contact + delivery destination.
+5. **Pesanan**: items, quantities, notes.
+6. **Pembayaran**: subtotal, applicable fees, discount, total, payment method, and COD cash information where applicable.
+7. Actions: cancellation only while policy/state allows; help/contact where applicable; reorder after completion where applicable.
+
+### Recipient integration
+- Checkout Recipient is either **Saya sendiri** or **Orang lain**.
+- SELF uses authenticated Customer Profile name + phone.
+- OTHER independently uses entered recipient name + phone.
+- Order Detail displays the immutable **Order Recipient snapshot**, not a live re-resolution from the current Customer Profile.
+- Recipient and Delivery Destination remain separate domain concepts but may be visually grouped: **who** receives = Recipient; **where** it goes = Delivery Destination; **who** placed/owns = Customer/Buyer.
+
+### State-driven presentation
+**Awaiting acceptance**
+- Hero: **Menunggu Konfirmasi**
+- Show Owner-defined location name.
+- Copy: **Pesananmu sedang dikonfirmasi.**
+- Show acceptance timer only during the acceptance window.
+- Never expose "cabang", "branch", "branch confirmation", or technical timer disclaimers.
+
+**Accepted / Preparing**
+- Hero: **Sedang Disiapkan**
+- Location name remains visible.
+- Acceptance timer disappears.
+
+**Ready / Delivery**
+- Pickup: **Siap Diambil**
+- Delivery: **Sedang Diantar**
+- Show only fulfillment information relevant to the selected order mode.
+
+**Completed**
+- Hero: **Pesanan Selesai**
+- Show final order details, recipient, destination, items, payment, and applicable actions such as **Bantuan** / **Pesan Lagi**.
+
+**Rejected**
+- Human-facing result such as **Pesanan Tidak Dapat Diproses**.
+- Show useful reason when the business contract permits it.
+- Do not expose internal rejection terminology.
+
+**Timeout**
+- Human-facing result such as **Konfirmasi Berakhir**.
+- Explain that the order was not confirmed within the allowed time and was cancelled.
+- Do not describe the internal mechanism as "branch timeout".
+
+### Cancellation
+- Customer cancellation is state/policy-driven and is not a dominant primary CTA.
+- Normal customer cancellation is available only before acceptance according to the existing order contract.
+- After acceptance, normal customer cancellation is not allowed; merchant/operational exception remains a separate flow.
+
+### UX invariants
+- Customer sees the order lifecycle, not Xentra's internal architecture.
+- Do not create long explanatory blocks such as **Yang Terjadi Selanjutnya**.
+- Do not expose implementation notes such as **Timer ini hanya tampilan. Status pesanan selalu dari server.**
+- Keep one Order Detail shell across states; update status hero, progress, and allowed actions from authoritative Order state.
+- Checkout data flows into Order Detail without asking the customer to re-enter it.
+
+### Canonical flow
+Checkout → recipient + address + fulfillment mode + payment → final verification / identity gate where required → create Order → Order Detail / Tracking → state-driven progress → completed / rejected / timeout.
+
+**Agent rule:** Treat this decision as authoritative for customer-facing Order Detail / Tracking UX. Do not reintroduce customer-facing Branch/Cabang terminology, separate waiting-page architecture, masking of Owner-defined location names, or duplicate Recipient input without a newer explicit decision.
