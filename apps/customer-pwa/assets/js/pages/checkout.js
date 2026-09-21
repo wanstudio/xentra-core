@@ -3150,17 +3150,19 @@
       return mentioned && !installed;
     })();
 
-    // Single helper: strip invalid reward lines so neither CTA can loop the
-    // sheet. Accepting "changes" without removing a rejected reward would
-    // re-submit the same cart → same rejection → sheet reopens forever.
+    // Single helper: strip invalid reward lines from the LIVE cart.
+    // NOTE: Store.getState() returns a detached deep clone — mutating it (and
+    // mirroring to localStorage) does NOT touch the live cart, so the reward
+    // would be re-submitted, re-rejected, and the sheet would reopen forever.
+    // Removal must go through Store.setQty (live state + notify + persist).
     function stripRewardFromCart() {
-      var cartState = Store.getState().cart;
-      cartState.items = (cartState.items || []).filter(function (it) {
-        return !Boolean(it.is_promo_reward || it.promotion_id || String(it.id).indexOf('reward_') === 0);
+      var liveItems = [];
+      try { liveItems = (Store.getState().cart.items || []).slice(); } catch (_) {}
+      liveItems.forEach(function (it) {
+        if (it && (it.is_promo_reward || it.promotion_id || String(it.id).indexOf('reward_') === 0)) {
+          try { Store.setQty(it.id, 0); } catch (_) {}
+        }
       });
-      try {
-        localStorage.setItem('xentra_cart', JSON.stringify(cartState));
-      } catch (_) {}
     }
 
     var titleHtml = 'Ada perubahan di pesananmu, cek dulu yuk';
