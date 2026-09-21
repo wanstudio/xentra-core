@@ -2835,8 +2835,8 @@
       '<div style="font-size:13px;color:#6b7280;margin-bottom:10px;">Pilih penerima pesanan makanan untuk order ini.</div>' +
       '<div class="x-alt-sheet-label">Dikirim kepada</div>' +
       '<div style="display:flex;gap:10px;margin-bottom:8px;">' +
-        '<label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="x-recip-type" value="self" ' + (initialType === 'self' ? 'checked' : '') + '><span>Saya sendiri</span></label>' +
-        '<label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="x-recip-type" value="other" ' + (initialType === 'other' ? 'checked' : '') + '><span>Orang lain</span></label>' +
+        '<label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="x-recip-type" value="self" style="accent-color:var(--x-primary, #00a637);width:17px;height:17px;margin:0;" ' + (initialType === 'self' ? 'checked' : '') + '><span>Saya sendiri</span></label>' +
+        '<label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="x-recip-type" value="other" style="accent-color:var(--x-primary, #00a637);width:17px;height:17px;margin:0;" ' + (initialType === 'other' ? 'checked' : '') + '><span>Orang lain</span></label>' +
       '</div>' +
       '<div id="x-recip-other-fields" style="margin-top:12px;' + (initialType === 'other' ? 'display:block;' : 'display:none;') + '">' +
         '<div class="x-alt-sheet-label">Nama Penerima</div>' +
