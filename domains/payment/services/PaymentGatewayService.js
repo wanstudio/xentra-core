@@ -8,11 +8,24 @@ const {
   DiningTableRepository
 } = require('../../../core/data/repositories');
 const { events } = require('../../../core');
+const { isConsumingOrderStatus } = require('../../../core/domain/OrderStatusContract');
 const PaymentModel = require('../models/PaymentModel');
 
 const paymentRepository = new PaymentRepository();
 const promotionRepository = new PromotionRepository();
 const diningTableRepository = new DiningTableRepository();
+
+/**
+ * Reward claim release (locked rule): a claim is only consumed once the order
+ * reached ACCEPTED (confirmed). When an order lands in a failure/reconciliation
+ * status (fulfillment_exception, ...) WITHOUT having been accepted, release the
+ * redemption so the customer can claim the reward again. Accepted orders keep it.
+ */
+function releaseClaimIfNeverAccepted(orderId, orderStatus, reason) {
+  if (isConsumingOrderStatus(orderStatus)) return;
+  const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+  PromotionEngineService.voidRedemptions({ order_id: orderId, reason });
+}
 
 class PaymentGatewayService {
   static resolvePaymentConfig(branch_id, brand_id) {
@@ -148,6 +161,8 @@ class PaymentGatewayService {
             note: `[Perlu Refund]: Pembayaran diterima setelah pesanan berstatus "${currentOrderState.status}". Pesanan tidak diaktifkan ulang.`,
             updatedAt: now
           });
+          // The order never reached ACCEPTED → release any reward claim it held.
+          releaseClaimIfNeverAccepted(order_id, currentOrderState.status, `Settlement after order left AWAITING (${currentOrderState.status})`);
         } else {
           const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
           OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
@@ -224,7 +239,11 @@ class PaymentGatewayService {
           paymentRepository.beginTransaction();
           paymentRepository.updatePaymentWebhook({ orderId: order_id, paymentStatus: 'settlement', webhookResponse: JSON.stringify(webhookData), settledAt: now, updatedAt: now });
           const notePrefix = err.message.includes('[PROMO_LIMIT_EXCEEDED_RACE]') ? `[Kendala Promo / Perlu Penyesuaian/Refund]: ${err.message}` : `[Kendala Stok / Perlu Refund]: ${err.message}`;
+          const preExceptionStatus = paymentRepository.findOrderStatus(order_id);
           paymentRepository.markFulfillmentException({ orderId: order_id, note: notePrefix, updatedAt: now });
+          // Stock/promo race on settlement: if this order was still awaiting
+          // acceptance it never consumed the reward → release the claim.
+          releaseClaimIfNeverAccepted(order_id, preExceptionStatus && preExceptionStatus.status, `Fulfillment exception before acceptance: ${err.message}`);
           paymentRepository.commitTransaction();
           events.EventBus.publish({ type: 'payment.fulfillment_exception', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: 'midtrans', amount: Number(gross_amount || payment.amount), error: err.message, settled_at: now } }).catch(() => {});
           return { success: true, order_id, payment_status: 'settlement', order_status: 'fulfillment_exception', message: 'Pembayaran berhasil diselesaikan namun terdapat kendala ketersediaan stok atau batas promosi. Pesanan dialihkan ke antrean fulfillment exception untuk rekonsiliasi refund.' };

@@ -1,4 +1,5 @@
 const { OrderRepository } = require('../../core/data/repositories');
+const { isConsumingOrderStatus } = require('../../core/domain/OrderStatusContract');
 const crypto = require('crypto');
 
 const orderRepository = new OrderRepository();
@@ -97,9 +98,14 @@ class OrderStateMachine {
         note
       });
 
-      if (target_status === 'cancelled' || target_status === 'rejected' || target_status === 'timeout') {
+      // Reward claim release (locked rule): a claim is only CONSUMED once the
+      // order reached ACCEPTED (confirmed) — after that, acceptance is final.
+      // Any transition of a NEVER-ACCEPTED order into a non-consuming state
+      // (cancelled / rejected / timeout / expired / fulfillment_exception / ...)
+      // releases the claim so the customer can claim the reward again.
+      if (!isConsumingOrderStatus(target_status) && !isConsumingOrderStatus(currentStatus)) {
         const PromotionEngineService = require('../../domains/promotion/services/PromotionEngineService');
-        PromotionEngineService.voidRedemptions({ order_id, reason: note || `Order ${target_status} by ${actor_type}` });
+        PromotionEngineService.voidRedemptions({ order_id, reason: note || `Order ${target_status} by ${actor_type} (never accepted)` });
       }
 
       orderRepository.commitTransaction();

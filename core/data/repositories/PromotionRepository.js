@@ -8,6 +8,7 @@
  * remain in the promotion domain/service layer.
  */
 const DataAccess = require('../DataAccess');
+const { CONSUMING_ORDER_STATUSES } = require('../../domain/OrderStatusContract');
 
 class PromotionRepository {
   constructor(dataAccess = DataAccess) {
@@ -206,16 +207,23 @@ class PromotionRepository {
   }
 
   countCustomerOrders({ customerPhone, brandId }) {
-    // First-order privilege is consumed only by orders that actually went
-    // through. Terminal non-consuming states (cancelled by customer, rejected
-    // or timed out by branch, refunded) must not burn it — otherwise a
-    // customer could never reclaim a reward after a failed order.
-    // (Pairs with OrderStateMachine voiding redemptions on those states.)
+    // First-order privilege is consumed ONLY by orders that actually went
+    // through — i.e. the branch ACCEPTED the order (confirmed → completed).
+    // Every other state (pending awaiting acceptance, cancelled, rejected,
+    // timeout, refunded, expired, fulfillment_exception, reconciliation_pending,
+    // ...) must NOT burn it, otherwise a customer could never reclaim a reward
+    // after a failed order.
+    //
+    // Uses the canonical consuming-status contract (core/domain/OrderStatusContract)
+    // as a WHITELIST — the previous blacklist silently missed states that bypass
+    // the operational state machine (e.g. fulfillment_exception). Pairs with
+    // OrderStateMachine / PaymentGatewayService releasing the redemption.
+    const placeholders = CONSUMING_ORDER_STATUSES.map(() => '?').join(', ');
     const row = this.db.queryOne(`
       SELECT COUNT(*) as count
       FROM orders
-      WHERE customer_phone = ? AND brand_id = ? AND status NOT IN ('cancelled', 'rejected', 'timeout', 'refunded')
-    `, [customerPhone, brandId]);
+      WHERE customer_phone = ? AND brand_id = ? AND status IN (${placeholders})
+    `, [customerPhone, brandId, ...CONSUMING_ORDER_STATUSES]);
     return Number(row?.count || 0);
   }
 
