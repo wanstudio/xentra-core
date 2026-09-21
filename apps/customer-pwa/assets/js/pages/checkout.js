@@ -825,7 +825,7 @@
       ) : '') +
 
       // 6. Card 5: Payment Summary & Methods Card
-      '  <div class="x-card x-alt-summary-card" id="x-payment-summary-card" style="margin:0 14px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
+      '  <div class="x-card x-alt-summary-card" id="x-payment-summary-card" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
       '    <div class="x-alt-summary-title" style="font-size:15px;font-weight:700;color:#111;margin-bottom:12px;">Ringkasan pembayaran</div>' +
       (!isReservation ? (
         '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Harga</span><span id="x-sum-subtotal" style="font-weight:600;color:#111;">' + fmtIDR(subtotal) + '</span></div>' +
