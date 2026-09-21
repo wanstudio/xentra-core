@@ -438,11 +438,12 @@
     targetContainer.innerHTML =
       '<div class="x-order-tracking-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
 
-      // Top bar
-      '  <div style="background:#fff;padding:12px 14px;margin-bottom:10px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
-      '    <button type="button" id="x-btn-order-back" style="display:inline-flex;align-items:center;gap:6px;background:none;border:0;font-size:15px;font-weight:800;color:#111;cursor:pointer;font-family:inherit;padding:4px;">' +
-      '      <span style="font-size:18px;line-height:1;">←</span> Pesanan' +
+      // Top bar (same pattern as the Riwayat Pesanan header)
+      '  <div class="x-aux-header" style="background:#fff;margin-bottom:10px;">' +
+      '    <button type="button" class="x-aux-back-btn" id="x-btn-order-back" aria-label="Kembali">' +
+      '      <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
       '    </button>' +
+      '    <h1 class="x-aux-title">Pesanan</h1>' +
       '  </div>' +
 
       // Header + dynamic status title
