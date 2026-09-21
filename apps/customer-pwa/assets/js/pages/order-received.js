@@ -725,6 +725,12 @@
     targetContainer.style.display = 'block';
     targetContainer.innerHTML =
       '<div style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
+      '  <div class="x-aux-header" style="background:#fff;margin-bottom:12px;">' +
+      '    <button type="button" class="x-aux-back-btn" id="x-btn-cancelled-back" aria-label="Kembali">' +
+      '      <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
+      '    </button>' +
+      '    <h1 class="x-aux-title">Pesanan Batal</h1>' +
+      '  </div>' +
       '  <div style="background:#fff;padding:28px 18px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);margin-bottom:12px;">' +
       '    <div style="font-size:48px;margin-bottom:12px;">🚫</div>' +
       '    <h1 style="font-size:20px;font-weight:800;color:#111;margin:0 0 8px;">Pesanan Dibatalkan</h1>' +
@@ -776,6 +782,9 @@
 
     var btn = document.getElementById('x-btn-new-order');
     if (btn && Router) btn.onclick = function () { Router.navigate('home'); };
+
+    var backBtn = document.getElementById('x-btn-cancelled-back');
+    if (backBtn && Router) backBtn.onclick = function () { Router.navigate('history'); };
   }
 
   // ─── P7.5 ACCEPTED STATE and fulfillment tracking ─────────────────────────
