@@ -2674,6 +2674,11 @@ router.get('/orders/:id', (req, res) => {
     // P7.2: branch context for awaiting-acceptance surface
     branch_id: order.branch_id,
     branch_name: order.branch_name || null,
+    // Recipient Identity Layer: order-level snapshot (projection only — the
+    // columns are written at placement; later profile edits never mutate them).
+    recipient_type: order.recipient_type || 'self',
+    recipient_name: order.recipient_name || '',
+    recipient_phone: order.recipient_phone || '',
     // P7.2: server-authoritative acceptance deadline (display only, null when not pending)
     acceptance_deadline_at: acceptanceDeadlineAt
   };

@@ -153,8 +153,15 @@
 
     // P6.4 / P6.6 PAYMENT SUCCESS -> AWAITING_BRANCH_ACCEPTANCE
     // When payment is settled (or cash), and order status is 'pending',
-    // the order is awaiting branch confirmation.
+    // the order is awaiting branch confirmation. Delivery/pickup use the
+    // unified tracking layout (phase 0 = PESANAN DIBUAT); other order types
+    // keep the legacy waiting surface.
     if (status === 'pending') {
+      var pendingType = order.order_type || 'delivery';
+      if (pendingType === 'delivery' || pendingType === 'pickup') {
+        renderTrackingOrder(data);
+        return;
+      }
       renderWaiting(data);
       return;
     }
@@ -285,6 +292,210 @@
 
     var btn = document.getElementById('x-btn-pay-retry');
     if (btn && Router) btn.onclick = function () { Router.navigate('home'); };
+  }
+
+  // ─── Customer phase model (SINGLE SOURCE for status title + progress) ──
+  // Backend lifecycle (OrderStateMachine, unchanged):
+  //   pending → confirmed → preparing → ready → out_for_delivery → completed
+  // Pickup short-circuits: ready → completed (no `ready_for_pickup` status exists).
+  // Both the big title and the progress steps below derive from this ONE
+  // function, so they can never disagree about the active phase.
+  function resolveOrderPhase(status, orderType) {
+    var isPickup = orderType === 'pickup';
+    var steps = isPickup
+      ? ['Pesanan dibuat', 'Sedang disiapkan', 'Siap diambil', 'Selesai']
+      : ['Pesanan dibuat', 'Sedang disiapkan', 'Sedang diantar', 'Selesai'];
+    var title = 'PESANAN DIBUAT';
+    var badge = '🧾';
+    var doneCount = 1; // the order exists → "Pesanan dibuat" is done
+    if (status === 'preparing') {
+      title = 'SEDANG DISIAPKAN'; badge = '🍳'; doneCount = 2;
+    } else if (status === 'ready') {
+      if (isPickup) { title = 'SIAP DIAMBIL'; badge = '🔔'; doneCount = 3; }
+      else { title = 'SEDANG DISIAPKAN'; badge = '🍳'; doneCount = 2; }
+    } else if (status === 'out_for_delivery') {
+      // out_for_delivery is a delivery-only transition (ready → completed for
+      // pickup). If it ever appears on pickup, stay in the pickup phase.
+      if (isPickup) { title = 'SIAP DIAMBIL'; badge = '🔔'; doneCount = 3; }
+      else { title = 'SEDANG DIANTAR'; badge = '🛵'; doneCount = 3; }
+    } else if (status === 'completed') {
+      title = 'PESANAN SELESAI'; badge = '🎉'; doneCount = 4;
+    }
+    // pending / confirmed → PESANAN DIBUAT, doneCount = 1
+    return { title: title, badge: badge, steps: steps, doneCount: doneCount };
+  }
+
+  // Vertical timeline: ● done (theme) / ○ todo, connected by │ lines.
+  function renderPhaseProgress(phase) {
+    var html = '<div id="x-order-progress" style="display:flex;flex-direction:column;">';
+    for (var i = 0; i < phase.steps.length; i++) {
+      var done = i < phase.doneCount;
+      var last = i === phase.steps.length - 1;
+      var dot = done
+        ? '<div style="width:22px;height:22px;border-radius:50%;background:var(--x-primary);color:var(--x-primary-text,#111);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">✓</div>'
+        : '<div style="width:22px;height:22px;border-radius:50%;border:2px solid #e5e7eb;background:#fff;flex-shrink:0;box-sizing:border-box;"></div>';
+      html +=
+        '<div style="display:flex;align-items:flex-start;gap:10px;">' +
+        '  <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">' +
+        dot +
+        (last ? '' : '<div style="width:2px;flex:1;min-height:16px;background:' + (done && (i + 1) < phase.doneCount ? 'var(--x-primary)' : '#e5e7eb') + ';"></div>') +
+        '  </div>' +
+        '  <div style="font-size:13.5px;font-weight:' + (done ? '700' : '500') + ';color:' + (done ? '#111' : '#9ca3af') + ';padding:2px 0 ' + (last ? '0' : '16px') + ' 0;">' + phase.steps[i] + '</div>' +
+        '</div>';
+    }
+    return html + '</div>';
+  }
+
+  function fmtDistance(meters) {
+    var m = Number(meters || 0);
+    if (!m || m <= 0) return '';
+    if (m < 1000) return Math.round(m) + ' m';
+    return (m / 1000).toFixed(1).replace('.', ',') + ' km';
+  }
+
+  // ─── Unified tracking layout (delivery + pickup, any active status) ───
+  // Section order: Header → Dynamic Title → Progress → Route/Location →
+  // DIKIRIM KEPADA → PEMBELIAN → DETAIL PEMBAYARAN → CATATAN → Batalkan.
+  function renderTrackingOrder(data) {
+    if (!targetContainer) return;
+    var order = data.order;
+    var items = data.items || [];
+    var delivery = data.delivery || {};
+    var payment = data.payment || {};
+    var orderType = order.order_type || 'delivery';
+    var isPickup = orderType === 'pickup';
+    var status = order.status;
+
+    var phase = resolveOrderPhase(status, orderType);
+    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var branchName = order.branch_name || 'Restoran';
+    var isCash = (payment.payment_method || order.payment_method || 'cash') === 'cash';
+    var payLabel = isCash ? 'Tunai (COD)' : 'Online Pay';
+    if (order.payment_status === 'settlement' || order.payment_status === 'paid' || payment.payment_status === 'settlement' || payment.payment_status === 'paid') {
+      payLabel += ' • Lunas';
+    }
+
+    var dist = fmtDistance(delivery.actual_road_distance_meters);
+    var destAddr = delivery.destination_address || delivery.address_text || '';
+
+    // Recipient snapshot (order-level; never re-resolved from profile here).
+    var rType = order.recipient_type || 'self';
+    var rName = order.recipient_name || (rType === 'other' ? '' : 'Saya');
+    var rPhone = String(order.recipient_phone || '').replace(/[^0-9]/g, '');
+
+    var itemsHtml = '';
+    items.forEach(function (item) {
+      var itemTotal = Number(item.unit_price || 0) * Number(item.quantity || 0);
+      itemsHtml +=
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #f3f4f6;">' +
+        '  <div style="flex:1;min-width:0;padding-right:12px;">' +
+        '    <div style="font-size:14px;font-weight:700;color:#111;">' + item.quantity + '× ' + UI.escape(item.product_name || item.name) + '</div>' +
+        (item.note ? '<div style="font-size:12px;color:#6b7280;margin-top:2px;">Catatan: ' + UI.escape(item.note) + '</div>' : '') +
+        '  </div>' +
+        '  <div style="font-size:14px;font-weight:700;color:#111;white-space:nowrap;">' + UI.money(itemTotal) + '</div>' +
+        '</div>';
+    });
+
+    var routeHtml;
+    if (isPickup) {
+      routeHtml =
+        '<div style="display:flex;gap:10px;align-items:flex-start;">' +
+        '  <div style="font-size:20px;line-height:1.3;">🍴</div>' +
+        '  <div style="min-width:0;">' +
+        '    <div style="font-size:12px;color:#6b7280;">Lokasi pengambilan</div>' +
+        '    <div style="font-size:14px;font-weight:700;color:#111;">' + UI.escape(branchName) + '</div>' +
+        '    <div style="font-size:12.5px;color:#6b7280;margin-top:2px;">Siap diambil di lokasi restoran</div>' +
+        '  </div>' +
+        '</div>';
+    } else {
+      routeHtml =
+        '<div style="display:flex;gap:10px;align-items:flex-start;">' +
+        '  <div style="font-size:20px;line-height:1.3;">🍴</div>' +
+        '  <div style="min-width:0;">' +
+        '    <div style="font-size:12px;color:#6b7280;">Alamat restoran</div>' +
+        '    <div style="font-size:14px;font-weight:700;color:#111;">' + UI.escape(branchName) + '</div>' +
+        '  </div>' +
+        '</div>' +
+        '<div style="margin:6px 0 6px 9px;border-left:2px dotted #d1d5db;height:14px;"></div>' +
+        '<div style="display:flex;gap:10px;align-items:flex-start;">' +
+        '  <div style="font-size:20px;line-height:1.3;">📍</div>' +
+        '  <div style="min-width:0;">' +
+        '    <div style="font-size:12px;color:#6b7280;">Alamat pengiriman' + (dist ? ' · ' + dist : '') + '</div>' +
+        '    <div style="font-size:13.5px;color:#111;line-height:1.45;">' + UI.escape(destAddr || 'Alamat tujuan') + '</div>' +
+        (delivery.driver_name
+          ? '<div style="margin-top:8px;padding:9px 12px;background:#f0fdf4;border-radius:10px;font-size:13px;color:#166534;">🛵 Kurir: <strong>' + UI.escape(delivery.driver_name) + '</strong>' +
+            (delivery.driver_phone ? ' (' + UI.escape(delivery.driver_phone) + ')' : '') +
+            (delivery.tracking_url ? '<div style="margin-top:6px;"><a href="' + UI.escape(delivery.tracking_url) + '" target="_blank" rel="noopener noreferrer" style="color:#16a34a;font-weight:700;text-decoration:underline;">Lacak Pengiriman Langsung →</a></div>' : '') +
+            '</div>'
+          : '') +
+        '  </div>' +
+        '</div>';
+    }
+
+    targetContainer.style.display = 'block';
+    targetContainer.innerHTML =
+      '<div class="x-order-tracking-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
+
+      // Header + dynamic status title
+      '  <div style="background:#fff;padding:24px 18px 20px;margin-bottom:10px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      '    <div style="font-size:12px;color:#6b7280;margin-bottom:2px;">Pesanan <strong style="color:#111;">' + UI.escape(orderNumber) + '</strong> • ' + UI.escape(branchName) + '</div>' +
+      '    <div style="width:52px;height:52px;border-radius:50%;background:#f0fdf4;display:flex;align-items:center;justify-content:center;margin:12px auto;font-size:26px;">' + phase.badge + '</div>' +
+      '    <h1 id="x-order-phase-title" style="font-size:20px;font-weight:800;color:#111;margin:0;">' + phase.title + '</h1>' +
+      '  </div>' +
+
+      // Progress
+      '  <div style="background:#fff;padding:16px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      renderPhaseProgress(phase) +
+      '  </div>' +
+
+      // Route / location (no heading)
+      '  <div style="background:#fff;padding:16px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      routeHtml +
+      '  </div>' +
+
+      // Dikirim kepada
+      '  <div style="background:#fff;padding:14px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:6px;">DIKIRIM KEPADA</div>' +
+      '    <div style="font-size:14px;font-weight:700;color:#111;">' + UI.escape(rName || 'Saya') + '</div>' +
+      (rPhone ? '<div style="font-size:13px;color:#4b5563;margin-top:1px;">' + UI.escape(rPhone) + '</div>' : '') +
+      '  </div>' +
+
+      // Pembelian
+      '  <div style="background:#fff;padding:14px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:4px;">PEMBELIAN</div>' +
+      itemsHtml +
+      '  </div>' +
+
+      // Detail pembayaran
+      '  <div style="background:#fff;padding:14px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:8px;">DETAIL PEMBAYARAN</div>' +
+      '    <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;"><span style="color:#6b7280;">Subtotal</span><span style="color:#111;">' + UI.money(order.subtotal || 0) + '</span></div>' +
+      (!isPickup ? '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;"><span style="color:#6b7280;">Biaya Pengiriman</span><span style="color:#111;">' + UI.money(order.delivery_fee || 0) + '</span></div>' : '') +
+      (Number(order.discount_amount) > 0 ? '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;color:#ff4040;"><span>Diskon</span><span>−' + UI.money(order.discount_amount) + '</span></div>' : '') +
+      '    <div style="height:1px;background:#e5e7eb;margin:8px 0;"></div>' +
+      '    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;color:#111;"><span>Total</span><span>' + UI.money(order.grand_total || 0) + '</span></div>' +
+      '    <div style="font-size:12px;color:#6b7280;margin-top:6px;">' + UI.escape(payLabel) + '</div>' +
+      '  </div>' +
+
+      // Catatan pengantaran
+      (order.order_note
+        ? '  <div style="background:#fff;padding:14px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+          '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:6px;">CATATAN PENGANTARAN</div>' +
+          '    <div style="font-size:13px;color:#4b5563;line-height:1.5;">' + UI.escape(order.order_note) + '</div>' +
+          '  </div>'
+        : '') +
+
+      // Cancel (server allows only while pending)
+      (status === 'pending'
+        ? '  <div style="padding:2px 14px 0;">' +
+          '    <button type="button" id="x-btn-cancel-order" style="display:block;width:100%;height:44px;font-size:14px;font-weight:700;border:2px solid #e5e7eb;border-radius:24px;cursor:pointer;background:#fff;color:#6b7280;">Batalkan Pesanan</button>' +
+          '  </div>'
+        : '') +
+
+      '</div>';
+
+    var cancelBtn = document.getElementById('x-btn-cancel-order');
+    if (cancelBtn) cancelBtn.onclick = function () { confirmCancel(order.id); };
   }
 
   // ─── P7.1 AWAITING BRANCH ACCEPTANCE SURFACE ─────────────────────────────
@@ -493,6 +704,13 @@
   // ─── P7.5 ACCEPTED STATE and fulfillment tracking ─────────────────────────
   function renderFulfillmentOrder(data) {
     if (!targetContainer) return;
+    // Delivery/pickup use the unified tracking layout (dynamic title +
+    // progress from resolveOrderPhase). Other order types keep legacy.
+    var fulType = (data.order && data.order.order_type) || 'delivery';
+    if (fulType === 'delivery' || fulType === 'pickup') {
+      renderTrackingOrder(data);
+      return;
+    }
     var order = data.order;
     var items = data.items || [];
     var delivery = data.delivery || {};
