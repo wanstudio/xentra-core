@@ -1621,6 +1621,10 @@
     var existingDetail = params.detail || '';
     var isFavorite = params.isFavorite === true;
     var existingId = params.existingId || null;
+    // Recipient Identity Layer: prefill from the persisted recipient selection (if any).
+    var existingRecipient = (Store && typeof Store.getRecipient === 'function') ? Store.getRecipient() : null;
+    var existingRecipientName = (existingRecipient && existingRecipient.type === 'other' && existingRecipient.name) ? existingRecipient.name : '';
+    var existingRecipientPhone = (existingRecipient && existingRecipient.type === 'other' && existingRecipient.phone) ? existingRecipient.phone : '';
 
     var parts = addressText.split(',');
     var titlePreview = params.title || parts[0] || 'Alamat Terpilih';
@@ -1661,6 +1665,16 @@
       '  <input type="text" id="x-input-fav-detail" class="x-loc-form-input" placeholder="" value="' + UI.escape(existingDetail) + '">' +
       '</div>' +
 
+      // Form 3: Penerima (Pesan untuk orang lain) — opsional
+      '<div class="x-loc-form-group">' +
+      '  <div class="x-loc-form-label">Nama penerima <span class="optional">(optional)</span></div>' +
+      '  <input type="text" id="x-input-recipient-name" class="x-loc-form-input" placeholder="Nama penerima" value="' + UI.escape(existingRecipientName) + '">' +
+      '</div>' +
+      '<div class="x-loc-form-group">' +
+      '  <div class="x-loc-form-label">Nomor WhatsApp penerima <span class="optional">(optional)</span></div>' +
+      '  <input type="tel" id="x-input-recipient-phone" class="x-loc-form-input" placeholder="08xx xxxx xxxx" value="' + UI.escape(existingRecipientPhone) + '">' +
+      '</div>' +
+
       // Custom Checkbox: "Simpan sebagai favorit" (Reference Image 3)
       '<label class="x-loc-checkbox-label" id="x-label-fav-check">' +
       '  <div class="x-loc-custom-check ' + (isFavorite ? 'is-checked' : '') + '" id="x-box-fav-check">' +
@@ -1669,8 +1683,8 @@
       '  <span>Simpan sebagai favorit</span>' +
       '</label>' +
 
-      // Konfirmasi Button: lime green when enabled, disabled gray when required field is empty
-      '<button type="button" class="x-btn-konfirmasi-main ' + (existingLabel.trim() ? 'is-enabled' : 'is-disabled') + '" id="x-btn-detail-konfirmasi" ' + (existingLabel.trim() ? '' : 'disabled') + '>Konfirmasi</button>';
+      // Simpan Button: lime green when enabled, disabled gray when required field is empty
+      '<button type="button" class="x-btn-konfirmasi-main ' + (existingLabel.trim() ? 'is-enabled' : 'is-disabled') + '" id="x-btn-detail-konfirmasi" ' + (existingLabel.trim() ? '' : 'disabled') + '>Simpan</button>';
 
     var sh = createOverlay(detailHtml);
     var el = sh.overlay;
@@ -1718,12 +1732,31 @@
         return;
       }
 
+      // Recipient Identity Layer: "Pesan untuk orang lain" (optional).
+      // Both empty → SELF (buyer is the recipient). Both filled → OTHER.
+      // Exactly one filled is an incomplete recipient → block the save.
+      var recNameEl = el.querySelector('#x-input-recipient-name');
+      var recPhoneEl = el.querySelector('#x-input-recipient-phone');
+      var recName = recNameEl ? recNameEl.value.trim() : '';
+      var recPhone = recPhoneEl ? recPhoneEl.value.trim() : '';
+      if (recName || recPhone) {
+        if (!recName || !recPhone) {
+          if (UI && UI.toast) UI.toast('Isi nama dan nomor WhatsApp penerima, atau kosongkan keduanya.');
+          return;
+        }
+        if (Store && typeof Store.setRecipient === 'function') {
+          Store.setRecipient({ type: 'other', name: recName, phone: recPhone });
+        }
+      } else if (Store && typeof Store.setRecipient === 'function') {
+        Store.setRecipient({ type: 'self', name: '', phone: '' });
+      }
+
       konfirmasiBtn.disabled = true;
       konfirmasiBtn.textContent = 'Memproses…';
 
       function resetButton() {
         konfirmasiBtn.disabled = false;
-        konfirmasiBtn.textContent = 'Konfirmasi';
+        konfirmasiBtn.textContent = 'Simpan';
         konfirmasiBtn.classList.add('is-enabled');
         konfirmasiBtn.classList.remove('is-disabled');
       }

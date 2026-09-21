@@ -1,16 +1,34 @@
 /**
- * Xentra Customer PWA — Service Worker (M6)
+ * Xentra Customer PWA — Service Worker
+ *
+ * Release identity: content hash of this file.
+ * When this file changes (new commit), the hash changes → new cache → old purged.
+ * No hardcoded version strings. No external endpoints. No manual edits.
+ *
  * Architecture:
- * 1. Immediate activation via skipWaiting() and clients.claim()
- * 2. Strict Network-First for HTML, JS, CSS (guarantees 0ms stale code on live connections)
- * 3. Cache-Fallback for genuine offline operation
- * 4. Automatic purge of old version caches on activation
- * 5. M6: Immutable media derivative caching — /assets/uploads/derivatives/ paths
- *    are versioned by media_id, so safe to cache with Cache-First strategy.
- *    Never cache: original binaries, admin endpoints, arbitrary uploads.
+ * 1. Cache name derived from own content hash (auto-changes with each commit)
+ * 2. skipWaiting() + clients.claim() for immediate activation
+ * 3. Activate purges ONLY stale app-shell caches (scoped to the xentra-pwa-
+ *    namespace) and PRESERVES the immutable media cache + unrelated caches.
+ *    Never performs a global Cache Storage wipe.
+ * 4. Per-category fetch strategy (P0 #4):
+ *      API /dashboard                        → bypass (always live network)
+ *      admin + uploads/originals|staging     → bypass (never cached)
+ *      /assets/uploads/derivatives/          → Cache-First (immutable, by media_id)
+ *      /assets/icons/ + /assets/pwa/         → Cache-First (cosmetic staleness only)
+ *      HTML / JS / CSS / manifest.json       → Network-First (freshness; unversioned
+ *                                              URLs make Cache-First unsafe here)
+ *      offline fallback                      → cached match, navigations → "/"
  */
-const CACHE_NAME = "bangjo-pwa-v_20260920_pwa_bootfix";
-const STATIC_ASSETS = [
+var MEDIA_CACHE_NAME = "xentra-media";
+// Every application-shell cache lives under this namespace. Activate only ever
+// deletes caches inside it, so a release can never wipe unrelated caches
+// (media derivatives, other apps served from the same origin, ...).
+var APP_CACHE_PREFIX = "xentra-pwa-";
+// Used only when the content hash cannot be computed (e.g. offline install).
+var FALLBACK_CACHE_NAME = "xentra-pwa-live";
+
+var STATIC_ASSETS = [
   "/",
   "/manifest.json",
   "/assets/pwa/icon-192.png",
@@ -40,99 +58,151 @@ const STATIC_ASSETS = [
   "/assets/js/pages/aux-pages.js"
 ];
 
-// M6: Separate cache for immutable media derivatives (versioned by media_id)
-const MEDIA_CACHE_NAME = "bangjo-media-m6a01";
+// Content-hash: fetch own file, compute simple hash for cache name.
+// When this file changes (new commit), hash changes → new cache → old purged.
+// Resolved once per SW lifetime and shared by install/activate/fetch so the SW
+// script is never re-fetched per request.
+var _cacheNamePromise = null;
+function computeCacheName() {
+  if (_cacheNamePromise) return _cacheNamePromise;
+  _cacheNamePromise = fetch(self.location.href, { cache: "no-store" })
+    .then(function (r) { return r.text(); })
+    .then(function (text) {
+      var hash = 0;
+      for (var i = 0; i < text.length; i++) {
+        hash = ((hash << 5) - hash) + text.charCodeAt(i);
+        hash = hash & hash;
+      }
+      return APP_CACHE_PREFIX + Math.abs(hash).toString(36);
+    })
+    .catch(function () {
+      // Fallback: use a static name so SW still installs
+      return FALLBACK_CACHE_NAME;
+    });
+  return _cacheNamePromise;
+}
 
-// 1. Install & Pre-cache with Cache-Busting
-self.addEventListener("install", event => {
+// 1. Install — compute content hash, pre-cache assets
+self.addEventListener("install", function (event) {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      const versionedUrls = STATIC_ASSETS.map(u => {
-        if (u === "/" || u === "/manifest.json" || u.includes(".png")) return u;
-        return u + "?v=" + "v_20260920_pwa_bootfix";
-      });
-      return cache.addAll(versionedUrls).catch(err => {
-        console.warn("[SW Install] Cache prefetch warn:", err);
+    computeCacheName().then(function (cacheName) {
+      return caches.open(cacheName).then(function (cache) {
+        return cache.addAll(STATIC_ASSETS).catch(function (err) {
+          console.warn("[SW Install] Cache prefetch warn:", err);
+        });
       });
     })
   );
 });
 
-// 2. Activate & Purge ALL Stale Caches
-self.addEventListener("activate", event => {
+// 2. Activate — purge ONLY stale application-shell caches, KEEP media cache.
+// Never performs a global cache wipe: caches outside the app-shell namespace
+// (media cache, other apps on this origin, ...) are always left untouched.
+self.addEventListener("activate", function (event) {
   event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.map(key => {
-          // Purge any non-current caches (old app cache AND old media cache)
-          if (key !== CACHE_NAME && key !== MEDIA_CACHE_NAME) {
-            console.log("[SW Activate] Purging old cache:", key);
+    computeCacheName().then(function (currentCacheName) {
+      // The content hash could not be computed (offline fallback). We cannot
+      // tell which caches belong to this release, so keep everything instead of
+      // risking the loss of the whole app shell.
+      if (currentCacheName === FALLBACK_CACHE_NAME) {
+        console.warn("[SW Activate] Cache name unresolved — skipping purge to protect existing caches");
+        return;
+      }
+      return caches.keys().then(function (keys) {
+        return Promise.all(
+          keys.map(function (key) {
+            // Preserve the immutable media cache across every release.
+            if (key === MEDIA_CACHE_NAME) return;
+            // Only purge caches inside this application's shell namespace.
+            if (key.indexOf(APP_CACHE_PREFIX) !== 0) return;
+            // Keep the cache created by this release.
+            if (key === currentCacheName) return;
+            console.log("[SW Activate] Purging old app-shell cache:", key);
             return caches.delete(key);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+          })
+        );
+      });
+    }).then(function () { return self.clients.claim(); })
   );
 });
 
-// 3. Fetch Strategy
-self.addEventListener("fetch", event => {
+// ── Fetch helpers ───────────────────────────────────────────────────────────
+
+// Cache-First: serve from cache when present, otherwise fetch and store.
+function cacheFirst(event, cacheName) {
+  return caches.open(cacheName).then(function (cache) {
+    return cache.match(event.request).then(function (cached) {
+      if (cached) return cached;
+      return fetch(event.request).then(function (response) {
+        if (response && response.status === 200) {
+          cache.put(event.request, response.clone());
+        }
+        return response;
+      }).catch(function () { return cached || null; });
+    });
+  });
+}
+
+// Network-First: fresh when online, cached when the network is unavailable.
+function networkFirst(event) {
+  return fetch(event.request)
+    .then(function (response) {
+      if (response && response.status === 200) {
+        var copy = response.clone();
+        computeCacheName().then(function (cn) {
+          caches.open(cn).then(function (c) { c.put(event.request, copy); });
+        });
+      }
+      return response;
+    })
+    .catch(function () {
+      return caches.match(event.request).then(function (cached) {
+        if (cached) return cached;
+        if (event.request.mode === "navigate") {
+          return caches.match("/");
+        }
+        return null;
+      });
+    });
+}
+
+// 3. Fetch strategy — per asset category (see the table in the header comment).
+self.addEventListener("fetch", function (event) {
   if (event.request.method !== "GET") return;
 
-  const url = new URL(event.request.url);
+  var url = new URL(event.request.url);
 
-  // Never touch API calls or Dashboard
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/dashboard')) {
+  // API calls / Dashboard: never intercepted → always live network state.
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/dashboard")) {
     return;
   }
 
-  // Never cache admin or original media paths
-  if (url.pathname.startsWith('/admin/') ||
-      url.pathname.startsWith('/assets/uploads/originals/') ||
-      url.pathname.startsWith('/assets/uploads/staging/')) {
+  // Never cache admin or original/staging media paths.
+  if (url.pathname.startsWith("/admin/") ||
+      url.pathname.startsWith("/assets/uploads/originals/") ||
+      url.pathname.startsWith("/assets/uploads/staging/")) {
     return;
   }
 
-  // M6: Cache-First for immutable media derivative URLs.
-  // Paths under /assets/uploads/derivatives/<brandId>/<mediaId>/<variant>.webp
-  // are content-addressed by media_id — safe to cache indefinitely.
-  // A media replacement creates a NEW media_id → new URL → new cache entry.
-  if (url.pathname.startsWith('/assets/uploads/derivatives/')) {
+  // Immutable media derivatives (content-addressed by media_id): Cache-First.
+  if (url.pathname.startsWith("/assets/uploads/derivatives/")) {
+    event.respondWith(cacheFirst(event, MEDIA_CACHE_NAME));
+    return;
+  }
+
+  // Static UI images (app icons): Cache-First. Only cosmetic staleness is
+  // possible, and it is bounded by the app-shell cache rotating on each release.
+  if (url.pathname.startsWith("/assets/icons/") || url.pathname.startsWith("/assets/pwa/")) {
     event.respondWith(
-      caches.open(MEDIA_CACHE_NAME).then(cache => {
-        return cache.match(event.request).then(cached => {
-          if (cached) return cached; // Cache hit — immutable derivative
-          return fetch(event.request).then(response => {
-            if (response && response.status === 200) {
-              cache.put(event.request, response.clone());
-            }
-            return response;
-          }).catch(() => cached || null);
-        });
-      })
+      computeCacheName().then(function (cn) { return cacheFirst(event, cn); })
     );
     return;
   }
 
-  // Network-First for HTML navigation, JS scripts, and CSS stylesheets
-  event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        if (response && response.status === 200) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(c => c.put(event.request, copy));
-        }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(event.request).then(cached => {
-          if (cached) return cached;
-          if (event.request.mode === "navigate") {
-            return caches.match("/");
-          }
-          return null;
-        });
-      })
-  );
+  // HTML / JS / CSS / manifest: Network-First. Deliberately NOT cache-first:
+  // asset URLs are unversioned (release identity is the SW content hash), so a
+  // stale JS/CSS could pair with a newer HTML document. Network-First keeps code
+  // freshness and lets the offline fallback handle real outages.
+  event.respondWith(networkFirst(event));
 });

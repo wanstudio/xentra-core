@@ -128,10 +128,16 @@ router.get('/brand/info', (req, res) => {
     // M6: Resolve canonical media delivery for logo (logo_media_id → derivative)
     let logoDeliveryUrl = req.brand.logo_url || null;
     try {
-      const brandRow = db.prepare('SELECT logo_media_id FROM brands WHERE id = ?').get(brandId);
-      if (brandRow && brandRow.logo_media_id) {
+      // P1.3: tenantResolver already resolved this brand row with `SELECT *`, so the
+      // logo_media_id is present on req.brand. Reuse it instead of re-reading the
+      // same row (removes one query from the Home critical path); only fall back to
+      // the authoritative query when the property is genuinely absent.
+      const logoMediaId = Object.prototype.hasOwnProperty.call(req.brand, 'logo_media_id')
+        ? req.brand.logo_media_id
+        : (db.prepare('SELECT logo_media_id FROM brands WHERE id = ?').get(brandId) || {}).logo_media_id;
+      if (logoMediaId) {
         const logoDelivery = resolveCustomerMediaDelivery({
-          mediaId: brandRow.logo_media_id,
+          mediaId: logoMediaId,
           brandId,
           assetType: 'square',
           legacyUrl: req.brand.logo_url || null
@@ -5718,6 +5724,9 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       bannersJson,
       req.brand_id
     );
+    // P1.2: brand row written → drop the cached hostname→brand mapping so the
+    // new profile/domain is authoritative immediately.
+    CoreBrandRepo.clearCustomDomainCache();
 
     if (req.brand) {
       req.brand.name = name || req.brand.name;

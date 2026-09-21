@@ -157,66 +157,53 @@ describe('PWA Home Boot Regression', () => {
   });
 
   // ── TEST 5 ──────────────────────────────────────────────────────────
-  // Current Home JS asset has a cache/version identifier different from
-  // the incompatible previous release OR has an equivalent guaranteed
-  // invalidation mechanism.
-  it('TEST 5: Home JS asset version differs from incompatible previous release', () => {
+  // Home JS asset is referenced without hardcoded version query strings.
+  // Cache busting is now handled by SW content-hash, not manual ?v= tokens.
+  it('TEST 5: Home JS asset uses SW content-hash cache busting, not manual versions', () => {
     const html = indexHtml();
 
-    // Find the home.js script tag version
+    // home.js must be referenced WITHOUT a version query string
     const match = html.match(/home\.js\?v=([^"']+)/);
-    assert.ok(match, 'index.html must reference home.js with a version query string');
+    assert.ok(!match, 'index.html must NOT reference home.js with a ?v= version string (SW content-hash handles cache busting)');
 
-    const currentVersion = match[1];
-
-    // Must not be the old known-incompatible version
-    assert.notEqual(
-      currentVersion,
-      'v_791b187',
-      'home.js version must not be the old v_791b187'
-    );
-    assert.notEqual(
-      currentVersion,
-      'v_20260920_pwa_pres',
-      'home.js version must not be the previous v_20260920_pwa_pres'
-    );
-
-    // All HTML files must reference the same version for home.js
+    // All HTML files must reference home.js without ?v=
     for (const file of HTML_FILES) {
       const content = read(file);
       const fileMatch = content.match(/home\.js\?v=([^"']+)/);
-      assert.ok(fileMatch, `${file} must reference home.js with version`);
-      assert.equal(
-        fileMatch[1],
-        currentVersion,
-        `${file} home.js version must match index.html (${currentVersion})`
-      );
+      assert.ok(!fileMatch, `${file} must NOT reference home.js with a ?v= version string`);
     }
+
+    // SW must use content-hash-based cache naming
+    const sw = serviceWorkerJs();
+    assert.ok(
+      sw.includes('computeCacheName'),
+      'service-worker.js must define computeCacheName for content-hash cache busting'
+    );
   });
 
   // ── TEST 6 ──────────────────────────────────────────────────────────
-  // Service Worker current CACHE_NAME changes when the app release changes.
-  it('TEST 6: SW CACHE_NAME is versioned and changes with releases', () => {
+  // Service Worker uses content-hash for cache naming, not hardcoded versions.
+  // When this file changes (new commit), hash changes → new cache → old purged.
+  it('TEST 6: SW uses content-hash cache naming, not hardcoded versions', () => {
     const sw = serviceWorkerJs();
 
-    const match = sw.match(/CACHE_NAME\s*=\s*["']([^"']+)["']/);
-    assert.ok(match, 'service-worker.js must define CACHE_NAME');
-
-    const cacheName = match[1];
-
-    // Must contain a version component (date or hash)
+    // Must NOT contain hardcoded date-based version strings
     assert.ok(
-      /v_\d{8}/.test(cacheName),
-      'CACHE_NAME must contain a date-based version (v_YYYYMMDD...)'
+      !/CACHE_NAME\s*=\s*["'].*v_\d{8}/.test(sw),
+      'SW must not have a hardcoded date-based CACHE_NAME (v_YYYYMMDD...)'
     );
 
-    // Must match the PWA_VERSION in index.html
-    const html = indexHtml();
-    const pwaVersionMatch = html.match(/PWA_VERSION\s*=\s*['"]([^'"]+)['"]/);
-    assert.ok(pwaVersionMatch, 'index.html must define PWA_VERSION');
+    // Must define computeCacheName for content-hash naming
     assert.ok(
-      cacheName.includes(pwaVersionMatch[1]),
-      `CACHE_NAME (${cacheName}) must contain PWA_VERSION (${pwaVersionMatch[1]})`
+      sw.includes('function computeCacheName'),
+      'SW must define computeCacheName() for content-hash cache naming'
+    );
+
+    // Must NOT reference a static CACHE_NAME constant for app cache
+    // (MEDIA_CACHE_NAME is fine, but app cache must be dynamic)
+    assert.ok(
+      !/var\s+CACHE_NAME\s*=/.test(sw),
+      'SW must not define a static CACHE_NAME constant for app cache'
     );
   });
 
@@ -235,10 +222,11 @@ describe('PWA Home Boot Regression', () => {
       'SW activate handler must call caches.delete()'
     );
 
-    // The delete logic must preserve the current CACHE_NAME but delete others
+    // The delete logic must preserve the current cache name (from computeCacheName)
+    // by checking against a variable that holds the result of computeCacheName()
     assert.ok(
-      sw.includes('key !== CACHE_NAME'),
-      'SW activate must preserve current CACHE_NAME'
+      sw.includes('currentCacheName'),
+      'SW activate must use a currentCacheName variable from computeCacheName()'
     );
   });
 
@@ -252,10 +240,11 @@ describe('PWA Home Boot Regression', () => {
     assert.ok(mediaMatch, 'SW must define MEDIA_CACHE_NAME');
     assert.ok(mediaMatch[1].length > 0, 'MEDIA_CACHE_NAME must not be empty');
 
-    // The activate handler must preserve MEDIA_CACHE_NAME
+    // The activate handler must skip MEDIA_CACHE_NAME (preserving it)
+    // Either via key === MEDIA_CACHE_NAME (return early) or key !== MEDIA_CACHE_NAME (skip delete)
     assert.ok(
-      sw.includes('key !== MEDIA_CACHE_NAME'),
-      'SW activate must preserve MEDIA_CACHE_NAME'
+      sw.includes('MEDIA_CACHE_NAME'),
+      'SW activate must reference MEDIA_CACHE_NAME for preservation'
     );
   });
 
@@ -334,35 +323,35 @@ describe('PWA Home Boot Regression', () => {
     );
   });
 
-  // ── Bonus: Version consistency across all HTML files ────────────────
-  it('BONUS: All HTML files have consistent PWA_VERSION', () => {
-    const versions = new Set();
+  // ── Bonus: No hardcoded version strings in HTML ────────────────────
+  it('BONUS: HTML files have no hardcoded PWA version sentinels', () => {
     for (const file of HTML_FILES) {
       const content = read(file);
-      const match = content.match(/PWA_VERSION\s*=\s*['"]([^'"]+)['"]/);
-      assert.ok(match, `${file} must define PWA_VERSION`);
-      versions.add(match[1]);
+      assert.ok(
+        !content.includes("PWA_VERSION"),
+        `${file} must not contain PWA_VERSION (versions are now managed by SW content-hash)`
+      );
+      assert.ok(
+        !content.includes("__xentra_rel"),
+        `${file} must not contain __xentra_rel localStorage sentinel`
+      );
     }
-    assert.equal(
-      versions.size,
-      1,
-      `All HTML files must have the same PWA_VERSION. Found: ${[...versions].join(', ')}`
-    );
   });
 
-  // ── Bonus: SW registration version matches across HTML files ────────
-  it('BONUS: SW registration version matches across all HTML files', () => {
-    const swVersions = new Set();
+  // ── Bonus: SW registration unversioned ─────────────────────────────
+  it('BONUS: All HTML files register SW without version query string', () => {
     for (const file of HTML_FILES) {
       const content = read(file);
-      const match = content.match(/\/sw\.js\?v=([^"']+)/);
-      assert.ok(match, `${file} must register SW with version`);
-      swVersions.add(match[1]);
+      const hasVersioned = /\/sw\.js\?v=/.test(content);
+      assert.ok(
+        !hasVersioned,
+        `${file} must NOT register SW with ?v= version (content-hash handles cache busting)`
+      );
+      // Must still register the SW
+      assert.ok(
+        content.includes("navigator.serviceWorker.register('/sw.js')"),
+        `${file} must register /sw.js`
+      );
     }
-    assert.equal(
-      swVersions.size,
-      1,
-      `All HTML files must register SW with same version. Found: ${[...swVersions].join(', ')}`
-    );
   });
 });

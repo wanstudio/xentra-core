@@ -1,24 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
 /* =========================================================
    Xentra Checkout
    Full checkout / address / fulfillment UI
    ========================================================= */
 
-.xentra-checkout,
-.x-sheet,
-.x-sheet-inner,
-.x-del-sheet,
-.x-note-sheet,
-.x-overlay,
-.x-checkout-overlay,
-.x-address-picker-overlay,
-.x-address-detail-overlay,
-.x-checkout-note-overlay,
-#xentra-checkout-state,
-#xentra-checkout-app {
-	font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-}
 
 .xentra-checkout{
 	background:#f5f5f5;
@@ -1074,17 +1058,6 @@
 	padding-bottom:0;
 }
 
-.x-product-info{
-	min-width:0;
-}
-
-.x-product-name{
-	font-size:16px;
-	line-height:21px;
-	font-weight:700;
-	color:#111;
-}
-
 .x-product-note-inline{
 	margin-top:4px;
 	color:#777;
@@ -1095,23 +1068,6 @@
 	-webkit-line-clamp:2;
 	line-clamp:2;
 	overflow:hidden;
-}
-
-.x-price{
-	margin-top:8px;
-}
-
-.x-old-price{
-	color:#999;
-	font-size:13px;
-	text-decoration:line-through;
-}
-
-.x-current-price{
-	font-size:17px;
-	margin-top:1px;
-	font-weight:700;
-	color:#111;
 }
 
 .x-product-discount{
@@ -1128,108 +1084,6 @@
 	width:14px;
 	height:14px;
 	object-fit:contain;
-}
-
-.x-product-right{
-	width:105px;
-	display:flex;
-	flex-direction:column;
-	align-items:stretch;
-}
-
-.x-product-image{
-	width:105px !important;
-	height:105px !important;
-	object-fit:contain !important;
-	border-radius:15px !important;
-	display:block;
-	background:#fafafa;
-	overflow:hidden;
-}
-
-.x-quantity{
-	width:100% !important;
-	height:34px !important;
-	margin-top:7px !important;
-	display:grid !important;
-	grid-template-columns:28px 1fr 28px !important;
-	align-items:center !important;
-	background:var(--x-primary) !important;
-	border-radius:18px !important;
-}
-
-.x-quantity button{
-	width:28px !important;
-	height:30px !important;
-	padding:0 !important;
-	margin:0 !important;
-	border:0 !important;
-	background:transparent !important;
-	display:flex !important;
-	align-items:center !important;
-	justify-content:center !important;
-	cursor:pointer !important;
-	font-size:16px !important;
-	font-weight:800 !important;
-	color:var(--x-primary-text) !important;
-}
-
-.x-quantity button svg{
-	stroke:currentColor !important;
-}
-
-.x-quantity button img{
-	width:13px;
-	height:13px;
-}
-
-.x-quantity-value{
-	text-align:center !important;
-	font-size:14px !important;
-	line-height:30px !important;
-	font-weight:700 !important;
-	color:var(--x-primary-text) !important;
-}
-
-.x-note-button{
-	width:fit-content;
-	height:30px !important;
-	margin-top:8px !important;
-	border:1px solid #e5e7eb !important;
-	border-radius:999px !important;
-	background:#f3f4f6 !important;
-	color:#555 !important;
-	font-family:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif !important;
-	font-size:12px !important;
-	font-weight:600 !important;
-	cursor:pointer !important;
-	display:inline-flex !important;
-	align-items:center !important;
-	justify-content:center !important;
-	gap:6px !important;
-	padding:0 14px !important;
-	box-shadow:none !important;
-}
-
-.x-product-right .x-note-button{
-	width:100% !important;
-	margin-top:6px !important;
-	border-radius:18px !important;
-}
-
-.x-note-button.has-note{
-	background:var(--x-primary-bg) !important;
-	border-color:var(--x-primary) !important;
-	color:#111 !important;
-	font-weight:700 !important;
-}
-
-.x-note-button .x-note-icon{
-	width:15px !important;
-	height:15px !important;
-	flex:0 0 15px !important;
-	object-fit:contain !important;
-	display:block !important;
 }
 
 
@@ -2019,33 +1873,6 @@
    checkout.js). See assets/js/checkout.js openDynamicOverlay().
    ========================================================= */
 
-.x-overlay{
-	position:fixed !important;
-	top:0 !important;
-	left:0 !important;
-	right:0 !important;
-	bottom:var(--x-overlay-bottom, 0px) !important;
-	width:100vw !important;
-	height:auto !important;
-	background:rgba(0,0,0,0.45) !important;
-	display:flex !important;
-	align-items:flex-end !important;
-	justify-content:center !important;
-	z-index:var(--x-z-overlay, 2147483000) !important;
-	opacity:0 !important;
-	visibility:hidden !important;
-	pointer-events:none !important;
-	transition:opacity 0.35s ease, visibility 0.35s ease, bottom 0.2s ease !important;
-	isolation:isolate;
-}
-
-.x-overlay.open{
-	opacity:1 !important;
-	visibility:visible !important;
-	pointer-events:auto !important;
-}
-
-.x-overlay .x-sheet,
 .x-checkout-sheet,
 .x-sheet-inner,
 .x-alt-sheet{
@@ -2066,19 +1893,9 @@
 	overscroll-behavior:contain !important;
 }
 
-.x-sheet.open,
-.x-overlay.open .x-sheet,
 .x-overlay.open .x-sheet-inner,
 .x-overlay.open .x-alt-sheet{
 	transform:translateY(0) !important;
-}
-
-.x-sheet-handle{
-	width:42px;
-	height:5px;
-	border-radius:999px;
-	background:#d5d5d5;
-	margin:0 auto 14px;
 }
 
 .x-sheet-header{
@@ -3157,138 +2974,11 @@ body.xentra-lock-scroll{
 
 
 /* =========================================================
-   HOMEV NOTE SHEET — ADD ONLY
-   Existing checkout CSS above is preserved unchanged.
+   NOTE SHEET (.x-note-* / #x-note-input ...) — OWNED BY home.css
+   Home and Checkout share the exact same note-sheet markup.
+   The canonical rules (and the body scroll-lock) live in home.css,
+   which every entry point loads, so checkout.css must not restate them.
    ========================================================= */
-
-#x-note-overlay,
-.x-note-overlay{
-	position:fixed !important;
-	inset:0 !important;
-	width:100vw !important;
-	height:100vh !important;
-	height:100dvh !important;
-	z-index:2147483000 !important;
-	display:flex !important;
-	align-items:flex-end;
-	margin:0 !important;
-	padding:0 !important;
-	background:rgba(0,0,0,.45);
-	opacity:0;
-	visibility:hidden;
-	pointer-events:none;
-	transition:opacity .35s ease, visibility .35s ease;
-	isolation:isolate;
-}
-
-#x-note-overlay.open,
-.x-note-overlay.open{
-	opacity:1;
-	visibility:visible;
-	pointer-events:auto;
-}
-
-#x-note-sheet,
-.x-note-sheet{
-	position:absolute !important;
-	left:0 !important;
-	right:0 !important;
-	bottom:var(--x-note-keyboard,0px) !important;
-	width:100% !important;
-	height:min(75dvh,var(--x-note-visible-height,75dvh)) !important;
-	max-height:none !important;
-	margin:0 !important;
-	background:#fff;
-	border-radius:22px 22px 0 0;
-	padding:8px 26px max(12px,env(safe-area-inset-bottom));
-	transform:translateY(105%);
-	transition:transform 0.38s cubic-bezier(0.22, 0.61, 0.36, 1);
-	display:flex !important;
-	flex-direction:column;
-	overflow:hidden;
-	touch-action:pan-y;
-	box-sizing:border-box !important;
-}
-
-#x-note-overlay.open #x-note-sheet,
-.x-note-overlay.open .x-note-sheet{
-	transform:translateY(0);
-}
-
-.x-note-handle{
-	width:42px;
-	height:3px;
-	margin:0 auto 20px;
-	background:#aeb4c0;
-	border-radius:10px;
-	flex:0 0 auto;
-}
-
-.x-note-header{
-	padding-bottom:13px;
-	border-bottom:1px solid #dedede;
-	flex:0 0 auto;
-}
-
-.x-note-header h3{
-	margin:0;
-	color:#161616;
-	font-size:16px;
-	line-height:22px;
-	font-weight:700;
-}
-
-#x-note-input{
-	width:100%;
-	min-height:0;
-	padding:12px 0;
-	border:0;
-	outline:0;
-	resize:none;
-	background:transparent;
-	color:#333;
-	font-family:'Plus Jakarta Sans',Arial,sans-serif;
-	font-size:14px;
-	line-height:21px;
-	flex:1 1 auto;
-	box-sizing:border-box;
-}
-
-#x-note-input::placeholder{
-	color:#999;
-}
-
-.x-note-footer{
-	display:flex;
-	align-items:center;
-	justify-content:space-between;
-	padding-top:10px;
-	border-top:1px solid #dedede;
-	flex:0 0 auto;
-}
-
-#x-note-counter{
-	font-size:12px;
-	color:#777;
-}
-
-#x-note-save{
-	width:86px;
-	height:34px;
-	border:0;
-	border-radius:18px;
-	background:var(--x-primary);
-	color:var(--x-primary-text, #111);
-	font-family:'Plus Jakarta Sans',Arial,sans-serif;
-	font-size:13px;
-	font-weight:600;
-	cursor:pointer;
-}
-
-body:has(#x-note-overlay.open),
-body:has(.x-note-overlay.open){
-	overflow:hidden;
-}
 
 /* =========================================================
    Checkout's own order-note sheet uses unique IDs (renamed

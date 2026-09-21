@@ -9,6 +9,42 @@
  */
 const DataAccess = require('../DataAccess');
 
+// ── Custom-domain → brand resolution cache (P1.2) ───────────────────────────
+// Tenant resolution runs `findByCustomDomain` on every API request (CORS dynamic
+// origin check + tenantResolver); same-origin requests that carry an `Origin`
+// header resolve the same host twice. The mapping is global (one `brands` table)
+// and only changes through an explicit brand write, so a short TTL is safe.
+//
+// Isolation guarantees:
+//  - the key is the EXACT normalization the SQL predicate uses (trim+lowercase),
+//    so a cached entry can never map a hostname to a different brand;
+//  - only POSITIVE hits are cached — an unknown hostname always falls through to
+//    the authoritative query (a newly registered domain resolves immediately);
+//  - a copy is returned per call because callers mutate `req.brand`;
+//  - the cache is cleared on every brand write (repository + profile route).
+const DOMAIN_CACHE_TTL_MS = 60 * 1000;
+const DOMAIN_CACHE_MAX_ENTRIES = 500;
+const domainCache = new Map();
+
+function clearDomainCache() {
+  domainCache.clear();
+}
+
+function readDomainCache(key) {
+  const hit = domainCache.get(key);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    domainCache.delete(key);
+    return null;
+  }
+  return Object.assign({}, hit.brand);
+}
+
+function writeDomainCache(key, brand) {
+  if (domainCache.size >= DOMAIN_CACHE_MAX_ENTRIES) domainCache.clear();
+  domainCache.set(key, { brand: Object.assign({}, brand), expiresAt: Date.now() + DOMAIN_CACHE_TTL_MS });
+}
+
 class BrandRepository {
   constructor(dataAccess = DataAccess) {
     this.db = dataAccess;
@@ -21,12 +57,27 @@ class BrandRepository {
 
   findByCustomDomain(hostname) {
     const clean = typeof hostname === 'string' ? hostname.trim().toLowerCase() : hostname;
-    return this.db.queryOne(`
+    const cacheable = typeof clean === 'string' && clean.length > 0;
+    if (cacheable) {
+      const cached = readDomainCache(clean);
+      if (cached) return cached;
+    }
+    const brand = this.db.queryOne(`
       SELECT *
       FROM brands
       WHERE lower(trim(custom_domain)) = ?
       LIMIT 1
     `, [clean]);
+    if (cacheable && brand) writeDomainCache(clean, brand);
+    return brand;
+  }
+
+  clearCustomDomainCache() {
+    clearDomainCache();
+  }
+
+  static clearCustomDomainCache() {
+    clearDomainCache();
   }
 
   findById(brandId) {
@@ -69,6 +120,7 @@ class BrandRepository {
       }
     }
 
+    clearDomainCache();
     return this.db.execute(`
       UPDATE brands
       SET name = COALESCE(?, name),
@@ -89,6 +141,7 @@ class BrandRepository {
   }
 
   updateBrandLogo(brandId, logoUrl) {
+    clearDomainCache();
     return this.db.execute(`
       UPDATE brands
       SET logo_url = ?,
@@ -98,6 +151,7 @@ class BrandRepository {
   }
 
   removeBrandLogo(brandId) {
+    clearDomainCache();
     return this.db.execute(`
       UPDATE brands
       SET logo_url = NULL,
@@ -111,6 +165,7 @@ class BrandRepository {
    * Both fields are updated atomically so legacy consumers still work.
    */
   updateBrandLogoMedia(brandId, { mediaId, logoUrl }) {
+    clearDomainCache();
     return this.db.execute(`
       UPDATE brands
       SET logo_media_id = ?,
@@ -124,6 +179,7 @@ class BrandRepository {
    * M5: Remove logo media reference (soft — retains logo_url fallback if present).
    */
   removeBrandLogoMedia(brandId) {
+    clearDomainCache();
     return this.db.execute(`
       UPDATE brands
       SET logo_media_id = NULL,

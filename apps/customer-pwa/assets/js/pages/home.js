@@ -42,6 +42,12 @@
   var catalogBranchId = null;
   var bannerLoadSeq = 0;
   var carouselTimer = null;
+  var firstRenderLogged = false;   // P1: emit home_first_render exactly once
+  // P1.5: last HTML rendered into #x-products. Store.subscribe fires on EVERY
+  // mutation, so renderProducts() runs constantly; rebuilding an identical grid
+  // is pure DOM/log layout work. null = the container content is unknown (owned
+  // by someone else), '' = the empty state is rendered.
+  var lastProductsHtml = null;
 
   // Lightweight performance instrumentation (gated by debug or ?perf=1)
   function perfLog(mark, label) {
@@ -204,9 +210,11 @@
 
     deferTask(function () {
       perfLog('promo_discovery_start');
+      perfLog('home_api_promo_start');
       // Do not require login/WhatsApp registration to discover this promo.
       API.get('/promotions/active?is_pwa=0&phone=')
         .then(function (res) {
+          perfLog('home_api_promo_end');
           if (!res || !res.success) return;
           var promo = (Array.isArray(res.promotions) ? res.promotions : []).find(function (p) {
             return p && p.should_show_banner === true;
@@ -236,6 +244,7 @@
           perfLog('promo_discovery_done');
         })
         .catch(function (err) {
+          perfLog('home_api_promo_end', 'error');
           // Network/API failure must not fabricate an entitlement.
           activePromo = null;
           evaluateBannerVisibility();
@@ -327,9 +336,11 @@
     var seq = ++bannerLoadSeq;
     var query = branchId ? '?branch_id=' + encodeURIComponent(String(branchId)) : '';
 
+    perfLog('home_api_brand_start');
     API.get('/brand/info' + query)
       .then(function (data) {
         if (seq !== bannerLoadSeq) return;
+        perfLog('home_api_brand_end');
 
         if (data && data.brand && Store && typeof Store.setBrand === 'function') {
           Store.setBrand(data.brand);
@@ -340,6 +351,7 @@
       })
       .catch(function (err) {
         if (seq !== bannerLoadSeq) return;
+        perfLog('home_api_brand_end', 'error');
         console.warn('[Home] Banner load warn:', err);
         initCarousel();
       });
@@ -745,7 +757,13 @@
     // 1. Reuse existing destination context (one canonical Active Destination state).
     var dest = null;
     try {
-      dest = (Store.getActiveDestination && Store.getActiveDestination()) || Store.getState().activeDestination || Store.getState().location;
+      dest = (Store.getActiveDestination && Store.getActiveDestination()) || null;
+      if (!dest) {
+        // P1.4: one snapshot instead of two consecutive getState() deep clones
+        // (getState() JSON-clones the whole store). Same data, half the work.
+        var snapshot = Store.getState();
+        dest = snapshot.activeDestination || snapshot.location;
+      }
     } catch (_) {}
     if (dest && dest.latitude != null && dest.longitude != null) {
       setDiscoveryOrigin({ latitude: dest.latitude, longitude: dest.longitude });
@@ -779,10 +797,22 @@
     branchListError = false;
 
     if (branches.length === 1) {
-      // Exactly 1 relevant Branch → hide the discovery UI and directly render
-      // the catalog for that Branch context; preserve the context internally
-      // for catalog/Cart/Checkout later authoritative validation (contract).
-      setActiveBranch(branches[0], true);
+      // Exactly 1 relevant Branch → directly render the catalog for that Branch
+      // context; preserve the context internally for catalog/Cart/Checkout later
+      // authoritative validation (contract).
+      // P1: init() may already have loaded THIS branch's menu (persisted branch
+      // context). Re-issuing the identical catalog+banner requests would be a pure
+      // duplicate, so reload only when the context actually changed or the
+      // already-loaded menu is empty (an empty/failed load still retries here).
+      var sole = branches[0];
+      var soleId = String(sole.id);
+      if (catalogBranchId === soleId && categories.length > 0) {
+        activeBranch = sole;
+        try { Store.setBranchContext(branchContextOf(sole)); } catch (_) {}
+        updateBranchActiveState();
+      } else {
+        setActiveBranch(sole, true);
+      }
     } else if (branches.length > 1) {
       // Re-confirm the previous selection is still present; otherwise require
       // an explicit selection (the first displayed Branch is NOT an
@@ -1014,8 +1044,10 @@
     resolveDiscoveryContext();
 
     // 3. Background refresh with authoritative branch data (cheap DB query).
+    perfLog('home_api_branches_start');
     API.get('/brand/branches')
       .then(function (res) {
+        perfLog('home_api_branches_end');
         if (res && res.success && Array.isArray(res.branches)) {
           saveDiscoveryCache(res.branches);
           applyBranchDiscovery(res.branches);
@@ -1025,6 +1057,7 @@
         }
       })
       .catch(function (err) {
+        perfLog('home_api_branches_end', 'error');
         console.warn('[Home] Branch discovery network warn:', err);
         if (!branches.length) {
           branchListError = true;
@@ -1060,6 +1093,8 @@
     if (track) track.innerHTML = loading ? '<div class="x-loading">' + loading + '</div>' : '';
     var productsEl = $('x-products');
     if (productsEl) productsEl.innerHTML = loading ? '<div class="x-loading">' + loading + '</div>' : '';
+    // P1.5: this function owns the product container now → invalidate the render cache.
+    lastProductsHtml = null;
   }
 
   // Honest empty branch: a branch menu that is empty (or failed to load) shows
@@ -1103,9 +1138,11 @@
     catalogBranchId = branchId ? String(branchId) : null;
     var path = branchId ? '/catalog/menu?branch_id=' + encodeURIComponent(branchId) : '/catalog/menu';
 
+    perfLog('home_api_catalog_start');
     API.get(path)
       .then(function (data) {
         if (seq !== catalogLoadSeq) return; // superseded by a newer catalog load
+        perfLog('home_api_catalog_end');
         if (data && data.success && data.categories && data.categories.length > 0) {
           // Only the brand-wide menu (no branch context) is cached; branch menus
           // are never cached so a cache key can never cross branch identities.
@@ -1125,6 +1162,7 @@
       })
       .catch(function (err) {
         if (seq !== catalogLoadSeq) return; // superseded by a newer catalog load
+        perfLog('home_api_catalog_end', 'error');
         console.warn('[Home] Load catalog network warn:', err);
         if (catalogBranchId) {
           renderEmptyBranchCatalog();
@@ -1203,6 +1241,7 @@
     // overwrite a newer selection with old-branch data.
     var seq = ++productLoadSeq;
     container.innerHTML = '<div class="x-loading">Memuat menu...</div>';
+    lastProductsHtml = null; // P1.5: container content replaced outside renderProducts()
 
     // When inside a branch context, the catalog was already loaded by
     // loadCatalog() and products[] should already be populated from
@@ -1239,19 +1278,29 @@
   function renderProducts() {
     var container = $('x-products');
     if (!container) return;
-    container.innerHTML = '';
 
     if (!products.length) {
-      container.innerHTML = '<div class="x-empty">Tidak ada menu di kategori ini.</div>';
+      // Skip the write when the empty state is already on screen.
+      if (lastProductsHtml !== '') {
+        container.innerHTML = '<div class="x-empty">Tidak ada menu di kategori ini.</div>';
+        lastProductsHtml = '';
+      }
       return;
     }
 
-    var state = Store.getState();
+    if (!firstRenderLogged) {
+      firstRenderLogged = true;
+      perfLog('home_first_render');
+    }
+    perfLog('home_render_start');
+
+    var activeBranchId = activeBranch ? String(activeBranch.id) : null;
+    var branchScope = activeBranch ? String(activeBranch.id) : undefined;
+    var html = '';
 
     products.forEach(function (product) {
-      var item = Store.findCartItem(product.id, activeBranch ? String(activeBranch.id) : undefined);
+      var item = Store.findCartItem(product.id, branchScope);
       var qty = item ? item.quantity : 0;
-      var activeBranchId = activeBranch ? String(activeBranch.id) : null;
       var note = (item && item.note) || (typeof Store !== 'undefined' && Store.getNote ? Store.getNote(product.id, activeBranchId) : '') || '';
 
       var price = Number(product.price || 0);
@@ -1261,11 +1310,6 @@
       // P3: branch-level availability is a SERVER-computed flag (is_available is
       // only present on branch-scoped menus). The client merely presents it.
       var unavailable = !!activeBranch && product.is_available === false;
-
-      var card = document.createElement('article');
-      card.className = 'x-product' + (unavailable ? ' x-product-unavailable' : '');
-      card.setAttribute('data-product-card', String(product.id));
-      card.onclick = function () { openProductDetail(product); };
 
       var oldPriceHtml = regPrice > price
         ? '<div class="x-old-price">' + UI.money(regPrice) + '</div>'
@@ -1308,7 +1352,8 @@
         }
       }
 
-      card.innerHTML =
+      html +=
+        '<article class="x-product' + (unavailable ? ' x-product-unavailable' : '') + '" data-product-card="' + UI.escape(String(product.id)) + '">' +
         '<div class="x-product-info">' +
         '  <div class="x-product-name">' + UI.escape(product.name) + '</div>' +
         '  <div class="x-product-description">' + UI.escape(desc) + '</div>' +
@@ -1320,12 +1365,25 @@
         '<div class="x-product-right">' +
         imgHtml +
         controls +
-        '</div>';
-
-      container.appendChild(card);
+        '</div>' +
+        '</article>';
     });
 
+    // P1.5: Store.subscribe fires on every mutation (brand, session, location,
+    // orderType, recipient, cart changes for products outside this category, ...).
+    // When nothing the grid depends on changed, keep the existing DOM untouched —
+    // no parse, no reflow, no re-binding.
+    if (html === lastProductsHtml) {
+      perfLog('home_render_end', 'unchanged');
+      return;
+    }
+
+    // One insertion for the whole category instead of N appendChild calls on a
+    // live container (N incremental layouts).
+    container.innerHTML = html;
+    lastProductsHtml = html;
     bindProductEvents();
+    perfLog('home_render_end');
   }
 
 
@@ -1400,6 +1458,17 @@
       btn.onclick = function (e) {
         e.stopPropagation();
         openNote(btn.dataset.note, btn.dataset.noteBranch !== undefined ? btn.dataset.noteBranch : (activeBranch ? String(activeBranch.id) : undefined));
+      };
+    });
+
+    // P1.5: the grid is written with a single innerHTML, so the card click is
+    // bound here (same "whole card opens the detail" behavior as before); the
+    // inner controls above stop propagation so they never trigger it.
+    document.querySelectorAll('[data-product-card]').forEach(function (card) {
+      card.onclick = function () {
+        var pid = card.getAttribute('data-product-card');
+        var product = products.find(function (x) { return String(x.id) === String(pid); });
+        if (product) openProductDetail(product);
       };
     });
   }
@@ -2065,6 +2134,7 @@
   // ======================================================================
   function init() {
     perfLog('home_init_start');
+    perfLog('home_api_start');
 
     // Clock
     updateClock();

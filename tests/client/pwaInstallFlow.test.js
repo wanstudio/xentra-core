@@ -662,7 +662,10 @@ test('AC-H1: Early head scripts in all HTML entry points use pure capture withou
   }
 });
 
-test('AC-H2: All Customer PWA entry points reference the canonical pwa-runtime.js version', () => {
+// P0 #3: release identity is owned by the Service Worker content hash.
+// HTML entry points must therefore carry NO version sentinel and NO ?v= asset
+// query strings, and must register the SW without a version query string.
+test('AC-H2: P0#3 — entry points use SW content-hash release identity (no version sentinels)', () => {
   const htmlFiles = [
     'apps/customer-pwa/index.html',
     'apps/customer-pwa/checkout.html',
@@ -671,21 +674,38 @@ test('AC-H2: All Customer PWA entry points reference the canonical pwa-runtime.j
     'apps/customer-pwa/order-received/index.html'
   ];
 
-  const canonicalRuntimeRegex = /src="\/assets\/js\/core\/pwa-runtime\.js\?v=v_20260920_pwa_bootfix"/;
-  const canonicalSwRegex = /register\('\/sw\.js\?v=v_20260920_pwa_bootfix'\)/;
-  const canonicalRelRegex = /var PWA_VERSION = 'v_20260920_pwa_bootfix'/;
+  const versionQueryRegex = /(?:href|src)="[^"]*\?v=[^"]*"/;
+  const versionedSwRegex = /register\('\/sw\.js\?v=/;
 
   for (const relPath of htmlFiles) {
     const fullPath = path.resolve(__dirname, '../../', relPath);
     const content = fs.readFileSync(fullPath, 'utf8');
 
-    assert.match(content, canonicalRuntimeRegex,
-      `${relPath} must reference canonical pwa-runtime.js?v=v_20260920_pwa_bootfix`);
-    assert.match(content, canonicalSwRegex,
-      `${relPath} must reference canonical /sw.js?v=v_20260920_pwa_bootfix`);
-    assert.match(content, canonicalRelRegex,
-      `${relPath} must define canonical PWA_VERSION = 'v_20260920_pwa_bootfix'`);
+    // No hardcoded release sentinel / destructive purge marker
+    assert.ok(!content.includes('PWA_VERSION'),
+      `${relPath} must NOT define PWA_VERSION (release identity lives in the SW content hash)`);
+    assert.ok(!content.includes('__xentra_rel'),
+      `${relPath} must NOT use the __xentra_rel localStorage sentinel`);
+    assert.ok(!content.includes('caches.keys(') && !content.includes('caches.delete('),
+      `${relPath} must NOT perform a destructive global Cache Storage purge`);
+
+    // No ?v= asset query strings — cache busting is handled by the SW
+    assert.ok(!versionQueryRegex.test(content),
+      `${relPath} must NOT reference assets with a ?v= query string`);
+
+    // SW must still be registered, and without a version query string
+    assert.ok(content.includes("navigator.serviceWorker.register('/sw.js')"),
+      `${relPath} must register /sw.js`);
+    assert.ok(!versionedSwRegex.test(content),
+      `${relPath} must register /sw.js WITHOUT a version query string`);
   }
+
+  // And the SW itself must version caches by its own content hash.
+  const sw = fs.readFileSync(
+    path.resolve(__dirname, '../../apps/customer-pwa/assets/pwa/service-worker.js'), 'utf8'
+  );
+  assert.ok(sw.includes('computeCacheName'),
+    'service-worker.js must derive the app cache name from its own content hash');
 });
 
 test('AC-H3: pwa-runtime.js broadcasts readiness if prompt was captured early in head', () => {

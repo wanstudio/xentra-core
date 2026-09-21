@@ -7,24 +7,9 @@
   <meta name="description" content="Pesan ayam tulang lunak spesial Bangjo langsung dari HP. Delivery & Pick-up tersedia!">
   <meta name="theme-color" content="#b6ff00">
   <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; style-src * 'unsafe-inline' https:; img-src * data: blob: https: http:; connect-src * https: http: ws: wss:;">
-  <!-- ══════════════════════════════════════════════════════════════
-       PWA VERSION SENTINEL & EARLY INSTALL PROMPT CAPTURE
-       Executes immediately in <head> to capture beforeinstallprompt on Android
-       ══════════════════════════════════════════════════════════════ -->
+  <!-- Early theme bootstrap: apply saved brand primary color before CSS renders -->
   <script>
     (function () {
-      var PWA_VERSION = 'v_20260920_pwa_bootfix';
-      try {
-        if (localStorage.getItem('__xentra_rel') !== PWA_VERSION) {
-          localStorage.setItem('__xentra_rel', PWA_VERSION);
-          if ('caches' in window) {
-            caches.keys().then(function (names) {
-              return Promise.all(names.map(function (n) { return caches.delete(n); }));
-            }).catch(function () {});
-          }
-        }
-      } catch (_) {}
-
       // Early theme bootstrap: apply saved brand primary color before CSS renders to prevent theme flash
       try {
         var rawBrand = localStorage.getItem('xentra_v2_brand');
@@ -76,13 +61,13 @@
   <link rel="manifest" href="/manifest.json">
 
   <!-- CSS (version-hashed for instant cache-busting) -->
-  <link rel="stylesheet" href="/assets/css/tokens.css?v=v_theme03">
-  <link rel="stylesheet" href="/assets/css/layout.css?v=v_theme03">
-  <link rel="stylesheet" href="/assets/css/components.css?v=v_theme03">
-  <link rel="stylesheet" href="/assets/css/home.css?v=v_theme03">
-  <link rel="stylesheet" href="/assets/css/checkout.css?v=v_20260919_codfmt">
-  <link rel="stylesheet" href="/assets/css/order-received.css?v=v_theme03">
-  <link rel="stylesheet" href="/assets/css/location-picker.css?v=v_theme03">
+  <link rel="stylesheet" href="/assets/css/tokens.css">
+  <link rel="stylesheet" href="/assets/css/layout.css">
+  <link rel="stylesheet" href="/assets/css/components.css">
+  <link rel="stylesheet" href="/assets/css/home.css">
+  <link rel="stylesheet" href="/assets/css/checkout.css">
+  <link rel="stylesheet" href="/assets/css/order-received.css">
+  <link rel="stylesheet" href="/assets/css/location-picker.css">
 </head>
 <body>
 
@@ -233,23 +218,23 @@
   </div>
 
   <!-- JS CORE & CONTROLLERS (Version Hashed v2.3.6) -->
-  <script src="/assets/js/core/store.js?v=v_791b187"></script>
-  <script src="/assets/js/core/ui.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/api.js?v=v_theme04"></script>
-  <script src="/assets/js/core/nav.js?v=v_20260919_nav"></script>
-  <script src="/assets/js/core/router.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/pwa-runtime.js?v=v_20260920_pwa_bootfix"></script>
-  <script src="/assets/js/core/promo-reward-cart.js?v=v_791b187"></script>
-  <script src="/assets/js/core/delivery-schedule.js?v=p7f4a09"></script>
-  <script src="/assets/js/location.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/discovery.js?v=p6c9d12"></script>
-  <script src="/assets/js/core/location-picker.js?v=v_20260919_poi"></script>
-  <script src="/assets/js/core/media.js?v=m6a02"></script>
+  <script src="/assets/js/core/store.js"></script>
+  <script src="/assets/js/core/ui.js"></script>
+  <script src="/assets/js/core/api.js"></script>
+  <script src="/assets/js/core/nav.js"></script>
+  <script src="/assets/js/core/router.js"></script>
+  <script src="/assets/js/core/pwa-runtime.js"></script>
+  <script src="/assets/js/core/promo-reward-cart.js"></script>
+  <script src="/assets/js/core/delivery-schedule.js"></script>
+  <script src="/assets/js/location.js"></script>
+  <script src="/assets/js/core/discovery.js"></script>
+  <script src="/assets/js/core/location-picker.js"></script>
+  <script src="/assets/js/core/media.js"></script>
 
   <!-- Page Controllers -->
-  <script src="/assets/js/pages/home.js?v=v_20260920_pwa_bootfix"></script>
-  <script src="/assets/js/pages/checkout.js?v=v_20260920_pwa_bootfix"></script>
-  <script src="/assets/js/pages/order-received.js?v=v_theme03"></script>
+  <script src="/assets/js/pages/home.js"></script>
+  <script src="/assets/js/pages/checkout.js"></script>
+  <script src="/assets/js/pages/order-received.js"></script>
 
   <!-- ═══════════════════════════════════════════════════
        SPA ROUTER & VIEW COORDINATOR
@@ -327,7 +312,7 @@
        ═══════════════════════════════════════════════════ -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js?v=v_20260920_pwa_bootfix').then(function (reg) {
+      navigator.serviceWorker.register('/sw.js').then(function (reg) {
         reg.addEventListener('updatefound', function () {
           var newWorker = reg.installing;
           if (newWorker) {

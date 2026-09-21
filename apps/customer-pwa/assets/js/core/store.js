@@ -16,6 +16,7 @@
   var ORDER_TYPE_KEY = PREFIX + 'order_type';
   var ORDER_CTX_KEY = PREFIX + 'order_context';
   var BRANCH_CTX_KEY = PREFIX + 'branch_context';
+  var RECIPIENT_KEY = PREFIX + 'delivery_recipient';
 
   var listeners = [];
 
@@ -72,7 +73,8 @@
     branchContext: load(BRANCH_CTX_KEY, null),
     cart: load(CART_KEY, { items: [] }),
     notes: load(NOTES_KEY, {}),
-    promo: { enabled: false, target: 0, discount: 0 }
+    promo: { enabled: false, target: 0, discount: 0 },
+    recipient: load(RECIPIENT_KEY, null)
   };
 
   // ── Persistence helpers ──
@@ -108,6 +110,10 @@
   // a point-in-time snapshot (kept for callers that rely on immutability).
   function getState() {
     return JSON.parse(JSON.stringify(state));
+  }
+
+  function getRecipient() {
+    return state.recipient;
   }
 
   function subscribe(fn) {
@@ -158,6 +164,18 @@
     state.customerSession = null;
     try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
     notify({ type: 'customerSession' });
+  }
+
+  function setRecipient(recipient) {
+    state.recipient = recipient;
+    save(RECIPIENT_KEY, recipient);
+    notify({ type: 'recipient' });
+  }
+
+  function clearRecipient() {
+    state.recipient = null;
+    try { localStorage.removeItem(RECIPIENT_KEY); } catch (_) {}
+    notify({ type: 'recipient' });
   }
 
   function setOrderType(type) {
@@ -612,6 +630,9 @@
     isPromoRewardItem: isPromoRewardItem,
     getCartItemsForBranch: getCartItemsForBranch,
     removeBranchItems: removeBranchItems,
-    removeCartItem: removeCartItem
+    removeCartItem: removeCartItem,
+    setRecipient: setRecipient,
+    getRecipient: getRecipient,
+    clearRecipient: clearRecipient
   };
 })();

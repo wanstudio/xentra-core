@@ -385,6 +385,7 @@
   font-size: 16px;
   line-height: 21px;
   font-weight: 700;
+  color: #111;
 }
 
 .x-product-description {
@@ -399,7 +400,7 @@
 }
 
 .x-price {
-  margin-top: 13px;
+  margin-top: 8px;
 }
 
 .x-old-price {
@@ -412,6 +413,7 @@
   font-size: 17px;
   margin-top: 1px;
   font-weight: 700;
+  color: #111;
 }
 
 
@@ -475,7 +477,13 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  font-size: 16px;
+  font-weight: 800;
   color: var(--x-primary-text, #111111);
+}
+
+.x-quantity button svg {
+  stroke: currentColor;
 }
 
 .x-quantity button img {
@@ -492,22 +500,34 @@
 }
 
 
-/* ── Note Button ── */
+/* ── Note Button ──
+   Owned by home.css: both Home product cards and Checkout item cards share
+   this exact markup, so the effective (winning) values live here and are
+   consumed by every page that loads home.css. */
 .x-note-button {
-  width: 100%;
-  height: 34px;
-  margin-top: 7px;
-  border: 1px solid #ddd;
-  border-radius: var(--x-radius-lg);
-  background: var(--x-white);
+  width: fit-content;
+  height: 30px;
+  margin-top: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #f3f4f6;
   color: var(--x-gray-700);
+  font-family: var(--x-font);
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0 12px;
+  padding: 0 14px;
+  box-shadow: none;
+}
+
+.x-product-right .x-note-button {
+  width: 100%;
+  margin-top: 6px;
+  border-radius: 18px;
 }
 
 .x-note-button .x-note-icon {
@@ -521,6 +541,8 @@
 .x-note-button.has-note {
   border-color: var(--x-primary);
   background: var(--x-primary-bg);
+  color: #111;
+  font-weight: 700;
 }
 
 .x-product-discount {
@@ -1213,6 +1235,37 @@
 }
 
 
+/* ── Shared overlay primitive (moved out of checkout.css) ──
+   Home and Checkout both build `.x-overlay` > `.x-sheet` dialogs. Declared
+   here (before `.x-note-overlay`) so the note overlay keeps winning the
+   same-specificity tie exactly as it did when checkout.css loaded last. */
+.x-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: var(--x-overlay-bottom, 0px) !important;
+  width: 100vw !important;
+  height: auto !important;
+  z-index: var(--x-z-overlay, 2147483000) !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  justify-content: center !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transition: opacity 0.35s ease, visibility 0.35s ease, bottom 0.2s ease !important;
+  isolation: isolate;
+}
+
+.x-overlay.open {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+
 /* ── Note Sheet ── */
 .x-note-overlay {
   position: fixed !important;
@@ -1334,36 +1387,11 @@
 	cursor: pointer;
 }
 
-#x-note-input::placeholder {
-  color: var(--x-gray-400);
-}
-
-.x-note-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 10px;
-  border-top: 1px solid var(--x-gray-150);
-  flex: 0 0 auto;
-}
-
-#x-note-counter {
-  font-size: 12px;
-  color: var(--x-gray-500);
-}
-
-#x-note-save {
-  width: 86px;
-  height: 34px;
-  border: 0;
-  border-radius: var(--x-radius-lg);
-  background: var(--x-primary);
-  color: var(--x-primary-text, #111111);
-  font-family: var(--x-font);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
+/* NOTE: a second, token-valued duplicate of #x-note-input::placeholder,
+   .x-note-footer, #x-note-counter and #x-note-save used to live here. It was
+   the rule that took over once checkout.css stopped restating these (and it
+   only differed in fallback font names), so it was removed to keep the exact
+   pre-cleanup computed values. */
 
 
 /* ── PWA Install Banner ── */
@@ -2409,5 +2437,53 @@
   color: #64748b;
   margin-top: 4px;
   line-height: 1.4;
+}
+
+
+/* ==========================================================================
+   SHARED OVERLAY / SHEET PRIMITIVES (moved out of checkout.css)
+
+   Home renders its cart sheet, note sheet, product-detail sheet and branch
+   switcher through the same `.x-overlay` > `.x-sheet` structure Checkout uses.
+   These rules previously lived in checkout.css and only applied to Home
+   because checkout.css loads last. They are owned here so Home no longer
+   depends on checkout.css being present.
+
+   NOTE: `.x-overlay` / `.x-overlay.open` are declared just above the Note
+   Sheet section (not here) so that `.x-note-overlay` keeps winning the
+   same-specificity tie it won when checkout.css loaded last.
+
+   The rules below are deliberately placed at the END of home.css: they must
+   keep winning the cascade against the view-specific rules above them (e.g.
+   `.x-detail-overlay .x-detail-sheet`), exactly as checkout.css used to.
+   ========================================================================== */
+
+.x-overlay .x-sheet {
+  background: #fff !important;
+  width: 100% !important;
+  max-width: 480px !important;
+  margin: 0 auto !important;
+  max-height: min(88dvh, calc(100% - 16px)) !important;
+  overflow-y: auto !important;
+  border-radius: 22px 22px 0 0 !important;
+  padding: 14px 18px calc(20px + env(safe-area-inset-bottom)) !important;
+  box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.15) !important;
+  transform: translateY(105%) !important;
+  transition: transform 0.38s cubic-bezier(0.22, 0.61, 0.36, 1) !important;
+  will-change: transform !important;
+  touch-action: pan-y !important;
+  box-sizing: border-box !important;
+  overscroll-behavior: contain !important;
+}
+
+.x-sheet.open,
+.x-overlay.open .x-sheet {
+  transform: translateY(0) !important;
+}
+
+/* Scroll lock while Home's note sheet is open (was body:has(...) in checkout.css) */
+body:has(#x-note-overlay.open),
+body:has(.x-note-overlay.open) {
+  overflow: hidden;
 }
 

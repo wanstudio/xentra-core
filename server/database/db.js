@@ -1735,6 +1735,17 @@ function initSchema(targetDb) {
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_products_media_id ON products(media_id) WHERE media_id IS NOT NULL;'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_categories_media_id ON categories(media_id) WHERE media_id IS NOT NULL;'); } catch (e) {}
 
+  // P1.3 INITIAL HOME READ PATH: EXPLAIN QUERY PLAN shows these storefront reads as
+  // full table scans, so index the brand/branch scope columns they filter on:
+  //   GET /catalog/menu           → categories(brand_id), products(brand_id)
+  //   GET /catalog/menu?branch_id → branch_categories(branch_id)
+  //   GET /brand/branches         → branches(brand_id)
+  // Non-unique and idempotent: safe on fresh databases, existing databases and restart.
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_categories_brand ON categories(brand_id);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_products_brand ON products(brand_id);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_branch_categories_branch ON branch_categories(branch_id);'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_branches_brand ON branches(brand_id);'); } catch (e) {}
+
   // Migrate existing users table if brand_id or password_hash has legacy NOT NULL constraint
   const usersTableInfo = targetDb.prepare('PRAGMA table_info(users);').all();
   const brandCol = usersTableInfo.find(c => c.name === 'brand_id');
