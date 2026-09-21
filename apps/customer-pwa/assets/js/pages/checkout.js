@@ -2737,11 +2737,12 @@
     // SELF resolves phone from Customer Profile — never ask the customer to
     // retype their own number when the profile already has it.
     var phone = r.phone || (isSelf ? (state.customer.phone || '') : '');
-    // Stacked layout: label, then name, then phone — each on its own line.
+    // Stacked layout: label, then name, then full phone — each on its own line.
+    // No masking: the customer must see the exact number clearly.
     var html = '<div style="display:block;min-width:0;">' +
       '<div style="font-size:12.5px;color:#555;">Dikirim kepada:</div>' +
       '<div style="font-size:14px;font-weight:700;color:#111;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + UI.escape(label) + '</div>';
-    if (phone) html += '<div style="font-size:12.5px;color:#666;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + UI.escape(maskPhone(phone)) + '</div>';
+    if (phone) html += '<div style="font-size:12.5px;color:#666;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + UI.escape(String(phone).replace(/[^0-9]/g, '')) + '</div>';
     html += '</div>';
     return html;
   }
