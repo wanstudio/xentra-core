@@ -206,10 +206,15 @@ class PromotionRepository {
   }
 
   countCustomerOrders({ customerPhone, brandId }) {
+    // First-order privilege is consumed only by orders that actually went
+    // through. Terminal non-consuming states (cancelled by customer, rejected
+    // or timed out by branch, refunded) must not burn it — otherwise a
+    // customer could never reclaim a reward after a failed order.
+    // (Pairs with OrderStateMachine voiding redemptions on those states.)
     const row = this.db.queryOne(`
       SELECT COUNT(*) as count
       FROM orders
-      WHERE customer_phone = ? AND brand_id = ? AND status != 'cancelled'
+      WHERE customer_phone = ? AND brand_id = ? AND status NOT IN ('cancelled', 'rejected', 'timeout', 'refunded')
     `, [customerPhone, brandId]);
     return Number(row?.count || 0);
   }
