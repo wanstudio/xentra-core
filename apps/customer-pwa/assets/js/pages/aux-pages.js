@@ -225,7 +225,9 @@
         sessDigits.length >= 9 && sessDigits.length <= 15);
       phoneHtml =
         '    <button type="button" class="x-profile-menu-item" id="x-profile-btn-phone">' +
-        '      <div class="left"><span class="icon">📱</span><span><span style="display:block;font-size:13px;color:#64748b;">Nomor WhatsApp</span>' +
+        '      <div class="left"><span class="icon" style="display:inline-flex;align-items:center;">' +
+        '<svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true"><path fill="#25D366" d="M16 3C9.4 3 4 8.4 4 15c0 2.4.7 4.6 1.9 6.5L4 29l7.7-1.8c1.8 1 3.9 1.6 6.1 1.6h.2c6.6 0 12-5.4 12-12S22.6 3 16 3zm0 21.8h-.2c-1.9 0-3.7-.5-5.3-1.5l-.4-.2-4.6 1.1 1.1-4.4-.2-.4c-1.1-1.7-1.7-3.7-1.7-5.7C4.9 9.4 9.7 4.7 16 4.7S27.1 9.4 27.1 15 22.4 24.8 16 24.8zm6-8.1c-.3-.2-1.9-1-2.2-1.1-.3-.1-.5-.2-.7.2-.2.3-.8 1.1-1 1.3-.2.2-.4.2-.7.1-.3-.2-1.4-.5-2.6-1.6-.9-.9-1.6-1.9-1.8-2.2-.2-.3 0-.5.1-.6l.5-.6c.2-.2.2-.4.3-.6.1-.2 0-.4 0-.6L14.5 9c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.6.2-.9.5-.3.3-1.1 1.1-1.1 2.7s1.2 3.1 1.3 3.4c.2.2 2.3 3.6 5.7 5 .8.3 1.4.5 1.9.7.8.2 1.5.2 2.1.1.6-.1 1.9-.8 2.2-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.2-.6-.4z"/></svg>' +
+        '</span><span><span style="display:block;font-size:13px;color:#64748b;">Nomor WhatsApp</span>' +
         '      <span id="x-profile-phone-value" style="display:block;font-size:14px;color:#111;font-weight:600;">' +
         (hasPhone ? UI.escape(sessPhone) : 'Belum ditambahkan') + '</span></span></div>' +
         '      <span id="x-profile-phone-action" style="font-size:12.5px;font-weight:600;color:#16a34a;">' +
