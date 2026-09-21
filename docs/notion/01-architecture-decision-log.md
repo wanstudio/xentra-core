@@ -345,13 +345,13 @@ Checkout → recipient + address + fulfillment mode + payment → final verifica
 **Agent rule:** Treat this decision as authoritative for customer-facing Order Detail / Tracking UX. Do not reintroduce customer-facing Branch/Cabang terminology, separate waiting-page architecture, masking of Owner-defined location names, or duplicate Recipient input without a newer explicit decision.
 
 
-## 🔒 LOCKED — Order Detail: Delivery Detail Block v1 — 2026-09-21
+## 🔒 LOCKED — Order Detail: Delivery Detail Presentation v2 — 2026-09-21
 **Status: LOCKED / AUTHORITATIVE**
 
-The **Detail Pengantaran** block is part of the canonical Customer Order Detail and must not be omitted.
+The delivery-origin/destination block is part of the canonical Customer Order Detail and must not be omitted. **The literal heading "Detail Pengantaran" must NOT be rendered as a customer-facing section title.** The route content is shown directly after the status/progress area.
 
 ### Canonical placement
-Place **Detail Pengantaran** after the Order status/progress area and before **Pembelian / Pesanan** and payment details.
+Place the delivery-origin/destination route directly after the Order status/progress area and before **Dikirim kepada / Pembelian / Pesanan** and payment details. Do not render a standalone **"Detail Pengantaran"** heading.
 
 ### Canonical content
 For delivery orders, show a compact vertical route:
