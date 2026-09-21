@@ -2693,7 +2693,22 @@ router.get('/orders/:id', (req, res) => {
     unit_price: it.unit_price,
     quantity: it.quantity,
     item_subtotal: it.item_subtotal,
-    note: it.note || ''
+    note: it.note || '',
+    // Reorder support: catalog image is not stored on order_items, so resolve
+    // it live (branch override first, then canonical product). Read-only.
+    image_url: (() => {
+      try {
+        const bp = order.branch_id && it.product_id
+          ? db.prepare('SELECT product_image_url, image_override FROM branch_products WHERE branch_id = ? AND product_id = ?').get(order.branch_id, String(it.product_id))
+          : null;
+        if (bp && (bp.image_override || bp.product_image_url)) return bp.image_override || bp.product_image_url;
+        const prod = it.product_id
+          ? db.prepare('SELECT image_url, image FROM products WHERE id = ?').get(String(it.product_id))
+          : null;
+        if (prod && (prod.image_url || prod.image)) return prod.image_url || prod.image;
+      } catch (_) {}
+      return '';
+    })()
   }));
 
   const safeDelivery = delivery ? {

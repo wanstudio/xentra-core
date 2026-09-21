@@ -908,7 +908,7 @@
         '  </div>' +
         '  <div class="x-product-right">' +
         (img
-          ? '<img class="x-product-image" src="' + UI.escape(img) + '" alt="' + UI.escape(item.name || '') + '" loading="lazy" onerror="this.src=\'/assets/icons/food-default.png\'">'
+          ? '<img class="x-product-image" src="' + UI.escape(img) + '" alt="' + UI.escape(item.name || '') + '" loading="lazy" onerror="this.onerror=null;this.src=\'/assets/icons/food-default.png\'">'
           : '<div class="x-product-image" style="background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:24px;">🍱</div>'
         ) +
         '    <div class="x-quantity">' +

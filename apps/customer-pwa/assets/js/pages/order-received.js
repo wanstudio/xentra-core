@@ -764,7 +764,7 @@
               name: it.product_name || it.name || 'Menu',
               price: Number(it.unit_price || 0),
               regular_price: null,
-              image_url: '',
+              image_url: it.image_url || '',
               description: '',
               note: ''
             }, Number(it.quantity || 1), { branch_id: order.branch_id, branch_name: order.branch_name || null });
