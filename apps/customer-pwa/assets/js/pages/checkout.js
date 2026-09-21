@@ -1787,10 +1787,11 @@
 
     // Reservation picker (customer app). Locked rules (notion roadmap):
     //   - reservation is a future arrival booking (tomorrow onwards); the date
-    //     wheel STARTS at Besok — "Hari ini" is never offered.
+    //     wheel STARTS at Besok — "Hari ini" is never offered. The wheel value
+    //     is the device-local ISO date (YYYY-MM-DD, e.g. 2026-05-02), so the
+    //     server/owner dashboard always receives a real date, never "Besok".
     //   - guest estimate 1-20, booking fee Rp0.
-    //   - time window is a placeholder 09:00-21:00 pending an operating-hours
-    //     data source (same B1 gap as delivery scheduling).
+    //   - time window 12:00-20:00 in 30-minute steps (last slot starts 19:30).
     function renderReservationSection() {
       schedContainer.innerHTML =
         '<div class="x-fulfillment-divider"></div>' +
@@ -1831,9 +1832,10 @@
         return { value: d.iso, label: d.value };
       });
 
-      // Booking time window placeholder: 09:00-21:00 in 30-minute steps.
+      // Booking time window: 12:00-20:00 in 30-minute steps. Last slot starts
+      // 19:30 (30-min duration ending 20:00). Values are HH:MM strings.
       var timeItems = [];
-      for (var m = 9 * 60; m + 30 <= 21 * 60; m += 30) {
+      for (var m = 12 * 60; m + 30 <= 20 * 60; m += 30) {
         var hh = ('0' + Math.floor(m / 60)).slice(-2);
         var mm = ('0' + (m % 60)).slice(-2);
         var tv = hh + ':' + mm;
