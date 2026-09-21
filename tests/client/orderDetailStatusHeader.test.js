@@ -199,3 +199,17 @@ test('ODH-16: fmtDistance formats ID locale', () => {
   assert.equal(fmtDistance(800), '800 m');
   assert.equal(fmtDistance(1500), '1,5 km');
 });
+
+test('ODH-17: cancelled screen is informative with reorder CTAs, no order code', () => {
+  const idx = src.indexOf('function renderCancelled(order, items)');
+  assert.ok(idx !== -1, 'renderCancelled must receive items');
+  const endIdx = src.indexOf('// ─── P7.5 ACCEPTED', idx);
+  const body = src.substring(idx, endIdx !== -1 ? endIdx : idx + 6000);
+  assert.ok(body.includes('Pesanan Dibatalkan'), 'must keep the cancelled title');
+  assert.ok(body.includes('Pesan Ini Lagi'), 'must offer Pesan Ini Lagi CTA');
+  assert.ok(body.includes('Pesan Menu Baru'), 'must offer Pesan Menu Baru CTA');
+  assert.ok(body.includes('PESANAN YANG DIBATALKAN'), 'must show what was cancelled');
+  assert.ok(!body.includes('order_number'), 'order code must not be shown to consumers');
+  assert.ok(body.includes("Router.navigate('checkout'"), 'reorder must go branch-scoped to checkout');
+  assert.ok(body.includes("indexOf('reward_')"), 'promo reward lines must not be copied straight into the cart');
+});

@@ -144,7 +144,7 @@
     // P6.3 PAYMENT PENDING / PROCESSING: Online payment has not settled yet
     if (isOnline && (payStatus === 'pending' || payStatus === 'reconciliation_pending')) {
       if (status === 'cancelled') {
-        renderCancelled(order);
+        renderCancelled(order, data.items);
         return;
       }
       renderPaymentPending(data);
@@ -180,7 +180,7 @@
 
     // Cancelled (customer-initiated)
     if (status === 'cancelled') {
-      renderCancelled(order);
+      renderCancelled(order, data.items);
       return;
     }
 
@@ -694,23 +694,85 @@
     if (btn && Router) btn.onclick = function () { Router.navigate('home'); };
   }
 
-  // Cancelled by customer
-  function renderCancelled(order) {
+  // Cancelled by customer — informative + direct reorder, no order code.
+  // Shows WHAT was cancelled and offers Pesan Ini Lagi (same items back to
+  // cart, branch-scoped checkout) + Pesan Menu Baru. Promo reward lines are
+  // never re-added directly — they go through promotion eligibility again.
+  function renderCancelled(order, items) {
     if (!targetContainer) return;
-    var orderNumber = order.order_number || ('XTR-' + order.id);
+    items = items || [];
+    var branchName = order.branch_name || 'Restoran';
+
+    var summaryText = items.length > 0
+      ? items.map(function (it) {
+          return (it.quantity || 1) + '× ' + (it.product_name || it.name || 'Menu');
+        }).join(', ')
+      : '';
+
+    var itemsHtml = '';
+    items.forEach(function (item) {
+      var itemTotal = Number(item.unit_price || 0) * Number(item.quantity || 0);
+      itemsHtml +=
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:9px 0;border-bottom:1px solid #f3f4f6;">' +
+        '  <div style="flex:1;min-width:0;padding-right:12px;">' +
+        '    <div style="font-size:14px;font-weight:700;color:#111;">' + (item.quantity || 1) + '× ' + UI.escape(item.product_name || item.name || 'Menu') + '</div>' +
+        (item.note ? '<div style="font-size:12px;color:#6b7280;margin-top:2px;">Catatan: ' + UI.escape(item.note) + '</div>' : '') +
+        '  </div>' +
+        '  <div style="font-size:14px;font-weight:700;color:#111;white-space:nowrap;">' + UI.money(itemTotal) + '</div>' +
+        '</div>';
+    });
 
     targetContainer.style.display = 'block';
     targetContainer.innerHTML =
       '<div style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
       '  <div style="background:#fff;padding:28px 18px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);margin-bottom:12px;">' +
       '    <div style="font-size:48px;margin-bottom:12px;">🚫</div>' +
-      '    <h1 style="font-size:20px;font-weight:800;color:#6b7280;margin:0 0 8px;">Pesanan Dibatalkan</h1>' +
-      '    <p style="font-size:13px;color:#6b7280;margin:0 0 16px;line-height:1.5;">Pesanan <strong>' + UI.escape(orderNumber) + '</strong> telah dibatalkan.</p>' +
+      '    <h1 style="font-size:20px;font-weight:800;color:#111;margin:0 0 8px;">Pesanan Dibatalkan</h1>' +
+      '    <p style="font-size:13px;color:#6b7280;margin:0;line-height:1.5;">' +
+      (summaryText
+        ? 'Pesananmu (' + UI.escape(summaryText) + ') dari <strong>' + UI.escape(branchName) + '</strong> telah dibatalkan.'
+        : 'Pesananmu dari <strong>' + UI.escape(branchName) + '</strong> telah dibatalkan.') +
+      '    </p>' +
       '  </div>' +
-      '  <div style="padding:0 14px;">' +
-      '    <button type="button" id="x-btn-new-order" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border:none;border-radius:24px;cursor:pointer;background:var(--x-primary);color:var(--x-primary-text);">Pesan Menu Baru</button>' +
+      (itemsHtml
+        ? '  <div style="background:#fff;padding:14px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+          '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:4px;">PESANAN YANG DIBATALKAN</div>' +
+          itemsHtml +
+          '  </div>'
+        : '') +
+      '  <div style="padding:4px 14px 0;display:flex;flex-direction:column;gap:10px;">' +
+      (itemsHtml
+        ? '    <button type="button" id="x-btn-reorder-same" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border:none;border-radius:24px;cursor:pointer;background:var(--x-primary);color:var(--x-primary-text);">Pesan Ini Lagi</button>'
+        : '') +
+      '    <button type="button" id="x-btn-new-order" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border-radius:24px;cursor:pointer;background:#fff;color:#111;border:2px solid #e5e7eb;">Pesan Menu Baru</button>' +
       '  </div>' +
       '</div>';
+
+    var reorderBtn = document.getElementById('x-btn-reorder-same');
+    if (reorderBtn) reorderBtn.onclick = function () {
+      try {
+        items.forEach(function (it) {
+          var pid = String(it.product_id || it.id || '');
+          // Promo reward lines re-enter only via promotion eligibility —
+          // never copy them straight into the cart.
+          if (!pid || pid.indexOf('reward_') === 0 || pid.indexOf('prm_') === 0) return;
+          if (it.note && String(it.note).indexOf('[PROMO:') !== -1) return;
+          if (Store && typeof Store.addItem === 'function') {
+            Store.addItem({
+              id: pid,
+              product_id: pid,
+              name: it.product_name || it.name || 'Menu',
+              price: Number(it.unit_price || 0),
+              regular_price: null,
+              image_url: '',
+              description: '',
+              note: ''
+            }, Number(it.quantity || 1), { branch_id: order.branch_id, branch_name: order.branch_name || null });
+          }
+        });
+      } catch (_) {}
+      if (Router) Router.navigate('checkout', order.branch_id ? { branchId: order.branch_id } : null);
+    };
 
     var btn = document.getElementById('x-btn-new-order');
     if (btn && Router) btn.onclick = function () { Router.navigate('home'); };
