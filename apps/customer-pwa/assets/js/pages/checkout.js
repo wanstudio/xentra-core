@@ -2829,16 +2829,24 @@
   // authoritatively); OTHER captures an explicit recipient (name + WhatsApp).
   function openRecipientSheet() {
     var current = state.recipient || { type: 'self', name: '', phone: '' };
-    var initialType = (current.type === 'other') ? 'other' : 'self';
+    var selectedType = (current.type === 'other') ? 'other' : 'self';
     var sh = makeOverlay(
       '<h3 class="x-alt-sheet-title">Dikirim kepada</h3>' +
       '<div style="font-size:13px;color:#6b7280;margin-bottom:10px;">Pilih penerima pesanan makanan untuk order ini.</div>' +
       '<div class="x-alt-sheet-label">Dikirim kepada</div>' +
-      '<div style="display:flex;gap:10px;margin-bottom:8px;">' +
-        '<label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="x-recip-type" value="self" style="accent-color:var(--x-primary, #00a637);width:17px;height:17px;margin:0;" ' + (initialType === 'self' ? 'checked' : '') + '><span>Saya sendiri</span></label>' +
-        '<label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="x-recip-type" value="other" style="accent-color:var(--x-primary, #00a637);width:17px;height:17px;margin:0;" ' + (initialType === 'other' ? 'checked' : '') + '><span>Orang lain</span></label>' +
+      // Same selectable-card pattern as the COD "Bayar dengan uang berapa" sheet:
+      // bordered card + theme-colored radio circle on the side.
+      '<div class="x-tender-presets" style="grid-template-columns:1fr;margin-bottom:0;">' +
+        '<div class="x-tender-preset-card' + (selectedType === 'self' ? ' is-selected' : '') + '" id="x-recip-self">' +
+        '  <span class="x-tender-preset-val">Saya sendiri</span>' +
+        '  <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
+        '</div>' +
+        '<div class="x-tender-preset-card' + (selectedType === 'other' ? ' is-selected' : '') + '" id="x-recip-other">' +
+        '  <span class="x-tender-preset-val">Orang lain</span>' +
+        '  <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
+        '</div>' +
       '</div>' +
-      '<div id="x-recip-other-fields" style="margin-top:12px;' + (initialType === 'other' ? 'display:block;' : 'display:none;') + '">' +
+      '<div id="x-recip-other-fields" style="margin-top:12px;' + (selectedType === 'other' ? 'display:block;' : 'display:none;') + '">' +
         '<div class="x-alt-sheet-label">Nama Penerima</div>' +
         '<input id="x-input-recipient-name" class="x-alt-input" type="text" value="' + UI.escape(current.name || '') + '" placeholder="Nama penerima">' +
         '<div class="x-alt-sheet-label" style="margin-top:10px;">Nomor WhatsApp / Telepon</div>' +
@@ -2847,19 +2855,20 @@
       '<button type="button" class="x-alt-submit-btn" id="x-save-recipient" style="margin-top:14px;">Gunakan</button>'
     );
 
-    // toggle OTHER fields on radio change
-    var radios = sh.overlay.querySelectorAll('input[name="x-recip-type"]');
-    for (var i = 0; i < radios.length; i++) {
-      radios[i].addEventListener('change', function () {
-        var otherFields = sh.overlay.querySelector('#x-recip-other-fields');
-        if (otherFields) {
-          otherFields.style.display = (sh.overlay.querySelector('input[value="other"]').checked) ? 'block' : 'none';
-        }
-      });
+    // Card select (same behaviour as the COD tender sheet cards)
+    var elSelf = sh.overlay.querySelector('#x-recip-self');
+    var elOther = sh.overlay.querySelector('#x-recip-other');
+    function paintRecipCards() {
+      if (elSelf) elSelf.classList.toggle('is-selected', selectedType === 'self');
+      if (elOther) elOther.classList.toggle('is-selected', selectedType === 'other');
+      var otherFields = sh.overlay.querySelector('#x-recip-other-fields');
+      if (otherFields) otherFields.style.display = (selectedType === 'other') ? 'block' : 'none';
     }
+    if (elSelf) elSelf.onclick = function () { selectedType = 'self'; paintRecipCards(); };
+    if (elOther) elOther.onclick = function () { selectedType = 'other'; paintRecipCards(); };
 
     sh.overlay.querySelector('#x-save-recipient').onclick = function () {
-      var type = (sh.overlay.querySelector('input[value="other"]').checked) ? 'other' : 'self';
+      var type = selectedType;
       var name = '', phone = '';
       if (type === 'other') {
         name = (sh.overlay.querySelector('#x-input-recipient-name').value || '').trim();
