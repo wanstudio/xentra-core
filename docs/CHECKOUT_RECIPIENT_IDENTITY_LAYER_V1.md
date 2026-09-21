@@ -133,3 +133,45 @@ The exact physical schema/API names remain subject to the relevant Commerce/Orde
 The earlier implementation direction that placed a full **Recipient Confirmation Bottom Sheet immediately after the “Pesan Sekarang” CTA** is superseded as the default presentation.
 
 The **Recipient Identity Layer itself remains locked**. Only the default Checkout presentation/interaction has changed to the simpler Address-card + `Dikirim kepada` pattern defined above.
+
+## Customer Phone Completion & SELF Recipient Identity
+
+**Locked:** 2026-09-21
+
+Customer phone is part of the authenticated Customer Profile/Identity and is the authoritative phone source for Recipient `SELF`.
+
+Rules:
+- Google authentication provides Customer identity, but Google authentication alone does not guarantee that the Customer profile has a usable phone number.
+- If an authenticated Customer has no phone number, Xentra must require a phone-completion step before the transaction can continue to final order/payment commit.
+- The phone is collected once and saved to the Customer Profile/Identity.
+- `SELF` automatically uses the Customer Profile name + phone.
+- Do not ask the customer to re-enter their own phone inside Recipient editing when the Customer Profile already has a valid phone.
+- Existing customers with a valid phone skip phone completion.
+- New Google customers without a phone complete the phone field after Google authentication, whether the flow originated from Profile/Signup or the Checkout identity gate.
+- After phone completion, return to the same checkout intent without losing cart, address, branch, recipient, promotion, payment method, or COD cash amount.
+- The Order stores its own Recipient snapshot; later Customer Profile changes must not mutate historical Orders.
+
+Canonical flow:
+
+```
+Google Auth
+  ↓
+Customer identity resolved
+  ↓
+Phone exists?
+  ├─ YES → continue
+  └─ NO  → Complete Phone → save Customer Profile → continue
+  ↓
+Checkout
+  ↓
+SELF Recipient = Customer Profile name + phone
+```
+
+Boundary:
+- Customer Profile/Identity owns the reusable current customer phone.
+- Order Recipient snapshot owns the phone captured for that order.
+- Saved Address does not own Recipient.
+- Recipient OTHER remains independent and requires no Xentra account, Google authentication, or OTP.
+
+Checkout may be the contextual place where a missing phone is collected, but the resulting phone must be persisted to Customer Profile/Identity and then used as the authoritative SELF Recipient value.
+
