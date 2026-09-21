@@ -343,3 +343,37 @@ The existing customer PWA currently sends payment_method from state with a cash 
 Checkout → recipient + address + fulfillment mode + payment → final verification / identity gate where required → create Order → Order Detail / Tracking → state-driven progress → completed / rejected / timeout.
 
 **Agent rule:** Treat this decision as authoritative for customer-facing Order Detail / Tracking UX. Do not reintroduce customer-facing Branch/Cabang terminology, separate waiting-page architecture, masking of Owner-defined location names, or duplicate Recipient input without a newer explicit decision.
+
+
+## 🔒 LOCKED — Order Detail: Delivery Detail Block v1 — 2026-09-21
+**Status: LOCKED / AUTHORITATIVE**
+
+The **Detail Pengantaran** block is part of the canonical Customer Order Detail and must not be omitted.
+
+### Canonical placement
+Place **Detail Pengantaran** after the Order status/progress area and before **Pembelian / Pesanan** and payment details.
+
+### Canonical content
+For delivery orders, show a compact vertical route:
+- **Alamat restoran** — Owner-defined Branch/location name and optional restaurant address.
+- **Alamat pengiriman** — customer's selected delivery destination/address and authoritative delivery distance when available.
+- Visual direction: restaurant/origin marker at top → vertical connector/route line → delivery destination marker at bottom.
+- Labels remain concise and customer-facing. Never expose internal Branch terminology.
+
+### Domain boundary
+**Detail Pengantaran** presents fulfillment origin/location, delivery destination, and route/distance context. It does not replace:
+- Recipient ("Dikirim kepada") = who receives.
+- Customer/Buyer = who places the order.
+- Fulfillment Branch = internal operational authority.
+
+For pickup orders, use the applicable pickup location/instruction rather than a fake delivery route.
+
+### Example
+Restaurant: **Bangjo Pringsewu**
+Delivery: **Altuera Tower at Southgate — 3,8 km**
+
+Exact address, distance, and location values must come from the authoritative order/fulfillment contract or snapshot; do not invent or reconstruct historical presentation from mutable profile/address data.
+
+### Implementation rule
+Customer Order Detail must include **Detail Pengantaran** as a first-class section. Visual styling may change, but this information architecture must remain.
+
