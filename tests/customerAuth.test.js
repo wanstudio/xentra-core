@@ -53,18 +53,13 @@ async function mockFetch(path, options = {}) {
   });
 }
 
+// RETIRED (2026-09-21): the WhatsApp OTP login endpoints are retired, so tests no
+// longer mint sessions through /auth/otp/*. A customer session is created directly
+// through the server's TokenSessionStore — the same store the Google Sign-In path
+// uses. No OTP / Wablas is involved.
 async function createCustomerSession(phone) {
-  const otpRes = await mockFetch('/api/v1/auth/otp/send', {
-    method: 'POST',
-    body: JSON.stringify({ phone })
-  });
-  const otpData = await otpRes.json();
-  const verifyRes = await mockFetch('/api/v1/auth/otp/verify', {
-    method: 'POST',
-    body: JSON.stringify({ challenge_id: otpData.challenge_id, otp: '123456', phone })
-  });
-  const verifyData = await verifyRes.json();
-  return verifyData.token;
+  const { token } = global.TokenSessionStore.createCustomerSession(phone, 'brand_bangjo', 3600);
+  return token;
 }
 
 function addTestBranch(id) {
@@ -176,7 +171,7 @@ test('SEC-06: Forged xnt_cust_ token (not in server store) is rejected', async (
   assert.ok(['CUSTOMER_AUTH_REQUIRED', 'INVALID_OR_EXPIRED_CUSTOMER_SESSION'].includes(data.error));
 });
 
-test('SEC-07: OTP-created session is recognized by requireCustomerAuth', async () => {
+test('SEC-07: valid customer session is recognized by requireCustomerAuth', async () => {
   addTestBranch('branch_sec_07');
   const token = await createCustomerSession('089000000007');
 
@@ -207,7 +202,7 @@ test('SEC-08: Checkout requires valid customer auth (no unauthenticated checkout
   assert.strictEqual(data.error, 'CUSTOMER_AUTH_REQUIRED');
 });
 
-test('SEC-09: Checkout with OTP session binds authoritative phone from session, not body', async () => {
+test('SEC-09: Checkout with a customer session binds authoritative phone from session, not body', async () => {
   addTestBranch('branch_sec_09');
   const phone = '089000000009';
   const token = await createCustomerSession(phone);
@@ -228,10 +223,16 @@ test('SEC-09: Checkout with OTP session binds authoritative phone from session, 
   assert.strictEqual(data.success, true);
 
   const order = db.prepare('SELECT customer_phone FROM orders WHERE id = ?').get(data.order_id);
-  assert.strictEqual(order.customer_phone, phone, 'server must use OTP session phone, not body phone');
+  assert.strictEqual(order.customer_phone, phone, 'server must use session phone, not body phone');
 });
 
-test('OTP-FLOW-01: OTP send returns valid challenge_id with retry_after', async () => {
+// RETIRED (2026-09-21): WhatsApp OTP login is retired. The /auth/otp/* routes
+// short-circuit with OTP_RETIRED (410) and never dispatch a Wablas message, so the
+// OTP flow tests below are SKIPPED (kept for reference — not deleted). Customer
+// identity now comes from Google Sign-In + Phone Completion.
+const OTP_FLOW_RETIRED_NOTE = 'RETIRED (2026-09-21): WhatsApp OTP login retired (/auth/otp/* -> 410 OTP_RETIRED).';
+
+test('OTP-FLOW-01: OTP send returns valid challenge_id with retry_after', { skip: OTP_FLOW_RETIRED_NOTE }, async () => {
   const res = await mockFetch('/api/v1/auth/otp/send', {
     method: 'POST',
     body: JSON.stringify({ phone: '089000000101' })
@@ -244,7 +245,7 @@ test('OTP-FLOW-01: OTP send returns valid challenge_id with retry_after', async 
   assert.strictEqual(typeof data.retry_after, 'number');
 });
 
-test('OTP-FLOW-02: OTP verify with correct code returns xnt_cust_ token', async () => {
+test('OTP-FLOW-02: OTP verify with correct code returns xnt_cust_ token', { skip: OTP_FLOW_RETIRED_NOTE }, async () => {
   const phone = '089000000102';
   const sendRes = await mockFetch('/api/v1/auth/otp/send', {
     method: 'POST',
@@ -266,7 +267,7 @@ test('OTP-FLOW-02: OTP verify with correct code returns xnt_cust_ token', async 
   assert.strictEqual(verifyData.phone, phone, 'must return the verified phone');
 });
 
-test('OTP-FLOW-03: OTP verify with wrong code returns error and does not authenticate', async () => {
+test('OTP-FLOW-03: OTP verify with wrong code returns error and does not authenticate', { skip: OTP_FLOW_RETIRED_NOTE }, async () => {
   const phone = '089000000103';
   const sendRes = await mockFetch('/api/v1/auth/otp/send', {
     method: 'POST',
@@ -285,7 +286,7 @@ test('OTP-FLOW-03: OTP verify with wrong code returns error and does not authent
   assert.ok(!verifyData.token, 'must not return token on failed verify');
 });
 
-test('OTP-FLOW-04: Complete OTP flow end-to-end: send → verify → use token for checkout', async () => {
+test('OTP-FLOW-04: Complete OTP flow end-to-end: send → verify → use token for checkout', { skip: OTP_FLOW_RETIRED_NOTE }, async () => {
   addTestBranch('branch_sec_flow');
   const phone = '089000000104';
 
@@ -320,7 +321,7 @@ test('OTP-FLOW-04: Complete OTP flow end-to-end: send → verify → use token f
   assert.ok(orderData.order_id, 'must create order');
 });
 
-test('OTP-FLOW-05: OTP send without phone returns 400', async () => {
+test('OTP-FLOW-05: OTP send without phone returns 400', { skip: OTP_FLOW_RETIRED_NOTE }, async () => {
   const res = await mockFetch('/api/v1/auth/otp/send', {
     method: 'POST',
     body: JSON.stringify({})
@@ -330,7 +331,7 @@ test('OTP-FLOW-05: OTP send without phone returns 400', async () => {
   assert.strictEqual(data.success, false);
 });
 
-test('OTP-FLOW-06: OTP verify without challenge_id returns 400', async () => {
+test('OTP-FLOW-06: OTP verify without challenge_id returns 400', { skip: OTP_FLOW_RETIRED_NOTE }, async () => {
   const res = await mockFetch('/api/v1/auth/otp/verify', {
     method: 'POST',
     body: JSON.stringify({ otp: '123456' })
@@ -340,7 +341,7 @@ test('OTP-FLOW-06: OTP verify without challenge_id returns 400', async () => {
   assert.strictEqual(data.success, false);
 });
 
-test('OTP-FLOW-07: OTP verify with non-existent challenge_id returns error', async () => {
+test('OTP-FLOW-07: OTP verify with non-existent challenge_id returns error', { skip: OTP_FLOW_RETIRED_NOTE }, async () => {
   const res = await mockFetch('/api/v1/auth/otp/verify', {
     method: 'POST',
     body: JSON.stringify({ challenge_id: 'chk_nonexistent', otp: '123456', phone: '089000000107' })
@@ -351,7 +352,7 @@ test('OTP-FLOW-07: OTP verify with non-existent challenge_id returns error', asy
   assert.strictEqual(data.error, 'CHALLENGE_NOT_FOUND');
 });
 
-test('OTP-FLOW-08: Max OTP attempts exceeded returns error', async () => {
+test('OTP-FLOW-08: Max OTP attempts exceeded returns error', { skip: OTP_FLOW_RETIRED_NOTE }, async () => {
   const phone = '089000000108';
   const sendRes = await mockFetch('/api/v1/auth/otp/send', {
     method: 'POST',
@@ -375,7 +376,7 @@ test('OTP-FLOW-08: Max OTP attempts exceeded returns error', async () => {
   assert.strictEqual(finalData.error, 'MAX_ATTEMPTS_EXCEEDED');
 });
 
-test('OTP-FLOW-09: Rate limit blocks immediate re-send', async () => {
+test('OTP-FLOW-09: Rate limit blocks immediate re-send', { skip: OTP_FLOW_RETIRED_NOTE }, async () => {
   const phone = '089000000109';
   await mockFetch('/api/v1/auth/otp/send', {
     method: 'POST',
@@ -466,7 +467,7 @@ test('SEC-16: Expired customer token on /checkout/verify is rejected with 401', 
   assert.ok(['CUSTOMER_AUTH_REQUIRED', 'INVALID_OR_EXPIRED_CUSTOMER_SESSION'].includes(data.error));
 });
 
-test('SEC-17: Valid OTP session allows /checkout/verify to succeed', async () => {
+test('SEC-17: Valid customer session allows /checkout/verify to succeed', async () => {
   addTestBranch('branch_sec_17');
   const phone = '089000000017';
   const token = await createCustomerSession(phone);
@@ -576,7 +577,7 @@ test('SEC-20: Unauthenticated checkout returns CUSTOMER_AUTH_REQUIRED, while inv
   assert.strictEqual(invalidTokenData.error, 'INVALID_OR_EXPIRED_CUSTOMER_SESSION');
 });
 
-test('SEC-21: Returning customer with existing valid session creates multiple consecutive orders WITHOUT re-OTP', async () => {
+test('SEC-21: Returning customer with existing valid session creates multiple consecutive orders WITHOUT re-auth', async () => {
   addTestBranch('branch_sec_21');
   const phone = '089000000021';
   // Step 1: Customer authenticates ONCE with WhatsApp OTP

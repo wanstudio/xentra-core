@@ -139,9 +139,9 @@ test('C3 — Validation & Defaults: mandatory Branch WhatsApp and secure environ
   }, /Missing required infrastructure secret "TEST_INFRA_SECRET". No hardcoded fallback allowed/);
 
   // Configured secret succeeds
-  process.env.TEST_INFRA_SECRET = 'wablas_sec_live_999';
+  process.env.TEST_INFRA_SECRET = 'test_infra_sec_live_999';
   const resolvedSecret = ConfigurationValidator.requireSecureEnvSecret('TEST_INFRA_SECRET');
-  assert.strictEqual(resolvedSecret, 'wablas_sec_live_999');
+  assert.strictEqual(resolvedSecret, 'test_infra_sec_live_999');
 
   // Restore env
   if (savedKey) process.env.TEST_INFRA_SECRET = savedKey;
@@ -194,8 +194,8 @@ test('C4 — Configuration Access: RBAC-aware mutation boundaries and secret mas
 
   // 3. Secret Read Masking (Unprivileged user reads masked value)
   scope.set({
-    key: 'wablas.infrastructure_token',
-    value: 'secret_wablas_prod_token',
+    key: 'test.infra_token',
+    value: 'secret_test_prod_token',
     type: 'string',
     scope_type: 'system',
     is_secret: true
@@ -203,7 +203,7 @@ test('C4 — Configuration Access: RBAC-aware mutation boundaries and secret mas
 
   const maskedRead = ConfigurationAccess.read({
     scopeManager: scope,
-    key: 'wablas.infrastructure_token',
+    key: 'test.infra_token',
     identity: branchMgrUser,
     assignments: branchMgrAssignments,
     reveal_secrets: true // Branch manager asks reveal, but lacks org:manage
@@ -213,12 +213,12 @@ test('C4 — Configuration Access: RBAC-aware mutation boundaries and secret mas
   // 4. Secret Read Revealed for Owner
   const ownerRead = ConfigurationAccess.read({
     scopeManager: scope,
-    key: 'wablas.infrastructure_token',
+    key: 'test.infra_token',
     identity: ownerUser,
     assignments: ownerAssignments,
     reveal_secrets: true
   });
-  assert.strictEqual(ownerRead.value, 'secret_wablas_prod_token');
+  assert.strictEqual(ownerRead.value, 'secret_test_prod_token');
 });
 
 // ==============================================================================

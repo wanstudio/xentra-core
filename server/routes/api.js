@@ -397,7 +397,23 @@ const RateLimiter = {
   }
 };
 
+// ── RETIRED (2026-09-21): WhatsApp OTP login ────────────────────────────────
+// The WhatsApp OTP identity flow and its Wablas transport are RETIRED and no
+// longer used by the Customer PWA. Customer identity is Google Sign-In +
+// Phone Completion (PATCH /customer/profile/phone) only.
+// The legacy challenge store + OTP routes below are intentionally KEPT for
+// reference but are unreachable: each route short-circuits with OTP_RETIRED and
+// NEVER dispatches to Wablas. Do not re-enable without a new decision.
+const OTP_RETIRED = {
+  success: false,
+  error: 'OTP_RETIRED',
+  message: 'Login dengan kode OTP sudah tidak digunakan. Silakan masuk dengan Google.'
+};
+
 router.post('/auth/otp/send', async (req, res) => {
+  // RETIRED — no WhatsApp / Wablas dispatch. Legacy implementation kept below.
+  return res.status(410).json(OTP_RETIRED);
+
   const { phone } = req.body;
   if (!phone || !phone.trim()) {
     return res.status(400).json({ success: false, error: 'Nomor WhatsApp / telepon wajib diisi.' });
@@ -509,6 +525,9 @@ router.post('/auth/otp/send', async (req, res) => {
 });
 
 router.post('/auth/otp/verify', (req, res) => {
+  // RETIRED — no OTP challenge verification. Legacy implementation kept below.
+  return res.status(410).json(OTP_RETIRED);
+
   const { challenge_id, otp, code, phone } = req.body;
   const otpInput = otp || code;
 
@@ -533,6 +552,9 @@ router.post('/auth/otp/verify', (req, res) => {
 });
 
 router.post('/auth/otp/trust', (req, res) => {
+  // RETIRED — no OTP trust lookup. Legacy implementation kept below.
+  return res.status(410).json(OTP_RETIRED);
+
   const { challenge_id, phone } = req.body;
   if (!challenge_id || !phone) {
     return res.status(400).json({ success: false, error: 'Challenge ID dan nomor telepon wajib disertakan.' });

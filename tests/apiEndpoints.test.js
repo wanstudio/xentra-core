@@ -74,19 +74,14 @@ async function mockFetch(path, options = {}) {
   });
 }
 
-// Helper: Create an OTP-verified customer session token
+// RETIRED (2026-09-21): the WhatsApp OTP login endpoints are retired, so tests no
+// longer mint sessions through /auth/otp/*. A customer session is created directly
+// through the server's TokenSessionStore — the same store the Google Sign-In path
+// uses. No OTP / Wablas is involved.
+// (Previously: "Helper: Create an OTP-verified customer session token")
 async function createCustomerSession(phone) {
-  const otpRes = await mockFetch('/api/v1/auth/otp/send', {
-    method: 'POST',
-    body: JSON.stringify({ phone })
-  });
-  const otpData = await otpRes.json();
-  const verifyRes = await mockFetch('/api/v1/auth/otp/verify', {
-    method: 'POST',
-    body: JSON.stringify({ challenge_id: otpData.challenge_id, otp: '123456', phone })
-  });
-  const verifyData = await verifyRes.json();
-  return verifyData.token;
+  const { token } = global.TokenSessionStore.createCustomerSession(phone, 'brand_bangjo', 3600);
+  return token;
 }
 
 test.beforeEach(() => {
@@ -2306,19 +2301,13 @@ test('R5 invalid decision value is rejected (INVALID_DECISION)', async () => {
        ACCEPTED/rejected/timed-out/cancelled orders cannot be customer-cancelled.
    ============================================================================ */
 
+// RETIRED (2026-09-21): minted through /auth/otp/* before; the OTP login endpoints are
+// retired, so the session is created directly via the server TokenSessionStore
+// (same store the Google Sign-In path uses). No OTP / Wablas involved.
 async function r6r7CustomerToken(phone) {
-  const send = await mockFetch('/api/v1/auth/otp/send', {
-    method: 'POST',
-    body: JSON.stringify({ phone })
-  });
-  const sendData = await send.json();
-  const verify = await mockFetch('/api/v1/auth/otp/verify', {
-    method: 'POST',
-    body: JSON.stringify({ challenge_id: sendData.challenge_id, otp: '123456', phone })
-  });
-  const verifyData = await verify.json();
-  assert.ok(verifyData.token, 'customer OTP token must be issued');
-  return { headers: { authorization: 'Bearer ' + verifyData.token }, rawToken: verifyData.token };
+  const { token } = global.TokenSessionStore.createCustomerSession(phone, 'brand_bangjo', 3600);
+  assert.ok(token, 'customer session token must be issued');
+  return { headers: { authorization: 'Bearer ' + token }, rawToken: token };
 }
 
 test('R6 API: an overdue pending order is timed out by the worker sweep and ACCEPT afterwards is rejected', async () => {

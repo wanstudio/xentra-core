@@ -104,18 +104,13 @@ async function mockFetch(path, options = {}) {
   });
 }
 
+// RETIRED (2026-09-21): the WhatsApp OTP login endpoints are retired, so tests no
+// longer mint sessions through /auth/otp/*. A customer session is created directly
+// through the server's TokenSessionStore — the same store the Google Sign-In path
+// uses. No OTP / Wablas is involved.
 async function createCustomerSession(phone) {
-  const otpRes = await mockFetch('/api/v1/auth/otp/send', {
-    method: 'POST',
-    body: JSON.stringify({ phone })
-  });
-  const otpData = await otpRes.json();
-  const verifyRes = await mockFetch('/api/v1/auth/otp/verify', {
-    method: 'POST',
-    body: JSON.stringify({ challenge_id: otpData.challenge_id, otp: '123456', phone })
-  });
-  const verifyData = await verifyRes.json();
-  return verifyData.token;
+  const { token } = global.TokenSessionStore.createCustomerSession(phone, 'brand_bangjo', 3600);
+  return token;
 }
 
 test.beforeEach(() => {
@@ -246,7 +241,7 @@ test('LOC-04: Selecting Favorite Address makes that address the Active Destinati
 // 2. FAVORITE ADDRESS CRUD & SECURITY TESTS
 // ═════════════════════════════════════════════════════════════════════════════
 
-test('LOC-05: Favorite Address persistence requires valid OTP session token', async () => {
+test('LOC-05: Favorite Address persistence requires a valid customer session token', async () => {
   const getRes = await mockFetch('/api/v1/addresses');
   assert.strictEqual(getRes.status, 401, 'Unauthenticated visitor cannot access /addresses');
 

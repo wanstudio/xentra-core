@@ -141,3 +141,29 @@ test('CPC-12: Checkout state preservation across Google auth still intact', () =
   assert.ok(src.includes('activeDestination') || src.includes('storeState.location'), 'address must restore');
   assert.ok(src.includes('cashTendered'), 'COD cash amount preservation must remain');
 });
+
+// ── Recipient input moved to the Tambah/Detail alamat sheet (locked 2026-09-21 revision) ──
+
+test('CPC-13: Checkout picks up recipient input entered in the Detail alamat sheet', () => {
+  const src = checkoutJs();
+  // The Store subscriber must react to recipient mutations, otherwise an input
+  // saved in the address sheet would never reach the order payload.
+  assert.ok(src.includes("mt !== 'recipient'"), 'checkout subscriber must accept recipient mutations');
+  assert.ok(
+    src.includes("state.recipient = Store.getRecipient() || { type: 'self', name: '', phone: '' }"),
+    'checkout must sync state.recipient from the Store on recipient mutations'
+  );
+  // Empty recipient fields → SELF → server resolves name/phone from the profile.
+  assert.ok(src.includes("isRecipientSelf() ? { type: 'self' }"), 'order payload must send SELF when no recipient input');
+});
+
+test('CPC-14: Checkout "Dikirim kepada" row is hidden (not deleted) and recipient is transaction-scoped', () => {
+  const src = checkoutJs();
+  // Row must no longer be rendered…
+  assert.ok(!src.includes('id="x-btn-change-recipient"'), 'the rendered "Dikirim kepada" row must be hidden');
+  // …but the recipient editor code stays available for reference/reuse.
+  assert.ok(src.includes('function openRecipientSheet'), 'openRecipientSheet must be kept');
+  assert.ok(src.includes('function _recipientSummaryHtml'), '_recipientSummaryHtml must be kept');
+  // A previous order's recipient must never silently apply to the next order.
+  assert.ok(src.includes('Store.clearRecipient()'), 'recipient must be cleared after a successful order');
+});

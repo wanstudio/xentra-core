@@ -57,6 +57,7 @@ Platform
 ┌────────────────────────────▼────────────────────────────────┐
 │                    DATA / PROVIDERS                          │
 │ SQLite/PostgreSQL/MySQL • Routing • Midtrans • Wablas etc.  │
+│ (Wablas / WhatsApp OTP: RETIRED 2026-09-21 — no longer used) │
 └─────────────────────────────────────────────────────────────┘
 ```
 

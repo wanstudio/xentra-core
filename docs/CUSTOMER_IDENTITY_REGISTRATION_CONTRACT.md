@@ -4,6 +4,30 @@
 **Decision Date:** 2026-09-19  
 **Authority:** Current Notion locked decisions
 
+## 🔒 SUPERSEDING DECISION — WhatsApp OTP & Wablas RETIRED
+
+**Status:** RETIRED / NO LONGER USED  
+**Decision Date:** 2026-09-21
+
+WhatsApp OTP login and its Wablas transport are **retired**. They are no longer
+used anywhere in the customer flow, and no WhatsApp notification is dispatched for
+customers, orders, or recipients.
+
+Authoritative:
+- **Customer identity = Google Sign-In + Phone Completion**
+  (`PATCH /customer/profile/phone`). No OTP step is required for login, checkout,
+  or order commit.
+- `/auth/otp/send`, `/auth/otp/verify` and `/auth/otp/trust` short-circuit with
+  `410 OTP_RETIRED` and never dispatch a Wablas message.
+- The legacy OTP challenge store, routes, and the client OTP sheets are
+  **HIDDEN, NOT DELETED** — kept for reference and clearly marked as retired.
+  Do not re-enable without a new explicit decision.
+- Any earlier OTP “step-up / recovery” wording in this document is superseded by
+  this section; session-security and fail-closed invariants remain valid.
+- Tests must not use OTP or Wablas: OTP/Wablas-exercising tests are skipped with a
+  RETIRED note, and session fixtures are created through the server
+  `TokenSessionStore` (the same store the Google path uses).
+
 ## 🔒 LOCKED — Google Identity Gate Placement in Checkout v1
 
 **Status:** LOCKED / AUTHORITATIVE  

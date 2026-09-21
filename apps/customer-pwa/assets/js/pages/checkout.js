@@ -819,7 +819,13 @@
         '    <div class="x-alt-address-head" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:15px;font-weight:700;color:#111;">Alamat Pengiriman</span><button type="button" class="x-pill-btn" id="x-btn-change-address">Pilih</button></div>' +
         '    <div class="x-alt-addr-label" style="font-size:14px;font-weight:700;color:#111;margin-top:4px;">' + UI.escape(state.address.label || 'Rumah') + '</div>' +
         '    <div class="x-alt-addr-text" style="font-size:12.5px;color:#666;line-height:18px;margin-top:2px;">' + UI.escape(state.address.formatted_address || 'Pilih alamat pengiriman') + '</div>' +
-        (isDelivery ? '<div class="x-alt-recipient-line" style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;min-width:0;"><div style="flex:1 1 auto;min-width:0;">' + _recipientSummaryHtml() + '</div><button type="button" class="x-pill-btn" id="x-btn-change-recipient" style="flex:0 0 auto;font-size:11px;padding:4px 10px;">Ubah</button></div>' : '') +
+        // Recipient ("Dikirim kepada") row is intentionally HIDDEN here — NOT deleted.
+        // Recipient name + WhatsApp number are now captured in the Tambah/Detail alamat
+        // sheet (location-picker) and carried into the order through the Store
+        // 'recipient' state; order-received still shows the order's recipient snapshot.
+        // The markup below, the x-btn-change-recipient wiring (renderBindings) and
+        // openRecipientSheet()/_recipientSummaryHtml() are kept for reference/reuse.
+        // (previous row:) (isDelivery ? '<div class="x-alt-recipient-line" …>' : '') +
         (state.address.detail ? '<div class="x-alt-addr-note" style="font-size:12px;color:#777;margin-top:4px;font-style:italic;">Patokan: ' + UI.escape(state.address.detail) + '</div>' : '') +
         '  </div>'
       ) : '') +
@@ -2437,6 +2443,12 @@
     };
   }
 
+  // ── RETIRED (2026-09-21): WhatsApp OTP login ──────────────────────────────
+  // The OTP phone/verify steps below are RETIRED and no longer reachable: they
+  // are never called anymore, and the server routes (/auth/otp/send|verify|trust)
+  // short-circuit with OTP_RETIRED (no Wablas dispatch). Customer identity is
+  // Google Sign-In + Phone Completion (PATCH /customer/profile/phone) only.
+  // Kept for reference — do not re-enable without a new decision.
   function renderOtpPhoneStep(phone, name, onSuccess) {
     var sh = makeOverlay(
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
@@ -2510,6 +2522,7 @@
     }
   }
 
+  // RETIRED (2026-09-21) — see the OTP note above; unreachable, kept for reference.
   function renderOtpVerifyStep(phone, name, challengeId, retryAfter, onSuccess) {
     var sh = makeOverlay(
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
@@ -3521,6 +3534,12 @@
 
     function onSuccess(orderId, snapToken) {
       state.isSubmitting = false;
+      // Recipient is transaction-scoped: this order already carries its own
+      // recipient snapshot, so the next checkout starts from SELF (profile
+      // name/phone) unless the customer fills the Detail alamat fields again.
+      // Never let a previous order's recipient silently apply to a new one.
+      if (Store && typeof Store.clearRecipient === 'function') Store.clearRecipient();
+      state.recipient = { type: 'self', name: '', phone: '' };
       if (snapToken && state.paymentMethod === 'midtrans' && window.snap && window.snap.pay) {
         window.snap.pay(snapToken, {
           onSuccess: function () { Router.navigate('order-received', { orderId: orderId }); },
@@ -3617,7 +3636,7 @@
     if (Router && Router.getCurrentView && Router.getCurrentView() !== 'checkout') return;
     if (checkoutContainer.style.display === 'none') return;
     var mt = mutation && mutation.type;
-    if (mt !== 'cart' && mt !== 'location' && mt !== 'activeDestination' && mt !== 'customerSession') return;
+    if (mt !== 'cart' && mt !== 'location' && mt !== 'activeDestination' && mt !== 'customerSession' && mt !== 'recipient') return;
 
     if (mt === 'customerSession') {
       var sess = Store.getState().customerSession;
@@ -3649,6 +3668,14 @@
           }
         }
       }
+      return;
+    }
+
+    if (mt === 'recipient') {
+      // Recipient input now lives in the Detail alamat sheet (location-picker).
+      // Pick it up here so the order payload always carries the current values
+      // (empty fields → SELF → server resolves name/phone from the profile).
+      state.recipient = Store.getRecipient() || { type: 'self', name: '', phone: '' };
       return;
     }
 

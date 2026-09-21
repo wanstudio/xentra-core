@@ -15,6 +15,13 @@ const {
   createChannelMapper
 } = require('../../core/integration');
 
+// RETIRED (2026-09-21): the Wablas (WhatsApp) transport is retired and is no longer
+// used by the product. Tests that exercised the adapter directly are SKIPPED (kept
+// for reference — not deleted). The generic integration framework tests (contract,
+// failure/timeout boundary, secret boundary, channel mapping, hardware printer)
+// still run because that framework remains in use.
+const WABLAS_RETIRED_NOTE = 'RETIRED (2026-09-21): Wablas (WhatsApp) transport retired — not used anymore.';
+
 // ==============================================================================
 // D1 — Integration Contract Test (Level: Request/Response Normalization)
 // Requirement: normalized request and success/failure response schemas
@@ -52,7 +59,7 @@ test('D1 — Integration Contract: normalized request/response structure and imm
 // D2/D3 — Adapter & External Request Handling Test (Level: Request Dispatching)
 // Requirement: dispatching normalized requests through registered adapters
 // ==============================================================================
-test('D2 & D3 — Adapter & External Request Handler: outbound request dispatching and response handling', async () => {
+test('D2 & D3 — Adapter & External Request Handler: outbound request dispatching and response handling', { skip: WABLAS_RETIRED_NOTE }, async () => {
   const channelMapper = createChannelMapper();
   channelMapper.registerMapping('branch_surabaya', { wablas_device_id: 'dev_surabaya_01' });
 
@@ -180,7 +187,7 @@ test('D7 — Hardware Integration Boundary: neutral hardware receipt printing', 
 // D8 — Integration Observability & Tracing Test (Level: Audit & Tracing Integration)
 // Requirement: trace context retention and sanitized logging
 // ==============================================================================
-test('D8 — Integration Observability: records traffic with trace context and redacted secrets', async () => {
+test('D8 — Integration Observability: records traffic with trace context and redacted secrets', { skip: WABLAS_RETIRED_NOTE }, async () => {
   const observer = new IntegrationObserver();
   const channelMapper = createChannelMapper();
   channelMapper.registerMapping('branch_01', { wablas_device_id: 'dev_01' });
