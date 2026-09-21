@@ -129,6 +129,7 @@ describe('Phase 8.1 — Merchant Dashboard Server-Authoritative Acceptance Deadl
   let bmToken;
 
   before(async () => {
+    db.seedDemoData(db);
     await new Promise(resolve => {
       server = app.listen(0, () => {
         baseUrl = `http://127.0.0.1:${server.address().port}`;

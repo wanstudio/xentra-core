@@ -3823,3 +3823,206 @@ input[type="file"].x-input,
   }
 }
 
+/* ==========================================================================
+   BRANCH MANAGER OPERATIONAL CENTER: MOBILE ORDER CARDS & ATTENTION
+   ========================================================================== */
+
+/* Responsive switching between desktop table and mobile cards */
+.bm-orders-desktop-table {
+  display: block;
+}
+
+.bm-orders-mobile-cards {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .bm-orders-desktop-table {
+    display: none !important;
+  }
+
+  .bm-orders-mobile-cards {
+    display: flex !important;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+}
+
+/* Operational Card Component */
+.bm-order-card {
+  background: var(--bg-card, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: var(--radius-md, 12px);
+  padding: 16px;
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Attention pulse / highlight for genuinely new pending orders */
+.bm-order-card.bm-order-card-attention {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25), var(--shadow-md);
+  animation: bmOrderPulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes bmOrderPulse {
+  0% {
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2), var(--shadow-sm);
+  }
+  100% {
+    box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.4), var(--shadow-md);
+  }
+}
+
+/* Card Header */
+.bm-order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bm-order-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bm-order-card-number {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-main, #0f172a);
+  word-break: break-all;
+}
+
+.bm-order-card-time {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+  font-weight: 600;
+}
+
+/* Card Customer & Fulfillment Meta */
+.bm-order-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bm-order-card-customer {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main, #0f172a);
+  word-break: break-word;
+}
+
+.bm-order-card-phone {
+  font-size: 12px;
+  color: var(--text-muted, #64748b);
+}
+
+.bm-order-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.bm-order-card-table {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #64748b);
+}
+
+/* Card Total & Status Row */
+.bm-order-card-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--bg-main, #f8fafc);
+  border-radius: var(--radius-sm, 8px);
+  gap: 8px;
+}
+
+.bm-order-card-total-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.bm-order-card-total-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted, #64748b);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bm-order-card-total-val {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-main, #0f172a);
+}
+
+.bm-order-card-status-wrap {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.bm-order-card-countdown {
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Card Action Buttons (Thumb-accessible) */
+.bm-order-card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.bm-order-card-actions .x-btn-primary,
+.bm-order-card-actions .x-btn-secondary {
+  flex: 1;
+  min-height: 40px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm, 8px);
+  box-sizing: border-box;
+}
+
+.bm-order-card-actions .bm-btn-danger {
+  color: #dc2626;
+  border-color: #fecaca;
+  background: #fff;
+}
+
+.bm-order-card-actions .bm-btn-danger:hover {
+  background: #fef2f2;
+}
+
+.bm-order-card-actions .bm-btn-detail {
+  flex: 0 0 auto;
+  min-width: 70px;
+}

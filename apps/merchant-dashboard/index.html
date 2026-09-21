@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
+  <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
   <link rel="stylesheet" href="/dashboard/assets/css/dashboard.css?v=3.0.10">
 </head>
 <body>
@@ -2889,9 +2891,10 @@
             </div>
           </div>
 
-          <!-- Orders Table Panel -->
+          <!-- Orders Table & Mobile Cards Panel -->
           <div class="x-card-panel">
-            <div class="x-table-responsive">
+            <!-- Desktop Table View -->
+            <div class="x-table-responsive bm-orders-desktop-table">
               <table class="x-table">
                 <thead>
                   <tr>
@@ -2909,6 +2912,11 @@
                   <tr><td colspan="8" class="text-center py-6 text-muted">Memuat data pesanan cabang...</td></tr>
                 </tbody>
               </table>
+            </div>
+
+            <!-- Mobile Cards View -->
+            <div id="bm-orders-cards-container" class="bm-orders-mobile-cards" aria-live="polite">
+              <div class="text-center py-6 text-muted">Memuat data pesanan cabang...</div>
             </div>
           </div>
         </div>
@@ -4866,6 +4874,8 @@
   </div>
 
   <!-- Dashboard JavaScript -->
+  <!-- Shared merchant infrastructure (auth, toast, action-menu, crop editor) — must load first -->
+  <script src="/merchant-shared/js/shared.js?v=1.0.0"></script>
   <script src="/dashboard/assets/js/dashboard.js?v=3.0.12"></script>
 </body>
 </html>

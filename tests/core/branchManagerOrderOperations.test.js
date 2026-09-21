@@ -172,6 +172,7 @@ describe('Phase 9 — Branch Manager Order Operations', () => {
   let customerToken;
 
   before(async () => {
+    db.seedDemoData(db);
     await new Promise(resolve => {
       server = app.listen(0, () => {
         baseUrl = `http://127.0.0.1:${server.address().port}`;

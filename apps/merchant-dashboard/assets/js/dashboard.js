@@ -6,9 +6,16 @@
 (function () {
   'use strict';
 
-  var API_BASE = '/api/v1';
-  var TOKEN_KEY = 'xentra_merchant_token';
-  var USER_KEY = 'xentra_merchant_user';
+  /* =========================================================================
+     SHARED INFRASTRUCTURE ALIASES
+     When merchant-shared/js/shared.js is loaded first, re-use its globals so
+     both files stay in sync. Falls back to inline definitions if absent
+     (backwards compatible — no behavioral change in either case).
+     ========================================================================= */
+  var _shared    = window.XentraShared || {};
+  var API_BASE   = _shared.API_BASE   || '/api/v1';
+  var TOKEN_KEY  = _shared.TOKEN_KEY  || 'xentra_merchant_token';
+  var USER_KEY   = _shared.USER_KEY   || 'xentra_merchant_user';
 
   function getAuthHeaders(extraHeaders) {
     var headers = Object.assign({ 'Content-Type': 'application/json' }, extraHeaders || {});
@@ -253,6 +260,8 @@
       closeAll: closeAll
     };
   })();
+  // ponytail: Phase 2 — remove local XentraActionMenu; shared.js already exports it.
+  // Until then, this re-export keeps the window global correct for inline HTML handlers.
   window.XentraActionMenu = XentraActionMenu;
 
   window.toggleStockChecked = function (id, checked) {
@@ -681,6 +690,7 @@
     };
   })();
 
+  // ponytail: Phase 2 — remove local XentraCropEditor; shared.js already exports it.
   window.XentraCropEditor = XentraCropEditor;
 
   /* =========================================================================
@@ -11344,7 +11354,9 @@
     inFlightAccept: {},
     inFlightStatus: {},
     currentDetailOrderId: null,
-    detailCountdownTimer: null
+    detailCountdownTimer: null,
+    seenPendingOrderIds: null, // Set of order IDs seen as pending in previous authoritative poll
+    newPendingOrderIds: {}     // Map of order IDs that are genuinely new in current snapshot
   };
 
   var _bmTablesState = {
@@ -11398,6 +11410,50 @@
   window.startBMOrdersPolling = startBMOrdersPolling;
   window.stopBMOrdersPolling = stopBMOrdersPolling;
 
+  // Browser-local audible chime for genuinely new pending orders (Web Audio API synthesis)
+  // Fails gracefully if browser autoplay policy blocks un-interacted audio without spamming errors
+  function playNewOrderAudibleChime() {
+    try {
+      var AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      var ctx = new AudioCtx();
+      if (ctx.state === 'suspended') {
+        // Autoplay blocked by browser policy before user interaction; fail gracefully
+        ctx.close().catch(function () {});
+        return;
+      }
+      var now = ctx.currentTime;
+      var osc1 = ctx.createOscillator();
+      var osc2 = ctx.createOscillator();
+      var gain = ctx.createGain();
+
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(880, now);        // A5 note
+      osc1.frequency.setValueAtTime(1174.66, now + 0.15); // D6 note
+
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(440, now);
+
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc1.start(now);
+      osc2.start(now);
+      osc1.stop(now + 0.5);
+      osc2.stop(now + 0.5);
+
+      setTimeout(function () {
+        ctx.close().catch(function () {});
+      }, 700);
+    } catch (_) {
+      // Ignore audio failure cleanly
+    }
+  }
+
   async function loadBMOrders(opts) {
     var user = getStoredUser();
     var branchId = user ? (user.branch_id || user.branchId) : null;
@@ -11405,8 +11461,12 @@
 
     var isBg = opts && opts.background;
     var tbody = $('bm-orders-tbody');
+    var cardsContainer = $('bm-orders-cards-container');
     if (tbody && !isBg && (!_bmOrdersState.orders || !_bmOrdersState.orders.length)) {
       tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-muted">Memuat antrean pesanan cabang...</td></tr>';
+    }
+    if (cardsContainer && !isBg && (!_bmOrdersState.orders || !_bmOrdersState.orders.length)) {
+      cardsContainer.innerHTML = '<div class="text-center py-6 text-muted">Memuat antrean pesanan cabang...</div>';
     }
 
     var currentSeq = ++_bmOrdersState.fetchSeq;
@@ -11425,11 +11485,47 @@
       if (currentSeq !== _bmOrdersState.fetchSeq) return;
 
       if (res.ok && data.success && Array.isArray(data.orders)) {
+        var currentPendingOrders = data.orders.filter(function (o) { return o.status === 'pending'; });
+        var currentPendingIds = {};
+        currentPendingOrders.forEach(function (o) { currentPendingIds[o.id] = true; });
+
+        if (_bmOrdersState.seenPendingOrderIds !== null) {
+          var newlyAppeared = [];
+          currentPendingOrders.forEach(function (o) {
+            if (!_bmOrdersState.seenPendingOrderIds[o.id]) {
+              newlyAppeared.push(o.id);
+            }
+          });
+
+          if (newlyAppeared.length > 0) {
+            newlyAppeared.forEach(function (id) {
+              _bmOrdersState.newPendingOrderIds[id] = true;
+            });
+            playNewOrderAudibleChime();
+          }
+        } else {
+          // Initial snapshot boot: baseline established, do not sound alert on first page load
+          _bmOrdersState.newPendingOrderIds = {};
+        }
+
+        // Clean up attention for orders that are no longer pending
+        Object.keys(_bmOrdersState.newPendingOrderIds).forEach(function (id) {
+          if (!currentPendingIds[id]) {
+            delete _bmOrdersState.newPendingOrderIds[id];
+          }
+        });
+
+        // Store authoritative seen set
+        _bmOrdersState.seenPendingOrderIds = currentPendingIds;
         _bmOrdersState.orders = data.orders;
+
         renderBMOrdersTable();
       } else {
         if (tbody && !isBg) {
           tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-danger">Gagal memuat pesanan: ' + esc(data.error || 'Terjadi kesalahan') + '</td></tr>';
+        }
+        if (cardsContainer && !isBg) {
+          cardsContainer.innerHTML = '<div class="text-center py-6 text-danger">Gagal memuat pesanan: ' + esc(data.error || 'Terjadi kesalahan') + '</div>';
         }
       }
     } catch (err) {
@@ -11437,6 +11533,9 @@
       console.warn('[BM Orders Load Error]:', err);
       if (tbody && !isBg) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat pesanan.</td></tr>';
+      }
+      if (cardsContainer && !isBg) {
+        cardsContainer.innerHTML = '<div class="text-center py-6 text-danger">Kesalahan jaringan saat memuat pesanan.</div>';
       }
     }
   }
@@ -11465,7 +11564,8 @@
 
   function renderBMOrdersTable() {
     var tbody = $('bm-orders-tbody');
-    if (!tbody) return;
+    var cardsContainer = $('bm-orders-cards-container');
+    if (!tbody && !cardsContainer) return;
 
     var filtered = (_bmOrdersState.orders || []).filter(function (ord) {
       if (_bmOrdersState.typeFilter && _bmOrdersState.typeFilter !== 'all') {
@@ -11484,8 +11584,31 @@
       return true;
     });
 
-    if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-muted">Belum ada pesanan yang sesuai filter.</td></tr>';
+    // Deterministic pending-first sorting without mutating server orders array:
+    // 1. Genuinely new pending orders (tier 0)
+    // 2. Existing pending orders (tier 1)
+    // 3. Other orders preserved in original server order (tier 2)
+    var sorted = filtered.slice().sort(function (a, b) {
+      var aIsPending = (a.status === 'pending');
+      var bIsPending = (b.status === 'pending');
+      var aIsNew = aIsPending && !!_bmOrdersState.newPendingOrderIds[a.id];
+      var bIsNew = bIsPending && !!_bmOrdersState.newPendingOrderIds[b.id];
+
+      var aRank = aIsNew ? 0 : (aIsPending ? 1 : 2);
+      var bRank = bIsNew ? 0 : (bIsPending ? 1 : 2);
+
+      if (aRank !== bRank) return aRank - bRank;
+      return 0; // Preserve relative server order
+    });
+
+    if (!sorted.length) {
+      var emptyMsg = 'Belum ada pesanan yang sesuai filter.';
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-muted">' + emptyMsg + '</td></tr>';
+      }
+      if (cardsContainer) {
+        cardsContainer.innerHTML = '<div class="text-center py-6 text-muted">' + emptyMsg + '</div>';
+      }
       return;
     }
 
@@ -11503,7 +11626,10 @@
 
     var now = Date.now();
 
-    var rowsHtml = filtered.map(function (ord) {
+    var rowsHtml = [];
+    var cardsHtml = [];
+
+    sorted.forEach(function (ord) {
       var ordType = ord.order_type || ord.fulfillment_type || 'delivery';
       var typeBadge = (ordType === 'delivery')
         ? '<span class="x-badge x-badge-info">DELIVERY</span>'
@@ -11513,10 +11639,14 @@
       var tableInfo = ord.table_number ? ('Meja ' + esc(ord.table_number)) : '—';
       var totalStr = formatMoney(ord.grand_total || ord.subtotal || 0);
 
-      var statusCol = statusBadges[ord.status] || ('<span class="x-badge">' + esc(ord.status.toUpperCase()) + '</span>');
+      var isNewPending = (ord.status === 'pending') && !!_bmOrdersState.newPendingOrderIds[ord.id];
+
+      // Build deadline / status representation (shared logic)
+      var statusBadgeHtml = statusBadges[ord.status] || ('<span class="x-badge">' + esc(ord.status.toUpperCase()) + '</span>');
+      var countdownHtml = '';
       if (ord.status === 'pending') {
         if (!ord.acceptance_deadline_at) {
-          statusCol += '<div style="font-size:11px; font-weight:700; color:#b45309; margin-top:3px;">⏱ Memeriksa status...</div>';
+          countdownHtml = '<div style="font-size:11px; font-weight:700; color:#b45309; margin-top:3px;">⏱ Memeriksa status...</div>';
           if (!_bmOrdersState.refreshPendingTimeout) {
             _bmOrdersState.refreshPendingTimeout = setTimeout(function () {
               _bmOrdersState.refreshPendingTimeout = null;
@@ -11526,13 +11656,13 @@
         } else {
           var expiresAtMs = new Date(ord.acceptance_deadline_at).getTime();
           if (isNaN(expiresAtMs)) {
-            statusCol += '<div style="font-size:11px; font-weight:700; color:#6b7280; margin-top:3px;">⏱ Deadline tidak tersedia</div>';
+            countdownHtml = '<div style="font-size:11px; font-weight:700; color:#6b7280; margin-top:3px;">⏱ Deadline tidak tersedia</div>';
           } else {
             var remainingMs = expiresAtMs - now;
             if (remainingMs > 0) {
-              statusCol += '<div style="font-size:11px; font-weight:700; color:#b45309; margin-top:3px;">⏱ ' + formatBMTimeRemaining(remainingMs) + '</div>';
+              countdownHtml = '<div style="font-size:11px; font-weight:700; color:#b45309; margin-top:3px;">⏱ ' + formatBMTimeRemaining(remainingMs) + '</div>';
             } else {
-              statusCol += '<div style="font-size:11px; font-weight:700; color:#dc2626; margin-top:3px;">⏱ Memeriksa status...</div>';
+              countdownHtml = '<div style="font-size:11px; font-weight:700; color:#dc2626; margin-top:3px;">⏱ Memeriksa status...</div>';
               if (!_bmOrdersState.refreshPendingTimeout) {
                 _bmOrdersState.refreshPendingTimeout = setTimeout(function () {
                   _bmOrdersState.refreshPendingTimeout = null;
@@ -11544,7 +11674,11 @@
         }
       }
 
+      var statusCol = statusBadgeHtml + countdownHtml;
       var isAccepting = !!_bmOrdersState.inFlightAccept[ord.id];
+      var isMutatingStatus = !!(_bmOrdersState.inFlightStatus && _bmOrdersState.inFlightStatus[ord.id]);
+
+      // --- Actions HTML for Desktop Table ---
       var actionsHtml = '';
       if (ord.status === 'pending') {
         actionsHtml =
@@ -11556,26 +11690,26 @@
       } else if (ord.status === 'confirmed') {
         actionsHtml =
           '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
-            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'confirmed\', \'' + esc(ordType) + '\', this)">Mulai Masak ➔</button>' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'confirmed\', \'' + esc(ordType) + '\', this)">Mulai Masak ➔</button>' +
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else if (ord.status === 'preparing') {
         actionsHtml =
           '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
-            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'preparing\', \'' + esc(ordType) + '\', this)">Tandai Siap ➔</button>' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'preparing\', \'' + esc(ordType) + '\', this)">Tandai Siap ➔</button>' +
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else if (ord.status === 'ready') {
         var nextLabel = (ordType === 'delivery') ? 'Kirim Pesanan ➔' : 'Selesaikan ➔';
         actionsHtml =
           '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
-            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'ready\', \'' + esc(ordType) + '\', this)">' + nextLabel + '</button>' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'ready\', \'' + esc(ordType) + '\', this)">' + nextLabel + '</button>' +
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else if (ord.status === 'out_for_delivery') {
         actionsHtml =
           '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
-            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'out_for_delivery\', \'' + esc(ordType) + '\', this)">Selesaikan ➔</button>' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'out_for_delivery\', \'' + esc(ordType) + '\', this)">Selesaikan ➔</button>' +
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else {
@@ -11586,19 +11720,101 @@
           '</div>';
       }
 
-      return '<tr>' +
-        '<td><strong>#' + esc(ord.order_number || ord.id.substring(0, 8)) + '</strong></td>' +
-        '<td><small class="text-muted">' + timeStr + '</small></td>' +
-        '<td><strong>' + esc(ord.customer_name || 'Pelanggan') + '</strong><br><small class="text-muted">' + esc(ord.customer_phone || '—') + '</small></td>' +
-        '<td>' + typeBadge + '</td>' +
-        '<td>' + tableInfo + '</td>' +
-        '<td><strong>' + totalStr + '</strong></td>' +
-        '<td>' + statusCol + '</td>' +
-        '<td class="text-right">' + actionsHtml + '</td>' +
-      '</tr>';
+      rowsHtml.push(
+        '<tr>' +
+          '<td><strong>#' + esc(ord.order_number || ord.id.substring(0, 8)) + '</strong></td>' +
+          '<td><small class="text-muted">' + timeStr + '</small></td>' +
+          '<td><strong>' + esc(ord.customer_name || 'Pelanggan') + '</strong><br><small class="text-muted">' + esc(ord.customer_phone || '—') + '</small></td>' +
+          '<td>' + typeBadge + '</td>' +
+          '<td>' + tableInfo + '</td>' +
+          '<td><strong>' + totalStr + '</strong></td>' +
+          '<td>' + statusCol + '</td>' +
+          '<td class="text-right">' + actionsHtml + '</td>' +
+        '</tr>'
+      );
+
+      // --- Operational Mobile Card HTML ---
+      var cardActionsHtml = '';
+      if (ord.status === 'pending') {
+        cardActionsHtml =
+          '<div class="bm-order-card-actions">' +
+            '<button type="button" class="x-btn-primary" ' + (isAccepting ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(ordType) + '\', this)" aria-label="Terima Pesanan #' + esc(ord.order_number || ord.id) + '">' + (isAccepting ? 'Memproses...' : 'Terima') + '</button>' +
+            '<button type="button" class="x-btn-secondary bm-btn-danger" ' + (isAccepting ? 'disabled' : '') + ' onclick="rejectBMOrder(\'' + esc(ord.id) + '\')" aria-label="Tolak Pesanan #' + esc(ord.order_number || ord.id) + '">Tolak</button>' +
+            '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')" aria-label="Detail Pesanan #' + esc(ord.order_number || ord.id) + '">Detail</button>' +
+          '</div>';
+      } else if (ord.status === 'confirmed') {
+        cardActionsHtml =
+          '<div class="bm-order-card-actions">' +
+            '<button type="button" class="x-btn-primary" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'confirmed\', \'' + esc(ordType) + '\', this)">Mulai Masak ➔</button>' +
+            '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else if (ord.status === 'preparing') {
+        cardActionsHtml =
+          '<div class="bm-order-card-actions">' +
+            '<button type="button" class="x-btn-primary" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'preparing\', \'' + esc(ordType) + '\', this)">Tandai Siap ➔</button>' +
+            '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else if (ord.status === 'ready') {
+        var cardNextLabel = (ordType === 'delivery') ? 'Kirim Pesanan ➔' : 'Selesaikan ➔';
+        cardActionsHtml =
+          '<div class="bm-order-card-actions">' +
+            '<button type="button" class="x-btn-primary" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'ready\', \'' + esc(ordType) + '\', this)">' + cardNextLabel + '</button>' +
+            '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else if (ord.status === 'out_for_delivery') {
+        cardActionsHtml =
+          '<div class="bm-order-card-actions">' +
+            '<button type="button" class="x-btn-primary" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'out_for_delivery\', \'' + esc(ordType) + '\', this)">Selesaikan ➔</button>' +
+            '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else {
+        cardActionsHtml =
+          '<div class="bm-order-card-actions">' +
+            '<button type="button" class="x-btn-secondary" style="width:100%;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Lihat Detail Pesanan</button>' +
+          '</div>';
+      }
+
+      var newAttentionClass = isNewPending ? ' bm-order-card-attention' : '';
+      var newAttentionBadge = isNewPending ? '<span class="x-badge x-badge-warning" style="animation:none; font-size:10px;">BARU</span>' : '';
+
+      cardsHtml.push(
+        '<article class="bm-order-card' + newAttentionClass + '" data-order-id="' + esc(ord.id) + '" aria-labelledby="bm-card-title-' + esc(ord.id) + '">' +
+          '<div class="bm-order-card-header">' +
+            '<div class="bm-order-card-title-group">' +
+              '<span id="bm-card-title-' + esc(ord.id) + '" class="bm-order-card-number">#' + esc(ord.order_number || ord.id.substring(0, 8)) + '</span>' +
+              newAttentionBadge +
+            '</div>' +
+            '<span class="bm-order-card-time">' + timeStr + '</span>' +
+          '</div>' +
+          '<div class="bm-order-card-meta">' +
+            '<div class="bm-order-card-customer">' + esc(ord.customer_name || 'Pelanggan') + '</div>' +
+            '<div class="bm-order-card-phone">' + esc(ord.customer_phone || '—') + '</div>' +
+            '<div class="bm-order-card-badges">' +
+              typeBadge +
+              (ord.table_number ? ('<span class="bm-order-card-table">• Meja ' + esc(ord.table_number) + '</span>') : '') +
+            '</div>' +
+          '</div>' +
+          '<div class="bm-order-card-summary">' +
+            '<div class="bm-order-card-total-wrap">' +
+              '<span class="bm-order-card-total-label">Total Pesanan</span>' +
+              '<span class="bm-order-card-total-val">' + totalStr + '</span>' +
+            '</div>' +
+            '<div class="bm-order-card-status-wrap">' +
+              statusBadgeHtml +
+              countdownHtml +
+            '</div>' +
+          '</div>' +
+          cardActionsHtml +
+        '</article>'
+      );
     });
 
-    tbody.innerHTML = rowsHtml.join('');
+    if (tbody) {
+      tbody.innerHTML = rowsHtml.join('');
+    }
+    if (cardsContainer) {
+      cardsContainer.innerHTML = cardsHtml.join('');
+    }
   }
 
   async function advanceBMOrderStatus(orderId, currentStatus, fulfillmentType, btnEl) {
@@ -11675,6 +11891,9 @@
     }
 
     try {
+      // LEGACY: BM-triggered downstream status transitions (confirmed→preparing→ready→out_for_delivery→completed)
+      // use PATCH /kitchen/orders/:id/status. This boundary will be reconciled in the dedicated
+      // KDS/Delivery slice when kitchen/driver authority is properly separated from Branch Manager.
       var patchRes = await adminFetch(API_BASE + '/kitchen/orders/' + encodeURIComponent(orderId) + '/status', {
         method: 'PATCH',
         headers: getAuthHeaders(),
