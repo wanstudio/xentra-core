@@ -2679,6 +2679,9 @@ router.get('/orders/:id', (req, res) => {
     recipient_type: order.recipient_type || 'self',
     recipient_name: order.recipient_name || '',
     recipient_phone: order.recipient_phone || '',
+    // Buyer identity as display fallback for pre-snapshot legacy orders only.
+    customer_name: order.customer_name || '',
+    customer_phone: order.customer_phone || '',
     // P7.2: server-authoritative acceptance deadline (display only, null when not pending)
     acceptance_deadline_at: acceptanceDeadlineAt
   };

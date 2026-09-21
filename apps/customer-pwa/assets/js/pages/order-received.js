@@ -302,9 +302,11 @@
   // function, so they can never disagree about the active phase.
   function resolveOrderPhase(status, orderType) {
     var isPickup = orderType === 'pickup';
-    var steps = isPickup
-      ? ['Pesanan dibuat', 'Sedang disiapkan', 'Siap diambil', 'Selesai']
-      : ['Pesanan dibuat', 'Sedang disiapkan', 'Sedang diantar', 'Selesai'];
+    // Phase-3 label is dynamic: "Siap / Diantar" while the courier has not
+    // taken over, "Sedang diantar" once delivery is active or finished.
+    var delivering = status === 'out_for_delivery' || status === 'completed';
+    var step3 = isPickup ? 'Siap diambil' : (delivering ? 'Sedang diantar' : 'Siap / Diantar');
+    var steps = ['Pesanan dibuat', 'Sedang disiapkan', step3, 'Selesai'];
     var title = 'PESANAN DIBUAT';
     var badge = '🧾';
     var doneCount = 1; // the order exists → "Pesanan dibuat" is done
@@ -370,7 +372,7 @@
     var orderNumber = order.order_number || ('XTR-' + order.id);
     var branchName = order.branch_name || 'Restoran';
     var isCash = (payment.payment_method || order.payment_method || 'cash') === 'cash';
-    var payLabel = isCash ? 'Tunai (COD)' : 'Online Pay';
+    var payLabel = isCash ? '💵 Tunai (COD)' : 'Online Pay';
     if (order.payment_status === 'settlement' || order.payment_status === 'paid' || payment.payment_status === 'settlement' || payment.payment_status === 'paid') {
       payLabel += ' • Lunas';
     }
@@ -378,10 +380,10 @@
     var dist = fmtDistance(delivery.actual_road_distance_meters);
     var destAddr = delivery.destination_address || delivery.address_text || '';
 
-    // Recipient snapshot (order-level; never re-resolved from profile here).
-    var rType = order.recipient_type || 'self';
-    var rName = order.recipient_name || (rType === 'other' ? '' : 'Saya');
-    var rPhone = String(order.recipient_phone || '').replace(/[^0-9]/g, '');
+    // Recipient snapshot first; buyer identity only as fallback for
+    // pre-snapshot legacy orders. Never render a bare "Saya".
+    var rName = order.recipient_name || order.customer_name || '';
+    var rPhone = String(order.recipient_phone || order.customer_phone || '').replace(/[^0-9]/g, '');
 
     var itemsHtml = '';
     items.forEach(function (item) {
@@ -436,6 +438,13 @@
     targetContainer.innerHTML =
       '<div class="x-order-tracking-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
 
+      // Top bar
+      '  <div style="background:#fff;padding:12px 14px;margin-bottom:10px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      '    <button type="button" id="x-btn-order-back" style="display:inline-flex;align-items:center;gap:6px;background:none;border:0;font-size:15px;font-weight:800;color:#111;cursor:pointer;font-family:inherit;padding:4px;">' +
+      '      <span style="font-size:18px;line-height:1;">←</span> Pesanan' +
+      '    </button>' +
+      '  </div>' +
+
       // Header + dynamic status title
       '  <div style="background:#fff;padding:24px 18px 20px;margin-bottom:10px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
       '    <div style="font-size:12px;color:#6b7280;margin-bottom:2px;">Pesanan <strong style="color:#111;">' + UI.escape(orderNumber) + '</strong> • ' + UI.escape(branchName) + '</div>' +
@@ -456,7 +465,7 @@
       // Dikirim kepada
       '  <div style="background:#fff;padding:14px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
       '    <div style="font-size:12px;font-weight:800;letter-spacing:.04em;color:#6b7280;margin-bottom:6px;">DIKIRIM KEPADA</div>' +
-      '    <div style="font-size:14px;font-weight:700;color:#111;">' + UI.escape(rName || 'Saya') + '</div>' +
+      '    <div style="font-size:14px;font-weight:700;color:#111;">' + UI.escape(rName || 'Pelanggan') + '</div>' +
       (rPhone ? '<div style="font-size:13px;color:#4b5563;margin-top:1px;">' + UI.escape(rPhone) + '</div>' : '') +
       '  </div>' +
 
@@ -475,6 +484,10 @@
       '    <div style="height:1px;background:#e5e7eb;margin:8px 0;"></div>' +
       '    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;color:#111;"><span>Total</span><span>' + UI.money(order.grand_total || 0) + '</span></div>' +
       '    <div style="font-size:12px;color:#6b7280;margin-top:6px;">' + UI.escape(payLabel) + '</div>' +
+      ((isCash && order.cash_tendered != null && Number(order.cash_tendered) > 0)
+        ? '    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:8px;"><span style="color:#6b7280;">Bayar dengan</span><span style="color:#111;font-weight:600;">' + UI.money(order.cash_tendered) + '</span></div>' +
+          '    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:4px;"><span style="color:#6b7280;">Perkiraan kembalian</span><span style="color:#111;font-weight:600;">' + UI.money(order.expected_change != null ? order.expected_change : Math.max(0, Number(order.cash_tendered) - Number(order.grand_total || 0))) + '</span></div>'
+        : '') +
       '  </div>' +
 
       // Catatan pengantaran
@@ -496,6 +509,9 @@
 
     var cancelBtn = document.getElementById('x-btn-cancel-order');
     if (cancelBtn) cancelBtn.onclick = function () { confirmCancel(order.id); };
+
+    var backBtn = document.getElementById('x-btn-order-back');
+    if (backBtn && Router) backBtn.onclick = function () { Router.navigate('history'); };
   }
 
   // ─── P7.1 AWAITING BRANCH ACCEPTANCE SURFACE ─────────────────────────────

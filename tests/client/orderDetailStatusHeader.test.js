@@ -49,7 +49,7 @@ test('ODH-01: newly created delivery (pending) → PESANAN DIBUAT', () => {
   const ph = resolveOrderPhase('pending', 'delivery');
   assert.equal(ph.title, 'PESANAN DIBUAT');
   assert.equal(ph.doneCount, 1);
-  assert.deepEqual(ph.steps, ['Pesanan dibuat', 'Sedang disiapkan', 'Sedang diantar', 'Selesai']);
+  assert.deepEqual(ph.steps, ['Pesanan dibuat', 'Sedang disiapkan', 'Siap / Diantar', 'Selesai']);
 });
 
 test('ODH-02: preparing delivery → SEDANG DISIAPKAN', () => {
@@ -110,10 +110,23 @@ test('ODH-09: confirmed → PESANAN DIBUAT (existing lifecycle, no new status)',
 test('ODH-10: delivery never shows pickup labels and vice versa', () => {
   for (const s of ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed']) {
     const d = resolveOrderPhase(s, 'delivery');
-    assert.ok(!d.title.includes('DIAMBIL') && !d.steps.join('|').includes('diambil'), `delivery ${s} must not mention diambil`);
+    assert.ok(!d.title.includes('DIAMBIL') && !d.steps.join('|').toLowerCase().includes('diambil'), `delivery ${s} must not mention diambil`);
     const p = resolveOrderPhase(s, 'pickup');
-    assert.ok(!p.title.includes('DIANTAR') && !p.steps.join('|').includes('diantar'), `pickup ${s} must not mention diantar`);
+    assert.ok(!p.title.includes('DIANTAR') && !p.steps.join('|').includes('Sedang diantar'), `pickup ${s} must not mention Sedang diantar`);
   }
+});
+
+test('ODH-10b: delivery phase-3 is Siap / Diantar until courier takes over', () => {
+  assert.equal(resolveOrderPhase('pending', 'delivery').steps[2], 'Siap / Diantar');
+  assert.equal(resolveOrderPhase('out_for_delivery', 'delivery').steps[2], 'Sedang diantar');
+});
+
+test('ODH-10c: recipient falls back to buyer identity, never a bare Saya', () => {
+  const idx = src.indexOf('function renderTrackingOrder');
+  const body = src.substring(idx, idx + 6000);
+  assert.ok(body.includes('order.recipient_name || order.customer_name'), 'recipient name must prefer snapshot, fallback buyer');
+  assert.ok(body.includes('order.recipient_phone || order.customer_phone'), 'recipient phone must prefer snapshot, fallback buyer');
+  assert.ok(!body.includes("'Saya'"), 'tracking layout must never render a bare Saya');
 });
 
 test('ODH-11: title + progress come from ONE source', () => {
