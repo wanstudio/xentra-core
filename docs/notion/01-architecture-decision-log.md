@@ -281,8 +281,8 @@ The existing customer PWA currently sends payment_method from state with a cash 
 
 ### Canonical customer Order Detail structure
 1. Header: **Pesanan**
-2. Status Hero: current human-readable status + Owner-defined location name + short explanation + acceptance timer only while awaiting acceptance.
-3. Status Progress: **Pesanan dibuat → Menunggu konfirmasi → Sedang disiapkan → Siap / Diantar → Selesai**; stages may vary by fulfillment mode.
+2. Status Hero: current human-readable status + Owner-defined location name + short explanation. No acceptance timer/countdown in customer UI.
+3. Status Progress (4 phases per mode, progress follows the active phase): delivery **Pesanan dibuat → Sedang disiapkan → Sedang diantar → Selesai**; pickup **Pesanan dibuat → Sedang disiapkan → Siap diambil → Selesai**.
 4. **Dikirim kepada**: recipient name + phone/contact + delivery destination.
 5. **Pesanan**: items, quantities, notes.
 6. **Pembayaran**: subtotal, applicable fees, discount, total, payment method, and COD cash information where applicable.
@@ -296,17 +296,16 @@ The existing customer PWA currently sends payment_method from state with a cash 
 - Recipient and Delivery Destination remain separate domain concepts but may be visually grouped: **who** receives = Recipient; **where** it goes = Delivery Destination; **who** placed/owns = Customer/Buyer.
 
 ### State-driven presentation
-**Awaiting acceptance**
-- Hero: **Menunggu Konfirmasi**
+**Awaiting acceptance (order created / pending)**
+- Hero: **PESANAN DIBUAT**
 - Show Owner-defined location name.
-- Copy: **Pesananmu sedang dikonfirmasi.**
-- Show acceptance timer only during the acceptance window.
-- Never expose "cabang", "branch", "branch confirmation", or technical timer disclaimers.
+- No acceptance timer/countdown in customer UI. The acceptance deadline remains server-enforced; the client refreshes state from the server.
+- Progress marks **Pesanan dibuat** as the active phase.
+- Never expose "cabang", "branch", "branch confirmation", "menunggu konfirmasi", or technical timer disclaimers.
 
 **Accepted / Preparing**
 - Hero: **Sedang Disiapkan**
 - Location name remains visible.
-- Acceptance timer disappears.
 
 **Ready / Delivery**
 - Pickup: **Siap Diambil**
@@ -343,6 +342,12 @@ The existing customer PWA currently sends payment_method from state with a cash 
 Checkout → recipient + address + fulfillment mode + payment → final verification / identity gate where required → create Order → Order Detail / Tracking → state-driven progress → completed / rejected / timeout.
 
 **Agent rule:** Treat this decision as authoritative for customer-facing Order Detail / Tracking UX. Do not reintroduce customer-facing Branch/Cabang terminology, separate waiting-page architecture, masking of Owner-defined location names, or duplicate Recipient input without a newer explicit decision.
+
+### Amendment 2026-09-21 — Pending phase presentation (supersedes "Menunggu Konfirmasi" + timer)
+- Awaiting-acceptance hero is **PESANAN DIBUAT**, not "Menunggu Konfirmasi".
+- No customer-facing acceptance countdown/timer. Server-side acceptance deadline and timeout behavior are unchanged.
+- Progress has 4 phases per fulfillment mode and always follows the active phase.
+- Do not restore the "Menunggu Konfirmasi" hero or the acceptance timer without a newer explicit decision.
 
 
 ## 🔒 LOCKED — Order Detail: Delivery Detail Presentation v2 — 2026-09-21
