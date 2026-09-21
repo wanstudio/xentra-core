@@ -447,7 +447,7 @@
 
       // Header: dynamic status title + progress phases in ONE card.
       // Order meta (number/branch) and badge icon are hidden by design.
-      '  <div style="background:#fff;padding:20px 18px;margin-bottom:10px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
+      '  <div style="background:#fff;padding:20px 18px;margin:0 14px 10px;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,0.06);">' +
       '    <h1 id="x-order-phase-title" style="font-size:20px;font-weight:800;color:#111;margin:0 0 14px;">' + phase.title + '</h1>' +
       renderPhaseProgress(phase) +
       '  </div>' +
