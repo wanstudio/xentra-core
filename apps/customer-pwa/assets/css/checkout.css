@@ -3645,8 +3645,8 @@ body:has(#x-checkout-note-overlay.open){
 }
 /* When no promo/reward banner renders, the slot is empty and contributes no
    margin — keep the same 12px top gap so the first card never sticks to the
-   checkout header. */
-#x-promo-slot:empty + .x-card{ margin-top:12px; }
+   checkout header. !important wins over the card's inline margin shorthand. */
+#x-promo-slot:empty + .x-card{ margin-top:12px !important; }
 .x-alt-promo-img{
   width:56px; height:56px; flex:0 0 56px;
   object-fit:contain; display:block; background:transparent;
