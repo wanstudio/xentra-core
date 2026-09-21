@@ -819,7 +819,7 @@
         '    <div class="x-alt-address-head" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:15px;font-weight:700;color:#111;">Alamat Pengiriman</span><button type="button" class="x-pill-btn" id="x-btn-change-address">Pilih</button></div>' +
         '    <div class="x-alt-addr-label" style="font-size:14px;font-weight:700;color:#111;margin-top:4px;">' + UI.escape(state.address.label || 'Rumah') + '</div>' +
         '    <div class="x-alt-addr-text" style="font-size:12.5px;color:#666;line-height:18px;margin-top:2px;">' + UI.escape(state.address.formatted_address || 'Pilih alamat pengiriman') + '</div>' +
-        (isDelivery ? '<div class="x-alt-recipient-line" style="font-size:12.5px;color:#555;margin-top:6px;display:flex;align-items:center;justify-content:space-between;min-width:0;overflow:hidden;"><span style="display:inline-flex;align-items:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _recipientSummaryHtml() + '</span><button type="button" class="x-pill-btn" id="x-btn-change-recipient" style="flex:0 0 auto;font-size:11px;padding:4px 10px;margin-top:-4px;">Ubah</button></div>' : '') +
+        (isDelivery ? '<div class="x-alt-recipient-line" style="margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;min-width:0;"><div style="flex:1 1 auto;min-width:0;">' + _recipientSummaryHtml() + '</div><button type="button" class="x-pill-btn" id="x-btn-change-recipient" style="flex:0 0 auto;font-size:11px;padding:4px 10px;">Ubah</button></div>' : '') +
         (state.address.detail ? '<div class="x-alt-addr-note" style="font-size:12px;color:#777;margin-top:4px;font-style:italic;">Patokan: ' + UI.escape(state.address.detail) + '</div>' : '') +
         '  </div>'
       ) : '') +
@@ -2737,8 +2737,12 @@
     // SELF resolves phone from Customer Profile — never ask the customer to
     // retype their own number when the profile already has it.
     var phone = r.phone || (isSelf ? (state.customer.phone || '') : '');
-    var html = 'Dikirim kepada <b style="margin-left:4px;white-space:nowrap;">' + UI.escape(label) + '</b>';
-    if (phone) html += '<span style="margin-left:4px;color:#999;white-space:nowrap;">· ' + UI.escape(maskPhone(phone)) + '</span>';
+    // Stacked layout: label, then name, then phone — each on its own line.
+    var html = '<div style="display:block;min-width:0;">' +
+      '<div style="font-size:12.5px;color:#555;">Dikirim kepada:</div>' +
+      '<div style="font-size:14px;font-weight:700;color:#111;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + UI.escape(label) + '</div>';
+    if (phone) html += '<div style="font-size:12.5px;color:#666;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + UI.escape(maskPhone(phone)) + '</div>';
+    html += '</div>';
     return html;
   }
 
