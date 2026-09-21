@@ -126,7 +126,9 @@ test('ODH-10c: recipient falls back to buyer identity, never a bare Saya', () =>
   const body = src.substring(idx, idx + 6000);
   assert.ok(body.includes('order.recipient_name || order.customer_name'), 'recipient name must prefer snapshot, fallback buyer');
   assert.ok(body.includes('order.recipient_phone || order.customer_phone'), 'recipient phone must prefer snapshot, fallback buyer');
+  assert.ok(body.includes('customerSession'), 'owner session must be the final fallback (owner-only view)');
   assert.ok(!body.includes("'Saya'"), 'tracking layout must never render a bare Saya');
+  assert.ok(!body.includes('maskPhone'), 'recipient phone must be shown as-is, never masked');
 });
 
 test('ODH-11: title + progress come from ONE source', () => {

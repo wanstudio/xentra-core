@@ -3248,6 +3248,16 @@
       return;
     }
 
+    // Sync profile identity into the submit payload so the SELF recipient
+    // snapshot always captures the real Customer Profile name + phone.
+    try {
+      var submitSess = Store.getState().customerSession;
+      if (submitSess) {
+        if (submitSess.name) state.customer.name = submitSess.name;
+        if (submitSess.phone) state.customer.phone = submitSess.phone;
+      }
+    } catch (_) {}
+
     // Phone gate: verified customer without a profile phone must complete it
     // first. State (cart/address/branch/recipient/promo/payment) is preserved;
     // the submit retries automatically after the phone is saved.

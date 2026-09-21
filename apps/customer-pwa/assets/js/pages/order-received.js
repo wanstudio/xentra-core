@@ -379,10 +379,14 @@
     var dist = fmtDistance(delivery.actual_road_distance_meters);
     var destAddr = delivery.destination_address || delivery.address_text || '';
 
-    // Recipient snapshot first; buyer identity only as fallback for
-    // pre-snapshot legacy orders. Never render a bare "Saya".
-    var rName = order.recipient_name || order.customer_name || '';
-    var rPhone = String(order.recipient_phone || order.customer_phone || '').replace(/[^0-9]/g, '');
+    // Recipient snapshot first; buyer columns for pre-snapshot legacy orders;
+    // owner session as final fallback (IDOR guard guarantees only the owner
+    // views this order, so the session IS the buyer). Always real profile
+    // data — never a bare placeholder. Phone shown as-is, never masked.
+    var sess = null;
+    try { sess = Store.getState().customerSession; } catch (_) {}
+    var rName = order.recipient_name || order.customer_name || (sess && sess.name) || '';
+    var rPhone = order.recipient_phone || order.customer_phone || (sess && sess.phone) || '';
 
     var itemsHtml = '';
     items.forEach(function (item) {
