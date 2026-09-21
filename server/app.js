@@ -133,11 +133,8 @@ app.get(['/invite/:token', '/invite/:token/'], (req, res) => {
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/invite.html'));
 });
 
-// Serve Public Static Assets
-app.use('/assets', express.static(path.join(__dirname, '../apps/customer-pwa/assets')));
-app.use('/pwa', express.static(path.join(__dirname, '../apps/customer-pwa/assets/pwa')));
-
-// PWA Manifest & Service Worker Routes with correct headers
+// PWA Manifest & Service Worker Routes — MUST come before express.static
+// so Cloudflare always sees the explicit no-store headers, not express.static defaults.
 app.get(['/manifest.json', '/pwa/manifest.json'], (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -148,11 +145,38 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
   res.setHeader('Service-Worker-Allowed', '/');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, '../apps/customer-pwa/assets/pwa/service-worker.js'));
 });
 
+// Serve Public Static Assets — setHeaders ensures Cloudflare does not cache JS/CSS
+// (express.static default is 'public, max-age=0' which Cloudflare treats as cacheable)
+const _noCacheHeaders = (res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+};
+app.use('/assets', express.static(path.join(__dirname, '../apps/customer-pwa/assets'), {
+  setHeaders: _noCacheHeaders,
+}));
+app.use('/pwa', express.static(path.join(__dirname, '../apps/customer-pwa/assets/pwa'), {
+  setHeaders: _noCacheHeaders,
+}));
+
 // Merchant Dashboard Assets
 app.use('/dashboard/assets', express.static(path.join(__dirname, '../apps/merchant-dashboard/assets'), {
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
+
+// Shared Merchant Frontend Infrastructure (merchant-shared/)
+// Serves apps/merchant-shared/ at /merchant-shared for all dashboard surfaces.
+app.use('/merchant-shared', express.static(path.join(__dirname, '../apps/merchant-shared'), {
   maxAge: 0,
   setHeaders: (res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
