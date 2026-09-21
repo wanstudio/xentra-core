@@ -121,6 +121,7 @@ class OrderRepository {
 
   insertOrder({
     id, orderNumber, clientTransactionId, brandId, branchId, customerId = null, customerName, customerPhone,
+    recipientType = 'self', recipientName = '', recipientPhone = '',
     orderType, orderChannel, selectionMode, tableNumber, fulfillmentScheduleType,
     scheduledSlotStart, scheduledSlotEnd, subtotal, discountAmount, deliveryFee,
     grandTotal, paymentMethod, status, orderNote, diningSessionId, cashTendered = null, createdAt, updatedAt
@@ -128,11 +129,13 @@ class OrderRepository {
     return this.db.execute(`
       INSERT INTO orders (
         id, order_number, client_transaction_id, brand_id, branch_id, customer_id, customer_name, customer_phone,
+        recipient_type, recipient_name, recipient_phone,
         order_type, order_channel, selection_mode, table_number, fulfillment_schedule_type, scheduled_slot_start, scheduled_slot_end,
         subtotal, discount_amount, delivery_fee, grand_total, payment_method, status, cash_tendered, order_note, dining_session_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id, orderNumber, clientTransactionId, brandId, branchId, customerId || null, customerName, customerPhone,
+      recipientType, recipientName, recipientPhone,
       orderType, orderChannel, selectionMode, tableNumber, fulfillmentScheduleType,
       scheduledSlotStart, scheduledSlotEnd, subtotal, discountAmount, deliveryFee,
       grandTotal, paymentMethod, status, (cashTendered !== null && cashTendered !== undefined) ? Number(cashTendered) : null, orderNote, diningSessionId, createdAt, updatedAt

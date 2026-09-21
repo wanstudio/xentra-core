@@ -142,6 +142,7 @@
   function get(path, options)        { return request('GET', path, null, options); }
   function post(path, body, options) { return request('POST', path, body, options); }
   function put(path, body, options)  { return request('PUT', path, body, options); }
+  function patch(path, body, options) { return request('PATCH', path, body, options); }
   function del(path, options)        { return request('DELETE', path, null, options); }
 
   // ── Export ──
@@ -150,6 +151,7 @@
     get: get,
     post: post,
     put: put,
+    patch: patch,
     del: del,
     request: request,
     isAbortError: isAbortError

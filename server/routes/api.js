@@ -1084,6 +1084,76 @@ router.post(['/cart/sync', '/checkout/session'], (req, res) => {
   });
 });
 
+// 5.2 Customer Profile — canonical Customer identity (phone lives here, not in checkout).
+// GET returns authoritative profile; PATCH /phone validates + normalizes + saves.
+router.get('/customer/profile', requireCustomerAuth(), (req, res) => {
+  try {
+    const customerId = req.customer.customerId || req.customer.customer_id;
+    if (!customerId) {
+      return res.status(404).json({ success: false, error: 'Customer identity tidak ditemukan.' });
+    }
+    const CustomerRepository = require('../../core/data/repositories/CustomerRepository');
+    const customerRepo = new CustomerRepository();
+    const record = customerRepo.findById(customerId);
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'Customer tidak ditemukan.' });
+    }
+    return res.json({
+      success: true,
+      customer: {
+        id: record.id,
+        name: record.display_name || null,
+        email: record.email || null,
+        phone: record.phone || null
+      }
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Gagal memuat profil customer.' });
+  }
+});
+
+router.patch('/customer/profile/phone', requireCustomerAuth(), (req, res) => {
+  try {
+    const customerId = req.customer.customerId || req.customer.customer_id;
+    if (!customerId) {
+      return res.status(404).json({ success: false, error: 'Customer identity tidak ditemukan.' });
+    }
+    const rawPhone = String((req.body && req.body.phone) || '').trim();
+    const clean = rawPhone.replace(/[^0-9]/g, '');
+    // Canonical Indonesian WhatsApp/mobile validation (same rule as recipient + OTP).
+    const isIndoMobile = clean.startsWith('08') || clean.startsWith('628') || clean.startsWith('8');
+    if (!rawPhone || !isIndoMobile || clean.length < 9 || clean.length > 15) {
+      return res.status(400).json({ success: false, error: 'Nomor WhatsApp/telepon tidak valid. Gunakan format 08xx atau 628xx (9-15 digit).' });
+    }
+    const CustomerRepository = require('../../core/data/repositories/CustomerRepository');
+    const customerRepo = new CustomerRepository();
+    const record = customerRepo.findById(customerId);
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'Customer tidak ditemukan.' });
+    }
+    customerRepo.updateCustomerProfile(customerId, { phone: clean });
+    // Refresh the live session so SELF recipient resolves immediately without re-login.
+    try {
+      const authHeader = req.headers['authorization'] || '';
+      const token = authHeader.startsWith('Bearer ')
+        ? authHeader.substring(7).trim()
+        : (req.headers['x-auth-token'] || req.headers['x-customer-token'] || '').trim();
+      const live = token && TokenSessionStore.getSession(token);
+      if (live) {
+        live.phone = clean;
+        live.customerPhone = clean;
+      }
+      const rawDb = require('../database/db');
+      if (token) {
+        try { rawDb.prepare('UPDATE customer_sessions SET phone = ? WHERE token = ?').run(clean, token); } catch (_) {}
+      }
+    } catch (_) {}
+    return res.json({ success: true, customer: { id: customerId, phone: clean } });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: 'Gagal menyimpan nomor WhatsApp.' });
+  }
+});
+
 // 5.3 Addresses (Protected by Customer Session - Brand scoped data)
 router.get('/addresses', requireCustomerAuth(), (req, res) => {
   try {
@@ -1732,6 +1802,33 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       }
     }
 
+    // R-Recipient Identity Layer: resolve authoritative recipient snapshot.
+    // SELF = authenticated customer identity (from session — never trusted from client).
+    // OTHER = validated recipient name + WhatsApp/mobile phone supplied by client.
+    // Recipient ≠ buyer; stored as order snapshot, independent of addresses.
+    const incomingRecipient = (req.body && req.body.recipient) || {};
+    const isOther = !!incomingRecipient && incomingRecipient.type === 'other';
+    let recipientName = (customerSession.name || customer.name || 'Pelanggan');
+    let recipientPhone = (customerSession.phone || customer.phone || '');
+    let recipient;
+    if (isOther) {
+      const rName = String(incomingRecipient.name || '').trim();
+      const rawPhone = String(incomingRecipient.phone || '').trim();
+      const clean = rawPhone.replace(/[^0-9]/g, '');
+      const isIndoMobile = clean.startsWith('08') || clean.startsWith('628') || clean.startsWith('8');
+      if (!rName) {
+        return res.status(400).json({ success: false, error: 'Nama penerima wajib diisi.' });
+      }
+      if (!rawPhone || !isIndoMobile || clean.length < 9 || clean.length > 15) {
+        return res.status(400).json({ success: false, error: 'Nomor WhatsApp/telepon penerima tidak valid.' });
+      }
+      recipientName = rName;
+      recipientPhone = rawPhone;
+      recipient = { type: 'other', name: rName, phone: rawPhone };
+    } else {
+      recipient = { type: 'self', name: recipientName, phone: recipientPhone };
+    }
+
     // 4. Delegate Cleanly to OrderPlacementService (ACID database transaction & event publishing)
     const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
     const placementResult = await OrderPlacementService.submitOrder({
@@ -1743,6 +1840,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         name: customer.name.trim(),
         phone: customer.phone.trim()
       },
+      recipient,
       items,
       delivery_fee: deliveryFee,
       discount_amount: discountAmount,

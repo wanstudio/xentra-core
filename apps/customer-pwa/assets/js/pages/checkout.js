@@ -65,6 +65,7 @@
     paymentMethod: null,
     cashTendered: null,
     cashTenderedType: null,
+    recipient: Store.getRecipient() || { type: 'self', name: '', phone: '' },
     isSubmitting: false
   };
 
@@ -474,7 +475,10 @@
       }
     } catch (_) {}
 
-    // Automatic retry checkout submission after successful auth broker return
+    // Automatic retry checkout submission after successful auth broker return.
+    // If the verified customer has no phone yet, open Phone Completion first —
+    // checkout state (cart/address/branch/recipient/promo/payment) is preserved
+    // in Store + sessionStorage and the submit runs after the phone is saved.
     if (state.customer.isVerified) {
       var autoRetry = false;
       try {
@@ -482,8 +486,22 @@
         if (autoRetry) sessionStorage.removeItem('xnt_auth_auto_retry_checkout');
       } catch (_) {}
       if (autoRetry) {
+        if (!hasValidCustomerPhone()) {
+          setTimeout(function () {
+            openPhoneCompletionSheet({ mode: 'checkout', onSaved: function () {
+              setTimeout(function () { executePrePaymentAndSubmit(); }, 300);
+            } });
+          }, 300);
+        } else {
+          setTimeout(function () {
+            executePrePaymentAndSubmit();
+          }, 300);
+        }
+      } else if (!hasValidCustomerPhone() && getCheckoutItems().length > 0) {
+        // Verified session restored (e.g. profile-first Google signup) without a
+        // phone: prompt completion without submitting anything.
         setTimeout(function () {
-          executePrePaymentAndSubmit();
+          openPhoneCompletionSheet({ mode: 'checkout' });
         }, 300);
       }
     }
@@ -801,6 +819,7 @@
         '    <div class="x-alt-address-head" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><span style="font-size:15px;font-weight:700;color:#111;">Alamat Pengiriman</span><button type="button" class="x-pill-btn" id="x-btn-change-address">Pilih</button></div>' +
         '    <div class="x-alt-addr-label" style="font-size:14px;font-weight:700;color:#111;margin-top:4px;">' + UI.escape(state.address.label || 'Rumah') + '</div>' +
         '    <div class="x-alt-addr-text" style="font-size:12.5px;color:#666;line-height:18px;margin-top:2px;">' + UI.escape(state.address.formatted_address || 'Pilih alamat pengiriman') + '</div>' +
+        (isDelivery ? '<div class="x-alt-recipient-line" style="font-size:12.5px;color:#555;margin-top:6px;display:flex;align-items:center;justify-content:space-between;min-width:0;overflow:hidden;"><span style="display:inline-flex;align-items:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _recipientSummaryHtml() + '</span><button type="button" class="x-pill-btn" id="x-btn-change-recipient" style="flex:0 0 auto;font-size:11px;padding:4px 10px;margin-top:-4px;">Ubah</button></div>' : '') +
         (state.address.detail ? '<div class="x-alt-addr-note" style="font-size:12px;color:#777;margin-top:4px;font-style:italic;">Patokan: ' + UI.escape(state.address.detail) + '</div>' : '') +
         '  </div>'
       ) : '') +
@@ -1254,6 +1273,8 @@
 
     var btnAddr = $('x-btn-change-address'); if (btnAddr) btnAddr.onclick = openAddressSheet;
     var addrCard = $('x-card-address'); if (addrCard) addrCard.addEventListener('click', function (e) { if (e.target.closest('button')) return; openAddressSheet(); });
+
+    var btnRecip = $('x-btn-change-recipient'); if (btnRecip) btnRecip.onclick = function (e) { if (e) e.stopPropagation(); if (e) e.preventDefault(); openRecipientSheet(); };
 
     var optCash = $('x-opt-cash');
     if (optCash) {
@@ -2342,6 +2363,79 @@
     }
   }
 
+  // ── Customer Phone Completion (Customer Profile/Identity Layer) ──
+  // Phone is part of Customer Profile, not checkout data. After Google
+  // signup/auth, customers without a valid phone must complete it via this
+  // Bottom Sheet before continuing. Saved to profile via PATCH
+  // /customer/profile/phone; SELF recipient then resolves automatically.
+  var _phoneSheetOpen = false;
+
+  function hasValidCustomerPhone() {
+    var p = String(state.customer.phone || '').replace(/[^0-9]/g, '');
+    var isIndoMobile = p.indexOf('08') === 0 || p.indexOf('628') === 0 || p.indexOf('8') === 0;
+    return Boolean(p && isIndoMobile && p.length >= 9 && p.length <= 15);
+  }
+
+  function openPhoneCompletionSheet(opts) {
+    opts = opts || {};
+    if (_phoneSheetOpen) return;
+    _phoneSheetOpen = true;
+    var mode = opts.mode === 'profile' ? 'profile' : 'checkout';
+    var desc = mode === 'profile'
+      ? 'Nomor ini digunakan sebagai kontak pengiriman pesanan.'
+      : 'Nomor ini diperlukan untuk melanjutkan pesanan.';
+    var btnLabel = mode === 'profile' ? 'Simpan Nomor' : 'Simpan & Lanjutkan Pesanan';
+    var sh = makeOverlay(
+      '<h3 class="x-alt-sheet-title">Lengkapi nomor WhatsApp</h3>' +
+      '<div style="font-size:13px;color:#6b7280;margin-bottom:10px;">' + desc + '</div>' +
+      '<div class="x-alt-sheet-label">Nomor WhatsApp / Telepon</div>' +
+      '<input id="x-input-profile-phone" class="x-alt-input" type="tel" value="" placeholder="08xx xxxx xxxx" enterkeyhint="done" autocomplete="tel">' +
+      '<div id="x-phone-error" style="display:none;margin-top:8px;font-size:12.5px;color:#dc2626;"></div>' +
+      '<button type="button" class="x-alt-submit-btn" id="x-save-profile-phone" style="margin-top:14px;">' + btnLabel + '</button>'
+    );
+    var phoneInput = sh.overlay.querySelector('#x-input-profile-phone');
+    var saveBtn = sh.overlay.querySelector('#x-save-profile-phone');
+    var errorEl = sh.overlay.querySelector('#x-phone-error');
+    function showErr(msg) {
+      if (errorEl) { errorEl.textContent = msg; errorEl.style.display = 'block'; }
+      else if (UI && UI.toast) UI.toast(msg);
+    }
+    function doneClose() { _phoneSheetOpen = false; sh.close(); }
+    if (phoneInput) { setTimeout(function () { try { phoneInput.focus(); } catch (_) {} }, 300); }
+    saveBtn.onclick = function () {
+      var raw = phoneInput ? (phoneInput.value || '').trim() : '';
+      var clean = raw.replace(/[^0-9]/g, '');
+      var isIndoMobile = clean.indexOf('08') === 0 || clean.indexOf('628') === 0 || clean.indexOf('8') === 0;
+      if (!raw) { showErr('Nomor WhatsApp wajib diisi.'); if (phoneInput) phoneInput.focus(); return; }
+      if (!isIndoMobile || clean.length < 9 || clean.length > 15) {
+        showErr('Nomor WhatsApp/telepon tidak valid. Gunakan format 08xx atau 628xx.');
+        if (phoneInput) phoneInput.focus();
+        return;
+      }
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Menyimpan...';
+      API.patch('/customer/profile/phone', { phone: clean }).then(function (res) {
+        var savedPhone = (res && res.customer && res.customer.phone) || clean;
+        state.customer.phone = savedPhone;
+        try {
+          var sess = Store.getState().customerSession;
+          if (sess) { sess.phone = savedPhone; Store.setCustomerSession(sess); }
+        } catch (_) {}
+        doneClose();
+        var y = window.scrollY;
+        try { renderLayout(); } catch (_) {}
+        window.scrollTo(0, y);
+        if (UI && UI.toast) UI.toast('Nomor WhatsApp tersimpan.');
+        if (typeof opts.onSaved === 'function') opts.onSaved(savedPhone);
+      }).catch(function (err) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = btnLabel;
+        var msg = (err && err.data && err.data.error) || 'Gagal menyimpan nomor. Coba lagi.';
+        showErr(msg);
+      });
+    };
+  }
+
   function renderOtpPhoneStep(phone, name, onSuccess) {
     var sh = makeOverlay(
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">' +
@@ -2626,6 +2720,28 @@
     };
   }
 
+  // ── Recipient Identity display helpers (R-Recipient Identity Layer V1) ──
+  function isRecipientSelf() {
+    var r = state.recipient;
+    return !r || r.type !== 'other';
+  }
+  function maskPhone(p) {
+    var d = String(p || '').replace(/[^0-9]/g, '');
+    if (d.length < 4) return d;
+    return d.slice(0, 4) + '•' + d.slice(-4);
+  }
+  function _recipientSummaryHtml() {
+    var r = state.recipient || { type: 'self', name: '', phone: '' };
+    var isSelf = r.type !== 'other';
+    var label = isSelf ? (r.name || state.customer.name || 'Saya') : (r.name || '');
+    // SELF resolves phone from Customer Profile — never ask the customer to
+    // retype their own number when the profile already has it.
+    var phone = r.phone || (isSelf ? (state.customer.phone || '') : '');
+    var html = 'Dikirim kepada <b style="margin-left:4px;white-space:nowrap;">' + UI.escape(label) + '</b>';
+    if (phone) html += '<span style="margin-left:4px;color:#999;white-space:nowrap;">· ' + UI.escape(maskPhone(phone)) + '</span>';
+    return html;
+  }
+
   // ── 5. Delivery Address Sheet ──
   function openAddressSheet() {
     if (window.XentraLocationPicker && typeof window.XentraLocationPicker.open === 'function') {
@@ -2698,6 +2814,70 @@
       calculateTotals();
       loadUpsell();
       scheduleDeliveryQuote();
+      window.scrollTo(0, y);
+    };
+  }
+
+  // ── 5c. Recipient Selection Sheet (R-Recipient Identity Layer V1) ──
+  // Recipient lives inside the Delivery Address card. "1 Order = 1 Recipient".
+  // SELF uses the authenticated customer's identity (server resolves
+  // authoritatively); OTHER captures an explicit recipient (name + WhatsApp).
+  function openRecipientSheet() {
+    var current = state.recipient || { type: 'self', name: '', phone: '' };
+    var initialType = (current.type === 'other') ? 'other' : 'self';
+    var sh = makeOverlay(
+      '<h3 class="x-alt-sheet-title">Dikirim kepada</h3>' +
+      '<div style="font-size:13px;color:#6b7280;margin-bottom:10px;">Pilih penerima pesanan makanan untuk order ini.</div>' +
+      '<div class="x-alt-sheet-label">Dikirim kepada</div>' +
+      '<div style="display:flex;gap:10px;margin-bottom:8px;">' +
+        '<label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="x-recip-type" value="self" ' + (initialType === 'self' ? 'checked' : '') + '><span>Saya sendiri</span></label>' +
+        '<label style="flex:1;display:flex;align-items:center;gap:6px;font-size:13px;"><input type="radio" name="x-recip-type" value="other" ' + (initialType === 'other' ? 'checked' : '') + '><span>Orang lain</span></label>' +
+      '</div>' +
+      '<div id="x-recip-other-fields" style="margin-top:12px;' + (initialType === 'other' ? 'display:block;' : 'display:none;') + '">' +
+        '<div class="x-alt-sheet-label">Nama Penerima</div>' +
+        '<input id="x-input-recipient-name" class="x-alt-input" type="text" value="' + UI.escape(current.name || '') + '" placeholder="Nama penerima">' +
+        '<div class="x-alt-sheet-label" style="margin-top:10px;">Nomor WhatsApp / Telepon</div>' +
+        '<input id="x-input-recipient-phone" class="x-alt-input" type="tel" value="' + UI.escape(current.phone || '') + '" placeholder="08xx xxxx xxxx">' +
+      '</div>' +
+      '<button type="button" class="x-alt-submit-btn" id="x-save-recipient" style="margin-top:14px;">Gunakan</button>'
+    );
+
+    // toggle OTHER fields on radio change
+    var radios = sh.overlay.querySelectorAll('input[name="x-recip-type"]');
+    for (var i = 0; i < radios.length; i++) {
+      radios[i].addEventListener('change', function () {
+        var otherFields = sh.overlay.querySelector('#x-recip-other-fields');
+        if (otherFields) {
+          otherFields.style.display = (sh.overlay.querySelector('input[value="other"]').checked) ? 'block' : 'none';
+        }
+      });
+    }
+
+    sh.overlay.querySelector('#x-save-recipient').onclick = function () {
+      var type = (sh.overlay.querySelector('input[value="other"]').checked) ? 'other' : 'self';
+      var name = '', phone = '';
+      if (type === 'other') {
+        name = (sh.overlay.querySelector('#x-input-recipient-name').value || '').trim();
+        phone = (sh.overlay.querySelector('#x-input-recipient-phone').value || '').trim();
+        if (!name) { sh.overlay.querySelector('#x-input-recipient-name').focus(); return; }
+        if (!phone) { sh.overlay.querySelector('#x-input-recipient-phone').focus(); return; }
+        // reuse canonical WhatsApp/mobile validation (no OTP for recipient)
+        var clean = phone.replace(/[^0-9]/g, '');
+        var isIndoMobile = clean.startsWith('08') || clean.startsWith('628') || clean.startsWith('8');
+        if (!isIndoMobile || clean.length < 9 || clean.length > 15) {
+          alert('Nomor WhatsApp/telepon penerima tidak valid.');
+          sh.overlay.querySelector('#x-input-recipient-phone').focus();
+          return;
+        }
+      }
+      // SELF leaves name/phone blank — server resolves authoritative identity from session.
+      state.recipient = (type === 'other')
+        ? { type: 'other', name: name, phone: phone }
+        : { type: 'self', name: '', phone: '' };
+      Store.setRecipient(state.recipient); // persist for Google-Auth round-trip
+      sh.close();
+      var y = window.scrollY;
+      renderLayout(); // re-renders card + re-binds events (renderLayout calls bindEvents)
       window.scrollTo(0, y);
     };
   }
@@ -3046,11 +3226,23 @@
     if (!activeSession || !activeSession.token || activeSession.token.indexOf('xnt_cust_') !== 0) {
       // No valid session → open Google Identity Gate
       openCustomerAuthSheet(function () {
-        // After successful Google auth, automatically retry the checkout submission
+      // After successful Google auth, automatically retry the checkout submission
+      setTimeout(function () {
+        executePrePaymentAndSubmit();
+      }, 100);
+    });
+      return;
+    }
+
+    // Phone gate: verified customer without a profile phone must complete it
+    // first. State (cart/address/branch/recipient/promo/payment) is preserved;
+    // the submit retries automatically after the phone is saved.
+    if (!hasValidCustomerPhone()) {
+      openPhoneCompletionSheet({ mode: 'checkout', onSaved: function () {
         setTimeout(function () {
           executePrePaymentAndSubmit();
         }, 100);
-      });
+      } });
       return;
     }
 
@@ -3225,6 +3417,7 @@
         name: state.customer.name || 'Pelanggan Bangjo',
         phone: state.customer.phone
       },
+      recipient: isRecipientSelf() ? { type: 'self' } : (state.recipient || { type: 'other', name: '', phone: '' }),
       pwa_runtime: pwaRuntime,
       order_type: fulType === 'dinein' ? 'dine_in' : fulType,
       fulfillment: {
@@ -3385,9 +3578,17 @@
           if (autoRetrySub) sessionStorage.removeItem('xnt_auth_auto_retry_checkout');
         } catch (_) {}
         if (autoRetrySub) {
-          setTimeout(function () {
-            executePrePaymentAndSubmit();
-          }, 300);
+          if (!hasValidCustomerPhone()) {
+            setTimeout(function () {
+              openPhoneCompletionSheet({ mode: 'checkout', onSaved: function () {
+                setTimeout(function () { executePrePaymentAndSubmit(); }, 300);
+              } });
+            }, 300);
+          } else {
+            setTimeout(function () {
+              executePrePaymentAndSubmit();
+            }, 300);
+          }
         }
       }
       return;
@@ -3417,6 +3618,8 @@
   window.Xentra.Checkout = {
     mount: mount,
     openCustomerAuthSheet: openCustomerAuthSheet,
+    openPhoneCompletionSheet: openPhoneCompletionSheet,
+    hasValidCustomerPhone: hasValidCustomerPhone,
     // Test-only hook: seed paymentMethod without going through the DOM.
     // MUST NOT be called in production paths.
     _setPaymentMethod: function (method) { state.paymentMethod = method; },

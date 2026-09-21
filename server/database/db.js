@@ -1607,6 +1607,11 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN client_transaction_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN cash_tendered REAL;'); } catch (e) {}
 
+  // F-Recipient Identity Layer: order-level recipient snapshot (buyer != recipient)
+  try { targetDb.exec("ALTER TABLE orders ADD COLUMN recipient_type TEXT NOT NULL DEFAULT 'self';"); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE orders ADD COLUMN recipient_name TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE orders ADD COLUMN recipient_phone TEXT;'); } catch (e) {}
+
   // F05 Migration Safety: inspect existing duplicate rows before establishing UNIQUE constraint
   try {
     const dupSql = `

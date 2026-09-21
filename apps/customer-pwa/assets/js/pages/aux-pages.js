@@ -216,6 +216,22 @@
     }
 
     var actionHtml = '';
+    var phoneHtml = '';
+    if (isAuthenticated) {
+      var sessPhone = session && session.phone ? String(session.phone) : '';
+      var sessDigits = sessPhone.replace(/[^0-9]/g, '');
+      var hasPhone = Boolean(sessDigits &&
+        (sessDigits.indexOf('08') === 0 || sessDigits.indexOf('628') === 0 || sessDigits.indexOf('8') === 0) &&
+        sessDigits.length >= 9 && sessDigits.length <= 15);
+      phoneHtml =
+        '    <button type="button" class="x-profile-menu-item" id="x-profile-btn-phone">' +
+        '      <div class="left"><span class="icon">📱</span><span><span style="display:block;font-size:13px;color:#64748b;">Nomor WhatsApp</span>' +
+        '      <span id="x-profile-phone-value" style="display:block;font-size:14px;color:#111;font-weight:600;">' +
+        (hasPhone ? UI.escape(sessPhone) : 'Belum ditambahkan') + '</span></span></div>' +
+        '      <span id="x-profile-phone-action" style="font-size:12.5px;font-weight:600;color:#16a34a;">' +
+        (hasPhone ? 'Ubah' : 'Tambahkan nomor') + '</span>' +
+        '    </button>';
+    }
     if (isAuthenticated) {
       actionHtml = '    <button type="button" class="x-profile-logout-btn" id="x-profile-logout">Keluar dari Akun</button>';
     } else {
@@ -238,6 +254,7 @@
       '  </div>' +
       '  <div class="x-aux-body">' +
       cardHtml +
+      phoneHtml +
       '    <div class="x-profile-menu-list">' +
       '      <button type="button" class="x-profile-menu-item" id="x-profile-btn-addresses">' +
       '        <div class="left"><span class="icon">📍</span><span>Alamat Favorit Saya</span></div>' +
@@ -258,6 +275,42 @@
 
     var backBtn = container.querySelector('#x-profile-back');
     if (backBtn) backBtn.onclick = function () { Router.navigate('home'); };
+
+    // WhatsApp number row: authoritative phone from Customer Profile.
+    var phoneBtn = container.querySelector('#x-profile-btn-phone');
+    function paintProfilePhone(phone) {
+      var valEl = container.querySelector('#x-profile-phone-value');
+      var actEl = container.querySelector('#x-profile-phone-action');
+      var d = String(phone || '').replace(/[^0-9]/g, '');
+      var ok = d.indexOf('08') === 0 || d.indexOf('628') === 0 || d.indexOf('8') === 0;
+      var valid = Boolean(d && ok && d.length >= 9 && d.length <= 15);
+      if (valEl) valEl.textContent = valid ? String(phone) : 'Belum ditambahkan';
+      if (actEl) actEl.textContent = valid ? 'Ubah' : 'Tambahkan nomor';
+    }
+    if (isAuthenticated && API) {
+      API.get('/customer/profile').then(function (res) {
+        var phone = res && res.customer && res.customer.phone;
+        if (phone) {
+          try {
+            var sess = Store.getState().customerSession;
+            if (sess && !sess.phone) { sess.phone = phone; Store.setCustomerSession(sess); }
+          } catch (_) {}
+        }
+        paintProfilePhone(phone || (session && session.phone) || '');
+      }).catch(function () {});
+    }
+    if (phoneBtn) {
+      phoneBtn.onclick = function () {
+        var checkout = window.Xentra && window.Xentra.Checkout;
+        if (checkout && typeof checkout.openPhoneCompletionSheet === 'function') {
+          checkout.openPhoneCompletionSheet({ mode: 'profile', onSaved: function (savedPhone) {
+            paintProfilePhone(savedPhone);
+          } });
+        } else if (UI && UI.toast) {
+          UI.toast('Fitur nomor WhatsApp tidak tersedia saat ini.');
+        }
+      };
+    }
 
     var addrBtn = container.querySelector('#x-profile-btn-addresses');
     if (addrBtn) {

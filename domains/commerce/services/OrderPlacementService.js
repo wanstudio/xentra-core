@@ -40,6 +40,7 @@ class OrderPlacementService {
     client_transaction_id = null,
     shift_id = null,
     pwa_runtime = null,
+    recipient = null,
     dining_session_id = null,
     table_ids = null,
     hold_reference_id = null,
@@ -161,6 +162,16 @@ class OrderPlacementService {
     const randSuffix = `${Math.floor(1000 + Math.random() * 9000)}-${crypto.randomBytes(3).toString('hex')}`;
     const orderNumber = `XN-${today}-${randSuffix}`;
 
+    // Recipient Identity Layer: resolve authoritative recipient snapshot.
+    // SELF uses the authenticated customer identity (authoritative); OTHER uses
+    // the validated recipient supplied by the caller. The order stores a snapshot
+    // so later profile changes never mutate previously placed orders.
+    const recipientType = (recipient && recipient.type === 'other') ? 'other' : 'self';
+    const recipientName = (recipient && recipient.name)
+      ? recipient.name
+      : (recipientType === 'self' ? (customer.name || 'Pelanggan') : '');
+    const recipientPhone = (recipient && recipient.phone) || '';
+
     try {
       orderRepository.beginTransaction();
       orderRepository.insertOrder({
@@ -172,6 +183,9 @@ class OrderPlacementService {
         customerId: customer.id || customer.customer_id || null,
         customerName: customer.name || 'Pelanggan',
         customerPhone: customer.phone || '',
+        recipientType,
+        recipientName,
+        recipientPhone,
         orderType: effectiveOrderType,
         orderChannel: order_channel,
         selectionMode: selection_mode || 'CUSTOMER_SELECTED',
