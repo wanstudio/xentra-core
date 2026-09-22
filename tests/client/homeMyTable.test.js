@@ -29,6 +29,10 @@ test('MYTABLE-01: topbar punya ikon scan dan ikon meja dengan badge', () => {
   assert.ok(/x-btn-my-table"[\s\S]{0,400}hidden/.test(HTML), 'ikon meja tersembunyi sampai tamu dapat meja');
   assert.ok(/x-my-table-badge"[\s\S]{0,300}background:#dc2626/.test(HTML), 'badge merah');
   assert.ok(/x-my-table-badge"[\s\S]{0,300}color:#fff/.test(HTML), 'angka badge putih');
+  // Ikon meja: meja di tengah + dua kursi berhadapan (lebih terbaca dari ikon lama).
+  assert.ok(/x-btn-my-table"[\s\S]{0,900}rx="2"/.test(HTML), 'ikon meja harus punya bentuk meja');
+  assert.ok((HTML.match(/rx="1\.25"/g) || []).length >= 2, 'ikon meja harus punya dua kursi');
+  assert.ok(!HTML.includes('<path d="M6 14v5"></path>'), 'ikon meja lama harus hilang');
 
   const scan = HTML.indexOf('x-btn-scan-table');
   const my = HTML.indexOf('x-btn-my-table');
@@ -80,6 +84,13 @@ test('MYTABLE-07: meja disimpan di Store (bertahan saat pindah halaman)', () => 
   assert.ok(STORE.includes("var MY_TABLE_KEY = PREFIX + 'my_table';"), 'kunci penyimpanan meja');
   assert.ok(STORE.includes('setMyTable: setMyTable') && STORE.includes('getMyTable: getMyTable')
     && STORE.includes('clearMyTable: clearMyTable'), 'setter/getter meja harus diekspor');
+});
+
+test('MYTABLE-09: meja yang dipilih di checkout ikut mengisi badge', () => {
+  assert.ok(CHECKOUT.includes('Store.setMyTable({ id: draft.selectedTableIds[0]'),
+    'badge di Home itu keterangan duduk di mana, jadi pilihan di checkout harus ikut terpasang');
+  assert.ok(/state\.fulfillment\.type === 'dine_in' && Store\.setMyTable/.test(CHECKOUT),
+    'hanya untuk dine-in');
 });
 
 test('MYTABLE-08: pesanan checkout terikat ke meja hasil scan', () => {

@@ -2415,6 +2415,11 @@
           var tNumStr = draft.tableNumber || computeSelectedTableNumbers(draft.selectedTableIds);
           state.fulfillment.tableNumber = tNumStr;
           state.fulfillment.table_ids = draft.selectedTableIds || [];
+        // Badge di Home itu keterangan "kamu duduk di mana" — jadi meja yang dipilih
+        // di sini pun harus ikut terpasang, bukan cuma yang di-scan dari Home.
+        if (state.fulfillment.type === 'dine_in' && Store.setMyTable && (draft.selectedTableIds || []).length === 1) {
+          Store.setMyTable({ id: draft.selectedTableIds[0], number: tNumStr || '' });
+        }
           state.fulfillment.guestCount = draft.guestCount || 1;
         } else {
           state.fulfillment.scheduled = false;
