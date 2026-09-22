@@ -116,6 +116,9 @@ function mkHarness(opts) {
     value: { userAgent: 'node-test' }, configurable: true
   });
   globalThis.window = globalThis;
+  // checkout.js binds window-level listeners at load time (PWA install prompt).
+  globalThis.addEventListener = () => {};
+  globalThis.removeEventListener = () => {};
   globalThis.matchMedia = () => ({ matches: false });
   globalThis.requestAnimationFrame = (fn) => { REAL_SET_TIMEOUT(fn, 0); return 0; };
 
@@ -282,7 +285,9 @@ function mkHarness(opts) {
 
   // Pre-seed session
   if (opts.token) {
-    Store.setCustomerSession({ phone: opts.phone || 'customer@google.com', name: opts.name || 'Test', token: opts.token });
+    // A verified customer must carry a valid Indonesian mobile; the checkout
+    // submit gate (hasValidCustomerPhone) requires it before /checkout/verify.
+    Store.setCustomerSession({ phone: opts.phone || '08120000001', name: opts.name || 'Test', token: opts.token });
   }
 
   // Pre-seed branch

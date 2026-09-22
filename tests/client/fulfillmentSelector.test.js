@@ -45,6 +45,9 @@ function freshStore(clearStorage) {
     persistentStorage = {};
   }
   globalThis.window = globalThis;
+  // checkout.js binds window-level listeners at load time (PWA install prompt).
+  globalThis.addEventListener = () => {};
+  globalThis.removeEventListener = () => {};
   globalThis.localStorage = {
     getItem: (k) => (Object.prototype.hasOwnProperty.call(persistentStorage, k) ? persistentStorage[k] : null),
     setItem: (k, v) => { persistentStorage[k] = String(v); },

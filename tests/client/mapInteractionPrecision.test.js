@@ -27,6 +27,9 @@ const PICKER_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/c
 function setupTestEnvironment() {
   const storage = {};
   globalThis.window = globalThis;
+  // checkout.js binds window-level listeners at load time (PWA install prompt).
+  globalThis.addEventListener = () => {};
+  globalThis.removeEventListener = () => {};
   globalThis.document = {
     createElement: (tag) => {
       const el = {

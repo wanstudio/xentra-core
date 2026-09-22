@@ -20,6 +20,9 @@ const DISCOVERY_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/j
 
 function loadDiscovery() {
   globalThis.window = globalThis;
+  // checkout.js binds window-level listeners at load time (PWA install prompt).
+  globalThis.addEventListener = () => {};
+  globalThis.removeEventListener = () => {};
   delete require.cache[DISCOVERY_PATH];
   require(DISCOVERY_PATH);
   return globalThis.window.Xentra.Discovery;

@@ -21,7 +21,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Test on the runtime production actually uses (docs/DEPLOY_VPS.md: Node 24
+          # via NVM; deploy-vps.yml activates Node 24). On Node 20 the database layer
+          # falls back to sql.js, which is not the production engine and which cannot
+          # even boot the app in NODE_ENV=production (see server/database/db.js:87-103).
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm test

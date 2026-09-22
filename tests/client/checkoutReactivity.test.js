@@ -99,6 +99,9 @@ function freshHarness(seedCart) {
 
   Object.defineProperty(globalThis, 'navigator', { value: { userAgent: 'node' }, configurable: true });
   globalThis.window = globalThis;
+  // checkout.js binds window-level listeners at load time (PWA install prompt).
+  globalThis.addEventListener = () => {};
+  globalThis.removeEventListener = () => {};
   globalThis.matchMedia = () => ({ matches: false });
   globalThis.document = {
     addEventListener: () => {},

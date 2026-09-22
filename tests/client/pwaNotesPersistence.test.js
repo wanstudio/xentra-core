@@ -42,6 +42,9 @@ function freshStore(initialStorage) {
   }
   globalThis.localStorage = storage;
   globalThis.window = globalThis;
+  // checkout.js binds window-level listeners at load time (PWA install prompt).
+  globalThis.addEventListener = () => {};
+  globalThis.removeEventListener = () => {};
   require(STORE_PATH);
   return { Store: globalThis.window.Xentra.Store, storage };
 }

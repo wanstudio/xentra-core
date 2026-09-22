@@ -17,6 +17,9 @@ const STORE_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/co
 function freshStore(seedStorage) {
   const storage = seedStorage || {};
   globalThis.window = globalThis;
+  // checkout.js binds window-level listeners at load time (PWA install prompt).
+  globalThis.addEventListener = () => {};
+  globalThis.removeEventListener = () => {};
   globalThis.localStorage = {
     getItem: (k) => (Object.prototype.hasOwnProperty.call(storage, k) ? storage[k] : null),
     setItem: (k, v) => { storage[k] = String(v); },

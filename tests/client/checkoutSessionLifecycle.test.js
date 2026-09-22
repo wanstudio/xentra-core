@@ -92,6 +92,9 @@ function mkHarness(opts) {
 
   Object.defineProperty(globalThis, 'navigator', { value: { userAgent: 'node-test' }, configurable: true });
   globalThis.window = globalThis;
+  // checkout.js binds window-level listeners at load time (PWA install prompt).
+  globalThis.addEventListener = () => {};
+  globalThis.removeEventListener = () => {};
   globalThis.matchMedia = () => ({ matches: false });
   // requestAnimationFrame stub so makeOverlay() doesn't crash when the real auth sheet opens
   globalThis.requestAnimationFrame = (fn) => { REAL_SET_TIMEOUT(fn, 0); return 0; };

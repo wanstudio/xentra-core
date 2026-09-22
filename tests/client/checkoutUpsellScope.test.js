@@ -199,6 +199,9 @@ function freshHarness(seedCart, opts) {
 
   Object.defineProperty(globalThis, 'navigator', { value: { userAgent: 'node' }, configurable: true });
   globalThis.window = globalThis;
+  // checkout.js binds window-level listeners at load time (PWA install prompt).
+  globalThis.addEventListener = () => {};
+  globalThis.removeEventListener = () => {};
   // enableTrackDragScroll attaches passive mousemove/mouseup listeners on window.
   globalThis.window.addEventListener = () => {};
   globalThis.window.removeEventListener = () => {};
