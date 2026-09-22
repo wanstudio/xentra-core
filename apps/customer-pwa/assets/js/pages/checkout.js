@@ -846,8 +846,8 @@
       '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'cash' ? 'is-active' : '') + '" id="x-opt-cash" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'cash' ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'cash' ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
       '        <img src="/assets/icons/cashblack.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
       '        <div style="display:flex;flex-direction:column;min-width:0;">' +
-      '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Tunai (COD)</span>' +
-      '          <span style="font-size:11px;color:#777;">Bayar di tempat</span>' +
+      '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + payMethodLabel().title + '</span>' +
+      '          <span style="font-size:11px;color:#777;">' + payMethodLabel().sub + '</span>' +
       '        </div>' +
       '      </button>' +
       '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'midtrans' ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'midtrans' ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'midtrans' ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
@@ -858,7 +858,7 @@
       '        </div>' +
       '      </button>' +
       '    </div>' +
-      (state.paymentMethod === 'cash' && state.cashTendered ? (
+      (needsCashTendered() && state.cashTendered ? (
         '    <div id="x-tender-selected-summary" style="margin-top:12px;padding:10px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;display:flex;align-items:center;justify-content:space-between;">' +
         '      <div style="display:flex;flex-direction:column;">' +
         '        <span style="font-size:11.5px;color:#6b7280;font-weight:500;">Uang Tunai Disiapkan</span>' +
@@ -874,7 +874,7 @@
       '  </div>' +
 
       // 7. Sticky Submit CTA Bar
-      '  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + (isReservation ? 'Konfirmasi Reservasi' : 'Pesan sekarang') + '</button></div>' +
+      '  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + submitCtaLabel(isReservation) + '</button></div>' +
 
       '</div>';
 
@@ -932,6 +932,33 @@
     return html;
   }
 
+  // Tunai yang dibayar DI KASIR (dine-in & pickup) vs tunai yang dibayar KE
+  // DRIVER (delivery/COD). Yang dibayar di kasir tidak menyiapkan uang di depan,
+  // jadi tidak ada nominal tender dan tidak ada kembalian di sini; billnya
+  // dilunasi kasir. Satu predikat dipakai semua tempat.
+  function isPayAtCashier() {
+    var t = state.fulfillment.type;
+    var atCounter = (t === 'dinein' || t === 'dine_in' || t === 'pickup');
+    return atCounter && state.paymentMethod === 'cash';
+  }
+
+  function needsCashTendered() {
+    return state.paymentMethod === 'cash' && !isPayAtCashier();
+  }
+
+  function payMethodLabel() {
+    return isPayAtCashier()
+      ? { title: 'Cash Tunai', sub: 'Bayar di kasir' }
+      : { title: 'Tunai (COD)', sub: 'Bayar ke driver' };
+  }
+
+  function submitCtaLabel(isReservation) {
+    if (isReservation) return 'Konfirmasi Reservasi';
+    if (isPayAtCashier()) return 'Bayar nanti di kasir';
+    if (state.paymentMethod === 'midtrans') return 'Bayar sekarang';
+    return 'Pesan sekarang';
+  }
+
   // Total pembayaran: the amount the customer actually has to hand over.
   // Single source for the summary and for the cash tender sheet.
   function payableTotal() {
@@ -946,8 +973,8 @@
   // Uang kembalian yang akan diterima konsumen: uang disiapkan - total bayar.
   // Tidak pernah negatif, karena nominal di bawah total tidak bisa dipilih.
   function tenderChange() {
-    var tendered = Number(state.paymentMethod === 'cash' ? (state.cashTendered || 0) : 0);
-    return Math.max(0, tendered - payableTotal());
+    if (!needsCashTendered()) return 0;
+    return Math.max(0, Number(state.cashTendered || 0) - payableTotal());
   }
 
   function calculateTotals() {
@@ -1304,6 +1331,15 @@
     var optCash = $('x-opt-cash');
     if (optCash) {
       optCash.onclick = function () {
+        // Dibayar di kasir: uang tidak disiapkan di depan, jadi tidak ada sheet.
+        if (isPayAtCashier()) {
+          state.paymentMethod = 'cash';
+          state.cashTendered = null;
+          state.cashTenderedType = null;
+          renderLayout();
+          syncPayVisual();
+          return;
+        }
         openCashTenderSheet();
       };
     }
@@ -3324,7 +3360,7 @@
       return;
     }
 
-    if (state.paymentMethod === 'cash' && (!state.cashTendered || Number(state.cashTendered) <= 0)) {
+    if (needsCashTendered() && (!state.cashTendered || Number(state.cashTendered) <= 0)) {
       openCashTenderSheet();
       return;
     }
@@ -3575,7 +3611,7 @@
         };
       }),
       payment_method: state.paymentMethod || 'cash',
-      cash_tendered: state.paymentMethod === 'cash' ? state.cashTendered : null,
+      cash_tendered: needsCashTendered() ? state.cashTendered : null,
       order_note: state.fulfillment.note || '',
       note: state.fulfillment.note || ''
     };

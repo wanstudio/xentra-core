@@ -195,16 +195,52 @@ test('T8: the summary card shows the change directly under the cash prepared', (
 
   // One formula: change = tendered - amount due, never negative.
   assert.ok(code.includes('function tenderChange()'), 'the change must have a single source');
-  assert.ok(code.includes('return Math.max(0, tendered - payableTotal());'),
+  assert.ok(code.includes('return Math.max(0, Number(state.cashTendered || 0) - payableTotal());'),
     'change must be tendered minus the amount due, clamped at 0');
-  assert.ok(code.includes("state.paymentMethod === 'cash' ? (state.cashTendered || 0) : 0"),
-    'change must only be computed for cash');
+  assert.ok(code.includes('if (!needsCashTendered()) return 0;'),
+    'change is computed only when money changes hands at the door');
 
   // Kept live when the bill is recomputed (promo, fee, quantity).
   assert.ok(code.includes("var elChange = $('x-sum-change'); if (elChange) elChange.textContent = fmtIDR(tenderChange());"),
     'changing the bill must refresh the change');
 
   // Cash only: the block renders only for cash with a tendered amount.
-  assert.ok(code.includes("(state.paymentMethod === 'cash' && state.cashTendered ? ("),
-    'the change must not show for online payments');
+  assert.ok(code.includes('(needsCashTendered() && state.cashTendered ? ('),
+    'the change must not show when nothing is prepared up front');
+});
+
+test('T9: paying at the counter (dine-in & pickup) changes the label, CTA and tender rules', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // One predicate owns the whole rule.
+  assert.ok(code.includes('function isPayAtCashier()'), 'a single predicate must own the rule');
+  assert.ok(code.includes("var atCounter = (t === 'dinein' || t === 'dine_in' || t === 'pickup');"),
+    'dine-in and pickup pay at the counter');
+  assert.ok(code.includes('function needsCashTendered()'),
+    'prepared cash must be derived from that predicate');
+
+  // Label + subtitle per fulfillment type.
+  assert.ok(code.includes("? { title: 'Cash Tunai', sub: 'Bayar di kasir' }"),
+    'counter payments are labelled Cash Tunai / Bayar di kasir');
+  assert.ok(code.includes(": { title: 'Tunai (COD)', sub: 'Bayar ke driver' };"),
+    'delivery COD is labelled Tunai (COD) / Bayar ke driver');
+
+  // CTA per choice.
+  assert.ok(code.includes("if (isPayAtCashier()) return 'Bayar nanti di kasir';"),
+    'counter cash defers the payment to the cashier');
+  assert.ok(code.includes("if (state.paymentMethod === 'midtrans') return 'Bayar sekarang';"),
+    'online pays now');
+  assert.ok(code.includes('submitCtaLabel(isReservation)'), 'the CTA must use that label');
+
+  // Picking cash at the counter must not open the tender sheet.
+  assert.ok(/optCash[\s\S]{0,240}if \(isPayAtCashier\(\)\) \{/.test(code),
+    'picking cash at the counter must not ask how much cash is prepared');
+
+  // No prepared amount, no change, nothing tendered.
+  assert.ok(code.includes('if (!needsCashTendered()) return 0;'),
+    'no change is computed for a counter payment');
+  assert.ok(code.includes('cash_tendered: needsCashTendered() ? state.cashTendered : null'),
+    'no tendered amount is sent for a counter payment');
+  assert.ok(code.includes('if (needsCashTendered() && (!state.cashTendered'),
+    'a tendered amount is required only when money changes hands now');
 });
