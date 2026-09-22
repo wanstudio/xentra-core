@@ -8,7 +8,7 @@ const { JSDOM } = require('jsdom');
 
 const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
-const CSS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/css/dashboard.css');
+const CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/dashboard.css');
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/branch-catalog.js');
 
@@ -78,7 +78,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
 
   await t.test('1. Production stylesheet link is correctly scoped and cache-busted without customer-pwa conflict', () => {
     assert.doesNotMatch(html, /href=["']\/assets\/css\/dashboard\.css/, 'index.html must not link to customer-pwa /assets/css/dashboard.css');
-    assert.match(html, /\/dashboard\/assets\/css\/dashboard\.css\?v=/, 'index.html must link to /dashboard/assets/css/dashboard.css with version cache buster');
+    assert.match(html, /\/merchant-shared\/css\/dashboard\.css\?v=/, 'index.html must link to /merchant-shared/css/dashboard.css with version cache buster');
     assert.match(html, /\/dashboard\/assets\/js\/dashboard\.js\?v=/, 'index.html must link to /dashboard/assets/js/dashboard.js with version cache buster');
   });
 

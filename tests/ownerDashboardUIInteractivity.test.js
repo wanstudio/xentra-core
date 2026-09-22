@@ -10,7 +10,7 @@ test('CLIENT OWNER DASHBOARD: UI INTERACTIVITY & CSS CONFLICT VERIFICATION', asy
   const dashboardJsPath = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
   const dashboardJs = fs.readFileSync(dashboardJsPath, 'utf8');
 
-  const dashboardCssPath = path.join(__dirname, '../apps/merchant-dashboard/assets/css/dashboard.css');
+  const dashboardCssPath = path.join(__dirname, '../apps/merchant-shared/css/dashboard.css');
   const dashboardCss = fs.readFileSync(dashboardCssPath, 'utf8');
 
   await t.test('1. index.html does NOT load conflicting /assets/css/dashboard.css', () => {
@@ -23,8 +23,8 @@ test('CLIENT OWNER DASHBOARD: UI INTERACTIVITY & CSS CONFLICT VERIFICATION', asy
 
     // Ensuring the dedicated merchant dashboard stylesheet is loaded
     assert.ok(
-      indexHtml.includes('href="/dashboard/assets/css/dashboard.css'),
-      'index.html must link to /dashboard/assets/css/dashboard.css'
+      indexHtml.includes('href="/merchant-shared/css/dashboard.css'),
+      'index.html must link to /merchant-shared/css/dashboard.css'
     );
   });
 

@@ -104,7 +104,7 @@ function request(method, pathName, body = null, headers = {}) {
 describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
   const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
   const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
-  const cssPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/css/dashboard.css');
+  const cssPath = path.join(__dirname, '../../apps/merchant-shared/css/dashboard.css');
 
   const html = fs.readFileSync(htmlPath, 'utf8');
   const js = fs.readFileSync(jsPath, 'utf8');
@@ -306,7 +306,7 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
   });
 
   it('P4B-10: Cache-busting query is applied in HTML', () => {
-    assert.ok(html.includes('href="/dashboard/assets/css/dashboard.css?v=3.0.6"'), 'dashboard.css must use version query v=3.0.6');
+    assert.ok(html.includes('href="/merchant-shared/css/dashboard.css?v=3.0.6"'), 'dashboard.css must use version query v=3.0.6');
     assert.ok(html.includes('src="/dashboard/assets/js/dashboard.js?v=3.0.6"'), 'dashboard.js must use version query v=3.0.6');
   });
 

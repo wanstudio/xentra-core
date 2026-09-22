@@ -13,7 +13,7 @@ const db = require('../server/database/db');
 
 const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
-const CSS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/css/dashboard.css');
+const CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/dashboard.css');
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/branch-catalog.js');
 const SHARED_CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/shared.css');

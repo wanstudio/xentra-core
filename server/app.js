@@ -252,6 +252,35 @@ app.get(/^\/dashboard(\/.*)?$/, async (req, res) => {
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
 });
 
+// Merchant App Assets (standalone Branch Manager operating surface)
+app.use('/merchant-app/assets', express.static(path.join(__dirname, '../apps/merchant-app/assets'), {
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
+
+// Merchant App entry point. Additive: /dashboard routing is unchanged and the
+// Branch Manager surface is served here for role-appropriate deep links.
+app.get(/^\/merchant-app(\/.*)?$/, async (req, res) => {
+  if (!isSaaSHost(req)) {
+    const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
+    await brandRepository.ready();
+    const brand = brandRepository.findByCustomDomain(cleanHost);
+    if (!brand) {
+      return res.status(404).json({
+        success: false,
+        error: 'TENANT_NOT_FOUND',
+        message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
+      });
+    }
+  }
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/merchant-app/index.html'));
+});
+
 // Health Check with Persistence & DB Readiness Verification
 app.get('/health', (req, res) => {
   let isDbReady = false;

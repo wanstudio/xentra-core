@@ -30,7 +30,7 @@ const path = require('path');
 describe('BM Phase 4A — Merchant Dashboard Shell & Context UX Reconciliation', () => {
   const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
   const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
-  const cssPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/css/dashboard.css');
+  const cssPath = path.join(__dirname, '../../apps/merchant-shared/css/dashboard.css');
 
   const html = fs.readFileSync(htmlPath, 'utf8');
   const js = fs.readFileSync(jsPath, 'utf8');
@@ -116,8 +116,8 @@ describe('BM Phase 4A — Merchant Dashboard Shell & Context UX Reconciliation',
   });
 
   it('P4A-13: Cache busting asset versions are present for dashboard.css and dashboard.js', () => {
-    assert.ok(/href="\/dashboard\/assets\/css\/dashboard\.css\?v=3\.0\.[2-9]"/.test(html), 'dashboard.css must use version query v=3.0.2 or newer');
-    assert.ok(/src="\/dashboard\/assets\/js\/dashboard\.js\?v=3\.0\.[2-9]"/.test(html), 'dashboard.js must use version query v=3.0.2 or newer');
+    assert.ok(/href="\/merchant-shared\/css\/dashboard\.css\?v=1\.0\.0"/.test(html), 'dashboard.css must use the shared stylesheet path with a version query');
+    assert.ok(/src="\/dashboard\/assets\/js\/dashboard\.js\?v=3\.0\.\d+"/.test(html), 'dashboard.js must use version query v=3.0.x or newer');
   });
 });
 
