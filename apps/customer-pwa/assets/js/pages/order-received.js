@@ -371,7 +371,10 @@
     var phase = resolveOrderPhase(status, orderType);
     var branchName = order.branch_name || 'Restoran';
     var isCash = (payment.payment_method || order.payment_method || 'cash') === 'cash';
-    var payLabel = isCash ? '💵 Tunai (COD)' : 'Online Pay';
+    // Tunai yang dibayar di kasir (dine-in & pickup) bukan COD: labelnya harus
+    // sama dengan yang dipilih konsumen di checkout.
+    var cashAtCounter = isCash && (orderType === 'dine_in' || orderType === 'dinein' || orderType === 'pickup');
+    var payLabel = isCash ? (cashAtCounter ? '💵 Cash Tunai • Bayar di kasir' : '💵 Tunai (COD)') : 'Online Pay';
     if (order.payment_status === 'settlement' || order.payment_status === 'paid' || payment.payment_status === 'settlement' || payment.payment_status === 'paid') {
       payLabel += ' • Lunas';
     }
