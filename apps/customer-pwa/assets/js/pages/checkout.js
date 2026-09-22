@@ -492,7 +492,7 @@
       '  </div>' +
       '  <div id="x-qr-notice" style="font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px;margin-bottom:12px;display:' + (canScan ? 'none' : 'block') + ';">' + reason + '</div>' +
       '  <div style="font-size:11.5px;color:#6b7280;margin-bottom:6px;">Tidak bisa scan? Tulis kode yang tertulis di bawah QR meja:</div>' +
-      '  <input id="x-qr-manual" type="text" placeholder="contoh: qr_9f2a41c8" style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;margin-bottom:10px;">' +
+      '  <input id="x-qr-manual" type="text" style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;margin-bottom:10px;">' +
       '  <button type="button" id="x-qr-manual-submit" style="width:100%;border:0;background:var(--x-primary);color:var(--x-primary-text,#111);font-weight:800;font-size:14px;padding:12px;border-radius:999px;cursor:pointer;margin-bottom:8px;font-family:inherit;">Gunakan kode ini</button>' +
       '  <button type="button" id="x-qr-close" style="display:block;width:100%;height:44px;font-size:14px;font-weight:700;border:2px solid #e5e7eb;border-radius:24px;cursor:pointer;background:#fff;color:#6b7280;font-family:inherit;">Tutup</button>' +
       '</div>';
