@@ -4698,18 +4698,15 @@
 
   /* =========================================================================
      MODUL 0: MERCHANT AUTH & SESSION GUARD
+     Auth/session helpers are owned by merchant-shared/js/shared.js so every
+     merchant surface shares one implementation.
      ========================================================================= */
-  function getStoredUser() {
-    try {
-      var u = localStorage.getItem(USER_KEY);
-      return u ? JSON.parse(u) : null;
-    } catch (_) { return null; }
-  }
 
-  function isBranchManager() {
-    var user = getStoredUser();
-    return user && user.role === 'branch_manager';
-  }
+  var getStoredUser = _shared.getStoredUser || window.XentraShared.getStoredUser;
+  var isBranchManager = _shared.isBranchManager || window.XentraShared.isBranchManager;
+  var checkAuth = _shared.checkAuth || window.XentraShared.checkAuth;
+  var handleHandoffExchange = _shared.handleHandoffExchange || window.XentraShared.handleHandoffExchange;
+  var validateServerSession = _shared.validateServerSession || window.XentraShared.validateServerSession;
 
   /**
    * Hides/shows UI panels depending on the logged-in user's role.
@@ -4806,90 +4803,6 @@
       if (branchSelector) {
         branchSelector.disabled = false;
       }
-    }
-  }
-
-  function checkAuth() {
-    var token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      if (typeof checkAppRoute === 'function') {
-        checkAppRoute();
-      } else if (!window.location.pathname.includes('login')) {
-        window.location.href = '/dashboard/login';
-      }
-      return false;
-    }
-
-    var user = getStoredUser();
-    if (user) {
-      if ($('dash-user-name')) $('dash-user-name').textContent = user.full_name || user.username || 'Pemilik Toko';
-      if ($('dash-user-avatar')) $('dash-user-avatar').textContent = (user.full_name || user.username || 'A').charAt(0).toUpperCase();
-      if ($('dash-user-role')) $('dash-user-role').textContent = (user.role || 'Owner').toUpperCase();
-    }
-    return true;
-  }
-
-  // Check URL parameters for single-use handoff ticket from xentra.cloud.
-  // Exchanges ticket via POST, stores returned session token, and immediately scrubs the ticket from URL.
-  // CRITICAL SECURITY INVARIANT: Session tokens (xnt_auth_*) are NEVER exposed in the URL.
-  async function handleHandoffExchange() {
-    var urlParams = new URLSearchParams(window.location.search);
-    var handoffTicket = urlParams.get('handoff');
-    if (!handoffTicket) return false;
-
-    // Immediately scrub ticket parameter from URL history to prevent URL leak or replay
-    urlParams.delete('handoff');
-    var cleanQuery = urlParams.toString();
-    var cleanUrl = window.location.pathname + (cleanQuery ? '?' + cleanQuery : '') + window.location.hash;
-    window.history.replaceState({}, document.title, cleanUrl);
-
-    try {
-      var res = await fetch(API_BASE + '/auth/handoff/exchange', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticket: handoffTicket })
-      });
-      var data = await res.json();
-      if (res.ok && data && data.success && data.token) {
-        localStorage.setItem(TOKEN_KEY, data.token);
-        if (data.user) {
-          localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-        }
-        return true;
-      } else {
-        console.warn('[Handoff exchange failed]:', data && (data.error || data.message));
-        clearStoredSession();
-        redirectToLogin();
-        return false;
-      }
-    } catch (err) {
-      console.error('[Handoff exchange network error]:', err);
-      clearStoredSession();
-      redirectToLogin();
-      return false;
-    }
-  }
-
-  // Server-side session validation at boot: a token that exists locally but is
-  // not valid on the server (401 INVALID_OR_EXPIRED_TOKEN) must force a real
-  // login instead of letting the dashboard render an empty/fake state.
-  async function validateServerSession() {
-    var token = localStorage.getItem(TOKEN_KEY);
-    if (!token) return false;
-    try {
-      var res = await adminFetch(API_BASE + '/auth/merchant/me', { headers: getAuthHeaders() });
-      var data = await res.json();
-      if (data && data.success) {
-        if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-        return true;
-      }
-      clearStoredSession();
-      redirectToLogin();
-      return false;
-    } catch (e) {
-      // adminFetch already cleared + redirected on 401; keep the session on
-      // network-level errors (server unreachable is not an expired session).
-      return e && e.message === 'SESSION_EXPIRED' ? false : true;
     }
   }
 

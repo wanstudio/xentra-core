@@ -288,11 +288,12 @@ describe('Real E2E Auth Flow: xentra.cloud Google Onboard → Handoff → app.my
     assert.ok(parsedUrl.searchParams.has('handoff'), 'URL must only contain ephemeral ?handoff code');
     assert.ok(!parsedUrl.searchParams.get('handoff').startsWith('xnt_auth_'), 'Handoff code is NOT a session token');
 
-    // Check dashboard.js and login.html source code never injects token into URL or history
+    // The dashboard handoff exchange lives in the shared merchant layer
+    // (merchant-shared/js/shared.js) and is consumed by dashboard.js.
     const fs = require('fs');
-    const dashboardJs = fs.readFileSync('apps/merchant-dashboard/assets/js/dashboard.js', 'utf8');
-    assert.ok(dashboardJs.includes("urlParams.delete('handoff')"), 'dashboard.js must scrub handoff from URL immediately');
-    assert.ok(dashboardJs.includes('window.history.replaceState'), 'dashboard.js must use replaceState to clean URL');
+    const sharedJs = fs.readFileSync('apps/merchant-shared/js/shared.js', 'utf8');
+    assert.ok(sharedJs.includes("urlParams.delete('handoff')"), 'shared.js must scrub handoff from URL immediately');
+    assert.ok(sharedJs.includes('window.history.replaceState'), 'shared.js must use replaceState to clean URL');
 
     const loginHtml = fs.readFileSync('apps/merchant-dashboard/login.html', 'utf8');
     assert.ok(loginHtml.includes("urlParams.delete('handoff')"), 'login.html must scrub handoff from URL immediately');

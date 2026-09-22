@@ -686,6 +686,102 @@
   })();
 
   /* =========================================================================
+     ROLE / SESSION GUARD HELPERS (shared by every merchant surface)
+     ========================================================================= */
+
+  /** True when the stored user's role is branch_manager. */
+  function isBranchManager() {
+    var user = getStoredUser();
+    return !!(user && user.role === 'branch_manager');
+  }
+
+  /**
+   * Boot guard: requires a stored token, otherwise sends the user to login.
+   * When a user is stored it also fills the shell user chip (dash-user-*).
+   * Returns false when there is no session.
+   */
+  function checkAuth() {
+    var token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      redirectToLogin();
+      return false;
+    }
+
+    var user = getStoredUser();
+    if (user) {
+      if ($('dash-user-name')) $('dash-user-name').textContent = user.full_name || user.username || 'Pemilik Toko';
+      if ($('dash-user-avatar')) $('dash-user-avatar').textContent = (user.full_name || user.username || 'A').charAt(0).toUpperCase();
+      if ($('dash-user-role')) $('dash-user-role').textContent = (user.role || 'Owner').toUpperCase();
+    }
+    return true;
+  }
+
+  /**
+   * Exchanges a single-use handoff ticket (from xentra.cloud) for a session.
+   * The ticket is scrubbed from the URL immediately: session tokens are NEVER
+   * exposed in the URL.
+   * Returns true when a session was established.
+   */
+  async function handleHandoffExchange() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var handoffTicket = urlParams.get('handoff');
+    if (!handoffTicket) return false;
+
+    urlParams.delete('handoff');
+    var cleanQuery = urlParams.toString();
+    var cleanUrl = window.location.pathname + (cleanQuery ? '?' + cleanQuery : '') + window.location.hash;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    try {
+      var res = await fetch(API_BASE + '/auth/handoff/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket: handoffTicket })
+      });
+      var data = await res.json();
+      if (res.ok && data && data.success && data.token) {
+        localStorage.setItem(TOKEN_KEY, data.token);
+        if (data.user) {
+          localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        }
+        return true;
+      }
+      console.warn('[Handoff exchange failed]:', data && (data.error || data.message));
+      clearStoredSession();
+      redirectToLogin();
+      return false;
+    } catch (err) {
+      console.error('[Handoff exchange network error]:', err);
+      clearStoredSession();
+      redirectToLogin();
+      return false;
+    }
+  }
+
+  /**
+   * Server-side session validation at boot: a locally stored token that is not
+   * valid on the server must force a real login instead of rendering an empty
+   * dashboard. Network errors keep the session (unreachable server ≠ expired).
+   */
+  async function validateServerSession() {
+    var token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return false;
+    try {
+      var res = await adminFetch(API_BASE + '/auth/merchant/me', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (data && data.success) {
+        if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        return true;
+      }
+      clearStoredSession();
+      redirectToLogin();
+      return false;
+    } catch (e) {
+      return e && e.message === 'SESSION_EXPIRED' ? false : true;
+    }
+  }
+
+  /* =========================================================================
      EXPORTS
      ========================================================================= */
   window.XentraShared = {
@@ -697,6 +793,10 @@
     redirectToLogin:    redirectToLogin,
     adminFetch:         adminFetch,
     getStoredUser:      getStoredUser,
+    isBranchManager:    isBranchManager,
+    checkAuth:          checkAuth,
+    handleHandoffExchange: handleHandoffExchange,
+    validateServerSession: validateServerSession,
     $:                  $,
     formatMoney:        formatMoney,
     esc:                esc,

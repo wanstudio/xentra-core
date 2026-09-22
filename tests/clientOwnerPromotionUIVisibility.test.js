@@ -8,10 +8,18 @@ const { JSDOM } = require('jsdom');
 
 const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
+const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
 
 test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Lifecycle', async (t) => {
   const html = fs.readFileSync(HTML_PATH, 'utf8');
   const js = fs.readFileSync(JS_PATH, 'utf8');
+  const sharedJs = fs.readFileSync(SHARED_JS_PATH, 'utf8');
+
+  // index.html loads merchant-shared/js/shared.js before dashboard.js; mirror that.
+  function evalApp(win) {
+    win.eval(sharedJs);
+    win.eval(js);
+  }
 
   const createdWins = [];
   function createDashboardDOM(initialHash = '', userRole = 'owner') {
@@ -112,7 +120,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
 
   await t.test('1. Owner flow: click Marketing -> workspace visible -> Program Promosi Brand visible -> + Buat Promo Baru visible -> modal opens', async () => {
     const { win } = createDashboardDOM('', 'owner');
-    win.eval(js);
+    evalApp(win);
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
     await new Promise(res => setTimeout(res, 50));
 
@@ -173,7 +181,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
 
   await t.test('2. BM isolation: Owner campaign builder not exposed to Branch Manager & operational promo UI preserved', async () => {
     const { win } = createDashboardDOM('', 'branch_manager');
-    win.eval(js);
+    evalApp(win);
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
     await new Promise(res => setTimeout(res, 50));
 
@@ -209,7 +217,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
 
     for (const r of routesToTest) {
       const { win } = createDashboardDOM(r, 'owner');
-      win.eval(js);
+      evalApp(win);
       win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
       await new Promise(res => setTimeout(res, 50));
 
@@ -225,7 +233,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
 
   await t.test('4. Marketing subnav switching works: Overview and Promotions toggling', async () => {
     const { win } = createDashboardDOM('marketing/overview', 'owner');
-    win.eval(js);
+    evalApp(win);
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
     await new Promise(res => setTimeout(res, 50));
 

@@ -9,11 +9,19 @@ const { JSDOM } = require('jsdom');
 const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
 const CSS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/css/dashboard.css');
+const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
 
 test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async (t) => {
   const html = fs.readFileSync(HTML_PATH, 'utf8');
   const js = fs.readFileSync(JS_PATH, 'utf8');
+  const sharedJs = fs.readFileSync(SHARED_JS_PATH, 'utf8');
   const css = fs.readFileSync(CSS_PATH, 'utf8');
+
+  // index.html loads merchant-shared/js/shared.js before dashboard.js; mirror that.
+  function evalApp(win) {
+    win.eval(sharedJs);
+    win.eval(js);
+  }
 
   const createdWins = [];
   function createDashboardDOM(initialHash = '', viewportWidth = 1024) {
@@ -80,7 +88,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
 
   await t.test('3. Desktop navigation clicks route correctly to all views', async () => {
     const { win } = createDashboardDOM('', 1024);
-    win.eval(js);
+    evalApp(win);
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
     await new Promise(res => setTimeout(res, 50));
 
@@ -122,7 +130,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
 
   await t.test('4. Catalog parent expandable navigation opens and toggles sub-nav', async () => {
     const { win } = createDashboardDOM('overview', 1024);
-    win.eval(js);
+    evalApp(win);
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
     await new Promise(res => setTimeout(res, 50));
 
@@ -148,7 +156,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
 
   await t.test('5. Mobile sidebar drawer opens via hamburger and closes on navigation or overlay click', async () => {
     const { win } = createDashboardDOM('overview', 375);
-    win.eval(js);
+    evalApp(win);
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
     await new Promise(res => setTimeout(res, 50));
 
@@ -183,7 +191,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
 
     // Test tablet width (e.g. 768px - 1023px) drawer behavior
     const { win: winTablet } = createDashboardDOM('overview', 900);
-    winTablet.eval(js);
+    evalApp(winTablet);
     winTablet.document.dispatchEvent(new winTablet.Event('DOMContentLoaded'));
     await new Promise(res => setTimeout(res, 50));
 
@@ -227,7 +235,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
 
     for (const check of directChecks) {
       const { win } = createDashboardDOM(check.hash, 1024);
-      win.eval(js);
+      evalApp(win);
       win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
       await new Promise(res => setTimeout(res, 50));
 
@@ -246,7 +254,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
     mockBtn.dataset.tab = 'orders';
     win.document.body.appendChild(mockBtn);
 
-    win.eval(js);
+    evalApp(win);
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
     await new Promise(res => setTimeout(res, 50));
 
