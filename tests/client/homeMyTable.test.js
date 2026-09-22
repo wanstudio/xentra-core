@@ -28,6 +28,9 @@ test('MYTABLE-01: topbar punya ikon scan dan ikon meja dengan badge', () => {
   assert.ok(HTML.includes('id="x-my-table-badge"'), 'badge angka meja harus ada');
   assert.ok(/x-btn-my-table"[\s\S]{0,400}hidden/.test(HTML), 'ikon meja tersembunyi sampai tamu dapat meja');
   assert.ok(/x-my-table-badge"[\s\S]{0,300}background:#dc2626/.test(HTML), 'badge merah');
+  // Badge harus kuat untuk 2-3 angka: tetap pill dan angkanya rata.
+  assert.ok(/x-my-table-badge"[\s\S]{0,400}min-width:18px/.test(HTML), 'badge siap 2-3 angka');
+  assert.ok(/x-my-table-badge"[\s\S]{0,400}font-variant-numeric:tabular-nums/.test(HTML), 'angka badge rata');
   assert.ok(/x-my-table-badge"[\s\S]{0,300}color:#fff/.test(HTML), 'angka badge putih');
   // Ikon: tutup makanan (cloche) versi ISI, hitam — sama gaya dengan ikon
   // riwayat & profil yang juga solid, bukan garis.
@@ -82,6 +85,14 @@ test('MYTABLE-05: pindah meja dikunci, tamu diarahkan ke kasir', () => {
     .test(HOME), 'scan meja lain harus ditolak saat sudah punya meja');
   assert.ok(!"Store.setMyTable({ id: res.table.id".includes('TIDAK'),
     'meja hanya dipasang kalau belum punya');
+});
+
+test('MYTABLE-10: ada halaman pratinjau untuk melihat badge 2-3 angka', () => {
+  const pv = read('apps/merchant-shared/prototype/badge-preview.html');
+  assert.ok(pv.includes('>20<'), 'pratinjau harus memperlihatkan badge 2 angka');
+  assert.ok(pv.includes('>100<'), 'dan 3 angka');
+  assert.ok(pv.includes('library.svg') && pv.includes('black_flowbite_user-solid.svg'),
+    'pratinjau harus memakai ikon asli supaya perbandingan warna & ukuran akurat');
 });
 
 test('MYTABLE-06: badge dilepas hanya setelah tagihan ditutup kasir', () => {
