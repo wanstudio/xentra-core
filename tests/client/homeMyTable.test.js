@@ -28,6 +28,7 @@ test('MYTABLE-01: topbar punya ikon scan dan ikon meja dengan badge', () => {
   assert.ok(HTML.includes('id="x-my-table-badge"'), 'badge angka meja harus ada');
   assert.ok(/x-btn-my-table"[\s\S]{0,400}hidden/.test(HTML), 'ikon meja tersembunyi sampai tamu dapat meja');
   assert.ok(/x-my-table-badge"[\s\S]{0,300}background:#dc2626/.test(HTML), 'badge merah');
+  assert.ok(/id="x-my-table-badge" hidden/.test(HTML), 'badge tidak boleh tampil sebelum ada nomor meja');
   // Badge harus kuat untuk 2-3 angka: tetap pill dan angkanya rata.
   assert.ok(/x-my-table-badge"[\s\S]{0,400}min-width:18px/.test(HTML), 'badge siap 2-3 angka');
   assert.ok(/x-my-table-badge"[\s\S]{0,400}font-variant-numeric:tabular-nums/.test(HTML), 'angka badge rata');
@@ -58,7 +59,8 @@ test('MYTABLE-02: ikon bertukar sesuai keadaan, dan scannernya modul bersama', (
   assert.ok(HOME.includes('function renderMyTableState()'), 'harus ada satu penentu tampilan');
   assert.ok(HOME.includes("btnScanTable.hidden = !!table"), 'ada meja → ikon scan hilang');
   assert.ok(HOME.includes("btnMyTable.hidden = !table"), 'ada meja → ikon meja muncul');
-  assert.ok(HOME.includes("badge.textContent = table ? (table.number || '') : ''"), 'badge diisi nomor meja');
+  assert.ok(HOME.includes("badge.textContent = num"), 'badge diisi nomor meja');
+  assert.ok(HOME.includes('badge.hidden = !num'), 'tanpa nomor, badge harus disembunyikan (bukan titik merah kosong)');
   assert.ok(HOME.includes('window.Xentra.TableQr'), 'home memakai scanner bersama, bukan salinannya sendiri');
 });
 

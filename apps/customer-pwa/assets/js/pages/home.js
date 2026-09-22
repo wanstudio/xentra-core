@@ -2269,7 +2269,12 @@
       if (btnScanTable) btnScanTable.hidden = !!table;
       if (btnMyTable) btnMyTable.hidden = !table;
       var badge = $('x-my-table-badge');
-      if (badge) badge.textContent = table ? (table.number || '') : '';
+      if (badge) {
+        var num = table ? (table.number || '') : '';
+        badge.textContent = num;
+        // Tanpa nomor, badge tidak boleh tampil sebagai titik merah kosong.
+        badge.hidden = !num;
+      }
     }
 
     // Klik ikon meja: ringkasan meja + isi pesanan, dengan dua jalan keluar.
