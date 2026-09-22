@@ -22,8 +22,8 @@ Xentra Core adalah *Core SaaS Platform Engine* independen generasi berikutnya un
 5. **Customer Mobile Ordering PWA (`apps/customer-pwa`):**
    - Single Page Application cepat bertema identitas visual `#b6ff00` dan Plus Jakarta Sans.
    - Interactive map location picker, floating bottom dock, dan alur checkout instan.
-6. **Kitchen App (`apps/kitchen-app`):**
-   - Layar antrean dapur resto realtime untuk manajemen status pesanan (`confirmed` ➡️ `preparing` ➡️ `ready` ➡️ `out_for_delivery` ➡️ `completed`).
+6. **Optional KDS Add-on (`apps/kitchen-display` — held/future):**
+   - Dedicated kitchen preparation surface for merchants with dedicated kitchen staff. Not required for MVP; future activation is controlled by SaaS feature entitlement.
 
 ---
 
@@ -93,7 +93,7 @@ node app.js
 ```
 Akses di browser:
 * 📱 **Customer PWA:** `http://localhost:3000/`
-* 🍳 **Kitchen App:** `/kitchen-app/` (login sebagai staf Dapur)
+* 🍳 **KDS Add-on:** held/future optional surface; not part of the default MVP operational flow
 * 🩺 **Health Check:** `http://localhost:3000/health`
 
 
