@@ -338,7 +338,7 @@ describe('Existing Tenant Claim / Adoption Flow (Bangjo)', () => {
     // 3. app.mybangjo.com/dashboard/login works
     const dashLoginRes = await makeRequest(server, {
       method: 'GET',
-      path: '/dashboard/login',
+      path: '/login',
       headers: { Host: 'app.mybangjo.com' }
     });
     assert.equal(dashLoginRes.status, 200);
@@ -377,7 +377,7 @@ describe('Existing Tenant Claim / Adoption Flow (Bangjo)', () => {
     // 2. Verify dashboard login page contains claim banner and claim handling logic
     const loginRes = await makeRequest(server, {
       method: 'GET',
-      path: '/dashboard/login?claim_domain=app.mybangjo.com',
+      path: '/login?claim_domain=app.mybangjo.com',
       headers: { Host: 'xentra.cloud' }
     });
     assert.equal(loginRes.status, 200);

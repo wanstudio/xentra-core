@@ -585,7 +585,7 @@ describe('Real E2E Auth Flow: xentra.cloud Google Onboard → Handoff → app.my
     const loginHtml = fs.readFileSync('apps/merchant-dashboard/login.html', 'utf8');
 
     assert.ok(loginHtml.includes('var currentOrigin = window.location.origin;'), 'login.html must read window.location.origin dynamically');
-    assert.ok(loginHtml.includes("var returnUrl = currentOrigin + '/dashboard/login';"), 'login.html must construct returnUrl from currentOrigin');
+    assert.ok(loginHtml.includes("var returnUrl = currentOrigin + '/login';"), 'login.html must construct returnUrl from currentOrigin');
     assert.ok(loginHtml.includes("'https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent(returnUrl)"), 'login.html must encode dynamic returnUrl to auth broker');
     // Ensure no client-specific production domain is hardcoded in login.html redirect
     assert.ok(!loginHtml.includes('app.mybangjo.com/auth/broker'), 'No client domain hardcoded in broker target');

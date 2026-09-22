@@ -49,7 +49,7 @@
     if (typeof checkAppRoute === 'function') {
       checkAppRoute();
     } else if (!window.location.pathname.includes('login')) {
-      window.location.href = '/dashboard/login';
+      window.location.href = '/login';
     }
   }
 
@@ -4107,7 +4107,7 @@
         if (typeof checkAppRoute === 'function') {
           checkAppRoute();
         } else {
-          window.location.href = '/dashboard/login';
+          window.location.href = '/login';
         }
       });
     }

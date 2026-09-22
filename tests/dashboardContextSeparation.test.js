@@ -71,16 +71,16 @@ describe('Dashboard Context Separation — Platform vs Client Owner', () => {
     assert.equal(json.error, 'TENANT_NOT_FOUND');
   });
 
-  it('4. Unregistered/unknown domain fails closed with 404 TENANT_NOT_FOUND on /dashboard/login', async () => {
-    const res = await makeRequest('/dashboard/login', 'unregistered-domain.com');
+  it('4. Unregistered/unknown domain fails closed with 404 TENANT_NOT_FOUND on the unified /login', async () => {
+    const res = await makeRequest('/login', 'unregistered-domain.com');
     assert.equal(res.status, 404);
     const json = JSON.parse(res.body);
     assert.equal(json.success, false);
     assert.equal(json.error, 'TENANT_NOT_FOUND');
   });
 
-  it('5. xentra.cloud Host serves login page (200 OK)', async () => {
-    const res = await makeRequest('/dashboard/login', 'xentra.cloud');
+  it('5. xentra.cloud Host serves the unified login page (200 OK)', async () => {
+    const res = await makeRequest('/login', 'xentra.cloud');
     assert.equal(res.status, 200);
     assert.match(res.body, /store-name-badge/);
   });

@@ -608,7 +608,7 @@
               if (data.user) {
                 localStorage.setItem(USER_KEY, JSON.stringify(data.user));
               }
-              window.location.href = '/dashboard/';
+              window.location.href = data.landing || '/dashboard/';
             } else {
               var errBox = document.getElementById('login-error');
               if (errBox) {
@@ -641,7 +641,7 @@
                 sessionStorage.removeItem('xentra_pending_claim_domain');
                 if (data.token) localStorage.setItem(TOKEN_KEY, data.token);
                 if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-                window.location.href = data.redirect_url || (data.business && data.business.custom_domain ? 'https://' + data.business.custom_domain + '/dashboard/' : '/dashboard/');
+                window.location.href = data.redirect_url || data.landing || (data.business && data.business.custom_domain ? 'https://' + data.business.custom_domain + '/dashboard/' : '/dashboard/');
               } else {
                 window.location.href = '/dashboard/';
               }
@@ -651,7 +651,10 @@
           });
           return;
         }
-        window.location.href = '/dashboard/';
+        fetch('/api/v1/auth/merchant/me', { headers: { 'Authorization': 'Bearer ' + existingToken } })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { window.location.href = (d && d.landing) || '/dashboard/'; })
+          .catch(function () { window.location.href = '/dashboard/'; });
         return;
       }
 
@@ -724,7 +727,7 @@
                   if (claimData.user) localStorage.setItem(USER_KEY, JSON.stringify(claimData.user));
                   btn.innerHTML = '<span>Klaim berhasil! Mengalihkan...</span>';
                   setTimeout(function () {
-                    window.location.href = claimData.redirect_url || (claimData.business && claimData.business.custom_domain ? 'https://' + claimData.business.custom_domain + '/dashboard/' : '/dashboard/');
+                    window.location.href = claimData.redirect_url || claimData.landing || (claimData.business && claimData.business.custom_domain ? 'https://' + claimData.business.custom_domain + '/dashboard/' : '/dashboard/');
                   }, 250);
                   return;
                 }
@@ -754,7 +757,7 @@
                   // Clear flag before redirect
                   sessionStorage.removeItem('xentra_pending_google_link');
                   var currentOrigin = window.location.origin;
-                  var returnUrl = currentOrigin + '/dashboard/login';
+                  var returnUrl = currentOrigin + '/login';
                   var brokerUrl = 'https://xentra.cloud/auth/broker?mode=link&link_token=' + encodeURIComponent(linkInitData.link_token) + '&return_to=' + encodeURIComponent(returnUrl);
                   window.location.href = brokerUrl;
                   return;
@@ -767,7 +770,7 @@
             }
 
             setTimeout(function () {
-              window.location.href = data.redirect_url || '/dashboard/';
+              window.location.href = data.redirect_url || data.landing || '/dashboard/';
             }, 250);
             return;
           }
@@ -921,7 +924,7 @@
                 localStorage.setItem(TOKEN_KEY, data.token);
                 if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
                 if (googleStatus) { googleStatus.textContent = 'Login Google berhasil! Mengalihkan...'; googleStatus.style.color = '#166534'; }
-                setTimeout(function () { window.location.href = data.redirect_url || '/dashboard/'; }, 250);
+                setTimeout(function () { window.location.href = data.redirect_url || data.landing || '/dashboard/'; }, 250);
                 return;
               }
               var msg;
@@ -983,7 +986,7 @@
           btnGoogleLogin.addEventListener('click', function (e) {
             e.preventDefault();
             var currentOrigin = window.location.origin;
-            var returnUrl = currentOrigin + '/dashboard/login';
+            var returnUrl = currentOrigin + '/login';
             var redirectTarget = 'https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent(returnUrl);
             if (claimDomain) {
               redirectTarget += '&claim_domain=' + encodeURIComponent(claimDomain);

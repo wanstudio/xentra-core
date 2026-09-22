@@ -26,6 +26,7 @@
   var handleHandoffExchange = S.handleHandoffExchange;
   var validateServerSession = S.validateServerSession;
   var clearStoredSession = S.clearStoredSession;
+  var enforceSurface = S.enforceSurface;
 
   var POLL_MS = 5000;
 
@@ -38,13 +39,6 @@
     inFlight: {},
     loadedOnce: false
   };
-
-  /* ── routing by role ──────────────────────────────────────────────────── */
-  function homeFor(role) {
-    if (role === 'kitchen') return null;              // stays here
-    if (role === 'branch_manager') return '/merchant-app/';
-    return '/dashboard/';                             // owner, brand_manager, cashier
-  }
 
   /* ── queue ────────────────────────────────────────────────────────────── */
   function loadQueue(opts) {
@@ -219,7 +213,7 @@
   if (logoutBtn) logoutBtn.addEventListener('click', function () {
     if (!confirm('Keluar dari layar dapur?')) return;
     clearStoredSession();
-    window.location.href = '/dashboard/login';
+    window.location.href = '/login';
   });
 
   document.addEventListener('visibilitychange', function () {
@@ -236,8 +230,13 @@
     if (!valid) return;
 
     var user = getStoredUser();
-    var home = homeFor(user && user.role);
-    if (home) { window.location.replace(home); return; }
+    if (!user) { window.location.replace('/login'); return; }
+
+    // Surface guard: this surface is only the landing for an entitled kitchen
+    // role. Any other role is sent to the surface the server resolved for it,
+    // so a URL swap cannot grant access. (The route itself stays unregistered
+    // while the KDS capability is off.)
+    if (enforceSurface('/kitchen-app/')) return;
 
     state.branch = (user && (user.branch_name || user.brand_name)) || 'Cabang';
 

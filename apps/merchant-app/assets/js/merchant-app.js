@@ -23,6 +23,7 @@
   var checkAuth = S.checkAuth;
   var handleHandoffExchange = S.handleHandoffExchange;
   var validateServerSession = S.validateServerSession;
+  var enforceSurface = S.enforceSurface;
   var Catalog = window.XentraBranchCatalog;
   var getActiveBranchId = Catalog.getActiveBranchId;
   var loadInlineBranchCatalog = Catalog.loadInlineBranchCatalog;
@@ -3539,15 +3540,15 @@
     if (!checkAuth()) return;
 
     var user = getStoredUser();
-    // This surface is Branch-Manager-only. Other roles belong to the Owner
-    // dashboard; server-side RBAC still enforces every API call.
-    if (!user || user.role !== 'branch_manager') {
-      window.location.replace('/dashboard/');
-      return;
-    }
+    // Not signed in at all → the unified login.
+    if (!user) { window.location.replace('/login'); return; }
 
     var isValid = await validateServerSession();
     if (!isValid) return;
+
+    // Surface guard: the server resolves the landing surface for this role, so
+    // swapping the URL can never grant a surface this role does not own.
+    if (enforceSurface('/merchant-app/')) return;
 
     applyRoleBasedUI();
     renderBranchManagerNavigation();

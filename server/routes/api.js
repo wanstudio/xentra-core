@@ -3835,11 +3835,43 @@ router.get('/auth/merchant/me', requireAuth(['owner', 'brand_manager', 'branch_m
       organization_id: req.user.organizationId || req.user.organization_id,
       branch_id: req.user.branchId || req.user.branch_id,
       email_verified: req.user.email_verified
-    }
+    },
+    ...landingPayload(req.user.role)
   });
 });
 
 // 10.1 Merchant Auth Endpoints
+
+// ── Unified login: role resolution ─────────────────────────────────────────
+// ONE place decides where an authenticated user lands. Authentication is the
+// same for every role; only authorization and the landing surface differ.
+// Surfaces must not be chosen from the URL: each surface compares its own path
+// against the landing resolved here.
+//
+// KDS is an optional SaaS capability. It is OFF in MVP, so the smallest
+// entitlement contract is a single server-side flag — no plugin framework.
+const KDS_ENTITLED = process.env.XENTRA_KDS_ENABLED === '1';
+
+function resolveLanding(role) {
+  switch (role) {
+    case 'branch_manager':
+      return '/merchant-app/';
+    case 'kitchen':
+      // KDS surface exists only when the capability is enabled for the tenant.
+      return KDS_ENTITLED ? '/kitchen-app/' : '/dashboard/';
+    case 'cashier':
+      // Cashier is branch-scoped but has no dedicated surface in MVP.
+      return '/dashboard/';
+    case 'owner':
+    case 'brand_manager':
+    default:
+      return '/dashboard/';
+  }
+}
+
+function landingPayload(role) {
+  return { landing: resolveLanding(role), entitlements: { kds: KDS_ENTITLED } };
+}
 const handleMerchantLogin = (req, res) => {
   try {
     const { username, password } = req.body;
@@ -3944,6 +3976,9 @@ const handleMerchantLogin = (req, res) => {
         brand_name: (req.brand && req.brand.name) ? req.brand.name : 'Bangjo Resto'
       }
     };
+
+    loginResponse.landing = resolveLanding(user.role);
+    loginResponse.entitlements = { kds: KDS_ENTITLED };
 
     if (handoffInfo) {
       loginResponse.handoff_ticket = handoffInfo.ticket;
@@ -4819,7 +4854,9 @@ router.post('/auth/handoff/exchange', async (req, res) => {
         branch_id: consumed.user.branch_id || null,
         email_verified: consumed.user.email_verified,
         brand_name: (req.brand && req.brand.name) ? req.brand.name : 'Merchant Resto'
-      }
+      },
+      landing: resolveLanding(consumed.user.role),
+      entitlements: { kds: KDS_ENTITLED }
     });
   } catch (err) {
     const status = err.status || 500;

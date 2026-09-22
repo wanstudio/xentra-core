@@ -218,7 +218,8 @@ app.get(['/onboarding', '/onboarding/*', '/onboarding/'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/onboarding.html'));
 });
-app.get(['/dashboard/login', '/dashboard/login/'], async (req, res) => {
+// Unified login — the single entry point for every role.
+app.get(['/login', '/login/'], async (req, res) => {
   if (!isSaaSHost(req)) {
     const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
     await brandRepository.ready();
@@ -233,6 +234,13 @@ app.get(['/dashboard/login', '/dashboard/login/'], async (req, res) => {
   }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/login.html'));
+});
+
+// Legacy login entry point. Kept only so existing links and bookmarks keep
+// working; it no longer serves its own login surface, it forwards to /login.
+app.get(['/dashboard/login', '/dashboard/login/'], (req, res) => {
+  const qs = req.originalUrl.indexOf('?') !== -1 ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+  res.redirect(301, '/login' + qs);
 });
 
 app.get(/^\/dashboard(\/.*)?$/, async (req, res) => {

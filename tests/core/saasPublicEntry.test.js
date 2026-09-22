@@ -10,7 +10,7 @@
  *   5. GET / (tenant host app.mybangjo.com) → customer PWA (not landing page)
  *   6. GET /signin (tenant host) → falls through to PWA (no SaaS page on tenant domain)
  *   7. Unknown path on xentra.cloud → redirects to / (landing), not /onboarding
- *   8. /dashboard/login still works (backwards-compat for existing Bangjo flows)
+ *   8. the legacy /dashboard/login entry forwards to the unified /login
  *   9. /dashboard/ still works
  */
 
@@ -143,13 +143,14 @@ describe('Xentra Cloud SaaS Public Entry Architecture', () => {
     assert.notEqual(location, '/onboarding', 'xentra.cloud wildcard must NOT redirect to /onboarding');
   });
 
-  it('8. GET /dashboard/login still works (backwards-compat for Bangjo merchants)', async () => {
+  it('8. the legacy /dashboard/login entry forwards to the unified /login', async () => {
     const res = await get('/dashboard/login', 'app.mybangjo.com');
-    assert.equal(res.status, 200, `Expected 200, got ${res.status}`);
-    assert.ok(
-      res.body.includes('login') || res.body.includes('Login') || res.body.includes('Masuk'),
-      'Legacy /dashboard/login must still serve login page'
-    );
+    assert.ok([301, 302, 307, 308].includes(res.status), `Expected a redirect, got ${res.status}`);
+    assert.match(res.headers.location || '', /^\/login(\?|$)/, 'Legacy entry must forward to /login');
+
+    const unified = await get('/login', 'app.mybangjo.com');
+    assert.equal(unified.status, 200, `Expected 200 from /login, got ${unified.status}`);
+    assert.ok(unified.body.includes('xentra_merchant_token'), 'Unified login must serve the login page');
   });
 
   it('9. GET /dashboard/ still serves merchant dashboard app', async () => {

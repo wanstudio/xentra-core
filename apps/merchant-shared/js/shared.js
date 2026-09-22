@@ -47,15 +47,38 @@
   }
 
   /**
-   * Redirects to the dashboard login page.
+   * Redirects to the unified login entry point (/login).
    * Calls checkAppRoute() if available (SPA router), otherwise hard redirects.
    */
   function redirectToLogin() {
     if (typeof window.checkAppRoute === 'function') {
       window.checkAppRoute();
     } else if (!window.location.pathname.includes('login')) {
-      window.location.href = '/dashboard/login';
+      window.location.href = '/login';
     }
+  }
+
+  /**
+   * Landing surface resolved by the server for the current role
+   * (see resolveLanding in server/routes/api.js). Cached from
+   * /auth/merchant/me so every surface can enforce it without guessing a role
+   * from the URL.
+   */
+  var _landing = null;
+
+  function setLanding(l) { _landing = l || null; }
+  function getLanding() { return _landing; }
+
+  /**
+   * Surface guard: a page whose path is not the landing resolved for the
+   * current role must not render. Returns true when it redirected.
+   * Unauthenticated pages are untouched — boot calls this after validation.
+   */
+  function enforceSurface(surfacePath) {
+    if (!_landing) return false;
+    if (_landing === surfacePath) return false;
+    window.location.replace(_landing);
+    return true;
   }
 
   /**
@@ -771,6 +794,7 @@
       var data = await res.json();
       if (data && data.success) {
         if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        if (data.landing) setLanding(data.landing);
         return true;
       }
       clearStoredSession();
@@ -797,6 +821,9 @@
     checkAuth:          checkAuth,
     handleHandoffExchange: handleHandoffExchange,
     validateServerSession: validateServerSession,
+    setLanding:         setLanding,
+    getLanding:         getLanding,
+    enforceSurface:     enforceSurface,
     $:                  $,
     formatMoney:        formatMoney,
     esc:                esc,

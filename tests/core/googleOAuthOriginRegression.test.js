@@ -125,7 +125,7 @@ describe('Google OAuth Origin Regression — tenant/platform canonical flow', ()
   test('GOOGLE-OAUTH-REG-05: no incorrect return_to domain is introduced', () => {
     const html = loginHtml();
     assert.ok(html.includes('var currentOrigin = window.location.origin;'), 'return_to must be derived from the current origin');
-    assert.ok(html.includes("var returnUrl = currentOrigin + '/dashboard/login';"), 'return_to must be built dynamically');
+    assert.ok(html.includes("var returnUrl = currentOrigin + '/login';"), 'return_to must be built dynamically');
     assert.ok(!html.includes('app.mybangjo.com/auth/broker'), 'return_to must not hardcode a client domain');
   });
 

@@ -704,7 +704,7 @@ describe('Google-First Authentication & Bangjo Owner Linking', () => {
   test('Q. GET /dashboard/login serves page with Platform inline SDK path and Client broker path', async () => {
     const loginRes = await makeRequest(server, {
       method: 'GET',
-      path: '/dashboard/login'
+      path: '/login'
     });
 
     assert.equal(loginRes.status, 200);
