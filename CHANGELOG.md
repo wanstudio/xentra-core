@@ -1,3 +1,13 @@
+## [Unreleased] - 2026-09-22
+### Merchant App frontend extraction + test runtime alignment
+- **Merchant App extracted as a standalone frontend entry point.** `apps/merchant-app/` serves the Branch Manager operating surface (Hari Ini, Order Center, Meja, Menu, Stok, Promo, Staff, Jam Operasional, Laporan) as its own document/script, booting independently at `/merchant-app`. Owner and Platform surfaces remain in `apps/merchant-dashboard`; no backend, domain, RBAC or API contract changed.
+- **Shared merchant frontend layer consolidated.** `apps/merchant-shared/` now owns the auth/session guards, the branch-catalog/override/category helpers, the shared surface stylesheet and the reusable widgets, consumed by both surfaces instead of duplicated. `apps/merchant-dashboard/index.html` links the shared stylesheet from `/merchant-shared`.
+- **Role-appropriate routing.** Branch Manager sessions that reach `/dashboard` are redirected to `/merchant-app`; Core continues to enforce authorization for every API call. `/dashboard` routing is otherwise unchanged and `merchant-dashboard` is retained.
+- **CI now tests on the production runtime (Node 24).** The test jobs previously ran Node 20, where `node:sqlite` is unavailable and the database layer falls back to `sql.js` — an engine production never uses. Production runs Node 24 (`docs/DEPLOY_VPS.md`; `deploy-vps.yml` activates Node 24).
+- **Test suite repaired and no longer hangs.** `npm test` gains `--test-force-exit`, demo fixtures are seeded explicitly per suite (schema initialization intentionally provisions only the essential tenant), customer session fixtures carry `organization_id`, and checkout test stubs/fixtures were completed. Full suite: **381 → 52 failures** on Node 24.
+- **Known infrastructure issue (reported, not changed):** `server/database/db.js:97` checks for the error string `'Cannot find module'` while Node 20 raises `'No such built-in module: node:sqlite'`. In `NODE_ENV=production` this makes the `sql.js` fallback terminate the process instead of falling back. Not changed here because it alters production runtime behaviour.
+- Full audit, evidence and remaining failure classification: `docs/TEST_SUITE_RUNTIME_AND_CI_AUDIT.md`.
+
 ## [Unreleased] - 2026-09-15
 ### Locked Owner ↔ Branch Manager dashboard boundary
 - Locked the cross-dashboard responsibility model: **Owner = CONFIGURE + GOVERN + OBSERVE**, **Branch Manager = OPERATE + OBSERVE**, and **Xentra-Core = AUTHENTICATE + AUTHORIZE + ENFORCE + PERSIST + AUDIT**.

@@ -55,3 +55,6 @@ apps/customer-pwa/assets/uploads/derivatives/*
 apps/customer-pwa/assets/uploads/originals/*
 !apps/customer-pwa/assets/uploads/originals/.gitkeep
 
+
+# Local agent/tool state
+.commandcode/
