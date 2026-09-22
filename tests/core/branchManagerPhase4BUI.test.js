@@ -110,6 +110,9 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
   const html = fs.readFileSync(htmlPath, 'utf8');
   const js = fs.readFileSync(jsPath, 'utf8');
   const css = fs.readFileSync(cssPath, 'utf8');
+  // Owner/Platform surface stays in the legacy dashboard.
+  const legacyHtml = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/index.html'), 'utf8');
+  const legacyJs = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
 
   let testProduct1Id = 'prod_bm4b_catalog_1';
   let testProduct2Id = 'prod_bm4b_catalog_2';
@@ -296,7 +299,7 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
 
     // Verify JS applyRoleBasedUI hides it for BM specifically while leaving it accessible for Owner
     assert.ok(js.includes("if (branchSelectorWrap) branchSelectorWrap.style.display = 'none'"), 'BM hides branchSelectorWrap via JS RBAC');
-    assert.ok(js.includes("if (branchSelectorWrap) branchSelectorWrap.style.display = 'flex'"), 'Owner shows branchSelectorWrap via JS RBAC');
+    assert.ok(legacyJs.includes("if (branchSelectorWrap) branchSelectorWrap.style.display = 'flex'"), 'Owner shows branchSelectorWrap via JS RBAC (legacy dashboard)');
   });
 
   it('P4B-09: Box-sizing border-box and responsive modal card CSS rules prevent horizontal overflow', () => {
@@ -307,14 +310,17 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
   });
 
   it('P4B-10: Cache-busting query is applied in HTML', () => {
-    assert.ok(html.includes('href="/merchant-shared/css/dashboard.css?v=3.0.6"'), 'dashboard.css must use version query v=3.0.6');
-    assert.ok(html.includes('src="/dashboard/assets/js/dashboard.js?v=3.0.6"'), 'dashboard.js must use version query v=3.0.6');
+    assert.ok(html.includes('href="/merchant-shared/css/dashboard.css?v=1.0.0"'), 'Merchant App stylesheet must carry a version query');
+    assert.ok(html.includes('src="/merchant-app/assets/js/merchant-app.js?v=1.0.0"'), 'merchant-app.js must carry a version query');
+    assert.ok(legacyHtml.includes('src="/dashboard/assets/js/dashboard.js?v='), 'legacy dashboard.js must carry a version query');
   });
 
   it('P4B-11: Sidebar drawer auto-closes on menu navigation click', () => {
     assert.ok(js.includes('function closeMobileSidebar()'), 'dashboard.js must define closeMobileSidebar');
     assert.ok(js.includes('closeMobileSidebar();'), 'dashboard.js must call closeMobileSidebar on navigation');
-    assert.ok(js.includes('sidebar.addEventListener(\'click\'') || js.includes('sidebar.addEventListener("click"'), 'dashboard.js must register click listener on sidebar');
+    // The drawer must close as part of navigation, whatever the wiring.
+    const navFn = js.slice(js.indexOf('function navigateTo'), js.indexOf('function switchTab'));
+    assert.ok(navFn.includes('closeMobileSidebar();'), 'navigation must close the mobile sidebar');
   });
 
   it('P4B-12: Topbar navigation is sticky on top so hamburger button is always accessible', () => {
