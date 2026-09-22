@@ -2184,7 +2184,14 @@
         '<div class="x-fulfillment-divider"></div>' +
         '<div class="x-dinein-container">' +
         '  <!-- Guest count filtering temporarily hidden per user request -->' +
-        '  <div class="x-dinein-guest-row" style="display:none !important;">' +
+        '  <div class="x-fulfillment-promo" id="x-dinein-scan-info">' +
+         '    <span class="x-fulfillment-promo-icon">i</span>' +
+         '    <span>Scan QR di mejamu, pesananmu akan kami antarkan segera.</span>' +
+         '  </div>' +
+         '  <div style="padding:0 16px 12px;text-align:center;">' +
+         '    <button type="button" id="x-btn-scan-table-qr" class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Scan QR di Meja</button>' +
+         '  </div>' +
+         '  <div class="x-dinein-guest-row" style="display:none !important;">' +
         '    <span class="x-dinein-guest-label">Jumlah Tamu</span>' +
         '    <div class="x-dinein-guest-control">' +
         '      <button type="button" class="x-dinein-guest-btn" id="x-btn-guest-minus">−</button>' +
@@ -2193,10 +2200,6 @@
         '    </div>' +
         '  </div>' +
         '  <div class="x-dinein-header-title">Pilih meja</div>' +
-         '  <div class="x-scan-table-strip" style="margin:0 0 10px;padding:10px 12px;border:1px dashed #bbf7d0;border-radius:12px;background:#f0fdf4;text-align:center;">' +
-         '    <div style="font-size:12px;color:#166534;margin-bottom:8px;">Scan QR di mejamu, pesananmu akan kami antarkan segera.</div>' +
-         '    <button type="button" id="x-btn-scan-table-qr" class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Scan QR di Meja</button>' +
-         '  </div>' +
         '  <div id="x-dinein-floor-canvas" class="x-floor-wrapper">' +
         '    <div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px;">Memuat tata letak meja…</div>' +
         '  </div>' +

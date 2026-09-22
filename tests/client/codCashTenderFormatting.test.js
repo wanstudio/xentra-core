@@ -341,8 +341,17 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
   assert.ok(code.includes('id="x-btn-scan-table-qr"'), 'the picking screen must offer scanning');
   assert.ok(code.includes('Scan QR di mejamu, pesananmu akan kami antarkan segera'),
     'the customer must be told what scanning does');
-  assert.ok(/x-btn-scan-table-qr[\s\S]{0,120}openTableQrScanner\(\)/.test(code),
+  assert.ok(code.includes("var scanQrBtn = schedContainer.querySelector('#x-btn-scan-table-qr');"),
+    'the button must be picked up from the section');
+  assert.ok(code.includes('scanQrBtn.onclick = function () { openTableQrScanner(); };'),
     'the button must open the scanner');
+
+  // Gaya bar info yang sudah dipakai untuk ketersediaan promo, dengan ikonnya.
+  assert.ok(code.includes('id="x-dinein-scan-info"'), 'bar info dine-in harus ada');
+  assert.ok(/x-dinein-scan-info"[\s\S]{0,120}x-fulfillment-promo-icon">i</.test(code),
+    'ikon information harus dipertahankan');
+  assert.ok(code.indexOf('x-dinein-scan-info') < code.indexOf('x-dinein-floor-canvas'),
+    'bar info harus DI ATAS area meja');
 
   // Camera scanning, feature-detected rather than assumed.
   assert.ok(code.includes("typeof window.BarcodeDetector === 'function'"),
