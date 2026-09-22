@@ -274,3 +274,33 @@ test('T10: checkout resumes the open table bill from the server', () => {
   assert.ok(code.includes('Pesanan tambahan otomatis masuk ke bill meja ini.'),
     'the customer must be told add-ons join the same bill');
 });
+
+test('T11: the customer picks ONE table; joining tables stays hidden', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // One table only, today.
+  assert.ok(code.includes('var ALLOW_MULTI_TABLE_SELECT = false;'),
+    'multi-table selection must be off');
+  assert.ok(code.includes('draft.selectedTableIds = [tid];'),
+    'picking a table must replace the selection, not add to it');
+  assert.ok(!code.includes('// Customer manual override / multiple selection'),
+    'the manual multi-select comment must be gone');
+
+  // The capability is kept, with a note on how to switch it back on.
+  assert.ok(code.includes('else if (ALLOW_MULTI_TABLE_SELECT) {'),
+    'the multi-table path must remain, behind the switch');
+  assert.ok(/ALLOW_MULTI_TABLE_SELECT[\s\S]{0,200}draft\.selectedTableIds\.push\(tid\)/.test(code),
+    'joining tables must still be reachable when the switch comes back on');
+  assert.ok(/Untuk\s*\n\s*\/\/ membukanya lagi nanti/.test(code),
+    'the switch must say how to re-enable it');
+
+  // A big party must not smuggle several tables in through the recommendation.
+  assert.ok(code.includes('? res.recommendation.table_ids'),
+    'the recommendation path must respect the same rule');
+  assert.ok(code.includes(': res.recommendation.table_ids.slice(0, 1);'),
+    'the recommendation must be clamped to one table');
+
+  // A stale saved selection must not smuggle a second table back in.
+  assert.ok(code.includes(': state.fulfillment.table_ids.slice(0, 1))'),
+    'a restored selection must be clamped to one table too');
+});

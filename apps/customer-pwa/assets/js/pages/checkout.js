@@ -436,6 +436,13 @@
     });
   }
 
+  // ── Pilih meja: SATU meja saja ──
+  // Konsep memilih BEBERAPA meja (menggabung meja untuk rombongan besar) sudah
+  // ada di kode ini dan sengaja DISEMBUNYIKAN: konsumen bisa bingung, atau
+  // iseng memilih semua meja sekaligus sehingga meja jadi kacau. Untuk
+  // membukanya lagi nanti, cukup ubah satu baris ini menjadi true.
+  var ALLOW_MULTI_TABLE_SELECT = false;
+
   // ── Mount ──
   function mount(container) {
     checkoutContainer = container || $('xentra-checkout-view');
@@ -1576,7 +1583,11 @@
       date: state.fulfillment.date || 'Hari ini',
       timeSlot: state.fulfillment.timeSlot || '16:00-16:30',
       tableNumber: state.fulfillment.tableNumber || '',
-      selectedTableIds: Array.isArray(state.fulfillment.table_ids) ? state.fulfillment.table_ids.slice() : [],
+      // Satu meja saja — termasuk pilihan lama yang tersimpan (lihat
+      // ALLOW_MULTI_TABLE_SELECT) supaya tidak ada cara menyelundupkan 2 meja.
+      selectedTableIds: Array.isArray(state.fulfillment.table_ids)
+        ? (ALLOW_MULTI_TABLE_SELECT ? state.fulfillment.table_ids.slice() : state.fulfillment.table_ids.slice(0, 1))
+        : [],
       reservationDate: state.fulfillment.reservationDate || '',
       reservationTime: state.fulfillment.reservationTime || '12:00',
       guestCount: state.fulfillment.guestCount || 2
@@ -2142,7 +2153,9 @@
         guest_count: draft.guestCount || 1
       }).then(function (res) {
         if (res && res.success && res.recommendation && res.recommendation.table_ids) {
-          draft.selectedTableIds = res.recommendation.table_ids;
+          draft.selectedTableIds = ALLOW_MULTI_TABLE_SELECT
+            ? res.recommendation.table_ids
+            : res.recommendation.table_ids.slice(0, 1);
           draft.tableNumber = computeSelectedTableNumbers(draft.selectedTableIds);
           draft.selectedTables = res.recommendation.tables || [];
         }
@@ -2210,9 +2223,11 @@
 
           if (isSel) {
             draft.selectedTableIds = draft.selectedTableIds.filter(function (id) { return id !== tid; });
-          } else {
-            // Customer manual override / multiple selection
+          } else if (ALLOW_MULTI_TABLE_SELECT) {
+            // Menggabung meja (disembunyikan) — lihat ALLOW_MULTI_TABLE_SELECT.
             draft.selectedTableIds.push(tid);
+          } else {
+            draft.selectedTableIds = [tid];
           }
           draft.tableNumber = computeSelectedTableNumbers(draft.selectedTableIds);
           renderFloorCanvas();
