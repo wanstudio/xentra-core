@@ -14,6 +14,8 @@ const db = require('../server/database/db');
 const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
 const CSS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/css/dashboard.css');
+const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
+const SHARED_CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/shared.css');
 
 test('MEDIA SYSTEM M2 — CROP / IMAGE EDITOR UI & DOMAIN SUITE', async (t) => {
   const mediaService = new MediaService();
@@ -285,7 +287,8 @@ test('MEDIA SYSTEM M2 — CROP / IMAGE EDITOR UI & DOMAIN SUITE', async (t) => {
   // 11. CSS rules exist for responsive mobile and desktop viewports
   // --------------------------------------------------------------------------
   await t.test('11. CSS rules exist for mobile viewport and touch interaction safety', () => {
-    const css = fs.readFileSync(CSS_PATH, 'utf8');
+    // Crop editor CSS is owned by merchant-shared (single source, de-duplicated from dashboard.css).
+    const css = fs.readFileSync(SHARED_CSS_PATH, 'utf8');
     assert.match(css, /\.x-crop-modal-card/, 'CSS has .x-crop-modal-card');
     assert.match(css, /\.x-crop-viewport/, 'CSS has .x-crop-viewport');
     assert.match(css, /touch-action:\s*none/, 'CSS specifies touch-action: none to prevent mobile page drag interference');
@@ -313,7 +316,8 @@ test('MEDIA SYSTEM M2 — CROP / IMAGE EDITOR UI & DOMAIN SUITE', async (t) => {
       text: async () => '{}'
     });
 
-    // Execute dashboard.js in DOM context
+    // merchant-shared/js/shared.js owns the widget, then dashboard.js aliases it.
+    win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
     const js = fs.readFileSync(JS_PATH, 'utf8');
     win.eval(js);
 
