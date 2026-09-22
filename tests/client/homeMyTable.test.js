@@ -67,7 +67,8 @@ test('MYTABLE-02: ikon bertukar sesuai keadaan, dan scannernya modul bersama', (
   // Satu mekanisme saja: atribut hidden + aturan CSS yang menegakkannya. Kalau
   // dicampur style.display, `!important` di CSS akan menang dan ikon tak muncul.
   assert.ok(!HOME.includes('btnMyTable.style.display'), 'jangan campur style.display dengan atribut hidden');
-  assert.ok(HOME.includes("badge.textContent = num"), 'badge diisi nomor meja');
+  assert.ok(HOME.includes("badge.textContent = num ? ('Meja ' + num) : ''"),
+    'badge harus menulis "Meja N" (bahasa Indonesia), bukan angka telanjang');
   assert.ok(HOME.includes('badge.hidden = !num'),
     'tanpa nomor, badge harus disembunyikan (bukan titik merah kosong)');
   assert.ok(HOME.includes('window.Xentra.TableQr'), 'home memakai scanner bersama, bukan salinannya sendiri');
@@ -121,8 +122,8 @@ test('MYTABLE-11: atribut hidden benar-benar menyembunyikan (kalah oleh display:
 
 test('MYTABLE-10: ada halaman pratinjau untuk melihat badge 2-3 angka', () => {
   const pv = read('apps/merchant-shared/prototype/badge-preview.html');
-  assert.ok(pv.includes('>Table 12<'), 'pratinjau harus memperlihatkan badge bertuliskan Table 12');
-  assert.ok(pv.includes('>Table 100<'), 'dan angka yang lebih panjang');
+  assert.ok(pv.includes('>Meja 12<'), 'pratinjau harus memperlihatkan badge bertuliskan "Meja 12"');
+  assert.ok(pv.includes('>Meja 100<'), 'dan angka yang lebih panjang');
   assert.ok(pv.includes('library.svg') && pv.includes('black_flowbite_user-solid.svg'),
     'pratinjau harus memakai ikon asli supaya perbandingan warna & ukuran akurat');
 });
