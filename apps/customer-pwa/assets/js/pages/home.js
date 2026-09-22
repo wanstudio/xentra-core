@@ -2373,6 +2373,16 @@
     renderMyTableState();
     reconcileMyTable();
 
+    // Ikon topbar juga harus ikut berubah TANPA reload: meja bisa dipasang dari
+    // halaman lain (dipilih di checkout), dan home tidak di-render ulang saat
+    // kembali. Sekali langganan saja, jangan menumpuk tiap init.
+    if (!window.__xentraMyTableBound && Store.subscribe) {
+      window.__xentraMyTableBound = true;
+      Store.subscribe(function (evt) {
+        if (!evt || evt.type === 'my_table') renderMyTableState();
+      });
+    }
+
     // Header Navigation buttons: Join (Affiliate), Library (History), Profile
     var btnJoin = $('x-btn-join');
     if (btnJoin) {

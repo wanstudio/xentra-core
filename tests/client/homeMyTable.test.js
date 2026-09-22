@@ -91,6 +91,12 @@ test('MYTABLE-05: pindah meja dikunci, tamu diarahkan ke kasir', () => {
     'meja hanya dipasang kalau belum punya');
 });
 
+test('MYTABLE-12: ikon berubah tanpa reload (dipasang dari halaman lain)', () => {
+  assert.ok(HOME.includes('Store.subscribe'), 'harus ikut perubahan Store');
+  assert.ok(HOME.includes("evt.type === 'my_table'"), 'hanya menanggapi perubahan meja');
+  assert.ok(HOME.includes('window.__xentraMyTableBound'), 'langganan tidak boleh menumpuk');
+});
+
 test('MYTABLE-11: atribut hidden benar-benar menyembunyikan (kalah oleh display:flex)', () => {
   const css = read('apps/customer-pwa/assets/css/home.css');
   assert.ok(css.includes('.x-hero-icon-btn[hidden]'), 'CSS harus menegakkan [hidden] untuk ikon topbar');
