@@ -128,6 +128,13 @@ test('MYTABLE-07: meja disimpan di Store (bertahan saat pindah halaman)', () => 
     && STORE.includes('clearMyTable: clearMyTable'), 'setter/getter meja harus diekspor');
 });
 
+test('MYTABLE-13: pilih tipe selain dine-in → meja dilepas, ikon balik ke scan', () => {
+  assert.ok(CHECKOUT.includes('if (Store.clearMyTable) Store.clearMyTable();'),
+    'meja harus dilepas saat tipe pembelian bukan dine-in');
+  assert.ok(/state\.fulfillment\.scheduled = false;\s*\n\s*\/\/[^\n]*dine-in[\s\S]{0,220}Store\.clearMyTable/.test(CHECKOUT),
+    'pelepasan meja harus di jalur non-dine-in');
+});
+
 test('MYTABLE-09: meja yang dipilih di checkout ikut mengisi badge', () => {
   assert.ok(CHECKOUT.includes('Store.setMyTable({ id: draft.selectedTableIds[0]'),
     'badge di Home itu keterangan duduk di mana, jadi pilihan di checkout harus ikut terpasang');

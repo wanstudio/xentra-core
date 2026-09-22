@@ -2425,6 +2425,9 @@
           state.fulfillment.guestCount = draft.guestCount || 1;
         } else {
           state.fulfillment.scheduled = false;
+          // Tipe pembelian selain dine-in berarti tamu tidak sedang duduk di meja:
+          // ikon di Home harus kembali jadi ikon scan, badge & tutup makanan hilang.
+          if (Store.clearMyTable) Store.clearMyTable();
         }
 
         var savedCtx = (Store.getState().orderContext && Store.getState().orderContext[draft.type]) || {};
