@@ -304,3 +304,28 @@ test('T11: the customer picks ONE table; joining tables stays hidden', () => {
   assert.ok(code.includes(': state.fulfillment.table_ids.slice(0, 1))'),
     'a restored selection must be clamped to one table too');
 });
+
+test('T12: scanning a table QR lands the customer on that table', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // The token comes from the QR link (/join?meja=<token>).
+  assert.ok(code.includes('function getJoinTokenFromUrl()'), 'the link token must be read from the URL');
+  assert.ok(code.includes('/[?&]meja=([^&]+)/'), 'the meja parameter is the token');
+  assert.ok(code.includes('if (joinToken) claimTableFromQr(joinToken);'),
+    'claiming must happen on mount, only when scanning');
+
+  // The table comes from the server, never guessed from the URL.
+  assert.ok(code.includes("API.post('/customer/dining-session/claim', { qr_token: qrToken })"),
+    'the claim must go through the server');
+  assert.ok(code.includes('state.fulfillment.table_ids = [table.id]'),
+    'the scanned table must become the single selection');
+  assert.ok(code.includes("state.fulfillment.type = 'dine_in'"),
+    'scanning a table means eating in');
+  assert.ok(code.includes('if (bill) state.openBill = bill;'),
+    'an existing bill at that table must be resumed');
+
+  // Not signed in yet: keep the token, do not crash, do not lose the scan.
+  assert.ok(code.includes('state.pendingJoinToken = qrToken;'),
+    'a scan before sign-in must be remembered');
+  assert.ok(code.includes('}).catch(function () {\n      return null;'), 'a failed claim must degrade quietly');
+});

@@ -1282,14 +1282,24 @@ router.post('/customer/dining-session/claim', requireCustomerAuth(), (req, res) 
     }
 
     const tableId = table.id || table.table_id;
+
+    // Mejanya selalu dikembalikan, walau belum ada billnya: konsumen yang scan QR
+    // tidak boleh diminta memilih meja lagi — mejanya sudah ada di QR itu.
+    const tableRow = db.prepare('SELECT id, table_number, label FROM branch_tables WHERE id = ?').get(tableId) || {};
+    const tableInfo = {
+      id: tableId,
+      table_number: tableRow.table_number || null,
+      label: tableRow.label || null
+    };
+
     const state = db.prepare('SELECT current_session_id FROM branch_table_states WHERE table_id = ?').get(tableId);
     const sessionId = state && state.current_session_id;
-    if (!sessionId) return res.json({ success: true, session: null });
+    if (!sessionId) return res.json({ success: true, session: null, table: tableInfo });
 
     const bill = buildOpenBill(sessionId, req.brand_id);
     if (!bill) return res.status(404).json({ success: false, error: 'BILL_TIDAK_DITEMUKAN' });
 
-    return res.json({ success: true, session: bill, via: 'qr', table_id: tableId });
+    return res.json({ success: true, session: bill, via: 'qr', table_id: tableId, table: tableInfo });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
   }

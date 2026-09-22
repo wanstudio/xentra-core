@@ -414,6 +414,47 @@
     return t.table_number || t.label || '-';
   }
 
+  // Scan QR meja: /join?meja=<token>. Mejanya sudah ditentukan oleh QR, jadi
+  // konsumen tidak perlu memilih meja lagi; kalau di meja itu sudah ada bill
+  // terbuka, billnya langsung dilanjutkan.
+  function getJoinTokenFromUrl() {
+    try {
+      var m = /[?&]meja=([^&]+)/.exec(window.location.search || '');
+      return m ? decodeURIComponent(m[1]) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function claimTableFromQr(qrToken) {
+    if (!qrToken || !API) return Promise.resolve(null);
+
+    var sess = Store.getState().customerSession;
+    if (!sess || !sess.token) {
+      // Belum masuk: simpan dulu, dilanjutkan setelah konsumen selesai login.
+      state.pendingJoinToken = qrToken;
+      return Promise.resolve(null);
+    }
+
+    return API.post('/customer/dining-session/claim', { qr_token: qrToken }).then(function (res) {
+      var bill = (res && res.success && res.session) ? res.session : null;
+      var table = (res && res.table) ? res.table : null;
+
+      // Meja dari QR mengunci pilihannya: satu meja, tidak bisa diganti.
+      if (table && table.id) {
+        state.fulfillment.type = 'dine_in';
+        state.fulfillment.table_ids = [table.id];
+        state.fulfillment.tableNumber = table.table_number || '';
+      }
+      state.pendingJoinToken = null;
+      if (bill) state.openBill = bill;
+      if (!state.isSubmitting) renderLayout();
+      return res || null;
+    }).catch(function () {
+      return null;
+    });
+  }
+
   function refreshOpenBill() {
     var sess = Store.getState().customerSession;
     if (!API || !sess || !sess.token) {
@@ -460,6 +501,9 @@
       state.customer.phone = storeState.customerSession.phone || '';
       state.customer.name = storeState.customerSession.name || state.customer.name;
       refreshOpenBill();
+
+      var joinToken = getJoinTokenFromUrl();
+      if (joinToken) claimTableFromQr(joinToken);
       var hasValidToken = storeState.customerSession.token &&
         storeState.customerSession.token.indexOf('xnt_cust_') === 0;
       state.customer.isVerified = !!hasValidToken;

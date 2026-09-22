@@ -234,6 +234,24 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
     assert.equal(res.status, 200, JSON.stringify(res.body));
     assert.ok(res.body.session && res.body.session.session_id, 'QR harus membuka bill meja itu');
     assert.equal(res.body.table_id, RESUME_TABLE);
+    assert.equal(res.body.table.table_number, '903', 'QR harus membawa identitas mejanya');
+  });
+
+  await t.test('scan meja yang belum ada billnya: mejanya tetap dikenali', async () => {
+    // Meja kosong: tidak ada yang bisa dilanjutkan, TAPI konsumen tidak boleh
+    // diminta memilih meja lagi — mejanya sudah ada di QR.
+    const empty = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'qr_bill_resume_belum_dipakai' });
+    assert.equal(empty.status, 404, 'QR tak dikenal tetap ditolak');
+
+    seedTable('tbl_bill_kosong', '905', 'qr_bill_kosong');
+    const res = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'qr_bill_kosong' });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.session, null, 'meja kosong belum punya bill');
+    assert.equal(res.body.table.id, 'tbl_bill_kosong');
+    assert.equal(res.body.table.table_number, '905');
+
+    db.prepare('DELETE FROM branch_table_states WHERE table_id = ?').run('tbl_bill_kosong');
+    db.prepare('DELETE FROM branch_tables WHERE id = ?').run('tbl_bill_kosong');
   });
 });
 
@@ -294,6 +312,19 @@ test('Staf bisa membuat QR meja', async (t) => {
     assert.ok(res.body.join_url.indexOf('/join?meja=') !== -1, 'isinya URL gabung, bukan token mentah');
     assert.ok(res.body.join_url.indexOf(QR_TABLE_TOKEN) !== -1, 'URL harus membawa token meja itu');
     assert.equal(res.body.table.table_number, '904');
+  });
+
+  await t.test('tautan /join menyajikan PWA konsumen (bukan 404)', async () => {
+    // Responsnya halaman, bukan JSON — jadi dibaca mentah.
+    const res = await new Promise((resolve, reject) => {
+      const url = new URL('/join?meja=' + QR_TABLE_TOKEN, baseUrl);
+      const req = http.request({ method: 'GET', hostname: url.hostname, port: url.port, path: url.pathname + url.search, headers: { Host: 'app.mybangjo.com' } },
+        (r) => { let d = ''; r.on('data', (c) => { d += c; }); r.on('end', () => resolve({ status: r.statusCode, body: d })); });
+      req.on('error', reject);
+      req.end();
+    });
+    assert.equal(res.status, 200, 'tautan QR harus mendarat di halaman, bukan 404');
+    assert.ok(/<html|<!doctype/i.test(res.body), 'tautan QR harus menyajikan PWA konsumen');
   });
 
   await t.test('melihat QR lagi TIDAK mematikan QR yang sudah ditempel', async () => {
