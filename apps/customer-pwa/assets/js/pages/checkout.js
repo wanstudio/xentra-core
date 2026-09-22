@@ -548,6 +548,12 @@
     }
 
     return API.post('/customer/dining-session/claim', { qr_token: qrToken }).then(function (res) {
+      if (!res || res.success !== true) {
+        // QR yang sudah dicabut/diganti tidak boleh diam-diam tidak terjadi apa-apa.
+        if (UI && UI.toast) UI.toast('QR meja ini sudah tidak berlaku. Minta petugas mencetak QR baru, atau pilih meja manual.');
+        if (!state.isSubmitting) renderLayout();
+        return null;
+      }
       var bill = (res && res.success && res.session) ? res.session : null;
       var table = (res && res.table) ? res.table : null;
 

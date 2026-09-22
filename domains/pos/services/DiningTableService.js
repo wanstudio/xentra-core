@@ -10,6 +10,18 @@ const { DiningTableRepository } = require('../../../core/data/repositories');
 const Template01 = require('../templates/Template01');
 
 const HOLD_DURATION_MINUTES = 15;
+
+// Ganti token QR meja setiap sesinya ditutup?
+//
+// Kenapa ON: token QR adalah kunci untuk melihat tagihan meja. Kalau tidak pernah
+// diganti, QR yang pernah difoto seseorang tetap bisa dipakai membuka tagihan
+// tamu BERIKUTNYA di meja yang sama.
+//
+// Konsekuensinya (baca sebelum mematikan): kartu QR yang sudah tercetak menjadi
+// tidak berlaku setiap kali sesi meja ditutup, jadi harus dicetak ulang. Kalau
+// resto memakai kartu laminasi permanen yang tidak mau diganti-ganti, ubah
+// baris ini menjadi false — dengan sadar menerima risiko di atas.
+const ROTATE_TABLE_QR_ON_SESSION_CLOSE = true;
 const repository = new DiningTableRepository();
 
 class DiningTableService {
@@ -219,7 +231,21 @@ class DiningTableService {
       throw err;
     }
 
-    return { success: true, session_id: sessionId, released_tables: associatedTables.map(t => t.table_id), status: 'completed' };
+    const releasedTables = associatedTables.map(t => t.table_id);
+
+    // Meja sudah bebas: kunci lama tidak boleh lagi bisa membuka tagihan tamu
+    // berikutnya di meja ini.
+    if (ROTATE_TABLE_QR_ON_SESSION_CLOSE) {
+      for (const tableId of releasedTables) {
+        try {
+          DiningTableService.regenerateQrToken(tableId);
+        } catch (err) {
+          console.warn('[DiningTableService] Gagal mengganti token QR meja', tableId, ':', err.message);
+        }
+      }
+    }
+
+    return { success: true, session_id: sessionId, released_tables: releasedTables, status: 'completed' };
   }
 
   static setTableBlockedState(tableId, isBlocked, reason = '') {

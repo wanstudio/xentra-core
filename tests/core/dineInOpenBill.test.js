@@ -335,3 +335,50 @@ test('Staf bisa membuat QR meja', async (t) => {
     assert.equal(row.qr_token, QR_TABLE_TOKEN, 'token tersimpan harus tetap sama');
   });
 });
+
+// ── Keamanan: kunci meja diganti saat sesinya ditutup ──────────────────────
+// Kalau token tidak pernah diganti, QR yang pernah difoto seseorang bisa dipakai
+// membuka tagihan tamu berikutnya di meja yang sama.
+
+test('Menutup sesi mengganti token QR meja itu saja', async (t) => {
+  t.before(() => {
+    seedTable('tbl_rot_a', '906', 'qr_rot_a_lama');
+    seedTable('tbl_rot_b', '907', 'qr_rot_b_lama');
+  });
+
+  t.after(() => {
+    Array.from(new Set(createdSessions)).forEach((sid) => {
+      db.prepare('DELETE FROM dining_session_tables WHERE session_id = ?').run(sid);
+      db.prepare('DELETE FROM dining_sessions WHERE id = ?').run(sid);
+    });
+    db.prepare('DELETE FROM branch_table_states WHERE table_id IN (?, ?)').run('tbl_rot_a', 'tbl_rot_b');
+    db.prepare('DELETE FROM branch_tables WHERE id IN (?, ?)').run('tbl_rot_a', 'tbl_rot_b');
+  });
+
+  await t.test('token meja yang sesinya ditutup berubah; meja lain tidak', () => {
+    const session = DiningTableService.createOrAttachDiningSession({
+      branch_id: BRANCH,
+      table_ids: ['tbl_rot_a'],
+      customer_name: 'Rina',
+      customer_phone: CUST_PHONE,
+      guest_count: 2
+    });
+    createdSessions.push(session.session_id);
+
+    const before = db.prepare('SELECT qr_token FROM branch_tables WHERE id = ?').get('tbl_rot_a').qr_token;
+    assert.equal(before, 'qr_rot_a_lama', 'token awal harus seperti yang ditempel');
+
+    const result = DiningTableService.completeDiningSession(session.session_id, 'staff');
+    assert.equal(result.status, 'completed');
+
+    const after = db.prepare('SELECT qr_token FROM branch_tables WHERE id = ?').get('tbl_rot_a').qr_token;
+    assert.notEqual(after, before, 'kunci lama tidak boleh tetap berlaku untuk tamu berikutnya');
+
+    const other = db.prepare('SELECT qr_token FROM branch_tables WHERE id = ?').get('tbl_rot_b').qr_token;
+    assert.equal(other, 'qr_rot_b_lama', 'meja yang tidak ikut sesi tidak boleh ikut berubah');
+
+    // Mejanya tetap bebas dan bisa dipakai lagi.
+    const state = db.prepare('SELECT operational_state FROM branch_table_states WHERE table_id = ?').get('tbl_rot_a');
+    assert.equal(state.operational_state, 'available', 'meja harus kembali tersedia');
+  });
+});

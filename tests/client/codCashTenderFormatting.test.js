@@ -328,6 +328,10 @@ test('T12: scanning a table QR lands the customer on that table', () => {
   assert.ok(code.includes('state.pendingJoinToken = qrToken;'),
     'a scan before sign-in must be remembered');
   assert.ok(code.includes('}).catch(function () {\n      return null;'), 'a failed claim must degrade quietly');
+
+  // A revoked QR (the token is rotated when a session closes) must not fail silently.
+  assert.ok(code.includes('QR meja ini sudah tidak berlaku'), 'a dead QR must say so, with what to do next');
+  assert.ok(code.includes("if (!res || res.success !== true)"), 'the claim result must be checked');
 });
 
 test('T13: the table-picking screen can scan the table QR, with a way out for old phones', () => {
