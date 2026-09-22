@@ -65,6 +65,14 @@ Key domain boundaries: Organization → Brand → Branch. Payment credentials re
 - `.agent/skills/xentra-debugging/SKILL.md` — root-cause debugging and runtime investigation.
 - `.agent/skills/xentra-security-audit/SKILL.md` — security and integrity audit when the task is security-sensitive or requires verification.
 
+## Product surface / feature boundary
+
+- `merchant-dashboard` is the Owner / Brand control surface.
+- `merchant-app` is the Branch Manager operational surface.
+- Kitchen does not require a separate UI surface in MVP; physical printing is the default workflow.
+- `kitchen-display` is a held/future KDS add-on surface. It must not become a mandatory login/device or duplicate order state machine.
+- Future KDS activation must be controlled by SaaS feature entitlement while reusing Core RBAC, scope, persistence, audit, and order-state authority.
+
 ## Domain / tenant / client-domain rules
 
 - `xentra.cloud` is the Xentra SaaS Control Plane/Admin surface.
