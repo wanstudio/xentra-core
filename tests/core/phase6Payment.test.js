@@ -270,6 +270,7 @@ describe('Phase 6 — Payment Implementation & Critical Invariants', () => {
     const mockData = {
       success: true,
       order: {
+        order_type: 'dine_in',
         id: 'ord_settled_test',
         order_number: 'P6-SETTLED-01',
         status: 'pending', // Awaiting branch acceptance!
@@ -304,6 +305,7 @@ describe('Phase 6 — Payment Implementation & Critical Invariants', () => {
     const mockData = {
       success: true,
       order: {
+        order_type: 'dine_in',
         id: 'ord_cash_test',
         order_number: 'P6-CASH-01',
         status: 'pending',

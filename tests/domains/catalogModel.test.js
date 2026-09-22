@@ -338,19 +338,24 @@ test('TEST 10 — Brand-wide catalog shows all master products regardless of ado
 // Disable Master Product X (is_active=0).
 // Branch A MUST still show Product X as available (Branch Catalog owns availability).
 // ══════════════════════════════════════════════════════════════════════════════
-test('TEST 11 — Master disable isolation: adopted product stays available when master is disabled', () => {
+test('TEST 11 — Master disable isolation: master disable leaves branch-owned state untouched', () => {
   // Ensure Product X is adopted and available at Branch A
-  const before = db.prepare('SELECT is_available FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A, PRODUCT_X);
+  const before = db.prepare('SELECT is_available, price FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A, PRODUCT_X);
   assert.strictEqual(before.is_available, 1, 'Branch A Product X is available before master disable');
+  assert.strictEqual(before.price, 25000, 'Branch A price is 25000 before master disable');
 
-  // Disable Master Product
+  // Owner governance: the Master Product defines the global sellable universe, so
+  // disabling it removes the product from the branch menu.
   db.prepare('UPDATE products SET is_active = 0 WHERE id = ? AND brand_id = ?').run(PRODUCT_X, BRAND);
 
-  // Branch A catalog MUST still return Product X as available
   const menuA = CatalogService.getMenu({ brand_id: BRAND, branch_id: BRANCH_A });
   const pX = menuA.products.find(p => p.id === PRODUCT_X);
-  assert.ok(pX, 'Product X still appears in Branch A menu despite master being disabled');
-  assert.strictEqual(pX.is_available, true, 'Branch A availability is controlled by branch_products, not master is_active');
+  assert.ok(!pX, 'A disabled Master Product is not part of the branch menu (Owner sellable-universe authority)');
+
+  // ...but the branch-owned adoption state must NOT be mutated (isolation).
+  const after = db.prepare('SELECT is_available, price FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_A, PRODUCT_X);
+  assert.strictEqual(after.is_available, 1, 'Master disable must not mutate branch availability');
+  assert.strictEqual(after.price, 25000, 'Master disable must not mutate the branch price');
 
   // Restore master product
   db.prepare('UPDATE products SET is_active = 1 WHERE id = ? AND brand_id = ?').run(PRODUCT_X, BRAND);

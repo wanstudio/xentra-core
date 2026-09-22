@@ -218,8 +218,11 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     win.Xentra.OrderReceived.mount(container, orderId);
     await new Promise(r => setTimeout(r, 10));
 
-    assert.ok(container.innerHTML.includes('Pesanan Diterima Cabang!'), 'Must display accepted title');
-    assert.ok(container.innerHTML.includes('Status Alur Pesanan'), 'Must render fulfillment stepper');
+    // Delivery/pickup render the unified tracking layout (dynamic phase title +
+    // progress). The server status assertion above is unchanged.
+    assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Must render the tracking screen');
+    assert.ok(container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must display the accepted phase title');
+    assert.ok(container.innerHTML.includes('id="x-order-progress"'), 'Must render the tracking progress');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -257,7 +260,11 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     win.Xentra.OrderReceived.mount(container, orderId);
     await new Promise(r => setTimeout(r, 10));
 
-    assert.ok(container.innerHTML.includes(num), 'Authoritative order number must be in the DOM');
+    // The unified tracking layout renders the server-derived phase and branch;
+    // the order number is not part of that surface (its authority is asserted
+    // against the server response above).
+    assert.ok(container.innerHTML.includes('id="x-order-phase-title"'), 'Must render the server-derived phase title');
+    assert.ok(container.innerHTML.includes(res.data.order.branch_name), 'Must render the authoritative branch');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -289,7 +296,7 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
 
   // ── P8-05: Accepted order displays correct order type ──────────────────────
   it('P8-05: Accepted order displays correct order type', async () => {
-    const { orderId, phone } = seedOrder({ status: 'confirmed', orderType: 'pickup' });
+    const { orderId, phone } = seedOrder({ status: 'ready', orderType: 'pickup' });
     const token = seedCustomerSession(phone);
 
     const res = await request('GET', `/api/v1/orders/${orderId}`, null, { Authorization: `Bearer ${token}` });
@@ -301,7 +308,9 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     win.Xentra.OrderReceived.mount(container, orderId);
     await new Promise(r => setTimeout(r, 10));
 
-    assert.ok(container.innerHTML.includes('Pick-up'), 'Must display Pick-up badge');
+    // Pickup is part of the unified tracking layout; its pickup-specific phase is
+    // "SIAP DIAMBIL" once the order is ready for collection.
+    assert.ok(container.innerHTML.includes('SIAP DIAMBIL'), 'Must display the pickup-specific phase');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -322,15 +331,15 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
       win.Xentra.OrderReceived.mount(container, orderId);
       await new Promise(r => setTimeout(r, 10));
 
-      if (st === 'preparing') {
-        assert.ok(container.innerHTML.includes('Sedang Disiapkan di Dapur'));
-      } else if (st === 'ready') {
-        assert.ok(container.innerHTML.includes('Pesanan Siap Diantar'));
-      } else if (st === 'out_for_delivery') {
-        assert.ok(container.innerHTML.includes('Dalam Pengantaran Kurir'));
-      } else if (st === 'completed') {
-        assert.ok(container.innerHTML.includes('Pesanan Selesai'));
-      }
+      // Unified tracking layout: the phase title is derived from the server status.
+      const expectedPhase = {
+        preparing: 'SEDANG DISIAPKAN',
+        ready: 'SEDANG DISIAPKAN',
+        out_for_delivery: 'SEDANG DIANTAR',
+        completed: 'PESANAN SELESAI'
+      }[st];
+      assert.ok(container.innerHTML.includes('x-order-tracking-screen'), `Must render the tracking screen for ${st}`);
+      assert.ok(container.innerHTML.includes(expectedPhase), `Phase title must reflect server status ${st}`);
       win.Xentra.OrderReceived.unmount();
     }
   });
@@ -363,7 +372,7 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     win.Xentra.OrderReceived.mount(container, orderId);
     await new Promise(r => setTimeout(r, 10));
 
-    assert.ok(container.innerHTML.includes('Pesanan Siap Diantar'), 'DOM reflects fresh server state after refresh');
+    assert.ok(container.innerHTML.includes('SEDANG DISIAPKAN'), 'DOM reflects fresh server state after refresh');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -382,7 +391,7 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     win.Xentra.OrderReceived.mount(container);
     await new Promise(r => setTimeout(r, 10));
 
-    assert.ok(container.innerHTML.includes('Dalam Pengantaran Kurir'));
+    assert.ok(container.innerHTML.includes('SEDANG DIANTAR'), 'Phase title must reflect the server status');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -429,7 +438,7 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
           setTimeout(() => {
             resolve({
               success: true,
-              order: { id: orderId, status: 'pending', branch_name: 'Cabang' }
+              order: { id: orderId, status: 'preparing', branch_name: 'Cabang' }
             });
           }, 40);
         });
@@ -450,8 +459,12 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     await new Promise(r => setTimeout(r, 60));
 
     // When slow call 1 finishes, its stale response is discarded by fetchSeq
-    assert.ok(container.innerHTML.includes('Pesanan Diterima Cabang!'),
+    // The stale response carries a later phase; if it were applied the DOM would
+    // show SEDANG DISIAPKAN. The newer (confirmed) response must prevail.
+    assert.ok(container.innerHTML.includes('>PESANAN DIBUAT<'),
       'Newer response must prevail — stale sequence discarded');
+    assert.ok(!container.innerHTML.includes('SEDANG DISIAPKAN'),
+      'Stale later-phase response must not be rendered');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -568,8 +581,8 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     win.Xentra.OrderReceived.mount(container, orderId);
     await new Promise(r => setTimeout(r, 10));
 
-    assert.ok(container.innerHTML.includes('Pesanan Selesai'), 'Must render completed title');
-    assert.ok(container.innerHTML.includes('✓'), 'All steps should show completed marks');
+    assert.ok(container.innerHTML.includes('PESANAN SELESAI'), 'Must render the completed phase title');
+    assert.ok(container.innerHTML.includes('id="x-order-progress"'), 'Must render the completed progress tracker');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -624,7 +637,9 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     });
 
     await new Promise(r => setTimeout(r, 10));
-    assert.ok(container.innerHTML.includes('XTR-SPARSE'), 'Renders without crashing on sparse data');
+    // The tracking layout does not print the order number; sparse data must still
+    // produce the tracking surface instead of throwing.
+    assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Renders the tracking screen on sparse data');
     win.Xentra.OrderReceived.unmount();
   });
 

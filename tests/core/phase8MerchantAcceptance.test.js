@@ -641,7 +641,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
   // ─── Group 7: Customer Integration (22–25) ─────────────────────────────────
 
   it('22. Customer waiting screen transitions to ACCEPTED after merchant accepts', async () => {
-    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending' });
+    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending', orderType: 'dine_in' });
 
     // Merchant accepts
     await request('POST', `/orders/${ord.orderId}/branch-acceptance`, { decision: 'accept' }, { Authorization: `Bearer ${bmAToken}` });
@@ -719,7 +719,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
   });
 
   it('25. Customer refresh after acceptance maintains correct state', async () => {
-    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending' });
+    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending', orderType: 'dine_in' });
 
     // Merchant accepts
     await request('POST', `/orders/${ord.orderId}/branch-acceptance`, { decision: 'accept' }, { Authorization: `Bearer ${bmAToken}` });
@@ -832,7 +832,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
   });
 
   it('31. Regression: P7 customer waiting flow unaffected by acceptance changes', async () => {
-    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending' });
+    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending', orderType: 'dine_in' });
 
     const custRes = await request('GET', `/orders/${ord.orderId}`, null, { Authorization: `Bearer ${customerToken}` });
     assert.equal(custRes.status, 200);

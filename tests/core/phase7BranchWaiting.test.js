@@ -188,6 +188,7 @@ describe('Phase 7 — Branch Acceptance Waiting Matrix', () => {
       success: true,
       order: {
         id: 'ord_p7_awaiting',
+        order_type: 'dine_in',
         order_number: 'P7-WAIT-01',
         status: 'pending',
         grand_total: 85000,
@@ -244,7 +245,8 @@ describe('Phase 7 — Branch Acceptance Waiting Matrix', () => {
     const seed = seedOrder({
       paymentMethod: 'midtrans',
       paymentStatus: 'settlement',
-      status: 'pending'
+      status: 'pending',
+      orderType: 'dine_in'
     });
 
     const token = seedCustomerSession(seed.phone);
@@ -318,6 +320,7 @@ describe('Phase 7 — Branch Acceptance Waiting Matrix', () => {
       success: true,
       order: {
         id: 'ord_p7_stale_test',
+        order_type: 'dine_in',
         order_number: 'P7-STALE-01',
         status: currentServerStatus,
         grand_total: 45000,
@@ -351,6 +354,7 @@ describe('Phase 7 — Branch Acceptance Waiting Matrix', () => {
       success: true,
       order: {
         id: 'ord_p7_timer',
+        order_type: 'dine_in',
         order_number: 'P7-TIM-01',
         status: 'pending',
         grand_total: 50000,
@@ -380,6 +384,7 @@ describe('Phase 7 — Branch Acceptance Waiting Matrix', () => {
         success: true,
         order: {
           id: 'ord_p7_zero_test',
+          order_type: 'dine_in',
           order_number: 'P7-ZERO-01',
           status: 'pending', // Server STILL says pending!
           grand_total: 50000,
@@ -409,6 +414,7 @@ describe('Phase 7 — Branch Acceptance Waiting Matrix', () => {
         success: true,
         order: {
           id: 'ord_p7_query_zero',
+          order_type: 'dine_in',
           order_number: 'P7-QZ-01',
           status: 'pending',
           grand_total: 50000,
@@ -436,6 +442,7 @@ describe('Phase 7 — Branch Acceptance Waiting Matrix', () => {
       success: true,
       order: {
         id: 'ord_p7_elapsed',
+        order_type: 'dine_in',
         order_number: 'P7-ELAPSED-01',
         status: 'pending',
         grand_total: 50000,
@@ -464,7 +471,7 @@ describe('Phase 7 — Branch Acceptance Waiting Matrix', () => {
         id: 'ord_p7_accepted',
         order_number: 'P7-ACC-01',
         status: 'confirmed',
-        order_type: 'delivery',
+        order_type: 'dine_in',
         grand_total: 65000,
         branch_name: 'Cabang Bangjo Barat'
       },
@@ -570,7 +577,8 @@ describe('Phase 7 — Branch Acceptance Waiting Matrix', () => {
     const seed = seedOrder({
       paymentMethod: 'midtrans',
       paymentStatus: 'settlement',
-      status: 'pending'
+      status: 'pending',
+      orderType: 'dine_in'
     });
 
     const token = seedCustomerSession(seed.phone);
