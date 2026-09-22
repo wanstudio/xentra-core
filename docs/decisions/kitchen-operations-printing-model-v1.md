@@ -1,15 +1,16 @@
 # Xentra — Kitchen Operations + Printing Model v1
 
-**Status:** LOCKED — Business / UX / Operational Direction  
-**Date:** 2026-09-21
+**Status:** LOCKED — MVP Kitchen Operations / Printing Baseline  
+**Date:** 2026-09-21  
+**Latest product boundary:** See `docs/decisions/kds-addon-capability-v1.md` (2026-09-22). KDS is an optional SaaS add-on, not a mandatory MVP surface.
 
 ## 1. Kitchen interface decision
 
 For the Xentra MVP, **KDS is NOT a separate dashboard, application, or required kitchen interface**.
 
-The Merchant Dashboard remains the primary merchant operational center. Kitchen does not need a dedicated software screen when the physical restaurant workflow is based on printed kitchen tickets and direct verbal coordination with the Branch Manager.
+The Merchant operational center is the current `merchant-app` surface for Branch Manager daily operations. Kitchen does not need a dedicated software screen when the physical restaurant workflow is based on printed kitchen tickets and direct verbal coordination with the Branch Manager.
 
-Do not introduce a separate Kitchen Dashboard/KDS project merely to represent kitchen preparation.
+Do not introduce or activate a mandatory KDS surface merely to represent kitchen preparation.
 
 ## 2. Kitchen operational model
 
@@ -130,7 +131,7 @@ CUSTOMER
   ↓
 ORDER
   ↓
-MERCHANT DASHBOARD
+MERCHANT APP
   ↓
 BRANCH MANAGER ACCEPTS
   ↓
