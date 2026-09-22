@@ -147,10 +147,14 @@ test('MYTABLE-15: konfirmasi MENGUNCI meja — pindah meja lewat checkout ditola
 });
 
 test('MYTABLE-13: pilih tipe selain dine-in → meja dilepas, ikon balik ke scan', () => {
-  assert.ok(CHECKOUT.includes('if (Store.clearMyTable) Store.clearMyTable();'),
-    'meja harus dilepas saat tipe pembelian bukan dine-in');
-  assert.ok(/state\.fulfillment\.scheduled = false;\s*\n\s*\/\/[^\n]*dine-in[\s\S]{0,220}Store\.clearMyTable/.test(CHECKOUT),
-    'pelepasan meja harus di jalur non-dine-in');
+  assert.ok(CHECKOUT.includes("if (draft.type !== 'dine_in' && Store.clearMyTable) Store.clearMyTable();"),
+    'meja harus dilepas untuk SEMUA tipe selain dine-in');
+  // Jangan di dalam rantai if/else: delivery & pickup dijaring cabang pertama,
+  // jadi cabang else tidak pernah jalan untuk keduanya.
+  assert.ok(CHECKOUT.indexOf("Store.clearMyTable()") < CHECKOUT.indexOf("if (draft.type === 'delivery' || draft.type === 'pickup')"),
+    'pelepasan meja harus sebelum rantai if/else, bukan di dalamnya');
+  assert.ok((CHECKOUT.match(/Store\.clearMyTable\(\)/g) || []).length === 1,
+    'hanya satu tempat melepas meja');
 });
 
 test('MYTABLE-09: meja yang dipilih di checkout ikut mengisi badge', () => {

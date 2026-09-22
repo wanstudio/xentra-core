@@ -2413,6 +2413,13 @@
 
         // Commit to state.fulfillment
         state.fulfillment.type = draft.type;
+
+        // Konfirmasi = MENGUNCI atau MELEPAS meja. Tipe selain dine-in berarti tamu
+        // tidak duduk di meja, jadi kuncinya dilepas dan ikon di Home kembali ke
+        // ikon scan. PENTING: jangan ditaruh di rantai if/else di bawah — delivery
+        // dan pickup dijaring cabang pertama, jadi cabang `else` tidak pernah
+        // dijalankan untuk keduanya (pernah terjadi: meja tidak pernah dilepas).
+        if (draft.type !== 'dine_in' && Store.clearMyTable) Store.clearMyTable();
         state.fulfillment.scheduled = Boolean(draft.scheduled);
         if (draft.type === 'delivery' || draft.type === 'pickup') {
           state.fulfillment.date = draft.date || 'Hari ini';
@@ -2435,9 +2442,6 @@
           state.fulfillment.guestCount = draft.guestCount || 1;
         } else {
           state.fulfillment.scheduled = false;
-          // Tipe pembelian selain dine-in berarti tamu tidak sedang duduk di meja:
-          // ikon di Home harus kembali jadi ikon scan, badge & tutup makanan hilang.
-          if (Store.clearMyTable) Store.clearMyTable();
         }
 
         var savedCtx = (Store.getState().orderContext && Store.getState().orderContext[draft.type]) || {};
