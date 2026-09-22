@@ -3,254 +3,226 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0f172a">
+<meta name="theme-color" content="#ffffff">
 <title>Xentra Merchant — Prototype</title>
 <style>
 :root{
-  --x-primary:#b6ff00; --x-primary-ink:#0f172a;
-  --ink:#0f172a; --ink-2:#334155; --muted:#64748b; --muted-2:#94a3b8;
-  --bg:#f4f6f9; --card:#ffffff; --line:#e6ebf1; --line-2:#eef2f6;
-  --ok:#16a34a; --ok-soft:#eafaf0; --warn:#f59e0b; --warn-soft:#fff7e6;
-  --danger:#ef4444; --danger-soft:#fef2f2; --info:#2563eb; --info-soft:#eff5ff;
-  --r-sm:10px; --r-md:14px; --r-lg:18px; --r-xl:24px;
-  --sh-1:0 1px 2px rgba(15,23,42,.04), 0 2px 8px rgba(15,23,42,.04);
-  --sh-2:0 6px 18px rgba(15,23,42,.08);
-  --appbar:56px; --tabbar:64px;
+  --ink:#111827; --ink-2:#374151; --muted:#6b7280; --muted-2:#9ca3af;
+  --line:#eef0f3; --chip:#f4f5f7; --bg:#ffffff; --bg-2:#f7f8fa;
+  --accent:#b6ff00; --accent-ink:#16210a;
+  --green:#0f9d58; --green-soft:#eaf7ef;
+  --amber:#b45309; --amber-soft:#fff7e8;
+  --red:#dc2626; --red-soft:#fef2f2;
+  --blue:#2563eb; --blue-soft:#eff5ff;
+  --r:14px; --r-lg:18px; --r-pill:999px;
+  --sh:0 1px 2px rgba(17,24,39,.04), 0 4px 14px rgba(17,24,39,.05);
+  --tab:60px;
   --font:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%}
-body{background:var(--bg);font-family:var(--font);color:var(--ink);-webkit-font-smoothing:antialiased}
-button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit}
+body{background:var(--bg-2);font-family:var(--font);color:var(--ink);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:0;background:none;color:inherit;text-align:left}
 svg{display:block}
+.app{max-width:460px;margin:0 auto;min-height:100%;background:var(--bg);box-shadow:0 0 0 1px var(--line)}
 
-/* shelter the prototype in a phone-width column on desktop */
-.shell{max-width:460px;margin:0 auto;min-height:100%;background:var(--bg);position:relative;
-  box-shadow:0 0 0 1px var(--line)}
+/* ── top bar ───────────────────────────────────────────── */
+.top{position:sticky;top:0;z-index:30;background:var(--bg);padding:10px 14px 8px;border-bottom:1px solid var(--line)}
+.top-row{display:flex;align-items:center;gap:10px}
+.search{flex:1;display:flex;align-items:center;gap:10px;min-width:0}
+.search .q{flex:1;min-width:0;font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.round{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;background:var(--chip);color:var(--ink-2)}
+.round.accent{background:var(--accent);color:var(--accent-ink)}
+.status-row{display:flex;align-items:center;gap:12px;margin-top:10px}
+.status{display:inline-flex;align-items:center;gap:7px;padding:6px 12px 6px 10px;border-radius:var(--r-pill);
+  background:var(--red-soft);color:var(--red);font-size:12.5px;font-weight:800}
+.status.open{background:var(--green-soft);color:var(--green)}
+.status .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.status-row .grow{flex:1}
+.badge{position:relative}
+.badge .n{position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 4px;border-radius:var(--r-pill);
+  background:var(--red);color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;border:2px solid var(--bg)}
 
-/* ── App bar ───────────────────────────────────────────── */
-.appbar{position:sticky;top:0;z-index:30;height:var(--appbar);display:flex;align-items:center;gap:10px;
-  padding:0 14px;background:var(--card);border-bottom:1px solid var(--line)}
-.appbar .branch{display:flex;align-items:center;gap:8px;min-width:0}
-.branch-dot{width:8px;height:8px;border-radius:50%;background:var(--muted-2);flex:0 0 auto}
-.branch-dot.open{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
-.branch-dot.closed{background:var(--danger);box-shadow:0 0 0 3px var(--danger-soft)}
-.branch-name{font-size:15px;font-weight:800;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.branch-sub{font-size:11px;color:var(--muted);font-weight:600;margin-top:1px}
-.appbar .spacer{flex:1}
-.icon-btn{width:38px;height:38px;border-radius:999px;display:grid;place-items:center;color:var(--ink-2);
-  position:relative;transition:background .15s}
-.icon-btn:active{background:var(--line-2)}
-.icon-btn .dot{position:absolute;top:7px;right:7px;width:8px;height:8px;border-radius:50%;
-  background:var(--danger);border:2px solid var(--card)}
+/* ── screen ────────────────────────────────────────────── */
+.screen{padding:14px 14px calc(var(--tab) + 22px)}
+.sec{margin-bottom:20px}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+.sec-title{font-size:14px;font-weight:800;letter-spacing:-.1px}
+.sec-link{font-size:12.5px;font-weight:700;color:var(--green);white-space:nowrap}
+.fresh{font-size:11.5px;color:var(--muted);margin:-6px 0 10px;line-height:1.45}
 
-/* ── Screen ────────────────────────────────────────────── */
-.screen{padding:14px 14px calc(var(--tabbar) + 26px)}
-.section{margin:0 0 18px}
-.section-head{display:flex;align-items:center;justify-content:space-between;margin:0 2px 10px}
-.section-title{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:.2px}
-.section-link{font-size:12px;font-weight:700;color:var(--muted)}
+.c{background:var(--bg);border-radius:var(--r);box-shadow:var(--sh)}
+.money-hero{padding:16px 14px 14px}
+.money-label{font-size:12px;font-weight:700;color:var(--muted)}
+.money-value{font-size:28px;font-weight:900;letter-spacing:-1px;margin-top:4px;display:flex;align-items:center;gap:8px}
+.money-value .eye{color:var(--muted-2)}
+.money-cards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.mc{padding:12px;border-radius:var(--r);background:var(--bg-2)}
+.mc .k{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--ink-2)}
+.mc .v{font-size:16px;font-weight:900;letter-spacing:-.4px;margin-top:6px}
+.mc .t{font-size:11px;color:var(--muted);margin-top:3px}
 
-/* ── Cards ─────────────────────────────────────────────── */
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--sh-1)}
-.card-pad{padding:14px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.metric{padding:12px 10px;border-radius:var(--r);background:var(--bg);box-shadow:var(--sh)}
+.metric .k{font-size:10.5px;font-weight:700;color:var(--muted);line-height:1.3;min-height:26px}
+.metric .v{font-size:19px;font-weight:900;letter-spacing:-.6px;margin-top:2px}
+.metric .d{font-size:10.5px;font-weight:700;color:var(--green);margin-top:6px}
+.calm{margin-top:10px;padding:12px 14px;border-radius:var(--r);background:var(--bg-2);font-size:12px;color:var(--muted);line-height:1.5}
 
-/* status hero — the two daily switches a branch manager owns */
-.hero{padding:14px;display:flex;flex-direction:column;gap:12px}
-.hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.hero-label{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
-.hero-value{font-size:18px;font-weight:800;margin-top:3px}
-.hero-note{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
-.hero-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
-  padding-top:12px;border-top:1px dashed var(--line)}
-.hero-row .t{font-size:13px;font-weight:700}
-.hero-row .s{font-size:11px;color:var(--muted);margin-top:2px}
+.alert{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--r);margin-bottom:8px;background:var(--red-soft)}
+.alert .ic{width:34px;height:34px;border-radius:11px;background:#fff;color:var(--red);display:grid;place-items:center;flex:0 0 auto}
+.alert .t{font-size:13.5px;font-weight:800}
+.alert .s{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+.alert.warn{background:var(--amber-soft)} .alert.warn .ic{color:var(--amber)}
+.alert .chev{margin-left:auto;color:var(--muted-2)}
 
-.switch{width:46px;height:27px;border-radius:999px;background:#dbe2ea;position:relative;flex:0 0 auto;
-  transition:background .18s}
-.switch i{position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;
-  box-shadow:0 1px 3px rgba(15,23,42,.25);transition:transform .18s}
-.switch.on{background:var(--ok)}
-.switch.on.primary{background:var(--x-primary)}
-.switch.on i{transform:translateX(19px)}
-.switch[aria-disabled="true"]{opacity:.5}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.score{padding:14px;border-radius:var(--r);background:var(--bg);box-shadow:var(--sh)}
+.score .k{font-size:12px;font-weight:700;color:var(--muted)}
+.score .row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.score .v{font-size:19px;font-weight:900;letter-spacing:-.5px}
+.score .sub{font-size:11px;color:var(--muted-2);font-weight:700}
+.ring{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:900}
+.ring.red{background:var(--red-soft);color:var(--red)} .ring.amber{background:var(--amber-soft);color:var(--amber)}
 
-/* attention */
-.attn{display:flex;gap:12px;align-items:center;padding:13px 14px;border-radius:var(--r-md);
-  background:var(--warn-soft);border:1px solid #fde9c3;margin-bottom:8px}
-.attn.danger{background:var(--danger-soft);border-color:#fcdada}
-.attn.info{background:var(--info-soft);border-color:#dbe8ff}
-.attn .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:0 0 auto;
-  background:#fff;color:var(--warn)}
-.attn.danger .ic{color:var(--danger)} .attn.info .ic{color:var(--info)}
-.attn .body{flex:1;min-width:0}
-.attn .t{font-size:13px;font-weight:800}
-.attn .s{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4}
-.attn .go{font-size:12px;font-weight:800;color:var(--ink)}
-.attn.calm{background:var(--ok-soft);border-color:#cdeeda}
-.attn.calm .ic{color:var(--ok)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 6px}
+.feat{display:flex;flex-direction:column;align-items:center;gap:7px;position:relative}
+.feat .ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;background:var(--bg);box-shadow:var(--sh);color:var(--ink-2)}
+.feat .l{font-size:10.5px;font-weight:700;text-align:center;line-height:1.25;color:var(--ink-2)}
+.feat .n{position:absolute;top:-2px;right:calc(50% - 29px);min-width:16px;height:16px;padding:0 4px;border-radius:var(--r-pill);
+  background:var(--red);color:#fff;font-size:9.5px;font-weight:800;display:grid;place-items:center;border:2px solid var(--bg)}
+.tag{font-size:9px;font-weight:800;color:var(--blue);background:var(--blue-soft);padding:1px 5px;border-radius:var(--r-pill)}
 
-/* stats */
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:11px 10px;text-align:left}
-.stat .k{font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
-.stat .v{font-size:15px;font-weight:800;margin-top:5px;letter-spacing:-.3px}
-.stat .d{font-size:10.5px;font-weight:700;margin-top:3px;color:var(--ok)}
-.stat .d.down{color:var(--danger)}
+.strip{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:var(--r);background:#111827;color:#fff}
+.strip .t{font-size:12.5px;font-weight:700;line-height:1.35}
 
-/* quick actions */
-.qa{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 4px;scrollbar-width:none}
-.qa::-webkit-scrollbar{display:none}
-.qa-btn{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:999px;
-  background:var(--card);border:1px solid var(--line);font-size:12.5px;font-weight:700;box-shadow:var(--sh-1)}
-.qa-btn:active{background:var(--line-2)}
-.qa-btn.primary{background:var(--x-primary);border-color:transparent;color:var(--x-primary-ink)}
+.row{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--bg);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:8px}
+.thumb{width:46px;height:46px;border-radius:12px;background:var(--bg-2);color:var(--muted-2);display:grid;place-items:center;flex:0 0 auto}
+.row .g{flex:1;min-width:0}
+.row .t{font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .s{font-size:11.5px;color:var(--muted);margin-top:3px}
+.off .t,.off .s{color:var(--muted-2)}
+.sw{width:44px;height:26px;border-radius:var(--r-pill);background:#dfe3e8;position:relative;flex:0 0 auto;transition:background .18s}
+.sw i{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s}
+.sw.on{background:var(--green)} .sw.on i{transform:translateX(18px)}
 
-/* ── Segmented control ─────────────────────────────────── */
-.seg{display:flex;gap:6px;background:var(--line-2);border-radius:999px;padding:4px;margin-bottom:12px}
-.seg button{flex:1;padding:8px 10px;border-radius:999px;font-size:12.5px;font-weight:800;color:var(--muted)}
-.seg button.active{background:var(--card);color:var(--ink);box-shadow:var(--sh-1)}
+.seg{display:flex;gap:4px;background:var(--chip);border-radius:var(--r-pill);padding:4px;margin-bottom:12px}
+.seg button{flex:1;padding:8px;border-radius:var(--r-pill);font-size:12.5px;font-weight:800;color:var(--muted);text-align:center}
+.seg button.active{background:var(--bg);color:var(--ink);box-shadow:var(--sh)}
 
-/* ── Order card ────────────────────────────────────────── */
-.order{padding:13px 14px;border-radius:var(--r-lg);background:var(--card);border:1px solid var(--line);
-  box-shadow:var(--sh-1);margin-bottom:10px;position:relative;overflow:hidden}
-.order.new{border-color:#ffd9a8;box-shadow:0 0 0 3px var(--warn-soft)}
-.order.new::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--warn)}
-.order.fresh{animation:pulse 1.9s ease-in-out infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 0 3px var(--warn-soft)}50%{box-shadow:0 0 0 6px #fdeccd}}
-.order-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-.order-code{font-size:13.5px;font-weight:800;letter-spacing:-.2px}
-.order-meta{font-size:11.5px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
-.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:10.5px;
-  font-weight:800;letter-spacing:.2px}
-.chip.new{background:var(--warn);color:#3b2600}
-.chip.wait{background:var(--warn-soft);color:#8a5a00}
-.chip.process{background:var(--info-soft);color:#1d4ed8}
-.chip.done{background:var(--ok-soft);color:#15803d}
-.chip.reject{background:var(--danger-soft);color:#b91c1c}
-.chip.tag{background:var(--line-2);color:var(--muted)}
-.countdown{font-size:22px;font-weight:900;letter-spacing:-.6px;font-variant-numeric:tabular-nums;color:#b45309}
-.countdown.crit{color:var(--danger)}
-.order-items{margin:10px 0 0;padding:10px 0 0;border-top:1px dashed var(--line)}
-.order-line{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--ink-2);padding:3px 0}
-.order-line b{font-weight:700;color:var(--ink)}
-.order-foot{display:flex;align-items:center;justify-content:space-between;margin-top:11px;padding-top:11px;
-  border-top:1px solid var(--line-2)}
-.order-total{font-size:14px;font-weight:800}
-.order-actions{display:flex;gap:8px}
-.btn{padding:10px 16px;border-radius:999px;font-size:12.5px;font-weight:800;border:1px solid transparent}
-.btn.ghost{background:var(--card);border-color:var(--line);color:var(--ink-2)}
-.btn.reject{background:var(--danger-soft);color:#b91c1c}
-.btn.accept{background:var(--x-primary);color:var(--x-primary-ink);box-shadow:0 3px 10px rgba(182,255,0,.45)}
-.btn.primary{background:var(--ink);color:#fff}
-.btn.block{width:100%;text-align:center}
-.btn:disabled{opacity:.45;box-shadow:none}
+.order{background:var(--bg);border-radius:var(--r-lg);box-shadow:var(--sh);padding:14px;margin-bottom:10px}
+.order.new{box-shadow:0 0 0 2px var(--accent), var(--sh)}
+.o-head{display:flex;align-items:flex-start;gap:10px}
+.o-code{font-size:14px;font-weight:900;letter-spacing:-.2px}
+.o-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px}
+.o-meta .m{font-size:11.5px;color:var(--muted)}
+.pill{font-size:10px;font-weight:800;padding:3px 8px;border-radius:var(--r-pill)}
+.pill.new{background:var(--accent);color:var(--accent-ink)}
+.pill.process{background:var(--blue-soft);color:var(--blue)}
+.pill.done{background:var(--green-soft);color:var(--green)}
+.pill.mute{background:var(--chip);color:var(--muted)}
+.pill.reject{background:var(--red-soft);color:var(--red)}
+.cd{margin-left:auto;text-align:right}
+.cd .v{font-size:20px;font-weight:900;letter-spacing:-.6px;font-variant-numeric:tabular-nums;color:var(--amber)}
+.cd .v.crit{color:var(--red)}
+.cd .l{font-size:10px;font-weight:700;color:var(--muted-2)}
+.o-items{margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+.o-line{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;color:var(--ink-2);padding:2.5px 0}
+.o-line b{color:var(--ink);font-weight:700}
+.o-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.o-total{font-size:15px;font-weight:900;letter-spacing:-.3px}
+.btns{display:flex;gap:8px}
+.btn{padding:11px 18px;border-radius:var(--r-pill);font-size:12.5px;font-weight:800;text-align:center}
+.btn.accept{background:var(--accent);color:var(--accent-ink);box-shadow:0 3px 10px rgba(182,255,0,.4)}
+.btn.reject{background:var(--red-soft);color:var(--red)}
+.btn.ghost{background:var(--chip);color:var(--ink-2)}
+.btn.dark{background:var(--ink);color:#fff}
+.btn.wide{width:100%}
 
-/* ── List rows (menu / stock) ──────────────────────────── */
-.search{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--line);
-  border-radius:999px;padding:10px 14px;margin-bottom:10px;color:var(--muted)}
-.search input{border:0;outline:0;background:none;font-size:13px;font-family:inherit;flex:1;color:var(--ink)}
-.cats{display:flex;gap:7px;overflow-x:auto;padding:0 2px 10px;scrollbar-width:none}
-.cats::-webkit-scrollbar{display:none}
-.cat{flex:0 0 auto;padding:7px 13px;border-radius:999px;background:var(--card);border:1px solid var(--line);
-  font-size:12px;font-weight:700;color:var(--muted)}
-.cat.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tables{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tbl{padding:14px;border-radius:var(--r);background:var(--bg);box-shadow:var(--sh)}
+.tbl .n{font-size:14px;font-weight:900}
+.tbl .s{font-size:11.5px;color:var(--muted);margin-top:3px}
+.tbl .st{margin-top:10px}
+.dotst{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800}
+.dotst::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.dotst.free{color:var(--green)} .dotst.busy{color:var(--red)} .dotst.book{color:var(--amber)}
 
-.row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--card);border:1px solid var(--line);
-  border-radius:var(--r-md);margin-bottom:8px;box-shadow:var(--sh-1)}
-.thumb{width:46px;height:46px;border-radius:12px;flex:0 0 auto;display:grid;place-items:center;
-  background:var(--line-2);color:var(--muted-2);font-size:17px}
-.row .grow{flex:1;min-width:0}
-.row .name{font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.row .sub{font-size:11.5px;color:var(--muted);margin-top:3px}
-.row.off .name,.row.off .sub{color:var(--muted-2)}
-.stock-qty{font-size:14px;font-weight:900;letter-spacing:-.3px}
-.stock-qty.low{color:var(--danger)}
-.pill{font-size:10.5px;font-weight:800;padding:3px 8px;border-radius:999px;background:var(--line-2);color:var(--muted)}
-.pill.low{background:var(--danger-soft);color:#b91c1c}
-.pill.ok{background:var(--ok-soft);color:#15803d}
+.li{display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:8px}
+.li .g{flex:1;min-width:0}
+.li .t{font-size:13.5px;font-weight:800}
+.li .s{font-size:11.5px;color:var(--muted);margin-top:3px}
+.li .chev{color:var(--muted-2)}
 
-/* ── Hub (Lainnya) ─────────────────────────────────────── */
-.hub{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:12px 6px;
-  display:flex;flex-direction:column;align-items:center;gap:8px;box-shadow:var(--sh-1);position:relative}
-.tile:active{background:var(--line-2)}
-.tile .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--line-2);color:var(--ink)}
-.tile .t{font-size:10.5px;font-weight:700;text-align:center;line-height:1.25}
-.badge-mini{position:absolute;top:7px;right:7px;font-size:9px;font-weight:800;padding:2px 5px;border-radius:999px;
-  background:var(--info-soft);color:#1d4ed8}
+.empty{padding:30px 16px;text-align:center}
+.empty .e{font-size:28px;margin-bottom:8px}
+.empty .t{font-size:13.5px;font-weight:800}
+.empty .s{font-size:12px;color:var(--muted);margin-top:5px;line-height:1.55}
 
-/* ── Bottom tab bar ────────────────────────────────────── */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;max-width:460px;margin:0 auto;
-  height:calc(var(--tabbar) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);
-  background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-top:1px solid var(--line);
+  height:calc(var(--tab) + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);
+  background:rgba(255,255,255,.97);backdrop-filter:blur(10px);border-top:1px solid var(--line);
   display:grid;grid-template-columns:repeat(5,1fr)}
 .tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--muted-2);
-  font-size:10px;font-weight:800;padding-top:8px;position:relative}
+  font-size:10px;font-weight:800;padding-top:7px;position:relative}
 .tab.active{color:var(--ink)}
-.tab.active::after{content:"";position:absolute;top:0;width:26px;height:3px;border-radius:0 0 3px 3px;background:var(--x-primary)}
-.tab .n{position:absolute;top:5px;right:calc(50% - 20px);min-width:17px;height:17px;padding:0 4px;border-radius:999px;
-  background:var(--danger);color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center}
+.tab .n{position:absolute;top:4px;right:calc(50% - 21px);min-width:17px;height:17px;padding:0 4px;border-radius:var(--r-pill);
+  background:var(--red);color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;border:2px solid #fff}
 
-/* ── FAB ───────────────────────────────────────────────── */
-.fab{position:fixed;right:calc(50% - 230px + 16px);bottom:calc(var(--tabbar) + 18px);z-index:41;
-  height:48px;padding:0 20px;border-radius:999px;background:var(--ink);color:#fff;font-size:13px;font-weight:800;
-  display:flex;align-items:center;gap:8px;box-shadow:0 10px 24px rgba(15,23,42,.28)}
-@media (max-width:479px){.fab{right:16px}}
-
-/* ── Sheet (detail) ────────────────────────────────────── */
-.sheet-wrap{position:fixed;inset:0;z-index:60;display:none}
-.sheet-wrap.open{display:block}
-.sheet-bg{position:absolute;inset:0;background:rgba(15,23,42,.45)}
-.sheet{position:absolute;left:0;right:0;bottom:0;max-width:460px;margin:0 auto;background:var(--card);
-  border-radius:var(--r-xl) var(--r-xl) 0 0;padding:8px 16px calc(20px + env(safe-area-inset-bottom));
-  max-height:88%;overflow:auto;animation:up .22s ease}
-@keyframes up{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
-.sheet-grip{width:38px;height:4px;border-radius:99px;background:var(--line);margin:6px auto 12px}
-.sheet h3{margin:0 0 4px;font-size:16px;font-weight:800}
-.sheet .muted{font-size:12.5px;color:var(--muted);margin-bottom:14px}
-.kv{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:9px 0;border-bottom:1px solid var(--line-2)}
+.sw-wrap{position:fixed;inset:0;z-index:60;display:none}
+.sw-wrap.open{display:block}
+.sw-bg{position:absolute;inset:0;background:rgba(17,24,39,.4)}
+.sheet{position:absolute;left:0;right:0;bottom:0;max-width:460px;margin:0 auto;background:#fff;
+  border-radius:20px 20px 0 0;padding:8px 16px calc(20px + env(safe-area-inset-bottom));max-height:86%;overflow:auto;animation:up .2s ease}
+@keyframes up{from{transform:translateY(12px);opacity:.7}to{transform:none;opacity:1}}
+.grip{width:36px;height:4px;border-radius:99px;background:#e5e7eb;margin:6px auto 14px}
+.sheet h3{margin:0 0 4px;font-size:16.5px;font-weight:900;letter-spacing:-.2px}
+.sheet .m{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.5}
+.kv{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:10px 0;border-bottom:1px solid var(--line)}
 .kv:last-of-type{border-bottom:0}
-.kv .k{color:var(--muted)} .kv .v{font-weight:700;text-align:right}
-.sheet-actions{display:flex;gap:8px;margin-top:16px}
+.kv .k{color:var(--muted)} .kv .v{font-weight:800;text-align:right}
+.acts{display:flex;gap:8px;margin-top:16px}
 
-.empty{padding:34px 18px;text-align:center;color:var(--muted)}
-.empty .e{font-size:30px;margin-bottom:8px}
-.empty .t{font-size:13.5px;font-weight:800;color:var(--ink)}
-.empty .s{font-size:12px;margin-top:4px;line-height:1.5}
-
-.proto-note{margin:2px 2px 12px;padding:9px 12px;border-radius:var(--r-sm);background:var(--info-soft);
-  border:1px dashed #c9dcff;color:#1d4ed8;font-size:11px;font-weight:700;line-height:1.45}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tabbar) + 22px);z-index:70;
-  background:var(--ink);color:#fff;font-size:12.5px;font-weight:700;padding:11px 18px;border-radius:999px;
-  box-shadow:var(--sh-2);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--tab) + 18px);z-index:70;background:var(--ink);
+  color:#fff;font-size:12.5px;font-weight:700;padding:11px 18px;border-radius:var(--r-pill);box-shadow:0 8px 24px rgba(17,24,39,.25);
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+.proto{margin:0 0 14px;font-size:11px;font-weight:700;color:var(--blue);background:var(--blue-soft);border-radius:10px;padding:8px 11px;line-height:1.45}
 </style>
 </head>
 <body>
-<div class="shell">
-  <header class="appbar">
-    <div class="branch">
-      <span class="branch-dot" id="dot"></span>
-      <div style="min-width:0">
-        <div class="branch-name" id="branchName">Bangjo Barat</div>
-        <div class="branch-sub" id="branchSub">Operasional cabang</div>
+<div class="app">
+  <header class="top">
+    <div class="top-row">
+      <div class="search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.4-3.4"/></svg>
+        <div class="q" id="branchQ">Bangjo Barat</div>
       </div>
+      <button class="round accent" aria-label="Menu cepat" onclick="openAllFeatures()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg>
+      </button>
     </div>
-    <div class="spacer"></div>
-    <button class="icon-btn" aria-label="Notifikasi" onclick="toast('2 pemberitahuan operasional')">
-      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-      <span class="dot" id="bellDot"></span>
-    </button>
+    <div class="status-row">
+      <button class="status open" id="statusChip" onclick="openStatus()">
+        <span class="dot"></span><span id="statusLabel">Buka</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <span class="grow"></span>
+      <button class="badge round" aria-label="Pemberitahuan" onclick="toast('2 pemberitahuan operasional')">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="n" id="notifN">2</span>
+      </button>
+      <button class="round" aria-label="Profil" onclick="toast('Profil cabang')">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+      </button>
+    </div>
   </header>
 
   <main class="screen" id="screen"></main>
-
   <nav class="tabbar" id="tabbar"></nav>
-  <div id="fabHost"></div>
 
-  <div class="sheet-wrap" id="sheetWrap">
-    <div class="sheet-bg" onclick="closeSheet()"></div>
+  <div class="sw-wrap" id="sheetWrap">
+    <div class="sw-bg" onclick="closeSheet()"></div>
     <div class="sheet" id="sheet"></div>
   </div>
   <div class="toast" id="toast"></div>
@@ -258,411 +230,443 @@ svg{display:block}
 
 <script>
 /* ══════════════════════════════════════════════════════════════════════════
-   XENTRA MERCHANT — UI PROTOTYPE
-   Dummy, in-memory only. No fetch, no storage, no server, no production DB:
-   every value below lives in this object and disappears on reload.
-   Scope: Branch Manager daily operations only (lihat BOUNDARY di komentar tab).
+   XENTRA MERCHANT — UI PROTOTYPE. In-memory dummy only:
+   no fetch, no storage, no server, no database. Reload resets everything.
+   Scope: Branch Manager DAILY operations. Owner/Platform surfaces excluded.
    ══════════════════════════════════════════════════════════════════════════ */
-const state = {
-  branch:{ name:'Bangjo Barat', city:'Surabaya', isOpen:true, onlineOrders:true },
-  sales:{ revenue:4850000, orders:87, avg:55700, delta:+12 },
+const S = {
+  branch:{ name:'Bangjo Barat', isOpen:true, online:true },
+  today:{ revenue:4850000, orders:87, done:81, avg:55700, cash:1240000, online:3610000 },
   orders:[
-    { id:'o1', code:'#A-1042', type:'delivery', time:'2 mnt lalu', total:86500, status:'new',  left:168,
-      items:[['Nasi Goreng Spesial',1],['Es Teh Manis',2]], customer:'Rina' },
-    { id:'o2', code:'#A-1041', type:'pickup',   time:'5 mnt lalu', total:42000, status:'new',  left:96,
-      items:[['Ayam Geprek',1]], customer:'Bagas' },
-    { id:'o3', code:'#A-1040', type:'dine-in',  time:'12 mnt lalu', total:158000, status:'process', left:null,
-      items:[['Paket Hemat A',2],['Kerupuk',1]], customer:'Meja 4' },
-    { id:'o4', code:'#A-1039', type:'delivery', time:'24 mnt lalu', total:63000, status:'process', left:null,
-      items:[['Mie Ayam',2]], customer:'Sari' },
-    { id:'o5', code:'#A-1038', type:'delivery', time:'48 mnt lalu', total:97500, status:'done', left:null,
-      items:[['Nasi Goreng Spesial',1],['Ayam Geprek',1]], customer:'Dewi' }
+    { id:'o1', code:'#A-1042', type:'delivery', time:'2 mnt', total:86500, status:'new', left:152, cust:'Rina',
+      items:[['Nasi Goreng Spesial',1,42000],['Es Teh Manis',2,8000]] },
+    { id:'o2', code:'#A-1041', type:'pickup', time:'6 mnt', total:28000, status:'new', left:84, cust:'Bagas',
+      items:[['Ayam Geprek',1,28000]] },
+    { id:'o3', code:'#A-1040', type:'dine-in', time:'13 mnt', total:158000, status:'process', left:null, cust:'Meja 4',
+      items:[['Paket Hemat A',2,72000],['Kerupuk',1,5000]] },
+    { id:'o4', code:'#A-1039', type:'delivery', time:'26 mnt', total:63000, status:'process', left:null, cust:'Sari',
+      items:[['Mie Ayam',2,25000]] },
+    { id:'o5', code:'#A-1038', type:'delivery', time:'52 mnt', total:97500, status:'done', left:null, cust:'Dewi',
+      items:[['Nasi Goreng Spesial',1,42000],['Ayam Geprek',1,28000]] }
   ],
   menu:[
-    { id:'m1', name:'Nasi Goreng Spesial', cat:'Makanan',  price:32000, available:true,  sold:24 },
-    { id:'m2', name:'Ayam Geprek',         cat:'Makanan',  price:28000, available:true,  sold:19 },
-    { id:'m3', name:'Mie Ayam',            cat:'Makanan',  price:25000, available:false, sold:6  },
-    { id:'m4', name:'Es Teh Manis',        cat:'Minuman',  price:8000,  available:true,  sold:41 },
-    { id:'m5', name:'Kopi Susu',           cat:'Minuman',  price:18000, available:true,  sold:12 },
-    { id:'m6', name:'Kerupuk',             cat:'Tambahan', price:5000,  available:true,  sold:33 }
+    { id:'m1', name:'Nasi Goreng Spesial', cat:'Makanan',  price:32000, on:true,  sold:24 },
+    { id:'m2', name:'Ayam Geprek',         cat:'Makanan',  price:28000, on:true,  sold:19 },
+    { id:'m3', name:'Mie Ayam',            cat:'Makanan',  price:25000, on:false, sold:6  },
+    { id:'m4', name:'Es Teh Manis',        cat:'Minuman',  price:8000,  on:true,  sold:41 },
+    { id:'m5', name:'Kopi Susu',           cat:'Minuman',  price:18000, on:true,  sold:12 },
+    { id:'m6', name:'Kerupuk',             cat:'Tambahan', price:5000,  on:true,  sold:33 }
   ],
   stock:[
-    { id:'s1', name:'Beras',        qty:18, unit:'kg',  min:20 },
-    { id:'s2', name:'Ayam Fillet',  qty:6,  unit:'kg',  min:8  },
-    { id:'s3', name:'Telur',        qty:42, unit:'butir', min:24 },
-    { id:'s4', name:'Minyak Goreng',qty:4,  unit:'liter', min:6 },
-    { id:'s5', name:'Gula',         qty:11, unit:'kg',  min:5  }
+    { id:'s1', name:'Beras',         qty:18, unit:'kg',    min:20 },
+    { id:'s2', name:'Ayam Fillet',   qty:6,  unit:'kg',    min:8  },
+    { id:'s3', name:'Telur',         qty:42, unit:'butir', min:24 },
+    { id:'s4', name:'Minyak Goreng', qty:4,  unit:'liter', min:6  },
+    { id:'s5', name:'Gula',          qty:11, unit:'kg',    min:5  }
   ],
   promos:[
-    { id:'p1', name:'Diskon 20% Menu Utama', status:'active',  scope:'Cabang' },
-    { id:'p2', name:'Gratis Es Teh min. 50rb', status:'active', scope:'Cabang' },
-    { id:'p3', name:'Paket Hemat Weekend', status:'ready',   scope:'Disetujui Owner' }
+    { id:'p1', name:'Diskon 20% Menu Utama', detail:'Berlaku sampai 30 Sep · min. belanja Rp40.000', on:true },
+    { id:'p2', name:'Gratis Es Teh',         detail:'Min. belanja Rp50.000 · delivery',             on:true },
+    { id:'p3', name:'Paket Hemat Weekend',   detail:'Disetujui Owner · belum diaktifkan',          on:false }
   ],
   tables:[
-    { id:'t1', name:'Meja 1', seats:4, status:'occupied' },
-    { id:'t2', name:'Meja 2', seats:4, status:'available' },
-    { id:'t3', name:'Meja 3', seats:2, status:'reserved' },
-    { id:'t4', name:'Meja 4', seats:6, status:'occupied' }
+    { id:'t1', name:'Meja 1', seats:4, st:'busy' },
+    { id:'t2', name:'Meja 2', seats:4, st:'free' },
+    { id:'t3', name:'Meja 3', seats:2, st:'book' },
+    { id:'t4', name:'Meja 4', seats:6, st:'busy' }
   ],
   staff:[
-    { id:'u1', name:'Dewi Kartika', role:'Kasir',   shift:'Pagi',  active:true },
-    { id:'u2', name:'Bagas Pratama', role:'Dapur',  shift:'Siang', active:true },
-    { id:'u3', name:'Sari Melati',  role:'Kasir',   shift:'Sore',  active:false }
+    { id:'u1', name:'Dewi Kartika', role:'Kasir',  shift:'Pagi',  on:true },
+    { id:'u2', name:'Bagas Pratama', role:'Dapur', shift:'Siang', on:true },
+    { id:'u3', name:'Sari Melati',  role:'Kasir',  shift:'Sore',  on:false }
   ],
   hours:{ open:'08:00', close:'22:00', exception:null }
 };
 
-/* ── icons (inline, no dependency) ─────────────────────────────────────── */
 const I = {
   home:'<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
-  order:'<path d="M6 2h12l2 5v15H4V7l2-5Z"/><path d="M4 7h16"/><path d="M9 12h6M9 16h6"/>',
-  menu:'<path d="M4 6h16M4 12h16M4 18h10"/>',
-  stock:'<path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="m3 8 9 5 9-5"/><path d="M12 21v-8"/>',
-  more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   bell:'<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',
+  menu:'<path d="M6 2h12l2 5v15H4V7l2-5Z"/><path d="M4 7h16"/><path d="M9 12h6M9 16h6"/>',
+  box:'<path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="m3 8 9 5 9-5"/><path d="M12 21v-8"/>',
+  promo:'<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.6"/>',
   table:'<path d="M4 11h16"/><path d="M4 11V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5"/><path d="M6 11v8M18 11v8"/>',
-  promo:'<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
-  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
-  kitchen:'<path d="M6 9a6 6 0 0 1 12 0v10H6V9Z"/><path d="M9 5V3M15 5V3"/>',
-  bike:'<circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17 10 8h5l3 9"/>',
   users:'<path d="M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 20v-2a4 4 0 0 0-3-3.9"/>',
-  info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
-  plus:'<path d="M12 5v14M5 12h14"/>',
-  search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
-  alert:'<path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5M12 17h.01"/>',
-  check:'<path d="m5 13 4 4L19 7"/>',
-  chev:'<path d="m9 6 6 6-6 6"/>',
-  power:'<path d="M12 3v9"/><path d="M6.5 6.5a9 9 0 1 0 11 0"/>'
+  chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  pan:'<path d="M6 9a6 6 0 0 1 12 0v10H6V9Z"/><path d="M9 5V3M15 5V3"/>',
+  bike:'<circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17 10 8h5l3 9"/>',
+  gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2 2 2 0 1 1-4 0 1.7 1.7 0 0 0-2.9-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3 15a2 2 0 1 1 0-4 1.7 1.7 0 0 0 1.4-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 4.6a2 2 0 1 1 4 0 1.7 1.7 0 0 0 2.7 1.4l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 21 11a2 2 0 1 1 0 4Z"/>',
+  star:'<path d="m12 3 2.6 5.6 6 .8-4.4 4.2 1.1 6L12 16.8 6.7 19.6l1.1-6L3.4 9.4l6-.8L12 3Z"/>',
+  eye:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff:'<path d="M3 3l18 18"/><path d="M10.6 5.2A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3 3.6"/><path d="M6.2 6.6A17 17 0 0 0 2 12s4 7 10 7a9.7 9.7 0 0 0 4.3-1"/>',
+  chev:'<path d="m9 6 6 6-6 6"/>', check:'<path d="m5 13 4 4L19 7"/>',
+  alert:'<path d="M12 3 2 20h20L12 3Z"/><path d="M12 9v5M12 17h.01"/>'
 };
-function svg(name,size,width){
-  return '<svg width="'+(size||22)+'" height="'+(size||22)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" '+
-         'stroke-width="'+(width||1.9)+'" stroke-linecap="round" stroke-linejoin="round">'+I[name]+'</svg>';
-}
+const svg = (n,s,w) => '<svg width="'+(s||22)+'" height="'+(s||22)+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" '+
+  'stroke-width="'+(w||1.9)+'" stroke-linecap="round" stroke-linejoin="round">'+I[n]+'</svg>';
+const rp = n => 'Rp' + Number(n||0).toLocaleString('id-ID');
+const find = (a,id) => a.find(x => x.id === id);
+const mmss = s => String(Math.floor(Math.max(0,s)/60)).padStart(2,'0')+':'+String(Math.floor(Math.max(0,s)%60)).padStart(2,'0');
+const newOrders = () => S.orders.filter(o => o.status === 'new');
+const lowStock  = () => S.stock.filter(s => s.qty < s.min);
+const soldOut   = () => S.menu.filter(m => !m.on);
 
-/* ── tabs: the Branch Manager's daily surface ───────────────────────────── */
+/* five daily, non-overlapping Branch-Manager surfaces */
 const TABS = [
-  { id:'beranda', label:'Beranda', icon:'home'  },
-  { id:'pesanan', label:'Pesanan', icon:'order' },
-  { id:'menu',    label:'Menu',    icon:'menu'  },
-  { id:'stok',    label:'Stok',    icon:'stock' },
-  { id:'lainnya', label:'Lainnya', icon:'more'  }
+  { id:'beranda', label:'Beranda',     icon:'home'  },
+  { id:'pesanan', label:'Pesanan',     icon:'bell'  },
+  { id:'katalog', label:'Stok & Menu', icon:'box'   },
+  { id:'promo',   label:'Promo',       icon:'promo' },
+  { id:'meja',    label:'Meja',        icon:'table' }
 ];
-let tab = 'beranda';
+let tab = 'beranda', catMode = 'menu', orderFilter = 'new', moneyHidden = false;
 
-const rupiah = n => 'Rp' + Number(n||0).toLocaleString('id-ID');
-const find = (arr,id) => arr.find(x => x.id === id);
-const newOrders = () => state.orders.filter(o => o.status === 'new');
-const lowStock  = () => state.stock.filter(s => s.qty < s.min);
-const soldOut   = () => state.menu.filter(m => !m.available);
-
-/* ── render ────────────────────────────────────────────────────────────── */
+function badgeFor(id){
+  if (id === 'pesanan') return newOrders().length;
+  if (id === 'katalog') return soldOut().length + lowStock().length;
+  if (id === 'meja')    return S.tables.filter(t => t.st === 'free').length;
+  return 0;
+}
 function render(){
-  document.getElementById('dot').className = 'branch-dot ' + (state.branch.isOpen ? 'open':'closed');
-  document.getElementById('branchSub').textContent =
-    (state.branch.isOpen ? 'Buka' : 'Tutup') + ' · ' +
-    (state.branch.onlineOrders ? 'Order online aktif' : 'Order online dijeda');
-  const bell = document.getElementById('bellDot');
-  bell.style.display = (newOrders().length || lowStock().length) ? 'block' : 'none';
+  const chip = document.getElementById('statusChip');
+  chip.className = 'status' + (S.branch.isOpen ? ' open' : '');
+  document.getElementById('statusLabel').textContent = S.branch.isOpen ? 'Buka' : 'Tutup';
+  document.getElementById('branchQ').textContent = S.branch.name;
+  const n = newOrders().length + lowStock().length;
+  const nn = document.getElementById('notifN');
+  nn.textContent = n; nn.style.display = n ? 'grid' : 'none';
 
-  const views = { beranda:viewBeranda, pesanan:viewPesanan, menu:viewMenu, stok:viewStok, lainnya:viewLainnya };
+  const views = { beranda:vBeranda, pesanan:vPesanan, katalog:vKatalog, promo:vPromo, meja:vMeja };
   document.getElementById('screen').innerHTML = views[tab]();
 
   document.getElementById('tabbar').innerHTML = TABS.map(t => {
-    const n = t.id === 'pesanan' ? newOrders().length : (t.id === 'stok' ? lowStock().length : 0);
+    const b = badgeFor(t.id);
     return '<button class="tab '+(tab===t.id?'active':'')+'" onclick="go(\''+t.id+'\')">'+
-      (n ? '<span class="n">'+n+'</span>' : '') + svg(t.icon,21) + '<span>'+t.label+'</span></button>';
+      (b ? '<span class="n">'+b+'</span>' : '') + svg(t.icon,21) + '<span>'+t.label+'</span></button>';
   }).join('');
-
-  const fab = { menu:'<button class="fab" onclick="toast(\'Tambah menu dari katalog Owner\')">'+svg('plus',17,2.4)+' Tambah Menu</button>' }[tab] || '';
-  document.getElementById('fabHost').innerHTML = fab;
 }
 function go(id){ tab = id; window.scrollTo(0,0); render(); }
-function toast(msg){
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('show');
-  clearTimeout(el._t); el._t = setTimeout(()=>el.classList.remove('show'), 1800);
+function toast(m){
+  const e = document.getElementById('toast'); e.textContent = m; e.classList.add('show');
+  clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('show'), 1700);
 }
+function openSheet(h){
+  document.getElementById('sheet').innerHTML = '<div class="grip"></div>' + h;
+  document.getElementById('sheetWrap').classList.add('open');
+}
+function closeSheet(){ document.getElementById('sheetWrap').classList.remove('open'); }
 
-/* ── Beranda ───────────────────────────────────────────────────────────── */
-function viewBeranda(){
+/* ── Beranda: one ordered column, no repeated blocks ───────────────────── */
+function vBeranda(){
   const n = newOrders().length, low = lowStock().length, out = soldOut().length;
   return [
-    '<div class="proto-note">Prototype UI · data dummy di memori, tidak menyentuh data cabang</div>',
+    n ? '<div class="alert"><div class="ic">'+svg('bell',18)+'</div><div>'+
+        '<div class="t">'+n+' pesanan menunggu diterima</div>'+
+        '<div class="s">Terima atau tolak sebelum batas waktu berakhir.</div></div>'+
+        '<button class="chev" onclick="go(\'pesanan\')">'+svg('chev',18,2.4)+'</button></div>' : '',
 
-    '<div class="section"><div class="card hero">',
-      '<div class="hero-top"><div>',
-        '<div class="hero-label">Status cabang</div>',
-        '<div class="hero-value">'+(state.branch.isOpen?'Sedang buka':'Sedang tutup')+'</div>',
-        '<div class="hero-note">'+(state.branch.isOpen
-          ? 'Pesanan masuk diproses seperti biasa.'
-          : 'Pesanan baru tidak diterima sampai cabang dibuka.')+'</div>',
-      '</div>',
-      '<button class="switch '+(state.branch.isOpen?'on':'')+'" role="switch" aria-checked="'+state.branch.isOpen+'" aria-label="Buka tutup cabang" onclick="toggle(\'isOpen\')"><i></i></button>',
-      '</div>',
-      '<div class="hero-row"><div>',
-        '<div class="t">Order online</div>',
-        '<div class="s">'+(state.branch.onlineOrders ? 'Aktif — pesanan aplikasi & agregator diterima' : 'Dijeda sementara, cabang tetap buka')+'</div>',
-      '</div>',
-      '<button class="switch '+(state.branch.onlineOrders?'on':'')+'" role="switch" aria-checked="'+state.branch.onlineOrders+'" aria-label="Jeda order online" onclick="toggle(\'onlineOrders\')"><i></i></button>',
-      '</div>',
+    '<div class="sec"><div class="c money-hero">'+
+      '<div class="sec-head" style="margin-bottom:0"><div class="sec-title">Penjualan hari ini</div>'+
+        '<button class="sec-link" onclick="openReport()">Rincian ›</button></div>'+
+      '<div class="money-value"><span id="moneyVal">'+rp(S.today.revenue)+'</span>'+
+        '<button class="eye" id="eyeBtn" onclick="toggleMoney()">'+svg('eye',19)+'</button></div>'+
+      '<div class="money-cards">'+
+        '<div class="mc"><div class="k">'+svg('box',14,2.2)+' Tunai (COD)</div><div class="v">'+rp(S.today.cash)+'</div>'+
+          '<div class="t">18 transaksi ›</div></div>'+
+        '<div class="mc"><div class="k">'+svg('chart',14,2.2)+' Online</div><div class="v">'+rp(S.today.online)+'</div>'+
+          '<div class="t">63 transaksi ›</div></div>'+
+      '</div>'+
     '</div></div>',
 
-    '<div class="section">',
-      '<div class="section-head"><div class="section-title">Perlu perhatian</div>'+
-        '<button class="section-link" onclick="go(\'pesanan\')">Lihat semua</button></div>',
-      (n ? '<div class="attn danger"><div class="ic">'+svg('bell',18)+'</div><div class="body">'+
-            '<div class="t">'+n+' pesanan baru menunggu diterima</div>'+
-            '<div class="s">Segera terima/tolak — pembatalan otomatis setelah batas waktu.</div></div>'+
-            '<button class="go" onclick="go(\'pesanan\')">'+svg('chev',16,2.4)+'</button></div>' : ''),
-      (out ? '<div class="attn"><div class="ic">'+svg('menu',18)+'</div><div class="body">'+
-            '<div class="t">'+out+' menu ditandai habis</div>'+
-            '<div class="s">Pelanggan tidak bisa memesan menu ini sampai diaktifkan kembali.</div></div>'+
-            '<button class="go" onclick="go(\'menu\')">'+svg('chev',16,2.4)+'</button></div>' : ''),
-      (low ? '<div class="attn"><div class="ic">'+svg('stock',18)+'</div><div class="body">'+
-            '<div class="t">'+low+' bahan di bawah stok minimum</div>'+
-            '<div class="s">'+lowStock().map(s=>s.name).join(', ')+'</div></div>'+
-            '<button class="go" onclick="go(\'stok\')">'+svg('chev',16,2.4)+'</button></div>' : ''),
-      (!n && !low && !out ? '<div class="attn calm"><div class="ic">'+svg('check',18)+'</div><div class="body">'+
-            '<div class="t">Semua terkendali</div><div class="s">Tidak ada pesanan menunggu atau stok kritis.</div></div></div>' : ''),
+    '<div class="sec"><div class="strip"><div>'+svg('chart',18,2.2)+'</div>'+
+      '<div class="t">Baru! Pantau performa cabangmu di sini</div></div></div>',
+
+    '<div class="sec">'+
+      '<div class="sec-head"><div class="sec-title">Perkembangan hari ini</div>'+
+        '<button class="sec-link" onclick="toast(\'Panduan performa cabang\')">Pelajari</button></div>'+
+      '<div class="fresh">Diperbarui baru saja</div>'+
+      '<div class="metrics">'+
+        metric('Pesanan masuk', S.today.orders)+
+        metric('Pesanan selesai', S.today.done)+
+        metric('Rata-rata', rp(S.today.avg))+
+      '</div>'+
+      (!S.today.orders ? '<div class="calm">Data akan muncul setelah ada aktivitas hari ini. Semangat!</div>' : '')+
     '</div>',
 
-    '<div class="section">',
-      '<div class="section-head"><div class="section-title">Ringkasan hari ini</div>'+
-        '<button class="section-link" onclick="toast(\'Laporan harian cabang\')">Detail</button></div>',
-      '<div class="stats">',
-        '<div class="stat"><div class="k">Penjualan</div><div class="v">'+rupiah(state.sales.revenue)+'</div>'+
-          '<div class="d'+(state.sales.delta<0?' down':'')+'">'+(state.sales.delta>0?'▲ ':'▼ ')+Math.abs(state.sales.delta)+'% vs kemarin</div></div>',
-        '<div class="stat"><div class="k">Pesanan</div><div class="v">'+state.sales.orders+'</div><div class="d">'+n+' baru</div></div>',
-        '<div class="stat"><div class="k">Rata-rata</div><div class="v">'+rupiah(state.sales.avg)+'</div><div class="d">per pesanan</div></div>',
-      '</div>',
+    '<div class="sec"><div class="pair">'+
+      '<button class="score" onclick="openReadiness()"><div class="k">Kesiapan cabang</div>'+
+        '<div class="row"><span class="ring '+(out ? 'red' : 'amber')+'">'+readiness()+'</span>'+
+        '<span class="v">'+readiness()+'<span class="sub">/100</span></span>'+
+        '<span style="margin-left:auto">'+svg('chev',16,2.6)+'</span></div></button>'+
+      '<button class="score" onclick="toast(\'Ulasan pelanggan cabang\')"><div class="k">Rating & ulasan</div>'+
+        '<div class="row"><span style="color:#f59e0b">'+svg('star',22,2)+'</span>'+
+        '<span class="v">4.7</span><span style="margin-left:auto">'+svg('chev',16,2.6)+'</span></div></button>'+
+    '</div></div>',
+
+    '<div class="sec">'+
+      '<div class="sec-head"><div class="sec-title">Fitur cabang</div>'+
+        '<button class="sec-link" onclick="openAllFeatures()">Lihat semua</button></div>'+
+      '<div class="grid">'+FEATURES.slice(0,8).map(f =>
+        '<button class="feat" onclick="'+f.act+'">'+(f.n ? '<span class="n">'+f.n+'</span>' : '')+
+          '<span class="ic">'+svg(f.icon,21)+'</span><span class="l">'+f.label+'</span>'+
+          (f.tag ? '<span class="tag">'+f.tag+'</span>' : '')+'</button>').join('')+'</div>'+
     '</div>',
 
-    '<div class="section">',
-      '<div class="section-head"><div class="section-title">Aksi cepat</div></div>',
-      '<div class="qa">',
-        '<button class="qa-btn primary" onclick="toggle(\'isOpen\')">'+svg('power',16,2.2)+' '+(state.branch.isOpen?'Tutup cabang':'Buka cabang')+'</button>',
-        '<button class="qa-btn" onclick="toggle(\'onlineOrders\')">'+svg('clock',16,2.2)+' '+(state.branch.onlineOrders?'Jeda online':'Aktifkan online')+'</button>',
-        '<button class="qa-btn" onclick="go(\'menu\')">'+svg('menu',16,2.2)+' Kelola menu</button>',
-        '<button class="qa-btn" onclick="go(\'stok\')">'+svg('stock',16,2.2)+' Sesuaikan stok</button>',
-      '</div>',
+    '<div class="sec">'+
+      '<div class="sec-head"><div class="sec-title">Promo cabang</div>'+
+        '<button class="sec-link" onclick="go(\'promo\')">Kelola</button></div>'+
+      (S.promos.filter(p => p.on).length
+        ? S.promos.filter(p => p.on).map(p =>
+            '<div class="li"><div class="thumb">'+svg('promo',20)+'</div>'+
+            '<div class="g"><div class="t">'+p.name+'</div><div class="s">'+p.detail+'</div></div>'+
+            '<span class="pill done">Aktif</span></div>').join('')
+        : '<div class="calm">Belum ada promo aktif. Promo yang disetujui Owner muncul di tab Promo.</div>')+
     '</div>'
   ].join('');
 }
-function toggle(key){
-  state.branch[key] = !state.branch[key];
-  toast(key === 'isOpen'
-    ? (state.branch.isOpen ? 'Cabang dibuka' : 'Cabang ditutup')
-    : (state.branch.onlineOrders ? 'Order online diaktifkan' : 'Order online dijeda'));
-  render();
+function metric(k,v){
+  return '<button class="metric" onclick="toast(\'Detail '+k+'\')"><div class="k">'+k+'</div>'+
+    '<div class="v">'+v+'</div><div class="d">Detail ›</div></button>';
+}
+function readiness(){
+  let s = 100;
+  s -= soldOut().length * 12;
+  s -= lowStock().length * 7;
+  if (!S.branch.online) s -= 15;
+  if (!S.branch.isOpen) s -= 30;
+  return Math.max(35, Math.round(s));
+}
+const FEATURES = [
+  { label:'Jam Buka',    icon:'clock', act:'openHours()' },
+  { label:'Karyawan',    icon:'users', act:'openStaff()' },
+  { label:'Laporan',     icon:'chart', act:'openReport()' },
+  { label:'Kitchen',     icon:'pan',   act:'openKitchen()', tag:'Pantau' },
+  { label:'Pengiriman',  icon:'bike',  act:'openShip()',    tag:'Pantau' },
+  { label:'Pengaturan',  icon:'gear',  act:'openSettings()' }
+];
+function toggleMoney(){
+  moneyHidden = !moneyHidden;
+  document.getElementById('moneyVal').textContent = moneyHidden ? 'Rp••••••' : rp(S.today.revenue);
+  document.getElementById('eyeBtn').innerHTML = svg(moneyHidden ? 'eyeoff' : 'eye', 19);
 }
 
 /* ── Pesanan ───────────────────────────────────────────────────────────── */
-let orderFilter = 'new';
-function viewPesanan(){
-  const list = state.orders.filter(o => orderFilter === 'all' ? true : o.status === orderFilter);
-  const seg = [['new','Baru'],['process','Diproses'],['done','Selesai'],['all','Semua']];
-  return [
-    '<div class="seg">'+seg.map(([k,l]) => {
-      const c = k==='all' ? state.orders.length : state.orders.filter(o=>o.status===k).length;
-      return '<button class="'+(orderFilter===k?'active':'')+'" onclick="setFilter(\''+k+'\')">'+l+
-             (k!=='all' && c ? ' · '+c : '')+'</button>';
-    }).join('')+'</div>',
-    list.length ? list.map(orderCard).join('')
-      : '<div class="empty"><div class="e">🧾</div><div class="t">Belum ada pesanan</div>'+
-        '<div class="s">Pesanan baru akan muncul di sini beserta hitungan waktu penerimaan.</div></div>'
-  ].join('');
+function vPesanan(){
+  const segs = [['new','Baru'],['process','Diproses'],['done','Selesai'],['all','Semua']];
+  const list = S.orders.filter(o => orderFilter === 'all' ? true : o.status === orderFilter);
+  return '<div class="seg">'+segs.map(([k,l]) => {
+      const c = k === 'all' ? S.orders.length : S.orders.filter(o => o.status === k).length;
+      return '<button class="'+(orderFilter===k?'active':'')+'" onclick="setFilter(\''+k+'\')">'+l+(k!=='all'&&c?' · '+c:'')+'</button>';
+    }).join('')+'</div>'+
+    (list.length ? list.map(oCard).join('')
+      : '<div class="empty"><div class="e">🧾</div><div class="t">Belum ada pesanan di sini</div>'+
+        '<div class="s">Pesanan baru muncul otomatis beserta hitungan waktu penerimaannya.</div></div>');
 }
 function setFilter(f){ orderFilter = f; render(); }
-function orderCard(o){
-  const badge = { new:['new','BARU'], process:['process','DIPROSES'], done:['done','SELESAI'], reject:['reject','DITOLAK'] }[o.status];
-  const typeLabel = { delivery:'Delivery', pickup:'Pickup', 'dine-in':'Dine-in' }[o.type];
-  return '<div class="order '+(o.status==='new'?'new fresh':'')+'">'+
-    '<div class="order-head"><div style="min-width:0">'+
-      '<div class="order-code">'+o.code+'</div>'+
-      '<div class="order-meta"><span class="chip '+badge[0]+'">'+badge[1]+'</span>'+
-        '<span class="chip tag">'+typeLabel+'</span><span>'+o.time+'</span><span>· '+o.customer+'</span></div>'+
+function oCard(o){
+  const st = { new:['new','BARU'], process:['process','DIPROSES'], done:['done','SELESAI'], reject:['reject','DITOLAK'] }[o.status];
+  const ty = { delivery:'Delivery', pickup:'Pickup', 'dine-in':'Dine-in' }[o.type];
+  return '<div class="order '+(o.status==='new'?'new':'')+'">'+
+    '<div class="o-head"><div style="min-width:0">'+
+      '<div class="o-code">'+o.code+'</div>'+
+      '<div class="o-meta"><span class="pill '+st[0]+'">'+st[1]+'</span><span class="pill mute">'+ty+'</span>'+
+        '<span class="m">· '+o.time+' · '+o.cust+'</span></div></div>'+
+    (o.left != null ? '<div class="cd"><div class="v'+(o.left<60?' crit':'')+'" id="cd-'+o.id+'">'+mmss(o.left)+'</div>'+
+      '<div class="l">sisa waktu</div></div>' : '')+
     '</div>'+
-    (o.left != null ? '<div style="text-align:right"><div class="countdown'+(o.left<60?' crit':'')+'" id="cd-'+o.id+'">'+mmss(o.left)+'</div>'+
-      '<div style="font-size:10px;color:var(--muted);font-weight:700">sisa waktu</div></div>' : '')+
-    '</div>'+
-    '<div class="order-items">'+o.items.map(([n,q])=>'<div class="order-line"><span>'+q+'× '+n+'</span><b>'+rupiah(o.total/o.items.length*q)+'</b></div>').join('')+'</div>'+
-    '<div class="order-foot"><div class="order-total">'+rupiah(o.total)+'</div>'+
-      '<div class="order-actions">'+
-        (o.status==='new'
-          ? '<button class="btn reject" onclick="setOrder(\''+o.id+'\',\'reject\')">Tolak</button>'+
-            '<button class="btn accept" onclick="setOrder(\''+o.id+'\',\'process\')">Terima</button>'
-          : '<button class="btn ghost" onclick="openOrder(\''+o.id+'\')">Detail</button>'+
-            (o.status==='process' ? '<button class="btn primary" onclick="setOrder(\''+o.id+'\',\'done\')">Selesaikan</button>' : ''))+
-      '</div>'+
-    '</div></div>';
+    '<div class="o-items">'+o.items.map(([n,q,t]) => '<div class="o-line"><span>'+q+'× '+n+'</span><b>'+rp(t*q)+'</b></div>').join('')+'</div>'+
+    '<div class="o-foot"><div class="o-total">'+rp(o.total)+'</div><div class="btns">'+
+      (o.status === 'new'
+        ? '<button class="btn reject" onclick="setOrder(\''+o.id+'\',\'reject\')">Tolak</button>'+
+          '<button class="btn accept" onclick="setOrder(\''+o.id+'\',\'process\')">Terima</button>'
+        : '<button class="btn ghost" onclick="openOrder(\''+o.id+'\')">Detail</button>'+
+          (o.status === 'process' ? '<button class="btn dark" onclick="setOrder(\''+o.id+'\',\'done\')">Selesaikan</button>' : ''))+
+    '</div></div></div>';
 }
-function setOrder(id,status){
-  const o = find(state.orders,id); if(!o) return;
-  o.status = status; if(status !== 'new') o.left = null;
-  toast(status==='process' ? 'Pesanan '+o.code+' diterima' : status==='reject' ? 'Pesanan '+o.code+' ditolak' : 'Pesanan '+o.code+' selesai');
-  if(orderFilter==='new' && status!=='new') orderFilter = 'process';
+function setOrder(id, to){
+  const o = find(S.orders,id); if (!o) return;
+  o.status = to; if (to !== 'new') o.left = null;
+  if (to === 'process') S.today.done = Math.min(S.today.orders, S.today.done + 1);
+  toast(to === 'process' ? o.code+' diterima' : to === 'reject' ? o.code+' ditolak' : o.code+' selesai');
+  if (orderFilter === 'new' && to !== 'new') orderFilter = 'process';
   render();
-}
-const mmss = s => String(Math.floor(s/60)).padStart(2,'0')+':'+String(Math.floor(s%60)).padStart(2,'0');
-
-/* ── Menu ──────────────────────────────────────────────────────────────── */
-let menuQ = '', menuCat = 'Semua';
-function viewMenu(){
-  const cats = ['Semua'].concat([...new Set(state.menu.map(m=>m.cat))]);
-  const list = state.menu.filter(m =>
-    (menuCat==='Semua' || m.cat===menuCat) &&
-    (!menuQ || m.name.toLowerCase().includes(menuQ)));
-  return [
-    '<div class="search">'+svg('search',18)+'<input id="menuQ" placeholder="Cari menu" value="'+menuQ+'" '+
-      'oninput="menuQ=this.value;var p=this.selectionStart;render();var e=document.getElementById(\'menuQ\');if(e){e.focus();e.setSelectionRange(p,p);}"></div>',
-    '<div class="cats">'+cats.map(c=>'<button class="cat '+(menuCat===c?'active':'')+'" onclick="menuCat=\''+c+'\';render()">'+c+'</button>').join('')+'</div>',
-    (soldOut().length ? '<div class="attn"><div class="ic">'+svg('menu',18)+'</div><div class="body">'+
-      '<div class="t">'+soldOut().length+' menu sedang habis</div><div class="s">Tap tombol di kanan untuk mengaktifkan kembali.</div></div></div>' : ''),
-    list.length ? list.map(menuRow).join('')
-      : '<div class="empty"><div class="e">🔍</div><div class="t">Menu tidak ditemukan</div><div class="s">Coba kata kunci lain.</div></div>'
-  ].join('');
-}
-function menuRow(m){
-  return '<div class="row '+(m.available?'':'off')+'">'+
-    '<div class="thumb">'+svg('menu',20)+'</div>'+
-    '<div class="grow"><div class="name">'+m.name+'</div>'+
-      '<div class="sub">'+rupiah(m.price)+' · '+m.cat+' · terjual '+m.sold+'</div></div>'+
-    '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">'+
-      '<button class="switch '+(m.available?'on primary':'')+'" role="switch" aria-checked="'+m.available+'" '+
-        'aria-label="Ketersediaan '+m.name+'" onclick="toggleMenu(\''+m.id+'\')"><i></i></button>'+
-      '<span class="pill '+(m.available?'ok':'low')+'">'+(m.available?'Tersedia':'Habis')+'</span>'+
-    '</div></div>';
-}
-function toggleMenu(id){
-  const m = find(state.menu,id); if(!m) return;
-  m.available = !m.available;
-  toast(m.available ? m.name+' diaktifkan' : m.name+' ditandai habis');
-  render();
-}
-
-/* ── Stok ──────────────────────────────────────────────────────────────── */
-function viewStok(){
-  const low = lowStock();
-  return [
-    (low.length ? '<div class="attn"><div class="ic">'+svg('alert',18)+'</div><div class="body">'+
-      '<div class="t">'+low.length+' bahan di bawah stok minimum</div>'+
-      '<div class="s">'+low.map(s=>s.name+' ('+s.qty+' '+s.unit+')').join(', ')+'</div></div></div>'
-      : '<div class="attn calm"><div class="ic">'+svg('check',18)+'</div><div class="body">'+
-        '<div class="t">Stok cabang aman</div><div class="s">Semua bahan di atas batas minimum.</div></div></div>'),
-    '<div class="section-head" style="margin-top:14px"><div class="section-title">Bahan & persediaan</div></div>',
-    state.stock.map(s => {
-      const isLow = s.qty < s.min;
-      return '<div class="row">'+
-        '<div class="thumb">'+svg('stock',20)+'</div>'+
-        '<div class="grow"><div class="name">'+s.name+'</div>'+
-          '<div class="sub">min. '+s.min+' '+s.unit+'</div></div>'+
-        '<div style="text-align:right">'+
-          '<div class="stock-qty'+(isLow?' low':'')+'">'+s.qty+' <span style="font-size:11px;font-weight:700">'+s.unit+'</span></div>'+
-          '<span class="pill '+(isLow?'low':'ok')+'">'+(isLow?'Menipis':'Aman')+'</span>'+
-        '</div>'+
-        '<button class="btn ghost" onclick="adjustStock(\''+s.id+'\')">Sesuaikan</button>'+
-      '</div>';
-    }).join('')
-  ].join('');
-}
-function adjustStock(id){
-  const s = find(state.stock,id); if(!s) return;
-  openSheet(
-    '<h3>Sesuaikan stok</h3><div class="muted">'+s.name+' — gunakan untuk pemakaian harian cabang.</div>'+
-    '<div class="kv"><span class="k">Stok saat ini</span><span class="v">'+s.qty+' '+s.unit+'</span></div>'+
-    '<div class="kv"><span class="k">Batas minimum</span><span class="v">'+s.min+' '+s.unit+'</span></div>'+
-    '<div class="sheet-actions">'+
-      '<button class="btn ghost block" onclick="bumpStock(\''+s.id+'\',-1)">− 1 '+s.unit+'</button>'+
-      '<button class="btn accept block" onclick="bumpStock(\''+s.id+'\',+1)">+ 1 '+s.unit+'</button>'+
-    '</div>'
-  );
-}
-function bumpStock(id,delta){
-  const s = find(state.stock,id); if(!s) return;
-  s.qty = Math.max(0, s.qty + delta);
-  toast(s.name+' → '+s.qty+' '+s.unit);
-  closeSheet(); render();
-}
-
-/* ── Lainnya (hub) ─────────────────────────────────────────────────────── */
-const HUB = [
-  { group:'Operasional harian', items:[
-    { id:'meja',   label:'Meja',        icon:'table',  action:'openMeja()',   note:'Status meja & dine-in hari ini' },
-    { id:'promo',  label:'Promo',       icon:'promo',  action:'openPromo()',  note:'Aktifkan promo yang sudah disetujui' },
-    { id:'jam',    label:'Jam Buka',    icon:'clock',  action:'openHours()',  note:'Pengecualian jadwal hari ini' }
-  ]},
-  { group:'Pemantauan', items:[
-    { id:'kitchen', label:'Kitchen', icon:'kitchen', badge:'Pantau', action:"toast('Pantau antrean dapur (read-only)')", note:'Progres masak — tanpa aksi' },
-    { id:'kirim',   label:'Pengiriman', icon:'bike', badge:'Pantau', action:"toast('Pantau pengiriman (read-only)')",    note:'Status kurir — tanpa aksi' }
-  ]},
-  { group:'Tim & kinerja', items:[
-    { id:'staf',    label:'Karyawan', icon:'users', action:'openStaf()',    note:'Staf cabang & shift' },
-    { id:'laporan', label:'Laporan',  icon:'chart', action:'openReport()',  note:'Ringkasan harian cabang' }
-  ]}
-];
-function viewLainnya(){
-  return HUB.map(sec =>
-    '<div class="section"><div class="section-head"><div class="section-title">'+sec.group+'</div></div>'+
-    '<div class="hub">'+sec.items.map(t =>
-      '<button class="tile" onclick="'+t.action+'">'+
-        (t.badge ? '<span class="badge-mini">'+t.badge+'</span>' : '')+
-        '<span class="ic">'+svg(t.icon,19)+'</span><span class="t">'+t.label+'</span>'+
-      '</button>').join('')+'</div></div>'
-  ).join('');
-}
-/* sub-screens reached from the hub */
-let sub = null;
-function openPromo(){
-  sub = 'promo';
-  openSheet('<h3>Promo cabang</h3><div class="muted">Hanya promo yang sudah disetujui Owner yang bisa diaktifkan di cabang ini.</div>'+
-    state.promos.map(p => '<div class="kv"><span class="k">'+p.name+'<br><span style="font-size:11px">'+p.scope+
-      '</span></span><span class="v">'+(p.status==='active'?'<span class="pill ok">Aktif</span>':'<span class="pill">Siap diaktifkan</span>')+'</span></div>').join('')+
-    '<div class="sheet-actions"><button class="btn accept block" onclick="toast(\'Promo diaktifkan untuk cabang ini\');closeSheet()">Aktifkan promo terpilih</button></div>');
-}
-function openHours(){
-  openSheet('<h3>Jam operasional</h3><div class="muted">Owner menetapkan jadwal default; cabang hanya mengatur pengecualian harian.</div>'+
-    '<div class="kv"><span class="k">Jadwal default</span><span class="v">'+state.hours.open+' – '+state.hours.close+'</span></div>'+
-    '<div class="kv"><span class="k">Pengecualian hari ini</span><span class="v">'+(state.hours.exception||'Tidak ada')+'</span></div>'+
-    '<div class="sheet-actions"><button class="btn ghost block" onclick="toast(\'Atur pengecualian jadwal\')">Atur pengecualian</button></div>');
-}
-function openReport(){
-  openSheet('<h3>Laporan harian</h3><div class="muted">Ringkasan operasional cabang hari ini.</div>'+
-    '<div class="kv"><span class="k">Penjualan</span><span class="v">'+rupiah(state.sales.revenue)+'</span></div>'+
-    '<div class="kv"><span class="k">Jumlah pesanan</span><span class="v">'+state.sales.orders+'</span></div>'+
-    '<div class="kv"><span class="k">Rata-rata per pesanan</span><span class="v">'+rupiah(state.sales.avg)+'</span></div>'+
-    '<div class="kv"><span class="k">Pesanan baru belum diterima</span><span class="v">'+newOrders().length+'</span></div>');
-}
-function openMeja(){
-  const label = { available:'Tersedia', occupied:'Terisi', reserved:'Dipesan', blocked:'Diblokir' };
-  const pill  = { available:'ok', occupied:'', reserved:'', blocked:'low' };
-  openSheet('<h3>Meja hari ini</h3><div class="muted">Status operasional meja cabang — bukan konfigurasi denah (itu milik Owner).</div>'+
-    state.tables.map(t => '<div class="kv"><span class="k">'+t.name+' · '+t.seats+' kursi</span>'+
-      '<span class="v"><span class="pill '+(pill[t.status]||'')+'">'+label[t.status]+'</span></span></div>').join(''));
-}
-function openStaf(){
-  openSheet('<h3>Karyawan cabang</h3><div class="muted">Staf operasional cabang ini dan shift hariannya.</div>'+
-    state.staff.map(u => '<div class="kv"><span class="k">'+u.name+'<br><span style="font-size:11px">'+u.role+' · shift '+u.shift+
-      '</span></span><span class="v"><span class="pill '+(u.active?'ok':'')+'">'+(u.active?'Aktif':'Nonaktif')+'</span></span></div>').join(''));
 }
 function openOrder(id){
-  const o = find(state.orders,id); if(!o) return;
-  openSheet('<h3>Pesanan '+o.code+'</h3><div class="muted">'+o.customer+' · '+o.time+'</div>'+
-    o.items.map(([n,q])=>'<div class="kv"><span class="k">'+q+'× '+n+'</span><span class="v">'+rupiah(o.total/o.items.length*q)+'</span></div>').join('')+
-    '<div class="kv"><span class="k">Total</span><span class="v">'+rupiah(o.total)+'</span></div>');
+  const o = find(S.orders,id); if (!o) return;
+  openSheet('<h3>Pesanan '+o.code+'</h3><div class="m">'+o.cust+' · '+o.time+'</div>'+
+    o.items.map(([n,q,t]) => '<div class="kv"><span class="k">'+q+'× '+n+'</span><span class="v">'+rp(t*q)+'</span></div>').join('')+
+    '<div class="kv"><span class="k">Total</span><span class="v">'+rp(o.total)+'</span></div>');
 }
-function openSheet(html){ document.getElementById('sheet').innerHTML = '<div class="sheet-grip"></div>'+html; document.getElementById('sheetWrap').classList.add('open'); }
-function closeSheet(){ document.getElementById('sheetWrap').classList.remove('open'); }
+
+/* ── Stok & Menu: one tab, two modes ───────────────────────────────────── */
+function vKatalog(){
+  return '<div class="seg">'+
+      '<button class="'+(catMode==='menu'?'active':'')+'" onclick="catMode=\'menu\';render()">Menu</button>'+
+      '<button class="'+(catMode==='stok'?'active':'')+'" onclick="catMode=\'stok\';render()">Stok</button>'+
+    '</div>' + (catMode === 'menu' ? vMenu() : vStok());
+}
+function vMenu(){
+  return (soldOut().length ? '<div class="alert warn"><div class="ic">'+svg('menu',18)+'</div><div>'+
+      '<div class="t">'+soldOut().length+' menu ditandai habis</div>'+
+      '<div class="s">Pelanggan tidak bisa memesan menu ini sampai diaktifkan kembali.</div></div></div>' : '')+
+    S.menu.map(m =>
+      '<div class="row '+(m.on?'':'off')+'"><div class="thumb">'+svg('menu',20)+'</div>'+
+      '<div class="g"><div class="t">'+m.name+'</div><div class="s">'+rp(m.price)+' · '+m.cat+' · terjual '+m.sold+'</div></div>'+
+      '<button class="sw '+(m.on?'on':'')+'" role="switch" aria-checked="'+m.on+'" aria-label="'+m.name+'" '+
+        'onclick="toggleMenu(\''+m.id+'\')"><i></i></button></div>').join('')+
+    '<button class="btn dark wide" style="margin-top:6px" onclick="toast(\'Tambah menu dari katalog Owner\')">Tambah menu dari katalog</button>';
+}
+function toggleMenu(id){
+  const m = find(S.menu,id); if (!m) return;
+  m.on = !m.on; toast(m.name + (m.on ? ' diaktifkan' : ' ditandai habis')); render();
+}
+function vStok(){
+  const low = lowStock();
+  return (low.length
+      ? '<div class="alert"><div class="ic">'+svg('alert',18)+'</div><div>'+
+        '<div class="t">'+low.length+' bahan di bawah minimum</div>'+
+        '<div class="s">'+low.map(s => s.name+' ('+s.qty+' '+s.unit+')').join(', ')+'</div></div></div>'
+      : '<div class="alert warn" style="background:var(--green-soft)"><div class="ic" style="color:var(--green)">'+
+        svg('check',18)+'</div><div><div class="t">Stok cabang aman</div>'+
+        '<div class="s">Semua bahan di atas batas minimum.</div></div></div>')+
+    S.stock.map(s => {
+      const isLow = s.qty < s.min;
+      return '<div class="row"><div class="thumb">'+svg('box',20)+'</div>'+
+        '<div class="g"><div class="t">'+s.name+'</div><div class="s">min. '+s.min+' '+s.unit+'</div></div>'+
+        '<div style="text-align:right"><div style="font-size:15px;font-weight:900;'+(isLow?'color:var(--red)':'')+'">'+
+          s.qty+' <span style="font-size:11px;font-weight:700">'+s.unit+'</span></div>'+
+          '<span class="pill '+(isLow?'reject':'done')+'" style="margin-top:4px;display:inline-block">'+
+          (isLow?'Menipis':'Aman')+'</span></div>'+
+        '<button class="btn ghost" style="padding:9px 13px" onclick="adjustStock(\''+s.id+'\')">Ubah</button></div>';
+    }).join('');
+}
+function adjustStock(id){
+  const s = find(S.stock,id); if (!s) return;
+  openSheet('<h3>'+s.name+'</h3><div class="m">Catat pemakaian harian cabang.</div>'+
+    '<div class="kv"><span class="k">Stok saat ini</span><span class="v">'+s.qty+' '+s.unit+'</span></div>'+
+    '<div class="kv"><span class="k">Batas minimum</span><span class="v">'+s.min+' '+s.unit+'</span></div>'+
+    '<div class="acts"><button class="btn ghost wide" onclick="bump(\''+s.id+'\',-1)">− 1 '+s.unit+'</button>'+
+    '<button class="btn accept wide" onclick="bump(\''+s.id+'\',1)">+ 1 '+s.unit+'</button></div>');
+}
+function bump(id,d){
+  const s = find(S.stock,id); if (!s) return;
+  s.qty = Math.max(0, s.qty + d);
+  toast(s.name+' → '+s.qty+' '+s.unit); closeSheet(); render();
+}
+
+/* ── Promo ─────────────────────────────────────────────────────────────── */
+function vPromo(){
+  return '<div class="sec-head"><div class="sec-title">Promo cabang</div></div>'+
+    '<div class="fresh">Cabang hanya mengaktifkan atau menonaktifkan promo yang sudah disetujui Owner — bukan membuat promo baru.</div>'+
+    S.promos.map(p =>
+      '<div class="li"><div class="thumb">'+svg('promo',20)+'</div>'+
+      '<div class="g"><div class="t">'+p.name+'</div><div class="s">'+p.detail+'</div></div>'+
+      '<button class="sw '+(p.on?'on':'')+'" role="switch" aria-checked="'+p.on+'" aria-label="'+p.name+'" '+
+        'onclick="togglePromo(\''+p.id+'\')"><i></i></button></div>').join('');
+}
+function togglePromo(id){
+  const p = find(S.promos,id); if (!p) return;
+  p.on = !p.on; toast(p.name + (p.on ? ' diaktifkan' : ' dinonaktifkan')); render();
+}
+
+/* ── Meja ──────────────────────────────────────────────────────────────── */
+const TLBL = { free:'Tersedia', busy:'Terisi', book:'Dipesan' };
+function vMeja(){
+  return '<div class="sec-head"><div class="sec-title">Status meja hari ini</div>'+
+    '<button class="sec-link" onclick="toast(\'Ketuk kartu meja untuk mengubah status\')">Bantuan</button></div>'+
+    '<div class="fresh">Denah dan jumlah kursi ditetapkan Owner. Di sini cabang hanya mengubah status harian.</div>'+
+    '<div class="tables">'+S.tables.map(t =>
+      '<button class="tbl" onclick="cycleTable(\''+t.id+'\')"><div class="n">'+t.name+'</div>'+
+      '<div class="s">'+t.seats+' kursi</div><div class="st"><span class="dotst '+t.st+'">'+TLBL[t.st]+'</span></div></button>').join('')+
+    '</div>';
+}
+function cycleTable(id){
+  const t = find(S.tables,id); if (!t) return;
+  t.st = t.st === 'free' ? 'busy' : t.st === 'busy' ? 'book' : 'free';
+  toast(t.name+' → '+TLBL[t.st]); render();
+}
+
+/* ── sheets ────────────────────────────────────────────────────────────── */
+function openAllFeatures(){
+  openSheet('<h3>Semua fitur cabang</h3><div class="m">Kemampuan operasional harian Branch Manager. '+
+    'Konfigurasi durable dan lintas cabang dikelola Owner.</div>'+
+    FEATURES.concat([{ label:'Pengaturan cabang', icon:'gear', act:'openSettings()' }]).map(f =>
+      '<div class="li" onclick="closeSheet();'+f.act+'" style="box-shadow:none;border-radius:0;padding:12px 0;border-bottom:1px solid var(--line);margin:0">'+
+      '<div class="thumb">'+svg(f.icon,20)+'</div><div class="g"><div class="t">'+f.label+'</div>'+
+      (f.tag ? '<div class="s">'+f.tag+'</div>' : '')+'</div><span class="chev">'+svg('chev',16,2.4)+'</span></div>').join(''));
+}
+function openStatus(){
+  openSheet('<h3>Status cabang</h3><div class="m">Buka/tutup menentukan apakah pesanan baru diterima.</div>'+
+    '<div class="kv"><span class="k">Cabang</span><span class="v">'+(S.branch.isOpen?'Buka':'Tutup')+'</span></div>'+
+    '<div class="kv"><span class="k">Order online</span><span class="v">'+(S.branch.online?'Aktif':'Dijeda')+'</span></div>'+
+    '<div class="acts"><button class="btn ghost wide" onclick="flip(\'online\')">'+
+      (S.branch.online?'Jeda online':'Aktifkan online')+'</button>'+
+    '<button class="btn accept wide" onclick="flip(\'isOpen\')">'+
+      (S.branch.isOpen?'Tutup cabang':'Buka cabang')+'</button></div>');
+}
+function flip(k){
+  S.branch[k] = !S.branch[k];
+  toast(k === 'isOpen' ? (S.branch.isOpen?'Cabang dibuka':'Cabang ditutup')
+                       : (S.branch.online?'Order online aktif':'Order online dijeda'));
+  closeSheet(); render();
+}
+function openReadiness(){
+  openSheet('<h3>Kesiapan cabang</h3><div class="m">Skor dari kondisi operasional saat ini.</div>'+
+    '<div class="kv"><span class="k">Menu ditandai habis</span><span class="v">'+soldOut().length+'</span></div>'+
+    '<div class="kv"><span class="k">Bahan di bawah minimum</span><span class="v">'+lowStock().length+'</span></div>'+
+    '<div class="kv"><span class="k">Status cabang</span><span class="v">'+(S.branch.isOpen?'Buka':'Tutup')+'</span></div>'+
+    '<div class="kv"><span class="k">Order online</span><span class="v">'+(S.branch.online?'Aktif':'Dijeda')+'</span></div>');
+}
+function openHours(){
+  openSheet('<h3>Jam buka</h3><div class="m">Owner menetapkan jadwal default. Cabang hanya mencatat pengecualian harian.</div>'+
+    '<div class="kv"><span class="k">Jadwal default</span><span class="v">'+S.hours.open+' – '+S.hours.close+'</span></div>'+
+    '<div class="kv"><span class="k">Pengecualian hari ini</span><span class="v">'+(S.hours.exception||'Tidak ada')+'</span></div>'+
+    '<div class="acts"><button class="btn dark wide" onclick="toast(\'Catat pengecualian jadwal\')">Catat pengecualian</button></div>');
+}
+function openStaff(){
+  openSheet('<h3>Karyawan cabang</h3><div class="m">Staf operasional cabang ini beserta shift hariannya.</div>'+
+    S.staff.map(u => '<div class="kv"><span class="k">'+u.name+
+      '<br><span style="font-size:11px">'+u.role+' · shift '+u.shift+'</span></span>'+
+      '<span class="v"><span class="pill '+(u.on?'done':'mute')+'">'+(u.on?'Aktif':'Nonaktif')+'</span></span></div>').join(''));
+}
+function openReport(){
+  openSheet('<h3>Laporan harian</h3><div class="m">Ringkasan operasional cabang hari ini.</div>'+
+    '<div class="kv"><span class="k">Penjualan</span><span class="v">'+rp(S.today.revenue)+'</span></div>'+
+    '<div class="kv"><span class="k">Pesanan masuk</span><span class="v">'+S.today.orders+'</span></div>'+
+    '<div class="kv"><span class="k">Pesanan selesai</span><span class="v">'+S.today.done+'</span></div>'+
+    '<div class="kv"><span class="k">Rata-rata per pesanan</span><span class="v">'+rp(S.today.avg)+'</span></div>'+
+    '<div class="kv"><span class="k">Menunggu diterima</span><span class="v">'+newOrders().length+'</span></div>');
+}
+function openKitchen(){
+  openSheet('<h3>Dapur — pantau</h3><div class="m">Progres masak bersifat pantauan. Aksinya ada di perangkat dapur.</div>'+
+    '<div class="kv"><span class="k">Sedang dimasak</span><span class="v">3</span></div>'+
+    '<div class="kv"><span class="k">Siap diantar</span><span class="v">2</span></div>'+
+    '<div class="kv"><span class="k">Rata-rata waktu masak</span><span class="v">11 mnt</span></div>');
+}
+function openShip(){
+  openSheet('<h3>Pengiriman — pantau</h3><div class="m">Status kurir bersifat pantauan; penetapan kurir bukan wewenang cabang.</div>'+
+    '<div class="kv"><span class="k">Dalam pengantaran</span><span class="v">4</span></div>'+
+    '<div class="kv"><span class="k">Menunggu kurir</span><span class="v">1</span></div>'+
+    '<div class="kv"><span class="k">Selesai hari ini</span><span class="v">'+S.today.done+'</span></div>');
+}
+function openSettings(){
+  openSheet('<h3>Pengaturan cabang</h3><div class="m">Profil, jam default, dan konfigurasi durable lain ditetapkan Owner. '+
+    'Cabang mengatur operasional harian.</div>'+
+    '<div class="kv"><span class="k">Nama cabang</span><span class="v">'+S.branch.name+'</span></div>'+
+    '<div class="kv"><span class="k">Order online</span><span class="v">'+(S.branch.online?'Aktif':'Dijeda')+'</span></div>'+
+    '<div class="kv"><span class="k">Meja terdaftar</span><span class="v">'+S.tables.length+'</span></div>');
+}
 
 /* ── boot ──────────────────────────────────────────────────────────────── */
 render();
-/* prototype-only countdown tick: pure visual, no order state is mutated by it */
+/* visual countdown only — never mutates order status */
 setInterval(function(){
   if (tab !== 'pesanan') return;
-  state.orders.forEach(o => { if (o.status === 'new' && o.left > 0) o.left--; });
-  state.orders.forEach(o => {
+  S.orders.forEach(o => {
+    if (o.status !== 'new' || o.left == null) return;
+    o.left = Math.max(0, o.left - 1);
     const el = document.getElementById('cd-' + o.id);
-    if (el) { el.textContent = mmss(Math.max(0, o.left)); el.className = 'countdown' + (o.left < 60 ? ' crit' : ''); }
+    if (el){ el.textContent = mmss(o.left); el.className = 'v' + (o.left < 60 ? ' crit' : ''); }
   });
 }, 1000);
 </script>
