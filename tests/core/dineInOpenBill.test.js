@@ -245,6 +245,30 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
     assert.ok(mine.body.session, 'pemilik tagihan tetap bisa membukanya lewat identitasnya');
   });
 
+  await t.test('kode meja manusiawi: "meja903" dikenali di cabang yang dipakai', async () => {
+    const meja = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'meja903', branch_id: BRANCH });
+    assert.equal(meja.status, 200, JSON.stringify(meja.body));
+    assert.equal(meja.body.table.id, RESUME_TABLE, 'meja903 harus menunjuk Meja 903');
+    assert.equal(meja.body.session, null, 'kode meja tetap bukan kunci: tidak membuka tagihan');
+
+    const angka = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: '903', branch_id: BRANCH });
+    assert.equal(angka.status, 200, 'angka saja juga boleh');
+    assert.equal(angka.body.table.id, RESUME_TABLE);
+
+    const besar = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'Meja 903', branch_id: BRANCH });
+    assert.equal(besar.status, 200, 'spasi dan huruf besar-kecil tidak masalah');
+  });
+
+  await t.test('kode meja tanpa cabang ditolak (nomor meja tidak unik antar cabang)', async () => {
+    const res = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'meja903' });
+    assert.equal(res.status, 400, 'tanpa cabang harus ditolak, bukan ditebak');
+    assert.equal(res.body.error, 'BRANCH_REQUIRED');
+
+    const tidakAda = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'meja999', branch_id: BRANCH });
+    assert.equal(tidakAda.status, 404, 'meja yang tidak ada di cabang itu harus ditolak');
+  });
+
+
   await t.test('scan meja yang belum ada billnya: mejanya tetap dikenali', async () => {
     // Meja kosong: tidak ada yang bisa dilanjutkan, TAPI konsumen tidak boleh
     // diminta memilih meja lagi — mejanya sudah ada di QR.

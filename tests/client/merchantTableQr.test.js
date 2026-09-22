@@ -44,6 +44,8 @@ test('QR-04: cetak menghasilkan halaman bersih (QR + nama meja saja)', () => {
   assert.ok(code.includes('Scan untuk melihat pesanan meja ini'), 'halaman cetak harus memberi instruksi');
   assert.ok(code.includes('w.print();'), 'harus memanggil print');
   assert.ok(code.includes("Kode meja: ' + esc(kode)"), 'kode meja harus tercetak di bawah QR (jalan manual)');
+  assert.ok(code.includes("('meja' + data.table.table_number)"),
+    'kode yang dicetak harus gampang ditulis tangan, mis. meja7');
 });
 
 test('QR-05: overlay tidak menumpuk', () => {

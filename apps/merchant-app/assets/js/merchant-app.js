@@ -2067,7 +2067,8 @@
   function printBMTableQr(data) {
     var title = (data.table && (data.table.label || data.table.table_number)) || 'Meja';
     // Kode di bawah QR: jalan terakhir kalau kamera tamu tidak bisa membaca QR.
-    var kode = (data.join_url || '').split('meja=')[1] || '';
+    // Sengaja kode yang gampang ditulis tangan, mis. "meja7" — bukan token acak.
+    var kode = (data.table && data.table.table_number) ? ('meja' + data.table.table_number) : '';
     var w = window.open('', '_blank');
     if (!w) return;
     w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>QR ' + esc(title) + '</title>' +

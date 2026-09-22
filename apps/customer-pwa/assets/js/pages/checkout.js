@@ -439,6 +439,8 @@
     if (url) return decodeURIComponent(url[1]);
     var raw = String(text).trim();
     if (/^qr_[A-Za-z0-9_-]+$/.test(raw)) return raw;
+    // Kode yang ditulis di kartu meja: "meja7" (juga menerima "7" atau "Meja 7").
+    if (/^(meja\s*)?\d{1,4}$/i.test(raw)) return raw.toLowerCase().replace(/\s+/g, '');
     return null;
   }
 
@@ -542,6 +544,14 @@
     });
   }
 
+  // Kode meja hanya unik per cabang, jadi cabang yang sedang dipakai harus ikut
+  // dikirim — supaya "meja7" tidak nyasar ke Meja 7 di cabang lain.
+  function claimBranchId() {
+    if (currentBranchId && currentBranchId !== '__unassigned__') return currentBranchId;
+    if (state.matchedBranch && state.matchedBranch.id) return state.matchedBranch.id;
+    return null;
+  }
+
   function claimTableFromQr(qrToken) {
     if (!qrToken || !API) return Promise.resolve(null);
 
@@ -552,7 +562,7 @@
       return Promise.resolve(null);
     }
 
-    return API.post('/customer/dining-session/claim', { qr_token: qrToken }).then(function (res) {
+    return API.post('/customer/dining-session/claim', { qr_token: qrToken, branch_id: claimBranchId() }).then(function (res) {
       if (!res || res.success !== true) {
         // QR yang sudah dicabut/diganti tidak boleh diam-diam tidak terjadi apa-apa.
         if (UI && UI.toast) UI.toast('QR meja ini sudah tidak berlaku. Minta petugas mencetak QR baru, atau pilih meja manual.');

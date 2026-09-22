@@ -1270,22 +1270,58 @@ router.get('/customer/dining-session', requireCustomerAuth(), (req, res) => {
 
 router.post('/customer/dining-session/claim', requireCustomerAuth(), (req, res) => {
   try {
-    const { qr_token } = req.body || {};
+    const { qr_token, branch_id } = req.body || {};
     if (!qr_token) {
       return res.status(400).json({ success: false, error: 'qr_token wajib diisi.' });
     }
 
-    const { DiningTableService } = require('../../domains/pos');
-    const table = DiningTableService.resolveFromQr(qr_token);
-    if (!table) {
-      return res.status(404).json({ success: false, error: 'QR Meja tidak valid atau telah dicabut.' });
+    const raw = String(qr_token).trim();
+    let tableRow = null;
+
+    // Kode manusiawi: "meja7", "Meja 7", atau "7" saja. Nomor meja hanya unik per
+    // CABANG (tiga cabang satu brand boleh sama-sama punya Meja 7), jadi cabangnya
+    // wajib disebut — tanpa itu kita tidak boleh menebak, karena bisa nyasar ke
+    // meja nomor sama di cabang lain.
+    const alias = /^(?:meja\s*)?(\d{1,4})$/i.exec(raw);
+    if (alias) {
+      if (!branch_id) {
+        return res.status(400).json({
+          success: false,
+          error: 'BRANCH_REQUIRED',
+          message: 'Cabang belum dipilih, jadi kode meja belum bisa dipakai.'
+        });
+      }
+      tableRow = db.prepare(`
+        SELECT id, table_number, label, branch_id FROM branch_tables
+        WHERE branch_id = ? AND (table_number = ? OR lower(replace(label, ' ', '')) = ?)
+      `).get(branch_id, alias[1], 'meja' + alias[1]);
+      if (!tableRow) {
+        return res.status(404).json({
+          success: false,
+          error: 'MEJA_TIDAK_DITEMUKAN',
+          message: 'Meja itu tidak ada di cabang ini.'
+        });
+      }
+    } else {
+      const { DiningTableService } = require('../../domains/pos');
+      const table = DiningTableService.resolveFromQr(raw);
+      if (!table) {
+        return res.status(404).json({ success: false, error: 'QR Meja tidak valid atau telah dicabut.' });
+      }
+      const tableId = table.id || table.table_id;
+      tableRow = db.prepare('SELECT id, table_number, label, branch_id FROM branch_tables WHERE id = ?').get(tableId) || { id: tableId };
     }
 
-    const tableId = table.id || table.table_id;
+    // Meja harus benar-benar milik brand ini.
+    const brandOfBranch = db.prepare('SELECT brand_id FROM branches WHERE id = ?').get(tableRow.branch_id);
+    if (!brandOfBranch || brandOfBranch.brand_id !== req.brand_id) {
+      return res.status(404).json({ success: false, error: 'MEJA_TIDAK_DITEMUKAN' });
+    }
+
+    const tableId = tableRow.id;
 
     // Mejanya selalu dikembalikan, walau belum ada billnya: konsumen yang scan QR
     // tidak boleh diminta memilih meja lagi — mejanya sudah ada di QR itu.
-    const tableRow = db.prepare('SELECT id, table_number, label FROM branch_tables WHERE id = ?').get(tableId) || {};
     const tableInfo = {
       id: tableId,
       table_number: tableRow.table_number || null,

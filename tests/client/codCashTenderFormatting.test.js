@@ -315,8 +315,8 @@ test('T12: scanning a table QR lands the customer on that table', () => {
     'claiming must happen on mount, only when scanning');
 
   // The table comes from the server, never guessed from the URL.
-  assert.ok(code.includes("API.post('/customer/dining-session/claim', { qr_token: qrToken })"),
-    'the claim must go through the server');
+  assert.ok(code.includes("API.post('/customer/dining-session/claim', { qr_token: qrToken, branch_id: claimBranchId() })"),
+    'the claim must go through the server, with the branch it is used in');
   assert.ok(code.includes('state.fulfillment.table_ids = [table.id]'),
     'the scanned table must become the single selection');
   assert.ok(code.includes("state.fulfillment.type = 'dine_in'"),
@@ -405,6 +405,9 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
   assert.ok(code.includes('Kamera tidak bisa dipakai'), 'a refused camera must be handled');
   assert.ok(code.includes('id="x-qr-manual"'), 'a manual code entry must exist');
   assert.ok(code.includes('function extractMejaToken('), 'the entered code or link must be understood');
+  assert.ok(code.includes("raw.toLowerCase().replace(/\\s+/g, '')"), 'kode "Meja 7" harus diterima jadi "meja7"');
+  assert.ok(code.includes('branch_id: claimBranchId()'), 'cabang harus ikut dikirim bersama kode meja');
+  assert.ok(code.includes('function claimBranchId()'), 'cabang ditentukan di satu tempat');
   assert.ok(code.includes('/^qr_[A-Za-z0-9_-]+$/'), 'a raw table code must be accepted');
 
   // A scan goes through the same server claim as the QR link.
