@@ -355,13 +355,28 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
   assert.ok(/x-btn-scan-table-qr"[\s\S]{0,700}<svg/.test(code), 'tombol harus pakai ikon scan');
   assert.ok(!code.includes('>Scan QR di Meja</button>'), 'label tombol harus ringkas: cukup "Scan QR"');
 
-  // Warna sengaja TIDAK ikut brand, biar menonjol seperti tombol install PWA.
-  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,400}background:#374151/.test(code),
-    'tombol harus abu-abu gelap hardcode');
-  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,400}color:#ffffff/.test(code),
-    'tulisan tombol harus putih');
+  // Warna disamakan dengan kartu meja (putih + garis abu terang) supaya serasi.
+  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,400}background:#ffffff/.test(code),
+    'tombol harus sewarna kartu meja');
+  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,400}border:1.5px solid #e5e7eb/.test(code),
+    'garis tombol harus sama dengan kartu meja');
   assert.ok(!/x-btn-scan-table-qr"[\s\S]{0,400}var\(--x-primary\)/.test(code),
     'tombol scan tidak boleh mengikuti warna brand');
+
+  // Scanner harus DI ATAS bottom sheet yang sedang terbuka.
+  assert.ok(code.includes('z-index:2147483647'), 'scanner harus di atas bottom sheet');
+  assert.ok(/x-table-qr-scanner[\s\S]{0,80}z-index:2147483647|z-index:2147483647/.test(code),
+    'overlay scanner yang memakai z-index tertinggi');
+
+  // Area kamera harus PERSEGI dengan bingkai scan, bukan memanjang seperti barcode.
+  assert.ok(code.includes('padding-bottom:100%'), 'area kamera harus persegi');
+  assert.ok(code.includes('object-fit:cover'), 'video harus mengisi kotaknya');
+  assert.ok(/x-qr-video-wrap[\s\S]{0,900}box-shadow:0 0 0 9999px/.test(code),
+    'harus ada bingkai scan dengan area luar yang diredupkan');
+
+  // Bar ketersediaan promo disembunyikan dulu.
+  assert.ok(code.includes('class="x-fulfillment-promo" style="display:none;"'),
+    'bar ketersediaan promo harus disembunyikan, bukan dihapus');
   assert.ok(!code.includes('class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Scan QR di Meja'),
     'gaya tombol lama harus diganti');
   assert.ok(/x-dinein-scan-info"[\s\S]{0,120}x-fulfillment-promo-icon">i</.test(code),

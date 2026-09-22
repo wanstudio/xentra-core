@@ -473,15 +473,20 @@
       ? 'Kamera tidak bisa dipakai. Tulis saja kode yang tertulis di bawah QR meja, atau minta bantuan petugas.'
       : 'HP ini tidak bisa scan langsung. Coba buka kamera HP, arahkan ke QR meja, lalu ikuti tautannya. Kalau tetap tidak bisa, minta bantuan petugas.';
 
+    // Harus DI ATAS bottom sheet yang sedang terbuka (pilih tipe pembelian),
+    // karena scanner ini dipanggil dari dalam sheet itu.
     var overlay = document.createElement('div');
     overlay.id = 'x-table-qr-scanner';
-    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.9);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.92);z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:16px;';
     overlay.innerHTML =
       '<div style="background:#fff;border-radius:16px;padding:18px;max-width:360px;width:100%;text-align:center;">' +
       '  <h3 style="margin:0 0 6px;font-size:16px;font-weight:800;">Scan QR di Meja</h3>' +
       '  <p style="margin:0 0 12px;font-size:12px;color:#64748b;">Arahkan kamera ke QR yang tertempel di meja. Nanti pesananmu langsung tercatat di tagihan meja itu.</p>' +
-      '  <div id="x-qr-video-wrap" style="position:relative;background:#0f172a;border-radius:12px;overflow:hidden;margin-bottom:12px;display:' + (canScan ? 'block' : 'none') + ';">' +
-      '    <video id="x-qr-video" playsinline autoplay muted style="width:100%;display:block;"></video>' +
+      '  <div id="x-qr-video-wrap" style="position:relative;width:100%;height:0;padding-bottom:100%;background:#0f172a;border-radius:14px;overflow:hidden;margin:0 auto 12px;display:' + (canScan ? 'block' : 'none') + ';">' +
+      '    <video id="x-qr-video" playsinline autoplay muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></video>' +
+      '    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">' +
+      '      <div style="width:62%;height:62%;border:3px solid rgba(255,255,255,.95);border-radius:18px;box-shadow:0 0 0 9999px rgba(15,23,42,.35);"></div>' +
+      '    </div>' +
       '  </div>' +
       '  <div id="x-qr-notice" style="font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px;margin-bottom:12px;display:' + (canScan ? 'none' : 'block') + ';">' + reason + '</div>' +
       '  <div style="font-size:11.5px;color:#6b7280;margin-bottom:6px;">Tidak bisa scan? Tulis kode yang tertulis di bawah QR meja:</div>' +
@@ -1810,7 +1815,7 @@
       '  <div id="x-ful-schedule-container">' +
       '    <!-- Rendered dynamically for delivery -->' +
       '  </div>' +
-      '  <div class="x-fulfillment-promo">' +
+      '  <div class="x-fulfillment-promo" style="display:none;" data-hidden-reason="disembunyikan sementara">' +
       '    <span class="x-fulfillment-promo-icon">i</span>' +
       '    <span>Ketersediaan promo tergantung pada tipe pembelian</span>' +
       '  </div>' +
@@ -2187,7 +2192,7 @@
         '  <div class="x-fulfillment-promo" id="x-dinein-scan-info" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
          '    <span class="x-fulfillment-promo-icon">i</span>' +
          '    <span style="flex:1 1 150px;min-width:0;">Scan QR di mejamu, pesananmu akan kami antarkan segera.</span>' +
-         '    <button type="button" id="x-btn-scan-table-qr" style="display:inline-flex;align-items:center;gap:6px;border:0;border-radius:999px;padding:8px 14px;background:#374151;color:#ffffff;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.10);">' +
+         '    <button type="button" id="x-btn-scan-table-qr" style="display:inline-flex;align-items:center;gap:6px;border-radius:12px;padding:8px 14px;background:#ffffff;color:#374151;border:1.5px solid #e5e7eb;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.10);">' +
          '      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
          '        <path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9"></path>' +
          '        <path d="M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9"></path>' +
