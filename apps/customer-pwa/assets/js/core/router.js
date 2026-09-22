@@ -6,7 +6,11 @@
 (function () {
   'use strict';
 
-  var currentView = 'home';
+  // Seeded from the URL: on a direct page load (refresh, deep link, PWA cold
+  // start) nothing calls navigate()/hashchange, so leaving this at the default
+  // made every subscriber that guards on the current view — checkout's store
+  // subscription in particular — silently inert until the next reload.
+  var currentView = getViewFromUrl();
   var listeners = [];
 
   function getViewFromUrl() {
