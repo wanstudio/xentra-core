@@ -767,7 +767,7 @@
             }
 
             setTimeout(function () {
-              window.location.href = data.redirect_url || ((data.user && data.user.role === 'kitchen') ? '/kitchen-app/' : '/dashboard/');
+              window.location.href = data.redirect_url || '/dashboard/';
             }, 250);
             return;
           }
@@ -921,7 +921,7 @@
                 localStorage.setItem(TOKEN_KEY, data.token);
                 if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
                 if (googleStatus) { googleStatus.textContent = 'Login Google berhasil! Mengalihkan...'; googleStatus.style.color = '#166534'; }
-                setTimeout(function () { window.location.href = data.redirect_url || ((data.user && data.user.role === 'kitchen') ? '/kitchen-app/' : '/dashboard/'); }, 250);
+                setTimeout(function () { window.location.href = data.redirect_url || '/dashboard/'; }, 250);
                 return;
               }
               var msg;
