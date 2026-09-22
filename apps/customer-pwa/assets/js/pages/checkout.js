@@ -2399,6 +2399,16 @@
             if (UI && UI.toast) UI.toast('Silakan pilih nomor meja untuk makan di tempat (Dine-in).');
             return;
           }
+          // Tombol konfirmasi bukan sekadar menyimpan: ia yang MENGUNCI meja.
+          // Meja terkunci = tagihan, jadi tamu tidak boleh memindahkannya sendiri
+          // (menyimpang dari aturan yang sama di jalur scan QR). Memindahkan meja
+          // adalah wewenang kasir; tamu hanya bisa MELEPAS dengan memilih tipe
+          // pembelian lain di sheet ini.
+          var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
+          if (lockedTable && String(lockedTable.id) !== String(draft.selectedTableIds[0])) {
+            if (UI && UI.toast) UI.toast('Ingin pindah meja? Hubungi kasir.');
+            return;
+          }
         }
 
         // Commit to state.fulfillment

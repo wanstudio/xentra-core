@@ -135,6 +135,17 @@ test('MYTABLE-07: meja disimpan di Store (bertahan saat pindah halaman)', () => 
     && STORE.includes('clearMyTable: clearMyTable'), 'setter/getter meja harus diekspor');
 });
 
+test('MYTABLE-15: konfirmasi MENGUNCI meja — pindah meja lewat checkout ditolak', () => {
+  assert.ok(CHECKOUT.includes("'Ingin pindah meja? Hubungi kasir.'"),
+    'checkout harus menolak pindah meja, sama seperti jalur scan');
+  assert.ok(/lockedTable && String\(lockedTable\.id\) !== String\(draft\.selectedTableIds\[0\]\)/.test(CHECKOUT),
+    'penolakan berlaku saat meja yang dipilih berbeda dari yang terkunci');
+  assert.ok(/var lockedTable = \(Store\.getMyTable && Store\.getMyTable\(\)\) \|\| null;[\s\S]{0,260}return;/.test(CHECKOUT),
+    'harus berhenti sebelum menyimpan, bukan menimpa meja terkunci');
+  assert.ok(CHECKOUT.indexOf('var lockedTable') < CHECKOUT.indexOf('state.fulfillment.type = draft.type;'),
+    'pemeriksaan kunci harus sebelum commit tipe pembelian');
+});
+
 test('MYTABLE-13: pilih tipe selain dine-in → meja dilepas, ikon balik ke scan', () => {
   assert.ok(CHECKOUT.includes('if (Store.clearMyTable) Store.clearMyTable();'),
     'meja harus dilepas saat tipe pembelian bukan dine-in');
