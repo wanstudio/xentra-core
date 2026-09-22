@@ -68,7 +68,7 @@
     overlay.innerHTML =
       '<div style="background:#fff;border-radius:16px;padding:18px;max-width:360px;width:100%;text-align:center;">' +
       '  <h3 style="margin:0 0 6px;font-size:16px;font-weight:800;">Dine-in, Scan QR di Meja</h3>' +
-      '  <p style="margin:0 0 12px;font-size:12px;color:#64748b;">Arahkan kamera ke QR yang ada di meja. QR ini hanya untuk makan di tempat.</p>' +
+      '  <p style="margin:0 0 12px;font-size:12px;color:#64748b;">QR code hanya berlaku untuk makan di tempat.</p>' +
       '  <div id="x-qr-video-wrap" style="position:relative;width:100%;height:0;padding-bottom:100%;background:#0f172a;border-radius:14px;overflow:hidden;margin:0 auto 12px;display:' + (canScan ? 'block' : 'none') + ';">' +
       '    <video id="x-qr-video" playsinline autoplay muted style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;"></video>' +
       '    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;">' +
