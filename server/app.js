@@ -281,6 +281,36 @@ app.get(/^\/merchant-app(\/.*)?$/, async (req, res) => {
   res.sendFile(path.join(__dirname, '../apps/merchant-app/index.html'));
 });
 
+// Kitchen App Assets (dedicated Kitchen Staff surface)
+app.use('/kitchen-app/assets', express.static(path.join(__dirname, '../apps/kitchen-app/assets'), {
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
+
+// Kitchen App entry point. Additive: the other surfaces are unchanged. The
+// kitchen role is routed here client-side after login; Core still enforces
+// role/scope on every API call.
+app.get(/^\/kitchen-app(\/.*)?$/, async (req, res) => {
+  if (!isSaaSHost(req)) {
+    const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
+    await brandRepository.ready();
+    const brand = brandRepository.findByCustomDomain(cleanHost);
+    if (!brand) {
+      return res.status(404).json({
+        success: false,
+        error: 'TENANT_NOT_FOUND',
+        message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
+      });
+    }
+  }
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/kitchen-app/index.html'));
+});
+
 // Health Check with Persistence & DB Readiness Verification
 app.get('/health', (req, res) => {
   let isDbReady = false;

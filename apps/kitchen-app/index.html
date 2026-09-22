@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0b1220">
+<title>Xentra Kitchen — Antrean Dapur</title>
+<link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
+<link rel="stylesheet" href="/kitchen-app/assets/css/kitchen-app.css?v=1.0.0">
+</head>
+<body class="kds">
+
+<header class="kds-bar">
+  <div class="kds-brand">
+    <span class="kds-logo">🍳</span>
+    <div>
+      <div class="kds-title">Antrean Dapur</div>
+      <div class="kds-sub" id="kds-branch">Memuat cabang…</div>
+    </div>
+  </div>
+  <div class="kds-bar-right">
+    <div class="kds-counts" id="kds-counts"></div>
+    <button type="button" class="kds-btn-ghost" id="kds-refresh" aria-label="Muat ulang antrean">Muat ulang</button>
+    <button type="button" class="kds-btn-ghost" id="kds-logout">Keluar</button>
+  </div>
+</header>
+
+<div class="kds-statusbar">
+  <span class="kds-dot" id="kds-conn"></span>
+  <span id="kds-conn-text">Menghubungkan…</span>
+  <span class="kds-sep">·</span>
+  <span id="kds-clock">--:--</span>
+</div>
+
+<main class="kds-board" id="kds-board">
+  <section class="kds-col" data-col="confirmed">
+    <h2 class="kds-col-title">Perlu dimasak <span class="kds-col-n" id="n-confirmed">0</span></h2>
+    <div class="kds-list" id="list-confirmed"><p class="kds-empty">Memuat…</p></div>
+  </section>
+  <section class="kds-col" data-col="preparing">
+    <h2 class="kds-col-title">Sedang dimasak <span class="kds-col-n" id="n-preparing">0</span></h2>
+    <div class="kds-list" id="list-preparing"></div>
+  </section>
+  <section class="kds-col" data-col="ready">
+    <h2 class="kds-col-title">Siap diambil <span class="kds-col-n" id="n-ready">0</span></h2>
+    <div class="kds-list" id="list-ready"></div>
+  </section>
+</main>
+
+<div id="x-toast-container" class="x-toast-container"></div>
+
+<script src="/merchant-shared/js/shared.js?v=1.0.0"></script>
+<script src="/kitchen-app/assets/js/kitchen-app.js?v=1.0.0"></script>
+</body>
+</html>

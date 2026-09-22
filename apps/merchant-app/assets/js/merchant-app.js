@@ -1355,16 +1355,11 @@
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px; color:#dc2626; border-color:#fecaca;" ' + (isAccepting ? 'disabled' : '') + ' onclick="rejectBMOrder(\'' + esc(ord.id) + '\')">Tolak</button>' +
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
-      } else if (ord.status === 'confirmed') {
+      } else if (ord.status === 'confirmed' || ord.status === 'preparing') {
+        // Cooking stages are driven from the Kitchen surface, not here.
         actionsHtml =
-          '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
-            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'confirmed\', \'' + esc(ordType) + '\', this)">Mulai Masak ➔</button>' +
-            '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
-          '</div>';
-      } else if (ord.status === 'preparing') {
-        actionsHtml =
-          '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
-            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'preparing\', \'' + esc(ordType) + '\', this)">Tandai Siap ➔</button>' +
+          '<div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">' +
+            '<small class="text-muted" style="font-size:11px; font-weight:700;">' + (ord.status === 'confirmed' ? 'Menunggu dapur' : 'Sedang dimasak') + '</small>' +
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else if (ord.status === 'ready') {
@@ -1375,9 +1370,10 @@
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else if (ord.status === 'out_for_delivery') {
+        // Completion is recorded by the Driver lifecycle.
         actionsHtml =
-          '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
-            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'out_for_delivery\', \'' + esc(ordType) + '\', this)">Selesaikan ➔</button>' +
+          '<div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">' +
+            '<small class="text-muted" style="font-size:11px; font-weight:700;">Dalam pengantaran</small>' +
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else {
@@ -1410,16 +1406,11 @@
             '<button type="button" class="x-btn-secondary bm-btn-danger" ' + (isAccepting ? 'disabled' : '') + ' onclick="rejectBMOrder(\'' + esc(ord.id) + '\')" aria-label="Tolak Pesanan #' + esc(ord.order_number || ord.id) + '">Tolak</button>' +
             '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')" aria-label="Detail Pesanan #' + esc(ord.order_number || ord.id) + '">Detail</button>' +
           '</div>';
-      } else if (ord.status === 'confirmed') {
+      } else if (ord.status === 'confirmed' || ord.status === 'preparing') {
+        // Cooking stages are driven from the Kitchen surface, not here.
         cardActionsHtml =
           '<div class="bm-order-card-actions">' +
-            '<button type="button" class="x-btn-primary" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'confirmed\', \'' + esc(ordType) + '\', this)">Mulai Masak ➔</button>' +
-            '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
-          '</div>';
-      } else if (ord.status === 'preparing') {
-        cardActionsHtml =
-          '<div class="bm-order-card-actions">' +
-            '<button type="button" class="x-btn-primary" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'preparing\', \'' + esc(ordType) + '\', this)">Tandai Siap ➔</button>' +
+            '<small class="text-muted" style="flex:1; font-size:12px; font-weight:700;">' + (ord.status === 'confirmed' ? 'Menunggu dapur memasak' : 'Sedang dimasak di dapur') + '</small>' +
             '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else if (ord.status === 'ready') {
@@ -1432,7 +1423,7 @@
       } else if (ord.status === 'out_for_delivery') {
         cardActionsHtml =
           '<div class="bm-order-card-actions">' +
-            '<button type="button" class="x-btn-primary" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'out_for_delivery\', \'' + esc(ordType) + '\', this)">Selesaikan ➔</button>' +
+            '<small class="text-muted" style="flex:1; font-size:12px; font-weight:700;">Dalam pengantaran (kurir)</small>' +
             '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else {
@@ -1534,11 +1525,11 @@
     }
 
     var isDelivery = (fulfillmentType === 'delivery');
+    // Branch Manager authority is acceptance (pending) and dispatch. Cooking
+    // stages (confirmed → preparing → ready) belong to the Kitchen surface
+    // (/kitchen-app), and out_for_delivery → completed to the Driver lifecycle.
     var nextMap = {
-      confirmed: 'preparing',
-      preparing: 'ready',
-      ready: isDelivery ? 'out_for_delivery' : 'completed',
-      out_for_delivery: 'completed'
+      ready: isDelivery ? 'out_for_delivery' : 'completed'
     };
 
     var nextStatus = nextMap[currentStatus];
@@ -1559,9 +1550,9 @@
     }
 
     try {
-      // LEGACY: BM-triggered downstream status transitions (confirmed→preparing→ready→out_for_delivery→completed)
-      // use PATCH /kitchen/orders/:id/status. This boundary will be reconciled in the dedicated
-      // KDS/Delivery slice when kitchen/driver authority is properly separated from Branch Manager.
+      // Kitchen cooking stages are no longer reachable from this surface: they
+      // are driven from /kitchen-app (confirmed→preparing→ready). Only dispatch
+      // (ready→out_for_delivery, or ready→completed for pickup) is triggered here.
       var patchRes = await adminFetch(API_BASE + '/kitchen/orders/' + encodeURIComponent(orderId) + '/status', {
         method: 'PATCH',
         headers: getAuthHeaders(),
@@ -1855,19 +1846,19 @@
           topActions.innerHTML =
             '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" ' + (isAccepting ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(ordType) + '\', this);">Terima Pesanan</button>' +
             '<button type="button" class="x-btn-secondary" style="font-size:13px; padding:6px 14px; color:#dc2626; border-color:#fecaca;" ' + (isAccepting ? 'disabled' : '') + ' onclick="rejectBMOrder(\'' + esc(ord.id) + '\');">Tolak Pesanan</button>';
-        } else if (ord.status === 'confirmed') {
+        } else if (ord.status === 'confirmed' || ord.status === 'preparing') {
+          // Cooking stages belong to the Kitchen surface (/kitchen-app).
           topActions.innerHTML =
-            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'confirmed\', \'' + esc(ordType) + '\', this);">Mulai Memasak ➔</button>';
-        } else if (ord.status === 'preparing') {
-          topActions.innerHTML =
-            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'preparing\', \'' + esc(ordType) + '\', this);">Tandai Siap ➔</button>';
+            '<small class="text-muted" style="font-size:12.5px; font-weight:700;">' +
+            (ord.status === 'confirmed' ? 'Menunggu dapur memasak' : 'Sedang dimasak di dapur') + '</small>';
         } else if (ord.status === 'ready') {
           var label = (ordType === 'delivery') ? 'Kirim Pesanan ➔' : 'Selesaikan Pesanan ➔';
           topActions.innerHTML =
             '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'ready\', \'' + esc(ordType) + '\', this);">' + label + '</button>';
         } else if (ord.status === 'out_for_delivery') {
+          // Completion is recorded by the Driver lifecycle.
           topActions.innerHTML =
-            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'out_for_delivery\', \'' + esc(ordType) + '\', this);">Selesaikan Pesanan ➔</button>';
+            '<small class="text-muted" style="font-size:12.5px; font-weight:700;">Dalam pengantaran (kurir)</small>';
         } else {
           topActions.innerHTML = '';
         }

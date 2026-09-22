@@ -3130,7 +3130,10 @@
       var orderChannel = ord.order_channel || 'customer_app';
       var fulfillmentType = ord.fulfillment_type || ord.order_type || 'delivery';
       var timeStr = ord.created_at ? (new Date(ord.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })) : '-';
-      var canAdvance = ord.status !== 'completed' && ord.status !== 'cancelled';
+      // Owner/Brand view: acceptance (pending) is the only exception path offered here.
+      // Cooking stages belong to the Kitchen surface (/kitchen-app) and dispatch/completion
+      // to the Branch Manager and Driver lifecycles.
+      var canAdvance = ord.status === 'pending';
 
       return [
         '<tr>',
@@ -3398,13 +3401,14 @@
     // Pickup / Dine-in: pending → confirmed → preparing → ready → completed
     var isDelivery = (fulfillmentType === 'delivery');
     var nextMap = {
-      confirmed: 'preparing',
-      preparing: 'ready',
-      ready: isDelivery ? 'out_for_delivery' : 'completed',
-      out_for_delivery: 'completed'
+      ready: isDelivery ? 'out_for_delivery' : 'completed'
     };
 
-    var nextStatus = nextMap[currentStatus] || 'completed';
+    var nextStatus = nextMap[currentStatus];
+    if (!nextStatus) {
+      showToast('Status ini dikelola oleh surface Kitchen / Driver.');
+      return;
+    }
     try {
       var res = await adminFetch(API_BASE + '/kitchen/orders/' + orderId + '/status', {
         method: 'PATCH',
@@ -8438,11 +8442,17 @@
     // Check for handoff ticket from xentra.cloud before initial auth check
     await handleHandoffExchange();
 
-    // The Branch Manager surface lives in the standalone Merchant App now.
-    // Role-appropriate routing: BM sessions are sent to /merchant-app (Core
-    // still enforces every API call). Deep links keep their hash.
+    // The Branch Manager and Kitchen surfaces live in their own apps now.
+    // Role-appropriate routing: BM sessions go to /merchant-app, kitchen staff
+    // to /kitchen-app (Core still enforces every API call).
     if (isBranchManager()) {
       window.location.replace('/merchant-app/' + window.location.hash);
+      return;
+    }
+
+    var bootUser = getStoredUser();
+    if (bootUser && bootUser.role === 'kitchen') {
+      window.location.replace('/kitchen-app/');
       return;
     }
 
