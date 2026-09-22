@@ -41,7 +41,7 @@ Tests use Node's built-in test runner (`node --test`) with `--test-concurrency=1
 server/          Express app, routes, middleware, services, database
  domains/        Domain logic (commerce, delivery, inventory, payment, pos, promotion, reporting, affiliate, banner)
 core/            Platform foundations (events, identity/RBAC, config, integration, audit)
-apps/            Static frontends (customer-pwa, merchant-dashboard, merchant-app, merchant-shared, kitchen-display)
+apps/            Static frontends (customer-pwa, merchant-dashboard, merchant-app, merchant-shared, kitchen-app)
 tests/           Node built-in test runner — mirrors domains/, core/, services/, client/
 tools/           Developer and administrative utility scripts (seed-demo, bootstrap, reset-admin)
 docs/notion/     Pinned Notion decision snapshots
