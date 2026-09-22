@@ -2194,7 +2194,7 @@
         '  </div>' +
         '  <div class="x-dinein-header-title">Pilih meja</div>' +
          '  <div class="x-scan-table-strip" style="margin:0 0 10px;padding:10px 12px;border:1px dashed #bbf7d0;border-radius:12px;background:#f0fdf4;text-align:center;">' +
-         '    <div style="font-size:12px;color:#166534;margin-bottom:8px;">Sudah duduk di meja? Scan QR di meja, supaya pesananmu langsung tercatat di tagihan meja itu.</div>' +
+         '    <div style="font-size:12px;color:#166534;margin-bottom:8px;">Scan QR di meja kamu, pesan menunya, dan kami akan antarkan langsung ke meja kamu.</div>' +
          '    <button type="button" id="x-btn-scan-table-qr" class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Scan QR di Meja</button>' +
          '  </div>' +
         '  <div id="x-dinein-floor-canvas" class="x-floor-wrapper">' +

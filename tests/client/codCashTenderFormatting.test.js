@@ -339,7 +339,7 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
 
   // Offered where the customer picks a table, with a plain-language guide.
   assert.ok(code.includes('id="x-btn-scan-table-qr"'), 'the picking screen must offer scanning');
-  assert.ok(code.includes('Sudah duduk di meja? Scan QR di meja'),
+  assert.ok(code.includes('Scan QR di meja kamu, pesan menunya'),
     'the customer must be told what scanning does');
   assert.ok(/x-btn-scan-table-qr[\s\S]{0,120}openTableQrScanner\(\)/.test(code),
     'the button must open the scanner');
