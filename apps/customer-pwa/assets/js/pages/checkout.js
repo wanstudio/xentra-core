@@ -863,6 +863,7 @@
         '      <div style="display:flex;flex-direction:column;">' +
         '        <span style="font-size:11.5px;color:#6b7280;font-weight:500;">Uang Tunai Disiapkan</span>' +
         '        <span style="font-size:14px;font-weight:800;color:#111827;">' + fmtIDR(state.cashTendered) + '</span>' +
+        '        <span style="font-size:11.5px;color:#6b7280;font-weight:500;margin-top:3px;">Kembalian <b id="x-sum-change" style="font-size:12.5px;font-weight:800;color:#059669;">' + fmtIDR(tenderChange()) + '</b></span>' +
         '      </div>' +
         '      <button type="button" id="x-btn-change-tender" style="border:none;background:#e5e7eb;color:#374151;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit;">Ubah</button>' +
         '    </div>'
@@ -942,6 +943,13 @@
     return Math.max(0, subtotal + fee - discount);
   }
 
+  // Uang kembalian yang akan diterima konsumen: uang disiapkan - total bayar.
+  // Tidak pernah negatif, karena nominal di bawah total tidak bisa dipilih.
+  function tenderChange() {
+    var tendered = Number(state.paymentMethod === 'cash' ? (state.cashTendered || 0) : 0);
+    return Math.max(0, tendered - payableTotal());
+  }
+
   function calculateTotals() {
     var items = getCheckoutItems();
     var subtotal = items.reduce(function (s, i) { return s + Number(i.price || 0) * Number(i.quantity || 0); }, 0);
@@ -956,6 +964,7 @@
     var elDisc = $('x-sum-discount'); if (elDisc) elDisc.textContent = '-' + fmtIDR(discount);
     var elOld = $('x-sum-oldtotal'); if (elOld) elOld.textContent = fmtIDR(oldTotal);
     var elGrand = $('x-sum-total'); if (elGrand) elGrand.textContent = fmtIDR(grand);
+    var elChange = $('x-sum-change'); if (elChange) elChange.textContent = fmtIDR(tenderChange());
   }
 
   // ── Upsell Recommendation Rail (Dynamic API/Catalog Integration) ──

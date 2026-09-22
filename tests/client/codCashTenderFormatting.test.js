@@ -184,3 +184,27 @@ test('T7: preset radios are limited by the amount due (total pembayaran)', () =>
   // The old hardcoded bindings must be gone.
   assert.ok(!code.includes('elPreset10k'), 'hardcoded preset bindings must be removed');
 });
+
+test('T8: the summary card shows the change directly under the cash prepared', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // Rendered inside the "Uang Tunai Disiapkan" column, so it sits right below
+  // the amount the customer prepares.
+  assert.ok(code.includes('>Uang Tunai Disiapkan</span>'), 'the prepared-cash row must exist');
+  assert.ok(code.includes('>Kembalian <b id="x-sum-change"'), 'the change must render under it');
+
+  // One formula: change = tendered - amount due, never negative.
+  assert.ok(code.includes('function tenderChange()'), 'the change must have a single source');
+  assert.ok(code.includes('return Math.max(0, tendered - payableTotal());'),
+    'change must be tendered minus the amount due, clamped at 0');
+  assert.ok(code.includes("state.paymentMethod === 'cash' ? (state.cashTendered || 0) : 0"),
+    'change must only be computed for cash');
+
+  // Kept live when the bill is recomputed (promo, fee, quantity).
+  assert.ok(code.includes("var elChange = $('x-sum-change'); if (elChange) elChange.textContent = fmtIDR(tenderChange());"),
+    'changing the bill must refresh the change');
+
+  // Cash only: the block renders only for cash with a tendered amount.
+  assert.ok(code.includes("(state.paymentMethod === 'cash' && state.cashTendered ? ("),
+    'the change must not show for online payments');
+});
