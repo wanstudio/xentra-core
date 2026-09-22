@@ -426,6 +426,117 @@
     }
   }
 
+  // ── Scanner QR meja (di dalam aplikasi) ──
+  // Jalur utama tetap kamera bawaan HP. Scanner ini untuk konsumen yang ingin
+  // langsung dari sini, DAN untuk HP yang kameranya tidak bisa membaca QR:
+  // kalau browser tidak punya detektor barcode atau kamera ditolak, konsumen
+  // diberi jalan memasukkan kode meja secara manual. Jadi tidak ada yang buntu.
+  var tableQrScanner = { stream: null, raf: null };
+
+  function extractMejaToken(text) {
+    if (!text) return null;
+    var url = /[?&]meja=([^&\s]+)/.exec(String(text));
+    if (url) return decodeURIComponent(url[1]);
+    var raw = String(text).trim();
+    if (/^qr_[A-Za-z0-9_-]+$/.test(raw)) return raw;
+    return null;
+  }
+
+  function stopTableQrScanner() {
+    if (tableQrScanner.raf) {
+      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(tableQrScanner.raf);
+      tableQrScanner.raf = null;
+    }
+    if (tableQrScanner.stream) {
+      try {
+        tableQrScanner.stream.getTracks().forEach(function (t) { t.stop(); });
+      } catch (e) { /* kamera sudah tertutup */ }
+      tableQrScanner.stream = null;
+    }
+    var overlay = document.getElementById('x-table-qr-scanner');
+    if (overlay) overlay.remove();
+  }
+
+  function handleScannedTable(token) {
+    if (!token) return;
+    stopTableQrScanner();
+    claimTableFromQr(token);
+  }
+
+  function openTableQrScanner() {
+    stopTableQrScanner();
+
+    var hasDetector = (typeof window.BarcodeDetector === 'function');
+    var hasCamera = !!(window.navigator && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    var canScan = hasDetector && hasCamera;
+    var reason = hasDetector
+      ? 'Kamera tidak bisa dipakai. Masukkan kode meja di bawah, atau minta bantuan staf.'
+      : 'HP ini belum bisa scan otomatis. Pakai kamera HP untuk memotret QR meja, atau masukkan kode meja di bawah.';
+
+    var overlay = document.createElement('div');
+    overlay.id = 'x-table-qr-scanner';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.9);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:16px;padding:18px;max-width:360px;width:100%;text-align:center;">' +
+      '  <h3 style="margin:0 0 6px;font-size:16px;font-weight:800;">Scan QR Meja</h3>' +
+      '  <p style="margin:0 0 12px;font-size:12px;color:#64748b;">Arahkan kamera ke QR yang tertempel di meja. Bill meja itu akan langsung nyambung.</p>' +
+      '  <div id="x-qr-video-wrap" style="position:relative;background:#0f172a;border-radius:12px;overflow:hidden;margin-bottom:12px;display:' + (canScan ? 'block' : 'none') + ';">' +
+      '    <video id="x-qr-video" playsinline autoplay muted style="width:100%;display:block;"></video>' +
+      '  </div>' +
+      '  <div id="x-qr-notice" style="font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px;margin-bottom:12px;display:' + (canScan ? 'none' : 'block') + ';">' + reason + '</div>' +
+      '  <div style="font-size:11.5px;color:#6b7280;margin-bottom:6px;">Atau masukkan kode meja:</div>' +
+      '  <input id="x-qr-manual" type="text" placeholder="qr_..." style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;margin-bottom:10px;">' +
+      '  <button type="button" id="x-qr-manual-submit" style="width:100%;border:0;background:var(--x-primary);color:var(--x-primary-text,#111);font-weight:800;font-size:14px;padding:12px;border-radius:999px;cursor:pointer;margin-bottom:8px;font-family:inherit;">Pakai kode ini</button>' +
+      '  <button type="button" id="x-qr-close" class="x-btn-secondary" style="width:100%;font-size:12px;padding:10px;">Tutup</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    function setNotice(msg) {
+      var notice = document.getElementById('x-qr-notice');
+      if (notice) { notice.textContent = msg; notice.style.display = 'block'; }
+      var wrap = document.getElementById('x-qr-video-wrap');
+      if (wrap) wrap.style.display = 'none';
+    }
+
+    overlay.querySelector('#x-qr-close').onclick = function () { stopTableQrScanner(); };
+
+    overlay.querySelector('#x-qr-manual-submit').onclick = function () {
+      var input = document.getElementById('x-qr-manual');
+      var token = extractMejaToken(input ? input.value : '');
+      if (!token) {
+        setNotice('Kode meja tidak dikenali. Contoh: qr_9f2a... atau tempelkan tautan QR-nya.');
+        return;
+      }
+      handleScannedTable(token);
+    };
+
+    if (!canScan) return;
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function (stream) {
+      tableQrScanner.stream = stream;
+
+      var video = document.getElementById('x-qr-video');
+      if (!video) { stopTableQrScanner(); return; }
+      video.srcObject = stream;
+      if (video.play) { var started = video.play(); if (started && started.catch) started.catch(function () {}); }
+
+      var detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+      var tick = function () {
+        detector.detect(video).then(function (codes) {
+          var text = codes && codes.length ? (codes[0].rawValue || '') : '';
+          var token = extractMejaToken(text);
+          if (token) { handleScannedTable(token); return; }
+          tableQrScanner.raf = requestAnimationFrame(tick);
+        }).catch(function () {
+          tableQrScanner.raf = requestAnimationFrame(tick);
+        });
+      };
+      tableQrScanner.raf = requestAnimationFrame(tick);
+    }).catch(function () {
+      setNotice('Kamera tidak bisa dipakai. Masukkan kode meja di bawah, atau minta bantuan staf.');
+    });
+  }
+
   function claimTableFromQr(qrToken) {
     if (!qrToken || !API) return Promise.resolve(null);
 
@@ -2076,10 +2187,17 @@
         '    </div>' +
         '  </div>' +
         '  <div class="x-dinein-header-title">Pilih meja</div>' +
+         '  <div class="x-scan-table-strip" style="margin:0 0 10px;padding:10px 12px;border:1px dashed #bbf7d0;border-radius:12px;background:#f0fdf4;text-align:center;">' +
+         '    <div style="font-size:12px;color:#166534;margin-bottom:8px;">Duduk di meja? Scan QR yang tertempel di meja supaya billnya langsung nyambung.</div>' +
+         '    <button type="button" id="x-btn-scan-table-qr" class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Scan QR Meja</button>' +
+         '  </div>' +
         '  <div id="x-dinein-floor-canvas" class="x-floor-wrapper">' +
         '    <div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px;">Memuat tata letak meja…</div>' +
         '  </div>' +
         '</div>';
+
+      var scanQrBtn = schedContainer.querySelector('#x-btn-scan-table-qr');
+      if (scanQrBtn) scanQrBtn.onclick = function () { openTableQrScanner(); };
 
       var minusBtn = schedContainer.querySelector('#x-btn-guest-minus');
       var plusBtn = schedContainer.querySelector('#x-btn-guest-plus');

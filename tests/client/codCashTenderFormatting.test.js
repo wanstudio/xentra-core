@@ -329,3 +329,36 @@ test('T12: scanning a table QR lands the customer on that table', () => {
     'a scan before sign-in must be remembered');
   assert.ok(code.includes('}).catch(function () {\n      return null;'), 'a failed claim must degrade quietly');
 });
+
+test('T13: the table-picking screen can scan the table QR, with a way out for old phones', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // Offered where the customer picks a table, with a plain-language guide.
+  assert.ok(code.includes('id="x-btn-scan-table-qr"'), 'the picking screen must offer scanning');
+  assert.ok(code.includes('Duduk di meja? Scan QR yang tertempel di meja'),
+    'the customer must be told what scanning does');
+  assert.ok(/x-btn-scan-table-qr[\s\S]{0,120}openTableQrScanner\(\)/.test(code),
+    'the button must open the scanner');
+
+  // Camera scanning, feature-detected rather than assumed.
+  assert.ok(code.includes("typeof window.BarcodeDetector === 'function'"),
+    'the decoder support must be detected, not assumed');
+  assert.ok(code.includes("facingMode: 'environment'"), 'the back camera must be used');
+  assert.ok(code.includes("new window.BarcodeDetector({ formats: ['qr_code'] })"), 'decode QR codes');
+
+  // Old phones / refused camera: never a dead end.
+  assert.ok(code.includes('HP ini belum bisa scan otomatis'),
+    'unsupported browsers must be told what to do instead');
+  assert.ok(code.includes('Kamera tidak bisa dipakai'), 'a refused camera must be handled');
+  assert.ok(code.includes('id="x-qr-manual"'), 'a manual code entry must exist');
+  assert.ok(code.includes('function extractMejaToken('), 'the entered code or link must be understood');
+  assert.ok(code.includes('/^qr_[A-Za-z0-9_-]+$/'), 'a raw table code must be accepted');
+
+  // A scan goes through the same server claim as the QR link.
+  assert.ok(/function handleScannedTable\(token\)[\s\S]{0,120}claimTableFromQr\(token\)/.test(code),
+    'a scanned table must use the same claim path as the link');
+
+  // The camera must be released, or the phone keeps the light on.
+  assert.ok(code.includes('tableQrScanner.stream.getTracks().forEach'), 'camera tracks must be stopped');
+  assert.ok(code.includes("document.getElementById('x-table-qr-scanner')"), 'the overlay must be cleaned up');
+});
