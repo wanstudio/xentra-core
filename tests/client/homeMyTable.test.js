@@ -87,8 +87,8 @@ test('MYTABLE-04: klik ikon meja → ringkasan + CTA', () => {
 
 test('MYTABLE-05: pindah meja dikunci, tamu diarahkan ke kasir', () => {
   assert.ok(HOME.includes('Ingin pindah meja? Hubungi kasir.'), 'harus ada pesan kunci pindah meja');
-  assert.ok(/var current = \(Store\.getMyTable && Store\.getMyTable\(\)\) \|\| null;\s*\n\s*if \(current\) \{/
-    .test(HOME), 'scan meja lain harus ditolak saat sudah punya meja');
+  assert.ok(HOME.includes('if (current && current.hadOpenBill) {'),
+    'scan meja lain ditolak hanya kalau sudah ada tagihan di meja itu');
   assert.ok(!"Store.setMyTable({ id: res.table.id".includes('TIDAK'),
     'meja hanya dipasang kalau belum punya');
 });
@@ -138,8 +138,8 @@ test('MYTABLE-07: meja disimpan di Store (bertahan saat pindah halaman)', () => 
 test('MYTABLE-15: konfirmasi MENGUNCI meja — pindah meja lewat checkout ditolak', () => {
   assert.ok(CHECKOUT.includes("'Ingin pindah meja? Hubungi kasir.'"),
     'checkout harus menolak pindah meja, sama seperti jalur scan');
-  assert.ok(/lockedTable && String\(lockedTable\.id\) !== String\(draft\.selectedTableIds\[0\]\)/.test(CHECKOUT),
-    'penolakan berlaku saat meja yang dipilih berbeda dari yang terkunci');
+  assert.ok(/lockedTable && lockedTable\.hadOpenBill && String\(lockedTable\.id\) !== String\(draft\.selectedTableIds\[0\]\)/.test(CHECKOUT),
+    'penolakan hanya saat sudah ada tagihan DAN mejanya berbeda');
   assert.ok(/var lockedTable = \(Store\.getMyTable && Store\.getMyTable\(\)\) \|\| null;[\s\S]{0,260}return;/.test(CHECKOUT),
     'harus berhenti sebelum menyimpan, bukan menimpa meja terkunci');
   assert.ok(CHECKOUT.indexOf('var lockedTable') < CHECKOUT.indexOf('state.fulfillment.type = draft.type;'),

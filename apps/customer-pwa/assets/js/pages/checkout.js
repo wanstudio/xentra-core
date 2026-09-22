@@ -2406,8 +2406,11 @@
           // (menyimpang dari aturan yang sama di jalur scan QR). Memindahkan meja
           // adalah wewenang kasir; tamu hanya bisa MELEPAS dengan memilih tipe
           // pembelian lain di sheet ini.
+          // TERKUNCI = sudah ada tagihan di meja itu, bukan sekadar ada meja
+          // tersimpan. Sebelum memesan, tamu masih bebas berpindah meja; kalau
+          // tidak, memilih meja lain akan ditolak dan terasa seperti tombol mati.
           var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
-          if (lockedTable && String(lockedTable.id) !== String(draft.selectedTableIds[0])) {
+          if (lockedTable && lockedTable.hadOpenBill && String(lockedTable.id) !== String(draft.selectedTableIds[0])) {
             if (UI && UI.toast) UI.toast('Ingin pindah meja? Hubungi kasir.');
             return;
           }

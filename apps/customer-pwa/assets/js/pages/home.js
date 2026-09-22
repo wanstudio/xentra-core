@@ -2326,8 +2326,10 @@
 
       // Sudah punya meja: memindahkan meja bukan hak tamu. Sistem mengunci, dan
       // kasir yang bisa memindahkan (reassign) atau menutup & membuka sesi baru.
+      // Sama seperti di checkout: terkunci berarti sudah ada tagihan di meja itu.
+      // Sebelum memesan, scan meja lain hanya berarti berpindah meja.
       var current = (Store.getMyTable && Store.getMyTable()) || null;
-      if (current) {
+      if (current && current.hadOpenBill) {
         showTableNotice({
           tone: 'warn',
           title: 'Ingin pindah meja? Hubungi kasir.',
