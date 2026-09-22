@@ -2477,6 +2477,11 @@
     refresh: function () {
       renderProducts();
       renderCartDock();
+      // Home tidak di-init ulang saat dibuka lagi, jadi keadaan ikon meja harus
+      // disegarkan di sini juga — kalau tidak, meja yang dipilih di halaman lain
+      // baru terlihat setelah reload.
+      renderMyTableState();
+      reconcileMyTable();
       if ($('x-sheet') && $('x-sheet').classList.contains('open')) {
         renderCartSheetItems();
       }

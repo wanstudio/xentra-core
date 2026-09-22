@@ -93,6 +93,13 @@ test('MYTABLE-05: pindah meja dikunci, tamu diarahkan ke kasir', () => {
     'meja hanya dipasang kalau belum punya');
 });
 
+test('MYTABLE-14: ikon disegarkan setiap Home dibuka (init jalan sekali saja)', () => {
+  assert.ok(/refresh: function \(\) \{[\s\S]{0,500}renderMyTableState\(\)/.test(HOME),
+    'XentraHome.refresh harus menyegarkan ikon meja');
+  assert.ok(/refresh: function \(\) \{[\s\S]{0,560}reconcileMyTable\(\)/.test(HOME),
+    'dan mencocokkan lagi ke server');
+});
+
 test('MYTABLE-12: ikon berubah tanpa reload (dipasang dari halaman lain)', () => {
   assert.ok(HOME.includes('Store.subscribe'), 'harus ikut perubahan Store');
   assert.ok(HOME.includes("evt.type === 'my_table'"), 'hanya menanggapi perubahan meja');
