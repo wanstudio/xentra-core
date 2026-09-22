@@ -533,7 +533,9 @@
       // Meja yang di-scan dari Home tersimpan di Store: dipakai di sini supaya
       // pesanan benar-benar terikat ke meja itu tanpa perlu pilih meja lagi.
       var storedTable = (Store.getMyTable && Store.getMyTable()) || null;
-      if (storedTable && storedTable.id && !((state.fulfillment.table_ids || []).length)) {
+      var storedOrderType = Store.getState().orderType;
+      var storedIsDineIn = storedOrderType === 'dine_in' || storedOrderType === 'dinein';
+      if (storedIsDineIn && storedTable && storedTable.id && !((state.fulfillment.table_ids || []).length)) {
         state.fulfillment.type = 'dine_in';
         state.fulfillment.table_ids = [storedTable.id];
         state.fulfillment.tableNumber = storedTable.number || '';
@@ -2413,13 +2415,6 @@
 
         // Commit to state.fulfillment
         state.fulfillment.type = draft.type;
-
-        // Konfirmasi = MENGUNCI atau MELEPAS meja. Tipe selain dine-in berarti tamu
-        // tidak duduk di meja, jadi kuncinya dilepas dan ikon di Home kembali ke
-        // ikon scan. PENTING: jangan ditaruh di rantai if/else di bawah — delivery
-        // dan pickup dijaring cabang pertama, jadi cabang `else` tidak pernah
-        // dijalankan untuk keduanya (pernah terjadi: meja tidak pernah dilepas).
-        if (draft.type !== 'dine_in' && Store.clearMyTable) Store.clearMyTable();
         state.fulfillment.scheduled = Boolean(draft.scheduled);
         if (draft.type === 'delivery' || draft.type === 'pickup') {
           state.fulfillment.date = draft.date || 'Hari ini';

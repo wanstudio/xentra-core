@@ -57,8 +57,8 @@ test('MYTABLE-01: topbar punya ikon scan dan ikon meja dengan badge', () => {
 
 test('MYTABLE-02: ikon bertukar sesuai keadaan, dan scannernya modul bersama', () => {
   assert.ok(HOME.includes('function renderMyTableState()'), 'harus ada satu penentu tampilan');
-  assert.ok(HOME.includes('btnScanTable.hidden = !!table'), 'ada meja → ikon scan hilang');
-  assert.ok(HOME.includes('btnMyTable.hidden = !table'), 'ada meja → ikon meja muncul');
+  assert.ok(HOME.includes('btnScanTable.hidden = showTable'), 'ada meja (dine-in) → ikon scan hilang');
+  assert.ok(HOME.includes('btnMyTable.hidden = !showTable'), 'ada meja (dine-in) → ikon meja muncul');
   // Satu mekanisme saja: atribut hidden + aturan CSS yang menegakkannya. Kalau
   // dicampur style.display, `!important` di CSS akan menang dan ikon tak muncul.
   assert.ok(!HOME.includes('btnMyTable.style.display'), 'jangan campur style.display dengan atribut hidden');
@@ -110,7 +110,7 @@ test('MYTABLE-11: atribut hidden benar-benar menyembunyikan (kalah oleh display:
   const css = read('apps/customer-pwa/assets/css/home.css');
   assert.ok(css.includes('.x-hero-icon-btn[hidden]'), 'CSS harus menegakkan [hidden] untuk ikon topbar');
   assert.ok(css.includes('#x-my-table-badge[hidden]'), 'dan untuk badge');
-  assert.ok(HOME.includes('if (btnScanTable) btnScanTable.hidden = !!table'),
+  assert.ok(HOME.includes('if (btnScanTable) btnScanTable.hidden = showTable'),
     'JS dan CSS harus memakai mekanisme yang sama (atribut hidden)');
 });
 
@@ -146,15 +146,14 @@ test('MYTABLE-15: konfirmasi MENGUNCI meja — pindah meja lewat checkout ditola
     'pemeriksaan kunci harus sebelum commit tipe pembelian');
 });
 
-test('MYTABLE-13: pilih tipe selain dine-in → meja dilepas, ikon balik ke scan', () => {
-  assert.ok(CHECKOUT.includes("if (draft.type !== 'dine_in' && Store.clearMyTable) Store.clearMyTable();"),
-    'meja harus dilepas untuk SEMUA tipe selain dine-in');
-  // Jangan di dalam rantai if/else: delivery & pickup dijaring cabang pertama,
-  // jadi cabang else tidak pernah jalan untuk keduanya.
-  assert.ok(CHECKOUT.indexOf("Store.clearMyTable()") < CHECKOUT.indexOf("if (draft.type === 'delivery' || draft.type === 'pickup')"),
-    'pelepasan meja harus sebelum rantai if/else, bukan di dalamnya');
-  assert.ok((CHECKOUT.match(/Store\.clearMyTable\(\)/g) || []).length === 1,
-    'hanya satu tempat melepas meja');
+test('MYTABLE-13: ganti tipe selain dine-in → ikon disembunyikan, meja TIDAK dilepas', () => {
+  // Meja tidak perlu lepas-pasang: yang berubah hanya tampil atau sembunyi.
+  assert.ok(HOME.includes('function isDineInOrderType()'), 'harus ada penentu tipe dine-in');
+  assert.ok(HOME.includes('var showTable = !!table && isDineInOrderType();'),
+    'ikon tampil hanya kalau tipe pembeliannya dine-in');
+  assert.ok(HOME.includes("evt.type === 'orderType'"), 'ganti tipe harus ikut menyegarkan ikon');
+  assert.ok(!CHECKOUT.includes('Store.clearMyTable()'),
+    'checkout tidak boleh melepas meja saat tipe berganti');
 });
 
 test('MYTABLE-09: meja yang dipilih di checkout ikut mengisi badge', () => {

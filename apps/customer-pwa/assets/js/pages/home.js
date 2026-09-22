@@ -2264,8 +2264,17 @@
       });
     }
 
+    // Tipe pembelian yang sedang dipakai. Meja tidak dilepas saat tipe berganti —
+    // yang berubah hanya TAMPIL atau SEMBUNYI, jadi tamu yang kembali ke dine-in
+    // tidak perlu memilih meja lagi.
+    function isDineInOrderType() {
+      var t = Store.getState().orderType;
+      return t === 'dine_in' || t === 'dinein';
+    }
+
     function renderMyTableState() {
       var table = (Store.getMyTable && Store.getMyTable()) || null;
+      var showTable = !!table && isDineInOrderType();
       // SATU mekanisme saja: atribut `hidden`. home.css menegakkannya dengan
       // [hidden] { display: none !important }, karena display:flex milik kelas
       // .x-hero-icon-btn mengalahkan atribut hidden bawaan browser.
@@ -2273,11 +2282,11 @@
       // JANGAN campur dengan style.display: `!important` di CSS mengalahkan inline
       // style, jadi menampilkan lewat style.display akan diam-diam gagal selama
       // atribut hidden masih menempel (pernah terjadi: ikon meja tak pernah muncul).
-      if (btnScanTable) btnScanTable.hidden = !!table;
-      if (btnMyTable) btnMyTable.hidden = !table;
+      if (btnScanTable) btnScanTable.hidden = showTable;
+      if (btnMyTable) btnMyTable.hidden = !showTable;
       var badge = $('x-my-table-badge');
       if (badge) {
-        var num = table ? (table.number || '') : '';
+        var num = showTable ? (table.number || '') : '';
         badge.textContent = num;
         // Tanpa nomor, badge tidak boleh tampil sebagai titik merah kosong.
         badge.hidden = !num;
@@ -2382,7 +2391,8 @@
     if (!window.__xentraMyTableBound && Store.subscribe) {
       window.__xentraMyTableBound = true;
       Store.subscribe(function (evt) {
-        if (!evt || evt.type === 'my_table') renderMyTableState();
+        // Ikut perubahan meja DAN perubahan tipe pembelian (tampil/sembunyi).
+        if (!evt || evt.type === 'my_table' || evt.type === 'orderType') renderMyTableState();
       });
     }
 
