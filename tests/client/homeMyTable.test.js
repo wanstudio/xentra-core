@@ -29,6 +29,11 @@ test('MYTABLE-01: topbar punya ikon scan dan ikon meja dengan badge', () => {
   assert.ok(/x-btn-my-table"[\s\S]{0,400}hidden/.test(HTML), 'ikon meja tersembunyi sampai tamu dapat meja');
   assert.ok(/x-my-table-badge"[\s\S]{0,300}background:#dc2626/.test(HTML), 'badge merah');
   assert.ok(/id="x-my-table-badge" hidden/.test(HTML), 'badge tidak boleh tampil sebelum ada nomor meja');
+  // Badge ditengahkan terhadap ikonnya: patokan kiri 50% + digeser setengah lebar.
+  assert.ok(/x-my-table-badge"[\s\S]{0,400}left:50%;transform:translateX\(-50%\)/.test(HTML),
+    'badge harus rata tengah dengan ikonnya');
+  assert.ok(!/x-my-table-badge"[\s\S]{0,400}right:-5px/.test(HTML),
+    'patokan kanan harus diganti dengan tengah');
   // Badge harus kuat untuk 2-3 angka: tetap pill dan angkanya rata.
   assert.ok(/x-my-table-badge"[\s\S]{0,400}min-width:18px/.test(HTML), 'badge siap 2-3 angka');
   assert.ok(/x-my-table-badge"[\s\S]{0,400}font-variant-numeric:tabular-nums/.test(HTML), 'angka badge rata');
