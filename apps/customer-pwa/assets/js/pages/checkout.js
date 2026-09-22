@@ -1730,7 +1730,7 @@
       '  <div id="x-ful-schedule-container">' +
       '    <!-- Rendered dynamically for delivery -->' +
       '  </div>' +
-      '  <div class="x-fulfillment-promo" style="display:none;" data-hidden-reason="disembunyikan sementara">' +
+      '  <div class="x-fulfillment-promo">' +
       '    <span class="x-fulfillment-promo-icon">i</span>' +
       '    <span>Ketersediaan promo tergantung pada tipe pembelian</span>' +
       '  </div>' +
@@ -2104,7 +2104,9 @@
         '<div class="x-fulfillment-divider"></div>' +
         '<div class="x-dinein-container">' +
         '  <!-- Guest count filtering temporarily hidden per user request -->' +
-        '  <div class="x-fulfillment-promo" id="x-dinein-scan-info" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+        // Disembunyikan sementara: pilih meja sudah langsung menampilkan meja, jadi
+         // ajakan scan di sini tidak perlu. Ubah display menjadi flex untuk menyalakan lagi.
+         '  <div class="x-fulfillment-promo" id="x-dinein-scan-info" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;">' +
          '    <span class="x-fulfillment-promo-icon">i</span>' +
          '    <span style="flex:1 1 150px;min-width:0;">Scan QR di mejamu, pesananmu akan kami antarkan segera.</span>' +
          '    <button type="button" id="x-btn-scan-table-qr" style="display:inline-flex;align-items:center;gap:6px;border-radius:12px;padding:8px 14px;background:#111111;color:#ffffff;border:0;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.10);">' +

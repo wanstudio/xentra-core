@@ -390,9 +390,16 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
   assert.ok(/x-qr-video-wrap[\s\S]{0,900}box-shadow:0 0 0 9999px/.test(code),
     'harus ada bingkai scan dengan area luar yang diredupkan');
 
-  // Bar ketersediaan promo disembunyikan dulu.
-  assert.ok(code.includes('class="x-fulfillment-promo" style="display:none;"'),
-    'bar ketersediaan promo harus disembunyikan, bukan dihapus');
+  // Bar ketersediaan promo TAMPIL lagi, tepat di bawah pilihan tipe/meja.
+  assert.ok(code.includes('class="x-fulfillment-promo"'), 'bar promo harus ada');
+  assert.ok(!code.includes('class="x-fulfillment-promo" style="display:none;"'),
+    'bar promo tidak boleh disembunyikan lagi');
+  assert.ok(code.indexOf('x-fulfillment-promo') < code.indexOf('x-fulfillment-actions'),
+    'bar promo harus di atas tombol aksi — jadi tepat di bawah pilihan meja');
+
+  // Bar ajakan scan di dalam dine-in disembunyikan (pilih meja sudah cukup).
+  assert.ok(code.includes('id="x-dinein-scan-info" style="display:none;'),
+    'bar scan dine-in harus disembunyikan');
   assert.ok(!code.includes('class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Scan QR di Meja'),
     'gaya tombol lama harus diganti');
   assert.ok(/x-dinein-scan-info"[\s\S]{0,120}x-fulfillment-promo-icon">i</.test(code),
