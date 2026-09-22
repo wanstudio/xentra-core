@@ -1356,10 +1356,10 @@
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else if (ord.status === 'confirmed' || ord.status === 'preparing') {
-        // Cooking stages are driven from the Kitchen surface, not here.
+        var kitchenNextLabel = ord.status === 'confirmed' ? 'Mulai Masak' : 'Tandai Siap';
         actionsHtml =
-          '<div style="display:flex; gap:6px; justify-content:flex-end; align-items:center;">' +
-            '<small class="text-muted" style="font-size:11px; font-weight:700;">' + (ord.status === 'confirmed' ? 'Menunggu dapur' : 'Sedang dimasak') + '</small>' +
+          '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'' + esc(ord.status) + '\', \'' + esc(ordType) + '\', this)">' + kitchenNextLabel + '</button>' +
             '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else if (ord.status === 'ready') {
@@ -1407,10 +1407,10 @@
             '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')" aria-label="Detail Pesanan #' + esc(ord.order_number || ord.id) + '">Detail</button>' +
           '</div>';
       } else if (ord.status === 'confirmed' || ord.status === 'preparing') {
-        // Cooking stages are driven from the Kitchen surface, not here.
+        var kitchenCardNextLabel = ord.status === 'confirmed' ? 'Mulai Masak' : 'Tandai Siap';
         cardActionsHtml =
           '<div class="bm-order-card-actions">' +
-            '<small class="text-muted" style="flex:1; font-size:12px; font-weight:700;">' + (ord.status === 'confirmed' ? 'Menunggu dapur memasak' : 'Sedang dimasak di dapur') + '</small>' +
+            '<button type="button" class="x-btn-primary" ' + (isMutatingStatus ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'' + esc(ord.status) + '\', \'' + esc(ordType) + '\', this)">' + kitchenCardNextLabel + '</button>' +
             '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
           '</div>';
       } else if (ord.status === 'ready') {
@@ -1525,10 +1525,12 @@
     }
 
     var isDelivery = (fulfillmentType === 'delivery');
-    // Branch Manager authority is acceptance (pending) and dispatch. Cooking
-    // stages (confirmed → preparing → ready) belong to the Kitchen surface
-    // (/kitchen-app), and out_for_delivery → completed to the Driver lifecycle.
+    // MVP: Branch Manager handles the full required operational order flow,
+    // including cooking stages. The same Core endpoint and state machine are
+    // reused; KDS remains an optional future add-on.
     var nextMap = {
+      confirmed: 'preparing',
+      preparing: 'ready',
       ready: isDelivery ? 'out_for_delivery' : 'completed'
     };
 
@@ -1550,9 +1552,8 @@
     }
 
     try {
-      // Kitchen cooking stages are no longer reachable from this surface: they
-      // are driven from /kitchen-app (confirmed→preparing→ready). Only dispatch
-      // (ready→out_for_delivery, or ready→completed for pickup) is triggered here.
+      // MVP uses this same Core endpoint for BM kitchen-stage actions and
+      // dispatch. Future KDS uses the same endpoint with its own role boundary.
       var patchRes = await adminFetch(API_BASE + '/kitchen/orders/' + encodeURIComponent(orderId) + '/status', {
         method: 'PATCH',
         headers: getAuthHeaders(),
@@ -1847,10 +1848,10 @@
             '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" ' + (isAccepting ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(ordType) + '\', this);">Terima Pesanan</button>' +
             '<button type="button" class="x-btn-secondary" style="font-size:13px; padding:6px 14px; color:#dc2626; border-color:#fecaca;" ' + (isAccepting ? 'disabled' : '') + ' onclick="rejectBMOrder(\'' + esc(ord.id) + '\');">Tolak Pesanan</button>';
         } else if (ord.status === 'confirmed' || ord.status === 'preparing') {
-          // Cooking stages belong to the Kitchen surface (/kitchen-app).
+          var detailKitchenLabel = ord.status === 'confirmed' ? 'Mulai Masak' : 'Tandai Siap';
           topActions.innerHTML =
-            '<small class="text-muted" style="font-size:12.5px; font-weight:700;">' +
-            (ord.status === 'confirmed' ? 'Menunggu dapur memasak' : 'Sedang dimasak di dapur') + '</small>';
+            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'' + esc(ord.status) + '\', \'' + esc(ordType) + '\', this);">' +
+            detailKitchenLabel + '</button>';
         } else if (ord.status === 'ready') {
           var label = (ordType === 'delivery') ? 'Kirim Pesanan ➔' : 'Selesaikan Pesanan ➔';
           topActions.innerHTML =
