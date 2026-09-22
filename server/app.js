@@ -243,7 +243,7 @@ app.get(['/dashboard/login', '/dashboard/login/'], (req, res) => {
   res.redirect(301, '/login' + qs);
 });
 
-app.get(/^\/dashboard(\/.*)?$/, async (req, res) => {
+app.get([/^\/dashboard(\/.*)?$/, /^\/owner(\/.*)?$/], async (req, res) => {
   if (!isSaaSHost(req)) {
     const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
     await brandRepository.ready();
@@ -272,7 +272,7 @@ app.use('/merchant-app/assets', express.static(path.join(__dirname, '../apps/mer
 
 // Merchant App entry point. Additive: /dashboard routing is unchanged and the
 // Branch Manager surface is served here for role-appropriate deep links.
-app.get(/^\/merchant-app(\/.*)?$/, async (req, res) => {
+app.get([/^\/merchant-app(\/.*)?$/, /^\/merchant(\/.*)?$/], async (req, res) => {
   if (!isSaaSHost(req)) {
     const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
     await brandRepository.ready();

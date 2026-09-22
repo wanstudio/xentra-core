@@ -74,10 +74,14 @@
    * current role must not render. Returns true when it redirected.
    * Unauthenticated pages are untouched — boot calls this after validation.
    */
-  function enforceSurface(surfacePath) {
+  function enforceSurface(surfacePaths) {
     if (!_landing) return false;
-    if (_landing === surfacePath) return false;
-    window.location.replace(_landing);
+    var paths = Array.isArray(surfacePaths) ? surfacePaths : [surfacePaths];
+    // No redirect when the server resolved THIS surface for the current role.
+    // The surface's canonical path is always in its own accepted set, so the
+    // guard can never bounce a page back to itself.
+    if (paths.indexOf(_landing) !== -1) return false;
+    window.location.replace(_landing + window.location.hash);
     return true;
   }
 

@@ -236,7 +236,7 @@
     // role. Any other role is sent to the surface the server resolved for it,
     // so a URL swap cannot grant access. (The route itself stays unregistered
     // while the KDS capability is off.)
-    if (enforceSurface('/kitchen-app/')) return;
+    if (enforceSurface(['/kitchen/', '/kitchen-app/'])) return;
 
     state.branch = (user && (user.branch_name || user.brand_name)) || 'Cabang';
 

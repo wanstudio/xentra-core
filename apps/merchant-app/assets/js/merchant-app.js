@@ -3548,7 +3548,7 @@
 
     // Surface guard: the server resolves the landing surface for this role, so
     // swapping the URL can never grant a surface this role does not own.
-    if (enforceSurface('/merchant-app/')) return;
+    if (enforceSurface(['/merchant/', '/merchant-app/'])) return;
 
     applyRoleBasedUI();
     renderBranchManagerNavigation();

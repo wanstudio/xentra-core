@@ -4019,7 +4019,7 @@
     // Role-based sidebar nav item visibility
     if (isBM) {
       // Branch Manager is served by the standalone Merchant App.
-      window.location.replace('/merchant-app/' + window.location.hash);
+      window.location.replace('/merchant/' + window.location.hash);
       return;
     } else {
       var isStaff = role === 'cashier' || role === 'kitchen';
@@ -8444,7 +8444,7 @@
     // Branch Manager gets the dedicated Merchant App surface.
     // KDS is held/future and must not become an active login destination.
     if (isBranchManager()) {
-      window.location.replace('/merchant-app/' + window.location.hash);
+      window.location.replace('/merchant/' + window.location.hash);
       return;
     }
 

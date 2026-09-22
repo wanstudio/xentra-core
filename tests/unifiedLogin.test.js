@@ -114,11 +114,12 @@ test('UNIFIED LOGIN — one entry point, server-resolved landing', async (t) => 
 
   await t.test('4. the server resolves the landing surface per role', async () => {
     const cases = [
-      ['uul_owner', 'owner', '/dashboard/'],
-      ['uul_bm', 'branch_manager', '/merchant-app/'],
-      ['uul_cashier', 'cashier', '/dashboard/'],
+      ['uul_owner', 'owner', '/owner/'],
+      ['uul_brand', 'brand_manager', '/owner/'],
+      ['uul_bm', 'branch_manager', '/merchant/'],
+      ['uul_cashier', 'cashier', '/owner/'],
       // KDS capability is OFF in MVP → kitchen has no dedicated surface
-      ['uul_kitchen', 'kitchen', '/dashboard/']
+      ['uul_kitchen', 'kitchen', '/owner/']
     ];
     for (const [id, role, expected] of cases) {
       const token = seedSession(id, role);
@@ -155,9 +156,9 @@ test('UNIFIED LOGIN — one entry point, server-resolved landing', async (t) => 
   });
 
   await t.test('7. surfaces enforce the landing (URL swap cannot grant a surface)', () => {
-    assert.ok(read('apps/merchant-app/assets/js/merchant-app.js').includes("enforceSurface('/merchant-app/')"),
+    assert.ok(read('apps/merchant-app/assets/js/merchant-app.js').includes("enforceSurface(['/merchant/', '/merchant-app/'])"),
       'merchant-app must guard its own surface');
-    assert.ok(read('apps/kitchen-app/assets/js/kitchen-app.js').includes("enforceSurface('/kitchen-app/')"),
+    assert.ok(read('apps/kitchen-app/assets/js/kitchen-app.js').includes("enforceSurface(['/kitchen/', '/kitchen-app/'])"),
       'kitchen-app must guard its own surface');
     assert.ok(read('apps/merchant-shared/js/shared.js').includes('function enforceSurface('),
       'the guard must live once, in the shared layer');
@@ -166,6 +167,20 @@ test('UNIFIED LOGIN — one entry point, server-resolved landing', async (t) => 
   await t.test('8. KDS stays inactive: the kitchen surface is not routed', () => {
     const appSource = read('server/app.js');
     assert.ok(!appSource.includes("'/kitchen-app/assets'"), 'kitchen assets must not be mounted while KDS is off');
-    assert.ok(!/\\\/kitchen-app\(/.test(appSource), 'no /kitchen-app route may exist while KDS is off');
+    assert.ok(!/\\\/kitchen(-app)?\(/.test(appSource), 'no /kitchen-app route may exist while KDS is off');
+  });
+  await t.test('9. the short surface paths resolve to the right app', async () => {
+    const owner = await request('GET', '/owner');
+    assert.equal(owner.status, 200, '/owner must serve the owner surface');
+    const merchant = await request('GET', '/merchant');
+    assert.equal(merchant.status, 200, '/merchant must serve the merchant surface');
+    assert.notEqual(owner.body, merchant.body, 'the two surfaces must stay distinct');
+
+    const legacy = await request('GET', '/merchant-app/');
+    assert.equal(legacy.status, 200, 'the previous path must keep working');
+
+    const src = read('server/app.js');
+    assert.ok(src.includes(String.raw`/^\/owner(\/.*)?$/`), '/owner must be a registered route');
+    assert.ok(src.includes(String.raw`/^\/merchant(\/.*)?$/`), '/merchant must be a registered route');
   });
 });

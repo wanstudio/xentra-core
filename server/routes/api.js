@@ -3855,17 +3855,18 @@ const KDS_ENTITLED = process.env.XENTRA_KDS_ENABLED === '1';
 function resolveLanding(role) {
   switch (role) {
     case 'branch_manager':
-      return '/merchant-app/';
+      return '/merchant/';
     case 'kitchen':
-      // KDS surface exists only when the capability is enabled for the tenant.
-      return KDS_ENTITLED ? '/kitchen-app/' : '/dashboard/';
+      // The kitchen surface exists only when the capability is enabled. It has
+      // no route while the capability is off, so it cannot be a landing target.
+      return KDS_ENTITLED ? '/kitchen/' : '/owner/';
     case 'cashier':
       // Cashier is branch-scoped but has no dedicated surface in MVP.
-      return '/dashboard/';
+      return '/owner/';
     case 'owner':
     case 'brand_manager':
     default:
-      return '/dashboard/';
+      return '/owner/';
   }
 }
 
