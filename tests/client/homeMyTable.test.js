@@ -29,10 +29,13 @@ test('MYTABLE-01: topbar punya ikon scan dan ikon meja dengan badge', () => {
   assert.ok(/x-btn-my-table"[\s\S]{0,400}hidden/.test(HTML), 'ikon meja tersembunyi sampai tamu dapat meja');
   assert.ok(/x-my-table-badge"[\s\S]{0,300}background:#dc2626/.test(HTML), 'badge merah');
   assert.ok(/x-my-table-badge"[\s\S]{0,300}color:#fff/.test(HTML), 'angka badge putih');
-  // Ikon meja: meja di tengah + dua kursi berhadapan (lebih terbaca dari ikon lama).
-  assert.ok(/x-btn-my-table"[\s\S]{0,900}rx="2"/.test(HTML), 'ikon meja harus punya bentuk meja');
-  assert.ok((HTML.match(/rx="1\.25"/g) || []).length >= 2, 'ikon meja harus punya dua kursi');
-  assert.ok(!HTML.includes('<path d="M6 14v5"></path>'), 'ikon meja lama harus hilang');
+  // Ikon: tutup makanan (cloche) hitam — kubah + alas + pegangan, tanpa tangan.
+  assert.ok(HTML.includes('M5.5 17a6.5 6.5 0 0 1 13 0'), 'ikon harus punya kubah tutup makanan');
+  assert.ok(HTML.includes('M3.5 17h17'), 'ikon harus punya alas');
+  assert.ok(/x-btn-my-table"[\s\S]{0,900}<circle cx="12" cy="7\.9"/.test(HTML),
+    'ikon harus punya pegangan di atas kubah');
+  assert.ok(!HTML.includes('<rect x="8.25"'), 'ikon meja/kursi lama harus hilang');
+  assert.ok(/x-btn-my-table"[\s\S]{0,900}stroke="#111111"/.test(HTML), 'ikon harus hitam');
 
   const scan = HTML.indexOf('x-btn-scan-table');
   const my = HTML.indexOf('x-btn-my-table');
