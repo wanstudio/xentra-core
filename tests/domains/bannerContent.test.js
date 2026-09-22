@@ -3,6 +3,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const db = require('../../server/database/db');
+
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
 const BannerContentService = require('../../domains/banner/services/BannerContentService');
 const BannerContentRepository = require('../../core/data/repositories/BannerContentRepository');
 

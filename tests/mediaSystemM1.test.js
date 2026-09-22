@@ -10,6 +10,8 @@ const { ImageValidator } = require('../core/domain');
 const { createPngBuffer, createJpegBuffer, createWebpBuffer } = require('./helpers/testImageHelper');
 const db = require('../server/database/db');
 
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('./helpers/demoFixtures.js')();
 test('MEDIA SYSTEM M1 — SECURE UPLOAD & VALIDATION SUITE', async (t) => {
   const mediaService = new MediaService();
   const BRAND_A = 'brand_bangjo';

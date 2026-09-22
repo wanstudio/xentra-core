@@ -45,6 +45,9 @@ const test = require('node:test');
 const assert = require('node:assert');
 const http = require('node:http');
 const db = require('../server/database/db');
+
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('./helpers/demoFixtures.js')();
 const app = require('../server/app');
 
 function makeRequest(server, options, body = null) {

@@ -111,6 +111,9 @@ test('PRL-05: voided redemptions do not count (count query only sees active)', (
 
 test('PRL-06: non-consuming statuses never burn the first-order privilege (real DB)', () => {
   const db = require('../../server/database/db');
+
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
   try { db.seedDemoData(db); } catch (_) {}
   const repo = new PromotionRepository(); // real DataAccess
 

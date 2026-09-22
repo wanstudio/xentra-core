@@ -17,6 +17,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const db = require('../../server/database/db');
+
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
 const EligibilityService = require('../../domains/commerce/services/EligibilityService');
 const BranchMatcher = require('../../server/services/BranchMatcher');
 const RouteService = require('../../server/services/RouteService');

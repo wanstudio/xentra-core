@@ -2,6 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert');
 const crypto = require('crypto');
 const db = require('../server/database/db');
+
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('./helpers/demoFixtures.js')();
 const OrderStateMachine = require('../server/services/OrderStateMachine');
 
 test('OrderStateMachine: enforces strict transition rules', () => {

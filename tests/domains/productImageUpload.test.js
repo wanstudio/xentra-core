@@ -24,6 +24,8 @@ const assert = require('node:assert');
 const app = require('../../server/app');
 const db = require('../../server/database/db');
 
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
 // 1x1 transparent PNG, base64-encoded — small, valid, deterministic fixture.
 const TINY_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';

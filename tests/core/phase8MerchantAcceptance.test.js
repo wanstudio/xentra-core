@@ -50,6 +50,9 @@ process.env.JWT_SECRET = 'test-secret-p8-merchant-acceptance';
 
 const app = require('../../server/app');
 const db = require('../../server/database/db');
+
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
 const OrderStateMachine = require('../../server/services/OrderStateMachine');
 const AcceptanceTimeoutService = require('../../server/services/AcceptanceTimeoutService');
 const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');

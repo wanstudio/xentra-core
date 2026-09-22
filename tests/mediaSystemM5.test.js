@@ -42,6 +42,9 @@ const MediaRepository = require('../core/data/repositories/MediaRepository');
 const DataAccess = require('../core/data/DataAccess');
 const ImageValidator = require('../core/domain/ImageValidator');
 const db = require('../server/database/db');
+
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('./helpers/demoFixtures.js')();
 const app = require('../server/app');
 const { createPngBuffer, createJpegBuffer } = require('./helpers/testImageHelper');
 

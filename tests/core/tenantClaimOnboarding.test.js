@@ -5,6 +5,9 @@ const assert = require('node:assert/strict');
 const http = require('http');
 
 const db = require('../../server/database/db');
+
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
 const app = require('../../server/app');
 const {
   ExistingTenantResolver,

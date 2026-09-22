@@ -17,6 +17,8 @@ const path = require('node:path');
 const app = require('../../server/app');
 const db = require('../../server/database/db');
 
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
 const STORE_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/store.js');
 const LOCATION_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/location.js');
 

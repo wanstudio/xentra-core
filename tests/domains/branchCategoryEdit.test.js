@@ -27,6 +27,8 @@ const crypto = require('crypto');
 const app = require('../../server/app');
 const db = require('../../server/database/db');
 
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
 const BRAND = 'brand_bangjo';
 const BRANCH_ID = 'branch_bangjo_barat';
 

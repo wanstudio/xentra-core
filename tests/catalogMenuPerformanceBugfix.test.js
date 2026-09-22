@@ -55,6 +55,8 @@ function request(urlPath, options = {}) {
 describe('Customer PWA Catalog Menu Performance & Regression Suite', () => {
   before(async () => {
     app = require('../server/app');
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('./helpers/demoFixtures.js')();
     server = http.createServer(app);
     await new Promise(res => server.listen(3098, '127.0.0.1', res));
   });

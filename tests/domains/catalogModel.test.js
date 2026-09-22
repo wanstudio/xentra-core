@@ -16,6 +16,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const db = require('../../server/database/db');
+
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
 const { CatalogService } = require('../../domains/commerce');
 
 const BRAND = 'brand_test_rc';

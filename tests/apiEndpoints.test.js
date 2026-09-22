@@ -3,6 +3,8 @@ const assert = require('node:assert');
 const app = require('../server/app');
 const db = require('../server/database/db');
 
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('./helpers/demoFixtures.js')();
 // Helper to make mock requests to Express app
 async function mockFetch(path, options = {}) {
   const method = options.method || 'GET';

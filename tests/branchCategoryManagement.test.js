@@ -12,6 +12,8 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const app = require('../server/app');
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('./helpers/demoFixtures.js')();
 const CatalogService = require('../domains/commerce/services/CatalogService');
 
 const BARAT = 'branch_bangjo_barat';

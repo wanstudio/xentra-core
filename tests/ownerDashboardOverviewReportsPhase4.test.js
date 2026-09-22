@@ -35,6 +35,9 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const db = require('../server/database/db');
+
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('./helpers/demoFixtures.js')();
 const app = require('../server/app');
 
 function makeRequest(server, options, body = null) {
