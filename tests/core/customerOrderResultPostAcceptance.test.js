@@ -24,6 +24,8 @@ process.env.JWT_SECRET = 'test-secret-p8-customer-post-acceptance';
 
 const app = require('../../server/app');
 const db = require('../../server/database/db');
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
 const OrderStateMachine = require('../../server/services/OrderStateMachine');
 
 let server;
@@ -102,6 +104,8 @@ function seedCustomerSession(phone, brandId = BRAND_ID) {
   if (store && store.sessions) {
     store.sessions.set(token, {
       type: 'customer',
+      organizationId: 'org_xentra_holding',
+      organization_id: 'org_xentra_holding',
       role: 'customer',
       phone: phone.trim(),
       customerPhone: phone.trim(),

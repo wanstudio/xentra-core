@@ -13,6 +13,8 @@ const { test, after, before } = require('node:test');
 const assert = require('node:assert');
 const crypto = require('node:crypto');
 const db = require('../../server/database/db');
+// Suites assert against demo branches/products/promotions, which are not auto-seeded.
+require('../helpers/demoFixtures.js')();
 const AcceptanceTimeoutService = require('../../server/services/AcceptanceTimeoutService');
 
 function cleanup() {

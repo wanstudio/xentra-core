@@ -89,6 +89,8 @@ function seedCustomerSession(phone, brandId = BRAND_ID) {
   if (store && store.sessions) {
     store.sessions.set(token, {
       type: 'customer',
+      organizationId: 'org_xentra_holding',
+      organization_id: 'org_xentra_holding',
       role: 'customer',
       phone: phone.trim(),
       customerPhone: phone.trim(),
