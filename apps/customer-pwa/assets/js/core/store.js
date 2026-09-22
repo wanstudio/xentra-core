@@ -13,6 +13,7 @@
   var ACTIVE_DESTINATION_KEY = PREFIX + 'active_destination';
   var BRANCH_KEY = PREFIX + 'branch';
   var SESSION_KEY = PREFIX + 'customer_session';
+  var MY_TABLE_KEY = PREFIX + 'my_table';
   var ORDER_TYPE_KEY = PREFIX + 'order_type';
   var ORDER_CTX_KEY = PREFIX + 'order_context';
   var BRANCH_CTX_KEY = PREFIX + 'branch_context';
@@ -74,7 +75,8 @@
     cart: load(CART_KEY, { items: [] }),
     notes: load(NOTES_KEY, {}),
     promo: { enabled: false, target: 0, discount: 0 },
-    recipient: load(RECIPIENT_KEY, null)
+    recipient: load(RECIPIENT_KEY, null),
+    myTable: load(MY_TABLE_KEY, null)
   };
 
   // ── Persistence helpers ──
@@ -176,6 +178,24 @@
     state.recipient = null;
     try { localStorage.removeItem(RECIPIENT_KEY); } catch (_) {}
     notify({ type: 'recipient' });
+  }
+
+  // Meja yang di-scan/dipilih tamu. Disimpan supaya ikon di home tahu "saya di
+  // meja berapa" dan tidak hilang saat pindah halaman atau refresh.
+  function setMyTable(table) {
+    state.myTable = table || null;
+    save(MY_TABLE_KEY, state.myTable);
+    notify({ type: 'my_table' });
+  }
+
+  function getMyTable() {
+    return state.myTable;
+  }
+
+  function clearMyTable() {
+    state.myTable = null;
+    try { localStorage.removeItem(MY_TABLE_KEY); } catch (_) {}
+    notify({ type: 'my_table' });
   }
 
   function setOrderType(type) {
@@ -633,6 +653,9 @@
     removeCartItem: removeCartItem,
     setRecipient: setRecipient,
     getRecipient: getRecipient,
-    clearRecipient: clearRecipient
+    clearRecipient: clearRecipient,
+    setMyTable: setMyTable,
+    getMyTable: getMyTable,
+    clearMyTable: clearMyTable
   };
 })();

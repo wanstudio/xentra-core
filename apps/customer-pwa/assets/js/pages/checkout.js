@@ -473,6 +473,7 @@
         state.fulfillment.type = 'dine_in';
         state.fulfillment.table_ids = [table.id];
         state.fulfillment.tableNumber = table.table_number || '';
+        if (Store.setMyTable) Store.setMyTable({ id: table.id, number: table.table_number || '' });
       }
       state.pendingJoinToken = null;
       if (!state.isSubmitting) renderLayout();
@@ -528,6 +529,15 @@
       state.customer.phone = storeState.customerSession.phone || '';
       state.customer.name = storeState.customerSession.name || state.customer.name;
       refreshOpenBill();
+
+      // Meja yang di-scan dari Home tersimpan di Store: dipakai di sini supaya
+      // pesanan benar-benar terikat ke meja itu tanpa perlu pilih meja lagi.
+      var storedTable = (Store.getMyTable && Store.getMyTable()) || null;
+      if (storedTable && storedTable.id && !((state.fulfillment.table_ids || []).length)) {
+        state.fulfillment.type = 'dine_in';
+        state.fulfillment.table_ids = [storedTable.id];
+        state.fulfillment.tableNumber = storedTable.number || '';
+      }
 
       var joinToken = getJoinTokenFromUrl();
       if (joinToken) claimTableFromQr(joinToken);

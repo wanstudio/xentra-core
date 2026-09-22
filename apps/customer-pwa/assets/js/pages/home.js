@@ -2216,6 +2216,154 @@
     var locBar = $('x-home-loc-bar');
     if (locBar) locBar.onclick = handleOpenLocationPicker;
 
+    // ── Meja saya: ikon scan ↔ ikon meja + badge ──
+    // Mejanya disimpan di Store supaya tidak hilang saat pindah halaman. Badge
+    // hanya hidup selama tagihannya masih terbuka di server — jadi kalau kasir
+    // menutup sesinya, ikonnya hilang sendiri (tidak perlu ditebak di HP).
+    var btnScanTable = $('x-btn-scan-table');
+    var btnMyTable = $('x-btn-my-table');
+
+    function escHtml(v) {
+      return (window.UI && UI.escape) ? UI.escape(String(v)) : String(v);
+    }
+
+    function myTableBranchId() {
+      var st = Store.getState();
+      var ctx = st.branchContext || {};
+      return ctx.id || ctx.branch_id || (st.branch && st.branch.id) || null;
+    }
+
+    function closeTableNotice() {
+      var el = document.getElementById('x-table-notice');
+      if (el) el.remove();
+    }
+
+    function showTableNotice(opts) {
+      closeTableNotice();
+      var warn = opts.tone === 'warn';
+      var el = document.createElement('div');
+      el.id = 'x-table-notice';
+      el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:88px;z-index:5000;width:calc(100% - 32px);max-width:420px;' +
+        'background:' + (warn ? '#fff7ed' : '#ecfdf5') + ';border:1px solid ' + (warn ? '#fed7aa' : '#a7f3d0') +
+        ';border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:14px;font-family:inherit;';
+      el.innerHTML =
+        '<div style="font-size:13px;font-weight:800;color:' + (warn ? '#9a3412' : '#065f46') + ';margin-bottom:2px;">' + escHtml(opts.title) + '</div>' +
+        (opts.body ? '<div style="font-size:12px;line-height:1.45;color:' + (warn ? '#9a3412' : '#047857') + ';">' + escHtml(opts.body) + '</div>' : '') +
+        (opts.detailsHtml || '') +
+        '<div id="x-table-notice-actions" style="display:flex;gap:8px;margin-top:10px;"></div>';
+      document.body.appendChild(el);
+      var wrap = el.querySelector('#x-table-notice-actions');
+      (opts.actions || []).forEach(function (a) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = a.label;
+        b.style.cssText = 'flex:1;height:38px;border-radius:999px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;' +
+          (a.primary ? 'border:0;background:#111111;color:#fff;' : 'border:2px solid #e5e7eb;background:#fff;color:#6b7280;');
+        b.onclick = a.onClick;
+        wrap.appendChild(b);
+      });
+    }
+
+    function renderMyTableState() {
+      var table = (Store.getMyTable && Store.getMyTable()) || null;
+      if (btnScanTable) btnScanTable.hidden = !!table;
+      if (btnMyTable) btnMyTable.hidden = !table;
+      var badge = $('x-my-table-badge');
+      if (badge) badge.textContent = table ? (table.number || '') : '';
+    }
+
+    // Klik ikon meja: ringkasan meja + isi pesanan, dengan dua jalan keluar.
+    function openMyTableSheet() {
+      var table = (Store.getMyTable && Store.getMyTable()) || null;
+      if (!table) return;
+      var n = table.number || '-';
+      var items = (Store.getState().cart && Store.getState().cart.items) || [];
+      var details = items.length
+        ? items.map(function (it) {
+            var qty = it.quantity || it.qty || 1;
+            var name = it.name || it.product_name || it.title || 'Menu';
+            return '<div style="display:flex;justify-content:space-between;font-size:12px;color:#065f46;margin-top:6px;">' +
+              '<span>' + escHtml(name) + ' × ' + escHtml(qty) + '</span></div>';
+          }).join('')
+        : '<div style="font-size:12px;color:#047857;margin-top:8px;">Belum ada menu. Pilih menumu, kami antarkan ke mejamu.</div>';
+
+      showTableNotice({
+        title: 'Kamu di meja ' + n,
+        detailsHtml: details,
+        actions: [
+          { label: 'Tambah menu', onClick: closeTableNotice },
+          { label: 'Checkout', primary: true, onClick: function () {
+            closeTableNotice();
+            if (window.Xentra && window.Xentra.Router) window.Xentra.Router.navigate('checkout');
+          } }
+        ]
+      });
+    }
+
+    function claimTableFromHome(token) {
+      if (!token || !API || !API.post) return;
+
+      // Sudah punya meja: memindahkan meja bukan hak tamu. Sistem mengunci, dan
+      // kasir yang bisa memindahkan (reassign) atau menutup & membuka sesi baru.
+      var current = (Store.getMyTable && Store.getMyTable()) || null;
+      if (current) {
+        showTableNotice({
+          tone: 'warn',
+          title: 'Ingin pindah meja? Hubungi kasir.',
+          body: 'Pesananmu sudah terikat ke meja ' + (current.number || '-') + '.',
+          actions: [{ label: 'Mengerti', onClick: closeTableNotice }]
+        });
+        return;
+      }
+
+      API.post('/customer/dining-session/claim', { qr_token: token, branch_id: myTableBranchId() }).then(function (res) {
+        if (!res || res.success !== true || !res.table) {
+          showTableNotice({ tone: 'warn', title: 'QR meja tidak dikenali.', body: 'Coba lagi, atau minta bantuan petugas.', actions: [{ label: 'Mengerti', onClick: closeTableNotice }] });
+          return;
+        }
+        var table = { id: res.table.id, number: res.table.table_number || res.table.label || '' };
+        Store.setMyTable(table);
+        renderMyTableState();
+        showTableNotice({
+          title: 'Berhasil, kamu sekarang ada di meja ' + (table.number || '-'),
+          body: 'Pesan makananmu, kami akan antarkan langsung ke mejamu.',
+          actions: [{ label: 'Pesan menu', primary: true, onClick: closeTableNotice }]
+        });
+      }).catch(function () {
+        showTableNotice({ tone: 'warn', title: 'Koneksi bermasalah.', body: 'Meja belum bisa dipasang. Coba lagi.', actions: [{ label: 'Mengerti', onClick: closeTableNotice }] });
+      });
+    }
+
+    // Badge dilepas HANYA kalau tadinya memang ada tagihan terbuka lalu tagihannya
+    // sudah tidak ada — artinya kasir menutup sesinya. "Belum pernah ada tagihan"
+    // (baru scan, belum pesan) bukan alasan menghapus meja.
+    function reconcileMyTable() {
+      var table = (Store.getMyTable && Store.getMyTable()) || null;
+      if (!table || !API || !API.get) return;
+      API.get('/customer/dining-session').then(function (res) {
+        var current = (Store.getMyTable && Store.getMyTable()) || null;
+        if (!current) return;
+        if (res && res.success && res.session) {
+          if (!current.hadOpenBill) Store.setMyTable({ id: current.id, number: current.number, hadOpenBill: true });
+        } else if (current.hadOpenBill) {
+          Store.clearMyTable();
+        }
+        renderMyTableState();
+      }).catch(function () {});
+    }
+
+    if (btnScanTable) {
+      btnScanTable.onclick = function () {
+        var TableQr = window.Xentra && window.Xentra.TableQr;
+        if (!TableQr) return;
+        TableQr.open(claimTableFromHome);
+      };
+    }
+    if (btnMyTable) btnMyTable.onclick = openMyTableSheet;
+
+    renderMyTableState();
+    reconcileMyTable();
+
     // Header Navigation buttons: Join (Affiliate), Library (History), Profile
     var btnJoin = $('x-btn-join');
     if (btnJoin) {
