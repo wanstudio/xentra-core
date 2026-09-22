@@ -354,6 +354,14 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
   assert.ok(!code.includes('x-dinein-scan-info"></div>'), 'tidak boleh ada bar terpisah tanpa isi');
   assert.ok(/x-btn-scan-table-qr"[\s\S]{0,700}<svg/.test(code), 'tombol harus pakai ikon scan');
   assert.ok(!code.includes('>Scan QR di Meja</button>'), 'label tombol harus ringkas: cukup "Scan QR"');
+
+  // Warna sengaja TIDAK ikut brand, biar menonjol seperti tombol install PWA.
+  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,400}background:#374151/.test(code),
+    'tombol harus abu-abu gelap hardcode');
+  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,400}color:#ffffff/.test(code),
+    'tulisan tombol harus putih');
+  assert.ok(!/x-btn-scan-table-qr"[\s\S]{0,400}var\(--x-primary\)/.test(code),
+    'tombol scan tidak boleh mengikuti warna brand');
   assert.ok(!code.includes('class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Scan QR di Meja'),
     'gaya tombol lama harus diganti');
   assert.ok(/x-dinein-scan-info"[\s\S]{0,120}x-fulfillment-promo-icon">i</.test(code),

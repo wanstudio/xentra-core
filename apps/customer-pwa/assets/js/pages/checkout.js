@@ -2187,7 +2187,7 @@
         '  <div class="x-fulfillment-promo" id="x-dinein-scan-info" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
          '    <span class="x-fulfillment-promo-icon">i</span>' +
          '    <span style="flex:1 1 150px;min-width:0;">Scan QR di mejamu, pesananmu akan kami antarkan segera.</span>' +
-         '    <button type="button" id="x-btn-scan-table-qr" style="display:inline-flex;align-items:center;gap:6px;border:0;border-radius:999px;padding:8px 14px;background:var(--x-primary);color:var(--x-primary-text,#111);font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.10);">' +
+         '    <button type="button" id="x-btn-scan-table-qr" style="display:inline-flex;align-items:center;gap:6px;border:0;border-radius:999px;padding:8px 14px;background:#374151;color:#ffffff;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.10);">' +
          '      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
          '        <path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9"></path>' +
          '        <path d="M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9"></path>' +
