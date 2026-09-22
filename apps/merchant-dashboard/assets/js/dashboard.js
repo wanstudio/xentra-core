@@ -3131,8 +3131,7 @@
       var fulfillmentType = ord.fulfillment_type || ord.order_type || 'delivery';
       var timeStr = ord.created_at ? (new Date(ord.created_at).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'short' })) : '-';
       // Owner/Brand view: acceptance (pending) is the only exception path offered here.
-      // Cooking stages belong to the Kitchen surface (/kitchen-app) and dispatch/completion
-      // to the Branch Manager and Driver lifecycles.
+      // Branch Manager operational cooking stages live in Merchant App.
       var canAdvance = ord.status === 'pending';
 
       return [
@@ -8442,17 +8441,10 @@
     // Check for handoff ticket from xentra.cloud before initial auth check
     await handleHandoffExchange();
 
-    // The Branch Manager and Kitchen surfaces live in their own apps now.
-    // Role-appropriate routing: BM sessions go to /merchant-app, kitchen staff
-    // to /kitchen-app (Core still enforces every API call).
+    // Branch Manager gets the dedicated Merchant App surface.
+    // KDS is held/future and must not become an active login destination.
     if (isBranchManager()) {
       window.location.replace('/merchant-app/' + window.location.hash);
-      return;
-    }
-
-    var bootUser = getStoredUser();
-    if (bootUser && bootUser.role === 'kitchen') {
-      window.location.replace('/kitchen-app/');
       return;
     }
 
