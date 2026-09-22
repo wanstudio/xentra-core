@@ -57,10 +57,12 @@ test('MYTABLE-01: topbar punya ikon scan dan ikon meja dengan badge', () => {
 
 test('MYTABLE-02: ikon bertukar sesuai keadaan, dan scannernya modul bersama', () => {
   assert.ok(HOME.includes('function renderMyTableState()'), 'harus ada satu penentu tampilan');
-  assert.ok(HOME.includes("btnScanTable.hidden = !!table"), 'ada meja → ikon scan hilang');
-  assert.ok(HOME.includes("btnMyTable.hidden = !table"), 'ada meja → ikon meja muncul');
+  assert.ok(HOME.includes("btnScanTable.style.display = table ? 'none' : ''"), 'ada meja → ikon scan hilang');
+  assert.ok(HOME.includes("btnMyTable.style.display = table ? '' : 'none'"), 'ada meja → ikon meja muncul');
+  assert.ok(!HOME.includes('btnScanTable.hidden ='), 'jangan pakai atribut hidden: kalah oleh display:flex kelasnya');
   assert.ok(HOME.includes("badge.textContent = num"), 'badge diisi nomor meja');
-  assert.ok(HOME.includes('badge.hidden = !num'), 'tanpa nomor, badge harus disembunyikan (bukan titik merah kosong)');
+  assert.ok(HOME.includes("badge.style.display = num ? 'flex' : 'none'"),
+    'tanpa nomor, badge harus disembunyikan (bukan titik merah kosong)');
   assert.ok(HOME.includes('window.Xentra.TableQr'), 'home memakai scanner bersama, bukan salinannya sendiri');
 });
 
@@ -87,6 +89,14 @@ test('MYTABLE-05: pindah meja dikunci, tamu diarahkan ke kasir', () => {
     .test(HOME), 'scan meja lain harus ditolak saat sudah punya meja');
   assert.ok(!"Store.setMyTable({ id: res.table.id".includes('TIDAK'),
     'meja hanya dipasang kalau belum punya');
+});
+
+test('MYTABLE-11: atribut hidden benar-benar menyembunyikan (kalah oleh display:flex)', () => {
+  const css = read('apps/customer-pwa/assets/css/home.css');
+  assert.ok(css.includes('.x-hero-icon-btn[hidden]'), 'CSS harus menegakkan [hidden] untuk ikon topbar');
+  assert.ok(css.includes('#x-my-table-badge[hidden]'), 'dan untuk badge');
+  assert.ok(HOME.includes("if (btnScanTable) btnScanTable.style.display"),
+    'JS harus menyetel display, bukan atribut hidden');
 });
 
 test('MYTABLE-10: ada halaman pratinjau untuk melihat badge 2-3 angka', () => {

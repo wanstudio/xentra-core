@@ -105,6 +105,13 @@
   transform: scale(0.97);
 }
 
+/* Atribut hidden harus benar-benar menyembunyikan: .x-hero-icon-btn memakai
+   display:flex, dan aturan kelas mengalahkan atribut hidden bawaan browser. */
+.x-hero-icon-btn[hidden],
+#x-my-table-badge[hidden] {
+  display: none !important;
+}
+
 .x-hero-action-icons {
   display: flex;
   align-items: center;
