@@ -20,6 +20,7 @@ const fs = require('node:fs');
 
 const UI_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/ui.js');
 const CHECKOUT_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/checkout.js');
+const TABLEQR_PATH = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/table-qr.js');
 
 test('T1: UI.formatNumber produces deterministic dot-separated Rupiah numbers', () => {
   // Fresh environment for UI
@@ -341,7 +342,8 @@ test('T12: scanning a table QR lands the customer on that table', () => {
 });
 
 test('T13: the table-picking screen can scan the table QR, with a way out for old phones', () => {
-  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+  // scannernya sekarang modul bersama, jadi dibaca dari kedua file
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8') + fs.readFileSync(TABLEQR_PATH, 'utf8');
 
   // Offered where the customer picks a table, with a plain-language guide.
   assert.ok(code.includes('id="x-btn-scan-table-qr"'), 'the picking screen must offer scanning');
@@ -417,8 +419,10 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
   assert.ok(code.includes('/^qr_[A-Za-z0-9_-]+$/'), 'a raw table code must be accepted');
 
   // A scan goes through the same server claim as the QR link.
-  assert.ok(/function handleScannedTable\(token\)[\s\S]{0,120}claimTableFromQr\(token\)/.test(code),
-    'a scanned table must use the same claim path as the link');
+  assert.ok(/function handleScannedTable\(token\)[\s\S]{0,160}onToken\(token\)/.test(code),
+    'hasil scan harus diserahkan lewat satu callback');
+  assert.ok(code.includes('TableQr.open(function (token) { claimTableFromQr(token); })'),
+    'checkout harus memakai jalur klaim yang sama dengan tautan QR');
 
   // The camera must be released, or the phone keeps the light on.
   assert.ok(code.includes('tableQrScanner.stream.getTracks().forEach'), 'camera tracks must be stopped');
