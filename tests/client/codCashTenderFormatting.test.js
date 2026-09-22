@@ -244,3 +244,33 @@ test('T9: paying at the counter (dine-in & pickup) changes the label, CTA and te
   assert.ok(code.includes('if (needsCashTendered() && (!state.cashTendered'),
     'a tendered amount is required only when money changes hands now');
 });
+
+test('T10: checkout resumes the open table bill from the server', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // The bill comes from the server, never from the device.
+  assert.ok(code.includes("API.get('/customer/dining-session')"),
+    'checkout must ask the server for the open bill');
+  assert.ok(code.includes('if (!API || !sess || !sess.token)'),
+    'the lookup only applies to a signed-in customer');
+  assert.ok(/refreshOpenBill\(\);/.test(code), 'the bill must be fetched when the page loads');
+
+  // Failing to load the bill must never block the checkout.
+  assert.ok(code.includes('state.openBill = null;\n      return null;'),
+    'a failed bill lookup must degrade quietly, not break checkout');
+
+  // No needless re-render, and never during a submit.
+  assert.ok(code.includes("var prev = state.openBill ? JSON.stringify(state.openBill) : 'null';"),
+    'an absent bill must not count as a change');
+  assert.ok(code.includes('if (prev !== next && !state.isSubmitting) renderLayout();'),
+    'the page must never re-render while the order is being submitted');
+
+  // Shown with the server's accumulated total, keyed to the locked table.
+  assert.ok(code.includes('id="x-open-bill-total"'), 'the bill total must be rendered');
+  assert.ok(code.includes('fmtIDR(Number(state.openBill.total_bill) || 0)'),
+    'the total must come from the server bill, not be recomputed on the client');
+  assert.ok(code.includes('>BILL MEJA '), 'the card must name the table');
+  assert.ok(code.includes('function billTableLabel()'), 'the table label must come from the bill');
+  assert.ok(code.includes('Pesanan tambahan otomatis masuk ke bill meja ini.'),
+    'the customer must be told add-ons join the same bill');
+});

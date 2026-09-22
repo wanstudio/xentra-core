@@ -132,6 +132,7 @@ function mkHarness(opts) {
     get: (url) => {
       if (url.includes('/brand/branches'))    return Promise.resolve({ success: true, branches: [] });
       if (url.includes('/promotions/active')) return Promise.resolve({ success: true, promotions: [], applied: [], rejected: [] });
+      if (url.includes('/customer/dining-session')) return Promise.resolve({ success: true, session: null });
       return new Promise((res) => { resolveFns.push(res); rejectFns.push(() => {}); });
     },
     post: (url, body) => {

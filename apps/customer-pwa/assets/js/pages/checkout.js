@@ -403,6 +403,39 @@
     });
   }
 
+  // ── Bill meja yang masih terbuka (dine-in) ──
+  // Satu meja = satu bill di server. Konsumen yang me-refresh halaman atau
+  // pindah HP tidak boleh kehilangan jejak mejanya, jadi billnya ditanyakan
+  // ulang ke server (bukan disimpan di HP). Gagal ambil bill tidak boleh
+  // menggagalkan checkout — ini informasi tambahan, bukan syarat.
+  function billTableLabel() {
+    var t = state.openBill && state.openBill.tables && state.openBill.tables[0];
+    if (!t) return '-';
+    return t.table_number || t.label || '-';
+  }
+
+  function refreshOpenBill() {
+    var sess = Store.getState().customerSession;
+    if (!API || !sess || !sess.token) {
+      state.openBill = null;
+      return Promise.resolve(null);
+    }
+    return API.get('/customer/dining-session').then(function (res) {
+      var bill = (res && res.success && res.session) ? res.session : null;
+      // Hanya render ulang kalau billnya benar-benar berubah; "tidak ada bill"
+      // bukan perubahan, jadi halaman tidak di-render sia-sia saat dibuka.
+      var prev = state.openBill ? JSON.stringify(state.openBill) : 'null';
+      var next = bill ? JSON.stringify(bill) : 'null';
+      state.openBill = bill;
+      // Jangan pernah render di tengah proses submit.
+      if (prev !== next && !state.isSubmitting) renderLayout();
+      return bill;
+    }).catch(function () {
+      state.openBill = null;
+      return null;
+    });
+  }
+
   // ── Mount ──
   function mount(container) {
     checkoutContainer = container || $('xentra-checkout-view');
@@ -419,6 +452,7 @@
     if (storeState.customerSession) {
       state.customer.phone = storeState.customerSession.phone || '';
       state.customer.name = storeState.customerSession.name || state.customer.name;
+      refreshOpenBill();
       var hasValidToken = storeState.customerSession.token &&
         storeState.customerSession.token.indexOf('xnt_cust_') === 0;
       state.customer.isVerified = !!hasValidToken;
@@ -858,6 +892,16 @@
       '        </div>' +
       '      </button>' +
       '    </div>' +
+      (state.openBill ? (
+        '    <div id="x-open-bill" style="margin-top:12px;padding:12px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;">' +
+        '      <div style="font-size:11.5px;color:#047857;font-weight:700;">BILL MEJA ' + UI.escape(billTableLabel()) + '</div>' +
+        '      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px;">' +
+        '        <span style="font-size:12px;color:#065f46;">Total pesanan sejauh ini</span>' +
+        '        <b id="x-open-bill-total" style="font-size:14px;font-weight:800;color:#064e3b;">' + fmtIDR(Number(state.openBill.total_bill) || 0) + '</b>' +
+        '      </div>' +
+        '      <div style="font-size:11px;color:#047857;margin-top:4px;">Pesanan tambahan otomatis masuk ke bill meja ini.</div>' +
+        '    </div>'
+      ) : '') +
       (needsCashTendered() && state.cashTendered ? (
         '    <div id="x-tender-selected-summary" style="margin-top:12px;padding:10px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;display:flex;align-items:center;justify-content:space-between;">' +
         '      <div style="display:flex;flex-direction:column;">' +
