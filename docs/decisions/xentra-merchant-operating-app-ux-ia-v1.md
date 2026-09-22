@@ -12,7 +12,7 @@ This is a UX/product benchmark, not a copy of their marketplace business model o
 Primary navigation:
 - **Beranda** — operational overview, attention items, today's business snapshot.
 - **Pesanan** — operational order center; mobile cards are the primary mobile pattern.
-- **Lainnya** — Menu, Stok, Kitchen, Delivery, Outlet, Penjualan, Keuangan, Promo, Wawasan, Karyawan, Pelanggan, Pengaturan.
+- **Lainnya** — Menu, Stok, Delivery, Outlet, Penjualan, Keuangan, Promo, Wawasan, Karyawan, Pelanggan, Pengaturan. KDS is not an active Merchant navigation item in MVP; it is an optional future SaaS add-on.
 
 ## Product model
 Xentra remains a **brand-owned Restaurant Operating System** with multi-branch support. It is not a marketplace.
@@ -27,8 +27,8 @@ Xentra remains a **brand-owned Restaurant Operating System** with multi-branch s
 - Outlet/branch selection is first-class.
 
 ## Authority remains locked
-- Branch Manager: order acceptance/rejection, operational monitoring, driver assignment/dispatch where authorized.
-- Head Kitchen/KDS: confirmed → preparing → ready.
+- Branch Manager: order acceptance/rejection, operational monitoring, driver assignment/dispatch where authorized, and the required cooking-stage actions in MVP when the outlet has no dedicated Kitchen surface.
+- Head Kitchen/KDS: confirmed → preparing → ready when the optional KDS capability is enabled for dedicated kitchen staff.
 - Driver: pickup → on_delivery → delivered and COD cash collection/custody.
 - Cashier/POS: COD handover, cash verification, payment settlement.
 - COD settlement remains separate from delivery completion.
@@ -40,8 +40,9 @@ Existing Order, Delivery, Kitchen, COD, RBAC, and branch-scope contracts remain 
 2. Order Center operational UX.
 3. Menu/Inventory UX.
 4. Delivery/Driver surfaces.
-5. Kitchen + Cashier/POS surfaces.
-6. Business analytics/reporting.
+5. Cashier/POS surfaces.
+6. Optional KDS add-on only when the SaaS feature entitlement is enabled for a dedicated kitchen workflow.
+7. Business analytics/reporting.
 
 ## Non-goals
 This lock does not authorize changes to Google auth, checkout, promo, customer auth, or unrelated backend behavior. Do not delete/reseed existing business data.
