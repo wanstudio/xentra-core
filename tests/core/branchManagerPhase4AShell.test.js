@@ -69,7 +69,7 @@ describe('BM Phase 4A — Merchant Dashboard Shell & Context UX Reconciliation',
   });
 
   it('P4A-05: Branch Manager cannot switch branch (locked to assigned branch_id, no switcher affordance)', () => {
-    assert.ok(js.includes("currentManagingBranchId = user.branch_id"), 'currentManagingBranchId must lock to user.branch_id');
+    assert.ok(js.includes("XentraBranchCatalog.state.branchId = user.branch_id"), 'shared branch id must lock to user.branch_id');
     assert.ok(js.includes("_branchContextState.selected = user.branch_id"), '_branchContextState.selected must lock to user.branch_id');
     assert.ok(js.includes("if (bmBranchBadge) bmBranchBadge.style.display = 'flex'"), 'bmBranchBadge must be shown as passive indicator');
   });

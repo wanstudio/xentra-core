@@ -9,15 +9,18 @@ const { JSDOM } = require('jsdom');
 const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
+const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/branch-catalog.js');
 
 test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Lifecycle', async (t) => {
   const html = fs.readFileSync(HTML_PATH, 'utf8');
   const js = fs.readFileSync(JS_PATH, 'utf8');
   const sharedJs = fs.readFileSync(SHARED_JS_PATH, 'utf8');
+  const branchCatalogJs = fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8');
 
-  // index.html loads merchant-shared/js/shared.js before dashboard.js; mirror that.
+  // index.html loads merchant-shared js before dashboard.js; mirror that order.
   function evalApp(win) {
     win.eval(sharedJs);
+    win.eval(branchCatalogJs);
     win.eval(js);
   }
 

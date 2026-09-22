@@ -15,6 +15,7 @@ const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
 const CSS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/css/dashboard.css');
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
+const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/branch-catalog.js');
 const SHARED_CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/shared.css');
 
 test('MEDIA SYSTEM M2 — CROP / IMAGE EDITOR UI & DOMAIN SUITE', async (t) => {
@@ -316,8 +317,9 @@ test('MEDIA SYSTEM M2 — CROP / IMAGE EDITOR UI & DOMAIN SUITE', async (t) => {
       text: async () => '{}'
     });
 
-    // merchant-shared/js/shared.js owns the widget, then dashboard.js aliases it.
+    // merchant-shared js owns the widgets, then dashboard.js aliases them.
     win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
     const js = fs.readFileSync(JS_PATH, 'utf8');
     win.eval(js);
 
