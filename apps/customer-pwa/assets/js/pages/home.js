@@ -2266,18 +2266,21 @@
 
     function renderMyTableState() {
       var table = (Store.getMyTable && Store.getMyTable()) || null;
-      // PENTING: pakai style.display, bukan atribut hidden. Kelas .x-hero-icon-btn
-      // memakai display:flex, dan aturan kelas mengalahkan atribut hidden — kalau
-      // pakai hidden, kedua ikon tampil bersamaan (sempat terjadi).
-      if (btnScanTable) btnScanTable.style.display = table ? 'none' : '';
-      if (btnMyTable) btnMyTable.style.display = table ? '' : 'none';
+      // SATU mekanisme saja: atribut `hidden`. home.css menegakkannya dengan
+      // [hidden] { display: none !important }, karena display:flex milik kelas
+      // .x-hero-icon-btn mengalahkan atribut hidden bawaan browser.
+      //
+      // JANGAN campur dengan style.display: `!important` di CSS mengalahkan inline
+      // style, jadi menampilkan lewat style.display akan diam-diam gagal selama
+      // atribut hidden masih menempel (pernah terjadi: ikon meja tak pernah muncul).
+      if (btnScanTable) btnScanTable.hidden = !!table;
+      if (btnMyTable) btnMyTable.hidden = !table;
       var badge = $('x-my-table-badge');
       if (badge) {
         var num = table ? (table.number || '') : '';
         badge.textContent = num;
         // Tanpa nomor, badge tidak boleh tampil sebagai titik merah kosong.
-        // 'flex' ditulis eksplisit karena display-nya memang inline di badge.
-        badge.style.display = num ? 'flex' : 'none';
+        badge.hidden = !num;
       }
     }
 
