@@ -470,23 +470,23 @@
     var hasCamera = !!(window.navigator && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
     var canScan = hasDetector && hasCamera;
     var reason = hasDetector
-      ? 'Kamera tidak bisa dipakai. Masukkan kode meja di bawah, atau minta bantuan staf.'
-      : 'HP ini belum bisa scan otomatis. Pakai kamera HP untuk memotret QR meja, atau masukkan kode meja di bawah.';
+      ? 'Kamera tidak bisa dipakai. Tulis saja kode yang tertulis di bawah QR meja, atau minta bantuan petugas.'
+      : 'HP ini tidak bisa scan langsung. Coba buka kamera HP, arahkan ke QR meja, lalu ikuti tautannya. Kalau tetap tidak bisa, minta bantuan petugas.';
 
     var overlay = document.createElement('div');
     overlay.id = 'x-table-qr-scanner';
     overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.9);z-index:4000;display:flex;align-items:center;justify-content:center;padding:16px;';
     overlay.innerHTML =
       '<div style="background:#fff;border-radius:16px;padding:18px;max-width:360px;width:100%;text-align:center;">' +
-      '  <h3 style="margin:0 0 6px;font-size:16px;font-weight:800;">Scan QR Meja</h3>' +
-      '  <p style="margin:0 0 12px;font-size:12px;color:#64748b;">Arahkan kamera ke QR yang tertempel di meja. Bill meja itu akan langsung nyambung.</p>' +
+      '  <h3 style="margin:0 0 6px;font-size:16px;font-weight:800;">Scan QR di Meja</h3>' +
+      '  <p style="margin:0 0 12px;font-size:12px;color:#64748b;">Arahkan kamera ke QR yang tertempel di meja. Nanti pesananmu langsung tercatat di tagihan meja itu.</p>' +
       '  <div id="x-qr-video-wrap" style="position:relative;background:#0f172a;border-radius:12px;overflow:hidden;margin-bottom:12px;display:' + (canScan ? 'block' : 'none') + ';">' +
       '    <video id="x-qr-video" playsinline autoplay muted style="width:100%;display:block;"></video>' +
       '  </div>' +
       '  <div id="x-qr-notice" style="font-size:11.5px;color:#b45309;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:8px;margin-bottom:12px;display:' + (canScan ? 'none' : 'block') + ';">' + reason + '</div>' +
-      '  <div style="font-size:11.5px;color:#6b7280;margin-bottom:6px;">Atau masukkan kode meja:</div>' +
-      '  <input id="x-qr-manual" type="text" placeholder="qr_..." style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;margin-bottom:10px;">' +
-      '  <button type="button" id="x-qr-manual-submit" style="width:100%;border:0;background:var(--x-primary);color:var(--x-primary-text,#111);font-weight:800;font-size:14px;padding:12px;border-radius:999px;cursor:pointer;margin-bottom:8px;font-family:inherit;">Pakai kode ini</button>' +
+      '  <div style="font-size:11.5px;color:#6b7280;margin-bottom:6px;">Tidak bisa scan? Tulis kode yang tertulis di bawah QR meja:</div>' +
+      '  <input id="x-qr-manual" type="text" placeholder="contoh: qr_9f2a41c8" style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;margin-bottom:10px;">' +
+      '  <button type="button" id="x-qr-manual-submit" style="width:100%;border:0;background:var(--x-primary);color:var(--x-primary-text,#111);font-weight:800;font-size:14px;padding:12px;border-radius:999px;cursor:pointer;margin-bottom:8px;font-family:inherit;">Gunakan kode ini</button>' +
       '  <button type="button" id="x-qr-close" class="x-btn-secondary" style="width:100%;font-size:12px;padding:10px;">Tutup</button>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -504,7 +504,7 @@
       var input = document.getElementById('x-qr-manual');
       var token = extractMejaToken(input ? input.value : '');
       if (!token) {
-        setNotice('Kode meja tidak dikenali. Contoh: qr_9f2a... atau tempelkan tautan QR-nya.');
+        setNotice('Kode tidak cocok. Coba periksa lagi, atau minta bantuan petugas.');
         return;
       }
       handleScannedTable(token);
@@ -533,7 +533,7 @@
       };
       tableQrScanner.raf = requestAnimationFrame(tick);
     }).catch(function () {
-      setNotice('Kamera tidak bisa dipakai. Masukkan kode meja di bawah, atau minta bantuan staf.');
+      setNotice('Kamera tidak bisa dipakai. Tulis saja kode yang tertulis di bawah QR meja, atau minta bantuan petugas.');
     });
   }
 
@@ -1056,12 +1056,12 @@
       '    </div>' +
       (state.openBill ? (
         '    <div id="x-open-bill" style="margin-top:12px;padding:12px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;">' +
-        '      <div style="font-size:11.5px;color:#047857;font-weight:700;">BILL MEJA ' + UI.escape(billTableLabel()) + '</div>' +
+        '      <div style="font-size:11.5px;color:#047857;font-weight:700;">TAGIHAN MEJA ' + UI.escape(billTableLabel()) + '</div>' +
         '      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px;">' +
-        '        <span style="font-size:12px;color:#065f46;">Total pesanan sejauh ini</span>' +
+        '        <span style="font-size:12px;color:#065f46;">Total pesanan</span>' +
         '        <b id="x-open-bill-total" style="font-size:14px;font-weight:800;color:#064e3b;">' + fmtIDR(Number(state.openBill.total_bill) || 0) + '</b>' +
         '      </div>' +
-        '      <div style="font-size:11px;color:#047857;margin-top:4px;">Pesanan tambahan otomatis masuk ke bill meja ini.</div>' +
+        '      <div style="font-size:11px;color:#047857;margin-top:4px;">Pesanan tambahan otomatis masuk ke tagihan ini.</div>' +
         '    </div>'
       ) : '') +
       (needsCashTendered() && state.cashTendered ? (
@@ -2188,8 +2188,8 @@
         '  </div>' +
         '  <div class="x-dinein-header-title">Pilih meja</div>' +
          '  <div class="x-scan-table-strip" style="margin:0 0 10px;padding:10px 12px;border:1px dashed #bbf7d0;border-radius:12px;background:#f0fdf4;text-align:center;">' +
-         '    <div style="font-size:12px;color:#166534;margin-bottom:8px;">Duduk di meja? Scan QR yang tertempel di meja supaya billnya langsung nyambung.</div>' +
-         '    <button type="button" id="x-btn-scan-table-qr" class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Scan QR Meja</button>' +
+         '    <div style="font-size:12px;color:#166534;margin-bottom:8px;">Sudah duduk di meja? Scan QR di meja, supaya pesananmu langsung tercatat di tagihan meja itu.</div>' +
+         '    <button type="button" id="x-btn-scan-table-qr" class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Scan QR di Meja</button>' +
          '  </div>' +
         '  <div id="x-dinein-floor-canvas" class="x-floor-wrapper">' +
         '    <div style="text-align:center;padding:30px;color:#9ca3af;font-size:13px;">Memuat tata letak meja…</div>' +

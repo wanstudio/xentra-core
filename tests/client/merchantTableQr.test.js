@@ -41,8 +41,9 @@ test('QR-03: tampil di layar dengan aksi cetak dan bagikan', () => {
 test('QR-04: cetak menghasilkan halaman bersih (QR + nama meja saja)', () => {
   assert.ok(code.includes('function printBMTableQr('), 'harus ada fungsi cetak');
   assert.ok(code.includes("w.document.write('<!doctype html>"), 'cetak lewat jendela sendiri');
-  assert.ok(code.includes('Scan untuk pesan / lihat bill meja ini'), 'halaman cetak harus memberi instruksi');
+  assert.ok(code.includes('Scan untuk melihat pesanan meja ini'), 'halaman cetak harus memberi instruksi');
   assert.ok(code.includes('w.print();'), 'harus memanggil print');
+  assert.ok(code.includes("Kode meja: ' + esc(kode)"), 'kode meja harus tercetak di bawah QR (jalan manual)');
 });
 
 test('QR-05: overlay tidak menumpuk', () => {

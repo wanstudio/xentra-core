@@ -269,9 +269,9 @@ test('T10: checkout resumes the open table bill from the server', () => {
   assert.ok(code.includes('id="x-open-bill-total"'), 'the bill total must be rendered');
   assert.ok(code.includes('fmtIDR(Number(state.openBill.total_bill) || 0)'),
     'the total must come from the server bill, not be recomputed on the client');
-  assert.ok(code.includes('>BILL MEJA '), 'the card must name the table');
+  assert.ok(code.includes('>TAGIHAN MEJA '), 'the card must name the table');
   assert.ok(code.includes('function billTableLabel()'), 'the table label must come from the bill');
-  assert.ok(code.includes('Pesanan tambahan otomatis masuk ke bill meja ini.'),
+  assert.ok(code.includes('Pesanan tambahan otomatis masuk ke tagihan ini.'),
     'the customer must be told add-ons join the same bill');
 });
 
@@ -335,7 +335,7 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
 
   // Offered where the customer picks a table, with a plain-language guide.
   assert.ok(code.includes('id="x-btn-scan-table-qr"'), 'the picking screen must offer scanning');
-  assert.ok(code.includes('Duduk di meja? Scan QR yang tertempel di meja'),
+  assert.ok(code.includes('Sudah duduk di meja? Scan QR di meja'),
     'the customer must be told what scanning does');
   assert.ok(/x-btn-scan-table-qr[\s\S]{0,120}openTableQrScanner\(\)/.test(code),
     'the button must open the scanner');
@@ -347,7 +347,7 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
   assert.ok(code.includes("new window.BarcodeDetector({ formats: ['qr_code'] })"), 'decode QR codes');
 
   // Old phones / refused camera: never a dead end.
-  assert.ok(code.includes('HP ini belum bisa scan otomatis'),
+  assert.ok(code.includes('HP ini tidak bisa scan langsung'),
     'unsupported browsers must be told what to do instead');
   assert.ok(code.includes('Kamera tidak bisa dipakai'), 'a refused camera must be handled');
   assert.ok(code.includes('id="x-qr-manual"'), 'a manual code entry must exist');

@@ -2044,10 +2044,10 @@
     overlay.innerHTML =
       '<div style="background:#fff;border-radius:16px;padding:20px;max-width:340px;width:100%;text-align:center;">' +
         '<h3 style="margin:0 0 4px;font-size:16px;font-weight:800;">QR ' + esc(title) + '</h3>' +
-        '<p style="margin:0 0 12px;font-size:12px;color:#64748b;">Tempel di meja. Konsumen scan pakai kamera HP, langsung masuk ke bill meja ini.</p>' +
+        '<p style="margin:0 0 12px;font-size:12px;color:#64748b;">Tempel di meja. Tamu bisa scan dengan kamera HP untuk melihat pesanan meja ini.</p>' +
         '<div id="bm-qr-svg" style="display:flex;justify-content:center;margin-bottom:12px;">' + data.svg + '</div>' +
         '<button type="button" id="bm-qr-print" class="x-btn-secondary" style="width:100%;margin-bottom:8px;">Cetak QR</button>' +
-        '<button type="button" id="bm-qr-share" class="x-btn-secondary" style="width:100%;margin-bottom:8px;">Bagikan link</button>' +
+        '<button type="button" id="bm-qr-share" class="x-btn-secondary" style="width:100%;margin-bottom:8px;">Kirim lewat WhatsApp</button>' +
         '<button type="button" id="bm-qr-close" class="x-btn-secondary" style="width:100%;">Tutup</button>' +
       '</div>';
     document.body.appendChild(overlay);
@@ -2066,11 +2066,13 @@
   // Nanti bisa disambungkan ke printer bluetooth tanpa mengubah endpoint-nya.
   function printBMTableQr(data) {
     var title = (data.table && (data.table.label || data.table.table_number)) || 'Meja';
+    // Kode di bawah QR: jalan terakhir kalau kamera tamu tidak bisa membaca QR.
+    var kode = (data.join_url || '').split('meja=')[1] || '';
     var w = window.open('', '_blank');
     if (!w) return;
     w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>QR ' + esc(title) + '</title>' +
       '<style>body{font-family:sans-serif;text-align:center;padding:32px;}h1{font-size:20px;margin:0 0 4px;}p{font-size:12px;color:#555;margin:0 0 20px;}svg{width:280px;height:280px;}</style>' +
-      '</head><body><h1>' + esc(title) + '</h1><p>Scan untuk pesan / lihat bill meja ini</p>' + (data.svg || '') + '</body></html>');
+      '</head><body><h1>' + esc(title) + '</h1><p>Scan untuk melihat pesanan meja ini</p>' + (data.svg || '') + (kode ? '<p style="font-size:11px;color:#777;margin-top:16px;">Kode meja: ' + esc(kode) + '</p>' : '') + '</body></html>');
     w.document.close();
     w.focus();
     w.print();
