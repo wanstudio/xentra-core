@@ -16,7 +16,7 @@ Do not introduce or activate a mandatory KDS surface merely to represent kitchen
 
 ```
 Order masuk
-→ Merchant Dashboard menerima order
+→ Merchant App menerima order
 → Branch Manager menerima/accept order
 → Printer menghasilkan kitchen copy + customer receipt
 → Kitchen menerima/ambil kitchen copy
