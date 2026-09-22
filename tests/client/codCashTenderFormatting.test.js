@@ -161,7 +161,7 @@ test('T7: preset radios are limited by the amount due (total pembayaran)', () =>
     'ineligible presets must not receive a click handler');
 
   // A selection the customer cannot use is never left open.
-  assert.ok(code.includes('if (eligibleKeys.indexOf(selectedType) === -1)'), 'an unusable selection must be dropped');
+  assert.ok(code.includes('if (!customIsUsable && eligibleKeys.indexOf(selectedType) === -1)'), 'an unusable selection must be dropped');
   assert.ok(code.includes("selectedType = eligibleKeys.length ? eligibleKeys[0] : 'custom';"),
     'must fall back to the cheapest covering preset, or Custom when none covers');
 
@@ -169,6 +169,17 @@ test('T7: preset radios are limited by the amount due (total pembayaran)', () =>
   assert.ok(code.includes('if (!isNaN(num) && num >= payable)'), 'custom amount below the bill must not validate');
   assert.ok(code.includes('if (tendered === null || tendered < payable) return;'),
     'confirm must refuse an amount below the bill');
+
+  // Default selection: the CHEAPEST preset that already covers the bill.
+  // Total Rp47.646 -> Rp50.000 ter-pick, bukan Rp100.000.
+  assert.ok(!code.includes("state.cashTenderedType || '100k'"),
+    'there must be no hardcoded default denomination');
+  assert.ok(code.includes("var selectedType = state.cashTenderedType || null;"),
+    'an unchosen sheet must fall through to the total-driven default');
+  assert.ok(code.includes('var customIsUsable = selectedType === \'custom\' && parseInt(customValue, 10) >= payable;'),
+    'a saved custom amount must not be overwritten by the default');
+  assert.ok(code.indexOf('eligibleKeys[0]') < code.indexOf('var sheetHtml'),
+    'the cheapest covering preset must be chosen before the sheet is rendered');
 
   // The old hardcoded bindings must be gone.
   assert.ok(!code.includes('elPreset10k'), 'hardcoded preset bindings must be removed');

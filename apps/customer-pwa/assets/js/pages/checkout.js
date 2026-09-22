@@ -2923,7 +2923,9 @@
 
   // ── 5b. COD Cash Tender Selection Sheet ──
   function openCashTenderSheet() {
-    var selectedType = state.cashTenderedType || '100k';
+    // Belum ada pilihan: default-nya ditentukan di bawah dari total (preset
+    // termurah yang sudah menutupi tagihan), bukan nominal tetap.
+    var selectedType = state.cashTenderedType || null;
     var customValue = '';
 
     if (state.cashTendered != null && Number(state.cashTendered) > 0) {
@@ -2966,8 +2968,12 @@
         '    </div>';
     });
 
-    // A selection that the customer cannot actually use is never kept open.
-    if (eligibleKeys.indexOf(selectedType) === -1) {
+    // Default ter-pick: preset TERMURAH yang sudah menutupi total. Total
+    // Rp47.646 → Rp50.000 (bukan Rp100.000). Pilihan yang sudah tersimpan tetap
+    // dihormati selama masih bisa dipakai; kalau tidak, jatuh ke default ini,
+    // dan ke Custom kalau tidak ada preset yang cukup.
+    var customIsUsable = selectedType === 'custom' && parseInt(customValue, 10) >= payable;
+    if (!customIsUsable && eligibleKeys.indexOf(selectedType) === -1) {
       selectedType = eligibleKeys.length ? eligibleKeys[0] : 'custom';
     }
 
