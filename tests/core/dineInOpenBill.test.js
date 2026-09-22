@@ -236,3 +236,71 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
     assert.equal(res.body.table_id, RESUME_TABLE);
   });
 });
+
+// ── Kemampuan membuat QR meja (siap dicetak / dibagikan) ───────────────────
+
+const STAFF_TOKEN = 'qr_staff_test';
+const QR_TABLE = 'tbl_qr_test';
+const QR_TABLE_TOKEN = 'qr_token_meja_uji';
+
+test('Staf bisa membuat QR meja', async (t) => {
+  t.before(async () => {
+    seedTable(QR_TABLE, '904', QR_TABLE_TOKEN);
+    db.prepare(
+      `INSERT OR REPLACE INTO users (id, brand_id, organization_id, branch_id, username, email, full_name, role, status, created_at, updated_at)
+       VALUES (?, 'brand_bangjo', NULL, ?, ?, ?, 'QR Staff', 'branch_manager', 'active', datetime('now'), datetime('now'))`
+    ).run('uqr_staff', BRANCH, 'uqr_staff', 'uqr_staff@test.local');
+
+    await new Promise((resolve) => {
+      server = require('../../server/app').listen(0, resolve);
+      baseUrl = 'http://127.0.0.1:' + server.address().port;
+    });
+
+    global.TokenSessionStore.sessions.set(STAFF_TOKEN, {
+      type: 'staff',
+      role: 'branch_manager',
+      brandId: 'brand_bangjo',
+      brand_id: 'brand_bangjo',
+      branchId: BRANCH,
+      branch_id: BRANCH,
+      userId: 'uqr_staff',
+      username: 'uqr_staff',
+      email_verified: true,
+      expiresAt: Date.now() + 3600000
+    });
+  });
+
+  t.after(async () => {
+    if (server) await new Promise((r) => server.close(r));
+    db.prepare('DELETE FROM users WHERE id = ?').run('uqr_staff');
+    db.prepare('DELETE FROM branch_table_states WHERE table_id = ?').run(QR_TABLE);
+    db.prepare('DELETE FROM branch_tables WHERE id = ?').run(QR_TABLE);
+  });
+
+  await t.test('tanpa login: ditolak', async () => {
+    const res = await api('GET', '/api/v1/dine-in/tables/' + QR_TABLE + '/qr');
+    assert.equal(res.status, 401, 'QR meja tidak boleh bisa dienumerasi publik');
+  });
+
+  await t.test('meja tidak dikenal: 404', async () => {
+    const res = await api('GET', '/api/v1/dine-in/tables/tbl_tidak_ada/qr', STAFF_TOKEN);
+    assert.equal(res.status, 404);
+  });
+
+  await t.test('QR berisi URL gabung + token mejanya', async () => {
+    const res = await api('GET', '/api/v1/dine-in/tables/' + QR_TABLE + '/qr', STAFF_TOKEN);
+    assert.equal(res.status, 200, JSON.stringify(res.body).slice(0, 200));
+    assert.ok(res.body.svg.indexOf('<svg') !== -1, 'harus ada gambar SVG-nya');
+    assert.ok(res.body.join_url.indexOf('/join?meja=') !== -1, 'isinya URL gabung, bukan token mentah');
+    assert.ok(res.body.join_url.indexOf(QR_TABLE_TOKEN) !== -1, 'URL harus membawa token meja itu');
+    assert.equal(res.body.table.table_number, '904');
+  });
+
+  await t.test('melihat QR lagi TIDAK mematikan QR yang sudah ditempel', async () => {
+    const a = await api('GET', '/api/v1/dine-in/tables/' + QR_TABLE + '/qr', STAFF_TOKEN);
+    const b = await api('GET', '/api/v1/dine-in/tables/' + QR_TABLE + '/qr', STAFF_TOKEN);
+    assert.equal(a.body.join_url, b.body.join_url, 'URL harus sama, tidak dirotasi diam-diam');
+    const row = db.prepare('SELECT qr_token FROM branch_tables WHERE id = ?').get(QR_TABLE);
+    assert.equal(row.qr_token, QR_TABLE_TOKEN, 'token tersimpan harus tetap sama');
+  });
+});

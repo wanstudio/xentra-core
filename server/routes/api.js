@@ -11484,6 +11484,55 @@ router.get('/dine-in/qr/:token', (req, res) => {
 });
 
 // Staff / Owner: Regenerate QR Token for a table
+// Staff: QR meja untuk dicetak / dibagikan / dikirim ke printer.
+//
+// Isinya URL GABUNG, bukan token mentah: kamera bawaan HP mana pun bisa
+// membacanya dan langsung membuka PWA, tanpa aplikasi kita dan tanpa izin apa
+// pun. Tokennya TIDAK dirotasi di sini — QR yang sudah ditempel di meja harus
+// tetap berlaku sampai staf sengaja mem-rotate-nya; token hanya dibuat kalau
+// meja itu belum punya.
+router.get('/dine-in/tables/:id/qr', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const table = db.prepare('SELECT id, branch_id, table_number, label, qr_token FROM branch_tables WHERE id = ?').get(req.params.id);
+    if (!table) {
+      return res.status(404).json({ success: false, error: 'MEJA_TIDAK_DITEMUKAN' });
+    }
+
+    if (['branch_manager', 'cashier'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (table.branch_id !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya memiliki kewenangan pada meja cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    let token = table.qr_token;
+    if (!token) {
+      const { DiningTableService } = require('../../domains/pos');
+      token = DiningTableService.regenerateQrToken(table.id).qr_token;
+    }
+
+    const joinUrl = 'https://' + req.headers.host + '/join?meja=' + encodeURIComponent(token);
+
+    const qrcode = require('qrcode-generator');
+    const qr = qrcode(0, 'M');
+    qr.addData(joinUrl);
+    qr.make();
+
+    res.json({
+      success: true,
+      table: { id: table.id, table_number: table.table_number, label: table.label },
+      join_url: joinUrl,
+      svg: qr.createSvgTag({ cellSize: 4, margin: 8, scalable: true })
+    });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/dine-in/tables/:id/regenerate-qr', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
     if (req.user.role === 'branch_manager') {
