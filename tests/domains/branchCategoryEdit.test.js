@@ -26,6 +26,7 @@ const assert = require('node:assert');
 const crypto = require('crypto');
 const app = require('../../server/app');
 const db = require('../../server/database/db');
+const NON_IMAGE_BASE64 = Buffer.from('%PDF-1.4\nnot an image at all').toString('base64');
 
 // Suites assert against demo branches/products/promotions, which are not auto-seeded.
 require('../helpers/demoFixtures.js')();
@@ -233,12 +234,13 @@ test('CATEGORY EDIT 4 — Validation and error handling', async () => {
   const resInvalidMime = await request(`/api/v1/admin/branches/${BRANCH_ID}/categories/${catId}/image`, {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token },
-    body: JSON.stringify({ image_base64: 'abc', mime_type: 'application/pdf' })
+    body: JSON.stringify({ image_base64: NON_IMAGE_BASE64, mime_type: 'application/pdf' })
   });
   assert.strictEqual(resInvalidMime.status, 400);
   const dataMime = await resInvalidMime.json();
   assert.strictEqual(dataMime.success, false);
-  assert.strictEqual(dataMime.error, 'Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+  // Format authority is server-side signature detection, not the declared mime.
+  assert.match(dataMime.error, /tidak valid|tidak didukung/i);
 
   // E. Missing image data
   const resNoData = await request(`/api/v1/admin/branches/${BRANCH_ID}/categories/${catId}/image`, {

@@ -15,6 +15,7 @@ const app = require('../server/app');
 // Suites assert against demo branches/products/promotions, which are not auto-seeded.
 require('./helpers/demoFixtures.js')();
 const CatalogService = require('../domains/commerce/services/CatalogService');
+const NON_IMAGE_BASE64 = Buffer.from('%PDF-1.4\nnot an image at all').toString('base64');
 
 const BARAT = 'branch_bangjo_barat';
 const TIMUR = 'branch_bangjo_timur';
@@ -176,7 +177,7 @@ test('3. Replace an existing category image with a new one', async () => {
   const rejected = await mockFetch(`/api/v1/admin/branches/${BARAT}/categories/${catId}/image`, {
     method: 'POST',
     headers: auth,
-    body: JSON.stringify({ image_base64: TINY_PNG_BASE64, mime_type: 'image/svg+xml' })
+    body: JSON.stringify({ image_base64: NON_IMAGE_BASE64, mime_type: 'image/svg+xml' })
   });
   assert.strictEqual(rejected.status, 400);
 });

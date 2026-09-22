@@ -31,6 +31,7 @@ const db = require('../server/database/db');
 // Suites assert against demo branches/products/promotions, which are not auto-seeded.
 require('./helpers/demoFixtures.js')();
 const CatalogService = require('../domains/commerce/services/CatalogService');
+const NON_IMAGE_BASE64 = Buffer.from('%PDF-1.4\nnot an image at all').toString('base64');
 
 const BRAND    = 'brand_bangjo';
 const BRANCH   = 'branch_bangjo_barat';
@@ -486,7 +487,7 @@ test('OVR-22 branch product photo upload sets image_override and resolves in cus
   var bad = await mockFetch('/api/v1/admin/branches/' + BRANCH + '/products/' + PRODUCT + '/image', {
     method: 'POST',
     headers: { authorization: 'Bearer ' + tok },
-    body: JSON.stringify({ image_base64: TINY_PNG_BASE64, mime_type: 'image/svg+xml' })
+    body: JSON.stringify({ image_base64: NON_IMAGE_BASE64, mime_type: 'image/svg+xml' })
   });
   assert.strictEqual(bad.status, 400, 'unsupported mime rejected');
 

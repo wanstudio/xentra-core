@@ -23,6 +23,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const app = require('../../server/app');
 const db = require('../../server/database/db');
+const NON_IMAGE_BASE64 = Buffer.from('%PDF-1.4\nnot an image at all').toString('base64');
 
 // Suites assert against demo branches/products/promotions, which are not auto-seeded.
 require('../helpers/demoFixtures.js')();
@@ -30,7 +31,8 @@ require('../helpers/demoFixtures.js')();
 const TINY_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
-const MAX_BYTES = 3 * 1024 * 1024;
+// Product image policy is 20 MB (M0 locked; core/domain/ImageValidator IMAGE_RULES.product)
+const MAX_BYTES = 20 * 1024 * 1024;
 
 async function mockFetch(path, options = {}) {
   const method = options.method || 'GET';
@@ -212,12 +214,13 @@ test('PRODUCT IMAGE 4 — validation and error handling', async () => {
   const resBadMime = await mockFetch(`/api/v1/admin/products/${productId}/image`, {
     method: 'POST',
     headers: auth,
-    body: JSON.stringify({ image_base64: TINY_PNG_BASE64, mime_type: 'application/pdf' })
+    body: JSON.stringify({ image_base64: NON_IMAGE_BASE64, mime_type: 'application/pdf' })
   });
   assert.strictEqual(resBadMime.status, 400);
   const dataMime = await resBadMime.json();
   assert.strictEqual(dataMime.success, false);
-  assert.strictEqual(dataMime.error, 'Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+  // Format authority is server-side signature detection, not the declared mime.
+  assert.match(dataMime.error, /tidak valid|tidak didukung/i);
 
   // C. Missing image data
   const resNoData = await mockFetch(`/api/v1/admin/products/${productId}/image`, {
@@ -240,5 +243,5 @@ test('PRODUCT IMAGE 4 — validation and error handling', async () => {
   assert.strictEqual(resOversized.status, 400);
   const dataOversized = await resOversized.json();
   assert.strictEqual(dataOversized.success, false);
-  assert.strictEqual(dataOversized.error, 'Ukuran gambar melebihi batas maksimal 3MB.');
+  assert.strictEqual(dataOversized.error, 'Ukuran file melebihi batas maksimal 20 MB untuk Foto Menu / Produk.');
 });

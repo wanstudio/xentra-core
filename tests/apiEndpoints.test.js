@@ -381,7 +381,8 @@ test('API Admin: GET & PUT /api/v1/admin/brand updates theme color and logo', as
   assert.strictEqual(putRes.status, 200);
   const putData = await putRes.json();
   assert.strictEqual(putData.success, true);
-  assert.strictEqual(putData.brand.primary_color, '#ff4d4f');
+  // The API normalises the stored brand colour; assert the value, not its casing.
+  assert.strictEqual(putData.brand.primary_color.toLowerCase(), '#ff4d4f');
   assert.strictEqual(putData.brand.name, 'Bangjo Express Resto');
 });
 

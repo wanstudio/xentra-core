@@ -128,6 +128,8 @@ function seedCustomerSession(phone = '081200000099', brandId = BRAND_ID) {
       customerPhone: phone.trim(),
       brandId,
       brand_id: brandId,
+      organizationId: 'org_xentra_holding',
+      organization_id: 'org_xentra_holding',
       email_verified: true,
       expiresAt: Date.now() + 86400 * 1000
     });
