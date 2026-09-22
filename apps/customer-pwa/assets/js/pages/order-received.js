@@ -484,8 +484,8 @@
       '    <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:800;color:#111;"><span>Total</span><span>' + UI.money(order.grand_total || 0) + '</span></div>' +
       '    <div style="font-size:12px;color:#6b7280;margin-top:6px;">' + UI.escape(payLabel) + '</div>' +
       ((isCash && order.cash_tendered != null && Number(order.cash_tendered) > 0)
-        ? '    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:8px;"><span style="color:#6b7280;">Bayar dengan</span><span style="color:#111;font-weight:600;">' + UI.money(order.cash_tendered) + '</span></div>' +
-          '    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:4px;"><span style="color:#6b7280;">Perkiraan kembalian</span><span style="color:#111;font-weight:600;">' + UI.money(order.expected_change != null ? order.expected_change : Math.max(0, Number(order.cash_tendered) - Number(order.grand_total || 0))) + '</span></div>'
+        ? '    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:8px;"><span style="color:#6b7280;">Bayar dengan uang</span><span style="color:#111;font-weight:600;">' + UI.money(order.cash_tendered) + '</span></div>' +
+          '    <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:4px;"><span style="color:#6b7280;">Kembalian</span><span style="color:#111;font-weight:600;">' + UI.money(order.expected_change != null ? order.expected_change : Math.max(0, Number(order.cash_tendered) - Number(order.grand_total || 0))) + '</span></div>'
         : '') +
       '  </div>' +
 

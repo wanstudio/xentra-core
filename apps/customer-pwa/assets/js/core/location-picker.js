@@ -727,6 +727,10 @@
   function openMapPickerFlow(options) {
     options = options || {};
     var isAddingFav = options.isAddingFavorite === true;
+    var existingId = options.existingId || null;
+    var existingLabel = options.existingLabel || '';
+    var existingDetail = options.existingDetail || '';
+    var onSavedCallback = options.onSaved || null;
 
     // Get starting coordinates and zoom from active destination or GPS or default
     var initialCoords = { lat: DEFAULT_LAT, lng: DEFAULT_LNG };
@@ -1150,10 +1154,12 @@
           address: fullAddr,
           latitude: currentPinCoords.lat,
           longitude: currentPinCoords.lng,
-          label: titleText,
-          detail: '',
+          label: existingId ? existingLabel : titleText,
+          detail: existingId ? existingDetail : '',
           source: 'map',
           isFavorite: true,
+          existingId: existingId,
+          onSaved: onSavedCallback,
           onSelect: function () {
             closeMap();
             if (typeof options.onSelect === 'function') options.onSelect();
@@ -1718,6 +1724,10 @@
       sh.close();
       openMapPickerFlow({
         isAddingFavorite: favChecked,
+        existingId: existingId,
+        existingLabel: existingLabel,
+        existingDetail: existingDetail,
+        onSaved: params.onSaved,
         onSelect: params.onSelect
       });
     };

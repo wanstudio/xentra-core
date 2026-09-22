@@ -2937,6 +2937,14 @@
       '    <p class="x-tender-subtitle">Driver akan menyiapkan uang kembalian.</p>' +
       '  </div>' +
       '  <div class="x-tender-presets">' +
+      '    <div class="x-tender-preset-card' + (selectedType === '10k' ? ' is-selected' : '') + '" id="x-preset-10k">' +
+      '      <span class="x-tender-preset-val">Rp10.000</span>' +
+      '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
+      '    </div>' +
+      '    <div class="x-tender-preset-card' + (selectedType === '20k' ? ' is-selected' : '') + '" id="x-preset-20k">' +
+      '      <span class="x-tender-preset-val">Rp20.000</span>' +
+      '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
+      '    </div>' +
       '    <div class="x-tender-preset-card' + (selectedType === '50k' ? ' is-selected' : '') + '" id="x-preset-50k">' +
       '      <span class="x-tender-preset-val">Rp50.000</span>' +
       '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
@@ -2962,6 +2970,8 @@
     var sh = makeOverlay(sheetHtml);
     var overlay = sh.overlay;
 
+    var elPreset10k = overlay.querySelector('#x-preset-10k');
+    var elPreset20k = overlay.querySelector('#x-preset-20k');
     var elPreset50k = overlay.querySelector('#x-preset-50k');
     var elPreset100k = overlay.querySelector('#x-preset-100k');
     var elCustomBox = overlay.querySelector('#x-tender-custom-box');
@@ -2970,12 +2980,14 @@
     var elBtnConfirm = overlay.querySelector('#x-btn-confirm-tender');
 
     function updateUi() {
+      if (elPreset10k) elPreset10k.classList.toggle('is-selected', selectedType === '10k');
+      if (elPreset20k) elPreset20k.classList.toggle('is-selected', selectedType === '20k');
       if (elPreset50k) elPreset50k.classList.toggle('is-selected', selectedType === '50k');
       if (elPreset100k) elPreset100k.classList.toggle('is-selected', selectedType === '100k');
       if (elCustomBox) elCustomBox.classList.toggle('is-selected', selectedType === 'custom');
 
       var isValid = false;
-      if (selectedType === '50k' || selectedType === '100k') {
+      if (selectedType === '10k' || selectedType === '20k' || selectedType === '50k' || selectedType === '100k') {
         isValid = true;
       } else if (selectedType === 'custom') {
         var num = parseInt(customValue, 10);
@@ -2986,6 +2998,20 @@
       if (elBtnConfirm) {
         elBtnConfirm.disabled = !isValid;
       }
+    }
+
+    if (elPreset10k) {
+      elPreset10k.onclick = function () {
+        selectedType = '10k';
+        updateUi();
+      };
+    }
+
+    if (elPreset20k) {
+      elPreset20k.onclick = function () {
+        selectedType = '20k';
+        updateUi();
+      };
     }
 
     if (elPreset50k) {
@@ -3097,7 +3123,11 @@
     if (elBtnConfirm) {
       elBtnConfirm.onclick = function () {
         var tendered = null;
-        if (selectedType === '50k') {
+        if (selectedType === '10k') {
+          tendered = 10000;
+        } else if (selectedType === '20k') {
+          tendered = 20000;
+        } else if (selectedType === '50k') {
           tendered = 50000;
         } else if (selectedType === '100k') {
           tendered = 100000;
