@@ -8,6 +8,13 @@
 - **Known infrastructure issue (reported, not changed):** `server/database/db.js:97` checks for the error string `'Cannot find module'` while Node 20 raises `'No such built-in module: node:sqlite'`. In `NODE_ENV=production` this makes the `sql.js` fallback terminate the process instead of falling back. Not changed here because it alters production runtime behaviour.
 - Full audit, evidence and remaining failure classification: `docs/TEST_SUITE_RUNTIME_AND_CI_AUDIT.md`.
 
+### Resend email is now production-only (hard guard)
+- **Fixed an environment hole in email provider selection.** `EmailProvider` resolved `EMAIL_PROVIDER` before `NODE_ENV`, so an environment exporting `EMAIL_PROVIDER=resend` (local `.env`, shell profile, CI variable) selected the Resend transport even under `NODE_ENV=test`. Suites that drive the HTTP API use the module-level `defaultEmailProvider`, so they could perform real deliveries and consume Resend quota.
+- **Two-layer guard.** Real transports (`resend`) are demoted to the in-memory provider whenever `NODE_ENV !== 'production'`; and a live `ResendEmailAdapter` can no longer be constructed outside production — `require('resend')` is unreachable unless `NODE_ENV=production` or a client is injected explicitly for tests. Unknown provider names still fail explicitly.
+- **Production behaviour unchanged.** `NODE_ENV=production` still selects Resend.
+- **Proof:** new `tests/core/emailEnvironmentGuard.test.js`; email-flow suites run with `EMAIL_PROVIDER=resend` + the real key exported and a tripwire preload report **65/65 passing with zero Resend SDK loads**. Adapter contract suite remains green.
+- Evidence and addendum: `docs/audit-resend-email-quota.md`.
+
 ## [Unreleased] - 2026-09-15
 ### Locked Owner ↔ Branch Manager dashboard boundary
 - Locked the cross-dashboard responsibility model: **Owner = CONFIGURE + GOVERN + OBSERVE**, **Branch Manager = OPERATE + OBSERVE**, and **Xentra-Core = AUTHENTICATE + AUTHORIZE + ENFORCE + PERSIST + AUDIT**.

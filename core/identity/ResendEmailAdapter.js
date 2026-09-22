@@ -30,6 +30,17 @@ class ResendEmailAdapter {
     if (options.client) {
       this.client = options.client;
     } else {
+      // Hard guard: a live Resend transport (and therefore any real network
+      // delivery) may only be constructed in production. Tests and development
+      // must use the in-memory provider, or inject a client explicitly.
+      if (process.env.NODE_ENV !== 'production') {
+        throw new Error(
+          '[ResendEmailAdapter] Refusing to construct a live Resend transport outside production ' +
+          `(NODE_ENV=${process.env.NODE_ENV || 'unset'}). Use the in-memory email provider, ` +
+          'or inject a client explicitly for tests.'
+        );
+      }
+
       const { Resend } = require('resend');
       this.client = new Resend(this.apiKey);
     }

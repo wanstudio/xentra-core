@@ -3,6 +3,21 @@
 const ResendEmailAdapter = require('./ResendEmailAdapter');
 
 /**
+ * Transports that perform real network delivery. These are production-only:
+ * outside production the in-memory provider is forced, so tests, CI and local
+ * development can never reach a live provider or consume a delivery quota.
+ */
+const REAL_TRANSPORTS = ['resend'];
+
+const IN_MEMORY_TRANSPORTS = ['memory', 'test'];
+
+let demotionWarned = false;
+
+function isProductionRuntime() {
+  return process.env.NODE_ENV === 'production';
+}
+
+/**
  * Minimal email delivery provider abstraction for Xentra.
  * Avoids vendor lock-in while providing safe test and development adapters,
  * and production transport delegation (e.g. Resend).
@@ -40,12 +55,31 @@ class EmailProvider {
    * 2. process.env.EMAIL_PROVIDER ('resend', 'smtp', 'memory', etc.)
    * 3. 'resend' if process.env.NODE_ENV === 'production'
    * 4. 'memory' for test and development
+   *
+   * Hard guard: a real transport (Resend) can only be selected in production.
+   * Any configuration that asks for one outside production is demoted to the
+   * in-memory provider, so an exported EMAIL_PROVIDER/RESEND_API_KEY (for
+   * example from a local .env or a CI environment) can never cause a live send.
    */
   _determineProviderName(explicitProvider) {
-    if (explicitProvider) return explicitProvider.toLowerCase();
-    if (process.env.EMAIL_PROVIDER) return process.env.EMAIL_PROVIDER.toLowerCase();
-    if (process.env.NODE_ENV === 'production') return 'resend';
-    return 'memory';
+    const requested = String(
+      explicitProvider ||
+      process.env.EMAIL_PROVIDER ||
+      (isProductionRuntime() ? 'resend' : 'memory')
+    ).toLowerCase();
+
+    if (REAL_TRANSPORTS.indexOf(requested) !== -1 && !isProductionRuntime()) {
+      if (!demotionWarned) {
+        demotionWarned = true;
+        console.warn(
+          `[EmailProvider] "${requested}" is production-only; using the in-memory provider ` +
+          `(NODE_ENV=${process.env.NODE_ENV || 'unset'}).`
+        );
+      }
+      return 'memory';
+    }
+
+    return requested;
   }
 
   /**
@@ -64,7 +98,7 @@ class EmailProvider {
       return this.adapter;
     }
 
-    if (providerName === 'memory' || providerName === 'test') {
+    if (IN_MEMORY_TRANSPORTS.indexOf(providerName) !== -1) {
       return null; // Uses in-memory sentEmails list
     }
 

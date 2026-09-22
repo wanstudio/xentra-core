@@ -46,7 +46,7 @@ User registration timeline:
 
 | Hypothesis | Status | Evidence |
 |---|---|---|
-| **Test suite hitting Resend production** | **RULED OUT** | All tests use `EmailProvider({ provider: 'memory' })` or inject `mockClient`. `emailProviderResend.test.js:117` uses `'re_mock_test_key'`. No test file creates `ResendEmailAdapter` without mock. |
+| **Test suite hitting Resend production** | **PARTIALLY WRONG — see Addendum** | The original conclusion assumed every test injects `EmailProvider({ provider: 'memory' })` or a mock client. That holds for the adapter unit tests, but **not** for suites that drive the HTTP API: they use the module-level `defaultEmailProvider`, which resolved `EMAIL_PROVIDER` **before** `NODE_ENV`. Any environment exporting `EMAIL_PROVIDER=resend` therefore made those suites deliver real email. Fixed by the guard in the Addendum. |
 | **Retry / loop in email code** | **RULED OUT** | `ResendEmailAdapter.sendEmail()` calls `this.client.emails.send()` exactly once (line 155). No retry, no loop, no `MAX_ATTEMPTS`. |
 | **Duplicate submit / double-click** | **RULED OUT** | Frontend `resendInvitation()` has `confirm()` dialog (dashboard.js:4755). Registration has rate limiting (5/10min/IP). Resend verification has rate limiting (3/15min/IP). |
 | **PM2/systemd duplicate runtime** | **RULED OUT** | No `ecosystem.config.js`, no PM2 config, no systemd service file found in repo. |
@@ -68,3 +68,47 @@ These have `branch_id = NULL` (not created by standard `registerBusiness()` whic
 2. **Add audit logging to `resendVerificationEmail()`** — Currently there's no `security_audit_log` entry for resend-verification calls. Adding one would make the exact resend count measurable.
 
 3. **Consider Resend domain verification allowlist** — In production, only send emails to domains that actually exist. Resend may already handle bounce tracking, but client-side validation avoids wasting quota upfront.
+
+---
+
+## Addendum — 2026-09-22: environment guard (IMPLEMENTED)
+
+### The hole
+
+`EmailProvider._determineProviderName()` resolved the transport in this order:
+
+1. explicit `options.provider`
+2. **`process.env.EMAIL_PROVIDER`**
+3. `NODE_ENV === 'production'` → `resend`
+4. otherwise `memory`
+
+Because step 2 preceded step 3, an environment that exported `EMAIL_PROVIDER=resend`
+(a local `.env`, a shell profile, a CI variable) selected the Resend transport **even
+when `NODE_ENV=test`**. Several suites drive the HTTP API (`/auth/register`,
+`/admin/invitations`, resend-verification) and therefore use the module-level
+`defaultEmailProvider` singleton — those suites would have performed real deliveries
+and consumed the Resend quota.
+
+### The guard (two layers)
+
+1. **`core/identity/EmailProvider.js`** — real transports (`resend`) are demoted to the
+   in-memory provider whenever `NODE_ENV !== 'production'`, with a one-time warning.
+   Unknown provider names still fail explicitly (contract preserved).
+2. **`core/identity/ResendEmailAdapter.js`** — a live transport cannot be constructed
+   outside production: `require('resend')` is now unreachable unless `NODE_ENV=production`
+   or a client is injected explicitly (the test seam).
+
+Production behaviour is unchanged: `NODE_ENV=production` still selects Resend.
+
+### Verification
+
+- `tests/core/emailEnvironmentGuard.test.js` (8 cases): test/development resolve to memory,
+  an explicit `resend` request is demoted, a live transport cannot be constructed outside
+  production, an injected client still works, production selection is unchanged, the SDK is
+  never loaded, and unknown providers still throw.
+- Adapter contract suite (`tests/core/emailProviderResend.test.js`) still green — 19/19 combined.
+- Email-flow suites (verification, reconciliation, invitation, access policy, adapter,
+  guard) executed with `EMAIL_PROVIDER=resend`, the real `RESEND_API_KEY` and `EMAIL_FROM`
+  exported, plus a tripwire preload that reports any load of the Resend SDK or any
+  `https.request`: **65/65 passing, 0 Resend SDK loads**. The same tripwire does fire when
+  the production path consciously constructs the adapter, confirming the detector works.
