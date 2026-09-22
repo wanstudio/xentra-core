@@ -554,7 +554,8 @@
         if (!state.isSubmitting) renderLayout();
         return null;
       }
-      var bill = (res && res.success && res.session) ? res.session : null;
+      // Kontraknya: QR hanya memberi tahu mejanya. Tagihan tetap dibuka lewat
+      // identitas tamu sendiri (refreshOpenBill), bukan lewat QR.
       var table = (res && res.table) ? res.table : null;
 
       // Meja dari QR mengunci pilihannya: satu meja, tidak bisa diganti.
@@ -564,7 +565,6 @@
         state.fulfillment.tableNumber = table.table_number || '';
       }
       state.pendingJoinToken = null;
-      if (bill) state.openBill = bill;
       if (!state.isSubmitting) renderLayout();
       return res || null;
     }).catch(function () {

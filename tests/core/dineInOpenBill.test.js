@@ -232,9 +232,17 @@ test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
 
     const res = await api('POST', '/api/v1/customer/dining-session/claim', OTHER_TOKEN, { qr_token: RESUME_QR });
     assert.equal(res.status, 200, JSON.stringify(res.body));
-    assert.ok(res.body.session && res.body.session.session_id, 'QR harus membuka bill meja itu');
     assert.equal(res.body.table_id, RESUME_TABLE);
     assert.equal(res.body.table.table_number, '903', 'QR harus membawa identitas mejanya');
+
+    // Keamanan: kartu QR ditempel PERMANEN di meja, jadi QR bukan rahasia dan
+    // bukan kunci — ia tidak boleh membuka tagihan siapa pun.
+    assert.equal(res.body.session, null, 'QR tidak boleh membuka tagihan');
+    assert.ok(!JSON.stringify(res.body).includes('total_bill'), 'isi tagihan tidak boleh ikut terbawa');
+
+    // Tamu yang memang pemiliknya tetap bisa membuka tagihannya, lewat identitas.
+    const mine = await api('GET', '/api/v1/customer/dining-session', CUST_TOKEN);
+    assert.ok(mine.body.session, 'pemilik tagihan tetap bisa membukanya lewat identitasnya');
   });
 
   await t.test('scan meja yang belum ada billnya: mejanya tetap dikenali', async () => {
@@ -340,7 +348,7 @@ test('Staf bisa membuat QR meja', async (t) => {
 // Kalau token tidak pernah diganti, QR yang pernah difoto seseorang bisa dipakai
 // membuka tagihan tamu berikutnya di meja yang sama.
 
-test('Menutup sesi mengganti token QR meja itu saja', async (t) => {
+test('Menutup sesi tidak mematikan kartu QR yang tertempel', async (t) => {
   t.before(() => {
     seedTable('tbl_rot_a', '906', 'qr_rot_a_lama');
     seedTable('tbl_rot_b', '907', 'qr_rot_b_lama');
@@ -355,7 +363,7 @@ test('Menutup sesi mengganti token QR meja itu saja', async (t) => {
     db.prepare('DELETE FROM branch_tables WHERE id IN (?, ?)').run('tbl_rot_a', 'tbl_rot_b');
   });
 
-  await t.test('token meja yang sesinya ditutup berubah; meja lain tidak', () => {
+  await t.test('kartu QR tetap sama setelah sesi ditutup; meja lain juga', () => {
     const session = DiningTableService.createOrAttachDiningSession({
       branch_id: BRANCH,
       table_ids: ['tbl_rot_a'],
@@ -372,7 +380,7 @@ test('Menutup sesi mengganti token QR meja itu saja', async (t) => {
     assert.equal(result.status, 'completed');
 
     const after = db.prepare('SELECT qr_token FROM branch_tables WHERE id = ?').get('tbl_rot_a').qr_token;
-    assert.notEqual(after, before, 'kunci lama tidak boleh tetap berlaku untuk tamu berikutnya');
+    assert.equal(after, before, 'kartu QR yang ditempel permanen tidak boleh mati sendiri');
 
     const other = db.prepare('SELECT qr_token FROM branch_tables WHERE id = ?').get('tbl_rot_b').qr_token;
     assert.equal(other, 'qr_rot_b_lama', 'meja yang tidak ikut sesi tidak boleh ikut berubah');

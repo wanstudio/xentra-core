@@ -13,15 +13,19 @@ const HOLD_DURATION_MINUTES = 15;
 
 // Ganti token QR meja setiap sesinya ditutup?
 //
-// Kenapa ON: token QR adalah kunci untuk melihat tagihan meja. Kalau tidak pernah
-// diganti, QR yang pernah difoto seseorang tetap bisa dipakai membuka tagihan
-// tamu BERIKUTNYA di meja yang sama.
+// OFF (default), dan itu memang disengaja: kartu QR dicetak SEKALI lalu ditempel
+// permanen di meja. Kalau tokennya diganti-ganti, kartu itu mati dan tamu yang
+// scan hanya dapat "QR sudah tidak berlaku" — jauh lebih sering bikin rugi
+// daripada yang dicegah.
 //
-// Konsekuensinya (baca sebelum mematikan): kartu QR yang sudah tercetak menjadi
-// tidak berlaku setiap kali sesi meja ditutup, jadi harus dicetak ulang. Kalau
-// resto memakai kartu laminasi permanen yang tidak mau diganti-ganti, ubah
-// baris ini menjadi false — dengan sadar menerima risiko di atas.
-const ROTATE_TABLE_QR_ON_SESSION_CLOSE = true;
+// Karena QR-nya permanen, QR ini TIDAK dijadikan kunci: /customer/dining-session/claim
+// hanya memberitahu MEJA-nya, tidak membuka tagihan. Melihat tagihan tetap
+// berdasarkan identitas tamu (nomor teleponnya sendiri), jadi QR yang pernah
+// difoto orang tidak bisa membuka tagihan tamu lain.
+//
+// Nyalakan (true) hanya kalau resto sanggup mencetak ulang kartu QR setiap sesi
+// meja ditutup.
+const ROTATE_TABLE_QR_ON_SESSION_CLOSE = false;
 const repository = new DiningTableRepository();
 
 class DiningTableService {

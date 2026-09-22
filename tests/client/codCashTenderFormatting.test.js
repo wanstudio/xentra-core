@@ -321,8 +321,8 @@ test('T12: scanning a table QR lands the customer on that table', () => {
     'the scanned table must become the single selection');
   assert.ok(code.includes("state.fulfillment.type = 'dine_in'"),
     'scanning a table means eating in');
-  assert.ok(code.includes('if (bill) state.openBill = bill;'),
-    'an existing bill at that table must be resumed');
+  assert.ok(!code.includes('if (bill) state.openBill = bill;'),
+    'the QR must not open a bill: a permanently taped QR is not a key');
 
   // Not signed in yet: keep the token, do not crash, do not lose the scan.
   assert.ok(code.includes('state.pendingJoinToken = qrToken;'),

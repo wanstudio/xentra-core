@@ -1292,14 +1292,12 @@ router.post('/customer/dining-session/claim', requireCustomerAuth(), (req, res) 
       label: tableRow.label || null
     };
 
-    const state = db.prepare('SELECT current_session_id FROM branch_table_states WHERE table_id = ?').get(tableId);
-    const sessionId = state && state.current_session_id;
-    if (!sessionId) return res.json({ success: true, session: null, table: tableInfo });
-
-    const bill = buildOpenBill(sessionId, req.brand_id);
-    if (!bill) return res.status(404).json({ success: false, error: 'BILL_TIDAK_DITEMUKAN' });
-
-    return res.json({ success: true, session: bill, via: 'qr', table_id: tableId, table: tableInfo });
+    // SENGAJA hanya mejanya, tanpa isi tagihan. QR meja ditempel permanen di meja,
+    // jadi QR itu bukan rahasia dan tidak boleh jadi kunci: kalau QR ini bisa
+    // membuka tagihan, siapa pun yang pernah memfotonya bisa membaca tagihan tamu
+    // berikutnya. Melihat tagihan tetap lewat identitas tamu sendiri
+    // (GET /customer/dining-session).
+    return res.json({ success: true, session: null, via: 'qr', table_id: tableId, table: tableInfo });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
   }
