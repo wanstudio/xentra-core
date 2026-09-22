@@ -408,7 +408,8 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
 
   // Old phones / refused camera: never a dead end.
   assert.ok(code.includes('>Dine-in, Scan QR di Meja</h3>'), 'judul scanner harus menyebut Dine-in');
-  assert.ok(code.includes('Arahkan kamera ke QR yang ada di meja.'), 'panduan scanner harus singkat');
+  assert.ok(code.includes('Arahkan kamera ke QR yang ada di meja.'), 'panduan harus tetap memberi tahu apa yang dilakukan');
+  assert.ok(code.includes('QR ini hanya untuk makan di tempat.'), 'batasannya harus disebut');
   assert.ok(code.includes('HP ini tidak bisa scan langsung'),
     'unsupported browsers must be told what to do instead');
   assert.ok(code.includes('Kamera tidak bisa dipakai'), 'a refused camera must be handled');
