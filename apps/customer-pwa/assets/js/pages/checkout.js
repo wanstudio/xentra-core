@@ -931,13 +931,24 @@
     return html;
   }
 
+  // Total pembayaran: the amount the customer actually has to hand over.
+  // Single source for the summary and for the cash tender sheet.
+  function payableTotal() {
+    var items = getCheckoutItems();
+    var subtotal = items.reduce(function (s, i) { return s + Number(i.price || 0) * Number(i.quantity || 0); }, 0);
+    var isDelivery = state.fulfillment.type === 'delivery';
+    var fee = isDelivery ? state.deliveryFee : 0;
+    var discount = isDelivery ? state.discount : 0;
+    return Math.max(0, subtotal + fee - discount);
+  }
+
   function calculateTotals() {
     var items = getCheckoutItems();
     var subtotal = items.reduce(function (s, i) { return s + Number(i.price || 0) * Number(i.quantity || 0); }, 0);
     var isDelivery = state.fulfillment.type === 'delivery';
     var fee = isDelivery ? state.deliveryFee : 0;
     var discount = isDelivery ? state.discount : 0;
-    var grand = Math.max(0, subtotal + fee - discount);
+    var grand = payableTotal();
     var oldTotal = subtotal + fee;
 
     var elSub = $('x-sum-subtotal'); if (elSub) elSub.textContent = fmtIDR(subtotal);
@@ -2930,6 +2941,36 @@
 
     var initialDisplayVal = (customValue && Number(customValue) > 0) ? fmtIDR(customValue) : '';
 
+    var payable = payableTotal();
+
+    // Tolak ukur tombol radio: nominal yang DI BAWAH total pembayaran tidak bisa
+    // dipilih. Total Rp45.000 → Rp50.000 & Rp100.000 bisa dipilih, Rp10.000 &
+    // Rp20.000 tidak (lihat eligibleKeys di bawah).
+    var presetDefs = [
+      { key: '10k', value: 10000, label: 'Rp10.000' },
+      { key: '20k', value: 20000, label: 'Rp20.000' },
+      { key: '50k', value: 50000, label: 'Rp50.000' },
+      { key: '100k', value: 100000, label: 'Rp100.000' }
+    ];
+
+    var presetCards = '';
+    var eligibleKeys = [];
+    presetDefs.forEach(function (p) {
+      var eligible = p.value >= payable;
+      if (eligible) eligibleKeys.push(p.key);
+      presetCards +=
+        '    <div class="x-tender-preset-card' + (selectedType === p.key ? ' is-selected' : '') + (eligible ? '' : ' is-disabled') + '" id="x-preset-' + p.key + '"' +
+        (eligible ? '' : ' aria-disabled="true" style="opacity:.45;cursor:not-allowed;"') + '>' +
+        '      <span class="x-tender-preset-val">' + p.label + '</span>' +
+        '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
+        '    </div>';
+    });
+
+    // A selection that the customer cannot actually use is never kept open.
+    if (eligibleKeys.indexOf(selectedType) === -1) {
+      selectedType = eligibleKeys.length ? eligibleKeys[0] : 'custom';
+    }
+
     var sheetHtml =
       '<div class="x-tender-sheet">' +
       '  <div class="x-tender-header">' +
@@ -2937,22 +2978,7 @@
       '    <p class="x-tender-subtitle">Driver akan menyiapkan uang kembalian.</p>' +
       '  </div>' +
       '  <div class="x-tender-presets">' +
-      '    <div class="x-tender-preset-card' + (selectedType === '10k' ? ' is-selected' : '') + '" id="x-preset-10k">' +
-      '      <span class="x-tender-preset-val">Rp10.000</span>' +
-      '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
-      '    </div>' +
-      '    <div class="x-tender-preset-card' + (selectedType === '20k' ? ' is-selected' : '') + '" id="x-preset-20k">' +
-      '      <span class="x-tender-preset-val">Rp20.000</span>' +
-      '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
-      '    </div>' +
-      '    <div class="x-tender-preset-card' + (selectedType === '50k' ? ' is-selected' : '') + '" id="x-preset-50k">' +
-      '      <span class="x-tender-preset-val">Rp50.000</span>' +
-      '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
-      '    </div>' +
-      '    <div class="x-tender-preset-card' + (selectedType === '100k' ? ' is-selected' : '') + '" id="x-preset-100k">' +
-      '      <span class="x-tender-preset-val">Rp100.000</span>' +
-      '      <div class="x-tender-radio"><div class="x-tender-radio-inner"></div></div>' +
-      '    </div>' +
+      presetCards +
       '  </div>' +
       '  <div class="x-tender-custom-card' + (selectedType === 'custom' ? ' is-selected' : '') + '" id="x-tender-custom-box">' +
       '    <div class="x-tender-custom-header" id="x-tender-custom-toggle">' +
@@ -2970,62 +2996,42 @@
     var sh = makeOverlay(sheetHtml);
     var overlay = sh.overlay;
 
-    var elPreset10k = overlay.querySelector('#x-preset-10k');
-    var elPreset20k = overlay.querySelector('#x-preset-20k');
-    var elPreset50k = overlay.querySelector('#x-preset-50k');
-    var elPreset100k = overlay.querySelector('#x-preset-100k');
+    var elPresets = {};
+    presetDefs.forEach(function (p) {
+      var el = overlay.querySelector('#x-preset-' + p.key);
+      if (!el) return;
+      elPresets[p.key] = el;
+      if (p.value < payable) return; // below the bill — not selectable
+      el.onclick = function () {
+        selectedType = p.key;
+        updateUi();
+      };
+    });
     var elCustomBox = overlay.querySelector('#x-tender-custom-box');
     var elCustomToggle = overlay.querySelector('#x-tender-custom-toggle');
     var elCustomInput = overlay.querySelector('#x-tender-custom-input');
     var elBtnConfirm = overlay.querySelector('#x-btn-confirm-tender');
 
     function updateUi() {
-      if (elPreset10k) elPreset10k.classList.toggle('is-selected', selectedType === '10k');
-      if (elPreset20k) elPreset20k.classList.toggle('is-selected', selectedType === '20k');
-      if (elPreset50k) elPreset50k.classList.toggle('is-selected', selectedType === '50k');
-      if (elPreset100k) elPreset100k.classList.toggle('is-selected', selectedType === '100k');
+      presetDefs.forEach(function (p) {
+        var el = elPresets[p.key];
+        if (el) el.classList.toggle('is-selected', selectedType === p.key);
+      });
       if (elCustomBox) elCustomBox.classList.toggle('is-selected', selectedType === 'custom');
 
       var isValid = false;
-      if (selectedType === '10k' || selectedType === '20k' || selectedType === '50k' || selectedType === '100k') {
+      if (eligibleKeys.indexOf(selectedType) !== -1) {
         isValid = true;
       } else if (selectedType === 'custom') {
+        // Uang yang diberikan juga tidak boleh di bawah total pembayaran.
         var num = parseInt(customValue, 10);
-        if (!isNaN(num) && num > 0) {
+        if (!isNaN(num) && num >= payable) {
           isValid = true;
         }
       }
       if (elBtnConfirm) {
         elBtnConfirm.disabled = !isValid;
       }
-    }
-
-    if (elPreset10k) {
-      elPreset10k.onclick = function () {
-        selectedType = '10k';
-        updateUi();
-      };
-    }
-
-    if (elPreset20k) {
-      elPreset20k.onclick = function () {
-        selectedType = '20k';
-        updateUi();
-      };
-    }
-
-    if (elPreset50k) {
-      elPreset50k.onclick = function () {
-        selectedType = '50k';
-        updateUi();
-      };
-    }
-
-    if (elPreset100k) {
-      elPreset100k.onclick = function () {
-        selectedType = '100k';
-        updateUi();
-      };
     }
 
     function selectCustom() {
@@ -3123,22 +3129,19 @@
     if (elBtnConfirm) {
       elBtnConfirm.onclick = function () {
         var tendered = null;
-        if (selectedType === '10k') {
-          tendered = 10000;
-        } else if (selectedType === '20k') {
-          tendered = 20000;
-        } else if (selectedType === '50k') {
-          tendered = 50000;
-        } else if (selectedType === '100k') {
-          tendered = 100000;
-        } else if (selectedType === 'custom') {
+        if (selectedType === 'custom') {
           var num = parseInt(customValue, 10);
           if (!isNaN(num) && num > 0) {
             tendered = num;
           }
+        } else {
+          presetDefs.forEach(function (p) {
+            if (p.key === selectedType) tendered = p.value;
+          });
         }
 
-        if (tendered === null) return;
+        // Never send an amount below the bill, whatever the sheet looked like.
+        if (tendered === null || tendered < payable) return;
 
         state.paymentMethod = 'cash';
         state.cashTendered = tendered;

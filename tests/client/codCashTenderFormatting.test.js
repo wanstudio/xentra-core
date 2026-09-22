@@ -142,3 +142,34 @@ test('T6: Caret calculation maintains smooth position when formatting alters len
 
   assert.strictEqual(targetCursor, 6, 'Caret must stay at the end of formatted string');
 });
+
+test('T7: preset radios are limited by the amount due (total pembayaran)', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // The threshold must be the real total, not a hardcoded minimum.
+  assert.ok(code.includes('function payableTotal()'), 'checkout.js must expose the amount actually due');
+  assert.ok(code.includes('var payable = payableTotal();'), 'the sheet must read that amount');
+
+  // Eligibility: only presets that cover the total stay pickable.
+  // Total Rp45.000 -> Rp50.000 & Rp100.000 pickable, Rp10.000 & Rp20.000 not.
+  assert.ok(code.includes('var eligible = p.value >= payable;'), 'a preset is pickable only when it covers the total');
+  assert.ok(code.includes('if (eligible) eligibleKeys.push(p.key);'), 'eligible presets must be tracked');
+
+  // Ineligible presets are marked and never bound to a click handler.
+  assert.ok(code.includes('aria-disabled="true"'), 'ineligible presets must be marked disabled');
+  assert.ok(code.includes('if (p.value < payable) return; // below the bill — not selectable'),
+    'ineligible presets must not receive a click handler');
+
+  // A selection the customer cannot use is never left open.
+  assert.ok(code.includes('if (eligibleKeys.indexOf(selectedType) === -1)'), 'an unusable selection must be dropped');
+  assert.ok(code.includes("selectedType = eligibleKeys.length ? eligibleKeys[0] : 'custom';"),
+    'must fall back to the cheapest covering preset, or Custom when none covers');
+
+  // Custom input and the confirm button follow the same floor.
+  assert.ok(code.includes('if (!isNaN(num) && num >= payable)'), 'custom amount below the bill must not validate');
+  assert.ok(code.includes('if (tendered === null || tendered < payable) return;'),
+    'confirm must refuse an amount below the bill');
+
+  // The old hardcoded bindings must be gone.
+  assert.ok(!code.includes('elPreset10k'), 'hardcoded preset bindings must be removed');
+});
