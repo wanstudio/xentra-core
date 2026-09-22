@@ -327,6 +327,12 @@ test('T12: scanning a table QR lands the customer on that table', () => {
   // Not signed in yet: keep the token, do not crash, do not lose the scan.
   assert.ok(code.includes('state.pendingJoinToken = qrToken;'),
     'a scan before sign-in must be remembered');
+  // ...dan BENAR-BENAR dipakai lagi setelah masuk, bukan cuma disimpan.
+  assert.ok(code.includes('function resumePendingTableClaim()'),
+    'token yang disimpan harus ada yang menyalakannya kembali');
+  assert.ok(/resumePendingTableClaim\(\);\s*\n\s*if \(typeof _authOnSuccess === 'function'\)/.test(code),
+    'klaim ulang harus jalan SEBELUM callback sukses-login aslinya');
+  assert.ok(code.includes('state.pendingJoinToken = null;'), 'jangan diklaim dua kali');
   assert.ok(code.includes('}).catch(function () {\n      return null;'), 'a failed claim must degrade quietly');
 
   // A revoked QR (the token is rotated when a session closes) must not fail silently.

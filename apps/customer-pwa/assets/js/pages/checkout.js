@@ -552,6 +552,14 @@
     return null;
   }
 
+  // Dipanggil setelah tamu berhasil masuk: klaim meja yang discan sebelumnya.
+  function resumePendingTableClaim() {
+    if (!state.pendingJoinToken) return;
+    var token = state.pendingJoinToken;
+    state.pendingJoinToken = null;
+    claimTableFromQr(token);
+  }
+
   function claimTableFromQr(qrToken) {
     if (!qrToken || !API) return Promise.resolve(null);
 
@@ -2560,6 +2568,16 @@
   var _authSheetDelegate = null;
 
   function openCustomerAuthSheet(onSuccess) {
+    // Tamu yang scan meja SEBELUM masuk: endpoint klaim butuh sesi, jadi mejanya
+    // baru bisa diklaim setelah login. Semua jalur sukses-login lewat callback
+    // yang sama, jadi dibungkus di sini sekali — dan dijalankan SEBELUM callback
+    // aslinya, supaya mejanya sudah terpasang saat pesanan dikirim. Tanpa ini,
+    // hasil scan tamu hilang begitu ia login.
+    var _authOnSuccess = onSuccess;
+    onSuccess = function () {
+      resumePendingTableClaim();
+      if (typeof _authOnSuccess === 'function') return _authOnSuccess.apply(null, arguments);
+    };
     // If a test override is installed, call it instead of the real sheet.
     if (typeof _authSheetDelegate === 'function') {
       _authSheetDelegate(onSuccess);
