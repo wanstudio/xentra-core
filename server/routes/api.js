@@ -1183,6 +1183,118 @@ router.patch('/customer/profile/phone', requireCustomerAuth(), (req, res) => {
 });
 
 // 5.3 Addresses (Protected by Customer Session - Brand scoped data)
+// ── Customer: bill meja yang masih terbuka (dine-in) ────────────────────────
+// Satu meja = satu bill (dining_sessions). Ini pintu untuk KONSUMEN:
+//   - GET  /customer/dining-session         → bill miliknya sendiri
+//   - POST /customer/dining-session/claim   → bill terbuka di meja dari QR (ganti HP)
+// Tanpa ini, konsumen yang me-refresh halaman kehilangan jejak billnya.
+// Pencocokan bill milik sendiri memakai kontrak yang sama dengan endpoint
+// customer lain: kesamaan persis pada req.customer.phone (tidak ada normalisasi
+// karangan sendiri, supaya bill orang lain tidak mungkin ikut terbaca).
+function buildOpenBill(sessionId, brandId) {
+  const session = db.prepare(`
+    SELECT ds.id, ds.opened_at, ds.customer_name
+    FROM dining_sessions ds
+    JOIN branches b ON b.id = ds.branch_id
+    WHERE ds.id = ? AND ds.status = 'active' AND b.brand_id = ?
+  `).get(sessionId, brandId);
+  if (!session) return null;
+
+  const tables = db.prepare(`
+    SELECT t.id, t.table_number, t.label
+    FROM dining_session_tables dst
+    JOIN branch_tables t ON t.id = dst.table_id
+    WHERE dst.session_id = ?
+    ORDER BY t.table_number
+  `).all(session.id);
+
+  const orders = db.prepare(`
+    SELECT id, order_number, order_type, status, payment_status, grand_total, created_at
+    FROM orders
+    WHERE dining_session_id = ?
+    ORDER BY created_at
+  `).all(session.id);
+
+  let totalBill = 0;
+  let outstanding = 0;
+  const billOrders = orders.map((o) => {
+    const amount = Number(o.grand_total) || 0;
+    const isSettled = o.payment_status === 'settlement' || o.payment_status === 'paid';
+    const isCancelled = o.status === 'cancelled';
+    if (!isCancelled) {
+      totalBill += amount;
+      if (!isSettled) outstanding += amount;
+    }
+    return {
+      id: o.id,
+      order_number: o.order_number,
+      order_type: o.order_type,
+      status: o.status,
+      payment_status: o.payment_status,
+      grand_total: amount,
+      is_settled: isSettled,
+      created_at: o.created_at
+    };
+  });
+
+  return {
+    session_id: session.id,
+    opened_at: session.opened_at,
+    customer_name: session.customer_name,
+    tables: tables.map((t) => ({ id: t.id, table_number: t.table_number, label: t.label })),
+    orders: billOrders,
+    total_bill: totalBill,
+    outstanding_total: outstanding
+  };
+}
+
+router.get('/customer/dining-session', requireCustomerAuth(), (req, res) => {
+  try {
+    const customerPhone = req.customer.phone;
+    if (!customerPhone) return res.json({ success: true, session: null });
+
+    const row = db.prepare(`
+      SELECT ds.id
+      FROM dining_sessions ds
+      JOIN branches b ON b.id = ds.branch_id
+      WHERE ds.status = 'active' AND b.brand_id = ? AND ds.customer_phone = ?
+      ORDER BY ds.opened_at DESC
+      LIMIT 1
+    `).get(req.brand_id, customerPhone);
+
+    return res.json({ success: true, session: row ? buildOpenBill(row.id, req.brand_id) : null });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/customer/dining-session/claim', requireCustomerAuth(), (req, res) => {
+  try {
+    const { qr_token } = req.body || {};
+    if (!qr_token) {
+      return res.status(400).json({ success: false, error: 'qr_token wajib diisi.' });
+    }
+
+    const { DiningTableService } = require('../../domains/pos');
+    const table = DiningTableService.resolveFromQr(qr_token);
+    if (!table) {
+      return res.status(404).json({ success: false, error: 'QR Meja tidak valid atau telah dicabut.' });
+    }
+
+    const tableId = table.id || table.table_id;
+    const state = db.prepare('SELECT current_session_id FROM branch_table_states WHERE table_id = ?').get(tableId);
+    const sessionId = state && state.current_session_id;
+    if (!sessionId) return res.json({ success: true, session: null });
+
+    const bill = buildOpenBill(sessionId, req.brand_id);
+    if (!bill) return res.status(404).json({ success: false, error: 'BILL_TIDAK_DITEMUKAN' });
+
+    return res.json({ success: true, session: bill, via: 'qr', table_id: tableId });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/addresses', requireCustomerAuth(), (req, res) => {
   try {
     const customerPhone = req.customer.phone;
