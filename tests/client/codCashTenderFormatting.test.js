@@ -355,13 +355,21 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
   assert.ok(/x-btn-scan-table-qr"[\s\S]{0,700}<svg/.test(code), 'tombol harus pakai ikon scan');
   assert.ok(!code.includes('>Scan QR di Meja</button>'), 'label tombol harus ringkas: cukup "Scan QR"');
 
-  // Warna disamakan dengan kartu meja (putih + garis abu terang) supaya serasi.
-  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,400}background:#ffffff/.test(code),
-    'tombol harus sewarna kartu meja');
-  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,400}border:1.5px solid #e5e7eb/.test(code),
-    'garis tombol harus sama dengan kartu meja');
+  // Tombol scan: hitam, tulisan & ikon putih (warna app: #111111).
+  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,400}background:#111111/.test(code),
+    'tombol scan harus hitam');
+  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,400}color:#ffffff/.test(code),
+    'tulisan tombol scan harus putih');
   assert.ok(!/x-btn-scan-table-qr"[\s\S]{0,400}var\(--x-primary\)/.test(code),
     'tombol scan tidak boleh mengikuti warna brand');
+
+  // Tombol Tutup mengikuti bentuk & warna "Batalkan Pesanan".
+  assert.ok(/x-qr-close"[\s\S]{0,400}border-radius:24px/.test(code),
+    'tombol Tutup harus berbentuk pill seperti Batalkan Pesanan');
+  assert.ok(/x-qr-close"[\s\S]{0,400}background:#fff;color:#6b7280/.test(code),
+    'warna tombol Tutup harus sama dengan Batalkan Pesanan');
+  assert.ok(/x-qr-close"[\s\S]{0,400}height:44px/.test(code), 'tinggi tombol Tutup harus sama');
+  assert.ok(!/x-qr-close" class="x-btn-secondary"/.test(code), 'gaya tombol Tutup lama harus diganti');
 
   // Scanner harus DI ATAS bottom sheet yang sedang terbuka.
   assert.ok(code.includes('z-index:2147483647'), 'scanner harus di atas bottom sheet');

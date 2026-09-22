@@ -492,7 +492,7 @@
       '  <div style="font-size:11.5px;color:#6b7280;margin-bottom:6px;">Tidak bisa scan? Tulis kode yang tertulis di bawah QR meja:</div>' +
       '  <input id="x-qr-manual" type="text" placeholder="contoh: qr_9f2a41c8" style="width:100%;padding:10px 12px;border:1px solid #e5e7eb;border-radius:10px;font-size:13px;font-family:inherit;margin-bottom:10px;">' +
       '  <button type="button" id="x-qr-manual-submit" style="width:100%;border:0;background:var(--x-primary);color:var(--x-primary-text,#111);font-weight:800;font-size:14px;padding:12px;border-radius:999px;cursor:pointer;margin-bottom:8px;font-family:inherit;">Gunakan kode ini</button>' +
-      '  <button type="button" id="x-qr-close" class="x-btn-secondary" style="width:100%;font-size:12px;padding:10px;">Tutup</button>' +
+      '  <button type="button" id="x-qr-close" style="display:block;width:100%;height:44px;font-size:14px;font-weight:700;border:2px solid #e5e7eb;border-radius:24px;cursor:pointer;background:#fff;color:#6b7280;font-family:inherit;">Tutup</button>' +
       '</div>';
     document.body.appendChild(overlay);
 
@@ -2192,7 +2192,7 @@
         '  <div class="x-fulfillment-promo" id="x-dinein-scan-info" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
          '    <span class="x-fulfillment-promo-icon">i</span>' +
          '    <span style="flex:1 1 150px;min-width:0;">Scan QR di mejamu, pesananmu akan kami antarkan segera.</span>' +
-         '    <button type="button" id="x-btn-scan-table-qr" style="display:inline-flex;align-items:center;gap:6px;border-radius:12px;padding:8px 14px;background:#ffffff;color:#374151;border:1.5px solid #e5e7eb;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.10);">' +
+         '    <button type="button" id="x-btn-scan-table-qr" style="display:inline-flex;align-items:center;gap:6px;border-radius:12px;padding:8px 14px;background:#111111;color:#ffffff;border:0;font-size:12px;font-weight:800;font-family:inherit;cursor:pointer;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.10);">' +
          '      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
          '        <path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9"></path>' +
          '        <path d="M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9"></path>' +
