@@ -125,3 +125,114 @@ test('Dine-in: satu meja = satu bill', async (t) => {
     assert.equal(resolved.id || resolved.table_id, TABLE_A, 'the QR must resolve to its own table');
   });
 });
+
+// ── Pintu konsumen: kembali ke bill yang masih terbuka ─────────────────────
+// Fixture mengikuti tests/customerSessionAuth.test.js: requireCustomerAuth()
+// mencari customer di DB, jadi baris `customers` wajib ada sebelum sesinya.
+
+const CUST_ID = 'cst_bill_test';
+const OTHER_CUST_ID = 'cst_bill_other';
+const CUST_PHONE = '08120000009';
+const OTHER_PHONE = '08129999999';
+const RESUME_TABLE = 'tbl_bill_resume';
+const RESUME_QR = 'qr_bill_resume';
+
+let server;
+let baseUrl;
+let CUST_TOKEN;
+let OTHER_TOKEN;
+
+function api(method, path, token, body) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(path, baseUrl);
+    const headers = { Host: 'app.mybangjo.com' };
+    if (token) { headers.Authorization = 'Bearer ' + token; headers['x-customer-token'] = token; }
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    const req = http.request({ method, hostname: url.hostname, port: url.port, path: url.pathname, headers }, (res) => {
+      let data = '';
+      res.on('data', (c) => { data += c; });
+      res.on('end', () => resolve({ status: res.statusCode, body: data ? JSON.parse(data) : null }));
+    });
+    req.on('error', reject);
+    req.end(body !== undefined ? JSON.stringify(body) : undefined);
+  });
+}
+
+test('Konsumen bisa kembali ke bill mejanya yang masih terbuka', async (t) => {
+  t.before(async () => {
+    seedTable(RESUME_TABLE, '903', RESUME_QR);
+    const brand = db.prepare('SELECT organization_id FROM brands WHERE id = ?').get('brand_bangjo');
+    const orgId = brand ? brand.organization_id : null;
+
+    db.prepare('INSERT OR REPLACE INTO customers (id, organization_id, brand_id, phone, display_name, email) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(CUST_ID, orgId, 'brand_bangjo', CUST_PHONE, 'Rina', 'rina.bill@test.local');
+    db.prepare('INSERT OR REPLACE INTO customers (id, organization_id, brand_id, phone, display_name, email) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(OTHER_CUST_ID, orgId, 'brand_bangjo', OTHER_PHONE, 'Budi', 'budi.bill@test.local');
+
+    await new Promise((resolve) => {
+      server = require('../../server/app').listen(0, resolve);
+      baseUrl = 'http://127.0.0.1:' + server.address().port;
+    });
+
+    const Store = global.TokenSessionStore;
+    CUST_TOKEN = Store.createCustomerSession(CUST_PHONE, 'brand_bangjo', 3600, { customerId: CUST_ID, organizationId: orgId }).token;
+    OTHER_TOKEN = Store.createCustomerSession(OTHER_PHONE, 'brand_bangjo', 3600, { customerId: OTHER_CUST_ID, organizationId: orgId }).token;
+  });
+
+  t.after(async () => {
+    if (server) await new Promise((r) => server.close(r));
+    Array.from(new Set(createdSessions)).forEach((sid) => {
+      db.prepare('DELETE FROM dining_session_tables WHERE session_id = ?').run(sid);
+      db.prepare('DELETE FROM dining_sessions WHERE id = ?').run(sid);
+    });
+    db.prepare('DELETE FROM branch_table_states WHERE table_id = ?').run(RESUME_TABLE);
+    db.prepare('DELETE FROM branch_tables WHERE id = ?').run(RESUME_TABLE);
+    db.prepare('DELETE FROM customers WHERE id IN (?, ?)').run(CUST_ID, OTHER_CUST_ID);
+  });
+
+  await t.test('tanpa bill terbuka: session null, bukan error', async () => {
+    const res = await api('GET', '/api/v1/customer/dining-session', CUST_TOKEN);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.equal(res.body.session, null, 'tanpa bill terbuka harus balas null');
+  });
+
+  await t.test('setelah pesan di meja: bill-nya ditemukan kembali', async () => {
+    const bill = DiningTableService.createOrAttachDiningSession({
+      branch_id: BRANCH,
+      table_ids: [RESUME_TABLE],
+      customer_name: 'Rina',
+      customer_phone: CUST_PHONE,
+      guest_count: 2
+    });
+    createdSessions.push(bill.session_id);
+
+    const res = await api('GET', '/api/v1/customer/dining-session', CUST_TOKEN);
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.ok(res.body.session, 'bill terbuka harus ditemukan');
+    assert.equal(res.body.session.session_id, bill.session_id, 'harus bill yang benar');
+    assert.deepEqual(res.body.session.tables.map((x) => x.id), [RESUME_TABLE], 'harus menyertakan mejanya');
+    assert.deepEqual(res.body.session.orders, [], 'bill tanpa order belum punya item');
+    assert.equal(res.body.session.total_bill, 0);
+  });
+
+  await t.test('konsumen lain tidak boleh melihat bill itu', async () => {
+    const mine = await api('GET', '/api/v1/customer/dining-session', CUST_TOKEN);
+    assert.ok(mine.body.session, 'pemilik bill harus tetap menemukannya');
+
+    const other = await api('GET', '/api/v1/customer/dining-session', OTHER_TOKEN);
+    assert.equal(other.body.session, null, 'bill konsumen lain tidak boleh terbaca');
+  });
+
+  await t.test('QR meja menyambungkan kembali ke bill (kasus ganti HP)', async () => {
+    const noToken = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, {});
+    assert.equal(noToken.status, 400, 'tanpa qr_token harus ditolak');
+
+    const bogus = await api('POST', '/api/v1/customer/dining-session/claim', CUST_TOKEN, { qr_token: 'qr_tidak_ada' });
+    assert.equal(bogus.status, 404, 'QR palsu harus ditolak');
+
+    const res = await api('POST', '/api/v1/customer/dining-session/claim', OTHER_TOKEN, { qr_token: RESUME_QR });
+    assert.equal(res.status, 200, JSON.stringify(res.body));
+    assert.ok(res.body.session && res.body.session.session_id, 'QR harus membuka bill meja itu');
+    assert.equal(res.body.table_id, RESUME_TABLE);
+  });
+});
