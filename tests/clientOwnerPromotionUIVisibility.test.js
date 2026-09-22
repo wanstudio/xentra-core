@@ -8,6 +8,8 @@ const { JSDOM } = require('jsdom');
 
 const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
+const MERCHANT_APP_HTML_PATH = path.join(__dirname, '../apps/merchant-app/index.html');
+const MERCHANT_APP_JS_PATH = path.join(__dirname, '../apps/merchant-app/assets/js/merchant-app.js');
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/branch-catalog.js');
 
@@ -183,36 +185,52 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
   });
 
   await t.test('2. BM isolation: Owner campaign builder not exposed to Branch Manager & operational promo UI preserved', async () => {
-    const { win } = createDashboardDOM('', 'branch_manager');
-    evalApp(win);
+    // Branch Manager is served by the standalone Merchant App.
+    const bmDom = new JSDOM(fs.readFileSync(MERCHANT_APP_HTML_PATH, 'utf8'), {
+      url: 'https://app.mybangjo.com/merchant-app/',
+      runScripts: 'dangerously'
+    });
+    const win = bmDom.window;
+    createdWins.push(win);
+    win.localStorage.setItem('xentra_merchant_token', 'test-token');
+    win.localStorage.setItem('xentra_merchant_user', JSON.stringify({
+      id: 'bm-1', role: 'branch_manager', branch_id: 'branch_bangjo_barat'
+    }));
+    win.fetch = async () => ({ ok: true, status: 200, json: async () => ({ success: true, data: {} }), text: async () => '{}' });
+
+    win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(MERCHANT_APP_JS_PATH, 'utf8'));
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
-    await new Promise(res => setTimeout(res, 50));
+    await new Promise(res => setTimeout(res, 120));
 
-    // 1. Sidebar is rendered with BM items (no marketing item)
-    const mktNavBtn = win.document.querySelector('.x-nav-item[data-route="marketing"]');
-    assert.strictEqual(mktNavBtn, null, 'BM navigation must not include Marketing route in sidebar');
+    // 1. BM navigation has no Marketing route
+    assert.strictEqual(
+      win.document.querySelector('.x-nav-item[data-route="marketing"]'), null,
+      'BM navigation must not include Marketing route in sidebar'
+    );
 
-    // 2. BM has operational Promo button in sidebar
-    const bmPromoBtn = win.document.querySelector('.x-nav-item[data-route="promo"]');
-    assert.ok(bmPromoBtn, 'BM navigation must include operational Promo button');
+    // 2. BM keeps the operational Promo entry
+    assert.ok(win.document.querySelector('.x-nav-item[data-route="promo"]'), 'BM navigation must include operational Promo');
 
-    // 3. Create promo button is hidden for BM
-    const createBtn = win.document.getElementById('btn-mkt-create-promo');
-    assert.ok(createBtn, 'btn-mkt-create-promo element exists in DOM');
-    assert.strictEqual(createBtn.style.display, 'none', 'btn-mkt-create-promo must be hidden for non-owner');
+    // 3. The Owner campaign builder is not shipped in the Merchant App bundle at all
+    assert.strictEqual(
+      win.document.getElementById('btn-mkt-create-promo'), null,
+      'Owner campaign builder button must not exist in the Merchant App'
+    );
+    assert.strictEqual(
+      win.document.getElementById('modal-mkt-promotion'), null,
+      'Owner promotion modal must not exist in the Merchant App'
+    );
 
-    // 4. BM navigating to marketing route is redirected to promo
+    // 4. Navigating to an unknown (owner) route falls back to the default BM route
     win.navigateTo('marketing');
-    await new Promise(res => setTimeout(res, 50));
-
+    await new Promise(res => setTimeout(res, 60));
     const activeTab = win.document.querySelector('.x-tab-content.active');
     assert.ok(activeTab, 'Active tab must exist');
-    assert.strictEqual(activeTab.id, 'tab-bm-promo', 'BM navigating to marketing must safely redirect to tab-bm-promo');
+    assert.strictEqual(activeTab.id, 'tab-hari-ini', 'Unknown route must fall back to the default Branch Manager route');
 
-    // 5. BM invocation of openCreatePromotionModal() is blocked
-    const modal = win.document.getElementById('modal-mkt-promotion');
-    await win.openCreatePromotionModal();
-    assert.strictEqual(modal.style.display, 'none', 'BM must be blocked from opening creation modal');
+    win.close();
   });
 
   await t.test('3. Direct deep-link routing to #marketing and #marketing/promotions activates workspace', async () => {

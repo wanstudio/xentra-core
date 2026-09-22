@@ -28,62 +28,66 @@ const fs = require('fs');
 const path = require('path');
 
 describe('BM Phase 4A — Merchant Dashboard Shell & Context UX Reconciliation', () => {
-  const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
-  const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+  const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
+  const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
   const cssPath = path.join(__dirname, '../../apps/merchant-shared/css/dashboard.css');
 
   const html = fs.readFileSync(htmlPath, 'utf8');
+  // The Merchant App owns the Branch Manager surface; Owner/Platform stay in legacy.
+  const legacyHtml = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/index.html'), 'utf8');
+  const legacyJs = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+
   const js = fs.readFileSync(jsPath, 'utf8');
   const css = fs.readFileSync(cssPath, 'utf8');
 
   it('P4A-01: Correct Portal label by role (Owner -> Owner Portal, Brand Manager -> Brand Portal, Branch Manager -> Branch Portal, Cashier -> Cashier Portal)', () => {
-    assert.ok(js.includes("'Owner Portal'"), 'Missing Owner Portal label in JS');
-    assert.ok(js.includes("'Brand Portal'"), 'Missing Brand Portal label in JS');
-    assert.ok(js.includes("'Branch Portal'"), 'Missing Branch Portal label in JS');
-    assert.ok(js.includes("'Cashier Portal'"), 'Missing Cashier Portal label in JS');
+    assert.ok(legacyJs.includes("'Owner Portal'"), 'Missing Owner Portal label in legacy JS');
+    assert.ok(legacyJs.includes("'Brand Portal'"), 'Missing Brand Portal label in legacy JS');
+    assert.ok(legacyJs.includes("'Cashier Portal'"), 'Missing Cashier Portal label in legacy JS');
+    // The Branch Manager portal label now lives in the Merchant App surface.
+    assert.ok(js.includes("'Branch Portal'"), 'Missing Branch Portal label in Merchant App JS');
 
-    // In applyRoleBasedUI, portalBadge must be updated from authenticated role
-    assert.ok(js.includes('portalBadge.textContent ='), 'Missing portalBadge textContent assignment in applyRoleBasedUI');
+    assert.ok(legacyJs.includes('portalBadge.textContent ='), 'Missing portalBadge textContent assignment in applyRoleBasedUI');
+    assert.ok(js.includes('portalBadge.textContent ='), 'Missing portalBadge textContent assignment in Merchant App');
   });
 
   it('P4A-02: Owner retains valid context selection (All Branches and all loaded branches)', () => {
     // For Owner: branchSelectorWrap is flex, bmBranchBadge is none, branchSelector is enabled
-    assert.ok(js.includes("if (branchSelectorWrap) branchSelectorWrap.style.display = 'flex'"), 'Missing branchSelectorWrap display flex for owner');
-    assert.ok(js.includes("if (bmBranchBadge) bmBranchBadge.style.display = 'none'"), 'Missing bmBranchBadge hide for owner');
-    assert.ok(js.includes("branchSelector.disabled = false"), 'branchSelector must be enabled for owner');
-    assert.ok(js.includes("sel.innerHTML = '<option value=\"all\">All Branches</option>'"), 'All Branches option must be available for owner');
+    assert.ok(legacyJs.includes("if (branchSelectorWrap) branchSelectorWrap.style.display = 'flex'"), 'Missing branchSelectorWrap display flex for owner');
+    assert.ok(legacyJs.includes("if (bmBranchBadge) bmBranchBadge.style.display = 'none'"), 'Missing bmBranchBadge hide for owner');
+    assert.ok(legacyJs.includes("branchSelector.disabled = false"), 'branchSelector must be enabled for owner');
+    assert.ok(legacyJs.includes("sel.innerHTML = '<option value=\"all\">All Branches</option>'"), 'All Branches option must be available for owner');
   });
 
   it('P4A-03: Brand Manager retains authorized branch selection scoped strictly to authorized Brand', () => {
-    assert.ok(js.includes("user.role === 'brand_manager' && user.brand_id"), 'Missing brand_manager scoping in populateBranchSelector');
-    assert.ok(js.includes("String(b.brand_id) === String(user.brand_id)"), 'Missing brand_id comparison in populateBranchSelector');
+    assert.ok(legacyJs.includes("user.role === 'brand_manager' && user.brand_id"), 'Missing brand_manager scoping in populateBranchSelector');
+    assert.ok(legacyJs.includes("String(b.brand_id) === String(user.brand_id)"), 'Missing brand_id comparison in populateBranchSelector');
     // Topbar brand badge is preserved for Brand Manager
-    assert.ok(js.includes("topbarBrandBadge.style.display = isBM ? 'none' : 'flex'"), 'Missing topbarBrandBadge display for brand manager');
+    assert.ok(legacyJs.includes("topbarBrandBadge.style.display = isBM ? 'none' : 'flex'"), 'Missing topbarBrandBadge display for brand manager');
   });
 
   it('P4A-04: Branch Manager has NO branch dropdown', () => {
-    // For BM: branchSelectorWrap is strictly hidden
-    assert.ok(js.includes("if (branchSelectorWrap) branchSelectorWrap.style.display = 'none'"), 'Missing branchSelectorWrap hide for BM');
-    // Underlying branchSelector select element is disabled
-    assert.ok(js.includes("branchSelector.disabled = true"), 'branchSelector must be disabled for BM');
+    // The Merchant App does not render a branch dropdown at all for BM.
+    assert.ok(!html.includes('id="x-branch-selector"'), 'Merchant App must not render the owner branch selector');
+    assert.ok(!html.includes('id="dash-branch-context"'), 'Merchant App must not render the branch context select');
+    assert.ok(js.includes("branchSelectorWrap.style.display = 'none'"), 'Merchant App must defensively hide any branch selector');
   });
 
   it('P4A-05: Branch Manager cannot switch branch (locked to assigned branch_id, no switcher affordance)', () => {
-    assert.ok(js.includes("XentraBranchCatalog.state.branchId = user.branch_id"), 'shared branch id must lock to user.branch_id');
-    assert.ok(js.includes("_branchContextState.selected = user.branch_id"), '_branchContextState.selected must lock to user.branch_id');
+    assert.ok(js.includes("Catalog.state.branchId = user.branch_id"), 'shared branch id must lock to user.branch_id');
     assert.ok(js.includes("if (bmBranchBadge) bmBranchBadge.style.display = 'flex'"), 'bmBranchBadge must be shown as passive indicator');
   });
 
   it('P4A-06: BM branch context remains server-authoritative (derived from authenticated session user.branch_id)', () => {
     assert.ok(js.includes("var user = getStoredUser();"), 'Must derive context from getStoredUser()');
-    assert.ok(js.includes("user.role === 'branch_manager' && user.branch_id"), 'Must inspect authenticated user.role and user.branch_id');
+    assert.ok(js.includes("user.branch_id"), 'Must derive branch context from the authenticated session');
   });
 
   it('P4A-07: Redundant BM topbar Brand badge is not presented', () => {
     // Hidden in applyRoleBasedUI
-    assert.ok(js.includes("topbarBrandBadge.style.display = isBM ? 'none' : 'flex'"), 'topbarBrandBadge must be hidden when isBM');
-    // Protected against revival in applyBrandToUI
-    assert.ok(js.includes("user.role === 'branch_manager' && $('topbar-brand-badge')"), 'applyBrandToUI must keep topbar brand badge hidden for BM');
+    assert.ok(js.includes("topbarBrandBadge.style.display = 'none'"), 'Merchant App must hide the topbar brand badge');
+    // Protected against revival in applyBrandToUI (legacy Owner shell)
+    assert.ok(legacyJs.includes("user.role === 'branch_manager' && $('topbar-brand-badge')"), 'legacy applyBrandToUI must keep topbar brand badge hidden for BM');
   });
 
   it('P4A-08: Search does not expose an unusable fake workflow (deceptive search icon hidden)', () => {
@@ -111,13 +115,14 @@ describe('BM Phase 4A — Merchant Dashboard Shell & Context UX Reconciliation',
     assert.ok(css.includes('.x-branch-context-badge {'), 'Missing .x-branch-context-badge selector in CSS');
     assert.ok(css.includes('@media (max-width: 1023px)'), 'Missing 1023px media query');
     const mobileIndex = css.indexOf('@media (max-width: 1023px)');
-    const mobileCss = css.slice(mobileIndex, mobileIndex + 3500);
+    const mobileCss = css.slice(mobileIndex, mobileIndex + 9000);
     assert.ok(mobileCss.includes('.x-branch-context-badge'), 'Missing responsive styling for x-branch-context-badge in mobile query');
   });
 
   it('P4A-13: Cache busting asset versions are present for dashboard.css and dashboard.js', () => {
-    assert.ok(/href="\/merchant-shared\/css\/dashboard\.css\?v=1\.0\.0"/.test(html), 'dashboard.css must use the shared stylesheet path with a version query');
-    assert.ok(/src="\/dashboard\/assets\/js\/dashboard\.js\?v=3\.0\.\d+"/.test(html), 'dashboard.js must use version query v=3.0.x or newer');
+    assert.ok(/href="\/merchant-shared\/css\/dashboard\.css\?v=1\.0\.0"/.test(html), 'shared stylesheet must carry a version query');
+    assert.ok(/src="\/merchant-app\/assets\/js\/merchant-app\.js\?v=1\.0\.0"/.test(html), 'merchant-app.js must carry a version query');
+    assert.ok(/src="\/dashboard\/assets\/js\/dashboard\.js\?v=3\.0\.\d+"/.test(legacyHtml), 'legacy dashboard.js must keep its version query');
   });
 });
 

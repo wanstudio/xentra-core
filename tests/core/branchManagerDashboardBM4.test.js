@@ -262,7 +262,7 @@ describe('BM-4 — Branch Manager Dashboard: Staff, Jam Operasional & Reports', 
   });
 
   it('BM4-10: index.html contains fully rendered UI surfaces for tab-bm-staff, tab-bm-jam-operasional, tab-bm-reports, and online toggle', () => {
-    const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
+    const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
 
     // Tab staff
@@ -285,7 +285,7 @@ describe('BM-4 — Branch Manager Dashboard: Staff, Jam Operasional & Reports', 
   });
 
   it('BM4-11: dashboard.js implements loadBMStaff, toggleBMStaffStatus, resetBMStaffPassword, loadBMJamOperasional, loadBMReports, and toggleBranchOnlineOrders', () => {
-    const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+    const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const js = fs.readFileSync(jsPath, 'utf8');
 
     assert.ok(js.includes('async function loadBMStaff()'), 'Missing loadBMStaff');

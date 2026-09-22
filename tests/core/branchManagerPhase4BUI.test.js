@@ -102,8 +102,8 @@ function request(method, pathName, body = null, headers = {}) {
 }
 
 describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
-  const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
-  const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+  const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
+  const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
   const cssPath = path.join(__dirname, '../../apps/merchant-shared/css/dashboard.css');
 
   const html = fs.readFileSync(htmlPath, 'utf8');

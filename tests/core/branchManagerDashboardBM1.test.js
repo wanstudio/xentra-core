@@ -328,7 +328,7 @@ describe('BM-1 — Branch Manager Dashboard Shell + Access + Hari Ini', () => {
   });
 
   it('BM1-13: index.html contains tab-hari-ini and 8 BM route placeholders', () => {
-    const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
+    const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
 
     assert.ok(html.includes('id="tab-hari-ini"'), 'Missing tab-hari-ini');
@@ -343,7 +343,7 @@ describe('BM-1 — Branch Manager Dashboard Shell + Access + Hari Ini', () => {
   });
 
   it('BM1-14: dashboard.js defines BM_ROUTE_META with all 9 canonical routes and loads Hari Ini', () => {
-    const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+    const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const js = fs.readFileSync(jsPath, 'utf8');
 
     assert.ok(js.includes('var BM_ROUTE_META ='), 'Missing BM_ROUTE_META');
@@ -358,15 +358,17 @@ describe('BM-1 — Branch Manager Dashboard Shell + Access + Hari Ini', () => {
   });
 
   it('BM1-15: Navigation IA & Branch Context element match locked contract for Branch Manager', () => {
-    const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
+    const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
 
-    // Index.html contains branch selector for owner and branch context badge for BM
-    assert.ok(html.includes('id="x-branch-selector"'), 'Missing x-branch-selector for owner');
+    // Branch context badge belongs to the Merchant App; the owner branch selector stays in legacy.
+    const legacyHtml = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/index.html'), 'utf8');
+    assert.ok(legacyHtml.includes('id="x-branch-selector"'), 'Missing x-branch-selector for owner in legacy dashboard');
+    assert.ok(!html.includes('id="x-branch-selector"'), 'Merchant App must not render the owner branch selector');
     assert.ok(html.includes('id="dash-bm-branch-badge"'), 'Missing dash-bm-branch-badge for branch manager');
     assert.ok(html.includes('id="dash-bm-branch-name"'), 'Missing dash-bm-branch-name for branch manager');
 
-    const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+    const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const js = fs.readFileSync(jsPath, 'utf8');
 
     // BM navigation must contain canonical labels: Hari Ini, Operasional (Pesanan, Meja, Menu, Promo, Stok), Tim (Staff), Laporan (Penjualan Hari Ini), Pengaturan (Jam Operasional)

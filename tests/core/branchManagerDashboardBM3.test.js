@@ -557,7 +557,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
   });
 
   it('BM3-19: index.html contains full operational UI for tab-bm-menu, tab-bm-promo, and tab-bm-stok with adjustment modal', () => {
-    const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
+    const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
 
     assert.ok(html.includes('id="tab-bm-menu"'), 'Missing tab-bm-menu');
@@ -575,7 +575,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
   });
 
   it('BM3-20: dashboard.js implements loadBMMenu, toggleBMProductAvailability, loadBMStock, submitBMStockAdjustment, and loadBMPromotions', () => {
-    const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+    const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const js = fs.readFileSync(jsPath, 'utf8');
 
     assert.ok(js.includes('async function loadBMMenu()'), 'Missing loadBMMenu');
@@ -784,7 +784,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
   });
 
   it('BM3-26: index.html contains UI controls for Phase 2 BM Menu workspace', () => {
-    const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
+    const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
 
     assert.ok(html.includes('id="btn-bm-menu-add-catalog"'), 'Missing btn-bm-menu-add-catalog');
@@ -795,7 +795,7 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
   });
 
   it('BM3-27: dashboard.js implements Phase 2 BM Menu functions and modal triggers', () => {
-    const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+    const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const js = fs.readFileSync(jsPath, 'utf8');
 
     assert.ok(js.includes('openBMAddCatalogModal'), 'Missing openBMAddCatalogModal');

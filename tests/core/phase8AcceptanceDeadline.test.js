@@ -209,8 +209,8 @@ describe('Phase 8.1 — Merchant Dashboard Server-Authoritative Acceptance Deadl
     assert.strictEqual(AcceptanceTimeoutService.computeAcceptanceDeadlineAt(null), null);
   });
 
-  it('5. apps/merchant-dashboard/assets/js/dashboard.js contains no local deadline reconstruction', () => {
-    const dashboardJsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+  it('5. apps/merchant-app/assets/js/merchant-app.js contains no local deadline reconstruction', () => {
+    const dashboardJsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const code = fs.readFileSync(dashboardJsPath, 'utf8');
 
     assert.ok(!code.includes('ACCEPTANCE_WINDOW_MS'), 'No ACCEPTANCE_WINDOW_MS constant should exist');

@@ -237,7 +237,7 @@ describe('BM Phase 4 Final — Branch Manager Operational Center (Hari Ini)', ()
   });
 
   it('P4F-10: index.html contains canonical Hari Ini structure and element IDs', () => {
-    const htmlPath = path.join(__dirname, '../../apps/merchant-dashboard/index.html');
+    const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
 
     // Section exists
@@ -266,7 +266,7 @@ describe('BM Phase 4 Final — Branch Manager Operational Center (Hari Ini)', ()
   });
 
   it('P4F-11: dashboard.js implements split status rendering and calm empty states', () => {
-    const jsPath = path.join(__dirname, '../../apps/merchant-dashboard/assets/js/dashboard.js');
+    const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const js = fs.readFileSync(jsPath, 'utf8');
 
     // Split state text
