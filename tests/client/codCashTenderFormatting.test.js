@@ -348,6 +348,14 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
 
   // Gaya bar info yang sudah dipakai untuk ketersediaan promo, dengan ikonnya.
   assert.ok(code.includes('id="x-dinein-scan-info"'), 'bar info dine-in harus ada');
+  // Satu kesatuan: info + tindakan di dalam bar yang sama, bukan dua blok.
+  assert.ok(/x-dinein-scan-info"[\s\S]{0,1400}x-btn-scan-table-qr/.test(code),
+    'tombol scan harus di DALAM bar info');
+  assert.ok(!code.includes('x-dinein-scan-info"></div>'), 'tidak boleh ada bar terpisah tanpa isi');
+  assert.ok(/x-btn-scan-table-qr"[\s\S]{0,700}<svg/.test(code), 'tombol harus pakai ikon scan');
+  assert.ok(/Scan QR<\/button>/.test(code), 'label tombol harus ringkas');
+  assert.ok(!code.includes('class="x-btn-secondary" style="font-size:12px;padding:6px 14px;">Scan QR di Meja'),
+    'gaya tombol lama harus diganti');
   assert.ok(/x-dinein-scan-info"[\s\S]{0,120}x-fulfillment-promo-icon">i</.test(code),
     'ikon information harus dipertahankan');
   assert.ok(code.indexOf('x-dinein-scan-info') < code.indexOf('x-dinein-floor-canvas'),
