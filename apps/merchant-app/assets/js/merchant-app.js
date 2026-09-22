@@ -2003,10 +2003,79 @@
           '<div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">Kapasitas: <strong>' + (t.capacity || 4) + ' Kursi</strong></div>' +
           (t.notes ? ('<div style="font-size:11px; color:#b91c1c; margin-bottom:8px; font-style:italic;">Catatan: ' + esc(t.notes) + '</div>') : '') +
         '</div>' +
-        '<div style="margin-top:12px;">' + actionsHtml + '</div>' +
+        '<div style="margin-top:12px;">' + actionsHtml +
+          '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%; margin-top:8px;" onclick="openBMTableQr(\'' + esc(t.id) + '\', \'' + esc(t.label || ('Meja ' + t.table_number)) + '\')">QR Meja</button>' +
+        '</div>' +
       '</div>';
     }).join('');
   }
+
+  // ── QR meja: lihat, cetak, bagikan ──
+  // QR berisi URL gabung (lihat endpoint /dine-in/tables/:id/qr), jadi kamera
+  // bawaan HP mana pun bisa membukanya tanpa aplikasi kita.
+  async function openBMTableQr(tableId, label) {
+    if (!tableId) return;
+    try {
+      var res = await adminFetch(API_BASE + '/dine-in/tables/' + encodeURIComponent(tableId) + '/qr', {
+        headers: getAuthHeaders()
+      });
+      var data = await res.json();
+      if (!res.ok || !data.success || !data.svg) {
+        var msg = (data && data.error) || 'Gagal memuat QR meja.';
+        if (typeof showToast === 'function') showToast(msg); else console.warn(msg);
+        return;
+      }
+      showBMTableQrOverlay(data);
+    } catch (err) {
+      console.warn('[BM Table QR Error]:', err);
+      if (typeof showToast === 'function') showToast(msg); else console.warn(msg);2
+    }
+  }
+  window.openBMTableQr = openBMTableQr;
+
+  function showBMTableQrOverlay(data) {
+    var previous = document.getElementById('bm-qr-overlay');
+    if (previous) previous.remove();
+
+    var title = (data.table && (data.table.label || data.table.table_number)) || 'Meja';
+    var overlay = document.createElement('div');
+    overlay.id = 'bm-qr-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;z-index:3000;padding:16px;';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:16px;padding:20px;max-width:340px;width:100%;text-align:center;">' +
+        '<h3 style="margin:0 0 4px;font-size:16px;font-weight:800;">QR ' + esc(title) + '</h3>' +
+        '<p style="margin:0 0 12px;font-size:12px;color:#64748b;">Tempel di meja. Konsumen scan pakai kamera HP, langsung masuk ke bill meja ini.</p>' +
+        '<div id="bm-qr-svg" style="display:flex;justify-content:center;margin-bottom:12px;">' + data.svg + '</div>' +
+        '<button type="button" id="bm-qr-print" class="x-btn-secondary" style="width:100%;margin-bottom:8px;">Cetak QR</button>' +
+        '<button type="button" id="bm-qr-share" class="x-btn-secondary" style="width:100%;margin-bottom:8px;">Bagikan link</button>' +
+        '<button type="button" id="bm-qr-close" class="x-btn-secondary" style="width:100%;">Tutup</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('#bm-qr-close').onclick = function () { overlay.remove(); };
+    overlay.onclick = function (e) { if (e.target === overlay) overlay.remove(); };
+    overlay.querySelector('#bm-qr-print').onclick = function () { printBMTableQr(data); };
+    overlay.querySelector('#bm-qr-share').onclick = function () {
+      if (!data.join_url) return;
+      window.open('https://wa.me/?text=' + encodeURIComponent('QR ' + title + ': ' + data.join_url), '_blank');
+    };
+  }
+  window.showBMTableQrOverlay = showBMTableQrOverlay;
+
+  // Cetak lewat jendela sendiri supaya hasilnya bersih: hanya QR + nama meja.
+  // Nanti bisa disambungkan ke printer bluetooth tanpa mengubah endpoint-nya.
+  function printBMTableQr(data) {
+    var title = (data.table && (data.table.label || data.table.table_number)) || 'Meja';
+    var w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>QR ' + esc(title) + '</title>' +
+      '<style>body{font-family:sans-serif;text-align:center;padding:32px;}h1{font-size:20px;margin:0 0 4px;}p{font-size:12px;color:#555;margin:0 0 20px;}svg{width:280px;height:280px;}</style>' +
+      '</head><body><h1>' + esc(title) + '</h1><p>Scan untuk pesan / lihat bill meja ini</p>' + (data.svg || '') + '</body></html>');
+    w.document.close();
+    w.focus();
+    w.print();
+  }
+  window.printBMTableQr = printBMTableQr;
 
   async function toggleBMTableBlocked(tableId, isBlocked) {
     var reason = '';
