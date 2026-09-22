@@ -399,6 +399,7 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
   assert.ok(code.includes("new window.BarcodeDetector({ formats: ['qr_code'] })"), 'decode QR codes');
 
   // Old phones / refused camera: never a dead end.
+  assert.ok(code.includes('Arahkan kamera ke QR yang ada di meja.'), 'panduan scanner harus singkat');
   assert.ok(code.includes('HP ini tidak bisa scan langsung'),
     'unsupported browsers must be told what to do instead');
   assert.ok(code.includes('Kamera tidak bisa dipakai'), 'a refused camera must be handled');
