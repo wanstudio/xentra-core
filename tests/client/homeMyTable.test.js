@@ -36,9 +36,10 @@ test('MYTABLE-01: topbar punya ikon scan dan ikon meja dengan badge', () => {
   assert.ok(/x-btn-my-table"[\s\S]{0,900}<circle cx="12" cy="4\.7"/.test(HTML),
     'ikon harus punya pegangan di atas kubah');
   assert.ok(/x-btn-my-table"[\s\S]{0,900}<rect x="3\.2"/.test(HTML), 'ikon harus punya alas');
-  assert.ok(/x-btn-my-table"[\s\S]{0,900}fill="#111111"/.test(HTML), 'ikon harus hitam dan terisi');
+  assert.ok(/x-btn-my-table"[\s\S]{0,900}fill="#303030"/.test(HTML),
+    'warna harus sama dengan ikon riwayat & profil (#303030)');
   // Ukurannya harus sepadan dengan ikon tetangga: gambar mengisi kotaknya.
-  assert.ok(/x-btn-my-table"[\s\S]{0,300}width="20"/.test(HTML), 'ikon harus cukup besar (20px)');
+  assert.ok(/x-btn-my-table"[\s\S]{0,300}width="18"/.test(HTML), 'ikon harus sepadan (18px)');
   assert.ok(/x-btn-my-table"[\s\S]{0,300}viewBox="3\.2 3\.35 17\.6 12\.95"/.test(HTML),
     'kotak ikon harus dipaskan ke gambarnya, jangan menyisakan ruang kosong');
   assert.ok(!/x-btn-my-table"[\s\S]{0,900}stroke=/.test(HTML), 'ikon tidak boleh bergaya garis lagi');

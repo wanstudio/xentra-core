@@ -21,7 +21,8 @@ test('TOPBAR-01: tombol "Yuk, join!" sudah diganti ikon share', () => {
   assert.ok(!html.includes('Yuk, join!'), 'tombol teks "Yuk, join!" harus hilang');
   assert.ok(html.includes('id="x-btn-join"'), 'id-nya dipertahankan supaya perilakunya tidak berubah');
   assert.ok(/x-btn-join"[\s\S]{0,700}<svg/.test(html), 'harus berupa ikon, bukan teks');
-  assert.ok(/x-btn-join"[\s\S]{0,700}stroke="#111111"/.test(html), 'ikon share harus hitam');
+  assert.ok(/x-btn-join"[\s\S]{0,700}stroke="#303030"/.test(html),
+    'ikon share harus sewarna ikon riwayat & profil (#303030)');
 });
 
 test('TOPBAR-02: bentuknya sama dengan ikon riwayat & profil', () => {
