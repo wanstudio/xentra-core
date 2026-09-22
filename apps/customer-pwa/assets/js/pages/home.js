@@ -2287,7 +2287,8 @@
       var badge = $('x-my-table-badge');
       if (badge) {
         var num = showTable ? (table.number || '') : '';
-        badge.textContent = num;
+        // Angka saja ambigu; tulis apa adanya: "Table 12".
+        badge.textContent = num ? ('Table ' + num) : '';
         // Tanpa nomor, badge tidak boleh tampil sebagai titik merah kosong.
         badge.hidden = !num;
       }

@@ -116,8 +116,8 @@ test('MYTABLE-11: atribut hidden benar-benar menyembunyikan (kalah oleh display:
 
 test('MYTABLE-10: ada halaman pratinjau untuk melihat badge 2-3 angka', () => {
   const pv = read('apps/merchant-shared/prototype/badge-preview.html');
-  assert.ok(pv.includes('>20<'), 'pratinjau harus memperlihatkan badge 2 angka');
-  assert.ok(pv.includes('>100<'), 'dan 3 angka');
+  assert.ok(pv.includes('>Table 12<'), 'pratinjau harus memperlihatkan badge bertuliskan Table 12');
+  assert.ok(pv.includes('>Table 100<'), 'dan angka yang lebih panjang');
   assert.ok(pv.includes('library.svg') && pv.includes('black_flowbite_user-solid.svg'),
     'pratinjau harus memakai ikon asli supaya perbandingan warna & ukuran akurat');
 });
