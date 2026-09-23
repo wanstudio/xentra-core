@@ -2025,7 +2025,8 @@
         '    <div class="x-wheel-col" id="x-res-time-col"></div>' +
         '  </div>' +
         '</div>' +
-        '<div class="x-dinein-guest-row" style="padding:4px 16px 0;">' +
+        '<div class="x-res-card" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:18px 16px;margin-top:12px;">' +
+        '<div class="x-dinein-guest-row" style="background:transparent;border:0;padding:0;margin-bottom:16px;">' +
         '  <span class="x-dinein-guest-label">Jumlah Orang</span>' +
         '  <div class="x-dinein-guest-control">' +
         '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-minus" aria-label="Kurangi orang"><img src="/assets/icons/minus.svg" alt="Kurangi orang" style="width:14px;height:14px"></button>' +
@@ -2033,7 +2034,7 @@
         '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-plus" aria-label="Tambah orang"><img src="/assets/icons/plus.svg" alt="Tambah orang" style="width:14px;height:14px"></button>' +
         '  </div>' +
         '</div>' +
-        '  <div class="x-res-contact" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:18px 16px;margin-top:12px;">' +
+        '  <div class="x-res-contact">' +
          // Centang memakai komponen yang sama dengan "Simpan sebagai favorit"
          // (x-loc-checkbox-label + x-loc-custom-check), hanya tulisannya beda.
          '    <label class="x-loc-checkbox-label" id="x-label-res-use-account" style="margin:0 0 12px;">' +
