@@ -1636,6 +1636,13 @@
 
   // ── 1. Fulfillment Sheet (4 Order Types: Delivery, Pick-up, Dine-in, Reservasi) ──
   function openFulfillmentSheet() {
+    // Bagian reservasi memakai komponen form & centang dari location-picker
+    // (x-loc-*), sedangkan CSS-nya di-lazy-load. Kalau belum dimuat, centangnya
+    // tampil tanpa gaya (kotak besar). Pastikan termuat saat sheet ini dibuka.
+    if (window.Xentra && window.Xentra.ensureLocationPickerCss) {
+      window.Xentra.ensureLocationPickerCss();
+    }
+
     // Determine dynamic branch capability availability
     var curBranch = state.matchedBranch || (availableBranches && availableBranches[0]) || null;
     var isDeliveryAvail = !curBranch || curBranch.is_delivery_active !== 0;

@@ -568,3 +568,11 @@ test('T18: halaman pratinjau reservasi tersedia untuk review desain', () => {
   assert.ok(pv.includes('>Nanti saja</button>') && pv.includes('>Simpan</button>'), 'pasangan Nanti saja + Simpan');
   assert.ok(pv.includes('#b6ff00'), 'warna brand memakai nilai asli, bukan tebakan');
 });
+
+test('T19: CSS komponen x-loc dimuat sebelum bagian reservasi tampil', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+  // Tanpa ini, centang & field dari location-picker tampil tanpa gaya.
+  assert.ok(/openFulfillmentSheet\([^)]*\) \{[\s\S]{0,400}ensureLocationPickerCss/.test(code),
+    'sheet pembelian harus memastikan CSS location-picker termuat');
+  assert.ok(code.includes('window.Xentra.ensureLocationPickerCss'), 'memakai loader CSS yang sudah ada');
+});
