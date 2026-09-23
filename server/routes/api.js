@@ -1343,8 +1343,14 @@ router.post('/customer/dining-session/claim', requireCustomerAuth(), (req, res) 
 // terpanggil karena salah request, dan dibatasi rate supaya tidak jadi alat serangan.
 router.delete('/customer/account', requireCustomerAuth(), (req, res) => {
   try {
-    const { confirm } = req.body || {};
-    if (String(confirm || '').trim().toUpperCase() !== 'HAPUS') {
+    // Konfirmasi dibaca dari QUERY atau header — dan tetap menerima body sebagai
+    // jalan ketiga. Alasannya bukan selera: permintaan DELETE yang membawa body
+    // ditolak lebih dulu oleh rantai middleware (400 tanpa badan), jadi body tidak
+    // bisa diandalkan untuk operasi ini.
+    const confirmToken = (req.query && req.query.confirm)
+      || req.headers['x-confirm-delete']
+      || (req.body && req.body.confirm);
+    if (String(confirmToken || '').trim().toUpperCase() !== 'HAPUS') {
       return res.status(400).json({
         success: false,
         error: 'KONFIRMASI_DIPERLUKAN',
@@ -1364,14 +1370,33 @@ router.delete('/customer/account', requireCustomerAuth(), (req, res) => {
     }
 
     const { CustomerIdentityService } = require('../../core/identity');
+    const deletingCustomer = db.prepare('SELECT phone FROM customers WHERE id = ?').get(customerId) || {};
+    const deletedPhone = deletingCustomer.phone || null;
+
     const result = new CustomerIdentityService().deleteCustomerAccount({ customerId, brandId: req.brand_id });
 
-    // sesi di store ikut dicabut (kalau ada)
+    // Sesi di STORE harus dicabut juga, bukan cuma barisnya di database: validasi
+    // sesi customer membaca store yang ada di memori (lihat getSession di berkas ini),
+    // jadi tanpa ini tamu yang sedang login tetap bisa memakai sesinya sampai
+    // kedaluwarsa. Hapus semua sesi customer milik orang ini — bukan cuma yang
+    // sedang dipakai, supaya keluar dari semua perangkat.
     try {
-      const authHeader = req.headers['authorization'] || '';
-      const raw = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
-      if (raw && TokenSessionStore.destroyCustomerSession) TokenSessionStore.destroyCustomerSession(raw);
-    } catch (_) {}
+      const store = global.TokenSessionStore;
+      if (store && store.sessions && typeof store.sessions.forEach === 'function') {
+        const toRemove = [];
+        store.sessions.forEach(function (sess, token) {
+          if (!sess) return;
+          const isCustomer = (sess.type === 'customer' || sess.role === 'customer');
+          if (!isCustomer) return;
+          const sameId = String(sess.customerId || sess.customer_id || '') === String(customerId);
+          const samePhone = deletedPhone && String(sess.phone || '') === String(deletedPhone);
+          if (sameId || samePhone) toRemove.push(token);
+        });
+        toRemove.forEach(function (t) { try { store.sessions.delete(t); } catch (_) {} });
+      }
+    } catch (err) {
+      console.warn('[Customer Account Delete] Gagal mencabut sesi di store:', err.message);
+    }
 
     return res.json({
       success: true,
