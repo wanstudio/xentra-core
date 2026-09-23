@@ -1,60 +1,75 @@
 <!doctype html>
 <html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pratinjau reservasi & konfirmasi nomor</title></head>
-<body style="margin:0;padding:18px;background:#eef2f6;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+<title>Pratinjau reservasi &amp; konfirmasi nomor</title>
+<!-- CSS asli aplikasi, urutan sama seperti index.html -->
+<link rel="stylesheet" href="/assets/css/tokens.css">
+<link rel="stylesheet" href="/assets/css/layout.css">
+<link rel="stylesheet" href="/assets/css/components.css">
+<link rel="stylesheet" href="/assets/css/home.css">
+<link rel="stylesheet" href="/assets/css/checkout.css">
+<link rel="stylesheet" href="/assets/css/location-picker.css">
+<style>
+  /* Hanya untuk halaman ini: bikin sheet tampil statis (di aplikasi posisinya fixed) */
+  body { background:#eef2f6; margin:0; padding:18px; font-family:var(--x-font, 'Plus Jakarta Sans', system-ui, sans-serif); }
+  .pv-sheet { position:static; max-width:420px; margin:0 auto 22px; }
+  .pv-label { max-width:420px; margin:0 auto 6px; font-size:12px; color:#64748b; }
+</style>
+</head>
+<body>
 
   <h1 style="font-size:16px;margin:0 0 4px;">Pratinjau: reservasi &amp; konfirmasi nomor</h1>
-  <p style="font-size:12px;color:#64748b;margin:0 0 18px;">Hanya untuk melihat desain. Markup &amp; warna disalin dari aplikasi; halaman ini tidak dipakai aplikasi.</p>
+  <p style="font-size:12px;color:#64748b;margin:0 0 18px;">Halaman ini memuat CSS asli aplikasi dan memakai markup yang sama, jadi yang terlihat adalah yang dirender aplikasi.</p>
 
-  <div style="font-size:12px;color:#64748b;margin-bottom:6px;">1. Bagian reservasi (isi bottom sheet)</div>
-  <div style="max-width:420px;background:#fff;border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(15,23,42,.08);margin-bottom:22px;">
+  <div class="pv-label">1. Bagian reservasi (isi bottom sheet)</div>
+  <div class="x-sheet x-alt-sheet pv-sheet">
+    <div class="x-sheet-handle" style="margin-bottom:12px;"></div>
 
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;">
-      <span style="font-size:13.5px;color:#111;font-weight:600;">Jumlah Orang</span>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <button type="button" style="width:30px;height:30px;border-radius:50%;border:1.5px solid #e5e7eb;background:#fff;font-size:16px;line-height:1;cursor:pointer;">&minus;</button>
-        <span style="font-size:15px;font-weight:800;color:#111;">2</span>
-        <button type="button" style="width:30px;height:30px;border-radius:50%;border:1.5px solid #e5e7eb;background:#fff;font-size:16px;line-height:1;cursor:pointer;">+</button>
+    <div class="x-dinein-guest-row" style="padding:4px 16px 0;">
+      <span class="x-dinein-guest-label">Jumlah Orang</span>
+      <div class="x-dinein-guest-control">
+        <button type="button" class="x-dinein-guest-btn" aria-label="Kurangi orang">&minus;</button>
+        <span class="x-dinein-guest-count">2</span>
+        <button type="button" class="x-dinein-guest-btn" aria-label="Tambah orang">+</button>
       </div>
     </div>
 
-    <!-- Centang DI ATAS field: mengisi field di bawahnya -->
-    <label class="x-loc-checkbox-label" id="x-label-res-use-account">
-      <div class="x-loc-custom-check" id="x-box-res-use-account">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 6 4.5 9 10 3"/></svg>
+    <div class="x-res-contact">
+      <label class="x-loc-checkbox-label" id="x-label-res-use-account">
+        <div class="x-loc-custom-check" id="x-box-res-use-account">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 6 4.5 9 10 3"/></svg>
+        </div>
+        <span>Gunakan akun Anda untuk reservasi</span>
+      </label>
+
+      <div class="x-loc-form-group">
+        <div class="x-loc-form-label">Nama Pemesan <span class="wajib">(wajib)</span></div>
+        <input type="text" class="x-loc-form-input" value="Rina" placeholder="">
       </div>
-      <span>Gunakan akun Anda untuk reservasi</span>
-    </label>
-
-    <div class="x-loc-form-group">
-      <div class="x-loc-form-label">Nama Pemesan <span class="wajib">(wajib)</span></div>
-      <input type="text" class="x-loc-form-input" value="Rina">
-    </div>
-    <div class="x-loc-form-group">
-      <div class="x-loc-form-label">Nomor WhatsApp <span class="wajib">(wajib)</span></div>
-      <input type="tel" class="x-loc-form-input" value="08120000009">
-    </div>
-    <div class="x-res-contact-hint">Dipakai resto untuk mengonfirmasi reservasimu.</div>
-
-    <!-- Bar hijau: untuk reservasi isinya janji konfirmasi -->
-    <div style="display:flex;align-items:center;gap:10px;margin-top:14px;padding:10px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;">
-      <span style="display:flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#16a34a;color:#fff;font-size:11px;font-weight:800;font-style:italic;">i</span>
-      <span style="font-size:12px;color:#166534;">Kami akan segera menghubungi Anda untuk konfirmasi</span>
+      <div class="x-loc-form-group">
+        <div class="x-loc-form-label">Nomor WhatsApp <span class="wajib">(wajib)</span></div>
+        <input type="tel" class="x-loc-form-input" value="08120000009" placeholder="">
+      </div>
+      <div class="x-res-contact-hint">Dipakai resto untuk mengonfirmasi reservasimu.</div>
     </div>
 
-    <div style="margin-top:10px;padding:10px 12px;background:#f8fafc;border-radius:12px;display:flex;justify-content:space-between;font-size:12.5px;color:#374151;">
+    <div class="x-fulfillment-selected-summary">
       <span>Rincian reservasi kedatangan</span>
-      <strong style="color:#111;">Besok &bull; 12:00 (2 Orang)</strong>
+      <strong>Besok &bull; 12:00 (2 Orang)</strong>
     </div>
 
-    <div style="display:flex;gap:8px;margin-top:14px;">
-      <button type="button" style="flex:1;height:46px;border-radius:12px;border:0;background:#f1f5f9;color:#64748b;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">Gak jadi</button>
-      <button type="button" style="flex:1;height:46px;border-radius:12px;border:0;background:var(--x-primary,#b6ff00);color:var(--x-primary-text,#111);font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">Reservasi</button>
+    <div class="x-fulfillment-promo">
+      <span class="x-fulfillment-promo-icon">i</span>
+      <span>Kami akan segera menghubungi Anda untuk konfirmasi</span>
+    </div>
+
+    <div class="x-fulfillment-actions">
+      <button type="button" class="x-fulfillment-cancel">Gak jadi</button>
+      <button type="button" class="x-fulfillment-confirm">Reservasi</button>
     </div>
   </div>
 
-  <div style="font-size:12px;color:#64748b;margin-bottom:6px;">2. Konfirmasi nomor akun (muncul kalau akun belum punya nomor)</div>
-  <div style="max-width:420px;background:#fff;border-radius:16px;padding:18px;box-shadow:0 6px 20px rgba(15,23,42,.08);margin-bottom:22px;">
+  <div class="pv-label">2. Konfirmasi nomor akun (muncul kalau akun belum punya nomor)</div>
+  <div class="x-sheet x-alt-sheet pv-sheet" style="padding:18px;">
     <h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:#111;">Apakah nomor ini nomor Anda?</h3>
     <p style="margin:0 0 12px;font-size:12.5px;color:#64748b;">Kami pastikan dulu sebelum menyimpannya ke akun Anda.</p>
     <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;color:#111;padding:12px;border:1px solid #e5e7eb;border-radius:12px;">
@@ -69,8 +84,8 @@
     </div>
   </div>
 
-  <div style="font-size:12px;color:#64748b;margin-bottom:6px;">3. Tombol di notifikasi setelah scan meja — pilih mana (A brand / B hitam)</div>
-  <div style="max-width:420px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(15,23,42,.08);margin-bottom:10px;">
+  <div class="pv-label">3. Tombol di notifikasi setelah scan meja — pilih mana (A brand / B hitam)</div>
+  <div style="max-width:420px;margin:0 auto 10px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:14px;padding:14px;">
     <div style="font-size:12.5px;color:#64748b;margin-bottom:6px;">A. Ikut warna brand</div>
     <div style="font-size:13px;font-weight:800;color:#065f46;">Berhasil, kamu sekarang ada di meja 12</div>
     <div style="font-size:12px;color:#047857;">Pesan makananmu, kami akan antarkan langsung ke mejamu.</div>
@@ -78,7 +93,7 @@
       <button type="button" style="flex:1;height:38px;border-radius:999px;border:0;background:var(--x-primary,#b6ff00);color:var(--x-primary-text,#111);font-size:13px;font-weight:800;cursor:pointer;">Pesan menu</button>
     </div>
   </div>
-  <div style="max-width:420px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(15,23,42,.08);margin-bottom:10px;">
+  <div style="max-width:420px;margin:0 auto 10px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:14px;padding:14px;">
     <div style="font-size:12.5px;color:#64748b;margin-bottom:6px;">B. Hitam (seperti sekarang)</div>
     <div style="font-size:13px;font-weight:800;color:#065f46;">Berhasil, kamu sekarang ada di meja 12</div>
     <div style="font-size:12px;color:#047857;">Pesan makananmu, kami akan antarkan langsung ke mejamu.</div>
@@ -86,16 +101,14 @@
       <button type="button" style="flex:1;height:38px;border-radius:999px;border:0;background:#111111;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">Pesan menu</button>
     </div>
   </div>
-  <p style="font-size:11.5px;color:#94a3b8;max-width:420px;">Warna brand memakai nilai asli dari tokens.css (#b6ff00) supaya perbandingan kontrasnya jujur.</p>
+  <p style="font-size:11.5px;color:#94a3b8;max-width:420px;margin:12px auto 0;">Bagian 2 &amp; 3 memang memakai gaya inline — itu juga yang dipakai aplikasinya, jadi tampilannya sama.</p>
+
 <script>
   (function () {
     var label = document.getElementById('x-label-res-use-account');
     var box = document.getElementById('x-box-res-use-account');
     if (!label || !box) return;
-    label.addEventListener('click', function (e) {
-      e.preventDefault();
-      box.classList.toggle('is-checked');
-    });
+    label.addEventListener('click', function (e) { e.preventDefault(); box.classList.toggle('is-checked'); });
   })();
 </script>
 </body></html>
