@@ -2032,7 +2032,7 @@
         '<div class="x-dinein-guest-row" style="background:transparent;border:0;padding:0;margin-bottom:22px;">' +
         '  <div style="display:flex;flex-direction:column;">' +
         '    <span class="x-dinein-guest-label" style="font-size:13.5px;font-weight:800;color:#111827;">Jumlah Orang</span>' +
-        '    <span style="font-size:11.5px;font-weight:400;color:#9ca3af;margin-top:2px;">(kapasitas maksimal ' + GUEST_MAX + ' orang)</span>' +
+        '    <span style="font-size:11.5px;color:#6b7280;margin-top:2px;">(kapasitas maksimal ' + GUEST_MAX + ' orang)</span>' +
         '  </div>' +
         '  <div class="x-dinein-guest-control">' +
         '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-minus" aria-label="Kurangi orang"><img src="/assets/icons/minus.svg" alt="Kurangi orang" style="width:14px;height:14px"></button>' +
