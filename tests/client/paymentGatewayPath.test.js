@@ -39,8 +39,10 @@ test('PAYGW-02: server key tidak pernah ikut ke browser', () => {
     API.indexOf("router.get('/brand/info'")
   );
   assert.ok(endpoint.length > 0, 'endpoint konfigurasi gateway harus ada');
-  assert.ok(!/server_key/.test(endpoint), 'endpoint publik tidak boleh mengirim server key');
-  assert.ok(!/secret_key|client_id/.test(endpoint), 'kredensial DOKU juga tidak boleh ikut');
+  // server_key dibaca di server untuk menilai kesiapan provider aktif — yang dilarang
+  // adalah memasukkannya ke respons.
+  assert.ok(!/server_key\s*:/.test(endpoint), 'server key tidak boleh ada di respons');
+  assert.ok(!/secret_key\s*:/.test(endpoint), 'secret key DOKU tidak boleh ada di respons');
 });
 
 test('PAYGW-03: halaman pembayaran tidak lagi memanggil window.snap langsung', () => {

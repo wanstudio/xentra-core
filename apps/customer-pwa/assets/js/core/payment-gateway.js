@@ -19,6 +19,11 @@
   var SNAP_ID = 'x-snap-script';
   var DEFAULT_SNAP_URL = 'https://app.sandbox.midtrans.com/snap/snap.js';
 
+  // Hanya provider yang aktif yang dipakai. Provider yang tidak aktif tidak boleh
+  // memblokir yang aktif, dan tidak boleh diminta kredensialnya.
+  var ONLINE_PROVIDERS = ['midtrans', 'doku'];
+  var DEFAULT_PROVIDER = 'midtrans';
+
   var gatewayConfig = null;
   var configPromise = null;
   var snapPromise = null;
@@ -75,6 +80,17 @@
     return snapPromise;
   }
 
+  // Provider yang sedang aktif menurut konfigurasi. Selama konfigurasi belum
+  // termuat, jawabannya 'midtrans' — sama dengan perilaku server untuk config lama.
+  function activeProvider() {
+    var p = gatewayConfig && gatewayConfig.active_provider;
+    return (p && ONLINE_PROVIDERS.indexOf(p) !== -1) ? p : DEFAULT_PROVIDER;
+  }
+
+  function isOnlineMethod(method) {
+    return ONLINE_PROVIDERS.indexOf(String(method || '').toLowerCase()) !== -1;
+  }
+
   /**
    * Bayar pesanan yang sudah punya token/tautan dari server.
    *
@@ -87,37 +103,28 @@
     var redirectUrl = opts.redirectUrl || null;
     var handlers = opts.handlers || {};
 
-    return loadConfig().then(function (cfg) {
-      var provider = (cfg && cfg.active_provider) || 'midtrans';
+    return loadConfig().then(function () {
+      var provider = activeProvider();
 
-      // DOKU: halaman pembayaran milik gateway, tidak ada Snap di sini.
-      if (redirectUrl && provider === 'doku') {
+      // DOKU berdiri sendiri: halaman pembayaran milik gateway. Tidak memuat
+      // Snap.js, tidak menyentuh window.snap, dan tidak meminta kredensial Midtrans.
+      if (provider === 'doku') {
+        if (!redirectUrl) throw new Error('DOKU_REDIRECT_MISSING');
         window.location.href = redirectUrl;
-        return { opened: 'redirect' };
+        return { opened: 'redirect', provider: provider };
       }
 
-      if (snapToken) {
-        return loadSnap().then(function (snap) {
-          snap.pay(snapToken, {
-            onSuccess: handlers.onSuccess,
-            onPending: handlers.onPending,
-            onError: handlers.onError,
-            onClose: handlers.onClose
-          });
-          return { opened: 'snap' };
-        }).catch(function (err) {
-          throw err;
+      // Midtrans memakai Snap. Hanya di jalur ini kredensial Midtrans dibutuhkan.
+      if (!snapToken) throw new Error('NO_PAYMENT_INSTRUCTION');
+      return loadSnap().then(function (snap) {
+        snap.pay(snapToken, {
+          onSuccess: handlers.onSuccess,
+          onPending: handlers.onPending,
+          onError: handlers.onError,
+          onClose: handlers.onClose
         });
-      }
-
-      // Tautan DOKU ada tapi provider aktif bukan DOKU: tetap pakai tautannya,
-      // karena tautan itu memang dibuat oleh gateway yang memproses pesanan ini.
-      if (redirectUrl) {
-        window.location.href = redirectUrl;
-        return { opened: 'redirect' };
-      }
-
-      throw new Error('NO_PAYMENT_INSTRUCTION');
+        return { opened: 'snap', provider: provider };
+      });
     });
   }
 
@@ -129,7 +136,7 @@
     if (code === 'SNAP_LOAD_FAILED' || code === 'SNAP_UNAVAILABLE') {
       return 'Gagal memuat halaman pembayaran. Periksa koneksi lalu coba lagi.';
     }
-    if (code === 'NO_PAYMENT_INSTRUCTION') {
+    if (code === 'NO_PAYMENT_INSTRUCTION' || code === 'DOKU_REDIRECT_MISSING') {
       return 'Tidak ada instruksi pembayaran untuk pesanan ini. Hubungi cabang.';
     }
     return 'Pembayaran tidak dapat dibuka. Silakan coba lagi.';
@@ -140,6 +147,11 @@
     loadConfig: loadConfig,
     ensureSnap: loadSnap,
     pay: pay,
-    messageFor: messageFor
+    messageFor: messageFor,
+    // Dipakai checkout & order-received supaya keduanya tidak menebak sendiri
+    // provider mana yang aktif (dulu keduanya menulis 'midtrans' langsung).
+    activeProvider: activeProvider,
+    isOnlineMethod: isOnlineMethod,
+    onlineMethod: activeProvider
   };
 })();

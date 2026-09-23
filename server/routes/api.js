@@ -141,6 +141,12 @@ router.get('/payment/config', (req, res) => {
       success: true,
       payment_gateway: {
         active_provider: activeProvider,
+        // Kesiapan diukur dari provider yang AKTIF saja. Provider yang tidak aktif
+        // tidak boleh memblokir: DOKU aktif tidak perlu kredensial Midtrans, dan
+        // sebaliknya.
+        active_provider_configured: activeProvider === 'doku'
+          ? Boolean(cfg.client_id && cfg.secret_key)
+          : Boolean(cfg.server_key || process.env.MIDTRANS_SERVER_KEY),
         midtrans_client_key: cfg.client_key || '',
         midtrans_is_production: isProduction,
         snap_script_url: isProduction

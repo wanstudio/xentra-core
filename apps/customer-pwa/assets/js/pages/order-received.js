@@ -133,7 +133,7 @@
     var status = order.status;
     var payMethod = (order.payment_method || payment.payment_method || 'cash').toLowerCase();
     var payStatus = (payment.payment_status || order.payment_status || 'pending').toLowerCase();
-    var isOnline = payMethod === 'midtrans';
+    var isOnline = isOnlineMethod(payMethod);
 
     // P6.5 PAYMENT FAILURE: Online payment cancelled, denied, or expired
     if (isOnline && (payStatus === 'deny' || payStatus === 'cancel' || payStatus === 'expire')) {
@@ -255,6 +255,15 @@
 
     var cancelBtn = document.getElementById('x-btn-cancel-pending');
     if (cancelBtn) cancelBtn.onclick = function () { confirmCancel(order.id); };
+  }
+
+  // Provider online mana pun dihitung "online" — bukan hanya Midtrans. Dulu
+  // perbandingannya mengunci satu nama provider, jadi pesanan DOKU tidak
+  // diperlakukan sebagai pembayaran online.
+  function isOnlineMethod(method) {
+    var G = window.Xentra && window.Xentra.PaymentGateway;
+    if (G && typeof G.isOnlineMethod === 'function') return G.isOnlineMethod(method);
+    return String(method || '').toLowerCase() === 'midtrans';
   }
 
   // ─── P6.5 PAYMENT FAILURE SURFACE ─────────────────────────────────────────
@@ -534,7 +543,7 @@
     var orderNumber = order.order_number || ('XTR-' + order.id);
     var deadlineAt = order.acceptance_deadline_at || null;
     var payMethod = (order.payment_method || payment.payment_method || 'cash').toLowerCase();
-    var isOnline = payMethod === 'midtrans';
+    var isOnline = isOnlineMethod(payMethod);
 
     // P7.3 Derive seconds remaining from server-authoritative deadline
     var secsRemaining = ACCEPTANCE_TIMEOUT_SECONDS;

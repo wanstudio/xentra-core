@@ -1126,10 +1126,23 @@
       : { title: 'Tunai (COD)', sub: 'Bayar ke driver' };
   }
 
+  // Provider online aktif menurut modul payment gateway. Modul itu satu-satunya
+  // yang tahu konfigurasi, jadi checkout tidak menebak sendiri.
+  function onlinePaymentMethod() {
+    var G = window.Xentra && window.Xentra.PaymentGateway;
+    return (G && typeof G.onlineMethod === 'function') ? G.onlineMethod() : 'midtrans';
+  }
+
+  function isOnlinePayment(method) {
+    var G = window.Xentra && window.Xentra.PaymentGateway;
+    if (G && typeof G.isOnlineMethod === 'function') return G.isOnlineMethod(method);
+    return method === 'midtrans';
+  }
+
   function submitCtaLabel(isReservation) {
     if (isReservation) return 'Reservasi';
     if (isPayAtCashier()) return 'Bayar nanti di kasir';
-    if (state.paymentMethod === 'midtrans') return 'Bayar sekarang';
+    if (isOnlinePayment(state.paymentMethod)) return 'Bayar sekarang';
     return 'Pesan sekarang';
   }
 
@@ -1529,7 +1542,10 @@
     var optOn = $('x-opt-online');
     if (optOn) {
       optOn.onclick = function () {
-        state.paymentMethod = 'midtrans';
+        // Provider online yang dipakai adalah provider yang AKTIF, bukan selalu
+        // Midtrans. Dulu nilainya ditulis 'midtrans' langsung, jadi saat DOKU yang
+        // aktif pesanan tetap diminta ke Midtrans.
+        state.paymentMethod = onlinePaymentMethod();
         state.cashTendered = null;
         state.cashTenderedType = null;
         renderLayout();
@@ -1578,7 +1594,7 @@
       c.style.background = isCash ? 'var(--x-primary-bg)' : '#fff';
     }
     if (o) {
-      var isOnline = state.paymentMethod === 'midtrans';
+      var isOnline = isOnlinePayment(state.paymentMethod);
       o.classList.toggle('is-active', isOnline);
       o.style.borderColor = isOnline ? 'var(--x-primary)' : '#e5e7eb';
       o.style.background = isOnline ? 'var(--x-primary-bg)' : '#fff';

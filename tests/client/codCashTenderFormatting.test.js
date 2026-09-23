@@ -229,8 +229,10 @@ test('T9: paying at the counter (dine-in & pickup) changes the label, CTA and te
   // CTA per choice.
   assert.ok(code.includes("if (isPayAtCashier()) return 'Bayar nanti di kasir';"),
     'counter cash defers the payment to the cashier');
-  assert.ok(code.includes("if (state.paymentMethod === 'midtrans') return 'Bayar sekarang';"),
-    'online pays now');
+  // Perilakunya sama (online → bayar sekarang), tetapi pemeriksaannya tidak lagi
+  // mengunci satu nama provider: yang aktif bisa Midtrans atau DOKU.
+  assert.ok(code.includes("if (isOnlinePayment(state.paymentMethod)) return 'Bayar sekarang';"),
+    'online pays now, for whichever gateway is active');
   assert.ok(code.includes('submitCtaLabel(isReservation)'), 'the CTA must use that label');
 
   // Picking cash at the counter must not open the tender sheet.
