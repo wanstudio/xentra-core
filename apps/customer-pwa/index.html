@@ -102,13 +102,13 @@
       #x-splash .bot-float { animation: bot-float 2.6s ease-in-out infinite alternate; }
       #x-splash .bot-shadow { animation: bot-shadow 2.6s ease-in-out infinite alternate; }
       #x-splash .bot-eye { animation: bot-blink 4.2s steps(1, end) infinite; transform-box: fill-box; transform-origin: center; }
-      #x-splash .bot-arm-l { animation: bot-trail-a 2.6s ease-in-out infinite alternate; }
-      #x-splash .bot-arm-r { animation: bot-trail-b 2.6s ease-in-out infinite alternate; }
+      #x-splash .bot-arm-l { animation: bot-flap-l 1.3s ease-in-out infinite alternate; }
+      #x-splash .bot-arm-r { animation: bot-flap-r 1.3s ease-in-out infinite alternate; }
       @keyframes bot-float { from { transform: translateY(0); } to { transform: translateY(-4px); } }
       @keyframes bot-shadow { from { transform: scaleX(1); opacity:.18; } to { transform: scaleX(.78); opacity:.10; } }
       @keyframes bot-blink { 0%, 44%, 48%, 92%, 96%, 100% { transform: scaleY(1); } 46% { transform: scaleY(.12); } 94% { transform: scaleY(.12); } }
-      @keyframes bot-trail-a { from { transform: translateY(0) rotate(-4deg); } to { transform: translateY(-2px) rotate(4deg); } }
-      @keyframes bot-trail-b { from { transform: translateY(-2px) rotate(4deg); } to { transform: translateY(0) rotate(-4deg); } }
+      @keyframes bot-flap-l { from { transform: translateY(0) rotate(-18deg); } to { transform: translateY(-5px) rotate(18deg); } }
+      @keyframes bot-flap-r { from { transform: translateY(-5px) rotate(18deg); } to { transform: translateY(0) rotate(-18deg); } }
       @media (prefers-reduced-motion: reduce) {
         #x-splash .bot-float, #x-splash .bot-shadow, #x-splash .bot-eye,
         #x-splash .bot-arm-l, #x-splash .bot-arm-r { animation: none; }
@@ -128,8 +128,8 @@
 
       <g class="bot bot-float">
         <!-- tangan: elips telur ramping, mengambang terpisah dari badan -->
-        <ellipse class="bot bot-arm-l" cx="15" cy="52" rx="4.4" ry="12.5" fill="#ffffff" stroke="#d1d5db" stroke-width="1.4"></ellipse>
-        <ellipse class="bot bot-arm-r" cx="77" cy="52" rx="4.4" ry="12.5" fill="#ffffff" stroke="#d1d5db" stroke-width="1.4"></ellipse>
+        <ellipse class="bot bot-arm-l" cx="15" cy="52" rx="4.4" ry="16" fill="#ffffff" stroke="#d1d5db" stroke-width="1.4"></ellipse>
+        <ellipse class="bot bot-arm-r" cx="77" cy="52" rx="4.4" ry="16" fill="#ffffff" stroke="#d1d5db" stroke-width="1.4"></ellipse>
 
         <!-- badan: lebar di atas, meruncing ke bawah, ujungnya tetap bulat -->
         <path d="M46 8 C62 8 72 22 72 44 C72 78 54 94 46 94 C38 94 20 78 20 44 C20 22 30 8 46 8 Z"
@@ -143,7 +143,7 @@
         </g>
 
         <!-- pembeda yang saya pegang: aksen brand di dada, bukan warna asing -->
-        <circle cx="46" cy="70" r="3.2" fill="#b6ff00"></circle>
+        <circle cx="46" cy="50" r="3.2" fill="#b6ff00"></circle>
       </g>
     </svg>
 
