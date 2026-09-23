@@ -541,3 +541,12 @@ test('T17: konfirmasi nomor akun sebelum nomor disimpan (nomor orang lain)', () 
     'step ini hanya untuk akun yang belum punya nomor');
   assert.ok(/function accountPhoneDigits\(\)/.test(code), 'nomor akun dibaca di satu tempat');
 });
+
+test('T18: halaman pratinjau reservasi tersedia untuk review desain', () => {
+  const pv = fs.readFileSync(path.resolve(__dirname, '../../apps/merchant-shared/prototype/reservation-preview.html'), 'utf8');
+  assert.ok(pv.includes('Nama Pemesan') && pv.includes('Nomor WhatsApp'), 'field pemesan ikut dipratinjau');
+  assert.ok(pv.includes('Gunakan akun Anda untuk reservasi'), 'centang akun ikut dipratinjau');
+  assert.ok(pv.includes('>Reservasi</button>'), 'tombol Reservasi ikut dipratinjau');
+  assert.ok(pv.includes('>Nanti saja</button>') && pv.includes('>Simpan</button>'), 'pasangan Nanti saja + Simpan');
+  assert.ok(pv.includes('#b6ff00'), 'warna brand memakai nilai asli, bukan tebakan');
+});

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pratinjau reservasi & konfirmasi nomor</title></head>
+<body style="margin:0;padding:18px;background:#eef2f6;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+
+  <h1 style="font-size:16px;margin:0 0 4px;">Pratinjau: reservasi &amp; konfirmasi nomor</h1>
+  <p style="font-size:12px;color:#64748b;margin:0 0 18px;">Hanya untuk melihat desain. Markup &amp; warna disalin dari aplikasi; halaman ini tidak dipakai aplikasi.</p>
+
+  <!-- 1. BAGIAN RESERVASI (isi bottom sheet) -->
+  <div style="font-size:12px;color:#64748b;margin-bottom:6px;">1. Bagian reservasi (isi bottom sheet)</div>
+  <div style="max-width:420px;background:#fff;border-radius:16px;padding:16px;box-shadow:0 6px 20px rgba(15,23,42,.08);margin-bottom:22px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;">
+      <span style="font-size:13.5px;color:#111;font-weight:600;">Jumlah Orang</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button type="button" style="width:30px;height:30px;border-radius:50%;border:1.5px solid #e5e7eb;background:#fff;font-size:16px;line-height:1;cursor:pointer;">&minus;</button>
+        <span style="font-size:15px;font-weight:800;color:#111;">2</span>
+        <button type="button" style="width:30px;height:30px;border-radius:50%;border:1.5px solid #e5e7eb;background:#fff;font-size:16px;line-height:1;cursor:pointer;">+</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;">Nama Pemesan</div>
+      <input type="text" value="Rina" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;font-family:inherit;">
+      <div style="font-size:12px;font-weight:700;color:#374151;margin:10px 0 4px;">Nomor WhatsApp</div>
+      <input type="tel" value="08120000009" style="width:100%;box-sizing:border-box;padding:12px;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;font-family:inherit;">
+      <div style="font-size:11.5px;color:#6b7280;margin-top:6px;">Dipakai resto untuk mengonfirmasi reservasimu.</div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:#374151;">
+        <input type="checkbox" style="width:16px;height:16px;accent-color:#16a34a;">
+        <span>Gunakan akun Anda untuk reservasi</span>
+      </label>
+    </div>
+
+    <div style="margin-top:14px;padding:10px 12px;background:#f8fafc;border-radius:12px;display:flex;justify-content:space-between;font-size:12.5px;color:#374151;">
+      <span>Kami akan menghubungi Anda untuk konfirmasi</span>
+      <strong style="color:#111;">Besok &bull; 12:00 (2 Orang)</strong>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button type="button" style="flex:1;height:46px;border-radius:12px;border:0;background:#f1f5f9;color:#64748b;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">Gak jadi</button>
+      <button type="button" style="flex:1;height:46px;border-radius:12px;border:0;background:var(--x-primary,#b6ff00);color:var(--x-primary-text,#111);font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">Reservasi</button>
+    </div>
+    <div style="font-size:11.5px;color:#94a3b8;margin-top:6px;">Tombol "Reservasi" = tombol Konfirmasi sheet, aktif kalau nama &amp; nomor terisi. Kalau kurang, tombolnya mati dan field yang kurang ada tepat di atasnya.</div>
+  </div>
+
+  <!-- 2. KONFIRMASI NOMOR -->
+  <div style="font-size:12px;color:#64748b;margin-bottom:6px;">2. Konfirmasi nomor akun (muncul kalau akun belum punya nomor)</div>
+  <div style="max-width:420px;background:#fff;border-radius:16px;padding:18px;box-shadow:0 6px 20px rgba(15,23,42,.08);margin-bottom:22px;">
+    <h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:#111;">Apakah nomor ini nomor Anda?</h3>
+    <p style="margin:0 0 12px;font-size:12.5px;color:#64748b;">Kami pastikan dulu sebelum menyimpannya ke akun Anda.</p>
+    <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;color:#111;padding:12px;border:1px solid #e5e7eb;border-radius:12px;">
+      <input type="checkbox" checked style="width:18px;height:18px;accent-color:#16a34a;">
+      <span>Ya, 08120000009 nomor saya</span>
+    </label>
+    <div style="margin-top:12px;font-size:12px;color:#6b7280;">Kalau bukan, masukkan nomor Anda di sini:</div>
+    <input type="tel" placeholder="" style="width:100%;box-sizing:border-box;margin-top:6px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;font-family:inherit;">
+    <div style="display:flex;gap:8px;margin-top:14px;">
+      <button type="button" style="flex:1;height:48px;border-radius:999px;border:2px solid #e5e7eb;background:#fff;color:#6b7280;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">Nanti saja</button>
+      <button type="button" style="flex:1;height:48px;border:0;border-radius:999px;background:var(--x-primary,#b6ff00);color:var(--x-primary-text,#111);font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;">Simpan</button>
+    </div>
+    <div style="font-size:11.5px;color:#94a3b8;margin-top:6px;">Sheet ini tidak bisa ditutup dari latar; "Nanti saja" jalan keluarnya (lanjut tanpa mengubah nomor akun). Simpan aktif kalau dicentang ATAU nomornya diisi.</div>
+  </div>
+
+  <!-- 3. PERBANDINGAN WARNA TOMBOL NOTIFIKASI -->
+  <div style="font-size:12px;color:#64748b;margin-bottom:6px;">3. Tombol di notifikasi setelah scan meja — pilih mana (A brand / B hitam)</div>
+  <div style="max-width:420px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(15,23,42,.08);margin-bottom:10px;">
+    <div style="font-size:12.5px;color:#64748b;margin-bottom:6px;">A. Ikut warna brand</div>
+    <div style="font-size:13px;font-weight:800;color:#065f46;">Berhasil, kamu sekarang ada di meja 12</div>
+    <div style="font-size:12px;color:#047857;">Pesan makananmu, kami akan antarkan langsung ke mejamu.</div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button type="button" style="flex:1;height:38px;border-radius:999px;border:0;background:var(--x-primary,#b6ff00);color:var(--x-primary-text,#111);font-size:13px;font-weight:800;cursor:pointer;">Pesan menu</button>
+    </div>
+  </div>
+  <div style="max-width:420px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:14px;padding:14px;box-shadow:0 6px 20px rgba(15,23,42,.08);margin-bottom:10px;">
+    <div style="font-size:12.5px;color:#64748b;margin-bottom:6px;">B. Hitam (seperti sekarang)</div>
+    <div style="font-size:13px;font-weight:800;color:#065f46;">Berhasil, kamu sekarang ada di meja 12</div>
+    <div style="font-size:12px;color:#047857;">Pesan makananmu, kami akan antarkan langsung ke mejamu.</div>
+    <div style="display:flex;gap:8px;margin-top:10px;">
+      <button type="button" style="flex:1;height:38px;border-radius:999px;border:0;background:#111111;color:#fff;font-size:13px;font-weight:800;cursor:pointer;">Pesan menu</button>
+    </div>
+  </div>
+  <p style="font-size:11.5px;color:#94a3b8;max-width:420px;">Warna brand memakai nilai asli dari tokens.css (#b6ff00) supaya perbandingan kontrasnya jujur.</p>
+</body></html>
