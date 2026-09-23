@@ -121,6 +121,38 @@ function resolveCustomerBannerPayload(req, brandId) {
   });
 }
 
+// Konfigurasi gateway yang boleh diketahui browser. Hanya nilai PUBLISHABLE:
+// client key Midtrans (memang dipakai di sisi browser oleh Snap) dan alamat
+// snap.js-nya. Server key tidak pernah keluar dari server.
+router.get('/payment/config', (req, res) => {
+  try {
+    const brandRow = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
+    let cfg = {};
+    if (brandRow && brandRow.default_payment_config) {
+      try { cfg = JSON.parse(brandRow.default_payment_config) || {}; } catch (_) { cfg = {}; }
+    }
+
+    const activeProvider = Object.prototype.hasOwnProperty.call(cfg, 'provider')
+      ? (cfg.provider || '')
+      : 'midtrans';
+    const isProduction = cfg.is_production === true;
+
+    res.json({
+      success: true,
+      payment_gateway: {
+        active_provider: activeProvider,
+        midtrans_client_key: cfg.client_key || '',
+        midtrans_is_production: isProduction,
+        snap_script_url: isProduction
+          ? 'https://app.midtrans.com/snap/snap.js'
+          : 'https://app.sandbox.midtrans.com/snap/snap.js'
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/brand/info', (req, res) => {
   try {
     const brandId = req.brand_id;

@@ -197,6 +197,8 @@
     var branchName = order.branch_name || 'Cabang';
     var orderNumber = order.order_number || ('XTR-' + order.id);
     var snapToken = payment.snap_token || order.snap_token || null;
+    // DOKU tidak memakai Snap: ia memberi halaman pembayarannya sendiri.
+    var gatewayRedirectUrl = payment.redirect_url || order.redirect_url || null;
     var isRecon = payStatus === 'reconciliation_pending';
 
     var headerTitle = isRecon ? 'Memverifikasi Pembayaran' : 'Menunggu Pembayaran';
@@ -223,24 +225,31 @@
       '    </div>' +
       '  </div>' +
       '  <div style="padding:0 14px;display:flex;flex-direction:column;gap:10px;">' +
-      (snapToken ? '    <button type="button" id="x-btn-resume-pay" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border:none;border-radius:24px;cursor:pointer;background:var(--x-primary);color:var(--x-primary-text);">Bayar Sekarang</button>' : '') +
+      ((snapToken || gatewayRedirectUrl) ? '    <button type="button" id="x-btn-resume-pay" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border:none;border-radius:24px;cursor:pointer;background:var(--x-primary);color:var(--x-primary-text);">Bayar Sekarang</button>' : '') +
       '    <button type="button" id="x-btn-cancel-pending" style="display:block;width:100%;height:44px;font-size:14px;font-weight:700;border:2px solid #e5e7eb;border-radius:24px;cursor:pointer;background:#fff;color:#6b7280;">Batalkan Pesanan</button>' +
       '  </div>' +
       '</div>';
 
     var resumeBtn = document.getElementById('x-btn-resume-pay');
-    if (resumeBtn && snapToken) {
+    if (resumeBtn && (snapToken || gatewayRedirectUrl)) {
       resumeBtn.onclick = function () {
-        if (window.snap && window.snap.pay) {
-          window.snap.pay(snapToken, {
-            onSuccess: function () { loadOrder(order.id); },
-            onPending: function () { loadOrder(order.id); },
-            onError: function () { loadOrder(order.id); },
-            onClose: function () { loadOrder(order.id); }
-          });
-        } else {
-          if (UI && UI.toast) UI.toast('Gateway pembayaran sedang dimuat, silakan coba lagi.');
+        // Jalur ke gateway diurus modul bersama: ia memuat Snap.js dengan client key
+        // yang dikonfigurasi, atau mengarahkan ke halaman DOKU. Dulu halaman ini
+        // memanggil window.snap langsung padahal Snap.js tidak pernah dimuat, jadi
+        // tombolnya selalu gagal dengan pesan "sedang dimuat".
+        var Gateway = window.Xentra && window.Xentra.PaymentGateway;
+        if (!Gateway) {
+          if (UI && UI.toast) UI.toast('Pembayaran tidak dapat dibuka. Silakan coba lagi.');
+          return;
         }
+        var back = function () { loadOrder(order.id); };
+        Gateway.pay({
+          snapToken: snapToken,
+          redirectUrl: gatewayRedirectUrl,
+          handlers: { onSuccess: back, onPending: back, onError: back, onClose: back }
+        }).catch(function (err) {
+          if (UI && UI.toast) UI.toast(Gateway.messageFor(err));
+        });
       };
     }
 

@@ -4206,17 +4206,20 @@
       state.isSubmitting = false;
       if (Store && typeof Store.clearRecipient === 'function') Store.clearRecipient();
       state.recipient = { type: 'self', name: '', phone: '' };
-      if (snapToken && state.paymentMethod === 'midtrans' && window.snap && window.snap.pay) {
-        window.snap.pay(snapToken, {
-          onSuccess: function () { Router.navigate('order-received', { orderId: orderId }); },
-          onPending: function () { Router.navigate('order-received', { orderId: orderId }); },
-          onError: function () { Router.navigate('order-received', { orderId: orderId }); },
-          onClose: function () { Router.navigate('order-received', { orderId: orderId }); }
-        });
-      } else if (state.paymentMethod === 'doku' && redirectUrl) {
-        window.location.href = redirectUrl;
+      // Jalur ke gateway diurus modul bersama: ia memuat Snap.js dengan client key
+      // yang dikonfigurasi (Midtrans), atau mengarahkan ke halaman DOKU. Sebelum ini
+      // halaman memanggil window.snap langsung, padahal Snap.js tidak pernah dimuat
+      // di PWA — jadi pembayaran online tidak pernah benar-benar terbuka.
+      var Gateway = window.Xentra && window.Xentra.PaymentGateway;
+      var backToOrder = function () { Router.navigate('order-received', { orderId: orderId }); };
+      if (Gateway && (snapToken || redirectUrl)) {
+        Gateway.pay({
+          snapToken: snapToken,
+          redirectUrl: redirectUrl,
+          handlers: { onSuccess: backToOrder, onPending: backToOrder, onError: backToOrder, onClose: backToOrder }
+        }).catch(function () { backToOrder(); });
       } else {
-        Router.navigate('order-received', { orderId: orderId });
+        backToOrder();
       }
       // R1 CART/CHECKOUT BOUNDARY — clear only what THIS single-branch checkout
       // consumed: whole cart when the checkout covered it (legacy flow, cart
