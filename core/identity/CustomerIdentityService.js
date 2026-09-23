@@ -329,7 +329,11 @@ class CustomerIdentityService {
       // Nominal, status, dan tanggal tidak disentuh sama sekali.
       let ordersAnonymized = 0;
       if (phone) {
-        const res = this.db.prepare('UPDATE orders SET customer_phone = ? WHERE customer_phone = ?').run(marker, phone);
+        // Nama dan nomor tamu SAMA-SAMA PII, dan keduanya tersimpan di pesanan
+        // (customer_name NOT NULL). Jadi keduanya dilepas; nominal/status/tanggal
+        // tidak disentuh sama sekali.
+        const res = this.db.prepare('UPDATE orders SET customer_phone = ?, customer_name = ? WHERE customer_phone = ?')
+          .run(marker, 'Tamu', phone);
         ordersAnonymized = res.changes || 0;
       }
 
