@@ -516,6 +516,13 @@ test('T17: konfirmasi nomor akun sebelum nomor disimpan (nomor orang lain)', () 
   assert.ok(code.includes('var enabled = ok.checked || typed.length >= 9;'),
     'Simpan aktif kalau dicentang atau nomornya diisi');
   assert.ok(code.includes('save.disabled = !enabled;'), 'kalau tidak, Simpan mati');
+  // Jalan keluar sejajar dengan Simpan: sheet ini tidak bisa ditutup dari latar.
+  assert.ok(code.includes('id="x-acct-phone-later"'), 'harus ada tombol Nanti saja');
+  assert.ok(code.includes('>Nanti saja</button>'), 'labelnya jelas');
+  assert.ok(/x-acct-phone-later"[\s\S]{0,400}x-acct-phone-save/.test(code),
+    'Nanti saja harus sejajar dengan Simpan (satu baris)');
+  assert.ok(/later\.onclick[\s\S]{0,200}sh\.close\(\);[\s\S]{0,40}done\(\);/.test(code),
+    'Nanti saja = lanjut tanpa menyimpan nomor');
 
   // Disimpan ke AKUN lewat jalur yang sama dengan pelengkapan nomor.
   assert.ok(code.includes("API.patch('/customer/profile/phone', { phone: clean })"),

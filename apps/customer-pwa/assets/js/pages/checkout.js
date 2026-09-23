@@ -2717,13 +2717,27 @@
       '  </label>' +
       '  <div style="margin-top:12px;font-size:12px;color:#6b7280;">Kalau bukan, masukkan nomor Anda di sini:</div>' +
       '  <input id="x-acct-phone-input" type="tel" inputmode="numeric" style="width:100%;margin-top:6px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;font-family:inherit;">' +
-      '  <button type="button" id="x-acct-phone-save" style="width:100%;margin-top:14px;height:48px;border:0;border-radius:999px;background:#111111;color:#fff;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;">Simpan</button>' +
+      '  <div style="display:flex;gap:8px;margin-top:14px;">' +
+      '    <button type="button" id="x-acct-phone-later" style="flex:1;height:48px;border-radius:999px;border:2px solid #e5e7eb;background:#fff;color:#6b7280;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">Nanti saja</button>' +
+      '    <button type="button" id="x-acct-phone-save" style="flex:1;height:48px;border:0;border-radius:999px;background:#111111;color:#fff;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;">Simpan</button>' +
+      '  </div>' +
       '</div>'
     );
     var overlay = sh.overlay;
     var ok = overlay.querySelector('#x-acct-phone-ok');
     var input = overlay.querySelector('#x-acct-phone-input');
     var save = overlay.querySelector('#x-acct-phone-save');
+    var later = overlay.querySelector('#x-acct-phone-later');
+
+    // Jalan keluar yang jelas. Sheet ini memang tidak bisa ditutup dari latar
+    // (memang begitu pola sheet di aplikasi ini), jadi tanpa tombol ini tamu
+    // terkunci: akunnya cukup dilewati, reservasinya tetap jalan.
+    if (later) {
+      later.onclick = function () {
+        sh.close();
+        done();
+      };
+    }
 
     // Simpan aktif kalau nomornya ditegaskan (centang) ATAU tamu menulis nomornya.
     function sync() {
