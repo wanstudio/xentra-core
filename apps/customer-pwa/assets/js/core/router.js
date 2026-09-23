@@ -30,6 +30,9 @@
     if (hash.startsWith('#profile') || window.location.pathname.startsWith('/profile')) {
       return 'profile';
     }
+  if (hash.startsWith('#account-settings') || window.location.pathname.startsWith('/pengaturan-akun')) {
+    return 'account-settings';
+  }
     return 'home';
   }
 
@@ -83,6 +86,8 @@
       window.location.hash = '#history';
     } else if (view === 'profile') {
       window.location.hash = '#profile';
+    } else if (view === 'account-settings') {
+      window.location.hash = '#account-settings';
     } else {
       // Navigating to Home
       if (window.location.pathname.startsWith('/checkout') ||

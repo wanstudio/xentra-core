@@ -186,6 +186,67 @@
   // ══════════════════════════════════════════════════════════════
   //  3. PROFILE VIEW (FLOWBITE_USER-SOLID.SVG)
   // ══════════════════════════════════════════════════════════════
+
+  // Alur hapus akun, satu tempat. Dipakai halaman Pengaturan Akun.
+  function bindDeleteAccountFlow(container) {
+
+  var deleteAccBtn = container.querySelector('#x-profile-delete');
+  if (deleteAccBtn) {
+    deleteAccBtn.onclick = function () {
+      // Dua langkah: mengetik, bukan sekadar menekan "Ya" — supaya tidak terhapus
+      // karena salah tekan.
+      var typed = prompt('Menghapus akun tidak bisa dibatalkan. Ketik HAPUS AKUN untuk melanjutkan:');
+      if (typed === null) return;
+      if (String(typed).trim().toUpperCase() !== 'HAPUS AKUN') {
+        if (UI && UI.toast) UI.toast('Penulisan tidak cocok. Akun tidak dihapus.');
+        return;
+      }
+      // Konfirmasi lewat QUERY: permintaan DELETE yang membawa body dijawab 400
+      // kosong oleh rantai middleware, jadi body tidak bisa diandalkan di sini.
+      API.del('/customer/account?confirm=HAPUS').then(function (res) {
+        if (!res || res.success !== true) {
+          if (UI && UI.toast) UI.toast((res && res.error) || 'Gagal menghapus akun.');
+          return;
+        }
+        // Bersihkan data lokal: sesi, keranjang, penerima, dan meja yang dipegang.
+        try {
+          if (Store && typeof Store.clearCustomerSession === 'function') Store.clearCustomerSession();
+          if (Store && typeof Store.clearCart === 'function') Store.clearCart();
+          if (Store && typeof Store.clearRecipient === 'function') Store.clearRecipient();
+          if (Store && typeof Store.clearMyTable === 'function') Store.clearMyTable();
+        } catch (_) {}
+        if (UI && UI.toast) UI.toast('Akun Anda sudah dihapus.');
+        mountProfile(container);
+      }).catch(function (err) {
+        // Sebab sebenarnya harus terlihat. Pesan generik "koneksi bermasalah"
+        // menyembunyikan alasan sesungguhnya (mis. 429 terlalu sering), dan itu
+        // membuat masalah yang bisa dijelaskan jadi tidak bisa didiagnosis.
+        var status = err && err.status ? (' (' + err.status + ')') : '';
+        var reason = (err && err.message) ? err.message : 'Koneksi bermasalah.';
+        if (UI && UI.toast) UI.toast('Akun belum dihapus: ' + reason + status);
+      });
+    };
+  }
+
+
+  }
+
+  function mountAccountSettings(container) {
+    if (!container) return;
+    container.innerHTML =
+      '<div class="x-aux-header">' +
+      '  <button type="button" class="x-aux-back" id="x-acc-back"><img src="/assets/icons/arrowback.svg" alt="Kembali" style="width:18px;"></button>' +
+      '  <h1 class="x-aux-title">Pengaturan Akun</h1>' +
+      '</div>' +
+      '<div class="x-aux-body">' +
+      '  <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 14px;">Menghapus akun berarti Anda keluar dari akun ini, dan alamat serta sesi Anda hilang. Riwayat pesanan tetap tersimpan di resto, tanpa terhubung lagi ke Anda.</p>' +
+      '  <button type="button" id="x-profile-delete" style="width:100%;height:46px;border-radius:12px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;">Hapus Akun</button>' +
+      '</div>';
+    var back = container.querySelector('#x-acc-back');
+    if (back) back.onclick = function () { Router.navigate('profile'); };
+    bindDeleteAccountFlow(container);
+  }
+
   function mountProfile(container) {
     if (!container) return;
     var session = Store ? Store.getState().customerSession : null;
@@ -235,12 +296,7 @@
         '    </button>';
     }
     if (isAuthenticated) {
-      actionHtml = '    <button type="button" class="x-profile-logout-btn" id="x-profile-logout">Keluar dari Akun</button>' +
-        '    <div style="margin-top:18px;padding-top:14px;border-top:1px solid #f1f5f9;">' +
-        '      <div style="font-size:13.5px;font-weight:800;color:#111827;margin-bottom:6px;">Pengaturan Akun</div>' +
-        '      <p style="font-size:11.5px;color:#94a3b8;margin:0 0 10px;">Menghapus akun berarti Anda keluar dari akun ini, dan alamat serta sesi Anda hilang. Riwayat pesanan tetap tersimpan di resto, tanpa terhubung lagi ke Anda.</p>' +
-        '      <button type="button" id="x-profile-delete" style="width:100%;height:44px;border-radius:12px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;text-align:left;padding:0 14px;">Hapus Akun</button>' +
-        '    </div>';
+      actionHtml = '    <button type="button" class="x-profile-logout-btn" id="x-profile-logout">Keluar dari Akun</button>';
     } else {
       actionHtml =
         '    <button type="button" class="x-profile-google-btn" id="x-profile-login">' +
@@ -273,6 +329,10 @@
       '      </button>' +
       '      <button type="button" class="x-profile-menu-item" id="x-profile-btn-affiliate">' +
       '        <div class="left"><span class="icon">🎁</span><span>Program Kemitraan (Yuk, join!)</span></div>' +
+      '        <img src="/assets/icons/arrowback.svg" alt="" style="transform:rotate(180deg);width:14px;opacity:0.4;">' +
+      '      </button>' +
+      '      <button type="button" class="x-profile-menu-item" id="x-profile-btn-account">' +
+      '        <div class="left"><span class="icon">⚙️</span><span>Pengaturan Akun</span></div>' +
       '        <img src="/assets/icons/arrowback.svg" alt="" style="transform:rotate(180deg);width:14px;opacity:0.4;">' +
       '      </button>' +
       '    </div>' +
@@ -372,45 +432,8 @@
             if (UI && UI.toast) UI.toast(msg);
           });
       };
-    }
-
-    var deleteAccBtn = container.querySelector('#x-profile-delete');
-    if (deleteAccBtn) {
-      deleteAccBtn.onclick = function () {
-        // Dua langkah: mengetik, bukan sekadar menekan "Ya" — supaya tidak terhapus
-        // karena salah tekan.
-        var typed = prompt('Menghapus akun tidak bisa dibatalkan. Ketik HAPUS AKUN untuk melanjutkan:');
-        if (typed === null) return;
-        if (String(typed).trim().toUpperCase() !== 'HAPUS AKUN') {
-          if (UI && UI.toast) UI.toast('Penulisan tidak cocok. Akun tidak dihapus.');
-          return;
-        }
-        // Konfirmasi lewat QUERY: permintaan DELETE yang membawa body dijawab 400
-        // kosong oleh rantai middleware, jadi body tidak bisa diandalkan di sini.
-        API.del('/customer/account?confirm=HAPUS').then(function (res) {
-          if (!res || res.success !== true) {
-            if (UI && UI.toast) UI.toast((res && res.error) || 'Gagal menghapus akun.');
-            return;
-          }
-          // Bersihkan data lokal: sesi, keranjang, penerima, dan meja yang dipegang.
-          try {
-            if (Store && typeof Store.clearCustomerSession === 'function') Store.clearCustomerSession();
-            if (Store && typeof Store.clearCart === 'function') Store.clearCart();
-            if (Store && typeof Store.clearRecipient === 'function') Store.clearRecipient();
-            if (Store && typeof Store.clearMyTable === 'function') Store.clearMyTable();
-          } catch (_) {}
-          if (UI && UI.toast) UI.toast('Akun Anda sudah dihapus.');
-          mountProfile(container);
-        }).catch(function (err) {
-          // Sebab sebenarnya harus terlihat. Pesan generik "koneksi bermasalah"
-          // menyembunyikan alasan sesungguhnya (mis. 429 terlalu sering), dan itu
-          // membuat masalah yang bisa dijelaskan jadi tidak bisa didiagnosis.
-          var status = err && err.status ? (' (' + err.status + ')') : '';
-          var reason = (err && err.message) ? err.message : 'Koneksi bermasalah.';
-          if (UI && UI.toast) UI.toast('Akun belum dihapus: ' + reason + status);
-        });
-      };
-    }
+    }    var accBtn = container.querySelector('#x-profile-btn-account');
+    if (accBtn) accBtn.onclick = function () { Router.navigate('account-settings'); };
 
     var logoutBtn = container.querySelector('#x-profile-logout');
     if (logoutBtn) {
@@ -430,6 +453,7 @@
   window.XentraAuxPages = {
     mountAffiliate: mountAffiliate,
     mountHistory: mountHistory,
-    mountProfile: mountProfile
+    mountProfile: mountProfile,
+    mountAccountSettings: mountAccountSettings
   };
 })();

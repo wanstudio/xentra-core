@@ -15,10 +15,17 @@ const path = require('node:path');
 const src = fs.readFileSync(path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/aux-pages.js'), 'utf8');
 
 test('DELUI-01: tombol ada, dengan penjelasan apa yang hilang dan apa yang tersisa', () => {
-  assert.ok(src.includes('id="x-profile-delete"'), 'tombol hapus akun harus ada di profil');
-  assert.ok(src.includes('>Pengaturan Akun<'), 'punya bagiannya sendiri, bukan menumpang di bawah Keluar');
-  assert.ok(src.indexOf('x-profile-logout') < src.indexOf('>Pengaturan Akun<'),
-    'Keluar tetap di atas, Pengaturan Akun terpisah di bawahnya');
+  // Baris menu ada di profil, ikon gear, tepat di bawah Program Kemitraan.
+  assert.ok(src.includes('id="x-profile-btn-account"'), 'baris Pengaturan Akun harus ada');
+  assert.ok(src.includes('>⚙️</span><span>Pengaturan Akun</span>'), 'ikonnya gear');
+  assert.ok(src.indexOf('Program Kemitraan') < src.indexOf('Pengaturan Akun'),
+    'harus di bawah Program Kemitraan');
+  // Tombol hapusnya kini di halamannya sendiri, bukan menumpang di profil.
+  assert.ok(src.includes('function mountAccountSettings(container)'), 'harus jadi halaman sendiri');
+  assert.ok(src.includes('id="x-profile-delete"'), 'tombol hapus akun ada di halaman itu');
+  assert.ok(src.includes('bindDeleteAccountFlow(container);'), 'halaman itu yang memasang alur hapus');
+  assert.ok(src.indexOf('function mountAccountSettings') < src.indexOf('bindDeleteAccountFlow(container);'),
+    'pemanggilannya ada di dalam halaman itu');
   assert.ok(src.includes('>Hapus Akun</button>'), 'labelnya jelas');
   assert.ok(src.includes('Riwayat pesanan tetap tersimpan di resto, tanpa terhubung lagi ke Anda.'),
     'tamu harus diberi tahu bahwa catatan pesanan tetap ada di resto');
@@ -54,4 +61,15 @@ test('DELUI-05: kegagalan menampilkan sebab sebenarnya, bukan pesan generik', ()
     'pesan dari server harus ditampilkan');
   assert.ok(!src.includes("UI.toast('Koneksi bermasalah. Akun belum dihapus.')"),
     'pesan generik lama harus hilang — itu yang menyembunyikan sebabnya');
+});
+
+test('DELUI-06: halaman Pengaturan Akun terdaftar di router dan shell', () => {
+  const router = fs.readFileSync(path.resolve(__dirname, '../../apps/customer-pwa/assets/js/core/router.js'), 'utf8');
+  const shell = fs.readFileSync(path.resolve(__dirname, '../../apps/customer-pwa/index.html'), 'utf8');
+
+  assert.ok(router.includes("return 'account-settings';"), 'view-nya dikenali router');
+  assert.ok(router.includes("window.location.hash = '#account-settings';"), 'bisa dinavigasi');
+  assert.ok(shell.includes("'account-settings': '/assets/js/pages/aux-pages.js'"), 'skrip halamannya dimuat');
+  assert.ok(shell.includes('id="xentra-account-settings-view"'), 'container halamannya ada');
+  assert.ok(shell.includes('window.XentraAuxPages.mountAccountSettings('), 'shell memasang halamannya');
 });

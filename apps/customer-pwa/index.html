@@ -221,6 +221,7 @@
        6. PROFILE VIEW (USER ICON)
        ═══════════════════════════════════════════════════ -->
   <div id="xentra-profile-view" class="x-page" style="display:none;"></div>
+  <div id="xentra-account-settings-view" class="x-page" style="display:none;"></div>
 
   <!-- NOTE SHEET (EXACT XENTRA-MVP PORTAL) -->
   <div id="x-note-overlay" class="x-note-overlay" style="display:none;">
@@ -365,7 +366,8 @@
         'order-received': '/assets/js/pages/order-received.js',
         affiliate: '/assets/js/pages/aux-pages.js',
         history: '/assets/js/pages/aux-pages.js',
-        profile: '/assets/js/pages/aux-pages.js'
+        profile: '/assets/js/pages/aux-pages.js',
+        'account-settings': '/assets/js/pages/aux-pages.js'
       };
 
       function ensureController(view) {
@@ -384,6 +386,7 @@
         var affiliateEl = document.getElementById('xentra-affiliate-view');
         var historyEl = document.getElementById('xentra-history-view');
         var profileEl = document.getElementById('xentra-profile-view');
+        var accountSettingsEl = document.getElementById('xentra-account-settings-view');
 
         // Hide all views first
         if (homeEl) homeEl.style.display = 'none';
@@ -446,6 +449,14 @@
             profileEl.style.display = 'block';
             ensureController('profile').then(function () {
               if (window.XentraAuxPages) window.XentraAuxPages.mountProfile(profileEl);
+            }).catch(function () {});
+            window.scrollTo(0, 0);
+          }
+        } else if (view === 'account-settings') {
+          if (accountSettingsEl) {
+            accountSettingsEl.style.display = 'block';
+            ensureController('account-settings').then(function () {
+              if (window.XentraAuxPages) window.XentraAuxPages.mountAccountSettings(accountSettingsEl);
             }).catch(function () {});
             window.scrollTo(0, 0);
           }
