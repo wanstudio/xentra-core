@@ -83,7 +83,7 @@ test('CPC-06: Submit path gates on phone before creating an order', () => {
   const gateIdx = submitBody.indexOf('if (!hasValidCustomerPhone())');
   assert.ok(gateIdx !== -1, 'submit must gate on hasValidCustomerPhone()');
   const gateBlock = submitBody.substring(gateIdx, gateIdx + 500);
-  assert.ok(gateBlock.includes('openPhoneCompletionSheet'), 'phoneless submit must open Phone Completion');
+  assert.ok(gateBlock.includes('openPhoneStep'), 'phoneless submit must open the phone step (via openPhoneStep)');
   assert.ok(gateBlock.includes('executePrePaymentAndSubmit'), 'submit must retry after phone save');
   // Gate sits before branch resolution — recipient/phone never rematch branch.
   const branchIdx = submitBody.indexOf('var fulBranch = getFulfillmentBranch();', gateIdx);
@@ -92,8 +92,8 @@ test('CPC-06: Submit path gates on phone before creating an order', () => {
 
 test('CPC-07: Google-auth return paths route phoneless customers to Phone Completion', () => {
   const src = checkoutJs();
-  const occurrences = src.split('openPhoneCompletionSheet({ mode:').length - 1;
-  assert.ok(occurrences >= 3, `expected >=3 Phone Completion entry points (mount/submit/subscriber), found ${occurrences}`);
+  const occurrences = src.split('openPhoneStep({ mode:').length - 1;
+  assert.ok(occurrences >= 3, `expected >=3 phone-step entry points (mount/submit/subscriber), found ${occurrences}`);
   // Payment context still persisted across the broker redirect.
   assert.ok(src.includes('xnt_pending_checkout_payment'), 'payment state preservation must remain');
   assert.ok(src.includes('xnt_auth_auto_retry_checkout'), 'auth auto-retry flag must remain');

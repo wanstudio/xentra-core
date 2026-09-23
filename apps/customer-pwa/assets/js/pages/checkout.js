@@ -614,7 +614,7 @@
       if (autoRetry) {
         if (!hasValidCustomerPhone()) {
           setTimeout(function () {
-            openPhoneCompletionSheet({ mode: 'checkout', onSaved: function () {
+            openPhoneStep({ mode: 'checkout', onSaved: function () {
               setTimeout(function () { executePrePaymentAndSubmit(); }, 300);
             } });
           }, 300);
@@ -627,7 +627,7 @@
         // Verified session restored (e.g. profile-first Google signup) without a
         // phone: prompt completion without submitting anything.
         setTimeout(function () {
-          openPhoneCompletionSheet({ mode: 'checkout' });
+          openPhoneStep({ mode: 'checkout' });
         }, 300);
       }
     }
@@ -2916,6 +2916,22 @@
     return Boolean(p && isIndoMobile && p.length >= 9 && p.length <= 15);
   }
 
+  // Titik PENGECUALIAN untuk reservasi. Nomor di field reservasi bisa nomor ORANG
+  // LAIN, jadi sebelum disimpan sebagai nomor AKUN tamu dikonfirmasi dulu ("Apakah
+  // nomor ini nomor Anda?" + centang + kolom cadangan + Nanti saja). Di luar
+  // reservasi perilakunya tetap: di sana tamu mengetik nomornya sendiri. Halaman
+  // profil (dipanggil aux-pages.js) juga memakai versi lama, tidak ikut berubah.
+  // Satu tempat, bukan empat salinan logika.
+  function openPhoneStep(opts) {
+    var o = opts || {};
+    if (state.fulfillment.type === 'reservation') {
+      return openAccountPhoneConfirmSheet(state.fulfillment.reservationPhone, function () {
+        if (typeof o.onSaved === 'function') o.onSaved(state.customer.phone);
+      });
+    }
+    return openPhoneCompletionSheet(o);
+  }
+
   function openPhoneCompletionSheet(opts) {
     opts = opts || {};
     if (_phoneSheetOpen) return;
@@ -3881,12 +3897,6 @@
       // Reservasi: kalau akunnya belum punya nomor, tanyakan dulu — nomor yang
       // diketik untuk orang lain tidak boleh otomatis jadi nomor akun.
       setTimeout(function () {
-        if (state.fulfillment.type === 'reservation' && !accountPhoneDigits()) {
-          openAccountPhoneConfirmSheet(state.fulfillment.reservationPhone, function () {
-            executePrePaymentAndSubmit();
-          });
-          return;
-        }
         executePrePaymentAndSubmit();
       }, 100);
     });
@@ -3907,7 +3917,7 @@
     // first. State (cart/address/branch/recipient/promo/payment) is preserved;
     // the submit retries automatically after the phone is saved.
     if (!hasValidCustomerPhone()) {
-      openPhoneCompletionSheet({ mode: 'checkout', onSaved: function () {
+      openPhoneStep({ mode: 'checkout', onSaved: function () {
         setTimeout(function () {
           executePrePaymentAndSubmit();
         }, 100);
@@ -4255,7 +4265,7 @@
         if (autoRetrySub) {
           if (!hasValidCustomerPhone()) {
             setTimeout(function () {
-              openPhoneCompletionSheet({ mode: 'checkout', onSaved: function () {
+              openPhoneStep({ mode: 'checkout', onSaved: function () {
                 setTimeout(function () { executePrePaymentAndSubmit(); }, 300);
               } });
             }, 300);

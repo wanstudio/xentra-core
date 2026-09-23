@@ -555,8 +555,10 @@ test('T17: konfirmasi nomor akun sebelum nomor disimpan (nomor orang lain)', () 
     'sesi akun ikut diperbarui');
 
   // Hanya kalau akunnya memang belum punya nomor; kalau sudah, langsung lanjut.
-  assert.ok(/state\.fulfillment\.type === 'reservation' && !accountPhoneDigits\(\)/.test(code),
-    'step ini hanya untuk akun yang belum punya nomor');
+  // Langkah nomor untuk reservasi kini lewat satu perantara (lihat T23), bukan hook
+  // terpisah di jalur submit.
+  assert.ok(/if \(state\.fulfillment\.type === 'reservation'\) \{[\s\S]{0,400}openAccountPhoneConfirmSheet\(/.test(code),
+    'reservasi memakai varian konfirmasi nomor');
   assert.ok(/function accountPhoneDigits\(\)/.test(code), 'nomor akun dibaca di satu tempat');
 });
 
@@ -645,4 +647,29 @@ test('T22: tiap tipe pembelian punya lingkungannya sendiri (tidak saling menular
     'bagian reservasi yang memberi label Reservasi');
   assert.ok(code.indexOf('sharedConfirm.textContent') < code.indexOf("sheetConfirm.textContent = 'Reservasi';"),
     'reset harus lebih dulu, penyetelan label reservasi menyusul');
+});
+
+test('T23: langkah nomor berbeda HANYA untuk reservasi (pengecualian, bukan global)', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // Satu titik pengecualian, bukan empat salinan logika.
+  assert.ok(code.includes('function openPhoneStep(opts)'), 'harus ada perantara openPhoneStep');
+  assert.ok((code.match(/openPhoneStep\(\{/g) || []).length === 4,
+    'keempat titik pembukaan sheet nomor memakai perantara itu');
+  assert.ok(!code.includes('openPhoneCompletionSheet({'),
+    'tidak boleh ada pemanggilan langsung yang melewati perantara');
+
+  // Reservasi → varian konfirmasi. Selain reservasi → perilaku lama.
+  assert.ok(/if \(state\.fulfillment\.type === 'reservation'\) \{[\s\S]{0,400}openAccountPhoneConfirmSheet\(/.test(code),
+    'reservasi memakai varian konfirmasi');
+  assert.ok(/return openPhoneCompletionSheet\(o\);/.test(code),
+    'tipe lain tetap memakai sheet nomor yang lama');
+
+  // Alur non-reservasi lain tidak ikut berubah: ekspornya masih ada.
+  assert.ok(code.includes('openPhoneCompletionSheet: openPhoneCompletionSheet'),
+    'ekspor untuk halaman profil tidak boleh hilang');
+
+  // Hook lama di jalur submit sudah tidak ada (dulu bikin sheet muncul dua kali).
+  assert.ok(!code.includes('!accountPhoneDigits()'),
+    'hook lama harus dibuang supaya tidak dobel');
 });
