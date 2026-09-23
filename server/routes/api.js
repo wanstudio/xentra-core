@@ -1364,7 +1364,7 @@ router.delete('/customer/account', requireCustomerAuth(), (req, res) => {
     }
 
     const limiterKey = 'customer-account-delete:' + req.brand_id + ':' + customerId;
-    const rate = RateLimiter.check(limiterKey, 3, 3600);
+    const rate = RateLimiter.check(limiterKey, 6, 3600);
     if (!rate.allowed) {
       return res.status(429).json({ success: false, error: 'TOO_MANY_REQUESTS', message: 'Terlalu sering. Coba lagi nanti.' });
     }

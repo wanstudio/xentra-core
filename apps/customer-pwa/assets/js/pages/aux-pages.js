@@ -236,8 +236,11 @@
     }
     if (isAuthenticated) {
       actionHtml = '    <button type="button" class="x-profile-logout-btn" id="x-profile-logout">Keluar dari Akun</button>' +
-        '    <p class="x-profile-subtitle" style="font-size:11.5px;color:#94a3b8;margin:14px 0 6px;">Menghapus akun berarti Anda keluar dari akun ini, dan alamat serta sesi Anda hilang. Riwayat pesanan tetap tersimpan di resto, tanpa terhubung lagi ke Anda.</p>' +
-        '    <button type="button" id="x-profile-delete" style="width:100%;height:44px;border-radius:999px;border:2px solid #fecaca;background:#fff;color:#dc2626;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;">Hapus Akun</button>';
+        '    <div style="margin-top:18px;padding-top:14px;border-top:1px solid #f1f5f9;">' +
+        '      <div style="font-size:13.5px;font-weight:800;color:#111827;margin-bottom:6px;">Pengaturan Akun</div>' +
+        '      <p style="font-size:11.5px;color:#94a3b8;margin:0 0 10px;">Menghapus akun berarti Anda keluar dari akun ini, dan alamat serta sesi Anda hilang. Riwayat pesanan tetap tersimpan di resto, tanpa terhubung lagi ke Anda.</p>' +
+        '      <button type="button" id="x-profile-delete" style="width:100%;height:44px;border-radius:12px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;text-align:left;padding:0 14px;">Hapus Akun</button>' +
+        '    </div>';
     } else {
       actionHtml =
         '    <button type="button" class="x-profile-google-btn" id="x-profile-login">' +
@@ -398,8 +401,13 @@
           } catch (_) {}
           if (UI && UI.toast) UI.toast('Akun Anda sudah dihapus.');
           mountProfile(container);
-        }).catch(function () {
-          if (UI && UI.toast) UI.toast('Koneksi bermasalah. Akun belum dihapus.');
+        }).catch(function (err) {
+          // Sebab sebenarnya harus terlihat. Pesan generik "koneksi bermasalah"
+          // menyembunyikan alasan sesungguhnya (mis. 429 terlalu sering), dan itu
+          // membuat masalah yang bisa dijelaskan jadi tidak bisa didiagnosis.
+          var status = err && err.status ? (' (' + err.status + ')') : '';
+          var reason = (err && err.message) ? err.message : 'Koneksi bermasalah.';
+          if (UI && UI.toast) UI.toast('Akun belum dihapus: ' + reason + status);
         });
       };
     }

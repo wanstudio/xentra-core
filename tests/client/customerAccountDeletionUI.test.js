@@ -16,6 +16,9 @@ const src = fs.readFileSync(path.resolve(__dirname, '../../apps/customer-pwa/ass
 
 test('DELUI-01: tombol ada, dengan penjelasan apa yang hilang dan apa yang tersisa', () => {
   assert.ok(src.includes('id="x-profile-delete"'), 'tombol hapus akun harus ada di profil');
+  assert.ok(src.includes('>Pengaturan Akun<'), 'punya bagiannya sendiri, bukan menumpang di bawah Keluar');
+  assert.ok(src.indexOf('x-profile-logout') < src.indexOf('>Pengaturan Akun<'),
+    'Keluar tetap di atas, Pengaturan Akun terpisah di bawahnya');
   assert.ok(src.includes('>Hapus Akun</button>'), 'labelnya jelas');
   assert.ok(src.includes('Riwayat pesanan tetap tersimpan di resto, tanpa terhubung lagi ke Anda.'),
     'tamu harus diberi tahu bahwa catatan pesanan tetap ada di resto');
@@ -42,4 +45,13 @@ test('DELUI-04: setelah berhasil, data lokal dibersihkan', () => {
   });
   assert.ok(src.includes('mountProfile(container)'), 'tampilan profil di-render ulang');
   assert.ok(src.includes("UI.toast('Akun Anda sudah dihapus.')"), 'tamu diberi tahu hasilnya');
+});
+
+test('DELUI-05: kegagalan menampilkan sebab sebenarnya, bukan pesan generik', () => {
+  assert.ok(src.includes("var status = err && err.status ? (' (' + err.status + ')') : '';"),
+    'status HTTP harus ikut ditampilkan');
+  assert.ok(src.includes("var reason = (err && err.message) ? err.message : 'Koneksi bermasalah.';"),
+    'pesan dari server harus ditampilkan');
+  assert.ok(!src.includes("UI.toast('Koneksi bermasalah. Akun belum dihapus.')"),
+    'pesan generik lama harus hilang — itu yang menyembunyikan sebabnya');
 });
