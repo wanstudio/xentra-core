@@ -22,6 +22,12 @@ async function tenantResolver(req, res, next) {
       '/auth/broker',
       '/onboarding/check-domain',
       '/api/v1/onboarding/check-domain',
+      '/webhooks/doku',
+      '/api/v1/webhooks/doku',
+      '/api/webhooks/doku',
+      '/webhooks/midtrans',
+      '/api/v1/webhooks/midtrans',
+      '/api/webhooks/midtrans',
       '/onboarding/claim',
       '/api/v1/onboarding/claim'
     ];

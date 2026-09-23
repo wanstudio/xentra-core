@@ -45,17 +45,22 @@ class DokuGateway {
   }
 
   async createTransaction(order, items = [], customer = {}) {
+    if (!this.config.client_id || !this.config.secret_key) {
+      throw new Error('[DokuGateway] Kredensial DOKU belum dikonfigurasi (Client-Id / Secret Key missing).');
+    }
+
     const requestId = this._generateRequestId();
     const timestamp = this._timestamp();
     const target = '/checkout/v1/payment';
+
+    const resolvedCallbackUrl = (this.config.callback_url && String(this.config.callback_url).trim()) ||
+      (order.callback_url && String(order.callback_url).trim()) || '';
 
     const body = {
       order: {
         amount: Math.round(order.grand_total),
         invoice_number: order.id,
         currency: 'IDR',
-        callback_url: this.config.callback_url || '',
-        auto_redirect: true,
         language: 'ID',
         line_items: items.map((i, idx) => ({
           id: String(idx + 1),
@@ -73,6 +78,13 @@ class DokuGateway {
         phone: customer.phone || order.customer_phone || ''
       }
     };
+
+    if (resolvedCallbackUrl) {
+      body.order.callback_url = resolvedCallbackUrl;
+      body.order.auto_redirect = true;
+    } else {
+      body.order.auto_redirect = false;
+    }
 
     if (order.delivery_fee > 0) {
       body.order.line_items.push({
@@ -112,15 +124,40 @@ class DokuGateway {
 
   verifySignature(headers, body, notificationPath) {
     try {
-      const clientId = headers['client-id'];
-      const requestId = headers['request-id'];
-      const timestamp = headers['request-timestamp'];
-      const receivedSig = headers['signature'];
+      const clientId = headers['client-id'] || headers['Client-Id'];
+      const requestId = headers['request-id'] || headers['Request-Id'];
+      const timestamp = headers['request-timestamp'] || headers['Request-Timestamp'];
+      const receivedSig = headers['signature'] || headers['Signature'];
+      const target = headers['request-target'] || headers['Request-Target'] || notificationPath;
+      const receivedDigest = headers['digest'] || headers['Digest'];
 
-      if (!clientId || !requestId || !timestamp || !receivedSig) return false;
+      if (!clientId || !requestId || !timestamp || !receivedSig || !target) return false;
 
-      const expectedSig = this._generateSignature(clientId, requestId, timestamp, notificationPath, body);
-      return receivedSig === expectedSig;
+      // Verify digest if Digest header is provided
+      if (receivedDigest && body) {
+        const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
+        const calculatedDigest = crypto.createHash('sha256').update(bodyStr).digest('base64');
+        const cleanReceivedDigest = String(receivedDigest).replace(/^Digest:\s*/i, '').trim();
+        if (cleanReceivedDigest !== calculatedDigest) {
+          return false;
+        }
+      }
+
+      const normalize = (sig) => String(sig || '').replace(/^HMACSHA256=/i, '').trim();
+
+      const expectedSig = this._generateSignature(clientId, requestId, timestamp, target, body);
+      if (normalize(receivedSig) === normalize(expectedSig)) return true;
+
+      // Fallback check if notificationPath has /api/v1 prefix difference
+      if (notificationPath) {
+        const altPath = notificationPath.startsWith('/api/v1')
+          ? notificationPath.replace(/^\/api\/v1/, '')
+          : `/api/v1${notificationPath}`;
+        const altSig = this._generateSignature(clientId, requestId, timestamp, altPath, body);
+        if (normalize(receivedSig) === normalize(altSig)) return true;
+      }
+
+      return false;
     } catch (_) {
       return false;
     }
@@ -128,12 +165,18 @@ class DokuGateway {
 
   parseWebhookStatus(webhookData) {
     const txStatus = webhookData.transaction?.status;
+    const orderStatus = webhookData.order?.status;
 
     if (txStatus === 'SUCCESS') {
       return { mappedStatus: 'settlement', shouldSettle: true };
     }
+    if (orderStatus === 'ORDER_EXPIRED' || txStatus === 'EXPIRED') {
+      return { mappedStatus: 'expire', shouldSettle: false };
+    }
     if (txStatus === 'FAILED') {
-      return { mappedStatus: 'cancel', shouldSettle: false };
+      // DOKU Checkout: customer can retry payment until order expires.
+      // Do not treat individual FAILED transaction as final cancellation.
+      return { mappedStatus: 'pending', shouldSettle: false, failureReason: 'PAYMENT_ATTEMPT_FAILED' };
     }
     if (txStatus === 'PENDING') {
       return { mappedStatus: 'pending', shouldSettle: false };
@@ -156,7 +199,7 @@ class DokuGateway {
   async checkTransactionStatus(orderId) {
     const requestId = this._generateRequestId();
     const timestamp = this._timestamp();
-    const target = `/checkout/v1/payment/${orderId}/status`;
+    const target = `/orders/v1/status/${encodeURIComponent(orderId)}`;
     const signature = this._generateSignature(this.config.client_id, requestId, timestamp, target);
 
     const response = await axios.get(this.baseUrl + target, {

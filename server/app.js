@@ -114,6 +114,11 @@ app.use(express.urlencoded({ extended: true, limit: '30mb' }));
 // REST API with Tenant Resolution (Support both /api/v1 and /api)
 app.use(['/api/v1', '/api'], tenantResolver, apiRoutes);
 
+// Public Payment Gateway Webhooks (Support direct /webhooks/* root paths)
+app.post(['/webhooks/doku', '/webhooks/midtrans'], (req, res, next) => {
+  apiRoutes(req, res, next);
+});
+
 // Xentra Cloud Platform: Public Email Verification Route
 app.get(['/verify-email', '/verify-email/'], (req, res, next) => {
   // Delegate directly to the api router verification handler

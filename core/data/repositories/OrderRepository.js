@@ -261,15 +261,24 @@ class OrderRepository {
     `, [paymentMethod, updatedAt, orderId]);
   }
 
-  markFulfillmentException({ orderId, note, updatedAt, paymentMethod = 'midtrans' }) {
+  markFulfillmentException({ orderId, note, updatedAt, paymentMethod }) {
+    if (paymentMethod) {
+      return this.db.execute(`
+        UPDATE orders
+        SET status = 'fulfillment_exception',
+            payment_method = ?,
+            order_note = COALESCE(order_note || ' | ', '') || ?,
+            updated_at = ?
+        WHERE id = ?
+      `, [paymentMethod, note, updatedAt, orderId]);
+    }
     return this.db.execute(`
       UPDATE orders
       SET status = 'fulfillment_exception',
-          payment_method = ?,
           order_note = COALESCE(order_note || ' | ', '') || ?,
           updated_at = ?
       WHERE id = ?
-    `, [paymentMethod, note, updatedAt, orderId]);
+    `, [note, updatedAt, orderId]);
   }
 
   cancelPendingOrder({ orderId, updatedAt }) {

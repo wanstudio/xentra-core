@@ -29,7 +29,7 @@ class OrderPlacementService {
     fulfillment_schedule_type = 'asap',
     scheduled_slot_start = null,
     scheduled_slot_end = null,
-    payment_method = 'midtrans',
+    payment_method = null,
     cash_tendered = null,
     order_channel = 'customer_app',
     order_type = 'delivery',
@@ -47,13 +47,6 @@ class OrderPlacementService {
     notes = '',
     trace_context = {}
   }) {
-    const effectivePaymentMethod = (payment_method === 'cash') ? 'cash' : 'midtrans';
-    const effectiveOrderType = order_type || 'delivery';
-
-    const insertedStatus = (effectivePaymentMethod === 'cash' && order_channel === 'pos_cashier')
-      ? 'confirmed'
-      : 'pending';
-
     if (client_transaction_id && branch_id) {
       const existing = orderRepository.findByBranchTransactionId(branch_id, client_transaction_id);
       if (existing) {
@@ -71,6 +64,8 @@ class OrderPlacementService {
         };
       }
     }
+
+    const effectiveOrderType = order_type || 'delivery';
 
     if (effectiveOrderType === 'reservation') {
       if (!reservation_date) {
@@ -95,9 +90,9 @@ class OrderPlacementService {
       const now = new Date().toISOString();
       const orderNumber = `RES-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
 
+      orderRepository.beginTransaction();
       try {
-        orderRepository.beginTransaction();
-        if (customer.phone) {
+        if (customer && customer.phone) {
           const existingRes = orderRepository.findActiveReservation({
             branchId: branch_id,
             customerPhone: customer.phone,
@@ -139,14 +134,46 @@ class OrderPlacementService {
         type: 'commerce.reservation.booked',
         producer: 'commerce',
         payload: { order_id: orderId, order_number: orderNumber, brand_id, branch_id, reservation_date: resDateStr, guest_count: guest_count || 1, customer },
-        context: { correlation_id: trace_context.correlation_id, causation_id: orderId }
+        trace: trace_context
       });
+
       return {
         success: true,
-        status: 'VERIFIED',
-        order: { id: orderId, order_number: orderNumber, brand_id, branch_id, order_type: 'reservation', order_channel, table_number, reservation_date: resDateStr, guest_count: guest_count || 1, subtotal: 0, delivery_fee: 0, grand_total: 0, status: 'confirmed', items: [], created_at: now }
+        order_id: orderId,
+        order_number: orderNumber,
+        grand_total: 0,
+        subtotal: 0,
+        order: {
+          id: orderId,
+          order_number: orderNumber,
+          order_type: 'reservation',
+          reservation_date: resDateStr,
+          guest_count: guest_count || 1,
+          customer_name: customer.name,
+          customer_phone: customer.phone,
+          subtotal: 0,
+          grand_total: 0,
+          items: []
+        }
       };
     }
+
+    const { PaymentGatewayService } = require('../../payment');
+    const paymentValidation = PaymentGatewayService.validatePaymentMethod(payment_method, { branch_id, brand_id });
+    if (!paymentValidation.valid) {
+      return {
+        success: false,
+        status: 'INVALID_PAYMENT_PROVIDER',
+        errors: [paymentValidation.message]
+      };
+    }
+    const effectivePaymentMethod = paymentValidation.provider;
+
+    const insertedStatus = (effectivePaymentMethod === 'cash' && order_channel === 'pos_cashier')
+      ? 'confirmed'
+      : 'pending';
+
+
 
     const verification = PrePaymentVerificationGate.verify({ branch_id, brand_id, items, customer, pwa_runtime });
     if (!verification.is_valid) {
@@ -262,12 +289,28 @@ class OrderPlacementService {
         });
       }
 
+      let resolvedMerchantId = 'midtrans_default';
+      if (effectivePaymentMethod === 'cash') {
+        resolvedMerchantId = 'cash';
+      } else {
+        try {
+          const pCfg = PaymentGatewayService.resolvePaymentConfig(branch_id, brand_id);
+          if (effectivePaymentMethod === 'doku') {
+            resolvedMerchantId = pCfg.client_id || 'doku_default';
+          } else if (effectivePaymentMethod === 'midtrans') {
+            resolvedMerchantId = pCfg.merchant_id || 'midtrans_default';
+          }
+        } catch (_) {
+          resolvedMerchantId = effectivePaymentMethod === 'doku' ? 'doku_default' : 'midtrans_default';
+        }
+      }
+
       orderRepository.ensurePendingPayment({
         paymentId: `pay_${crypto.randomBytes(6).toString('hex')}`,
         orderId,
         provider: effectivePaymentMethod,
         paymentMethod: effectivePaymentMethod,
-        merchantId: effectivePaymentMethod === 'cash' ? 'cash' : 'midtrans',
+        merchantId: resolvedMerchantId,
         amount: grandTotal,
         createdAt: now,
         updatedAt: now

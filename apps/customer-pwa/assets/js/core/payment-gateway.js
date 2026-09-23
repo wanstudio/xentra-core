@@ -22,7 +22,6 @@
   // Hanya provider yang aktif yang dipakai. Provider yang tidak aktif tidak boleh
   // memblokir yang aktif, dan tidak boleh diminta kredensialnya.
   var ONLINE_PROVIDERS = ['midtrans', 'doku'];
-  var DEFAULT_PROVIDER = 'midtrans';
 
   // Satu tempat yang tahu nama tiap provider. Halaman tidak menuliskan nama provider
   // sendiri, jadi menambah provider baru tidak perlu menyentuh checkout/order-received.
@@ -49,6 +48,7 @@
       // Gagal mengambil konfigurasi bukan alasan untuk menyerah: biarkan pemanggil
       // memutuskan, dan jangan mengunci hasil gagal itu sebagai jawaban selamanya.
       configPromise = null;
+      gatewayConfig = null;
       return null;
     });
     return configPromise;
@@ -88,11 +88,26 @@
     return snapPromise;
   }
 
-  // Provider yang sedang aktif menurut konfigurasi. Selama konfigurasi belum
-  // termuat, jawabannya 'midtrans' — sama dengan perilaku server untuk config lama.
+  // Provider yang sedang aktif menurut konfigurasi.
+  // FAIL CLOSED: Jangan pernah fallback ke Midtrans atau provider lain jika config tidak ada.
   function activeProvider() {
     var p = gatewayConfig && gatewayConfig.active_provider;
-    return (p && ONLINE_PROVIDERS.indexOf(p) !== -1) ? p : DEFAULT_PROVIDER;
+    if (p && ONLINE_PROVIDERS.indexOf(p) !== -1) return p;
+    return '';
+  }
+
+  function isConfigured() {
+    var p = activeProvider();
+    if (!p) return false;
+    if (gatewayConfig && typeof gatewayConfig.active_provider_configured === 'boolean') {
+      return gatewayConfig.active_provider_configured;
+    }
+    return true;
+  }
+
+  // Pre-load gateway config immediately so activeProvider is populated early
+  if (typeof window !== 'undefined') {
+    loadConfig();
   }
 
   function isOnlineMethod(method) {
@@ -126,6 +141,10 @@
     return loadConfig().then(function () {
       var provider = activeProvider();
 
+      if (!provider) {
+        throw new Error('NO_ACTIVE_ONLINE_PROVIDER');
+      }
+
       // DOKU berdiri sendiri: halaman pembayaran milik gateway. Tidak memuat
       // Snap.js, tidak menyentuh window.snap, dan tidak meminta kredensial Midtrans.
       if (provider === 'doku') {
@@ -150,7 +169,7 @@
 
   function messageFor(err) {
     var code = err && err.message;
-    if (code === 'MIDTRANS_CLIENT_KEY_MISSING') {
+    if (code === 'NO_ACTIVE_ONLINE_PROVIDER' || code === 'MIDTRANS_CLIENT_KEY_MISSING') {
       return 'Pembayaran online belum dikonfigurasi. Hubungi cabang untuk menyelesaikan pembayaran.';
     }
     if (code === 'SNAP_LOAD_FAILED' || code === 'SNAP_UNAVAILABLE') {
@@ -173,6 +192,7 @@
     activeProvider: activeProvider,
     isOnlineMethod: isOnlineMethod,
     onlineLabel: onlineLabel,
-    onlineMethod: activeProvider
+    onlineMethod: activeProvider,
+    isConfigured: isConfigured
   };
 })();

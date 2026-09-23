@@ -622,6 +622,18 @@
     loadUpsell();
     quoteNow();
 
+    var G = window.Xentra && window.Xentra.PaymentGateway;
+    if (G && typeof G.loadConfig === 'function') {
+      G.loadConfig().then(function (cfg) {
+        if (cfg && cfg.active_provider && isOnlinePayment(state.paymentMethod)) {
+          state.paymentMethod = cfg.active_provider;
+        } else if ((!cfg || !cfg.active_provider) && isOnlinePayment(state.paymentMethod)) {
+          state.paymentMethod = 'cash';
+        }
+        syncPayVisual();
+      });
+    }
+
     // Restore payment state persisted before Google Auth redirect.
     // The broker return handler navigates to #checkout which re-creates this
     // controller with paymentMethod=null; the pending context restores it.
@@ -1546,7 +1558,12 @@
         // Provider online yang dipakai adalah provider yang AKTIF, bukan selalu
         // nama provider yang aktif. Dulu nilainya ditulis langsung, jadi saat DOKU
         // yang aktif pesanan tetap diminta ke gateway yang salah.
-        state.paymentMethod = onlinePaymentMethod();
+        var method = onlinePaymentMethod();
+        if (!method) {
+          toast('Pembayaran online belum tersedia atau belum dikonfigurasi.');
+          return;
+        }
+        state.paymentMethod = method;
         state.cashTendered = null;
         state.cashTenderedType = null;
         renderLayout();
@@ -4295,7 +4312,7 @@
         return;
       }
 
-      var msg = (errData && (errData.error || errData.message)) || 'Gagal memproses pesanan.';
+      var msg = (errData && (errData.message || errData.error)) || 'Gagal memproses pesanan.';
       if (UI && UI.toast) UI.toast(msg);
       renderLayout();
       calculateTotals();

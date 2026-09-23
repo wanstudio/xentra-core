@@ -264,8 +264,8 @@
   function isOnlineMethod(method) {
     var G = window.Xentra && window.Xentra.PaymentGateway;
     if (G && typeof G.isOnlineMethod === 'function') return G.isOnlineMethod(method);
-    // Modul belum termuat: pembayaran tunai adalah satu-satunya yang pasti bukan online.
-    return String(method || '').toLowerCase() !== 'cash';
+    var m = String(method || '').toLowerCase();
+    return m === 'midtrans' || m === 'doku';
   }
 
   // Nama provider tidak ditulis di sini: label diambil dari modul. Kalau modul belum

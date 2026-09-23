@@ -31,8 +31,10 @@ class PaymentGatewayService {
       if (branch && branch.payment_config_override) {
         try {
           const cfg = JSON.parse(branch.payment_config_override);
-          if (cfg && this._hasValidCredentials(cfg)) return cfg;
-        } catch (_) {}
+          if (cfg && typeof cfg === 'object') return cfg;
+        } catch (err) {
+          throw new Error('[PaymentGatewayService] Konfigurasi pembayaran cabang gagal dibaca (format JSON tidak valid).');
+        }
       }
     }
 
@@ -41,27 +43,44 @@ class PaymentGatewayService {
       if (brand && brand.default_payment_config) {
         try {
           const cfg = JSON.parse(brand.default_payment_config);
-          if (cfg && this._hasValidCredentials(cfg)) return cfg;
-        } catch (_) {}
+          if (cfg && typeof cfg === 'object') return cfg;
+        } catch (err) {
+          throw new Error('[PaymentGatewayService] Konfigurasi pembayaran brand gagal dibaca (format JSON tidak valid).');
+        }
       }
     }
 
+    if (process.env.MIDTRANS_SERVER_KEY) {
+      return {
+        provider: 'midtrans',
+        is_production: process.env.MIDTRANS_IS_PRODUCTION === 'true',
+        server_key: process.env.MIDTRANS_SERVER_KEY || '',
+        client_key: process.env.MIDTRANS_CLIENT_KEY || '',
+        merchant_id: process.env.MIDTRANS_MERCHANT_ID || ''
+      };
+    }
+
     return {
-      provider: 'midtrans',
-      is_production: process.env.MIDTRANS_IS_PRODUCTION === 'true',
-      server_key: process.env.MIDTRANS_SERVER_KEY || '',
-      client_key: process.env.MIDTRANS_CLIENT_KEY || '',
-      merchant_id: process.env.MIDTRANS_MERCHANT_ID || ''
+      provider: '',
+      is_production: false
     };
   }
 
   static _hasValidCredentials(cfg) {
+    if (!cfg) return false;
     if (cfg.provider === 'doku') return Boolean(cfg.client_id && cfg.secret_key);
-    return Boolean(cfg.server_key);
+    if (cfg.provider === 'midtrans') return Boolean(cfg.server_key);
+    return Boolean(cfg.server_key || (cfg.client_id && cfg.secret_key));
   }
 
   static _resolveProvider(config) {
-    return config.provider || 'midtrans';
+    if (!config) return null;
+    if (typeof config.provider === 'string' && config.provider.trim() !== '') {
+      return config.provider.trim().toLowerCase();
+    }
+    if (config.client_id || config.secret_key || (config.doku_methods && Object.keys(config.doku_methods).length > 0)) return 'doku';
+    if (config.server_key || config.client_key || (config.midtrans_methods && Object.keys(config.midtrans_methods).length > 0)) return 'midtrans';
+    return null;
   }
 
   /**
@@ -72,27 +91,66 @@ class PaymentGatewayService {
    * produksi ikut memindahkan yang lain — dua environment yang seharusnya berdiri
    * sendiri jadi saling mencampuri.
    */
-  static _gatewayConfig(config) {
+  static _gatewayConfig(config, providerOverride) {
     const resolved = Object.assign({}, config);
-    if (this._resolveProvider(config) === 'doku') {
+    const provider = providerOverride || this._resolveProvider(config);
+    if (provider === 'doku') {
       resolved.is_production = config.doku_is_production === true;
     }
     return resolved;
   }
 
-  static _getGateway(config) {
-    const provider = this._resolveProvider(config);
-    const gatewayConfig = this._gatewayConfig(config);
+  static getActiveProvider(branch_id, brand_id) {
+    const config = this.resolvePaymentConfig(branch_id, brand_id);
+    return this._resolveProvider(config);
+  }
+
+  static validatePaymentMethod(payment_method, { branch_id, brand_id } = {}) {
+    if (!payment_method || typeof payment_method !== 'string' || !payment_method.trim()) {
+      return { valid: false, error: 'INVALID_PAYMENT_PROVIDER', message: 'Metode pembayaran (payment_method) wajib diisi.' };
+    }
+    const clean = payment_method.trim().toLowerCase();
+    if (clean === 'cash') {
+      return { valid: true, provider: 'cash' };
+    }
+    if (!['midtrans', 'doku'].includes(clean)) {
+      return { valid: false, error: 'INVALID_PAYMENT_PROVIDER', message: `Metode pembayaran "${payment_method}" tidak valid atau tidak didukung.` };
+    }
+    return { valid: true, provider: clean };
+  }
+
+  static _getGateway(config, providerOverride) {
+    const provider = providerOverride || this._resolveProvider(config);
+    const gatewayConfig = this._gatewayConfig(config, provider);
     if (provider === 'doku') return new DokuGateway(gatewayConfig);
-    return new MidtransGateway(gatewayConfig);
+    if (provider === 'midtrans') return new MidtransGateway(gatewayConfig);
+    throw new Error(`[PaymentGatewayService] Provider gateway pembayaran "${provider || 'tidak ada'}" tidak valid atau tidak didukung.`);
   }
 
   static async createSnapTransaction(order, items = [], customer = {}) {
     const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
-    const gateway = this._getGateway(config);
-    const gatewayConfig = this._gatewayConfig(config);
+    const activeProvider = this._resolveProvider(config);
+    const provider = (order.payment_method && order.payment_method !== 'cash')
+      ? order.payment_method
+      : activeProvider;
+
+    if (!provider) {
+      throw new Error('[PaymentGatewayService] Tidak ada gateway pembayaran online yang aktif.');
+    }
+
+    if (provider === 'doku') {
+      if (!config.client_id || !config.secret_key) {
+        throw new Error('[DokuGateway] Kredensial DOKU belum dikonfigurasi (Client-Id / Secret Key missing).');
+      }
+    }
+
+    const gateway = this._getGateway(config, provider);
+    const gatewayConfig = this._gatewayConfig(config, provider);
 
     try {
+      if (provider === 'midtrans' && !config.server_key) {
+        throw new Error('[MidtransGateway] Server Key Midtrans belum dikonfigurasi.');
+      }
       return await gateway.createTransaction(order, items, customer);
     } catch (err) {
       const isProd = gatewayConfig.is_production === true;
@@ -115,6 +173,9 @@ class PaymentGatewayService {
   }
 
   static handleWebhook(webhookData, { skipSignatureCheck = false, provider = 'midtrans', headers = {}, notificationPath = '' } = {}) {
+    if (!provider || !['doku', 'midtrans'].includes(provider)) {
+      throw new Error('[PaymentGatewayService] INVALID_PAYMENT_PROVIDER: Provider webhook tidak valid atau tidak didukung.');
+    }
     const orderId = provider === 'doku'
       ? (webhookData.order && webhookData.order.invoice_number) || ''
       : (webhookData.order_id || '');
@@ -127,7 +188,9 @@ class PaymentGatewayService {
     const branchId = webhookData._branch_id || (order && order.branch_id);
     const brandId = webhookData._brand_id || (order && order.brand_id);
     const config = this.resolvePaymentConfig(branchId, brandId);
-    const gateway = this._getGateway(config);
+    const gateway = provider === 'doku'
+      ? new DokuGateway(this._gatewayConfig(config))
+      : new MidtransGateway(this._gatewayConfig(config));
 
     if (!skipSignatureCheck) {
       if (provider === 'doku') {
@@ -148,6 +211,9 @@ class PaymentGatewayService {
       paymentRepository.ensurePendingPayment({
         paymentId: `pay_${crypto.randomBytes(6).toString('hex')}`,
         orderId: orderId,
+        provider: provider,
+        paymentMethod: provider,
+        merchantId: provider === 'doku' ? (config.client_id || 'doku_default') : (config.merchant_id || 'midtrans_default'),
         amount: order.grand_total,
         createdAt: healNow,
         updatedAt: healNow
@@ -178,7 +244,15 @@ class PaymentGatewayService {
     let orderStatusAfterSettlement = null;
     paymentRepository.beginTransaction();
     try {
-      paymentRepository.updatePaymentWebhook({ orderId: orderId, paymentStatus: newPaymentStatus, webhookResponse: JSON.stringify(webhookData), settledAt: now, updatedAt: now });
+      paymentRepository.updatePaymentWebhook({
+        orderId: orderId,
+        paymentStatus: newPaymentStatus,
+        webhookResponse: JSON.stringify(webhookData),
+        settledAt: now,
+        updatedAt: now,
+        provider: provider,
+        paymentMethod: provider
+      });
 
       if (shouldSettle) {
         const currentOrderState = paymentRepository.findOrderStatus(orderId);
@@ -293,19 +367,38 @@ class PaymentGatewayService {
     const order = paymentRepository.findOrder(order_id);
     if (!order) throw new Error(`[PaymentGatewayService] Order "${order_id}" tidak ditemukan.`);
     const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
-    const gateway = this._getGateway(config);
+    const provider = (payment && payment.provider) || this._resolveProvider(config);
+    if (!provider || !['doku', 'midtrans'].includes(provider)) {
+      throw new Error(`[PaymentGatewayService] INVALID_PAYMENT_PROVIDER: Provider pembayaran untuk order "${order_id}" tidak valid atau tidak diketahui.`);
+    }
+    const gateway = provider === 'doku'
+      ? new DokuGateway(this._gatewayConfig(config))
+      : new MidtransGateway(this._gatewayConfig(config));
 
     try {
       const data = await gateway.checkTransactionStatus(order_id);
       if (data) {
         const normalizedData = { ...data };
-        if (config.provider === 'midtrans') {
-          return this.handleWebhook(normalizedData, { skipSignatureCheck: true });
+        if (provider === 'midtrans') {
+          return this.handleWebhook(normalizedData, { skipSignatureCheck: true, provider: 'midtrans' });
         }
-        if (config.provider === 'doku' && data.response) {
+        if (provider === 'doku') {
+          let txStatus = data.transaction?.status || data.response?.status;
+          if (!txStatus && data.order?.status) {
+            if (data.order.status === 'ORDER_EXPIRED') txStatus = 'EXPIRED';
+            else if (data.order.status === 'ORDER_GENERATED') txStatus = 'PENDING';
+          }
           const dokuData = {
-            order: { invoice_number: order_id, amount: order.grand_total },
-            transaction: { status: data.response.status || 'PENDING' }
+            ...data,
+            order: {
+              invoice_number: order_id,
+              amount: (data.order && data.order.amount) || order.grand_total,
+              ...(data.order || {})
+            },
+            transaction: {
+              status: txStatus || 'PENDING',
+              ...(data.transaction || {})
+            }
           };
           return this.handleWebhook(dokuData, { skipSignatureCheck: true, provider: 'doku' });
         }

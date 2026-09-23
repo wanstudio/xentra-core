@@ -129,12 +129,29 @@ router.get('/payment/config', (req, res) => {
     const brandRow = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
     let cfg = {};
     if (brandRow && brandRow.default_payment_config) {
-      try { cfg = JSON.parse(brandRow.default_payment_config) || {}; } catch (_) { cfg = {}; }
+      try {
+        cfg = JSON.parse(brandRow.default_payment_config) || {};
+      } catch (parseErr) {
+        return res.status(500).json({
+          success: false,
+          error: 'CONFIG_PARSE_ERROR',
+          message: 'Konfigurasi payment gateway brand gagal dibaca (format JSON tidak valid).'
+        });
+      }
     }
 
-    const activeProvider = Object.prototype.hasOwnProperty.call(cfg, 'provider')
-      ? (cfg.provider || '')
-      : 'midtrans';
+    let activeProvider = '';
+    if (Object.prototype.hasOwnProperty.call(cfg, 'provider')) {
+      activeProvider = cfg.provider || '';
+    } else if (cfg.client_id || cfg.secret_key || cfg.doku_methods) {
+      activeProvider = 'doku';
+    } else if (cfg.server_key || cfg.client_key || cfg.midtrans_methods) {
+      activeProvider = 'midtrans';
+    } else if (!brandRow && process.env.MIDTRANS_SERVER_KEY) {
+      activeProvider = 'midtrans';
+    } else {
+      activeProvider = '';
+    }
     const isProduction = cfg.is_production === true;
 
     res.json({
@@ -146,12 +163,14 @@ router.get('/payment/config', (req, res) => {
         // sebaliknya.
         active_provider_configured: activeProvider === 'doku'
           ? Boolean(cfg.client_id && cfg.secret_key)
-          : Boolean(cfg.server_key || process.env.MIDTRANS_SERVER_KEY),
-        midtrans_client_key: cfg.client_key || '',
+          : (activeProvider === 'midtrans' ? Boolean(cfg.server_key || (!brandRow && process.env.MIDTRANS_SERVER_KEY)) : false),
+        midtrans_client_key: activeProvider === 'midtrans' ? (cfg.client_key || '') : '',
         midtrans_is_production: isProduction,
-        snap_script_url: isProduction
-          ? 'https://app.midtrans.com/snap/snap.js'
-          : 'https://app.sandbox.midtrans.com/snap/snap.js'
+        snap_script_url: activeProvider === 'midtrans'
+          ? (isProduction
+            ? 'https://app.midtrans.com/snap/snap.js'
+            : 'https://app.sandbox.midtrans.com/snap/snap.js')
+          : null
       }
     });
   } catch (err) {
@@ -1739,10 +1758,12 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
 
     // P1 SECURE PAYMENT METHOD VALIDATION: Whitelist only officially supported payment methods
     const allowedPaymentMethods = ['cash', 'midtrans', 'doku'];
-    if (!allowedPaymentMethods.includes(payment_method)) {
+    if (!payment_method || !allowedPaymentMethods.includes(payment_method)) {
       return res.status(400).json({
         success: false,
-        error: `Metode pembayaran "${payment_method}" tidak valid. Pilihan yang didukung: ${allowedPaymentMethods.join(', ')}.`
+        status: 'INVALID_PAYMENT_PROVIDER',
+        error: 'INVALID_PAYMENT_PROVIDER',
+        message: `Metode pembayaran "${payment_method}" tidak valid. Pilihan yang didukung: ${allowedPaymentMethods.join(', ')}.`
       });
     }
 
@@ -2177,7 +2198,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     if (order_type === 'dine_in' && tableIdsToHold.length > 0) {
       const { DiningTableService } = require('../../domains/pos');
       try {
-        if (payment_method === 'midtrans') {
+        if (payment_method === 'midtrans' || payment_method === 'doku') {
           DiningTableService.holdTablesForPayment({
             branch_id: branch.id,
             table_ids: tableIdsToHold,
@@ -2214,27 +2235,58 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
           merchant_id: existingPayment.merchant_id || (payment_method === 'doku' ? 'doku_default' : 'midtrans_default')
         };
       } else {
+        let reqProto = 'https';
+        try { reqProto = req.protocol || 'https'; } catch (_) { reqProto = 'https'; }
+        let reqHost = 'localhost';
+        try { reqHost = (typeof req.get === 'function' ? req.get('host') : req.headers?.host) || 'localhost'; } catch (_) { reqHost = 'localhost'; }
+        const reqOrigin = `${reqProto}://${reqHost}`;
+        const xentraOrderReceivedUrl = `${reqOrigin}/order-received/${orderId}`;
         try {
           snapResult = await PaymentService.createSnapTransaction(
-            { id: orderId, grand_total: grandTotal, branch_id: branch.id, brand_id: req.brand_id, delivery_fee: deliveryFee, discount_amount: discountAmount, customer_name: customer.name, customer_phone: customer.phone },
+            { id: orderId, grand_total: grandTotal, branch_id: branch.id, brand_id: req.brand_id, delivery_fee: deliveryFee, discount_amount: discountAmount, customer_name: customer.name, customer_phone: customer.phone, callback_url: xentraOrderReceivedUrl, payment_method: payment_method },
             order ? order.items : items,
             customer
           );
         } catch (payErr) {
-        console.error('[Payment Gateway Error / Timeout]:', payErr.message);
-        db.exec('BEGIN IMMEDIATE;');
-        try {
-          db.prepare("UPDATE order_payments SET payment_status = 'reconciliation_pending', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
-          db.prepare("UPDATE orders SET status = 'pending', updated_at = datetime('now') WHERE id = ?").run(orderId);
-          db.exec('COMMIT;');
-        } catch (_) {
-          try { db.exec('ROLLBACK;'); } catch (_) {}
-        }
-        return res.status(502).json({
-          success: false,
-          error: 'PAYMENT_GATEWAY_TIMEOUT',
-          message: `Koneksi ke gateway pembayaran online mengalami kendala (${payErr.message}). Jika Anda sudah melakukan pembayaran, transaksi akan otomatis direkonsiliasi.`
-        });
+          console.error('[Payment Gateway Error / Timeout]:', payErr.message);
+          const isTimeout = /timeout|ETIMEDOUT|ECONNABORTED|ECONNRESET/i.test(payErr.code || payErr.message);
+          const isConfigError = /kredensial|belum dikonfigurasi|tidak ada gateway|client_id|secret_key|server_key/i.test(payErr.message);
+
+          db.exec('BEGIN IMMEDIATE;');
+          try {
+            if (isTimeout) {
+              db.prepare("UPDATE order_payments SET payment_status = 'reconciliation_pending', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
+              db.prepare("UPDATE orders SET status = 'pending', updated_at = datetime('now') WHERE id = ?").run(orderId);
+            } else {
+              db.prepare("UPDATE order_payments SET payment_status = 'failed', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
+              db.prepare("UPDATE orders SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?").run(orderId);
+            }
+            db.exec('COMMIT;');
+          } catch (_) {
+            try { db.exec('ROLLBACK;'); } catch (_) {}
+          }
+
+          if (isConfigError) {
+            return res.status(400).json({
+              success: false,
+              error: 'PAYMENT_GATEWAY_NOT_CONFIGURED',
+              message: payErr.message || 'Layanan pembayaran online belum dikonfigurasi atau tidak aktif.'
+            });
+          }
+
+          if (isTimeout) {
+            return res.status(504).json({
+              success: false,
+              error: 'PAYMENT_GATEWAY_TIMEOUT',
+              message: `Koneksi ke gateway pembayaran online mengalami timeout (${payErr.message}). Jika Anda sudah melakukan pembayaran, transaksi akan otomatis direkonsiliasi.`
+            });
+          }
+
+          return res.status(502).json({
+            success: false,
+            error: 'PAYMENT_GATEWAY_ERROR',
+            message: `Gagal memproses pembayaran melalui gateway (${payErr.message}). Silakan coba beberapa saat lagi atau pilih metode pembayaran lain.`
+          });
         }
       }
     }
@@ -3845,9 +3897,11 @@ router.post('/webhooks/doku', (req, res) => {
         'client-id': req.headers['client-id'] || req.headers['Client-Id'],
         'request-id': req.headers['request-id'] || req.headers['Request-Id'],
         'request-timestamp': req.headers['request-timestamp'] || req.headers['Request-Timestamp'],
-        'signature': req.headers['signature'] || req.headers['Signature']
+        'signature': req.headers['signature'] || req.headers['Signature'],
+        'digest': req.headers['digest'] || req.headers['Digest'],
+        'request-target': req.headers['request-target'] || req.headers['Request-Target']
       },
-      notificationPath: '/webhooks/doku'
+      notificationPath: req.originalUrl ? req.originalUrl.split('?')[0] : '/webhooks/doku'
     });
     res.json(result);
   } catch (err) {
@@ -10265,6 +10319,7 @@ router.get('/admin/finance/overview', requireAuth(['owner', 'brand_manager', 'br
     const totalSettled = paymentReport.summary?.total_settled || 0;
     const cashSettled = paymentReport.summary?.cash_settled || 0;
     const midtransSettled = paymentReport.summary?.midtrans_settled || 0;
+    const dokuSettled = paymentReport.summary?.doku_settled || 0;
     const totalPending = paymentReport.summary?.total_pending || 0;
 
     let totalTxCount = 0;
@@ -10283,6 +10338,7 @@ router.get('/admin/finance/overview', requireAuth(['owner', 'brand_manager', 'br
           total_settled: totalSettled,
           cash_settled: cashSettled,
           midtrans_settled: midtransSettled,
+          doku_settled: dokuSettled,
           total_pending: totalPending,
           transaction_count: totalTxCount,
           unreconciled_count: pendingRecon.length,
@@ -10379,10 +10435,6 @@ router.get('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
     }
 
     const effectiveConfig = branchOverride || parsedBrandConfig || {};
-    const activeProvider = Object.prototype.hasOwnProperty.call(effectiveConfig, 'provider')
-      ? (effectiveConfig.provider || '')
-      : 'midtrans';
-
     const midtransActive = Boolean(
       (branchOverride && branchOverride.server_key) ||
       (parsedBrandConfig && parsedBrandConfig.server_key) ||
@@ -10392,6 +10444,9 @@ router.get('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
       (branchOverride && branchOverride.client_id && branchOverride.secret_key) ||
       (parsedBrandConfig && parsedBrandConfig.client_id && parsedBrandConfig.secret_key)
     );
+    const activeProvider = Object.prototype.hasOwnProperty.call(effectiveConfig, 'provider')
+      ? (effectiveConfig.provider || '')
+      : (midtransActive ? 'midtrans' : (dokuActive ? 'doku' : ''));
 
     // Tiap gateway punya environment-nya SENDIRI. Dulu satu `is_production` dipakai
     // bersama, jadi memindahkan Midtrans ke produksi ikut memindahkan DOKU.
@@ -10484,16 +10539,12 @@ router.put('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
     if (targetBranchId) {
       const branchRow = corePaymentRepo.findBranchPaymentConfig(targetBranchId, req.brand_id);
       if (branchRow && branchRow.payment_config_override) {
-        try { config = JSON.parse(branchRow.payment_config_override); } catch (_) {}
+        try { config = JSON.parse(branchRow.payment_config_override) || {}; } catch (_) {}
       }
-    }
-    if (!config[configKey]) {
+    } else {
       const brandConfig = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
       if (brandConfig && brandConfig.default_payment_config) {
-        try {
-          const parsed = JSON.parse(brandConfig.default_payment_config);
-          if (parsed[configKey]) config[configKey] = { ...parsed[configKey] };
-        } catch (_) {}
+        try { config = JSON.parse(brandConfig.default_payment_config) || {}; } catch (_) {}
       }
     }
     if (!config[configKey]) config[configKey] = {};
@@ -12219,12 +12270,11 @@ router.get('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
 
     const effectiveConfig = branchOverride || parsedBrandConfig || {};
     const hasOverride = Boolean(branchOverride);
-    // Config lama tidak menyimpan field `provider` sama sekali; untuk itu default-nya
-    // tetap midtrans. Tetapi begitu field itu ada, nilainya dihormati apa adanya —
-    // termasuk '' yang berarti tidak ada gateway online yang aktif.
+    const midtransConfigured = Boolean(effectiveConfig.server_key || process.env.MIDTRANS_SERVER_KEY);
+    const dokuConfigured = Boolean(effectiveConfig.client_id && effectiveConfig.secret_key);
     const activeProvider = Object.prototype.hasOwnProperty.call(effectiveConfig, 'provider')
       ? (effectiveConfig.provider || '')
-      : 'midtrans';
+      : (midtransConfigured ? 'midtrans' : (dokuConfigured ? 'doku' : ''));
 
     res.json({
       success: true,
@@ -12593,7 +12643,7 @@ router.get('/admin/settings/integrations', requireAuth(['owner', 'brand_manager'
     const midtransActive = Boolean(parsedConfig?.server_key || process.env.MIDTRANS_SERVER_KEY);
     const midtransEnv = (parsedConfig?.is_production || process.env.MIDTRANS_IS_PRODUCTION === 'true') ? 'production' : 'sandbox';
     const dokuActive = Boolean(parsedConfig?.client_id && parsedConfig?.secret_key);
-    const activeProvider = parsedConfig?.provider || 'midtrans';
+    const activeProvider = parsedConfig?.provider || (dokuActive ? 'doku' : (midtransActive ? 'midtrans' : ''));
 
     res.json({
       success: true,

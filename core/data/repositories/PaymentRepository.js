@@ -71,21 +71,37 @@ class PaymentRepository {
     );
   }
 
-  ensurePendingPayment({ paymentId, orderId, amount, createdAt, updatedAt }) {
+  ensurePendingPayment({ paymentId, orderId, provider = 'midtrans', paymentMethod = 'midtrans', merchantId = null, amount, createdAt, updatedAt }) {
     return this.db.execute(`
       INSERT INTO order_payments (
         id, order_id, provider, payment_method, merchant_id, snap_token,
         payment_status, amount, created_at, updated_at
-      ) VALUES (?, ?, 'midtrans', 'midtrans', 'midtrans', NULL, 'pending', ?, ?, ?)
-      ON CONFLICT(order_id) DO NOTHING
-    `, [paymentId, orderId, amount, createdAt, updatedAt]);
+      ) VALUES (?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?)
+      ON CONFLICT(order_id) DO UPDATE SET
+        provider = excluded.provider,
+        payment_method = excluded.payment_method,
+        merchant_id = COALESCE(excluded.merchant_id, order_payments.merchant_id),
+        amount = excluded.amount,
+        updated_at = excluded.updated_at
+    `, [paymentId, orderId, provider, paymentMethod, merchantId, amount, createdAt, updatedAt]);
   }
 
-  updatePaymentWebhook({ orderId, paymentStatus, webhookResponse, settledAt, updatedAt }) {
+  updatePaymentWebhook({ orderId, paymentStatus, webhookResponse, settledAt, updatedAt, provider, paymentMethod }) {
+    if (provider && paymentMethod) {
+      return this.db.execute(`
+        UPDATE order_payments
+        SET payment_status = ?,
+            provider = ?,
+            payment_method = ?,
+            raw_webhook_response = ?,
+            settled_at = CASE WHEN ? = 'settlement' THEN ? ELSE settled_at END,
+            updated_at = ?
+        WHERE order_id = ?
+      `, [paymentStatus, provider, paymentMethod, webhookResponse, paymentStatus, settledAt, updatedAt, orderId]);
+    }
     return this.db.execute(`
       UPDATE order_payments
       SET payment_status = ?,
-          payment_method = 'midtrans',
           raw_webhook_response = ?,
           settled_at = CASE WHEN ? = 'settlement' THEN ? ELSE settled_at END,
           updated_at = ?
@@ -129,11 +145,20 @@ class PaymentRepository {
     return this.db.queryOne('SELECT status FROM orders WHERE id = ?', [orderId]);
   }
 
-  markFulfillmentException({ orderId, note, updatedAt }) {
+  markFulfillmentException({ orderId, note, updatedAt, paymentMethod }) {
+    if (paymentMethod) {
+      return this.db.execute(`
+        UPDATE orders
+        SET status = 'fulfillment_exception',
+            payment_method = ?,
+            order_note = COALESCE(order_note || ' | ', '') || ?,
+            updated_at = ?
+        WHERE id = ?
+      `, [paymentMethod, note, updatedAt, orderId]);
+    }
     return this.db.execute(`
       UPDATE orders
       SET status = 'fulfillment_exception',
-          payment_method = 'midtrans',
           order_note = COALESCE(order_note || ' | ', '') || ?,
           updated_at = ?
       WHERE id = ?

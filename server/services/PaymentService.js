@@ -16,6 +16,22 @@ class PaymentService {
   static settleCash(params) {
     return CashSettlementService.settleCashPayment(params);
   }
+
+  static getActiveProvider(branch_id, brand_id) {
+    return PaymentGatewayService.getActiveProvider(branch_id, brand_id);
+  }
+
+  static validatePaymentMethod(payment_method, options = {}) {
+    return PaymentGatewayService.validatePaymentMethod(payment_method, options);
+  }
+
+  static checkTransactionStatus(order_id) {
+    return PaymentGatewayService.checkTransactionStatus(order_id);
+  }
+
+  static reconcilePendingTransactions() {
+    return PaymentGatewayService.reconcilePendingTransactions();
+  }
 }
 
 module.exports = PaymentService;
