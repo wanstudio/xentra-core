@@ -12298,6 +12298,70 @@ router.put('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
   }
 });
 
+// 4.3b Kredensial per provider — SATU pintu masuk per gateway.
+// Menyimpan kredensial DOKU hanya menyentuh field DOKU; Midtrans tidak dibaca,
+// tidak ditulis, dan tidak tersentuh. Endpoint terpisah ini membuat pencampuran
+// itu tidak mungkin secara struktur, bukan sekadar dijaga oleh percabangan.
+router.put('/admin/settings/commerce/payments/:provider/credentials', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const provider = String(req.params.provider || '').toLowerCase();
+    if (provider !== 'midtrans' && provider !== 'doku') {
+      return res.status(400).json({ success: false, error: 'Provider pembayaran tidak dikenal.' });
+    }
+
+    const { branch_id } = req.body;
+    const isBranchScope = Boolean(branch_id && branch_id !== 'all');
+
+    // Baca config tersimpan sebagai dasar, supaya provider lain tidak ikut hilang.
+    let existing = {};
+    if (isBranchScope) {
+      const row = corePaymentRepo.findBranchPaymentConfig(branch_id, req.brand_id);
+      if (row && row.payment_config_override) {
+        try { existing = JSON.parse(row.payment_config_override) || {}; } catch (_) { existing = {}; }
+      }
+    }
+    if (!Object.keys(existing).length) {
+      const brandRow = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
+      if (brandRow && brandRow.default_payment_config) {
+        try { existing = JSON.parse(brandRow.default_payment_config) || {}; } catch (_) { existing = {}; }
+      }
+    }
+
+    const merged = Object.assign({}, existing);
+    if (!Object.prototype.hasOwnProperty.call(merged, 'provider')) merged.provider = 'midtrans';
+
+    if (provider === 'midtrans') {
+      const { server_key, client_key, merchant_id, is_production } = req.body;
+      // Kosong = pertahankan yang tersimpan (nilai rahasia tidak pernah dikirim balik).
+      if (server_key) merged.server_key = server_key;
+      if (client_key) merged.client_key = client_key;
+      if (merchant_id) merged.merchant_id = merchant_id;
+      if (typeof is_production !== 'undefined') merged.is_production = Boolean(is_production);
+    } else {
+      const { doku_client_id, doku_secret_key, doku_callback_url, doku_is_production } = req.body;
+      if (doku_client_id) merged.client_id = doku_client_id;
+      if (doku_secret_key) merged.secret_key = doku_secret_key;
+      if (doku_callback_url) merged.callback_url = doku_callback_url;
+      if (typeof doku_is_production !== 'undefined') merged.doku_is_production = Boolean(doku_is_production);
+    }
+
+    const jsonStr = JSON.stringify(merged);
+    if (isBranchScope) {
+      const belongs = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, req.brand_id);
+      if (!belongs) {
+        return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan atau bukan milik brand ini.' });
+      }
+      corePaymentRepo.updateBranchPaymentConfig(branch_id, jsonStr);
+      return res.json({ success: true, provider, is_branch_override: true, message: 'Kredensial ' + (provider === 'doku' ? 'DOKU' : 'Midtrans') + ' berhasil disimpan.' });
+    }
+
+    corePaymentRepo.updateBrandPaymentConfig(req.brand_id, jsonStr);
+    res.json({ success: true, provider, is_branch_override: false, message: 'Kredensial ' + (provider === 'doku' ? 'DOKU' : 'Midtrans') + ' berhasil disimpan.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 4.4 Fulfillment Settings
 router.get('/admin/settings/commerce/fulfillment', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {

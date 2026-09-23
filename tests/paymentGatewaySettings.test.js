@@ -99,6 +99,8 @@ test('PAYMENT GATEWAY — kredensial tersimpan & satu gateway online aktif', asy
     }
   });
 
+  const putCredentials = (provider, body) => makeRequest(server,
+    { path: CHECKOUT_PAYMENTS + '/' + provider + '/credentials', method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` } }, body);
   const put = (body) => makeRequest(server,
     { path: CHECKOUT_PAYMENTS, method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` } }, body);
   const getSettings = () => makeRequest(server,
@@ -257,30 +259,77 @@ test('PAYMENT GATEWAY — kredensial tersimpan & satu gateway online aktif', asy
       'form DOKU menuju fungsi DOKU');
   });
 
-  await t.test('PGW-09: tiap tab hanya membawa field miliknya sendiri', () => {
-    // Badan fungsi diambil apa adanya dari sumber, lalu diperiksa: tab Midtrans
-    // tidak boleh menyentuh field DOKU, dan sebaliknya.
-    const body = DASHBOARD_JS.slice(
-      DASHBOARD_JS.indexOf('async function saveGatewayCredentials('),
-      DASHBOARD_JS.indexOf('function saveSettingsPaymentsMidtrans(')
+  await t.test('PGW-09: environment tiap provider hanya memuat field & endpoint miliknya', () => {
+    const envSrc = DASHBOARD_JS.slice(
+      DASHBOARD_JS.indexOf('function createGatewayEnv('),
+      DASHBOARD_JS.indexOf('var gatewayEnvs = {')
     );
-    assert.ok(body.length > 0, 'saveGatewayCredentials harus ditemukan');
+    assert.ok(envSrc.length > 0, 'createGatewayEnv harus ada');
+    assert.ok(envSrc.includes("'/admin/settings/commerce/payments/' + spec.key + '/credentials'"),
+      'simpan menuju endpoint milik provider itu sendiri');
 
-    const midtransBranch = body.slice(body.indexOf('} else {'), body.indexOf('}\n\n      try'));
-    const dokuBranch = body.slice(body.indexOf('if (isDoku) {'), body.indexOf('} else {'));
+    const midtransSpec = DASHBOARD_JS.slice(
+      DASHBOARD_JS.indexOf('midtrans: createGatewayEnv({'),
+      DASHBOARD_JS.indexOf('doku: createGatewayEnv({')
+    );
+    const dokuSpec = DASHBOARD_JS.slice(
+      DASHBOARD_JS.indexOf('doku: createGatewayEnv({'),
+      DASHBOARD_JS.indexOf('// Dua pintu masuk terpisah')
+    );
 
-    assert.ok(!/doku_/.test(midtransBranch),
-      'cabang Midtrans tidak boleh memuat field DOKU');
-    assert.ok(!/server_key|client_key|merchant_id/.test(dokuBranch),
-      'cabang DOKU tidak boleh memuat field Midtrans');
-    assert.ok(midtransBranch.includes('is_production'),
+    assert.ok(!/doku_/.test(midtransSpec), 'environment Midtrans tidak boleh memuat field DOKU');
+    assert.ok(!/server_key|client_key|merchant_id/.test(dokuSpec),
+      'environment DOKU tidak boleh memuat field Midtrans');
+
+    assert.ok(midtransSpec.includes("productionKey: 'is_production'"),
       'Midtrans memakai flag produksinya sendiri');
-    assert.ok(dokuBranch.includes('doku_is_production'),
+    assert.ok(dokuSpec.includes("productionKey: 'doku_is_production'"),
       'DOKU memakai flag produksinya sendiri');
 
-    // Tidak ada satu pun payload yang mengirim `provider`.
-    assert.ok(!/provider\s*:/.test(body),
-      'menyimpan kredensial tidak boleh mengirim provider');
+    // Tidak ada lingkungan yang memuat ulang tab lain: pemuatan hanya menyentuh
+    // elemen miliknya sendiri, lewat daftar `fields` miliknya.
+    assert.ok(DASHBOARD_JS.includes('gatewayEnvs.midtrans.load(ps)') &&
+      DASHBOARD_JS.includes('gatewayEnvs.doku.load(ps)'),
+      'tiap environment memuat bagiannya sendiri');
+    assert.ok(!DASHBOARD_JS.includes('switchPaymentTab(activeProvider);\n      } catch'),
+      'pemuatan ulang tidak boleh memindahkan tab yang sedang dilihat');
+  });
+
+  await t.test('PGW-11: endpoint kredensial per provider hanya menulis provider itu', async () => {
+    await putCredentials('midtrans', { server_key: 'MK-1', client_key: 'CK-1', merchant_id: 'M-1', is_production: false });
+    await putCredentials('doku', { doku_client_id: 'DK-1', doku_secret_key: 'DS-1', doku_callback_url: 'https://contoh.test/cb', doku_is_production: false });
+
+    const readStored = () => JSON.parse(
+      db.prepare('SELECT default_payment_config FROM brands WHERE id = ?').get(BRAND_ID).default_payment_config
+    );
+
+    // Menyimpan DOKU hanya menyentuh DOKU.
+    const dokuRes = await putCredentials('doku', { doku_client_id: 'DK-2' });
+    assert.equal(dokuRes.status, 200, 'simpan DOKU harus berhasil');
+    assert.equal(dokuRes.body.provider, 'doku', 'respons menyebut provider yang disimpan');
+
+    let stored = readStored();
+    assert.equal(stored.client_id, 'DK-2', 'client_id DOKU diperbarui');
+    assert.equal(stored.secret_key, 'DS-1', 'rahasia DOKU yang tidak diisi tetap');
+    assert.equal(stored.server_key, 'MK-1', 'server_key Midtrans TIDAK tersentuh');
+    assert.equal(stored.client_key, 'CK-1', 'client_key Midtrans TIDAK tersentuh');
+    assert.equal(stored.merchant_id, 'M-1', 'merchant_id Midtrans TIDAK tersentuh');
+
+    // Menyimpan Midtrans hanya menyentuh Midtrans.
+    const midRes = await putCredentials('midtrans', { server_key: 'MK-2', is_production: true });
+    assert.equal(midRes.status, 200, 'simpan Midtrans harus berhasil');
+    assert.equal(midRes.body.provider, 'midtrans');
+
+    stored = readStored();
+    assert.equal(stored.server_key, 'MK-2', 'server_key diperbarui');
+    assert.equal(stored.client_id, 'DK-2', 'client_id DOKU TIDAK tersentuh');
+    assert.equal(stored.secret_key, 'DS-1', 'rahasia DOKU TIDAK tersentuh');
+    assert.equal(stored.is_production, true, 'environment Midtrans berubah');
+    assert.equal(stored.doku_is_production, false, 'environment DOKU TIDAK ikut berubah');
+
+    // Provider yang tidak dikenal ditolak, bukan disimpan diam-diam.
+    const bad = await putCredentials('qris', { server_key: 'X' });
+    assert.equal(bad.status, 400, 'provider tak dikenal harus ditolak');
   });
 
   await t.test('PGW-10: environment tiap gateway berdiri sendiri', async () => {
