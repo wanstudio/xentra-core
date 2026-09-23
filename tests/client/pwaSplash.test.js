@@ -37,6 +37,8 @@ test('SPLASH-01: splash dilukis paling awal, opak, dan tidak bisa tertembus', ()
   assert.ok(splash.includes('class="bot bot-float"'), 'harus ada karakter beranimasi');
   assert.ok(splash.includes('@keyframes bot-float'), 'badannya mengambang');
   assert.ok(splash.includes('@keyframes bot-blink'), 'matanya berkedip');
+  // Kedip 2x per siklus: dua momen scaleY(.12) dalam keyframes.
+  assert.ok((splash.match(/scaleY\(\.12\)/g) || []).length === 2, 'kedip 2x per siklus');
   // Cute cues yang sekaligus membedakannya dari karakter mana pun: senyum dan antena.
   assert.ok(splash.includes('bot-eye'), 'mata ada');
   assert.ok(splash.includes('stop-color="#e9eef3"'), 'badan memakai gradien lembut');
