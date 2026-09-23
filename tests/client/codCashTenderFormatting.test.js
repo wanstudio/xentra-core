@@ -628,3 +628,21 @@ test('T21: ringkasan reservasi memakai tanggal realtime + zona waktu cabang', ()
   assert.ok(!code.includes("' · ('"), 'pemisah lama harus hilang');
   assert.ok(code.includes("replace(':', '.')"), 'jam memakai titik (12.00)');
 });
+
+test('T22: tiap tipe pembelian punya lingkungannya sendiri (tidak saling menular)', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // Tombol Konfirmasi milik sheet: label & keadaannya direset setiap tipe berganti,
+  // supaya label "Reservasi" tidak menular ke tipe lain.
+  assert.ok(/function renderScheduleSection\(\) \{[\s\S]{0,700}sharedConfirm\.textContent = 'Konfirmasi'/.test(code),
+    'label Konfirmasi harus direset saat tipe berganti');
+  assert.ok(/sharedConfirm\.disabled = false;/.test(code), 'keadaan tombol juga direset');
+  assert.ok(code.includes("sharedConfirm.textContent = 'Reservasi'") === false ||
+    /draft\.type === 'reservation'/.test(code), 'label Reservasi hanya untuk tipe reservasi');
+
+  // Reservasi tetap yang mengubah labelnya, dan hanya lewat jalur reservasi.
+  assert.ok(code.includes("sheetConfirm.textContent = 'Reservasi';"),
+    'bagian reservasi yang memberi label Reservasi');
+  assert.ok(code.indexOf('sharedConfirm.textContent') < code.indexOf("sheetConfirm.textContent = 'Reservasi';"),
+    'reset harus lebih dulu, penyetelan label reservasi menyusul');
+});

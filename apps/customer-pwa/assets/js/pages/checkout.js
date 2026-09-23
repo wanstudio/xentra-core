@@ -1881,6 +1881,18 @@
     }
 
     function renderScheduleSection() {
+      // Tombol Konfirmasi adalah MILIK SHEET dan dipakai semua tipe. Karena itu
+      // label & keadaannya harus DIKEMBALIKAN di sini setiap tipe berganti — kalau
+      // tidak, label "Reservasi" milik tipe reservasi tertinggal dan ikut menular ke
+      // delivery/pickup/dine-in (pernah terjadi). Tiap tipe punya lingkungannya
+      // sendiri; yang dibagi hanya komponen tombolnya, bukan keadaannya.
+      var sharedConfirm = document.getElementById('x-ful-btn-confirm');
+      if (sharedConfirm) {
+        sharedConfirm.textContent = 'Konfirmasi';
+        sharedConfirm.disabled = false;
+        sharedConfirm.style.opacity = '1';
+      }
+
       // Bar hijau mengikuti tipe pembelian: catatan promo hanya relevan untuk
       // pembelian, sedangkan reservasi butuh janji konfirmasi. Satu tempat saja.
       var promoText = document.getElementById('x-ful-promo-text');
