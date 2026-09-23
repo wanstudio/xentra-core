@@ -39,8 +39,12 @@ test('SPLASH-01: splash dilukis paling awal, opak, dan tidak bisa tertembus', ()
   assert.ok(splash.includes('@keyframes bot-blink'), 'matanya berkedip');
   // Cute cues yang sekaligus membedakannya dari karakter mana pun: senyum dan antena.
   assert.ok(splash.includes('bot-eye'), 'mata ada');
-  assert.ok(/stroke="#ffffff"[^>]*opacity="\.85"|M40 45\.5c3 3\.2/.test(splash), 'ada senyum');
-  assert.ok(splash.includes('stop-color="#eef2f6"'), 'badan memakai gradien lembut');
+  assert.ok(splash.includes('stop-color="#e9eef3"'), 'badan memakai gradien lembut');
+  // Tanpa mulut & antena, bentuk meruncing, tangan elips ramping.
+  assert.ok(!/c3 3\.2 9 3\.2 12 0/.test(splash), 'mulut sudah dihilangkan');
+  assert.ok(!splash.includes('cy="4" r="2.6"'), 'antena sudah dihilangkan');
+  assert.ok(splash.includes('M46 10 C66 10 74 26 74 46'), 'badan meruncing ke bawah');
+  assert.ok(splash.includes('rx="4.4" ry="12.5"'), 'tangan elips ramping');
   assert.ok(splash.indexOf('bot-float') < splash.indexOf('xentra-logo.png'),
     'animasinya di atas logo');
   assert.ok(splash.includes('@media (prefers-reduced-motion: reduce)'),
