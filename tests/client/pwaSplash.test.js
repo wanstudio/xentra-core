@@ -16,7 +16,12 @@ const read = (p) => fs.readFileSync(path.resolve(__dirname, '../..', p), 'utf8')
 const HTML = read('apps/customer-pwa/index.html');
 const MANIFEST = JSON.parse(read('apps/customer-pwa/assets/pwa/manifest.json'));
 
-const BRAND = '#b6ff00';
+// Warna boleh berubah (putih dipilih karena lime terlalu menyala) — yang dikunci
+// adalah KONSISTENSI antara splash di halaman dan splash bawaan PWA.
+const SPLASH_BG = (function () {
+  const m = HTML.slice(HTML.indexOf('id="x-splash"')).match(/background:(#[0-9a-fA-F]{6})/);
+  return m ? m[1].toLowerCase() : null;
+})();
 
 test('SPLASH-01: splash dilukis paling awal, opak, dan tidak bisa tertembus', () => {
   assert.ok(HTML.includes('id="x-splash"'), 'harus ada elemen splash');
@@ -26,7 +31,7 @@ test('SPLASH-01: splash dilukis paling awal, opak, dan tidak bisa tertembus', ()
   const splash = HTML.slice(HTML.indexOf('id="x-splash"'), HTML.indexOf('id="xentra-home-view"'));
   assert.ok(splash.includes('position:fixed'), 'harus menutup layar');
   assert.ok(splash.includes('z-index:9999'), 'harus di atas kerangka');
-  assert.ok(splash.includes('background:' + BRAND), 'latar memakai warna brand');
+  assert.ok(SPLASH_BG, 'latar splash harus warna tetap (hex)');
   assert.ok(/object-fit:contain/.test(splash) && splash.includes('xentra-logo.png'), 'memuat logo');
   assert.ok(splash.includes('Memuat'), 'ada tulisan menunggu');
 });
@@ -47,6 +52,8 @@ test('SPLASH-03: aplikasi menutup splash saat tampilan pertama siap', () => {
 test('SPLASH-04: splash bawaan PWA (manifest) sewarna dengan splash di halaman', () => {
   // Chrome membuat splash sendiri dari manifest; kalau warnanya beda, yang terjadi
   // justru dua kali ganti warna (putih lalu hijau).
-  assert.equal(MANIFEST.background_color, BRAND, 'background_color harus sama dengan splash');
-  assert.equal(MANIFEST.theme_color, BRAND, 'theme_color harus sama dengan splash');
+  assert.equal(String(MANIFEST.background_color).toLowerCase(), SPLASH_BG,
+    'background_color harus sama dengan splash di halaman');
+  assert.equal(String(MANIFEST.theme_color).toLowerCase(), SPLASH_BG,
+    'theme_color harus sama dengan splash di halaman');
 });
