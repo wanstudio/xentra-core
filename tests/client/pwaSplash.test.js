@@ -34,9 +34,10 @@ test('SPLASH-01: splash dilukis paling awal, opak, dan tidak bisa tertembus', ()
   assert.ok(SPLASH_BG, 'latar splash harus warna tetap (hex)');
   assert.ok(/object-fit:contain/.test(splash) && splash.includes('xentra-logo.png'), 'memuat logo');
   // Animasi karakter (SVG + CSS, tanpa aset baru), di ATAS logo.
-  assert.ok(splash.includes('class="chb chb-body"'), 'harus ada karakter beranimasi');
-  assert.ok(splash.includes('@keyframes chb-swing-a'), 'kaki/ tangannya bergerak');
-  assert.ok(splash.indexOf('chb-body') < splash.indexOf('xentra-logo.png'),
+  assert.ok(splash.includes('class="bot bot-float"'), 'harus ada karakter beranimasi');
+  assert.ok(splash.includes('@keyframes bot-float'), 'badannya mengambang');
+  assert.ok(splash.includes('@keyframes bot-blink'), 'matanya berkedip');
+  assert.ok(splash.indexOf('bot-float') < splash.indexOf('xentra-logo.png'),
     'animasinya di atas logo');
   assert.ok(splash.includes('@media (prefers-reduced-motion: reduce)'),
     'gerakan harus dihentikan kalau tamu memilih reduced motion');
