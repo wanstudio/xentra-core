@@ -194,6 +194,7 @@
     var order = data.order;
     var payment = data.payment || {};
     var payStatus = (payment.payment_status || order.payment_status || 'pending').toLowerCase();
+    var payMethod = (payment.payment_method || order.payment_method || 'cash').toLowerCase();
     var branchName = order.branch_name || 'Cabang';
     var orderNumber = order.order_number || ('XTR-' + order.id);
     var snapToken = payment.snap_token || order.snap_token || null;
@@ -220,7 +221,7 @@
       '    <div style="background:#f8f9fa;border-radius:14px;padding:12px 16px;text-align:left;display:flex;flex-direction:column;gap:8px;">' +
       '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Nomor Pesanan</span><strong style="color:#111;">' + UI.escape(orderNumber) + '</strong></div>' +
       '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Cabang</span><span style="font-weight:700;color:#111;">' + UI.escape(branchName) + '</span></div>' +
-      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Metode Pembayaran</span><span style="font-weight:700;color:#111;">Online Pay (Midtrans / QRIS)</span></div>' +
+      '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Metode Pembayaran</span><span style="font-weight:700;color:#111;">' + onlinePayLabel(payMethod, true) + '</span></div>' +
       '      <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:#6b7280;">Total Tagihan</span><span style="font-weight:700;color:#111;">' + UI.money(order.grand_total || 0) + '</span></div>' +
       '    </div>' +
       '  </div>' +
@@ -263,7 +264,16 @@
   function isOnlineMethod(method) {
     var G = window.Xentra && window.Xentra.PaymentGateway;
     if (G && typeof G.isOnlineMethod === 'function') return G.isOnlineMethod(method);
-    return String(method || '').toLowerCase() === 'midtrans';
+    // Modul belum termuat: pembayaran tunai adalah satu-satunya yang pasti bukan online.
+    return String(method || '').toLowerCase() !== 'cash';
+  }
+
+  // Nama provider tidak ditulis di sini: label diambil dari modul. Kalau modul belum
+  // termuat, labelnya dibuat generik — bukan menebak salah satu provider.
+  function onlinePayLabel(method, withChannels) {
+    var G = window.Xentra && window.Xentra.PaymentGateway;
+    if (G && typeof G.onlineLabel === 'function') return G.onlineLabel(method, withChannels);
+    return 'Online Pay';
   }
 
   // ─── P6.5 PAYMENT FAILURE SURFACE ─────────────────────────────────────────
@@ -811,6 +821,8 @@
   // ─── P7.5 ACCEPTED STATE and fulfillment tracking ─────────────────────────
   function renderFulfillmentOrder(data) {
     if (!targetContainer) return;
+    // Metode pembayaran pesanan ini, untuk label. Nama provider tidak ditulis di sini.
+    var payMethod = ((data.order && data.order.payment_method) || (data.payment && data.payment.payment_method) || 'cash').toLowerCase();
     // Delivery/pickup use the unified tracking layout (dynamic title +
     // progress from resolveOrderPhase). Other order types keep legacy.
     var fulType = (data.order && data.order.order_type) || 'delivery';
@@ -898,7 +910,7 @@
     if (orderType === 'dine_in') orderTypeBadge = '🍽️ Dine-in ' + (order.table_number ? '(' + order.table_number + ')' : '');
     if (orderType === 'reservation') orderTypeBadge = '📅 Reservasi (' + (order.guest_count || 2) + ' Tamu)';
 
-    var paymentStatusText = isCash ? 'Bayar di Tempat' : 'Online Pay (Midtrans)';
+    var paymentStatusText = isCash ? 'Bayar di Tempat' : onlinePayLabel(payMethod);
     if (order.payment_status === 'settlement' || order.payment_status === 'paid' || payment.payment_status === 'settlement' || payment.payment_status === 'paid') {
       paymentStatusText += ' • Lunas';
     }

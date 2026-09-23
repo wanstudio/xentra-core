@@ -1014,7 +1014,7 @@
       '          <span style="font-size:11px;color:#777;">' + payMethodLabel().sub + '</span>' +
       '        </div>' +
       '      </button>' +
-      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'midtrans' ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'midtrans' ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'midtrans' ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
+      '      <button type="button" class="x-alt-pay-opt ' + (isOnlinePayment(state.paymentMethod) ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (isOnlinePayment(state.paymentMethod) ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (isOnlinePayment(state.paymentMethod) ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
       '        <img src="/assets/icons/qrisgreen.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
       '        <div style="display:flex;flex-direction:column;min-width:0;">' +
       '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Online Pay</span>' +
@@ -1130,13 +1130,14 @@
   // yang tahu konfigurasi, jadi checkout tidak menebak sendiri.
   function onlinePaymentMethod() {
     var G = window.Xentra && window.Xentra.PaymentGateway;
-    return (G && typeof G.onlineMethod === 'function') ? G.onlineMethod() : 'midtrans';
+    // Modul satu-satunya yang tahu nama provider. Kalau belum termuat, jangan menebak.
+    return (G && typeof G.onlineMethod === 'function') ? G.onlineMethod() : '';
   }
 
   function isOnlinePayment(method) {
     var G = window.Xentra && window.Xentra.PaymentGateway;
     if (G && typeof G.isOnlineMethod === 'function') return G.isOnlineMethod(method);
-    return method === 'midtrans';
+    return (G && typeof G.isOnlineMethod === 'function') ? G.isOnlineMethod(method) : false;
   }
 
   function submitCtaLabel(isReservation) {
@@ -1543,8 +1544,8 @@
     if (optOn) {
       optOn.onclick = function () {
         // Provider online yang dipakai adalah provider yang AKTIF, bukan selalu
-        // Midtrans. Dulu nilainya ditulis 'midtrans' langsung, jadi saat DOKU yang
-        // aktif pesanan tetap diminta ke Midtrans.
+        // nama provider yang aktif. Dulu nilainya ditulis langsung, jadi saat DOKU
+        // yang aktif pesanan tetap diminta ke gateway yang salah.
         state.paymentMethod = onlinePaymentMethod();
         state.cashTendered = null;
         state.cashTenderedType = null;

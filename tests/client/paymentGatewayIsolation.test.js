@@ -244,4 +244,18 @@ test('PGISO-10: checkout dan order-received memakai modul, tidak menulis "midtra
   assert.ok(received.includes('isOnlineMethod(payMethod)'), 'memakai pemeriksaan dari modul');
   assert.ok(received.includes('isOnlineMethod(payMethod)'),
     'order-received memakai pemeriksaan dari modul');
+
+  // Tidak ada nama provider yang ditulis tangan di halaman: modul yang tahu namanya.
+  assert.ok(!/state\.paymentMethod === 'midtrans'/.test(checkout),
+    'pilihan online tidak boleh membandingkan dengan nama provider');
+  assert.ok(checkout.includes('isOnlinePayment(state.paymentMethod)'),
+    'pilihan online memakai pemeriksaan dari modul');
+  assert.ok(!/Online Pay \(Midtrans/.test(received),
+    'label tidak boleh menuliskan nama provider sendiri');
+  assert.ok(received.includes('onlinePayLabel('), 'label diambil dari modul');
+
+  // Registry provider tinggal di satu tempat.
+  const moduleSrc = fs.readFileSync(MODULE_PATH, 'utf8');
+  assert.ok(moduleSrc.includes('var PROVIDERS = {'), 'nama provider terdaftar di modul');
+  assert.ok(moduleSrc.includes('function onlineLabel('), 'modul menyediakan label');
 });

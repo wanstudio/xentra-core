@@ -24,6 +24,14 @@
   var ONLINE_PROVIDERS = ['midtrans', 'doku'];
   var DEFAULT_PROVIDER = 'midtrans';
 
+  // Satu tempat yang tahu nama tiap provider. Halaman tidak menuliskan nama provider
+  // sendiri, jadi menambah provider baru tidak perlu menyentuh checkout/order-received.
+  // `channels` adalah daftar kanal yang ditawarkan provider itu, untuk label panjang.
+  var PROVIDERS = {
+    midtrans: { name: 'Midtrans', channels: 'Midtrans / QRIS' },
+    doku: { name: 'DOKU', channels: 'DOKU' }
+  };
+
   var gatewayConfig = null;
   var configPromise = null;
   var snapPromise = null;
@@ -92,6 +100,18 @@
   }
 
   /**
+   * Label pembayaran online untuk SATU pesanan.
+   *
+   * Mengikuti provider yang memproses pesanan itu, bukan provider yang kebetulan
+   * sedang aktif. Dipakai halaman supaya tidak ada nama provider yang ditulis tangan
+   * di sana.
+   */
+  function onlineLabel(method, withChannels) {
+    var info = PROVIDERS[String(method || '').toLowerCase()];
+    return 'Online Pay (' + (withChannels ? info.channels : info.name) + ')';
+  }
+
+  /**
    * Bayar pesanan yang sudah punya token/tautan dari server.
    *
    * Midtrans memakai Snap (butuh Snap.js); DOKU memakai halaman pembayarannya
@@ -152,6 +172,7 @@
     // provider mana yang aktif (dulu keduanya menulis 'midtrans' langsung).
     activeProvider: activeProvider,
     isOnlineMethod: isOnlineMethod,
+    onlineLabel: onlineLabel,
     onlineMethod: activeProvider
   };
 })();
