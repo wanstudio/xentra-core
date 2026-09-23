@@ -173,7 +173,7 @@ router.get('/brand/branches', (req, res) => {
       .prepare(`
         SELECT 
           b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone,
-          b.is_active, b.is_open_override, b.timezone,
+          b.is_active, b.is_open_override, b.timezone, b.reservation_max_guests,
           s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km,
           s.promo_delivery_discount, s.promo_min_order
         FROM branches b
@@ -7717,7 +7717,7 @@ router.get('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
 
 router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
-    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount, timezone } = req.body;
+    const { name, address_text, latitude, longitude, phone, whatsapp_number, is_active, is_open_override, is_delivery_active, is_pickup_active, free_delivery_km, price_per_km, max_radius_km, promo_min_order, promo_delivery_discount, timezone, reservation_max_guests } = req.body;
     const targetPhone = phone !== undefined ? phone : null;
     const targetWa = whatsapp_number !== undefined ? whatsapp_number : null;
 
@@ -7816,6 +7816,21 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
       }
     }
 
+    // Kapasitas reservasi: bilangan bulat 1..1000. 0 berarti DIKOSONGKAN lagi
+    // (reservasi jadi mati di aplikasi konsumen). NULL/undefined = tidak diubah,
+    // karena UPDATE memakai COALESCE.
+    let normalizedMaxGuests = null;
+    if (reservation_max_guests !== undefined && reservation_max_guests !== null && String(reservation_max_guests).trim() !== '') {
+      const n = Number(reservation_max_guests);
+      if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0 || n > 1000) {
+        return res.status(400).json({
+          success: false,
+          error: 'Kapasitas maksimal reservasi harus bilangan bulat antara 0 dan 1000. Isi 0 untuk mengosongkan.'
+        });
+      }
+      normalizedMaxGuests = n;
+    }
+
     if (targetWa !== null && targetWa !== undefined) {
       const cleanWaDigits = String(targetWa).replace(/[^0-9]/g, '');
       const isIndoMobile = cleanWaDigits.startsWith('08') || cleanWaDigits.startsWith('628') || cleanWaDigits.startsWith('8');
@@ -7840,6 +7855,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
             is_active = COALESCE(?, is_active),
             is_open_override = COALESCE(?, is_open_override),
             timezone = COALESCE(?, timezone),
+            reservation_max_guests = COALESCE(?, reservation_max_guests),
             updated_at = datetime('now')
         WHERE id = ? AND brand_id = ?
       `).run(
@@ -7852,6 +7868,7 @@ router.put('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         providedIsActive,
         providedIsOpenOverride,
         timezone !== undefined ? normalizedTimezone : null,
+        normalizedMaxGuests,
         req.params.id,
         req.brand_id
       );

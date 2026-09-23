@@ -1604,6 +1604,12 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN fulfillment_type TEXT DEFAULT "delivery";'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN table_number TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN dining_session_id TEXT;'); } catch (e) {}
+
+  // Kapasitas maksimal reservasi, DIISI MANUAL manager cabang per cabang.
+  // NULL = belum diisi → reservasi dimatikan di aplikasi konsumen.
+  // Tidak dihitung dari denah meja: meja berbeda-beda (2/4/12 orang), jadi
+  // menjumlahkan kapasitas meja itu pukul rata dan hasilnya bukan kapasitas nyata.
+  try { targetDb.exec('ALTER TABLE branches ADD COLUMN reservation_max_guests INTEGER;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN client_transaction_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN cash_tendered REAL;'); } catch (e) {}
 
