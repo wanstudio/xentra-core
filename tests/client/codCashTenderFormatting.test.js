@@ -616,6 +616,10 @@ test('T21: ringkasan reservasi memakai tanggal realtime + zona waktu cabang', ()
 
   // Bentuk tampilannya.
   assert.ok(code.includes("(long ? ' (' + UI.escape(long) + ')' : '')"), 'tanggal panjang dalam tanda kurung');
+  // Tanpa gaya sendiri: baris utama di <strong> milik komponen, baris kedua teks biasa.
+  assert.ok(code.includes("'<strong>' + UI.escape(lbl)"), 'baris utama memakai <strong> komponen');
+  assert.ok(!code.includes("'<br>'"), 'tidak boleh menyusun baris sendiri dengan <br>');
+  assert.ok(!/x-res-summary-text"[^>]*style=/.test(code), 'ringkasan tidak boleh diberi gaya sendiri');
   assert.ok(code.includes("'Pukul ' + UI.escape(jam) + ' ' + UI.escape(branchTzLabel())"),
     'baris kedua: Pukul <jam> <zona>');
   assert.ok(code.includes("' | (' + (draft.guestCount || 2) + ' orang)'"), 'jumlah orang huruf kecil');
