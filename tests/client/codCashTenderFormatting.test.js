@@ -459,7 +459,15 @@ test('T14: reservasi wajib isi nama pemesan & nomor WhatsApp', () => {
     'validasi dipakai satu tempat (tombol sheet & jalur submit)');
 
   // Bar informasi & label CTA.
-  assert.ok(code.includes('Kami akan menghubungi Anda untuk konfirmasi'), 'bar informasi reservasi');
+  // Bar hijau mengikuti tipe pembelian; kalimat konfirmasi hanya untuk reservasi.
+  assert.ok(code.includes('id="x-ful-promo-text"'), 'teks bar hijau punya id');
+  assert.ok(code.includes("'Kami akan segera menghubungi Anda untuk konfirmasi'"),
+    'reservasi: kalimat konfirmasi di bar hijau');
+  assert.ok(code.includes("'Ketersediaan promo tergantung pada tipe pembelian'"),
+    'tipe lain: catatan promo tetap ada');
+  // Centang berada DI ATAS field, karena mengisi field di bawahnya.
+  assert.ok(code.indexOf('id="x-res-use-account"') < code.indexOf('for="x-res-name"'),
+    'centang "Gunakan akun Anda" harus di atas Nama Pemesan');
   assert.ok(code.includes("if (isReservation) return 'Reservasi';"), 'CTA berlabel Reservasi');
 });
 

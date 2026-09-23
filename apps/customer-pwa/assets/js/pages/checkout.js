@@ -1738,7 +1738,7 @@
       '  </div>' +
       '  <div class="x-fulfillment-promo">' +
       '    <span class="x-fulfillment-promo-icon">i</span>' +
-      '    <span>Ketersediaan promo tergantung pada tipe pembelian</span>' +
+      '    <span id="x-ful-promo-text">Ketersediaan promo tergantung pada tipe pembelian</span>' +
       '  </div>' +
       '  <div class="x-fulfillment-actions">' +
       '    <button type="button" class="x-fulfillment-cancel" id="x-ful-btn-cancel">Gak jadi</button>' +
@@ -1862,6 +1862,15 @@
     }
 
     function renderScheduleSection() {
+      // Bar hijau mengikuti tipe pembelian: catatan promo hanya relevan untuk
+      // pembelian, sedangkan reservasi butuh janji konfirmasi. Satu tempat saja.
+      var promoText = document.getElementById('x-ful-promo-text');
+      if (promoText) {
+        promoText.textContent = (draft.type === 'reservation')
+          ? 'Kami akan segera menghubungi Anda untuk konfirmasi'
+          : 'Ketersediaan promo tergantung pada tipe pembelian';
+      }
+
       if (draft.type === 'dine_in') {
         renderDineInFloorPlan();
         return;
@@ -2018,18 +2027,18 @@
         '  </div>' +
         '</div>' +
         '  <div class="x-res-contact">' +
+         '    <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#374151;margin-bottom:10px;">' +
+         '      <input type="checkbox" id="x-res-use-account" style="width:16px;height:16px;accent-color:#16a34a;">' +
+         '      <span>Gunakan akun Anda untuk reservasi</span>' +
+         '    </label>' +
          '    <label class="x-res-contact-label" for="x-res-name">Nama Pemesan</label>' +
          '    <input id="x-res-name" class="x-res-contact-input" type="text" autocomplete="name" value="">' +
          '    <label class="x-res-contact-label" for="x-res-phone">Nomor WhatsApp</label>' +
          '    <input id="x-res-phone" class="x-res-contact-input" type="tel" inputmode="numeric" autocomplete="tel" value="">' +
          '    <div class="x-res-contact-hint">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
-         '    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:#374151;font-family:inherit;">' +
-         '      <input type="checkbox" id="x-res-use-account" style="width:16px;height:16px;accent-color:#16a34a;">' +
-         '      <span>Gunakan akun Anda untuk reservasi</span>' +
-         '    </label>' +
          '  </div>' +
          '<div class="x-fulfillment-selected-summary">' +
-         '  <span>Kami akan menghubungi Anda untuk konfirmasi</span>' +
+         '  <span>Reservasi kedatangan</span>' +
         '  <strong id="x-res-summary-text"></strong>' +
         '</div>';
 
