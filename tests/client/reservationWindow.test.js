@@ -16,6 +16,8 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '../..');
 const checkoutSrc = fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/pages/checkout.js'), 'utf8');
 const placementSrc = fs.readFileSync(path.join(ROOT, 'domains/commerce/services/OrderPlacementService.js'), 'utf8');
+// Fulfillment environment: sumber kebenaran field fulfillment per tipe.
+const envSrc = fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/core/fulfillment-environments.js'), 'utf8');
 
 function reservationSection() {
   const start = checkoutSrc.indexOf('function renderReservationSection');
@@ -47,8 +49,16 @@ test('RSV-02: date wheel starts tomorrow (Besok), never today', () => {
 test('RSV-03: server/dashboard receives an ISO date, never the Besok label', () => {
   const body = reservationSection();
   assert.ok(body.includes('value: d.iso'), 'wheel value must be the ISO date');
-  // Submit path carries the ISO value through to reservation_date.
-  assert.ok(checkoutSrc.includes('reservation_date: state.fulfillment.reservationDate'), 'submit must send reservationDate as reservation_date');
+  // Submit path carries the ISO value through to reservation_date. Sejak isolasi
+  // environment, nilainya diambil dari state milik environment reservasi.
+  assert.ok(
+    envSrc.includes('var reservationDate = ownsReservation ? (env.state.reservationDate || null) : null'),
+    'reservation_date harus berasal dari state reservasi, bukan state bersama'
+  );
+  assert.ok(
+    checkoutSrc.includes('reservation_date: envPayload.topLevel.reservation_date'),
+    'submit must send reservationDate as reservation_date'
+  );
   assert.ok(checkoutSrc.includes('state.fulfillment.reservationDate = draft.reservationDate'), 'draft date must commit the ISO value to state');
 });
 

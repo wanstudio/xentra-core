@@ -320,8 +320,8 @@ test('T12: scanning a table QR lands the customer on that table', () => {
     'the claim must go through the server, with the branch it is used in');
   assert.ok(code.includes('state.fulfillment.table_ids = [table.id]'),
     'the scanned table must become the single selection');
-  assert.ok(code.includes("state.fulfillment.type = 'dine_in'"),
-    'scanning a table means eating in');
+  assert.ok(code.includes("switchFulfillmentEnvironment('dine_in')"),
+    'scanning a table switches to the dine-in environment');
   assert.ok(!code.includes('if (bill) state.openBill = bill;'),
     'the QR must not open a bill: a permanently taped QR is not a key');
 

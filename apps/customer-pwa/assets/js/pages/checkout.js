@@ -23,6 +23,10 @@
   // is DEVICE-LOCAL. The customer schedule picker NEVER uses the server or
   // WordPress timezone as its current-time source.
   var DeliverySchedule = window.Xentra && window.Xentra.DeliverySchedule;
+  // Fulfillment environment: Delivery / Pickup / Dine-in / Reservation. Masing-masing
+  // punya state, validasi, dan field payload sendiri. Isolasinya ada di
+  // core/fulfillment-environments.js, bukan lagi di satu objek bersama.
+  var FulfillmentEnv = window.Xentra && window.Xentra.FulfillmentEnvironments;
 
   var checkoutContainer = null;
   var upsellItems = [];
@@ -33,18 +37,21 @@
   // null = no scope filter (legacy whole-cart flow).
   var currentBranchId = null;
 
+  // state.fulfillment MENUNJUK ke state milik environment yang sedang aktif.
+  // Tiap tipe punya objeknya sendiri, jadi nilai satu tipe tidak pernah terbaca
+  // tipe lain. Penggantian tipe lewat switchFulfillmentEnvironment().
   var state = {
-    fulfillment: {
-      type: 'delivery', // 'delivery' | 'pickup' | 'dinein' (mapped to dine_in) | 'reservation'
+    fulfillment: (FulfillmentEnv && FulfillmentEnv.getActive().state) || {
+      type: 'delivery',
       scheduled: false,
       date: 'Hari Ini',
       timeSlot: '12.00 - 12.30',
-      typeLabel: 'Delivery',
       note: '',
       tableNumber: '',
+      table_ids: [],
       reservationDate: '',
       reservationTime: '12:00',
-      guestCount: 2,
+      guestCount: null,
       reservationName: '',
       reservationPhone: ''
     },
@@ -449,6 +456,15 @@
     claimTableFromQr(token);
   }
 
+  // Kode meja hanya unik per cabang, jadi cabang yang sedang dipakai harus ikut
+  // dikirim supaya "meja7" tidak nyasar ke Meja 7 di cabang lain. Jalur ini milik
+  // dine-in saja; tidak ada tipe lain yang memakainya.
+  function claimBranchId() {
+    if (currentBranchId && currentBranchId !== '__unassigned__') return currentBranchId;
+    if (state.matchedBranch && state.matchedBranch.id) return state.matchedBranch.id;
+    return null;
+  }
+
   function claimTableFromQr(qrToken) {
     if (!qrToken || !API) return Promise.resolve(null);
 
@@ -472,7 +488,7 @@
 
       // Meja dari QR mengunci pilihannya: satu meja, tidak bisa diganti.
       if (table && table.id) {
-        state.fulfillment.type = 'dine_in';
+        switchFulfillmentEnvironment('dine_in');
         state.fulfillment.table_ids = [table.id];
         state.fulfillment.tableNumber = table.table_number || '';
         if (Store.setMyTable) Store.setMyTable({ id: table.id, number: table.table_number || '' });
@@ -514,6 +530,28 @@
   // membukanya lagi nanti, cukup ubah satu baris ini menjadi true.
   var ALLOW_MULTI_TABLE_SELECT = false;
 
+  // ── Ganti environment fulfillment ──
+  // Environment LAMA di-unmount dulu (listener dilepas, state sementaranya
+  // dibuang), baru yang baru di-mount. Jadi tidak ada listener atau nilai sisa
+  // dari tipe sebelumnya yang masih hidup.
+  function switchFulfillmentEnvironment(nextType) {
+    if (!FulfillmentEnv) {
+      state.fulfillment.type = nextType;
+      return state.fulfillment;
+    }
+    var prevType = FulfillmentEnv.getActive().type;
+    var env = FulfillmentEnv.switchTo(nextType);
+    state.fulfillment = env.state;
+
+    // Recipient adalah snapshot per transaksi, bukan milik tipe mana pun. Kalau
+    // reservasi sempat mengisinya, jangan sampai terbawa ke tipe berikutnya.
+    if (prevType === 'reservation' && env.type !== 'reservation') {
+      state.recipient = { type: 'self', name: '', phone: '' };
+      if (Store && typeof Store.clearRecipient === 'function') Store.clearRecipient();
+    }
+    return state.fulfillment;
+  }
+
   // ── Mount ──
   function mount(container) {
     checkoutContainer = container || $('xentra-checkout-view');
@@ -538,7 +576,7 @@
       var storedOrderType = Store.getState().orderType;
       var storedIsDineIn = storedOrderType === 'dine_in' || storedOrderType === 'dinein';
       if (storedIsDineIn && storedTable && storedTable.id && !((state.fulfillment.table_ids || []).length)) {
-        state.fulfillment.type = 'dine_in';
+        switchFulfillmentEnvironment('dine_in');
         state.fulfillment.table_ids = [storedTable.id];
         state.fulfillment.tableNumber = storedTable.number || '';
       }
@@ -562,7 +600,7 @@
 
     // Restore order type & fulfillment note
     if (storeState.orderType) {
-      state.fulfillment.type = storeState.orderType;
+      switchFulfillmentEnvironment(storeState.orderType);
     }
     var orderCtx = storeState.orderContext && storeState.orderContext[state.fulfillment.type];
     if (orderCtx && typeof orderCtx.note === 'string') {
@@ -2618,7 +2656,9 @@
           }
         }
 
-        // Commit to state.fulfillment
+        // Commit to state.fulfillment — tipe berganti lebih dulu supaya penulisan
+        // di bawah ini masuk ke environment yang benar, bukan yang lama.
+        switchFulfillmentEnvironment(draft.type);
         state.fulfillment.type = draft.type;
         state.fulfillment.scheduled = Boolean(draft.scheduled);
         if (draft.type === 'delivery' || draft.type === 'pickup') {
@@ -4052,6 +4092,30 @@
     return cartItems.every(function (it) { return set[String(it.id)]; });
   }
 
+  // Bentuk field fulfillment untuk payload order. Sumbernya environment aktif —
+  // bukan state bersama — sehingga tidak ada nilai tipe lain yang bisa terbawa.
+  function buildFulfillmentPayload() {
+    if (FulfillmentEnv) {
+      var env = FulfillmentEnv.getActive();
+      // Kalau tipe state berbeda dari environment aktif (mis. dipulihkan dari
+      // penyimpanan), environment-nya diselaraskan lebih dulu.
+      if (FulfillmentEnv.normalize(state.fulfillment.type) !== env.type) {
+        env = FulfillmentEnv.switchTo(state.fulfillment.type);
+        state.fulfillment = env.state;
+      }
+      return env.payloadFields();
+    }
+    var t = state.fulfillment.type === 'dinein' ? 'dine_in' : state.fulfillment.type;
+    var tn = state.fulfillment.tableNumber || null;
+    var ti = Array.isArray(state.fulfillment.table_ids) ? state.fulfillment.table_ids : [];
+    var rd = state.fulfillment.reservationDate || null;
+    var gc = state.fulfillment.guestCount || null;
+    return {
+      fulfillment: { type: t, table_number: tn, table_ids: ti, reservation_date: rd, guest_count: gc },
+      topLevel: { table_number: tn, table_ids: ti, reservation_date: rd, guest_count: gc }
+    };
+  }
+
   function proceedCreateOrder() {
     var btn = $('x-btn-submit-order');
     if (btn) btn.textContent = 'Memproses pesanan…';
@@ -4088,6 +4152,10 @@
       return { start: state.fulfillment.date + ' ' + state.fulfillment.timeSlot, end: null };
     }
 
+    // Field fulfillment HANYA diambil dari environment aktif. Field milik tipe lain
+    // selalu netral, jadi meja dine-in tidak mungkin ikut terkirim di order delivery.
+    var envPayload = buildFulfillmentPayload();
+
     var clientTxId = 'ctx_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 8);
     var payload = {
       client_transaction_id: clientTxId,
@@ -4098,18 +4166,12 @@
       },
       recipient: isRecipientSelf() ? { type: 'self' } : (state.recipient || { type: 'other', name: '', phone: '' }),
       pwa_runtime: pwaRuntime,
-      order_type: fulType === 'dinein' ? 'dine_in' : fulType,
-      fulfillment: {
-        type: fulType === 'dinein' ? 'dine_in' : fulType,
-        table_number: state.fulfillment.tableNumber || null,
-        table_ids: Array.isArray(state.fulfillment.table_ids) ? state.fulfillment.table_ids : [],
-        reservation_date: state.fulfillment.reservationDate || null,
-        guest_count: state.fulfillment.guestCount || null
-      },
-      table_number: state.fulfillment.tableNumber || null,
-      table_ids: Array.isArray(state.fulfillment.table_ids) ? state.fulfillment.table_ids : [],
-      reservation_date: state.fulfillment.reservationDate || null,
-      guest_count: state.fulfillment.guestCount || null,
+      order_type: envPayload.fulfillment.type,
+      fulfillment: envPayload.fulfillment,
+      table_number: envPayload.topLevel.table_number,
+      table_ids: envPayload.topLevel.table_ids,
+      reservation_date: envPayload.topLevel.reservation_date,
+      guest_count: envPayload.topLevel.guest_count,
       schedule_type: state.fulfillment.scheduled ? 'scheduled' : 'asap',
       scheduled_slot_start: state.fulfillment.scheduled ? resolveScheduledIso().start : null,
       scheduled_slot_end: state.fulfillment.scheduled ? resolveScheduledIso().end : null,
@@ -4140,12 +4202,8 @@
       note: state.fulfillment.note || ''
     };
 
-    function onSuccess(orderId, snapToken) {
+    function onSuccess(orderId, snapToken, redirectUrl) {
       state.isSubmitting = false;
-      // Recipient is transaction-scoped: this order already carries its own
-      // recipient snapshot, so the next checkout starts from SELF (profile
-      // name/phone) unless the customer fills the Detail alamat fields again.
-      // Never let a previous order's recipient silently apply to a new one.
       if (Store && typeof Store.clearRecipient === 'function') Store.clearRecipient();
       state.recipient = { type: 'self', name: '', phone: '' };
       if (snapToken && state.paymentMethod === 'midtrans' && window.snap && window.snap.pay) {
@@ -4155,6 +4213,8 @@
           onError: function () { Router.navigate('order-received', { orderId: orderId }); },
           onClose: function () { Router.navigate('order-received', { orderId: orderId }); }
         });
+      } else if (state.paymentMethod === 'doku' && redirectUrl) {
+        window.location.href = redirectUrl;
       } else {
         Router.navigate('order-received', { orderId: orderId });
       }
@@ -4225,7 +4285,8 @@
       if (res && res.success && (res.order_id || res.order)) {
         var oid = res.order_id || (res.order && res.order.id) || (res.order && res.order.order_id);
         var st = res.snap_token || (res.payment && res.payment.snap_token) || null;
-        onSuccess(oid, st);
+        var rUrl = res.redirect_url || (res.payment && res.payment.redirect_url) || null;
+        onSuccess(oid, st, rUrl);
       } else {
         onFail(res);
       }
