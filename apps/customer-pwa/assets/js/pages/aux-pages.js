@@ -235,7 +235,9 @@
         '    </button>';
     }
     if (isAuthenticated) {
-      actionHtml = '    <button type="button" class="x-profile-logout-btn" id="x-profile-logout">Keluar dari Akun</button>';
+      actionHtml = '    <button type="button" class="x-profile-logout-btn" id="x-profile-logout">Keluar dari Akun</button>' +
+        '    <p class="x-profile-subtitle" style="font-size:11.5px;color:#94a3b8;margin:14px 0 6px;">Menghapus akun berarti Anda keluar dari akun ini, dan alamat serta sesi Anda hilang. Riwayat pesanan tetap tersimpan di resto, tanpa terhubung lagi ke Anda.</p>' +
+        '    <button type="button" id="x-profile-delete" style="width:100%;height:44px;border-radius:999px;border:2px solid #fecaca;background:#fff;color:#dc2626;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;">Hapus Akun</button>';
     } else {
       actionHtml =
         '    <button type="button" class="x-profile-google-btn" id="x-profile-login">' +
@@ -366,6 +368,39 @@
                       'Gagal menghubungi server. Periksa koneksi internet lalu coba lagi.';
             if (UI && UI.toast) UI.toast(msg);
           });
+      };
+    }
+
+    var deleteAccBtn = container.querySelector('#x-profile-delete');
+    if (deleteAccBtn) {
+      deleteAccBtn.onclick = function () {
+        // Dua langkah: mengetik, bukan sekadar menekan "Ya" — supaya tidak terhapus
+        // karena salah tekan.
+        var typed = prompt('Menghapus akun tidak bisa dibatalkan. Ketik HAPUS AKUN untuk melanjutkan:');
+        if (typed === null) return;
+        if (String(typed).trim().toUpperCase() !== 'HAPUS AKUN') {
+          if (UI && UI.toast) UI.toast('Penulisan tidak cocok. Akun tidak dihapus.');
+          return;
+        }
+        // Konfirmasi lewat QUERY: permintaan DELETE yang membawa body dijawab 400
+        // kosong oleh rantai middleware, jadi body tidak bisa diandalkan di sini.
+        API.del('/customer/account?confirm=HAPUS').then(function (res) {
+          if (!res || res.success !== true) {
+            if (UI && UI.toast) UI.toast((res && res.error) || 'Gagal menghapus akun.');
+            return;
+          }
+          // Bersihkan data lokal: sesi, keranjang, penerima, dan meja yang dipegang.
+          try {
+            if (Store && typeof Store.clearCustomerSession === 'function') Store.clearCustomerSession();
+            if (Store && typeof Store.clearCart === 'function') Store.clearCart();
+            if (Store && typeof Store.clearRecipient === 'function') Store.clearRecipient();
+            if (Store && typeof Store.clearMyTable === 'function') Store.clearMyTable();
+          } catch (_) {}
+          if (UI && UI.toast) UI.toast('Akun Anda sudah dihapus.');
+          mountProfile(container);
+        }).catch(function () {
+          if (UI && UI.toast) UI.toast('Koneksi bermasalah. Akun belum dihapus.');
+        });
       };
     }
 
