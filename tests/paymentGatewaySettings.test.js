@@ -252,6 +252,24 @@ test('PAYMENT GATEWAY — kredensial tersimpan & satu gateway online aktif', asy
     assert.ok(!/function saveSettingsPayments\s*\(/.test(DASHBOARD_JS),
       'fungsi simpan bersama yang membaca kedua gateway harus hilang');
 
+    // Pengaturan ini fokus menyimpan kredensial: tidak ada status aktif/nonaktif
+    // di tab gateway — itu urusan Finance → Payment Methods.
+    ['payment-tab-midtrans-status', 'payment-tab-doku-status'].forEach((id) => {
+      assert.ok(!DASHBOARD_HTML.includes(id), 'badge status ' + id + ' harus dihapus dari markup');
+      assert.ok(!DASHBOARD_JS.includes(id), 'badge status ' + id + ' tidak boleh lagi disentuh JavaScript');
+    });
+    assert.ok(!DASHBOARD_JS.includes('updateProviderStatusBadges'),
+      'fungsi badge status harus hilang, bukan hanya tidak dipanggil');
+    // Dibatasi ke panel payment gateway: di bagian lain dashboard, kata "Aktif"
+    // memang dipakai untuk hal yang berbeda.
+    const gatewayPanel = DASHBOARD_HTML.slice(
+      DASHBOARD_HTML.indexOf('id="settings-panel-commerce-payments"'),
+      DASHBOARD_HTML.indexOf('id="settings-panel-commerce-fulfillment"')
+    );
+    assert.ok(gatewayPanel.length > 0, 'panel payment gateway harus ditemukan');
+    assert.ok(!/>Aktif<|>Nonaktif<|>Siap</.test(gatewayPanel),
+      'panel kredensial tidak boleh menampilkan status Aktif/Nonaktif/Siap');
+
     // Tiap tombol menunjuk ke fungsinya masing-masing.
     assert.ok(DASHBOARD_HTML.includes('id="form-settings-payments-midtrans" onsubmit="saveSettingsPaymentsMidtrans(event)"'),
       'form Midtrans menuju fungsi Midtrans');

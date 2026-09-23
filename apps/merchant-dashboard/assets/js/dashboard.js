@@ -8262,41 +8262,6 @@
     }
     window.switchPaymentTab = switchPaymentTab;
 
-    function updateProviderStatusBadges(activeProvider, midtransConfigured, dokuConfigured) {
-      var midBadge = $('payment-tab-midtrans-status');
-      var dokuBadge = $('payment-tab-doku-status');
-      if (midBadge) {
-        if (activeProvider === 'midtrans') {
-          midBadge.textContent = 'Aktif';
-          midBadge.style.background = '#dcfce7';
-          midBadge.style.color = '#166534';
-        } else if (midtransConfigured) {
-          midBadge.textContent = 'Siap';
-          midBadge.style.background = '#fef3c7';
-          midBadge.style.color = '#92400e';
-        } else {
-          midBadge.textContent = 'Nonaktif';
-          midBadge.style.background = '#e2e8f0';
-          midBadge.style.color = '#64748b';
-        }
-      }
-      if (dokuBadge) {
-        if (activeProvider === 'doku') {
-          dokuBadge.textContent = 'Aktif';
-          dokuBadge.style.background = '#dcfce7';
-          dokuBadge.style.color = '#166534';
-        } else if (dokuConfigured) {
-          dokuBadge.textContent = 'Siap';
-          dokuBadge.style.background = '#fef3c7';
-          dokuBadge.style.color = '#92400e';
-        } else {
-          dokuBadge.textContent = 'Nonaktif';
-          dokuBadge.style.background = '#e2e8f0';
-          dokuBadge.style.color = '#64748b';
-        }
-      }
-    }
-
     var _paymentTabInitialised = false;
 
     async function loadSettingsPayments() {
@@ -8330,11 +8295,8 @@
 
         var activeProvider = ps.active_provider || 'midtrans';
 
-        updateProviderStatusBadges(
-          activeProvider,
-          Boolean(ps.server_key_configured),
-          Boolean(ps.doku_client_id_configured)
-        );
+        // Tab gateway tidak menampilkan status aktif/nonaktif: pengaturan ini fokus
+        // pada penyimpanan kredensial. Aktif/nonaktifnya ada di Finance → Payment Methods.
 
         // Setiap environment memuat bagiannya SENDIRI — Midtrans hanya menyentuh field
         // Midtrans, DOKU hanya field DOKU. Tidak ada lingkungan yang mengosongkan input
