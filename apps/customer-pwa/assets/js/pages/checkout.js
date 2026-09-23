@@ -2029,7 +2029,7 @@
         '  </div>' +
         '</div>' +
         '<div class="x-res-card" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:18px 16px;margin-top:12px;">' +
-        '<div class="x-dinein-guest-row" style="background:transparent;border:0;padding:0;margin-bottom:16px;">' +
+        '<div class="x-dinein-guest-row" style="background:transparent;border:0;padding:0;margin-bottom:22px;">' +
         '  <div style="display:flex;flex-direction:column;">' +
         '    <span class="x-dinein-guest-label" style="font-size:13.5px;font-weight:800;color:#111827;">Jumlah Orang</span>' +
         '    <span style="font-size:11.5px;font-weight:400;color:#9ca3af;margin-top:2px;">(kapasitas maksimal ' + GUEST_MAX + ' orang)</span>' +
@@ -2058,7 +2058,7 @@
          '      <div class="x-loc-form-label">Nomor WhatsApp <span class="wajib">(wajib)</span></div>' +
          '      <input type="tel" id="x-res-phone" class="x-loc-form-input" inputmode="numeric" autocomplete="tel" placeholder="" value="">' +
          '    </div>' +
-         '    <div class="x-res-contact-hint" style="font-size:11.5px;color:#6b7280;margin-top:6px;">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
+         '    <div class="x-res-contact-hint" style="font-size:11.5px;color:#6b7280;margin:6px 0 14px;">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
          '<div class="x-fulfillment-selected-summary" style="margin-bottom:0;">' +
          '  <span>Rincian reservasi kedatangan</span>' +
         '  <strong id="x-res-summary-text"></strong>' +
