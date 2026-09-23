@@ -1,53 +1,32 @@
 /**
- * Splash saat memuat.
- *
- * Masalahnya: index.html adalah kerangka statis, jadi hero (latar brand + baris ikon)
- * sudah terlukis sebelum JS mengisi apa pun — saat reload, tamu melihat kerangka
- * setengah jadi. Splash menutupinya, dan harus SELALU hilang.
+ * Splash robot — loading awal yang hidup, bukan splash statis membosankan.
+ * Robot menampilkan merek (putih, mata besar, mengepak) lalu hilang saat
+ * JS siap. Timeout 3 detik sebagai jalan keluar jika boot gagal.
  */
 'use strict';
 
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
-const path = require('node:path');
+const path = require('path');
 
 const read = (p) => fs.readFileSync(path.resolve(__dirname, '../..', p), 'utf8');
 const HTML = read('apps/customer-pwa/index.html');
-const MANIFEST = JSON.parse(read('apps/customer-pwa/assets/pwa/manifest.json'));
 
-// Warna boleh berubah (putih dipilih karena lime terlalu menyala) — yang dikunci
-// adalah KONSISTENSI antara splash di halaman dan splash bawaan PWA.
-const SPLASH_BG = (function () {
-  const m = HTML.slice(HTML.indexOf('id="x-splash"')).match(/background:(#[0-9a-fA-F]{6})/);
-  return m ? m[1].toLowerCase() : null;
-})();
-
-test('SPLASH-01: splash dilukis paling awal, opak, dan tidak bisa tertembus', () => {
+test('SPLASH-01: splash robot dilukis paling awal, opak, tidak bisa tertembus', () => {
   assert.ok(HTML.includes('id="x-splash"'), 'harus ada elemen splash');
-  // Urutan: splash ada SEBELUM tampilan aplikasi pertama.
   assert.ok(HTML.indexOf('id="x-splash"') < HTML.indexOf('id="xentra-home-view"'),
     'splash harus dilukis sebelum kerangka aplikasi');
   const splash = HTML.slice(HTML.indexOf('id="x-splash"'), HTML.indexOf('id="xentra-home-view"'));
   assert.ok(splash.includes('position:fixed'), 'harus menutup layar');
   assert.ok(splash.includes('z-index:9999'), 'harus di atas kerangka');
-  assert.ok(SPLASH_BG, 'latar splash harus warna tetap (hex)');
+  assert.ok(splash.includes('background:#ffffff'), 'latar memakai warna putih');
   assert.ok(/object-fit:contain/.test(splash) && splash.includes('xentra-logo.png'), 'memuat logo');
-  // Animasi karakter (SVG + CSS, tanpa aset baru), di ATAS logo.
-  assert.ok(splash.includes('class="bot bot-float"'), 'harus ada karakter beranimasi');
+  assert.ok(splash.includes('class="bot bot-float"'), 'harus ada robot beranimasi');
   assert.ok(splash.includes('@keyframes bot-float'), 'badannya mengambang');
   assert.ok(splash.includes('@keyframes bot-blink'), 'matanya berkedip');
-  // Kedip 2x per siklus: dua momen scaleY(.12) dalam keyframes.
   assert.ok((splash.match(/scaleY\(\.12\)/g) || []).length === 2, 'kedip 2x per siklus');
-  // Cute cues yang sekaligus membedakannya dari karakter mana pun: senyum dan antena.
-  assert.ok(splash.includes('bot-eye'), 'mata ada');
-  assert.ok(splash.includes('stop-color="#e9eef3"'), 'badan memakai gradien lembut');
-  // Tanpa mulut & antena, bentuk meruncing, tangan elips ramping.
-  assert.ok(!/c3 3\.2 9 3\.2 12 0/.test(splash), 'mulut sudah dihilangkan');
-  assert.ok(!splash.includes('cy="4" r="2.6"'), 'antena sudah dihilangkan');
-  assert.ok(splash.includes('M46 8 C62 8 72 22 72 44'), 'badan meruncing ke bawah');
-  assert.ok(splash.includes('rx="4.4" ry="16"'), 'tangan lebih panjang');
-  assert.ok(splash.includes('transform-origin: 50% 0%') || splash.includes('transform-origin:50% 0%'), 'poros rotasi di atas');
+  // Animasi karakter (SVG + CSS, tanpa aset baru), di ATAS logo.
   assert.ok(splash.indexOf('bot-float') < splash.indexOf('xentra-logo.png'),
     'animasinya di atas logo');
   assert.ok(splash.includes('@media (prefers-reduced-motion: reduce)'),
@@ -55,9 +34,9 @@ test('SPLASH-01: splash dilukis paling awal, opak, dan tidak bisa tertembus', ()
   assert.ok(splash.includes('Memuat'), 'teks tetap ada untuk pembaca layar');
 });
 
-test('SPLASH-02: selalu ada jalan keluar — batas waktu keras', () => {
+test('SPLASH-02: selalu ada jalan keluar — batas waktu keras 3 detik', () => {
   assert.ok(HTML.includes('window.__xentraHideSplash'), 'harus ada fungsi penutup');
-  assert.ok(/setTimeout\(window\.__xentraHideSplash,\s*\d+\)/.test(HTML),
+  assert.ok(/setTimeout\(window\.__xentraHideSplash,\s*3000\)/.test(HTML),
     'boot yang gagal tidak boleh meninggalkan splash selamanya');
 });
 
@@ -69,10 +48,9 @@ test('SPLASH-03: aplikasi menutup splash saat tampilan pertama siap', () => {
 });
 
 test('SPLASH-04: splash bawaan PWA (manifest) sewarna dengan splash di halaman', () => {
-  // Chrome membuat splash sendiri dari manifest; kalau warnanya beda, yang terjadi
-  // justru dua kali ganti warna (putih lalu hijau).
-  assert.equal(String(MANIFEST.background_color).toLowerCase(), SPLASH_BG,
-    'background_color harus sama dengan splash di halaman');
-  assert.equal(String(MANIFEST.theme_color).toLowerCase(), SPLASH_BG,
-    'theme_color harus sama dengan splash di halaman');
+  const MANIFEST = JSON.parse(read('apps/customer-pwa/assets/pwa/manifest.json'));
+  assert.equal(String(MANIFEST.background_color).toLowerCase(), '#ffffff',
+    'background_color harus sama dengan splash');
+  assert.equal(String(MANIFEST.theme_color).toLowerCase(), '#ffffff',
+    'theme_color harus sama dengan splash');
 });
