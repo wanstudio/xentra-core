@@ -234,13 +234,17 @@
   function mountAccountSettings(container) {
     if (!container) return;
     container.innerHTML =
-      '<div class="x-aux-header">' +
-      '  <button type="button" class="x-aux-back" id="x-acc-back"><img src="/assets/icons/arrowback.svg" alt="Kembali" style="width:18px;"></button>' +
-      '  <h1 class="x-aux-title">Pengaturan Akun</h1>' +
-      '</div>' +
-      '<div class="x-aux-body">' +
-      '  <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 14px;">Menghapus akun berarti Anda keluar dari akun ini, dan alamat serta sesi Anda hilang. Riwayat pesanan tetap tersimpan di resto, tanpa terhubung lagi ke Anda.</p>' +
-      '  <button type="button" id="x-profile-delete" style="width:100%;height:46px;border-radius:12px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;">Hapus Akun</button>' +
+      '<div class="x-aux-page">' +
+      '  <div class="x-aux-header">' +
+      '    <button type="button" class="x-aux-back-btn" id="x-acc-back" aria-label="Kembali">' +
+      '      <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
+      '    </button>' +
+      '    <h1 class="x-aux-title">Pengaturan Akun</h1>' +
+      '  </div>' +
+      '  <div class="x-aux-body">' +
+      '    <p style="font-size:12.5px;color:#64748b;line-height:1.5;margin:0 0 14px;">Menghapus akun berarti Anda keluar dari akun ini, dan alamat serta sesi Anda hilang. Riwayat pesanan tetap tersimpan di resto, tanpa terhubung lagi ke Anda.</p>' +
+      '    <button type="button" id="x-profile-delete" style="width:100%;height:46px;border-radius:12px;border:1.5px solid #fecaca;background:#fff;color:#dc2626;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;">Hapus Akun</button>' +
+      '  </div>' +
       '</div>';
     var back = container.querySelector('#x-acc-back');
     if (back) back.onclick = function () { Router.navigate('profile'); };

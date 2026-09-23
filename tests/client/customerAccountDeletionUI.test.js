@@ -73,3 +73,15 @@ test('DELUI-06: halaman Pengaturan Akun terdaftar di router dan shell', () => {
   assert.ok(shell.includes('id="xentra-account-settings-view"'), 'container halamannya ada');
   assert.ok(shell.includes('window.XentraAuxPages.mountAccountSettings('), 'shell memasang halamannya');
 });
+
+test('DELUI-07: header & tombol back sama dengan halaman Pesanan', () => {
+  // Pola yang dipakai halaman Riwayat Pesanan: pembungkus .x-aux-page, header
+  // .x-aux-header, tombol .x-aux-back-btn dengan aria-label, judul .x-aux-title.
+  const block = src.slice(src.indexOf('function mountAccountSettings'), src.indexOf('function mountProfile'));
+  ['x-aux-page', 'x-aux-header', 'x-aux-back-btn', 'aria-label="Kembali"', 'x-aux-title', 'x-aux-body'].forEach(function (token) {
+    assert.ok(block.includes(token), 'harus memakai ' + token + ' seperti halaman Pesanan');
+  });
+  assert.ok(block.includes('<img src="/assets/icons/arrowback.svg" alt="Kembali">'),
+    'ikon panahnya sama');
+  assert.ok(!block.includes('class="x-aux-back"'), 'kelas tombol back lama harus hilang');
+});
