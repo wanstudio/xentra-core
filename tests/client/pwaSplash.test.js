@@ -1,0 +1,52 @@
+/**
+ * Splash saat memuat.
+ *
+ * Masalahnya: index.html adalah kerangka statis, jadi hero (latar brand + baris ikon)
+ * sudah terlukis sebelum JS mengisi apa pun — saat reload, tamu melihat kerangka
+ * setengah jadi. Splash menutupinya, dan harus SELALU hilang.
+ */
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const read = (p) => fs.readFileSync(path.resolve(__dirname, '../..', p), 'utf8');
+const HTML = read('apps/customer-pwa/index.html');
+const MANIFEST = JSON.parse(read('apps/customer-pwa/assets/pwa/manifest.json'));
+
+const BRAND = '#b6ff00';
+
+test('SPLASH-01: splash dilukis paling awal, opak, dan tidak bisa tertembus', () => {
+  assert.ok(HTML.includes('id="x-splash"'), 'harus ada elemen splash');
+  // Urutan: splash ada SEBELUM tampilan aplikasi pertama.
+  assert.ok(HTML.indexOf('id="x-splash"') < HTML.indexOf('id="xentra-home-view"'),
+    'splash harus dilukis sebelum kerangka aplikasi');
+  const splash = HTML.slice(HTML.indexOf('id="x-splash"'), HTML.indexOf('id="xentra-home-view"'));
+  assert.ok(splash.includes('position:fixed'), 'harus menutup layar');
+  assert.ok(splash.includes('z-index:9999'), 'harus di atas kerangka');
+  assert.ok(splash.includes('background:' + BRAND), 'latar memakai warna brand');
+  assert.ok(/object-fit:contain/.test(splash) && splash.includes('xentra-logo.png'), 'memuat logo');
+  assert.ok(splash.includes('Memuat'), 'ada tulisan menunggu');
+});
+
+test('SPLASH-02: selalu ada jalan keluar — batas waktu keras', () => {
+  assert.ok(HTML.includes('window.__xentraHideSplash'), 'harus ada fungsi penutup');
+  assert.ok(/setTimeout\(window\.__xentraHideSplash,\s*\d+\)/.test(HTML),
+    'boot yang gagal tidak boleh meninggalkan splash selamanya');
+});
+
+test('SPLASH-03: aplikasi menutup splash saat tampilan pertama siap', () => {
+  assert.ok(/__xentraHideSplash\(\)/.test(HTML), 'aplikasi harus memanggilnya');
+  const appCall = HTML.slice(HTML.indexOf('window.XentraHome.refresh()'));
+  assert.ok(appCall.indexOf('__xentraHideSplash') !== -1,
+    'penutupan terjadi setelah render pertama, bukan sebelum');
+});
+
+test('SPLASH-04: splash bawaan PWA (manifest) sewarna dengan splash di halaman', () => {
+  // Chrome membuat splash sendiri dari manifest; kalau warnanya beda, yang terjadi
+  // justru dua kali ganti warna (putih lalu hijau).
+  assert.equal(MANIFEST.background_color, BRAND, 'background_color harus sama dengan splash');
+  assert.equal(MANIFEST.theme_color, BRAND, 'theme_color harus sama dengan splash');
+});
