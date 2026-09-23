@@ -1010,7 +1010,7 @@
       '  </div>' +
 
       // 7. Sticky Submit CTA Bar
-      '  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + submitCtaLabel(isReservation) + '</button></div>' +
+      (isReservation ? '' : ('  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + submitCtaLabel(isReservation) + '</button></div>')) +
 
       '</div>';
 
@@ -2024,6 +2024,9 @@
          '    <input id="x-res-phone" class="x-res-contact-input" type="tel" inputmode="numeric" autocomplete="tel" value="">' +
          '    <div class="x-res-contact-hint">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
          '  </div>' +
+         '  <div style="padding:12px 16px 0;">' +
+         '    <button type="button" id="x-res-submit" style="width:100%;height:48px;border:0;border-radius:999px;background:#111111;color:#fff;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;">Reservasi</button>' +
+         '  </div>' +
          '<div class="x-fulfillment-selected-summary">' +
          '  <span>Kami akan menghubungi Anda untuk konfirmasi</span>' +
         '  <strong id="x-res-summary-text"></strong>' +
@@ -2043,6 +2046,22 @@
         if (!draft.reservationPhone) draft.reservationPhone = acct.phone || '';
         resPhone.value = draft.reservationPhone || '';
         resPhone.oninput = function () { draft.reservationPhone = resPhone.value; };
+      }
+
+      // Tombol kirim reservasi ada di sini (bukan di CTA bawah yang disembunyikan
+      // untuk reservasi). Ia memakai jalur commit + submit yang sama persis.
+      var resSubmit = schedContainer.querySelector('#x-res-submit');
+      if (resSubmit) {
+        resSubmit.onclick = function () {
+          if (!validateReservationContact()) {
+            state.fulfillment.reservationName = (draft.reservationName || '').trim();
+            state.fulfillment.reservationPhone = (draft.reservationPhone || '').trim();
+            if (!validateReservationContact()) return;
+          }
+          var confirmBtn = document.getElementById('x-ful-btn-confirm');
+          if (confirmBtn) confirmBtn.click();
+          executePrePaymentAndSubmit();
+        };
       }
 
       var dateCol = schedContainer.querySelector('#x-res-date-col');
@@ -3185,6 +3204,25 @@
   }
 
   // ── 5b. COD Cash Tender Selection Sheet ──
+  // Reservasi wajib punya kontak pemesan: resto memakai nomor itu untuk konfirmasi.
+  // Divalidasi dengan pesan, bukan tombol dimatikan — tamu harus tahu apa yang
+  // kurang, bukan dihadapkan tombol yang tak bisa ditekan tanpa penjelasan.
+  function validateReservationContact() {
+    var nm = (state.fulfillment.reservationName || '').trim();
+    var ph = (state.fulfillment.reservationPhone || '').trim();
+    state.fulfillment.reservationName = nm;
+    state.fulfillment.reservationPhone = ph;
+    if (!nm) {
+      if (UI && UI.toast) UI.toast('Isi nama pemesan dulu.');
+      return false;
+    }
+    if (!ph) {
+      if (UI && UI.toast) UI.toast('Isi nomor WhatsApp pemesan dulu.');
+      return false;
+    }
+    return true;
+  }
+
   function openCashTenderSheet() {
     // Belum ada pilihan: default-nya ditentukan di bawah dari total (preset
     // termurah yang sudah menutupi tagihan), bukan nominal tetap.
@@ -3579,25 +3617,16 @@
     // ditekan tanpa penjelasan. Namanya boleh berbeda dari nama akun — reservasi
     // bisa untuk orang lain — jadi kontaknya dipakai sebagai kontak pesanan.
     if (state.fulfillment.type === 'reservation') {
-      var resNm = (state.fulfillment.reservationName || '').trim();
-      var resPh = (state.fulfillment.reservationPhone || '').trim();
-      if (!resNm) {
-        if (UI && UI.toast) UI.toast('Isi nama pemesan dulu.');
-        return;
-      }
-      if (!resPh) {
-        if (UI && UI.toast) UI.toast('Isi nomor WhatsApp pemesan dulu.');
-        return;
-      }
-      state.recipient = { type: 'other', name: resNm, phone: resPh };
-    }
-
-    if (!state.paymentMethod) {
+      if (!validateReservationContact()) return;
+      state.recipient = {
+        type: 'other',
+        name: state.fulfillment.reservationName.trim(),
+        phone: state.fulfillment.reservationPhone.trim()
+      };
+    } else if (!state.paymentMethod) {
       if (UI && UI.toast) UI.toast('Silakan pilih metode pembayaran terlebih dahulu.');
       return;
-    }
-
-    if (needsCashTendered() && (!state.cashTendered || Number(state.cashTendered) <= 0)) {
+    } else if (needsCashTendered() && (!state.cashTendered || Number(state.cashTendered) <= 0)) {
       openCashTenderSheet();
       return;
     }

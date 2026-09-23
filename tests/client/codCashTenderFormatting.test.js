@@ -454,10 +454,33 @@ test('T14: reservasi wajib isi nama pemesan & nomor WhatsApp', () => {
   // Wajib, tapi divalidasi dengan pesan — bukan tombol dimatikan.
   assert.ok(code.includes("UI.toast('Isi nama pemesan dulu.')"), 'pesan kalau nama kosong');
   assert.ok(code.includes("UI.toast('Isi nomor WhatsApp pemesan dulu.')"), 'pesan kalau nomor kosong');
-  assert.ok(code.includes("state.recipient = { type: 'other', name: resNm, phone: resPh };"),
+  assert.ok(/state\.recipient = \{[\s\S]{0,200}type: 'other'[\s\S]{0,200}name: state\.fulfillment\.reservationName\.trim\(\)/.test(code),
     'kontak pemesan dikirim sebagai kontak pesanan');
+  assert.ok(code.includes('function validateReservationContact()'),
+    'validasi dipakai satu tempat (tombol sheet & jalur submit)');
 
   // Bar informasi & label CTA.
   assert.ok(code.includes('Kami akan menghubungi Anda untuk konfirmasi'), 'bar informasi reservasi');
   assert.ok(code.includes("if (isReservation) return 'Reservasi';"), 'CTA berlabel Reservasi');
+});
+
+test('T15: reservasi dikirim dari sheet, CTA bawah disembunyikan', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  assert.ok(code.includes('id="x-res-submit"'), 'tombol Reservasi ada di dalam sheet reservasi');
+  assert.ok(code.includes("window.executePrePaymentAndSubmit") === false, 'submit tetap satu fungsi');
+  assert.ok(code.includes("var resSubmit = schedContainer.querySelector('#x-res-submit');"),
+    'tombol reservasi harus dipasang di bagian reservasi');
+  assert.ok(/resSubmit\.onclick[\s\S]{0,900}executePrePaymentAndSubmit\(\)/.test(code),
+    'tombol reservasi memakai jalur submit yang sama');
+  assert.ok(code.includes("document.getElementById('x-ful-btn-confirm')"),
+    'commit lewat jalur konfirmasi sheet yang sudah ada, bukan logika kedua');
+
+  // CTA bawah tidak ditampilkan untuk reservasi (submit-nya di sheet).
+  assert.ok(code.includes("(isReservation ? '' : ('  <div class=\"x-alt-cta-bar\""),
+    'CTA sticky harus disembunyikan untuk reservasi');
+
+  // Pembayaran tidak disyaratkan untuk reservasi — server juga melewatinya.
+  assert.ok(code.includes('} else if (!state.paymentMethod) {'),
+    'syarat metode pembayaran hanya untuk non-reservasi');
 });
