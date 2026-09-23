@@ -577,26 +577,27 @@ test('T19: CSS komponen x-loc dimuat sebelum bagian reservasi tampil', () => {
   assert.ok(code.includes('window.Xentra.ensureLocationPickerCss'), 'memakai loader CSS yang sudah ada');
 });
 
-test('T20: kapasitas reservasi datang dari cabang, dan reservasi mati kalau belum diisi', () => {
+test('T20: kapasitas dipakai untuk batas jumlah orang, BUKAN mematikan tipe pembelian', () => {
   const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
 
-  // Dibaca dari data cabang (diisi manager cabang lewat merchant app).
-  assert.ok(code.includes('var capRaw = capRow ? capRow.reservation_max_guests : undefined;'),
-    'kapasitas dibaca dari cabang (atau dari daftar cabang)');
-  assert.ok(code.includes('var capacityUnknown = capRaw === undefined || capRaw === null;'),
-    '"tidak tahu" harus dibedakan dari "belum diisi"');
-  assert.ok(code.includes('capRow = availableBranches.filter('),
-    'nilai diambil dari daftar cabang kalau objek cabangnya belum membawa field ini');
-  assert.ok(/curBranch\.is_reservation_active !== 0 && \(capacityUnknown \|\| reservationCap > 0\)/.test(code),
-    'opsi Reservasi hanya tersedia kalau kapasitas sudah diisi');
-  assert.ok(code.includes("var branchCap = Number(resBranch.reservation_max_guests) || 0;"),
+  // Tipe pembelian lain tidak boleh ikut terpengaruh sama sekali.
+  assert.ok(code.includes('var isReservationAvail = !curBranch || curBranch.is_reservation_active !== 0;'),
+    'ketersediaan Reservasi memakai aturan lama (tidak digerbangi kapasitas)');
+  assert.ok(!/isReservationAvail =[\s\S]{0,200}reservationCap > 0/.test(code),
+    'kapasitas tidak boleh mematikan opsi Reservasi');
+
+  // Batas jumlah orang tetap dari data cabang.
+  assert.ok(code.includes('var branchCap = Number(resBranch.reservation_max_guests) || 0;'),
     'batas jumlah orang memakai nilai cabang');
   assert.ok(code.includes('var GUEST_MAX = branchCap > 0 ? branchCap : 60;'),
     '60 hanya cadangan kalau data cabang belum terbaca');
-  // Tanpa data cabang sama sekali, perilaku lama dipertahankan (jangan mematikan
-  // fitur hanya karena cabang belum termuat).
-  assert.ok(code.includes('var isReservationAvail = !curBranch ||'),
-    'kalau cabang belum termuat, jangan mematikan reservasi');
+
+  // availableBranches harus dijaga Array.isArray: .filter pada non-array melempar
+  // dan mematikan seluruh bagian sheet, termasuk klik semua kartu tipe.
+  assert.ok(code.includes('Array.isArray(availableBranches)'),
+    'daftar cabang harus dijaga Array.isArray sebelum .filter');
+  assert.ok(!/availableBranches && availableBranches\.length/.test(code),
+    'jangan cek .length saja: non-array juga punya length');
 });
 
 test('T21: ringkasan reservasi memakai tanggal realtime + zona waktu cabang', () => {

@@ -1655,16 +1655,12 @@
     //     JANGAN dimatikan; itu data yang belum sampai, bukan keputusan.
     // Kesalahan memperlakukan keduanya sama pernah membuat reservasi mati padahal
     // di database sudah diisi.
-    var capRow = curBranch;
-    if (curBranch && availableBranches && availableBranches.length) {
-      // sebagian endpoint mengirim objek cabang tanpa field ini; ambil dari daftar cabang
-      capRow = availableBranches.filter(function (b) { return String(b.id) === String(curBranch.id); })[0] || curBranch;
-    }
-    var capRaw = capRow ? capRow.reservation_max_guests : undefined;
-    var capacityUnknown = capRaw === undefined || capRaw === null;
-    var reservationCap = Number(capRaw) || 0;
-    var isReservationAvail = !curBranch ||
-      (curBranch.is_reservation_active !== 0 && (capacityUnknown || reservationCap > 0));
+    // DIKEMBALIKAN ke aturan lama: kapasitas tidak dipakai untuk mematikan tipe
+    // pembelian apa pun. Upaya mematikannya sempat membuat kartu tipe tidak bisa
+    // diklik (kesalahan di bawah), dan mematikan fitur bukan hal yang boleh
+    // dilakukan diam-diam oleh perubahan tampilan. Kapasitas tetap dipakai untuk
+    // batas jumlah orang di bagian reservasi.
+    var isReservationAvail = !curBranch || curBranch.is_reservation_active !== 0;
 
     var availabilityMap = {
       delivery: isDeliveryAvail,
@@ -2032,8 +2028,12 @@
       // tetap. Dipakai label, tombol, dan input manual — satu sumber. 60 hanya
       // cadangan kalau data cabang belum terbaca.
       var resBranch = (typeof getFulfillmentBranch === 'function' ? getFulfillmentBranch() : null) || state.matchedBranch || {};
-      if (availableBranches && availableBranches.length && resBranch.id) {
-        resBranch = availableBranches.filter(function (b) { return String(b.id) === String(resBranch.id); })[0] || resBranch;
+      // Array.isArray: kalau availableBranches bukan array, .filter tidak ada dan
+      // melempar TypeError saat sheet dirender — itu mematikan SELURUH bagian,
+      // termasuk handler klik semua kartu tipe (pernah terjadi).
+      if (Array.isArray(availableBranches) && resBranch.id) {
+        var capMatch = availableBranches.filter(function (b) { return String(b.id) === String(resBranch.id); })[0];
+        if (capMatch) resBranch = capMatch;
       }
       var branchCap = Number(resBranch.reservation_max_guests) || 0;
       var GUEST_MAX = branchCap > 0 ? branchCap : 60;
