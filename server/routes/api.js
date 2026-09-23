@@ -12199,6 +12199,11 @@ router.get('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
         merchant_id: effectiveConfig.merchant_id || process.env.MIDTRANS_MERCHANT_ID || '',
         is_production: Boolean(effectiveConfig.is_production !== undefined ? effectiveConfig.is_production : (process.env.MIDTRANS_IS_PRODUCTION === 'true')),
         doku_is_production: Boolean(effectiveConfig.doku_is_production),
+        // Client ID dan Callback URL bukan rahasia — dikirim seperti merchant_id
+        // Midtrans, supaya form bisa menampilkan yang sudah tersimpan. Secret key
+        // tetap tidak pernah dikirim; hanya statusnya.
+        doku_client_id: effectiveConfig.client_id || '',
+        doku_callback_url: effectiveConfig.callback_url || '',
         doku_client_id_configured: Boolean(effectiveConfig.client_id),
         doku_secret_key_configured: Boolean(effectiveConfig.secret_key),
         providers: [

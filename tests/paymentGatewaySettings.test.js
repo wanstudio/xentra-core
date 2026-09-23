@@ -376,6 +376,53 @@ test('PAYMENT GATEWAY — kredensial tersimpan & satu gateway online aktif', asy
     assert.equal(online.find((m) => m.code === 'doku').environment, 'production');
   });
 
+  await t.test('PGW-12: form bisa menampilkan kredensial tersimpan, tanpa membocorkan rahasia', async () => {
+    await putCredentials('midtrans', { server_key: 'MK-SECRET', client_key: 'CK-SECRET', merchant_id: 'M-VISIBLE' });
+    await putCredentials('doku', { doku_client_id: 'BRN-VISIBLE', doku_secret_key: 'DK-SECRET', doku_callback_url: 'https://contoh.test/cb' });
+
+    const res = await getSettings();
+    const ps = res.body.payment_settings;
+
+    // Yang BUKAN rahasia dikirim balik, supaya bisa ditampilkan di form. Tanpa ini
+    // kolomnya selalu kosong dan simpanannya tampak hilang.
+    assert.equal(ps.merchant_id, 'M-VISIBLE', 'merchant_id Midtrans ditampilkan');
+    assert.equal(ps.doku_client_id, 'BRN-VISIBLE', 'Client ID DOKU ditampilkan');
+    assert.equal(ps.doku_callback_url, 'https://contoh.test/cb', 'Callback URL DOKU ditampilkan');
+
+    // Rahasia TIDAK boleh ikut terkirim — hanya statusnya.
+    assert.equal(ps.server_key, undefined, 'server_key tidak boleh dikirim');
+    assert.equal(ps.client_key, undefined, 'client_key tidak boleh dikirim');
+    assert.equal(ps.doku_secret_key, undefined, 'secret key DOKU tidak boleh dikirim');
+    assert.ok(!JSON.stringify(ps).includes('SECRET'), 'tidak ada nilai rahasia yang bocor');
+    assert.equal(ps.server_key_configured, true, 'status rahasia Midtrans dilaporkan');
+    assert.equal(ps.doku_secret_key_configured, true, 'status rahasia DOKU dilaporkan');
+  });
+
+  await t.test('PGW-13: environment DOKU mengisi kolom non-rahasia dan menandai yang tersimpan', () => {
+    const dokuSpec = DASHBOARD_JS.slice(
+      DASHBOARD_JS.indexOf('doku: createGatewayEnv({'),
+      DASHBOARD_JS.indexOf('// Dua pintu masuk terpisah')
+    );
+    assert.ok(dokuSpec.includes("doku_client_id: 'doku_client_id'"),
+      'Client ID DOKU harus diisi dari respons');
+    assert.ok(dokuSpec.includes("doku_callback_url: 'doku_callback_url'"),
+      'Callback URL DOKU harus diisi dari respons');
+    assert.ok(dokuSpec.includes("doku_secret_key: 'doku_secret_key_configured'"),
+      'secret key hanya ditandai tersimpan, bukan diisi nilainya');
+
+    const midtransSpec = DASHBOARD_JS.slice(
+      DASHBOARD_JS.indexOf('midtrans: createGatewayEnv({'),
+      DASHBOARD_JS.indexOf('doku: createGatewayEnv({')
+    );
+    assert.ok(midtransSpec.includes("merchant_id: 'merchant_id'"), 'merchant_id diisi');
+    assert.ok(!/populated:\s*\{[^}]*server_key/.test(midtransSpec),
+      'server_key tidak boleh diisi nilainya di form');
+
+    // Placeholder kolom rahasia berubah saat sudah tersimpan, supaya tidak tampak kosong.
+    assert.ok(DASHBOARD_JS.includes('Tersimpan — isi hanya jika ingin mengganti'),
+      'kolom rahasia yang tersimpan harus memberi tanda jelas');
+  });
+
   await t.test('PGW-08: toggle Finance memakai keadaan AKTIF, bukan sekadar "kredensial ada"', async () => {
     const finance = await getFinance();
     const online = finance.body.payment_methods.filter((m) => m.type === 'online_gateway');

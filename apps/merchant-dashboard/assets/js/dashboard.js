@@ -8374,16 +8374,35 @@
           }
         },
 
-        // Nilai yang memang tidak pernah dikirim server (rahasia) dikosongkan;
-        // sisanya diisi. Hanya elemen milik provider ini yang disentuh.
+        // Hanya elemen milik provider ini yang disentuh.
+        //
+        // Kolom yang BUKAN rahasia diisi dengan nilai tersimpan, supaya yang pernah
+        // disimpan terlihat di form. Kolom rahasia memang tidak pernah dikirim server,
+        // jadi selain dikosongkan, placeholder-nya diberi tanda "sudah tersimpan" —
+        // kalau tidak, form tampak kosong dan tamu mengira simpanannya hilang.
         load: function (ps) {
           if (!ps) return;
           Object.keys(spec.fields).forEach(function (field) {
             var el = $(spec.fields[field]);
             if (!el) return;
-            var value = spec.populated[field];
-            el.value = value && ps[value] ? ps[value] : '';
+
+            if (Object.prototype.hasOwnProperty.call(spec.populated, field)) {
+              var value = ps[spec.populated[field]];
+              el.value = value || '';
+              return;
+            }
+
+            el.value = '';
+            if (!Object.prototype.hasOwnProperty.call(el, 'xOriginalPlaceholder')) {
+              el.xOriginalPlaceholder = el.placeholder || '';
+            }
+            var configuredFlag = spec.configured[field];
+            var isStored = configuredFlag ? Boolean(ps[configuredFlag]) : false;
+            el.placeholder = isStored
+              ? 'Tersimpan — isi hanya jika ingin mengganti'
+              : el.xOriginalPlaceholder;
           });
+
           var prodEl = $(spec.productionField);
           if (prodEl) prodEl.checked = Boolean(ps[spec.productionKey]);
         },
@@ -8409,9 +8428,11 @@
           client_key: 'set-payment-client-key',
           merchant_id: 'set-payment-merchant-id'
         },
-        // field payload → field respons GET yang mengisinya (rahasia tidak pernah
-        // dikirim balik, jadi tidak ada di sini dan selalu dikosongkan).
+        // field payload → field respons GET yang mengisinya. Yang tidak ada di sini
+        // adalah rahasia: server tidak pernah mengirimnya balik.
         populated: { merchant_id: 'merchant_id' },
+        // field rahasia → flag "sudah tersimpan" dari respons GET.
+        configured: { server_key: 'server_key_configured', client_key: 'client_key_configured' },
         productionField: 'set-payment-is-production',
         productionKey: 'is_production'
       }),
@@ -8423,7 +8444,9 @@
           doku_secret_key: 'set-payment-doku-secret-key',
           doku_callback_url: 'set-payment-doku-callback-url'
         },
-        populated: {},
+        populated: { doku_client_id: 'doku_client_id', doku_callback_url: 'doku_callback_url' },
+        // Hanya secret key yang rahasia; Client ID dan Callback URL ditampilkan.
+        configured: { doku_secret_key: 'doku_secret_key_configured' },
         productionField: 'set-payment-doku-is-production',
         productionKey: 'doku_is_production'
       })
