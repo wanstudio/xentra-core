@@ -2347,6 +2347,11 @@
         }
         var table = { id: res.table.id, number: res.table.table_number || res.table.label || '' };
         Store.setMyTable(table);
+        // Scan meja berarti tamu makan di tempat: tipe pembeliannya ikut dipilih
+        // dine-in. Ini juga yang membuat ikon meja + badge tampil (ikon mengikuti
+        // tipe pembelian). Tamu tetap bisa menggantinya di sheet, dan ikonnya
+        // otomatis kembali jadi ikon scan.
+        if (Store.setOrderType) Store.setOrderType('dine_in');
         renderMyTableState();
         showTableNotice({
           title: 'Berhasil, kamu sekarang ada di meja ' + (table.number || '-'),

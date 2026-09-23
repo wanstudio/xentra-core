@@ -80,6 +80,10 @@ test('MYTABLE-03: notifikasi berhasil + tombol "Pesan menu"', () => {
     'isi notifikasi menjelaskan apa yang terjadi');
   assert.ok(HOME.includes("label: 'Pesan menu'"), 'harus ada tombol Pesan menu');
   assert.ok(HOME.includes('Store.setMyTable(table)'), 'meja disimpan supaya tidak hilang saat pindah halaman');
+  // Tanpa ini, ikon meja tidak akan tampil: tampil/sembunyinya mengikuti tipe
+  // pembelian, dan tamu yang scan berarti makan di tempat.
+  assert.ok(/Store\.setMyTable\(table\);[\s\S]{0,700}Store\.setOrderType\('dine_in'\)/.test(HOME),
+    'scan meja harus ikut memilih tipe pembelian dine-in');
 });
 
 test('MYTABLE-04: klik ikon meja → ringkasan + CTA', () => {
