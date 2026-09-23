@@ -1339,6 +1339,52 @@ router.post('/customer/dining-session/claim', requireCustomerAuth(), (req, res) 
   }
 });
 
+// Hapus akun dari sudut pandang tamu. Wajib konfirmasi eksplisit supaya tidak
+// terpanggil karena salah request, dan dibatasi rate supaya tidak jadi alat serangan.
+router.delete('/customer/account', requireCustomerAuth(), (req, res) => {
+  try {
+    const { confirm } = req.body || {};
+    if (String(confirm || '').trim().toUpperCase() !== 'HAPUS') {
+      return res.status(400).json({
+        success: false,
+        error: 'KONFIRMASI_DIPERLUKAN',
+        message: 'Kirim confirm: "HAPUS" untuk benar-benar menghapus akun.'
+      });
+    }
+
+    const customerId = req.customer.customerId || req.customer.customer_id;
+    if (!customerId) {
+      return res.status(404).json({ success: false, error: 'Customer identity tidak ditemukan.' });
+    }
+
+    const limiterKey = 'customer-account-delete:' + req.brand_id + ':' + customerId;
+    const rate = RateLimiter.check(limiterKey, 3, 3600);
+    if (!rate.allowed) {
+      return res.status(429).json({ success: false, error: 'TOO_MANY_REQUESTS', message: 'Terlalu sering. Coba lagi nanti.' });
+    }
+
+    const { CustomerIdentityService } = require('../../core/identity');
+    const result = new CustomerIdentityService().deleteCustomerAccount({ customerId, brandId: req.brand_id });
+
+    // sesi di store ikut dicabut (kalau ada)
+    try {
+      const authHeader = req.headers['authorization'] || '';
+      const raw = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : '';
+      if (raw && TokenSessionStore.destroyCustomerSession) TokenSessionStore.destroyCustomerSession(raw);
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      deleted: true,
+      orders_kept: true,
+      message: 'Akun Anda sudah dihapus. Riwayat pesanan tetap tersimpan di resto tanpa terhubung ke Anda.'
+    });
+  } catch (err) {
+    const status = err.status || 400;
+    return res.status(status).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/addresses', requireCustomerAuth(), (req, res) => {
   try {
     const customerPhone = req.customer.phone;

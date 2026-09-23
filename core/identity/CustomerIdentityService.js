@@ -279,6 +279,75 @@ class CustomerIdentityService {
   /**
    * Finds customer by ID.
    */
+  /**
+   * Hapus akun dari sudut pandang CUSTOMER.
+   *
+   * Yang diputus: identitas Google (sub), alamat tersimpan, seluruh sesi login,
+   * dan keterkaitan pesanannya. Yang DIPERTAHANKAN: pesanan itu sendiri beserta
+   * nominal/statusnya — catatan transaksi milik resto, bukan milik tamu.
+   *
+   * Konsekuensi penting: setelah baris identitas dihapus, login lagi dengan Google
+   * yang sama TIDAK menyambung ke akun lama — findOrCreateFromGoogle tidak menemukan
+   * kaitan apa pun, jadi lahir customer baru dengan id baru (email boleh sama, karena
+   * customers.email tidak UNIQUE).
+   *
+   * Semua langkah dalam satu transaksi: gagal di tengah berarti tidak ada yang berubah.
+   */
+  deleteCustomerAccount({ customerId, brandId }) {
+    if (!customerId || !brandId) throw new Error('[CustomerIdentity] customerId dan brandId wajib diisi.');
+
+    const customer = this.db.prepare('SELECT id, brand_id, phone, email, display_name FROM customers WHERE id = ?').get(customerId);
+    if (!customer) throw new Error('[CustomerIdentity] Customer tidak ditemukan.');
+    if (customer.brand_id !== brandId) throw new Error('[CustomerIdentity] Customer bukan milik brand ini.');
+
+    const phone = customer.phone || null;
+    // Penanda netral: tidak bisa dipakai menghubungi siapa pun, tapi baris tetap sah.
+    const marker = 'deleted:' + String(brandId);
+    const now = new Date().toISOString();
+
+    this.db.exec('BEGIN IMMEDIATE;');
+    try {
+      // putus kaitan orang <-> akun (inilah yang membuat akun lama tak bisa dimasuki)
+      this.db.prepare('DELETE FROM customer_auth_providers WHERE customer_id = ?').run(customerId);
+
+      // alamat: FK-nya ON DELETE SET NULL, jadi harus dihapus eksplisit —
+      // termasuk yang sudah tak bertuan tapi nomornya sama (tamu lama)
+      if (phone) {
+        this.db.prepare('DELETE FROM customer_addresses WHERE customer_id = ? OR (customer_id IS NULL AND customer_phone = ?)').run(customerId, phone);
+      } else {
+        this.db.prepare('DELETE FROM customer_addresses WHERE customer_id = ?').run(customerId);
+      }
+
+      // sesi login: keluar dari semua perangkat
+      if (phone) {
+        this.db.prepare('DELETE FROM customer_sessions WHERE customer_id = ? OR phone = ?').run(customerId, phone);
+      } else {
+        this.db.prepare('DELETE FROM customer_sessions WHERE customer_id = ?').run(customerId);
+      }
+
+      // pesanan DIPERTAHANKAN; hanya keterkaitan ke orangnya yang dilepas.
+      // Nominal, status, dan tanggal tidak disentuh sama sekali.
+      let ordersAnonymized = 0;
+      if (phone) {
+        const res = this.db.prepare('UPDATE orders SET customer_phone = ? WHERE customer_phone = ?').run(marker, phone);
+        ordersAnonymized = res.changes || 0;
+      }
+
+      // baris customer: anonymize + tandai terhapus (bukan DELETE)
+      this.db.prepare(`
+        UPDATE customers
+        SET display_name = 'Akun Dihapus', email = NULL, phone = NULL, deleted_at = ?, updated_at = ?
+        WHERE id = ? AND brand_id = ?
+      `).run(now, now, customerId, brandId);
+
+      this.db.exec('COMMIT;');
+      return { success: true, customer_id: customerId, orders_anonymized: ordersAnonymized };
+    } catch (err) {
+      try { this.db.exec('ROLLBACK;'); } catch (_) {}
+      throw err;
+    }
+  }
+
   findById(customerId) {
     return this.customerRepo.findById(customerId);
   }

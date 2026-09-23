@@ -1610,6 +1610,11 @@ function initSchema(targetDb) {
   // Tidak dihitung dari denah meja: meja berbeda-beda (2/4/12 orang), jadi
   // menjumlahkan kapasitas meja itu pukul rata dan hasilnya bukan kapasitas nyata.
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN reservation_max_guests INTEGER;'); } catch (e) {}
+
+  // Penanda akun customer yang sudah dihapus (dari sudut pandang tamu). Barisnya
+  // SENGAJA tidak di-DELETE: catatan transaksi resto tetap merujuk padanya, dan
+  // "pernah ada akun" harus tetap bisa diaudit.
+  try { targetDb.exec('ALTER TABLE customers ADD COLUMN deleted_at TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN client_transaction_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN cash_tendered REAL;'); } catch (e) {}
 
