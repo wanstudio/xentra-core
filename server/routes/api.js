@@ -1700,7 +1700,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     }
 
     // P1 SECURE PAYMENT METHOD VALIDATION: Whitelist only officially supported payment methods
-    const allowedPaymentMethods = ['cash', 'midtrans'];
+    const allowedPaymentMethods = ['cash', 'midtrans', 'doku'];
     if (!allowedPaymentMethods.includes(payment_method)) {
       return res.status(400).json({
         success: false,
@@ -2162,10 +2162,10 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       }
     }
 
-    // 4. Payment Gateway Resolution (Midtrans Snap or Cash)
-    let snapResult = { snap_token: null, redirect_url: null, merchant_id: payment_method === 'cash' ? 'cash' : 'midtrans_default' };
+    // 4. Payment Gateway Resolution (Midtrans Snap, DOKU Checkout, or Cash)
+    let snapResult = { snap_token: null, redirect_url: null, merchant_id: payment_method === 'cash' ? 'cash' : (payment_method === 'doku' ? 'doku_default' : 'midtrans_default') };
 
-    if (payment_method === 'midtrans') {
+    if (payment_method === 'midtrans' || payment_method === 'doku') {
       const existingPayment = placementResult.idempotent
         ? db.prepare('SELECT snap_token, merchant_id FROM order_payments WHERE order_id = ?').get(orderId)
         : null;
@@ -2173,20 +2173,17 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         snapResult = {
           snap_token: existingPayment.snap_token,
           redirect_url: null,
-          merchant_id: existingPayment.merchant_id || 'midtrans_default'
+          merchant_id: existingPayment.merchant_id || (payment_method === 'doku' ? 'doku_default' : 'midtrans_default')
         };
       } else {
         try {
           snapResult = await PaymentService.createSnapTransaction(
-            { id: orderId, grand_total: grandTotal, branch_id: branch.id, brand_id: req.brand_id, delivery_fee: deliveryFee, discount_amount: discountAmount },
+            { id: orderId, grand_total: grandTotal, branch_id: branch.id, brand_id: req.brand_id, delivery_fee: deliveryFee, discount_amount: discountAmount, customer_name: customer.name, customer_phone: customer.phone },
             order ? order.items : items,
             customer
           );
         } catch (payErr) {
         console.error('[Payment Gateway Error / Timeout]:', payErr.message);
-        // P1 RECONCILIATION-AWARE FAILURE HANDLING (NEW-01 & NEW-02):
-        // Mark payment as 'reconciliation_pending' so if gateway actually processed the transaction,
-        // incoming settlement webhook can reconcile and confirm the order cleanly.
         db.exec('BEGIN IMMEDIATE;');
         try {
           db.prepare("UPDATE order_payments SET payment_status = 'reconciliation_pending', updated_at = datetime('now') WHERE order_id = ?").run(orderId);
@@ -2209,7 +2206,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
         UPDATE order_payments
         SET snap_token = ?, merchant_id = ?, updated_at = ?
         WHERE order_id = ?
-      `).run(snapResult.snap_token || null, snapResult.merchant_id || (payment_method === 'cash' ? 'cash' : 'midtrans'), new Date().toISOString(), orderId);
+      `).run(snapResult.snap_token || null, snapResult.merchant_id || (payment_method === 'cash' ? 'cash' : payment_method), new Date().toISOString(), orderId);
     }
 
     res.status(201).json({
@@ -3797,6 +3794,26 @@ router.post('/webhooks/midtrans', (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[Webhook] Midtrans error:', err);
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 10.1 DOKU Webhook
+router.post('/webhooks/doku', (req, res) => {
+  try {
+    const result = PaymentService.handleWebhook(req.body, {
+      provider: 'doku',
+      headers: {
+        'client-id': req.headers['client-id'] || req.headers['Client-Id'],
+        'request-id': req.headers['request-id'] || req.headers['Request-Id'],
+        'request-timestamp': req.headers['request-timestamp'] || req.headers['Request-Timestamp'],
+        'signature': req.headers['signature'] || req.headers['Signature']
+      },
+      notificationPath: '/webhooks/doku'
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('[Webhook] DOKU error:', err);
     res.status(400).json({ success: false, error: err.message });
   }
 });
@@ -10323,10 +10340,19 @@ router.get('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
       }
     }
 
+    const effectiveConfig = branchOverride || parsedBrandConfig || {};
+    const activeProvider = Object.prototype.hasOwnProperty.call(effectiveConfig, 'provider')
+      ? (effectiveConfig.provider || '')
+      : 'midtrans';
+
     const midtransActive = Boolean(
       (branchOverride && branchOverride.server_key) ||
       (parsedBrandConfig && parsedBrandConfig.server_key) ||
       process.env.MIDTRANS_SERVER_KEY
+    );
+    const dokuActive = Boolean(
+      (branchOverride && branchOverride.client_id && branchOverride.secret_key) ||
+      (parsedBrandConfig && parsedBrandConfig.client_id && parsedBrandConfig.secret_key)
     );
 
     const isProduction = Boolean(
@@ -10335,8 +10361,12 @@ router.get('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
       process.env.MIDTRANS_IS_PRODUCTION === 'true'
     );
 
+    const midtransMethods = effectiveConfig.midtrans_methods || {};
+    const dokuMethods = effectiveConfig.doku_methods || {};
+
     res.json({
       success: true,
+      active_provider: activeProvider,
       payment_methods: [
         {
           code: 'cash',
@@ -10345,20 +10375,94 @@ router.get('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
           is_enabled: true,
           type: 'offline',
           settlement_mode: 'manual_cashier',
-          description: 'Pembayaran tunai langsung di kasir cabang dengan validasi shift POS'
+          description: 'Pembayaran tunai langsung di kasir cabang dengan validasi shift POS',
+          types: []
         },
         {
           code: 'midtrans',
           name: 'Midtrans Online Payment',
           provider: 'midtrans',
           is_enabled: midtransActive,
+          is_active_provider: activeProvider === 'midtrans',
           type: 'online_gateway',
           environment: isProduction ? 'production' : 'sandbox',
           has_branch_override: Boolean(branchOverride),
-          description: 'Payment gateway multi-channel (QRIS, GoPay, ShopeePay, Virtual Account, Kartu Kredit)'
+          description: 'Payment gateway multi-channel (QRIS, GoPay, ShopeePay, Virtual Account, Kartu Kredit)',
+          types: [
+            { code: 'qris', name: 'QRIS', icon: '📱', enabled: midtransMethods.qris !== false },
+            { code: 'gopay', name: 'GoPay', icon: '💚', enabled: midtransMethods.gopay !== false },
+            { code: 'shopeepay', name: 'ShopeePay', icon: '🧡', enabled: midtransMethods.shopeepay !== false },
+            { code: 'va', name: 'Virtual Account', icon: '🏦', enabled: midtransMethods.va !== false },
+            { code: 'credit_card', name: 'Kartu Kredit', icon: '💳', enabled: midtransMethods.credit_card !== false },
+            { code: 'bank_transfer', name: 'Bank Transfer', icon: '🏛️', enabled: midtransMethods.bank_transfer !== false }
+          ]
+        },
+        {
+          code: 'doku',
+          name: 'DOKU Online Payment',
+          provider: 'doku',
+          is_enabled: dokuActive,
+          is_active_provider: activeProvider === 'doku',
+          type: 'online_gateway',
+          environment: isProduction ? 'production' : 'sandbox',
+          has_branch_override: Boolean(branchOverride),
+          description: 'Payment gateway alternatif dengan QRIS, VA, e-wallet, dan kartu kredit',
+          types: [
+            { code: 'qris', name: 'QRIS', icon: '📱', enabled: dokuMethods.qris !== false },
+            { code: 'gopay', name: 'GoPay', icon: '💚', enabled: dokuMethods.gopay !== false },
+            { code: 'ovo', name: 'OVO', icon: '💜', enabled: dokuMethods.ovo !== false },
+            { code: 'dana', name: 'DANA', icon: '💙', enabled: dokuMethods.dana !== false },
+            { code: 'shopeepay', name: 'ShopeePay', icon: '🧡', enabled: dokuMethods.shopeepay !== false },
+            { code: 'va', name: 'Virtual Account', icon: '🏦', enabled: dokuMethods.va !== false },
+            { code: 'credit_card', name: 'Kartu Kredit', icon: '💳', enabled: dokuMethods.credit_card !== false },
+            { code: 'bank_transfer', name: 'Bank Transfer', icon: '🏛️', enabled: dokuMethods.bank_transfer !== false }
+          ]
         }
       ]
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT: Update payment method type toggles
+router.put('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const { provider, method_type, enabled, branch_id } = req.body;
+    if (!provider || !method_type) {
+      return res.status(400).json({ success: false, error: 'provider and method_type are required.' });
+    }
+
+    const targetBranchId = req.user.role === 'branch_manager' ? (req.user.branch_id || req.user.branchId) : branch_id;
+    const configKey = provider === 'midtrans' ? 'midtrans_methods' : 'doku_methods';
+
+    let config = {};
+    if (targetBranchId) {
+      const branchRow = corePaymentRepo.findBranchPaymentConfig(targetBranchId, req.brand_id);
+      if (branchRow && branchRow.payment_config_override) {
+        try { config = JSON.parse(branchRow.payment_config_override); } catch (_) {}
+      }
+    }
+    if (!config[configKey]) {
+      const brandConfig = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
+      if (brandConfig && brandConfig.default_payment_config) {
+        try {
+          const parsed = JSON.parse(brandConfig.default_payment_config);
+          if (parsed[configKey]) config[configKey] = { ...parsed[configKey] };
+        } catch (_) {}
+      }
+    }
+    if (!config[configKey]) config[configKey] = {};
+    config[configKey][method_type] = Boolean(enabled);
+
+    const jsonStr = JSON.stringify(config);
+    if (targetBranchId) {
+      corePaymentRepo.updateBranchPaymentConfig(targetBranchId, jsonStr);
+    } else {
+      corePaymentRepo.updateBrandPaymentConfig(req.brand_id, jsonStr);
+    }
+
+    res.json({ success: true, message: `${provider}/${method_type} ${enabled ? 'diaktifkan' : 'dinonaktifkan'}.` });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -12071,19 +12175,33 @@ router.get('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
 
     const effectiveConfig = branchOverride || parsedBrandConfig || {};
     const hasOverride = Boolean(branchOverride);
+    // Config lama tidak menyimpan field `provider` sama sekali; untuk itu default-nya
+    // tetap midtrans. Tetapi begitu field itu ada, nilainya dihormati apa adanya —
+    // termasuk '' yang berarti tidak ada gateway online yang aktif.
+    const activeProvider = Object.prototype.hasOwnProperty.call(effectiveConfig, 'provider')
+      ? (effectiveConfig.provider || '')
+      : 'midtrans';
 
     res.json({
       success: true,
       payment_settings: {
         branch_id: effectiveBranchId || null,
         has_branch_override: hasOverride,
+        active_provider: activeProvider,
         server_key_configured: Boolean(effectiveConfig.server_key || process.env.MIDTRANS_SERVER_KEY),
         client_key_configured: Boolean(effectiveConfig.client_key || process.env.MIDTRANS_CLIENT_KEY),
         merchant_id: effectiveConfig.merchant_id || process.env.MIDTRANS_MERCHANT_ID || '',
         is_production: Boolean(effectiveConfig.is_production !== undefined ? effectiveConfig.is_production : (process.env.MIDTRANS_IS_PRODUCTION === 'true')),
+        doku_client_id_configured: Boolean(effectiveConfig.client_id),
+        doku_secret_key_configured: Boolean(effectiveConfig.secret_key),
+        providers: [
+          { code: 'midtrans', name: 'Midtrans Payment Gateway', enabled: Boolean(effectiveConfig.server_key || process.env.MIDTRANS_SERVER_KEY), is_active: activeProvider === 'midtrans' },
+          { code: 'doku', name: 'DOKU Payment Gateway', enabled: Boolean(effectiveConfig.client_id && effectiveConfig.secret_key), is_active: activeProvider === 'doku' }
+        ],
         methods: [
           { code: 'cash', name: 'Tunai Kasir', enabled: true, mode: 'pos_cashier' },
-          { code: 'midtrans', name: 'Midtrans Payment Gateway', enabled: Boolean(effectiveConfig.server_key || process.env.MIDTRANS_SERVER_KEY), mode: 'online' }
+          { code: 'midtrans', name: 'Midtrans Payment Gateway', enabled: Boolean(effectiveConfig.server_key || process.env.MIDTRANS_SERVER_KEY), mode: 'online', is_active_provider: activeProvider === 'midtrans' },
+          { code: 'doku', name: 'DOKU Payment Gateway', enabled: Boolean(effectiveConfig.client_id && effectiveConfig.secret_key), mode: 'online', is_active_provider: activeProvider === 'doku' }
         ]
       }
     });
@@ -12095,16 +12213,64 @@ router.get('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
 // 4.3 Payment Settings (PUT - Owner/Brand Manager only)
 router.put('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { branch_id, server_key, client_key, merchant_id, is_production } = req.body;
-    const configPayload = {
-      server_key: server_key || '',
-      client_key: client_key || '',
-      merchant_id: merchant_id || '',
-      is_production: Boolean(is_production)
-    };
-    const jsonStr = JSON.stringify(configPayload);
+    const { branch_id, server_key, client_key, merchant_id, is_production, provider, doku_client_id, doku_secret_key, doku_callback_url } = req.body;
 
-    if (branch_id && branch_id !== 'all') {
+    const isBranchScope = Boolean(branch_id && branch_id !== 'all');
+
+    // Config yang sudah tersimpan jadi DASAR-nya, bukan dibuang. Dulu payload dibangun
+    // dari nol lalu menimpa seluruhnya, jadi menyimpan tab Midtrans menghapus kredensial
+    // DOKU — dan sebaliknya. Kredensial juga tidak pernah dikirim balik ke klien, jadi
+    // kolom yang dibiarkan kosong HARUS berarti "pertahankan yang tersimpan".
+    let existing = {};
+    if (isBranchScope) {
+      const row = corePaymentRepo.findBranchPaymentConfig(branch_id, req.brand_id);
+      if (row && row.payment_config_override) {
+        try { existing = JSON.parse(row.payment_config_override) || {}; } catch (_) { existing = {}; }
+      }
+    }
+    if (!Object.keys(existing).length) {
+      const brandRow = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
+      if (brandRow && brandRow.default_payment_config) {
+        try { existing = JSON.parse(brandRow.default_payment_config) || {}; } catch (_) { existing = {}; }
+      }
+    }
+
+    const merged = Object.assign({}, existing);
+
+    // `provider` = satu-satunya gateway online yang aktif. Tidak dikirim berarti
+    // tidak diubah; dikirim kosong berarti tidak ada yang aktif.
+    if (typeof provider !== 'undefined') {
+      merged.provider = provider || '';
+    } else if (!Object.prototype.hasOwnProperty.call(merged, 'provider')) {
+      merged.provider = 'midtrans';
+    }
+    if (typeof is_production !== 'undefined') merged.is_production = Boolean(is_production);
+
+    // Kredensial: kosong = pertahankan yang lama.
+    if (server_key) merged.server_key = server_key;
+    if (client_key) merged.client_key = client_key;
+    if (doku_secret_key) merged.secret_key = doku_secret_key;
+    if (merchant_id) merged.merchant_id = merchant_id;
+    if (doku_client_id) merged.client_id = doku_client_id;
+    if (doku_callback_url) merged.callback_url = doku_callback_url;
+
+    // Satu gateway online aktif, dan hanya yang benar-benar punya kredensial yang
+    // boleh dinyalakan — kalau tidak, tamu akan diarahkan ke gateway yang tidak jalan.
+    if (merged.provider === 'midtrans' || merged.provider === 'doku') {
+      const credentialsReady = merged.provider === 'midtrans'
+        ? Boolean(merged.server_key || process.env.MIDTRANS_SERVER_KEY)
+        : Boolean(merged.client_id && merged.secret_key);
+      if (!credentialsReady) {
+        return res.status(400).json({
+          success: false,
+          error: 'Kredensial ' + (merged.provider === 'doku' ? 'DOKU' : 'Midtrans') + ' belum lengkap. Simpan kredensialnya dulu sebelum diaktifkan.'
+        });
+      }
+    }
+
+    const jsonStr = JSON.stringify(merged);
+
+    if (isBranchScope) {
       // Branch-specific override
       const belongs = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, req.brand_id);
       if (!belongs) {
@@ -12306,6 +12472,8 @@ router.get('/admin/settings/integrations', requireAuth(['owner', 'brand_manager'
 
     const midtransActive = Boolean(parsedConfig?.server_key || process.env.MIDTRANS_SERVER_KEY);
     const midtransEnv = (parsedConfig?.is_production || process.env.MIDTRANS_IS_PRODUCTION === 'true') ? 'production' : 'sandbox';
+    const dokuActive = Boolean(parsedConfig?.client_id && parsedConfig?.secret_key);
+    const activeProvider = parsedConfig?.provider || 'midtrans';
 
     res.json({
       success: true,
@@ -12317,7 +12485,18 @@ router.get('/admin/settings/integrations', requireAuth(['owner', 'brand_manager'
           status: midtransActive ? 'connected' : 'disconnected',
           environment: midtransEnv,
           description: 'Payment gateway multi-channel untuk pembayaran online checkout PWA dan web.',
-          is_configurable: true
+          is_configurable: true,
+          is_active_provider: activeProvider === 'midtrans'
+        },
+        {
+          id: 'payment_gateway_doku',
+          name: 'DOKU Payment Gateway',
+          category: 'payment',
+          status: dokuActive ? 'connected' : 'disconnected',
+          environment: midtransEnv,
+          description: 'Payment gateway alternatif dengan dukungan QRIS, VA, e-wallet, dan kartu kredit.',
+          is_configurable: true,
+          is_active_provider: activeProvider === 'doku'
         },
         {
           id: 'pos_cashier_engine',

@@ -1,7 +1,6 @@
 'use strict';
 
 const crypto = require('crypto');
-const axios = require('axios');
 const {
   PaymentRepository,
   PromotionRepository,
@@ -10,17 +9,13 @@ const {
 const { events } = require('../../../core');
 const { isConsumingOrderStatus } = require('../../../core/domain/OrderStatusContract');
 const PaymentModel = require('../models/PaymentModel');
+const MidtransGateway = require('../gateways/MidtransGateway');
+const DokuGateway = require('../gateways/DokuGateway');
 
 const paymentRepository = new PaymentRepository();
 const promotionRepository = new PromotionRepository();
 const diningTableRepository = new DiningTableRepository();
 
-/**
- * Reward claim release (locked rule): a claim is only consumed once the order
- * reached ACCEPTED (confirmed). When an order lands in a failure/reconciliation
- * status (fulfillment_exception, ...) WITHOUT having been accepted, release the
- * redemption so the customer can claim the reward again. Accepted orders keep it.
- */
 function releaseClaimIfNeverAccepted(orderId, orderStatus, reason) {
   if (isConsumingOrderStatus(orderStatus)) return;
   const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
@@ -36,7 +31,7 @@ class PaymentGatewayService {
       if (branch && branch.payment_config_override) {
         try {
           const cfg = JSON.parse(branch.payment_config_override);
-          if (cfg && cfg.server_key) return cfg;
+          if (cfg && this._hasValidCredentials(cfg)) return cfg;
         } catch (_) {}
       }
     }
@@ -46,7 +41,7 @@ class PaymentGatewayService {
       if (brand && brand.default_payment_config) {
         try {
           const cfg = JSON.parse(brand.default_payment_config);
-          if (cfg && cfg.server_key) return cfg;
+          if (cfg && this._hasValidCredentials(cfg)) return cfg;
         } catch (_) {}
       }
     }
@@ -60,86 +55,102 @@ class PaymentGatewayService {
     };
   }
 
+  static _hasValidCredentials(cfg) {
+    if (cfg.provider === 'doku') return Boolean(cfg.client_id && cfg.secret_key);
+    return Boolean(cfg.server_key);
+  }
+
+  static _resolveProvider(config) {
+    return config.provider || 'midtrans';
+  }
+
+  static _getGateway(config) {
+    const provider = this._resolveProvider(config);
+    if (provider === 'doku') return new DokuGateway(config);
+    return new MidtransGateway(config);
+  }
+
   static async createSnapTransaction(order, items = [], customer = {}) {
     const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
-    const isProd = config.is_production === true;
-    const snapUrl = isProd
-      ? 'https://app.midtrans.com/snap/v1/transactions'
-      : 'https://app.sandbox.midtrans.com/snap/v1/transactions';
-    const authHeader = 'Basic ' + Buffer.from(config.server_key + ':').toString('base64');
-    const payload = {
-      transaction_details: { order_id: order.id, gross_amount: Math.round(order.grand_total) },
-      customer_details: { first_name: customer.name || 'Pelanggan', phone: customer.phone || '' },
-      item_details: items.map((i) => ({
-        id: i.product_id || i.id,
-        price: Math.round(i.unit_price || i.price),
-        quantity: i.quantity || 1,
-        name: String(i.product_name || i.name || 'Menu').substring(0, 50)
-      }))
-    };
-    if (order.delivery_fee > 0) payload.item_details.push({ id: 'DELIVERY_FEE', price: Math.round(order.delivery_fee), quantity: 1, name: 'Biaya Pengantaran' });
+    const gateway = this._getGateway(config);
 
     try {
-      const response = await axios.post(snapUrl, payload, {
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: authHeader },
-        timeout: 8000
-      });
-      return { snap_token: response.data.token, redirect_url: response.data.redirect_url, merchant_id: config.merchant_id };
+      return await gateway.createTransaction(order, items, customer);
     } catch (err) {
+      const isProd = config.is_production === true;
       if (isProd || process.env.NODE_ENV === 'production') {
-        const errorDetail = err.response?.data?.error_messages?.join(', ') || err.message;
-        throw new Error(`[Midtrans Gateway Error]: Gagal membuat transaksi pembayaran online (${errorDetail}).`);
+        const errorDetail = err.response?.data?.error_messages?.join(', ') || err.response?.data?.message?.join(', ') || err.message;
+        throw new Error(`[${gateway.name} Gateway Error]: Gagal membuat transaksi pembayaran online (${errorDetail}).`);
       }
-      const simToken = 'sim_snap_' + Date.now();
-      return { snap_token: simToken, redirect_url: `https://app.sandbox.midtrans.com/snap/v2/vtweb/${simToken}`, merchant_id: config.merchant_id };
+      const simFallback = gateway.getSimFallback(order.id);
+      if (simFallback) return simFallback;
+      throw err;
     }
   }
 
-  static verifySignature(webhookData, serverKey) {
+  static verifySignature(webhookData, serverKey, provider) {
+    if (provider === 'doku') return false;
     if (!webhookData || !webhookData.signature_key || !serverKey) return false;
     const { order_id, status_code, gross_amount, signature_key } = webhookData;
     const raw = `${order_id}${status_code}${gross_amount}${serverKey}`;
     return crypto.createHash('sha512').update(raw).digest('hex') === signature_key;
   }
 
-  static handleWebhook(webhookData, { skipSignatureCheck = false } = {}) {
-    const { order_id, transaction_status, fraud_status, gross_amount } = webhookData;
-    let payment = paymentRepository.findPaymentByOrderId(order_id);
-    const order = paymentRepository.findOrder(order_id);
+  static handleWebhook(webhookData, { skipSignatureCheck = false, provider = 'midtrans', headers = {}, notificationPath = '' } = {}) {
+    const orderId = provider === 'doku'
+      ? (webhookData.order && webhookData.order.invoice_number) || ''
+      : (webhookData.order_id || '');
+    const grossAmount = provider === 'doku'
+      ? (webhookData.order && webhookData.order.amount)
+      : webhookData.gross_amount;
+    let payment = paymentRepository.findPaymentByOrderId(orderId);
+    const order = paymentRepository.findOrder(orderId);
+
+    const branchId = webhookData._branch_id || (order && order.branch_id);
+    const brandId = webhookData._brand_id || (order && order.brand_id);
+    const config = this.resolvePaymentConfig(branchId, brandId);
+    const gateway = this._getGateway(config);
 
     if (!skipSignatureCheck) {
-      const config = this.resolvePaymentConfig(order?.branch_id, order?.brand_id);
-      if (!config.server_key) throw new Error(`[PaymentGatewayService] Server Key Midtrans belum dikonfigurasi untuk brand/cabang order "${order_id}". Webhook ditolak demi keamanan.`);
-      if (!webhookData.signature_key) throw new Error(`[PaymentGatewayService] Signature key tidak disertakan pada webhook payload untuk order "${order_id}". Webhook ditolak.`);
-      if (!this.verifySignature(webhookData, config.server_key)) throw new Error(`[PaymentGatewayService Signature Fraud]: Signature webhook Midtrans tidak valid untuk order "${order_id}". Transaksi ditolak.`);
+      if (provider === 'doku') {
+        if (!config.secret_key) throw new Error(`[PaymentGatewayService] Secret Key DOKU belum dikonfigurasi. Webhook ditolak demi keamanan.`);
+        if (!gateway.verifySignature(headers, webhookData, notificationPath)) {
+          throw new Error(`[PaymentGatewayService Signature Fraud]: Signature webhook DOKU tidak valid untuk order "${orderId}". Transaksi ditolak.`);
+        }
+      } else {
+        if (!config.server_key) throw new Error(`[PaymentGatewayService] Server Key Midtrans belum dikonfigurasi untuk brand/cabang order "${orderId}". Webhook ditolak demi keamanan.`);
+        if (!webhookData.signature_key) throw new Error(`[PaymentGatewayService] Signature key tidak disertakan pada webhook payload untuk order "${orderId}". Webhook ditolak.`);
+        if (!gateway.verifySignature(webhookData)) throw new Error(`[PaymentGatewayService Signature Fraud]: Signature webhook Midtrans tidak valid untuk order "${orderId}". Transaksi ditolak.`);
+      }
     }
 
     if (!payment) {
-      if (!order) throw new Error(`[PaymentGatewayService] Data pesanan untuk Order ID "${order_id}" tidak ditemukan.`);
+      if (!order) throw new Error(`[PaymentGatewayService] Data pesanan untuk Order ID "${orderId}" tidak ditemukan.`);
       const healNow = new Date().toISOString();
       paymentRepository.ensurePendingPayment({
         paymentId: `pay_${crypto.randomBytes(6).toString('hex')}`,
-        orderId: order_id,
+        orderId: orderId,
         amount: order.grand_total,
         createdAt: healNow,
         updatedAt: healNow
       });
-      payment = paymentRepository.findPaymentByOrderId(order_id);
+      payment = paymentRepository.findPaymentByOrderId(orderId);
     }
 
+    const { mappedStatus, shouldSettle } = gateway.parseWebhookStatus(webhookData);
     let newPaymentStatus = PaymentModel.STATUSES.PENDING;
-    const shouldSettle = transaction_status === 'settlement' || (transaction_status === 'capture' && fraud_status === 'accept');
-    if (transaction_status === 'capture' && fraud_status === 'challenge') newPaymentStatus = PaymentModel.STATUSES.CHALLENGE;
-    else if (shouldSettle) newPaymentStatus = PaymentModel.STATUSES.SETTLEMENT;
-    else if (['cancel', 'deny', 'expire'].includes(transaction_status)) newPaymentStatus = transaction_status;
 
-    if (payment.payment_status === PaymentModel.STATUSES.SETTLEMENT && newPaymentStatus === PaymentModel.STATUSES.SETTLEMENT) return { success: true, idempotent: true, order_id, payment_status: PaymentModel.STATUSES.SETTLEMENT, message: 'Pembayaran sudah diselesaikan sebelumnya.' };
-    if (payment.payment_status === newPaymentStatus) return { success: true, idempotent: true, order_id, payment_status: newPaymentStatus, message: `Status pembayaran sudah berada pada "${newPaymentStatus}".` };
+    if (mappedStatus === 'challenge') newPaymentStatus = PaymentModel.STATUSES.CHALLENGE;
+    else if (shouldSettle) newPaymentStatus = PaymentModel.STATUSES.SETTLEMENT;
+    else if (['cancel', 'deny', 'expire'].includes(mappedStatus)) newPaymentStatus = mappedStatus;
+
+    if (payment.payment_status === PaymentModel.STATUSES.SETTLEMENT && newPaymentStatus === PaymentModel.STATUSES.SETTLEMENT) return { success: true, idempotent: true, order_id: orderId, payment_status: PaymentModel.STATUSES.SETTLEMENT, message: 'Pembayaran sudah diselesaikan sebelumnya.' };
+    if (payment.payment_status === newPaymentStatus) return { success: true, idempotent: true, order_id: orderId, payment_status: newPaymentStatus, message: `Status pembayaran sudah berada pada "${newPaymentStatus}".` };
     if (!PaymentModel.canTransition(payment.payment_status, newPaymentStatus)) throw new Error(`[PaymentGatewayService State Violation]: Transisi status pembayaran tidak valid dari "${payment.payment_status}" ke "${newPaymentStatus}". Status terminal tidak dapat diubah.`);
-    if (order && order.status === 'cancelled' && shouldSettle) throw new Error(`[PaymentGatewayService State Violation]: Pesanan "${order_id}" sudah dibatalkan (cancelled) dan tidak dapat dikonfirmasi ulang.`);
+    if (order && order.status === 'cancelled' && shouldSettle) throw new Error(`[PaymentGatewayService State Violation]: Pesanan "${orderId}" sudah dibatalkan (cancelled) dan tidak dapat dikonfirmasi ulang.`);
 
     if (shouldSettle || newPaymentStatus === PaymentModel.STATUSES.SETTLEMENT) {
-      const gatewayAmount = Number(gross_amount);
+      const gatewayAmount = Number(grossAmount);
       const orderAmount = order ? Number(order.grand_total) : null;
       const paymentAmount = Number(payment.amount);
       if (!Number.isFinite(gatewayAmount) || (orderAmount !== null && Math.round(gatewayAmount) !== Math.round(orderAmount)) || Math.round(gatewayAmount) !== Math.round(paymentAmount)) throw new Error(`[PAYMENT_AMOUNT_MISMATCH]: Nominal pembayaran gateway (Rp ${gatewayAmount}) tidak cocok dengan tagihan order (Rp ${orderAmount}) atau payment record (Rp ${paymentAmount}). Transaksi settlement ditolak demi integritas finansial.`);
@@ -149,25 +160,24 @@ class PaymentGatewayService {
     let orderStatusAfterSettlement = null;
     paymentRepository.beginTransaction();
     try {
-      paymentRepository.updatePaymentWebhook({ orderId: order_id, paymentStatus: newPaymentStatus, webhookResponse: JSON.stringify(webhookData), settledAt: now, updatedAt: now });
+      paymentRepository.updatePaymentWebhook({ orderId: orderId, paymentStatus: newPaymentStatus, webhookResponse: JSON.stringify(webhookData), settledAt: now, updatedAt: now });
 
       if (shouldSettle) {
-        const currentOrderState = paymentRepository.findOrderStatus(order_id);
+        const currentOrderState = paymentRepository.findOrderStatus(orderId);
         const terminalOrderStatuses = ['rejected', 'timeout', 'cancelled', 'fulfillment_exception'];
         if (currentOrderState && terminalOrderStatuses.includes(currentOrderState.status)) {
           orderStatusAfterSettlement = 'fulfillment_exception';
           paymentRepository.markFulfillmentException({
-            orderId: order_id,
+            orderId: orderId,
             note: `[Perlu Refund]: Pembayaran diterima setelah pesanan berstatus "${currentOrderState.status}". Pesanan tidak diaktifkan ulang.`,
             updatedAt: now
           });
-          // The order never reached ACCEPTED → release any reward claim it held.
-          releaseClaimIfNeverAccepted(order_id, currentOrderState.status, `Settlement after order left AWAITING (${currentOrderState.status})`);
+          releaseClaimIfNeverAccepted(orderId, currentOrderState.status, `Settlement after order left AWAITING (${currentOrderState.status})`);
         } else {
           const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
-          OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
+          OrderPlacementService.deductStockForSettledOrder(orderId, { dbTransactionProvided: true });
 
-          const promoItems = paymentRepository.findOrderItemsWithPromoMarker(order_id);
+          const promoItems = paymentRepository.findOrderItemsWithPromoMarker(orderId);
           const promoRedemptionsToRecord = [];
           if (promoItems && promoItems.length > 0 && order && order.customer_phone) {
             for (const it of promoItems) {
@@ -200,7 +210,7 @@ class PaymentGatewayService {
 
           if (promoRedemptionsToRecord.length > 0) {
             const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-            PromotionEngineService.recordRedemptions({ order_id, brand_id: order?.brand_id, branch_id: order?.branch_id, customer_phone: order?.customer_phone, promotions: promoRedemptionsToRecord });
+            PromotionEngineService.recordRedemptions({ order_id: orderId, brand_id: order?.brand_id, branch_id: order?.branch_id, customer_phone: order?.customer_phone, promotions: promoRedemptionsToRecord });
           }
 
           if (order && order.order_type === 'dine_in') {
@@ -218,10 +228,10 @@ class PaymentGatewayService {
           }
         }
       } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
-        const cancelOrderResult = paymentRepository.cancelPendingOrder({ orderId: order_id, updatedAt: now });
+        const cancelOrderResult = paymentRepository.cancelPendingOrder({ orderId: orderId, updatedAt: now });
         if (cancelOrderResult && cancelOrderResult.changes > 0) {
           const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-          PromotionEngineService.voidRedemptions({ order_id, reason: `Gateway status ${newPaymentStatus}` });
+          PromotionEngineService.voidRedemptions({ order_id: orderId, reason: `Gateway status ${newPaymentStatus}` });
           if (order && order.order_type === 'dine_in') {
             try {
               const { DiningTableService } = require('../../pos');
@@ -237,29 +247,27 @@ class PaymentGatewayService {
       if (isConcurrencyException) {
         try {
           paymentRepository.beginTransaction();
-          paymentRepository.updatePaymentWebhook({ orderId: order_id, paymentStatus: 'settlement', webhookResponse: JSON.stringify(webhookData), settledAt: now, updatedAt: now });
+          paymentRepository.updatePaymentWebhook({ orderId: orderId, paymentStatus: 'settlement', webhookResponse: JSON.stringify(webhookData), settledAt: now, updatedAt: now });
           const notePrefix = err.message.includes('[PROMO_LIMIT_EXCEEDED_RACE]') ? `[Kendala Promo / Perlu Penyesuaian/Refund]: ${err.message}` : `[Kendala Stok / Perlu Refund]: ${err.message}`;
-          const preExceptionStatus = paymentRepository.findOrderStatus(order_id);
-          paymentRepository.markFulfillmentException({ orderId: order_id, note: notePrefix, updatedAt: now });
-          // Stock/promo race on settlement: if this order was still awaiting
-          // acceptance it never consumed the reward → release the claim.
-          releaseClaimIfNeverAccepted(order_id, preExceptionStatus && preExceptionStatus.status, `Fulfillment exception before acceptance: ${err.message}`);
+          const preExceptionStatus = paymentRepository.findOrderStatus(orderId);
+          paymentRepository.markFulfillmentException({ orderId: orderId, note: notePrefix, updatedAt: now });
+          releaseClaimIfNeverAccepted(orderId, preExceptionStatus && preExceptionStatus.status, `Fulfillment exception before acceptance: ${err.message}`);
           paymentRepository.commitTransaction();
-          events.EventBus.publish({ type: 'payment.fulfillment_exception', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: 'midtrans', amount: Number(gross_amount || payment.amount), error: err.message, settled_at: now } }).catch(() => {});
-          return { success: true, order_id, payment_status: 'settlement', order_status: 'fulfillment_exception', message: 'Pembayaran berhasil diselesaikan namun terdapat kendala ketersediaan stok atau batas promosi. Pesanan dialihkan ke antrean fulfillment exception untuk rekonsiliasi refund.' };
+          events.EventBus.publish({ type: 'payment.fulfillment_exception', producer: 'payment', payload: { payment_id: payment.id, order_id: orderId, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: gateway.name, amount: Number(grossAmount || payment.amount), error: err.message, settled_at: now } }).catch(() => {});
+          return { success: true, order_id: orderId, payment_status: 'settlement', order_status: 'fulfillment_exception', message: 'Pembayaran berhasil diselesaikan namun terdapat kendala ketersediaan stok atau batas promosi. Pesanan dialihkan ke antrean fulfillment exception untuk rekonsiliasi refund.' };
         } catch (_) { try { paymentRepository.rollbackTransaction(); } catch (_) {} }
       }
       throw new Error(`[PaymentGatewayService Transaction Error]: ${err.message}`);
     }
 
     if (shouldSettle) {
-      if (orderStatusAfterSettlement === 'fulfillment_exception') events.EventBus.publish({ type: 'payment.fulfillment_exception', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: 'midtrans', amount: Number(gross_amount || payment.amount), error: `Settlement arrived after order left AWAITING (${orderStatusAfterSettlement}).`, settled_at: now } }).catch(() => {});
-      else events.EventBus.publish({ type: 'payment.settled', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: 'midtrans', payment_method: 'midtrans', amount: Number(gross_amount || payment.amount), settled_at: now } }).catch(() => {});
+      if (orderStatusAfterSettlement === 'fulfillment_exception') events.EventBus.publish({ type: 'payment.fulfillment_exception', producer: 'payment', payload: { payment_id: payment.id, order_id: orderId, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: gateway.name, amount: Number(grossAmount || payment.amount), error: `Settlement arrived after order left AWAITING (${orderStatusAfterSettlement}).`, settled_at: now } }).catch(() => {});
+      else events.EventBus.publish({ type: 'payment.settled', producer: 'payment', payload: { payment_id: payment.id, order_id: orderId, branch_id: order?.branch_id, brand_id: order?.brand_id, provider: gateway.name, payment_method: gateway.name, amount: Number(grossAmount || payment.amount), settled_at: now } }).catch(() => {});
     } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
-      events.EventBus.publish({ type: 'payment.failed', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id: order?.branch_id, provider: 'midtrans', status: newPaymentStatus } }).catch(() => {});
+      events.EventBus.publish({ type: 'payment.failed', producer: 'payment', payload: { payment_id: payment.id, order_id: orderId, branch_id: order?.branch_id, provider: gateway.name, status: newPaymentStatus } }).catch(() => {});
     }
 
-    return { success: true, order_id, payment_status: newPaymentStatus, ...(orderStatusAfterSettlement ? { order_status: orderStatusAfterSettlement } : {}) };
+    return { success: true, order_id: orderId, payment_status: newPaymentStatus, ...(orderStatusAfterSettlement ? { order_status: orderStatusAfterSettlement } : {}) };
   }
 
   static async checkTransactionStatus(order_id) {
@@ -267,12 +275,23 @@ class PaymentGatewayService {
     const order = paymentRepository.findOrder(order_id);
     if (!order) throw new Error(`[PaymentGatewayService] Order "${order_id}" tidak ditemukan.`);
     const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
-    if (!config.server_key) throw new Error(`[PaymentGatewayService] Server Key Midtrans belum dikonfigurasi untuk brand/cabang order "${order_id}".`);
-    const isProd = config.is_production || process.env.MIDTRANS_IS_PRODUCTION === 'true';
-    const baseUrl = isProd ? 'https://api.midtrans.com/v2' : 'https://api.sandbox.midtrans.com/v2';
+    const gateway = this._getGateway(config);
+
     try {
-      const response = await axios.get(`${baseUrl}/${order_id}/status`, { headers: { Accept: 'application/json', Authorization: 'Basic ' + Buffer.from(config.server_key + ':').toString('base64') }, timeout: 6000 });
-      if (response?.data) return this.handleWebhook(response.data, { skipSignatureCheck: true });
+      const data = await gateway.checkTransactionStatus(order_id);
+      if (data) {
+        const normalizedData = { ...data };
+        if (config.provider === 'midtrans') {
+          return this.handleWebhook(normalizedData, { skipSignatureCheck: true });
+        }
+        if (config.provider === 'doku' && data.response) {
+          const dokuData = {
+            order: { invoice_number: order_id, amount: order.grand_total },
+            transaction: { status: data.response.status || 'PENDING' }
+          };
+          return this.handleWebhook(dokuData, { skipSignatureCheck: true, provider: 'doku' });
+        }
+      }
     } catch (err) {
       if (err.response?.status === 404) {
         const now = new Date().toISOString();
@@ -282,7 +301,7 @@ class PaymentGatewayService {
           const orderCancelled = paymentRepository.cancelPendingOrder({ orderId: order_id, updatedAt: now });
           paymentRepository.commitTransaction();
           const orderStatus = orderCancelled?.changes > 0 ? 'cancelled' : null;
-          return { success: true, order_id, payment_status: 'cancel', ...(orderStatus ? { order_status: orderStatus } : {}), message: orderStatus ? 'Transaksi tidak ditemukan di gateway Midtrans. Pembayaran resmi dibatalkan.' : 'Transaksi tidak ditemukan di gateway Midtrans. Pembayaran dicatat batal; status pesanan terminal dipertahankan.' };
+          return { success: true, order_id, payment_status: 'cancel', ...(orderStatus ? { order_status: orderStatus } : {}), message: orderStatus ? `Transaksi tidak ditemukan di gateway ${gateway.name}. Pembayaran resmi dibatalkan.` : `Transaksi tidak ditemukan di gateway ${gateway.name}. Pembayaran dicatat batal; status pesanan terminal dipertahankan.` };
         } catch (_) { try { paymentRepository.rollbackTransaction(); } catch (_) {} }
       }
       throw new Error(`[PaymentGatewayService] Gagal memeriksa status transaksi gateway: ${err.message}`);

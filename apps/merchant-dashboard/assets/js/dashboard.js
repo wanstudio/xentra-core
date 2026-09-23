@@ -5244,19 +5244,79 @@
       if (!json.success || !json.payment_methods) return;
 
       var cards = json.payment_methods.map(function (m) {
-        var activeBadge = m.is_enabled
-          ? '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:700;">Aktif</span>'
-          : '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-weight:600;">Belum Dikonfigurasi</span>';
+        // Tiga keadaan yang berbeda dan tidak boleh tertukar: sedang AKTIF, sudah
+        // siap tapi tidak dipakai, dan belum punya kredensial sama sekali.
+        var isOnlineGateway = m.type === 'online_gateway';
+        var providerBadge = '';
+        if (m.is_active_provider === true) {
+          providerBadge = '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#dcfce7;color:#166534;font-weight:700;">Aktif</span>';
+        } else if (isOnlineGateway && !m.is_enabled) {
+          providerBadge = '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#f1f5f9;color:#64748b;font-weight:600;">Belum dikonfigurasi</span>';
+        } else if (isOnlineGateway) {
+          providerBadge = '<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#fef3c7;color:#92400e;font-weight:600;">Siap Digunakan</span>';
+        }
 
-        var envText = m.environment ? '<div style="font-size:11px;color:#64748b;margin-top:4px;">Lingkungan: <strong>' + esc(m.environment) + '</strong>' + (m.has_branch_override ? ' (Override Cabang)' : ' (Brand Default)') + '</div>' : '';
+        var configInfo = '';
+        if (m.code !== 'cash') {
+          var envLabel = m.environment ? (m.environment === 'production' ? 'Produksi' : 'Sandbox') : '';
+          configInfo = '<div style="font-size:11px;color:#64748b;margin-top:4px;">' +
+            (envLabel ? 'Lingkungan: <strong>' + envLabel + '</strong>' : '') +
+            (m.has_branch_override ? ' (Override Cabang)' : '') +
+          '</div>';
+        }
 
-        return '<div class="x-card" style="padding:18px;border:1px solid var(--border-color);border-radius:var(--radius-md);background:#ffffff;">' +
-          '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
+        var typesHtml = '';
+        if (m.types && m.types.length > 0) {
+          var togglesHtml = m.types.map(function (t) {
+            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f1f5f9;">' +
+              '<div style="display:flex;align-items:center;gap:8px;">' +
+                '<span style="font-size:16px;">' + t.icon + '</span>' +
+                '<span style="font-size:13px;font-weight:600;color:#1e293b;">' + esc(t.name) + '</span>' +
+              '</div>' +
+              '<label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;">' +
+                '<input type="checkbox" data-provider="' + m.code + '" data-method-type="' + t.code + '" ' + (t.enabled ? 'checked' : '') + ' onchange="togglePaymentMethodType(this)" style="opacity:0;width:0;height:0;">' +
+                '<span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:' + (t.enabled ? '#22c55e' : '#e2e8f0') + ';transition:0.2s;border-radius:22px;"></span>' +
+                '<span style="position:absolute;content:\'\';height:18px;width:18px;left:' + (t.enabled ? '19px' : '3px') + ';bottom:2px;background-color:white;transition:0.2s;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.15);"></span>' +
+              '</label>' +
+            '</div>';
+          }).join('');
+          typesHtml = '<div style="margin-top:12px;padding-top:8px;">' +
+            '<div style="font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Channel Pembayaran</div>' +
+            togglesHtml +
+          '</div>';
+        }
+
+        // Hanya SATU gateway online yang boleh hijau. Toggle mencerminkan keadaan
+        // aktif (bukan sekadar "kredensial ada"), dan mematikan salah satu berarti
+        // tidak ada gateway online yang aktif.
+        var isOn = isOnlineGateway ? (m.is_active_provider === true) : true;
+        var trackColor = isOn ? '#22c55e' : '#ef4444';
+        var knobLeft = isOn ? '19px' : '3px';
+        var toggleHtml;
+        if (isOnlineGateway || isOn) {
+          toggleHtml = '<label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;" title="' + (isOn ? 'Aktif — klik untuk menonaktifkan' : 'Nonaktif — klik untuk mengaktifkan') + '">' +
+            '<input type="checkbox" data-provider="' + m.code + '" data-toggle-provider="true" ' + (isOn ? 'checked' : '') + ' onchange="togglePaymentProvider(this)" style="opacity:0;width:0;height:0;">' +
+            '<span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background-color:' + trackColor + ';transition:0.2s;border-radius:22px;"></span>' +
+            '<span style="position:absolute;content:\'\';height:18px;width:18px;left:' + knobLeft + ';bottom:2px;background-color:white;transition:0.2s;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.15);"></span>' +
+          '</label>';
+        } else {
+          // Tunai tidak bisa dimatikan: alur bayar-di-kasir dan setoran tunai
+          // bergantung padanya. Ditampilkan hijau dan terkunci, bukan disembunyikan,
+          // supaya jelas bahwa ia memang selalu aktif.
+          toggleHtml = '<span title="Tunai selalu aktif" style="display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:700;color:#166534;background:#dcfce7;border-radius:999px;padding:3px 10px;">Selalu aktif</span>';
+        }
+
+        var borderColor = m.is_active_provider ? '#22c55e' : '#e2e8f0';
+
+        return '<div class="x-card" style="padding:18px;border:2px solid ' + borderColor + ';border-radius:var(--radius-md);background:#ffffff;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">' +
             '<h4 style="font-size:15px;font-weight:800;margin:0;color:var(--text-main);">' + esc(m.name) + '</h4>' +
-            activeBadge +
+            '<div style="display:flex;align-items:center;gap:8px;">' + providerBadge + toggleHtml +
+            '</div>' +
           '</div>' +
-          '<p style="font-size:12px;color:var(--text-muted);margin:0 0 10px 0;line-height:1.4;">' + esc(m.description) + '</p>' +
-          envText +
+          '<p style="font-size:12px;color:var(--text-muted);margin:0;line-height:1.4;">' + esc(m.description) + '</p>' +
+          configInfo +
+          typesHtml +
         '</div>';
       });
 
@@ -5267,6 +5327,63 @@
     }
   }
   window.loadFinancePaymentMethods = loadFinancePaymentMethods;
+
+  window.togglePaymentMethodType = async function (checkbox) {
+    var provider = checkbox.dataset.provider;
+    var methodType = checkbox.dataset.methodType;
+    var enabled = checkbox.checked;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/finance/payment-methods', {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ provider: provider, method_type: methodType, enabled: enabled })
+      });
+      var json = await res.json();
+      if (json.success) {
+        showToast(esc(provider.toUpperCase()) + ' ' + esc(methodType) + (enabled ? ' diaktifkan' : ' dinonaktifkan'));
+        var span = checkbox.nextElementSibling;
+        var dot = span ? span.nextElementSibling : null;
+        if (span) span.style.backgroundColor = enabled ? '#22c55e' : '#e2e8f0';
+        if (dot) dot.style.left = enabled ? '19px' : '3px';
+      } else {
+        checkbox.checked = !enabled;
+        showToast('Gagal: ' + (json.error || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      checkbox.checked = !enabled;
+      showToast('Kesalahan jaringan saat menyimpan perubahan.');
+    }
+  };
+
+  window.togglePaymentProvider = async function (checkbox) {
+    var provider = checkbox.dataset.provider;
+    var enabled = checkbox.checked;
+    var label = provider === 'doku' ? 'DOKU' : 'Midtrans';
+    try {
+      // Mengaktifkan satu gateway online otomatis mematikan yang lain: `provider`
+      // adalah satu-satunya gateway online yang aktif, jadi mengirim 'doku' berarti
+      // Midtrans berhenti aktif. Mematikan keduanya berarti mengirim kosong.
+      var res = await adminFetch(API_BASE + '/admin/settings/commerce/payments', {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ provider: enabled ? provider : '' })
+      });
+      var json = await res.json();
+      if (json.success) {
+        // Muat ulang supaya gateway lain terlihat ikut berubah, bukan hanya yang diklik.
+        loadFinancePaymentMethods();
+        showToast(enabled
+          ? label + ' diaktifkan. Hanya satu gateway online yang aktif.'
+          : label + ' dinonaktifkan.');
+      } else {
+        checkbox.checked = !enabled;
+        showToast('Gagal: ' + (json.error || 'Terjadi kesalahan'));
+      }
+    } catch (err) {
+      checkbox.checked = !enabled;
+      showToast('Kesalahan jaringan saat mengubah provider.');
+    }
+  };
 
   function switchMarketingSection(subtab, updateHash) {
     if (!subtab) subtab = 'overview';
@@ -8120,7 +8237,66 @@
     }
     window.loadSettingsCommerceOrders = loadSettingsCommerceOrders;
 
-    // 5. Commerce Payments
+    // 5. Commerce Payments — Tabbed Provider Interface
+    var _activePaymentTab = 'midtrans';
+
+    function switchPaymentTab(tab) {
+      _activePaymentTab = tab;
+      var midtransBtn = $('payment-tab-midtrans');
+      var dokuBtn = $('payment-tab-doku');
+      var midtransContent = $('payment-tab-content-midtrans');
+      var dokuContent = $('payment-tab-content-doku');
+
+      if (midtransBtn) {
+        midtransBtn.style.borderBottomColor = tab === 'midtrans' ? '#0f172a' : 'transparent';
+        midtransBtn.style.color = tab === 'midtrans' ? '#0f172a' : '#94a3b8';
+        midtransBtn.style.background = tab === 'midtrans' ? '#f8fafc' : 'transparent';
+      }
+      if (dokuBtn) {
+        dokuBtn.style.borderBottomColor = tab === 'doku' ? '#0f172a' : 'transparent';
+        dokuBtn.style.color = tab === 'doku' ? '#0f172a' : '#94a3b8';
+        dokuBtn.style.background = tab === 'doku' ? '#f8fafc' : 'transparent';
+      }
+      if (midtransContent) midtransContent.style.display = tab === 'midtrans' ? 'block' : 'none';
+      if (dokuContent) dokuContent.style.display = tab === 'doku' ? 'block' : 'none';
+    }
+    window.switchPaymentTab = switchPaymentTab;
+
+    function updateProviderStatusBadges(activeProvider, midtransConfigured, dokuConfigured) {
+      var midBadge = $('payment-tab-midtrans-status');
+      var dokuBadge = $('payment-tab-doku-status');
+      if (midBadge) {
+        if (activeProvider === 'midtrans') {
+          midBadge.textContent = 'Aktif';
+          midBadge.style.background = '#dcfce7';
+          midBadge.style.color = '#166534';
+        } else if (midtransConfigured) {
+          midBadge.textContent = 'Siap';
+          midBadge.style.background = '#fef3c7';
+          midBadge.style.color = '#92400e';
+        } else {
+          midBadge.textContent = 'Nonaktif';
+          midBadge.style.background = '#e2e8f0';
+          midBadge.style.color = '#64748b';
+        }
+      }
+      if (dokuBadge) {
+        if (activeProvider === 'doku') {
+          dokuBadge.textContent = 'Aktif';
+          dokuBadge.style.background = '#dcfce7';
+          dokuBadge.style.color = '#166534';
+        } else if (dokuConfigured) {
+          dokuBadge.textContent = 'Siap';
+          dokuBadge.style.background = '#fef3c7';
+          dokuBadge.style.color = '#92400e';
+        } else {
+          dokuBadge.textContent = 'Nonaktif';
+          dokuBadge.style.background = '#e2e8f0';
+          dokuBadge.style.color = '#64748b';
+        }
+      }
+    }
+
     async function loadSettingsPayments() {
       try {
         var branchId = getEffectiveBranchId();
@@ -8150,8 +8326,25 @@
           scopeSel.value = (branchId && branchId !== 'all') ? branchId : 'brand';
         }
 
+        var activeProvider = ps.active_provider || 'midtrans';
+        var midtransConfigured = Boolean(ps.server_key_configured);
+        var dokuConfigured = Boolean(ps.doku_client_id_configured);
+
+        updateProviderStatusBadges(activeProvider, midtransConfigured, dokuConfigured);
+
+        // Tab gateway hanya menyimpan kredensial. Aktif/nonaktifnya diatur di
+        // Finance → Payment Methods, jadi tidak ada checkbox di sini.
+        if ($('set-payment-server-key')) $('set-payment-server-key').value = '';
+        if ($('set-payment-client-key')) $('set-payment-client-key').value = '';
         if ($('set-payment-merchant-id')) $('set-payment-merchant-id').value = ps.merchant_id || '';
         if ($('set-payment-is-production')) $('set-payment-is-production').checked = Boolean(ps.is_production);
+
+        if ($('set-payment-doku-client-id')) $('set-payment-doku-client-id').value = '';
+        if ($('set-payment-doku-secret-key')) $('set-payment-doku-secret-key').value = '';
+        if ($('set-payment-doku-callback-url')) $('set-payment-doku-callback-url').value = '';
+        if ($('set-payment-doku-is-production')) $('set-payment-doku-is-production').checked = Boolean(ps.is_production);
+
+        switchPaymentTab(activeProvider);
       } catch (err) {
         console.warn('[Load Settings Payments Warn]:', err);
       }
@@ -8159,39 +8352,32 @@
     window.loadSettingsPayments = loadSettingsPayments;
 
     function onPaymentScopeChange() {
-      var scopeSel = $('set-payment-scope-select');
-      var val = scopeSel ? scopeSel.value : 'brand';
-      var query = val !== 'brand' ? '?branch_id=' + encodeURIComponent(val) : '';
-      adminFetch(API_BASE + '/admin/settings/commerce/payments' + query, { headers: getAuthHeaders() })
-        .then(function (res) { return res.json(); })
-        .then(function (json) {
-          if (json.success && json.payment_settings) {
-            var ps = json.payment_settings;
-            var scopeBadge = $('set-payment-scope-badge');
-            if (scopeBadge) {
-              scopeBadge.textContent = ps.has_branch_override ? 'Branch Override Aktif' : 'Brand Default';
-              scopeBadge.style.background = ps.has_branch_override ? '#fef3c7' : '#f1f5f9';
-              scopeBadge.style.color = ps.has_branch_override ? '#92400e' : '#475569';
-            }
-            if ($('set-payment-merchant-id')) $('set-payment-merchant-id').value = ps.merchant_id || '';
-            if ($('set-payment-is-production')) $('set-payment-is-production').checked = Boolean(ps.is_production);
-          }
-        });
+      loadSettingsPayments();
     }
     window.onPaymentScopeChange = onPaymentScopeChange;
 
-    async function saveSettingsPayments(e) {
+    async function saveSettingsPayments(e, provider) {
       if (e) e.preventDefault();
       try {
         var scopeSel = $('set-payment-scope-select');
         var scopeVal = scopeSel ? scopeSel.value : 'brand';
+        var activeProvider = provider || _activePaymentTab || 'midtrans';
 
+        // `provider` sengaja TIDAK dikirim: menyimpan kredensial bukan tindakan
+        // mengaktifkan gateway. Yang mengaktifkan hanya toggle di Finance →
+        // Payment Methods. Kolom kredensial yang dibiarkan kosong juga tidak
+        // menimpa yang tersimpan (server yang menjaganya).
         var payload = {
           branch_id: scopeVal !== 'brand' ? scopeVal : null,
-          server_key: $('set-payment-server-key').value.trim(),
-          client_key: $('set-payment-client-key').value.trim(),
-          merchant_id: $('set-payment-merchant-id').value.trim(),
-          is_production: $('set-payment-is-production').checked
+          is_production: activeProvider === 'midtrans'
+            ? Boolean($('set-payment-is-production') && $('set-payment-is-production').checked)
+            : Boolean($('set-payment-doku-is-production') && $('set-payment-doku-is-production').checked),
+          server_key: $('set-payment-server-key') ? $('set-payment-server-key').value.trim() : '',
+          client_key: $('set-payment-client-key') ? $('set-payment-client-key').value.trim() : '',
+          merchant_id: $('set-payment-merchant-id') ? $('set-payment-merchant-id').value.trim() : '',
+          doku_client_id: $('set-payment-doku-client-id') ? $('set-payment-doku-client-id').value.trim() : '',
+          doku_secret_key: $('set-payment-doku-secret-key') ? $('set-payment-doku-secret-key').value.trim() : '',
+          doku_callback_url: $('set-payment-doku-callback-url') ? $('set-payment-doku-callback-url').value.trim() : ''
         };
 
         var res = await adminFetch(API_BASE + '/admin/settings/commerce/payments', {
@@ -8201,16 +8387,19 @@
         });
         var json = await res.json();
         if (json.success) {
-          showToast(json.message || 'Kredensial pembayaran berhasil disimpan.');
+          showToast(json.message || 'Konfigurasi ' + (activeProvider === 'doku' ? 'DOKU' : 'Midtrans') + ' berhasil disimpan.');
           loadSettingsPayments();
         } else {
           showToast('Gagal: ' + (json.error || 'Terjadi kesalahan.'));
         }
       } catch (err) {
-        showToast('Kesalahan jaringan saat menyimpan kredensial pembayaran.');
+        showToast('Kesalahan jaringan saat menyimpan konfigurasi pembayaran.');
       }
     }
     window.saveSettingsPayments = saveSettingsPayments;
+
+    // Saling-kunci antar gateway tidak lagi diatur di sini: aturannya ada di
+    // Finance → Payment Methods, dan ditegakkan server (satu gateway online aktif).
 
     // 6. Commerce Fulfillment
     async function loadSettingsFulfillment() {

@@ -7,9 +7,9 @@ const PaymentGatewayService = require('./services/PaymentGatewayService');
 
 const PAYMENT_IDENTITY = {
   name: 'payment',
-  version: '1.0.0',
+  version: '1.1.0',
   display_name: 'Xentra Payment',
-  description: 'Authoritative Payment Domain for Physical Cash Settlement & Midtrans Online Gateway with full lifecycle isolation'
+  description: 'Authoritative Payment Domain for Physical Cash Settlement & Multi-Gateway Online Payments (Midtrans, DOKU) with full lifecycle isolation'
 };
 
 const PAYMENT_CAPABILITIES = {
@@ -30,6 +30,8 @@ const PAYMENT_CAPABILITIES = {
     'cash_settlement',
     'midtrans_snap',
     'midtrans_webhook_signature',
+    'doku_checkout',
+    'doku_webhook_signature',
     'payment_lifecycle_isolation'
   ]
 };
