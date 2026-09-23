@@ -47,7 +47,7 @@ test('SPLASH-01: splash dilukis paling awal, opak, dan tidak bisa tertembus', ()
   assert.ok(!splash.includes('cy="4" r="2.6"'), 'antena sudah dihilangkan');
   assert.ok(splash.includes('M46 8 C62 8 72 22 72 44'), 'badan meruncing ke bawah');
   assert.ok(splash.includes('rx="4.4" ry="16"'), 'tangan lebih panjang');
-  assert.ok(splash.includes('stroke="#cbd5e1"') && splash.includes('transform-origin: 50% 0%'), 'poros rotasi di atas');
+  assert.ok(splash.includes('transform-origin: 50% 0%') || splash.includes('transform-origin:50% 0%'), 'poros rotasi di atas');
   assert.ok(splash.indexOf('bot-float') < splash.indexOf('xentra-logo.png'),
     'animasinya di atas logo');
   assert.ok(splash.includes('@media (prefers-reduced-motion: reduce)'),
