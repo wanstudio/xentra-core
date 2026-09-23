@@ -2216,7 +2216,7 @@
         sumText.innerHTML =
           '<strong>' + UI.escape(lbl) + (long ? ' (' + UI.escape(long) + ')' : '') + '</strong>' +
           'Pukul ' + UI.escape(jam) + ' ' + UI.escape(branchTzLabel()) +
-          ' · (' + (draft.guestCount || 2) + ' orang)';
+          '&nbsp;&nbsp;&nbsp;<b>·</b>&nbsp;&nbsp;&nbsp;(' + (draft.guestCount || 2) + ' orang)';
       }
 
       buildWheel(dateCol, dateItems, draft.reservationDate, function (it) {
