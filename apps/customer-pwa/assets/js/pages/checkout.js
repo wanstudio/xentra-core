@@ -2053,7 +2053,7 @@
          '      <input type="tel" id="x-res-phone" class="x-loc-form-input" inputmode="numeric" autocomplete="tel" placeholder="" value="">' +
          '    </div>' +
          '    <div class="x-res-contact-hint" style="font-size:11.5px;color:#6b7280;margin-top:6px;">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
-         '<div class="x-fulfillment-selected-summary">' +
+         '<div class="x-fulfillment-selected-summary" style="margin-bottom:0;">' +
          '  <span>Rincian reservasi kedatangan</span>' +
         '  <strong id="x-res-summary-text"></strong>' +
         '</div>' +
