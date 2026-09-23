@@ -88,20 +88,13 @@
         done = true;
         var el = document.getElementById('x-splash');
         if (el) el.style.display = 'none';
-        var sk = document.getElementById('x-skeleton');
-        if (sk) sk.style.display = 'block';
       };
       setTimeout(window.__xentraHideSplash, 3000);
     })();
   </script>
 
-  <!-- SPLASH + SKELETON: robot beranimasi di tengah, lalu skeleton halaman menggantikan.
-       Jadi robot dipakai, bukan placeholder sia-sia. -->
   <div id="x-splash" style="position:fixed;inset:0;z-index:9999;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
     <style>
-      /* Robot putih kecil, mengambang di tempat. Tiga gerak halus saja: naik-turun
-         pelan, bayangan yang mengecil-membesar (petunjuk "mengambang", bukan
-         melompat), dan mata yang berkedip sesekali. Tidak ada kilatan warna. */
       #x-splash .bot-arm-l, #x-splash .bot-arm-r { transform-box: fill-box; transform-origin: 50% 0%; }
       #x-splash .bot-float { animation: bot-float 2.6s ease-in-out infinite alternate; }
       #x-splash .bot-shadow { animation: bot-shadow 2.6s ease-in-out infinite alternate; }
@@ -113,19 +106,9 @@
       @keyframes bot-blink { 0%, 44%, 48%, 92%, 96%, 100% { transform: scaleY(1); } 46% { transform: scaleY(.12); } 94% { transform: scaleY(.12); } }
       @keyframes bot-flap-l { from { transform: rotate(-22deg); } to { transform: rotate(22deg); } }
       @keyframes bot-flap-r { from { transform: rotate(22deg); } to { transform: rotate(-22deg); } }
-      /* Skeleton yang menggantikan splash: placeholder halaman, tanpa robot. */
-      #x-skeleton { display:none; position:fixed;inset:0;z-index:9999;background:#ffffff; }
-      @keyframes shim { 0% { opacity:.18; } 50% { opacity:.38; } 100% { opacity:.18; } }
-      .sk { background:#e2e8f0; border-radius:10px; animation: shim 1.15s ease-in-out infinite; }
-      .sk-hero { height:200px; border-radius:0; }
-      .sk-row { height:22px; width:60%; margin:14px auto; }
-      .sk-card { height:150px; border-radius:14px; margin:0 14px 10px; }
-      .sk-bar { height:44px; border-radius:12px; margin:10px 14px; }
-      .sk-row2 { height:16px; width:38%; margin:10px auto 0; }
       @media (prefers-reduced-motion: reduce) {
         #x-splash .bot-float, #x-splash .bot-shadow, #x-splash .bot-eye,
         #x-splash .bot-arm-l, #x-splash .bot-arm-r { animation: none; }
-        .sk { animation: none; opacity:.30; }
       }
     </style>
 
@@ -165,16 +148,6 @@
     <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Memuat…</span>
   </div>
 
-  <!-- SKELETON: kerangka halaman home, muncul setelah robot tertutup -->
-  <div id="x-skeleton" style="position:fixed;inset:0;z-index:9999;background:#ffffff;">
-    <div class="sk sk-hero"></div>
-    <div class="sk sk-row"></div>
-    <div class="sk sk-card"></div>
-    <div class="sk sk-card"></div>
-    <div class="sk sk-bar"></div>
-    <div class="sk sk-row2"></div>
-    <div style="height:80px;"></div>
-  </div>
   <div id="xentra-home-view" class="x-page">
 
     <!-- HERO HEADER -->

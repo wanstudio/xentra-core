@@ -26,7 +26,6 @@ test('SPLASH-01: splash robot dilukis paling awal, opak, tidak bisa tertembus', 
   assert.ok(splash.includes('@keyframes bot-float'), 'badannya mengambang');
   assert.ok(splash.includes('@keyframes bot-blink'), 'matanya berkedip');
   assert.ok((splash.match(/scaleY\(\.12\)/g) || []).length === 2, 'kedip 2x per siklus');
-  // Animasi karakter (SVG + CSS, tanpa aset baru), di ATAS logo.
   assert.ok(splash.indexOf('bot-float') < splash.indexOf('xentra-logo.png'),
     'animasinya di atas logo');
   assert.ok(splash.includes('@media (prefers-reduced-motion: reduce)'),
