@@ -463,7 +463,7 @@ test('T14: reservasi wajib isi nama pemesan & nomor WhatsApp', () => {
   // Bar informasi & label CTA.
   // Bar hijau mengikuti tipe pembelian; kalimat konfirmasi hanya untuk reservasi.
   assert.ok(code.includes('id="x-ful-promo-text"'), 'teks bar hijau punya id');
-  assert.ok(code.includes("'Kami akan segera menghubungi Anda untuk konfirmasi'"),
+  assert.ok(code.includes("'Kami akan segera menghubungimu untuk konfirmasi'"),
     'reservasi: kalimat konfirmasi di bar hijau');
   assert.ok(code.includes("'Ketersediaan promo tergantung pada tipe pembelian'"),
     'tipe lain: catatan promo tetap ada');

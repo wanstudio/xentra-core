@@ -1874,7 +1874,7 @@
       var promoText = document.getElementById('x-ful-promo-text');
       if (promoText) {
         promoText.textContent = (draft.type === 'reservation')
-          ? 'Kami akan segera menghubungi Anda untuk konfirmasi'
+          ? 'Kami akan segera menghubungimu untuk konfirmasi'
           : 'Ketersediaan promo tergantung pada tipe pembelian';
       }
 
