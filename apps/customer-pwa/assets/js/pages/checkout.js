@@ -2033,10 +2033,10 @@
         '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-plus" aria-label="Tambah orang"><img src="/assets/icons/plus.svg" alt="Tambah orang" style="width:14px;height:14px"></button>' +
         '  </div>' +
         '</div>' +
-        '  <div class="x-res-contact" style="padding:0 16px;">' +
+        '  <div class="x-res-contact" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:18px 16px;margin-top:12px;">' +
          // Centang memakai komponen yang sama dengan "Simpan sebagai favorit"
          // (x-loc-checkbox-label + x-loc-custom-check), hanya tulisannya beda.
-         '    <label class="x-loc-checkbox-label" id="x-label-res-use-account" style="margin:18px 0 12px;">' +
+         '    <label class="x-loc-checkbox-label" id="x-label-res-use-account" style="margin:0 0 12px;">' +
          '      <div class="x-loc-custom-check" id="x-box-res-use-account">' +
          '        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 6 4.5 9 10 3"/></svg>' +
          '      </div>' +
@@ -2052,11 +2052,11 @@
          '      <input type="tel" id="x-res-phone" class="x-loc-form-input" inputmode="numeric" autocomplete="tel" placeholder="" value="">' +
          '    </div>' +
          '    <div class="x-res-contact-hint" style="font-size:11.5px;color:#6b7280;margin-top:6px;">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
-         '  </div>' +
          '<div class="x-fulfillment-selected-summary">' +
          '  <span>Rincian reservasi kedatangan</span>' +
         '  <strong id="x-res-summary-text"></strong>' +
-        '</div>';
+        '</div>' +
+         '  </div>';
 
       // Prefill dari akun (bisa diedit): reservasi boleh untuk orang lain, jadi
       // nama/nomor akun hanya titik awal — resto tetap butuh nomor yang bisa dihubungi.
