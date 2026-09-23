@@ -2024,9 +2024,6 @@
          '    <input id="x-res-phone" class="x-res-contact-input" type="tel" inputmode="numeric" autocomplete="tel" value="">' +
          '    <div class="x-res-contact-hint">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
          '  </div>' +
-         '  <div style="padding:12px 16px 0;">' +
-         '    <button type="button" id="x-res-submit" style="width:100%;height:48px;border:0;border-radius:999px;background:#111111;color:#fff;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;">Reservasi</button>' +
-         '  </div>' +
          '<div class="x-fulfillment-selected-summary">' +
          '  <span>Kami akan menghubungi Anda untuk konfirmasi</span>' +
         '  <strong id="x-res-summary-text"></strong>' +
@@ -2040,29 +2037,26 @@
       if (resName) {
         if (!draft.reservationName) draft.reservationName = acct.name || acct.full_name || '';
         resName.value = draft.reservationName || '';
-        resName.oninput = function () { draft.reservationName = resName.value; };
+        resName.oninput = function () { draft.reservationName = resName.value; syncResConfirm(); };
       }
       if (resPhone) {
         if (!draft.reservationPhone) draft.reservationPhone = acct.phone || '';
         resPhone.value = draft.reservationPhone || '';
-        resPhone.oninput = function () { draft.reservationPhone = resPhone.value; };
+        resPhone.oninput = function () { draft.reservationPhone = resPhone.value; syncResConfirm(); };
       }
 
-      // Tombol kirim reservasi ada di sini (bukan di CTA bawah yang disembunyikan
-      // untuk reservasi). Ia memakai jalur commit + submit yang sama persis.
-      var resSubmit = schedContainer.querySelector('#x-res-submit');
-      if (resSubmit) {
-        resSubmit.onclick = function () {
-          if (!validateReservationContact()) {
-            state.fulfillment.reservationName = (draft.reservationName || '').trim();
-            state.fulfillment.reservationPhone = (draft.reservationPhone || '').trim();
-            if (!validateReservationContact()) return;
-          }
-          var confirmBtn = document.getElementById('x-ful-btn-confirm');
-          if (confirmBtn) confirmBtn.click();
-          executePrePaymentAndSubmit();
-        };
+      // "Reservasi" adalah tombol Konfirmasi milik sheet ini — bukan tombol kedua.
+      // Aktif hanya kalau syaratnya lengkap; matinya pun terlihat alasannya karena
+      // field yang kurang ada tepat di atasnya.
+      var sheetConfirm = document.getElementById('x-ful-btn-confirm');
+      function syncResConfirm() {
+        if (!sheetConfirm) return;
+        sheetConfirm.textContent = 'Reservasi';
+        var lengkap = !!((draft.reservationName || '').trim() && (draft.reservationPhone || '').trim());
+        sheetConfirm.disabled = !lengkap;
+        sheetConfirm.style.opacity = lengkap ? '1' : '0.5';
       }
+      syncResConfirm();
 
       var dateCol = schedContainer.querySelector('#x-res-date-col');
       var timeCol = schedContainer.querySelector('#x-res-time-col');
@@ -2474,6 +2468,10 @@
           state.fulfillment.reservationTime = draft.reservationTime || '12:00';
           state.fulfillment.reservationName = (draft.reservationName || '').trim();
           state.fulfillment.reservationPhone = (draft.reservationPhone || '').trim();
+          // Reservasi dikirim dari tombol yang sama: draft sudah terkunci, jadi
+          // lanjut ke rincian pesanan (gate Google terbuka dulu kalau belum masuk).
+          // Ditunda sejenak supaya sheet sempat tertutup dan halaman sempat dirender.
+          setTimeout(function () { executePrePaymentAndSubmit(); }, 0);
           state.fulfillment.guestCount = draft.guestCount || 2;
         } else if (draft.type === 'dine_in') {
           state.fulfillment.scheduled = false;

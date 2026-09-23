@@ -464,23 +464,21 @@ test('T14: reservasi wajib isi nama pemesan & nomor WhatsApp', () => {
   assert.ok(code.includes("if (isReservation) return 'Reservasi';"), 'CTA berlabel Reservasi');
 });
 
-test('T15: reservasi dikirim dari sheet, CTA bawah disembunyikan', () => {
+test('T15: "Reservasi" adalah tombol Konfirmasi milik sheet, bukan tombol kedua', () => {
   const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
 
-  assert.ok(code.includes('id="x-res-submit"'), 'tombol Reservasi ada di dalam sheet reservasi');
-  assert.ok(code.includes("window.executePrePaymentAndSubmit") === false, 'submit tetap satu fungsi');
-  assert.ok(code.includes("var resSubmit = schedContainer.querySelector('#x-res-submit');"),
-    'tombol reservasi harus dipasang di bagian reservasi');
-  assert.ok(/resSubmit\.onclick[\s\S]{0,900}executePrePaymentAndSubmit\(\)/.test(code),
-    'tombol reservasi memakai jalur submit yang sama');
+  assert.ok(!code.includes('id="x-res-submit"'), 'tidak boleh ada tombol reservasi kedua');
+  assert.ok(code.includes("sheetConfirm.textContent = 'Reservasi';"),
+    'tombol Konfirmasi sheet yang diberi label Reservasi');
   assert.ok(code.includes("document.getElementById('x-ful-btn-confirm')"),
-    'commit lewat jalur konfirmasi sheet yang sudah ada, bukan logika kedua');
-
-  // CTA bawah tidak ditampilkan untuk reservasi (submit-nya di sheet).
+    'memakai tombol konfirmasi sheet yang sudah ada');
+  assert.ok(code.includes('sheetConfirm.disabled = !lengkap;'), 'aktif hanya kalau nama & nomor terisi');
+  assert.ok(code.includes('function syncResConfirm()'), 'keadaan tombol disinkronkan di satu tempat');
+  assert.ok(/resName\.oninput[\s\S]{0,140}syncResConfirm\(\)/.test(code), 'field nama memicunya');
+  assert.ok(/resPhone\.oninput[\s\S]{0,140}syncResConfirm\(\)/.test(code), 'field nomor memicunya');
+  assert.ok(/setTimeout\(function \(\) \{ executePrePaymentAndSubmit\(\); \}, 0\)/.test(code),
+    'reservasi dikirim dari tombol itu, setelah sheet tertutup');
+  assert.ok(code.includes('} else if (!state.paymentMethod) {'), 'pembayaran tidak disyaratkan untuk reservasi');
   assert.ok(code.includes("(isReservation ? '' : ('  <div class=\"x-alt-cta-bar\""),
-    'CTA sticky harus disembunyikan untuk reservasi');
-
-  // Pembayaran tidak disyaratkan untuk reservasi — server juga melewatinya.
-  assert.ok(code.includes('} else if (!state.paymentMethod) {'),
-    'syarat metode pembayaran hanya untuk non-reservasi');
+    'CTA sticky disembunyikan untuk reservasi');
 });
