@@ -444,8 +444,10 @@ test('T14: reservasi wajib isi nama pemesan & nomor WhatsApp', () => {
   // Dua field, di bagian reservasi, dengan prefill dari akun.
   assert.ok(code.includes('id="x-res-name"') && code.includes('id="x-res-phone"'),
     'harus ada field nama pemesan dan nomor WhatsApp');
-  assert.ok(code.includes('>Nama Pemesan<') && code.includes('>Nomor WhatsApp<'),
-    'label kedua field harus jelas');
+  assert.ok(code.includes('Nama Pemesan <span class="wajib">(wajib)</span>'),
+    'label Nama Pemesan harus menyebut (wajib)');
+  assert.ok(code.includes('Nomor WhatsApp <span class="wajib">(wajib)</span>'),
+    'label Nomor WhatsApp harus menyebut (wajib)');
   // Tanpa centang, data akun TIDAK boleh terpakai diam-diam.
   assert.ok(!code.includes('draft.reservationName = acct.name'),
     'akun tidak boleh mengisi otomatis tanpa diminta');
@@ -466,8 +468,9 @@ test('T14: reservasi wajib isi nama pemesan & nomor WhatsApp', () => {
   assert.ok(code.includes("'Ketersediaan promo tergantung pada tipe pembelian'"),
     'tipe lain: catatan promo tetap ada');
   // Centang berada DI ATAS field, karena mengisi field di bawahnya.
-  assert.ok(code.indexOf('id="x-res-use-account"') < code.indexOf('for="x-res-name"'),
+  assert.ok(code.indexOf('id="x-label-res-use-account"') < code.indexOf('id="x-res-name"'),
     'centang "Gunakan akun Anda" harus di atas Nama Pemesan');
+  assert.ok(code.includes('Rincian reservasi kedatangan'), 'label rincian reservasi');
   assert.ok(code.includes("if (isReservation) return 'Reservasi';"), 'CTA berlabel Reservasi');
 });
 
@@ -493,7 +496,14 @@ test('T15: "Reservasi" adalah tombol Konfirmasi milik sheet, bukan tombol kedua'
 test('T16: centang "Gunakan akun Anda" — satu-satunya jalan data akun dipakai', () => {
   const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
 
-  assert.ok(code.includes('id="x-res-use-account"'), 'harus ada centang gunakan akun');
+  // Centang memakai komponen yang sama dengan "Simpan sebagai favorit".
+  assert.ok(code.includes('id="x-label-res-use-account"') && code.includes('id="x-box-res-use-account"'),
+    'harus ada centang gunakan akun');
+  assert.ok(code.includes('class="x-loc-checkbox-label" id="x-label-res-use-account"'),
+    'centang harus memakai komponen x-loc-checkbox-label');
+  assert.ok(code.includes('class="x-loc-custom-check" id="x-box-res-use-account"'),
+    'kotak centang harus memakai x-loc-custom-check');
+  assert.ok(code.includes('<polyline points="2 6 4.5 9 10 3"/>'), 'ikon centangnya sama dengan favorit');
   assert.ok(code.includes('>Gunakan akun Anda untuk reservasi<'), 'labelnya jelas');
 
   // Sudah masuk -> isi dari akun. Belum masuk -> buka gate Google dulu.
@@ -518,7 +528,7 @@ test('T17: konfirmasi nomor akun sebelum nomor disimpan (nomor orang lain)', () 
   assert.ok(code.includes('id="x-acct-phone-ok"'), 'harus ada centang');
   assert.ok(code.includes('id="x-acct-phone-input"'), 'harus ada kolom "kalau bukan"');
   assert.ok(code.includes('Kalau bukan, masukkan nomor Anda di sini:'), 'label kolom cadangan');
-  assert.ok(code.includes('accent-color:#16a34a'), 'centang hijau');
+  assert.ok(code.includes('x-loc-form-input'), 'field mengikuti bentuk Detail alamat');
 
   // Simpan aktif kalau dicentang ATAU nomornya diisi.
   assert.ok(code.includes('var enabled = ok.checked || typed.length >= 9;'),

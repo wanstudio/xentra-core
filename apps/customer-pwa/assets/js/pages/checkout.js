@@ -2027,18 +2027,27 @@
         '  </div>' +
         '</div>' +
         '  <div class="x-res-contact">' +
-         '    <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#374151;margin-bottom:10px;">' +
-         '      <input type="checkbox" id="x-res-use-account" style="width:16px;height:16px;accent-color:#16a34a;">' +
+         // Centang memakai komponen yang sama dengan "Simpan sebagai favorit"
+         // (x-loc-checkbox-label + x-loc-custom-check), hanya tulisannya beda.
+         '    <label class="x-loc-checkbox-label" id="x-label-res-use-account" style="margin-bottom:12px;">' +
+         '      <div class="x-loc-custom-check" id="x-box-res-use-account">' +
+         '        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 6 4.5 9 10 3"/></svg>' +
+         '      </div>' +
          '      <span>Gunakan akun Anda untuk reservasi</span>' +
          '    </label>' +
-         '    <label class="x-res-contact-label" for="x-res-name">Nama Pemesan</label>' +
-         '    <input id="x-res-name" class="x-res-contact-input" type="text" autocomplete="name" value="">' +
-         '    <label class="x-res-contact-label" for="x-res-phone">Nomor WhatsApp</label>' +
-         '    <input id="x-res-phone" class="x-res-contact-input" type="tel" inputmode="numeric" autocomplete="tel" value="">' +
+         // Field memakai bentuk yang sama dengan form "Detail alamat".
+         '    <div class="x-loc-form-group">' +
+         '      <div class="x-loc-form-label">Nama Pemesan <span class="wajib">(wajib)</span></div>' +
+         '      <input type="text" id="x-res-name" class="x-loc-form-input" autocomplete="name" placeholder="" value="">' +
+         '    </div>' +
+         '    <div class="x-loc-form-group">' +
+         '      <div class="x-loc-form-label">Nomor WhatsApp <span class="wajib">(wajib)</span></div>' +
+         '      <input type="tel" id="x-res-phone" class="x-loc-form-input" inputmode="numeric" autocomplete="tel" placeholder="" value="">' +
+         '    </div>' +
          '    <div class="x-res-contact-hint">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
          '  </div>' +
          '<div class="x-fulfillment-selected-summary">' +
-         '  <span>Reservasi kedatangan</span>' +
+         '  <span>Rincian reservasi kedatangan</span>' +
         '  <strong id="x-res-summary-text"></strong>' +
         '</div>';
 
@@ -2046,7 +2055,8 @@
       // nama/nomor akun hanya titik awal — resto tetap butuh nomor yang bisa dihubungi.
       var resName = schedContainer.querySelector('#x-res-name');
       var resPhone = schedContainer.querySelector('#x-res-phone');
-      var useAcct = schedContainer.querySelector('#x-res-use-account');
+      var useAcctLabel = schedContainer.querySelector('#x-label-res-use-account');
+      var useAcctBox = schedContainer.querySelector('#x-box-res-use-account');
 
       // Isi dari data akun. Hanya dipakai kalau tamu MEMINTA (centang) — nomor
       // akun tidak pernah dipakai diam-diam, dan nomor di field reservasi tetap
@@ -2059,12 +2069,15 @@
         syncResConfirm();
       }
 
-      if (useAcct) {
-        useAcct.onchange = function () {
-          if (!useAcct.checked) return;
+      if (useAcctLabel) {
+        useAcctLabel.onclick = function (e) {
+          if (e) e.preventDefault();
+          var on = !useAcctBox.classList.contains('is-checked');
+          useAcctBox.classList.toggle('is-checked', on);
+          if (!on) return;
           var sess = Store.getState().customerSession;
           if (sess && sess.token) { fillFromAccount(); return; }
-          // Belum masuk: buka gate Google dulu, isi dari akun setelah berhasil.
+          // Belum login: buka gate Google dulu, isi dari akun setelah berhasil.
           openCustomerAuthSheet(function () { fillFromAccount(); });
         };
       }
