@@ -12195,6 +12195,9 @@ router.get('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
         has_branch_override: hasOverride,
         active_provider: activeProvider,
         server_key_configured: Boolean(effectiveConfig.server_key || process.env.MIDTRANS_SERVER_KEY),
+        // Client Key Midtrans bersifat publishable (dipakai di sisi browser oleh Snap),
+        // jadi ditampilkan seperti merchant_id. Server Key tetap rahasia.
+        client_key: effectiveConfig.client_key || '',
         client_key_configured: Boolean(effectiveConfig.client_key || process.env.MIDTRANS_CLIENT_KEY),
         merchant_id: effectiveConfig.merchant_id || process.env.MIDTRANS_MERCHANT_ID || '',
         is_production: Boolean(effectiveConfig.is_production !== undefined ? effectiveConfig.is_production : (process.env.MIDTRANS_IS_PRODUCTION === 'true')),

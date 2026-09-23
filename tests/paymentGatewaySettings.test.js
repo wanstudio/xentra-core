@@ -391,10 +391,16 @@ test('PAYMENT GATEWAY — kredensial tersimpan & satu gateway online aktif', asy
 
     // Rahasia TIDAK boleh ikut terkirim — hanya statusnya.
     assert.equal(ps.server_key, undefined, 'server_key tidak boleh dikirim');
-    assert.equal(ps.client_key, undefined, 'client_key tidak boleh dikirim');
     assert.equal(ps.doku_secret_key, undefined, 'secret key DOKU tidak boleh dikirim');
-    assert.ok(!JSON.stringify(ps).includes('SECRET'), 'tidak ada nilai rahasia yang bocor');
+    // Client Key Midtrans publishable (dipakai di sisi browser oleh Snap), jadi
+    // memang ditampilkan — perlakuan yang sama dengan Client ID DOKU.
+    assert.equal(ps.client_key, 'CK-SECRET', 'Client Key Midtrans ditampilkan');
+    // Hanya nilai yang benar-benar rahasia yang tidak boleh ikut.
+    const rawPs = JSON.stringify(ps);
+    assert.ok(!rawPs.includes('MK-SECRET'), 'server_key Midtrans bocor');
+    assert.ok(!rawPs.includes('DK-SECRET'), 'secret key DOKU bocor');
     assert.equal(ps.server_key_configured, true, 'status rahasia Midtrans dilaporkan');
+    assert.equal(ps.client_key_configured, true, 'status Client Key dilaporkan');
     assert.equal(ps.doku_secret_key_configured, true, 'status rahasia DOKU dilaporkan');
   });
 
@@ -421,6 +427,63 @@ test('PAYMENT GATEWAY — kredensial tersimpan & satu gateway online aktif', asy
     // Placeholder kolom rahasia berubah saat sudah tersimpan, supaya tidak tampak kosong.
     assert.ok(DASHBOARD_JS.includes('Tersimpan — isi hanya jika ingin mengganti'),
       'kolom rahasia yang tersimpan harus memberi tanda jelas');
+  });
+
+  await t.test('PGW-14: kedua provider lewat jalur simpan→tampil yang sama (end-to-end)', async () => {
+    // Satu perlakuan untuk keduanya: yang publishable ditampilkan, yang rahasia
+    // hanya ditandai. Diuji dengan memanggil endpoint sungguhan, bukan membaca kode.
+    const cases = [
+      {
+        provider: 'midtrans',
+        payload: { server_key: 'SK-RAHASIA', client_key: 'CK-PUBLIK', merchant_id: 'M-PUBLIK' },
+        publik: ['client_key', 'merchant_id'],
+        rahasia: ['server_key'],
+        flags: { server_key_configured: true, client_key_configured: true }
+      },
+      {
+        provider: 'doku',
+        payload: { doku_client_id: 'BRN-PUBLIK', doku_secret_key: 'DK-RAHASIA', doku_callback_url: 'https://contoh.test/cb' },
+        publik: ['doku_client_id', 'doku_callback_url'],
+        rahasia: ['doku_secret_key'],
+        flags: { doku_client_id_configured: true, doku_secret_key_configured: true }
+      }
+    ];
+
+    for (const c of cases) {
+      const save = await putCredentials(c.provider, c.payload);
+      assert.equal(save.status, 200, c.provider + ' harus bisa disimpan sendiri');
+
+      const ps = (await getSettings()).body.payment_settings;
+
+      c.publik.forEach((key) => {
+        assert.equal(ps[key], c.payload[key],
+          c.provider + ': ' + key + ' (publishable) harus tampil di form');
+      });
+      c.rahasia.forEach((key) => {
+        assert.equal(ps[key], undefined,
+          c.provider + ': ' + key + ' tidak boleh dikirim ke browser');
+      });
+      Object.keys(c.flags).forEach((flag) => {
+        assert.equal(ps[flag], c.flags[flag], c.provider + ': ' + flag + ' harus dilaporkan');
+      });
+
+      // Tidak ada satu pun nilai rahasia yang bocor di seluruh respons.
+      const raw = JSON.stringify(ps);
+      c.rahasia.forEach((key) => {
+        assert.ok(!raw.includes(c.payload[key]),
+          c.provider + ': nilai ' + key + ' bocor di respons');
+      });
+    }
+
+    // Keduanya tersimpan berdampingan: menyimpan satu tidak menghapus yang lain.
+    const stored = JSON.parse(
+      db.prepare('SELECT default_payment_config FROM brands WHERE id = ?').get(BRAND_ID).default_payment_config
+    );
+    assert.equal(stored.server_key, 'SK-RAHASIA', 'rahasia Midtrans tetap');
+    assert.equal(stored.client_key, 'CK-PUBLIK', 'Client Key Midtrans tetap');
+    assert.equal(stored.client_id, 'BRN-PUBLIK', 'Client ID DOKU tetap');
+    assert.equal(stored.secret_key, 'DK-RAHASIA', 'rahasia DOKU tetap');
+    assert.equal(stored.provider, 'midtrans', 'gateway aktif tidak berubah hanya karena menyimpan kredensial');
   });
 
   await t.test('PGW-08: toggle Finance memakai keadaan AKTIF, bukan sekadar "kredensial ada"', async () => {

@@ -8428,11 +8428,11 @@
           client_key: 'set-payment-client-key',
           merchant_id: 'set-payment-merchant-id'
         },
-        // field payload → field respons GET yang mengisinya. Yang tidak ada di sini
-        // adalah rahasia: server tidak pernah mengirimnya balik.
-        populated: { merchant_id: 'merchant_id' },
+        // field payload → field respons GET yang mengisinya. Server Key tidak ada di
+        // sini karena rahasia; Client Key dan Merchant ID publishable, jadi ditampilkan.
+        populated: { client_key: 'client_key', merchant_id: 'merchant_id' },
         // field rahasia → flag "sudah tersimpan" dari respons GET.
-        configured: { server_key: 'server_key_configured', client_key: 'client_key_configured' },
+        configured: { server_key: 'server_key_configured' },
         productionField: 'set-payment-is-production',
         productionKey: 'is_production'
       }),
