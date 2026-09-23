@@ -8342,7 +8342,8 @@
         if ($('set-payment-doku-client-id')) $('set-payment-doku-client-id').value = '';
         if ($('set-payment-doku-secret-key')) $('set-payment-doku-secret-key').value = '';
         if ($('set-payment-doku-callback-url')) $('set-payment-doku-callback-url').value = '';
-        if ($('set-payment-doku-is-production')) $('set-payment-doku-is-production').checked = Boolean(ps.is_production);
+        // Environment DOKU dibaca dari flag-nya sendiri, bukan dari flag Midtrans.
+        if ($('set-payment-doku-is-production')) $('set-payment-doku-is-production').checked = Boolean(ps.doku_is_production);
 
         switchPaymentTab(activeProvider);
       } catch (err) {
@@ -8356,30 +8357,45 @@
     }
     window.onPaymentScopeChange = onPaymentScopeChange;
 
-    async function saveSettingsPayments(e, provider) {
+    // Lingkup (brand atau cabang) adalah satu-satunya hal yang memang dibagi kedua
+    // tab: ke mana kredensial disimpan. Isi kredensialnya tidak pernah dibagi.
+    function paymentScopeValue() {
+      var scopeSel = $('set-payment-scope-select');
+      var scopeVal = scopeSel ? scopeSel.value : 'brand';
+      return scopeVal && scopeVal !== 'brand' ? scopeVal : null;
+    }
+
+    /**
+     * Simpan kredensial SATU gateway.
+     *
+     * Tiap tab berdiri sendiri: payload-nya hanya memuat field milik gateway itu,
+     * termasuk environment-nya sendiri (`is_production` untuk Midtrans,
+     * `doku_is_production` untuk DOKU). Tab Midtrans tidak pernah membaca, mengirim,
+     * atau menimpa kredensial DOKU — dan sebaliknya.
+     *
+     * `provider` sengaja tidak dikirim: menyimpan kredensial bukan tindakan
+     * mengaktifkan gateway. Yang mengaktifkan hanya toggle di Finance → Payment
+     * Methods. Kolom yang dibiarkan kosong juga tidak menimpa nilai tersimpan.
+     */
+    async function saveGatewayCredentials(e, gateway) {
       if (e) e.preventDefault();
+      var isDoku = gateway === 'doku';
+      var label = isDoku ? 'DOKU' : 'Midtrans';
+
+      var payload = { branch_id: paymentScopeValue() };
+      if (isDoku) {
+        payload.doku_client_id = $('set-payment-doku-client-id') ? $('set-payment-doku-client-id').value.trim() : '';
+        payload.doku_secret_key = $('set-payment-doku-secret-key') ? $('set-payment-doku-secret-key').value.trim() : '';
+        payload.doku_callback_url = $('set-payment-doku-callback-url') ? $('set-payment-doku-callback-url').value.trim() : '';
+        payload.doku_is_production = Boolean($('set-payment-doku-is-production') && $('set-payment-doku-is-production').checked);
+      } else {
+        payload.server_key = $('set-payment-server-key') ? $('set-payment-server-key').value.trim() : '';
+        payload.client_key = $('set-payment-client-key') ? $('set-payment-client-key').value.trim() : '';
+        payload.merchant_id = $('set-payment-merchant-id') ? $('set-payment-merchant-id').value.trim() : '';
+        payload.is_production = Boolean($('set-payment-is-production') && $('set-payment-is-production').checked);
+      }
+
       try {
-        var scopeSel = $('set-payment-scope-select');
-        var scopeVal = scopeSel ? scopeSel.value : 'brand';
-        var activeProvider = provider || _activePaymentTab || 'midtrans';
-
-        // `provider` sengaja TIDAK dikirim: menyimpan kredensial bukan tindakan
-        // mengaktifkan gateway. Yang mengaktifkan hanya toggle di Finance →
-        // Payment Methods. Kolom kredensial yang dibiarkan kosong juga tidak
-        // menimpa yang tersimpan (server yang menjaganya).
-        var payload = {
-          branch_id: scopeVal !== 'brand' ? scopeVal : null,
-          is_production: activeProvider === 'midtrans'
-            ? Boolean($('set-payment-is-production') && $('set-payment-is-production').checked)
-            : Boolean($('set-payment-doku-is-production') && $('set-payment-doku-is-production').checked),
-          server_key: $('set-payment-server-key') ? $('set-payment-server-key').value.trim() : '',
-          client_key: $('set-payment-client-key') ? $('set-payment-client-key').value.trim() : '',
-          merchant_id: $('set-payment-merchant-id') ? $('set-payment-merchant-id').value.trim() : '',
-          doku_client_id: $('set-payment-doku-client-id') ? $('set-payment-doku-client-id').value.trim() : '',
-          doku_secret_key: $('set-payment-doku-secret-key') ? $('set-payment-doku-secret-key').value.trim() : '',
-          doku_callback_url: $('set-payment-doku-callback-url') ? $('set-payment-doku-callback-url').value.trim() : ''
-        };
-
         var res = await adminFetch(API_BASE + '/admin/settings/commerce/payments', {
           method: 'PUT',
           headers: getAuthHeaders(),
@@ -8387,16 +8403,21 @@
         });
         var json = await res.json();
         if (json.success) {
-          showToast(json.message || 'Konfigurasi ' + (activeProvider === 'doku' ? 'DOKU' : 'Midtrans') + ' berhasil disimpan.');
+          showToast('Kredensial ' + label + ' berhasil disimpan.');
           loadSettingsPayments();
         } else {
-          showToast('Gagal: ' + (json.error || 'Terjadi kesalahan.'));
+          showToast('Gagal menyimpan kredensial ' + label + ': ' + (json.error || 'Terjadi kesalahan.'));
         }
       } catch (err) {
-        showToast('Kesalahan jaringan saat menyimpan konfigurasi pembayaran.');
+        showToast('Kesalahan jaringan saat menyimpan kredensial ' + label + '.');
       }
     }
-    window.saveSettingsPayments = saveSettingsPayments;
+
+    // Dua pintu masuk terpisah — satu per tab, tidak ada jalur bersama.
+    function saveSettingsPaymentsMidtrans(e) { return saveGatewayCredentials(e, 'midtrans'); }
+    function saveSettingsPaymentsDoku(e) { return saveGatewayCredentials(e, 'doku'); }
+    window.saveSettingsPaymentsMidtrans = saveSettingsPaymentsMidtrans;
+    window.saveSettingsPaymentsDoku = saveSettingsPaymentsDoku;
 
     // Saling-kunci antar gateway tidak lagi diatur di sini: aturannya ada di
     // Finance → Payment Methods, dan ditegakkan server (satu gateway online aktif).

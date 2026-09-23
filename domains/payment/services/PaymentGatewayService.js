@@ -64,20 +64,38 @@ class PaymentGatewayService {
     return config.provider || 'midtrans';
   }
 
+  /**
+   * Config yang diberikan ke gateway, dengan environment milik gateway itu sendiri.
+   *
+   * Midtrans memakai `is_production`, DOKU memakai `doku_is_production`. Sebelumnya
+   * keduanya membaca `is_production` yang sama, jadi memindahkan satu gateway ke
+   * produksi ikut memindahkan yang lain — dua environment yang seharusnya berdiri
+   * sendiri jadi saling mencampuri.
+   */
+  static _gatewayConfig(config) {
+    const resolved = Object.assign({}, config);
+    if (this._resolveProvider(config) === 'doku') {
+      resolved.is_production = config.doku_is_production === true;
+    }
+    return resolved;
+  }
+
   static _getGateway(config) {
     const provider = this._resolveProvider(config);
-    if (provider === 'doku') return new DokuGateway(config);
-    return new MidtransGateway(config);
+    const gatewayConfig = this._gatewayConfig(config);
+    if (provider === 'doku') return new DokuGateway(gatewayConfig);
+    return new MidtransGateway(gatewayConfig);
   }
 
   static async createSnapTransaction(order, items = [], customer = {}) {
     const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
     const gateway = this._getGateway(config);
+    const gatewayConfig = this._gatewayConfig(config);
 
     try {
       return await gateway.createTransaction(order, items, customer);
     } catch (err) {
-      const isProd = config.is_production === true;
+      const isProd = gatewayConfig.is_production === true;
       if (isProd || process.env.NODE_ENV === 'production') {
         const errorDetail = err.response?.data?.error_messages?.join(', ') || err.response?.data?.message?.join(', ') || err.message;
         throw new Error(`[${gateway.name} Gateway Error]: Gagal membuat transaksi pembayaran online (${errorDetail}).`);

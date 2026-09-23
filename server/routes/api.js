@@ -10355,10 +10355,16 @@ router.get('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
       (parsedBrandConfig && parsedBrandConfig.client_id && parsedBrandConfig.secret_key)
     );
 
-    const isProduction = Boolean(
+    // Tiap gateway punya environment-nya SENDIRI. Dulu satu `is_production` dipakai
+    // bersama, jadi memindahkan Midtrans ke produksi ikut memindahkan DOKU.
+    const midtransProduction = Boolean(
       (branchOverride && branchOverride.is_production) ||
       (parsedBrandConfig && parsedBrandConfig.is_production) ||
       process.env.MIDTRANS_IS_PRODUCTION === 'true'
+    );
+    const dokuProduction = Boolean(
+      (branchOverride && branchOverride.doku_is_production) ||
+      (parsedBrandConfig && parsedBrandConfig.doku_is_production)
     );
 
     const midtransMethods = effectiveConfig.midtrans_methods || {};
@@ -10385,7 +10391,7 @@ router.get('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
           is_enabled: midtransActive,
           is_active_provider: activeProvider === 'midtrans',
           type: 'online_gateway',
-          environment: isProduction ? 'production' : 'sandbox',
+          environment: midtransProduction ? 'production' : 'sandbox',
           has_branch_override: Boolean(branchOverride),
           description: 'Payment gateway multi-channel (QRIS, GoPay, ShopeePay, Virtual Account, Kartu Kredit)',
           types: [
@@ -10404,7 +10410,7 @@ router.get('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
           is_enabled: dokuActive,
           is_active_provider: activeProvider === 'doku',
           type: 'online_gateway',
-          environment: isProduction ? 'production' : 'sandbox',
+          environment: dokuProduction ? 'production' : 'sandbox',
           has_branch_override: Boolean(branchOverride),
           description: 'Payment gateway alternatif dengan QRIS, VA, e-wallet, dan kartu kredit',
           types: [
@@ -12192,6 +12198,7 @@ router.get('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
         client_key_configured: Boolean(effectiveConfig.client_key || process.env.MIDTRANS_CLIENT_KEY),
         merchant_id: effectiveConfig.merchant_id || process.env.MIDTRANS_MERCHANT_ID || '',
         is_production: Boolean(effectiveConfig.is_production !== undefined ? effectiveConfig.is_production : (process.env.MIDTRANS_IS_PRODUCTION === 'true')),
+        doku_is_production: Boolean(effectiveConfig.doku_is_production),
         doku_client_id_configured: Boolean(effectiveConfig.client_id),
         doku_secret_key_configured: Boolean(effectiveConfig.secret_key),
         providers: [
@@ -12213,7 +12220,7 @@ router.get('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
 // 4.3 Payment Settings (PUT - Owner/Brand Manager only)
 router.put('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { branch_id, server_key, client_key, merchant_id, is_production, provider, doku_client_id, doku_secret_key, doku_callback_url } = req.body;
+    const { branch_id, server_key, client_key, merchant_id, is_production, provider, doku_client_id, doku_secret_key, doku_callback_url, doku_is_production } = req.body;
 
     const isBranchScope = Boolean(branch_id && branch_id !== 'all');
 
@@ -12244,7 +12251,10 @@ router.put('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
     } else if (!Object.prototype.hasOwnProperty.call(merged, 'provider')) {
       merged.provider = 'midtrans';
     }
+    // Environment disimpan per gateway: `is_production` milik Midtrans,
+    // `doku_is_production` milik DOKU. Tidak ada lagi satu flag untuk keduanya.
     if (typeof is_production !== 'undefined') merged.is_production = Boolean(is_production);
+    if (typeof doku_is_production !== 'undefined') merged.doku_is_production = Boolean(doku_is_production);
 
     // Kredensial: kosong = pertahankan yang lama.
     if (server_key) merged.server_key = server_key;

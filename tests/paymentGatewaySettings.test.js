@@ -226,7 +226,7 @@ test('PAYMENT GATEWAY — kredensial tersimpan & satu gateway online aktif', asy
     assert.equal(stored.server_key, 'SB-Mid-server-CCC', 'kredensial baru tersimpan');
   });
 
-  await t.test('PGW-07: tab gateway tidak punya checkbox aktifkan lagi', () => {
+  await t.test('PGW-07: tab gateway tidak punya checkbox aktifkan, dan tiap tab punya simpan sendiri', () => {
     ['set-payment-midtrans-active', 'set-payment-doku-active'].forEach((id) => {
       assert.ok(!DASHBOARD_HTML.includes(id), id + ' harus sudah dihapus dari markup');
       assert.ok(!DASHBOARD_JS.includes(id), id + ' tidak boleh lagi disentuh JavaScript');
@@ -242,14 +242,71 @@ test('PAYMENT GATEWAY — kredensial tersimpan & satu gateway online aktif', asy
     assert.ok(DASHBOARD_HTML.includes('id="btn-save-settings-payments-midtrans"'), 'tombol simpan Midtrans ada');
     assert.ok(DASHBOARD_HTML.includes('id="btn-save-settings-payments-doku"'), 'tombol simpan DOKU ada');
 
-    // Menyimpan kredensial tidak boleh mengirim `provider`.
-    const saveFn = DASHBOARD_JS.slice(
-      DASHBOARD_JS.indexOf('function saveSettingsPayments'),
-      DASHBOARD_JS.indexOf('window.saveSettingsPayments = saveSettingsPayments')
+    // Dua pintu masuk terpisah — satu per tab, tidak ada jalur bersama.
+    assert.ok(DASHBOARD_JS.includes('function saveSettingsPaymentsMidtrans('),
+      'tab Midtrans harus punya fungsi simpan sendiri');
+    assert.ok(DASHBOARD_JS.includes('function saveSettingsPaymentsDoku('),
+      'tab DOKU harus punya fungsi simpan sendiri');
+    assert.ok(!/function saveSettingsPayments\s*\(/.test(DASHBOARD_JS),
+      'fungsi simpan bersama yang membaca kedua gateway harus hilang');
+
+    // Tiap tombol menunjuk ke fungsinya masing-masing.
+    assert.ok(DASHBOARD_HTML.includes('id="form-settings-payments-midtrans" onsubmit="saveSettingsPaymentsMidtrans(event)"'),
+      'form Midtrans menuju fungsi Midtrans');
+    assert.ok(DASHBOARD_HTML.includes('id="form-settings-payments-doku" onsubmit="saveSettingsPaymentsDoku(event)"'),
+      'form DOKU menuju fungsi DOKU');
+  });
+
+  await t.test('PGW-09: tiap tab hanya membawa field miliknya sendiri', () => {
+    // Badan fungsi diambil apa adanya dari sumber, lalu diperiksa: tab Midtrans
+    // tidak boleh menyentuh field DOKU, dan sebaliknya.
+    const body = DASHBOARD_JS.slice(
+      DASHBOARD_JS.indexOf('async function saveGatewayCredentials('),
+      DASHBOARD_JS.indexOf('function saveSettingsPaymentsMidtrans(')
     );
-    assert.ok(saveFn.length > 0, 'saveSettingsPayments harus ditemukan');
-    assert.ok(!/provider:\s*activeProvider\s*,/.test(saveFn),
-      'payload simpan kredensial tidak boleh memuat provider');
+    assert.ok(body.length > 0, 'saveGatewayCredentials harus ditemukan');
+
+    const midtransBranch = body.slice(body.indexOf('} else {'), body.indexOf('}\n\n      try'));
+    const dokuBranch = body.slice(body.indexOf('if (isDoku) {'), body.indexOf('} else {'));
+
+    assert.ok(!/doku_/.test(midtransBranch),
+      'cabang Midtrans tidak boleh memuat field DOKU');
+    assert.ok(!/server_key|client_key|merchant_id/.test(dokuBranch),
+      'cabang DOKU tidak boleh memuat field Midtrans');
+    assert.ok(midtransBranch.includes('is_production'),
+      'Midtrans memakai flag produksinya sendiri');
+    assert.ok(dokuBranch.includes('doku_is_production'),
+      'DOKU memakai flag produksinya sendiri');
+
+    // Tidak ada satu pun payload yang mengirim `provider`.
+    assert.ok(!/provider\s*:/.test(body),
+      'menyimpan kredensial tidak boleh mengirim provider');
+  });
+
+  await t.test('PGW-10: environment tiap gateway berdiri sendiri', async () => {
+    // Midtrans ke produksi.
+    await put({ is_production: true });
+    let settings = await getSettings();
+    assert.equal(settings.body.payment_settings.is_production, true, 'Midtrans produksi');
+    assert.equal(settings.body.payment_settings.doku_is_production, false,
+      'DOKU tidak boleh ikut ke produksi');
+
+    let finance = await getFinance();
+    let online = finance.body.payment_methods.filter((m) => m.type === 'online_gateway');
+    assert.equal(online.find((m) => m.code === 'midtrans').environment, 'production');
+    assert.equal(online.find((m) => m.code === 'doku').environment, 'sandbox',
+      'label lingkungan DOKU harus tetap sandbox');
+
+    // DOKU ke produksi: Midtrans tidak ikut berubah.
+    await put({ doku_is_production: true });
+    settings = await getSettings();
+    assert.equal(settings.body.payment_settings.doku_is_production, true, 'DOKU produksi');
+    assert.equal(settings.body.payment_settings.is_production, true,
+      'Midtrans tetap seperti sebelumnya');
+
+    finance = await getFinance();
+    online = finance.body.payment_methods.filter((m) => m.type === 'online_gateway');
+    assert.equal(online.find((m) => m.code === 'doku').environment, 'production');
   });
 
   await t.test('PGW-08: toggle Finance memakai keadaan AKTIF, bukan sekadar "kredensial ada"', async () => {
