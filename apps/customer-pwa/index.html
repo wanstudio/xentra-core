@@ -60,7 +60,10 @@
   <link rel="apple-touch-icon" href="/assets/pwa/icon-192.png">
   <link rel="manifest" href="/manifest.json">
 
-  <!-- CSS (version-hashed for instant cache-busting) -->
+  <!-- CSS kritis di-preload agar splash lebih cepat hilang -->
+  <link rel="preload" href="/assets/css/tokens.css" as="style">
+  <link rel="preload" href="/assets/css/layout.css" as="style">
+  <link rel="preload" href="/assets/css/components.css" as="style">
   <link rel="stylesheet" href="/assets/css/tokens.css">
   <link rel="stylesheet" href="/assets/css/layout.css">
   <link rel="stylesheet" href="/assets/css/components.css">
