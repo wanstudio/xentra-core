@@ -1648,12 +1648,23 @@
     var isDeliveryAvail = !curBranch || curBranch.is_delivery_active !== 0;
     var isPickupAvail = !curBranch || curBranch.is_pickup_active !== 0;
     var isDineInAvail = !curBranch || curBranch.is_dine_in_active !== 0;
-    // Reservasi butuh kapasitas yang sudah ditetapkan manager cabang. Kalau belum
-    // diisi (0/kosong), opsi Reservasi dimatikan — memakai mekanisme yang sudah ada
-    // untuk is_reservation_active, bukan logika baru.
-    var reservationCap = curBranch ? (Number(curBranch.reservation_max_guests) || 0) : 0;
+    // Reservasi butuh kapasitas yang ditetapkan manager cabang.
+    // PENTING: bedakan "TIDAK TAHU" dari "BELUM DIISI".
+    //   - 0 (manager menyatakan belum diisi) → reservasi DIMATIKAN.
+    //   - field tidak ada sama sekali (endpoint belum membawa / belum termuat) →
+    //     JANGAN dimatikan; itu data yang belum sampai, bukan keputusan.
+    // Kesalahan memperlakukan keduanya sama pernah membuat reservasi mati padahal
+    // di database sudah diisi.
+    var capRow = curBranch;
+    if (curBranch && availableBranches && availableBranches.length) {
+      // sebagian endpoint mengirim objek cabang tanpa field ini; ambil dari daftar cabang
+      capRow = availableBranches.filter(function (b) { return String(b.id) === String(curBranch.id); })[0] || curBranch;
+    }
+    var capRaw = capRow ? capRow.reservation_max_guests : undefined;
+    var capacityUnknown = capRaw === undefined || capRaw === null;
+    var reservationCap = Number(capRaw) || 0;
     var isReservationAvail = !curBranch ||
-      (curBranch.is_reservation_active !== 0 && reservationCap > 0);
+      (curBranch.is_reservation_active !== 0 && (capacityUnknown || reservationCap > 0));
 
     var availabilityMap = {
       delivery: isDeliveryAvail,
@@ -2021,6 +2032,9 @@
       // tetap. Dipakai label, tombol, dan input manual — satu sumber. 60 hanya
       // cadangan kalau data cabang belum terbaca.
       var resBranch = (typeof getFulfillmentBranch === 'function' ? getFulfillmentBranch() : null) || state.matchedBranch || {};
+      if (availableBranches && availableBranches.length && resBranch.id) {
+        resBranch = availableBranches.filter(function (b) { return String(b.id) === String(resBranch.id); })[0] || resBranch;
+      }
       var branchCap = Number(resBranch.reservation_max_guests) || 0;
       var GUEST_MAX = branchCap > 0 ? branchCap : 60;
 

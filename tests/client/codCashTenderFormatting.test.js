@@ -581,9 +581,13 @@ test('T20: kapasitas reservasi datang dari cabang, dan reservasi mati kalau belu
   const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
 
   // Dibaca dari data cabang (diisi manager cabang lewat merchant app).
-  assert.ok(code.includes('var reservationCap = curBranch ? (Number(curBranch.reservation_max_guests) || 0) : 0;'),
-    'kapasitas dibaca dari cabang');
-  assert.ok(/curBranch\.is_reservation_active !== 0 && reservationCap > 0/.test(code),
+  assert.ok(code.includes('var capRaw = capRow ? capRow.reservation_max_guests : undefined;'),
+    'kapasitas dibaca dari cabang (atau dari daftar cabang)');
+  assert.ok(code.includes('var capacityUnknown = capRaw === undefined || capRaw === null;'),
+    '"tidak tahu" harus dibedakan dari "belum diisi"');
+  assert.ok(code.includes('capRow = availableBranches.filter('),
+    'nilai diambil dari daftar cabang kalau objek cabangnya belum membawa field ini');
+  assert.ok(/curBranch\.is_reservation_active !== 0 && \(capacityUnknown \|\| reservationCap > 0\)/.test(code),
     'opsi Reservasi hanya tersedia kalau kapasitas sudah diisi');
   assert.ok(code.includes("var branchCap = Number(resBranch.reservation_max_guests) || 0;"),
     'batas jumlah orang memakai nilai cabang');
