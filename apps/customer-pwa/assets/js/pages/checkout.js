@@ -2182,10 +2182,38 @@
         return value;
       }
 
-      function updateSummary() {
-        if (sumText) {
-          sumText.textContent = dateLabel(draft.reservationDate) + ' • ' + draft.reservationTime + ' (' + (draft.guestCount || 2) + ' Orang)';
+      // Label zona waktu dari timezone CABANG (bukan tebakan): Jakarta=WIB,
+      // Makassar=WITA, Jayapura=WIT.
+      function branchTzLabel() {
+        var tz = (typeof curBranch !== 'undefined' && curBranch && curBranch.timezone)
+          || (state.matchedBranch && state.matchedBranch.timezone) || 'Asia/Jakarta';
+        if (tz === 'Asia/Makassar') return 'WITA';
+        if (tz === 'Asia/Jayapura') return 'WIT';
+        return 'WIB';
+      }
+
+      // Tanggal panjang Bahasa Indonesia dari tanggal ISO yang dipilih. Dihitung
+      // realtime (bukan teks tetap), dan dibaca sebagai waktu lokal supaya harinya
+      // tidak bergeser gara-gara parsing UTC.
+      function longDate(iso) {
+        try {
+          var d = new Date(String(iso) + 'T00:00:00');
+          if (isNaN(d.getTime())) return '';
+          return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        } catch (e) {
+          return '';
         }
+      }
+
+      function updateSummary() {
+        if (!sumText) return;
+        var lbl = dateLabel(draft.reservationDate) || '';
+        var long = longDate(draft.reservationDate);
+        var jam = String(draft.reservationTime || '12:00').replace(':', '.');
+        sumText.innerHTML =
+          UI.escape(lbl) + (long ? ' (' + UI.escape(long) + ')' : '') + '<br>' +
+          'Pukul ' + UI.escape(jam) + ' ' + UI.escape(branchTzLabel()) +
+          ' | (' + (draft.guestCount || 2) + ' orang)';
       }
 
       buildWheel(dateCol, dateItems, draft.reservationDate, function (it) {

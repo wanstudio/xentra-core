@@ -598,3 +598,26 @@ test('T20: kapasitas reservasi datang dari cabang, dan reservasi mati kalau belu
   assert.ok(code.includes('var isReservationAvail = !curBranch ||'),
     'kalau cabang belum termuat, jangan mematikan reservasi');
 });
+
+test('T21: ringkasan reservasi memakai tanggal realtime + zona waktu cabang', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // Tanggal panjang dihitung realtime dari tanggal ISO yang dipilih.
+  assert.ok(code.includes('function longDate(iso)'), 'harus ada penghitung tanggal panjang');
+  assert.ok(code.includes("month: 'long', year: 'numeric'"), 'format Bahasa Indonesia (September 2026)');
+  assert.ok(code.includes("new Date(String(iso) + 'T00:00:00')"),
+    'dibaca sebagai waktu lokal supaya harinya tidak bergeser');
+
+  // Zona waktu dari data cabang, bukan teks tetap.
+  assert.ok(code.includes('function branchTzLabel()'), 'harus ada label zona waktu');
+  assert.ok(code.includes("if (tz === 'Asia/Makassar') return 'WITA';"), 'WITA untuk Makassar');
+  assert.ok(code.includes("if (tz === 'Asia/Jayapura') return 'WIT';"), 'WIT untuk Jayapura');
+  assert.ok(code.includes('curBranch.timezone'), 'diambil dari timezone cabang');
+
+  // Bentuk tampilannya.
+  assert.ok(code.includes("(long ? ' (' + UI.escape(long) + ')' : '')"), 'tanggal panjang dalam tanda kurung');
+  assert.ok(code.includes("'Pukul ' + UI.escape(jam) + ' ' + UI.escape(branchTzLabel())"),
+    'baris kedua: Pukul <jam> <zona>');
+  assert.ok(code.includes("' | (' + (draft.guestCount || 2) + ' orang)'"), 'jumlah orang huruf kecil');
+  assert.ok(code.includes("replace(':', '.')"), 'jam memakai titik (12.00)');
+});
