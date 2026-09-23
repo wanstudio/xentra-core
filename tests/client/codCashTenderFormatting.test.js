@@ -622,6 +622,7 @@ test('T21: ringkasan reservasi memakai tanggal realtime + zona waktu cabang', ()
   assert.ok(!/x-res-summary-text"[^>]*style=/.test(code), 'ringkasan tidak boleh diberi gaya sendiri');
   assert.ok(code.includes("'Pukul ' + UI.escape(jam) + ' ' + UI.escape(branchTzLabel())"),
     'baris kedua: Pukul <jam> <zona>');
-  assert.ok(code.includes("' | (' + (draft.guestCount || 2) + ' orang)'"), 'jumlah orang huruf kecil');
+  assert.ok(code.includes("' · (' + (draft.guestCount || 2) + ' orang)'"),
+    'jumlah orang huruf kecil, dipisah titik tengah berspasi (tidak dempet)');
   assert.ok(code.includes("replace(':', '.')"), 'jam memakai titik (12.00)');
 });
