@@ -98,7 +98,7 @@
       /* Robot putih kecil, mengambang di tempat. Tiga gerak halus saja: naik-turun
          pelan, bayangan yang mengecil-membesar (petunjuk "mengambang", bukan
          melompat), dan mata yang berkedip sesekali. Tidak ada kilatan warna. */
-      #x-splash .bot { transform-box: fill-box; transform-origin: center; }
+      #x-splash .bot-arm-l, #x-splash .bot-arm-r { transform-box: fill-box; transform-origin: 50% 0%; }
       #x-splash .bot-float { animation: bot-float 2.6s ease-in-out infinite alternate; }
       #x-splash .bot-shadow { animation: bot-shadow 2.6s ease-in-out infinite alternate; }
       #x-splash .bot-eye { animation: bot-blink 4.2s steps(1, end) infinite; transform-box: fill-box; transform-origin: center; }
@@ -107,8 +107,8 @@
       @keyframes bot-float { from { transform: translateY(0); } to { transform: translateY(-4px); } }
       @keyframes bot-shadow { from { transform: scaleX(1); opacity:.18; } to { transform: scaleX(.78); opacity:.10; } }
       @keyframes bot-blink { 0%, 44%, 48%, 92%, 96%, 100% { transform: scaleY(1); } 46% { transform: scaleY(.12); } 94% { transform: scaleY(.12); } }
-      @keyframes bot-flap-l { from { transform: translateY(0) rotate(-18deg); } to { transform: translateY(-5px) rotate(18deg); } }
-      @keyframes bot-flap-r { from { transform: translateY(-5px) rotate(18deg); } to { transform: translateY(0) rotate(-18deg); } }
+      @keyframes bot-flap-l { from { transform: rotate(-22deg); } to { transform: rotate(22deg); } }
+      @keyframes bot-flap-r { from { transform: rotate(22deg); } to { transform: rotate(-22deg); } }
       @media (prefers-reduced-motion: reduce) {
         #x-splash .bot-float, #x-splash .bot-shadow, #x-splash .bot-eye,
         #x-splash .bot-arm-l, #x-splash .bot-arm-r { animation: none; }
@@ -143,7 +143,7 @@
         </g>
 
         <!-- pembeda yang saya pegang: aksen brand di dada, bukan warna asing -->
-        <circle cx="46" cy="50" r="3.2" fill="#b6ff00"></circle>
+        
       </g>
     </svg>
 
