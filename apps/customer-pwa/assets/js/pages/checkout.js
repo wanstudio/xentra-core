@@ -2695,6 +2695,72 @@
   // /customer/profile/phone; SELF recipient then resolves automatically.
   var _phoneSheetOpen = false;
 
+  // ── Konfirmasi nomor akun ──
+  // Nomor di field reservasi bisa nomor ORANG LAIN (memesan untuk teman). Jadi
+  // nomor itu TIDAK pernah disimpan sebagai nomor akun tanpa persetujuan eksplisit
+  // di sini: salah menyimpan nomor di akun bukan sekadar data kotor.
+  // Dipakai hanya kalau akunnya memang belum punya nomor.
+  function accountPhoneDigits() {
+    var sess = Store.getState().customerSession || {};
+    return String(sess.phone || '').replace(/[^0-9]/g, '');
+  }
+
+  function openAccountPhoneConfirmSheet(proposed, onDone) {
+    var done = typeof onDone === 'function' ? onDone : function () {};
+    var sh = makeOverlay(
+      '<div style="padding:18px 16px max(18px, calc(16px + env(safe-area-inset-bottom, 0px)));font-family:inherit;">' +
+      '  <h3 style="margin:0 0 6px;font-size:16px;font-weight:800;color:#111;">Apakah nomor ini nomor Anda?</h3>' +
+      '  <p style="margin:0 0 12px;font-size:12.5px;color:#64748b;">Kami pastikan dulu sebelum menyimpannya ke akun Anda.</p>' +
+      '  <label style="display:flex;align-items:center;gap:10px;font-size:14px;font-weight:700;color:#111;padding:12px;border:1px solid #e5e7eb;border-radius:12px;">' +
+      '    <input type="checkbox" id="x-acct-phone-ok" style="width:18px;height:18px;accent-color:#16a34a;">' +
+      '    <span>Ya, ' + UI.escape(proposed || '-') + ' nomor saya</span>' +
+      '  </label>' +
+      '  <div style="margin-top:12px;font-size:12px;color:#6b7280;">Kalau bukan, masukkan nomor Anda di sini:</div>' +
+      '  <input id="x-acct-phone-input" type="tel" inputmode="numeric" style="width:100%;margin-top:6px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;font-family:inherit;">' +
+      '  <button type="button" id="x-acct-phone-save" style="width:100%;margin-top:14px;height:48px;border:0;border-radius:999px;background:#111111;color:#fff;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;">Simpan</button>' +
+      '</div>'
+    );
+    var overlay = sh.overlay;
+    var ok = overlay.querySelector('#x-acct-phone-ok');
+    var input = overlay.querySelector('#x-acct-phone-input');
+    var save = overlay.querySelector('#x-acct-phone-save');
+
+    // Simpan aktif kalau nomornya ditegaskan (centang) ATAU tamu menulis nomornya.
+    function sync() {
+      var typed = String(input.value || '').replace(/[^0-9]/g, '');
+      var enabled = ok.checked || typed.length >= 9;
+      save.disabled = !enabled;
+      save.style.opacity = enabled ? '1' : '0.5';
+    }
+    ok.onchange = sync;
+    input.oninput = sync;
+    sync();
+
+    save.onclick = function () {
+      if (save.disabled) return;
+      var chosen = ok.checked ? String(proposed || '') : String(input.value || '');
+      var clean = chosen.replace(/[^0-9]/g, '');
+      if (clean.length < 9) return;
+      save.disabled = true;
+      save.textContent = 'Menyimpan...';
+      // Jalur yang sama dengan pelengkapan nomor: nomornya menjadi milik AKUN.
+      API.patch('/customer/profile/phone', { phone: clean }).then(function (res) {
+        var savedPhone = (res && res.customer && res.customer.phone) || clean;
+        state.customer.phone = savedPhone;
+        try {
+          var sess = Store.getState().customerSession;
+          if (sess) { sess.phone = savedPhone; Store.setCustomerSession(sess); }
+        } catch (_) {}
+        sh.close();
+        done();
+      }).catch(function () {
+        save.disabled = false;
+        save.textContent = 'Simpan';
+        if (UI && UI.toast) UI.toast('Gagal menyimpan nomor. Coba lagi.');
+      });
+    };
+  }
+
   function hasValidCustomerPhone() {
     var p = String(state.customer.phone || '').replace(/[^0-9]/g, '');
     var isIndoMobile = p.indexOf('08') === 0 || p.indexOf('628') === 0 || p.indexOf('8') === 0;
@@ -3662,8 +3728,16 @@
     if (!activeSession || !activeSession.token || activeSession.token.indexOf('xnt_cust_') !== 0) {
       // No valid session → open Google Identity Gate
       openCustomerAuthSheet(function () {
-      // After successful Google auth, automatically retry the checkout submission
+      // After successful Google auth, automatically retry the checkout submission.
+      // Reservasi: kalau akunnya belum punya nomor, tanyakan dulu — nomor yang
+      // diketik untuk orang lain tidak boleh otomatis jadi nomor akun.
       setTimeout(function () {
+        if (state.fulfillment.type === 'reservation' && !accountPhoneDigits()) {
+          openAccountPhoneConfirmSheet(state.fulfillment.reservationPhone, function () {
+            executePrePaymentAndSubmit();
+          });
+          return;
+        }
         executePrePaymentAndSubmit();
       }, 100);
     });

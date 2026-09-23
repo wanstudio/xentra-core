@@ -497,3 +497,34 @@ test('T16: centang "Gunakan akun Anda" — satu-satunya jalan data akun dipakai'
   // Nomor yang dipakai resto tetap dari field reservasi, bukan dari akun.
   assert.ok(/function fillFromAccount\(\)/.test(code), 'pengisian dari akun terpusat di satu fungsi');
 });
+
+test('T17: konfirmasi nomor akun sebelum nomor disimpan (nomor orang lain)', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // Tanyakan dulu, jangan simpan diam-diam.
+  assert.ok(code.includes('function openAccountPhoneConfirmSheet('), 'harus ada step konfirmasi nomor');
+  assert.ok(code.includes('Apakah nomor ini nomor Anda?'), 'pertanyaannya jelas');
+  assert.ok(code.includes("Kami pastikan dulu sebelum menyimpannya ke akun Anda."), 'jelaskan kenapa ditanya');
+
+  // Centang + kolom cadangan, gaya "simpan sebagai favorit".
+  assert.ok(code.includes('id="x-acct-phone-ok"'), 'harus ada centang');
+  assert.ok(code.includes('id="x-acct-phone-input"'), 'harus ada kolom "kalau bukan"');
+  assert.ok(code.includes('Kalau bukan, masukkan nomor Anda di sini:'), 'label kolom cadangan');
+  assert.ok(code.includes('accent-color:#16a34a'), 'centang hijau');
+
+  // Simpan aktif kalau dicentang ATAU nomornya diisi.
+  assert.ok(code.includes('var enabled = ok.checked || typed.length >= 9;'),
+    'Simpan aktif kalau dicentang atau nomornya diisi');
+  assert.ok(code.includes('save.disabled = !enabled;'), 'kalau tidak, Simpan mati');
+
+  // Disimpan ke AKUN lewat jalur yang sama dengan pelengkapan nomor.
+  assert.ok(code.includes("API.patch('/customer/profile/phone', { phone: clean })"),
+    'nomor disimpan ke akun, bukan ke pesanan');
+  assert.ok(code.includes('sess.phone = savedPhone; Store.setCustomerSession(sess);'),
+    'sesi akun ikut diperbarui');
+
+  // Hanya kalau akunnya memang belum punya nomor; kalau sudah, langsung lanjut.
+  assert.ok(/state\.fulfillment\.type === 'reservation' && !accountPhoneDigits\(\)/.test(code),
+    'step ini hanya untuk akun yang belum punya nomor');
+  assert.ok(/function accountPhoneDigits\(\)/.test(code), 'nomor akun dibaca di satu tempat');
+});
