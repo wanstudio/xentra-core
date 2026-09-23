@@ -576,3 +576,21 @@ test('T19: CSS komponen x-loc dimuat sebelum bagian reservasi tampil', () => {
     'sheet pembelian harus memastikan CSS location-picker termuat');
   assert.ok(code.includes('window.Xentra.ensureLocationPickerCss'), 'memakai loader CSS yang sudah ada');
 });
+
+test('T20: kapasitas reservasi datang dari cabang, dan reservasi mati kalau belum diisi', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // Dibaca dari data cabang (diisi manager cabang lewat merchant app).
+  assert.ok(code.includes('var reservationCap = curBranch ? (Number(curBranch.reservation_max_guests) || 0) : 0;'),
+    'kapasitas dibaca dari cabang');
+  assert.ok(/curBranch\.is_reservation_active !== 0 && reservationCap > 0/.test(code),
+    'opsi Reservasi hanya tersedia kalau kapasitas sudah diisi');
+  assert.ok(code.includes("var branchCap = Number(resBranch.reservation_max_guests) || 0;"),
+    'batas jumlah orang memakai nilai cabang');
+  assert.ok(code.includes('var GUEST_MAX = branchCap > 0 ? branchCap : 60;'),
+    '60 hanya cadangan kalau data cabang belum terbaca');
+  // Tanpa data cabang sama sekali, perilaku lama dipertahankan (jangan mematikan
+  // fitur hanya karena cabang belum termuat).
+  assert.ok(code.includes('var isReservationAvail = !curBranch ||'),
+    'kalau cabang belum termuat, jangan mematikan reservasi');
+});

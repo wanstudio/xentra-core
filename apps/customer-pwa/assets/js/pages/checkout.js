@@ -1648,7 +1648,12 @@
     var isDeliveryAvail = !curBranch || curBranch.is_delivery_active !== 0;
     var isPickupAvail = !curBranch || curBranch.is_pickup_active !== 0;
     var isDineInAvail = !curBranch || curBranch.is_dine_in_active !== 0;
-    var isReservationAvail = !curBranch || curBranch.is_reservation_active !== 0;
+    // Reservasi butuh kapasitas yang sudah ditetapkan manager cabang. Kalau belum
+    // diisi (0/kosong), opsi Reservasi dimatikan — memakai mekanisme yang sudah ada
+    // untuk is_reservation_active, bukan logika baru.
+    var reservationCap = curBranch ? (Number(curBranch.reservation_max_guests) || 0) : 0;
+    var isReservationAvail = !curBranch ||
+      (curBranch.is_reservation_active !== 0 && reservationCap > 0);
 
     var availabilityMap = {
       delivery: isDeliveryAvail,
@@ -2012,8 +2017,12 @@
     //   - guest estimate 1-20, booking fee Rp0.
     //   - time window 12:00-20:00 in 30-minute steps (last slot starts 19:30).
     function renderReservationSection() {
-      // Batas jumlah orang, dipakai label, tombol, dan input manual — satu sumber.
-      var GUEST_MAX = 60;
+      // Batas jumlah orang = kapasitas cabang (diisi manager cabang), bukan angka
+      // tetap. Dipakai label, tombol, dan input manual — satu sumber. 60 hanya
+      // cadangan kalau data cabang belum terbaca.
+      var resBranch = (typeof getFulfillmentBranch === 'function' ? getFulfillmentBranch() : null) || state.matchedBranch || {};
+      var branchCap = Number(resBranch.reservation_max_guests) || 0;
+      var GUEST_MAX = branchCap > 0 ? branchCap : 60;
 
       schedContainer.innerHTML =
         '<div class="x-fulfillment-divider"></div>' +
