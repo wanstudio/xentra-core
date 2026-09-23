@@ -2719,7 +2719,7 @@
       '  <input id="x-acct-phone-input" type="tel" inputmode="numeric" style="width:100%;margin-top:6px;padding:12px;border:1px solid #e5e7eb;border-radius:12px;font-size:14px;font-family:inherit;">' +
       '  <div style="display:flex;gap:8px;margin-top:14px;">' +
       '    <button type="button" id="x-acct-phone-later" style="flex:1;height:48px;border-radius:999px;border:2px solid #e5e7eb;background:#fff;color:#6b7280;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;">Nanti saja</button>' +
-      '    <button type="button" id="x-acct-phone-save" style="flex:1;height:48px;border:0;border-radius:999px;background:#111111;color:#fff;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;">Simpan</button>' +
+      '    <button type="button" id="x-acct-phone-save" style="flex:1;height:48px;border:0;border-radius:999px;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;">Simpan</button>' +
       '  </div>' +
       '</div>'
     );

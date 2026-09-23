@@ -517,6 +517,12 @@ test('T17: konfirmasi nomor akun sebelum nomor disimpan (nomor orang lain)', () 
     'Simpan aktif kalau dicentang atau nomornya diisi');
   assert.ok(code.includes('save.disabled = !enabled;'), 'kalau tidak, Simpan mati');
   // Jalan keluar sejajar dengan Simpan: sheet ini tidak bisa ditutup dari latar.
+  // Tombol utama memakai warna brand, bukan hardcode.
+  assert.ok(/x-acct-phone-save"[\s\S]{0,300}background:var\(--x-primary\)/.test(code),
+    'tombol Simpan harus ikut warna brand');
+  assert.ok(/x-acct-phone-save"[\s\S]{0,300}color:var\(--x-primary-text/.test(code),
+    'teks tombol mengikuti warna teks brand');
+
   assert.ok(code.includes('id="x-acct-phone-later"'), 'harus ada tombol Nanti saja');
   assert.ok(code.includes('>Nanti saja</button>'), 'labelnya jelas');
   assert.ok(/x-acct-phone-later"[\s\S]{0,400}x-acct-phone-save/.test(code),
