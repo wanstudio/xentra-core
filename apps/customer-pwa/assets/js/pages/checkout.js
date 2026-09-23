@@ -2012,6 +2012,9 @@
     //   - guest estimate 1-20, booking fee Rp0.
     //   - time window 12:00-20:00 in 30-minute steps (last slot starts 19:30).
     function renderReservationSection() {
+      // Batas jumlah orang, dipakai label, tombol, dan input manual — satu sumber.
+      var GUEST_MAX = 60;
+
       schedContainer.innerHTML =
         '<div class="x-fulfillment-divider"></div>' +
         '<div class="x-fulfillment-schedule-head">' +
@@ -2027,7 +2030,10 @@
         '</div>' +
         '<div class="x-res-card" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:18px 16px;margin-top:12px;">' +
         '<div class="x-dinein-guest-row" style="background:transparent;border:0;padding:0;margin-bottom:16px;">' +
-        '  <span class="x-dinein-guest-label">Jumlah Orang</span>' +
+        '  <div style="display:flex;flex-direction:column;">' +
+        '    <span class="x-dinein-guest-label" style="font-size:13.5px;font-weight:800;color:#111827;">Jumlah Orang</span>' +
+        '    <span style="font-size:11.5px;font-weight:400;color:#9ca3af;margin-top:2px;">(kapasitas maksimal ' + GUEST_MAX + ' orang)</span>' +
+        '  </div>' +
         '  <div class="x-dinein-guest-control">' +
         '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-minus" aria-label="Kurangi orang"><img src="/assets/icons/minus.svg" alt="Kurangi orang" style="width:14px;height:14px"></button>' +
         '    <span class="x-dinein-guest-count" id="x-res-guest-count">' + (draft.guestCount || 2) + '</span>' +
@@ -2169,6 +2175,39 @@
       });
 
       if (guestTxt) {
+        // Klik angkanya untuk mengetik manual (mis. 24 orang), daripada menekan +
+        // puluhan kali. Sama seperti tombol: dibatasi 1..GUEST_MAX.
+        guestTxt.style.cursor = 'pointer';
+        guestTxt.onclick = function () {
+          if (guestTxt.dataset && guestTxt.dataset.editing === '1') return;
+          if (guestTxt.dataset) guestTxt.dataset.editing = '1';
+          var input = document.createElement('input');
+          input.type = 'number';
+          input.inputMode = 'numeric';
+          input.min = '1';
+          input.max = String(GUEST_MAX);
+          input.value = String(draft.guestCount || 1);
+          input.style.cssText = 'width:58px;height:28px;text-align:center;font-size:15px;font-weight:800;color:#111;border:1px solid #e5e7eb;border-radius:8px;font-family:inherit;box-sizing:border-box;';
+          guestTxt.replaceWith(input);
+          input.focus();
+          if (input.select) input.select();
+          function commit() {
+            var n = parseInt(String(input.value || '').replace(/[^0-9]/g, ''), 10);
+            if (isNaN(n) || n < 1) n = 1;
+            if (n > GUEST_MAX) n = GUEST_MAX;
+            draft.guestCount = n;
+            input.replaceWith(guestTxt);
+            guestTxt.textContent = n;
+            if (guestTxt.dataset) guestTxt.dataset.editing = '0';
+            updateSummary();
+          }
+          input.onblur = commit;
+          input.onkeydown = function (e) {
+            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') { input.value = String(draft.guestCount || 1); commit(); }
+          };
+        };
+
         var minusRes = schedContainer.querySelector('#x-res-guest-minus');
         var plusRes = schedContainer.querySelector('#x-res-guest-plus');
         if (minusRes) {
@@ -2182,7 +2221,7 @@
         }
         if (plusRes) {
           plusRes.onclick = function () {
-            if (draft.guestCount < 20) {
+            if (draft.guestCount < GUEST_MAX) {
               draft.guestCount++;
               guestTxt.textContent = draft.guestCount;
               updateSummary();
