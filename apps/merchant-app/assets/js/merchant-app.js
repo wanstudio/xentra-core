@@ -21,6 +21,8 @@
   var getStoredUser = S.getStoredUser;
   var isBranchManager = S.isBranchManager;
   var checkAuth = S.checkAuth;
+  var clearStoredSession = S.clearStoredSession;
+  var redirectToLogin = S.redirectToLogin;
   var handleHandoffExchange = S.handleHandoffExchange;
   var validateServerSession = S.validateServerSession;
   var enforceSurface = S.enforceSurface;
@@ -3606,7 +3608,27 @@
     }
   }
 
+  /**
+   * Tombol keluar di header.
+   *
+   * Sesi merchant disimpan di localStorage oleh apps/merchant-shared, jadi keluar
+   * berarti membersihkan sesi itu lalu kembali ke login terpadu. Tanpa handler ini
+   * tombolnya tampil tapi tidak melakukan apa pun — persis seperti keluhan
+   * "tidak bisa logout".
+   */
+  function initAuthListeners() {
+    var btnLogout = $('btn-logout');
+    if (!btnLogout) return;
+    btnLogout.addEventListener('click', function () {
+      if (!confirm('Apakah Anda ingin keluar dari Merchant App?')) return;
+      clearStoredSession();
+      redirectToLogin();
+    });
+  }
+
   async function boot() {
+    initAuthListeners();
+
     await handleHandoffExchange();
 
     if (!checkAuth()) return;

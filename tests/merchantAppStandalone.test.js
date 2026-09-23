@@ -114,6 +114,68 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(js.includes('/branch-acceptance'), 'ACCEPT goes through the dedicated branch-acceptance endpoint');
   });
 
+  await t.test('5. tombol keluar di header benar-benar mengeluarkan pengguna', async () => {
+    const html = fs.readFileSync(HTML_PATH, 'utf8');
+    const dom = new JSDOM(html, {
+      url: 'https://app.mybangjo.com/merchant-app/',
+      runScripts: 'dangerously'
+    });
+    const win = dom.window;
+
+    win.localStorage.setItem('xentra_merchant_token', 'test-token');
+    win.localStorage.setItem('xentra_merchant_user', JSON.stringify({
+      id: 'u-bm-1',
+      role: 'branch_manager',
+      branch_id: 'branch_bangjo_barat',
+      branch_name: 'Bangjo Barat'
+    }));
+    win.fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: true, data: {} }),
+      text: async () => '{}'
+    });
+
+    // merchant-app tidak punya router SPA sendiri, jadi redirectToLogin() memakai
+    // checkAppRoute kalau ada — dipakai di sini untuk menangkap pengalihannya.
+    let redirected = false;
+    win.checkAppRoute = function () { redirected = true; };
+    let confirmAnswer = false;
+    win.confirm = function () { return confirmAnswer; };
+
+    win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(JS_PATH, 'utf8'));
+    win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
+    await new Promise((r) => setTimeout(r, 200));
+
+    const btn = win.document.getElementById('btn-logout');
+    assert.ok(btn, 'header harus punya tombol keluar');
+
+    // Dibatalkan: sesi tetap utuh, tidak ada pengalihan.
+    confirmAnswer = false;
+    btn.click();
+    assert.equal(win.localStorage.getItem('xentra_merchant_token'), 'test-token',
+      'membatalkan konfirmasi tidak boleh mengeluarkan pengguna');
+    assert.equal(redirected, false, 'batal = tidak dialihkan');
+
+    // Dikonfirmasi: sesi dibersihkan lalu dialihkan ke login terpadu.
+    confirmAnswer = true;
+    btn.click();
+    assert.equal(win.localStorage.getItem('xentra_merchant_token'), null,
+      'token sesi merchant harus dihapus saat keluar');
+    assert.equal(win.localStorage.getItem('xentra_merchant_user'), null,
+      'data pengguna harus dihapus saat keluar');
+    assert.equal(redirected, true, 'setelah keluar harus dialihkan ke login terpadu');
+
+    // Tanpa router SPA, redirectToLogin() jatuh ke /login — bukan ke halaman lain.
+    const js = fs.readFileSync(JS_PATH, 'utf8');
+    assert.ok(!/(function\s+checkAppRoute|checkAppRoute\s*=)/.test(js),
+      'merchant-app tidak boleh mengklaim punya router SPA sendiri');
+
+    win.close();
+  });
+
   await t.test('4. Merchant App is served at /merchant-app without changing /dashboard', () => {
     const appSource = fs.readFileSync(path.join(ROOT, 'server/app.js'), 'utf8');
     assert.ok(appSource.includes("'/merchant-app/assets'"), '/merchant-app/assets must be mounted');
