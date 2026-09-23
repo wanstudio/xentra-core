@@ -446,10 +446,9 @@ test('T14: reservasi wajib isi nama pemesan & nomor WhatsApp', () => {
     'harus ada field nama pemesan dan nomor WhatsApp');
   assert.ok(code.includes('>Nama Pemesan<') && code.includes('>Nomor WhatsApp<'),
     'label kedua field harus jelas');
-  assert.ok(code.includes("draft.reservationName = acct.name || acct.full_name || ''"),
-    'diprefill dari akun (bisa diedit)');
-  assert.ok(code.includes("draft.reservationPhone = acct.phone || ''"),
-    'nomor diprefill kalau akunnya punya');
+  // Tanpa centang, data akun TIDAK boleh terpakai diam-diam.
+  assert.ok(!code.includes('draft.reservationName = acct.name'),
+    'akun tidak boleh mengisi otomatis tanpa diminta');
 
   // Wajib, tapi divalidasi dengan pesan — bukan tombol dimatikan.
   assert.ok(code.includes("UI.toast('Isi nama pemesan dulu.')"), 'pesan kalau nama kosong');
@@ -481,4 +480,20 @@ test('T15: "Reservasi" adalah tombol Konfirmasi milik sheet, bukan tombol kedua'
   assert.ok(code.includes('} else if (!state.paymentMethod) {'), 'pembayaran tidak disyaratkan untuk reservasi');
   assert.ok(code.includes("(isReservation ? '' : ('  <div class=\"x-alt-cta-bar\""),
     'CTA sticky disembunyikan untuk reservasi');
+});
+
+test('T16: centang "Gunakan akun Anda" — satu-satunya jalan data akun dipakai', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  assert.ok(code.includes('id="x-res-use-account"'), 'harus ada centang gunakan akun');
+  assert.ok(code.includes('>Gunakan akun Anda untuk reservasi<'), 'labelnya jelas');
+
+  // Sudah masuk -> isi dari akun. Belum masuk -> buka gate Google dulu.
+  assert.ok(/if \(sess && sess\.token\) \{ fillFromAccount\(\); return; \}/.test(code),
+    'sudah masuk: langsung isi dari akun');
+  assert.ok(/openCustomerAuthSheet\(function \(\) \{ fillFromAccount\(\); \}\)/.test(code),
+    'belum masuk: buka gate Google dulu, isi setelah berhasil');
+
+  // Nomor yang dipakai resto tetap dari field reservasi, bukan dari akun.
+  assert.ok(/function fillFromAccount\(\)/.test(code), 'pengisian dari akun terpusat di satu fungsi');
 });

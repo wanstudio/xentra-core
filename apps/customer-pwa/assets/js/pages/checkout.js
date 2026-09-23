@@ -2023,6 +2023,10 @@
          '    <label class="x-res-contact-label" for="x-res-phone">Nomor WhatsApp</label>' +
          '    <input id="x-res-phone" class="x-res-contact-input" type="tel" inputmode="numeric" autocomplete="tel" value="">' +
          '    <div class="x-res-contact-hint">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
+         '    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:#374151;font-family:inherit;">' +
+         '      <input type="checkbox" id="x-res-use-account" style="width:16px;height:16px;accent-color:#16a34a;">' +
+         '      <span>Gunakan akun Anda untuk reservasi</span>' +
+         '    </label>' +
          '  </div>' +
          '<div class="x-fulfillment-selected-summary">' +
          '  <span>Kami akan menghubungi Anda untuk konfirmasi</span>' +
@@ -2033,14 +2037,37 @@
       // nama/nomor akun hanya titik awal — resto tetap butuh nomor yang bisa dihubungi.
       var resName = schedContainer.querySelector('#x-res-name');
       var resPhone = schedContainer.querySelector('#x-res-phone');
-      var acct = (Store.getState().customerSession) || {};
+      var useAcct = schedContainer.querySelector('#x-res-use-account');
+
+      // Isi dari data akun. Hanya dipakai kalau tamu MEMINTA (centang) — nomor
+      // akun tidak pernah dipakai diam-diam, dan nomor di field reservasi tetap
+      // yang dipakai resto untuk konfirmasi.
+      function fillFromAccount() {
+        var sess = Store.getState().customerSession || {};
+        var nm = sess.name || sess.full_name || '';
+        if (resName && nm) { draft.reservationName = nm; resName.value = nm; }
+        if (resPhone && sess.phone) { draft.reservationPhone = sess.phone; resPhone.value = sess.phone; }
+        syncResConfirm();
+      }
+
+      if (useAcct) {
+        useAcct.onchange = function () {
+          if (!useAcct.checked) return;
+          var sess = Store.getState().customerSession;
+          if (sess && sess.token) { fillFromAccount(); return; }
+          // Belum masuk: buka gate Google dulu, isi dari akun setelah berhasil.
+          openCustomerAuthSheet(function () { fillFromAccount(); });
+        };
+      }
+      // TIDAK ada pengisian otomatis dari akun di sini. Data akun hanya dipakai
+      // kalau tamu sendiri mencentang "Gunakan akun Anda untuk reservasi" — nomor
+      // akun tidak boleh terpakai diam-diam, dan nomor yang dipakai resto tetap
+      // nomor di field reservasi.
       if (resName) {
-        if (!draft.reservationName) draft.reservationName = acct.name || acct.full_name || '';
         resName.value = draft.reservationName || '';
         resName.oninput = function () { draft.reservationName = resName.value; syncResConfirm(); };
       }
       if (resPhone) {
-        if (!draft.reservationPhone) draft.reservationPhone = acct.phone || '';
         resPhone.value = draft.reservationPhone || '';
         resPhone.oninput = function () { draft.reservationPhone = resPhone.value; syncResConfirm(); };
       }
