@@ -437,3 +437,27 @@ test('T13: the table-picking screen can scan the table QR, with a way out for ol
   assert.ok(code.includes('tableQrScanner.stream.getTracks().forEach'), 'camera tracks must be stopped');
   assert.ok(code.includes("document.getElementById('x-table-qr-scanner')"), 'the overlay must be cleaned up');
 });
+
+test('T14: reservasi wajib isi nama pemesan & nomor WhatsApp', () => {
+  const code = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+
+  // Dua field, di bagian reservasi, dengan prefill dari akun.
+  assert.ok(code.includes('id="x-res-name"') && code.includes('id="x-res-phone"'),
+    'harus ada field nama pemesan dan nomor WhatsApp');
+  assert.ok(code.includes('>Nama Pemesan<') && code.includes('>Nomor WhatsApp<'),
+    'label kedua field harus jelas');
+  assert.ok(code.includes("draft.reservationName = acct.name || acct.full_name || ''"),
+    'diprefill dari akun (bisa diedit)');
+  assert.ok(code.includes("draft.reservationPhone = acct.phone || ''"),
+    'nomor diprefill kalau akunnya punya');
+
+  // Wajib, tapi divalidasi dengan pesan — bukan tombol dimatikan.
+  assert.ok(code.includes("UI.toast('Isi nama pemesan dulu.')"), 'pesan kalau nama kosong');
+  assert.ok(code.includes("UI.toast('Isi nomor WhatsApp pemesan dulu.')"), 'pesan kalau nomor kosong');
+  assert.ok(code.includes("state.recipient = { type: 'other', name: resNm, phone: resPh };"),
+    'kontak pemesan dikirim sebagai kontak pesanan');
+
+  // Bar informasi & label CTA.
+  assert.ok(code.includes('Kami akan menghubungi Anda untuk konfirmasi'), 'bar informasi reservasi');
+  assert.ok(code.includes("if (isReservation) return 'Reservasi';"), 'CTA berlabel Reservasi');
+});

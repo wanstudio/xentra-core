@@ -44,7 +44,9 @@
       tableNumber: '',
       reservationDate: '',
       reservationTime: '12:00',
-      guestCount: 2
+      guestCount: 2,
+      reservationName: '',
+      reservationPhone: ''
     },
     customer: {
       name: 'Pelanggan Bangjo',
@@ -1087,7 +1089,7 @@
   }
 
   function submitCtaLabel(isReservation) {
-    if (isReservation) return 'Konfirmasi Reservasi';
+    if (isReservation) return 'Reservasi';
     if (isPayAtCashier()) return 'Bayar nanti di kasir';
     if (state.paymentMethod === 'midtrans') return 'Bayar sekarang';
     return 'Pesan sekarang';
@@ -1673,7 +1675,9 @@
         : [],
       reservationDate: state.fulfillment.reservationDate || '',
       reservationTime: state.fulfillment.reservationTime || '12:00',
-      guestCount: state.fulfillment.guestCount || 2
+      guestCount: state.fulfillment.guestCount || 2,
+      reservationName: state.fulfillment.reservationName || '',
+      reservationPhone: state.fulfillment.reservationPhone || ''
     };
 
     var WHEEL_ITEM_HEIGHT = 44;
@@ -2013,10 +2017,33 @@
         '    <button type="button" class="x-dinein-guest-btn" id="x-res-guest-plus" aria-label="Tambah orang"><img src="/assets/icons/plus.svg" alt="Tambah orang" style="width:14px;height:14px"></button>' +
         '  </div>' +
         '</div>' +
-        '<div class="x-fulfillment-selected-summary">' +
-        '  <span>Reservasi kedatangan</span>' +
+        '  <div class="x-res-contact">' +
+         '    <label class="x-res-contact-label" for="x-res-name">Nama Pemesan</label>' +
+         '    <input id="x-res-name" class="x-res-contact-input" type="text" autocomplete="name" value="">' +
+         '    <label class="x-res-contact-label" for="x-res-phone">Nomor WhatsApp</label>' +
+         '    <input id="x-res-phone" class="x-res-contact-input" type="tel" inputmode="numeric" autocomplete="tel" value="">' +
+         '    <div class="x-res-contact-hint">Dipakai resto untuk mengonfirmasi reservasimu.</div>' +
+         '  </div>' +
+         '<div class="x-fulfillment-selected-summary">' +
+         '  <span>Kami akan menghubungi Anda untuk konfirmasi</span>' +
         '  <strong id="x-res-summary-text"></strong>' +
         '</div>';
+
+      // Prefill dari akun (bisa diedit): reservasi boleh untuk orang lain, jadi
+      // nama/nomor akun hanya titik awal — resto tetap butuh nomor yang bisa dihubungi.
+      var resName = schedContainer.querySelector('#x-res-name');
+      var resPhone = schedContainer.querySelector('#x-res-phone');
+      var acct = (Store.getState().customerSession) || {};
+      if (resName) {
+        if (!draft.reservationName) draft.reservationName = acct.name || acct.full_name || '';
+        resName.value = draft.reservationName || '';
+        resName.oninput = function () { draft.reservationName = resName.value; };
+      }
+      if (resPhone) {
+        if (!draft.reservationPhone) draft.reservationPhone = acct.phone || '';
+        resPhone.value = draft.reservationPhone || '';
+        resPhone.oninput = function () { draft.reservationPhone = resPhone.value; };
+      }
 
       var dateCol = schedContainer.querySelector('#x-res-date-col');
       var timeCol = schedContainer.querySelector('#x-res-time-col');
@@ -2426,6 +2453,8 @@
           state.fulfillment.scheduled = false;
           state.fulfillment.reservationDate = draft.reservationDate || '';
           state.fulfillment.reservationTime = draft.reservationTime || '12:00';
+          state.fulfillment.reservationName = (draft.reservationName || '').trim();
+          state.fulfillment.reservationPhone = (draft.reservationPhone || '').trim();
           state.fulfillment.guestCount = draft.guestCount || 2;
         } else if (draft.type === 'dine_in') {
           state.fulfillment.scheduled = false;
@@ -3542,6 +3571,25 @@
     if (!isReservation && !items.length) {
       if (UI && UI.toast) UI.toast('Keranjang belanja kosong');
       return;
+    }
+
+    // Reservasi: nama & nomor WhatsApp pemesan WAJIB, karena resto memakai nomor
+    // itu untuk konfirmasi. Divalidasi di sini (bukan tombol dimatikan) supaya
+    // tamu diberi tahu apa yang kurang, bukan dihadapkan tombol yang tak bisa
+    // ditekan tanpa penjelasan. Namanya boleh berbeda dari nama akun — reservasi
+    // bisa untuk orang lain — jadi kontaknya dipakai sebagai kontak pesanan.
+    if (state.fulfillment.type === 'reservation') {
+      var resNm = (state.fulfillment.reservationName || '').trim();
+      var resPh = (state.fulfillment.reservationPhone || '').trim();
+      if (!resNm) {
+        if (UI && UI.toast) UI.toast('Isi nama pemesan dulu.');
+        return;
+      }
+      if (!resPh) {
+        if (UI && UI.toast) UI.toast('Isi nomor WhatsApp pemesan dulu.');
+        return;
+      }
+      state.recipient = { type: 'other', name: resNm, phone: resPh };
     }
 
     if (!state.paymentMethod) {
