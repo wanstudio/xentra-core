@@ -88,6 +88,37 @@ class PosShiftService {
     };
   }
 
+  static startBreak({ shift_id, actor_id = null, actor_role = null }) {
+    if (!shift_id) throw new Error('[PosShiftService] "shift_id" is required to start a break.');
+    const shift = posShiftRepository.findById(shift_id);
+    if (!shift || shift.status !== 'open') throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup.');
+    if (actor_role === 'cashier' && actor_id && shift.cashier_id !== actor_id) {
+      throw new Error('[PosShiftService Authorization Breach]: Kasir tidak berwenang mengubah shift milik kasir lain.');
+    }
+    if (posShiftRepository.findActiveBreakByShift(shift_id)) throw new Error('[PosShiftService] Shift sudah dalam status istirahat.');
+    const breakId = `break_${crypto.randomBytes(6).toString('hex')}`;
+    const startedAt = new Date().toISOString();
+    posShiftRepository.insertShiftBreak({ breakId, shiftId: shift_id, startedAt });
+    events.EventBus.publish({ type:'pos.shift.break.started', producer:'pos', payload:{shift_id,break_id:breakId,branch_id:shift.branch_id,cashier_id:shift.cashier_id,started_at:startedAt} }).catch(() => {});
+    return { id:breakId, shift_id, started_at:startedAt, ended_at:null };
+  }
+
+  static endBreak({ shift_id, actor_id = null, actor_role = null }) {
+    if (!shift_id) throw new Error('[PosShiftService] "shift_id" is required to end a break.');
+    const shift = posShiftRepository.findById(shift_id);
+    if (!shift || shift.status !== 'open') throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup.');
+    if (actor_role === 'cashier' && actor_id && shift.cashier_id !== actor_id) {
+      throw new Error('[PosShiftService Authorization Breach]: Kasir tidak berwenang mengubah shift milik kasir lain.');
+    }
+    const activeBreak = posShiftRepository.findActiveBreakByShift(shift_id);
+    if (!activeBreak) throw new Error('[PosShiftService] Shift tidak sedang istirahat.');
+    const endedAt = new Date().toISOString();
+    const result = posShiftRepository.endShiftBreak({ breakId:activeBreak.id, endedAt });
+    if (!result || result.changes !== 1) throw new Error('[PosShiftService] Gagal mengakhiri istirahat.');
+    events.EventBus.publish({ type:'pos.shift.break.ended', producer:'pos', payload:{shift_id,break_id:activeBreak.id,branch_id:shift.branch_id,cashier_id:shift.cashier_id,started_at:activeBreak.started_at,ended_at:endedAt} }).catch(() => {});
+    return { id:activeBreak.id, shift_id, started_at:activeBreak.started_at, ended_at:endedAt };
+  }
+
   /**
    * Records a manual Cash Movement (Cash In or Cash Out) with Defense-in-Depth Ownership Verification.
    * 
@@ -108,6 +139,9 @@ class PosShiftService {
     const shift = posShiftRepository.findById(shift_id);
     if (!shift || shift.status !== 'open') {
       throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup.');
+    }
+    if (posShiftRepository.findActiveBreakByShift(shift_id)) {
+      throw new Error('[PosShiftService] Shift sedang istirahat. Selesaikan istirahat terlebih dahulu.');
     }
 
     // P1 DOMAIN LEVEL DEFENSE-IN-DEPTH OWNERSHIP GUARD (NEW-01 & NEW-02)
