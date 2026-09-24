@@ -94,6 +94,24 @@ function makeRequest(server, options, body = null) {
   });
 }
 
+test('OWNER DASHBOARD SETTINGS — route boundary is isolated', () => {
+  const apiPath = require.resolve('../server/routes/api');
+  const settingsPath = require.resolve('../server/routes/settings');
+  const apiSource = require('node:fs').readFileSync(apiPath, 'utf8');
+  const settingsSource = require('node:fs').readFileSync(settingsPath, 'utf8');
+
+  const inline = apiSource.match(/router\\.(?:get|put)\\('\/admin\\/settings\\//g) || [];
+  const isolated = settingsSource.match(/router\\.(?:get|put)\\('\/admin\\/settings\\//g) || [];
+
+  assert.equal(inline.length, 0, 'admin settings routes must not be implemented inline in api.js');
+  assert.ok(isolated.length > 0, 'settings.js must own admin settings routes');
+  assert.equal(
+    (apiSource.match(/registerSettingsRoutes\\(router,/g) || []).length,
+    1,
+    'api.js must register settings routes exactly once'
+  );
+});
+
 test('PHASE 7: OWNER DASHBOARD SETTINGS & INTEGRATIONS IMPLEMENTATION', async (t) => {
   let server;
   let ownerToken;
