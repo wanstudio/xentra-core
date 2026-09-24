@@ -400,6 +400,7 @@
                   <option value="delivery">Delivery</option>
                   <option value="pickup">Pickup</option>
                   <option value="dine_in">Dine-In (Makan di Tempat)</option>
+                  <option value="reservation">Reservasi</option>
                 </select>
               </div>
             </div>
@@ -506,7 +507,11 @@
                   <div><span class="text-muted">Telepon:</span> <strong id="bm-detail-cust-phone">-</strong></div>
                   <div><span class="text-muted">Layanan:</span> <span id="bm-detail-fulfillment-badge" class="x-badge x-badge-info">DELIVERY</span></div>
                   <div id="bm-detail-table-row" style="display:none;"><span class="text-muted">Meja:</span> <strong id="bm-detail-table-number">-</strong></div>
-                  <div><span class="text-muted">Waktu:</span> <span id="bm-detail-order-time">-</span></div>
+                  <div id="bm-detail-reservation-row" style="display:none;">
+                    <div><span class="text-muted">Jadwal reservasi:</span> <strong id="bm-detail-reservation-datetime">-</strong></div>
+                    <div><span class="text-muted">Jumlah tamu:</span> <strong id="bm-detail-reservation-guests">-</strong></div>
+                  </div>
+                  <div><span class="text-muted">Waktu dibuat:</span> <span id="bm-detail-order-time">-</span></div>
                   <div><span class="text-muted">Catatan:</span> <span id="bm-detail-order-notes" style="font-style:italic;">-</span></div>
                 </div>
               </div>
