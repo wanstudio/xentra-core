@@ -11,7 +11,7 @@ const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashb
 const MERCHANT_APP_HTML_PATH = path.join(__dirname, '../apps/merchant-app/index.html');
 const MERCHANT_APP_JS_PATH = path.join(__dirname, '../apps/merchant-app/assets/js/merchant-app.js');
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
-const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/branch-catalog.js');
+const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-app/assets/js/branch-catalog-ui.js');
 
 test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Lifecycle', async (t) => {
   const html = fs.readFileSync(HTML_PATH, 'utf8');
