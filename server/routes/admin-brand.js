@@ -114,8 +114,6 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
 });
 
 // Brand Logo Upload & Delete Endpoints
-const BRAND_LOGO_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/logos');
-const BANNER_IMAGE_DIR = path.join(__dirname, '../../apps/customer-pwa/assets/uploads/banners');
 
 router.post('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
