@@ -21,6 +21,7 @@ const ORDER_RECEIVED = read('apps/customer-pwa/assets/js/pages/order-received.js
 const CHECKOUT = read('apps/customer-pwa/assets/js/pages/checkout.js');
 const INDEX = read('apps/customer-pwa/index.html');
 const API = read('server/routes/api.js');
+const PAYMENT_CONFIG = read('server/routes/payment-config.js');
 
 test('PAYGW-01: Snap.js dimuat dari client key yang dikonfigurasi', () => {
   // Snap.js butuh client key; tanpa itu gateway tidak bisa dibuka sama sekali.
@@ -34,11 +35,16 @@ test('PAYGW-01: Snap.js dimuat dari client key yang dikonfigurasi', () => {
 test('PAYGW-02: server key tidak pernah ikut ke browser', () => {
   // Yang boleh keluar hanya client key (publishable). Server key tetap di server.
   assert.ok(!/server_key/.test(MODULE), 'modul PWA tidak boleh menyebut server key');
-  const endpoint = API.slice(
-    API.indexOf("router.get('/payment/config'"),
-    API.indexOf("router.get('/brand/info'")
+  const endpoint = PAYMENT_CONFIG.slice(
+    PAYMENT_CONFIG.indexOf("router.get('/payment/config'"),
+    PAYMENT_CONFIG.lastIndexOf("  });") + 6
   );
-  assert.ok(endpoint.length > 0, 'endpoint konfigurasi gateway harus ada');
+  assert.equal(
+    (API.match(/router\.get\('\/payment\/config'/g) || []).length,
+    0,
+    'payment/config implementation must not remain inline in api.js'
+  );
+  assert.ok(endpoint.length > 0, 'endpoint konfigurasi gateway harus ada di module payment-config.js');
   // server_key dibaca di server untuk menilai kesiapan provider aktif — yang dilarang
   // adalah memasukkannya ke respons.
   assert.ok(!/server_key\s*:/.test(endpoint), 'server key tidak boleh ada di respons');
