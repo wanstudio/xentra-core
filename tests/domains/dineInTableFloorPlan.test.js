@@ -1,8 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const db = require('../../server/database/db');
-const { DiningTableService, TableRecommendationService } = require('../../domains/pos');
-const Template01 = require('../../domains/pos/templates/Template01');
+const { DiningTableService, TableRecommendationService } = require('../../domains/dining');
+const Template01 = require('../../domains/dining/templates/Template01');
 
 test.before(() => {
   try {
