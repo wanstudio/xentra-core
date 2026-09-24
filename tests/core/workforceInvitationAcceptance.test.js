@@ -12,7 +12,8 @@ const app = require('../../server/app');
 const db = require('../../server/database/db');
 const {
   WorkforceInvitationService,
-  WorkforceService
+  WorkforceService,
+  WorkforceMembershipService
 } = require('../../core/identity');
 
 let server;
@@ -196,12 +197,29 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
     db.prepare("DELETE FROM security_audit_log WHERE brand_id = ?").run(testBrandId);
 
     // Reset existing recipient to baseline cashier role at branch 1
+    const membershipService = new WorkforceMembershipService();
     db.prepare("UPDATE users SET role = 'cashier', brand_id = ?, organization_id = ?, branch_id = ?, status = 'active' WHERE id = ?")
       .run(testBrandId, testOrgId, testBranch1Id, existingRecipientUser.id);
+    membershipService.ensureMembership({
+      userId: existingRecipientUser.id,
+      organizationId: testOrgId,
+      brandId: testBrandId,
+      branchId: testBranch1Id,
+      role: 'cashier',
+      status: 'active'
+    });
 
     // Reset wrong recipient user
     db.prepare("UPDATE users SET role = 'cashier', brand_id = ?, organization_id = ?, branch_id = ?, status = 'active' WHERE id = ?")
       .run(testBrandId, testOrgId, testBranch1Id, wrongRecipientUser.id);
+    membershipService.ensureMembership({
+      userId: wrongRecipientUser.id,
+      organizationId: testOrgId,
+      brandId: testBrandId,
+      branchId: testBranch1Id,
+      role: 'cashier',
+      status: 'active'
+    });
 
     // Refresh recipient user sessions for tests that make REST requests
     const loginExisting = await request('POST', '/api/v1/auth/merchant/login', {
@@ -250,10 +268,14 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
     assert.equal(invRow.status, 'accepted');
     assert.ok(invRow.accepted_at);
 
-    // Verify user role and scope updated in DB
-    const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(existingRecipientUser.id);
-    assert.equal(updatedUser.role, 'branch_manager');
-    assert.equal(updatedUser.branch_id, testBranch2Id);
+    // Verify the target business membership changed; the global user identity
+    // remains reusable by other businesses.
+    const membership = db.prepare(
+      'SELECT role, brand_id, branch_id FROM workforce_memberships WHERE user_id = ? AND brand_id = ?'
+    ).get(existingRecipientUser.id, testBrandId);
+    assert.equal(membership.role, 'branch_manager');
+    assert.equal(membership.brand_id, testBrandId);
+    assert.equal(membership.branch_id, testBranch2Id);
   });
 
   it('INV-ACC-02: Missing or unauthenticated user is rejected with 401 UNAUTHORIZED', async () => {
@@ -472,8 +494,10 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
     assert.equal(res.data.branch_id, testBranch1Id); // Strictly branch 1 from invitation
     assert.equal(res.data.brand_id, testBrandId);
 
-    // Verify DB user record
-    const userRow = db.prepare('SELECT role, branch_id, brand_id FROM users WHERE id = ?').get(existingRecipientUser.id);
+    // Verify the target membership, not the legacy user scope.
+    const userRow = db.prepare(
+      'SELECT role, branch_id, brand_id FROM workforce_memberships WHERE user_id = ? AND brand_id = ?'
+    ).get(existingRecipientUser.id, testBrandId);
     assert.equal(userRow.role, 'cashier');
     assert.equal(userRow.branch_id, testBranch1Id);
     assert.equal(userRow.brand_id, testBrandId);
@@ -737,15 +761,13 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
     assert.equal(ownerDb.role, 'owner');
   });
 
-  it('ACC-REC-03: User bound to another brand cannot accept cross-brand invitation (WORKFORCE_SCOPE_CONFLICT)', async () => {
+  it('ACC-REC-03: Existing user may accept invitation for a second business without overwriting the first membership', async () => {
     const service = new WorkforceInvitationService();
 
-    // Create a brand 2
     const otherBrandId = 'brand_acc_foreign';
-    db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain, primary_color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\'), datetime(\'now\'))')
+    db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain, primary_color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
       .run(otherBrandId, testOrgId, 'Other Foreign Brand', 'other-foreign', 'other-foreign.xentra.cloud', '#ffffff');
 
-    // Create user bound to foreign brand
     const workforce = new WorkforceService();
     let foreignUser;
     try {
@@ -756,43 +778,55 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
         email: 'foreign.worker@test.com',
         password: 'Password123!',
         full_name: 'Foreign Worker',
-        role: 'cashier'
+        role: 'cashier',
+        branch_id: null
       });
     } catch (_) {
       foreignUser = db.prepare('SELECT * FROM users WHERE username = ?').get('foreign_worker');
     }
 
-    // Invitation is for main brand
     const created = await service.createInvitation({
       actor: { actor_id: ownerUser.id, actor_role: 'owner' },
       email: 'foreign.worker@test.com',
-      role: 'cashier',
+      role: 'branch_manager',
       brand_id: testBrandId,
       organization_id: testOrgId,
       branch_id: testBranch1Id
     });
 
-    assert.throws(() => {
-      service.acceptInvitation({
-        authenticatedUser: { id: foreignUser.id, email: 'foreign.worker@test.com' },
-        rawToken: created.rawToken
-      });
-    }, (err) => {
-      assert.equal(err.status, 409);
-      assert.equal(err.code, 'WORKFORCE_SCOPE_CONFLICT');
-      return true;
+    const result = service.acceptInvitation({
+      authenticatedUser: { id: foreignUser.id, email: 'foreign.worker@test.com' },
+      rawToken: created.rawToken
     });
 
-    // Foreign user's brand_id was NOT overwritten
-    const foreignDb = db.prepare('SELECT brand_id FROM users WHERE id = ?').get(foreignUser.id);
-    assert.equal(foreignDb.brand_id, otherBrandId);
+    assert.equal(result.success, true);
+    assert.equal(result.role, 'branch_manager');
+    assert.equal(result.brand_id, testBrandId);
+    assert.equal(result.branch_id, testBranch1Id);
+
+    const userRow = db.prepare('SELECT brand_id, role, branch_id FROM users WHERE id = ?').get(foreignUser.id);
+    assert.equal(userRow.brand_id, otherBrandId);
+    assert.equal(userRow.role, 'cashier');
+
+    const memberships = db.prepare(
+      'SELECT brand_id, role, branch_id FROM workforce_memberships WHERE user_id = ? ORDER BY brand_id'
+    ).all(foreignUser.id);
+
+    assert.equal(memberships.length, 2);
+    assert.ok(memberships.some(m => m.brand_id === otherBrandId && m.role === 'cashier'));
+    assert.ok(memberships.some(m => m.brand_id === testBrandId && m.role === 'branch_manager' && m.branch_id === testBranch1Id));
   });
 
   it('ACC-REC-04: Manager cannot be demoted to cashier or kitchen role via invitation', async () => {
     const service = new WorkforceInvitationService();
 
-    // Set Alice as brand_manager
+    // Set Alice as brand_manager in the canonical workforce membership.
     db.prepare("UPDATE users SET role = 'brand_manager', branch_id = NULL WHERE id = ?").run(existingRecipientUser.id);
+    new WorkforceMembershipService().updateRoleScope(existingRecipientUser.id, testBrandId, {
+      role: 'brand_manager',
+      branchId: null,
+      status: 'active'
+    });
 
     // Invitation is for cashier
     const created = await service.createInvitation({
@@ -823,8 +857,13 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
   it('ACC-REC-05: Branch Manager cannot be reassigned to a different branch via invitation', async () => {
     const service = new WorkforceInvitationService();
 
-    // Set Alice as branch_manager for branch 1
+    // Set Alice as branch_manager for branch 1 in the canonical membership.
     db.prepare("UPDATE users SET role = 'branch_manager', branch_id = ? WHERE id = ?").run(testBranch1Id, existingRecipientUser.id);
+    new WorkforceMembershipService().updateRoleScope(existingRecipientUser.id, testBrandId, {
+      role: 'branch_manager',
+      branchId: testBranch1Id,
+      status: 'active'
+    });
 
     // Invitation is for branch 2
     const created = await service.createInvitation({
@@ -1073,8 +1112,13 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
 
   it('AUDIT-FAIL-05: Existing successful invitation acceptance remains successful and records audit', async () => {
     const service = new WorkforceInvitationService();
-    // Ensure clean state for recipient
-    db.prepare("UPDATE users SET role = 'cashier', brand_id = ?, branch_id = NULL WHERE id = ?").run(testBrandId, existingRecipientUser.id);
+    // Ensure clean canonical membership state for recipient.
+    db.prepare("UPDATE users SET role = 'cashier', brand_id = ?, organization_id = ?, branch_id = NULL WHERE id = ?").run(testBrandId, testOrgId, existingRecipientUser.id);
+    new WorkforceMembershipService().updateRoleScope(existingRecipientUser.id, testBrandId, {
+      role: 'cashier',
+      branchId: null,
+      status: 'active'
+    });
 
     const created = await service.createInvitation({
       actor: { actor_id: ownerUser.id, actor_role: 'owner' },
@@ -1105,28 +1149,21 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
     assert.equal(auditRow.result, 'success');
   });
 
-  it('AUDIT-FAIL-06: Existing Phase 4A reconciliation tests remain passing', async () => {
-    // Cross-brand conflict test
+  it('AUDIT-FAIL-06: Cross-business membership is additive, not destructive', async () => {
     const service = new WorkforceInvitationService();
     const otherBrandId = 'brand_acc_foreign_2';
     db.prepare('INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain, primary_color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, datetime(\'now\'), datetime(\'now\'))')
       .run(otherBrandId, testOrgId, 'Other Foreign Brand 2', 'other-foreign-2', 'other-foreign-2.xentra.cloud', '#ffffff');
 
-    const workforce = new WorkforceService();
-    let foreignUser;
-    try {
-      foreignUser = workforce.createUser({
-        brand_id: otherBrandId,
-        organization_id: testOrgId,
-        username: 'foreign_worker_2',
-        email: 'foreign.worker2@test.com',
-        password: 'Password123!',
-        full_name: 'Foreign Worker 2',
-        role: 'cashier'
-      });
-    } catch (_) {
-      foreignUser = db.prepare('SELECT * FROM users WHERE username = ?').get('foreign_worker_2');
-    }
+    const foreignUser = new WorkforceService().createUser({
+      brand_id: otherBrandId,
+      organization_id: testOrgId,
+      username: 'foreign_worker_2',
+      email: 'foreign.worker2@test.com',
+      password: 'Password123!',
+      full_name: 'Foreign Worker 2',
+      role: 'cashier'
+    });
 
     const created = await service.createInvitation({
       actor: { actor_id: ownerUser.id, actor_role: 'owner' },
@@ -1137,15 +1174,20 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
       branch_id: testBranch1Id
     });
 
-    assert.throws(() => {
-      service.acceptInvitation({
-        authenticatedUser: { id: foreignUser.id, email: 'foreign.worker2@test.com' },
-        rawToken: created.rawToken
-      });
-    }, (err) => {
-      assert.equal(err.status, 409);
-      assert.equal(err.code, 'WORKFORCE_SCOPE_CONFLICT');
-      return true;
+    const result = service.acceptInvitation({
+      authenticatedUser: { id: foreignUser.id, email: 'foreign.worker2@test.com' },
+      rawToken: created.rawToken
     });
+
+    assert.equal(result.success, true);
+    assert.equal(
+      db.prepare('SELECT brand_id FROM users WHERE id = ?').get(foreignUser.id).brand_id,
+      otherBrandId
+    );
+    assert.equal(
+      db.prepare('SELECT COUNT(*) AS cnt FROM workforce_memberships WHERE user_id = ?').get(foreignUser.id).cnt,
+      2
+    );
+  })
   });
 });
