@@ -22,7 +22,7 @@
   var XentraActionMenu = window.XentraActionMenu;
   var XentraCropEditor = window.XentraCropEditor;
 
-  // Shared branch-catalog helpers are owned by merchant-shared/js/branch-catalog.js.
+  // Owner branch-catalog UI is owned by this dashboard surface.
   var XentraOwnerBranchCatalog = window.XentraOwnerBranchCatalog;
   var getActiveBranchId = XentraOwnerBranchCatalog.getActiveBranchId;
 
