@@ -8592,12 +8592,15 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
     // pending → upcoming confirmed reservation → everything else.
     // This is a visibility safeguard at the API boundary; the client may still
     // apply its own presentation sort without changing server business state.
-    const params = [req.brand_id, req.params.id, branchLocalNow, branchLocalNow];
+    const params = [req.brand_id, req.params.id];
 
     if (statusFilter && statusFilter !== 'all') {
       query += ' AND o.status = ?';
       params.push(statusFilter);
     }
+
+    // ORDER BY placeholders come after the optional status filter placeholder.
+    params.push(branchLocalNow, branchLocalNow);
 
     query += `
       ORDER BY
