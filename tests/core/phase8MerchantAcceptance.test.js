@@ -720,7 +720,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
   });
 
   it('25. Customer refresh after acceptance maintains correct state', async () => {
-    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending', orderType: 'dine_in' });
+    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending', orderType: 'delivery' });
 
     // Merchant accepts
     await request('POST', `/orders/${ord.orderId}/branch-acceptance`, { decision: 'accept' }, { Authorization: `Bearer ${bmAToken}` });
@@ -846,8 +846,9 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
     win.Xentra.OrderReceived.mount(container, ord.orderId);
     await new Promise(r => setTimeout(r, 20));
 
-    assert.ok(container.innerHTML.includes('id="x-waiting-screen"'));
-    assert.ok(container.innerHTML.includes('Menunggu Konfirmasi Cabang'));
+    assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Pending delivery must render unified tracking screen');
+    assert.ok(container.innerHTML.includes('>PESANAN DIBUAT<'), 'Pending delivery must show the canonical first phase');
+    assert.ok(!container.innerHTML.includes('Menunggu Konfirmasi Cabang'), 'Legacy waiting-screen copy must not be rendered');
     win.Xentra.OrderReceived.unmount();
   });
 });
