@@ -544,6 +544,59 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     );
   });
 
+  // ── P8-RSV: Reservation customer projection & dedicated surface ────────────
+  it('P8-RSV: reservation exposes schedule/guest metadata and does not enter payment UI', async () => {
+    const { orderId, phone } = seedOrder({
+      status: 'confirmed',
+      orderType: 'reservation',
+      deliveryFee: 0,
+      discountAmount: 0,
+      grandTotal: 0,
+      paymentMethod: 'cash',
+      paymentStatus: 'pending',
+      orderNote: 'Reservasi (4 Tamu, Tgl: 2099-01-02)'
+    });
+    db.prepare('UPDATE orders SET scheduled_slot_start = ? WHERE id = ?')
+      .run('2099-01-02T19:00:00', orderId);
+
+    const token = seedCustomerSession(phone);
+    const detail = await request('GET', `/api/v1/orders/${orderId}`, null, {
+      Authorization: `Bearer ${token}`
+    });
+
+    assert.equal(detail.status, 200);
+    assert.equal(detail.data.order.order_type, 'reservation');
+    assert.equal(detail.data.order.reservation_date, '2099-01-02');
+    assert.equal(detail.data.order.reservation_time, '19:00');
+    assert.equal(detail.data.order.guest_count, 4);
+
+    const history = await request('GET', '/api/v1/customer/orders', null, {
+      Authorization: `Bearer ${token}`
+    });
+    assert.equal(history.status, 200);
+    const historyRow = (history.data.orders || []).find(o => o.id === orderId);
+    assert.ok(historyRow, 'reservation must be present in customer history');
+    assert.equal(historyRow.reservation_date, '2099-01-02');
+    assert.equal(historyRow.reservation_time, '19:00');
+    assert.equal(historyRow.guest_count, 4);
+
+    const { win, container } = setupPwaDOM();
+    win.Xentra.API.get = async () => detail.data;
+    win.Xentra.Router.navigate = () => {};
+
+    win.Xentra.OrderReceived.mount(container, orderId);
+    await new Promise(r => setTimeout(r, 10));
+
+    assert.ok(container.innerHTML.includes('id="x-reservation-screen"'), 'reservation must use the dedicated reservation surface');
+    assert.ok(container.innerHTML.includes('2099-01-02'), 'reservation date must be displayed');
+    assert.ok(container.innerHTML.includes('19:00'), 'reservation time must be displayed');
+    assert.ok(container.innerHTML.includes('4 orang'), 'guest count must be displayed');
+    assert.ok(!container.innerHTML.includes('Bayar Sekarang'), 'reservation must never expose payment action');
+    assert.ok(!container.innerHTML.includes('Sedang Disiapkan'), 'reservation must never use generic cooking fulfillment copy');
+
+    win.Xentra.OrderReceived.unmount();
+  });
+
   // ── P8-14: Payment state remains server-authoritative ──────────────────────
   it('P8-14: Payment state remains server-authoritative', async () => {
     const { orderId, phone, grandTotal } = seedOrder({
