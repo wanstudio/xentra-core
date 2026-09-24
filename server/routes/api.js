@@ -11,6 +11,7 @@ const PaymentService = require('../services/PaymentService');
 const registerCustomerOrderRoutes = require('./customer-orders');
 const registerCustomerRoutes = require('./customer');
 const registerCustomerAuthRoutes = require('./customer-auth');
+const registerLegacyCustomerOtpRoutes = require('./legacy-customer-otp');
 const registerCheckoutRoutes = require('./checkout');
 const registerCustomerAddressRoutes = require('./customer-addresses');
 const registerWorkforceRoutes = require('./workforce');
@@ -378,6 +379,12 @@ const TokenSessionStore = {
     this.revokeUserSessions(userId);
   }
 };
+
+// Retired customer OTP routes remain isolated for reference; they always return OTP_RETIRED.
+registerLegacyCustomerOtpRoutes(router, {
+  crypto,
+  TokenSessionStore
+});
 
 // Expose globally for WorkforceService
 global.TokenSessionStore = TokenSessionStore;
