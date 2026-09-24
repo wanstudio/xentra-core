@@ -1732,6 +1732,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       scheduled_slot_end,
       table_number,
       reservation_date,
+      reservation_time,
       guest_count,
       delivery,
       address,
@@ -1746,6 +1747,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     order_note = order_note || note || '';
     table_number = table_number || fulfillment.table_number || null;
     reservation_date = reservation_date || fulfillment.reservation_date || null;
+    reservation_time = reservation_time || fulfillment.reservation_time || null;
     guest_count = guest_count || fulfillment.guest_count || null;
 
     if (address && !delivery) {
@@ -2187,6 +2189,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       table_ids: tableIdsToHold,
       dining_session_id: req.body.dining_session_id || req.body.sessionId || null,
       reservation_date,
+      reservation_time,
       guest_count,
       pwa_runtime,
       notes: order_note,
