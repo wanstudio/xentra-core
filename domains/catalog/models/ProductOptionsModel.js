@@ -28,7 +28,7 @@ class ProductOptionsModel {
         const required = type === 'variant' ? !(g && g.required === false) : Boolean(g && g.required === true);
         const min = type === 'variant'
           ? (required ? 1 : 0)
-          : Math.max(0, Number.isInteger(Number(g && g.min)) ? Number(g.min) : 0);
+          : Math.max(required ? 1 : 0, Number.isInteger(Number(g && g.min)) ? Number(g.min) : 0);
         const max = type === 'variant'
           ? 1
           : (g && g.max != null && Number.isInteger(Number(g.max)) && Number(g.max) >= 0 ? Number(g.max) : null);
