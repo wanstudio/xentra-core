@@ -29,7 +29,7 @@ const routes = [
 
 test('Merchant Auth Routes: implementation is isolated behind one route boundary', () => {
   assert.equal(
-    (apiSource.match(/registerMerchantAuthRoutes\\(router,/g) || []).length,
+    (apiSource.match(/registerMerchantAuthRoutes\(router,/g) || []).length,
     1,
     'api.js must register merchant auth routes exactly once'
   );
