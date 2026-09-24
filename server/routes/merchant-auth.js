@@ -311,8 +311,8 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
         // no route while the capability is off, so it cannot be a landing target.
         return KDS_ENTITLED ? '/kitchen/' : '/owner/';
       case 'cashier':
-        // Cashier is branch-scoped but has no dedicated surface in MVP.
-        return '/owner/';
+        // Cashier owns the transaction-execution surface; management stays in Merchant App.
+        return '/pos/';
       case 'owner':
       case 'brand_manager':
       default:
