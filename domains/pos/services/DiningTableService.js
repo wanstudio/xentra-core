@@ -134,9 +134,18 @@ class DiningTableService {
     return { valid: true };
   }
 
-  static holdTablesForPayment({ branch_id, table_ids, customer_phone, hold_reference_id }) {
+  static holdTablesForPayment({ branch_id, table_id = null, table_ids = [], customer_phone = null, hold_reference_id = null, channel = null }) {
     this.sweepExpiredHolds();
-    if (!branch_id || !Array.isArray(table_ids) || table_ids.length === 0) throw new Error('[DiningTableService] branch_id and non-empty table_ids are required.');
+
+    let resolvedTableIds = [];
+    if (table_id) resolvedTableIds.push(table_id);
+    else if (Array.isArray(table_ids)) resolvedTableIds = [...table_ids];
+
+    if (!branch_id || resolvedTableIds.length === 0) throw new Error('[DiningTableService] branch_id and non-empty table_ids are required.');
+
+    if (channel === 'customer_app' && resolvedTableIds.length > 1) {
+      throw new Error('[DiningTableService] SINGLE_TABLE_REQUIRED: Customer dine-in hanya diperbolehkan untuk 1 meja.');
+    }
 
     const cleanCustomerPhone = customer_phone ? String(customer_phone).trim() : '';
 
@@ -146,9 +155,17 @@ class DiningTableService {
       const existingSession = repository.findActiveSessionByCustomer(branch_id, cleanCustomerPhone);
       if (existingSession) {
         const sessTables = repository.findSessionTables(existingSession.id).map(r => r.table_id);
-        const isSelfTransfer = table_ids.some(tid => !sessTables.includes(tid));
+        const isSelfTransfer = resolvedTableIds.some(tid => !sessTables.includes(tid));
         if (isSelfTransfer) {
           throw new Error('[DiningTableService] CUSTOMER_TABLE_TRANSFER_FORBIDDEN: Anda sudah memiliki sesi aktif di meja lain pada cabang ini. Pelanggan tidak diizinkan memindahkan meja sendiri. Silakan hubungi kasir/staf untuk pindah meja.');
+        }
+      }
+
+      const existingHold = repository.findActiveHoldByCustomer(branch_id, cleanCustomerPhone);
+      if (existingHold && (!hold_reference_id || existingHold.hold_reference_id !== hold_reference_id)) {
+        const isDiffTable = resolvedTableIds.some(tid => tid !== existingHold.table_id);
+        if (isDiffTable) {
+          throw new Error('[DiningTableService] CUSTOMER_PENDING_HOLD_EXISTS: Anda sudah memiliki pesanan meja yang sedang menunggu konfirmasi pada meja lain di cabang ini. Batalkan pesanan sebelumnya jika ingin berpindah meja.');
         }
       }
     }
@@ -159,7 +176,7 @@ class DiningTableService {
 
     repository.beginTransaction();
     try {
-      for (const tid of table_ids) {
+      for (const tid of resolvedTableIds) {
         const row = repository.findTableForBranch(tid, branch_id);
         if (!row || !row.is_active) throw new Error(`[TABLE_UNAVAILABLE] Meja "${tid}" tidak aktif atau tidak ditemukan.`);
         if (row.operational_state !== 'available') {
@@ -179,7 +196,7 @@ class DiningTableService {
         }
       }
 
-      for (const tid of table_ids) {
+      for (const tid of resolvedTableIds) {
         const row = repository.findTableForBranch(tid, branch_id);
         if (row && row.operational_state !== 'occupied') {
           const holdId = `bth_${crypto.randomBytes(6).toString('hex')}`;
@@ -197,7 +214,7 @@ class DiningTableService {
       throw err;
     }
 
-    return { success: true, hold_reference_id: holdRef, table_ids, expires_at: expiresAt.toISOString(), duration_minutes: HOLD_DURATION_MINUTES };
+    return { success: true, hold_reference_id: holdRef, table_ids: resolvedTableIds, expires_at: expiresAt.toISOString(), duration_minutes: HOLD_DURATION_MINUTES };
   }
 
   static releaseHold({ branch_id, hold_reference_id, reason = 'cancelled' }) {
@@ -224,16 +241,25 @@ class DiningTableService {
 
   static createOrAttachDiningSession({
     branch_id,
+    table_id = null,
     table_ids = [],
     order_id = null,
     customer_name = '',
     customer_phone = '',
     guest_count = 1,
     hold_reference_id = null,
-    channel = 'customer_app',
+    channel = null,
     session_id = null
   }) {
     if (!branch_id) throw new Error('[DiningTableService] branch_id is required.');
+
+    let resolvedTableIds = [];
+    if (table_id) resolvedTableIds.push(table_id);
+    else if (Array.isArray(table_ids)) resolvedTableIds = [...table_ids];
+
+    if (channel === 'customer_app' && resolvedTableIds.length > 1) {
+      throw new Error('[DiningTableService] SINGLE_TABLE_REQUIRED: Customer dine-in hanya diperbolehkan untuk 1 meja.');
+    }
 
     const now = new Date().toISOString();
     const cleanCustomerPhone = customer_phone ? String(customer_phone).trim() : '';
@@ -243,7 +269,7 @@ class DiningTableService {
 
     try {
       // 1. Validate every table belongs to branch_id and is active
-      for (const tid of table_ids) {
+      for (const tid of resolvedTableIds) {
         const tableRow = repository.findTableForBranch(tid, branch_id);
         if (!tableRow || !tableRow.is_active) {
           throw new Error(`[DiningTableService] BRANCH_TABLE_MISMATCH: Meja "${tid}" tidak ditemukan atau tidak aktif di cabang "${branch_id}".`);
@@ -267,8 +293,8 @@ class DiningTableService {
         }
 
         const sessionTableIds = repository.findSessionTables(session.id).map(r => r.table_id);
-        if (table_ids.length > 0) {
-          const mismatch = table_ids.some(tid => !sessionTableIds.includes(tid));
+        if (resolvedTableIds.length > 0) {
+          const mismatch = resolvedTableIds.some(tid => !sessionTableIds.includes(tid));
           if (mismatch) {
             throw new Error(`[DiningTableService] TABLE_SESSION_MISMATCH: Meja yang diminta tidak sesuai dengan meja pada sesi aktif "${session_id}".`);
           }
@@ -281,8 +307,8 @@ class DiningTableService {
         const existingCustSession = repository.findActiveSessionByCustomer(branch_id, cleanCustomerPhone);
         if (existingCustSession) {
           const custTables = repository.findSessionTables(existingCustSession.id).map(r => r.table_id);
-          if (table_ids.length > 0) {
-            const isSelfTransfer = table_ids.some(tid => !custTables.includes(tid));
+          if (resolvedTableIds.length > 0) {
+            const isSelfTransfer = resolvedTableIds.some(tid => !custTables.includes(tid));
             if (isSelfTransfer) {
               throw new Error(`[DiningTableService] CUSTOMER_TABLE_TRANSFER_FORBIDDEN: Anda sudah memiliki sesi aktif di meja lain pada cabang ini. Pelanggan tidak diizinkan memindahkan meja sendiri. Silakan hubungi kasir/staf untuk pindah meja.`);
             }
@@ -294,7 +320,7 @@ class DiningTableService {
       // 4. If still no sessionId, we are creating a new session.
       // Must check table concurrency atomically inside transaction!
       if (!sessionId) {
-        for (const tid of table_ids) {
+        for (const tid of resolvedTableIds) {
           const stateRow = repository.findCurrentSessionForTable(tid);
           if (stateRow) {
             if (stateRow.operational_state === 'occupied' && stateRow.current_session_id) {
@@ -334,7 +360,7 @@ class DiningTableService {
       }
 
       // 5. Attach tables & set state to occupied
-      for (const tid of table_ids) {
+      for (const tid of resolvedTableIds) {
         repository.attachDiningSessionTable({
           mappingId: `dst_${crypto.randomBytes(6).toString('hex')}`,
           sessionId,
@@ -369,7 +395,7 @@ class DiningTableService {
       throw err;
     }
 
-    return { session_id: sessionId, branch_id, table_ids, status: 'active' };
+    return { session_id: sessionId, branch_id, table_ids: resolvedTableIds, status: 'active' };
   }
 
   static completeDiningSession(sessionId, actorId = 'staff') {

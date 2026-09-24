@@ -2094,11 +2094,25 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     let tableIdsToHold = [];
     if (order_type === 'dine_in') {
       const { DiningTableService } = require('../../domains/pos');
-      const reqTableIds = Array.isArray(req.body.table_ids) ? req.body.table_ids : [];
+      let reqTableIds = [];
+      if (req.body.table_id) {
+        reqTableIds.push(req.body.table_id);
+      } else if (Array.isArray(req.body.table_ids)) {
+        reqTableIds = [...req.body.table_ids];
+      }
       if (reqTableIds.length === 0 && table_number) {
         // Resolve table_id from table_number if table_ids array not directly sent
         const tblRow = db.prepare('SELECT id FROM branch_tables WHERE branch_id = ? AND (table_number = ? OR label = ?)').get(branch.id, table_number, table_number);
         if (tblRow) reqTableIds.push(tblRow.id);
+      }
+
+      // Single-table enforcement for customer dine-in (Section 6 & Notion locked decision)
+      if (reqTableIds.length > 1) {
+        return res.status(400).json({
+          success: false,
+          status: 'SINGLE_TABLE_REQUIRED',
+          error: 'Pesanan dine-in customer hanya diperbolehkan untuk 1 meja.'
+        });
       }
 
       if (reqTableIds.length > 0) {
@@ -2169,6 +2183,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       order_type,
       selection_mode,
       table_number,
+      table_id: tableIdsToHold[0] || req.body.table_id || null,
       table_ids: tableIdsToHold,
       dining_session_id: req.body.dining_session_id || req.body.sessionId || null,
       reservation_date,
@@ -2197,30 +2212,23 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     const orderNumber = order.order_number;
     const subtotal = order.subtotal;
 
-    // 4a. Dine-in Table Hold for Payment Stage (15-minute hold) or Immediate Session for Cash
-    if (order_type === 'dine_in' && tableIdsToHold.length > 0) {
+    // 4a. Dine-in Table Hold for Payment / Acceptance Stage (15-minute hold)
+    // Baseline Business Flow:
+    // Customer -> QR / Floor Plan -> 1 Table -> Order (Hold Table / Pending) -> Merchant Accept -> Active Dining Session
+    // A customer dine-in order does NOT immediately become an active dining session at checkout.
+    // Both Cash and Online hold the table pending merchant acceptance or payment.
+    // If the customer already has an active session, order is already linked to it.
+    if (order_type === 'dine_in' && tableIdsToHold.length > 0 && !order.dining_session_id) {
       const { DiningTableService } = require('../../domains/pos');
       try {
-        if (payment_method === 'midtrans' || payment_method === 'doku') {
-          DiningTableService.holdTablesForPayment({
-            branch_id: branch.id,
-            table_ids: tableIdsToHold,
-            customer_phone: customer.phone,
-            hold_reference_id: orderId
-          });
-        } else if (payment_method === 'cash') {
-          DiningTableService.createOrAttachDiningSession({
-            branch_id: branch.id,
-            table_ids: tableIdsToHold,
-            order_id: orderId,
-            customer_name: customer.name,
-            customer_phone: customer.phone,
-            guest_count: guest_count || 1,
-            hold_reference_id: null,
-            channel: 'customer_app',
-            session_id: order.dining_session_id || null
-          });
-        }
+        DiningTableService.holdTablesForPayment({
+          branch_id: branch.id,
+          table_id: tableIdsToHold[0],
+          table_ids: tableIdsToHold,
+          customer_phone: customer.phone,
+          hold_reference_id: orderId,
+          channel: 'customer_app'
+        });
       } catch (tblHoldErr) {
         console.warn('[Checkout Dine-In Table Hold Warning]:', tblHoldErr.message);
       }
@@ -3318,6 +3326,54 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
       note: actorNote
     });
 
+    // Baseline: Customer -> QR/Floor Plan -> 1 Table -> Order -> Merchant -> Accept -> Dining Session ACTIVE
+    const fullOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+    if (fullOrder && fullOrder.order_type === 'dine_in') {
+      const { DiningTableService } = require('../../domains/pos');
+      const { DiningTableRepository } = require('../../core/data/repositories');
+      const diningRepo = new DiningTableRepository();
+
+      if (decision === 'accept') {
+        let tableIds = [];
+        const activeHolds = diningRepo.findActiveHolds(fullOrder.id);
+        if (activeHolds && activeHolds.length > 0) {
+          tableIds = activeHolds.map(h => h.table_id);
+        } else if (fullOrder.table_number) {
+          const tbl = diningRepo.findTableIdByNumberOrLabel(fullOrder.branch_id, fullOrder.table_number);
+          if (tbl) tableIds = [tbl.id];
+        }
+
+        if (tableIds.length > 0) {
+          try {
+            const sessionResult = DiningTableService.createOrAttachDiningSession({
+              branch_id: fullOrder.branch_id,
+              table_ids: tableIds,
+              order_id: fullOrder.id,
+              customer_name: fullOrder.customer_name,
+              customer_phone: fullOrder.customer_phone,
+              guest_count: fullOrder.guest_count || 1,
+              hold_reference_id: fullOrder.id,
+              channel: fullOrder.order_channel || 'customer_app',
+              session_id: fullOrder.dining_session_id || null
+            });
+            result.dining_session_id = sessionResult.session_id;
+          } catch (sessionErr) {
+            console.error('[BranchAcceptance Dine-in Session Warning]:', sessionErr.message);
+          }
+        }
+      } else if (decision === 'reject') {
+        try {
+          DiningTableService.releaseHold({
+            branch_id: fullOrder.branch_id,
+            hold_reference_id: fullOrder.id,
+            reason: 'rejected'
+          });
+        } catch (relErr) {
+          console.error('[BranchAcceptance Release Hold Warning]:', relErr.message);
+        }
+      }
+    }
+
     res.json({ success: true, decision, ...result });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -3376,6 +3432,20 @@ router.post('/orders/:id/cancel', requireCustomerAuth(), (req, res) => {
       // fail ([STATE_CHANGED]) instead of cancelling an ACCEPTED order.
       expected_current_status: 'pending'
     });
+
+    const fullOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+    if (fullOrder && fullOrder.order_type === 'dine_in') {
+      const { DiningTableService } = require('../../domains/pos');
+      try {
+        DiningTableService.releaseHold({
+          branch_id: fullOrder.branch_id,
+          hold_reference_id: fullOrder.id,
+          reason: 'cancelled'
+        });
+      } catch (relErr) {
+        console.error('[CustomerCancel Release Hold Warning]:', relErr.message);
+      }
+    }
 
     res.json({ success: true, decision: 'customer_cancel', ...result });
   } catch (err) {

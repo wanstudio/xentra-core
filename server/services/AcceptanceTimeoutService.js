@@ -29,6 +29,16 @@ function checkAndApplyTimeouts() {
         actor_id: 'acceptance_timeout_worker',
         note: `[BRANCH_TIMEOUT] Tidak ada penerimaan cabang dalam ${ACCEPTANCE_TIMEOUT_SECONDS / 60} menit (kebijakan platform Xentra).`
       });
+      if (order.order_type === 'dine_in') {
+        try {
+          const { DiningTableService } = require('../../domains/pos');
+          DiningTableService.releaseHold({
+            branch_id: order.branch_id,
+            hold_reference_id: order.id,
+            reason: 'timeout'
+          });
+        } catch (_) {}
+      }
       timedOut += 1;
     } catch (txErr) {
       skipped += 1;

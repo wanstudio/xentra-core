@@ -42,6 +42,7 @@ class OrderPlacementService {
     pwa_runtime = null,
     recipient = null,
     dining_session_id = null,
+    table_id = null,
     table_ids = null,
     hold_reference_id = null,
     notes = '',
@@ -160,11 +161,24 @@ class OrderPlacementService {
 
     let effectiveDiningSessionId = dining_session_id || null;
     let resolvedTableNumber = table_number || null;
-    let resolvedTableIds = Array.isArray(table_ids) ? [...table_ids] : [];
+    let resolvedTableIds = [];
+    if (table_id) {
+      resolvedTableIds.push(table_id);
+    } else if (Array.isArray(table_ids)) {
+      resolvedTableIds = [...table_ids];
+    }
 
     if (effectiveOrderType === 'dine_in') {
       const { DiningTableRepository } = require('../../../core/data/repositories');
       const diningTableRepo = new DiningTableRepository();
+
+      if (order_channel === 'customer_app' && resolvedTableIds.length > 1) {
+        return {
+          success: false,
+          status: 'SINGLE_TABLE_REQUIRED',
+          errors: ['Pesanan dine-in customer hanya diperbolehkan untuk 1 meja.']
+        };
+      }
 
       if (resolvedTableIds.length === 0 && resolvedTableNumber) {
         const tbl = diningTableRepo.findTableIdByNumberOrLabel(branch_id, resolvedTableNumber);
@@ -172,11 +186,13 @@ class OrderPlacementService {
       }
 
       if (resolvedTableIds.length === 0 && !resolvedTableNumber) {
-        return {
-          success: false,
-          status: 'TABLE_REQUIRED',
-          errors: ['Meja (table_number atau table_ids) wajib disertakan untuk pesanan dine-in.']
-        };
+        if (order_channel === 'customer_app') {
+          return {
+            success: false,
+            status: 'TABLE_REQUIRED',
+            errors: ['Meja (table_number atau table_ids) wajib disertakan untuk pesanan dine-in.']
+          };
+        }
       }
 
       // Validate that all resolved tables exist and belong to branch_id
@@ -203,6 +219,21 @@ class OrderPlacementService {
       }
 
       const authenticatedCustomerPhone = customer?.phone ? String(customer.phone).trim() : null;
+
+      // Check customer pending hold on another table (Scenario 9 / 13)
+      if (order_channel === 'customer_app' && authenticatedCustomerPhone) {
+        const existingHold = diningTableRepo.findActiveHoldByCustomer(branch_id, authenticatedCustomerPhone);
+        if (existingHold) {
+          const isDiffTable = resolvedTableIds.some(tid => tid !== existingHold.table_id);
+          if (isDiffTable) {
+            return {
+              success: false,
+              status: 'CUSTOMER_PENDING_HOLD_EXISTS',
+              errors: ['Anda sudah memiliki pesanan meja yang sedang menunggu konfirmasi pada meja lain di cabang ini. Batalkan pesanan sebelumnya jika ingin berpindah meja.']
+            };
+          }
+        }
+      }
 
       // 1. If caller supplied an explicit dining_session_id
       if (effectiveDiningSessionId) {
@@ -512,7 +543,7 @@ class OrderPlacementService {
     return {
       success: true,
       status: 'VERIFIED',
-      order: { id: orderId, order_number: orderNumber, brand_id, branch_id, order_type: effectiveOrderType, order_channel, table_number: resolvedTableNumber, dining_session_id: effectiveDiningSessionId, reservation_date, guest_count, subtotal, delivery_fee, grand_total: grandTotal, payment_method: effectivePaymentMethod, cash_tendered: (effectivePaymentMethod === 'cash' && cash_tendered !== null && cash_tendered !== undefined) ? Number(cash_tendered) : null, status: insertedStatus, items: verifiedItems, created_at: now }
+      order: { id: orderId, order_number: orderNumber, brand_id, branch_id, customer_name: customer?.name || '', customer_phone: customer?.phone || '', order_type: effectiveOrderType, order_channel, table_number: resolvedTableNumber, dining_session_id: effectiveDiningSessionId, reservation_date, guest_count, subtotal, delivery_fee, grand_total: grandTotal, payment_method: effectivePaymentMethod, cash_tendered: (effectivePaymentMethod === 'cash' && cash_tendered !== null && cash_tendered !== undefined) ? Number(cash_tendered) : null, status: insertedStatus, items: verifiedItems, created_at: now }
     };
   }
 

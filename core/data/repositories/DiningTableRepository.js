@@ -87,6 +87,15 @@ class DiningTableRepository {
     `, [referenceId]);
   }
 
+  findActiveHoldByCustomer(branchId, customerPhone) {
+    return this.db.queryOne(`
+      SELECT id, table_id, hold_reference_id
+      FROM branch_table_holds
+      WHERE branch_id = ? AND customer_phone = ? AND status = 'active'
+      ORDER BY created_at DESC LIMIT 1
+    `, [branchId, customerPhone]);
+  }
+
   findExpiredHolds(nowIso) {
     return this.db.queryMany(`
       SELECT id, table_id, branch_id, hold_reference_id

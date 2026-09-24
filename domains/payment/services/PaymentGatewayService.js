@@ -306,17 +306,35 @@ class PaymentGatewayService {
           }
 
           if (order && order.order_type === 'dine_in') {
-            try {
-              const { DiningTableService } = require('../../pos');
-              let tableIds = [];
-              const activeHold = diningTableRepository.findActiveHolds(order.id);
-              if (activeHold && activeHold.length > 0) tableIds = activeHold.map(h => h.table_id);
-              else if (order.table_number) {
-                const tbl = diningTableRepository.findTableIdByNumberOrLabel(order.branch_id, order.table_number);
-                if (tbl) tableIds = [tbl.id];
+            // Invariant: payment completion alone does not activate the dining session.
+            // Active Dining Session begins when the Merchant operationally accepts the order.
+            // If the order has already been operationally accepted, ensure session is created/attached.
+            if (order.status === 'confirmed') {
+              try {
+                const { DiningTableService } = require('../../pos');
+                let tableIds = [];
+                const activeHold = diningTableRepository.findActiveHolds(order.id);
+                if (activeHold && activeHold.length > 0) tableIds = activeHold.map(h => h.table_id);
+                else if (order.table_number) {
+                  const tbl = diningTableRepository.findTableIdByNumberOrLabel(order.branch_id, order.table_number);
+                  if (tbl) tableIds = [tbl.id];
+                }
+                if (tableIds.length > 0) {
+                  DiningTableService.createOrAttachDiningSession({
+                    branch_id: order.branch_id,
+                    table_ids: tableIds,
+                    order_id: order.id,
+                    customer_name: order.customer_name,
+                    customer_phone: order.customer_phone,
+                    guest_count: 1,
+                    hold_reference_id: order.id,
+                    channel: order.order_channel || 'customer_app'
+                  });
+                }
+              } catch (dineErr) {
+                console.warn('[PaymentGatewayService] Dine-in table settlement warning:', dineErr.message);
               }
-              if (tableIds.length > 0) DiningTableService.createOrAttachDiningSession({ branch_id: order.branch_id, table_ids: tableIds, order_id: order.id, customer_name: order.customer_name, customer_phone: order.customer_phone, guest_count: 1, hold_reference_id: order.id, channel: order.order_channel || 'customer_app' });
-            } catch (dineErr) { console.warn('[PaymentGatewayService] Dine-in table settlement warning:', dineErr.message); }
+            }
           }
         }
       } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
