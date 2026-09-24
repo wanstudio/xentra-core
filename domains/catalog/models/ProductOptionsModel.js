@@ -22,10 +22,10 @@ class ProductOptionsModel {
     return {
       version: 1,
       groups: groups.map((g, gi) => {
-        const type = g && g.type === 'addon' ? 'addon' : 'variant';
+        const type = g && g.type != null ? String(g.type).trim() : 'variant';
         const groupId = String((g && g.id) || `group_${gi + 1}`).trim();
         const options = Array.isArray(g && g.options) ? g.options : [];
-        const required = g && g.required === true;
+        const required = type === 'variant' ? !(g && g.required === false) : Boolean(g && g.required === true);
         const min = type === 'variant'
           ? (required ? 1 : 0)
           : Math.max(0, Number.isInteger(Number(g && g.min)) ? Number(g.min) : 0);
