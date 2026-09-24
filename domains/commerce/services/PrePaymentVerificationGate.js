@@ -9,7 +9,7 @@
  * 4. Branch Low-Stock Threshold: Captures branch manager configured threshold.
  */
 const CatalogRepository = require('../../../core/data/repositories/CatalogRepository');
-const PricingPolicyModel = require('../models/PricingPolicyModel');
+const PricingPolicyModel = require('../../catalog/models/PricingPolicyModel');
 
 const catalogRepository = new CatalogRepository();
 
