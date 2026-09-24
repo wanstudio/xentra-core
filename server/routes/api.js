@@ -859,48 +859,6 @@ registerAdminFinanceRoutes(router, {
 // Marketing overview routes are isolated in server/routes/admin-marketing-overview.js.
 registerAdminMarketingOverviewRoutes(router, { requireAuth, corePromotionRepo });
 
-// 6. Marketing Promotions List API
-router.get('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
-  try {
-    const isBM = req.user.role === 'branch_manager';
-    const effectiveBranchId = isBM ? (req.user.branch_id || req.user.branchId) : null;
-    const promotions = corePromotionRepo.findAllPromotions(req.brand_id, effectiveBranchId);
-    const enrichedPromotions = promotions.map(p => {
-      const rewards = (p.rewards || []).map(r => {
-        let pres = {};
-        if (r.presentation_payload) {
-          try {
-            pres = typeof r.presentation_payload === 'string'
-              ? JSON.parse(r.presentation_payload)
-              : r.presentation_payload;
-          } catch (_) {}
-        }
-        let delivery = null;
-        if (pres.media_id) {
-          delivery = bannerMediaDelivery(req.brand_id, pres.media_id);
-        }
-        return {
-          ...r,
-          presentation: pres,
-          presentation_delivery: delivery
-        };
-      });
-      return {
-        ...p,
-        rewards
-      };
-    });
-    res.json({
-      success: true,
-      promotions: enrichedPromotions,
-      total: enrichedPromotions.length
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-
 // 6.00 STOREFRONT BANNERS — Content + Placement/Assignment APIs
 // Content is Brand-scoped. Assignment is Branch-scoped. Promotion remains separate.
 // ============================================================================
@@ -918,7 +876,9 @@ registerAdminMarketingPromotionRoutes(router, {
   db,
   crypto,
   requireAuth,
-  corePromotionRepo
+  corePromotionRepo,
+  mediaService,
+  bannerMediaDelivery
 });
 
 // Dine-in routes are isolated in server/routes/dine-in.js.
