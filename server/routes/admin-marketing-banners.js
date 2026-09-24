@@ -2,7 +2,7 @@
  * XENTRA CORE — ADMIN MARKETING BANNER ROUTES
  *
  * Banner content lifecycle and branch placement/assignment APIs. Shared media
- * delivery and legacy banner parsing remain injected from the canonical API layer.
+ * delivery and legacy banner parsing use the centralized banner helper boundary.
  */
 module.exports = function registerAdminMarketingBannerRoutes(router, deps) {
   const {
@@ -10,9 +10,10 @@ module.exports = function registerAdminMarketingBannerRoutes(router, deps) {
     requireAuth,
     bannerContentService,
     bannerAssignmentService,
-    bannerMediaDelivery,
-    parseLegacyBrandBanners
+    mediaService
   } = deps;
+
+  const { bannerMediaDelivery, parseLegacyBrandBanners } = require('./banner-helpers').createBannerHelpers(mediaService);
 
 function bannerActor(req) {
   return {
