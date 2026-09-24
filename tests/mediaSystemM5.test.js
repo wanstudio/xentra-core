@@ -49,6 +49,34 @@ const app = require('../server/app');
 const { createPngBuffer, createJpegBuffer } = require('./helpers/testImageHelper');
 
 // ── Synthetic real image (sharp-generated — passes binary validation) ──────
+test('M1-M4 media lifecycle routes are isolated from api.js', () => {
+  const apiSource = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const mediaSource = fs.readFileSync(require.resolve('../server/routes/media-upload'), 'utf8');
+
+  const routes = [
+    "router.post('/admin/media/upload'",
+    "router.post('/admin/media/:id/ready'",
+    "router.post('/admin/media/:id/crop'",
+    "router.post('/admin/media/:id/process'",
+    "router.post('/admin/media/:id/transition'",
+    "router.post('/admin/media/:id/retry'",
+    "router.post('/admin/media/:id/attach'",
+    "router.post('/admin/media/replace'",
+    "router.get('/admin/media/consistency'",
+    "router.get('/admin/media'",
+    "router.get('/admin/media/:id'",
+    "router.post('/admin/media/reconcile'",
+    "router.post('/admin/media/gc'"
+  ];
+
+  for (const route of routes) {
+    assert.equal(apiSource.includes(route), false, route + ' must not remain inline in api.js');
+    assert.equal(mediaSource.includes(route), true, route + ' must live in media-upload.js');
+  }
+
+  assert.equal((apiSource.match(/registerMediaUploadRoutes\\(router,/g) || []).length, 1);
+});
+
 test('M5 media routes are isolated from api.js', () => {
   const apiPath = require.resolve('../server/routes/api');
   const mediaRoutePath = require.resolve('../server/routes/media-entities');
