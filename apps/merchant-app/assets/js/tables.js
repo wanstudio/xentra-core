@@ -288,15 +288,5 @@
   }
   window.completeBMTableSession = completeBMTableSession;
 
-  function getBMTargetBranchId() {
-    var user = getStoredUser();
-    var fromUser = user ? (user.branch_id || user.branchId || (user.branch && user.branch.id)) : null;
-    var fromActive = (typeof getActiveBranchId === 'function' ? getActiveBranchId() : null);
-    var fromManaging = XentraBranchCatalog.state.branchId || null;
-    var fromEffective = (typeof getEffectiveBranchId === 'function' ? getEffectiveBranchId() : null);
-    var branchId = fromUser || fromManaging || fromActive || fromEffective || null;
-    if (branchId) XentraBranchCatalog.state.branchId = branchId;
-    return branchId;
-  }
 
 })();
