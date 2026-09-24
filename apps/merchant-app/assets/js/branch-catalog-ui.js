@@ -29,10 +29,7 @@
   window.toggleBranchProductAvailability = async function (productId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
-        method: 'PATCH',
-                body: JSON.stringify({ is_available: nextAvail })
-      });
+      var res = await CatalogClient.setBranchProductAvailability(currentManagingBranchId, productId, nextAvail);
       var data = await res.json();
       if (data.success) {
         showToast('Ketersediaan menu cabang diperbarui.');
@@ -50,9 +47,7 @@
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.')) return;
 
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
-        method: 'DELETE',
-              });
+      var res = await CatalogClient.removeBranchProduct(currentManagingBranchId, productId);
       var data = await res.json();
       if (data.success) {
         showToast('✅ Produk dihapus dari katalog cabang.');
@@ -272,10 +267,7 @@
           branchImgPayload.crop_spec = _bpCropSpec;
         }
 
-        var imgRes = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/image', {
-          method: 'POST',
-                    body: JSON.stringify(branchImgPayload)
-        });
+        var imgRes = await CatalogClient.uploadBranchProductImage(currentManagingBranchId, _overrideProductId, branchImgPayload);
         var imgData = {};
         try {
           imgData = await imgRes.json();
@@ -289,10 +281,7 @@
       }
 
       // 2. Text + price + category overrides
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
-        method: 'PATCH',
-                body: JSON.stringify(payload)
-      });
+      var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, payload);
       var data = await res.json();
       if (data.success) {
         showToast('✅ Perubahan menu cabang berhasil disimpan!');
@@ -317,9 +306,7 @@
   window.clearBranchProductOverride = async function () {
     if (!currentManagingBranchId || !_overrideProductId) return;
     if (!confirm('Kembalikan semua nilai ke Master? Nama, deskripsi, foto, harga, dan kategori dikembalikan ke pengaturan asal produk Master.')) return;
-    var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
-      method: 'PATCH',       body: JSON.stringify({ name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] })
-    });
+    var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, { name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] });
     var data = await res.json();
     if (data.success) {
       showToast('✅ Semua nilai dikembalikan ke Master.');
@@ -341,10 +328,7 @@
     if (!name || !name.trim()) return;
 
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/categories', {
-        method: 'POST',
-                body: JSON.stringify({ name: name.trim() })
-      });
+      var res = await CatalogClient.createBranchCategory(currentManagingBranchId, { name: name.trim() });
       var data = await res.json();
       if (data.success) {
         showToast('✅ Kategori cabang berhasil dibuat!');
@@ -431,14 +415,11 @@
       var priceVal = Number($('adopt-price').value);
 
       try {
-        var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/adopt', {
-          method: 'POST',
-                    body: JSON.stringify({
+        var res = await CatalogClient.adoptProduct(currentManagingBranchId, {
             product_id: prodId,
             branch_category_id: catId || undefined,
             price: priceVal
-          })
-        });
+          });
         var data = await res.json();
         if (data.success) {
           showToast('✅ Menu berhasil diadopsi ke cabang!');
@@ -499,8 +480,7 @@
     if (catsEl) catsEl.innerHTML = '<span class="text-muted" style="font-size:13px;">Memuat kategori...</span>';
 
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/catalog', {
-              });
+      var res = await CatalogClient.getBranchCatalog(currentManagingBranchId);
       var data = await res.json();
       if (!data.success) {
         showToast('\u274C ' + (data.error || 'Gagal memuat katalog cabang.'));
@@ -719,10 +699,7 @@
     currentManagingBranchId = branchId;
 
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + branchId + '/categories/reorder', {
-        method: 'PUT',
-                body: JSON.stringify({ order: orderedIds })
-      });
+      var res = await CatalogClient.reorderBranchCategories(branchId, orderedIds);
       var data = await res.json();
       if (data.success) {
         showToast('✅ Urutan kategori disimpan — tampilan pelanggan diperbarui.');
@@ -916,10 +893,7 @@
 
           if (!catId) {
             // CREATE new branch category
-            var createRes = await CatalogClient.request( '/admin/branches/' + activeBranchId + '/categories', {
-              method: 'POST',
-                            body: JSON.stringify({ name: newName })
-            });
+            var createRes = await CatalogClient.createBranchCategory(activeBranchId, { name: newName });
             var createData = await createRes.json();
             if (!createRes.ok || !createData.success) {
               showToast('❌ ' + (createData.error || createData.message || 'Gagal membuat kategori cabang.'));
@@ -928,10 +902,7 @@
             targetCatId = createData.category && createData.category.id;
           } else {
             // 1. Rename existing
-            var renameRes = await CatalogClient.request( '/admin/branches/' + activeBranchId + '/categories/' + catId, {
-              method: 'PATCH',
-                            body: JSON.stringify({ name: newName })
-            });
+            var renameRes = await CatalogClient.updateBranchCategory(activeBranchId, catId, { name: newName });
             var renameData = {};
             try {
               renameData = await renameRes.json();
@@ -959,10 +930,7 @@
               catImgPayload.crop_spec = _bceCropSpec;
             }
 
-            var imageRes = await CatalogClient.request( '/admin/branches/' + activeBranchId + '/categories/' + targetCatId + '/image', {
-              method: 'POST',
-                            body: JSON.stringify(catImgPayload)
-            });
+            var imageRes = await CatalogClient.uploadBranchCategoryImage(activeBranchId, targetCatId, catImgPayload);
             var imageData = {};
             try {
               imageData = await imageRes.json();
@@ -1140,10 +1108,7 @@
   window.toggleBranchProductAvailability = async function (productId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
-        method: 'PATCH',
-                body: JSON.stringify({ is_available: nextAvail })
-      });
+      var res = await CatalogClient.setBranchProductAvailability(currentManagingBranchId, productId, nextAvail);
       var data = await res.json();
       if (data.success) {
         showToast('Ketersediaan menu cabang diperbarui.');
@@ -1163,9 +1128,7 @@
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
 
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
-        method: 'DELETE',
-              });
+      var res = await CatalogClient.removeBranchProduct(currentManagingBranchId, productId);
       var data = await res.json();
       if (data.success) {
         showToast('\u2705 Produk dihapus dari katalog cabang.');
