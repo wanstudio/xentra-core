@@ -126,6 +126,22 @@ class WorkforceService {
     `).get(brandId, userId, brandId);
 
     if (!user) throw { status: 404, code: 'USER_NOT_FOUND', message: 'User not found.' };
+
+    // Self-heal legacy rows created after the schema migration. Existing users
+    // created by older code may have only users.brand_id/role; materialize that
+    // relationship into workforce_memberships on first access.
+    if (!user.membership_id && user.brand_id && user.organization_id && user.role && user.role !== 'platform_owner') {
+      this.memberships.ensureMembership({
+        userId: user.id,
+        organizationId: user.organization_id,
+        brandId: user.brand_id,
+        branchId: user.branch_id || null,
+        role: user.role,
+        status: user.status || 'active'
+      });
+      return this.getUser(userId, brandId);
+    }
+
     if (user.membership_status && user.membership_status !== 'active') {
       throw { status: 403, code: 'ACCOUNT_DISABLED', message: 'Workforce membership is not active.' };
     }
