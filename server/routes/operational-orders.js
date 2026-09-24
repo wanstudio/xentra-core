@@ -236,7 +236,7 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
         // 1. If dine-in, validate table and activate dining session atomically
         // Invariant: An order CANNOT be confirmed if its Dining Session fails to activate.
         if (fullOrder.order_type === 'dine_in') {
-          const { DiningTableService } = require('../../domains/pos');
+          const { DiningTableService } = require('../../domains/dining');
           const { DiningTableRepository } = require('../../core/data/repositories');
           const diningRepo = new DiningTableRepository();
 
@@ -308,7 +308,7 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
         }, { dbTransactionProvided: true });
 
         if (fullOrder.order_type === 'dine_in') {
-          const { DiningTableService } = require('../../domains/pos');
+          const { DiningTableService } = require('../../domains/dining');
           DiningTableService.releaseHold({
             branch_id: fullOrder.branch_id,
             hold_reference_id: fullOrder.id,
