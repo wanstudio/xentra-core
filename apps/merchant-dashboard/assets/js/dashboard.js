@@ -2159,6 +2159,144 @@
     }
   }
 
+  var _productOptionsDraft = [];
+
+  function normalizeProductOptionsDraft(raw) {
+    var cfg = raw;
+    if (typeof raw === 'string') {
+      try { cfg = JSON.parse(raw); } catch (_) { cfg = null; }
+    }
+    var groups = cfg && Array.isArray(cfg.groups) ? cfg.groups : [];
+    return groups.map(function (g, gi) {
+      var type = g && g.type === 'addon' ? 'addon' : 'variant';
+      var required = type === 'variant' ? g.required !== false : !!g.required;
+      return {
+        id: String((g && g.id) || ('group_' + (gi + 1))),
+        name: String((g && g.name) || ''),
+        type: type,
+        required: required,
+        min: Number.isInteger(Number(g && g.min)) ? Number(g.min) : 0,
+        max: g && g.max != null && Number.isInteger(Number(g.max)) ? Number(g.max) : null,
+        options: (Array.isArray(g && g.options) ? g.options : []).map(function (o, oi) {
+          return {
+            id: String((o && o.id) || ('option_' + (gi + 1) + '_' + (oi + 1))),
+            name: String((o && o.name) || ''),
+            price_adjustment: Number.isFinite(Number(o && o.price_adjustment)) ? Number(o.price_adjustment) : 0
+          };
+        })
+      };
+    });
+  }
+
+  function renderProductOptionsEditor() {
+    var box = $('prod-options-editor');
+    if (!box) return;
+    if (!_productOptionsDraft.length) {
+      box.innerHTML = '<div class="text-muted" style="padding:10px;border:1px dashed #cbd5e1;border-radius:8px;font-size:12px;">Belum ada opsi penjualan.</div>';
+      return;
+    }
+
+    box.innerHTML = _productOptionsDraft.map(function (g, gi) {
+      var groupHeader = '<div style="display:grid;grid-template-columns:minmax(0,1fr) 115px auto;gap:6px;align-items:center;">' +
+        '<input class="x-input" data-opt-group-name="' + gi + '" value="' + esc(g.name) + '" placeholder="Nama group, contoh: Ukuran">' +
+        '<select class="x-input" data-opt-group-type="' + gi + '">' +
+          '<option value="variant" ' + (g.type === 'variant' ? 'selected' : '') + '>Variant</option>' +
+          '<option value="addon" ' + (g.type === 'addon' ? 'selected' : '') + '>Add-on</option>' +
+        '</select>' +
+        '<button type="button" class="x-btn-secondary" data-opt-remove-group="' + gi + '" style="color:#ef4444;">Hapus</button>' +
+      '</div>';
+
+      var groupRules = g.type === 'addon'
+        ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:7px;">' +
+            '<label style="font-size:10px;color:#64748b;">Min <input type="number" min="0" class="x-input" data-opt-group-min="' + gi + '" value="' + Number(g.min || 0) + '"></label>' +
+            '<label style="font-size:10px;color:#64748b;">Max <input type="number" min="0" class="x-input" data-opt-group-max="' + gi + '" value="' + (g.max == null ? '' : Number(g.max)) + '" placeholder="tanpa batas"></label>' +
+          '</div>'
+        : '<label style="display:flex;align-items:center;gap:7px;font-size:11px;margin-top:7px;"><input type="checkbox" data-opt-group-required="' + gi + '" ' + (g.required ? 'checked' : '') + '> Wajib dipilih</label>';
+
+      var optionsHtml=(g.options||[]).map(function(o,oi){
+        return '<div style="display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:6px;align-items:center;margin-top:6px;">' +
+          '<input class="x-input" data-opt-name="' + gi + ':' + oi + '" value="' + esc(o.name) + '" placeholder="Nama pilihan">' +
+          '<input type="number" class="x-input" data-opt-price="' + gi + ':' + oi + '" value="' + Number(o.price_adjustment || 0) + '" placeholder="Adjustment">' +
+          '<button type="button" class="x-btn-secondary" data-opt-remove="' + gi + ':' + oi + '" style="color:#ef4444;">✕</button>' +
+        '</div>';
+      }).join('');
+
+      return '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#f8fafc;">' +
+        '<div style="font-size:11px;font-weight:800;color:#334155;margin-bottom:7px;">Group ' + (gi + 1) + '</div>' +
+        groupHeader +
+        groupRules +
+        '<div style="margin-top:9px;"><div style="font-size:10px;font-weight:700;color:#64748b;">Pilihan</div>' + (optionsHtml || '<div class="text-muted" style="font-size:11px;padding:6px 0;">Belum ada pilihan.</div>') + '</div>' +
+        '<button type="button" class="x-btn-secondary" data-opt-add="' + gi + '" style="margin-top:8px;font-size:11px;">+ Tambah Pilihan</button>' +
+      '</div>';
+    }).join('');
+
+    box.querySelectorAll('[data-opt-group-name]').forEach(function(el){ el.oninput=function(){ _productOptionsDraft[Number(el.dataset.optGroupName)].name=el.value; }; });
+    box.querySelectorAll('[data-opt-group-type]').forEach(function(el){ el.onchange=function(){ var g=_productOptionsDraft[Number(el.dataset.optGroupType)]; g.type=el.value; if(g.type==='variant'){g.max=1;g.min=0;if(g.required==null)g.required=true;} renderProductOptionsEditor(); }; });
+    box.querySelectorAll('[data-opt-group-required]').forEach(function(el){ el.onchange=function(){ _productOptionsDraft[Number(el.dataset.optGroupRequired)].required=el.checked; }; });
+    box.querySelectorAll('[data-opt-group-min]').forEach(function(el){ el.oninput=function(){ _productOptionsDraft[Number(el.dataset.optGroupMin)].min=Math.max(0,Number(el.value||0)); }; });
+    box.querySelectorAll('[data-opt-group-max]').forEach(function(el){ el.oninput=function(){ var v=el.value.trim(); _productOptionsDraft[Number(el.dataset.optGroupMax)].max=v===''?null:Math.max(0,Number(v)); }; });
+    box.querySelectorAll('[data-opt-name]').forEach(function(el){ el.oninput=function(){ var parts=el.dataset.optName.split(':'); _productOptionsDraft[Number(parts[0])].options[Number(parts[1])].name=el.value; }; });
+    box.querySelectorAll('[data-opt-price]').forEach(function(el){ el.oninput=function(){ var parts=el.dataset.optPrice.split(':'); _productOptionsDraft[Number(parts[0])].options[Number(parts[1])].price_adjustment=Number(el.value||0); }; });
+    box.querySelectorAll('[data-opt-remove-group]').forEach(function(el){ el.onclick=function(){ _productOptionsDraft.splice(Number(el.dataset.optRemoveGroup),1); renderProductOptionsEditor(); }; });
+    box.querySelectorAll('[data-opt-remove]').forEach(function(el){ el.onclick=function(){ var parts=el.dataset.optRemove.split(':'); _productOptionsDraft[Number(parts[0])].options.splice(Number(parts[1]),1); renderProductOptionsEditor(); }; });
+    box.querySelectorAll('[data-opt-add]').forEach(function(el){ el.onclick=function(){ var gi=Number(el.dataset.optAdd); _productOptionsDraft[gi].options.push({id:'option_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name:'',price_adjustment:0}); renderProductOptionsEditor(); }; });
+  }
+
+  function newProductOptionGroup() {
+    _productOptionsDraft.push({
+      id: 'group_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+      name: '',
+      type: 'variant',
+      required: true,
+      min: 0,
+      max: 1,
+      options: [{ id: 'option_' + Date.now(), name: '', price_adjustment: 0 }]
+    });
+    renderProductOptionsEditor();
+  }
+
+  function productOptionsPayload() {
+    return {
+      version: 1,
+      groups: _productOptionsDraft.map(function(g){
+        return {
+          id: g.id,
+          name: String(g.name || '').trim(),
+          type: g.type,
+          required: !!g.required,
+          min: g.type === 'addon' ? Math.max(0, Number(g.min || 0)) : 0,
+          max: g.type === 'addon' ? (g.max == null ? null : Math.max(0, Number(g.max))) : 1,
+          options: (g.options || []).map(function(o){
+            return { id:o.id, name:String(o.name||'').trim(), price_adjustment:Number(o.price_adjustment||0) };
+          })
+        };
+      })
+    };
+  }
+
+  async function loadProductOptionsEditor(id) {
+    try {
+      var res=await adminFetch(API_BASE+'/admin/products/'+encodeURIComponent(id)+'/options',{headers:getAuthHeaders()});
+      var data=await res.json();
+      if(!data.success) throw new Error(data.error||'Gagal memuat opsi produk.');
+      _productOptionsDraft=normalizeProductOptionsDraft(data.options_config);
+      renderProductOptionsEditor();
+    } catch(e) {
+      showToast('❌ Opsi produk belum dapat dimuat.');
+    }
+  }
+
+  async function saveProductOptions(id) {
+    var res=await adminFetch(API_BASE+'/admin/products/'+encodeURIComponent(id)+'/options',{
+      method:'PUT',
+      headers:getAuthHeaders(),
+      body:JSON.stringify({options_config:productOptionsPayload()})
+    });
+    var data=await res.json();
+    if(!data.success) throw new Error(data.error||'Gagal menyimpan opsi produk.');
+    return data.options_config;
+  }
+
   // Product Actions
   window.openAddProduct = function () {
     $('modal-product-title').textContent = 'Tambah Produk Master Baru';
@@ -2175,6 +2313,8 @@
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
     setProductImagePreview('', false);
+    _productOptionsDraft = [];
+    renderProductOptionsEditor();
     populateProductCategorySelect();
     $('modal-product').style.display = 'flex';
   };
@@ -2200,7 +2340,10 @@
     if (fileInput) fileInput.value = '';
     var existingImage = prod.image || prod.image_url || '';
     setProductImagePreview(existingImage, existingImage !== '');
+    _productOptionsDraft = normalizeProductOptionsDraft(prod.options_config);
+    renderProductOptionsEditor();
     $('modal-product').style.display = 'flex';
+    loadProductOptionsEditor(prod.id);
   };
 
   window.closeProductModal = function () {
@@ -2257,6 +2400,9 @@
   };
 
   function initCatalogListeners() {
+    var btnOptionsAddGroup = $('btn-prod-options-add-group');
+    if (btnOptionsAddGroup) btnOptionsAddGroup.addEventListener('click', newProductOptionGroup);
+
     var prodPricingMode = $('prod-pricing-mode');
     if (prodPricingMode) {
       prodPricingMode.addEventListener('change', toggleRangeFields);
@@ -2461,6 +2607,16 @@
           }
 
           var savedId = (data.product && data.product.id) || id;
+          if (!savedId) {
+            showToast('❌ Produk tersimpan tetapi ID produk tidak kembali dari server.');
+            return;
+          }
+          try {
+            await saveProductOptions(savedId);
+          } catch (optionErr) {
+            showToast('❌ ' + optionErr.message);
+            return;
+          }
           if (_productImageFile && savedId) {
             var base64 = await new Promise(function (resolve, reject) {
               var imgReader = new FileReader();
