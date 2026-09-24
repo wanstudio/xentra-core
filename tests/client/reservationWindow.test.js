@@ -15,7 +15,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '../..');
 const checkoutSrc = fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/pages/checkout.js'), 'utf8');
-const placementSrc = fs.readFileSync(path.join(ROOT, 'domains/commerce/services/OrderPlacementService.js'), 'utf8');
+const diningSrc = fs.readFileSync(path.join(ROOT, 'domains/dining/services/DiningTableService.js'), 'utf8');
 // Fulfillment environment: sumber kebenaran field fulfillment per tipe.
 const envSrc = fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/core/fulfillment-environments.js'), 'utf8');
 
@@ -63,7 +63,7 @@ test('RSV-03: server/dashboard receives an ISO date, never the Besok label', () 
 });
 
 test('RSV-04: server rejects same-day-or-earlier reservation dates', () => {
-  assert.ok(placementSrc.includes('SAME_DAY_RESERVATION_REJECTED'), 'server must reject same-day reservations');
+  assert.ok(diningSrc.includes('SAME_DAY_RESERVATION_REJECTED'), 'Dining domain must reject same-day reservations server-side');
 });
 
 test('RSV-05: card Ringkasan Pembayaran di-hide pada checkout jika tipe Reservasi terpilih', () => {
