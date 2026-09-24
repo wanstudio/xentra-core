@@ -14,13 +14,11 @@
   'use strict';
 
   var S = window.XentraShared;
-  var API_BASE = S.API_BASE;
+  var CatalogClient = window.XentraCatalogClient;
   var $ = S.$;
   var esc = S.esc;
   var formatMoney = S.formatMoney;
   var showToast = S.showToast;
-  var adminFetch = S.adminFetch;
-  var getAuthHeaders = S.getAuthHeaders;
   var getStoredUser = S.getStoredUser;
   var isBranchManager = S.isBranchManager;
 
@@ -65,9 +63,8 @@
     if (availableContainer) availableContainer.innerHTML = '<p class="text-muted" style="font-size:13px;">Memuat produk rekomendasi Owner...</p>';
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/catalog', {
-        headers: getAuthHeaders()
-      });
+      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/catalog', {
+              });
       var data = await res.json();
       if (!data.success) {
         showToast('❌ ' + (data.error || 'Gagal memuat katalog cabang.'));
@@ -194,10 +191,9 @@
   window.toggleBranchProductAvailability = async function (productId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
+      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ is_available: nextAvail })
+                body: JSON.stringify({ is_available: nextAvail })
       });
       var data = await res.json();
       if (data.success) {
@@ -216,10 +212,9 @@
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.')) return;
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
+      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
         method: 'DELETE',
-        headers: getAuthHeaders()
-      });
+              });
       var data = await res.json();
       if (data.success) {
         showToast('✅ Produk dihapus dari katalog cabang.');
@@ -439,10 +434,9 @@
           branchImgPayload.crop_spec = _bpCropSpec;
         }
 
-        var imgRes = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/image', {
+        var imgRes = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/image', {
           method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify(branchImgPayload)
+                    body: JSON.stringify(branchImgPayload)
         });
         var imgData = {};
         try {
@@ -457,10 +451,9 @@
       }
 
       // 2. Text + price + category overrides
-      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
+      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
         method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload)
+                body: JSON.stringify(payload)
       });
       var data = await res.json();
       if (data.success) {
@@ -486,9 +479,8 @@
   window.clearBranchProductOverride = async function () {
     if (!currentManagingBranchId || !_overrideProductId) return;
     if (!confirm('Kembalikan semua nilai ke Master? Nama, deskripsi, foto, harga, dan kategori dikembalikan ke pengaturan asal produk Master.')) return;
-    var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
-      method: 'PATCH', headers: getAuthHeaders(),
-      body: JSON.stringify({ name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] })
+    var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
+      method: 'PATCH',       body: JSON.stringify({ name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] })
     });
     var data = await res.json();
     if (data.success) {
@@ -511,10 +503,9 @@
     if (!name || !name.trim()) return;
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/categories', {
+      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/categories', {
         method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ name: name.trim() })
+                body: JSON.stringify({ name: name.trim() })
       });
       var data = await res.json();
       if (data.success) {
@@ -602,10 +593,9 @@
       var priceVal = Number($('adopt-price').value);
 
       try {
-        var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/adopt', {
+        var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/adopt', {
           method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({
+                    body: JSON.stringify({
             product_id: prodId,
             branch_category_id: catId || undefined,
             price: priceVal
@@ -671,9 +661,8 @@
     if (catsEl) catsEl.innerHTML = '<span class="text-muted" style="font-size:13px;">Memuat kategori...</span>';
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/catalog', {
-        headers: getAuthHeaders()
-      });
+      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/catalog', {
+              });
       var data = await res.json();
       if (!data.success) {
         showToast('\u274C ' + (data.error || 'Gagal memuat katalog cabang.'));
@@ -892,10 +881,9 @@
     currentManagingBranchId = branchId;
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + branchId + '/categories/reorder', {
+      var res = await CatalogClient.request( '/admin/branches/' + branchId + '/categories/reorder', {
         method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ order: orderedIds })
+                body: JSON.stringify({ order: orderedIds })
       });
       var data = await res.json();
       if (data.success) {
@@ -1090,10 +1078,9 @@
 
           if (!catId) {
             // CREATE new branch category
-            var createRes = await adminFetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories', {
+            var createRes = await CatalogClient.request( '/admin/branches/' + activeBranchId + '/categories', {
               method: 'POST',
-              headers: getAuthHeaders(),
-              body: JSON.stringify({ name: newName })
+                            body: JSON.stringify({ name: newName })
             });
             var createData = await createRes.json();
             if (!createRes.ok || !createData.success) {
@@ -1103,10 +1090,9 @@
             targetCatId = createData.category && createData.category.id;
           } else {
             // 1. Rename existing
-            var renameRes = await adminFetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + catId, {
+            var renameRes = await CatalogClient.request( '/admin/branches/' + activeBranchId + '/categories/' + catId, {
               method: 'PATCH',
-              headers: getAuthHeaders(),
-              body: JSON.stringify({ name: newName })
+                            body: JSON.stringify({ name: newName })
             });
             var renameData = {};
             try {
@@ -1135,10 +1121,9 @@
               catImgPayload.crop_spec = _bceCropSpec;
             }
 
-            var imageRes = await adminFetch(API_BASE + '/admin/branches/' + activeBranchId + '/categories/' + targetCatId + '/image', {
+            var imageRes = await CatalogClient.request( '/admin/branches/' + activeBranchId + '/categories/' + targetCatId + '/image', {
               method: 'POST',
-              headers: getAuthHeaders(),
-              body: JSON.stringify(catImgPayload)
+                            body: JSON.stringify(catImgPayload)
             });
             var imageData = {};
             try {
@@ -1182,10 +1167,9 @@
     currentManagingBranchId = branchId;
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + branchId + '/categories/' + catId, {
+      var res = await CatalogClient.request( '/admin/branches/' + branchId + '/categories/' + catId, {
         method: 'DELETE',
-        headers: getAuthHeaders()
-      });
+              });
       var data = await res.json();
       if (data.success) {
         showToast('✅ Kategori dihapus.');
@@ -1318,10 +1302,9 @@
   window.toggleBranchProductAvailability = async function (productId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
+      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ is_available: nextAvail })
+                body: JSON.stringify({ is_available: nextAvail })
       });
       var data = await res.json();
       if (data.success) {
@@ -1342,10 +1325,9 @@
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
+      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
         method: 'DELETE',
-        headers: getAuthHeaders()
-      });
+              });
       var data = await res.json();
       if (data.success) {
         showToast('\u2705 Produk dihapus dari katalog cabang.');
