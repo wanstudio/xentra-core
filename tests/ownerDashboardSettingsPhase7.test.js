@@ -112,6 +112,27 @@ test('OWNER DASHBOARD SETTINGS — route boundary is isolated', () => {
   );
 });
 
+test('MARKETING OVERVIEW — route boundary is isolated', () => {
+  const apiSource = require('node:fs').readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const marketingSource = require('node:fs').readFileSync(require.resolve('../server/routes/admin-marketing-overview'), 'utf8');
+
+  assert.equal(
+    (apiSource.match(/router\\.get\\('\/admin\\/marketing\\/overview'/g) || []).length,
+    0,
+    'marketing overview must not remain inline in api.js'
+  );
+  assert.equal(
+    (marketingSource.match(/router\\.get\\('\/admin\\/marketing\\/overview'/g) || []).length,
+    1,
+    'marketing overview must be implemented once in its route module'
+  );
+  assert.equal(
+    (apiSource.match(/registerAdminMarketingOverviewRoutes\\(router,/g) || []).length,
+    1,
+    'api.js must register marketing overview exactly once'
+  );
+});
+
 test('PHASE 7: OWNER DASHBOARD SETTINGS & INTEGRATIONS IMPLEMENTATION', async (t) => {
   let server;
   let ownerToken;
