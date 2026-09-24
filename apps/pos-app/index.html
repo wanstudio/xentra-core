@@ -17,12 +17,13 @@
       <!-- ROW 1 (Atas): Logo Bangjo B hijau + Bangjo Kasir di kiri; Pesan, Notifikasi, User di kanan -->
       <div class="pos-topbar-row pos-topbar-row-top">
         <div class="pos-brand-block">
-          <div class="pos-bangjo-logo" aria-label="Bangjo Logo">
-            <span class="pos-bangjo-letter">B</span>
+          <div class="pos-client-logo-box" id="pos-client-logo-box">
+            <img id="pos-client-logo-img" class="pos-client-logo-img hidden" alt="Logo Brand" onerror="this.classList.add('hidden');if(document.getElementById('pos-client-logo-letter'))document.getElementById('pos-client-logo-letter').classList.remove('hidden');">
+            <span id="pos-client-logo-letter" class="pos-bangjo-letter">B</span>
           </div>
           <div class="pos-brand-meta">
-            <span class="pos-brand-name">Bangjo Kasir</span>
-            <span class="pos-branch-tag" id="pos-branch-name">Memuat cabang…</span>
+            <span class="pos-brand-name" id="pos-branch-name">Memuat Cabang…</span>
+            <span class="pos-pos-tag">Kasir POS</span>
           </div>
         </div>
 
@@ -39,7 +40,7 @@
             </svg>
             <span class="pos-tool-badge-dot"></span>
           </button>
-          <span id="pos-connection-badge" class="pos-status online" title="Status Jaringan">ONLINE</span>
+          <span id="pos-connection-badge" class="pos-status online" title="Status Jaringan Server (Online / Offline)">ONLINE</span>
           <div class="pos-user-area">
             <div class="pos-user-pill" title="Profil Kasir">
               <span class="pos-user-icon">
@@ -114,9 +115,19 @@
 
             <div class="pos-search-row">
               <div class="pos-search-wrap">
-                <span class="pos-search-icon" aria-hidden="true">🔍</span>
-                <input id="pos-menu-search" type="search" autocomplete="off" placeholder="Cari menu… (tekan / untuk cari)">
-                <button type="button" id="btn-pos-clear-search" class="pos-search-clear hidden" title="Hapus pencarian">×</button>
+                <span class="pos-search-icon" aria-hidden="true">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </span>
+                <input id="pos-menu-search" type="text" autocomplete="off" placeholder="Cari menu… (tekan / untuk cari)">
+                <button type="button" id="btn-pos-clear-search" class="pos-search-clear hidden" title="Hapus pencarian">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
               </div>
             </div>
             <div id="pos-category-tabs" class="pos-category-tabs"></div>

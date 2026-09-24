@@ -205,12 +205,43 @@
     } finally { if (timer) clearTimeout(timer); }
   }
 
+  function applyBrandInfo(brandData) {
+    if(!brandData) return;
+    state.brand=brandData;
+    var logoImg=$('pos-client-logo-img'), letter=$('pos-client-logo-letter');
+    if(brandData.logo_url && logoImg){
+      logoImg.src=brandData.logo_url;
+      logoImg.classList.remove('hidden');
+      if(letter) letter.classList.add('hidden');
+    }else{
+      if(logoImg) logoImg.classList.add('hidden');
+      if(letter){
+        letter.classList.remove('hidden');
+        letter.textContent=(brandData.name||'B').charAt(0).toUpperCase();
+      }
+    }
+  }
+
+  async function loadBrandInfo() {
+    try{
+      var cached=JSON.parse(localStorage.getItem('xentra_pos_brand_info')||'null');
+      if(cached) applyBrandInfo(cached);
+      var d=await request('/brand/info');
+      if(d && d.brand){
+        applyBrandInfo(d.brand);
+        try{ localStorage.setItem('xentra_pos_brand_info',JSON.stringify(d.brand)); }catch(_){}
+      }
+    }catch(_){}
+  }
+
   function applyCashierUser(userData) {
     state.user=userData;
     state.branchId=userData.branch_id || userData.branchId || null;
     if(state.branchId) localStorage.setItem('xentra_pos_branch_id',String(state.branchId));
-    if ($('pos-branch-name')) $('pos-branch-name').textContent=userData.branch_name || state.branchId || 'Cabang';
+    var cleanBranchName=userData.branch_name || (state.brand && state.brand.name) || 'Kasir';
+    if ($('pos-branch-name')) $('pos-branch-name').textContent=cleanBranchName;
     if ($('pos-cashier-name')) $('pos-cashier-name').textContent=userData.full_name || userData.username || 'Kasir';
+    loadBrandInfo();
   }
 
   function showPosAuthGate(offlineReason) {
@@ -587,19 +618,26 @@
           mediaHtml='<div class="pos-product-media"><span class="pos-product-avatar" style="background:'+color.bg+';color:'+color.text+';border-color:'+color.border+'">'+esc(initials)+'</span></div>';
         }
 
-        var badgeText=unavailable?'Habis':(hasOpts?'✦ Opsi':'Siap');
-        var badgeClass=unavailable?'pos-badge-out':(hasOpts?'pos-badge-opts':'pos-badge-ready');
+        var badgeHtml = '';
+        if (unavailable) {
+          badgeHtml = '<span class="pos-product-status pos-badge-out">Habis</span>';
+        } else if (hasOpts) {
+          badgeHtml = '<span class="pos-product-status pos-badge-opts">✦ Opsi</span>';
+        }
 
-        return '<button type="button" class="pos-product '+(unavailable?'disabled':'')+(cartQty>0?' in-cart':'')+'" data-product-id="'+esc(p.id)+'" style="--cat-accent:'+color.border+'">'+
+        return '<button type="button" class="pos-product '+(unavailable?'disabled':'')+(cartQty>0?' in-cart':'')+'" data-product-id="'+esc(p.id)+'">'+
           (cartQty>0?'<span class="pos-product-cart-badge">'+cartQty+'</span>':'')+
           mediaHtml+
           '<div class="pos-product-body">'+
-            '<div class="pos-product-top">'+
-              (cat?'<span class="pos-product-cat-tag" style="background:'+color.bg+';color:'+color.text+'">'+esc(cat.name||cat.title)+'</span>':'<span class="pos-product-cat-tag" style="background:#f3f4f6;color:#4b5563">Menu</span>')+
-              '<span class="pos-product-status '+badgeClass+'">'+badgeText+'</span>'+
+            '<div class="pos-product-meta-row">'+
+              (cat?'<span class="pos-product-cat-tag" style="background:'+color.bg+';color:'+color.text+'">'+esc(cat.name||cat.title)+'</span>':'<span class="pos-product-cat-tag" style="background:#f1f5f9;color:#475569">Menu</span>')+
+              badgeHtml+
             '</div>'+
             '<div class="pos-product-name">'+esc(pName)+'</div>'+
-            '<div class="pos-product-price">'+money(p.price||p.sale_price||p.regular_price)+'</div>'+
+            '<div class="pos-product-footer">'+
+              '<div class="pos-product-price">'+money(p.price||p.sale_price||p.regular_price)+'</div>'+
+              (!unavailable ? '<span class="pos-product-add-btn" aria-hidden="true">+</span>' : '')+
+            '</div>'+
           '</div>'+
         '</button>';
       }).join('');
