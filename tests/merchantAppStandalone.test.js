@@ -186,7 +186,10 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     };
     win.XentraBranchCatalog = {
       getActiveBranchId: () => 'branch-test',
-      loadInlineBranchCatalog: () => {}
+      loadInlineBranchCatalog: () => {},
+      setHooks: () => {},
+      setBmMenuState: () => {},
+      state: {}
     };
 
     // merchant-app.js consumes the shared contract through XentraShared; use
