@@ -262,7 +262,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     const js = fs.readFileSync(JS_PATH, 'utf8');
     const reportsJs = fs.readFileSync(REPORTS_JS_PATH, 'utf8');
 
-    const count = (reportsJs.match(/(?:async\\s+)?function\\s+loadBMReports\\s*\\(/g) || []).length;
+    const count = (reportsJs.match(/async function loadBMReports\s*\(/g) || []).length;
     assert.equal(count, 1, 'loadBMReports must have exactly one implementation in reports.js');
     assert.ok(!js.includes('async function loadBMReports(') && !js.includes('function loadBMReports('),
       'loadBMReports must not be implemented in merchant-app.js');
@@ -272,7 +272,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     const js = fs.readFileSync(JS_PATH, 'utf8');
     const jamJs = fs.readFileSync(JAM_OPERASIONAL_JS_PATH, 'utf8');
 
-    const count = (jamJs.match(/(?:async\\s+)?function\\s+loadBMJamOperasional\\s*\\(/g) || []).length;
+    const count = (jamJs.match(/async function loadBMJamOperasional\s*\(/g) || []).length;
     assert.equal(count, 1, 'loadBMJamOperasional must have exactly one implementation in jam-operasional.js');
     assert.ok(!js.includes('async function loadBMJamOperasional(') && !js.includes('function loadBMJamOperasional('),
       'loadBMJamOperasional must not be implemented in merchant-app.js');
