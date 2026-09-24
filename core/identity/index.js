@@ -20,6 +20,7 @@ const ExistingTenantResolver = require('./ExistingTenantResolver');
 const OwnershipClaimService = require('./OwnershipClaimService');
 const TenantOwnershipTransferService = require('./TenantOwnershipTransferService');
 const CustomerIdentityService = require('./CustomerIdentityService');
+const GoogleAuthService = require('../../server/services/GoogleAuthService');
 const { EmailProvider, defaultEmailProvider, ResendEmailAdapter } = require('./EmailProvider');
 
 module.exports = {
@@ -36,6 +37,7 @@ module.exports = {
   EmailVerificationService,
   PlatformBootstrapService,
   AuthProviderService,
+  GoogleAuthService,
   HandoffService,
   ExistingTenantResolver,
   OwnershipClaimService,

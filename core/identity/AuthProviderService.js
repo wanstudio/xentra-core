@@ -33,15 +33,15 @@ class AuthProviderService {
           uap.metadata as provider_metadata,
           uap.linked_at,
           u.id,
-          COALESCE(wm.brand_id, u.brand_id) AS brand_id,
-          COALESCE(wm.organization_id, u.organization_id) AS organization_id,
-          COALESCE(wm.branch_id, u.branch_id) AS branch_id,
+          CASE WHEN wm.id IS NOT NULL THEN wm.brand_id ELSE u.brand_id END AS brand_id,
+          CASE WHEN wm.id IS NOT NULL THEN wm.organization_id ELSE u.organization_id END AS organization_id,
+          CASE WHEN wm.id IS NOT NULL THEN wm.branch_id ELSE u.branch_id END AS branch_id,
           u.username,
           u.email,
           u.full_name,
-          COALESCE(wm.role, u.role) AS role,
+          CASE WHEN wm.id IS NOT NULL THEN wm.role ELSE u.role END AS role,
           u.status,
-          COALESCE(wm.status, u.status, 'active') AS membership_status,
+          CASE WHEN wm.id IS NOT NULL THEN wm.status ELSE COALESCE(u.status, 'active') END AS membership_status,
           u.email_verified_at,
           u.password_hash,
           wm.id AS membership_id
@@ -53,6 +53,7 @@ class AuthProviderService {
           AND (
             wm.id IS NOT NULL
             OR u.brand_id = ?
+            OR u.brand_id IS NULL
           )
         LIMIT 1
       `).get(String(brandId), cleanProvider, cleanProviderUserId, String(brandId));

@@ -996,6 +996,21 @@ class WorkforceInvitationService {
         const managerialRoles = ['brand_manager', 'branch_manager'];
 
         if (currentRole === 'owner' && invitation.role !== 'owner') {
+          this._logSecurityEvent({
+            actor_id: userRecord.id,
+            actor_role: userRecord.role,
+            action: 'INVITATION_ACCEPT_DENIED',
+            brand_id: invitation.brand_id,
+            organization_id: invitation.organization_id,
+            branch_id: invitation.branch_id,
+            result: 'denied',
+            metadata: {
+              invitation_id: invitation.id,
+              reason: 'CANNOT_DEMOTE_OWNER',
+              current_role: currentRole,
+              invited_role: invitation.role
+            }
+          });
           throw {
             status: 409,
             code: 'WORKFORCE_ROLE_CONFLICT',
@@ -1004,6 +1019,21 @@ class WorkforceInvitationService {
         }
 
         if (managerialRoles.includes(currentRole) && !managerialRoles.includes(invitation.role)) {
+          this._logSecurityEvent({
+            actor_id: userRecord.id,
+            actor_role: userRecord.role,
+            action: 'INVITATION_ACCEPT_DENIED',
+            brand_id: invitation.brand_id,
+            organization_id: invitation.organization_id,
+            branch_id: invitation.branch_id,
+            result: 'denied',
+            metadata: {
+              invitation_id: invitation.id,
+              reason: 'CANNOT_DEMOTE_MANAGER',
+              current_role: currentRole,
+              invited_role: invitation.role
+            }
+          });
           throw {
             status: 409,
             code: 'WORKFORCE_ROLE_CONFLICT',
@@ -1017,18 +1047,27 @@ class WorkforceInvitationService {
           invitation.branch_id &&
           currentBranchId !== invitation.branch_id
         ) {
+          this._logSecurityEvent({
+            actor_id: userRecord.id,
+            actor_role: userRecord.role,
+            action: 'INVITATION_ACCEPT_DENIED',
+            brand_id: invitation.brand_id,
+            organization_id: invitation.organization_id,
+            branch_id: invitation.branch_id,
+            result: 'denied',
+            metadata: {
+              invitation_id: invitation.id,
+              reason: 'BRANCH_SCOPE_CONFLICT',
+              current_branch_id: currentBranchId,
+              target_branch_id: invitation.branch_id
+            }
+          });
           throw {
             status: 409,
             code: 'WORKFORCE_SCOPE_CONFLICT',
             message: 'Branch Manager telah bertugas pada cabang lain dalam brand ini.'
           };
         }
-
-        throw {
-          status: 409,
-          code: 'WORKFORCE_SCOPE_CONFLICT',
-          message: 'Akun pengguna sudah memiliki membership dengan role/scope yang berbeda pada bisnis ini.'
-        };
       }
     }
 
@@ -1063,6 +1102,26 @@ class WorkforceInvitationService {
         role: invitation.role,
         status: 'active'
       });
+
+      // Maintain backward compatibility on legacy users table for same-brand or identity-only users
+      if (!userRecord.brand_id || userRecord.brand_id === invitation.brand_id) {
+        this.db.prepare(`
+          UPDATE users
+          SET role = ?,
+              brand_id = ?,
+              organization_id = ?,
+              branch_id = ?,
+              updated_at = ?
+          WHERE id = ?
+        `).run(
+          invitation.role,
+          invitation.brand_id,
+          invitation.organization_id,
+          invitation.branch_id || null,
+          now,
+          userRecord.id
+        );
+      }
 
       this.db.exec('COMMIT;');
     } catch (err) {
@@ -1253,7 +1312,7 @@ class WorkforceInvitationService {
       'SELECT id, role, brand_id, organization_id, branch_id, status, email FROM users WHERE LOWER(email) = ?'
     ).get(inviteEmail);
 
-    if (existingProvider && existingUser && existingProvider.user_id !== existingUser.id) {
+    if (existingProvider && (!existingUser || existingProvider.user_id !== existingUser.id)) {
       this._logSecurityEvent({
         actor_id: existingProvider.user_id,
         actor_role: null,
@@ -1326,6 +1385,21 @@ class WorkforceInvitationService {
           const managerialRoles = ['brand_manager', 'branch_manager'];
 
           if (currentRole === 'owner' && invitation.role !== 'owner') {
+            this._logSecurityEvent({
+              actor_id: existingUser.id,
+              actor_role: existingUser.role,
+              action: 'INVITATION_ACCEPT_DENIED',
+              brand_id: invitation.brand_id,
+              organization_id: invitation.organization_id,
+              branch_id: invitation.branch_id,
+              result: 'denied',
+              metadata: {
+                invitation_id: invitation.id,
+                reason: 'CANNOT_DEMOTE_OWNER',
+                current_role: currentRole,
+                invited_role: invitation.role
+              }
+            });
             throw {
               status: 409,
               code: 'WORKFORCE_ROLE_CONFLICT',
@@ -1334,6 +1408,21 @@ class WorkforceInvitationService {
           }
 
           if (managerialRoles.includes(currentRole) && !managerialRoles.includes(invitation.role)) {
+            this._logSecurityEvent({
+              actor_id: existingUser.id,
+              actor_role: existingUser.role,
+              action: 'INVITATION_ACCEPT_DENIED',
+              brand_id: invitation.brand_id,
+              organization_id: invitation.organization_id,
+              branch_id: invitation.branch_id,
+              result: 'denied',
+              metadata: {
+                invitation_id: invitation.id,
+                reason: 'CANNOT_DEMOTE_MANAGER',
+                current_role: currentRole,
+                invited_role: invitation.role
+              }
+            });
             throw {
               status: 409,
               code: 'WORKFORCE_ROLE_CONFLICT',
@@ -1347,18 +1436,27 @@ class WorkforceInvitationService {
             invitation.branch_id &&
             currentBranchId !== invitation.branch_id
           ) {
+            this._logSecurityEvent({
+              actor_id: existingUser.id,
+              actor_role: existingUser.role,
+              action: 'INVITATION_ACCEPT_DENIED',
+              brand_id: invitation.brand_id,
+              organization_id: invitation.organization_id,
+              branch_id: invitation.branch_id,
+              result: 'denied',
+              metadata: {
+                invitation_id: invitation.id,
+                reason: 'BRANCH_SCOPE_CONFLICT',
+                current_branch_id: currentBranchId,
+                target_branch_id: invitation.branch_id
+              }
+            });
             throw {
               status: 409,
               code: 'WORKFORCE_SCOPE_CONFLICT',
               message: 'Branch Manager telah bertugas pada cabang lain dalam brand ini.'
             };
           }
-
-          throw {
-            status: 409,
-            code: 'WORKFORCE_SCOPE_CONFLICT',
-            message: 'Akun pengguna sudah memiliki membership dengan role/scope yang berbeda pada bisnis ini.'
-          };
         }
       }
       // No membership in target brand: this is the intended cross-business
@@ -1436,6 +1534,25 @@ class WorkforceInvitationService {
         role: invitation.role,
         status: 'active'
       });
+
+      if (!isNewUser && (!existingUser.brand_id || existingUser.brand_id === invitation.brand_id)) {
+        this.db.prepare(`
+          UPDATE users
+          SET role = ?,
+              brand_id = ?,
+              organization_id = ?,
+              branch_id = ?,
+              updated_at = ?
+          WHERE id = ?
+        `).run(
+          invitation.role,
+          invitation.brand_id,
+          invitation.organization_id,
+          invitation.branch_id || null,
+          now,
+          targetUserId
+        );
+      }
 
       if (!existingProvider) {
         const providerLinkId = 'uap_' + crypto.randomBytes(16).toString('hex');

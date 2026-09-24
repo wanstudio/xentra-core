@@ -105,13 +105,13 @@ class WorkforceService {
     const user = this.repository.prepare(`
       SELECT
         u.id,
-        COALESCE(wm.brand_id, u.brand_id) AS brand_id,
-        COALESCE(wm.organization_id, u.organization_id) AS organization_id,
-        COALESCE(wm.branch_id, u.branch_id) AS branch_id,
+        CASE WHEN wm.id IS NOT NULL THEN wm.brand_id ELSE u.brand_id END AS brand_id,
+        CASE WHEN wm.id IS NOT NULL THEN wm.organization_id ELSE u.organization_id END AS organization_id,
+        CASE WHEN wm.id IS NOT NULL THEN wm.branch_id ELSE u.branch_id END AS branch_id,
         u.username, u.email, u.full_name,
-        COALESCE(wm.role, u.role) AS role,
+        CASE WHEN wm.id IS NOT NULL THEN wm.role ELSE u.role END AS role,
         u.status,
-        COALESCE(wm.status, u.status, 'active') AS membership_status,
+        CASE WHEN wm.id IS NOT NULL THEN wm.status ELSE COALESCE(u.status, 'active') END AS membership_status,
         wm.id AS membership_id,
         u.created_at, u.updated_at, u.last_login_at, u.password_changed_at
       FROM users u
@@ -154,12 +154,12 @@ class WorkforceService {
     let query = `
       SELECT
         u.id,
-        COALESCE(wm.brand_id, u.brand_id) AS brand_id,
-        COALESCE(wm.organization_id, u.organization_id) AS organization_id,
-        COALESCE(wm.branch_id, u.branch_id) AS branch_id,
+        CASE WHEN wm.id IS NOT NULL THEN wm.brand_id ELSE u.brand_id END AS brand_id,
+        CASE WHEN wm.id IS NOT NULL THEN wm.organization_id ELSE u.organization_id END AS organization_id,
+        CASE WHEN wm.id IS NOT NULL THEN wm.branch_id ELSE u.branch_id END AS branch_id,
         u.username, u.email, u.full_name,
-        COALESCE(wm.role, u.role) AS role,
-        COALESCE(wm.status, u.status, 'active') AS status,
+        CASE WHEN wm.id IS NOT NULL THEN wm.role ELSE u.role END AS role,
+        CASE WHEN wm.id IS NOT NULL THEN wm.status ELSE COALESCE(u.status, 'active') END AS status,
         u.created_at, u.updated_at, u.last_login_at
       FROM users u
       LEFT JOIN workforce_memberships wm
@@ -528,11 +528,11 @@ class WorkforceService {
       SELECT
         u.*,
         wm.id AS membership_id,
-        COALESCE(wm.brand_id, u.brand_id) AS membership_brand_id,
-        COALESCE(wm.organization_id, u.organization_id) AS membership_organization_id,
-        COALESCE(wm.branch_id, u.branch_id) AS membership_branch_id,
-        COALESCE(wm.role, u.role) AS membership_role,
-        COALESCE(wm.status, u.status, 'active') AS membership_status
+        CASE WHEN wm.id IS NOT NULL THEN wm.brand_id ELSE u.brand_id END AS membership_brand_id,
+        CASE WHEN wm.id IS NOT NULL THEN wm.organization_id ELSE u.organization_id END AS membership_organization_id,
+        CASE WHEN wm.id IS NOT NULL THEN wm.branch_id ELSE u.branch_id END AS membership_branch_id,
+        CASE WHEN wm.id IS NOT NULL THEN wm.role ELSE u.role END AS membership_role,
+        CASE WHEN wm.id IS NOT NULL THEN wm.status ELSE COALESCE(u.status, 'active') END AS membership_status
       FROM users u
       LEFT JOIN workforce_memberships wm
         ON wm.user_id = u.id AND wm.brand_id = ?
@@ -540,7 +540,8 @@ class WorkforceService {
         AND (
           wm.id IS NOT NULL
           OR u.brand_id = ?
-          OR (u.brand_id IS NULL AND ? IS NULL)
+          OR u.brand_id IS NULL
+          OR ? IS NULL
         )
       LIMIT 1
     `).get(brandId, username, username, brandId, brandId);

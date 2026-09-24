@@ -60,7 +60,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
         email_verified: false
       };
   
-      const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, null);
+      const { token, expiresAt } = TokenSessionStore.createSession(sessionUser, result.brand.id);
   
       // Audit log
       const workforce = new WorkforceService();
@@ -448,7 +448,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
   
   // 10.2 Google Authentication & Account Linking Endpoints
   const GoogleAuthService = require('../services/GoogleAuthService');
-  const { AuthProviderService } = require('../../core/identity');
+  const { AuthProviderService, WorkforceInvitationService, WorkforceService } = require('../../core/identity');
   
   // In-memory store for short-lived Google account linking tokens.
   // These tokens are issued by /auth/google/link-init and consumed by /auth/google (link_token mode).

@@ -115,7 +115,7 @@ class HandoffService {
 
     // Verify user exists and resolve the user's relationship to the TARGET brand.
     const user = this.db.prepare(
-      'SELECT id, username, email, full_name, status, email_verified_at FROM users WHERE id = ?'
+      'SELECT id, username, email, full_name, status, email_verified_at, brand_id, organization_id, branch_id, role FROM users WHERE id = ?'
     ).get(userId);
     if (!user) {
       throw { status: 404, code: 'USER_NOT_FOUND', message: 'User not found.' };
@@ -124,11 +124,29 @@ class HandoffService {
       throw { status: 403, code: 'ACCOUNT_DISABLED', message: 'User account is not active.' };
     }
 
+    const brand = validatedReturn
+      ? validatedReturn.brand
+      : this.db.prepare('SELECT id, organization_id, custom_domain FROM brands WHERE id = ?').get(targetBrandId);
+    if (!brand) {
+      throw { status: 404, code: 'BRAND_NOT_FOUND', message: 'Target brand not found.' };
+    }
+
     // A handoff is authorized by an explicit workforce membership for the
     // target brand. Owner-in-one-business must not implicitly grant access to
     // every other brand in the same organization.
     const membershipService = new WorkforceMembershipService(this.db);
-    const membership = membershipService.findByUserAndBrand(userId, targetBrandId);
+    let membership = membershipService.findByUserAndBrand(userId, targetBrandId);
+    if (!membership && user.brand_id === targetBrandId && user.role) {
+      membership = membershipService.ensureMembership({
+        userId: user.id,
+        brandId: targetBrandId,
+        organizationId: user.organization_id || brand.organization_id,
+        role: user.role,
+        branchId: user.branch_id || null,
+        status: user.status || 'active'
+      });
+    }
+
     if (!membership || membership.status !== 'active') {
       throw {
         status: 403,
