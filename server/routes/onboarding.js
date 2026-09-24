@@ -216,3 +216,4 @@ router.post(['/onboarding/claim', '/api/v1/onboarding/claim'], async (req, res) 
     });
   }
 });
+};
