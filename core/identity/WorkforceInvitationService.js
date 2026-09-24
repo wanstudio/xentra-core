@@ -903,32 +903,14 @@ class WorkforceInvitationService {
     `).get(tokenHash);
 
     if (!invitation) {
-      throw {
-        status: 404,
-        code: 'INVITATION_NOT_FOUND',
-        message: 'Undangan tidak ditemukan atau token salah.'
-      };
+      throw { status: 404, code: 'INVITATION_NOT_FOUND', message: 'Undangan tidak ditemukan atau token salah.' };
     }
-
-    // Check revoked
     if (invitation.status === 'revoked') {
-      throw {
-        status: 410,
-        code: 'INVITATION_REVOKED',
-        message: 'Undangan ini telah dibatalkan.'
-      };
+      throw { status: 410, code: 'INVITATION_REVOKED', message: 'Undangan ini telah dibatalkan.' };
     }
-
-    // Check already accepted
     if (invitation.status === 'accepted') {
-      throw {
-        status: 410,
-        code: 'INVITATION_ALREADY_ACCEPTED',
-        message: 'Undangan ini telah digunakan.'
-      };
+      throw { status: 410, code: 'INVITATION_ALREADY_ACCEPTED', message: 'Undangan ini telah digunakan.' };
     }
-
-    // Check expired
     if (invitation.status === 'expired' || new Date(invitation.expires_at) < new Date()) {
       if (invitation.status !== 'expired') {
         this.db.prepare("UPDATE workforce_invitations SET status = 'expired', updated_at = datetime('now') WHERE id = ?").run(invitation.id);
@@ -943,22 +925,12 @@ class WorkforceInvitationService {
           metadata: { invitation_id: invitation.id }
         });
       }
-      throw {
-        status: 410,
-        code: 'INVITATION_EXPIRED',
-        message: 'Undangan ini telah kadaluarsa.'
-      };
+      throw { status: 410, code: 'INVITATION_EXPIRED', message: 'Undangan ini telah kadaluarsa.' };
     }
-
     if (invitation.status !== 'pending') {
-      throw {
-        status: 400,
-        code: 'INVALID_STATE',
-        message: `Tidak dapat menerima undangan dengan status ${invitation.status}.`
-      };
+      throw { status: 400, code: 'INVALID_STATE', message: `Tidak dapat menerima undangan dengan status ${invitation.status}.` };
     }
 
-    // Identity check: authenticated user email must strictly match invitation email
     const userEmail = String(authenticatedUser.email).trim().toLowerCase();
     const inviteEmail = String(invitation.email).trim().toLowerCase();
 
@@ -971,11 +943,7 @@ class WorkforceInvitationService {
         organization_id: invitation.organization_id,
         branch_id: invitation.branch_id,
         result: 'denied',
-        metadata: {
-          invitation_id: invitation.id,
-          reason: 'RECIPIENT_MISMATCH',
-          role: invitation.role
-        }
+        metadata: { invitation_id: invitation.id, reason: 'RECIPIENT_MISMATCH', role: invitation.role }
       });
 
       throw {
@@ -985,104 +953,57 @@ class WorkforceInvitationService {
       };
     }
 
-    // Check target user in database
-    const userRecord = this.db.prepare('SELECT id, role, brand_id, organization_id, branch_id, status FROM users WHERE id = ?').get(authenticatedUser.id);
+    const userRecord = this.db.prepare(
+      'SELECT id, role, brand_id, organization_id, branch_id, status, email FROM users WHERE id = ?'
+    ).get(authenticatedUser.id);
+
     if (!userRecord) {
-      throw {
-        status: 404,
-        code: 'USER_NOT_FOUND',
-        message: 'Akun pengguna tidak ditemukan.'
-      };
+      throw { status: 404, code: 'USER_NOT_FOUND', message: 'Akun pengguna tidak ditemukan.' };
     }
-
     if (userRecord.status === 'disabled') {
-      throw {
-        status: 403,
-        code: 'ACCOUNT_DISABLED',
-        message: 'Akun pengguna telah dinonaktifkan.'
+      throw { status: 403, code: 'ACCOUNT_DISABLED', message: 'Akun pengguna telah dinonaktifkan.' };
+    }
+
+    const membershipService = new WorkforceMembershipService(this.db);
+    let targetMembership = membershipService.findByUserAndBrand(userRecord.id, invitation.brand_id);
+
+    // Compatibility with pre-membership rows that were created after startup:
+    // treat the legacy users.brand_id/role/scope as the membership for that
+    // brand without rewriting it during another-brand acceptance.
+    if (!targetMembership && userRecord.brand_id === invitation.brand_id) {
+      targetMembership = {
+        role: userRecord.role,
+        branch_id: userRecord.branch_id || null,
+        status: userRecord.status || 'active'
       };
     }
 
-    // Phase 4A Reconciliation: Safe Workforce Role & Scope Attachment
-    // Prevent accidental destruction or demotion of active merchant roles
-    const hasExistingWorkforce = Boolean(userRecord.brand_id && userRecord.role);
-
-    if (hasExistingWorkforce) {
-      // 1. If user is an Owner, never silently demote or overwrite to a staff/manager role
-      if (userRecord.role === 'owner' && invitation.role !== 'owner') {
-        this._logSecurityEvent({
-          actor_id: userRecord.id,
-          actor_role: userRecord.role,
-          action: 'INVITATION_ACCEPT_DENIED',
-          brand_id: invitation.brand_id,
-          organization_id: invitation.organization_id,
-          branch_id: invitation.branch_id,
-          result: 'denied',
-          metadata: {
-            invitation_id: invitation.id,
-            reason: 'CANNOT_DEMOTE_OWNER',
-            current_role: userRecord.role,
-            invited_role: invitation.role
-          }
-        });
+    if (targetMembership) {
+      if (targetMembership.status !== 'active') {
         throw {
-          status: 409,
-          code: 'WORKFORCE_ROLE_CONFLICT',
-          message: 'Akun pemilik bisnis (Owner) tidak dapat menerima undangan sebagai staf atau manajer.'
+          status: 403,
+          code: 'WORKFORCE_MEMBERSHIP_DISABLED',
+          message: 'Akun pengguna tidak aktif pada bisnis ini.'
         };
       }
 
-      // 2. If user already belongs to another brand, prevent destructive cross-brand overwrite
-      if (userRecord.brand_id !== invitation.brand_id) {
-        this._logSecurityEvent({
-          actor_id: userRecord.id,
-          actor_role: userRecord.role,
-          action: 'INVITATION_ACCEPT_DENIED',
-          brand_id: invitation.brand_id,
-          organization_id: invitation.organization_id,
-          branch_id: invitation.branch_id,
-          result: 'denied',
-          metadata: {
-            invitation_id: invitation.id,
-            reason: 'CROSS_BRAND_CONFLICT',
-            current_brand_id: userRecord.brand_id,
-            target_brand_id: invitation.brand_id
-          }
-        });
-        throw {
-          status: 409,
-          code: 'WORKFORCE_SCOPE_CONFLICT',
-          message: 'Akun pengguna telah terikat pada brand bisnis lain.'
-        };
-      }
+      const currentRole = targetMembership.role;
+      const currentBranchId = targetMembership.branch_id || null;
+      const sameRole = currentRole === invitation.role;
+      const sameBranch = currentBranchId === (invitation.branch_id || null);
 
-      // 3. User is in the same brand. Check if role/branch is identical (idempotent / duplicate acceptance)
-      const sameRole = userRecord.role === invitation.role;
-      const sameBranch = (userRecord.branch_id || null) === (invitation.branch_id || null);
-
-      if (sameRole && sameBranch) {
-        // User already has this exact role and scope within this brand
-        // Consume invitation deterministically without altering user
-      } else {
-        // Evaluate role transition within same brand
-        // Managerial roles cannot be silently demoted to cashier/kitchen
+      if (!sameRole || !sameBranch) {
         const managerialRoles = ['brand_manager', 'branch_manager'];
-        if (managerialRoles.includes(userRecord.role) && !managerialRoles.includes(invitation.role)) {
-          this._logSecurityEvent({
-            actor_id: userRecord.id,
-            actor_role: userRecord.role,
-            action: 'INVITATION_ACCEPT_DENIED',
-            brand_id: invitation.brand_id,
-            organization_id: invitation.organization_id,
-            branch_id: invitation.branch_id,
-            result: 'denied',
-            metadata: {
-              invitation_id: invitation.id,
-              reason: 'CANNOT_DEMOTE_MANAGER',
-              current_role: userRecord.role,
-              invited_role: invitation.role
-            }
-          });
+
+        if (currentRole === 'owner' && invitation.role !== 'owner') {
+          throw {
+            status: 409,
+            code: 'WORKFORCE_ROLE_CONFLICT',
+            message: 'Akun pemilik bisnis (Owner) tidak dapat menerima undangan sebagai staf atau manajer pada bisnis yang sama.'
+          };
+        }
+
+        if (managerialRoles.includes(currentRole) && !managerialRoles.includes(invitation.role)) {
           throw {
             status: 409,
             code: 'WORKFORCE_ROLE_CONFLICT',
@@ -1090,36 +1011,29 @@ class WorkforceInvitationService {
           };
         }
 
-        // Branch Manager with branch A cannot be silently reassigned to branch B if branch A differs
-        if (userRecord.role === 'branch_manager' && userRecord.branch_id && invitation.branch_id && userRecord.branch_id !== invitation.branch_id) {
-          this._logSecurityEvent({
-            actor_id: userRecord.id,
-            actor_role: userRecord.role,
-            action: 'INVITATION_ACCEPT_DENIED',
-            brand_id: invitation.brand_id,
-            organization_id: invitation.organization_id,
-            branch_id: invitation.branch_id,
-            result: 'denied',
-            metadata: {
-              invitation_id: invitation.id,
-              reason: 'BRANCH_SCOPE_CONFLICT',
-              current_branch_id: userRecord.branch_id,
-              target_branch_id: invitation.branch_id
-            }
-          });
+        if (
+          currentRole === 'branch_manager' &&
+          currentBranchId &&
+          invitation.branch_id &&
+          currentBranchId !== invitation.branch_id
+        ) {
           throw {
             status: 409,
             code: 'WORKFORCE_SCOPE_CONFLICT',
             message: 'Branch Manager telah bertugas pada cabang lain dalam brand ini.'
           };
         }
+
+        throw {
+          status: 409,
+          code: 'WORKFORCE_SCOPE_CONFLICT',
+          message: 'Akun pengguna sudah memiliki membership dengan role/scope yang berbeda pada bisnis ini.'
+        };
       }
     }
 
-    // Atomic state transition: pending -> accepted and bind user to brand/role/scope
     const now = new Date().toISOString();
 
-    // Use transaction to ensure both invitation status update and user scope/role assignment occur atomically
     this.db.exec('BEGIN TRANSACTION;');
     try {
       const updateResult = this.db.prepare(`
@@ -1131,53 +1045,31 @@ class WorkforceInvitationService {
       if (updateResult.changes === 0) {
         const latest = this.db.prepare('SELECT status FROM workforce_invitations WHERE id = ?').get(invitation.id);
         if (latest && latest.status === 'accepted') {
-          throw {
-            status: 410,
-            code: 'INVITATION_ALREADY_ACCEPTED',
-            message: 'Undangan ini telah digunakan.'
-          };
+          throw { status: 410, code: 'INVITATION_ALREADY_ACCEPTED', message: 'Undangan ini telah digunakan.' };
         }
         if (latest && latest.status === 'revoked') {
-          throw {
-            status: 410,
-            code: 'INVITATION_REVOKED',
-            message: 'Undangan ini telah dibatalkan.'
-          };
+          throw { status: 410, code: 'INVITATION_REVOKED', message: 'Undangan ini telah dibatalkan.' };
         }
-        throw {
-          status: 400,
-          code: 'INVALID_STATE',
-          message: 'Undangan tidak lagi dalam status pending.'
-        };
+        throw { status: 400, code: 'INVALID_STATE', message: 'Undangan tidak lagi dalam status pending.' };
       }
 
-      // Assign role and scope to user strictly from invitation record
-      this.db.prepare(`
-        UPDATE users
-        SET role = ?,
-            brand_id = ?,
-            organization_id = ?,
-            branch_id = ?,
-            updated_at = ?
-        WHERE id = ?
-      `).run(
-        invitation.role,
-        invitation.brand_id,
-        invitation.organization_id,
-        invitation.branch_id || null,
-        now,
-        userRecord.id
-      );
+      // Only the target business relationship changes. The canonical User
+      // identity and any memberships in other businesses remain untouched.
+      membershipService.ensureMembership({
+        userId: userRecord.id,
+        organizationId: invitation.organization_id,
+        brandId: invitation.brand_id,
+        branchId: invitation.branch_id || null,
+        role: invitation.role,
+        status: 'active'
+      });
 
       this.db.exec('COMMIT;');
     } catch (err) {
-      try {
-        this.db.exec('ROLLBACK;');
-      } catch (_) {}
+      try { this.db.exec('ROLLBACK;'); } catch (_) {}
       throw err;
     }
 
-    // Invalidate existing sessions so permissions refresh immediately
     if (global.TokenSessionStore && global.TokenSessionStore.revokeUserSessions) {
       global.TokenSessionStore.revokeUserSessions(userRecord.id);
     }
