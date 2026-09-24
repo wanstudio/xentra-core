@@ -16,6 +16,7 @@ const crypto = require('crypto');
 const { events } = require('../../../core');
 const { OrderRepository, PosOrderRepository } = require('../../../core/data/repositories');
 const { OrderPlacementService } = require('../../commerce');
+const { DiningTableService } = require('../../dining');
 
 const orderRepository = new OrderRepository();
 const posOrderRepository = new PosOrderRepository();
@@ -131,121 +132,18 @@ class PosOrderService {
    * @returns {Object} Active converted dine_in order
    */
   static checkInReservation({ reservation_order_id, table_number }) {
-    if (!reservation_order_id || !table_number) {
-      throw new Error('[PosOrderService] "reservation_order_id" and "table_number" are required for reservation check-in.');
-    }
-
-    const order = orderRepository.findById(reservation_order_id);
-    if (!order) {
-      throw new Error(`[PosOrderService] Data reservasi dengan ID ${reservation_order_id} tidak ditemukan.`);
-    }
-
-    if (order.order_type !== 'reservation') {
-      throw new Error(`[PosOrderService] Order ${reservation_order_id} bukan tipe reservation.`);
-    }
-
-    const now = new Date().toISOString();
-
-    // In-place conversion of the SAME order: reservation -> dine_in
-    orderRepository.convertReservationToDineIn({
-      orderId: reservation_order_id,
-      tableNumber: table_number,
-      updatedAt: now
-    });
-
-    const updatedOrder = orderRepository.findById(reservation_order_id);
-    const orderItems = orderRepository.findItems(reservation_order_id);
-
-    // Emit event: pos.reservation.checked_in
-    events.EventBus.publish({
-      type: 'pos.reservation.checked_in',
-      producer: 'pos',
-      payload: {
-        order_id: reservation_order_id,
-        order_number: updatedOrder.order_number,
-        branch_id: updatedOrder.branch_id,
-        table_number: String(table_number),
-        customer_name: updatedOrder.customer_name,
-        order_type: 'dine_in',
-        status: 'active_table'
-      }
-    }).catch(() => {});
-
-    return {
-      success: true,
-      status: 'CHECKED_IN',
-      order: {
-        ...updatedOrder,
-        order_type: 'dine_in',
-        table_number: String(table_number),
-        status: 'active_table',
-        items: orderItems
-      }
-    };
+    const result = DiningTableService.checkInReservation({ reservation_order_id, table_number });
+    const updatedOrder = result.order;
+    events.EventBus.publish({ type: 'pos.reservation.checked_in', producer: 'pos', payload: { order_id: reservation_order_id, order_number: updatedOrder.order_number, branch_id: updatedOrder.branch_id, table_number: String(table_number), customer_name: updatedOrder.customer_name, order_type: 'dine_in', status: 'active_table' } }).catch(() => {});
+    return result;
   }
 
-  /**
-   * Cancels an overdue reservation when guest does not arrive within the configured grace period (No-Show).
-   * Locked Rule: Reservation is cancelled without automatic stock mutation.
-   * 
-   * @param {Object} params
-   * @param {string} params.reservation_order_id
-   * @param {string} [params.actor_id] - Manager or staff who executes the cancellation
-   * @param {string} [params.reason='No-Show: Melewati batas toleransi kedatangan']
-   * @returns {Object} Cancelled reservation order result
-   */
   static cancelNoShowReservation({ reservation_order_id, actor_id = 'branch_manager', reason = 'No-Show: Melewati batas toleransi kedatangan' }) {
-    if (!reservation_order_id) {
-      throw new Error('[PosOrderService] "reservation_order_id" is required.');
-    }
-
-    const order = orderRepository.findById(reservation_order_id);
-    if (!order) {
-      throw new Error(`[PosOrderService] Data reservasi dengan ID ${reservation_order_id} tidak ditemukan.`);
-    }
-
-    if (order.order_type !== 'reservation') {
-      throw new Error(`[PosOrderService] Order ${reservation_order_id} bukan tipe reservation.`);
-    }
-
-    const now = new Date().toISOString();
-
-    orderRepository.cancelReservationNoShow({
-      orderId: reservation_order_id,
-      reason,
-      updatedAt: now
-    });
-
-    // Emit event: pos.reservation.no_show_cancelled
-    events.EventBus.publish({
-      type: 'pos.reservation.no_show_cancelled',
-      producer: 'pos',
-      payload: {
-        order_id: reservation_order_id,
-        order_number: order.order_number,
-        branch_id: order.branch_id,
-        actor_id,
-        reason
-      }
-    }).catch(() => {});
-
-    return {
-      success: true,
-      status: 'CANCELLED_NO_SHOW',
-      order_id: reservation_order_id,
-      order_number: order.order_number,
-      reason
-    };
+    const result = DiningTableService.cancelNoShowReservation({ reservation_order_id, reason });
+    events.EventBus.publish({ type: 'pos.reservation.no_show_cancelled', producer: 'pos', payload: { order_id: result.order_id, order_number: result.order_number, branch_id: result.branch_id, actor_id, reason } }).catch(() => {});
+    return result;
   }
 
-  /**
-   * Splits a held bill into two separate bills.
-   * 
-   * @param {Object} params
-   * @param {string} params.held_order_id
-   * @param {Array<Object>} params.split_items - Items to extract into a new bill
-   * @returns {{ original_bill: Object, new_bill: Object }}
-   */
   static splitBill({ held_order_id, split_items = [] }) {
     const original = posOrderRepository.findHeldById(held_order_id);
     if (!original || original.status !== 'held') {

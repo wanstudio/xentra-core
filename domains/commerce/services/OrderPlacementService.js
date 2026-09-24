@@ -70,94 +70,16 @@ class OrderPlacementService {
     const effectiveOrderType = order_type || 'delivery';
 
     if (effectiveOrderType === 'reservation') {
-      if (!reservation_date) {
-        return { success: false, status: 'VALIDATION_ERROR', errors: ['Tanggal reservasi wajib diisi untuk tipe pesanan reservation.'] };
-      }
-      const parsedGuestCount = Number(guest_count);
-      if (!guest_count || !Number.isInteger(parsedGuestCount) || parsedGuestCount <= 0) {
-        return { success: false, status: 'VALIDATION_ERROR', errors: ['Perkiraan jumlah orang (guest_count) wajib diisi dengan bilangan bulat positif (> 0) untuk reservasi.'] };
-      }
-      const resDate = new Date(reservation_date);
-      const today = new Date();
-      const resDateStr = resDate.toISOString().slice(0, 10);
-      const todayStr = today.toISOString().slice(0, 10);
-      if (resDateStr <= todayStr) {
-        return { success: false, status: 'SAME_DAY_RESERVATION_REJECTED', errors: ['Reservasi hari yang sama tidak diperbolehkan. Minimum reservasi adalah untuk besok atau tanggal setelahnya.'] };
-      }
-      if (!branch_id) {
-        return { success: false, status: 'VALIDATION_ERROR', errors: ['Cabang tujuan (branch_id) wajib dipilih untuk melakukan reservasi meja.'] };
-      }
-
-      const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
-      const now = new Date().toISOString();
-      const orderNumber = `RES-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
-
-      orderRepository.beginTransaction();
+      let reservationResult;
       try {
-        if (customer && customer.phone) {
-          const existingRes = orderRepository.findActiveReservation({
-            branchId: branch_id,
-            customerPhone: customer.phone,
-            reservationDate: resDateStr
-          });
-          if (existingRes) {
-            orderRepository.rollbackTransaction();
-            return { success: false, status: 'DUPLICATE_RESERVATION', errors: [`Anda sudah memiliki booking reservasi aktif di cabang ini untuk tanggal ${resDateStr}.`] };
-          }
-        }
-        const dailyBookingsCount = orderRepository.countActiveReservations({ branchId: branch_id, reservationDate: resDateStr });
-        if (dailyBookingsCount >= 30) {
-          orderRepository.rollbackTransaction();
-          return { success: false, status: 'BRANCH_CAPACITY_FULL', errors: [`Kapasitas reservasi meja untuk cabang ini pada tanggal ${resDateStr} sudah penuh.`] };
-        }
-        orderRepository.insertReservation({
-          id: orderId,
-          orderNumber,
-          brandId: brand_id,
-          branchId: branch_id,
-          customerId: customer.id || customer.customer_id || null,
-          customerName: customer.name || 'Tamu Reservasi',
-          customerPhone: customer.phone || '',
-          orderChannel: order_channel,
-          selectionMode: selection_mode || 'CUSTOMER_SELECTED',
-          reservationDate: resDateStr,
-          orderNote: notes ? `Reservasi (${guest_count || 1} Tamu, Tgl: ${resDateStr}) | ${notes}` : `Reservasi (${guest_count || 1} Tamu, Tgl: ${resDateStr})`,
-          createdAt: now,
-          updatedAt: now
-        });
-        orderRepository.commitTransaction();
-      } catch (txErr) {
-        try { orderRepository.rollbackTransaction(); } catch (_) {}
-        console.error('[OrderPlacementService] Reservation insert error:', txErr.message);
-        return { success: false, status: 'ORDER_CREATION_FAILED', errors: [txErr.message] };
+        reservationResult = DiningTableService.createReservation({ brand_id, branch_id, customer, order_channel, selection_mode, reservation_date, guest_count, notes });
+      } catch (err) {
+        console.error('[OrderPlacementService] Reservation insert error:', err.message);
+        return { success: false, status: 'ORDER_CREATION_FAILED', errors: [err.message] };
       }
-
-      await events.EventBus.publish({
-        type: 'commerce.reservation.booked',
-        producer: 'commerce',
-        payload: { order_id: orderId, order_number: orderNumber, brand_id, branch_id, reservation_date: resDateStr, guest_count: guest_count || 1, customer },
-        trace: trace_context
-      });
-
-      return {
-        success: true,
-        order_id: orderId,
-        order_number: orderNumber,
-        grand_total: 0,
-        subtotal: 0,
-        order: {
-          id: orderId,
-          order_number: orderNumber,
-          order_type: 'reservation',
-          reservation_date: resDateStr,
-          guest_count: guest_count || 1,
-          customer_name: customer.name,
-          customer_phone: customer.phone,
-          subtotal: 0,
-          grand_total: 0,
-          items: []
-        }
-      };
+      if (!reservationResult.success) return reservationResult;
+      await events.EventBus.publish({ type: 'commerce.reservation.booked', producer: 'commerce', payload: { order_id: reservationResult.order_id, order_number: reservationResult.order_number, brand_id, branch_id, reservation_date: reservationResult.order.reservation_date, guest_count: reservationResult.order.guest_count, customer }, trace: trace_context });
+      return reservationResult;
     }
 
     let effectiveDiningSessionId = dining_session_id || null;

@@ -62,3 +62,23 @@ test('Commerce dine-in flow delegates table/session validation to Dining boundar
   const dining = require('../../domains/dining');
   assert.equal(typeof dining.DiningTableService.prepareDineInOrderContext, 'function');
 });
+
+
+test('Reservation semantics are delegated to Dining boundary', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const commerceSource = fs.readFileSync(path.resolve(__dirname, '../../domains/commerce/services/OrderPlacementService.js'), 'utf8');
+  const posSource = fs.readFileSync(path.resolve(__dirname, '../../domains/pos/services/PosOrderService.js'), 'utf8');
+  assert.match(commerceSource, /DiningTableService\.createReservation/);
+  assert.doesNotMatch(commerceSource, /findActiveReservation\(/);
+  assert.doesNotMatch(commerceSource, /countActiveReservations\(/);
+  assert.doesNotMatch(commerceSource, /insertReservation\(/);
+  assert.match(posSource, /DiningTableService\.checkInReservation/);
+  assert.match(posSource, /DiningTableService\.cancelNoShowReservation/);
+  assert.doesNotMatch(posSource, /convertReservationToDineIn\(/);
+  assert.doesNotMatch(posSource, /cancelReservationNoShow\(/);
+  const dining = require('../../domains/dining');
+  assert.equal(typeof dining.DiningTableService.createReservation, 'function');
+  assert.equal(typeof dining.DiningTableService.checkInReservation, 'function');
+  assert.equal(typeof dining.DiningTableService.cancelNoShowReservation, 'function');
+});
