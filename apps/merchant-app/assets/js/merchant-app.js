@@ -209,9 +209,6 @@
      BM-3: OPERASIONAL MENU, STOK & PROMO (BRANCH MANAGER OPERATIONAL CENTER)
      ========================================================================= */
 
-  // The shared branch-catalog module reads BM menu categories from this state.
-  if (window.XentraBranchCatalog) window.XentraBranchCatalog.setBmMenuState(_bmMenuState);
-
 
 
 
