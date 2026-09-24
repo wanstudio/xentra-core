@@ -25,6 +25,7 @@ const test   = require('node:test');
 const assert = require('node:assert');
 const app    = require('../server/app');
 const db     = require('../server/database/db');
+const fs     = require('node:fs');
 
 // ── Mock Google tokeninfo ──────────────────────────────────────────────────
 // Intercept axios.get calls to oauth2.googleapis.com/tokeninfo
@@ -143,6 +144,23 @@ function addTestBranch(branchId) {
 
 
 // ── CGA-01: Missing credential → 400 ──────────────────────────────────────
+test('CGA-00: customer auth routes are isolated from api.js', () => {
+  const apiSource = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const authSource = fs.readFileSync(require.resolve('../server/routes/customer-auth'), 'utf8');
+
+  assert.equal((apiSource.match(/router\.post\('\/customer\/auth\/google'/g) || []).length, 0);
+  assert.equal((apiSource.match(/router\.post\('\/customer\/auth\/broker\/(?:init|exchange|google)'/g) || []).length, 0);
+
+  for (const route of [
+    "/customer/auth/google",
+    "/customer/auth/broker/init",
+    "/customer/auth/broker/exchange",
+    "/customer/auth/broker/google"
+  ]) {
+    assert.equal((authSource.match(new RegExp("router\\\\.post\\\\('" + route.replace(/[.*+?^$\\{}()|[\\]\\\\]/g, '\\\\$&') + "'")) || []).length, 1);
+  }
+});
+
 test('CGA-01: Missing Google credential → 400 MISSING_GOOGLE_CREDENTIAL', async () => {
   const res  = await mockFetch('/api/v1/customer/auth/google', {
     method: 'POST',
