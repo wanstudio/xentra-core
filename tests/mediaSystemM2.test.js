@@ -15,6 +15,7 @@ const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
 const CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/dashboard.css');
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
+const CROP_EDITOR_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/crop-editor.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/branch-catalog.js');
 const SHARED_CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/shared.css');
 
@@ -297,7 +298,7 @@ test('MEDIA SYSTEM M2 — CROP / IMAGE EDITOR UI & DOMAIN SUITE', async (t) => {
   });
 
   // --------------------------------------------------------------------------
-  // 12. Dashboard JS exposes and initializes XentraCropEditor
+  // 12. Dedicated shared crop-editor module exposes XentraCropEditor
   // --------------------------------------------------------------------------
   await t.test('12. Dashboard JS initializes XentraCropEditor with open, confirm, cancel, reset API', () => {
     const html = fs.readFileSync(HTML_PATH, 'utf8');
@@ -317,8 +318,9 @@ test('MEDIA SYSTEM M2 — CROP / IMAGE EDITOR UI & DOMAIN SUITE', async (t) => {
       text: async () => '{}'
     });
 
-    // merchant-shared js owns the widgets, then dashboard.js aliases them.
+    // shared.js owns auth/utilities; crop-editor.js owns the reusable crop UI primitive.
     win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(CROP_EDITOR_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
     const js = fs.readFileSync(JS_PATH, 'utf8');
     win.eval(js);
