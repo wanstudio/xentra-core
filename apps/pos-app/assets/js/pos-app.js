@@ -79,7 +79,7 @@
     if (!box) return;
     if (!state.cart.length) { box.innerHTML='<div class="pos-empty">Belum ada item.</div>'; return; }
     box.innerHTML=state.cart.map(function(it,idx){
-      return '<div class="pos-cart-item"><div><div class="pos-cart-item-name">'+esc(it.name)+'</div><div class="pos-cart-item-meta">'+money(it.unit_price)+'</div></div>' +
+      return '<div class="pos-cart-item"><div><div class="pos-cart-item-name">'+esc(it.name)+'</div><div class="pos-cart-item-meta">'+money(it.unit_price)+(it.options&&it.options.length?'<div class="pos-cart-item-options">'+esc(optionSummary(it.options))+'</div>':'')+(it.note?'<div class="pos-cart-item-note">Catatan: '+esc(it.note)+'</div>':'')+'</div></div>' +
         '<div class="pos-cart-item-actions"><button class="pos-qty" data-idx="'+idx+'" data-d="-1">−</button><span class="pos-qty-value">'+it.quantity+'</span><button class="pos-qty" data-idx="'+idx+'" data-d="1">+</button></div></div>';
     }).join('');
     box.querySelectorAll('.pos-qty').forEach(function(b){ b.onclick=function(){ changeQty(Number(b.dataset.idx), Number(b.dataset.d)); }; });
@@ -92,12 +92,124 @@
     renderCart();
   }
 
-  function addProduct(p){
+  function productOptions(p){
+    var cfg=p && p.options_config;
+    if(!cfg || !Array.isArray(cfg.groups)) return {version:1,groups:[]};
+    return cfg;
+  }
+
+  function optionGroups(p){
+    return productOptions(p).groups || [];
+  }
+
+  function optionSelectionKey(options){
+    return (Array.isArray(options)?options:[]).map(function(o){
+      return String(o.group_id)+':'+String(o.option_id);
+    }).sort().join('|');
+  }
+
+  function clientOptionPrice(p, selections){
+    var base=Number(p.price || p.sale_price || p.regular_price || 0);
+    var adjustment=0;
+    var groups=optionGroups(p);
+    (Array.isArray(selections)?selections:[]).forEach(function(sel){
+      var g=groups.find(function(x){return String(x.id)===String(sel.group_id);});
+      var o=g && (g.options||[]).find(function(x){return String(x.id)===String(sel.option_id);});
+      if(o) adjustment += Number(o.price_adjustment||0);
+    });
+    return base+adjustment;
+  }
+
+  function optionSummary(options){
+    if(!Array.isArray(options)||!options.length) return '';
+    return options.map(function(o){return o.group_name?o.group_name+': '+o.option_name:o.option_name;}).join(' · ');
+  }
+
+  function addConfiguredProduct(p,selections,note){
     if (p.is_available === 0 || p.is_available === false) return toast('Menu sedang tidak tersedia.');
-    var hit=state.cart.find(function(i){return String(i.product_id)===String(p.id);});
+    var cleanSelections=Array.isArray(selections)?selections:[];
+    var lineKey=optionSelectionKey(cleanSelections);
+    var hit=state.cart.find(function(i){
+      return String(i.product_id)===String(p.id) && optionSelectionKey(i.options||[])===lineKey && String(i.note||'')===String(note||'');
+    });
+    var unitPrice=clientOptionPrice(p,cleanSelections);
     if(hit) hit.quantity += 1;
-    else state.cart.push({product_id:p.id,name:p.name || p.product_name || 'Produk',unit_price:Number(p.price || p.sale_price || p.regular_price || 0),quantity:1});
+    else state.cart.push({
+      product_id:p.id,
+      name:p.name || p.product_name || 'Produk',
+      unit_price:unitPrice,
+      quantity:1,
+      options:cleanSelections,
+      note:note||''
+    });
     renderCart();
+  }
+
+  function addProduct(p){
+    if (optionGroups(p).length > 0) {
+      return openProductOptions(p);
+    }
+    return addConfiguredProduct(p,[], '');
+  }
+
+  function openProductOptions(p){
+    var groups=optionGroups(p);
+    var title=p.name || p.product_name || 'Produk';
+    var html='<h3>'+esc(title)+'</h3><p>Pilih opsi untuk item ini. Harga akhir akan diverifikasi oleh Core saat pembayaran.</p>';
+    groups.forEach(function(g){
+      var type=g.type==='addon'?'addon':'variant';
+      var required=!!g.required;
+      var inputType=type==='variant'?'radio':'checkbox';
+      html+='<div class="pos-option-group" data-option-group="'+esc(g.id)+'"><div class="pos-option-group-head"><strong>'+esc(g.name)+'</strong><small>'+ (required?'Wajib':'Opsional') +'</small></div>';
+      (g.options||[]).forEach(function(o){
+        var price=Number(o.price_adjustment||0);
+        var suffix=price===0?'':' '+(price>0?'+':'')+money(price);
+        html+='<label class="pos-option-row"><input type="'+inputType+'" name="pos-opt-'+esc(g.id)+'" value="'+esc(o.id)+'" data-option-id="'+esc(o.id)+'" data-option-group="'+esc(g.id)+'"><span>'+esc(o.name)+'</span><em>'+esc(suffix)+'</em></label>';
+      });
+      html+='</div>';
+    });
+    html+='<div class="pos-form-row"><label>Catatan item (opsional)</label><input id="pos-item-note" type="text" maxlength="120" placeholder="Contoh: tanpa bawang"></div>';
+    html+='<div id="pos-option-total" class="pos-payment-total">'+money(clientOptionPrice(p,[]))+'</div>';
+    html+='<div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-option-cancel">Batal</button><button class="pos-btn" id="pos-option-add">Tambahkan</button></div>';
+    showModal(html);
+
+    function readSelections(){
+      var out=[];
+      groups.forEach(function(g){
+        var checked=document.querySelectorAll('[data-option-group="'+String(g.id).replace(/"/g,'\\\"')+'"] input:checked');
+        checked.forEach(function(input){
+          var opt=(g.options||[]).find(function(o){return String(o.id)===String(input.value);});
+          if(opt) out.push({group_id:g.id,group_name:g.name,type:g.type==='addon'?'addon':'variant',option_id:opt.id,option_name:opt.name,price_adjustment:Number(opt.price_adjustment||0)});
+        });
+      });
+      return out;
+    }
+
+    function validateSelections(){
+      for(var i=0;i<groups.length;i++){
+        var g=groups[i], count=readSelections().filter(function(s){return String(s.group_id)===String(g.id);}).length;
+        var min=g.type==='variant'?(g.required?1:0):Number(g.min||0);
+        var max=g.type==='variant'?1:(g.max==null?null:Number(g.max));
+        if(count<min) return 'Pilih minimal '+min+' pada "'+g.name+'".';
+        if(max!=null&&count>max) return 'Maksimal '+max+' pilihan pada "'+g.name+'".';
+      }
+      return '';
+    }
+
+    document.querySelectorAll('[data-option-id]').forEach(function(inp){
+      inp.onchange=function(){
+        var selections=readSelections(), validation=validateSelections();
+        var totalAmount=clientOptionPrice(p,selections);
+        if($('pos-option-total'))$('pos-option-total').textContent=money(totalAmount);
+      };
+    });
+    $('pos-option-cancel').onclick=hideModal;
+    $('pos-option-add').onclick=function(){
+      var validation=validateSelections();
+      if(validation) return toast(validation);
+      addConfiguredProduct(p,readSelections(),$('pos-item-note').value.trim());
+      hideModal();
+    };
   }
 
   function renderMenu(){
@@ -110,7 +222,7 @@
       tabs.querySelectorAll('button').forEach(function(b){ b.onclick=function(){state.category=b.dataset.cat;renderMenu();}; });
     }
     var q=state.search.toLowerCase();
-    var products=(state.menu.products||[]).filter(function(p){
+    var products=(Array.isArray(state.menu.products)?state.menu.products:[]).filter(function(p){
       var okCat=state.category==='all' || String(state.category)===String(p.category_id) || (Array.isArray(p.category_ids)&&p.category_ids.map(String).indexOf(String(state.category))!==-1);
       var okQ=!q || String(p.name||'').toLowerCase().indexOf(q)!==-1;
       return okCat && okQ;
@@ -123,7 +235,7 @@
           '<div class="pos-product-price">'+money(p.price || p.sale_price || p.regular_price)+'</div></button>';
       }).join(''):'<div class="pos-empty">Menu tidak ditemukan.</div>';
       grid.querySelectorAll('.pos-product').forEach(function(b){
-        b.onclick=function(){ var p=(state.menu.products||[]).find(function(x){return String(x.id)===String(b.dataset.productId);}); if(p)addProduct(p); };
+        b.onclick=function(){ var p=(Array.isArray(state.menu.products)?state.menu.products:[]).find(function(x){return String(x.id)===String(b.dataset.productId);}); if(p)addProduct(p); };
       });
     }
   }
@@ -132,7 +244,8 @@
     if(!state.branchId)return;
     try{
       var data=await request('/catalog/menu?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
-      state.menu={categories:data.categories||[],products:data.products||[]};
+      var catalogProducts=Array.isArray(data.all_products)?data.all_products:(data.products&&Array.isArray(data.products.items)?data.products.items:[]);
+      state.menu={categories:data.categories||[],products:catalogProducts};
       renderMenu();
       setConnection(true);
     }catch(e){ setConnection(false); if($('pos-product-grid'))$('pos-product-grid').innerHTML='<div class="pos-empty">Menu tidak dapat dimuat. Periksa koneksi.</div>'; }
@@ -279,7 +392,7 @@
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
     if(state.orderType==='dine_in'&&!state.selectedTable)return toast('Pilih meja untuk transaksi dine-in.');
     if(!navigator.onLine&&paymentMode!=='cash')return toast('Payment Gateway dan QRIS Statis membutuhkan koneksi internet pada POS.');
-    var payload={branch_id:state.branchId,shift_id:state.shift.id,order_type:state.orderType,payment_mode:paymentMode,amount_tendered:paymentMode==='cash'?amountTendered:null,customer:{name:$('pos-customer-name').value.trim(),phone:'',table_number:state.selectedTable?state.selectedTable.table_number:null},items:state.cart.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price};}),client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)};
+    var payload={branch_id:state.branchId,shift_id:state.shift.id,order_type:state.orderType,payment_mode:paymentMode,amount_tendered:paymentMode==='cash'?amountTendered:null,customer:{name:$('pos-customer-name').value.trim(),phone:'',table_number:state.selectedTable?state.selectedTable.table_number:null},items:state.cart.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,options:i.options||[],note:i.note||''};}),client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)};
     try{
       var d;
       if(!navigator.onLine){
