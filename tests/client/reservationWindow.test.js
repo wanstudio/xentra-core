@@ -66,7 +66,18 @@ test('RSV-04: server rejects same-day-or-earlier reservation dates', () => {
   assert.ok(diningSrc.includes('SAME_DAY_RESERVATION_REJECTED'), 'Dining domain must reject same-day reservations server-side');
 });
 
-test('RSV-05: card Ringkasan Pembayaran di-hide pada checkout jika tipe Reservasi terpilih', () => {
+test('RSV-05: reservation time ikut payload dan tidak hilang sebelum server', () => {
+  assert.ok(envSrc.includes('var reservationTime = ownsReservation ? (env.state.reservationTime || \'12:00\') : null'),
+    'environment reservasi harus memiliki reservation_time sendiri');
+  assert.ok(envSrc.includes('fulfillment.reservation_time = reservationTime'),
+    'reservation_time harus masuk fulfillment payload');
+  assert.ok(envSrc.includes('topLevel.reservation_time = reservationTime'),
+    'reservation_time harus masuk top-level payload');
+  assert.ok(checkoutSrc.includes('reservation_time: envPayload.topLevel.reservation_time'),
+    'checkout harus mengirim reservation_time');
+});
+
+test('RSV-06: card Ringkasan Pembayaran di-hide pada checkout jika tipe Reservasi terpilih', () => {
   // Card 5 (x-payment-summary-card) harus dibungkus dengan (!isReservation ? ...)
   assert.ok(
     /(!isReservation\s*\?\s*\(\s*'  <div class="x-card x-alt-summary-card" id="x-payment-summary-card")/.test(checkoutSrc),
