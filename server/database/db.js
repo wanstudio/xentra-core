@@ -1312,6 +1312,17 @@ function initSchema(targetDb) {
       FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS pos_shift_breaks (
+      id TEXT PRIMARY KEY,
+      shift_id TEXT NOT NULL,
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      FOREIGN KEY (shift_id) REFERENCES pos_shifts(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pos_shift_breaks_shift_started
+      ON pos_shift_breaks(shift_id, started_at);
+
     CREATE TABLE IF NOT EXISTS pos_cash_movements (
       id TEXT PRIMARY KEY,
       shift_id TEXT NOT NULL,
