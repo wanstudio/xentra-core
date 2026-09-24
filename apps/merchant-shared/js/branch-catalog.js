@@ -25,6 +25,10 @@
   var isBranchManager = S.isBranchManager;
 
   var hooks = { getBranches: null, refreshBMMenu: null };
+  function isBranchManager() {
+    var user = getStoredUser();
+    return !!(user && user.role === 'branch_manager');
+  }
   var bmMenuState = null;
 
   /* =========================================================================
