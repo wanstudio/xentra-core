@@ -166,8 +166,9 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
       'detail view must expose reservation schedule');
     assert.ok(orderJs.includes('bm-detail-reservation-guests'),
       'detail view must expose guest count');
-    assert.ok(/Reservasi\\s*\\(\\s*\\(\\d\+\\)\\s*Tamu/i.test(orderJs) === false,
+    assert.equal(orderJs.includes('Reservasi\\\\s*'), false,
       'guest count parser must not contain an invalid double-escaped regex');
+
   });
 
   await t.test('7. upcoming reservations stay visible in operational queue order', async () => {
