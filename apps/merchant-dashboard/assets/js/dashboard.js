@@ -17,6 +17,22 @@
   var TOKEN_KEY  = _shared.TOKEN_KEY  || 'xentra_merchant_token';
   var USER_KEY   = _shared.USER_KEY   || 'xentra_merchant_user';
 
+  var getStoredUser = (_shared && _shared.getStoredUser) || function () {
+    try {
+      var u = localStorage.getItem(USER_KEY);
+      return u ? JSON.parse(u) : null;
+    } catch (_) { return null; }
+  };
+  var isBranchManager = (_shared && _shared.isBranchManager) || function () {
+    var u = getStoredUser();
+    return !!(u && u.role === 'branch_manager');
+  };
+  var checkAuth = (_shared && _shared.checkAuth) || function () {
+    return !!localStorage.getItem(TOKEN_KEY);
+  };
+  var handleHandoffExchange = (_shared && _shared.handleHandoffExchange) || async function () {};
+  var validateServerSession = (_shared && _shared.validateServerSession) || async function () { return true; };
+
   // Shared UI widgets are owned by merchant-shared/js/shared.js (loaded first).
   // dashboard.js only aliases them so every merchant surface shares one implementation.
   var XentraActionMenu = window.XentraActionMenu;
@@ -138,11 +154,20 @@
      ========================================================================= */
 
   function isPlatformContext() {
-    var host = (window.location.hostname || '').toLowerCase();
+    var path = (window.location.pathname || '').toLowerCase();
+    if (path.startsWith('/owner')) return false;
+
     var urlParams = new URLSearchParams(window.location.search);
     var contextParam = (urlParams.get('context') || '').toLowerCase();
     if (contextParam === 'platform') return true;
     if (contextParam === 'client') return false;
+
+    var user = getStoredUser();
+    if (user && user.role && user.role !== 'platform_superadmin') {
+      return false;
+    }
+
+    var host = (window.location.hostname || '').toLowerCase();
     return host === 'xentra.cloud';
   }
 
@@ -3066,6 +3091,7 @@
   window.startOrdersPolling = startOrdersPolling;
   window.stopOrdersPolling = stopOrdersPolling;
 
+  window.loadOrders = loadOrders;
   async function loadOrders(opts) {
     var isBg = opts && opts.background;
     var tbody = $('orders-table-body');
@@ -3999,11 +4025,7 @@
      merchant surface shares one implementation.
      ========================================================================= */
 
-  var getStoredUser = _shared.getStoredUser || window.XentraShared.getStoredUser;
-  var isBranchManager = _shared.isBranchManager || window.XentraShared.isBranchManager;
-  var checkAuth = _shared.checkAuth || window.XentraShared.checkAuth;
-  var handleHandoffExchange = _shared.handleHandoffExchange || window.XentraShared.handleHandoffExchange;
-  var validateServerSession = _shared.validateServerSession || window.XentraShared.validateServerSession;
+  // Core auth/session helpers initialized at top of module closure
 
   /**
    * Hides/shows UI panels depending on the logged-in user's role.
@@ -7835,99 +7857,6 @@
   };
 
   /* =========================================================================
-     INITIALIZATION ON DOM READY
-     ========================================================================= */
-  var _isInitialized = false;
-  async function initializeDashboard() {
-    if (_isInitialized) return;
-    _isInitialized = true;
-
-    // Wire navigation click handlers for nav items (supports data-route and data-tab)
-    document.querySelectorAll('.x-nav-item:not(.x-nav-parent)').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var route = btn.dataset.route || btn.dataset.tab;
-        if (route) {
-          navigateTo(route);
-        }
-      });
-    });
-
-    // Wire catalog sub-nav click handlers
-    document.querySelectorAll('.x-nav-sub-item').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var route = btn.dataset.route || btn.dataset.tab;
-        if (route) {
-          navigateTo(route);
-        }
-      });
-    });
-
-    // Catalog parent: toggle sub-nav on click if already on catalog route
-    var catalogParentBtn = $('nav-catalog-parent');
-    if (catalogParentBtn) {
-      catalogParentBtn.addEventListener('click', function () {
-        var currentRoute = getCurrentRoute();
-        var isCatalogActive = currentRoute === 'catalog' || currentRoute.indexOf('catalog/') === 0;
-        if (!isCatalogActive) {
-          // Navigate to catalog (will open sub-nav via applyRoute)
-          navigateTo('catalog');
-        } else {
-          // Toggle sub-nav open/close without changing route
-          var sub = $('nav-catalog-sub');
-          if (sub) sub.classList.toggle('open');
-          var expanded = sub && sub.classList.contains('open');
-          catalogParentBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-        }
-      });
-    }
-
-    initAuthListeners();
-    initBrandListeners();
-    initSettingsProfileListeners();
-    initCatalogListeners();
-    initBranchSearchAndFilter();
-    initBranchOperationsForm();
-    initOrdersFilterListeners();
-    initMobileSidebar();
-    initBranchContextSelector();
-
-    // Workforce form submit
-    var formUser = $('form-user');
-    if (formUser) {
-      formUser.addEventListener('submit', submitUserForm);
-    }
-
-    if ($('btn-refresh-orders')) {
-      $('btn-refresh-orders').addEventListener('click', loadOrders);
-    }
-
-    // Inline branch category button
-    var btnAddBranchCatInline = $('btn-add-branch-category-inline');
-    if (btnAddBranchCatInline) {
-      btnAddBranchCatInline.addEventListener('click', async function () {
-        if (!XentraOwnerBranchCatalog || !XentraOwnerBranchCatalog.state || !XentraOwnerBranchCatalog.state.branchId) return;
-        var name = prompt('Nama Kategori Baru untuk Cabang ini:');
-        if (!name || !name.trim()) return;
-        try {
-          var res = await adminFetch(API_BASE + '/admin/branches/' + XentraOwnerBranchCatalog.state.branchId + '/categories', {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ name: name.trim() })
-          });
-          var data = await res.json();
-          if (data.success) {
-            showToast('\u2705 Kategori cabang berhasil dibuat!');
-            loadInlineBranchCatalog();
-          } else {
-            showToast('\u274C ' + (data.error || 'Gagal membuat kategori.'));
-          }
-        } catch (err) {
-          showToast('\u274C Kesalahan jaringan.');
-        }
-      });
-    }
-
-    /* =========================================================================
        PHASE 7: SETTINGS & INTEGRATIONS CONTROLLER
        ========================================================================= */
     var _activeSettingsSection = 'business/profile';
@@ -8697,6 +8626,127 @@
     }
     window.loadSettingsSecurity = loadSettingsSecurity;
 
+
+  /* =========================================================================
+     INITIALIZATION ON DOM READY
+     ========================================================================= */
+  var _isInitialized = false;
+  async function initializeDashboard() {
+    if (_isInitialized) return;
+    _isInitialized = true;
+
+    // Wire navigation via event delegation on nav container (reliable across DOM renders)
+    var navContainer = $('x-dash-nav');
+    if (navContainer) {
+      navContainer.addEventListener('click', function (e) {
+        var btn = e.target.closest('.x-nav-item, .x-nav-sub-item');
+        if (!btn) return;
+        if (btn.classList.contains('x-nav-parent')) {
+          var currentRoute = getCurrentRoute();
+          var isCatalogActive = currentRoute === 'catalog' || currentRoute.indexOf('catalog/') === 0;
+          if (!isCatalogActive) {
+            navigateTo('catalog');
+          } else {
+            var sub = $('nav-catalog-sub');
+            if (sub) sub.classList.toggle('open');
+            var expanded = sub && sub.classList.contains('open');
+            btn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+          }
+          return;
+        }
+        var route = btn.dataset.route || btn.dataset.tab;
+        if (route) {
+          navigateTo(route);
+        }
+      });
+    }
+
+    // Direct click handlers for nav items (supports data-route and data-tab)
+    document.querySelectorAll('.x-nav-item:not(.x-nav-parent)').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var route = btn.dataset.route || btn.dataset.tab;
+        if (route) {
+          navigateTo(route);
+        }
+      });
+    });
+
+    // Wire catalog sub-nav click handlers
+    document.querySelectorAll('.x-nav-sub-item').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var route = btn.dataset.route || btn.dataset.tab;
+        if (route) {
+          navigateTo(route);
+        }
+      });
+    });
+
+    // Catalog parent: toggle sub-nav on click if already on catalog route
+    var catalogParentBtn = $('nav-catalog-parent');
+    if (catalogParentBtn) {
+      catalogParentBtn.addEventListener('click', function () {
+        var currentRoute = getCurrentRoute();
+        var isCatalogActive = currentRoute === 'catalog' || currentRoute.indexOf('catalog/') === 0;
+        if (!isCatalogActive) {
+          // Navigate to catalog (will open sub-nav via applyRoute)
+          navigateTo('catalog');
+        } else {
+          // Toggle sub-nav open/close without changing route
+          var sub = $('nav-catalog-sub');
+          if (sub) sub.classList.toggle('open');
+          var expanded = sub && sub.classList.contains('open');
+          catalogParentBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        }
+      });
+    }
+
+    initAuthListeners();
+    initBrandListeners();
+    initSettingsProfileListeners();
+    initCatalogListeners();
+    initBranchSearchAndFilter();
+    initBranchOperationsForm();
+    initOrdersFilterListeners();
+    initMobileSidebar();
+    initBranchContextSelector();
+
+    // Workforce form submit
+    var formUser = $('form-user');
+    if (formUser) {
+      formUser.addEventListener('submit', submitUserForm);
+    }
+
+    if ($('btn-refresh-orders')) {
+      $('btn-refresh-orders').addEventListener('click', loadOrders);
+    }
+
+    // Inline branch category button
+    var btnAddBranchCatInline = $('btn-add-branch-category-inline');
+    if (btnAddBranchCatInline) {
+      btnAddBranchCatInline.addEventListener('click', async function () {
+        if (!XentraOwnerBranchCatalog || !XentraOwnerBranchCatalog.state || !XentraOwnerBranchCatalog.state.branchId) return;
+        var name = prompt('Nama Kategori Baru untuk Cabang ini:');
+        if (!name || !name.trim()) return;
+        try {
+          var res = await adminFetch(API_BASE + '/admin/branches/' + XentraOwnerBranchCatalog.state.branchId + '/categories', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ name: name.trim() })
+          });
+          var data = await res.json();
+          if (data.success) {
+            showToast('\u2705 Kategori cabang berhasil dibuat!');
+            loadInlineBranchCatalog();
+          } else {
+            showToast('\u274C ' + (data.error || 'Gagal membuat kategori.'));
+          }
+        } catch (err) {
+          showToast('\u274C Kesalahan jaringan.');
+        }
+      });
+    }
+
+    
     // Check for handoff ticket from xentra.cloud before initial auth check
     await handleHandoffExchange();
 
