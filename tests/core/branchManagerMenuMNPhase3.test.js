@@ -545,11 +545,10 @@ describe('BM Phase 3 — M:N Category Membership + RBAC + Branch Scope', () => {
 
   it('P3-18: UI contains M:N category elements in index.html and dashboard.js', () => {
     const html = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/index.html'), 'utf8');
-    // The M:N category picker is rendered by the shared branch-catalog module,
-    // which both the Owner modal and the Branch Manager menu consume.
+    // The M:N category picker is rendered by the surface-owned catalog UI module.
     const js = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/assets/js/branch-catalog-ui.js'), 'utf8');
 
     assert.ok(html.includes('id="override-categories-list"'), 'Missing override-categories-list in index.html');
-    assert.ok(js.includes('override-cat-checkbox'), 'Missing override-cat-checkbox in the shared branch-catalog module');
+    assert.ok(js.includes('override-cat-checkbox'), 'Missing override-cat-checkbox in the Owner branch catalog UI module');
   });
 });
