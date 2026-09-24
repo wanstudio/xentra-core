@@ -852,7 +852,7 @@
     $('btn-pos-hold').onclick=holdSale;
     $('btn-pos-select-table').onclick=function(){setView('meja');};
     $('btn-pos-load-sales').onclick=loadSales;
-    $('btn-pos-shift-status').onclick=toggleShiftBreak;
+    $('btn-pos-shift-status').onclick=function(){if(!state.shift){setView('shift');return;}toggleShiftBreak();};
     $('btn-pos-close-shift-top').onclick=closeShift;
     $('btn-pos-logout').onclick=function(){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(USER_KEY);window.location.replace('/login');};
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
