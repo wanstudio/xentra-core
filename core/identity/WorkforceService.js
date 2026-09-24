@@ -355,7 +355,10 @@ class WorkforceService {
       throw { status: 400, code: 'PASSWORD_TOO_SHORT', message: 'Password must be at least 8 characters.' };
     }
 
-    const user = this.repository.prepare('SELECT * FROM users WHERE id = ? AND brand_id = ?').get(userId, brandId);
+    // Membership determines access to the requested business; password remains
+    // a property of the Xentra User identity and is therefore global.
+    this.getUser(userId, brandId);
+    const user = this.repository.prepare('SELECT * FROM users WHERE id = ?').get(userId);
     if (!user) {
       throw { status: 404, code: 'USER_NOT_FOUND', message: 'User not found.' };
     }
@@ -374,14 +377,15 @@ class WorkforceService {
     const newHash = this.hashPassword(newPassword);
 
     // Update password
-    this.repository.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
-      .run(newHash, userId, brandId);
+    this.repository.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
+      .run(newHash, userId);
 
     return { success: true };
   }
 
   adminResetPassword(targetUserId, brandId, { actor_id, actor_role, actor_branch_id }) {
-    const target = this.repository.prepare('SELECT * FROM users WHERE id = ? AND brand_id = ?').get(targetUserId, brandId);
+    const targetContext = this.getUser(targetUserId, brandId);
+    const target = this.repository.prepare('SELECT * FROM users WHERE id = ?').get(targetUserId);
     if (!target) {
       throw { status: 404, code: 'USER_NOT_FOUND', message: 'Target user not found.' };
     }
