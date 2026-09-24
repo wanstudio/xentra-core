@@ -223,6 +223,9 @@ class PosShiftService {
     if (!shift || shift.status !== 'open') {
       throw new Error('[PosShiftService] Shift tidak ditemukan atau sudah ditutup.');
     }
+    if (posShiftRepository.findActiveBreakByShift(shift_id)) {
+      throw new Error('[PosShiftService] Shift sedang istirahat. Akhiri istirahat sebelum menutup shift.');
+    }
 
     // P1 DOMAIN LEVEL DEFENSE-IN-DEPTH OWNERSHIP GUARD (NEW-01 & NEW-02)
     if (actor_role === 'cashier' && actor_id && shift.cashier_id !== actor_id) {
