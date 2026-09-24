@@ -530,6 +530,19 @@ test('API Location routes: implementation is isolated from api.js', () => {
   }
 });
 
+test('API Public brand routes: implementation is isolated from api.js', () => {
+  const api = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const brandRoutes = fs.readFileSync(require.resolve('../server/routes/public-brand'), 'utf8');
+
+  for (const route of [
+    "router.get(['/promo/active', '/promotions/active']",
+    "router.get('/brand/branches'"
+  ]) {
+    assert.ok(brandRoutes.includes(route), route + ' must live in public-brand.js');
+    assert.equal(api.includes(route), false, route + ' must not remain inline in api.js');
+  }
+});
+
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
     method: 'POST',
