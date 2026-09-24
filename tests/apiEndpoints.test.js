@@ -331,7 +331,7 @@ test('Reservation create order: future booking accepted, same-day rejected via A
   const okData = okResBody;
   const row = db.prepare('SELECT order_type, scheduled_slot_start, status, order_note FROM orders WHERE id = ?').get(okData.order_id);
   assert.strictEqual(row.order_type, 'reservation');
-  assert.strictEqual(row.scheduled_slot_start, tomorrowStr);
+  assert.strictEqual(row.scheduled_slot_start, tomorrowStr + 'T19:00:00');
   assert.strictEqual(row.status, 'confirmed');
   assert.ok(String(row.order_note).includes('4 Tamu'), 'Guest count persisted in reservation note');
 
