@@ -175,12 +175,12 @@
 
     function readSelections(){
       var out=[];
-      groups.forEach(function(g){
-        var checked=document.querySelectorAll('[data-option-group="'+String(g.id).replace(/"/g,'\\\"')+'"] input:checked');
-        checked.forEach(function(input){
-          var opt=(g.options||[]).find(function(o){return String(o.id)===String(input.value);});
-          if(opt) out.push({group_id:g.id,group_name:g.name,type:g.type==='addon'?'addon':'variant',option_id:opt.id,option_name:opt.name,price_adjustment:Number(opt.price_adjustment||0)});
-        });
+      document.querySelectorAll('[data-option-id][data-option-group]').forEach(function(input){
+        if(!input.checked) return;
+        var gid=String(input.getAttribute('data-option-group'));
+        var g=groups.find(function(x){return String(x.id)===gid;});
+        var opt=g && (g.options||[]).find(function(o){return String(o.id)===String(input.value);});
+        if(opt) out.push({group_id:g.id,group_name:g.name,type:g.type==='addon'?'addon':'variant',option_id:opt.id,option_name:opt.name,price_adjustment:Number(opt.price_adjustment||0)});
       });
       return out;
     }
@@ -231,7 +231,7 @@
       grid.innerHTML=products.length?products.map(function(p){
         var unavailable=p.is_available===0 || p.is_available===false;
         return '<button type="button" class="pos-product '+(unavailable?'disabled':'')+'" data-product-id="'+esc(p.id)+'">'+
-          '<div><div class="pos-product-name">'+esc(p.name || p.product_name)+'</div><div class="pos-product-meta">'+(unavailable?'Tidak tersedia':'Siap dijual')+'</div></div>'+
+          '<div><div class="pos-product-name">'+esc(p.name || p.product_name)+'</div><div class="pos-product-meta">'+(unavailable?'Tidak tersedia':(optionGroups(p).length?'Pilih opsi':'Siap dijual'))+'</div></div>'+
           '<div class="pos-product-price">'+money(p.price || p.sale_price || p.regular_price)+'</div></button>';
       }).join(''):'<div class="pos-empty">Menu tidak ditemukan.</div>';
       grid.querySelectorAll('.pos-product').forEach(function(b){
