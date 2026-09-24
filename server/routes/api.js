@@ -6127,8 +6127,6 @@ registerPaymentConfigRoutes(router, { corePaymentRepo });
 registerAdminReportingRoutes(router, {
   db,
   requireAuth,
-  ReportingEngine,
-  overviewReportingRepo,
   corePromotionRepo,
   corePaymentRepo
 });
