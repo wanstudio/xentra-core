@@ -76,11 +76,16 @@ class PosPinCredentialService {
     return { configured: true, offline_credential: credential, user: { id: user.id, username: user.username, email: user.email, full_name: user.full_name, role: user.role, branch_id: user.branch_id } };
   }
 
-  authenticateWithPin({ brandId, branchId, pin }) {
+  authenticateWithPin({ brandId, branchId, pin, terminalId = null }) {
     const normalized = assertPin(pin);
     if (!brandId || !branchId) throw { status: 400, code: 'POS_BRANCH_REQUIRED', message: 'Cabang POS wajib ditentukan.' };
     const branch = this.repository.prepare('SELECT id, brand_id FROM branches WHERE id = ? AND brand_id = ?').get(branchId, brandId);
     if (!branch) throw { status: 400, code: 'INVALID_BRANCH', message: 'Cabang POS tidak valid untuk brand ini.' };
+    if (!terminalId) throw { status: 400, code: 'POS_TERMINAL_REQUIRED', message: 'Terminal POS belum terdaftar. Masuk menggunakan akun Xentra terlebih dahulu.' };
+    const terminal = this.repository.prepare(
+      "SELECT id, branch_id, status FROM pos_terminals WHERE id = ? AND branch_id = ? AND status = 'active'"
+    ).get(terminalId, branchId);
+    if (!terminal) throw { status: 403, code: 'POS_TERMINAL_MISMATCH', message: 'Terminal POS tidak sah untuk cabang ini.' };
     const candidates = this.repository.prepare(`
       SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status,
              pos_pin_salt, pos_pin_hash, pos_pin_failed_attempts, pos_pin_locked_until
