@@ -23,9 +23,15 @@
   var XentraCropEditor = window.XentraCropEditor;
 
   // Shared branch-catalog helpers are owned by merchant-shared/js/branch-catalog.js.
-  var XentraBranchCatalog = window.XentraBranchCatalog;
-  var getActiveBranchId = XentraBranchCatalog.getActiveBranchId;
-  var loadInlineBranchCatalog = XentraBranchCatalog.loadInlineBranchCatalog;
+  var XentraOwnerBranchCatalog = window.XentraOwnerBranchCatalog;
+  var getActiveBranchId = XentraOwnerBranchCatalog.getActiveBranchId;
+
+  // Legacy dashboard Branch Manager menu view remains local to this surface.
+  function loadInlineBranchCatalog() {
+    var branchId = getActiveBranchId();
+    if (!branchId) return;
+    if (typeof loadSingleBranchMenuView === 'function') return loadSingleBranchMenuView(branchId);
+  }
 
   // Drag state for the Branch Manager menu category bar (surface-local).
   var _dragSrcCatId = null;
@@ -1808,7 +1814,7 @@
         subtitle.textContent = 'Mengatur menu jual, harga override, dan kategori cabang untuk ' + branchName;
       }
 
-      XentraBranchCatalog.state.branchId = selectedBranchId;
+      XentraOwnerBranchCatalog.state.branchId = selectedBranchId;
       await loadSingleBranchMenuView(selectedBranchId);
     }
   }
@@ -1886,7 +1892,7 @@
   };
 
   async function loadSingleBranchMenuView(branchId) {
-    XentraBranchCatalog.state.branchId = branchId;
+    XentraOwnerBranchCatalog.state.branchId = branchId;
 
     var adoptedEl = $('menus-branch-adopted-container');
     var availableEl = $('menus-branch-available-container');
@@ -1905,7 +1911,7 @@
         return;
       }
 
-      XentraBranchCatalog.state.catalogData = data;
+      XentraOwnerBranchCatalog.state.catalogData = data;
 
       var categories = data.categories || [];
       var adopted = data.adopted_products || [];
@@ -1916,7 +1922,7 @@
       if ($('menus-branch-available-count')) $('menus-branch-available-count').textContent = available.length;
 
       renderMenusBranchCategoriesBar(categories);
-      renderMenusBranchAdoptedProducts(adopted, XentraBranchCatalog.state.inlineFilter);
+      renderMenusBranchAdoptedProducts(adopted, XentraOwnerBranchCatalog.state.inlineFilter);
       renderMenusBranchAvailableProducts(available);
     } catch (err) {
       console.error('[Single Branch Menu Load Error]:', err);
@@ -1933,14 +1939,14 @@
     // "Semua" filter button
     var allBtn = document.createElement('button');
     allBtn.type = 'button';
-    allBtn.className = 'x-cat-filter-btn' + (XentraBranchCatalog.state.inlineFilter === 'all' ? ' active' : '');
+    allBtn.className = 'x-cat-filter-btn' + (XentraOwnerBranchCatalog.state.inlineFilter === 'all' ? ' active' : '');
     allBtn.style.borderRadius = '20px';
     allBtn.textContent = 'Semua';
     allBtn.addEventListener('click', function () {
-      XentraBranchCatalog.state.inlineFilter = 'all';
+      XentraOwnerBranchCatalog.state.inlineFilter = 'all';
       if ($('menus-branch-filter-label')) $('menus-branch-filter-label').textContent = 'Menampilkan semua kategori';
       renderMenusBranchCategoriesBar(categories);
-      renderMenusBranchAdoptedProducts(XentraBranchCatalog.state.catalogData.adopted_products || [], 'all');
+      renderMenusBranchAdoptedProducts(XentraOwnerBranchCatalog.state.catalogData.adopted_products || [], 'all');
     });
     bar.appendChild(allBtn);
 
@@ -1954,7 +1960,7 @@
     }
 
     categories.forEach(function (cat) {
-      var isActive = XentraBranchCatalog.state.inlineFilter === cat.id;
+      var isActive = XentraOwnerBranchCatalog.state.inlineFilter === cat.id;
 
       var chip = document.createElement('span');
       chip.dataset.catId = cat.id;
@@ -1972,10 +1978,10 @@
       nameBtn.textContent = cat.name;
       nameBtn.addEventListener('click', function (e) {
         e.stopPropagation();
-        XentraBranchCatalog.state.inlineFilter = cat.id;
+        XentraOwnerBranchCatalog.state.inlineFilter = cat.id;
         if ($('menus-branch-filter-label')) $('menus-branch-filter-label').textContent = 'Filter: ' + cat.name;
         renderMenusBranchCategoriesBar(categories);
-        renderMenusBranchAdoptedProducts(XentraBranchCatalog.state.catalogData.adopted_products || [], cat.id);
+        renderMenusBranchAdoptedProducts(XentraOwnerBranchCatalog.state.catalogData.adopted_products || [], cat.id);
       });
       chip.appendChild(nameBtn);
 
@@ -2339,7 +2345,7 @@
     var btnMenusAddBranchCat = $('btn-menus-add-branch-category');
     if (btnMenusAddBranchCat) {
       btnMenusAddBranchCat.addEventListener('click', async function () {
-        if (!XentraBranchCatalog.state.branchId) {
+        if (!XentraOwnerBranchCatalog.state.branchId) {
           showToast('❌ Pilih cabang terlebih dahulu.');
           return;
         }
@@ -2347,7 +2353,7 @@
         if (!name || !name.trim()) return;
 
         try {
-          var res = await adminFetch(API_BASE + '/admin/branches/' + XentraBranchCatalog.state.branchId + '/categories', {
+          var res = await adminFetch(API_BASE + '/admin/branches/' + XentraOwnerBranchCatalog.state.branchId + '/categories', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ name: name.trim() })
@@ -4074,7 +4080,7 @@
       if (branchSelectorWrap) branchSelectorWrap.style.display = 'none';
       if (bmBranchBadge) bmBranchBadge.style.display = 'flex';
       if (user.branch_id) {
-        XentraBranchCatalog.state.branchId = user.branch_id;
+        XentraOwnerBranchCatalog.state.branchId = user.branch_id;
         _branchContextState.selected = user.branch_id;
         if (branchSelector) {
           branchSelector.value = user.branch_id;
@@ -7807,8 +7813,8 @@
   window.deleteMarketingPromotion = deleteMarketingPromotion;
 
   // Wire shared branch-catalog hooks: the Owner surface supplies the branch list.
-  if (window.XentraBranchCatalog) {
-    window.XentraBranchCatalog.setHooks({
+  if (window.XentraOwnerBranchCatalog) {
+    window.XentraOwnerBranchCatalog.setHooks({
       getBranches: function () { return state.branches; }
     });
   }
@@ -7897,11 +7903,11 @@
     var btnAddBranchCatInline = $('btn-add-branch-category-inline');
     if (btnAddBranchCatInline) {
       btnAddBranchCatInline.addEventListener('click', async function () {
-        if (!XentraBranchCatalog.state.branchId) return;
+        if (!XentraOwnerBranchCatalog.state.branchId) return;
         var name = prompt('Nama Kategori Baru untuk Cabang ini:');
         if (!name || !name.trim()) return;
         try {
-          var res = await adminFetch(API_BASE + '/admin/branches/' + XentraBranchCatalog.state.branchId + '/categories', {
+          var res = await adminFetch(API_BASE + '/admin/branches/' + XentraOwnerBranchCatalog.state.branchId + '/categories', {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify({ name: name.trim() })
