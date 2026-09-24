@@ -9,7 +9,9 @@ module.exports = function registerAdminMarketingPromotionRoutes(router, deps) {
     db,
     crypto,
     requireAuth,
-    corePromotionRepo
+    corePromotionRepo,
+    mediaService,
+    bannerMediaDelivery
   } = deps;
 
   function logPromotionSecurityEvent({
@@ -43,6 +45,47 @@ module.exports = function registerAdminMarketingPromotionRoutes(router, deps) {
       console.warn('[Promotion Audit Log Error]:', e.message);
     }
   }
+
+  // 6. Marketing Promotions List API
+  router.get('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+    try {
+      const isBM = req.user.role === 'branch_manager';
+      const effectiveBranchId = isBM ? (req.user.branch_id || req.user.branchId) : null;
+      const promotions = corePromotionRepo.findAllPromotions(req.brand_id, effectiveBranchId);
+      const enrichedPromotions = promotions.map(p => {
+        const rewards = (p.rewards || []).map(r => {
+          let pres = {};
+          if (r.presentation_payload) {
+            try {
+              pres = typeof r.presentation_payload === 'string'
+                ? JSON.parse(r.presentation_payload)
+                : r.presentation_payload;
+            } catch (_) {}
+          }
+          let delivery = null;
+          if (pres.media_id) {
+            delivery = bannerMediaDelivery(req.brand_id, pres.media_id);
+          }
+          return {
+            ...r,
+            presentation: pres,
+            presentation_delivery: delivery
+          };
+        });
+        return {
+          ...p,
+          rewards
+        };
+      });
+      res.json({
+        success: true,
+        promotions: enrichedPromotions,
+        total: enrichedPromotions.length
+      });
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
 
 router.post('/admin/marketing/promotions', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
