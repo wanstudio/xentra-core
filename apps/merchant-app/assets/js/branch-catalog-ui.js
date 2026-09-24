@@ -973,9 +973,7 @@
     currentManagingBranchId = branchId;
 
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + branchId + '/categories/' + catId, {
-        method: 'DELETE',
-              });
+      var res = await CatalogClient.deleteBranchCategory(branchId, catId);
       var data = await res.json();
       if (data.success) {
         showToast('✅ Kategori dihapus.');
