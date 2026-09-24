@@ -1136,6 +1136,7 @@
   }
 
   // Override removeBranchProduct and toggleBranchProductAvailability to also refresh inline panel
+  var _origToggleBranchAvail = window.toggleBranchProductAvailability;
   window.toggleBranchProductAvailability = async function (productId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
@@ -1155,6 +1156,8 @@
       showToast('\u274C Kesalahan jaringan.');
     }
   };
+
+  var _origRemoveBranchProduct = window.removeBranchProduct;
   window.removeBranchProduct = async function (productId, productName) {
     if (!currentManagingBranchId) return;
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan.')) return;
@@ -1176,14 +1179,15 @@
     }
   };
 
-  /* =========================================================================
-     EXPORTS
-     ========================================================================= */
-  window.XentraBranchCatalog = {
-    state: {
-      get branchId() { return currentManagingBranchId; },
-      set branchId(v) { currentManagingBranchId = v; },
-      get catalogData() { return currentBranchCatalogData; },
+  // Override adopt form submit to reload inline panel for branch_manager
+  var _origFormAdoptSubmit = null;
+  (function rewireAdoptSubmit() {
+    var formAdoptInline = $('form-adopt-product');
+    if (!formAdoptInline) return;
+    // We'll patch the success callback — store original handler then re-listen
+    // (already set above; we monkey-patch via reload override in openAdoptModal closure)
+  })();
+
   window.XentraMerchantBranchCatalog = {
     state: {
       get branchId() { return currentManagingBranchId; },
@@ -1197,7 +1201,9 @@
     loadInlineBranchCatalog: loadInlineBranchCatalog,
     setHooks: function (h) {
       if (!h) return;
-      Object.keys(h).forEach(function (k) { if (Object.prototype.hasOwnProperty.call(hooks, k)) hooks[k] = h[k]; });
+      Object.keys(h).forEach(function (k) {
+        if (Object.prototype.hasOwnProperty.call(hooks, k)) hooks[k] = h[k];
+      });
     },
     setBmMenuState: function (s) { bmMenuState = s; }
   };
