@@ -646,6 +646,37 @@ test('API Marketing promotion routes: implementation is isolated from api.js', (
     'promotion audit helper must stay with promotion routes');
 });
 
+test('API Marketing banner routes: implementation is isolated from api.js', () => {
+  const api = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const banners = fs.readFileSync(require.resolve('../server/routes/admin-marketing-banners'), 'utf8');
+
+  const routes = [
+    "router.get('/admin/marketing/banners'",
+    "router.get('/admin/marketing/banners/:bannerId'",
+    "router.post('/admin/marketing/banners'",
+    "router.patch('/admin/marketing/banners/:bannerId/draft'",
+    "router.post('/admin/marketing/banners/:bannerId/publish'",
+    "router.post('/admin/marketing/banners/:bannerId/discard-draft'",
+    "router.delete('/admin/marketing/banners/:bannerId'",
+    "router.post('/admin/marketing/banners/:bannerId/assignments'",
+    "router.post('/admin/marketing/banners/:bannerId/assignments/bulk'",
+    "router.patch('/admin/marketing/banners/:bannerId/assignments/:assignmentId'",
+    "router.delete('/admin/marketing/banners/:bannerId/assignments/:assignmentId'"
+  ];
+
+  for (const route of routes) {
+    assert.ok(banners.includes(route), route + ' must live in admin-marketing-banners.js');
+    assert.equal(api.includes(route), false, route + ' must not remain inline in api.js');
+  }
+
+  assert.ok(banners.includes('function bannerActor(req)'),
+    'banner actor helper must stay with banner routes');
+  assert.ok(banners.includes('function bannerAssignmentDtoForResponse('),
+    'banner assignment DTO helper must stay with banner routes');
+  assert.ok(api.includes('function bannerMediaDelivery('),
+    'shared media delivery helper must remain available to public/promotions routes');
+});
+
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
     method: 'POST',
