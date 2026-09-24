@@ -559,6 +559,30 @@ test('API Customer routes: implementation is isolated from api.js', () => {
   }
 });
 
+test('API POS routes: implementation is isolated from api.js', () => {
+  const api = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const pos = fs.readFileSync(require.resolve('../server/routes/pos'), 'utf8');
+
+  const routes = [
+    "router.post('/pos/orders/:id/settle-cash'",
+    "router.get('/pos/shifts/current'",
+    "router.post('/pos/shifts/open'",
+    "router.post('/pos/shifts/:id/cash-movement'",
+    "router.post('/pos/shifts/:id/close'",
+    "router.post('/pos/offline-sync'",
+    "router.post('/pos/offline-sync/batch'",
+    "router.post('/pos/terminal/register'",
+    "router.post('/pos/local/sale'",
+    "router.post('/pos/local/sync-outbox'",
+    "router.post('/pos/inventory-conflicts/:id/resolve'"
+  ];
+
+  for (const route of routes) {
+    assert.ok(pos.includes(route), route + ' must live in pos.js');
+    assert.equal(api.includes(route), false, route + ' must not remain inline in api.js');
+  }
+});
+
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
     method: 'POST',
