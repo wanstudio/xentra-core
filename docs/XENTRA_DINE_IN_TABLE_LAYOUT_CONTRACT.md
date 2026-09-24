@@ -6,7 +6,7 @@
 
 ## 1. Scope
 
-Xentra `dine_in` is table-aware. A Dine-in purchase is associated with one or more physical Tables at the selected fulfillment Branch.
+Xentra `dine_in` is table-aware. A customer-started Dine-in purchase is associated with exactly one physical Table at the selected fulfillment Branch. Customer-side multi-table selection is not allowed.
 
 Customer-facing Dine-in selection may use a visual floor-plan/table map instead of a simple table list.
 
@@ -15,7 +15,7 @@ Purchase Type = Dine-in
         ↓
 Guest Count
         ↓
-Table Recommendation / Selection
+Table Recommendation / Selection (one Table)
         ↓
 Confirm
         ↓
@@ -88,23 +88,46 @@ The system presents one best recommendation and visually highlights/selects it o
 
 Visual dimensions are presentation data and must never become the capacity rule.
 
-## 6. Multi-Table Dine-in
+## 6. Customer Dine-in Table Scope
 
-A Dine-in Order / active Dining Session may use one or multiple existing Table entities.
+Customer-side Dine-in selection is **single-table only**.
 
-Multiple Tables are associated with the same dining context; they are not merged into a new Table entity and no merge/split lifecycle is required.
+- A Customer may select/claim exactly one Table for a customer-started Dine-in context.
+- Customer App must not expose multi-table selection or allow a Customer to claim multiple Tables through repeated QR scans, floor-plan selections, or multiple pending requests.
+- Any operational table correction required after acceptance is a Merchant/POS responsibility, not a customer self-service table transfer.
+- Multi-table customer selection is explicitly out of scope for the current MVP/business contract.
 
-The number of associated Tables is not capped by a fixed business rule.
+## 7. Customer Entry, Merchant Acceptance, and Payment
 
-All Tables associated with the active dining context participate in the same operational lifecycle for that context, subject to independent reservation/blocking state.
+Customer Dine-in has two valid entry methods:
 
-## 7. Operational State, QR, and Payment Hold
+1. **Table QR** — resolves Branch + Table directly.
+2. **Customer PWA Floor Plan** — Customer selects one Table from the visual layout.
 
-Browsing or selecting Tables does not create a hold.
+QR is a shortcut for selecting the Table. It does **not** automatically create an Active Dining Session.
 
-A temporary Table hold begins when the Customer enters the payment stage. The Dine-in payment/Table hold expiry is **15 minutes**.
+Floor-plan selection likewise does **not** automatically create an Active Dining Session.
 
-Payment success changes held Tables to occupied for the active Dining Session. Payment failure, cancellation, or expiry releases the temporary hold back to available, subject to authoritative server/payment state.
+Both entry methods converge into the same customer-started Dine-in order flow:
+
+`QR OR FLOOR PLAN → 1 TABLE → DINE-IN ORDER → MERCHANT ACCEPT / REJECT → ACTIVE DINING SESSION`
+
+Customer-side table selection is a declaration/selection, not authoritative occupancy. The Merchant operationally accepts or rejects the customer-started Dine-in order.
+
+### Payment
+
+Xentra customer payment has two practical methods:
+
+- **Online:** Customer may pay from anywhere. Physical presence is not a required security condition for online payment. If a Customer pays online for a Dine-in order and does not arrive, the payment is not treated as a technical table-fraud problem.
+- **Cash:** Customer selects Cash and the order enters Merchant operational flow. Merchant/Branch Manager can verify whether the Customer is present at the selected Table. If the Customer does not arrive within the configured operational timeout, the Merchant may cancel/reject the cash Dine-in order.
+
+Do not invent an additional customer-facing payment/security step solely to prove physical presence.
+
+### Table hold
+
+Browsing or selecting a Table does not create an occupancy hold.
+
+Where the existing payment/hold contract requires a temporary Table hold during payment, the hold remains a server-authoritative operational mechanism and expires according to the existing **15-minute** contract. A hold is not equivalent to an Active Dining Session.
 
 Frontend timers are not authoritative; backend/payment provider callbacks or webhooks determine payment state.
 
@@ -112,17 +135,19 @@ Each Table has a stable QR identity. QR may be revoked and replaced by Owner/Bra
 
 Staff may block/unblock a Table temporarily without changing its layout.
 
-## 8. Dining Lifecycle, Corrections, and Additional Orders
+## 8. Dining Lifecycle and Additional Orders
+
+An Active Dining Session begins only after the customer-started Dine-in order reaches the approved Merchant operational acceptance boundary.
 
 Payment completion does not mean the dining session is finished.
 
 A Dine-in Dining Session remains active until staff/POS explicitly completes/finishes it.
 
-Customer may place additional food/drink orders from their phone while the Dining Session is active. Additional orders remain associated with the same active dining context and its Table association, as separate order events/orders as appropriate.
+Customer may place additional food/drink orders from their phone while the Dining Session is active. Additional orders remain associated with the same active dining context and its single customer Table.
 
-Staff/POS may correct the selected Table or Table combination operationally when necessary, including after a successful online payment. Payment remains attached to the Order and is not invalidated merely because the Table assignment changes.
+Customer cannot self-transfer to another Table after the dining context is active. Any operational correction/reassignment is a Merchant/POS responsibility.
 
-When the active Dining Session is completed, all Tables associated with that session become available together, subject to any independent reservation or blocking state.
+When the active Dining Session is completed, its Table becomes available again, subject to independent reservation or blocking state.
 
 ## 9. Reservation Boundary
 
@@ -172,9 +197,9 @@ Owner, Branch Manager, and Staff with the appropriate permission may configure/e
 - Table capacity is authoritative.
 - Recommendation uses guest count, availability, and floor-plan spatial proximity.
 - Customer receives one best visual recommendation but may change selection manually.
-- A Dine-in context may associate any number of existing Tables; no merge/split entity is created.
+- Customer-started Dine-in context uses exactly one customer-selected Table.
 - Payment belongs to the Order, not to the Table.
-- Table hold begins at payment stage and expires after 15 minutes unless payment state resolves earlier.
+- Where applicable, Table hold begins at payment stage and expires after 15 minutes unless payment state resolves earlier; hold is distinct from Active Dining Session.
 - `dine_in` and `reservation` remain separate order types.
 - Table identity remains stable when visual layout changes or Table properties are edited.
 - `order_channel` remains separate from `order_type`.
@@ -182,6 +207,6 @@ Owner, Branch Manager, and Staff with the appropriate permission may configure/e
 
 ## 13. Explicit Non-Goals / Do Not Invent
 
-Do not invent customer-initiated table transfer workflows, post-start automatic table reassignment, advanced seating optimization beyond the stated recommendation priority, or other table lifecycle policies not defined here.
+Do not invent customer-initiated table transfer workflows, post-start automatic table reassignment, multi-table customer selection, GPS proof-of-presence requirements, or other table lifecycle policies not defined here.
 
-Table merge/split is explicitly **not** a feature. Multi-Table Dine-in is association of existing independent Table entities to the same dining context.
+Customer-side Multi-Table Dine-in is explicitly **not** a feature for the current MVP/business contract.
