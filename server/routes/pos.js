@@ -303,13 +303,25 @@ router.get('/pos/orders/:id/receipt', requireAuth(['cashier']), (req, res) => {
     if (!order) return res.status(404).json({ success: false, error: 'Transaksi POS tidak ditemukan.' });
 
     const itemRows = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY rowid ASC').all(order.id);
-    const items = itemRows.map((it) => ({
-      name: it.product_name || it.name || it.product_id,
-      quantity: Number(it.quantity || 1),
-      unit_price: Number(it.unit_price || it.price || 0),
-      subtotal: Number(it.item_subtotal || it.subtotal || 0),
-      note: it.note || ''
-    }));
+    const items = itemRows.map((it) => {
+      let optionText = '';
+      if (it.modifiers_snapshot) {
+        try {
+          const options = JSON.parse(it.modifiers_snapshot);
+          if (Array.isArray(options) && options.length) {
+            optionText = options.map((o) => o.group_name ? o.group_name + ': ' + o.option_name : o.option_name).join(' · ');
+          }
+        } catch (_) {}
+      }
+      const note = [optionText ? 'Opsi: ' + optionText : '', it.note || ''].filter(Boolean).join(' | ');
+      return {
+        name: it.product_name || it.name || it.product_id,
+        quantity: Number(it.quantity || 1),
+        unit_price: Number(it.unit_price || it.price || 0),
+        subtotal: Number(it.item_subtotal || it.subtotal || 0),
+        note
+      };
+    });
 
     const { PosHardwareRouter } = require('../../domains/pos');
     const receipt = PosHardwareRouter.buildCustomerReceipt({
