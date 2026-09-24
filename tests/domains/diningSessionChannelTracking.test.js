@@ -3,7 +3,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const crypto = require('crypto');
 const db = require('../../server/database/db');
-const { DiningTableService, DiningTableRepository } = require('../../domains/pos');
+const { DiningTableService } = require('../../domains/dining');
+const { DiningTableRepository } = require('../../core/data/repositories');
 const { CashSettlementService, PaymentGatewayService } = require('../../domains/payment');
 
 test.before(() => {
