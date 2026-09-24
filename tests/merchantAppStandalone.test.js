@@ -189,8 +189,8 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
       loadInlineBranchCatalog: () => {}
     };
 
-    win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
-    // The test source only needs the shared globals/functions exposed above.
+    // merchant-app.js consumes the shared contract through XentraShared; use
+    // lightweight stubs here so the test isolates queue rendering and sorting.
     win.eval(fs.readFileSync(JS_PATH, 'utf8'));
     await win.loadBMOrders();
 
