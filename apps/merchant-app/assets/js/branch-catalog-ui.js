@@ -26,39 +26,9 @@
     return !!(user && user.role === 'branch_manager');
   }
 
-  window.toggleBranchProductAvailability = async function (productId, nextAvail) {
-    if (!currentManagingBranchId) return;
-    try {
-      var res = await CatalogClient.setBranchProductAvailability(currentManagingBranchId, productId, nextAvail);
-      var data = await res.json();
-      if (data.success) {
-        showToast('Ketersediaan menu cabang diperbarui.');
-        loadInlineBranchCatalog();
-      } else {
-        showToast('❌ ' + (data.error || 'Gagal mengubah ketersediaan.'));
-      }
-    } catch (err) {
-      showToast('❌ Kesalahan jaringan.');
-    }
-  };
 
-  window.removeBranchProduct = async function (productId, productName) {
-    if (!currentManagingBranchId) return;
-    if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.')) return;
 
-    try {
-      var res = await CatalogClient.removeBranchProduct(currentManagingBranchId, productId);
-      var data = await res.json();
-      if (data.success) {
-        showToast('✅ Produk dihapus dari katalog cabang.');
-        loadInlineBranchCatalog();
-      } else {
-        showToast('❌ ' + (data.error || 'Gagal menghapus produk.'));
-      }
-    } catch (err) {
-      showToast('❌ Kesalahan jaringan.');
-    }
-  };
+
 
   /* =========================================================================
      MODUL 3.2: BRANCH PRODUCT OVERRIDE — name / description / image_url
