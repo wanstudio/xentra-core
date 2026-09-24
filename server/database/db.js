@@ -799,6 +799,26 @@ function initSchema(targetDb) {
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS workforce_memberships (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      organization_id TEXT NOT NULL,
+      brand_id TEXT NOT NULL,
+      branch_id TEXT,
+      role TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE SET NULL,
+      UNIQUE (user_id, brand_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_wfm_user_id ON workforce_memberships(user_id);
+    CREATE INDEX IF NOT EXISTS idx_wfm_brand_role ON workforce_memberships(brand_id, role, status);
+    CREATE INDEX IF NOT EXISTS idx_wfm_branch ON workforce_memberships(brand_id, branch_id, role, status);
+
     CREATE TABLE IF NOT EXISTS branch_delivery_settings (
       id TEXT PRIMARY KEY,
       branch_id TEXT UNIQUE NOT NULL,
@@ -1835,6 +1855,34 @@ function initSchema(targetDb) {
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_prt_user_id ON password_reset_tokens(user_id);'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_prt_token_hash ON password_reset_tokens(token_hash);'); } catch (e) {}
   try { targetDb.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_unique ON users(email) WHERE email IS NOT NULL;'); } catch (e) {}
+
+  // Workforce membership migration: legacy users carried one brand/role directly
+  // on the user row. Backfill that legacy relationship into the canonical
+  // per-brand membership table without deleting or rewriting the legacy fields.
+  try {
+    targetDb.exec(`
+      INSERT OR IGNORE INTO workforce_memberships (
+        id, user_id, organization_id, brand_id, branch_id, role, status, created_at, updated_at
+      )
+      SELECT
+        'wfm_legacy_' || u.id,
+        u.id,
+        u.organization_id,
+        u.brand_id,
+        u.branch_id,
+        u.role,
+        COALESCE(u.status, 'active'),
+        COALESCE(u.created_at, datetime('now')),
+        COALESCE(u.updated_at, datetime('now'))
+      FROM users u
+      WHERE u.brand_id IS NOT NULL
+        AND u.organization_id IS NOT NULL
+        AND u.role IS NOT NULL
+        AND u.role != 'platform_owner';
+    `);
+  } catch (e) {
+    console.warn('[Database] Workforce membership backfill skipped:', e.message);
+  }
 
   // Email verification tokens (single-use, time-limited)
   try { targetDb.exec('ALTER TABLE users ADD COLUMN email_verified_at TEXT;'); } catch (e) {}
