@@ -170,6 +170,27 @@ function request(method, path, body, headers = {}) {
 
 // ─── Test Suite ───────────────────────────────────────────────────────────────
 
+it('P9-00: operational order lifecycle routes are isolated from api.js', () => {
+  const fs = require('fs');
+  const apiPath = require.resolve('../../server/routes/api');
+  const modulePath = require.resolve('../../server/routes/operational-orders');
+  const apiSource = fs.readFileSync(apiPath, 'utf8');
+  const moduleSource = fs.readFileSync(modulePath, 'utf8');
+
+  const patterns = [
+    "router.get('/kitchen/queue'",
+    "router.patch('/kitchen/orders/:id/status'",
+    "router.post('/orders/:id/branch-acceptance'"
+  ];
+
+  for (const pattern of patterns) {
+    assert.equal(apiSource.includes(pattern), false, pattern + ' must not remain inline in api.js');
+    assert.equal(moduleSource.includes(pattern), true, pattern + ' must live in operational-orders.js');
+  }
+
+  assert.equal((apiSource.match(/registerOperationalOrderRoutes\\(router,/g) || []).length, 1);
+});
+
 describe('Phase 9 — Branch Manager Order Operations', () => {
   let bmAToken;
   let bmBToken;
