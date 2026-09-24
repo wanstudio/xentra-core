@@ -5,6 +5,9 @@
   var API = '/api/v1';
   var TOKEN_KEY = 'xentra_merchant_token';
   var USER_KEY = 'xentra_merchant_user';
+  var POS_PIN_CACHE_KEY = 'xentra_pos_pin_cache_v1';
+  var POS_MENU_CACHE_PREFIX = 'xentra_pos_menu_cache_v1:';
+  var POS_SHIFT_CACHE_PREFIX = 'xentra_pos_shift_cache_v1:';
   var state = {
     user: null,
     branchId: null,
@@ -19,7 +22,8 @@
     sales: [],
     terminalId: localStorage.getItem('xentra_pos_terminal_id') || null,
     paymentModes: [],
-    activePaymentMode: 'cash'
+    activePaymentMode: 'cash',
+    offlineMode: false
   };
 
   function $(id) { return document.getElementById(id); }
@@ -55,6 +59,215 @@
     var el=$('pos-connection-badge'); if(!el)return;
     el.textContent=online?'ONLINE':'OFFLINE'; el.className='pos-status '+(online?'online':'offline');
   }
+
+  function getPosPinCache() {
+    try { return JSON.parse(localStorage.getItem(POS_PIN_CACHE_KEY) || 'null'); } catch (_) { return null; }
+  }
+
+  function savePosPinCache(userData, credential, branchId) {
+    if (!userData || !credential || !credential.salt || !credential.hash || !branchId) return;
+    localStorage.setItem(POS_PIN_CACHE_KEY, JSON.stringify({
+      user: {
+        id: userData.id,
+        username: userData.username,
+        email: userData.email || null,
+        full_name: userData.full_name || userData.username || 'Kasir',
+        role: 'cashier',
+        branch_id: branchId
+      },
+      branch_id: branchId,
+      offline_credential: credential,
+      cached_at: new Date().toISOString()
+    }));
+  }
+
+  function savePosMenuCache() {
+    if (!state.branchId || !state.menu) return;
+    try { localStorage.setItem(POS_MENU_CACHE_PREFIX + state.branchId, JSON.stringify({ saved_at: new Date().toISOString(), menu: state.menu })); } catch (_) {}
+  }
+
+  function getPosMenuCache(branchId) {
+    if (!branchId) return null;
+    try {
+      var entry=JSON.parse(localStorage.getItem(POS_MENU_CACHE_PREFIX + branchId) || 'null');
+      return entry && entry.menu ? entry.menu : null;
+    } catch (_) { return null; }
+  }
+
+  function savePosShiftCache() {
+    if (!state.user || !state.user.id) return;
+    try { localStorage.setItem(POS_SHIFT_CACHE_PREFIX + state.user.id, JSON.stringify({ saved_at: new Date().toISOString(), shift: state.shift || null })); } catch (_) {}
+  }
+
+  function getPosShiftCache(userId) {
+    if (!userId) return null;
+    try {
+      var entry=JSON.parse(localStorage.getItem(POS_SHIFT_CACHE_PREFIX + userId) || 'null');
+      return entry ? entry.shift : null;
+    } catch (_) { return null; }
+  }
+
+  function base64FromBytes(bytes) {
+    var binary='';
+    for (var i=0;i<bytes.length;i++) binary+=String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
+  function bytesFromBase64(value) {
+    var binary=atob(value);
+    var out=new Uint8Array(binary.length);
+    for (var i=0;i<binary.length;i++) out[i]=binary.charCodeAt(i);
+    return out;
+  }
+
+  async function verifyOfflinePin(pin, credential) {
+    if (!credential || !window.crypto || !window.crypto.subtle || !window.TextEncoder) return false;
+    if (!/^\d{6}$/.test(String(pin || ''))) return false;
+    try {
+      var key=await crypto.subtle.importKey('raw', new TextEncoder().encode(String(pin)), {name:'PBKDF2'}, false, ['deriveBits']);
+      var bits=await crypto.subtle.deriveBits({
+        name:'PBKDF2',
+        salt:bytesFromBase64(credential.salt),
+        iterations:Number(credential.iterations || 210000),
+        hash:credential.digest || 'SHA-256'
+      }, key, Number(credential.key_length || 32)*8);
+      return base64FromBytes(new Uint8Array(bits))===credential.hash;
+    } catch (_) { return false; }
+  }
+
+  async function requestWithTimeout(path, options, timeoutMs) {
+    var opts=options||{};
+    var controller=window.AbortController ? new AbortController() : null;
+    if (controller) opts.signal=controller.signal;
+    var timer=null;
+    try {
+      var timeoutPromise=new Promise(function(_,reject){
+        timer=setTimeout(function(){
+          if (controller) controller.abort();
+          var err=new Error('NETWORK_TIMEOUT'); err.code='NETWORK_TIMEOUT'; reject(err);
+        }, timeoutMs || 1800);
+      });
+      var fetchPromise=fetch(API+path,opts).then(async function(res){
+        var data=await res.json().catch(function(){return {};});
+        if (!res.ok) {
+          var err=new Error(data.error || data.message || 'Permintaan gagal.');
+          err.code=data.code || (res.status===401?'UNAUTHORIZED':'HTTP_ERROR');
+          err.status=res.status;
+          throw err;
+        }
+        return data;
+      });
+      return await Promise.race([fetchPromise,timeoutPromise]);
+    } catch (err) {
+      if (err && err.name==='AbortError') {
+        var timeoutErr=new Error('NETWORK_TIMEOUT'); timeoutErr.code='NETWORK_TIMEOUT'; throw timeoutErr;
+      }
+      throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  function applyCashierUser(userData) {
+    state.user=userData;
+    state.branchId=userData.branch_id || userData.branchId || null;
+    if ($('pos-branch-name')) $('pos-branch-name').textContent=userData.branch_name || state.branchId || 'Cabang';
+    if ($('pos-cashier-name')) $('pos-cashier-name').textContent=userData.full_name || userData.username || 'Kasir';
+  }
+
+  function showPosAuthGate(offlineReason) {
+    var gate=$('pos-auth-gate'); if(!gate) return;
+    var badge=$('pos-auth-badge'), subtitle=$('pos-auth-subtitle'), input=$('pos-login-pin'), error=$('pos-pin-login-error');
+    if (offlineReason) {
+      badge.textContent='OFFLINE / PIN TERSIMPAN'; badge.className='pos-auth-badge offline';
+      subtitle.textContent='Koneksi ke Core tidak tersedia atau terlalu lambat. Masukkan PIN POS untuk membuka kasir yang sudah pernah digunakan di terminal ini.';
+    } else {
+      badge.textContent='PIN Kasir'; badge.className='pos-auth-badge';
+      subtitle.textContent='Masukkan PIN 6 digit untuk masuk cepat ke akun Kasir.';
+    }
+    if (error) error.textContent='';
+    if (input) { input.value=''; setTimeout(function(){input.focus();},50); }
+    gate.style.display='flex';
+  }
+
+  function hidePosAuthGate() {
+    var gate=$('pos-auth-gate'); if(gate) gate.style.display='none';
+  }
+
+  async function onlinePinLogin(pin) {
+    var cached=getPosPinCache();
+    var branchId=(cached && cached.branch_id) || state.branchId;
+    if (!branchId) {
+      var err=new Error('POS terminal belum memiliki konteks cabang. Masuk menggunakan akun Xentra terlebih dahulu.'); err.code='POS_BRANCH_REQUIRED'; throw err;
+    }
+    return requestWithTimeout('/auth/pos/pin',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({branch_id:branchId,pin:String(pin||'')})
+    },1800);
+  }
+
+  async function unlockWithPin(pin) {
+    var cached=getPosPinCache();
+    if (!cached || !cached.offline_credential || !cached.user) {
+      var missing=new Error('PIN POS belum tersiap pada terminal ini. Masuk menggunakan akun Xentra terlebih dahulu.'); missing.code='PIN_NOT_CACHED'; throw missing;
+    }
+
+    var canTryOnline=navigator.onLine;
+    if (canTryOnline) {
+      try {
+        var online=await onlinePinLogin(pin);
+        localStorage.setItem(TOKEN_KEY,online.token);
+        localStorage.setItem(USER_KEY,JSON.stringify(online.user));
+        state.offlineMode=false;
+        applyCashierUser(online.user);
+        if (online.offline_credential) savePosPinCache(online.user,online.offline_credential,state.branchId);
+        return {online:true};
+      } catch (err) {
+        // Never fall back to a cached PIN for an explicit server-side credential failure.
+        if (err && err.status && err.status>=400 && err.status<500 && err.code!=='NETWORK_TIMEOUT') throw err;
+      }
+    }
+
+    var valid=await verifyOfflinePin(pin,cached.offline_credential);
+    if (!valid) {
+      var invalid=new Error('PIN Kasir salah.'); invalid.code='INVALID_OFFLINE_POS_PIN'; throw invalid;
+    }
+
+    state.offlineMode=true;
+    applyCashierUser(cached.user);
+    state.terminalId=localStorage.getItem('xentra_pos_terminal_id') || null;
+    state.menu=getPosMenuCache(state.branchId) || {categories:[],products:[]};
+    state.shift=getPosShiftCache(state.user.id);
+    return {online:false};
+  }
+
+  function openPinUnlockGate(offlineReason) {
+    return new Promise(function(resolve,reject){
+      showPosAuthGate(offlineReason);
+      var form=$('pos-pin-login-form'), input=$('pos-login-pin'), error=$('pos-pin-login-error'), btn=$('btn-pos-pin-login');
+      if (!form) return reject(new Error('POS PIN form tidak tersedia.'));
+      form.onsubmit=async function(e){
+        e.preventDefault();
+        var pin=(input ? input.value : '').trim();
+        if (!/^\d{6}$/.test(pin)) { if(error) error.textContent='Masukkan PIN 6 digit.'; return; }
+        if (btn) { btn.disabled=true; btn.textContent='Memverifikasi...'; }
+        try {
+          var result=await unlockWithPin(pin);
+          hidePosAuthGate();
+          if (btn) { btn.disabled=false; btn.textContent='Masuk dengan PIN'; }
+          resolve(result);
+        } catch (err) {
+          if (error) error.textContent=err.message || 'PIN tidak valid.';
+          if (input) { input.value=''; input.focus(); }
+          if (btn) { btn.disabled=false; btn.textContent='Masuk dengan PIN'; }
+        }
+      };
+      var accountBtn=$('btn-pos-account-login');
+      if (accountBtn) accountBtn.onclick=function(){ window.location.replace('/login'); };
+    });
+  }
+
 
   function setView(view) {
     document.querySelectorAll('.pos-view').forEach(function(v){ v.classList.toggle('active', v.id === 'pos-view-' + view); });
@@ -246,21 +459,90 @@
       var data=await request('/catalog/menu?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
       var catalogProducts=Array.isArray(data.all_products)?data.all_products:(data.products&&Array.isArray(data.products.items)?data.products.items:[]);
       state.menu={categories:data.categories||[],products:catalogProducts};
+      savePosMenuCache();
       renderMenu();
       setConnection(true);
-    }catch(e){ setConnection(false); if($('pos-product-grid'))$('pos-product-grid').innerHTML='<div class="pos-empty">Menu tidak dapat dimuat. Periksa koneksi.</div>'; }
+    }catch(e){
+      setConnection(false);
+      var cachedMenu=getPosMenuCache(state.branchId);
+      if(cachedMenu){ state.menu=cachedMenu; renderMenu(); return; }
+      if($('pos-product-grid'))$('pos-product-grid').innerHTML='<div class="pos-empty">Menu tidak dapat dimuat. Periksa koneksi.</div>';
+    }
+  }
+
+  async function ensurePosPinConfigured(){
+    try {
+      var d=await request('/auth/pos-pin',{headers:headers()});
+      if(d && d.configured && d.offline_credential) {
+        savePosPinCache(d.user || state.user,d.offline_credential,state.branchId);
+        return true;
+      }
+      return await promptSetPosPin();
+    } catch (err) {
+      // A configured PIN may already exist in the terminal cache; only force setup
+      // when the current authenticated session is healthy and no cache is available.
+      var cached=getPosPinCache();
+      if(cached && cached.offline_credential) return true;
+      throw err;
+    }
+  }
+
+  function promptSetPosPin(){
+    return new Promise(function(resolve){
+      showModal('<h3>Buat PIN POS</h3><p class="pos-pin-setup-note">PIN ini adalah credential tambahan untuk membuka POS dengan cepat. PIN tidak menggantikan login akun Xentra dan tidak dapat dipakai untuk Owner Dashboard atau Merchant App.</p>'+
+        '<div class="pos-form-row"><label>PIN POS (6 digit)</label><input id="pos-setup-pin" class="pos-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" minlength="6" autocomplete="new-password" placeholder="••••••"></div>'+
+        '<div class="pos-form-row"><label>Konfirmasi PIN</label><input id="pos-setup-pin-confirm" class="pos-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" minlength="6" autocomplete="new-password" placeholder="••••••"></div>'+
+        '<div id="pos-pin-setup-error" class="pos-auth-error"></div>'+
+        '<div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-pin-setup-cancel" type="button">Nanti</button><button class="pos-btn" id="pos-pin-setup-save" type="button">Simpan PIN</button></div>');
+      $('pos-pin-setup-cancel').onclick=function(){
+        hideModal();
+        var err=new Error('POS PIN belum diset.'); err.code='POS_PIN_NOT_CONFIGURED'; resolve(false);
+      };
+      $('pos-pin-setup-save').onclick=async function(){
+        var pin=($('pos-setup-pin').value||'').trim(), confirm=($('pos-setup-pin-confirm').value||'').trim(), error=$('pos-pin-setup-error'), btn=$('pos-pin-setup-save');
+        if(!/^\d{6}$/.test(pin) || pin!==confirm) { error.textContent='PIN harus 6 digit dan kedua input harus sama.'; return; }
+        btn.disabled=true; btn.textContent='Menyimpan...';
+        try {
+          var d=await request('/auth/pos-pin',{method:'PUT',headers:headers(),body:JSON.stringify({pin:pin})});
+          if(d && d.offline_credential) savePosPinCache(d.user || state.user,d.offline_credential,state.branchId);
+          hideModal();
+          resolve(true);
+        } catch(err) {
+          error.textContent=err.message || 'PIN gagal disimpan.';
+          btn.disabled=false; btn.textContent='Simpan PIN';
+        }
+      };
+      setTimeout(function(){ if($('pos-setup-pin')) $('pos-setup-pin').focus(); },50);
+    });
   }
 
   async function ensureSession(){
-    if(!token()){window.location.replace('/login');return false;}
-    var me=await request('/auth/merchant/me',{headers:headers()});
-    state.user=me.user;
-    if(state.user.role!=='cashier'){ window.location.replace(me.landing || '/merchant/'); return false; }
-    state.branchId=state.user.branch_id || state.user.branchId;
-    if(!state.branchId){ toast('Akun kasir belum memiliki cabang.'); return false; }
-    if($('pos-branch-name')) $('pos-branch-name').textContent=state.user.branch_name || state.branchId;
-    if($('pos-cashier-name')) $('pos-cashier-name').textContent=state.user.full_name || state.user.username || 'Kasir';
-    return true;
+    if(!token()){
+      var cached=getPosPinCache();
+      if(!cached) { window.location.replace('/login'); return false; }
+      await openPinUnlockGate(!navigator.onLine);
+      return true;
+    }
+    try {
+      var me=await requestWithTimeout('/auth/merchant/me',{headers:headers()},1800);
+      applyCashierUser(me.user);
+      if(state.user.role!=='cashier'){ window.location.replace(me.landing || '/merchant/'); return false; }
+      if(!state.branchId){ toast('Akun kasir belum memiliki cabang.'); return false; }
+      await ensurePosPinConfigured();
+      return true;
+    } catch(err) {
+      var cached=getPosPinCache();
+      // Network/timeout may use local PIN; a real server-side 401 can also be
+      // recovered through the cached POS credential without accepting the old token.
+      if(cached && cached.offline_credential) {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+        await openPinUnlockGate(err && err.code==='NETWORK_TIMEOUT' ? true : true);
+        return true;
+      }
+      window.location.replace('/login');
+      return false;
+    }
   }
 
   async function loadPaymentModes(){
@@ -276,12 +558,12 @@
   async function loadTerminal(){
     try{
       var d=await request('/pos/terminal/current',{headers:headers()});
-      state.terminalId=d.terminal ? d.terminal.id : null;
+      state.terminalId=d.terminal ? d.terminal.id : (localStorage.getItem('xentra_pos_terminal_id') || null);
       if(state.terminalId) localStorage.setItem('xentra_pos_terminal_id',state.terminalId);
       return !!state.terminalId;
     }catch(e){
-      state.terminalId=null;
-      return false;
+      state.terminalId=state.terminalId || localStorage.getItem('xentra_pos_terminal_id') || null;
+      return !!state.terminalId;
     }
   }
 
@@ -289,7 +571,10 @@
     try{
       var d=await request('/pos/shifts/current',{headers:headers()});
       state.shift=d.shift||null;
-    }catch(e){state.shift=null;}
+      savePosShiftCache();
+    }catch(e){
+      state.shift=getPosShiftCache(state.user && state.user.id);
+    }
     renderShift(); renderCart();
   }
 
@@ -492,9 +777,17 @@
       await loadShift();
       await loadMenu();
       setView('kasir');
-      window.addEventListener('online',function(){setConnection(true);loadTerminal();loadMenu();request('/pos/local/sync-outbox',{method:'POST',headers:headers(),body:JSON.stringify({terminal_id:state.terminalId,branch_id:state.branchId})}).catch(function(){});});
+      window.addEventListener('online',function(){
+        setConnection(!state.offlineMode);
+        if(state.offlineMode && token()) state.offlineMode=false;
+        loadTerminal();
+        loadMenu();
+        if(token()) {
+          request('/pos/local/sync-outbox',{method:'POST',headers:headers(),body:JSON.stringify({terminal_id:state.terminalId,branch_id:state.branchId})}).catch(function(){});
+        }
+      });
       window.addEventListener('offline',function(){setConnection(false);});
-      setConnection(navigator.onLine);
+      setConnection(!state.offlineMode && navigator.onLine);
     }catch(e){toast(e.message||'Gagal memuat POS.');}
   }
 
