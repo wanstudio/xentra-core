@@ -24,7 +24,10 @@ const routes = [
   "router.post('/auth/handoff/exchange'",
   "router.post('/auth/link-google'",
   "router.post('/auth/google/link-init'",
-  "router.get('/auth/config'"
+  "router.get('/auth/config'",
+  "router.get('/auth/pos-pin'",
+  "router.put('/auth/pos-pin'",
+  "router.post('/auth/pos/pin'"
 ];
 
 test('Merchant Auth Routes: implementation is isolated behind one route boundary', () => {

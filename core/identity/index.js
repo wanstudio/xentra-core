@@ -11,6 +11,7 @@ const RoleBoundaryEnforcement = require('./RoleBoundaryEnforcement');
 const WorkforceService = require('./WorkforceService');
 const WorkforceInvitationService = require('./WorkforceInvitationService');
 const WorkforceMembershipService = require('./WorkforceMembershipService');
+const PosPinCredentialService = require('./PosPinCredentialService');
 const RegistrationService = require('./RegistrationService');
 const EmailVerificationService = require('./EmailVerificationService');
 const PlatformBootstrapService = require('./PlatformBootstrapService');
@@ -33,6 +34,7 @@ module.exports = {
   WorkforceService,
   WorkforceInvitationService,
   WorkforceMembershipService,
+  PosPinCredentialService,
   RegistrationService,
   EmailVerificationService,
   PlatformBootstrapService,

@@ -16,6 +16,7 @@
  */
 const { CatalogRepository } = require('../../../core/data/repositories');
 const PricingPolicyModel = require('../models/PricingPolicyModel');
+const ProductOptionsModel = require('../models/ProductOptionsModel');
 
 const catalogRepository = new CatalogRepository();
 
@@ -79,7 +80,8 @@ class CatalogService {
         master_image_url: prod.master_image_url,
         media_id: prod.media_id || null,
         category_ids: prod.category_ids || (prod.category_id ? [prod.category_id] : []),
-        categories: prod.categories || []
+        categories: prod.categories || [],
+        options_config: ProductOptionsModel.normalizeConfig(prod.options_config)
       };
     });
 
@@ -128,7 +130,8 @@ class CatalogService {
         is_available: true,
         stock_estimate: null,
         sort_order: prod.sort_order,
-        media_id: prod.media_id || null
+        media_id: prod.media_id || null,
+        options_config: ProductOptionsModel.normalizeConfig(prod.options_config)
       };
     });
 

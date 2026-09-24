@@ -270,6 +270,40 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
   }
 });
 
+router.get('/admin/products/:id/options', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const product = db.prepare('SELECT id, name, options_config FROM products WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!product) return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+    const ProductOptionsModel = require('../../domains/catalog/models/ProductOptionsModel');
+    res.json({ success: true, product_id: product.id, product_name: product.name, options_config: ProductOptionsModel.normalizeConfig(product.options_config) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/admin/products/:id/options', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const product = db.prepare('SELECT id, name FROM products WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    if (!product) return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+
+    const ProductOptionsModel = require('../../domains/catalog/models/ProductOptionsModel');
+    const config = ProductOptionsModel.validateConfig(req.body && req.body.options_config);
+    const stmt = db.prepare(`
+      UPDATE products
+      SET options_config = ?, updated_at = datetime('now')
+      WHERE id = ? AND brand_id = ?
+    `).run(JSON.stringify(config), product.id, req.brand_id);
+
+    if (!stmt || stmt.changes === 0) {
+      return res.status(400).json({ success: false, error: 'Konfigurasi option tidak berubah.' });
+    }
+
+    res.json({ success: true, product_id: product.id, product_name: product.name, options_config: config });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.patch('/admin/products/:id/toggle', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const stmt = db.prepare(`

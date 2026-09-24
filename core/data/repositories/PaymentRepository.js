@@ -72,7 +72,7 @@ class PaymentRepository {
   }
 
   ensurePendingPayment({ paymentId, orderId, provider, paymentMethod, merchantId = null, amount, createdAt, updatedAt }) {
-    const validProviders = ['cash', 'midtrans', 'doku'];
+    const validProviders = ['cash', 'midtrans', 'doku', 'qris_static'];
     if (!provider || !validProviders.includes(provider) || !paymentMethod || !validProviders.includes(paymentMethod)) {
       throw new Error('INVALID_PAYMENT_PROVIDER');
     }
@@ -119,6 +119,13 @@ class PaymentRepository {
       SET payment_status = ?, updated_at = ?
       WHERE order_id = ?
     `, [paymentStatus, updatedAt, orderId]);
+  }
+
+  updatePaymentGatewayToken({ orderId, snapToken = null, merchantId = null, transactionId = null, updatedAt }) {
+    return this.db.execute(
+      'UPDATE order_payments SET snap_token = COALESCE(?, snap_token), merchant_id = COALESCE(?, merchant_id), transaction_id = COALESCE(?, transaction_id), updated_at = ? WHERE order_id = ?',
+      [snapToken, merchantId, transactionId, updatedAt, orderId]
+    );
   }
 
   settleCashPayment({ paymentId, orderId, amount, settledAt, rawPayment, createdAt, updatedAt }) {

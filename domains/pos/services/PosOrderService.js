@@ -20,6 +20,8 @@ const { DiningTableService } = require('../../dining');
 
 const orderRepository = new OrderRepository();
 const posOrderRepository = new PosOrderRepository();
+const { PaymentRepository } = require('../../../core/data/repositories');
+const paymentRepository = new PaymentRepository();
 
 class PosOrderService {
   static ORDER_TYPES = {
@@ -248,7 +250,8 @@ class PosOrderService {
     reservation_date = null,
     guest_count = null,
     customer = {},
-    items = []
+    items = [],
+    cashier_id = null
   }) {
     // 1. If settling from held order, load items and table from DB if not passed
     let orderItems = items;
@@ -318,68 +321,78 @@ class PosOrderService {
 
     const order = placementResult.order;
     const grandTotal = order.grand_total;
-
-    // 3. Calculate Change (Kembalian) if cash payment and Record Cash Payment Lifecycle
-    // (Bypass for reservation which is a zero-bill table booking)
     let changeAmount = 0;
+    let payment = null;
+
     if (payment_method === 'cash' && order_type !== 'reservation') {
       if (typeof amount_tendered === 'number') {
-        if (amount_tendered < grandTotal) {
-          throw new Error(`[PosOrderService] Uang yang diterima (Rp ${amount_tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${grandTotal.toLocaleString('id-ID')}).`);
-        }
+        if (amount_tendered < grandTotal) throw new Error('[PosOrderService] Uang diterima kurang dari total tagihan.');
         changeAmount = amount_tendered - grandTotal;
       }
-
-      // Authoritatively settle cash payment in order_payments and pos_shifts.
-      // (No silent swallowing: any settlement failure will reject immediately and prevent false pos.order.settled event)
       const { CashSettlementService } = require('../../payment');
-      CashSettlementService.settleCashPayment({
-        order_id: order.id,
-        amount: grandTotal,
-        amount_tendered: amount_tendered || grandTotal,
-        shift_id
-      });
-    }
-
-    // 5. If settled from held bill, mark held order as settled
-    if (held_order_id) {
-      posOrderRepository.cancelHeldOrder({
-        heldOrderId: held_order_id,
-        updatedAt: new Date().toISOString(),
-        status: 'settled'
-      });
-    }
-
-    // 6. Emit event: pos.order.settled
-    events.EventBus.publish({
-      type: 'pos.order.settled',
-      producer: 'pos',
-      payload: {
-        order_id: order.id,
-        order_number: order.order_number,
-        branch_id,
-        shift_id,
-        order_type,
-        table_number: tableNumber,
-        payment_method,
-        grand_total: grandTotal,
-        amount_tendered,
-        change: changeAmount,
-        client_transaction_id
+      CashSettlementService.settleCashPayment({ order_id: order.id, amount: grandTotal, amount_tendered: amount_tendered || grandTotal, cashier_id, shift_id });
+      payment = { method: 'cash', provider: 'cash', status: 'settlement' };
+    } else if (payment_method === 'qris_static') {
+      const { PaymentGatewayService } = require('../../payment');
+      const qris = PaymentGatewayService.resolveStaticQrisConfig(branch_id, brand_id);
+      if (!qris.enabled) {
+        paymentRepository.updatePaymentStatus({ orderId: order.id, paymentStatus: 'cancel', updatedAt: new Date().toISOString() });
+        orderRepository.updateStatusIfCurrent({ orderId: order.id, targetStatus: 'cancelled', currentStatus: 'pending' });
+        throw new Error('[QRIS_STATIC_NOT_CONFIGURED]: QRIS statis belum dikonfigurasi untuk cabang ini.');
       }
-    }).catch(() => {});
+      const existingPayment = paymentRepository.findPaymentByOrderId(order.id);
+      if (existingPayment && existingPayment.provider === 'qris_static' && existingPayment.payment_status === 'settlement') {
+        payment = { method: 'qris_static', provider: 'qris_static', status: 'settlement' };
+      } else {
+        payment = { method: 'qris_static', provider: 'qris_static', status: 'pending', qris_static: qris };
+      }
+    } else if (payment_method === 'midtrans' || payment_method === 'doku') {
+      const { PaymentGatewayService } = require('../../payment');
+      try {
+        const existingPayment = paymentRepository.findPaymentByOrderId(order.id);
+        if (existingPayment && existingPayment.payment_status === 'settlement') {
+          payment = { method: payment_method, provider: existingPayment.provider, status: 'settlement' };
+        } else if (existingPayment && existingPayment.payment_status === 'pending' && existingPayment.snap_token) {
+          payment = { method: payment_method, provider: existingPayment.provider, status: 'pending', snap_token: existingPayment.snap_token, merchant_id: existingPayment.merchant_id, redirect_url: null };
+        } else {
+          const gatewayResult = await PaymentGatewayService.createSnapTransaction({
+            id: order.id, grand_total: grandTotal, branch_id, brand_id, delivery_fee: 0,
+            customer_name: customer.name || 'Pelanggan POS', customer_phone: customer.phone || '', payment_method, order_type
+          }, order.items || orderItems, customer);
+          paymentRepository.updatePaymentGatewayToken({
+            orderId: order.id, snapToken: gatewayResult && gatewayResult.snap_token,
+            merchantId: gatewayResult && gatewayResult.merchant_id,
+            transactionId: gatewayResult && (gatewayResult.transaction_id || gatewayResult.order_id),
+            updatedAt: new Date().toISOString()
+          });
+          payment = { method: payment_method, provider: payment_method, status: 'pending', snap_token: (gatewayResult && gatewayResult.snap_token) || null, redirect_url: (gatewayResult && gatewayResult.redirect_url) || null, merchant_id: (gatewayResult && gatewayResult.merchant_id) || null, doku_session_id: (gatewayResult && gatewayResult.doku_session_id) || null, expired_date: (gatewayResult && gatewayResult.expired_date) || null };
+        }
+      } catch (err) {
+        const isTimeout = /timeout|ETIMEDOUT|ECONNABORTED|ECONNRESET/i.test(err.code || err.message);
+        const now = new Date().toISOString();
+        paymentRepository.updatePaymentStatus({ orderId: order.id, paymentStatus: isTimeout ? 'reconciliation_pending' : 'cancel', updatedAt: now });
+        if (!isTimeout) orderRepository.updateStatusIfCurrent({ orderId: order.id, targetStatus: 'cancelled', currentStatus: 'pending' });
+        if (isTimeout) return { success: false, status: 'PAYMENT_GATEWAY_TIMEOUT', error: 'Koneksi ke gateway pembayaran mengalami timeout. Status transaksi perlu direkonsiliasi sebelum pembayaran diulang.', order_id: order.id, order_number: order.order_number, payment: { method: payment_method, provider: payment_method, status: 'reconciliation_pending' } };
+        return { success: false, status: 'PAYMENT_GATEWAY_ERROR', error: err.message || 'Gagal membuat transaksi pembayaran gateway.', order_id: order.id, order_number: order.order_number, payment: { method: payment_method, provider: payment_method, status: 'cancel' } };
+      }
+    } else {
+      throw new Error('[PosOrderService] Payment method tidak didukung: ' + payment_method);
+    }
+
+    if (held_order_id) posOrderRepository.cancelHeldOrder({ heldOrderId: held_order_id, updatedAt: new Date().toISOString(), status: 'settled' });
+
+    if (payment && payment.status === 'settlement') {
+      events.EventBus.publish({
+        type: 'pos.order.settled', producer: 'pos',
+        payload: { order_id: order.id, order_number: order.order_number, branch_id, shift_id, order_type, table_number: tableNumber, payment_method, grand_total: grandTotal, amount_tendered, change: changeAmount, client_transaction_id }
+      }).catch(() => {});
+    }
 
     return {
       success: true,
-      status: 'SETTLED',
-      order: {
-        ...order,
-        order_type,
-        table_number: tableNumber,
-        amount_tendered,
-        change: changeAmount,
-        payment_method
-      }
+      status: payment && payment.status === 'settlement' ? 'SETTLED' : 'PAYMENT_PENDING',
+      order: { ...order, order_type, table_number: tableNumber, amount_tendered, change: changeAmount, payment_method, status: payment && payment.status === 'settlement' ? 'confirmed' : 'pending' },
+      payment
     };
   }
 }

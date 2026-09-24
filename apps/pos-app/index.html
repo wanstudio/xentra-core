@@ -27,7 +27,7 @@
             <div class="pos-pane-head">
               <div>
                 <h1>Kasir</h1>
-                <p>Pilih menu, atur pesanan, lalu selesaikan pembayaran.</p>
+                <p>Pilih menu, atur pesanan, lalu selesaikan pembayaran dengan Cash, Payment Gateway, atau QRIS Statis.</p>
               </div>
               <button type="button" class="pos-btn ghost" id="btn-pos-refresh-menu">↻</button>
             </div>
@@ -106,6 +106,23 @@
       <button type="button" data-view="meja"><span>⌂</span><b>Meja</b></button>
       <button type="button" data-view="shift"><span>◷</span><b>Shift</b></button>
     </nav>
+  </div>
+
+  <div id="pos-auth-gate" class="pos-auth-gate" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="pos-auth-title">
+    <div class="pos-auth-card">
+      <div class="pos-auth-brand">XENTRA POS</div>
+      <h1 id="pos-auth-title" class="pos-auth-title">Masuk sebagai Kasir</h1>
+      <p id="pos-auth-subtitle" class="pos-auth-subtitle">Gunakan PIN POS Anda untuk membuka terminal ini dengan cepat.</p>
+      <div id="pos-auth-badge" class="pos-auth-badge">PIN Kasir</div>
+      <form id="pos-pin-login-form">
+        <input id="pos-login-pin" class="pos-pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" minlength="6" autocomplete="one-time-code" placeholder="••••••" aria-label="PIN Kasir" required>
+        <div id="pos-pin-login-error" class="pos-auth-error" aria-live="polite"></div>
+        <div class="pos-auth-actions">
+          <button type="submit" class="pos-btn" id="btn-pos-pin-login">Masuk dengan PIN</button>
+          <button type="button" class="pos-auth-link" id="btn-pos-account-login">Masuk dengan akun Xentra</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <div id="pos-modal" class="pos-modal hidden">

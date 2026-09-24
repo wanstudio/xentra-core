@@ -10,6 +10,7 @@
  */
 const CatalogRepository = require('../../../core/data/repositories/CatalogRepository');
 const PricingPolicyModel = require('../../catalog/models/PricingPolicyModel');
+const ProductOptionsModel = require('../../catalog/models/ProductOptionsModel');
 
 const catalogRepository = new CatalogRepository();
 
@@ -200,7 +201,19 @@ class PrePaymentVerificationGate {
         },
         masterProduct.branch_raw_price
       );
-      const actualPrice = pricing.effective_price;
+      const basePrice = pricing.effective_price;
+      let optionResolution;
+      try {
+        optionResolution = ProductOptionsModel.resolveSelections(
+          masterProduct.options_config,
+          item.options || item.selected_options || item.modifiers || []
+        );
+      } catch (optionErr) {
+        errors.push(`Pilihan pada produk "${masterProduct.name}" tidak valid: ${optionErr.message}`);
+        continue;
+      }
+
+      const actualPrice = basePrice + optionResolution.adjustment;
       const hasExplicitExpectedPrice = item.expected_price !== undefined && item.expected_price !== null && !isNaN(Number(item.expected_price));
       const hasExplicitItemPrice = item.price !== undefined && item.price !== null && !isNaN(Number(item.price));
       if ((hasExplicitExpectedPrice || hasExplicitItemPrice) && expectedPrice !== actualPrice) {
@@ -217,6 +230,10 @@ class PrePaymentVerificationGate {
         name: masterProduct.name,
         quantity: requestedQty,
         unit_price: actualPrice,
+        base_unit_price: basePrice,
+        options: optionResolution.snapshot,
+        modifiers_snapshot: optionResolution.snapshot,
+        note: String(item.note || item.item_note || '').trim(),
         subtotal: actualPrice * requestedQty,
         current_stock: currentStock,
         branch_low_stock_threshold: masterProduct.branch_low_stock_threshold

@@ -774,6 +774,11 @@ function initSchema(targetDb) {
       role TEXT DEFAULT 'owner',
       mfa_enabled INTEGER DEFAULT 0,
       mfa_enrolled_at TEXT,
+      pos_pin_salt TEXT,
+      pos_pin_hash TEXT,
+      pos_pin_failed_attempts INTEGER DEFAULT 0,
+      pos_pin_locked_until TEXT,
+      pos_pin_updated_at TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
@@ -884,6 +889,7 @@ function initSchema(targetDb) {
       sort_order INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
+      options_config TEXT DEFAULT NULL,
       FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     );
@@ -928,6 +934,7 @@ function initSchema(targetDb) {
       item_subtotal REAL,
       subtotal REAL,
       note TEXT,
+      modifiers_snapshot TEXT DEFAULT NULL,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     );
@@ -1599,6 +1606,13 @@ function initSchema(targetDb) {
 
   try { targetDb.exec('ALTER TABLE media_assets ADD COLUMN crop_spec TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN branch_id TEXT;'); } catch (e) {}
+  // POS Cashier PIN credential fields: same workforce identity, POS-only authentication method.
+  // Idempotent for existing production databases.
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN pos_pin_salt TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN pos_pin_hash TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN pos_pin_failed_attempts INTEGER DEFAULT 0;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN pos_pin_locked_until TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE users ADD COLUMN pos_pin_updated_at TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN whatsapp_number TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branches ADD COLUMN is_archived INTEGER DEFAULT 0;'); } catch (e) {}
@@ -1618,6 +1632,7 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE products ADD COLUMN pricing_mode TEXT DEFAULT "lock";'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE products ADD COLUMN min_price REAL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE products ADD COLUMN max_price REAL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE products ADD COLUMN options_config TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN tagline TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN banners TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN order_channel TEXT DEFAULT "customer_app";'); } catch (e) {}
@@ -1639,6 +1654,7 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE customers ADD COLUMN deleted_at TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN client_transaction_id TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN cash_tendered REAL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE order_items ADD COLUMN modifiers_snapshot TEXT;'); } catch (e) {}
 
   // F-Recipient Identity Layer: order-level recipient snapshot (buyer != recipient)
   try { targetDb.exec("ALTER TABLE orders ADD COLUMN recipient_type TEXT NOT NULL DEFAULT 'self';"); } catch (e) {}

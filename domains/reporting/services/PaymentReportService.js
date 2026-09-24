@@ -19,6 +19,7 @@ class PaymentReportService {
     let totalCashSettled = 0;
     let totalMidtransSettled = 0;
     let totalDokuSettled = 0;
+    let totalQrisStaticSettled = 0;
     let totalPending = 0;
 
     for (const row of breakdown) {
@@ -26,6 +27,7 @@ class PaymentReportService {
         if (row.provider === 'cash') totalCashSettled += row.total_amount;
         if (row.provider === 'midtrans') totalMidtransSettled += row.total_amount;
         if (row.provider === 'doku') totalDokuSettled += row.total_amount;
+        if (row.provider === 'qris_static') totalQrisStaticSettled += row.total_amount;
       } else if (row.payment_status === 'pending') {
         totalPending += row.total_amount;
       }
@@ -35,10 +37,11 @@ class PaymentReportService {
       report_type: 'payment',
       filter,
       summary: {
-        total_settled: totalCashSettled + totalMidtransSettled + totalDokuSettled,
+        total_settled: totalCashSettled + totalMidtransSettled + totalDokuSettled + totalQrisStaticSettled,
         cash_settled: totalCashSettled,
         midtrans_settled: totalMidtransSettled,
         doku_settled: totalDokuSettled,
+        qris_static_settled: totalQrisStaticSettled,
         total_pending: totalPending
       },
       breakdown

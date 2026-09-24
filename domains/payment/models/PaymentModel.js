@@ -15,7 +15,8 @@ class PaymentModel {
   static METHODS = {
     CASH: 'cash',
     MIDTRANS: 'midtrans',
-    DOKU: 'doku'
+    DOKU: 'doku',
+    QRIS_STATIC: 'qris_static'
   };
 
   /**
@@ -55,8 +56,8 @@ class PaymentModel {
     const errors = [];
     if (!params.order_id) errors.push('"order_id" is required.');
     if (!params.amount || Number(params.amount) <= 0) errors.push('"amount" must be greater than 0.');
-    if (!params.provider || !['cash', 'midtrans', 'doku'].includes(params.provider)) {
-      errors.push('"provider" must be either "cash", "midtrans", or "doku".');
+    if (!params.provider || !['cash', 'midtrans', 'doku', 'qris_static'].includes(params.provider)) {
+      errors.push('"provider" must be either "cash", "midtrans", "doku", or "qris_static".');
     }
 
     return {
