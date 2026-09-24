@@ -57,5 +57,11 @@ button,input{font:inherit}.pos-shell{min-height:100vh;display:flex;flex-directio
 .pos-pin-input:focus{background:#fff;border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.08)}
 .pos-auth-actions{display:flex;flex-direction:column;gap:9px;margin-top:14px}
 .pos-auth-error{min-height:18px;margin-top:10px;color:#dc2626;font-size:12px;font-weight:700;text-align:center}
-.pos-auth-link{width:100%;border:0;background:transparent;color:#64748b;font-size:12px;font-weight:700;padding:8px;cursor:pointer}
+.pos-auth-divider{display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:#94a3b8;font-size:12px}
+.pos-auth-divider::before,.pos-auth-divider::after{content:'';flex:1;height:1px;background:#e2e8f0}
+.pos-google-login-btn{width:100%;min-height:46px;border:1px solid #dadce0;border-radius:10px;background:#fff;color:#3c4043;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;transition:box-shadow .2s ease,background .2s ease}
+.pos-google-login-btn:hover{background:#f8fafc;box-shadow:0 1px 3px rgba(60,64,67,.2)}
+.pos-google-login-btn:active{background:#f1f3f4}
+.pos-google-icon{display:flex;align-items:center;justify-content:center}
+.pos-auth-link{width:100%;border:0;background:transparent;color:#64748b;font-size:12px;font-weight:700;padding:10px 8px 2px;cursor:pointer}
 .pos-pin-setup-note{font-size:12px;line-height:1.5;color:#64748b;margin-top:10px}

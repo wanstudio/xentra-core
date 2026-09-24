@@ -281,6 +281,12 @@
           if (btn) { btn.disabled=false; btn.textContent='Masuk dengan PIN'; }
         }
       };
+      var googleBtn=$('btn-pos-google-login');
+      if (googleBtn) googleBtn.onclick=function(){
+        var returnUrl=window.location.origin + '/pos/';
+        var brokerUrl='https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent(returnUrl);
+        window.location.href=brokerUrl;
+      };
       var accountBtn=$('btn-pos-account-login');
       if (accountBtn) accountBtn.onclick=function(){ window.location.replace('/login'); };
     });
@@ -534,12 +540,41 @@
     });
   }
 
+  async function consumeGoogleHandoff(){
+    var params=new URLSearchParams(window.location.search);
+    var handoff=params.get('handoff');
+    if(!handoff) return true;
+
+    params.delete('handoff');
+    var cleanQuery=params.toString();
+    var cleanUrl=window.location.pathname + (cleanQuery ? '?' + cleanQuery : '') + window.location.hash;
+    window.history.replaceState({},document.title,cleanUrl);
+
+    try{
+      var res=await fetch(API + '/auth/handoff/exchange',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ticket:handoff})
+      });
+      var data=await res.json().catch(function(){return {};});
+      if(res.ok && data && data.success && data.token){
+        localStorage.setItem(TOKEN_KEY,data.token);
+        if(data.user) localStorage.setItem(USER_KEY,JSON.stringify(data.user));
+        return true;
+      }
+      throw new Error((data && (data.error || data.message)) || 'Login Google gagal.');
+    }catch(err){
+      showPosAuthGate(false);
+      var error=$('pos-pin-login-error');
+      if(error) error.textContent=err.message || 'Login Google gagal.';
+      return false;
+    }
+  }
+
   async function ensureSession(){
     if(!token()){
-      var cached=getPosPinCache();
-      if(!cached) { window.location.replace('/login'); return false; }
       await openPinUnlockGate(!navigator.onLine);
-      return true;
+      return !!token() || !!state.user;
     }
     try {
       var me=await requestWithTimeout('/auth/merchant/me',{headers:headers()},1800);
@@ -786,40 +821,10 @@
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
   }
 
-  async function handleHandoffExchange() {
-    var urlParams = new URLSearchParams(window.location.search);
-    var handoffTicket = urlParams.get('handoff');
-    if (!handoffTicket) return false;
-
-    urlParams.delete('handoff');
-    var cleanQuery = urlParams.toString();
-    var cleanUrl = window.location.pathname + (cleanQuery ? '?' + cleanQuery : '') + window.location.hash;
-    window.history.replaceState({}, document.title, cleanUrl);
-
-    try {
-      var res = await fetch(API + '/auth/handoff/exchange', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticket: handoffTicket })
-      });
-      var data = await res.json();
-      if (res.ok && data && data.success && data.token) {
-        localStorage.setItem(TOKEN_KEY, data.token);
-        if (data.user) {
-          localStorage.setItem(USER_KEY, JSON.stringify(data.user));
-        }
-        return true;
-      }
-      return false;
-    } catch (_) {
-      return false;
-    }
-  }
-
   async function boot(){
     bind();
     try{
-      await handleHandoffExchange();
+      if(!await consumeGoogleHandoff())return;
       if(!await ensureSession())return;
       await loadPaymentModes();
       await loadTerminal();
