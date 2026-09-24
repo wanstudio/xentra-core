@@ -583,6 +583,19 @@ test('API POS routes: implementation is isolated from api.js', () => {
   }
 });
 
+test('API Platform routes: implementation is isolated from api.js', () => {
+  const api = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const platform = fs.readFileSync(require.resolve('../server/routes/platform'), 'utf8');
+
+  for (const route of [
+    "router.post(['/platform/auth/login', '/api/v1/platform/auth/login']",
+    "router.get(['/platform/me', '/api/v1/platform/me']"
+  ]) {
+    assert.ok(platform.includes(route), route + ' must live in platform.js');
+    assert.equal(api.includes(route), false, route + ' must not remain inline in api.js');
+  }
+});
+
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
     method: 'POST',
