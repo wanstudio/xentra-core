@@ -25,6 +25,7 @@ const ORDER_RECEIVED_PATH = path.resolve(
   __dirname, '../../apps/customer-pwa/assets/js/pages/order-received.js'
 );
 const API_PATH = path.resolve(__dirname, '../../server/routes/api.js');
+const PAYMENT_CONFIG_PATH = path.resolve(__dirname, '../../server/routes/payment-config.js');
 
 /**
  * Sandbox: window/document tiruan. `scripts` mencatat setiap <script> yang disuntikkan,
@@ -198,9 +199,15 @@ test('PGISO-07: berpindah provider tidak membawa dependency provider sebelumnya'
 
 test('PGISO-08: Server Key tidak pernah ikut ke browser', () => {
   const api = fs.readFileSync(API_PATH, 'utf8');
-  const endpoint = api.slice(
-    api.indexOf("router.get('/payment/config'"),
-    api.indexOf("router.get('/brand/info'")
+  const paymentConfig = fs.readFileSync(PAYMENT_CONFIG_PATH, 'utf8');
+  const endpoint = paymentConfig.slice(
+    paymentConfig.indexOf("router.get('/payment/config'"),
+    paymentConfig.lastIndexOf("  });") + 6
+  );
+  assert.equal(
+    (api.match(/router\.get\('\/payment\/config'/g) || []).length,
+    0,
+    'payment/config implementation must not remain inline in api.js'
   );
   assert.ok(endpoint.length > 0, 'endpoint konfigurasi gateway harus ada');
   // server_key memang dibaca di server untuk menilai kesiapan — yang dilarang adalah
@@ -216,9 +223,15 @@ test('PGISO-08: Server Key tidak pernah ikut ke browser', () => {
 
 test('PGISO-09: kesiapan dinilai dari provider aktif saja', () => {
   const api = fs.readFileSync(API_PATH, 'utf8');
-  const endpoint = api.slice(
-    api.indexOf("router.get('/payment/config'"),
-    api.indexOf("router.get('/brand/info'")
+  const paymentConfig = fs.readFileSync(PAYMENT_CONFIG_PATH, 'utf8');
+  const endpoint = paymentConfig.slice(
+    paymentConfig.indexOf("router.get('/payment/config'"),
+    paymentConfig.lastIndexOf("  });") + 6
+  );
+  assert.equal(
+    (api.match(/router\.get\('\/payment\/config'/g) || []).length,
+    0,
+    'payment/config implementation must not remain inline in api.js'
   );
   assert.ok(/activeProvider === 'doku'/.test(endpoint),
     'DOKU aktif dinilai dari kredensial DOKU saja');
