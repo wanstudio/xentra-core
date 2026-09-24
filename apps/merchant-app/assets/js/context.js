@@ -10,7 +10,7 @@
     var user = window.XentraShared && typeof window.XentraShared.getStoredUser === 'function'
       ? window.XentraShared.getStoredUser()
       : null;
-    var branchCatalog = window.XentraBranchCatalog;
+    var branchCatalog = window.XentraMerchantBranchCatalog;
     var fromUser = user ? (user.branch_id || user.branchId || (user.branch && user.branch.id)) : null;
     var fromActive = branchCatalog && typeof branchCatalog.getActiveBranchId === 'function'
       ? branchCatalog.getActiveBranchId()
