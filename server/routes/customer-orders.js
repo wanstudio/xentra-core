@@ -313,7 +313,7 @@ router.post('/orders/:id/cancel', requireCustomerAuth(), (req, res) => {
 
     const fullOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
     if (fullOrder && fullOrder.order_type === 'dine_in') {
-      const { DiningTableService } = require('../../domains/pos');
+      const { DiningTableService } = require('../../domains/dining');
       try {
         DiningTableService.releaseHold({
           branch_id: fullOrder.branch_id,
