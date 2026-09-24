@@ -308,17 +308,78 @@ class DiningTableService {
     return { success: true, order_id: orderId, order_number: orderNumber, grand_total: 0, subtotal: 0, order: { id: orderId, order_number: orderNumber, order_type: 'reservation', reservation_date: resDateStr, guest_count: parsedGuestCount, customer_name: customer?.name, customer_phone: customer?.phone, subtotal: 0, grand_total: 0, items: [] } };
   }
 
-  /** Check in a reservation by mutating the same Order record in place. */
+  /** Check in a reservation by converting the same Order record into an active dine-in order. */
   static checkInReservation({ reservation_order_id, table_number } = {}) {
-    if (!reservation_order_id || !table_number) throw new Error('[DiningTableService] "reservation_order_id" and "table_number" are required for reservation check-in.');
+    if (!reservation_order_id || !table_number) {
+      throw new Error('[DiningTableService] "reservation_order_id" and "table_number" are required for reservation check-in.');
+    }
+
     const order = orderRepository.findById(reservation_order_id);
     if (!order) throw new Error(`[DiningTableService] Data reservasi dengan ID ${reservation_order_id} tidak ditemukan.`);
-    if (order.order_type !== 'reservation') throw new Error(`[DiningTableService] Order ${reservation_order_id} bukan tipe reservation.`);
+    if (order.order_type !== 'reservation') {
+      throw new Error(`[DiningTableService] Order ${reservation_order_id} bukan tipe reservation.`);
+    }
+    if (order.status !== 'confirmed') {
+      throw new Error(`[DiningTableService] Reservation ${reservation_order_id} tidak dapat check-in dari status "${order.status}".`);
+    }
+
+    const table = repository.findTableIdByNumberOrLabel(order.branch_id, String(table_number));
+    if (!table || !table.is_active) {
+      throw new Error('[DiningTableService] RESERVATION_CHECKIN_TABLE_INVALID: Meja tidak ditemukan atau tidak aktif pada cabang reservasi.');
+    }
+
+    const tableState = repository.findTableForBranch(table.id, order.branch_id);
+    if (!tableState || !tableState.is_active) {
+      throw new Error('[DiningTableService] RESERVATION_CHECKIN_TABLE_INVALID: Meja tidak valid pada cabang reservasi.');
+    }
+    if (tableState.operational_state !== 'available') {
+      throw new Error(`[DiningTableService] RESERVATION_CHECKIN_TABLE_UNAVAILABLE: Meja "${tableState.table_number}" sedang tidak tersedia (${tableState.operational_state}).`);
+    }
+
     const now = new Date().toISOString();
-    orderRepository.convertReservationToDineIn({ orderId: reservation_order_id, tableNumber: table_number, updatedAt: now });
-    const updatedOrder = orderRepository.findById(reservation_order_id);
-    const orderItems = orderRepository.findItems(reservation_order_id);
-    return { success: true, status: 'CHECKED_IN', order: { ...updatedOrder, order_type: 'dine_in', table_number: String(table_number), status: 'active_table', items: orderItems } };
+    orderRepository.beginTransaction();
+    try {
+      // Create/attach the authoritative dining session inside the same DB transaction.
+      // dbTransactionProvided prevents the nested service from opening a second transaction.
+      const session = this.createOrAttachDiningSession({
+        branch_id: order.branch_id,
+        table_ids: [table.id],
+        order_id: reservation_order_id,
+        customer_name: order.customer_name || 'Tamu Reservasi',
+        customer_phone: order.customer_phone || '',
+        channel: 'staff',
+        session_id: null
+      }, { dbTransactionProvided: true });
+
+      const converted = orderRepository.convertReservationToDineIn({
+        orderId: reservation_order_id,
+        tableNumber: tableState.table_number,
+        updatedAt: now
+      });
+      if (!converted || converted.changes === 0) {
+        throw new Error('[DiningTableService] RESERVATION_CHECKIN_CONVERSION_FAILED: Reservation gagal dikonversi menjadi dine-in.');
+      }
+
+      orderRepository.commitTransaction();
+
+      const updatedOrder = orderRepository.findById(reservation_order_id);
+      const orderItems = orderRepository.findItems(reservation_order_id);
+      return {
+        success: true,
+        status: 'CHECKED_IN',
+        order: {
+          ...updatedOrder,
+          order_type: 'dine_in',
+          table_number: String(tableState.table_number),
+          status: 'active_table',
+          dining_session_id: session.session_id,
+          items: orderItems
+        }
+      };
+    } catch (err) {
+      try { orderRepository.rollbackTransaction(); } catch (_) {}
+      throw err;
+    }
   }
 
   /** Cancel an overdue reservation as no-show without changing inventory. */
