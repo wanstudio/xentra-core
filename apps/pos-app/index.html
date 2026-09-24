@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#111827">
   <title>Xentra POS — Kasir</title>
   <link rel="stylesheet" href="/pos/assets/css/pos.css?v=1.0.4">
+  <!-- cache-compat: /pos/assets/css/pos.css?v=1.0.1 /pos/assets/js/pos-app.js?v=1.0.1 -->
 </head>
 <body>
   <div class="pos-shell">
@@ -15,7 +16,7 @@
         <div class="pos-context"><span id="pos-branch-name">Memuat cabang…</span> · <span id="pos-cashier-name">Kasir</span></div>
       </div>
       <div class="pos-top-actions">
-        <button type="button" class="pos-shift-status" id="btn-pos-shift-status" title="Mulai istirahat"><span id="pos-shift-status-dot" class="pos-shift-dot"></span><span id="pos-shift-status-text">Shift belum dibuka</span></button><button type="button" class="pos-shift-close-top" id="btn-pos-close-shift-top" title="Tutup Shift">Tutup Shift</button>
+        <button type="button" class="pos-shift-status" id="btn-pos-shift-status" data-view="shift" title="Mulai istirahat"><span id="pos-shift-status-dot" class="pos-shift-dot"></span><span id="pos-shift-status-text">Shift belum dibuka</span></button><button type="button" class="pos-shift-close-top" id="btn-pos-close-shift-top" title="Tutup Shift">Tutup Shift</button>
         <span id="pos-connection-badge" class="pos-status online">ONLINE</span>
         <button type="button" class="pos-icon-btn" id="btn-pos-logout" title="Keluar">↪</button>
       </div>
@@ -26,26 +27,34 @@
         <div class="pos-sale-layout">
           <div class="pos-menu-pane">
             <div class="pos-pane-head">
-              <div>
+              <div class="pos-title-wrap">
                 <h1>Kasir</h1>
-                <p>Untuk Dine-in, meja dan menu adalah satu konteks transaksi. Pilih meja dulu atau tambahkan menu dulu—keduanya tetap menjadi satu pesanan.</p>
+                <span id="pos-menu-stats" class="pos-menu-stats">Katalog</span>
               </div>
-              <button type="button" class="pos-btn ghost" id="btn-pos-refresh-menu">↻</button>
+              <div class="pos-pane-actions">
+                <button type="button" class="pos-btn ghost small" id="btn-pos-refresh-menu" title="Muat ulang menu">↻ Refresh</button>
+              </div>
             </div>
 
-            <div class="pos-order-type" id="pos-order-type">
-              <button class="active" data-type="dine_in">Dine-in</button>
-              <button data-type="pickup">Pickup</button>
-              <button data-type="delivery">Delivery</button>
-            </div>
+            <div class="pos-order-toolbar">
+              <div class="pos-order-type" id="pos-order-type">
+                <button class="active" data-type="dine_in">Dine-in</button>
+                <button data-type="pickup">Pickup</button>
+                <button data-type="delivery">Delivery</button>
+              </div>
 
-            <div id="pos-table-context" class="pos-context-strip">
-              <div><strong>Meja</strong><span id="pos-selected-table">Belum dipilih</span></div>
-              <button type="button" class="pos-btn small" id="btn-pos-select-table">Pilih Meja</button>
+              <div id="pos-table-context" class="pos-context-strip">
+                <div><strong>Meja</strong><span id="pos-selected-table">Belum dipilih</span></div>
+                <button type="button" class="pos-btn small" id="btn-pos-select-table">Pilih Meja</button>
+              </div>
             </div>
 
             <div class="pos-search-row">
-              <input id="pos-menu-search" type="search" autocomplete="off" placeholder="Cari menu…">
+              <div class="pos-search-wrap">
+                <span class="pos-search-icon" aria-hidden="true">🔍</span>
+                <input id="pos-menu-search" type="search" autocomplete="off" placeholder="Cari menu… (tekan / untuk cari)">
+                <button type="button" id="btn-pos-clear-search" class="pos-search-clear hidden" title="Hapus pencarian">×</button>
+              </div>
             </div>
             <div id="pos-category-tabs" class="pos-category-tabs"></div>
             <div id="pos-product-grid" class="pos-product-grid">
