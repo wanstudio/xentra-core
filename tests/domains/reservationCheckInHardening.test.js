@@ -151,4 +151,49 @@ test('successful reservation check-in creates the dining session and converts th
   assert.equal(table.current_session_id, order.dining_session_id);
 
   DiningTableService.completeDiningSession(order.dining_session_id);
+
+test('reservation no-show cannot cancel before scheduled time plus grace period', () => {
+  const id = 'ord_res_no_show_guard_' + Date.now();
+  const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+  db.prepare(`
+    INSERT INTO orders (
+      id, order_number, brand_id, branch_id, customer_name, customer_phone,
+      order_type, order_channel, subtotal, delivery_fee, grand_total,
+      payment_method, status, scheduled_slot_start, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 'No Show Guard', '081900001111',
+              'reservation', 'staff', 0, 0, 0,
+              'cash', 'confirmed', ?, datetime('now'), datetime('now'))
+  `).run(id, 'RES-NO-SHOW-GUARD-' + id, BRAND_ID, BRANCH_A, future + 'T19:30:00');
+
+  assert.throws(
+    () => DiningTableService.cancelNoShowReservation({ reservation_order_id: id }),
+    /RESERVATION_NO_SHOW_TOO_EARLY/
+  );
+
+  const row = db.prepare('SELECT order_type, status FROM orders WHERE id = ?').get(id);
+  assert.equal(row.order_type, 'reservation');
+  assert.equal(row.status, 'confirmed');
+  db.prepare('DELETE FROM orders WHERE id = ?').run(id);
+});
+
+test('checked-in reservation cannot be cancelled as no-show', () => {
+  const id = 'ord_res_no_show_after_checkin_' + Date.now();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO orders (
+      id, order_number, brand_id, branch_id, customer_name, customer_phone,
+      order_type, order_channel, subtotal, delivery_fee, grand_total,
+      payment_method, status, scheduled_slot_start, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, 'Checked In Guard', '081900001112',
+              'dine_in', 'staff', 0, 0, 0,
+              'cash', 'active_table', ?, ?, ?)
+  `).run(id, 'RES-CHECKED-IN-GUARD-' + id, BRANCH_A, BRANCH_A, now, now, now);
+
+  assert.throws(
+    () => DiningTableService.cancelNoShowReservation({ reservation_order_id: id }),
+    /bukan tipe reservation/
+  );
+
+  db.prepare('DELETE FROM orders WHERE id = ?').run(id);
+});
 });
