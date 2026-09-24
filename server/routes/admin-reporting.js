@@ -8,8 +8,6 @@ module.exports = function registerAdminReportingRoutes(router, deps) {
   const {
     db,
     requireAuth,
-    ReportingEngine,
-    overviewReportingRepo,
     corePromotionRepo,
     corePaymentRepo
   } = deps;
