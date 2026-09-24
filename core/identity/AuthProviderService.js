@@ -2,7 +2,6 @@
 
 const crypto = require('crypto');
 const db = require('../../server/database/db');
-const WorkforceMembershipService = require('./WorkforceMembershipService');
 
 class AuthProviderService {
   constructor(database = db) {
