@@ -1188,6 +1188,5 @@ describe('Phase 4: Workforce Invitation Acceptance (INV-ACC-01 to INV-ACC-18)', 
       db.prepare('SELECT COUNT(*) AS cnt FROM workforce_memberships WHERE user_id = ?').get(foreignUser.id).cnt,
       2
     );
-  })
   });
 });
