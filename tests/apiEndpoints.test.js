@@ -460,6 +460,29 @@ test('API Merchant Auth: POST /api/v1/auth/merchant/login authenticates owner', 
   assert.strictEqual(unauthRes.status, 401);
 });
 
+test('API Media Upload Routes: extracted module is canonical', () => {
+  const apiPath = require.resolve('../server/routes/api');
+  const modulePath = require.resolve('../server/routes/media-upload');
+  const apiSource = fs.readFileSync(apiPath, 'utf8');
+  const moduleSource = fs.readFileSync(modulePath, 'utf8');
+
+  for (const route of [
+    "router.post('/admin/branches/:id/categories/:catId/image'",
+    "router.post('/admin/products/:productId/image'",
+    "router.post('/admin/branches/:id/products/:productId/image'"
+  ]) {
+    const moduleCount = moduleSource.split(route).length - 1;
+    const apiCount = apiSource.split(route).length - 1;
+    assert.equal(moduleCount, 1, route + ' must have one canonical implementation in media-upload.js');
+    assert.equal(apiCount, 0, route + ' must not remain implemented inline in api.js');
+  }
+
+  assert.ok(apiSource.includes("const registerMediaUploadRoutes = require('./media-upload');"),
+    'api.js must import media-upload route module');
+  assert.ok(apiSource.includes('registerMediaUploadRoutes(router, {'),
+    'api.js must register media-upload routes');
+});
+
 test('API Customer Order Routes: extracted module is canonical and registered before kitchen routes', () => {
   const apiPath = require.resolve('../server/routes/api');
   const modulePath = require.resolve('../server/routes/customer-orders');
