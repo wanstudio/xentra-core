@@ -273,8 +273,17 @@ class DiningTableService {
   }
 
   /** Create a reservation using the existing Order record as the persistence model. */
-  static createReservation({ brand_id, branch_id, customer, order_channel = 'customer_app', selection_mode = null, reservation_date = null, guest_count = null, notes = '' } = {}) {
+  static createReservation({ brand_id, branch_id, customer, order_channel = 'customer_app', selection_mode = null, reservation_date = null, reservation_time = '12:00', guest_count = null, notes = '' } = {}) {
     if (!reservation_date) return { success: false, status: 'VALIDATION_ERROR', errors: ['Tanggal reservasi wajib diisi untuk tipe pesanan reservation.'] };
+    const reservationTime = String(reservation_time || '').trim();
+    const timeMatch = /^(\\d{2}):(\\d{2})$/.exec(reservationTime);
+    if (!timeMatch) {
+      return { success: false, status: 'INVALID_RESERVATION_TIME', errors: ['Jam reservasi wajib menggunakan format HH:MM.'] };
+    }
+    const timeMinutes = Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
+    if (!Number.isInteger(timeMinutes) || timeMinutes < 12 * 60 || timeMinutes > 19 * 60 + 30 || timeMinutes % 30 !== 0) {
+      return { success: false, status: 'INVALID_RESERVATION_TIME', errors: ['Jam reservasi harus berada pada slot 12:00–19:30 dengan interval 30 menit.'] };
+    }
     const parsedGuestCount = Number(guest_count);
     if (!guest_count || !Number.isInteger(parsedGuestCount) || parsedGuestCount <= 0) return { success: false, status: 'VALIDATION_ERROR', errors: ['Perkiraan jumlah orang (guest_count) wajib diisi dengan bilangan bulat positif (> 0) untuk reservasi.'] };
     const resDate = new Date(reservation_date);
@@ -317,13 +326,13 @@ class DiningTableService {
         orderRepository.rollbackTransaction();
         return { success: false, status: 'BRANCH_CAPACITY_FULL', errors: [`Kapasitas reservasi meja untuk cabang ini pada tanggal ${resDateStr} sudah penuh.`] };
       }
-      orderRepository.insertReservation({ id: orderId, orderNumber, brandId: brand_id, branchId: branch_id, customerId: customer?.id || customer?.customer_id || null, customerName: customer?.name || 'Tamu Reservasi', customerPhone: customer?.phone || '', orderChannel: order_channel, selectionMode: selection_mode || 'CUSTOMER_SELECTED', reservationDate: resDateStr, orderNote: notes ? `Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr}) | ${notes}` : `Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr})`, createdAt: now, updatedAt: now });
+      orderRepository.insertReservation({ id: orderId, orderNumber, brandId: brand_id, branchId: branch_id, customerId: customer?.id || customer?.customer_id || null, customerName: customer?.name || 'Tamu Reservasi', customerPhone: customer?.phone || '', orderChannel: order_channel, selectionMode: selection_mode || 'CUSTOMER_SELECTED', reservationDate: resDateStr, reservationTime, orderNote: notes ? `Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr}) | ${notes}` : `Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr})`, createdAt: now, updatedAt: now });
       orderRepository.commitTransaction();
     } catch (err) {
       try { orderRepository.rollbackTransaction(); } catch (_) {}
       throw err;
     }
-    return { success: true, order_id: orderId, order_number: orderNumber, grand_total: 0, subtotal: 0, order: { id: orderId, order_number: orderNumber, order_type: 'reservation', reservation_date: resDateStr, guest_count: parsedGuestCount, customer_name: customer?.name, customer_phone: customer?.phone, subtotal: 0, grand_total: 0, items: [] } };
+    return { success: true, order_id: orderId, order_number: orderNumber, grand_total: 0, subtotal: 0, order: { id: orderId, order_number: orderNumber, order_type: 'reservation', reservation_date: resDateStr, reservation_time: reservationTime, guest_count: parsedGuestCount, customer_name: customer?.name, customer_phone: customer?.phone, subtotal: 0, grand_total: 0, items: [] } };
   }
 
   /** Check in a reservation by converting the same Order record into an active dine-in order. */
