@@ -1,4 +1,5 @@
 const WorkforceRepository = require('../data/repositories/WorkforceRepository');
+const WorkforceMembershipService = require('./WorkforceMembershipService');
 
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
@@ -11,6 +12,7 @@ const LOCKOUT_MINUTES = 30;
 class WorkforceService {
   constructor(repository = new WorkforceRepository()) {
     this.repository = repository instanceof WorkforceRepository ? repository : new WorkforceRepository(repository);
+    this.memberships = new WorkforceMembershipService(this.repository);
   }
 
   // ==================== PASSWORD HASHING ====================
@@ -38,29 +40,24 @@ class WorkforceService {
   // ==================== USER LIFECYCLE ====================
 
   createUser({ brand_id, organization_id, branch_id, username, email, password, full_name, role, created_by }) {
-    // Validate required fields
     if (!brand_id || !organization_id || !username || !password || !role) {
       throw { status: 400, code: 'VALIDATION_ERROR', message: 'brand_id, organization_id, username, password, and role are required.' };
     }
 
-    // Validate role
     const allowedRoles = ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'];
     if (!allowedRoles.includes(role)) {
       throw { status: 400, code: 'INVALID_ROLE', message: `Role must be one of: ${allowedRoles.join(', ')}` };
     }
 
-    // Validate username format
     if (!/^[a-z0-9._-]+$/.test(username)) {
       throw { status: 400, code: 'INVALID_USERNAME', message: 'Username must contain only lowercase letters, numbers, dots, hyphens, and underscores.' };
     }
 
-    // Check username uniqueness within brand
-    const existing = this.repository.prepare('SELECT id FROM users WHERE username = ? AND brand_id = ?').get(username, brand_id);
+    const existing = this.repository.prepare('SELECT id FROM users WHERE username = ?').get(username);
     if (existing) {
-      throw { status: 409, code: 'USERNAME_EXISTS', message: 'Username already exists in this brand.' };
+      throw { status: 409, code: 'USERNAME_EXISTS', message: 'Username already exists.' };
     }
 
-    // Validate branch exists if provided
     if (branch_id) {
       const branch = this.repository.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, brand_id);
       if (!branch) {
@@ -73,65 +70,124 @@ class WorkforceService {
     const now = new Date().toISOString();
 
     this.repository.prepare(`
-      INSERT INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at, created_at, updated_at)
+      INSERT INTO users (
+        id, brand_id, organization_id, branch_id, username, email, password_hash,
+        full_name, role, status, password_changed_at, email_verified_at, created_at, updated_at
+      )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-    `).run(id, brand_id, organization_id, branch_id || null, username, email || null, password_hash, full_name || null, role, now, now, now, now);
+    `).run(
+      id, brand_id, organization_id, branch_id || null, username, email || null,
+      password_hash, full_name || null, role, now, now, now, now
+    );
 
-    return { id, username, email, full_name, role, branch_id: branch_id || null, status: 'active', email_verified: true };
+    this.memberships.ensureMembership({
+      userId: id,
+      organizationId: organization_id,
+      brandId: brand_id,
+      branchId: branch_id || null,
+      role,
+      status: 'active'
+    });
+
+    return {
+      id, username, email, full_name, role,
+      branch_id: branch_id || null,
+      organization_id,
+      brand_id,
+      status: 'active',
+      email_verified: true
+    };
   }
+
+
 
   getUser(userId, brandId) {
     const user = this.repository.prepare(`
-      SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status, 
-             created_at, updated_at, last_login_at, password_changed_at
-      FROM users WHERE id = ? AND brand_id = ?
-    `).get(userId, brandId);
+      SELECT
+        u.id,
+        COALESCE(wm.brand_id, u.brand_id) AS brand_id,
+        COALESCE(wm.organization_id, u.organization_id) AS organization_id,
+        COALESCE(wm.branch_id, u.branch_id) AS branch_id,
+        u.username, u.email, u.full_name,
+        COALESCE(wm.role, u.role) AS role,
+        u.status,
+        COALESCE(wm.status, u.status, 'active') AS membership_status,
+        wm.id AS membership_id,
+        u.created_at, u.updated_at, u.last_login_at, u.password_changed_at
+      FROM users u
+      LEFT JOIN workforce_memberships wm
+        ON wm.user_id = u.id AND wm.brand_id = ?
+      WHERE u.id = ?
+        AND (
+          wm.id IS NOT NULL
+          OR u.brand_id = ?
+        )
+      LIMIT 1
+    `).get(brandId, userId, brandId);
+
     if (!user) throw { status: 404, code: 'USER_NOT_FOUND', message: 'User not found.' };
+    if (user.membership_status && user.membership_status !== 'active') {
+      throw { status: 403, code: 'ACCOUNT_DISABLED', message: 'Workforce membership is not active.' };
+    }
     return user;
   }
 
+
+
   listUsers(brandId, { role, branch_id, status, limit = 50, offset = 0 } = {}) {
     let query = `
-      SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status,
-             created_at, updated_at, last_login_at
-      FROM users WHERE brand_id = ?
+      SELECT
+        u.id,
+        COALESCE(wm.brand_id, u.brand_id) AS brand_id,
+        COALESCE(wm.organization_id, u.organization_id) AS organization_id,
+        COALESCE(wm.branch_id, u.branch_id) AS branch_id,
+        u.username, u.email, u.full_name,
+        COALESCE(wm.role, u.role) AS role,
+        COALESCE(wm.status, u.status, 'active') AS status,
+        u.created_at, u.updated_at, u.last_login_at
+      FROM users u
+      LEFT JOIN workforce_memberships wm
+        ON wm.user_id = u.id AND wm.brand_id = ?
+      WHERE (
+        wm.id IS NOT NULL
+        OR u.brand_id = ?
+      )
     `;
-    const params = [brandId];
+    const params = [brandId, brandId];
 
     if (role) {
-      query += ' AND role = ?';
+      query += ' AND COALESCE(wm.role, u.role) = ?';
       params.push(role);
     }
     if (branch_id) {
-      query += ' AND branch_id = ?';
+      query += ' AND COALESCE(wm.branch_id, u.branch_id) = ?';
       params.push(branch_id);
     }
     if (status) {
-      query += ' AND status = ?';
+      query += ' AND COALESCE(wm.status, u.status, \'active\') = ?';
       params.push(status);
     }
 
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    query += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
     return this.repository.prepare(query).all(...params);
   }
 
+
+
   updateUser(userId, brandId, updates, { actor_id, actor_role } = {}) {
     const user = this.getUser(userId, brandId);
 
-    // Brand Manager can only update Cashier profiles
-    if (actor_role === 'brand_manager') {
-      if (user.role !== 'cashier') {
-        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only update Cashier accounts.' };
-      }
+    if (actor_role === 'brand_manager' && user.role !== 'cashier') {
+      throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only update Cashier profiles.' };
     }
 
     const allowedFields = ['full_name', 'email'];
     const setClauses = [];
     const params = [];
 
-    for (const [key, value] of Object.entries(updates)) {
+    for (const [key, value] of Object.entries(updates || {})) {
       if (allowedFields.includes(key)) {
         setClauses.push(`${key} = ?`);
         params.push(value);
@@ -143,25 +199,24 @@ class WorkforceService {
     }
 
     setClauses.push('updated_at = datetime(\'now\')');
-    params.push(userId, brandId);
-
-    this.repository.prepare(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ? AND brand_id = ?`).run(...params);
+    params.push(userId);
+    this.repository.prepare(`UPDATE users SET ${setClauses.join(', ')} WHERE id = ?`).run(...params);
 
     return this.getUser(userId, brandId);
   }
 
+
+
   disableUser(targetUserId, brandId, { actor_id, actor_role, actor_branch_id }) {
     const target = this.getUser(targetUserId, brandId);
 
-    // Last-owner protection
     if (target.role === 'owner') {
-      const ownerCount = this.repository.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ? AND role = ? AND status = ?').get(brandId, 'owner', 'active');
-      if (ownerCount.cnt <= 1) {
+      const ownerCount = this.memberships.countActiveOwners(brandId);
+      if (ownerCount <= 1) {
         throw { status: 400, code: 'LAST_OWNER_PROTECTED', message: 'Cannot disable the last Owner account.' };
       }
     }
 
-    // Authorization: Manager can only disable Cashier within own branch
     if (actor_role === 'branch_manager' || actor_role === 'brand_manager') {
       if (target.role !== 'cashier') {
         throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only disable Cashier accounts.' };
@@ -171,16 +226,17 @@ class WorkforceService {
       }
     }
 
-    this.repository.prepare('UPDATE users SET status = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
-      .run('disabled', targetUserId, brandId);
+    this.memberships.setStatus(targetUserId, brandId, 'disabled');
+    this.invalidateUserSessions(targetUserId);
 
-    return { ...target, status: 'disabled' };
+    return { ...target, status: 'disabled', membership_status: 'disabled' };
   }
+
+
 
   enableUser(targetUserId, brandId, { actor_id, actor_role, actor_branch_id }) {
     const target = this.getUser(targetUserId, brandId);
 
-    // Authorization: Manager can only enable Cashier within own branch
     if (actor_role === 'branch_manager' || actor_role === 'brand_manager') {
       if (target.role !== 'cashier') {
         throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only enable Cashier accounts.' };
@@ -190,118 +246,89 @@ class WorkforceService {
       }
     }
 
-    this.repository.prepare('UPDATE users SET status = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
-      .run('active', targetUserId, brandId);
-
-    // Clean up revocation marker so the user can log in again
+    this.memberships.setStatus(targetUserId, brandId, 'active');
     if (global.TokenSessionStore && global.TokenSessionStore.revokedUserIds) {
       global.TokenSessionStore.revokedUserIds.delete(targetUserId);
     }
 
-    return { ...target, status: 'active' };
+    return { ...target, status: 'active', membership_status: 'active' };
   }
 
+
+
   deleteUser(targetUserId, brandId, { actor_id, actor_role, actor_branch_id }) {
-    // Authorization: Only Owner can delete team members
     if (actor_role !== 'owner') {
       throw { status: 403, code: 'FORBIDDEN_DELETE_MEMBER', message: 'Only Owner can delete team members.' };
     }
 
     const target = this.getUser(targetUserId, brandId);
-
-    // Self-deletion protection: Owner cannot delete themselves
     if (actor_id && targetUserId === actor_id) {
       throw { status: 400, code: 'SELF_DELETE_PROTECTED', message: 'Anda tidak dapat menghapus akun Anda sendiri.' };
     }
 
-    // Last-owner protection: Cannot delete the last owner
-    if (target.role === 'owner') {
-      const ownerCount = this.repository.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ? AND role = ?').get(brandId, 'owner');
-      if (ownerCount.cnt <= 1) {
-        throw { status: 400, code: 'LAST_OWNER_PROTECTED', message: 'Tidak dapat menghapus Owner terakhir.' };
-      }
+    if (target.role === 'owner' && this.memberships.countActiveOwners(brandId) <= 1) {
+      throw { status: 400, code: 'LAST_OWNER_PROTECTED', message: 'Tidak dapat menghapus Owner terakhir.' };
     }
 
-    // Invalidate sessions immediately
+    this.memberships.removeMembership(targetUserId, brandId);
     this.invalidateUserSessions(targetUserId);
 
-    // Delete child authentication & token records (clean up explicit cascades if any)
-    try {
-      this.repository.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(targetUserId);
-    } catch (_) {}
-    try {
-      this.repository.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(targetUserId);
-    } catch (_) {}
-    try {
-      this.repository.prepare('DELETE FROM user_auth_providers WHERE user_id = ?').run(targetUserId);
-    } catch (_) {}
-
-    // Delete user
-    const result = this.repository.prepare('DELETE FROM users WHERE id = ? AND brand_id = ?').run(targetUserId, brandId);
-
-    if (result.changes === 0) {
-      throw { status: 404, code: 'USER_NOT_FOUND', message: 'User not found or already removed.' };
-    }
-
-    return { success: true, deleted_user_id: targetUserId, deleted_user_name: target.full_name, role: target.role };
+    // The User remains as the authentication identity so memberships in other
+    // businesses (and future Customer identity) are never destroyed.
+    return {
+      success: true,
+      deleted_user_id: targetUserId,
+      deleted_user_name: target.full_name,
+      role: target.role
+    };
   }
+
+
 
   changeUserRole(targetUserId, brandId, newRole, { actor_id, actor_role, actor_branch_id }) {
     const target = this.getUser(targetUserId, brandId);
 
-    // Only Owner can change roles
     if (actor_role !== 'owner') {
       throw { status: 403, code: 'FORBIDDEN_ROLE_CHANGE', message: 'Only Owner can change user roles.' };
     }
 
-    // Validate new role
     const allowedRoles = ['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen'];
     if (!allowedRoles.includes(newRole)) {
       throw { status: 400, code: 'INVALID_ROLE', message: `Role must be one of: ${allowedRoles.join(', ')}` };
     }
 
-    // Prevent demoting the last owner
-    if (target.role === 'owner' && newRole !== 'owner') {
-      const ownerCount = this.repository.prepare('SELECT COUNT(*) as cnt FROM users WHERE brand_id = ? AND role = ? AND status = ?').get(brandId, 'owner', 'active');
-      if (ownerCount.cnt <= 1) {
-        throw { status: 400, code: 'LAST_OWNER_PROTECTED', message: 'Cannot demote the last Owner account.' };
-      }
+    if (target.role === 'owner' && newRole !== 'owner' && this.memberships.countActiveOwners(brandId) <= 1) {
+      throw { status: 400, code: 'LAST_OWNER_PROTECTED', message: 'Cannot demote the last Owner account.' };
     }
 
-    this.repository.prepare('UPDATE users SET role = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
-      .run(newRole, targetUserId, brandId);
-
-    // Invalidate all sessions for the target user (role changed — stale sessions must not survive)
+    this.memberships.updateRoleScope(targetUserId, brandId, {
+      role: newRole,
+      branchId: target.branch_id
+    });
     this.invalidateUserSessions(targetUserId);
 
     return { ...target, role: newRole };
   }
 
+
+
   changeUserScope(targetUserId, brandId, newBranchId, { actor_id, actor_role, actor_branch_id }) {
     const target = this.getUser(targetUserId, brandId);
 
-    // Brand Manager can only change scope of Cashier (not other managers/owner)
-    if (actor_role === 'brand_manager') {
+    if (actor_role === 'brand_manager' || actor_role === 'branch_manager') {
       if (target.role !== 'cashier') {
         throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only change scope of Cashier accounts.' };
       }
-    }
-
-    // Branch Manager can only change scope of Cashier within own branch
-    if (actor_role === 'branch_manager') {
-      if (target.role !== 'cashier') {
-        throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only change scope of Cashier accounts.' };
-      }
-      if (target.branch_id !== actor_branch_id) {
-        throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only change scope of Cashier accounts within their branch.' };
-      }
-      // Manager cannot assign to a different branch
-      if (newBranchId && newBranchId !== actor_branch_id) {
-        throw { status: 403, code: 'FORBIDDEN_SCOPE_ESCALATION', message: 'Managers cannot assign Cashier to a different branch.' };
+      if (actor_role === 'branch_manager') {
+        if (target.branch_id !== actor_branch_id) {
+          throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only change scope of Cashier accounts within their branch.' };
+        }
+        if (newBranchId && newBranchId !== actor_branch_id) {
+          throw { status: 403, code: 'FORBIDDEN_SCOPE_ESCALATION', message: 'Managers cannot assign Cashier to a different branch.' };
+        }
       }
     }
 
-    // Validate branch exists if provided
     if (newBranchId) {
       const branch = this.repository.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(newBranchId, brandId);
       if (!branch) {
@@ -309,14 +336,13 @@ class WorkforceService {
       }
     }
 
-    this.repository.prepare('UPDATE users SET branch_id = ?, updated_at = datetime(\'now\') WHERE id = ? AND brand_id = ?')
-      .run(newBranchId || null, targetUserId, brandId);
-
-    // Invalidate all sessions for the target user (scope changed — stale sessions must not survive)
+    this.memberships.updateRoleScope(targetUserId, brandId, { branchId: newBranchId || null });
     this.invalidateUserSessions(targetUserId);
 
     return { ...target, branch_id: newBranchId || null };
   }
+
+  // ==================== PASSWORD MANAGEMENT ====================
 
   // ==================== PASSWORD MANAGEMENT ====================
 
@@ -470,73 +496,71 @@ class WorkforceService {
   // ==================== AUTHENTICATION ====================
 
   authenticate(username, password, brandId) {
-    let user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id = ?')
-      .get(username, username, brandId);
+    let user = this.repository.prepare(`
+      SELECT
+        u.*,
+        wm.id AS membership_id,
+        COALESCE(wm.brand_id, u.brand_id) AS membership_brand_id,
+        COALESCE(wm.organization_id, u.organization_id) AS membership_organization_id,
+        COALESCE(wm.branch_id, u.branch_id) AS membership_branch_id,
+        COALESCE(wm.role, u.role) AS membership_role,
+        COALESCE(wm.status, u.status, 'active') AS membership_status
+      FROM users u
+      LEFT JOIN workforce_memberships wm
+        ON wm.user_id = u.id AND wm.brand_id = ?
+      WHERE (u.username = ? OR u.email = ?)
+        AND (
+          wm.id IS NOT NULL
+          OR u.brand_id = ?
+          OR (u.brand_id IS NULL AND ? IS NULL)
+        )
+      LIMIT 1
+    `).get(brandId, username, username, brandId, brandId);
 
-    // Fallback: identity-only users (pre-invitation) have brand_id = NULL
-    if (!user) {
-      user = this.repository.prepare('SELECT * FROM users WHERE (username = ? OR email = ?) AND brand_id IS NULL')
-        .get(username, username);
-    }
+    if (!user) return { success: false, error: 'INVALID_CREDENTIALS' };
 
-    if (!user) {
-      return { success: false, error: 'INVALID_CREDENTIALS' };
-    }
-
-    // Platform Owner must never authenticate through merchant login
     if (user.role === 'platform_owner') {
       return { success: false, error: 'INVALID_CREDENTIALS' };
     }
 
-    // Check if account is disabled
     if (user.status === 'disabled') {
       return { success: false, error: 'ACCOUNT_DISABLED', message: 'Akun Anda telah dinonaktifkan. Hubungi administrator.' };
     }
 
-    // Check if account is locked
+    if (user.membership_status && user.membership_status !== 'active') {
+      return { success: false, error: 'ACCOUNT_DISABLED', message: 'Akun Anda tidak aktif pada bisnis ini.' };
+    }
+
     if (user.locked_until && new Date(user.locked_until) > new Date()) {
       return { success: false, error: 'ACCOUNT_LOCKED', message: 'Akun Anda terkunci sementara. Coba lagi nanti.' };
     }
 
-    // Guard: Account has no password credential (e.g. Google-only account)
     if (!user.password_hash) {
-      // Track failed attempt identically to invalid password to avoid timing/enumeration leaks
       const attempts = (user.failed_login_attempts || 0) + 1;
-      const updates = { failed_login_attempts: attempts };
-
-      if (attempts >= MAX_LOGIN_ATTEMPTS) {
-        const lockUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000).toISOString();
-        updates.locked_until = lockUntil;
-      }
-
-      this.repository.prepare('UPDATE users SET failed_login_attempts = ?, locked_until = ?, updated_at = datetime(\'now\') WHERE id = ?')
-        .run(attempts, updates.locked_until || null, user.id);
-
+      const lockUntil = attempts >= MAX_LOGIN_ATTEMPTS
+        ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000).toISOString()
+        : null;
+      this.repository.prepare(
+        'UPDATE users SET failed_login_attempts = ?, locked_until = ?, updated_at = datetime(\'now\') WHERE id = ?'
+      ).run(attempts, lockUntil, user.id);
       return { success: false, error: 'INVALID_CREDENTIALS' };
     }
 
-    // Verify password
     if (!this.verifyPassword(password, user.password_hash)) {
-      // Increment failed attempts
       const attempts = (user.failed_login_attempts || 0) + 1;
-      const updates = { failed_login_attempts: attempts };
-
-      if (attempts >= MAX_LOGIN_ATTEMPTS) {
-        const lockUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000).toISOString();
-        updates.locked_until = lockUntil;
-      }
-
-      this.repository.prepare('UPDATE users SET failed_login_attempts = ?, locked_until = ?, updated_at = datetime(\'now\') WHERE id = ?')
-        .run(attempts, updates.locked_until || null, user.id);
-
+      const lockUntil = attempts >= MAX_LOGIN_ATTEMPTS
+        ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000).toISOString()
+        : null;
+      this.repository.prepare(
+        'UPDATE users SET failed_login_attempts = ?, locked_until = ?, updated_at = datetime(\'now\') WHERE id = ?'
+      ).run(attempts, lockUntil, user.id);
       return { success: false, error: 'INVALID_CREDENTIALS' };
     }
 
-    // Successful login - reset failed attempts and update last_login_at
-    this.repository.prepare('UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?')
-      .run(user.id);
+    this.repository.prepare(
+      'UPDATE users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = datetime(\'now\'), updated_at = datetime(\'now\') WHERE id = ?'
+    ).run(user.id);
 
-    // Re-hash with bcrypt if using legacy SHA-256
     if (this.isLegacyHash(user.password_hash)) {
       const newHash = this.hashPassword(password);
       this.repository.prepare('UPDATE users SET password_hash = ?, password_changed_at = datetime(\'now\') WHERE id = ?')
@@ -550,14 +574,18 @@ class WorkforceService {
         username: user.username,
         email: user.email,
         full_name: user.full_name,
-        role: user.role,
-        branch_id: user.branch_id,
-        organization_id: user.organization_id,
+        role: user.membership_role || user.role,
+        branch_id: user.membership_branch_id || null,
+        organization_id: user.membership_organization_id || null,
+        brand_id: user.membership_brand_id || brandId || null,
+        membership_id: user.membership_id || null,
         status: 'active',
         email_verified: Boolean(user.email_verified_at)
       }
     };
   }
+
+
 
   // ==================== AUDIT LOGGING ====================
 
