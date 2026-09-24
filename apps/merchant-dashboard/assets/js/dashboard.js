@@ -23,8 +23,10 @@
   var XentraCropEditor = window.XentraCropEditor;
 
   // Owner branch-catalog UI is owned by this dashboard surface.
-  var XentraOwnerBranchCatalog = window.XentraOwnerBranchCatalog;
-  var getActiveBranchId = XentraOwnerBranchCatalog.getActiveBranchId;
+  var XentraOwnerBranchCatalog = window.XentraOwnerBranchCatalog || {};
+  var getActiveBranchId = typeof XentraOwnerBranchCatalog.getActiveBranchId === 'function'
+    ? function () { return XentraOwnerBranchCatalog.getActiveBranchId(); }
+    : function () { return null; };
 
   // Legacy dashboard Branch Manager menu view remains local to this surface.
   function loadInlineBranchCatalog() {
@@ -52,8 +54,8 @@
   }
 
   function redirectToLogin() {
-    if (typeof checkAppRoute === 'function') {
-      checkAppRoute();
+    if (typeof window.checkAppRoute === 'function') {
+      window.checkAppRoute();
     } else if (!window.location.pathname.includes('login')) {
       window.location.href = '/login';
     }
@@ -4110,8 +4112,8 @@
         if (!confirm('Apakah Anda ingin keluar dari Dashboard?')) return;
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
-        if (typeof checkAppRoute === 'function') {
-          checkAppRoute();
+        if (typeof window.checkAppRoute === 'function') {
+          window.checkAppRoute();
         } else {
           window.location.href = '/login';
         }
@@ -7813,7 +7815,7 @@
   window.deleteMarketingPromotion = deleteMarketingPromotion;
 
   // Wire shared branch-catalog hooks: the Owner surface supplies the branch list.
-  if (window.XentraOwnerBranchCatalog) {
+  if (window.XentraOwnerBranchCatalog && typeof window.XentraOwnerBranchCatalog.setHooks === 'function') {
     window.XentraOwnerBranchCatalog.setHooks({
       getBranches: function () { return state.branches; }
     });
@@ -7903,7 +7905,7 @@
     var btnAddBranchCatInline = $('btn-add-branch-category-inline');
     if (btnAddBranchCatInline) {
       btnAddBranchCatInline.addEventListener('click', async function () {
-        if (!XentraOwnerBranchCatalog.state.branchId) return;
+        if (!XentraOwnerBranchCatalog || !XentraOwnerBranchCatalog.state || !XentraOwnerBranchCatalog.state.branchId) return;
         var name = prompt('Nama Kategori Baru untuk Cabang ini:');
         if (!name || !name.trim()) return;
         try {
