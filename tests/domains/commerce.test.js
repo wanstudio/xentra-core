@@ -475,7 +475,7 @@ test('Commerce 9 — PWA Runtime Context: Test C (Legacy flag rejected) & Test D
   const resLegacySpoof = await OrderPlacementService.submitOrder({
     brand_id: brand.id,
     branch_id: branch.id,
-    order_type: 'dine_in',
+    order_type: 'delivery',
     payment_method: 'cash',
     customer: { name: 'Customer Spoof', phone: '081299992202' },
     is_pwa_installed: true, // Legacy client flag MUST have zero authority
@@ -493,7 +493,7 @@ test('Commerce 9 — PWA Runtime Context: Test C (Legacy flag rejected) & Test D
   const resAcceptedTabE2E = await OrderPlacementService.submitOrder({
     brand_id: brand.id,
     branch_id: branch.id,
-    order_type: 'dine_in',
+    order_type: 'delivery',
     payment_method: 'cash',
     customer: { name: 'Customer Accepted Tab', phone: '081299992204' },
     pwa_runtime: { display_mode: 'browser', install_state: 'accepted', install_requirement_satisfied: false },
@@ -510,7 +510,7 @@ test('Commerce 9 — PWA Runtime Context: Test C (Legacy flag rejected) & Test D
   const resVerifiedTabE2E = await OrderPlacementService.submitOrder({
     brand_id: brand.id,
     branch_id: branch.id,
-    order_type: 'dine_in',
+    order_type: 'delivery',
     payment_method: 'cash',
     customer: { name: 'Customer Verified Tab', phone: '081299992204' },
     pwa_runtime: { display_mode: 'browser', install_state: 'installed', install_requirement_satisfied: true },
@@ -529,7 +529,7 @@ test('Commerce 9 — PWA Runtime Context: Test C (Legacy flag rejected) & Test D
   const resE2E = await OrderPlacementService.submitOrder({
     brand_id: brand.id,
     branch_id: branch.id,
-    order_type: 'dine_in',
+    order_type: 'delivery',
     payment_method: 'cash',
     customer: { name: 'Customer Legit PWA', phone: '081299992202' },
     pwa_runtime: { display_mode: 'standalone' },

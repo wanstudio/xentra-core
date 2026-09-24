@@ -263,6 +263,7 @@ describe('PWA Install Reward Flow Hardening', () => {
       brand_id: brandId,
       branch_id: branchA,
       order_type: 'delivery',
+      order_channel: 'pos_cashier',
       payment_method: 'cash',
       customer: { phone, name: 'Eligible PWA User' },
       pwa_runtime: { display_mode: 'standalone' },

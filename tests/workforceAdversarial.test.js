@@ -547,7 +547,7 @@ describe('Workforce Adversarial Security Verification', () => {
   describe('ATTACK 19: Hard Delete', () => {
     it('Non-owner cannot use the permanent user-delete endpoint', async () => {
       const res = await request('DELETE', `/api/v1/admin/users/${cashierAId}`, null, { Authorization: `Bearer ${managerAToken}` });
-      assert.ok(res.status === 404 || res.status === 405, `Expected 404/405, got ${res.status}`);
+      assert.ok(res.status === 401 || res.status === 403, `Expected 401/403, got ${res.status}`);
     });
   });
 
