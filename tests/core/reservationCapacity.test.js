@@ -15,6 +15,7 @@ process.env.NODE_ENV = 'test';
 
 const app = require('../../server/app');
 const db = require('../../server/database/db');
+const DiningTableService = require('../../domains/dining/services/DiningTableService');
 require('../helpers/demoFixtures.js')();
 
 const BRANCH = 'branch_bangjo_barat';
@@ -91,6 +92,36 @@ test('Kapasitas reservasi: diisi manual per cabang', async (t) => {
       assert.equal(res.status, 400, ('harus ditolak: ' + JSON.stringify(bad)));
     }
     assert.equal(storedCapacity(), 0, 'nilai lama tidak boleh berubah saat input ditolak');
+  });
+
+  await t.test('guest_count di atas kapasitas cabang ditolak di server', () => {
+    const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+    const result = DiningTableService.createReservation({
+      brand_id: 'brand_bangjo',
+      branch_id: BRANCH,
+      customer: { name: 'Capacity Guard', phone: '081900009901' },
+      reservation_date: future,
+      guest_count: 26
+    });
+    assert.equal(result.success, false);
+    assert.equal(result.status, 'RESERVATION_GUEST_CAPACITY_EXCEEDED');
+    const order = db.prepare(
+      'SELECT id FROM orders WHERE branch_id = ? AND customer_phone = ? AND order_type = \'reservation\''
+    ).get(BRANCH, '081900009901');
+    assert.equal(order, undefined, 'reservation yang melampaui kapasitas tidak boleh dibuat');
+  });
+
+  await t.test('guest_count tepat di kapasitas cabang tetap diterima', () => {
+    const future = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+    const result = DiningTableService.createReservation({
+      brand_id: 'brand_bangjo',
+      branch_id: BRANCH,
+      customer: { name: 'Capacity Guard', phone: '081900009902' },
+      reservation_date: future,
+      guest_count: 25
+    });
+    assert.equal(result.success, true, JSON.stringify(result));
+    db.prepare('DELETE FROM orders WHERE id = ?').run(result.order_id);
   });
 
   await t.test('field lain tidak ikut berubah', async () => {
