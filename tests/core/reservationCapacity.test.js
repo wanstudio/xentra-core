@@ -111,6 +111,36 @@ test('Kapasitas reservasi: diisi manual per cabang', async (t) => {
     assert.equal(order, undefined, 'reservation yang melampaui kapasitas tidak boleh dibuat');
   });
 
+  await t.test('jam reservasi disimpan dan harus mengikuti slot 30 menit 12:00–19:30', () => {
+    const future = new Date(Date.now() + 4 * 86400000).toISOString().slice(0, 10);
+
+    const valid = DiningTableService.createReservation({
+      brand_id: 'brand_bangjo',
+      branch_id: BRANCH,
+      customer: { name: 'Reservation Time Guard', phone: '081900009903' },
+      reservation_date: future,
+      reservation_time: '19:30',
+      guest_count: 2
+    });
+    assert.equal(valid.success, true, JSON.stringify(valid));
+    const row = db.prepare('SELECT scheduled_slot_start FROM orders WHERE id = ?').get(valid.order_id);
+    assert.equal(row.scheduled_slot_start, future + 'T19:30:00');
+    db.prepare('DELETE FROM orders WHERE id = ?').run(valid.order_id);
+
+    for (const badTime of ['11:30', '12:15', '19:45', '20:00', 'abc']) {
+      const result = DiningTableService.createReservation({
+        brand_id: 'brand_bangjo',
+        branch_id: BRANCH,
+        customer: { name: 'Reservation Time Guard', phone: '08190000990' + String(badTime.length) },
+        reservation_date: future,
+        reservation_time: badTime,
+        guest_count: 2
+      });
+      assert.equal(result.success, false, 'jam ' + badTime + ' harus ditolak');
+      assert.equal(result.status, 'INVALID_RESERVATION_TIME');
+    }
+  });
+
   await t.test('guest_count tepat di kapasitas cabang tetap diterima', () => {
     const future = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
     const result = DiningTableService.createReservation({
