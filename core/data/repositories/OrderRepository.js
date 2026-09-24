@@ -161,12 +161,12 @@ class OrderRepository {
     ]);
   }
 
-  insertItem({ id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note }) {
+  insertItem({ id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note, modifiersSnapshot = null }) {
     return this.db.execute(`
       INSERT INTO order_items (
-        id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note]);
+        id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note, modifiers_snapshot
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note, modifiersSnapshot]);
   }
 
   insertDelivery({
