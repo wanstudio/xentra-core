@@ -647,10 +647,4 @@ router.get('/admin/marketing/redemptions', requireAuth(['owner', 'brand_manager'
   }
 });
 
-// =========================================================================
-// DINE-IN TABLE FLOOR PLAN & OPERATIONAL DOMAIN APIS
-// =========================================================================
-const { DiningTableService, TableRecommendationService } = require('../../domains/dining');
-
-// Customer / Public / Staff: Get Branch Floor Plan & Operational Table State
 };
