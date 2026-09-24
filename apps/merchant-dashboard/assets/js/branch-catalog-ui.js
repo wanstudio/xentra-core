@@ -17,6 +17,7 @@
   var hooks = { getBranches: null };
   var currentManagingBranchId = null;
   var currentBranchCatalogData = null;
+  var inlineFilter = 'all';
 
   window.openBranchCatalogModal = async function (branchId) {
     currentManagingBranchId = branchId;
@@ -588,7 +589,9 @@
       get branchId() { return currentManagingBranchId; },
       set branchId(v) { currentManagingBranchId = v; },
       get catalogData() { return currentBranchCatalogData; },
-      set catalogData(v) { currentBranchCatalogData = v; }
+      set catalogData(v) { currentBranchCatalogData = v; },
+      get inlineFilter() { return inlineFilter; },
+      set inlineFilter(v) { inlineFilter = v; }
     },
     getActiveBranchId: function () {
       return currentManagingBranchId ||
