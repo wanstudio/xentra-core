@@ -6,7 +6,7 @@
  */
 
 const crypto = require('crypto');
-const { DiningTableRepository } = require('../../../core/data/repositories');
+const { DiningTableRepository, OrderRepository } = require('../../../core/data/repositories');
 const Template01 = require('../templates/Template01');
 
 const HOLD_DURATION_MINUTES = 15;
@@ -27,6 +27,7 @@ const HOLD_DURATION_MINUTES = 15;
 // meja ditutup.
 const ROTATE_TABLE_QR_ON_SESSION_CLOSE = false;
 const repository = new DiningTableRepository();
+const orderRepository = new OrderRepository();
 
 class DiningTableService {
   static initializeBranchLayout(branchId, templateId = 'template_01') {
@@ -284,24 +285,24 @@ class DiningTableService {
     const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
     const orderNumber = `RES-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
-    repository.beginTransaction();
+    orderRepository.beginTransaction();
     try {
       if (customer && customer.phone) {
-        const existingReservation = repository.findActiveReservation({ branchId: branch_id, customerPhone: customer.phone, reservationDate: resDateStr });
+        const existingReservation = orderRepository.findActiveReservation({ branchId: branch_id, customerPhone: customer.phone, reservationDate: resDateStr });
         if (existingReservation) {
-          repository.rollbackTransaction();
+          orderRepository.rollbackTransaction();
           return { success: false, status: 'DUPLICATE_RESERVATION', errors: [`Anda sudah memiliki booking reservasi aktif di cabang ini untuk tanggal ${resDateStr}.`] };
         }
       }
-      const dailyBookingsCount = repository.countActiveReservations({ branchId: branch_id, reservationDate: resDateStr });
+      const dailyBookingsCount = orderRepository.countActiveReservations({ branchId: branch_id, reservationDate: resDateStr });
       if (dailyBookingsCount >= 30) {
-        repository.rollbackTransaction();
+        orderRepository.rollbackTransaction();
         return { success: false, status: 'BRANCH_CAPACITY_FULL', errors: [`Kapasitas reservasi meja untuk cabang ini pada tanggal ${resDateStr} sudah penuh.`] };
       }
-      repository.insertReservation({ id: orderId, orderNumber, brandId: brand_id, branchId: branch_id, customerId: customer?.id || customer?.customer_id || null, customerName: customer?.name || 'Tamu Reservasi', customerPhone: customer?.phone || '', orderChannel: order_channel, selectionMode: selection_mode || 'CUSTOMER_SELECTED', reservationDate: resDateStr, orderNote: notes ? `Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr}) | ${notes}` : `Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr})`, createdAt: now, updatedAt: now });
-      repository.commitTransaction();
+      orderRepository.insertReservation({ id: orderId, orderNumber, brandId: brand_id, branchId: branch_id, customerId: customer?.id || customer?.customer_id || null, customerName: customer?.name || 'Tamu Reservasi', customerPhone: customer?.phone || '', orderChannel: order_channel, selectionMode: selection_mode || 'CUSTOMER_SELECTED', reservationDate: resDateStr, orderNote: notes ? `Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr}) | ${notes}` : `Reservasi (${parsedGuestCount} Tamu, Tgl: ${resDateStr})`, createdAt: now, updatedAt: now });
+      orderRepository.commitTransaction();
     } catch (err) {
-      try { repository.rollbackTransaction(); } catch (_) {}
+      try { orderRepository.rollbackTransaction(); } catch (_) {}
       throw err;
     }
     return { success: true, order_id: orderId, order_number: orderNumber, grand_total: 0, subtotal: 0, order: { id: orderId, order_number: orderNumber, order_type: 'reservation', reservation_date: resDateStr, guest_count: parsedGuestCount, customer_name: customer?.name, customer_phone: customer?.phone, subtotal: 0, grand_total: 0, items: [] } };
@@ -310,24 +311,24 @@ class DiningTableService {
   /** Check in a reservation by mutating the same Order record in place. */
   static checkInReservation({ reservation_order_id, table_number } = {}) {
     if (!reservation_order_id || !table_number) throw new Error('[DiningTableService] "reservation_order_id" and "table_number" are required for reservation check-in.');
-    const order = repository.findById(reservation_order_id);
+    const order = orderRepository.findById(reservation_order_id);
     if (!order) throw new Error(`[DiningTableService] Data reservasi dengan ID ${reservation_order_id} tidak ditemukan.`);
     if (order.order_type !== 'reservation') throw new Error(`[DiningTableService] Order ${reservation_order_id} bukan tipe reservation.`);
     const now = new Date().toISOString();
-    repository.convertReservationToDineIn({ orderId: reservation_order_id, tableNumber: table_number, updatedAt: now });
-    const updatedOrder = repository.findById(reservation_order_id);
-    const orderItems = repository.findItems(reservation_order_id);
+    orderRepository.convertReservationToDineIn({ orderId: reservation_order_id, tableNumber: table_number, updatedAt: now });
+    const updatedOrder = orderRepository.findById(reservation_order_id);
+    const orderItems = orderRepository.findItems(reservation_order_id);
     return { success: true, status: 'CHECKED_IN', order: { ...updatedOrder, order_type: 'dine_in', table_number: String(table_number), status: 'active_table', items: orderItems } };
   }
 
   /** Cancel an overdue reservation as no-show without changing inventory. */
   static cancelNoShowReservation({ reservation_order_id, reason = 'No-Show: Melewati batas toleransi kedatangan' } = {}) {
     if (!reservation_order_id) throw new Error('[DiningTableService] "reservation_order_id" is required.');
-    const order = repository.findById(reservation_order_id);
+    const order = orderRepository.findById(reservation_order_id);
     if (!order) throw new Error(`[DiningTableService] Data reservasi dengan ID ${reservation_order_id} tidak ditemukan.`);
     if (order.order_type !== 'reservation') throw new Error(`[DiningTableService] Order ${reservation_order_id} bukan tipe reservation.`);
     const now = new Date().toISOString();
-    repository.cancelReservationNoShow({ orderId: reservation_order_id, reason, updatedAt: now });
+    orderRepository.cancelReservationNoShow({ orderId: reservation_order_id, reason, updatedAt: now });
     return { success: true, status: 'CANCELLED_NO_SHOW', order_id: reservation_order_id, order_number: order.order_number, branch_id: order.branch_id, reason };
   }
 
