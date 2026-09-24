@@ -24,7 +24,6 @@ router.get('/customer/profile', requireCustomerAuth(), (req, res) => {
     if (!customerId) {
       return res.status(404).json({ success: false, error: 'Customer identity tidak ditemukan.' });
     }
-    const CustomerRepository = require('../../core/data/repositories/CustomerRepository');
     const customerRepo = new CustomerRepository();
     const record = customerRepo.findById(customerId);
     if (!record) {
@@ -207,7 +206,6 @@ router.post('/customer/dining-session/claim', requireCustomerAuth(), (req, res) 
         });
       }
     } else {
-      const { DiningTableService } = require('../../domains/pos');
       const table = DiningTableService.resolveFromQr(raw);
       if (!table) {
         return res.status(404).json({ success: false, error: 'QR Meja tidak valid atau telah dicabut.' });
@@ -273,7 +271,6 @@ router.delete('/customer/account', requireCustomerAuth(), (req, res) => {
       return res.status(429).json({ success: false, error: 'TOO_MANY_REQUESTS', message: 'Terlalu sering. Coba lagi nanti.' });
     }
 
-    const { CustomerIdentityService } = require('../../core/identity');
     const deletingCustomer = db.prepare('SELECT phone FROM customers WHERE id = ?').get(customerId) || {};
     const deletedPhone = deletingCustomer.phone || null;
 
