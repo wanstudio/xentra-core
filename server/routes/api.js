@@ -12,6 +12,7 @@ const registerCustomerOrderRoutes = require('./customer-orders');
 const registerMediaUploadRoutes = require('./media-upload');
 const registerPaymentConfigRoutes = require('./payment-config');
 const registerLocationRoutes = require('./location');
+const registerPublicBrandRoutes = require('./public-brand');
 const OrderStateMachine = require('../services/OrderStateMachine');
 const AcceptanceTimeoutService = require('../services/AcceptanceTimeoutService');
 const RouteService = require('../services/RouteService');
@@ -27,32 +28,8 @@ const mediaService = new MediaService();
 const bannerContentService = new BannerContentService({ media: mediaService });
 const bannerAssignmentService = new BannerAssignmentService();
 
-// 0. Active Promotions & Evaluation Endpoint
-router.get(['/promo/active', '/promotions/active'], (req, res) => {
-  try {
-    const brandId = req.brand.id;
-    const isPwa = req.query.is_pwa === '1' || req.query.is_pwa === 'true';
-    const phone = req.query.phone || '';
-    const branchId = req.query.branch_id || req.query.branchId || null;
-
-    const evaluation = PromotionEngineService.evaluate({
-      brand_id: brandId,
-      branch_id: branchId,
-      is_pwa_installed: isPwa,
-      customer_phone: phone
-    });
-
-    res.json({
-      success: true,
-      promotions: evaluation.discovery,
-      applied: evaluation.applied,
-      rejected: evaluation.rejected
-    });
-  } catch (err) {
-    console.error('[API Error /promo/active]:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
+// Public brand discovery routes are isolated in server/routes/public-brand.js.
+registerPublicBrandRoutes(router, { db, PromotionEngineService });
 
 // 1. Get Brand Profile & Theme
 function resolveCustomerBannerPayload(req, brandId) {
@@ -125,32 +102,6 @@ function resolveCustomerBannerPayload(req, brandId) {
   });
 }
 
-
-// 2. List Branches for Brand
-router.get('/brand/branches', (req, res) => {
-  try {
-    const branches = db
-      .prepare(`
-        SELECT 
-          b.id, b.name, b.slug, b.address_text, b.latitude, b.longitude, b.phone,
-          b.is_active, b.is_open_override, b.timezone, b.reservation_max_guests,
-          s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km,
-          s.promo_delivery_discount, s.promo_min_order
-        FROM branches b
-        LEFT JOIN branch_delivery_settings s ON s.branch_id = b.id
-        WHERE b.brand_id = ? AND b.is_active = 1 AND (b.is_archived = 0 OR b.is_archived IS NULL)
-      `)
-      .all(req.brand_id);
-
-    res.json({
-      success: true,
-      branches
-    });
-  } catch (err) {
-    console.error('[API Error /brand/branches]:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 // Branch matching and address lookup routes are isolated in server/routes/location.js.
 registerLocationRoutes(router, { BranchMatcher, RouteService });
