@@ -166,7 +166,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
       'detail view must expose reservation schedule');
     assert.ok(orderJs.includes('bm-detail-reservation-guests'),
       'detail view must expose guest count');
-    assert.ok(/Reservasi\\s*\\(\\s*\\(\\d\+\\)\\s*Tamu/i.test(js) === false,
+    assert.ok(/Reservasi\\s*\\(\\s*\\(\\d\+\\)\\s*Tamu/i.test(orderJs) === false,
       'guest count parser must not contain an invalid double-escaped regex');
   });
 
@@ -219,7 +219,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
       state: {}
     };
 
-    // merchant-app.js consumes the shared contract through XentraShared; use
+    // orders.js consumes the shared contract through XentraShared; use
     // lightweight stubs here so the test isolates queue rendering and sorting.
     win.eval(fs.readFileSync(ORDER_JS_PATH, 'utf8'));
     await win.loadBMOrders();
