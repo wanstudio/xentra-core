@@ -1006,15 +1006,6 @@ router.patch('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'bra
   }
 });
 
-registerMediaUploadRoutes(router, {
-  db,
-  path,
-  fs,
-  crypto,
-  ImageValidator,
-  requireAuth
-});
-
 // Delete a branch category (products in it remain, just lose category assignment)
 router.delete('/admin/branches/:id/categories/:catId', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {

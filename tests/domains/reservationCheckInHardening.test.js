@@ -197,4 +197,3 @@ test('checked-in reservation cannot be cancelled as no-show', () => {
 
   db.prepare('DELETE FROM orders WHERE id = ?').run(id);
 });
-});

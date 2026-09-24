@@ -74,7 +74,7 @@ test('M1-M4 media lifecycle routes are isolated from api.js', () => {
     assert.equal(mediaSource.includes(route), true, route + ' must live in media-upload.js');
   }
 
-  assert.equal((apiSource.match(/registerMediaUploadRoutes\\(router,/g) || []).length, 1);
+  assert.equal((apiSource.match(/registerMediaUploadRoutes\(router,/g) || []).length, 1);
 });
 
 test('M5 media routes are isolated from api.js', () => {
@@ -83,12 +83,12 @@ test('M5 media routes are isolated from api.js', () => {
   const apiSource = fs.readFileSync(apiPath, 'utf8');
   const mediaRouteSource = fs.readFileSync(mediaRoutePath, 'utf8');
 
-  const entityRouteMatches = apiSource.match(/router\\.(?:get|post|delete)\\('\/admin\\/media\\/entity\\//g) || [];
+  const entityRouteMatches = apiSource.match(/router\.(?:get|post|delete)\('\/admin\/media\/entity\//g) || [];
   assert.equal(entityRouteMatches.length, 0, 'canonical entity media routes must not be implemented inline in api.js');
   assert.ok(mediaRouteSource.includes('module.exports = function registerMediaEntityRoutes'),
     'media-entities.js must own canonical entity media routes');
   assert.equal(
-    (apiSource.match(/registerMediaEntityRoutes\\(router,/g) || []).length,
+    (apiSource.match(/registerMediaEntityRoutes\(router,/g) || []).length,
     1,
     'api.js must register canonical entity media routes exactly once'
   );

@@ -48,6 +48,7 @@ const RouteService = require('../services/RouteService');
 const { PromotionEngineService } = require('../../domains/promotion');
 const { InventoryStockService, InventoryMovementModel } = require('../../domains/inventory');
 const CatalogService = require('../../domains/catalog/services/CatalogService');
+const { PricingPolicyModel } = require('../../domains/catalog');
 const { XentraConnectorClient, XentraConnectorError } = require('../../core/integration/XentraConnectorClient');
 const { BrandRepository: CoreBrandRepo, BranchRepository: CoreBranchRepo, UserRepository: CoreUserRepo } = require('../../core/data/repositories');
 const coreBrandRepo = new CoreBrandRepo();
@@ -58,9 +59,118 @@ const { ImageValidator } = require('../../core/domain');
 const { MediaService } = require('../../core/media');
 const { BannerContentService, BannerAssignmentService } = require('../../domains/banner');
 const mediaService = new MediaService();
-const { bannerMediaDelivery, parseLegacyBrandBanners } = createBannerHelpers(mediaService);
+function bannerMediaDelivery(brandId, mediaId) {
+  if (!mediaId) {
+    return { media_id: null, preview_url: null, srcset_variants: [] };
+  }
+
+  try {
+    const asset = mediaService.getMedia({ mediaId, brandId });
+    const variants = Array.isArray(asset.variants) ? asset.variants : [];
+    const preview = variants.find(v => Number(v.width) >= 640) || variants[variants.length - 1] || null;
+    return {
+      media_id: mediaId,
+      preview_url: preview ? preview.url : asset.url,
+      srcset_variants: variants.map(v => ({
+        url: v.url,
+        width: v.width,
+        height: v.height,
+        name: v.name
+      }))
+    };
+  } catch (_) {
+    return { media_id: mediaId, preview_url: null, srcset_variants: [] };
+  }
+}
+
+function parseLegacyBrandBanners(brand) {
+  if (!brand || brand.banners === null || brand.banners === undefined || brand.banners === '') return [];
+  try {
+    const parsed = typeof brand.banners === 'string' ? JSON.parse(brand.banners) : brand.banners;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function resolveBannerDelivery(banner, brandId) {
+  if (!banner) return banner;
+  const mediaId = banner.media_id || null;
+  const legacyUrl = banner.image_url || null;
+
+  const delivery = bannerMediaDelivery(brandId, mediaId);
+
+  return {
+    id: banner.id,
+    title: banner.title || '',
+    link: banner.link || '#',
+    preview_url: delivery.preview_url,
+    srcset_variants: delivery.srcset_variants,
+    media_id: delivery.media_id,
+    image_url: delivery.preview_url || legacyUrl
+  };
+}
+
 const bannerContentService = new BannerContentService({ media: mediaService });
 const bannerAssignmentService = new BannerAssignmentService();
+
+function batchResolveCustomerMediaDelivery({ mediaIds = [], brandId, assetType = 'square' }) {
+  const resultMap = new Map();
+  if (!brandId || !Array.isArray(mediaIds) || mediaIds.length === 0) {
+    return resultMap;
+  }
+
+  const uniqueIds = Array.from(new Set(mediaIds.filter(id => Boolean(id) && typeof id === 'string')));
+  if (uniqueIds.length === 0) return resultMap;
+
+  try {
+    const placeholders = uniqueIds.map(() => '?').join(',');
+    const assets = db.prepare(
+      `SELECT id, brand_id, status FROM media_assets WHERE brand_id = ? AND status = 'ready' AND id IN (${placeholders})`
+    ).all(brandId, ...uniqueIds);
+
+    if (!assets || assets.length === 0) return resultMap;
+
+    const readyIds = assets.map(a => a.id);
+    const readyPlaceholders = readyIds.map(() => '?').join(',');
+
+    const variants = db.prepare(
+      `SELECT media_id, variant_name, width, height, storage_key FROM media_variants WHERE media_id IN (${readyPlaceholders}) ORDER BY width ASC`
+    ).all(...readyIds);
+
+    const variantsByMediaId = new Map();
+    for (const v of (variants || [])) {
+      if (!variantsByMediaId.has(v.media_id)) {
+        variantsByMediaId.set(v.media_id, []);
+      }
+      variantsByMediaId.get(v.media_id).push(v);
+    }
+
+    for (const asset of assets) {
+      const itemVariants = variantsByMediaId.get(asset.id) || [];
+      if (itemVariants.length === 0) continue;
+
+      const deliveryVariants = itemVariants.map(v => ({
+        name: v.variant_name,
+        width: v.width,
+        height: v.height,
+        url: mediaService.storage.resolveUrl(v.storage_key)
+      }));
+
+      const previewVariant = deliveryVariants.find(v => v.width >= 640) || deliveryVariants[deliveryVariants.length - 1];
+
+      resultMap.set(asset.id, {
+        media_id: asset.id,
+        preview_url: previewVariant ? previewVariant.url : null,
+        srcset_variants: deliveryVariants.map(v => ({ url: v.url, width: v.width, height: v.height, name: v.name }))
+      });
+    }
+  } catch (_) {
+    // Fail-safe: empty map causes callers to seamlessly use legacyUrl
+  }
+
+  return resultMap;
+}
 
 // Public brand discovery routes are isolated in server/routes/public-brand.js.
 registerPublicBrandRoutes(router, { db, PromotionEngineService });
@@ -136,6 +246,39 @@ function resolveCustomerBannerPayload(req, brandId) {
   });
 }
 
+router.get('/brand/info', (req, res) => {
+  try {
+    const brandId = req.brand_id;
+
+    let logoDeliveryUrl = req.brand.logo_url || null;
+    try {
+      const logoMediaId = Object.prototype.hasOwnProperty.call(req.brand, 'logo_media_id')
+        ? req.brand.logo_media_id
+        : (db.prepare('SELECT logo_media_id FROM brands WHERE id = ?').get(brandId) || {}).logo_media_id;
+      if (logoMediaId) {
+        const logoDelivery = bannerMediaDelivery(brandId, logoMediaId);
+        if (logoDelivery.preview_url) logoDeliveryUrl = logoDelivery.preview_url;
+      }
+    } catch (_) {}
+
+    const enrichedBanners = resolveCustomerBannerPayload(req, brandId);
+
+    res.json({
+      success: true,
+      brand: {
+        id: req.brand.id,
+        name: req.brand.name,
+        slug: req.brand.slug,
+        logo_url: logoDeliveryUrl,
+        primary_color: req.brand.primary_color || '#b6ff00',
+        banners: enrichedBanners
+      }
+    });
+  } catch (err) {
+    console.error('[API Error /brand/info]:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 // Branch matching and address lookup routes are isolated in server/routes/location.js.
 registerLocationRoutes(router, { BranchMatcher, RouteService });
@@ -181,22 +324,6 @@ const RateLimiter = {
   }
 };
 
-// Customer Google authentication + broker handoff routes are isolated in server/routes/customer-auth.js.
-registerCustomerAuthRoutes(router, {
-  db,
-  crypto,
-  RateLimiter,
-  TokenSessionStore
-});
-
-// 5. Menu Catalog & Home
-// Canonical public catalog menu route is isolated in server/routes/catalog.js.
-registerCatalogRoutes(router, { db, CatalogService, batchResolveCustomerMediaDelivery });
-
-// Product/upsell/checkout-session support routes are isolated in server/routes/storefront.js.
-registerStorefrontRoutes(router, { db, crypto, batchResolveCustomerMediaDelivery });
-
-// Customer address CRUD is isolated in server/routes/customer-addresses.js.
 // In-Memory Token & Session Store with TTL + Revocation Support
 const TokenSessionStore = {
   sessions: new Map(),
@@ -381,14 +508,29 @@ const TokenSessionStore = {
   }
 };
 
+// Expose globally for WorkforceService
+global.TokenSessionStore = TokenSessionStore;
+
+// Customer Google authentication + broker handoff routes are isolated in server/routes/customer-auth.js.
+registerCustomerAuthRoutes(router, {
+  db,
+  crypto,
+  RateLimiter,
+  TokenSessionStore
+});
+
 // Retired customer OTP routes remain isolated for reference; they always return OTP_RETIRED.
 registerLegacyCustomerOtpRoutes(router, {
   crypto,
   TokenSessionStore
 });
 
-// Expose globally for WorkforceService
-global.TokenSessionStore = TokenSessionStore;
+// 5. Menu Catalog & Home
+// Canonical public catalog menu route is isolated in server/routes/catalog.js.
+registerCatalogRoutes(router, { db, CatalogService, batchResolveCustomerMediaDelivery });
+
+// Product/upsell/checkout-session support routes are isolated in server/routes/storefront.js.
+registerStorefrontRoutes(router, { db, crypto, batchResolveCustomerMediaDelivery });
 
 // Authoritative customer session organization authorization
 function authorizeCustomerSession(session, req) {
@@ -826,9 +968,42 @@ registerAdminBrandRoutes(router, {
   CoreBrandRepo
 });
 
+// Master catalog CRUD is isolated in server/routes/admin-catalog.js.
+registerAdminCatalogRoutes(router, { db, requireAuth });
 
+// Admin branch management routes are isolated in server/routes/admin-branches.js.
+registerAdminBranchRoutes(router, { db, crypto, requireAuth });
 
+// Branch orders and operational order feed are isolated in server/routes/admin-orders.js.
+registerAdminOrderRoutes(router, { db, requireAuth, AcceptanceTimeoutService });
 
+// Branch catalog adoption, availability, and pricing overrides are isolated in server/routes/admin-branch-catalog.js.
+registerAdminBranchCatalogRoutes(router, {
+  db,
+  crypto,
+  requireAuth,
+  CatalogService,
+  PricingPolicyModel,
+  XentraConnectorClient,
+  InventoryStockService
+});
+
+// Branch product and inventory routes are isolated in server/routes/admin-branch-operations.js.
+registerAdminBranchOperationsRoutes(router, { db, requireAuth, InventoryStockService });
+
+// Media upload routes are isolated in server/routes/media-upload.js.
+registerMediaUploadRoutes(router, {
+  db,
+  path,
+  fs,
+  crypto,
+  ImageValidator,
+  requireAuth,
+  mediaService
+});
+
+// Canonical entity media routes are isolated in server/routes/media-entities.js.
+registerMediaEntityRoutes(router, { db, requireAuth, mediaService, coreBrandRepo });
 
 /* =========================================================================
    ADMIN & OWNER DASHBOARD API ENDPOINTS (Protected by requireAuth)

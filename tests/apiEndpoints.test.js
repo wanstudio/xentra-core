@@ -503,15 +503,15 @@ test('API Customer Order Routes: extracted module is canonical and registered be
   assert.ok(apiSource.includes("const registerCustomerOrderRoutes = require('./customer-orders');"),
     'api.js must import customer-orders route module');
   const registrationIndex = apiSource.indexOf('registerCustomerOrderRoutes(router, {');
-  const kitchenIndex = apiSource.indexOf("router.get('/kitchen/queue'");
+  const kitchenIndex = apiSource.indexOf("registerOperationalOrderRoutes(router, {");
   assert.ok(registrationIndex >= 0 && kitchenIndex >= 0 && registrationIndex < kitchenIndex,
     'customer order routes must stay registered before the kitchen routes');
 });
 
 test('API Auth Merchant Me: route is registered exactly once', () => {
-  const apiPath = require.resolve('../server/routes/api');
-  const apiSource = fs.readFileSync(apiPath, 'utf8');
-  const matches = apiSource.match(/router\.get\('\/auth\/merchant\/me'/g) || [];
+  const authPath = require.resolve('../server/routes/merchant-auth');
+  const authSource = fs.readFileSync(authPath, 'utf8');
+  const matches = authSource.match(/router\.get\('\/auth\/merchant\/me'/g) || [];
   assert.strictEqual(matches.length, 1, 'GET /auth/merchant/me must have exactly one route implementation');
 });
 

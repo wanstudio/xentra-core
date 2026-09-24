@@ -27,5 +27,5 @@ test('DINE-IN ROUTES — HTTP boundary is isolated', () => {
     assert.equal(dineInSource.includes(route), true, route + ' must live in dine-in.js');
   }
 
-  assert.equal((apiSource.match(/registerDineInRoutes\\(router,/g) || []).length, 1);
+  assert.equal((apiSource.match(/registerDineInRoutes\(router,/g) || []).length, 1);
 });
