@@ -44,3 +44,21 @@ test('DiningTableService target module resolves its moved template boundary', ()
   assert.ok(Array.isArray(Template.tables));
   assert.ok(Template.tables.length > 0);
 });
+
+test('Commerce dine-in flow delegates table/session validation to Dining boundary', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const source = fs.readFileSync(
+    path.resolve(__dirname, '../../domains/commerce/services/OrderPlacementService.js'),
+    'utf8'
+  );
+
+  assert.match(source, /DiningTableService\.prepareDineInOrderContext/);
+  assert.doesNotMatch(source, /new DiningTableRepository/);
+  assert.doesNotMatch(source, /diningTableRepo\.findActiveHoldByCustomer/);
+  assert.doesNotMatch(source, /diningTableRepo\.findActiveSessionByCustomer/);
+  assert.doesNotMatch(source, /diningTableRepo\.findCurrentSessionForTable/);
+
+  const dining = require('../../domains/dining');
+  assert.equal(typeof dining.DiningTableService.prepareDineInOrderContext, 'function');
+});

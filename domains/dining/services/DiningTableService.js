@@ -103,6 +103,173 @@ class DiningTableService {
     return { branch_id: branchId, canvas, sections, non_table_objects: nonTableObjects, tables };
   }
 
+  /**
+   * Resolve and validate the table/session context for a Commerce dine-in order.
+   * Commerce owns Order placement; Dining owns table/session business invariants.
+   * This method intentionally preserves the pre-extraction response semantics so
+   * the migration remains behavior-preserving while the repository access moves
+   * behind the Dining boundary.
+   */
+  static prepareDineInOrderContext({
+    branch_id,
+    order_channel = 'customer_app',
+    customer_phone = null,
+    dining_session_id = null,
+    table_number = null,
+    table_id = null,
+    table_ids = null
+  } = {}) {
+    let effectiveDiningSessionId = dining_session_id || null;
+    let resolvedTableNumber = table_number || null;
+    const resolvedTableIds = [];
+
+    if (table_id) {
+      resolvedTableIds.push(table_id);
+    } else if (Array.isArray(table_ids)) {
+      resolvedTableIds.push(...table_ids);
+    }
+
+    if (order_channel === 'customer_app' && resolvedTableIds.length > 1) {
+      return {
+        valid: false,
+        status: 'SINGLE_TABLE_REQUIRED',
+        errors: ['Pesanan dine-in customer hanya diperbolehkan untuk 1 meja.']
+      };
+    }
+
+    if (resolvedTableIds.length === 0 && resolvedTableNumber) {
+      const table = repository.findTableIdByNumberOrLabel(branch_id, resolvedTableNumber);
+      if (table) resolvedTableIds.push(table.id);
+    }
+
+    if (resolvedTableIds.length === 0 && !resolvedTableNumber && order_channel === 'customer_app') {
+      return {
+        valid: false,
+        status: 'TABLE_REQUIRED',
+        errors: ['Meja (table_number atau table_ids) wajib disertakan untuk pesanan dine-in.']
+      };
+    }
+
+    // Validate table identity and branch scope here, not inside Commerce.
+    for (const tid of resolvedTableIds) {
+      const tableRow = repository.findTableForBranch(tid, branch_id);
+      if (!tableRow || !tableRow.is_active) {
+        return {
+          valid: false,
+          status: 'BRANCH_TABLE_MISMATCH',
+          errors: [`Meja "${tid}" tidak ditemukan atau tidak aktif pada cabang ini.`]
+        };
+      }
+      if (!resolvedTableNumber) resolvedTableNumber = tableRow.table_number;
+    }
+
+    if (resolvedTableNumber && resolvedTableIds.length === 0) {
+      return {
+        valid: false,
+        status: 'BRANCH_TABLE_MISMATCH',
+        errors: [`Meja "${resolvedTableNumber}" tidak ditemukan pada cabang ini.`]
+      };
+    }
+
+    const authenticatedCustomerPhone = customer_phone ? String(customer_phone).trim() : null;
+
+    // A customer may not keep multiple pending dine-in table contexts at once.
+    if (order_channel === 'customer_app' && authenticatedCustomerPhone) {
+      const existingHold = repository.findActiveHoldByCustomer(branch_id, authenticatedCustomerPhone);
+      if (existingHold) {
+        const isDifferentTable = resolvedTableIds.some(tid => tid !== existingHold.table_id);
+        if (isDifferentTable) {
+          return {
+            valid: false,
+            status: 'CUSTOMER_PENDING_HOLD_EXISTS',
+            errors: ['Anda sudah memiliki pesanan meja yang sedang menunggu konfirmasi pada meja lain di cabang ini. Batalkan pesanan sebelumnya jika ingin berpindah meja.']
+          };
+        }
+      }
+    }
+
+    if (effectiveDiningSessionId) {
+      const session = repository.findDiningSession(effectiveDiningSessionId);
+      if (!session) {
+        return {
+          valid: false,
+          status: 'SESSION_NOT_FOUND',
+          errors: [`Sesi meja "${effectiveDiningSessionId}" tidak ditemukan.`]
+        };
+      }
+      if (session.branch_id !== branch_id) {
+        return {
+          valid: false,
+          status: 'BRANCH_SESSION_MISMATCH',
+          errors: [`Sesi meja "${effectiveDiningSessionId}" bukan milik cabang ini.`]
+        };
+      }
+      if (session.status !== 'active') {
+        return {
+          valid: false,
+          status: 'COMPLETED_SESSION_REUSE_REJECTED',
+          errors: [`Sesi meja "${effectiveDiningSessionId}" sudah ditutup (${session.status}) dan tidak dapat digunakan kembali.`]
+        };
+      }
+      if (order_channel === 'customer_app' && session.customer_phone && authenticatedCustomerPhone && session.customer_phone !== authenticatedCustomerPhone) {
+        return {
+          valid: false,
+          status: 'UNAUTHORIZED_SESSION_ACCESS',
+          errors: ['Sesi meja ini milik pelanggan lain. Anda tidak dapat bergabung atau membuat pesanan pada sesi ini.']
+        };
+      }
+
+      const sessionTableIds = repository.findSessionTables(session.id).map(row => row.table_id);
+      if (resolvedTableIds.length > 0) {
+        const mismatch = resolvedTableIds.some(tid => !sessionTableIds.includes(tid));
+        if (mismatch) {
+          return {
+            valid: false,
+            status: 'TABLE_SESSION_MISMATCH',
+            errors: ['Meja yang dipesan tidak sesuai dengan meja pada sesi aktif ini.']
+          };
+        }
+      }
+    } else if (order_channel === 'customer_app' && authenticatedCustomerPhone) {
+      const existingSession = repository.findActiveSessionByCustomer(branch_id, authenticatedCustomerPhone);
+      if (existingSession) {
+        const sessionTableIds = repository.findSessionTables(existingSession.id).map(row => row.table_id);
+        if (resolvedTableIds.length > 0) {
+          const isSelfTransfer = resolvedTableIds.some(tid => !sessionTableIds.includes(tid));
+          if (isSelfTransfer) {
+            return {
+              valid: false,
+              status: 'CUSTOMER_TABLE_TRANSFER_FORBIDDEN',
+              errors: ['Anda sudah memiliki sesi aktif di meja lain pada cabang ini. Pelanggan tidak diizinkan memindahkan meja sendiri. Silakan hubungi kasir/staf untuk pindah meja.']
+            };
+          }
+        }
+        effectiveDiningSessionId = existingSession.id;
+      } else {
+        for (const tid of resolvedTableIds) {
+          const currentTable = repository.findCurrentSessionForTable(tid);
+          if (currentTable && currentTable.operational_state === 'occupied' && currentTable.current_session_id) {
+            const activeSession = repository.findDiningSessionById(currentTable.current_session_id);
+            if (activeSession && activeSession.status === 'active' && activeSession.customer_phone !== authenticatedCustomerPhone) {
+              return {
+                valid: false,
+                status: 'TABLE_ALREADY_OCCUPIED',
+                errors: ['Meja sedang digunakan oleh pelanggan lain.']
+              };
+            }
+          }
+        }
+      }
+    }
+
+    return {
+      valid: true,
+      dining_session_id: effectiveDiningSessionId,
+      table_number: resolvedTableNumber,
+      table_ids: resolvedTableIds
+    };
+  }
+
   static validateTablesAvailable(branchId, tableIds, customerPhone = null) {
     this.sweepExpiredHolds();
     if (!Array.isArray(tableIds) || tableIds.length === 0) return { valid: false, error: 'Daftar meja tidak boleh kosong.' };
