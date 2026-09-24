@@ -158,7 +158,7 @@ router.get('/admin/branches/:id', requireAuth(['owner', 'brand_manager', 'branch
         s.is_delivery_active, s.is_pickup_active, s.free_delivery_km, s.price_per_km, s.max_radius_km, s.promo_delivery_discount, s.promo_min_order,
         (SELECT COUNT(*) FROM branch_products bp WHERE bp.branch_id = b.id) AS adopted_products_count,
         (SELECT COUNT(*) FROM branch_categories bc WHERE bc.branch_id = b.id) AS branch_categories_count,
-        (SELECT COUNT(*) FROM users u WHERE u.branch_id = b.id AND u.brand_id = b.brand_id) AS staff_count,
+        (SELECT COUNT(*) FROM workforce_memberships wm WHERE wm.branch_id = b.id AND wm.brand_id = b.brand_id AND wm.status = 'active') AS staff_count,
         (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id) AS total_orders,
         (SELECT COUNT(*) FROM orders o WHERE o.branch_id = b.id AND o.status IN ('pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery')) AS active_orders
       FROM branches b
