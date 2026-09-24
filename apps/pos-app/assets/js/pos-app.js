@@ -334,6 +334,9 @@
     if (grand) grand.textContent=money(total());
     if (pay) pay.textContent=money(total());
     if (btn) btn.disabled=!state.cart.length || !state.shift || !!state.shift.active_break;
+    var tableLabel=$('pos-selected-table'),tableBtn=$('btn-pos-select-table');
+    if(tableLabel) tableLabel.textContent=state.selectedTable?(state.selectedTable.label||('Meja '+state.selectedTable.table_number)):'Belum dipilih';
+    if(tableBtn) tableBtn.textContent=state.selectedTable?'Ubah':'Pilih Meja';
     if (!box) return;
     if (!state.cart.length) { box.innerHTML='<div class="pos-empty">Belum ada item.</div>'; return; }
     box.innerHTML=state.cart.map(function(it,idx){
@@ -723,6 +726,9 @@
 
   function openPayModal(){
     if(!state.cart.length)return;
+    if(!state.shift)return toast('Buka shift terlebih dahulu.');
+    if(state.shift.active_break)return toast('Akhiri istirahat sebelum melanjutkan transaksi.');
+    if(state.orderType==='dine_in'&&!state.selectedTable){openTableSelector();return;}
     var t=total();
     var modes=state.paymentModes.filter(function(m){return m.enabled;});
     if(!modes.some(function(m){return m.code==='cash';}))modes.unshift({code:'cash',name:'Cash',enabled:true,offline_supported:true,provider:'cash'});
@@ -763,7 +769,7 @@
 
   async function submitSale(paymentMode,amountTendered){
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
-    if(state.orderType==='dine_in'&&!state.selectedTable)return toast('Pilih meja untuk transaksi dine-in.');
+    if(state.orderType==='dine_in'&&!state.selectedTable){hideModal();openTableSelector();return;}
     if(!navigator.onLine&&paymentMode!=='cash')return toast('Payment Gateway dan QRIS Statis membutuhkan koneksi internet pada POS.');
     var payload={branch_id:state.branchId,shift_id:state.shift.id,order_type:state.orderType,payment_mode:paymentMode,amount_tendered:paymentMode==='cash'?amountTendered:null,customer:{name:$('pos-customer-name').value.trim(),phone:'',table_number:state.selectedTable?state.selectedTable.table_number:null},items:state.cart.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,options:i.options||[],note:i.note||''};}),client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)};
     try{
@@ -884,13 +890,13 @@
 
   function bind(){
     document.querySelectorAll('.pos-bottom-nav button').forEach(function(b){b.onclick=function(){setView(b.dataset.view);};});
-    document.querySelectorAll('.pos-order-type button').forEach(function(b){b.onclick=function(){state.orderType=b.dataset.type;document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x===b);});$('pos-table-context').classList.toggle('hidden',state.orderType!=='dine_in');if(state.orderType!=='dine_in')state.selectedTable=null;};});
+    document.querySelectorAll('.pos-order-type button').forEach(function(b){b.onclick=function(){state.orderType=b.dataset.type;document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x===b);});$('pos-table-context').classList.toggle('hidden',state.orderType!=='dine_in');if(state.orderType!=='dine_in'){state.selectedTable=null;renderCart();}else{renderCart();}};});
     $('pos-menu-search').oninput=function(){state.search=this.value;renderMenu();};
     $('btn-pos-refresh-menu').onclick=loadMenu;
     $('btn-pos-pay').onclick=openPayModal;
     $('btn-pos-clear').onclick=function(){resetSale();};
     $('btn-pos-hold').onclick=holdSale;
-    $('btn-pos-select-table').onclick=function(){setView('meja');};
+    $('btn-pos-select-table').onclick=function(){openTableSelector();};
     $('btn-pos-load-sales').onclick=loadSales;
     $('btn-pos-shift-status').onclick=function(){if(!state.shift){setView('shift');return;}toggleShiftBreak();};
     $('btn-pos-close-shift-top').onclick=closeShift;
