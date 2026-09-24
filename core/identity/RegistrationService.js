@@ -535,7 +535,17 @@ class RegistrationService {
       this.db.prepare(`INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`).run(branchId, brandId, finalBranchName, branchSlug, branchAddress, Number(latitude), Number(longitude), branchPhone, now, now);
       this.db.prepare(`INSERT INTO branch_delivery_settings (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount, created_at, updated_at) VALUES (?, ?, 1, 1, 10.0, 2.0, 3000.0, 15000.0, ?, ?)`).run(bdsId, branchId, now, now);
       
-      this.db.prepare(`UPDATE users SET brand_id = ?, organization_id = ?, branch_id = ?, updated_at = ? WHERE id = ?`).run(brandId, orgId, branchId, now, userId);
+      // Identity-only onboarding may populate legacy scope fields. Once a User
+      // already has another business membership, do NOT overwrite that
+      // membership's compatibility fields just because they create another business.
+      this.db.prepare(`
+        UPDATE users
+        SET brand_id = CASE WHEN brand_id IS NULL THEN ? ELSE brand_id END,
+            organization_id = CASE WHEN organization_id IS NULL THEN ? ELSE organization_id END,
+            branch_id = CASE WHEN brand_id IS NULL THEN ? ELSE branch_id END,
+            updated_at = ?
+        WHERE id = ?
+      `).run(brandId, orgId, branchId, now, userId);
 
       new WorkforceMembershipService(this.db).ensureMembership({
         userId,
