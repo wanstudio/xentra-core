@@ -19,15 +19,19 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const DASHBOARD_JS = read('apps/merchant-dashboard/assets/js/dashboard.js');
 const MERCHANT_APP_JS = read('apps/merchant-app/assets/js/merchant-app.js');
 const SHARED_JS = read('apps/merchant-shared/js/shared.js');
+const ACTION_MENU_JS = read('apps/merchant-shared/js/action-menu.js');
+const CROP_EDITOR_JS = read('apps/merchant-shared/js/crop-editor.js');
 const BRANCH_CATALOG_JS = read('apps/merchant-shared/js/branch-catalog.js');
 const DASHBOARD_HTML = read('apps/merchant-dashboard/index.html');
 const MERCHANT_APP_HTML = read('apps/merchant-app/index.html');
 
 test('MERCHANT SHARED — single source, no duplication', async (t) => {
 
-  await t.test('1. shared widgets are defined once, in merchant-shared', () => {
-    assert.ok(SHARED_JS.includes('window.XentraActionMenu = XentraActionMenu'), 'shared.js owns XentraActionMenu');
-    assert.ok(SHARED_JS.includes('window.XentraCropEditor = XentraCropEditor'), 'shared.js owns XentraCropEditor');
+  await t.test('1. shared primitives are defined once in dedicated merchant-shared modules', () => {
+    assert.ok(ACTION_MENU_JS.includes('window.XentraActionMenu = XentraActionMenu'), 'action-menu.js owns XentraActionMenu');
+    assert.ok(CROP_EDITOR_JS.includes('window.XentraCropEditor = XentraCropEditor'), 'crop-editor.js owns XentraCropEditor');
+    assert.ok(!SHARED_JS.includes('var XentraActionMenu = (function'), 'shared.js must not own XentraActionMenu');
+    assert.ok(!SHARED_JS.includes('var XentraCropEditor = (function'), 'shared.js must not own XentraCropEditor');
 
     assert.ok(!DASHBOARD_JS.includes('var XentraActionMenu = (function'), 'dashboard.js must not redefine XentraActionMenu');
     assert.ok(!DASHBOARD_JS.includes('var XentraCropEditor = (function'), 'dashboard.js must not redefine XentraCropEditor');
@@ -96,18 +100,21 @@ test('MERCHANT SHARED — single source, no duplication', async (t) => {
     });
   });
 
-  await t.test('5. both surfaces load the shared layer in the same order', () => {
-    const legacyOrder = DASHBOARD_HTML.indexOf('/merchant-shared/js/shared.js') <
-      DASHBOARD_HTML.indexOf('/merchant-shared/js/branch-catalog.js') &&
-      DASHBOARD_HTML.indexOf('/merchant-shared/js/branch-catalog.js') <
-      DASHBOARD_HTML.indexOf('/dashboard/assets/js/dashboard.js');
-    assert.ok(legacyOrder, 'merchant-dashboard must load shared.js, branch-catalog.js, then dashboard.js');
+  await t.test('5. both surfaces load shared primitives before branch catalog/surface code', () => {
+    function assertLoadOrder(html, surfaceJsPath, label) {
+      const shared = html.indexOf('/merchant-shared/js/shared.js');
+      const action = html.indexOf('/merchant-shared/js/action-menu.js');
+      const crop = html.indexOf('/merchant-shared/js/crop-editor.js');
+      const catalog = html.indexOf('/merchant-shared/js/branch-catalog.js');
+      const surface = html.indexOf(surfaceJsPath);
 
-    const appOrder = MERCHANT_APP_HTML.indexOf('/merchant-shared/js/shared.js') <
-      MERCHANT_APP_HTML.indexOf('/merchant-shared/js/branch-catalog.js') &&
-      MERCHANT_APP_HTML.indexOf('/merchant-shared/js/branch-catalog.js') <
-      MERCHANT_APP_HTML.indexOf('/merchant-app/assets/js/merchant-app.js');
-    assert.ok(appOrder, 'merchant-app must load shared.js, branch-catalog.js, then merchant-app.js');
+      assert.ok(shared >= 0 && action >= 0 && crop >= 0 && catalog >= 0 && surface >= 0, label + ' must load all required scripts');
+      assert.ok(shared < action && action < crop && crop < catalog && catalog < surface,
+        label + ' must load shared.js, action-menu.js, crop-editor.js, branch-catalog.js, then surface JS');
+    }
+
+    assertLoadOrder(DASHBOARD_HTML, '/dashboard/assets/js/dashboard.js', 'merchant-dashboard');
+    assertLoadOrder(MERCHANT_APP_HTML, '/merchant-app/assets/js/merchant-app.js', 'merchant-app');
 
     assert.ok(
       !/\/dashboard\/assets\//.test(MERCHANT_APP_HTML),
