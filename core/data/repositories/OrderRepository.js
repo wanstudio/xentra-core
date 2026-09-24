@@ -34,9 +34,9 @@ class OrderRepository {
         AND status NOT IN ('cancelled', 'completed')
         AND branch_id = ?
         AND customer_phone = ?
-        AND (scheduled_slot_start = ? OR order_note LIKE ?)
+        AND (scheduled_slot_start = ? OR substr(scheduled_slot_start, 1, 10) = ? OR order_note LIKE ?)
       LIMIT 1
-    `, [branchId, customerPhone, reservationDate, `%Tgl: ${reservationDate}%`]);
+    `, [branchId, customerPhone, reservationDate, reservationDate, `%Tgl: ${reservationDate}%`]);
   }
 
   countActiveReservations({ branchId, reservationDate }) {
@@ -46,8 +46,8 @@ class OrderRepository {
       WHERE order_type = 'reservation'
         AND status NOT IN ('cancelled', 'completed')
         AND branch_id = ?
-        AND (scheduled_slot_start = ? OR order_note LIKE ?)
-    `, [branchId, reservationDate, `%Tgl: ${reservationDate}%`]);
+        AND (scheduled_slot_start = ? OR substr(scheduled_slot_start, 1, 10) = ? OR order_note LIKE ?)
+    `, [branchId, reservationDate, reservationDate, `%Tgl: ${reservationDate}%`]);
     return Number(row?.count || 0);
   }
 
@@ -144,8 +144,11 @@ class OrderRepository {
 
   insertReservation({
     id, orderNumber, brandId, branchId, customerId = null, customerName, customerPhone,
-    orderChannel, selectionMode, reservationDate, orderNote, createdAt, updatedAt
+    orderChannel, selectionMode, reservationDate, reservationTime = null, orderNote, createdAt, updatedAt
   }) {
+    const scheduledSlotStart = reservationDate && reservationTime
+      ? String(reservationDate) + 'T' + String(reservationTime) + ':00'
+      : reservationDate;
     return this.db.execute(`
       INSERT INTO orders (
         id, order_number, brand_id, branch_id, customer_id, customer_name, customer_phone,
@@ -154,7 +157,7 @@ class OrderRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 'reservation', ?, ?, NULL, ?, 0, 0, 0, 'cash', 'confirmed', ?, ?, ?)
     `, [
       id, orderNumber, brandId, branchId, customerId || null, customerName, customerPhone,
-      orderChannel, selectionMode, reservationDate, orderNote, createdAt, updatedAt
+      orderChannel, selectionMode, scheduledSlotStart, orderNote, createdAt, updatedAt
     ]);
   }
 
