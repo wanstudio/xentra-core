@@ -4,10 +4,11 @@ const { domain } = require('../../core');
 const PaymentModel = require('./models/PaymentModel');
 const CashSettlementService = require('./services/CashSettlementService');
 const PaymentGatewayService = require('./services/PaymentGatewayService');
+const ManualQrisSettlementService = require('./services/ManualQrisSettlementService');
 
 const PAYMENT_IDENTITY = {
   name: 'payment',
-  version: '1.1.0',
+  version: '1.2.0',
   display_name: 'Xentra Payment',
   description: 'Authoritative Payment Domain for Physical Cash Settlement & Multi-Gateway Online Payments (Midtrans, DOKU) with full lifecycle isolation'
 };
@@ -31,6 +32,7 @@ const PAYMENT_CAPABILITIES = {
     'midtrans_snap',
     'midtrans_webhook_signature',
     'doku_checkout',
+    'qris_static_manual_settlement',
     'doku_webhook_signature',
     'payment_lifecycle_isolation'
   ]
@@ -53,6 +55,7 @@ module.exports = {
   registration,
   PaymentModel,
   CashSettlementService,
-  PaymentGatewayService
+  PaymentGatewayService,
+  ManualQrisSettlementService
 };
 
