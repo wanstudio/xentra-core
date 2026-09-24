@@ -65,3 +65,14 @@ button,input{font:inherit}.pos-shell{min-height:100vh;display:flex;flex-directio
 .pos-google-icon{display:flex;align-items:center;justify-content:center}
 .pos-auth-link{width:100%;border:0;background:transparent;color:#64748b;font-size:12px;font-weight:700;padding:10px 8px 2px;cursor:pointer}
 .pos-pin-setup-note{font-size:12px;line-height:1.5;color:#64748b;margin-top:10px}
+
+/* POS dine-in table picker */
+.pos-table-picker{display:flex;flex-direction:column;gap:8px;max-height:55vh;overflow:auto}
+.pos-table-pick{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px;cursor:pointer}
+.pos-table-pick:hover{border-color:#9ca3af}
+.pos-table-pick.selected{border-color:#111827;background:#f9fafb}
+.pos-table-pick.disabled{opacity:.55;cursor:not-allowed;background:#f9fafb}
+.pos-table-pick span{display:flex;flex-direction:column;gap:3px}
+.pos-table-pick strong{font-size:13px}
+.pos-table-pick small{font-size:11px;color:var(--muted)}
+.pos-table-pick b{font-size:11px;white-space:nowrap}
