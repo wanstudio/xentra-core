@@ -324,7 +324,7 @@ class DiningTableRepository {
 
   findTableIdByNumberOrLabel(branchId, tableValue) {
     return this.db.queryOne(
-      'SELECT id FROM branch_tables WHERE branch_id = ? AND (table_number = ? OR label = ?)',
+      'SELECT id, is_active FROM branch_tables WHERE branch_id = ? AND (table_number = ? OR label = ?)',
       [branchId, tableValue, tableValue]
     );
   }
