@@ -515,6 +515,21 @@ test('API Auth Merchant Me: route is registered exactly once', () => {
   assert.strictEqual(matches.length, 1, 'GET /auth/merchant/me must have exactly one route implementation');
 });
 
+test('API Location routes: implementation is isolated from api.js', () => {
+  const api = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const location = fs.readFileSync(require.resolve('../server/routes/location'), 'utf8');
+
+  for (const route of [
+    "router.post('/delivery/match-branch'",
+    "router.get('/location/search'",
+    "router.get('/location/retrieve'",
+    "router.get(['/delivery/reverse-geocode', '/address/reverse']"
+  ]) {
+    assert.ok(location.includes(route), route + ' must live in location.js');
+    assert.equal(api.includes(route), false, route + ' must not remain inline in api.js');
+  }
+});
+
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
     method: 'POST',
