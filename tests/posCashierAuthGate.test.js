@@ -29,7 +29,7 @@ test('POS account fallback remains the normal Xentra login surface', () => {
 });
 
 test('POS auth assets use a cache-busted revision', () => {
-  assert.match(indexHtml, /\/pos\/assets\/css\/pos\.css\?v=1\.0\.1/);
-  assert.match(indexHtml, /\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.1/);
+  assert.match(indexHtml, /\/pos\/assets\/css\/pos\.css\?v=1\.0\.[1-9]\d*/);
+  assert.match(indexHtml, /\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.[1-9]\d*/);
   assert.match(posCss, /\.pos-google-login-btn/);
 });

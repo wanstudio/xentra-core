@@ -60,6 +60,27 @@
     el.textContent=online?'ONLINE':'OFFLINE'; el.className='pos-status '+(online?'online':'offline');
   }
 
+  function renderShiftStatus() {
+    var text=$('pos-shift-status-text'), dot=$('pos-shift-status-dot'), btn=$('btn-pos-shift-status');
+    if(!text || !dot || !btn) return;
+    if(!state.shift) {
+      text.textContent='Shift belum dibuka';
+      dot.className='pos-shift-dot';
+      btn.className='pos-shift-status';
+      btn.title='Buka shift';
+      var closeBtn=$('btn-pos-close-shift-top');
+      if(closeBtn) closeBtn.style.display='none';
+      return;
+    }
+    var onBreak=!!state.shift.active_break;
+    text.textContent=onBreak?'Istirahat':'Shift Aktif';
+    dot.className='pos-shift-dot '+(onBreak?'break':'active');
+    btn.className='pos-shift-status '+(onBreak?'break':'active');
+    btn.title=onBreak?'Kembali bertugas':'Mulai istirahat';
+    var closeBtn=$('btn-pos-close-shift-top');
+    if(closeBtn) closeBtn.style.display='inline-flex';
+  }
+
   function getPosPinProfiles() {
     try {
       var raw=JSON.parse(localStorage.getItem(POS_PIN_CACHE_KEY) || 'null');
@@ -312,7 +333,10 @@
     if (subtotal) subtotal.textContent=money(total());
     if (grand) grand.textContent=money(total());
     if (pay) pay.textContent=money(total());
-    if (btn) btn.disabled=!state.cart.length || !state.shift;
+    if (btn) btn.disabled=!state.cart.length || !state.shift || !!state.shift.active_break;
+    var tableLabel=$('pos-selected-table'),tableBtn=$('btn-pos-select-table');
+    if(tableLabel) tableLabel.textContent=state.selectedTable?(state.selectedTable.label||('Meja '+state.selectedTable.table_number)):'Belum dipilih';
+    if(tableBtn) tableBtn.textContent=state.selectedTable?'Ubah':'Pilih Meja';
     if (!box) return;
     if (!state.cart.length) { box.innerHTML='<div class="pos-empty">Belum ada item.</div>'; return; }
     box.innerHTML=state.cart.map(function(it,idx){
@@ -628,10 +652,13 @@
     }catch(e){
       state.shift=getPosShiftCache(state.user && state.user.id);
     }
-    renderShift(); renderCart();
+    renderShiftStatus();
+    renderShift();
+    renderCart();
   }
 
   function renderShift(){
+    renderShiftStatus();
     var box=$('pos-shift-card'); if(!box)return;
     if(!state.shift){
       box.innerHTML='<h3>Belum ada shift aktif</h3><p>Kasir harus membuka shift sebelum penjualan dapat diselesaikan.</p>'+
@@ -641,7 +668,7 @@
       return;
     }
     var s=state.shift;
-    box.innerHTML='<h3>Shift Aktif</h3><p>'+esc(s.id)+' · dibuka '+esc(s.opened_at || '')+'</p>'+
+    box.innerHTML='<h3>'+ (s.active_break ? 'Sedang Istirahat' : 'Shift Aktif') +'</h3><p>'+esc(s.id)+' · dibuka '+esc(s.opened_at || '')+'</p>'+
       '<div class="pos-shift-grid">'+
       '<div class="pos-shift-metric"><span>Modal Awal</span><strong>'+money(s.starting_float)+'</strong></div>'+
       '<div class="pos-shift-metric"><span>Penjualan Tunai</span><strong>'+money(s.total_cash_sales)+'</strong></div>'+
@@ -655,7 +682,7 @@
 
   async function openShift(){
     var amount=Number($('pos-starting-float').value||0);
-    try{var d=await request('/pos/shifts/open',{method:'POST',headers:headers(),body:JSON.stringify({branch_id:state.branchId,starting_float:amount})});state.shift=d.shift;renderShift();renderCart();toast('Shift dibuka.');}
+    try{var d=await request('/pos/shifts/open',{method:'POST',headers:headers(),body:JSON.stringify({branch_id:state.branchId,starting_float:amount})});state.shift=d.shift;savePosShiftCache();renderShift();renderCart();toast('Shift dibuka.');}
     catch(e){toast(e.message);}
   }
 
@@ -668,11 +695,22 @@
     catch(e){toast(e.message);}
   }
 
+  async function toggleShiftBreak(){
+    if(!state.shift)return;
+    var endpoint=state.shift.active_break ? 'end' : 'start';
+    try{
+      var d=await request('/pos/shifts/'+encodeURIComponent(state.shift.id)+'/break/'+endpoint,{method:'POST',headers:headers()});
+      state.shift.active_break=endpoint==='start'?d.break:null;
+      savePosShiftCache(); renderShiftStatus(); renderCart(); renderShift();
+      toast(endpoint==='start'?'Istirahat dimulai.':'Kembali bertugas.');
+    }catch(e){toast(e.message);}
+  }
+
   async function closeShift(){
     if(!state.shift)return;
     var actual=prompt('Masukkan uang fisik aktual di laci'); if(actual===null)return;
     actual=Number(actual); if(!Number.isFinite(actual)||actual<0)return toast('Nominal tidak valid.');
-    try{var d=await request('/pos/shifts/'+encodeURIComponent(state.shift.id)+'/close',{method:'POST',headers:headers(),body:JSON.stringify({actual_cash:actual})});state.shift=null;renderShift();renderCart();toast('Shift ditutup. Variance: '+money(d.shift && d.shift.variance));}
+    try{var d=await request('/pos/shifts/'+encodeURIComponent(state.shift.id)+'/close',{method:'POST',headers:headers(),body:JSON.stringify({actual_cash:actual})});state.shift=null;savePosShiftCache();renderShift();renderCart();toast('Shift ditutup. Variance: '+money(d.shift && d.shift.variance));}
     catch(e){toast(e.message);}
   }
 
@@ -688,6 +726,9 @@
 
   function openPayModal(){
     if(!state.cart.length)return;
+    if(!state.shift)return toast('Buka shift terlebih dahulu.');
+    if(state.shift.active_break)return toast('Akhiri istirahat sebelum melanjutkan transaksi.');
+    if(state.orderType==='dine_in'&&!state.selectedTable){openTableSelector();return;}
     var t=total();
     var modes=state.paymentModes.filter(function(m){return m.enabled;});
     if(!modes.some(function(m){return m.code==='cash';}))modes.unshift({code:'cash',name:'Cash',enabled:true,offline_supported:true,provider:'cash'});
@@ -728,7 +769,7 @@
 
   async function submitSale(paymentMode,amountTendered){
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
-    if(state.orderType==='dine_in'&&!state.selectedTable)return toast('Pilih meja untuk transaksi dine-in.');
+    if(state.orderType==='dine_in'&&!state.selectedTable){hideModal();openTableSelector();return;}
     if(!navigator.onLine&&paymentMode!=='cash')return toast('Payment Gateway dan QRIS Statis membutuhkan koneksi internet pada POS.');
     var payload={branch_id:state.branchId,shift_id:state.shift.id,order_type:state.orderType,payment_mode:paymentMode,amount_tendered:paymentMode==='cash'?amountTendered:null,customer:{name:$('pos-customer-name').value.trim(),phone:'',table_number:state.selectedTable?state.selectedTable.table_number:null},items:state.cart.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,options:i.options||[],note:i.note||''};}),client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)};
     try{
@@ -794,35 +835,78 @@
     box.querySelectorAll('[data-print]').forEach(function(b){b.onclick=function(){printReceipt(b.dataset.print);};});
   }
 
+  function tableStateLabel(st){
+    return ({available:'Tersedia',held:'Ditahan',reserved:'Reservasi',occupied:'Terisi',blocked:'Diblokir',out_of_service:'Tidak tersedia'})[st]||st;
+  }
+
+  function applySelectedTable(t){
+    if(!t)return;
+    state.selectedTable=t;
+    state.orderType='dine_in';
+    document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x.dataset.type==='dine_in');});
+    var ctx=$('pos-table-context'); if(ctx)ctx.classList.remove('hidden');
+    renderCart();
+  }
+
+  function openTableSelector(){
+    if(!state.branchId)return toast('Cabang POS belum tersedia.');
+    request('/dine-in/layout?branch_id='+encodeURIComponent(state.branchId),{headers:headers()}).then(function(d){
+      var tables=(d.layout&&d.layout.tables)||[];
+      var html='<h3>Pilih Meja</h3><p>Pilih meja yang menjadi konteks transaksi Dine-in. Cart yang sudah dibuat tetap dipertahankan.</p><div class="pos-table-picker">';
+      if(!tables.length) html+='<div class="pos-empty">Belum ada meja aktif di cabang ini.</div>';
+      tables.forEach(function(t){
+        var st=t.operational_state||t.status||'available';
+        var can=st==='available';
+        var selected=state.selectedTable&&String(state.selectedTable.id)===String(t.id);
+        html+='<button type="button" class="pos-table-pick '+(can?'':'disabled')+(selected?' selected':'')+'" '+(can?'':'disabled')+' data-table-pick="'+esc(t.id)+'"><span><strong>'+esc(t.label||('Meja '+t.table_number))+'</strong><small>'+esc(String(t.capacity||4))+' kursi · '+esc(tableStateLabel(st))+'</small></span><b>'+(selected?'✓':can?'Pilih':'Tidak tersedia')+'</b></button>';
+      });
+      html+='</div><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-table-picker-cancel">Batal</button></div>';
+      showModal(html);
+      $('pos-table-picker-cancel').onclick=hideModal;
+      document.querySelectorAll('[data-table-pick]').forEach(function(btn){btn.onclick=function(){
+        var t=tables.find(function(x){return String(x.id)===String(btn.dataset.tablePick);});
+        if(!t||(t.operational_state||t.status||'available')!=='available')return;
+        applySelectedTable(t); hideModal(); setView('kasir');
+      };});
+    }).catch(function(e){toast(e.message||'Layout meja tidak dapat dimuat.');});
+  }
+
   async function loadTables(){
     try{
       var d=await request('/dine-in/layout?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
       var tables=(d.layout&&d.layout.tables)||[]; var box=$('pos-table-grid'); if(!box)return;
       box.innerHTML=tables.map(function(t){
         var st=t.operational_state||t.status||'available'; var can=st==='available';
-        return '<div class="pos-table-card '+esc(st)+'"><h3>'+esc(t.label||('Meja '+t.table_number))+'</h3><p>'+esc(String(t.capacity||4))+' kursi · '+esc(st)+'</p>'+
-          '<button type="button" class="pos-btn small '+(can?'':'ghost')+'" '+(can?'':'disabled')+' data-table="'+esc(t.id)+'">Gunakan untuk Sale</button></div>';
+        return '<div class="pos-table-card '+esc(st)+'"><h3>'+esc(t.label||('Meja '+t.table_number))+'</h3><p>'+esc(String(t.capacity||4))+' kursi · '+esc(tableStateLabel(st))+'</p>'+
+          '<button type="button" class="pos-btn small '+(can?'':'ghost')+'" '+(can?'':'disabled')+' data-table="'+esc(t.id)+'">'+(can?'Gunakan untuk Sale':'Tidak tersedia')+'</button></div>';
       }).join('');
-      box.querySelectorAll('[data-table]').forEach(function(b){b.onclick=function(){var t=tables.find(function(x){return String(x.id)===String(b.dataset.table);});if(!t)return;state.selectedTable=t;$('pos-selected-table').textContent=t.label||('Meja '+t.table_number);state.orderType='dine_in';document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x.dataset.type==='dine_in');});setView('kasir');};});
+      box.querySelectorAll('[data-table]').forEach(function(btn){btn.onclick=function(){
+        var t=tables.find(function(x){return String(x.id)===String(btn.dataset.table);});
+        if(!t)return;
+        applySelectedTable(t); setView('kasir');
+      };});
     }catch(e){$('pos-table-grid').innerHTML='<div class="pos-empty">Layout meja tidak dapat dimuat.</div>';}
   }
 
   function bind(){
     document.querySelectorAll('.pos-bottom-nav button').forEach(function(b){b.onclick=function(){setView(b.dataset.view);};});
-    document.querySelectorAll('.pos-order-type button').forEach(function(b){b.onclick=function(){state.orderType=b.dataset.type;document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x===b);});$('pos-table-context').classList.toggle('hidden',state.orderType!=='dine_in');if(state.orderType!=='dine_in')state.selectedTable=null;};});
+    document.querySelectorAll('.pos-order-type button').forEach(function(b){b.onclick=function(){state.orderType=b.dataset.type;document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x===b);});$('pos-table-context').classList.toggle('hidden',state.orderType!=='dine_in');if(state.orderType!=='dine_in'){state.selectedTable=null;renderCart();}else{renderCart();}};});
     $('pos-menu-search').oninput=function(){state.search=this.value;renderMenu();};
     $('btn-pos-refresh-menu').onclick=loadMenu;
     $('btn-pos-pay').onclick=openPayModal;
     $('btn-pos-clear').onclick=function(){resetSale();};
     $('btn-pos-hold').onclick=holdSale;
-    $('btn-pos-select-table').onclick=function(){setView('meja');};
+    $('btn-pos-select-table').onclick=function(){openTableSelector();};
     $('btn-pos-load-sales').onclick=loadSales;
+    $('btn-pos-shift-status').onclick=function(){if(!state.shift){setView('shift');return;}toggleShiftBreak();};
+    $('btn-pos-close-shift-top').onclick=closeShift;
     $('btn-pos-logout').onclick=function(){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(USER_KEY);window.location.replace('/login');};
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
   }
 
   async function boot(){
     bind();
+    renderShiftStatus();
     try{
       if(!await consumeGoogleHandoff())return;
       if(!await ensureSession())return;

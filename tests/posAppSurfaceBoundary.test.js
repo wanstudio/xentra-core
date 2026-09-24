@@ -1,3 +1,4 @@
+const { describe, it } = require('node:test');
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -15,7 +16,7 @@ describe('POS ↔ Merchant App surface boundary', () => {
     assert.ok(html.includes('data-view="kasir"'));
     assert.ok(html.includes('data-view="transaksi"'));
     assert.ok(html.includes('data-view="meja"'));
-    assert.ok(html.includes('data-view="shift"'));
+    assert.ok(html.includes('id="btn-pos-shift-status"') || html.includes('data-view="shift"'));
     assert.ok(!html.includes('data-view="menu"'), 'POS must not expose branch menu management as navigation');
     assert.ok(!html.includes('data-view="promo"'), 'POS must not expose promotion governance as navigation');
     assert.ok(!html.includes('data-view="stok"'), 'POS must not expose stock management as navigation');

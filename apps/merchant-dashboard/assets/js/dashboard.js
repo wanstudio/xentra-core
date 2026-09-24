@@ -32,7 +32,7 @@
   };
   var handleHandoffExchange = (_shared && _shared.handleHandoffExchange) || async function () {};
   var validateServerSession = (_shared && _shared.validateServerSession) || async function () { return true; };
-  var enforceSurface = (_shared && _shared.enforceSurface) || function () { return false; };
+  var enforceSurface = _shared.enforceSurface || window.XentraShared.enforceSurface;
 
   // Shared UI widgets are owned by merchant-shared/js/shared.js (loaded first).
   // dashboard.js only aliases them so every merchant surface shares one implementation.

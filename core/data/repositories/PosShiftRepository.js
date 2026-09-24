@@ -51,6 +51,28 @@ class PosShiftRepository {
     `, [shiftId, branchId, cashierId, startingFloat, startingFloat, openedAt]);
   }
 
+  findActiveBreakByShift(shiftId) {
+    return this.db.queryOne(`
+      SELECT * FROM pos_shift_breaks
+      WHERE shift_id = ? AND ended_at IS NULL
+      ORDER BY started_at DESC LIMIT 1
+    `, [shiftId]);
+  }
+
+  insertShiftBreak({ breakId, shiftId, startedAt }) {
+    return this.db.execute(`
+      INSERT INTO pos_shift_breaks (id, shift_id, started_at)
+      VALUES (?, ?, ?)
+    `, [breakId, shiftId, startedAt]);
+  }
+
+  endShiftBreak({ breakId, endedAt }) {
+    return this.db.execute(`
+      UPDATE pos_shift_breaks SET ended_at = ?
+      WHERE id = ? AND ended_at IS NULL
+    `, [endedAt, breakId]);
+  }
+
   insertCashMovement({ movementId, shiftId, type, amount, reason, createdAt }) {
     return this.db.execute(`
       INSERT INTO pos_cash_movements (id, shift_id, type, amount, reason, created_at)
