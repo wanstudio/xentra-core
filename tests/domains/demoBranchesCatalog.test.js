@@ -25,7 +25,7 @@ const db = require('../../server/database/db');
 
 // Suites assert against demo branches/products/promotions, which are not auto-seeded.
 require('../helpers/demoFixtures.js')();
-const CatalogService = require('../../domains/commerce/services/CatalogService');
+const CatalogService = require('../../domains/catalog/services/CatalogService');
 
 const BRAND = 'brand_bangjo';
 const TARGET_BRANCHES = [
