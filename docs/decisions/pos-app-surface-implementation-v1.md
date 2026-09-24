@@ -154,3 +154,28 @@ Static boundary checks passed against the latest GitHub source:
 - POS frontend has no Merchant App module coupling.
 
 **Full `npm test` has not been executed in this environment.**
+
+ 
+## POS Payment Modes — locked MVP structure
+
+POS payment selection is exactly **three modes**:
+
+1. **Cash** — immediate cashier settlement; tender/change and offline POS supported.
+2. **Payment Gateway** — one POS mode backed by the active configured Xentra gateway, **DOKU or Midtrans**. POS waits for Core/gateway settlement.
+3. **QRIS Statis** — merchant's existing static QRIS; POS creates a pending sale, displays the configured QR, and requires explicit cashier verification before settlement.
+
+Core mapping:
+
+| POS mode | Core payment method | Settlement |
+| --- | --- | --- |
+| Cash | `cash` | CashSettlementService |
+| Payment Gateway | `midtrans` / `doku` | Gateway webhook/status |
+| QRIS Statis | `qris_static` | Manual cashier verification |
+
+QRIS Statis is a **fallback/manual mode**, not a new PJP or dynamic-QR integration.
+
+Offline POS remains **cash-only**. Payment Gateway and QRIS Statis require connectivity to Core.
+
+Gateway timeout is treated as `reconciliation_pending`; it must not be blindly retried or duplicated. A clear gateway failure cancels that failed payment attempt, allowing the cashier to create a new sale using another payment mode.
+
+The same Xentra-Core payment authority remains the single source of truth. No second payment state machine is introduced.
