@@ -68,6 +68,22 @@ test('reservation cannot be reconciled through gateway status checks', async () 
   );
 });
 
+test('reservation webhook cannot create or settle a payment', () => {
+  assert.throws(
+    () => PaymentGatewayService.handleWebhook({
+      order_id: 'ord_res_payment_iso',
+      transaction_status: 'settlement',
+      gross_amount: '0.00',
+      status_code: '200',
+      signature_key: 'not-used-in-this-guard-test'
+    }, { skipSignatureCheck: true, provider: 'midtrans' }),
+    /PAYMENT_NOT_APPLICABLE/
+  );
+
+  const paymentRow = db.prepare('SELECT COUNT(*) AS count FROM order_payments WHERE order_id = ?').get('ord_res_payment_iso');
+  assert.equal(paymentRow.count, 0, 'Reservation webhook must not heal/create a payment record.');
+});
+
 test('payment reconciliation queue ignores reservation orders', () => {
   db.prepare(`
     INSERT OR REPLACE INTO order_payments (
