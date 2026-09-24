@@ -518,6 +518,32 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     assert.equal(cancelRes.data.status, 'CUSTOMER_CANCEL_NOT_ALLOWED');
   });
 
+  // ── P8-13R: Reservation follows the post-acceptance cancellation boundary
+  it('P8-13R: confirmed reservation cannot be customer-cancelled through the normal cancel endpoint', async () => {
+    const { orderId, phone } = seedOrder({
+      status: 'confirmed',
+      orderType: 'reservation',
+      deliveryFee: 0,
+      discountAmount: 0,
+      grandTotal: 0,
+      paymentMethod: 'cash',
+      paymentStatus: 'pending'
+    });
+    const customerToken = seedCustomerSession(phone);
+
+    const cancelRes = await request('POST', `/api/v1/orders/${orderId}/cancel`,
+      { reason: 'Customer mencoba membatalkan reservasi terkonfirmasi' },
+      { Authorization: `Bearer ${customerToken}` });
+
+    assert.equal(cancelRes.status, 400, 'confirmed reservation remains outside normal customer cancellation');
+    assert.equal(cancelRes.data.status, 'CUSTOMER_CANCEL_NOT_ALLOWED');
+    assert.deepEqual(
+      db.prepare('SELECT order_type, status FROM orders WHERE id = ?').get(orderId),
+      { order_type: 'reservation', status: 'confirmed' },
+      'reservation must remain confirmed when normal customer cancel is rejected'
+    );
+  });
+
   // ── P8-14: Payment state remains server-authoritative ──────────────────────
   it('P8-14: Payment state remains server-authoritative', async () => {
     const { orderId, phone, grandTotal } = seedOrder({
