@@ -25,6 +25,7 @@ const REPORTS_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/reports.js'
 const TABLES_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/tables.js');
 const CONTEXT_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/context.js');
 const MENU_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/menu.js');
+const STOCK_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/stock.js');
 const SHARED_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/shared.js');
 const BRANCH_CATALOG_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/branch-catalog.js');
 
@@ -71,6 +72,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     win.eval(fs.readFileSync(JAM_OPERASIONAL_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(REPORTS_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(TABLES_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(STOCK_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(ORDER_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(JS_PATH, 'utf8'));
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
@@ -120,8 +122,33 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(html.includes('/merchant-app/assets/js/jam-operasional.js'), 'must load jam-operasional.js');
     assert.ok(html.includes('/merchant-app/assets/js/reports.js'), 'must load reports.js');
     assert.ok(html.includes('/merchant-app/assets/js/tables.js'), 'must load tables.js');
+    assert.ok(html.includes('/merchant-app/assets/js/stock.js'), 'must load stock.js');
     assert.ok(html.includes('/merchant-app/assets/js/orders.js'), 'must load orders.js');
     assert.ok(html.includes('/merchant-app/assets/js/merchant-app.js'), 'must load merchant-app.js');
+  });
+
+  await t.test('2g. Stock module is the canonical implementation', () => {
+    const js = fs.readFileSync(JS_PATH, 'utf8');
+    const stockJs = fs.readFileSync(STOCK_JS_PATH, 'utf8');
+
+    for (const name of [
+      'loadBMStock',
+      'updateBMStockStats',
+      'onBMStockFilterChange',
+      'renderBMStockTable',
+      'openBMStockAdjustmentModal',
+      'closeBMStockAdjustModal',
+      'onBMAdjustTypeChange',
+      'submitBMStockAdjustment'
+    ]) {
+      const count = (stockJs.match(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\(', 'g')) || []).length;
+      assert.equal(count, 1, name + ' must have exactly one implementation in stock.js');
+      assert.ok(!js.includes('function ' + name + '(') && !js.includes('async function ' + name + '('),
+        name + ' must not be implemented in merchant-app.js');
+    }
+
+    assert.ok(stockJs.includes('var _bmStockState = {'), '_bmStockState must live in stock.js');
+    assert.ok(!js.includes('var _bmStockState = {'), '_bmStockState must not live in merchant-app.js');
   });
 
   await t.test('2f. Menu module owns menu state/controller and tables consume shared branch context', () => {
