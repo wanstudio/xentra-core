@@ -3,14 +3,16 @@ const test = require('node:test');
 const assert = require('node:assert');
 const db = require('../../server/database/db');
 const {
-  PricingPolicyModel,
   LowStockThresholdModel,
-  CatalogService,
   PrePaymentVerificationGate,
   OrderPlacementService,
   identity,
   capabilities
 } = require('../../domains/commerce');
+const {
+  PricingPolicyModel,
+  CatalogService
+} = require('../../domains/catalog');
 const { domain, events } = require('../../core');
 
 // Seed test database context
