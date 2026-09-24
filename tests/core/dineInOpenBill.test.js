@@ -22,7 +22,7 @@ process.env.NODE_ENV = 'test';
 
 const db = require('../../server/database/db');
 require('../helpers/demoFixtures.js')();
-const { DiningTableService } = require('../../domains/pos');
+const { DiningTableService } = require('../../domains/dining');
 
 const BRANCH = 'branch_bangjo_barat';
 const TABLE_A = 'tbl_bill_test_a';
