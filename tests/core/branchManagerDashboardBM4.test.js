@@ -315,15 +315,38 @@ describe('BM-4 — Branch Manager Dashboard: Staff, Jam Operasional & Reports', 
     assert.ok(!js.includes("openEditUser('"), 'Merchant App Staff flow must not reference an undefined dashboard-only edit-user handler');
   });
 
-  it('BM4-11: dashboard.js implements loadBMStaff, toggleBMStaffStatus, resetBMStaffPassword, loadBMJamOperasional, loadBMReports, and toggleBranchOnlineOrders', () => {
+  it('BM4-11: staff, jam operasional, reports and online-order controls live in their canonical modules', () => {
+    const staffPath = path.join(__dirname, '../../apps/merchant-app/assets/js/staff.js');
+    const jamPath = path.join(__dirname, '../../apps/merchant-app/assets/js/jam-operasional.js');
+    const reportsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/reports.js');
+    const hariIniPath = path.join(__dirname, '../../apps/merchant-app/assets/js/hari-ini.js');
+
+    const staffJs = fs.readFileSync(staffPath, 'utf8');
+    const jamJs = fs.readFileSync(jamPath, 'utf8');
+    const reportsJs = fs.readFileSync(reportsPath, 'utf8');
+    const hariIniJs = fs.readFileSync(hariIniPath, 'utf8');
+
+    assert.ok(staffJs.includes('async function loadBMStaff()'), 'Missing loadBMStaff');
+    assert.ok(staffJs.includes('async function toggleBMStaffStatus('), 'Missing toggleBMStaffStatus');
+    assert.ok(staffJs.includes('async function resetBMStaffPassword('), 'Missing resetBMStaffPassword');
+    assert.ok(jamJs.includes('async function loadBMJamOperasional()'), 'Missing loadBMJamOperasional');
+    assert.ok(reportsJs.includes('async function loadBMReports()'), 'Missing loadBMReports');
+    assert.ok(hariIniJs.includes('async function toggleBranchOnlineOrders()'), 'Missing toggleBranchOnlineOrders');
+  });
+
+  it('BM4-12: merchant-app.js no longer contains Staff or operational-hours/report controller implementations', () => {
     const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const js = fs.readFileSync(jsPath, 'utf8');
 
-    assert.ok(js.includes('async function loadBMStaff()'), 'Missing loadBMStaff');
-    assert.ok(js.includes('async function toggleBMStaffStatus('), 'Missing toggleBMStaffStatus');
-    assert.ok(js.includes('async function resetBMStaffPassword('), 'Missing resetBMStaffPassword');
-    assert.ok(js.includes('async function loadBMJamOperasional()'), 'Missing loadBMJamOperasional');
-    assert.ok(js.includes('async function loadBMReports()'), 'Missing loadBMReports');
-    assert.ok(js.includes('async function toggleBranchOnlineOrders()'), 'Missing toggleBranchOnlineOrders');
+    for (const name of [
+      'loadBMStaff',
+      'toggleBMStaffStatus',
+      'resetBMStaffPassword',
+      'loadBMJamOperasional',
+      'loadBMReports'
+    ]) {
+      assert.ok(!js.includes('function ' + name + '(') && !js.includes('async function ' + name + '('),
+        name + ' must not be implemented in merchant-app.js');
+    }
   });
 });
