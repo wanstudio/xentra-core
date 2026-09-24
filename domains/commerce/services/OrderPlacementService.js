@@ -206,7 +206,8 @@ class OrderPlacementService {
           unitPrice: item.unit_price,
           quantity: item.quantity,
           itemSubtotal: item.subtotal,
-          note: formattedItemNote
+          note: formattedItemNote,
+          modifiersSnapshot: JSON.stringify(item.modifiers_snapshot || item.options || [])
         });
 
         // Only deduct stock at creation if order is already confirmed (e.g. pos_cashier walk-in sales)
