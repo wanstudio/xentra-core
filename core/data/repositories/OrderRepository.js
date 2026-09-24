@@ -188,7 +188,7 @@ class OrderRepository {
   }
 
   ensurePendingPayment({ paymentId, orderId, provider, paymentMethod, merchantId, amount, createdAt, updatedAt }) {
-    const validProviders = ['cash', 'midtrans', 'doku'];
+    const validProviders = ['cash', 'midtrans', 'doku', 'qris_static'];
     if (!provider || !validProviders.includes(provider) || !paymentMethod || !validProviders.includes(paymentMethod)) {
       throw new Error('INVALID_PAYMENT_PROVIDER');
     }
