@@ -194,13 +194,7 @@
      ROLE / SESSION GUARD HELPERS (shared by every merchant surface)
      ========================================================================= */
 
-  /** True when the stored user's role is branch_manager. */
-  function isBranchManager() {
-    var user = getStoredUser();
-    return !!(user && user.role === 'branch_manager');
-  }
-
-  /**
+    /**
    * Boot guard: requires a stored token, otherwise sends the user to login.
    * When a user is stored it also fills the shell user chip (dash-user-*).
    * Returns false when there is no session.
@@ -299,7 +293,6 @@
     redirectToLogin:    redirectToLogin,
     adminFetch:         adminFetch,
     getStoredUser:      getStoredUser,
-    isBranchManager:    isBranchManager,
     checkAuth:          checkAuth,
     handleHandoffExchange: handleHandoffExchange,
     validateServerSession: validateServerSession,
@@ -312,6 +305,5 @@
     showToast:          showToast
   };
 
-  window.XentraCropEditor = XentraCropEditor;
 
 })();
