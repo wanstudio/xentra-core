@@ -13,6 +13,8 @@ const MidtransGateway = require('../gateways/MidtransGateway');
 const DokuGateway = require('../gateways/DokuGateway');
 
 const paymentRepository = new PaymentRepository();
+const { OrderRepository } = require('../../../core/data/repositories');
+const orderRepository = new OrderRepository();
 const promotionRepository = new PromotionRepository();
 const diningTableRepository = new DiningTableRepository();
 
@@ -105,6 +107,18 @@ class PaymentGatewayService {
     return this._resolveProvider(config);
   }
 
+  static resolveStaticQrisConfig(branch_id, brand_id) {
+    const config = this.resolvePaymentConfig(branch_id, brand_id) || {};
+    const raw = (config.qris_static && typeof config.qris_static === 'object') ? config.qris_static : {};
+    const imageUrl = String(raw.image_url || config.qris_static_image_url || config.qris_static_url || '').trim();
+    return {
+      enabled: raw.enabled !== false && Boolean(imageUrl),
+      image_url: imageUrl,
+      merchant_name: String(raw.merchant_name || '').trim(),
+      instructions: String(raw.instructions || 'Pastikan pelanggan sudah menyelesaikan pembayaran, lalu verifikasi sebelum menekan Konfirmasi.').trim()
+    };
+  }
+
   static validatePaymentMethod(payment_method, { branch_id, brand_id } = {}) {
     if (!payment_method || typeof payment_method !== 'string' || !payment_method.trim()) {
       return { valid: false, error: 'INVALID_PAYMENT_PROVIDER', message: 'Metode pembayaran (payment_method) wajib diisi.' };
@@ -112,6 +126,9 @@ class PaymentGatewayService {
     const clean = payment_method.trim().toLowerCase();
     if (clean === 'cash') {
       return { valid: true, provider: 'cash' };
+    }
+    if (clean === 'qris_static') {
+      return { valid: true, provider: 'qris_static' };
     }
     if (!['midtrans', 'doku'].includes(clean)) {
       return { valid: false, error: 'INVALID_PAYMENT_PROVIDER', message: `Metode pembayaran "${payment_method}" tidak valid atau tidak didukung.` };
@@ -262,7 +279,19 @@ class PaymentGatewayService {
       });
 
       if (shouldSettle) {
-        const currentOrderState = paymentRepository.findOrderStatus(orderId);
+        let currentOrderState = paymentRepository.findOrderStatus(orderId);
+        if (order && order.order_channel === 'pos_cashier' && currentOrderState && currentOrderState.status === 'pending') {
+          const confirmedResult = orderRepository.updateStatusIfCurrent({ orderId, targetStatus: 'confirmed', currentStatus: 'pending' });
+          if (confirmedResult && confirmedResult.changes === 1) {
+            orderRepository.insertStatusLog({
+              logId: 'log_' + crypto.randomBytes(8).toString('hex'),
+              orderId, previousStatus: 'pending', newStatus: 'confirmed',
+              actorType: 'payment', actorId: gateway.name,
+              note: 'POS gateway payment settled; cashier sale confirmed.'
+            });
+            currentOrderState = { status: 'confirmed' };
+          }
+        }
         const terminalOrderStatuses = ['rejected', 'timeout', 'cancelled', 'fulfillment_exception'];
         if (currentOrderState && terminalOrderStatuses.includes(currentOrderState.status)) {
           orderStatusAfterSettlement = 'fulfillment_exception';
