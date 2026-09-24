@@ -16,6 +16,7 @@
   var adminFetch = S.adminFetch;
   var getAuthHeaders = S.getAuthHeaders;
   var getStoredUser = S.getStoredUser;
+  var getBMTargetBranchId = window.getBMTargetBranchId;
   var XentraBranchCatalog = window.XentraBranchCatalog;
   var loadInlineBranchCatalog = XentraBranchCatalog && XentraBranchCatalog.loadInlineBranchCatalog;
 
