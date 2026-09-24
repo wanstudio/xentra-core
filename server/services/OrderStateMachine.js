@@ -37,10 +37,11 @@ class OrderStateMachine {
     return allowed.includes(targetStatus);
   }
 
-  static transition(params) {
+  static transition(params, { dbTransactionProvided = false } = {}) {
     const { order_id, target_status, actor_type = 'system', actor_id = null, note = '', expected_current_status = null } = params;
 
-    orderRepository.beginTransaction();
+    const ownsTransaction = !dbTransactionProvided;
+    if (ownsTransaction) orderRepository.beginTransaction();
     let currentStatus = null;
     try {
       const order = orderRepository.findById(order_id);
@@ -108,9 +109,11 @@ class OrderStateMachine {
         PromotionEngineService.voidRedemptions({ order_id, reason: note || `Order ${target_status} by ${actor_type} (never accepted)` });
       }
 
-      orderRepository.commitTransaction();
+      if (ownsTransaction) orderRepository.commitTransaction();
     } catch (txErr) {
-      try { orderRepository.rollbackTransaction(); } catch (_) {}
+      if (ownsTransaction) {
+        try { orderRepository.rollbackTransaction(); } catch (_) {}
+      }
       throw txErr;
     }
 

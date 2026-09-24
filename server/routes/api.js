@@ -3318,154 +3318,138 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
       ? `[ACCEPT by ${actorLabel}] ${note ? note : ''}`.trim()
       : `[REJECT by ${actorLabel}] ${String(reason).trim()}`;
 
-    const fullOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+    const { OrderRepository } = require('../../core/data/repositories');
+    const orderRepo = new OrderRepository();
 
-    // 1. Idempotency: if already in targetStatus, return success directly without duplicating side-effects
-    if (fullOrder && fullOrder.status === targetStatus) {
-      const result = OrderStateMachine.transition({
-        order_id: order.id,
-        target_status: targetStatus,
-        actor_type: 'branch_actor',
-        actor_id: req.user.userId || req.user.username,
-        note: actorNote
-      });
-      return res.json({ success: true, decision, ...result });
-    }
+    // Unified database transaction: ensures table activation, stock deduction, and status transition
+    // are truly atomic at the SQLite database level. Concurrently arriving duplicate accept requests
+    // will be serialized by SQLite's write lock and safely resolve via the authoritative idempotency check.
+    orderRepo.beginTransaction();
+    try {
+      const fullOrder = orderRepo.findById(order.id);
+      if (!fullOrder) {
+        orderRepo.rollbackTransaction();
+        return res.status(404).json({ success: false, error: 'Pesanan tidak ditemukan.' });
+      }
 
-    // 2. Validate state transition capability before running operational side-effects
-    if (fullOrder && !OrderStateMachine.canTransition(fullOrder.status, targetStatus)) {
-      OrderStateMachine.transition({
-        order_id: order.id,
-        target_status: targetStatus,
-        actor_type: 'branch_actor',
-        actor_id: req.user.userId || req.user.username,
-        note: actorNote
-      });
-    }
-
-    if (decision === 'accept') {
-      let sessionResult = null;
-
-      // 1. If dine-in, validate table and activate dining session atomically
-      // Invariant: An order CANNOT be confirmed if its Dining Session fails to activate.
-      if (fullOrder && fullOrder.order_type === 'dine_in') {
-        const { DiningTableService } = require('../../domains/pos');
-        const { DiningTableRepository } = require('../../core/data/repositories');
-        const diningRepo = new DiningTableRepository();
-
-        let tableIds = [];
-        const activeHolds = diningRepo.findActiveHolds(fullOrder.id);
-        if (activeHolds && activeHolds.length > 0) {
-          tableIds = activeHolds.map(h => h.table_id);
-        } else if (fullOrder.table_number) {
-          const tbl = diningRepo.findTableIdByNumberOrLabel(fullOrder.branch_id, fullOrder.table_number);
-          if (tbl) tableIds = [tbl.id];
-        } else if (fullOrder.dining_session_id) {
-          const sessTables = diningRepo.findSessionTables(fullOrder.dining_session_id);
-          if (sessTables && sessTables.length > 0) tableIds = sessTables.map(t => t.table_id);
-        }
-
-        if (tableIds.length === 0) {
-          return res.status(400).json({
-            success: false,
-            status: 'TABLE_REQUIRED',
-            error: 'Gagal menerima pesanan: meja tidak ditemukan atau hold telah kedaluwarsa.'
-          });
-        }
-
-        // createOrAttachDiningSession enforces table availability atomically.
-        // If table is already occupied/blocked/mismatched, it throws and stops acceptance.
-        sessionResult = DiningTableService.createOrAttachDiningSession({
-          branch_id: fullOrder.branch_id,
-          table_ids: tableIds,
+      // 1. Idempotency: if already in targetStatus, return success directly without duplicating side-effects
+      if (fullOrder.status === targetStatus) {
+        orderRepo.commitTransaction();
+        return res.json({
+          success: true,
           order_id: fullOrder.id,
-          customer_name: fullOrder.customer_name,
-          customer_phone: fullOrder.customer_phone,
-          guest_count: fullOrder.guest_count || 1,
-          hold_reference_id: fullOrder.id,
-          channel: fullOrder.order_channel || 'customer_app',
-          session_id: fullOrder.dining_session_id || null
+          decision,
+          previous_status: fullOrder.status,
+          new_status: fullOrder.status,
+          already_in_state: true,
+          idempotent: true
         });
       }
 
-      // 2. Deduct inventory stock for the accepted order (idempotent)
-      // For cash orders, stock was not deducted while pending. If stock is insufficient, abort accept.
-      try {
-        const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
-        OrderPlacementService.deductStockForSettledOrder(order.id);
-      } catch (stockErr) {
-        if (sessionResult && sessionResult.session_id) {
-          const { DiningTableService } = require('../../domains/pos');
-          try {
-            DiningTableService.completeDiningSession(sessionResult.session_id, 'Stock deduction rollback');
-            DiningTableService.holdTablesForPayment({
-              branch_id: fullOrder.branch_id,
-              table_ids: sessionResult.table_ids,
-              customer_phone: fullOrder.customer_phone,
-              hold_reference_id: fullOrder.id,
-              channel: 'customer_app'
-            });
-          } catch (_) {}
-        }
+      // 2. Validate state transition capability before running operational side-effects
+      if (!OrderStateMachine.canTransition(fullOrder.status, targetStatus)) {
+        orderRepo.rollbackTransaction();
         return res.status(400).json({
           success: false,
-          status: 'OUT_OF_STOCK',
-          error: `Gagal menerima pesanan: ${stockErr.message}`
+          error: `Perubahan status pesanan tidak valid: dari "${fullOrder.status}" ke "${targetStatus}".`
         });
       }
 
-      // 3. Transition order status from pending -> confirmed (ACCEPTED)
-      try {
+      if (decision === 'accept') {
+        let sessionResult = null;
+
+        // 1. If dine-in, validate table and activate dining session atomically
+        // Invariant: An order CANNOT be confirmed if its Dining Session fails to activate.
+        if (fullOrder.order_type === 'dine_in') {
+          const { DiningTableService } = require('../../domains/pos');
+          const { DiningTableRepository } = require('../../core/data/repositories');
+          const diningRepo = new DiningTableRepository();
+
+          let tableIds = [];
+          const activeHolds = diningRepo.findActiveHolds(fullOrder.id);
+          if (activeHolds && activeHolds.length > 0) {
+            tableIds = activeHolds.map(h => h.table_id);
+          } else if (fullOrder.table_number) {
+            const tbl = diningRepo.findTableIdByNumberOrLabel(fullOrder.branch_id, fullOrder.table_number);
+            if (tbl) tableIds = [tbl.id];
+          } else if (fullOrder.dining_session_id) {
+            const sessTables = diningRepo.findSessionTables(fullOrder.dining_session_id);
+            if (sessTables && sessTables.length > 0) tableIds = sessTables.map(t => t.table_id);
+          }
+
+          if (tableIds.length === 0) {
+            orderRepo.rollbackTransaction();
+            return res.status(400).json({
+              success: false,
+              status: 'TABLE_REQUIRED',
+              error: 'Gagal menerima pesanan: meja tidak ditemukan atau hold telah kedaluwarsa.'
+            });
+          }
+
+          // createOrAttachDiningSession enforces table availability atomically inside unified transaction.
+          // If table is already occupied/blocked/mismatched, it throws and stops acceptance.
+          sessionResult = DiningTableService.createOrAttachDiningSession({
+            branch_id: fullOrder.branch_id,
+            table_ids: tableIds,
+            order_id: fullOrder.id,
+            customer_name: fullOrder.customer_name,
+            customer_phone: fullOrder.customer_phone,
+            guest_count: fullOrder.guest_count || 1,
+            hold_reference_id: fullOrder.id,
+            channel: fullOrder.order_channel || 'customer_app',
+            session_id: fullOrder.dining_session_id || null
+          }, { dbTransactionProvided: true });
+        }
+
+        // 2. Deduct inventory stock for the accepted order (idempotent, inside unified transaction)
+        // For cash orders, stock was not deducted while pending. If stock is insufficient, abort accept.
+        const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
+        OrderPlacementService.deductStockForSettledOrder(order.id, { dbTransactionProvided: true });
+
+        // 3. Transition order status from pending -> confirmed (ACCEPTED)
         const result = OrderStateMachine.transition({
           order_id: order.id,
           target_status: 'confirmed',
           actor_type: 'branch_actor',
           actor_id: req.user.userId || req.user.username,
           note: actorNote
-        });
+        }, { dbTransactionProvided: true });
 
         if (sessionResult) {
           result.dining_session_id = sessionResult.session_id;
         }
 
+        orderRepo.commitTransaction();
         return res.json({ success: true, decision, ...result });
-      } catch (stateErr) {
-        if (sessionResult && sessionResult.session_id) {
-          const { DiningTableService } = require('../../domains/pos');
-          try {
-            DiningTableService.completeDiningSession(sessionResult.session_id, 'State transition rollback');
-          } catch (_) {}
-        }
-        return res.status(400).json({ success: false, error: stateErr.message });
       }
-    }
 
-    if (decision === 'reject') {
-      const result = OrderStateMachine.transition({
-        order_id: order.id,
-        target_status: 'rejected',
-        actor_type: 'branch_actor',
-        actor_id: req.user.userId || req.user.username,
-        note: actorNote
-      });
+      if (decision === 'reject') {
+        const result = OrderStateMachine.transition({
+          order_id: order.id,
+          target_status: 'rejected',
+          actor_type: 'branch_actor',
+          actor_id: req.user.userId || req.user.username,
+          note: actorNote
+        }, { dbTransactionProvided: true });
 
-      if (fullOrder && fullOrder.order_type === 'dine_in') {
-        const { DiningTableService } = require('../../domains/pos');
-        try {
+        if (fullOrder.order_type === 'dine_in') {
+          const { DiningTableService } = require('../../domains/pos');
           DiningTableService.releaseHold({
             branch_id: fullOrder.branch_id,
             hold_reference_id: fullOrder.id,
             reason: 'rejected'
-          });
-        } catch (relErr) {
-          console.error('[BranchAcceptance Release Hold Warning]:', relErr.message);
+          }, { dbTransactionProvided: true });
         }
-      }
 
-      return res.json({ success: true, decision, ...result });
+        orderRepo.commitTransaction();
+        return res.json({ success: true, decision, ...result });
+      }
+    } catch (err) {
+      try { orderRepo.rollbackTransaction(); } catch (_) {}
+      return res.status(400).json({ success: false, error: err.message });
     }
-  } catch (err) {
-    res.status(400).json({ success: false, error: err.message });
+  } catch (outerErr) {
+    return res.status(400).json({ success: false, error: outerErr.message });
   }
 });
 

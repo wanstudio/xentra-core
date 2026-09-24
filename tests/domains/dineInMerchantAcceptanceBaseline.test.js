@@ -22,6 +22,7 @@ const TABLE_T1 = `tbl_bline_t1_${Date.now()}`;
 const TABLE_T2 = `tbl_bline_t2_${Date.now()}`;
 const TABLE_T3 = `tbl_bline_t3_${Date.now()}`;
 const TABLE_T4 = `tbl_bline_t4_${Date.now()}`;
+const TABLE_T5 = `tbl_bline_t5_${Date.now()}`;
 
 const CUST_PHONE = '081299112233';
 
@@ -105,7 +106,8 @@ test.before(async () => {
     { id: TABLE_T1, num: 'T1' },
     { id: TABLE_T2, num: 'T2' },
     { id: TABLE_T3, num: 'T3' },
-    { id: TABLE_T4, num: 'T4' }
+    { id: TABLE_T4, num: 'T4' },
+    { id: TABLE_T5, num: 'T5' }
   ];
 
   for (const t of tables) {
@@ -480,3 +482,77 @@ test('Baseline 6: Acceptance Timeout releases table hold back to available', asy
   const t4State = diningRepo.findTableState(TABLE_T4);
   assert.equal(t4State.operational_state, 'available', 'Table must return to available after timeout');
 });
+
+test('Baseline 7: Concurrent double-click Accept requests execute atomically without destroying active session', async () => {
+  const custPhone = '081299990007';
+  const stockBefore = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+
+  // Step 1: Customer creates cash order for Table T5
+  const orderRes = await OrderPlacementService.submitOrder({
+    brand_id: BRAND_ID,
+    branch_id: BRANCH_ID,
+    customer: { name: 'Customer T5', phone: custPhone },
+    items: makeItems(),
+    payment_method: 'cash',
+    order_type: 'dine_in',
+    order_channel: 'customer_app',
+    table_id: TABLE_T5
+  });
+
+  assert.equal(orderRes.success, true);
+  const order = orderRes.order;
+  assert.equal(order.status, 'pending');
+
+  DiningTableService.holdTablesForPayment({
+    branch_id: BRANCH_ID,
+    table_id: TABLE_T5,
+    customer_phone: custPhone,
+    hold_reference_id: order.id,
+    channel: 'customer_app'
+  });
+
+  assert.equal(diningRepo.findTableState(TABLE_T5).operational_state, 'held');
+
+  // Step 2: Simulate concurrent double-click / simultaneous accept calls
+  const [res1, res2] = await Promise.all([
+    request('POST', `/orders/${order.id}/branch-acceptance`, {
+      decision: 'accept',
+      note: 'Accept request 1'
+    }, {
+      Authorization: `Bearer ${bmToken}`
+    }),
+    request('POST', `/orders/${order.id}/branch-acceptance`, {
+      decision: 'accept',
+      note: 'Accept request 2'
+    }, {
+      Authorization: `Bearer ${bmToken}`
+    })
+  ]);
+
+  // Both requests must return 200 OK
+  assert.equal(res1.status, 200, 'Request 1 should succeed');
+  assert.equal(res2.status, 200, 'Request 2 should succeed (idempotent duplicate)');
+
+  // Verify order status in DB is confirmed
+  const orderInDb = db.prepare('SELECT status FROM orders WHERE id = ?').get(order.id);
+  assert.equal(orderInDb.status, 'confirmed');
+
+  // Verify Table T5 is OCCUPIED (CRITICAL: Active session must NOT be closed/completed by the duplicate request!)
+  const t5State = diningRepo.findTableState(TABLE_T5);
+  assert.equal(t5State.operational_state, 'occupied', 'Table must remain occupied');
+  assert.ok(t5State.current_session_id, 'Table must have active session attached');
+
+  // Verify Dining Session is ACTIVE
+  const activeSession = diningRepo.findDiningSessionById(t5State.current_session_id);
+  assert.ok(activeSession, 'Active session must exist in DB');
+  assert.equal(activeSession.status, 'active', 'Active session must NOT be completed by duplicate accept');
+
+  // Verify stock was deducted EXACTLY ONCE (stockBefore - 1)
+  const stockAfter = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get(BRANCH_ID, 'prod_bline_1').stock;
+  assert.equal(stockAfter, stockBefore - 1, 'Stock must be deducted exactly once despite concurrent accept requests');
+
+  // Cleanup session
+  DiningTableService.completeDiningSession(activeSession.id);
+  assert.equal(diningRepo.findTableState(TABLE_T5).operational_state, 'available');
+});
+

@@ -217,21 +217,24 @@ class DiningTableService {
     return { success: true, hold_reference_id: holdRef, table_ids: resolvedTableIds, expires_at: expiresAt.toISOString(), duration_minutes: HOLD_DURATION_MINUTES };
   }
 
-  static releaseHold({ branch_id, hold_reference_id, reason = 'cancelled' }) {
+  static releaseHold({ branch_id, hold_reference_id, reason = 'cancelled' }, { dbTransactionProvided = false } = {}) {
     if (!hold_reference_id) return { released: 0 };
     const holds = repository.findActiveHolds(hold_reference_id);
     if (!holds || holds.length === 0) return { released: 0 };
 
     const now = new Date().toISOString();
-    repository.beginTransaction();
+    const ownsTransaction = !dbTransactionProvided;
+    if (ownsTransaction) repository.beginTransaction();
     try {
       for (const h of holds) {
         repository.updateHoldStatus({ holdId: h.id, status: reason, updatedAt: now });
         repository.updateTableState({ tableId: h.table_id, operationalState: 'available', currentSessionId: null, notes: `Released: ${reason}`, updatedAt: now });
       }
-      repository.commitTransaction();
+      if (ownsTransaction) repository.commitTransaction();
     } catch (err) {
-      try { repository.rollbackTransaction(); } catch (_) {}
+      if (ownsTransaction) {
+        try { repository.rollbackTransaction(); } catch (_) {}
+      }
       console.error('[DiningTableService] releaseHold error:', err);
       throw err;
     }
@@ -250,7 +253,7 @@ class DiningTableService {
     hold_reference_id = null,
     channel = null,
     session_id = null
-  }) {
+  }, { dbTransactionProvided = false } = {}) {
     if (!branch_id) throw new Error('[DiningTableService] branch_id is required.');
 
     let resolvedTableIds = [];
@@ -264,7 +267,8 @@ class DiningTableService {
     const now = new Date().toISOString();
     const cleanCustomerPhone = customer_phone ? String(customer_phone).trim() : '';
 
-    repository.beginTransaction();
+    const ownsTransaction = !dbTransactionProvided;
+    if (ownsTransaction) repository.beginTransaction();
     let sessionId = null;
 
     try {
@@ -389,9 +393,11 @@ class DiningTableService {
         repository.associateOrderToDiningSession({ orderId: order_id, sessionId, updatedAt: now });
       }
 
-      repository.commitTransaction();
+      if (ownsTransaction) repository.commitTransaction();
     } catch (err) {
-      try { repository.rollbackTransaction(); } catch (_) {}
+      if (ownsTransaction) {
+        try { repository.rollbackTransaction(); } catch (_) {}
+      }
       throw err;
     }
 
