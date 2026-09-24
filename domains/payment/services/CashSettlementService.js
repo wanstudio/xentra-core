@@ -150,7 +150,7 @@ class CashSettlementService {
 
       if (order && order.order_type === 'dine_in') {
         try {
-          const { DiningTableService } = require('../../pos');
+          const { DiningTableService } = require('../../dining');
           let tableIds = [];
           const activeHold = diningTableRepository.findActiveHolds(order.id);
           if (activeHold && activeHold.length > 0) {
