@@ -276,7 +276,7 @@ class DiningTableService {
   static createReservation({ brand_id, branch_id, customer, order_channel = 'customer_app', selection_mode = null, reservation_date = null, reservation_time = '12:00', guest_count = null, notes = '' } = {}) {
     if (!reservation_date) return { success: false, status: 'VALIDATION_ERROR', errors: ['Tanggal reservasi wajib diisi untuk tipe pesanan reservation.'] };
     const reservationTime = String(reservation_time || '').trim();
-    const timeMatch = /^(\\d{2}):(\\d{2})$/.exec(reservationTime);
+    const timeMatch = /^(\d{2}):(\d{2})$/.exec(reservationTime);
     if (!timeMatch) {
       return { success: false, status: 'INVALID_RESERVATION_TIME', errors: ['Jam reservasi wajib menggunakan format HH:MM.'] };
     }
