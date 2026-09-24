@@ -43,3 +43,19 @@ button,input{font:inherit}.pos-shell{min-height:100vh;display:flex;flex-directio
 .pos-qris-merchant{font-weight:800;margin:4px 0}
 .pos-qris-instructions{font-size:12px;color:#6b7280;line-height:1.45}
 @media(max-width:640px){.pos-payment-mode-grid{grid-template-columns:1fr}}
+
+
+/* POS PIN / fast re-auth gate */
+.pos-auth-gate{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.96)}
+.pos-auth-card{width:min(420px,100%);background:#fff;border-radius:18px;padding:28px;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+.pos-auth-brand{font-size:12px;font-weight:800;letter-spacing:.12em;color:#64748b;margin-bottom:8px}
+.pos-auth-title{font-size:24px;font-weight:800;color:#0f172a;margin:0 0 8px}
+.pos-auth-subtitle{font-size:13px;line-height:1.5;color:#64748b;margin:0 0 20px}
+.pos-auth-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#f1f5f9;color:#475569;font-size:11px;font-weight:800;margin-bottom:16px}
+.pos-auth-badge.offline{background:#fff7ed;color:#9a3412}
+.pos-pin-input{width:100%;padding:16px 14px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#0f172a;font-size:28px;font-weight:800;letter-spacing:.35em;text-align:center;outline:none}
+.pos-pin-input:focus{background:#fff;border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.08)}
+.pos-auth-actions{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+.pos-auth-error{min-height:18px;margin-top:10px;color:#dc2626;font-size:12px;font-weight:700;text-align:center}
+.pos-auth-link{width:100%;border:0;background:transparent;color:#64748b;font-size:12px;font-weight:700;padding:8px;cursor:pointer}
+.pos-pin-setup-note{font-size:12px;line-height:1.5;color:#64748b;margin-top:10px}
