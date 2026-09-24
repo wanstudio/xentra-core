@@ -10,6 +10,7 @@ const DeliveryCalculator = require('../services/DeliveryCalculator');
 const PaymentService = require('../services/PaymentService');
 const registerCustomerOrderRoutes = require('./customer-orders');
 const registerMediaUploadRoutes = require('./media-upload');
+const registerPaymentConfigRoutes = require('./payment-config');
 const OrderStateMachine = require('../services/OrderStateMachine');
 const AcceptanceTimeoutService = require('../services/AcceptanceTimeoutService');
 const RouteService = require('../services/RouteService');
@@ -122,107 +123,6 @@ function resolveCustomerBannerPayload(req, brandId) {
     };
   });
 }
-
-// Konfigurasi gateway yang boleh diketahui browser. Hanya nilai PUBLISHABLE:
-// client key Midtrans (memang dipakai di sisi browser oleh Snap) dan alamat
-// snap.js-nya. Server key tidak pernah keluar dari server.
-router.get('/payment/config', (req, res) => {
-  try {
-    const brandRow = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
-    let cfg = {};
-    if (brandRow && brandRow.default_payment_config) {
-      try {
-        cfg = JSON.parse(brandRow.default_payment_config) || {};
-      } catch (parseErr) {
-        return res.status(500).json({
-          success: false,
-          error: 'CONFIG_PARSE_ERROR',
-          message: 'Konfigurasi payment gateway brand gagal dibaca (format JSON tidak valid).'
-        });
-      }
-    }
-
-    let activeProvider = '';
-    if (Object.prototype.hasOwnProperty.call(cfg, 'provider')) {
-      activeProvider = cfg.provider || '';
-    } else if (cfg.client_id || cfg.secret_key || cfg.doku_methods) {
-      activeProvider = 'doku';
-    } else if (cfg.server_key || cfg.client_key || cfg.midtrans_methods) {
-      activeProvider = 'midtrans';
-    } else if (!brandRow && process.env.MIDTRANS_SERVER_KEY) {
-      activeProvider = 'midtrans';
-    } else {
-      activeProvider = '';
-    }
-    const isProduction = cfg.is_production === true;
-
-    res.json({
-      success: true,
-      payment_gateway: {
-        active_provider: activeProvider,
-        // Kesiapan diukur dari provider yang AKTIF saja. Provider yang tidak aktif
-        // tidak boleh memblokir: DOKU aktif tidak perlu kredensial Midtrans, dan
-        // sebaliknya.
-        active_provider_configured: activeProvider === 'doku'
-          ? Boolean(cfg.client_id && cfg.secret_key)
-          : (activeProvider === 'midtrans' ? Boolean(cfg.server_key || (!brandRow && process.env.MIDTRANS_SERVER_KEY)) : false),
-        midtrans_client_key: activeProvider === 'midtrans' ? (cfg.client_key || '') : '',
-        midtrans_is_production: isProduction,
-        snap_script_url: activeProvider === 'midtrans'
-          ? (isProduction
-            ? 'https://app.midtrans.com/snap/snap.js'
-            : 'https://app.sandbox.midtrans.com/snap/snap.js')
-          : null
-      }
-    });
-  } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-router.get('/brand/info', (req, res) => {
-  try {
-    const brandId = req.brand_id;
-
-    // M6: Resolve canonical media delivery for logo (logo_media_id → derivative)
-    let logoDeliveryUrl = req.brand.logo_url || null;
-    try {
-      // P1.3: tenantResolver already resolved this brand row with `SELECT *`, so the
-      // logo_media_id is present on req.brand. Reuse it instead of re-reading the
-      // same row (removes one query from the Home critical path); only fall back to
-      // the authoritative query when the property is genuinely absent.
-      const logoMediaId = Object.prototype.hasOwnProperty.call(req.brand, 'logo_media_id')
-        ? req.brand.logo_media_id
-        : (db.prepare('SELECT logo_media_id FROM brands WHERE id = ?').get(brandId) || {}).logo_media_id;
-      if (logoMediaId) {
-        const logoDelivery = resolveCustomerMediaDelivery({
-          mediaId: logoMediaId,
-          brandId,
-          assetType: 'square',
-          legacyUrl: req.brand.logo_url || null
-        });
-        if (logoDelivery.preview_url) logoDeliveryUrl = logoDelivery.preview_url;
-      }
-    } catch (_) {}
-
-    const enrichedBanners = resolveCustomerBannerPayload(req, brandId);
-
-    res.json({
-      success: true,
-      brand: {
-        id: req.brand.id,
-        name: req.brand.name,
-        slug: req.brand.slug,
-        logo_url: logoDeliveryUrl,
-        primary_color: req.brand.primary_color || '#b6ff00',
-        banners: enrichedBanners
-      }
-    });
-  } catch (err) {
-    console.error('[API Error /brand/info]:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 
 
 // 2. List Branches for Brand
@@ -10099,6 +9999,7 @@ router.get('/admin/customers/:id', requireAuth(['owner', 'brand_manager', 'branc
 const { PaymentRepository: CorePaymentRepo, PromotionRepository: CorePromotionRepo } = require('../../core/data/repositories');
 const corePaymentRepo = new CorePaymentRepo();
 const corePromotionRepo = new CorePromotionRepo();
+registerPaymentConfigRoutes(router, { corePaymentRepo });
 
 function logPromotionSecurityEvent({ actor_id, actor_role, action, brand_id, organization_id = null, branch_id = null, result, metadata }) {
   try {
