@@ -7,9 +7,7 @@
 module.exports = function registerAdminReportingRoutes(router, deps) {
   const {
     db,
-    requireAuth,
-    corePromotionRepo,
-    corePaymentRepo
+    requireAuth
   } = deps;
 
 router.get('/admin/analytics/summary', requireAuth(['owner', 'brand_manager']), (req, res) => {
@@ -215,15 +213,4 @@ router.get('/admin/customers/:id', requireAuth(['owner', 'brand_manager', 'branc
   }
 });
 
-// =========================================================================
-// PHASE 6: CLIENT OWNER DASHBOARD — FINANCE & MARKETING APIS
-// Authoritative Core reuse with strict multi-tenant & RBAC scoping
-// =========================================================================
-const { PaymentRepository: CorePaymentRepo, PromotionRepository: CorePromotionRepo } = require('../../core/data/repositories');
-const corePaymentRepo = new CorePaymentRepo();
-const corePromotionRepo = new CorePromotionRepo();
-registerPaymentConfigRoutes(router, { corePaymentRepo });
-
-// Promotion audit helper and management routes are isolated in server/routes/admin-marketing-promotions.js.
-// 1. Finance Overview API
 };
