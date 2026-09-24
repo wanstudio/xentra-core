@@ -4002,6 +4002,7 @@
   var checkAuth = _shared.checkAuth || window.XentraShared.checkAuth;
   var handleHandoffExchange = _shared.handleHandoffExchange || window.XentraShared.handleHandoffExchange;
   var validateServerSession = _shared.validateServerSession || window.XentraShared.validateServerSession;
+  var enforceSurface = _shared.enforceSurface || window.XentraShared.enforceSurface;
 
   /**
    * Hides/shows UI panels depending on the logged-in user's role.
@@ -8764,7 +8765,11 @@
       // Apply role-based UI before data load
       var isAuth = checkAuth();
       applyRoleBasedUI();
-      validateServerSession();
+      validateServerSession().then(function (isValid) {
+        if (!isValid) return;
+        // Owner Dashboard must never become a fallback surface for operational roles.
+        enforceSurface(['/owner/', '/dashboard/', '/dashboard']);
+      }).catch(function () {});
 
       // Apply initial route from URL hash (enables deep-link and browser refresh)
       applyRoute(getCurrentRoute());
