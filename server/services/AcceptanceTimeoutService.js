@@ -31,7 +31,7 @@ function checkAndApplyTimeouts() {
       });
       if (order.order_type === 'dine_in') {
         try {
-          const { DiningTableService } = require('../../domains/pos');
+          const { DiningTableService } = require('../../domains/dining');
           DiningTableService.releaseHold({
             branch_id: order.branch_id,
             hold_reference_id: order.id,
