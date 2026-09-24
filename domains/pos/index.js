@@ -57,8 +57,8 @@ try {
   registration = domain.DomainRegistry.getDomain('pos');
 }
 
-const DiningTableService = require('./services/DiningTableService');
-const TableRecommendationService = require('./services/TableRecommendationService');
+/* Compatibility exports: Dining ownership moved to domains/dining. */
+const { DiningTableService, TableRecommendationService } = require('../dining');
 const PosLocalOperationService = require('./services/PosLocalOperationService');
 
 module.exports = {
@@ -71,6 +71,7 @@ module.exports = {
   PosOrderService,
   PosHardwareRouter,
   OfflineReconciliationService,
+  // @deprecated compatibility exports; use require('../../domains/dining') instead.
   DiningTableService,
   TableRecommendationService,
   PosLocalOperationService
