@@ -17,7 +17,9 @@
     cart: [],
     held: [],
     sales: [],
-    terminalId: localStorage.getItem('xentra_pos_terminal_id') || null
+    terminalId: localStorage.getItem('xentra_pos_terminal_id') || null,
+    paymentModes: [],
+    activePaymentMode: 'cash'
   };
 
   function $(id) { return document.getElementById(id); }
@@ -148,6 +150,16 @@
     return true;
   }
 
+  async function loadPaymentModes(){
+    try{
+      var d=await request('/pos/payment-methods',{headers:headers()});
+      state.paymentModes=d.payment_modes||[];
+    }catch(e){
+      state.paymentModes=[{code:'cash',name:'Cash',enabled:true,offline_supported:true,provider:'cash'}];
+    }
+    return state.paymentModes;
+  }
+
   async function loadTerminal(){
     try{
       var d=await request('/pos/terminal/current',{headers:headers()});
@@ -213,51 +225,74 @@
     catch(e){toast(e.message);}
   }
 
+  function paymentModeInfo(mode){ return state.paymentModes.find(function(m){return m.code===mode;}) || {code:mode,name:mode,enabled:true}; }
+
+  function paymentModeBody(mode,totalAmount){
+    var info=paymentModeInfo(mode);
+    if(mode==='cash') return '<div class="pos-form-row"><label>Uang Diterima</label><input id="pos-amount-tendered" type="number" min="'+totalAmount+'" value="'+totalAmount+'"></div><div id="pos-change-preview" class="pos-change">Kembalian: '+money(0)+'</div>';
+    if(mode==='payment_gateway') return '<div class="pos-payment-pending"><strong>Payment Gateway</strong><span>Provider: '+esc(String(info.provider||'—').toUpperCase())+'</span><small>Pembayaran dibuat melalui gateway aktif dan POS menunggu status settlement.</small></div>';
+    var q=info.qris_static||{};
+    return '<div class="pos-qris-panel"><div class="pos-payment-total">'+money(totalAmount)+'</div>'+(q.merchant_name?'<div class="pos-qris-merchant">'+esc(q.merchant_name)+'</div>':'')+'<img class="pos-qris-image" src="'+esc(q.image_url||'')+'" alt="QRIS Statis"><p class="pos-qris-instructions">'+esc(q.instructions||'Verifikasi pembayaran pelanggan sebelum konfirmasi.')+'</p></div>';
+  }
+
   function openPayModal(){
     if(!state.cart.length)return;
     var t=total();
-    showModal('<h3>Bayar</h3><p>POS menyelesaikan Sale lalu mencatat payment dan cash settlement sesuai shift aktif.</p>'+
-      '<div class="pos-payment-total">'+money(t)+'</div>'+
-      '<div class="pos-form-row"><label>Metode Pembayaran</label><select id="pos-payment-method"><option value="cash">Tunai</option><option value="qris" disabled>QRIS (belum tersedia di endpoint POS)</option></select></div>'+
-      '<div class="pos-form-row"><label>Uang Diterima</label><input id="pos-amount-tendered" type="number" min="'+t+'" value="'+t+'"></div>'+
-      '<div id="pos-change-preview" class="pos-change">Kembalian: '+money(0)+'</div>'+
-      '<div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-pay-cancel">Batal</button><button class="pos-btn" id="pos-pay-confirm">Konfirmasi Bayar</button></div>');
-    var amt=$('pos-amount-tendered'); var preview=$('pos-change-preview');
-    amt.oninput=function(){preview.textContent='Kembalian: '+money(Math.max(0,Number(amt.value||0)-t));};
-    $('pos-pay-cancel').onclick=hideModal; $('pos-pay-confirm').onclick=function(){submitSale(Number(amt.value||0));};
+    var modes=state.paymentModes.filter(function(m){return m.enabled;});
+    if(!modes.some(function(m){return m.code==='cash';}))modes.unshift({code:'cash',name:'Cash',enabled:true,offline_supported:true,provider:'cash'});
+    state.activePaymentMode=(modes.find(function(m){return m.code===state.activePaymentMode;})||modes[0]).code;
+    showModal('<h3>Pembayaran</h3><div class="pos-payment-total">'+money(t)+'</div><div class="pos-form-row"><label>Mode Pembayaran</label><div class="pos-payment-mode-grid">'+modes.map(function(m){return '<button type="button" class="pos-payment-option '+(m.code===state.activePaymentMode?'active':'')+'" data-pay-mode="'+esc(m.code)+'"><strong>'+esc(m.name)+'</strong><small>'+(m.code==='payment_gateway'?esc(String(m.provider||'').toUpperCase()):m.code==='qris_static'?'Fallback manual':'Offline tersedia')+'</small></button>';}).join('')+'</div></div><div id="pos-payment-mode-body">'+paymentModeBody(state.activePaymentMode,t)+'</div><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-pay-cancel">Batal</button><button class="pos-btn" id="pos-pay-confirm">Lanjutkan</button></div>');
+    document.querySelectorAll('[data-pay-mode]').forEach(function(btn){btn.onclick=function(){state.activePaymentMode=btn.dataset.payMode;document.querySelectorAll('[data-pay-mode]').forEach(function(x){x.classList.toggle('active',x===btn);});$('pos-payment-mode-body').innerHTML=paymentModeBody(state.activePaymentMode,t);bindCashPreview();};});
+    bindCashPreview();
+    $('pos-pay-cancel').onclick=hideModal;
+    $('pos-pay-confirm').onclick=function(){var amount=$('pos-amount-tendered');submitSale(state.activePaymentMode,amount?Number(amount.value||0):null);};
   }
 
-  async function submitSale(amountTendered){
+  function bindCashPreview(){
+    var amount=$('pos-amount-tendered'),preview=$('pos-change-preview');
+    if(amount&&preview)amount.oninput=function(){preview.textContent='Kembalian: '+money(Math.max(0,Number(amount.value||0)-total()));};
+  }
+
+  function showPaymentSuccess(order,change){
+    showModal('<h3>Pembayaran Berhasil</h3><p>Sale '+esc(order.order_number||order.id||'')+' selesai.</p><div class="pos-payment-total">'+money(order.grand_total||total())+'</div>'+(change!=null?'<div class="pos-change">Kembalian: '+money(change)+'</div>':'')+'<div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-sale-close">Selesai</button><button class="pos-btn" id="pos-sale-print">Cetak Struk</button></div>');
+    $('pos-sale-close').onclick=function(){hideModal();resetSale();};
+    $('pos-sale-print').onclick=function(){printReceipt(order.id);};
+  }
+
+  function showGatewayPending(d){
+    var p=d.payment||{},oid=d.order_id||((d.order||{}).id)||'';
+    showModal('<h3>Menunggu Pembayaran</h3><p>'+esc(d.order_number||oid)+' · '+money(d.grand_total||0)+'</p><div class="pos-payment-pending"><strong>'+esc(String(p.provider||'').toUpperCase())+'</strong>'+(p.redirect_url?'<button class="pos-btn" id="pos-open-gateway">Buka Pembayaran</button>':'')+'<button class="pos-btn ghost" id="pos-check-gateway">Cek Status Pembayaran</button><small id="pos-gateway-status-text">Menunggu settlement gateway…</small></div><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-gateway-close">Tutup</button></div>');
+    if($('pos-open-gateway'))$('pos-open-gateway').onclick=function(){window.open(p.redirect_url,'_blank','noopener');};
+    $('pos-gateway-close').onclick=function(){hideModal();};
+    function poll(){request('/pos/orders/'+encodeURIComponent(oid)+'/payment-status?refresh=1',{headers:headers()}).then(function(st){var ps=st.payment&&st.payment.payment_status,os=st.order&&st.order.status;if(ps==='settlement'){clearInterval(timer);showPaymentSuccess({id:oid,order_number:st.order.order_number,grand_total:st.order.grand_total},null);loadShift();loadSales();}else if(ps==='reconciliation_pending'){if($('pos-gateway-status-text'))$('pos-gateway-status-text').textContent='Status gateway belum dapat dipastikan. Jangan ulangi pembayaran untuk order ini.';}else if(['cancel','deny','expire'].indexOf(ps)>=0||['cancelled','rejected','timeout'].indexOf(os)>=0){clearInterval(timer);if($('pos-gateway-status-text'))$('pos-gateway-status-text').textContent='Pembayaran gagal/dibatalkan. Silakan pilih metode lain.';}}).catch(function(){});}
+    var timer=setInterval(poll,3000);$('pos-check-gateway').onclick=poll;poll();
+  }
+
+  function showStaticQrisPending(d){
+    var p=d.payment||{},oid=d.order_id||((d.order||{}).id)||'',q=p.qris_static||{};
+    showModal('<h3>QRIS Statis</h3><p>Tagihan '+money(d.grand_total||0)+'</p>' +(q.merchant_name?'<div class="pos-qris-merchant">'+esc(q.merchant_name)+'</div>':'')+'<img class="pos-qris-image" src="'+esc(q.image_url||'')+'" alt="QRIS Statis"><p class="pos-qris-instructions">'+esc(q.instructions||'Verifikasi pembayaran pelanggan sebelum konfirmasi.')+'</p><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-qris-cancel">Belum Bayar</button><button class="pos-btn" id="pos-qris-confirm">Saya Sudah Verifikasi</button></div>');
+    $('pos-qris-cancel').onclick=function(){request('/pos/orders/'+encodeURIComponent(oid)+'/cancel-qris-static',{method:'POST',headers:headers(),body:JSON.stringify({reason:'QRIS statis belum dibayar.'})}).then(function(){hideModal();resetSale();loadSales();}).catch(function(e){toast(e.message);});};
+    $('pos-qris-confirm').onclick=function(){var note=prompt('Referensi transaksi (opsional)')||'';request('/pos/orders/'+encodeURIComponent(oid)+'/confirm-qris-static',{method:'POST',headers:headers(),body:JSON.stringify({reference_note:note})}).then(function(result){if(result&&result.success){showPaymentSuccess({id:oid,order_number:result.order_number,grand_total:d.grand_total},null);loadSales();}}).catch(function(e){toast(e.message);});};
+  }
+
+  async function submitSale(paymentMode,amountTendered){
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
-    if(state.orderType==='dine_in' && !state.selectedTable)return toast('Pilih meja untuk transaksi dine-in.');
-    var payload={
-      branch_id:state.branchId, shift_id:state.shift.id, order_type:state.orderType, payment_method:'cash',
-      amount_tendered:amountTendered, customer:{name:$('pos-customer-name').value.trim(),phone:'',table_number:state.selectedTable ? state.selectedTable.table_number : null},
-      notes:$('pos-order-note').value.trim(),items:state.cart.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price};}),
-      client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)
-    };
+    if(state.orderType==='dine_in'&&!state.selectedTable)return toast('Pilih meja untuk transaksi dine-in.');
+    if(!navigator.onLine&&paymentMode!=='cash')return toast('Payment Gateway dan QRIS Statis membutuhkan koneksi internet pada POS.');
+    var payload={branch_id:state.branchId,shift_id:state.shift.id,order_type:state.orderType,payment_mode:paymentMode,amount_tendered:paymentMode==='cash'?amountTendered:null,customer:{name:$('pos-customer-name').value.trim(),phone:'',table_number:state.selectedTable?state.selectedTable.table_number:null},items:state.cart.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price};}),client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)};
     try{
       var d;
       if(!navigator.onLine){
-        if(!state.terminalId){ toast('POS offline belum siap: terminal cabang belum terdaftar.'); return; }
-        d=await request('/pos/local/sale',{method:'POST',headers:headers(),body:JSON.stringify({
-          terminal_id:state.terminalId, branch_id:state.branchId, shift_id:state.shift.id,
-          order_type:state.orderType, payment_method:'cash', amount_tendered:amountTendered,
-          customer:payload.customer, items:payload.items, client_transaction_id:payload.client_transaction_id,
-          offline_created_at:new Date().toISOString(), config_version:1
-        })});
-        hideModal(); resetSale();
-        toast('Penjualan tersimpan lokal. Akan disinkronkan saat online.');
-        return;
+        if(!state.terminalId)return toast('POS offline belum siap: terminal cabang belum terdaftar.');
+        await request('/pos/local/sale',{method:'POST',headers:headers(),body:JSON.stringify({terminal_id:state.terminalId,branch_id:state.branchId,shift_id:state.shift.id,order_type:state.orderType,payment_method:'cash',amount_tendered:amountTendered,customer:payload.customer,items:payload.items,client_transaction_id:payload.client_transaction_id,offline_created_at:new Date().toISOString(),config_version:1})});
+        hideModal();resetSale();toast('Penjualan tersimpan lokal. Akan disinkronkan saat online.');return;
       }
       d=await request('/pos/sales',{method:'POST',headers:headers(),body:JSON.stringify(payload)});
-      hideModal(); var order=d.order||{}; var change=Number(order.change||0);
-      showModal('<h3>Pembayaran Berhasil</h3><p>Sale '+esc(order.order_number||order.id||'')+' selesai.</p><div class="pos-payment-total">'+money(order.grand_total||total())+'</div><div class="pos-change">Kembalian: '+money(change)+'</div><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-sale-close">Selesai</button><button class="pos-btn" id="pos-sale-print">Cetak Struk</button></div>');
-      $('pos-sale-close').onclick=function(){hideModal();resetSale();}; $('pos-sale-print').onclick=function(){printReceipt(order.id);};
-      loadShift(); loadSales();
+      if(paymentMode==='cash'||d.status==='SETTLED'){hideModal();showPaymentSuccess(d.order||{},Number((d.order||{}).change||0));loadShift();loadSales();}
+      else if(paymentMode==='payment_gateway'){hideModal();showGatewayPending(d);}
+      else if(paymentMode==='qris_static'){hideModal();showStaticQrisPending(d);}
     }catch(e){toast(e.message);}
   }
-
   async function printReceipt(orderId){
     try{
       var d=await request('/pos/orders/'+encodeURIComponent(orderId)+'/receipt',{headers:headers()});
@@ -339,6 +374,7 @@
     bind();
     try{
       if(!await ensureSession())return;
+      await loadPaymentModes();
       await loadTerminal();
       await loadShift();
       await loadMenu();
