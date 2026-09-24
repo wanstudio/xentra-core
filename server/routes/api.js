@@ -5024,7 +5024,7 @@ router.post('/admin/media/gc', requireAuth(['owner', 'brand_manager']), async (r
       orphanGraceDays,
       brandId: req.brand_id
     });
-    res.json({
+    res.status(200).json({
       success: true,
       message: 'Media Garbage Collection selesai.',
       result
@@ -5032,12 +5032,14 @@ router.post('/admin/media/gc', requireAuth(['owner', 'brand_manager']), async (r
   } catch (err) {
     res.status(500).json({
       success: false,
-     // Canonical entity media routes are isolated in server/routes/media-entities.js.
-registerMediaEntityRoutes(router, { db, requireAuth, mediaService, coreBrandRepo });
-err.message, code: 'ENTITY_MEDIA_FETCH_ERROR' });
-    }
+      error: err.message,
+      code: 'GC_ERROR'
+    });
   }
-);
+});
+
+// Canonical entity media routes are isolated in server/routes/media-entities.js.
+registerMediaEntityRoutes(router, { db, requireAuth, mediaService, coreBrandRepo });
 
 // Master catalog CRUD is isolated in server/routes/admin-catalog.js.
 registerAdminCatalogRoutes(router, { db, requireAuth });
