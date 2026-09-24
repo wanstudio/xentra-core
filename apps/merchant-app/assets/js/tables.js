@@ -13,6 +13,7 @@
   var adminFetch = S.adminFetch;
   var getAuthHeaders = S.getAuthHeaders;
   var getStoredUser = S.getStoredUser;
+  var getBMTargetBranchId = window.getBMTargetBranchId;
   var showToast = S.showToast;
 
   var _bmTablesState = {
