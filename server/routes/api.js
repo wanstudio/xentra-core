@@ -8621,6 +8621,8 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
         END ASC,
         o.created_at DESC
     `;
+
+    const limit = req.query.limit ? Math.min(parseInt(req.query.limit, 10), 200) : 100;
     query += ` LIMIT ${limit}`;
 
     if (req.query.offset) {
