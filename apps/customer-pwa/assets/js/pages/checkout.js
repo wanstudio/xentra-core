@@ -4417,6 +4417,7 @@
       table_number: envPayload.topLevel.table_number,
       table_ids: envPayload.topLevel.table_ids,
       reservation_date: envPayload.topLevel.reservation_date,
+      reservation_time: envPayload.topLevel.reservation_time,
       guest_count: envPayload.topLevel.guest_count,
       schedule_type: state.fulfillment.scheduled ? 'scheduled' : 'asap',
       scheduled_slot_start: state.fulfillment.scheduled ? resolveScheduledIso().start : null,
