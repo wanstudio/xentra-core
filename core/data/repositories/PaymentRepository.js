@@ -216,10 +216,12 @@ class PaymentRepository {
 
   findPendingReconciliationPayments() {
     return this.db.queryMany(`
-      SELECT order_id
-      FROM order_payments
-      WHERE payment_status = 'reconciliation_pending'
-      ORDER BY created_at ASC
+      SELECT p.order_id
+      FROM order_payments p
+      JOIN orders o ON o.id = p.order_id
+      WHERE p.payment_status = 'reconciliation_pending'
+        AND o.order_type <> 'reservation'
+      ORDER BY p.created_at ASC
     `);
   }
 
