@@ -8,7 +8,8 @@ process.env.NODE_ENV = 'test';
 const db = require('../../server/database/db');
 const {
   WorkforceService,
-  WorkforceInvitationService
+  WorkforceInvitationService,
+  AuthProviderService
 } = require('../../core/identity');
 
 const ORG_A = 'org_multi_wfm_a';
@@ -152,6 +153,79 @@ test('WF-MULTI-01: one user can be Owner in Business A and Manager in Business B
   assert.equal(loginBAfterDisable.error, 'ACCOUNT_DISABLED');
   assert.equal(loginAAfterDisable.success, true);
   assert.equal(loginAAfterDisable.user.role, 'owner');
+});
+
+
+test('WF-MULTI-01B: Google workforce identity resolves the same user with the target business role', async () => {
+  const workforce = new WorkforceService();
+
+  const userA = workforce.createUser({
+    brand_id: BRAND_A,
+    organization_id: ORG_A,
+    username: 'multi_wfm_google_user',
+    email: 'multi.google@example.test',
+    password: 'Password123!',
+    full_name: 'Multi Google User',
+    role: 'owner',
+    branch_id: BRANCH_A
+  });
+
+  const ownerB = workforce.createUser({
+    brand_id: BRAND_B,
+    organization_id: ORG_B,
+    username: 'multi_wfm_google_owner_b',
+    email: 'owner.google.b@example.test',
+    password: 'Password123!',
+    full_name: 'Business B Google Owner',
+    role: 'owner',
+    branch_id: BRANCH_B
+  });
+
+  const invitationService = new WorkforceInvitationService(db, {
+    async sendTeamInvitation() {}
+  });
+
+  const invitation = await invitationService.createInvitation({
+    actor: {
+      actor_id: ownerB.id,
+      actor_role: 'owner',
+      actor_brand_id: BRAND_B,
+      actor_org_id: ORG_B
+    },
+    email: userA.email,
+    role: 'branch_manager',
+    brand_id: BRAND_B,
+    organization_id: ORG_B,
+    branch_id: BRANCH_B
+  });
+
+  const accepted = invitationService.acceptInvitationWithGoogle({
+    rawToken: invitation.rawToken,
+    verifiedGoogleClaims: {
+      sub: 'google-sub-multi-business-01b',
+      email: userA.email,
+      email_verified: true,
+      name: 'Multi Google User'
+    }
+  });
+
+  assert.equal(accepted.success, true);
+  assert.equal(accepted.user_id, userA.id);
+  assert.equal(accepted.role, 'branch_manager');
+  assert.equal(accepted.brand_id, BRAND_B);
+
+  const authProvider = new AuthProviderService(db);
+  const identityA = authProvider.findIdentity('google', 'google-sub-multi-business-01b', BRAND_A);
+  const identityB = authProvider.findIdentity('google', 'google-sub-multi-business-01b', BRAND_B);
+
+  assert.equal(identityA.userId, userA.id);
+  assert.equal(identityA.user.role, 'owner');
+  assert.equal(identityA.user.brand_id, BRAND_A);
+
+  assert.equal(identityB.userId, userA.id);
+  assert.equal(identityB.user.role, 'branch_manager');
+  assert.equal(identityB.user.brand_id, BRAND_B);
+  assert.equal(identityB.user.branch_id, BRANCH_B);
 });
 
 test('WF-MULTI-02: deleting one business membership preserves the global User identity and other membership', async () => {
