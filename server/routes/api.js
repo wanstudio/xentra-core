@@ -3039,6 +3039,18 @@ router.get('/orders/:id', (req, res) => {
   // It is a DISPLAY timestamp only — the client countdown reaching zero never
   // transitions order state. Status is always fetched from server.
   const acceptanceDeadlineAt = AcceptanceTimeoutService.computeAcceptanceDeadlineAt(order);
+  const isReservationOrder = order.order_type === 'reservation';
+  const reservationDate = isReservationOrder
+    ? String(order.reservation_date || (order.scheduled_slot_start || '').substring(0, 10) || '')
+    : null;
+  const reservationTime = isReservationOrder
+    ? String(order.reservation_time || (order.scheduled_slot_start || '').substring(11, 16) || '')
+    : null;
+  let reservationGuestCount = null;
+  if (isReservationOrder) {
+    const guestMatch = /Reservasi\s*\(\s*(\d+)\s*Tamu/i.exec(String(order.order_note || ''));
+    reservationGuestCount = guestMatch ? Number(guestMatch[1]) : null;
+  }
 
   const safeOrder = {
     id: order.id,
@@ -3046,6 +3058,9 @@ router.get('/orders/:id', (req, res) => {
     status: order.status,
     order_type: order.order_type,
     order_channel: order.order_channel,
+    reservation_date: reservationDate,
+    reservation_time: reservationTime,
+    guest_count: reservationGuestCount,
     table_number: order.table_number,
     subtotal: order.subtotal,
     delivery_fee: order.delivery_fee,
@@ -3143,7 +3158,7 @@ router.get('/customer/orders', requireCustomerAuth(), (req, res) => {
       // Canonical ownership: customer only sees orders explicitly belonging to their customer_id
       orders = db.prepare(`
         SELECT o.id, o.order_number, o.status, o.order_type, o.subtotal, o.delivery_fee, o.discount_amount,
-               o.grand_total, o.payment_method, o.created_at, b.name as branch_name
+               o.grand_total, o.payment_method, o.order_note, o.scheduled_slot_start, o.created_at, b.name as branch_name
         FROM orders o
         JOIN branches b ON b.id = o.branch_id
         WHERE b.brand_id = ? AND o.customer_id = ?
@@ -3163,10 +3178,27 @@ router.get('/customer/orders', requireCustomerAuth(), (req, res) => {
       `).all(req.brand_id, customerPhone);
     }
 
-    const enriched = orders.map(ord => ({
-      ...ord,
-      items: db.prepare('SELECT id, product_name, quantity, unit_price, item_subtotal FROM order_items WHERE order_id = ?').all(ord.id)
-    }));
+    const enriched = orders.map(ord => {
+      let reservationDate = null;
+      let reservationTime = null;
+      let guestCount = null;
+
+      if (ord.order_type === 'reservation') {
+        const scheduled = String(ord.scheduled_slot_start || '');
+        reservationDate = scheduled.substring(0, 10) || null;
+        reservationTime = scheduled.substring(11, 16) || null;
+        const guestMatch = /Reservasi\s*\(\s*(\d+)\s*Tamu/i.exec(String(ord.order_note || ''));
+        guestCount = guestMatch ? Number(guestMatch[1]) : null;
+      }
+
+      return {
+        ...ord,
+        reservation_date: reservationDate,
+        reservation_time: reservationTime,
+        guest_count: guestCount,
+        items: db.prepare('SELECT id, product_name, quantity, unit_price, item_subtotal FROM order_items WHERE order_id = ?').all(ord.id)
+      };
+    });
 
     res.json({ success: true, orders: enriched });
   } catch (err) {
