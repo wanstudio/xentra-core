@@ -205,7 +205,38 @@ Owner, Branch Manager, and Staff with the appropriate permission may configure/e
 - `order_channel` remains separate from `order_type`.
 - Checkout orchestrates the flow but does not own table business logic.
 
-## 13. Explicit Non-Goals / Do Not Invent
+## 13. Locked Scenario Matrix
+
+| # | Scenario | Expected result |
+|---|---|---|
+| 1 | Customer datang → Scan QR → Online | Valid; order diproses sesuai lifecycle. |
+| 2 | Customer datang → Floor Plan → Online | Valid; QR tidak diperlukan. |
+| 3 | Customer datang → Scan QR → Cash | Order masuk Merchant; customer diverifikasi secara operasional. |
+| 4 | Customer datang → Floor Plan → Cash | Order masuk Merchant; customer diverifikasi secara operasional. |
+| 5 | Customer di luar restoran → Floor Plan → Online | Valid; physical presence bukan syarat online payment. |
+| 6 | Customer di luar restoran → Floor Plan → Cash → tidak datang | Merchant menunggu sesuai timeout → Cancel/Reject. |
+| 7 | Customer memilih Table 05 → kemudian mencoba Table 06 sebelum order accepted | Tidak membuat dua konteks aktif; customer harus menyelesaikan/cancel konteks sebelumnya sesuai lifecycle. |
+| 8 | Customer A aktif di Table 05 → Customer B mencoba memakai session A | Reject; session ownership wajib diverifikasi server-side. |
+| 9 | Customer A aktif di Table 05 → mencoba pindah sendiri ke Table 06 | Reject; tidak ada customer self-transfer. |
+| 10 | Customer A membuat banyak order cash dengan banyak akun/meja | Setiap order tetap melalui Merchant acceptance; order cash tanpa customer hadir dapat ditolak/cancel. |
+| 11 | Dua customer bersamaan memilih Table 05 | Server-side concurrency/availability check memastikan tidak ada dua active assignments. |
+| 12 | Customer membayar online lalu tidak datang | Payment tetap valid; Xentra tidak memerlukan proof-of-presence untuk online payment. |
+| 13 | Customer membayar online → Merchant accepts → customer pesan tambahan | Additional order masuk Dining Session yang sama. |
+| 14 | Dining Session sudah completed → customer mencoba order tambahan | Reject; session lama tidak dapat dipakai kembali. |
+| 15 | Customer spam submit order yang sama | Satu order saja melalui idempotency/client transaction ID. |
+| 16 | QR Table 05 dipakai sebagai shortcut oleh customer lain | QR hanya mengidentifikasi Table; authorization/session ownership tetap divalidasi server-side. |
+
+## 14. Fraud Boundary
+
+Fraud control Xentra tidak mencoba membuktikan bahwa setiap customer online benar-benar berada di restoran.
+
+- Online: customer membayar sendiri; physical presence bukan security gate.
+- Cash: Merchant menjadi verification point; customer yang tidak hadir dapat ditolak/cancel.
+- Table: QR/Floor Plan hanya memilih Table; server tetap authoritative.
+- Session: ownership, Branch, Table, lifecycle, dan reuse wajib divalidasi server-side.
+- Customer: satu pending/active Dine-in context per Branch dan satu Table dalam customer flow.
+
+## 15. Explicit Non-Goals / Do Not Invent
 
 Do not invent customer-initiated table transfer workflows, post-start automatic table reassignment, multi-table customer selection, GPS proof-of-presence requirements, or other table lifecycle policies not defined here.
 
