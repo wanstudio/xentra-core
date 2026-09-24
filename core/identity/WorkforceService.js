@@ -142,9 +142,9 @@ class WorkforceService {
       return this.getUser(userId, brandId);
     }
 
-    if (user.membership_status && user.membership_status !== 'active') {
-      throw { status: 403, code: 'ACCOUNT_DISABLED', message: 'Workforce membership is not active.' };
-    }
+    // The resolver returns inactive memberships as context so management
+    // operations such as enableUser() can reactivate them. Authentication and
+    // request authorization enforce active membership separately.
     return user;
   }
 
@@ -287,6 +287,16 @@ class WorkforceService {
     }
 
     this.memberships.removeMembership(targetUserId, brandId);
+
+    // If this was the user's last workforce relationship, clear the legacy
+    // tenant fields so the removed business cannot remain a login target.
+    const remaining = this.memberships.listForUser(targetUserId, { activeOnly: false });
+    if (remaining.length === 0) {
+      this.repository.prepare(
+        'UPDATE users SET brand_id = NULL, organization_id = NULL, branch_id = NULL, updated_at = datetime(\'now\') WHERE id = ?'
+      ).run(targetUserId);
+    }
+
     this.invalidateUserSessions(targetUserId);
 
     // The User remains as the authentication identity so memberships in other
