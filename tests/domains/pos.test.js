@@ -375,6 +375,11 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
     customer: { name: 'Tamu No Show', phone: '0812999999' }
   });
 
+  // Simulate a reservation whose scheduled arrival was more than the
+  // 60-minute no-show grace period ago.
+  db.prepare("UPDATE orders SET scheduled_slot_start = ? WHERE id = ?")
+    .run(new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString().slice(0, 19), overdueRes.order.id);
+
   const cancelResult = PosOrderService.cancelNoShowReservation({
     reservation_order_id: overdueRes.order.id,
     actor_id: 'manager_branch_pos',
