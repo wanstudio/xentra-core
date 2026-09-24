@@ -313,6 +313,7 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
     branch_id: 'branch_pos',
     order_type: PosOrderService.ORDER_TYPES.RESERVATION,
     reservation_date: todayStr,
+    reservation_time: '19:00',
     guest_count: 4,
     customer: { name: 'Tamu Reservasi Hari Ini', phone: '0812345678' }
   });
