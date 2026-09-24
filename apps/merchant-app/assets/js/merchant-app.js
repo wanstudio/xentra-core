@@ -1304,9 +1304,19 @@
       var ordType = ord.order_type || ord.fulfillment_type || 'delivery';
       var typeBadge = (ordType === 'delivery')
         ? '<span class="x-badge x-badge-info">DELIVERY</span>'
-        : (ordType === 'dine_in' ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DINE-IN</span>' : '<span class="x-badge x-badge-warning">PICKUP</span>');
+        : (ordType === 'dine_in'
+          ? '<span class="x-badge" style="background:#ede9fe;color:#6d28d9;">DINE-IN</span>'
+          : (ordType === 'reservation'
+            ? '<span class="x-badge" style="background:#fef3c7;color:#92400e;">RESERVASI</span>'
+            : '<span class="x-badge x-badge-warning">PICKUP</span>'));
 
       var timeStr = (ord.created_at || '').substring(11, 16) || '—';
+      var reservationDate = ord.order_type === 'reservation' ? String(ord.reservation_date || (ord.scheduled_slot_start || '').substring(0, 10) || '') : '';
+      var reservationTime = ord.order_type === 'reservation' ? String(ord.reservation_time || (ord.scheduled_slot_start || '').substring(11, 16) || '') : '';
+      var reservationGuests = ord.order_type === 'reservation' ? Number(ord.guest_count || 0) : 0;
+      var reservationInfo = ord.order_type === 'reservation'
+        ? (esc(reservationDate || '—') + ' • ' + esc(reservationTime || '—') + (reservationGuests ? (' • ' + reservationGuests + ' tamu') : ''))
+        : '';
       var tableInfo = ord.table_number ? ('Meja ' + esc(ord.table_number)) : '—';
       var totalStr = formatMoney(ord.grand_total || ord.subtotal || 0);
 
@@ -1351,7 +1361,14 @@
 
       // --- Actions HTML for Desktop Table ---
       var actionsHtml = '';
-      if (ord.status === 'pending') {
+      if (ordType === 'reservation' && ord.status === 'confirmed') {
+        actionsHtml =
+          '<div style="display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap;">' +
+            '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" onclick="checkInBMReservation(\'' + esc(ord.id) + '\')">Check-in</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px; color:#dc2626; border-color:#fecaca;" onclick="noShowBMReservation(\'' + esc(ord.id) + '\')">No-show</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 8px;" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else if (ord.status === 'pending') {
         actionsHtml =
           '<div style="display:flex; gap:6px; justify-content:flex-end;">' +
             '<button type="button" class="x-btn-primary" style="font-size:11px; padding:4px 8px;" ' + (isAccepting ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(ordType) + '\', this)">' + (isAccepting ? 'Memproses...' : 'Terima') + '</button>' +
@@ -1390,10 +1407,10 @@
       rowsHtml.push(
         '<tr>' +
           '<td><strong>#' + esc(ord.order_number || ord.id.substring(0, 8)) + '</strong></td>' +
-          '<td><small class="text-muted">' + timeStr + '</small></td>' +
+          '<td><small class="text-muted">' + timeStr + '</small>' + (reservationInfo ? '<br><small style="color:#92400e;font-weight:700;">' + reservationInfo + '</small>' : '') + '</td>' +
           '<td><strong>' + esc(ord.customer_name || 'Pelanggan') + '</strong><br><small class="text-muted">' + esc(ord.customer_phone || '—') + '</small></td>' +
           '<td>' + typeBadge + '</td>' +
-          '<td>' + tableInfo + '</td>' +
+          '<td>' + (ordType === 'reservation' ? (reservationGuests ? (reservationGuests + ' tamu') : '—') : tableInfo) + '</td>' +
           '<td><strong>' + totalStr + '</strong></td>' +
           '<td>' + statusCol + '</td>' +
           '<td class="text-right">' + actionsHtml + '</td>' +
@@ -1402,7 +1419,14 @@
 
       // --- Operational Mobile Card HTML ---
       var cardActionsHtml = '';
-      if (ord.status === 'pending') {
+      if (ordType === 'reservation' && ord.status === 'confirmed') {
+        cardActionsHtml =
+          '<div class="bm-order-card-actions">' +
+            '<button type="button" class="x-btn-primary" onclick="checkInBMReservation(\'' + esc(ord.id) + '\')">Check-in</button>' +
+            '<button type="button" class="x-btn-secondary bm-btn-danger" onclick="noShowBMReservation(\'' + esc(ord.id) + '\')">No-show</button>' +
+            '<button type="button" class="x-btn-secondary bm-btn-detail" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>' +
+          '</div>';
+      } else if (ord.status === 'pending') {
         cardActionsHtml =
           '<div class="bm-order-card-actions">' +
             '<button type="button" class="x-btn-primary" ' + (isAccepting ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(ordType) + '\', this)" aria-label="Terima Pesanan #' + esc(ord.order_number || ord.id) + '">' + (isAccepting ? 'Memproses...' : 'Terima') + '</button>' +
@@ -1453,7 +1477,9 @@
             '<div class="bm-order-card-phone">' + esc(ord.customer_phone || '—') + '</div>' +
             '<div class="bm-order-card-badges">' +
               typeBadge +
-              (ord.table_number ? ('<span class="bm-order-card-table">• Meja ' + esc(ord.table_number) + '</span>') : '') +
+              (ordType === 'reservation'
+                ? ('<span class="bm-order-card-table">• ' + reservationInfo + '</span>')
+                : (ord.table_number ? ('<span class="bm-order-card-table">• Meja ' + esc(ord.table_number) + '</span>') : '')) +
             '</div>' +
           '</div>' +
           '<div class="bm-order-card-summary">' +
@@ -1704,6 +1730,68 @@
   }
   window.rejectBMOrder = rejectBMOrder;
 
+  function formatBMReservationDateTime(ord) {
+    var raw = ord && (ord.scheduled_slot_start || '');
+    var date = String(ord && (ord.reservation_date || raw.substring(0, 10)) || '').trim();
+    var time = String(ord && (ord.reservation_time || raw.substring(11, 16)) || '').trim();
+    if (!date) return '—';
+    return date + (time ? ' • ' + time : '');
+  }
+
+  async function checkInBMReservation(orderId) {
+    var tableNumber = prompt('Masukkan nomor meja untuk check-in reservasi:');
+    if (tableNumber === null) return;
+    tableNumber = String(tableNumber).trim();
+    if (!tableNumber) {
+      showToast('Nomor meja wajib diisi.');
+      return;
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/pos/reservations/' + encodeURIComponent(orderId) + '/check-in', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ table_number: tableNumber })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Reservasi #' + orderId + ' berhasil check-in di meja ' + tableNumber + '.');
+        await loadBMOrders({ background: true });
+        viewBMOrderDetail(orderId);
+      } else {
+        showToast('Check-in gagal: ' + (data.error || 'Terjadi kesalahan'));
+        loadBMOrders({ background: true });
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan saat check-in reservasi.');
+    }
+  }
+  window.checkInBMReservation = checkInBMReservation;
+
+  async function noShowBMReservation(orderId) {
+    if (!confirm('Tandai reservasi #' + orderId + ' sebagai NO-SHOW? Ini hanya berhasil setelah jadwal + grace period.')) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/pos/reservations/' + encodeURIComponent(orderId) + '/no-show', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({})
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Reservasi #' + orderId + ' ditandai NO-SHOW.');
+        await loadBMOrders({ background: true });
+        closeBMOrderDetail();
+      } else {
+        showToast('No-show gagal: ' + (data.error || 'Belum melewati grace period'));
+        loadBMOrders({ background: true });
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan saat memproses no-show.');
+    }
+  }
+  window.noShowBMReservation = noShowBMReservation;
+
   async function viewBMOrderDetail(orderId) {
     _bmOrdersState.currentDetailOrderId = orderId;
     var listView = $('bm-orders-list-view');
@@ -1744,6 +1832,16 @@
       if ($('bm-detail-cust-phone')) $('bm-detail-cust-phone').textContent = ord.customer_phone || '—';
       if ($('bm-detail-fulfillment-badge')) $('bm-detail-fulfillment-badge').textContent = ordType.toUpperCase();
       if ($('bm-detail-order-time')) $('bm-detail-order-time').textContent = ord.created_at ? new Date(ord.created_at).toLocaleString('id-ID') : '—';
+      var reservationRow = $('bm-detail-reservation-row');
+      if (reservationRow) {
+        if (ordType === 'reservation') {
+          reservationRow.style.display = 'block';
+          if ($('bm-detail-reservation-datetime')) $('bm-detail-reservation-datetime').textContent = formatBMReservationDateTime(ord);
+          if ($('bm-detail-reservation-guests')) $('bm-detail-reservation-guests').textContent = Number(ord.guest_count || 0) + ' tamu';
+        } else {
+          reservationRow.style.display = 'none';
+        }
+      }
       if ($('bm-detail-order-notes')) $('bm-detail-order-notes').textContent = ord.notes || ord.order_notes || '—';
 
       var tableRow = $('bm-detail-table-row');
@@ -1845,7 +1943,11 @@
       // Top action buttons in detail
       var topActions = $('bm-detail-actions-top');
       if (topActions) {
-        if (ord.status === 'pending') {
+        if (ordType === 'reservation' && ord.status === 'confirmed') {
+          topActions.innerHTML =
+            '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" onclick="checkInBMReservation(\'' + esc(ord.id) + '\');">Check-in Reservasi</button>' +
+            '<button type="button" class="x-btn-secondary" style="font-size:13px; padding:6px 14px; color:#dc2626; border-color:#fecaca;" onclick="noShowBMReservation(\'' + esc(ord.id) + '\');">No-show</button>';
+        } else if (ord.status === 'pending') {
           var isAccepting = !!_bmOrdersState.inFlightAccept[ord.id];
           topActions.innerHTML =
             '<button type="button" class="x-btn-primary" style="font-size:13px; padding:6px 14px;" ' + (isAccepting ? 'disabled' : '') + ' onclick="advanceBMOrderStatus(\'' + esc(ord.id) + '\', \'pending\', \'' + esc(ordType) + '\', this);">Terima Pesanan</button>' +
