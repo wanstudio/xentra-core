@@ -22,8 +22,8 @@
             <span id="pos-client-logo-letter" class="pos-bangjo-letter">B</span>
           </div>
           <div class="pos-brand-meta">
-            <span class="pos-brand-name" id="pos-branch-name">Memuat Cabang…</span>
-            <span class="pos-pos-tag">Kasir POS</span>
+            <span class="pos-brand-name">Kasir POS</span>
+            <span class="pos-branch-subtitle" id="pos-branch-name">Memuat Cabang…</span>
           </div>
         </div>
 
@@ -96,7 +96,13 @@
                 <span id="pos-menu-stats" class="pos-menu-stats">Katalog</span>
               </div>
               <div class="pos-pane-actions">
-                <button type="button" class="pos-btn ghost small" id="btn-pos-refresh-menu" title="Muat ulang menu">↻ Refresh</button>
+                <button type="button" class="pos-btn ghost small pos-btn-refresh" id="btn-pos-refresh-menu" title="Muat ulang menu">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                  </svg>
+                  <span>Refresh</span>
+                </button>
               </div>
             </div>
 
@@ -108,7 +114,7 @@
               </div>
 
               <div id="pos-table-context" class="pos-context-strip">
-                <div><strong>Meja</strong><span id="pos-selected-table">Belum dipilih</span></div>
+                <div class="pos-table-context-info"><strong>Meja:</strong> <span id="pos-selected-table">Belum dipilih</span></div>
                 <button type="button" class="pos-btn small" id="btn-pos-select-table">Pilih Meja</button>
               </div>
             </div>
