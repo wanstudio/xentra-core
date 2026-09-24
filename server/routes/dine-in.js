@@ -123,7 +123,7 @@ router.get('/dine-in/tables/:id/qr', requireAuth(['owner', 'brand_manager', 'bra
 
     let token = table.qr_token;
     if (!token) {
-      const { DiningTableService } = require('../../domains/pos');
+      const { DiningTableService } = require('../../domains/dining');
       token = DiningTableService.regenerateQrToken(table.id).qr_token;
     }
 
