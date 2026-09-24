@@ -30,6 +30,16 @@ class BranchRepository {
     `, [brandId]);
   }
 
+  findBranchReservationSettings(branchId) {
+    return this.db.queryOne(`
+      SELECT
+        b.id as branch_id,
+        b.reservation_max_guests
+      FROM branches b
+      WHERE b.id = ?
+    `, [branchId]);
+  }
+
   findBranchDeliverySettings(branchId) {
     return this.db.queryOne(`
       SELECT
