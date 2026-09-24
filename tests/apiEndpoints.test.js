@@ -677,6 +677,34 @@ test('API Marketing banner routes: implementation is isolated from api.js', () =
     'shared media delivery helper must remain available to public/promotions routes');
 });
 
+test('API reporting and finance routes: implementations are isolated from api.js', () => {
+  const api = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const reporting = fs.readFileSync(require.resolve('../server/routes/admin-reporting'), 'utf8');
+  const finance = fs.readFileSync(require.resolve('../server/routes/admin-finance'), 'utf8');
+
+  for (const route of [
+    "router.get('/admin/analytics/summary'",
+    "router.get('/admin/overview'",
+    "router.get('/reports/:report_type'",
+    "router.get('/admin/customers'",
+    "router.get('/admin/customers/:id'"
+  ]) {
+    assert.ok(reporting.includes(route), route + ' must live in admin-reporting.js');
+    assert.equal(api.includes(route), false, route + ' must not remain inline in api.js');
+  }
+
+  for (const route of [
+    "router.get('/admin/finance/overview'",
+    "router.get('/admin/finance/transactions'",
+    "router.get('/admin/finance/reconciliation'",
+    "router.get('/admin/finance/payment-methods'",
+    "router.put('/admin/finance/payment-methods'"
+  ]) {
+    assert.ok(finance.includes(route), route + ' must live in admin-finance.js');
+    assert.equal(api.includes(route), false, route + ' must not remain inline in api.js');
+  }
+});
+
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
     method: 'POST',
