@@ -13,6 +13,7 @@ const {
   capabilities
 } = require('../../domains/pos');
 const { domain, events } = require('../../core');
+const DiningTableService = require('../../domains/dining/services/DiningTableService');
 
 // Seed test context
 test.before(() => {
@@ -20,6 +21,8 @@ test.before(() => {
     db.prepare(`INSERT OR IGNORE INTO organizations (id, name, slug) VALUES ('org_pos', 'Holding POS', 'org-pos')`).run();
     db.prepare(`INSERT OR IGNORE INTO brands (id, organization_id, name, slug) VALUES ('brand_pos', 'org_pos', 'Brand POS', 'brand-pos')`).run();
     db.prepare(`INSERT OR IGNORE INTO branches (id, brand_id, name, slug, whatsapp_number, address_text, latitude, longitude) VALUES ('branch_pos', 'brand_pos', 'Cabang POS', 'cabang-pos', '62812345678', 'Jl. Kasir', -7.25, 112.75)`).run();
+    db.prepare(`INSERT OR IGNORE INTO branch_tables (id, branch_id, table_number, label, capacity, qr_token, is_active) VALUES ('tbl_pos_12', 'branch_pos', '12', 'Meja 12', 4, 'qr-pos-12', 1)`).run();
+    db.prepare(`INSERT OR IGNORE INTO branch_table_states (table_id, operational_state, current_session_id, updated_at) VALUES ('tbl_pos_12', 'available', NULL, datetime('now'))`).run();
     db.prepare(`INSERT OR IGNORE INTO categories (id, brand_id, name, slug) VALUES ('cat_pos', 'brand_pos', 'Makanan POS', 'makanan-pos')`).run();
 
     db.prepare(`
@@ -357,6 +360,10 @@ test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day re
   assert.strictEqual(dbOrder.order_type, 'dine_in');
   assert.strictEqual(dbOrder.table_number, '12');
   assert.strictEqual(dbOrder.status, 'active_table');
+
+  // Clean up the active dining context so this regression fixture does not
+  // contaminate later POS tests.
+  DiningTableService.completeDiningSession(checkInResult.order.dining_session_id, 'test');
 
   // 5. No-Show Grace Period Exceeded: Manager Cancels Overdue Reservation
   const overdueRes = await PosOrderService.settleOrder({
