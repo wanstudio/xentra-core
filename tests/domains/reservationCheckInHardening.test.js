@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const db = require('../../server/database/db');
-const { DiningTableService } = require('../../domains/pos');
+const { DiningTableService } = require('../../domains/dining');
 
 const ORG_ID = 'org_res_checkin_hardening';
 const BRAND_ID = 'brand_res_checkin_hardening';
