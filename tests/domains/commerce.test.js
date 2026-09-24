@@ -283,6 +283,7 @@ test('Commerce 7 — Reservation: rejects same-day reservation and accepts futur
     branch_id: 'branch_test',
     order_type: 'reservation',
     reservation_date: todayStr,
+    reservation_time: '19:00',
     guest_count: 5,
     customer: { name: 'Rombongan Dadakan', phone: '0812345678' },
     items: [
