@@ -23,6 +23,8 @@ const HARI_INI_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/hari-ini.j
 const JAM_OPERASIONAL_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/jam-operasional.js');
 const REPORTS_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/reports.js');
 const TABLES_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/tables.js');
+const CONTEXT_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/context.js');
+const MENU_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/menu.js');
 const SHARED_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/shared.js');
 const BRANCH_CATALOG_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/branch-catalog.js');
 
@@ -63,6 +65,8 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
 
     win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(CONTEXT_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(MENU_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(HARI_INI_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(JAM_OPERASIONAL_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(REPORTS_JS_PATH, 'utf8'));
@@ -110,12 +114,48 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(html.includes('/merchant-shared/css/dashboard.css'), 'must load the shared surface stylesheet');
     assert.ok(html.includes('/merchant-shared/js/shared.js'), 'must load shared.js');
     assert.ok(html.includes('/merchant-shared/js/branch-catalog.js'), 'must load branch-catalog.js');
+    assert.ok(html.includes('/merchant-app/assets/js/context.js'), 'must load context.js');
+    assert.ok(html.includes('/merchant-app/assets/js/menu.js'), 'must load menu.js');
     assert.ok(html.includes('/merchant-app/assets/js/hari-ini.js'), 'must load hari-ini.js');
     assert.ok(html.includes('/merchant-app/assets/js/jam-operasional.js'), 'must load jam-operasional.js');
     assert.ok(html.includes('/merchant-app/assets/js/reports.js'), 'must load reports.js');
     assert.ok(html.includes('/merchant-app/assets/js/tables.js'), 'must load tables.js');
     assert.ok(html.includes('/merchant-app/assets/js/orders.js'), 'must load orders.js');
     assert.ok(html.includes('/merchant-app/assets/js/merchant-app.js'), 'must load merchant-app.js');
+  });
+
+  await t.test('2f. Menu module owns menu state/controller and tables consume shared branch context', () => {
+    const js = fs.readFileSync(JS_PATH, 'utf8');
+    const menuJs = fs.readFileSync(MENU_JS_PATH, 'utf8');
+    const tablesJs = fs.readFileSync(TABLES_JS_PATH, 'utf8');
+    const contextJs = fs.readFileSync(CONTEXT_JS_PATH, 'utf8');
+
+    for (const name of [
+      'loadBMMenu',
+      'updateBMMenuStats',
+      'onBMMenuFilterChange',
+      'setBMMenuCategoryFilter',
+      'renderBMMenuCategoriesBar',
+      'renderBMMenuTable',
+      'toggleBMProductAvailability',
+      'updateBMAddCatalogFooter',
+      'renderBMAddCatalogList',
+      'saveBMBranchCategoryOrder'
+    ]) {
+      const count = (menuJs.match(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\(', 'g')) || []).length;
+      assert.equal(count, 1, name + ' must have exactly one implementation in menu.js');
+      assert.ok(!js.includes('function ' + name + '(') && !js.includes('async function ' + name + '('),
+        name + ' must not be implemented in merchant-app.js');
+    }
+
+    assert.ok(menuJs.includes('var _bmMenuState = {'), '_bmMenuState must live in menu.js');
+    assert.ok(!js.includes('var _bmMenuState = {'), '_bmMenuState must not live in merchant-app.js');
+    assert.ok(contextJs.includes('window.getBMTargetBranchId = getBMTargetBranchId;'),
+      'branch context resolver must be exported explicitly');
+    assert.ok(tablesJs.includes('getBMTargetBranchId()'),
+      'tables module must use the shared branch context resolver');
+    assert.ok(!tablesJs.includes('function getBMTargetBranchId()'),
+      'tables module must not own the shared branch context resolver');
   });
 
   await t.test('2e. Tables module is the canonical implementation', () => {
