@@ -16,6 +16,7 @@ const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashb
 const CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/dashboard.css');
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
 const CROP_EDITOR_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/crop-editor.js');
+const CATALOG_CLIENT_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/catalog-client.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/branch-catalog-ui.js');
 const SHARED_CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/shared.css');
 
@@ -321,6 +322,7 @@ test('MEDIA SYSTEM M2 — CROP / IMAGE EDITOR UI & DOMAIN SUITE', async (t) => {
     // shared.js owns auth/utilities; crop-editor.js owns the reusable crop UI primitive.
     win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(CROP_EDITOR_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(CATALOG_CLIENT_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
     const js = fs.readFileSync(JS_PATH, 'utf8');
     win.eval(js);
