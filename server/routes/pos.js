@@ -364,10 +364,14 @@ router.get('/pos/shifts/current', requireAuth(['owner', 'brand_manager', 'branch
       ORDER BY opened_at DESC LIMIT 1
     `).get(targetCashierId, userBranchId);
 
+    let activeBreak=null;
+    if (shift) {
+      activeBreak=db.prepare(`SELECT * FROM pos_shift_breaks WHERE shift_id=? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1`).get(shift.id) || null;
+    }
     res.json({
       success: true,
       has_active_shift: !!shift,
-      shift: shift || null
+      shift: shift ? Object.assign({}, shift, { active_break: activeBreak }) : null
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -449,6 +453,30 @@ router.post('/pos/shifts/open', requireAuth(['owner', 'brand_manager', 'branch_m
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
+});
+
+router.post('/pos/shifts/:id/break/start', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const shiftId=req.params.id, cashierId=req.user.id || req.user.userId;
+    const shift=db.prepare(`SELECT s.*, b.brand_id FROM pos_shifts s JOIN branches b ON b.id=s.branch_id WHERE s.id=? AND b.brand_id=?`).get(shiftId, req.brand_id);
+    if (!shift) return res.status(404).json({success:false,error:'Shift tidak ditemukan pada brand ini.'});
+    if (req.user.role==='cashier' && (shift.cashier_id!==cashierId || ((req.user.branch_id||req.user.branchId) && shift.branch_id!==(req.user.branch_id||req.user.branchId)))) return res.status(403).json({success:false,error:'Akses ditolak.'});
+    const {PosShiftService}=require('../../domains/pos');
+    const breakRecord=PosShiftService.startBreak({shift_id:shiftId,actor_id:cashierId,actor_role:req.user.role});
+    res.status(201).json({success:true,message:'Istirahat dimulai.',break:breakRecord});
+  } catch(err){ res.status(400).json({success:false,error:err.message}); }
+});
+
+router.post('/pos/shifts/:id/break/end', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const shiftId=req.params.id, cashierId=req.user.id || req.user.userId;
+    const shift=db.prepare(`SELECT s.*, b.brand_id FROM pos_shifts s JOIN branches b ON b.id=s.branch_id WHERE s.id=? AND b.brand_id=?`).get(shiftId, req.brand_id);
+    if (!shift) return res.status(404).json({success:false,error:'Shift tidak ditemukan pada brand ini.'});
+    if (req.user.role==='cashier' && (shift.cashier_id!==cashierId || ((req.user.branch_id||req.user.branchId) && shift.branch_id!==(req.user.branch_id||req.user.branchId)))) return res.status(403).json({success:false,error:'Akses ditolak.'});
+    const {PosShiftService}=require('../../domains/pos');
+    const breakRecord=PosShiftService.endBreak({shift_id:shiftId,actor_id:cashierId,actor_role:req.user.role});
+    res.json({success:true,message:'Istirahat selesai.',break:breakRecord});
+  } catch(err){ res.status(400).json({success:false,error:err.message}); }
 });
 
 router.post('/pos/shifts/:id/cash-movement', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
