@@ -188,6 +188,10 @@ class PaymentGatewayService {
     let payment = paymentRepository.findPaymentByOrderId(orderId);
     const order = paymentRepository.findOrder(orderId);
 
+    if (order && order.order_type === 'reservation') {
+      throw new Error('[PaymentGatewayService] PAYMENT_NOT_APPLICABLE: Reservation webhook/payment lifecycle is not supported.');
+    }
+
     const branchId = webhookData._branch_id || (order && order.branch_id);
     const brandId = webhookData._brand_id || (order && order.brand_id);
     const config = this.resolvePaymentConfig(branchId, brandId);
