@@ -6,7 +6,7 @@
  */
 
 const crypto = require('crypto');
-const { DiningTableRepository, OrderRepository } = require('../../../core/data/repositories');
+const { DiningTableRepository, OrderRepository, BranchRepository } = require('../../../core/data/repositories');
 const Template01 = require('../templates/Template01');
 
 const HOLD_DURATION_MINUTES = 15;
@@ -28,6 +28,7 @@ const HOLD_DURATION_MINUTES = 15;
 const ROTATE_TABLE_QR_ON_SESSION_CLOSE = false;
 const repository = new DiningTableRepository();
 const orderRepository = new OrderRepository();
+const branchRepository = new BranchRepository();
 
 class DiningTableService {
   static initializeBranchLayout(branchId, templateId = 'template_01') {
@@ -282,6 +283,23 @@ class DiningTableService {
     const todayStr = today.toISOString().slice(0, 10);
     if (resDateStr <= todayStr) return { success: false, status: 'SAME_DAY_RESERVATION_REJECTED', errors: ['Reservasi hari yang sama tidak diperbolehkan. Minimum reservasi adalah untuk besok atau tanggal setelahnya.'] };
     if (!branch_id) return { success: false, status: 'VALIDATION_ERROR', errors: ['Cabang tujuan (branch_id) wajib dipilih untuk melakukan reservasi meja.'] };
+
+    // Server-side mirror of the branch-configured reservation guest limit.
+    // The customer UI is only a presentation/validation aid; a direct API
+    // caller can still submit a larger guest_count.
+    const branchReservationSettings = branchRepository.findBranchReservationSettings(branch_id);
+    if (!branchReservationSettings) {
+      return { success: false, status: 'BRANCH_NOT_FOUND', errors: ['Cabang tujuan (branch_id) tidak ditemukan.'] };
+    }
+    const maxGuests = Number(branchReservationSettings.reservation_max_guests);
+    if (Number.isFinite(maxGuests) && maxGuests > 0 && parsedGuestCount > maxGuests) {
+      return {
+        success: false,
+        status: 'RESERVATION_GUEST_CAPACITY_EXCEEDED',
+        errors: ['Jumlah tamu (' + parsedGuestCount + ') melebihi kapasitas reservasi cabang (' + maxGuests + ' orang).']
+      };
+    }
+
     const orderId = `ord_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
     const orderNumber = `RES-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
