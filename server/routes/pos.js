@@ -577,6 +577,21 @@ router.post('/pos/offline-sync/batch', requireAuth(['owner', 'brand_manager', 'b
   }
 });
 
+
+// Cashier can only inspect the terminal bound to their own branch.
+// Registration remains a Manager/Owner administrative capability.
+router.get('/pos/terminal/current', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const { PosLocalOperationService } = require('../../domains/pos');
+    const terminal = PosLocalOperationService.getActiveTerminal(branchId);
+    res.json({ success: true, terminal: terminal || null, registered: !!terminal });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 9.4 POS Phase 1: Local Operational Foundation Endpoints
 router.post('/pos/terminal/register', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
   try {
