@@ -1,7 +1,7 @@
 /**
  * XENTRA CORE — MERCHANT APP BRANCH CATALOG UI
  *
- * Branch Manager catalog UI. Data/transport operations are delegated to
+ * Branch Manager UI only. API/data transport is provided by
  * merchant-shared/js/catalog-client.js.
  */
 (function () {
@@ -26,6 +26,9 @@
     return !!(user && user.role === 'branch_manager');
   }
 
+  window.toggleBranchProductAvailability = async function (productId, nextAvail) {
+    if (!currentManagingBranchId) return;
+    try {
       var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
         method: 'PATCH',
                 body: JSON.stringify({ is_available: nextAvail })
@@ -298,8 +301,8 @@
           if (typeof hooks.refreshBMMenu === 'function') hooks.refreshBMMenu();
           if (typeof loadInlineBranchCatalog === 'function') loadInlineBranchCatalog();
         } else {
-        loadInlineBranchCatalog();
-      }
+          loadInlineBranchCatalog();
+        }
       } else {
         showToast('❌ ' + (data.message || data.error || 'Gagal menyimpan perubahan.'));
       }
@@ -339,6 +342,147 @@
 
     try {
       var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/categories', {
+        method: 'POST',
+                body: JSON.stringify({ name: name.trim() })
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('✅ Kategori cabang berhasil dibuat!');
+        loadInlineBranchCatalog();
+      } else {
+        showToast('❌ ' + (data.error || 'Gagal membuat kategori cabang.'));
+      }
+    } catch (err) {
+      showToast('❌ Kesalahan jaringan.');
+    }
+  };
+
+  // Adopt Product Modal Actions
+  window.openAdoptModal = function (productId) {
+    if (!currentBranchCatalogData) return;
+    var p = currentBranchCatalogData.available_master_products.find(function (x) { return String(x.id) === String(productId); });
+    if (!p) return;
+
+    var resolvedBranchId = currentManagingBranchId ||
+      (typeof getActiveBranchId === 'function' ? getActiveBranchId() : null) ||
+      (typeof getEffectiveBranchId === 'function' ? getEffectiveBranchId() : null);
+    if (resolvedBranchId) {
+      currentManagingBranchId = resolvedBranchId;
+    }
+
+    $('adopt-product-id').value = p.id;
+    $('adopt-product-name').value = p.name;
+    $('adopt-pricing-mode').value = p.pricing_mode || 'lock';
+    $('adopt-min-price').value = p.min_price || p.price;
+    $('adopt-max-price').value = p.max_price || p.price;
+
+    var isRange = p.pricing_mode === 'range';
+    var priceInput = $('adopt-price');
+    var priceHint = $('adopt-price-hint');
+
+    if (isRange) {
+      priceInput.readOnly = false;
+      priceInput.value = p.price;
+      priceInput.min = p.min_price;
+      priceInput.max = p.max_price;
+      priceHint.innerHTML = '💡 <strong>Range Harga Fleksibel:</strong> Cabang diizinkan menentukan harga antara <strong>' + formatMoney(p.min_price) + '</strong> s/d <strong>' + formatMoney(p.max_price) + '</strong>.';
+    } else {
+      priceInput.readOnly = true;
+      priceInput.value = p.price;
+      priceHint.innerHTML = '🔒 <strong>Harga Terkunci:</strong> Ditetapkan paten oleh Pemilik Resto (Owner) sebesar <strong>' + formatMoney(p.price) + '</strong>.';
+    }
+
+    // Populate branch categories
+    var catSelect = $('adopt-branch-category');
+    var cats = currentBranchCatalogData.categories || [];
+    var catOptions = cats.map(function (c) {
+      return '<option value="' + c.id + '">' + esc(c.name) + '</option>';
+    });
+    catOptions.unshift('<option value="">(Otomatis sesuaikan kategori produk)</option>');
+    catSelect.innerHTML = catOptions.join('');
+
+    $('modal-adopt-product').style.display = 'flex';
+  };
+
+  window.closeAdoptModal = function () {
+    $('modal-adopt-product').style.display = 'none';
+  };
+
+  // Form Adopt Submit Listener
+  var formAdopt = $('form-adopt-product');
+  if (formAdopt) {
+    formAdopt.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var targetBranchId = currentManagingBranchId ||
+        (typeof getActiveBranchId === 'function' ? getActiveBranchId() : null) ||
+        (typeof getEffectiveBranchId === 'function' ? getEffectiveBranchId() : null);
+      if (!targetBranchId) {
+        showToast('❌ Cabang tidak valid atau belum dipilih.');
+        return;
+      }
+      currentManagingBranchId = targetBranchId;
+
+      var btn = $('btn-save-adopt');
+      btn.disabled = true;
+      btn.textContent = 'Menyimpan...';
+
+      var prodId = $('adopt-product-id').value;
+      var catId = $('adopt-branch-category').value;
+      var priceVal = Number($('adopt-price').value);
+
+      try {
+        var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/adopt', {
+          method: 'POST',
+                    body: JSON.stringify({
+            product_id: prodId,
+            branch_category_id: catId || undefined,
+            price: priceVal
+          })
+        });
+        var data = await res.json();
+        if (data.success) {
+          showToast('✅ Menu berhasil diadopsi ke cabang!');
+          window.closeAdoptModal();
+          // Refresh the correct panel depending on role/view
+          if (isBranchManager()) {
+            if (typeof hooks.refreshBMMenu === 'function') hooks.refreshBMMenu();
+            if (typeof loadInlineBranchCatalog === 'function') loadInlineBranchCatalog();
+          } else {
+            loadInlineBranchCatalog();
+          }
+        } else {
+          showToast('❌ ' + (data.message || data.error || 'Gagal mengadopsi produk.'));
+        }
+      } catch (err) {
+        showToast('❌ Kesalahan jaringan.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Simpan ke Katalog Cabang';
+      }
+    });
+  }
+
+  /* ==========================================================================
+     BRANCH CATALOG INLINE PANEL + BRANCH CATEGORY MODAL (shared with Branch Manager)
+     ========================================================================== */
+
+  /* =========================================================================
+     MODUL 3.2: BRANCH CATALOG INLINE PANEL
+     (Used when role = branch_manager — renders directly in tab-catalog)
+     ========================================================================= */
+
+  var branchCatalogFilter = 'all'; // active branch category filter ('all' or catId)
+
+  function getActiveBranchId() {
+    if (currentManagingBranchId) return currentManagingBranchId;
+    if (currentBranchCatalogData && currentBranchCatalogData.branch && currentBranchCatalogData.branch.id) {
+      return currentBranchCatalogData.branch.id;
+    }
+    if (_bceCurrentCat && _bceCurrentCat.branch_id) {
+      return _bceCurrentCat.branch_id;
+    }
+    var user = getStoredUser();
+    if (user && user.branch_id) return user.branch_id;
     return null;
   }
 
