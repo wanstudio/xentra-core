@@ -2,9 +2,8 @@
  * Xentra Commerce Domain Unified Module Entry
  */
 const { domain } = require('../../core');
-const PricingPolicyModel = require('./models/PricingPolicyModel');
+const { CatalogService, PricingPolicyModel } = require('../catalog');
 const LowStockThresholdModel = require('./models/LowStockThresholdModel');
-const CatalogService = require('./services/CatalogService');
 const PrePaymentVerificationGate = require('./services/PrePaymentVerificationGate');
 const OrderPlacementService = require('./services/OrderPlacementService');
 
@@ -55,6 +54,7 @@ module.exports = {
   identity: COMMERCE_IDENTITY,
   capabilities: COMMERCE_CAPABILITIES,
   registration,
+  // @deprecated compatibility exports; use require('../catalog') instead.
   PricingPolicyModel,
   LowStockThresholdModel,
   CatalogService,
