@@ -264,9 +264,9 @@ describe('Phase 9 — Branch Manager Order Operations', () => {
     });
 
     assert.equal(pendingFirst.status, 200);
-    assert.equal(pendingFirst.orders.length, 1);
-    assert.equal(pendingFirst.data, undefined);
-    assert.equal(pendingFirst.data, undefined);
+    assert.equal(pendingFirst.data.orders.length, 1);
+    assert.equal(pendingFirst.data.orders[0].id, pending.orderId,
+      'pending operational work must remain ahead of upcoming reservations');
   });
 
   // P9-02: Cross-branch order visibility denied
