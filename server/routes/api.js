@@ -2212,6 +2212,37 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     const orderNumber = order.order_number;
     const subtotal = order.subtotal;
 
+    // Reservation is a booking, not a purchase. It must never enter table-hold
+    // or online-payment gateway resolution, even if a malicious/stale client
+    // sends payment_method=doku/midtrans.
+    if (order_type === 'reservation') {
+      return res.status(201).json({
+        success: true,
+        order_id: orderId,
+        order_number: orderNumber,
+        grand_total: 0,
+        subtotal: 0,
+        delivery_fee: 0,
+        discount_amount: 0,
+        cash_tendered: null,
+        payment: {
+          method: null,
+          cash_tendered: null,
+          expected_change: null,
+          snap_token: null,
+          redirect_url: null
+        },
+        snap_token: null,
+        redirect_url: null,
+        redirect: '/order-received/' + orderId,
+        order: {
+          ...order,
+          order_type: 'reservation',
+          payment_method: null
+        }
+      });
+    }
+
     // 4a. Dine-in Table Hold for Payment / Acceptance Stage (15-minute hold)
     // Baseline Business Flow:
     // Customer -> QR / Floor Plan -> 1 Table -> Order (Hold Table / Pending) -> Merchant Accept -> Active Dining Session
