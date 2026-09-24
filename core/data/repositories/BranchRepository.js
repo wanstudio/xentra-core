@@ -40,6 +40,14 @@ class BranchRepository {
     `, [branchId]);
   }
 
+  findBranchTimezone(branchId) {
+    const row = this.db.queryOne(
+      'SELECT timezone FROM branches WHERE id = ?',
+      [branchId]
+    );
+    return row && row.timezone ? row.timezone : 'Asia/Jakarta';
+  }
+
   findBranchDeliverySettings(branchId) {
     return this.db.queryOne(`
       SELECT
