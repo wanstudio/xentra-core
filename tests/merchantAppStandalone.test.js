@@ -29,6 +29,7 @@ const STOCK_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/stock.js');
 const PROMOTIONS_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/promotions.js');
 const STAFF_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/staff.js');
 const SHARED_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/shared.js');
+const CATALOG_CLIENT_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/catalog-client.js');
 const BRANCH_CATALOG_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/branch-catalog-ui.js');
 
 const BM_ROUTES = [
@@ -67,6 +68,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     win.clearInterval = function (id) { active.delete(id); return origClearInterval(id); };
 
     win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(CATALOG_CLIENT_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(CONTEXT_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(MENU_JS_PATH, 'utf8'));
@@ -408,7 +410,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
       validateServerSession: () => {},
       enforceSurface: () => {}
     };
-    win.XentraBranchCatalog = {
+    win.XentraMerchantBranchCatalog = {
       getActiveBranchId: () => 'branch-test',
       loadInlineBranchCatalog: () => {},
       setHooks: () => {},
@@ -463,6 +465,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     win.confirm = function () { return confirmAnswer; };
 
     win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(CATALOG_CLIENT_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(JS_PATH, 'utf8'));
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
