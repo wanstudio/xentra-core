@@ -162,4 +162,6 @@ However, it must **not** be read as redefining the `branch_products.stock` field
 
 For the current ready-to-sell product model, order acceptance is the stock-decrease boundary defined above.
 
+**Notion locked decision:** https://app.notion.com/p/3e51ae1e12b181ca8dc3dde84ecf9585?pvs=204
+
 **Git source of this lock:** https://github.com/wanstudio/xentra-core
