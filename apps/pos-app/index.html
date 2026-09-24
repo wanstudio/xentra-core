@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#111827">
   <title>Xentra POS — Kasir</title>
-  <link rel="stylesheet" href="/pos/assets/css/pos.css?v=1.0.3">
+  <link rel="stylesheet" href="/pos/assets/css/pos.css?v=1.0.4">
 </head>
 <body>
   <div class="pos-shell">
@@ -28,7 +28,7 @@
             <div class="pos-pane-head">
               <div>
                 <h1>Kasir</h1>
-                <p>Pilih menu, atur pesanan, lalu selesaikan pembayaran dengan Cash, Payment Gateway, atau QRIS Statis.</p>
+                <p>Untuk Dine-in, meja dan menu adalah satu konteks transaksi. Pilih meja dulu atau tambahkan menu dulu—keduanya tetap menjadi satu pesanan.</p>
               </div>
               <button type="button" class="pos-btn ghost" id="btn-pos-refresh-menu">↻</button>
             </div>
@@ -39,7 +39,7 @@
               <button data-type="delivery">Delivery</button>
             </div>
 
-            <div id="pos-table-context" class="pos-context-strip hidden">
+            <div id="pos-table-context" class="pos-context-strip">
               <div><strong>Meja</strong><span id="pos-selected-table">Belum dipilih</span></div>
               <button type="button" class="pos-btn small" id="btn-pos-select-table">Pilih Meja</button>
             </div>
@@ -142,6 +142,6 @@
   </div>
   <div id="pos-toast" class="pos-toast"></div>
 
-  <script src="/pos/assets/js/pos-app.js?v=1.0.3"></script>
+  <script src="/pos/assets/js/pos-app.js?v=1.0.4"></script>
 </body>
 </html>
