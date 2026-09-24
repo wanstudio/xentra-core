@@ -311,7 +311,7 @@ class PaymentGatewayService {
             // If the order has already been operationally accepted, ensure session is created/attached.
             if (order.status === 'confirmed') {
               try {
-                const { DiningTableService } = require('../../pos');
+                const { DiningTableService } = require('../../dining');
                 let tableIds = [];
                 const activeHold = diningTableRepository.findActiveHolds(order.id);
                 if (activeHold && activeHold.length > 0) tableIds = activeHold.map(h => h.table_id);
@@ -344,7 +344,7 @@ class PaymentGatewayService {
           PromotionEngineService.voidRedemptions({ order_id: orderId, reason: `Gateway status ${newPaymentStatus}` });
           if (order && order.order_type === 'dine_in') {
             try {
-              const { DiningTableService } = require('../../pos');
+              const { DiningTableService } = require('../../dining');
               DiningTableService.releaseHold({ branch_id: order.branch_id, hold_reference_id: order.id, reason: newPaymentStatus });
             } catch (_) {}
           }
