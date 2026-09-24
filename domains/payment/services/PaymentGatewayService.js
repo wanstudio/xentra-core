@@ -128,6 +128,9 @@ class PaymentGatewayService {
   }
 
   static async createSnapTransaction(order, items = [], customer = {}) {
+    if (order && order.order_type === 'reservation') {
+      throw new Error('[PaymentGatewayService] PAYMENT_NOT_APPLICABLE: Reservation is a booking and must not create an online payment transaction.');
+    }
     const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
     const activeProvider = this._resolveProvider(config);
     const provider = (order.payment_method && order.payment_method !== 'cash')
@@ -384,6 +387,9 @@ class PaymentGatewayService {
     const payment = paymentRepository.findPaymentByOrderId(order_id);
     const order = paymentRepository.findOrder(order_id);
     if (!order) throw new Error(`[PaymentGatewayService] Order "${order_id}" tidak ditemukan.`);
+    if (order.order_type === 'reservation') {
+      throw new Error('[PaymentGatewayService] PAYMENT_NOT_APPLICABLE: Reservation does not have a payment transaction to reconcile.');
+    }
     const config = this.resolvePaymentConfig(order.branch_id, order.brand_id);
     const provider = (payment && payment.provider) || this._resolveProvider(config);
     if (!provider || !['doku', 'midtrans'].includes(provider)) {
