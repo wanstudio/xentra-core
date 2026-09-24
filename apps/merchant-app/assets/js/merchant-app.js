@@ -1313,7 +1313,7 @@
       var timeStr = (ord.created_at || '').substring(11, 16) || '—';
       var reservationDate = ord.order_type === 'reservation' ? String(ord.reservation_date || (ord.scheduled_slot_start || '').substring(0, 10) || '') : '';
       var reservationTime = ord.order_type === 'reservation' ? String(ord.reservation_time || (ord.scheduled_slot_start || '').substring(11, 16) || '') : '';
-      var reservationGuests = ord.order_type === 'reservation' ? Number(ord.guest_count || 0) : 0;
+      var reservationGuests = ord.order_type === 'reservation' ? getBMReservationGuestCount(ord) : 0;
       var reservationInfo = ord.order_type === 'reservation'
         ? (esc(reservationDate || '—') + ' • ' + esc(reservationTime || '—') + (reservationGuests ? (' • ' + reservationGuests + ' tamu') : ''))
         : '';
@@ -1729,6 +1729,16 @@
     openBMRejectModal(orderId, 'orders');
   }
   window.rejectBMOrder = rejectBMOrder;
+
+  function getBMReservationGuestCount(ord) {
+    if (!ord) return 0;
+    var explicit = Number(ord.guest_count);
+    if (Number.isInteger(explicit) && explicit > 0) return explicit;
+
+    var note = String(ord.order_note || ord.notes || ord.order_notes || '');
+    var match = /Reservasi\\s*\\(\\s*(\\d+)\\s*Tamu/i.exec(note);
+    return match ? Number(match[1]) : 0;
+  }
 
   function formatBMReservationDateTime(ord) {
     var raw = ord && (ord.scheduled_slot_start || '');
