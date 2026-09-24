@@ -286,6 +286,35 @@ describe('BM-4 — Branch Manager Dashboard: Staff, Jam Operasional & Reports', 
     assert.ok(html.includes('id="btn-bm-toggle-online-orders"'), 'Missing btn-bm-toggle-online-orders');
   });
 
+  it('BM4-12: merchant-app.js has one canonical Staff implementation and uses the standalone BM cashier modal', () => {
+    const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
+    const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
+    const js = fs.readFileSync(jsPath, 'utf8');
+    const html = fs.readFileSync(htmlPath, 'utf8');
+
+    const countFunction = (name) => {
+      const matches = js.match(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\(', 'g')) || [];
+      return matches.length;
+    };
+
+    for (const name of [
+      'loadBMStaff',
+      'renderBMStaffTable',
+      'openBMAddCashierModal',
+      'toggleBMStaffStatus',
+      'resetBMStaffPassword'
+    ]) {
+      assert.equal(countFunction(name), 1, name + ' must have exactly one implementation');
+    }
+
+    assert.ok(js.includes("var modal = $('modal-bm-add-cashier');"), 'Staff add flow must use the standalone BM cashier modal');
+    assert.ok(js.includes("var form = $('form-bm-add-cashier');"), 'Staff add flow must reset the standalone BM cashier form');
+    assert.ok(html.includes('id="modal-bm-add-cashier"'), 'Standalone BM cashier modal must exist');
+    assert.ok(html.includes('id="form-bm-add-cashier"'), 'Standalone BM cashier form must exist');
+    assert.ok(!js.includes('openCreateUserModal()'), 'Merchant App Staff flow must not depend on dashboard-only create-user modal');
+    assert.ok(!js.includes("openEditUser('"), 'Merchant App Staff flow must not reference an undefined dashboard-only edit-user handler');
+  });
+
   it('BM4-11: dashboard.js implements loadBMStaff, toggleBMStaffStatus, resetBMStaffPassword, loadBMJamOperasional, loadBMReports, and toggleBranchOnlineOrders', () => {
     const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const js = fs.readFileSync(jsPath, 'utf8');
