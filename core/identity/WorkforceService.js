@@ -630,23 +630,36 @@ class WorkforceService {
   }
 
   getSecurityAuditLog(brandId, { action, actor_id, target_user_id, limit = 50, offset = 0 } = {}) {
-    let query = 'SELECT * FROM security_audit_log WHERE brand_id = ?';
+    let query = `
+      SELECT 
+        sal.*,
+        u_actor.full_name as actor_name,
+        u_actor.username as actor_username,
+        u_target.full_name as target_name,
+        u_target.username as target_username,
+        br.name as branch_name
+      FROM security_audit_log sal
+      LEFT JOIN users u_actor ON u_actor.id = sal.actor_id
+      LEFT JOIN users u_target ON u_target.id = sal.target_user_id
+      LEFT JOIN branches br ON br.id = sal.branch_id
+      WHERE sal.brand_id = ?
+    `;
     const params = [brandId];
 
     if (action) {
-      query += ' AND action = ?';
+      query += ' AND sal.action = ?';
       params.push(action);
     }
     if (actor_id) {
-      query += ' AND actor_id = ?';
+      query += ' AND sal.actor_id = ?';
       params.push(actor_id);
     }
     if (target_user_id) {
-      query += ' AND target_user_id = ?';
+      query += ' AND sal.target_user_id = ?';
       params.push(target_user_id);
     }
 
-    query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+    query += ' ORDER BY sal.created_at DESC LIMIT ? OFFSET ?';
     params.push(limit, offset);
 
     return this.repository.prepare(query).all(...params);

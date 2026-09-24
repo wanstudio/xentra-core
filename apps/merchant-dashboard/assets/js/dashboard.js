@@ -4516,6 +4516,12 @@
       roleSelect.innerHTML = '<option value="cashier">Kasir</option>';
     }
     roleSelect.value = user.role;
+    if (_timCurrentUserRole !== 'owner') {
+      roleSelect.disabled = true;
+    } else {
+      var isSoleOwner = user.role === 'owner' && _timUsers.filter(function (x) { return x.role === 'owner'; }).length <= 1;
+      roleSelect.disabled = isSoleOwner;
+    }
 
     // Branch options
     var branchSelect = $('user-branch');
@@ -4735,10 +4741,10 @@
      ========================================================================= */
 
   function switchTeamSection(sectionName, updateHash) {
-    var valid = ['members', 'invitations', 'roles', 'permissions'];
+    var valid = ['members', 'invitations', 'activity', 'roles', 'permissions'];
     var sec = valid.indexOf(sectionName) !== -1 ? sectionName : 'members';
 
-    ['members', 'invitations', 'roles', 'permissions'].forEach(function (name) {
+    ['members', 'invitations', 'activity', 'roles', 'permissions'].forEach(function (name) {
       var el = $('team-section-' + name);
       if (el) el.style.display = name === sec ? '' : 'none';
     });
@@ -4749,6 +4755,8 @@
 
     if (sec === 'invitations') {
       loadInvitations();
+    } else if (sec === 'activity') {
+      loadTeamActivity();
     }
 
     if (updateHash !== false) {
@@ -4766,7 +4774,7 @@
   async function loadInvitations() {
     var tbody = $('invitations-table-body');
     if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Memuat data undangan...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Memuat data undangan...</td></tr>';
     }
 
     try {
@@ -4777,13 +4785,13 @@
         renderInvitationsTable(_invitationsList);
       } else {
         if (tbody) {
-          tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">' + esc(data.error || 'Gagal memuat undangan.') + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-danger">' + esc(data.error || 'Gagal memuat undangan.') + '</td></tr>';
         }
       }
     } catch (err) {
       console.error('[Load Invitations Error]:', err);
       if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat undangan.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat undangan.</td></tr>';
       }
     }
   }
@@ -4794,23 +4802,29 @@
     if (!tbody) return;
 
     if (!invitations || invitations.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Belum ada undangan yang dibuat.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Belum ada undangan yang dibuat.</td></tr>';
       return;
     }
 
     var rows = invitations.map(function (inv) {
+      var isDeliveryFailed = inv.latest_delivery_action === 'INVITATION_SEND_FAILED';
       var statusBadge = '';
       if (inv.status === 'pending') {
-        statusBadge = '<span class="x-badge" style="background:#fef3c7;color:#92400e;font-weight:600;">Pending</span>';
+        if (isDeliveryFailed) {
+          statusBadge = '<span class="x-badge" style="background:#fff7ed;color:#c2410c;font-weight:600;" title="Email gagal terkirim">Gagal Terkirim</span>';
+        } else {
+          statusBadge = '<span class="x-badge" style="background:#fef3c7;color:#92400e;font-weight:600;">Menunggu Diterima</span>';
+        }
       } else if (inv.status === 'accepted') {
-        statusBadge = '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:600;">Accepted</span>';
-      } else if (inv.status === 'revoked') {
-        statusBadge = '<span class="x-badge" style="background:#fef2f2;color:#991b1b;font-weight:600;">Revoked</span>';
+        statusBadge = '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:600;">Diterima</span>';
+      } else if (inv.status === 'revoked' || inv.status === 'cancelled') {
+        statusBadge = '<span class="x-badge" style="background:#fef2f2;color:#991b1b;font-weight:600;">Dibatalkan</span>';
       } else if (inv.status === 'expired') {
-        statusBadge = '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-weight:600;">Expired</span>';
+        statusBadge = '<span class="x-badge" style="background:#f1f5f9;color:#64748b;font-weight:600;">Kedaluwarsa</span>';
       }
 
-      var branchName = inv.branch_id ? _timBranchName(inv.branch_id) : '<span class="text-muted">Brand-wide</span>';
+      var branchName = inv.branch_name ? esc(inv.branch_name) : (inv.branch_id ? _timBranchName(inv.branch_id) : '<span class="text-muted">Brand-wide</span>');
+      var inviterName = inv.invited_by_name ? esc(inv.invited_by_name) : '<span class="text-muted">—</span>';
       var expiresFormatted = inv.expires_at ? new Date(inv.expires_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
       var actions = '—';
@@ -4819,15 +4833,173 @@
           '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;" onclick="resendInvitation(\'' + inv.id + '\', \'' + esc(inv.email) + '\')">Kirim Ulang</button>' +
           '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;color:#dc2626;" onclick="revokeInvitation(\'' + inv.id + '\', \'' + esc(inv.email) + '\')">Batalkan</button>' +
         '</div>';
+      } else if (inv.status === 'expired') {
+        actions = '<div class="x-item-actions" style="justify-content:flex-end;gap:6px;">' +
+          '<button type="button" class="x-btn-secondary" style="padding:4px 8px;font-size:11px;" onclick="resendInvitation(\'' + inv.id + '\', \'' + esc(inv.email) + '\')">Kirim Ulang</button>' +
+        '</div>';
+      } else if (inv.status === 'accepted') {
+        actions = '<span class="text-muted" style="font-size:11px;">Sudah Terdaftar</span>';
       }
 
       return '<tr>' +
         '<td><strong>' + esc(inv.email) + '</strong></td>' +
         '<td><span class="x-badge ' + _timRoleBadgeClass(inv.role) + '">' + _timRoleLabel(inv.role) + '</span></td>' +
         '<td>' + branchName + '</td>' +
+        '<td>' + inviterName + '</td>' +
         '<td>' + statusBadge + '</td>' +
         '<td>' + expiresFormatted + '</td>' +
         '<td class="text-right">' + actions + '</td>' +
+      '</tr>';
+    });
+
+    tbody.innerHTML = rows.join('');
+  }
+
+  /* =========================================================================
+     MODUL: TEAM ACTIVITY / AUDIT TRAIL (Before ➔ After)
+     ========================================================================= */
+
+  var _teamActivityList = [];
+  var _teamActivityFilter = 'all';
+
+  async function loadTeamActivity() {
+    var tbody = $('team-activity-table-body');
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Memuat riwayat aktivitas tim...</td></tr>';
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/admin/security-audit?limit=100', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (data.success) {
+        _teamActivityList = data.logs || [];
+        renderTeamActivityTable(_teamActivityList);
+      } else {
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">' + esc(data.error || 'Gagal memuat log aktivitas.') + '</td></tr>';
+        }
+      }
+    } catch (err) {
+      console.error('[Load Team Activity Error]:', err);
+      if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-danger">Kesalahan jaringan saat memuat aktivitas tim.</td></tr>';
+      }
+    }
+  }
+  window.loadTeamActivity = loadTeamActivity;
+
+  function filterTeamActivity(actionFilter) {
+    _teamActivityFilter = actionFilter;
+    document.querySelectorAll('#team-activity-filters .x-cat-filter-btn').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.action === actionFilter);
+    });
+    renderTeamActivityTable(_teamActivityList);
+  }
+  window.filterTeamActivity = filterTeamActivity;
+
+  function renderTeamActivityTable(logs) {
+    var tbody = $('team-activity-table-body');
+    if (!tbody) return;
+
+    var filtered = logs.filter(function (log) {
+      if (_teamActivityFilter === 'all') {
+        var workforceActions = [
+          'ROLE_CHANGED', 'SCOPE_CHANGED', 'USER_CREATED', 'USER_UPDATED',
+          'USER_DISABLED', 'USER_ENABLED', 'USER_DELETED', 'PASSWORD_RESET_REQUESTED',
+          'INVITATION_CREATED', 'INVITATION_SUPERSEDED', 'INVITATION_RESENT',
+          'INVITATION_REVOKED', 'INVITATION_ACCEPTED', 'INVITATION_SEND_FAILED', 'POS_PIN_SET'
+        ];
+        return workforceActions.indexOf(log.action) !== -1;
+      }
+      if (_teamActivityFilter === 'ROLE_CHANGED') return log.action === 'ROLE_CHANGED';
+      if (_teamActivityFilter === 'SCOPE_CHANGED') return log.action === 'SCOPE_CHANGED';
+      if (_teamActivityFilter === 'USER_STATUS') return ['USER_DISABLED', 'USER_ENABLED', 'USER_DELETED', 'USER_CREATED'].indexOf(log.action) !== -1;
+      if (_teamActivityFilter === 'INVITATION') return log.action && log.action.indexOf('INVITATION') !== -1;
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Tidak ada rekaman aktivitas yang sesuai filter.</td></tr>';
+      return;
+    }
+
+    var rows = filtered.map(function (log) {
+      var dateFormatted = log.created_at
+        ? new Date(log.created_at.indexOf('T') !== -1 ? log.created_at : log.created_at.replace(' ', 'T') + 'Z')
+            .toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+        : '—';
+
+      var actorText = log.actor_name ? esc(log.actor_name) : (log.actor_username ? esc(log.actor_username) : (log.actor_id ? '<span style="font-family:monospace;font-size:11px;">' + esc(log.actor_id.substring(0, 10)) + '</span>' : 'Sistem'));
+      if (log.actor_role) {
+        actorText += ' <small class="text-muted">(' + _timRoleLabel(log.actor_role) + ')</small>';
+      }
+
+      var targetText = log.target_name ? esc(log.target_name) : (log.target_username ? esc(log.target_username) : '—');
+
+      var actionLabels = {
+        'ROLE_CHANGED': '🛡️ Perubahan Peran',
+        'SCOPE_CHANGED': '📍 Perubahan Cabang',
+        'USER_CREATED': '👤 Tambah Anggota',
+        'USER_UPDATED': '✏️ Edit Data Profil',
+        'USER_DISABLED': '⛔ Nonaktifkan Akun',
+        'USER_ENABLED': '✅ Aktifkan Akun',
+        'USER_DELETED': '🗑️ Hapus Anggota',
+        'PASSWORD_RESET_REQUESTED': '🔑 Reset Password',
+        'INVITATION_CREATED': '✉️ Undangan Baru',
+        'INVITATION_SUPERSEDED': '🔄 Undangan Diperbarui',
+        'INVITATION_RESENT': '📨 Undangan Dikirim Ulang',
+        'INVITATION_REVOKED': '🚫 Undangan Dibatalkan',
+        'INVITATION_ACCEPTED': '🎉 Undangan Diterima',
+        'INVITATION_SEND_FAILED': '⚠️ Pengiriman Gagal',
+        'POS_PIN_SET': '🔢 Set PIN Kasir'
+      };
+      var actionLabel = actionLabels[log.action] || log.action;
+
+      var detailText = '—';
+      var meta = {};
+      try {
+        if (log.metadata) meta = typeof log.metadata === 'string' ? JSON.parse(log.metadata) : log.metadata;
+      } catch (_) {}
+
+      if (meta.target_name && targetText === '—') {
+        targetText = esc(meta.target_name);
+      }
+      if (meta.email && targetText === '—') {
+        targetText = esc(meta.email);
+      }
+
+      if (log.action === 'ROLE_CHANGED' && (meta.role_before || meta.role_after)) {
+        detailText = '<span class="x-badge ' + _timRoleBadgeClass(meta.role_before) + '">' + _timRoleLabel(meta.role_before) + '</span> ' +
+          '<strong style="color:#64748b;margin:0 4px;">➔</strong> ' +
+          '<span class="x-badge ' + _timRoleBadgeClass(meta.role_after) + '">' + _timRoleLabel(meta.role_after) + '</span>';
+      } else if (log.action === 'SCOPE_CHANGED' && (meta.branch_before !== undefined || meta.branch_after !== undefined)) {
+        var bBefore = meta.branch_before ? _timBranchName(meta.branch_before) : '<span class="text-muted">Brand-wide</span>';
+        var bAfter = meta.branch_after ? _timBranchName(meta.branch_after) : '<span class="text-muted">Brand-wide</span>';
+        detailText = bBefore + ' <strong style="color:#64748b;margin:0 4px;">➔</strong> ' + bAfter;
+      } else if ((log.action === 'USER_DISABLED' || log.action === 'USER_ENABLED') && meta.status_before && meta.status_after) {
+        var sBefore = meta.status_before === 'active' ? '<span style="color:#16a34a;font-weight:600;">Aktif</span>' : '<span style="color:#dc2626;font-weight:600;">Nonaktif</span>';
+        var sAfter = meta.status_after === 'active' ? '<span style="color:#16a34a;font-weight:600;">Aktif</span>' : '<span style="color:#dc2626;font-weight:600;">Nonaktif</span>';
+        detailText = sBefore + ' <strong style="color:#64748b;margin:0 4px;">➔</strong> ' + sAfter;
+      } else if (meta.email) {
+        detailText = 'Penerima: <strong>' + esc(meta.email) + '</strong>' + (meta.role ? ' (' + _timRoleLabel(meta.role) + ')' : '');
+      } else if (meta.deleted_user_name) {
+        detailText = 'Akun anggota: <strong>' + esc(meta.deleted_user_name) + '</strong>';
+      } else if (log.branch_name) {
+        detailText = 'Cabang: ' + esc(log.branch_name);
+      }
+
+      var isSuccess = log.result === 'success';
+      var resultBadge = isSuccess
+        ? '<span class="x-badge" style="background:#ecfdf5;color:#047857;font-weight:600;">Berhasil</span>'
+        : '<span class="x-badge" style="background:#fef2f2;color:#991b1b;font-weight:600;">' + esc(log.result || 'Gagal') + '</span>';
+
+      return '<tr>' +
+        '<td style="font-size:12px;color:#64748b;white-space:nowrap;">' + dateFormatted + '</td>' +
+        '<td><strong>' + actorText + '</strong></td>' +
+        '<td>' + actionLabel + '</td>' +
+        '<td>' + targetText + '</td>' +
+        '<td>' + detailText + '</td>' +
+        '<td class="text-center">' + resultBadge + '</td>' +
       '</tr>';
     });
 

@@ -799,10 +799,11 @@
 
       <!-- TAB 5: TIM / WORKFORCE MANAGEMENT -->
       <section id="tab-tim" class="x-tab-content" data-tab="tim">
-        <!-- Subnav: Members, Invitations, Roles, Permissions -->
+        <!-- Subnav: Members, Invitations, Activity, Roles, Permissions -->
         <div class="x-subnav-tabs" id="team-subnav">
           <button type="button" class="x-subnav-tab active" data-team-section="members" onclick="switchTeamSection('members')">Members</button>
           <button type="button" class="x-subnav-tab" data-team-section="invitations" onclick="switchTeamSection('invitations')">Undangan Tim</button>
+          <button type="button" class="x-subnav-tab" data-team-section="activity" onclick="switchTeamSection('activity')">Aktivitas Tim</button>
           <button type="button" class="x-subnav-tab" data-team-section="roles" onclick="switchTeamSection('roles')">Roles</button>
           <button type="button" class="x-subnav-tab" data-team-section="permissions" onclick="switchTeamSection('permissions')">Permissions</button>
         </div>
@@ -872,6 +873,7 @@
                     <th>Email Penerima</th>
                     <th>Peran (Role)</th>
                     <th>Cakupan Cabang</th>
+                    <th>Pengundang</th>
                     <th>Status</th>
                     <th>Kadaluarsa</th>
                     <th class="text-right">Aksi</th>
@@ -879,7 +881,49 @@
                 </thead>
                 <tbody id="invitations-table-body">
                   <tr>
-                    <td colspan="6" class="text-center py-6">Memuat data undangan...</td>
+                    <td colspan="7" class="text-center py-6">Memuat data undangan...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 1.8: Activity -->
+        <div id="team-section-activity" style="display:none;">
+          <div class="x-card-panel">
+            <div class="x-panel-header-flex">
+              <div>
+                <h3>📜 Aktivitas & Riwayat Tim</h3>
+                <p>Jejak audit perubahan peran, penugasan cabang, status akun, dan undangan.</p>
+              </div>
+              <button type="button" class="x-btn-secondary" onclick="loadTeamActivity()">🔄 Refresh Aktivitas</button>
+            </div>
+
+            <!-- Activity Filters -->
+            <div class="x-catalog-filters" id="team-activity-filters" style="margin-top:16px;">
+              <button type="button" class="x-cat-filter-btn active" data-action="all" onclick="filterTeamActivity('all')">Semua Aktivitas</button>
+              <button type="button" class="x-cat-filter-btn" data-action="ROLE_CHANGED" onclick="filterTeamActivity('ROLE_CHANGED')">Perubahan Peran</button>
+              <button type="button" class="x-cat-filter-btn" data-action="SCOPE_CHANGED" onclick="filterTeamActivity('SCOPE_CHANGED')">Perubahan Cabang</button>
+              <button type="button" class="x-cat-filter-btn" data-action="USER_STATUS" onclick="filterTeamActivity('USER_STATUS')">Status Akun</button>
+              <button type="button" class="x-cat-filter-btn" data-action="INVITATION" onclick="filterTeamActivity('INVITATION')">Undangan</button>
+            </div>
+
+            <div class="x-table-responsive mt-4">
+              <table class="x-table">
+                <thead>
+                  <tr>
+                    <th style="width:160px;">Waktu</th>
+                    <th>Aktor</th>
+                    <th>Aktivitas</th>
+                    <th>Target</th>
+                    <th>Rincian Perubahan (Sebelum ➔ Sesudah)</th>
+                    <th class="text-center" style="width:90px;">Hasil</th>
+                  </tr>
+                </thead>
+                <tbody id="team-activity-table-body">
+                  <tr>
+                    <td colspan="6" class="text-center py-6">Memuat riwayat aktivitas tim...</td>
                   </tr>
                 </tbody>
               </table>

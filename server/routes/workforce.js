@@ -160,7 +160,7 @@ router.post('/admin/users', requireAuth(['owner', 'brand_manager', 'branch_manag
   }
 });
 
-// Update user profile
+// Update user profile (and optionally role and branch scope)
 router.put('/admin/users/:id', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
     const workforce = new WorkforceService();
@@ -174,17 +174,72 @@ router.put('/admin/users/:id', requireAuth(['owner', 'brand_manager', 'branch_ma
       }
     }
 
-    const updated = workforce.updateUser(req.params.id, req.brand_id, req.body, actor);
+    let currentTarget = target;
 
-    workforce.logSecurityEvent({
-      ...actor,
-      action: 'USER_UPDATED',
-      target_user_id: target.id,
-      target_role: target.role,
-      brand_id: req.brand_id,
-      result: 'success',
-      metadata: { fields: Object.keys(req.body) }
-    });
+    // 1. Role Change
+    if (req.body.role && req.body.role !== target.role) {
+      if (actor.actor_role !== 'owner') {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_ROLE_CHANGE', message: 'Hanya Owner yang dapat mengubah role anggota tim.' });
+      }
+      const previousRole = target.role;
+      currentTarget = workforce.changeUserRole(req.params.id, req.brand_id, req.body.role, actor);
+      workforce.logSecurityEvent({
+        ...actor,
+        action: 'ROLE_CHANGED',
+        target_user_id: target.id,
+        target_role: req.body.role,
+        brand_id: req.brand_id,
+        result: 'success',
+        metadata: {
+          role_before: previousRole,
+          role_after: req.body.role,
+          target_name: target.full_name
+        }
+      });
+    }
+
+    // 2. Branch Scope Change
+    const targetBranch = req.body.branch_id !== undefined ? (req.body.branch_id || null) : target.branch_id;
+    if (req.body.branch_id !== undefined && targetBranch !== target.branch_id) {
+      const previousBranch = target.branch_id;
+      currentTarget = workforce.changeUserScope(req.params.id, req.brand_id, targetBranch, actor);
+      workforce.logSecurityEvent({
+        ...actor,
+        action: 'SCOPE_CHANGED',
+        target_user_id: target.id,
+        target_role: currentTarget.role,
+        brand_id: req.brand_id,
+        branch_id: targetBranch,
+        result: 'success',
+        metadata: {
+          branch_before: previousBranch,
+          branch_after: targetBranch,
+          target_name: target.full_name
+        }
+      });
+    }
+
+    // 3. Profile Info (full_name, email)
+    const profileUpdates = {};
+    if (req.body.full_name) profileUpdates.full_name = req.body.full_name;
+    if (req.body.email !== undefined) profileUpdates.email = req.body.email;
+
+    let updated = currentTarget;
+    if (Object.keys(profileUpdates).length > 0) {
+      updated = workforce.updateUser(req.params.id, req.brand_id, profileUpdates, actor);
+      workforce.logSecurityEvent({
+        ...actor,
+        action: 'USER_UPDATED',
+        target_user_id: target.id,
+        target_role: updated.role,
+        brand_id: req.brand_id,
+        result: 'success',
+        metadata: { 
+          fields: Object.keys(profileUpdates),
+          target_name: target.full_name
+        }
+      });
+    }
 
     res.json({ success: true, user: updated });
   } catch (err) {
@@ -210,7 +265,12 @@ router.post('/admin/users/:id/disable', requireAuth(['owner', 'brand_manager', '
       target_user_id: disabled.id,
       target_role: disabled.role,
       brand_id: req.brand_id,
-      result: 'success'
+      result: 'success',
+      metadata: {
+        status_before: 'active',
+        status_after: 'disabled',
+        target_name: disabled.full_name
+      }
     });
 
     res.json({ success: true, user: disabled });
@@ -234,7 +294,12 @@ router.post('/admin/users/:id/enable', requireAuth(['owner', 'brand_manager', 'b
       target_user_id: enabled.id,
       target_role: enabled.role,
       brand_id: req.brand_id,
-      result: 'success'
+      result: 'success',
+      metadata: {
+        status_before: 'disabled',
+        status_after: 'active',
+        target_name: enabled.full_name
+      }
     });
 
     res.json({ success: true, user: enabled });
@@ -259,7 +324,10 @@ router.delete('/admin/users/:id', requireAuth(['owner']), (req, res) => {
       target_role: deleted.role,
       brand_id: req.brand_id,
       result: 'success',
-      metadata: { deleted_user_name: deleted.deleted_user_name }
+      metadata: { 
+        deleted_user_name: deleted.deleted_user_name,
+        target_name: deleted.deleted_user_name
+      }
     });
 
     res.json({ success: true, message: 'Anggota tim berhasil dihapus.', ...deleted });
@@ -275,6 +343,8 @@ router.post('/admin/users/:id/role', requireAuth(['owner']), (req, res) => {
     const workforce = new WorkforceService();
     const actor = getWorkforceActor(req);
     const { role } = req.body;
+    const target = workforce.getUser(req.params.id, req.brand_id);
+    const previousRole = target.role;
 
     const updated = workforce.changeUserRole(req.params.id, req.brand_id, role, actor);
 
@@ -285,7 +355,11 @@ router.post('/admin/users/:id/role', requireAuth(['owner']), (req, res) => {
       target_role: role,
       brand_id: req.brand_id,
       result: 'success',
-      metadata: { previous_role: updated.role }
+      metadata: { 
+        role_before: previousRole, 
+        role_after: role,
+        target_name: target.full_name
+      }
     });
 
     res.json({ success: true, user: updated });
@@ -301,6 +375,8 @@ router.post('/admin/users/:id/scope', requireAuth(['owner', 'brand_manager']), (
     const workforce = new WorkforceService();
     const actor = getWorkforceActor(req);
     const { branch_id } = req.body;
+    const target = workforce.getUser(req.params.id, req.brand_id);
+    const previousBranchId = target.branch_id;
 
     const updated = workforce.changeUserScope(req.params.id, req.brand_id, branch_id, actor);
 
@@ -312,7 +388,11 @@ router.post('/admin/users/:id/scope', requireAuth(['owner', 'brand_manager']), (
       brand_id: req.brand_id,
       branch_id: branch_id,
       result: 'success',
-      metadata: { previous_branch_id: updated.branch_id }
+      metadata: { 
+        branch_before: previousBranchId, 
+        branch_after: branch_id,
+        target_name: target.full_name
+      }
     });
 
     res.json({ success: true, user: updated });
@@ -557,8 +637,8 @@ router.post('/admin/invitations/:id/resend', requireAuth(['owner', 'brand_manage
   }
 });
 
-// Revoke workforce invitation
-router.post('/admin/invitations/:id/revoke', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+// Revoke / Cancel workforce invitation
+const handleRevokeInvitation = (req, res) => {
   try {
     const invitationService = new WorkforceInvitationService();
     const actor = getWorkforceActor(req);
@@ -573,7 +653,9 @@ router.post('/admin/invitations/:id/revoke', requireAuth(['owner', 'brand_manage
     const status = err.status || 500;
     res.status(status).json({ success: false, error: err.code || 'REVOKE_ERROR', message: err.message });
   }
-});
+};
+router.post('/admin/invitations/:id/revoke', requireAuth(['owner', 'brand_manager', 'branch_manager']), handleRevokeInvitation);
+router.post('/admin/invitations/:id/cancel', requireAuth(['owner', 'brand_manager', 'branch_manager']), handleRevokeInvitation);
 
 // Validate workforce invitation token capability (Public capability check)
 router.get('/invitations/validate/:token', (req, res) => {

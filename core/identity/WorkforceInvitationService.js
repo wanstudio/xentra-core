@@ -535,11 +535,11 @@ class WorkforceInvitationService {
       invitation.status = 'expired';
     }
 
-    if (invitation.status !== 'pending') {
+    if (invitation.status !== 'pending' && invitation.status !== 'expired') {
       throw {
         status: 400,
         code: 'INVALID_STATE',
-        message: `Hanya undangan berstatus pending yang dapat dikirim ulang (status saat ini: ${invitation.status}).`
+        message: `Hanya undangan berstatus pending atau expired yang dapat dikirim ulang (status saat ini: ${invitation.status}).`
       };
     }
 
@@ -548,11 +548,11 @@ class WorkforceInvitationService {
     const expiresAt = new Date(Date.now() + INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
     const now = new Date().toISOString();
 
-    // Concurrency-safe atomic state transition: update token ONLY if still pending
+    // Concurrency-safe atomic state transition: update token and reset status to pending
     const updateResult = this.db.prepare(`
       UPDATE workforce_invitations
-      SET token_hash = ?, expires_at = ?, updated_at = ?
-      WHERE id = ? AND status = 'pending'
+      SET token_hash = ?, expires_at = ?, status = 'pending', updated_at = ?
+      WHERE id = ? AND (status = 'pending' OR status = 'expired')
     `).run(tokenHash, expiresAt, now, invitation.id);
 
     if (updateResult.changes === 0) {
@@ -563,7 +563,7 @@ class WorkforceInvitationService {
       throw {
         status: 400,
         code: 'INVALID_STATE',
-        message: `Hanya undangan berstatus pending yang dapat dikirim ulang (status saat ini: ${latest.status}).`
+        message: `Hanya undangan berstatus pending atau expired yang dapat dikirim ulang (status saat ini: ${latest.status}).`
       };
     }
 
@@ -575,7 +575,7 @@ class WorkforceInvitationService {
       organization_id: invitation.organization_id,
       branch_id: invitation.branch_id,
       result: 'success',
-      metadata: { invitation_id: invitation.id, email: invitation.email }
+      metadata: { invitation_id: invitation.id, email: invitation.email, role: invitation.role, target_name: invitation.email }
     });
 
     // Lookup brand and branch names
@@ -835,28 +835,55 @@ class WorkforceInvitationService {
    * @returns {Array<Object>}
    */
   listInvitations(brandId, { status, branch_id, role } = {}) {
+    // Automatically transition expired pending invitations to 'expired'
+    try {
+      this.db.prepare(`
+        UPDATE workforce_invitations 
+        SET status = 'expired', updated_at = datetime('now') 
+        WHERE brand_id = ? AND status = 'pending' AND expires_at < datetime('now')
+      `).run(brandId);
+    } catch (_) {}
+
     let query = `
-      SELECT id, organization_id, brand_id, branch_id, email, role, invited_by_user_id, status,
-             expires_at, accepted_at, revoked_at, created_at, updated_at
-      FROM workforce_invitations
-      WHERE brand_id = ?
+      SELECT 
+        wi.id, wi.organization_id, wi.brand_id, wi.branch_id, wi.email, wi.role, wi.invited_by_user_id,
+        wi.status, wi.expires_at, wi.accepted_at, wi.revoked_at, wi.created_at, wi.updated_at,
+        u.full_name as invited_by_name,
+        br.name as branch_name,
+        (
+          SELECT sal.action 
+          FROM security_audit_log sal 
+          WHERE sal.brand_id = wi.brand_id 
+            AND (sal.action = 'INVITATION_SEND_FAILED' OR sal.action = 'INVITATION_SEND_SUCCEEDED')
+            AND sal.metadata LIKE ('%' || wi.id || '%')
+          ORDER BY sal.created_at DESC 
+          LIMIT 1
+        ) as latest_delivery_action
+      FROM workforce_invitations wi
+      LEFT JOIN users u ON u.id = wi.invited_by_user_id
+      LEFT JOIN branches br ON br.id = wi.branch_id
+      WHERE wi.brand_id = ?
     `;
     const params = [brandId];
 
     if (status) {
-      query += ' AND status = ?';
-      params.push(status);
+      if (status === 'cancelled' || status === 'revoked') {
+        query += " AND wi.status IN ('revoked', 'cancelled')";
+      } else {
+        query += ' AND wi.status = ?';
+        params.push(status);
+      }
     }
     if (branch_id) {
-      query += ' AND branch_id = ?';
+      query += ' AND wi.branch_id = ?';
       params.push(branch_id);
     }
     if (role) {
-      query += ' AND role = ?';
+      query += ' AND wi.role = ?';
       params.push(role);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY wi.created_at DESC';
     return this.db.prepare(query).all(...params);
   }
 
