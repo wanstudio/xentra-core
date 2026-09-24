@@ -1255,21 +1255,48 @@
       return true;
     });
 
-    // Deterministic pending-first sorting without mutating server orders array:
+    function getBMReservationScheduleMs(ord) {
+      if (!ord || ord.order_type !== 'reservation' || ord.status !== 'confirmed') return NaN;
+
+      var date = String(ord.reservation_date || (ord.scheduled_slot_start || '').substring(0, 10) || '').trim();
+      var time = String(ord.reservation_time || (ord.scheduled_slot_start || '').substring(11, 16) || '').trim();
+
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !/^\\d{2}:\\d{2}$/.test(time)) return NaN;
+
+      var parsed = new Date(date + 'T' + time + ':00').getTime();
+      return isNaN(parsed) ? NaN : parsed;
+    }
+
+    // Deterministic operational queue sorting without mutating server orders array:
     // 1. Genuinely new pending orders (tier 0)
     // 2. Existing pending orders (tier 1)
-    // 3. Other orders preserved in original server order (tier 2)
+    // 3. Upcoming confirmed reservations (tier 2), nearest reservation first
+    // 4. Everything else preserved in original server order (tier 3)
+    //
+    // Reservation urgency is visibility-only: it does not alter business state,
+    // payment flow or server-side ordering.
+    var sortNow = Date.now();
     var sorted = filtered.slice().sort(function (a, b) {
       var aIsPending = (a.status === 'pending');
       var bIsPending = (b.status === 'pending');
       var aIsNew = aIsPending && !!_bmOrdersState.newPendingOrderIds[a.id];
       var bIsNew = bIsPending && !!_bmOrdersState.newPendingOrderIds[b.id];
 
-      var aRank = aIsNew ? 0 : (aIsPending ? 1 : 2);
-      var bRank = bIsNew ? 0 : (bIsPending ? 1 : 2);
+      var aReservationMs = getBMReservationScheduleMs(a);
+      var bReservationMs = getBMReservationScheduleMs(b);
+      var aIsUpcomingReservation = !isNaN(aReservationMs) && aReservationMs >= sortNow;
+      var bIsUpcomingReservation = !isNaN(bReservationMs) && bReservationMs >= sortNow;
+
+      var aRank = aIsNew ? 0 : (aIsPending ? 1 : (aIsUpcomingReservation ? 2 : 3));
+      var bRank = bIsNew ? 0 : (bIsPending ? 1 : (bIsUpcomingReservation ? 2 : 3));
 
       if (aRank !== bRank) return aRank - bRank;
-      return 0; // Preserve relative server order
+
+      if (aIsUpcomingReservation && bIsUpcomingReservation) {
+        if (aReservationMs !== bReservationMs) return aReservationMs - bReservationMs;
+      }
+
+      return 0; // Preserve relative server order within the same operational tier
     });
 
     if (!sorted.length) {
