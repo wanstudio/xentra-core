@@ -450,10 +450,20 @@ test('API Merchant Auth: POST /api/v1/auth/merchant/login authenticates owner', 
   assert.strictEqual(meData.success, true);
   assert.strictEqual(meData.user.username, 'admin');
   assert.strictEqual(meData.user.role, 'owner');
+  assert.ok('landing' in meData, 'merchant session profile must include server-resolved landing');
+  assert.ok('brand' in meData, 'merchant session profile must include sanitized brand context');
+  assert.ok('brand_name' in meData.user, 'merchant session profile must include brand_name');
 
   // Test /auth/merchant/me without token -> 401 Unauthorized
   const unauthRes = await mockFetch('/api/v1/auth/merchant/me');
   assert.strictEqual(unauthRes.status, 401);
+});
+
+test('API Auth Merchant Me: route is registered exactly once', () => {
+  const apiPath = require.resolve('../server/routes/api');
+  const apiSource = fs.readFileSync(apiPath, 'utf8');
+  const matches = apiSource.match(/router\.get\('\/auth\/merchant\/me'/g) || [];
+  assert.strictEqual(matches.length, 1, 'GET /auth/merchant/me must have exactly one route implementation');
 });
 
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
