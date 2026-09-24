@@ -37,6 +37,11 @@ const { InventoryStockService, InventoryMovementModel } = require('../../domains
 const CatalogService = require('../../domains/commerce/services/CatalogService');
 const PricingPolicyModel = require('../../domains/commerce/models/PricingPolicyModel');
 const { XentraConnectorClient, XentraConnectorError } = require('../../core/integration/XentraConnectorClient');
+const { BrandRepository: CoreBrandRepo, BranchRepository: CoreBranchRepo, UserRepository: CoreUserRepo } = require('../../core/data/repositories');
+const coreBrandRepo = new CoreBrandRepo();
+const coreBranchRepo = new CoreBranchRepo();
+const coreUserRepo = new CoreUserRepo();
+
 const { ImageValidator } = require('../../core/domain');
 const { MediaService } = require('../../core/media');
 const { BannerContentService, BannerAssignmentService } = require('../../domains/banner');
