@@ -27,8 +27,6 @@
   var validateServerSession = S.validateServerSession;
   var enforceSurface = S.enforceSurface;
   var Catalog = window.XentraBranchCatalog;
-  var getActiveBranchId = Catalog.getActiveBranchId;
-  var loadInlineBranchCatalog = Catalog.loadInlineBranchCatalog;
 
   /* =========================================================================
      ROUTING (Branch Manager routes only)
