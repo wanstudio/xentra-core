@@ -136,9 +136,13 @@ class WorkforceMembershipService {
   countActiveOwners(brandId) {
     const row = this.db.prepare(`
       SELECT COUNT(*) AS cnt
-      FROM workforce_memberships
-      WHERE brand_id = ? AND role = 'owner' AND status = 'active'
-    `).get(String(brandId));
+      FROM users u
+      LEFT JOIN workforce_memberships wm
+        ON wm.user_id = u.id AND wm.brand_id = ?
+      WHERE COALESCE(wm.brand_id, u.brand_id) = ?
+        AND COALESCE(wm.role, u.role) = 'owner'
+        AND COALESCE(wm.status, u.status, 'active') = 'active'
+    `).get(String(brandId), String(brandId));
 
     return Number(row && row.cnt ? row.cnt : 0);
   }
