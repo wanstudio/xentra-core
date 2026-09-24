@@ -379,7 +379,7 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
 
     await t2.test('5.2 Xentra Connector is HOLD and not imported/required for Catalog', () => {
       const apiCode = require('fs').readFileSync(require('path').join(__dirname, '../server/routes/api.js'), 'utf8');
-      const catalogServiceCode = require('fs').readFileSync(require('path').join(__dirname, '../domains/commerce/services/CatalogService.js'), 'utf8');
+      const catalogServiceCode = require('fs').readFileSync(require('path').join(__dirname, '../domains/catalog/services/CatalogService.js'), 'utf8');
       assert.ok(!apiCode.includes("require('../../connector"), 'API must not depend on Connector');
       assert.ok(!catalogServiceCode.includes('connector'), 'CatalogService must not depend on Connector');
     });
