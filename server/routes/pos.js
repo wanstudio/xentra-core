@@ -111,7 +111,8 @@ router.post('/pos/sales', requireAuth(['cashier']), async (req, res) => {
     const {
       shift_id,
       order_type = 'dine_in',
-      payment_method = 'cash',
+      payment_mode = null,
+      payment_method = null,
       amount_tendered,
       customer = {},
       items = [],
@@ -127,9 +128,19 @@ router.post('/pos/sales', requireAuth(['cashier']), async (req, res) => {
     if (!['dine_in', 'pickup', 'delivery'].includes(order_type)) {
       return res.status(400).json({ success: false, error: 'POS Sale hanya mendukung dine_in, pickup, atau delivery.' });
     }
-    if (payment_method !== 'cash') {
-      return res.status(400).json({ success: false, error: 'Metode pembayaran non-tunai POS belum diaktifkan pada endpoint ini.' });
-    }
+    let resolvedPaymentMethod = payment_method;
+    if (payment_mode === 'cash') resolvedPaymentMethod = 'cash';
+    else if (payment_mode === 'payment_gateway') {
+      resolvedPaymentMethod = PaymentGatewayService.getActiveProvider(branchId, req.brand_id);
+      if (!resolvedPaymentMethod) return res.status(400).json({ success: false, error: 'Tidak ada Payment Gateway aktif untuk cabang ini.' });
+      const gatewayConfig = PaymentGatewayService.resolvePaymentConfig(branchId, req.brand_id);
+      if (!PaymentGatewayService._hasValidCredentials(gatewayConfig)) return res.status(400).json({ success: false, error: 'Payment Gateway belum dikonfigurasi dengan kredensial yang valid.' });
+    } else if (payment_mode === 'qris_static') {
+      const qris = PaymentGatewayService.resolveStaticQrisConfig(branchId, req.brand_id);
+      if (!qris.enabled) return res.status(400).json({ success: false, error: 'QRIS statis belum dikonfigurasi untuk cabang ini.' });
+      resolvedPaymentMethod = 'qris_static';
+    } else if (!resolvedPaymentMethod) resolvedPaymentMethod = 'cash';
+    else if (!['cash', 'midtrans', 'doku', 'qris_static'].includes(resolvedPaymentMethod)) return res.status(400).json({ success: false, error: 'Mode pembayaran POS tidak valid.' });
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, error: 'Sale minimal memiliki satu item.' });
     }
@@ -141,18 +152,17 @@ router.post('/pos/sales', requireAuth(['cashier']), async (req, res) => {
       return res.status(400).json({ success: false, error: 'Shift aktif tidak ditemukan untuk kasir/cabang ini.' });
     }
 
-    const tendered = Number(amount_tendered);
-    if (!Number.isFinite(tendered) || tendered <= 0) {
-      return res.status(400).json({ success: false, error: 'Uang diterima wajib berupa angka positif.' });
+    const tendered = amount_tendered == null ? null : Number(amount_tendered);
+    if (resolvedPaymentMethod === 'cash' && (!Number.isFinite(tendered) || tendered <= 0)) {
+      return res.status(400).json({ success: false, error: 'Uang diterima wajib berupa angka positif untuk pembayaran Cash.' });
     }
 
-    const { PosOrderService } = require('../../domains/pos');
     const result = await PosOrderService.settleOrder({
       brand_id: req.brand_id,
       branch_id: branchId,
       shift_id: shift.id,
       order_type,
-      payment_method,
+      payment_method: resolvedPaymentMethod,
       amount_tendered: tendered,
       customer: {
         name: customer && customer.name ? String(customer.name) : 'Pelanggan POS',
@@ -160,6 +170,7 @@ router.post('/pos/sales', requireAuth(['cashier']), async (req, res) => {
         table_number: order_type === 'dine_in' && customer ? (customer.table_number || null) : null
       },
       items,
+      cashier_id: cashierId,
       client_transaction_id: client_transaction_id || null
     });
 
@@ -173,6 +184,50 @@ router.post('/pos/sales', requireAuth(['cashier']), async (req, res) => {
   }
 });
 
+router.get('/pos/payment-methods', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const config = PaymentGatewayService.resolvePaymentConfig(branchId, req.brand_id);
+    const activeProvider = PaymentGatewayService.getActiveProvider(branchId, req.brand_id);
+    const qrisStatic = PaymentGatewayService.resolveStaticQrisConfig(branchId, req.brand_id);
+    res.json({ success: true, payment_modes: [
+      { code: 'cash', name: 'Cash', enabled: true, offline_supported: true, provider: 'cash' },
+      { code: 'payment_gateway', name: 'Payment Gateway', enabled: Boolean(activeProvider && PaymentGatewayService._hasValidCredentials(config)), offline_supported: false, provider: activeProvider || null },
+      { code: 'qris_static', name: 'QRIS Statis', enabled: qrisStatic.enabled, offline_supported: false, provider: 'qris_static', qris_static: qrisStatic }
+    ]});
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.get('/pos/orders/:id/payment-status', requireAuth(['cashier']), async (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    const order = db.prepare("SELECT id, order_number, branch_id, brand_id, order_channel, order_type, grand_total, payment_method, status FROM orders WHERE id = ? AND brand_id = ? AND branch_id = ? AND order_channel = 'pos_cashier'").get(req.params.id, req.brand_id, branchId);
+    if (!order) return res.status(404).json({ success: false, error: 'Transaksi POS tidak ditemukan.' });
+    let payment = db.prepare("SELECT id, provider, payment_method, payment_status, amount, merchant_id, snap_token, transaction_id, settled_at, created_at, updated_at FROM order_payments WHERE order_id = ? LIMIT 1").get(order.id);
+    if (payment && ['midtrans', 'doku'].includes(payment.provider) && payment.payment_status === 'pending') {
+      try { await PaymentGatewayService.checkTransactionStatus(order.id); } catch (_) {}
+      payment = db.prepare("SELECT id, provider, payment_method, payment_status, amount, merchant_id, snap_token, transaction_id, settled_at, created_at, updated_at FROM order_payments WHERE order_id = ? LIMIT 1").get(order.id);
+    }
+    res.json({ success: true, order: { id: order.id, order_number: order.order_number, status: order.status, grand_total: order.grand_total, payment_method: order.payment_method }, payment: payment || null });
+  } catch (err) { res.status(500).json({ success: false, error: err.message }); }
+});
+
+router.post('/pos/orders/:id/confirm-qris-static', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    const cashierId = req.user.id || req.user.userId;
+    res.json(ManualQrisSettlementService.settleStaticQrisPayment({ order_id: req.params.id, cashier_id: cashierId, branch_id: branchId, reference_note: req.body?.reference_note || '' }));
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
+});
+
+router.post('/pos/orders/:id/cancel-qris-static', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    const cashierId = req.user.id || req.user.userId;
+    res.json(ManualQrisSettlementService.cancelStaticQrisPayment({ order_id: req.params.id, cashier_id: cashierId, branch_id: branchId, reason: req.body?.reason || 'QRIS statis dibatalkan oleh kasir.' }));
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
+});
 router.get('/pos/sales', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
@@ -182,7 +237,7 @@ router.get('/pos/sales', requireAuth(['cashier']), (req, res) => {
     }
 
     const rows = db.prepare(`
-      SELECT o.*, p.status AS payment_status
+      SELECT o.*, p.payment_status AS payment_status
       FROM orders o
       LEFT JOIN order_payments p ON p.order_id = o.id
       WHERE o.brand_id = ? AND o.branch_id = ? AND o.order_channel = 'pos_cashier'
