@@ -2960,6 +2960,15 @@ router.get(['/platform/me', '/api/v1/platform/me'], requirePlatformAuth(), (req,
 
 // 7. Get Order Details & Live Status (Protected by Ownership or Operator Auth - NEW-01)
 // 7.1 Customer Order History (Protected by Customer Auth)
+registerCustomerOrderRoutes(router, {
+  db,
+  TokenSessionStore,
+  AcceptanceTimeoutService,
+  OrderStateMachine,
+  requireCustomerAuth,
+  DiningTableService: require('../../domains/pos').DiningTableService
+});
+
 // 8. Kitchen Display Queue (Strictly Tenant-Scoped & Branch-Scoped for Operator Roles)
 router.get('/kitchen/queue', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
   // If user is a branch-level operator, strictly enforce their assigned branch
@@ -3784,14 +3793,6 @@ router.post('/pos/inventory-conflicts/:id/resolve', requireAuth(['owner', 'brand
 
 // Payment-provider webhooks are isolated in server/routes/webhooks.js.
 registerPaymentWebhooks(router);
-registerCustomerOrderRoutes(router, {
-  db,
-  TokenSessionStore,
-  AcceptanceTimeoutService,
-  OrderStateMachine,
-  requireCustomerAuth,
-  DiningTableService: require('../../domains/pos').DiningTableService
-});
 
 // 10.0 SaaS Control Plane Business Registration Endpoint
 router.post('/auth/register', async (req, res) => {
