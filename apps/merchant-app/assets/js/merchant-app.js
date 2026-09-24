@@ -5,7 +5,7 @@
  * The Owner and Platform surfaces stay in apps/merchant-dashboard; shared
  * auth/session, UI widgets and branch-catalog logic come from apps/merchant-shared.
  *
- * Load order: shared.js -> shell.js -> branch-catalog.js -> merchant-app.js
+ * Load order: shared.js -> shell.js -> surface-owned branch-catalog-ui.js -> merchant-app.js
  */
 (function () {
   'use strict';
@@ -26,7 +26,7 @@
   var handleHandoffExchange = S.handleHandoffExchange;
   var validateServerSession = S.validateServerSession;
   var enforceSurface = S.enforceSurface;
-  var Catalog = window.XentraBranchCatalog;
+  var Catalog = window.XentraMerchantBranchCatalog;
 
   /* =========================================================================
      ROUTING (Branch Manager routes only)
