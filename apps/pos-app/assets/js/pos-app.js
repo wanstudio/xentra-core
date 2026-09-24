@@ -60,25 +60,43 @@
     el.textContent=online?'ONLINE':'OFFLINE'; el.className='pos-status '+(online?'online':'offline');
   }
 
-  function getPosPinCache() {
-    try { return JSON.parse(localStorage.getItem(POS_PIN_CACHE_KEY) || 'null'); } catch (_) { return null; }
+  function getPosPinProfiles() {
+    try {
+      var raw=JSON.parse(localStorage.getItem(POS_PIN_CACHE_KEY) || 'null');
+      if (!raw) return {};
+      // Migrate the first single-profile implementation to the multi-cashier cache.
+      if (raw.user && raw.offline_credential) {
+        var migrated={}; migrated[String(raw.user.id)]=raw; return migrated;
+      }
+      return raw.profiles && typeof raw.profiles==='object' ? raw.profiles : {};
+    } catch (_) { return {}; }
   }
 
   function savePosPinCache(userData, credential, branchId) {
-    if (!userData || !credential || !credential.salt || !credential.hash || !branchId) return;
-    localStorage.setItem(POS_PIN_CACHE_KEY, JSON.stringify({
-      user: {
-        id: userData.id,
-        username: userData.username,
-        email: userData.email || null,
-        full_name: userData.full_name || userData.username || 'Kasir',
-        role: 'cashier',
-        branch_id: branchId
+    if (!userData || !userData.id || !credential || !credential.salt || !credential.hash || !branchId) return;
+    var profiles=getPosPinProfiles();
+    profiles[String(userData.id)]={
+      user:{
+        id:userData.id,
+        username:userData.username,
+        email:userData.email || null,
+        full_name:userData.full_name || userData.username || 'Kasir',
+        role:'cashier',
+        branch_id:branchId
       },
-      branch_id: branchId,
-      offline_credential: credential,
-      cached_at: new Date().toISOString()
-    }));
+      branch_id:branchId,
+      offline_credential:credential,
+      cached_at:new Date().toISOString()
+    };
+    try { localStorage.setItem(POS_PIN_CACHE_KEY,JSON.stringify({version:1,profiles:profiles})); } catch (_) {}
+    localStorage.setItem('xentra_pos_branch_id',String(branchId));
+  }
+
+  function getCachedPinProfilesForBranch(branchId) {
+    var profiles=getPosPinProfiles();
+    return Object.keys(profiles).map(function(id){return profiles[id];}).filter(function(profile){
+      return profile && profile.branch_id && String(profile.branch_id)===String(branchId) && profile.offline_credential && profile.user;
+    });
   }
 
   function savePosMenuCache() {
@@ -124,13 +142,13 @@
     if (!credential || !window.crypto || !window.crypto.subtle || !window.TextEncoder) return false;
     if (!/^\d{6}$/.test(String(pin || ''))) return false;
     try {
-      var key=await crypto.subtle.importKey('raw', new TextEncoder().encode(String(pin)), {name:'PBKDF2'}, false, ['deriveBits']);
+      var key=await crypto.subtle.importKey('raw',new TextEncoder().encode(String(pin)),{name:'PBKDF2'},false,['deriveBits']);
       var bits=await crypto.subtle.deriveBits({
         name:'PBKDF2',
         salt:bytesFromBase64(credential.salt),
         iterations:Number(credential.iterations || 210000),
         hash:credential.digest || 'SHA-256'
-      }, key, Number(credential.key_length || 32)*8);
+      },key,Number(credential.key_length || 32)*8);
       return base64FromBytes(new Uint8Array(bits))===credential.hash;
     } catch (_) { return false; }
   }
@@ -145,7 +163,7 @@
         timer=setTimeout(function(){
           if (controller) controller.abort();
           var err=new Error('NETWORK_TIMEOUT'); err.code='NETWORK_TIMEOUT'; reject(err);
-        }, timeoutMs || 1800);
+        },timeoutMs || 1800);
       });
       var fetchPromise=fetch(API+path,opts).then(async function(res){
         var data=await res.json().catch(function(){return {};});
@@ -163,14 +181,13 @@
         var timeoutErr=new Error('NETWORK_TIMEOUT'); timeoutErr.code='NETWORK_TIMEOUT'; throw timeoutErr;
       }
       throw err;
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
+    } finally { if (timer) clearTimeout(timer); }
   }
 
   function applyCashierUser(userData) {
     state.user=userData;
     state.branchId=userData.branch_id || userData.branchId || null;
+    if(state.branchId) localStorage.setItem('xentra_pos_branch_id',String(state.branchId));
     if ($('pos-branch-name')) $('pos-branch-name').textContent=userData.branch_name || state.branchId || 'Cabang';
     if ($('pos-cashier-name')) $('pos-cashier-name').textContent=userData.full_name || userData.username || 'Kasir';
   }
@@ -178,68 +195,69 @@
   function showPosAuthGate(offlineReason) {
     var gate=$('pos-auth-gate'); if(!gate) return;
     var badge=$('pos-auth-badge'), subtitle=$('pos-auth-subtitle'), input=$('pos-login-pin'), error=$('pos-pin-login-error');
-    if (offlineReason) {
+    if(offlineReason){
       badge.textContent='OFFLINE / PIN TERSIMPAN'; badge.className='pos-auth-badge offline';
-      subtitle.textContent='Koneksi ke Core tidak tersedia atau terlalu lambat. Masukkan PIN POS untuk membuka kasir yang sudah pernah digunakan di terminal ini.';
-    } else {
+      subtitle.textContent='Koneksi ke Core tidak tersedia atau terlalu lambat. Masukkan PIN POS untuk membuka salah satu kasir yang sudah pernah digunakan di terminal ini.';
+    }else{
       badge.textContent='PIN Kasir'; badge.className='pos-auth-badge';
       subtitle.textContent='Masukkan PIN 6 digit untuk masuk cepat ke akun Kasir.';
     }
-    if (error) error.textContent='';
-    if (input) { input.value=''; setTimeout(function(){input.focus();},50); }
+    if(error) error.textContent='';
+    if(input){input.value='';setTimeout(function(){input.focus();},50);}
     gate.style.display='flex';
   }
 
-  function hidePosAuthGate() {
-    var gate=$('pos-auth-gate'); if(gate) gate.style.display='none';
-  }
+  function hidePosAuthGate(){var gate=$('pos-auth-gate');if(gate)gate.style.display='none';}
 
   async function onlinePinLogin(pin) {
-    var cached=getPosPinCache();
-    var branchId=(cached && cached.branch_id) || state.branchId;
-    if (!branchId) {
-      var err=new Error('POS terminal belum memiliki konteks cabang. Masuk menggunakan akun Xentra terlebih dahulu.'); err.code='POS_BRANCH_REQUIRED'; throw err;
+    var branchId=state.branchId || localStorage.getItem('xentra_pos_branch_id') || null;
+    var terminalId=state.terminalId || localStorage.getItem('xentra_pos_terminal_id') || null;
+    if(!branchId || !terminalId){
+      var err=new Error('Terminal POS belum memiliki konteks cabang. Masuk menggunakan akun Xentra terlebih dahulu.'); err.code='POS_CONTEXT_REQUIRED'; throw err;
     }
     return requestWithTimeout('/auth/pos/pin',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({branch_id:branchId,pin:String(pin||'')})
+      body:JSON.stringify({branch_id:branchId,terminal_id:terminalId,pin:String(pin||'')})
     },1800);
   }
 
   async function unlockWithPin(pin) {
-    var cached=getPosPinCache();
-    if (!cached || !cached.offline_credential || !cached.user) {
-      var missing=new Error('PIN POS belum tersiap pada terminal ini. Masuk menggunakan akun Xentra terlebih dahulu.'); missing.code='PIN_NOT_CACHED'; throw missing;
+    var branchId=state.branchId || localStorage.getItem('xentra_pos_branch_id') || null;
+    if(!branchId){
+      var contextErr=new Error('Konteks cabang POS belum tersimpan. Masuk menggunakan akun Xentra terlebih dahulu.'); contextErr.code='POS_CONTEXT_REQUIRED'; throw contextErr;
     }
 
-    var canTryOnline=navigator.onLine;
-    if (canTryOnline) {
-      try {
+    if(navigator.onLine){
+      try{
         var online=await onlinePinLogin(pin);
         localStorage.setItem(TOKEN_KEY,online.token);
         localStorage.setItem(USER_KEY,JSON.stringify(online.user));
         state.offlineMode=false;
         applyCashierUser(online.user);
-        if (online.offline_credential) savePosPinCache(online.user,online.offline_credential,state.branchId);
+        if(online.offline_credential) savePosPinCache(online.user,online.offline_credential,branchId);
         return {online:true};
-      } catch (err) {
-        // Never fall back to a cached PIN for an explicit server-side credential failure.
-        if (err && err.status && err.status>=400 && err.status<500 && err.code!=='NETWORK_TIMEOUT') throw err;
+      }catch(err){
+        // Only network/timeout failures may fall back to the locally cached verifier.
+        if(err && err.status) throw err;
+        if(err && err.code && err.code!=='NETWORK_TIMEOUT') throw err;
       }
     }
 
-    var valid=await verifyOfflinePin(pin,cached.offline_credential);
-    if (!valid) {
-      var invalid=new Error('PIN Kasir salah.'); invalid.code='INVALID_OFFLINE_POS_PIN'; throw invalid;
+    var profiles=getCachedPinProfilesForBranch(branchId);
+    for(var i=0;i<profiles.length;i++){
+      var valid=await verifyOfflinePin(pin,profiles[i].offline_credential);
+      if(!valid) continue;
+      state.offlineMode=true;
+      applyCashierUser(profiles[i].user);
+      state.terminalId=localStorage.getItem('xentra_pos_terminal_id') || null;
+      state.menu=getPosMenuCache(state.branchId) || {categories:[],products:[]};
+      state.shift=getPosShiftCache(state.user.id);
+      localStorage.setItem(USER_KEY,JSON.stringify(state.user));
+      return {online:false};
     }
 
-    state.offlineMode=true;
-    applyCashierUser(cached.user);
-    state.terminalId=localStorage.getItem('xentra_pos_terminal_id') || null;
-    state.menu=getPosMenuCache(state.branchId) || {categories:[],products:[]};
-    state.shift=getPosShiftCache(state.user.id);
-    return {online:false};
+    var invalid=new Error('PIN Kasir salah atau belum pernah didaftarkan pada terminal ini.'); invalid.code='INVALID_OFFLINE_POS_PIN'; throw invalid;
   }
 
   function openPinUnlockGate(offlineReason) {
