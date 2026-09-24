@@ -8,6 +8,7 @@ const db = new RoutePersistenceRepository();
 const BranchMatcher = require('../services/BranchMatcher');
 const DeliveryCalculator = require('../services/DeliveryCalculator');
 const PaymentService = require('../services/PaymentService');
+const registerPaymentWebhooks = require('./webhooks');
 const OrderStateMachine = require('../services/OrderStateMachine');
 const AcceptanceTimeoutService = require('../services/AcceptanceTimeoutService');
 const RouteService = require('../services/RouteService');
@@ -4091,41 +4092,8 @@ router.post('/pos/inventory-conflicts/:id/resolve', requireAuth(['owner', 'brand
   }
 });
 
-// 10. Midtrans Webhook
-router.post('/webhooks/midtrans', (req, res) => {
-  try {
-    const result = PaymentService.handleWebhook(req.body, {
-      provider: 'midtrans',
-      headers: req.headers
-    });
-    res.json(result);
-  } catch (err) {
-    console.error('[Webhook] Midtrans error:', err);
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
-
-// 10.1 DOKU Webhook
-router.post('/webhooks/doku', (req, res) => {
-  try {
-    const result = PaymentService.handleWebhook(req.body, {
-      provider: 'doku',
-      headers: {
-        'client-id': req.headers['client-id'] || req.headers['Client-Id'],
-        'request-id': req.headers['request-id'] || req.headers['Request-Id'],
-        'request-timestamp': req.headers['request-timestamp'] || req.headers['Request-Timestamp'],
-        'signature': req.headers['signature'] || req.headers['Signature'],
-        'digest': req.headers['digest'] || req.headers['Digest'],
-        'request-target': req.headers['request-target'] || req.headers['Request-Target']
-      },
-      notificationPath: req.originalUrl ? req.originalUrl.split('?')[0] : '/webhooks/doku'
-    });
-    res.json(result);
-  } catch (err) {
-    console.error('[Webhook] DOKU error:', err);
-    res.status(400).json({ success: false, error: err.message });
-  }
-});
+// Payment-provider webhooks are isolated in server/routes/webhooks.js.
+registerPaymentWebhooks(router);
 
 // 10.0 SaaS Control Plane Business Registration Endpoint
 router.post('/auth/register', async (req, res) => {
