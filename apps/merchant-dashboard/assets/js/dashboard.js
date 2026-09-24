@@ -8293,7 +8293,7 @@
           scopeSel.value = (branchId && branchId !== 'all') ? branchId : 'brand';
         }
 
-        var activeProvider = ps.active_provider || 'midtrans';
+        var activeProvider = ps.active_provider || '';
 
         // Tab gateway tidak menampilkan status aktif/nonaktif: pengaturan ini fokus
         // pada penyimpanan kredensial. Aktif/nonaktifnya ada di Finance → Payment Methods.
@@ -8308,7 +8308,9 @@
         // Memuat ulang setelah menyimpan tidak boleh memindahkan tab yang sedang dilihat.
         if (!_paymentTabInitialised) {
           _paymentTabInitialised = true;
-          switchPaymentTab(activeProvider);
+          if (activeProvider) {
+            switchPaymentTab(activeProvider);
+          }
         }
       } catch (err) {
         console.warn('[Load Settings Payments Warn]:', err);

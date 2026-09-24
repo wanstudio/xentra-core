@@ -37,9 +37,6 @@ var STATIC_ASSETS = [
   "/assets/css/layout.css",
   "/assets/css/components.css",
   "/assets/css/home.css",
-  "/assets/css/checkout.css",
-  "/assets/css/order-received.css",
-  "/assets/css/location-picker.css",
   "/assets/js/core/store.js",
   "/assets/js/core/ui.js",
   "/assets/js/core/api.js",
@@ -47,15 +44,10 @@ var STATIC_ASSETS = [
   "/assets/js/core/router.js",
   "/assets/js/core/pwa-runtime.js",
   "/assets/js/core/promo-reward-cart.js",
-  "/assets/js/core/delivery-schedule.js",
-  "/assets/js/core/media.js",
   "/assets/js/location.js",
   "/assets/js/core/discovery.js",
-  "/assets/js/core/location-picker.js",
-  "/assets/js/pages/home.js",
-  "/assets/js/pages/checkout.js",
-  "/assets/js/pages/order-received.js",
-  "/assets/js/pages/aux-pages.js"
+  "/assets/js/core/media.js",
+  "/assets/js/pages/home.js"
 ];
 
 // Content-hash: fetch own file, compute simple hash for cache name.
@@ -144,6 +136,25 @@ function cacheFirst(event, cacheName) {
   });
 }
 
+// Stale-While-Revalidate: Instant paint from cache while revalidating in background.
+function staleWhileRevalidate(event) {
+  return computeCacheName().then(function (cn) {
+    return caches.open(cn).then(function (cache) {
+      return cache.match(event.request).then(function (cached) {
+        var fetchPromise = fetch(event.request).then(function (response) {
+          if (response && response.status === 200) {
+            cache.put(event.request, response.clone());
+          }
+          return response;
+        }).catch(function () {
+          return cached || null;
+        });
+        return cached || fetchPromise;
+      });
+    });
+  });
+}
+
 // Network-First: fresh when online, cached when the network is unavailable.
 function networkFirst(event) {
   return fetch(event.request)
@@ -167,7 +178,7 @@ function networkFirst(event) {
     });
 }
 
-// 3. Fetch strategy — per asset category (see the table in the header comment).
+// 3. Fetch strategy — per asset category.
 self.addEventListener("fetch", function (event) {
   if (event.request.method !== "GET") return;
 
@@ -191,8 +202,7 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
-  // Static UI images (app icons): Cache-First. Only cosmetic staleness is
-  // possible, and it is bounded by the app-shell cache rotating on each release.
+  // Static UI images (app icons): Cache-First.
   if (url.pathname.startsWith("/assets/icons/") || url.pathname.startsWith("/assets/pwa/")) {
     event.respondWith(
       computeCacheName().then(function (cn) { return cacheFirst(event, cn); })
@@ -200,9 +210,13 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
-  // HTML / JS / CSS / manifest: Network-First. Deliberately NOT cache-first:
-  // asset URLs are unversioned (release identity is the SW content hash), so a
-  // stale JS/CSS could pair with a newer HTML document. Network-First keeps code
-  // freshness and lets the offline fallback handle real outages.
+  // Static app shell styles and scripts: Stale-While-Revalidate for instant render,
+  // refreshed in background without stale mismatch (bound to active release cache).
+  if (url.pathname.startsWith("/assets/css/") || url.pathname.startsWith("/assets/js/")) {
+    event.respondWith(staleWhileRevalidate(event));
+    return;
+  }
+
+  // HTML / manifest.json / navigations: Network-First for immediate code freshness.
   event.respondWith(networkFirst(event));
 });

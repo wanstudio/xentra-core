@@ -290,7 +290,7 @@ test('Payment 3 — Midtrans Webhook: verifies SHA512 signature, advances status
   };
 
   // 2. Process valid Webhook
-  const result = PaymentGatewayService.handleWebhook(webhookPayload);
+  const result = PaymentGatewayService.handleWebhook(webhookPayload, { provider: 'midtrans' });
   assert.strictEqual(result.success, true);
   assert.strictEqual(result.payment_status, 'settlement');
 
@@ -316,7 +316,7 @@ test('Payment 3 — Midtrans Webhook: verifies SHA512 signature, advances status
   assert.strictEqual(movements[0].movement_type, 'sale_deduction');
 
   // 3. Idempotent Test: Same webhook sent a second time -> DROPPED (No duplicate deduction)
-  const duplicateResult = PaymentGatewayService.handleWebhook(webhookPayload);
+  const duplicateResult = PaymentGatewayService.handleWebhook(webhookPayload, { provider: 'midtrans' });
   assert.strictEqual(duplicateResult.success, true);
   assert.strictEqual(duplicateResult.idempotent, true);
 
@@ -353,7 +353,7 @@ test('Payment 4 — Midtrans Webhook: strictly rejects invalid SHA512 signature 
   };
 
   assert.throws(() => {
-    PaymentGatewayService.handleWebhook(fakeWebhookPayload);
+    PaymentGatewayService.handleWebhook(fakeWebhookPayload, { provider: 'midtrans' });
   }, /Signature webhook Midtrans tidak valid/);
 });
 
@@ -406,7 +406,7 @@ test('Payment 5 — Concurrency Race: Stock Depleted on Settlement marks fulfill
     payment_type: 'qris'
   };
 
-  const result = PaymentGatewayService.handleWebhook(webhookPayload);
+  const result = PaymentGatewayService.handleWebhook(webhookPayload, { provider: 'midtrans' });
   assert.strictEqual(result.success, true);
   assert.strictEqual(result.payment_status, 'settlement');
   assert.strictEqual(result.order_status, 'fulfillment_exception');
@@ -457,7 +457,7 @@ test('Payment 6 — Terminal State Invariant: rejects settlement on cancelled / 
     signature_key: expireSig,
     transaction_status: 'expire',
     payment_type: 'qris'
-  });
+  }, { provider: 'midtrans' });
 
   const expiredOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
   const expiredPayment = db.prepare('SELECT payment_status FROM order_payments WHERE order_id = ?').get(orderId);
@@ -476,7 +476,7 @@ test('Payment 6 — Terminal State Invariant: rejects settlement on cancelled / 
       signature_key: settleSig,
       transaction_status: 'settlement',
       payment_type: 'qris'
-    });
+    }, { provider: 'midtrans' });
   }, /Transisi status pembayaran tidak valid/);
 
   // Verify order remains cancelled
@@ -519,7 +519,7 @@ test('Payment 7 — Midtrans Webhook: strictly rejects amount mismatch even with
       signature_key: validCryptoSig,
       transaction_status: 'settlement',
       payment_type: 'qris'
-    });
+    }, { provider: 'midtrans' });
   }, /PAYMENT_AMOUNT_MISMATCH/);
 
   // Assert order & payment remain pending and NOT confirmed
@@ -660,7 +660,7 @@ test('Payment 9 — Webhook Concurrency Race & Idempotent Retry: First settlemen
     gross_amount: '25000'
   };
 
-  const resA = PaymentGatewayService.handleWebhook(webhookPayloadA, { skipSignatureCheck: true });
+  const resA = PaymentGatewayService.handleWebhook(webhookPayloadA, { skipSignatureCheck: true, provider: 'midtrans' });
   assert.strictEqual(resA.payment_status, 'settlement');
   const orderAInDb = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderIdA);
   assert.strictEqual(orderAInDb.status, 'pending', 'money settled but order still AWAITING_BRANCH_ACCEPTANCE (R5 check-2)');
@@ -676,7 +676,7 @@ test('Payment 9 — Webhook Concurrency Race & Idempotent Retry: First settlemen
     gross_amount: '25000'
   };
 
-  const resB = PaymentGatewayService.handleWebhook(webhookPayloadB, { skipSignatureCheck: true });
+  const resB = PaymentGatewayService.handleWebhook(webhookPayloadB, { skipSignatureCheck: true, provider: 'midtrans' });
   assert.strictEqual(resB.payment_status, 'settlement');
   assert.strictEqual(resB.order_status, 'fulfillment_exception');
 
@@ -685,7 +685,7 @@ test('Payment 9 — Webhook Concurrency Race & Idempotent Retry: First settlemen
   assert.ok(orderBInDb.order_note.includes('PROMO_LIMIT_EXCEEDED_RACE'));
 
   // 5. Idempotent Retry: Re-sending webhook for Order A returns idempotent success without duplicate rows
-  const retryA = PaymentGatewayService.handleWebhook(webhookPayloadA, { skipSignatureCheck: true });
+  const retryA = PaymentGatewayService.handleWebhook(webhookPayloadA, { skipSignatureCheck: true, provider: 'midtrans' });
   assert.strictEqual(retryA.idempotent, true);
   assert.strictEqual(retryA.payment_status, 'settlement');
 
@@ -728,7 +728,7 @@ test('Payment R11 — settlement after branch REJECT/BRANCH_TIMEOUT routes to fu
       gross_amount: '60000.00',
       transaction_status: 'settlement',
       payment_type: 'qris'
-    }, { skipSignatureCheck: true });
+    }, { skipSignatureCheck: true, provider: 'midtrans' });
 
     assert.strictEqual(result.success, true, label);
     assert.strictEqual(result.payment_status, 'settlement', 'money IS settled');
@@ -766,7 +766,7 @@ test('Payment R11 — gateway cancel/deny/expire never overwrites a terminal BRA
     gross_amount: '60000.00',
     transaction_status: 'expire',
     payment_type: 'qris'
-  }, { skipSignatureCheck: true });
+  }, { skipSignatureCheck: true, provider: 'midtrans' });
 
   assert.strictEqual(result.success, true);
   assert.strictEqual(result.payment_status, 'expire', 'payment failure is recorded');
@@ -814,7 +814,7 @@ test('R5 CHECK-2 — settlement keeps the order AWAITING; only Branch ACCEPT con
     gross_amount: '45000.00',
     transaction_status: 'settlement',
     payment_type: 'qris'
-  }, { skipSignatureCheck: true });
+  }, { skipSignatureCheck: true, provider: 'midtrans' });
 
   assert.strictEqual(resA.success, true);
   assert.strictEqual(resA.payment_status, 'settlement');
@@ -863,7 +863,7 @@ test('R5 CHECK-2 — settlement keeps the order AWAITING; only Branch ACCEPT con
     gross_amount: '30000.00',
     transaction_status: 'settlement',
     payment_type: 'qris'
-  }, { skipSignatureCheck: true });
+  }, { skipSignatureCheck: true, provider: 'midtrans' });
   assert.strictEqual(resB.success, true);
   assert.strictEqual(resB.payment_status, 'settlement');
   const orderB = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderIdB);
@@ -888,7 +888,7 @@ test('R5 CHECK-2 — settlement keeps the order AWAITING; only Branch ACCEPT con
     gross_amount: '20000.00',
     transaction_status: 'expire',
     payment_type: 'qris'
-  }, { skipSignatureCheck: true });
+  }, { skipSignatureCheck: true, provider: 'midtrans' });
   assert.strictEqual(
     db.prepare('SELECT status FROM orders WHERE id = ?').get(orderIdC).status,
     'cancelled',

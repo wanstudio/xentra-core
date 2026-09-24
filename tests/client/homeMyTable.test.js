@@ -179,3 +179,26 @@ test('MYTABLE-08: pesanan checkout terikat ke meja hasil scan', () => {
   assert.ok(CHECKOUT.includes('state.fulfillment.table_ids = [storedTable.id];'),
     'meja itu langsung terpasang, tanpa pilih meja lagi');
 });
+
+test('MYTABLE-16: refreshOpenBill mensinkronkan meja tagihan aktif dan mengunci hadOpenBill di Store', () => {
+  assert.ok(/bill && Array\.isArray\(bill\.tables\) && bill\.tables\.length > 0/.test(CHECKOUT),
+    'refreshOpenBill harus mengecek meja dari bill aktif');
+  assert.ok(/Store\.setMyTable\(\{ id: bId, number: bNum, hadOpenBill: true \}\)/.test(CHECKOUT),
+    'refreshOpenBill harus mengunci meja dengan hadOpenBill: true');
+  assert.ok(CHECKOUT.includes("switchFulfillmentEnvironment('dine_in');"),
+    'tipe fulfillment harus beralih ke dine_in saat ada open bill');
+});
+
+test('MYTABLE-17: canvas denah meja dan autoRecommendTable mengunci meja saat hadOpenBill aktif', () => {
+  assert.ok(/lockedTable && lockedTable\.hadOpenBill && String\(lockedTable\.id\) !== String\(tid\)/.test(CHECKOUT),
+    'klik meja lain di denah harus menolak dengan toast ingin pindah meja');
+  assert.ok(/var isMyLockedTable = Boolean\(lockedTable && lockedTable\.hadOpenBill && String\(lockedTable\.id\) === String\(t\.id\)\);/.test(CHECKOUT),
+    'meja sendiri yang sedang occupied tidak boleh ditandai unavailable');
+  assert.ok(/function autoRecommendTable\(\) \{[\s\S]{0,180}lockedTable && lockedTable\.hadOpenBill/.test(CHECKOUT),
+    'autoRecommendTable dilewati jika meja sudah terkunci open bill');
+});
+
+test('MYTABLE-18: onSuccess mencatat hadOpenBill: true saat pesanan dine-in berhasil disubmit', () => {
+  assert.ok(/function onSuccess[\s\S]{0,1200}state\.fulfillment\.type === 'dine_in'[\s\S]{0,300}hadOpenBill: true/.test(CHECKOUT),
+    'onSuccess harus mengunci hadOpenBill: true pada pesanan dine-in pertama');
+});

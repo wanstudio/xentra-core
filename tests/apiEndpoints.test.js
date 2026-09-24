@@ -2518,7 +2518,7 @@ test('R5 CHECK-2 API: midtrans settlement keeps order AWAITING; only branch-acce
     gross_amount: String(orderData.grand_total) + '.00',
     transaction_status: 'settlement',
     payment_type: 'qris'
-  }, { skipSignatureCheck: true });
+  }, { skipSignatureCheck: true, provider: 'midtrans' });
   assert.strictEqual(handled.payment_status, 'settlement');
   assert.strictEqual(
     db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId).status,

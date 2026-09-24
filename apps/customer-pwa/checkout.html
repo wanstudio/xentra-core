@@ -71,6 +71,77 @@
 </head>
 <body>
 
+  <script>
+    (function () {
+      window.Xentra = window.Xentra || {};
+      window.Xentra.showSplash = function (message) {
+        var el = document.getElementById('x-splash');
+        if (el) {
+          el.style.display = 'flex';
+          var txt = document.getElementById('x-splash-text');
+          if (txt && typeof message === 'string') {
+            txt.textContent = message;
+          }
+        }
+      };
+      window.Xentra.hideSplash = function () {
+        var el = document.getElementById('x-splash');
+        if (el) el.style.display = 'none';
+      };
+      window.__xentraHideSplash = window.Xentra.hideSplash;
+
+      window.addEventListener('pageshow', function () {
+        if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+          window.Xentra.hideSplash();
+        }
+      });
+    })();
+  </script>
+
+  <div id="x-splash" style="position:fixed;inset:0;z-index:99999;background:#ffffff;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+    <style>
+      #x-splash .bot-arm-l, #x-splash .bot-arm-r { transform-box: fill-box; transform-origin: 50% 0%; }
+      #x-splash .bot-float { animation: bot-float 2.6s ease-in-out infinite alternate; }
+      #x-splash .bot-shadow { animation: bot-shadow 2.6s ease-in-out infinite alternate; }
+      #x-splash .bot-eye { animation: bot-blink 4.2s steps(1, end) infinite; transform-box: fill-box; transform-origin: center; }
+      #x-splash .bot-arm-l { animation: bot-flap-l 1.3s ease-in-out infinite alternate; }
+      #x-splash .bot-arm-r { animation: bot-flap-r 1.3s ease-in-out infinite alternate; }
+      @keyframes bot-float { from { transform: translateY(0); } to { transform: translateY(-4px); } }
+      @keyframes bot-shadow { from { transform: scaleX(1); opacity:.18; } to { transform: scaleX(.78); opacity:.10; } }
+      @keyframes bot-blink { 0%, 44%, 48%, 92%, 96%, 100% { transform: scaleY(1); } 46% { transform: scaleY(.12); } 94% { transform: scaleY(.12); } }
+      @keyframes bot-flap-l { from { transform: rotate(-22deg); } to { transform: rotate(22deg); } }
+      @keyframes bot-flap-r { from { transform: rotate(22deg); } to { transform: rotate(-22deg); } }
+      @media (prefers-reduced-motion: reduce) {
+        #x-splash .bot-float, #x-splash .bot-shadow, #x-splash .bot-eye,
+        #x-splash .bot-arm-l, #x-splash .bot-arm-r { animation: none; }
+      }
+    </style>
+
+    <svg width="88" height="96" viewBox="0 0 92 100" aria-hidden="true">
+      <defs>
+        <linearGradient id="botBody" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffffff"></stop>
+          <stop offset="1" stop-color="#e9eef3"></stop>
+        </linearGradient>
+      </defs>
+      <ellipse class="bot bot-shadow" cx="46" cy="96" rx="16" ry="4" fill="#111827" opacity=".15"></ellipse>
+      <g class="bot bot-float">
+        <ellipse class="bot bot-arm-l" cx="15" cy="52" rx="4.4" ry="16" fill="#ffffff" stroke="#d1d5db" stroke-width="1.4"></ellipse>
+        <ellipse class="bot bot-arm-r" cx="77" cy="52" rx="4.4" ry="16" fill="#ffffff" stroke="#d1d5db" stroke-width="1.4"></ellipse>
+        <path d="M46 8 C62 8 72 22 72 44 C72 78 54 94 46 94 C38 94 20 78 20 44 C20 22 30 8 46 8 Z"
+              fill="url(#botBody)" stroke="#d1d5db" stroke-width="1.6"></path>
+        <rect x="26" y="20" width="40" height="34" rx="17" fill="#111827"></rect>
+        <g class="bot bot-eye">
+          <ellipse cx="38.5" cy="37" rx="6.2" ry="7" fill="#ffffff"></ellipse>
+          <ellipse cx="53.5" cy="37" rx="6.2" ry="7" fill="#ffffff"></ellipse>
+        </g>
+      </g>
+    </svg>
+
+    <img src="/assets/img/xentra-logo.png" alt="" style="width:56px;height:56px;object-fit:contain;opacity:.9;margin-top:2px;">
+    <div id="x-splash-text" style="color:#64748b;font-size:13px;font-weight:600;letter-spacing:-0.01em;margin-top:2px;">Memuat…</div>
+  </div>
+
   <!-- ═══════════════════════════════════════════════════
        1. HOME VIEW (MENU KATALOG)
        ═══════════════════════════════════════════════════ -->

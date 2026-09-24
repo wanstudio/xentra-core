@@ -2103,7 +2103,8 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
 
       if (reqTableIds.length > 0) {
         // Authoritatively check availability
-        const availCheck = DiningTableService.validateTablesAvailable(branch.id, reqTableIds);
+        const custPhone = (customer && customer.phone) || (customerSession && customerSession.phone) || null;
+        const availCheck = DiningTableService.validateTablesAvailable(branch.id, reqTableIds, custPhone);
         if (!availCheck.valid) {
           return res.status(400).json({
             success: false,
@@ -2213,7 +2214,8 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
             customer_name: customer.name,
             customer_phone: customer.phone,
             guest_count: guest_count || 1,
-            hold_reference_id: null
+            hold_reference_id: null,
+            channel: 'customer_app'
           });
         }
       } catch (tblHoldErr) {
@@ -3880,7 +3882,10 @@ router.post('/pos/inventory-conflicts/:id/resolve', requireAuth(['owner', 'brand
 // 10. Midtrans Webhook
 router.post('/webhooks/midtrans', (req, res) => {
   try {
-    const result = PaymentService.handleWebhook(req.body);
+    const result = PaymentService.handleWebhook(req.body, {
+      provider: 'midtrans',
+      headers: req.headers
+    });
     res.json(result);
   } catch (err) {
     console.error('[Webhook] Midtrans error:', err);
@@ -12345,7 +12350,7 @@ router.put('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
     if (typeof provider !== 'undefined') {
       merged.provider = provider || '';
     } else if (!Object.prototype.hasOwnProperty.call(merged, 'provider')) {
-      merged.provider = 'midtrans';
+      merged.provider = '';
     }
     // Environment disimpan per gateway: `is_production` milik Midtrans,
     // `doku_is_production` milik DOKU. Tidak ada lagi satu flag untuk keduanya.
@@ -12424,7 +12429,7 @@ router.put('/admin/settings/commerce/payments/:provider/credentials', requireAut
     }
 
     const merged = Object.assign({}, existing);
-    if (!Object.prototype.hasOwnProperty.call(merged, 'provider')) merged.provider = 'midtrans';
+    if (!Object.prototype.hasOwnProperty.call(merged, 'provider')) merged.provider = '';
 
     if (provider === 'midtrans') {
       const { server_key, client_key, merchant_id, is_production } = req.body;

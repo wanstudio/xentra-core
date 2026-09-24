@@ -53,3 +53,53 @@ test('SPLASH-04: splash bawaan PWA (manifest) sewarna dengan splash di halaman',
   assert.equal(String(MANIFEST.theme_color).toLowerCase(), '#ffffff',
     'theme_color harus sama dengan splash');
 });
+
+test('SPLASH-05: window.Xentra.showSplash dan window.Xentra.hideSplash diekspos dengan pageshow auto-hide', () => {
+  assert.ok(HTML.includes('window.Xentra.showSplash'), 'harus ada showSplash global');
+  assert.ok(HTML.includes('window.Xentra.hideSplash'), 'harus ada hideSplash global');
+  assert.ok(HTML.includes('id="x-splash-text"'), 'harus ada wadah teks status pesan splash');
+  assert.ok(HTML.includes("addEventListener('pageshow'"), 'harus ada listener pageshow untuk back-button/bfcache auto-hide');
+});
+
+test('SPLASH-06: checkout.js dan payment-gateway.js menampilkan splash robot saat proses dan redirect pembayaran', () => {
+  const checkoutJs = read('apps/customer-pwa/assets/js/pages/checkout.js');
+  const paymentGwJs = read('apps/customer-pwa/assets/js/core/payment-gateway.js');
+
+  // Checkout memanggil showSplash saat order online dibuat
+  assert.ok(checkoutJs.includes("window.Xentra.showSplash('Menyiapkan pembayaran…')"),
+    'checkout harus memanggil showSplash saat mulai menyiapkan pembayaran');
+
+  // Checkout mengupdate pesan splash dan memanggil ensurePaymentGateway
+  assert.ok(checkoutJs.includes("window.Xentra.showSplash('Mengarahkan ke pembayaran…')"),
+    'checkout harus memanggil showSplash saat mengarahkan ke gateway');
+  assert.ok(checkoutJs.includes('window.Xentra.ensurePaymentGateway'),
+    'checkout harus memastikan PaymentGateway ter-load sebelum pay()');
+
+  // Checkout menyembunyikan splash jika submit/prepayment gagal
+  assert.ok(checkoutJs.includes('window.Xentra.hideSplash()'),
+    'checkout harus menutup splash saat terjadi kegagalan atau pembatalan');
+
+  // PaymentGateway memanggil showSplash sebelum redirect DOKU
+  assert.ok(paymentGwJs.includes("window.Xentra.showSplash('Mengarahkan ke pembayaran…')"),
+    'payment-gateway harus memanggil showSplash sebelum navigasi window.location.href');
+});
+
+test('SPLASH-07: pencegahan fallback keranjang kosong dan perlindungan DOM selama proses dan redirect online pay', () => {
+  const checkoutJs = read('apps/customer-pwa/assets/js/pages/checkout.js');
+
+  // syncRowsFromItems dicegah memanggil renderEmpty saat submit / redirecting
+  assert.ok(checkoutJs.includes('if (state.isSubmitting || state.isRedirectingToPayment) return;'),
+    'syncRowsFromItems harus di-guard agar tidak memanggil renderEmpty saat payment berlangsung');
+
+  // renderEmpty dicegah menimpa DOM dengan template keranjang kosong saat submit / redirecting
+  assert.ok(checkoutJs.includes("if (state.isSubmitting || state.isRedirectingToPayment) {\n      if (window.Xentra && typeof window.Xentra.showSplash === 'function') {\n        window.Xentra.showSplash('Mengarahkan ke pembayaran…');\n      }\n      return;\n    }"),
+    'renderEmpty harus di-guard agar tidak menampilkan Keranjang Masih Kosong');
+
+  // Store.subscribe dicegah menimpa layout saat payment berlangsung
+  assert.ok(checkoutJs.includes('if (!checkoutContainer || state.isSubmitting || state.isRedirectingToPayment) return;'),
+    'Store.subscribe harus mengabaikan event cart saat redirecting to payment');
+
+  // pageshow listener mengembalikan state submission dan tombol CTA
+  assert.ok(checkoutJs.includes('state.isRedirectingToPayment = false;') && checkoutJs.includes('btn.disabled = false;'),
+    'pageshow harus mereset isRedirectingToPayment dan mengembalikan tombol submit');
+});

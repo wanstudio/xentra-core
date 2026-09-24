@@ -259,3 +259,65 @@ test('PGISO-10: checkout dan order-received memakai modul, tidak menulis "midtra
   assert.ok(moduleSrc.includes('var PROVIDERS = {'), 'nama provider terdaftar di modul');
   assert.ok(moduleSrc.includes('function onlineLabel('), 'modul menyediakan label');
 });
+
+// ── 11. Resilient online payment selection & no bare toast ──
+
+test('PGISO-11: checkout.js bebas dari pemanggilan bare toast() dan memakai UI.toast', () => {
+  const checkout = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+  assert.ok(!/[^.]toast\(/g.test(checkout), 'checkout.js tidak boleh memanggil bare toast() yang undefined');
+  assert.ok(checkout.includes("UI.toast('Pembayaran online belum tersedia atau belum dikonfigurasi.')"),
+    'checkout.js memakai UI.toast untuk feedback online payment');
+});
+
+test('PGISO-12: checkout.js optOn click handler memuat konfigurasi gateway secara asinkron saat belum siap', () => {
+  const checkout = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+  assert.ok(checkout.includes('applyOnlineMethod'), 'checkout.js memiliki callback applyOnlineMethod');
+  assert.ok(checkout.includes('ensureGateway'), 'checkout.js meng-await ensureGateway jika config belum siap');
+  assert.ok(checkout.includes('loadConfig(true)'), 'checkout.js memanggil loadConfig jika config belum ada');
+});
+
+test('PGISO-13: isOnlinePayment di checkout.js aman mengenali doku/midtrans saat gateway loading', () => {
+  const checkout = fs.readFileSync(CHECKOUT_PATH, 'utf8');
+  assert.ok(checkout.includes("m === 'midtrans' || m === 'doku'"),
+    'isOnlinePayment memiliki fallback aman saat modul gateway sedang loading');
+});
+
+test('PGISO-14: index.html memastikan ensurePaymentGateway selalu di-resolve pada checkout dan order-received', () => {
+  const indexHtml = fs.readFileSync(path.resolve(__dirname, '../../apps/customer-pwa/index.html'), 'utf8');
+  const checkoutRouteSection = indexHtml.slice(indexHtml.indexOf("view === 'checkout'"), indexHtml.indexOf("view === 'affiliate'"));
+  assert.ok(checkoutRouteSection.includes('window.Xentra.ensurePaymentGateway'),
+    'ensureController checkout dan order-received harus selalu meng-await ensurePaymentGateway');
+});
+
+test('PGISO-15: payment-gateway.js loadConfig mendukung forceReload dan pemulihan dari null', async () => {
+  let callCount = 0;
+  const win = {
+    Xentra: {
+      API: {
+        get: () => {
+          callCount++;
+          return Promise.resolve({ success: true, payment_gateway: { active_provider: 'doku', active_provider_configured: true } });
+        }
+      }
+    }
+  };
+  globalThis.window = win;
+  delete require.cache[MODULE_PATH];
+  require(MODULE_PATH);
+
+  const GW = win.Xentra.PaymentGateway;
+  const cfg1 = await GW.loadConfig();
+  assert.equal(cfg1.active_provider, 'doku');
+  assert.equal(callCount, 1);
+
+  // Cached call without forceReload
+  const cfg2 = await GW.loadConfig();
+  assert.equal(cfg2.active_provider, 'doku');
+  assert.equal(callCount, 1);
+
+  // forceReload call
+  const cfg3 = await GW.loadConfig(true);
+  assert.equal(cfg3.active_provider, 'doku');
+  assert.equal(callCount, 2);
+});
+

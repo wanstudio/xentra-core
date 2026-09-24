@@ -39,9 +39,14 @@ class DiningTableRepository {
         t.id, t.branch_id, t.table_number, t.label, t.capacity, t.section_id,
         t.x, t.y, t.width, t.height, t.shape, t.orientation, t.qr_token, t.is_active,
         COALESCE(s.operational_state, 'available') as operational_state,
-        s.current_session_id, s.notes, s.updated_at as state_updated_at
+        s.current_session_id, s.notes, s.updated_at as state_updated_at,
+        ds.channel as session_channel,
+        ds.customer_name as session_customer_name,
+        ds.customer_phone as session_customer_phone,
+        ds.opened_at as session_opened_at
       FROM branch_tables t
       LEFT JOIN branch_table_states s ON s.table_id = t.id
+      LEFT JOIN dining_sessions ds ON ds.id = s.current_session_id AND ds.status = 'active'
       WHERE t.branch_id = ? AND t.is_active = 1
       ORDER BY CAST(t.table_number AS INTEGER) ASC, t.table_number ASC
     `, [branchId]);
@@ -172,13 +177,14 @@ class DiningTableRepository {
 
   updateTableState({ tableId, operationalState, currentSessionId = null, notes = null, updatedAt }) {
     return this.db.execute(`
-      UPDATE branch_table_states
-      SET operational_state = ?,
-          current_session_id = ?,
-          notes = ?,
-          updated_at = ?
-      WHERE table_id = ?
-    `, [operationalState, currentSessionId, notes, updatedAt, tableId]);
+      INSERT INTO branch_table_states (table_id, operational_state, current_session_id, notes, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(table_id) DO UPDATE SET
+        operational_state = excluded.operational_state,
+        current_session_id = excluded.current_session_id,
+        notes = excluded.notes,
+        updated_at = excluded.updated_at
+    `, [tableId, operationalState, currentSessionId, notes, updatedAt]);
   }
 
   updateTableOperationalState({ tableId, operationalState, notes, updatedAt }) {
@@ -237,7 +243,7 @@ class DiningTableRepository {
 
   findDiningSessionById(sessionId) {
     return this.db.queryOne(
-      "SELECT id, status FROM dining_sessions WHERE id = ? AND status = 'active'",
+      "SELECT id, status, customer_phone, branch_id FROM dining_sessions WHERE id = ? AND status = 'active'",
       [sessionId]
     );
   }
@@ -249,17 +255,18 @@ class DiningTableRepository {
     );
   }
 
-  createDiningSession({ sessionId, branchId, customerName, customerPhone, guestCount, openedAt, updatedAt }) {
+  createDiningSession({ sessionId, branchId, customerName, customerPhone, guestCount, channel = 'customer_app', openedAt, updatedAt }) {
     return this.db.execute(`
       INSERT INTO dining_sessions (
-        id, branch_id, customer_name, customer_phone, guest_count, status, opened_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+        id, branch_id, customer_name, customer_phone, guest_count, channel, status, opened_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?)
     `, [
       sessionId,
       branchId,
       customerName || 'Tamu Dine-In',
       customerPhone || '',
       Number(guestCount) || 1,
+      channel || 'customer_app',
       openedAt,
       updatedAt
     ]);

@@ -15,7 +15,7 @@
 (function () {
   'use strict';
 
-  if (window.XentraLocationPicker) return;
+  if (window.XentraLocationPicker && window.XentraLocationPicker.__isRealModule) return;
 
   var API = window.Xentra && window.Xentra.API;
   var Store = window.Xentra && window.Xentra.Store;
@@ -1957,6 +1957,7 @@
 
   // ── Public API ──
   window.XentraLocationPicker = {
+    __isRealModule: true,
     open: openMainLocationSheet,
     openSearch: openSearchFlow,
     openMap: openMapPickerFlow,

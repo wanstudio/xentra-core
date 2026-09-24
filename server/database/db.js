@@ -1487,6 +1487,7 @@ function initSchema(targetDb) {
       customer_name TEXT,
       customer_phone TEXT,
       guest_count INTEGER DEFAULT 1,
+      channel TEXT NOT NULL DEFAULT 'customer_app', -- 'customer_app' | 'pos_cashier'
       status TEXT NOT NULL DEFAULT 'active', -- 'active' | 'completed'
       opened_at TEXT DEFAULT (datetime('now')),
       closed_at TEXT,
@@ -1604,6 +1605,7 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN fulfillment_type TEXT DEFAULT "delivery";'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN table_number TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN dining_session_id TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE dining_sessions ADD COLUMN channel TEXT DEFAULT "customer_app";'); } catch (e) {}
 
   // Kapasitas maksimal reservasi, DIISI MANUAL manager cabang per cabang.
   // NULL = belum diisi → reservasi dimatikan di aplikasi konsumen.

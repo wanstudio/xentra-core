@@ -824,5 +824,150 @@ test('PAYMENT GATEWAY AUDIT & REGRESSION SUITE', async (t) => {
     assert.ok(report.summary.doku_settled >= 25000, 'doku_settled harus mencakup transaksi DOKU yang settlement');
     assert.ok(report.summary.midtrans_settled >= 30000, 'midtrans_settled harus mencakup transaksi Midtrans yang settlement');
   });
+
+  // ── 20. PaymentRepository.ensurePendingPayment: Missing provider strictly rejects ──
+  await t.test('REG-20: PaymentRepository.ensurePendingPayment rejects missing provider with INVALID_PAYMENT_PROVIDER', async () => {
+    const PaymentRepository = require('../core/data/repositories/PaymentRepository');
+    const paymentRepo = new PaymentRepository();
+
+    assert.throws(() => {
+      paymentRepo.ensurePendingPayment({
+        paymentId: 'pay_missing_1',
+        orderId: 'ord_missing_1',
+        amount: 50000,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }, /INVALID_PAYMENT_PROVIDER/);
+
+    assert.throws(() => {
+      paymentRepo.ensurePendingPayment({
+        paymentId: 'pay_missing_2',
+        orderId: 'ord_missing_2',
+        provider: null,
+        paymentMethod: null,
+        amount: 50000,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }, /INVALID_PAYMENT_PROVIDER/);
+  });
+
+  // ── 21. PaymentRepository.ensurePendingPayment: Unknown provider strictly rejects ──
+  await t.test('REG-21: PaymentRepository.ensurePendingPayment rejects unknown provider with INVALID_PAYMENT_PROVIDER', async () => {
+    const PaymentRepository = require('../core/data/repositories/PaymentRepository');
+    const paymentRepo = new PaymentRepository();
+
+    for (const bad of ['stripe', 'paypal', 'unknown', 'midtrans_fake', 'xendit']) {
+      assert.throws(() => {
+        paymentRepo.ensurePendingPayment({
+          paymentId: `pay_unk_${bad}`,
+          orderId: `ord_unk_${bad}`,
+          provider: bad,
+          paymentMethod: bad,
+          amount: 50000,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }, /INVALID_PAYMENT_PROVIDER/);
+    }
+  });
+
+  // ── 22. PaymentRepository.ensurePendingPayment: Valid providers (cash, midtrans, doku) succeed ──
+  await t.test('REG-22: PaymentRepository.ensurePendingPayment accepts cash, midtrans, and doku', async () => {
+    const PaymentRepository = require('../core/data/repositories/PaymentRepository');
+    const paymentRepo = new PaymentRepository();
+
+    for (const valid of ['cash', 'midtrans', 'doku']) {
+      const orderId = `ord_valid_${valid}_${Date.now()}`;
+      db.prepare(`
+        INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+        VALUES (?, ?, ?, ?, 'Valid Cust', '08123', 'dine_in', 'pos', 50000, 50000, ?, 'pending')
+      `).run(orderId, `XN-${orderId}`, BRAND_ID, BRANCH_ID, valid);
+
+      paymentRepo.ensurePendingPayment({
+        paymentId: `pay_valid_${valid}`,
+        orderId: orderId,
+        provider: valid,
+        paymentMethod: valid,
+        amount: 50000,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      const row = db.prepare('SELECT provider, payment_method FROM order_payments WHERE order_id = ?').get(orderId);
+      assert.equal(row.provider, valid);
+      assert.equal(row.payment_method, valid);
+    }
+  });
+
+  // ── 23. PaymentGatewayService.handleWebhook: Missing provider strictly rejects ──
+  await t.test('REG-23: PaymentGatewayService.handleWebhook rejects missing provider with INVALID_PAYMENT_PROVIDER', async () => {
+    assert.throws(() => {
+      PaymentGatewayService.handleWebhook({
+        order_id: 'ord_wh_missing',
+        transaction_status: 'settlement',
+        gross_amount: '50000.00'
+      });
+    }, /INVALID_PAYMENT_PROVIDER/);
+
+    assert.throws(() => {
+      PaymentGatewayService.handleWebhook({
+        order_id: 'ord_wh_missing_opts',
+        transaction_status: 'settlement',
+        gross_amount: '50000.00'
+      }, { skipSignatureCheck: true });
+    }, /INVALID_PAYMENT_PROVIDER/);
+  });
+
+  // ── 24. PaymentGatewayService.handleWebhook: Unknown provider strictly rejects ──
+  await t.test('REG-24: PaymentGatewayService.handleWebhook rejects unknown provider with INVALID_PAYMENT_PROVIDER', async () => {
+    for (const bad of ['stripe', 'paypal', 'xendit', 'cash', 'unknown']) {
+      assert.throws(() => {
+        PaymentGatewayService.handleWebhook({
+          order_id: `ord_wh_unk_${bad}`,
+          transaction_status: 'settlement',
+          gross_amount: '50000.00'
+        }, { skipSignatureCheck: true, provider: bad });
+      }, /INVALID_PAYMENT_PROVIDER/);
+    }
+  });
+
+  // ── 25. PaymentGatewayService.handleWebhook: DOKU stays DOKU, Midtrans stays Midtrans ──
+  await t.test('REG-25: DOKU webhook stays doku, Midtrans webhook stays midtrans', async () => {
+    const dokuOrdId = `ord_iso_doku_${Date.now()}`;
+    db.prepare(`
+      INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+      VALUES (?, ?, ?, ?, 'Doku Cust', '08123', 'dine_in', 'customer_app', 40000, 40000, 'doku', 'pending')
+    `).run(dokuOrdId, `XN-${dokuOrdId}`, BRAND_ID, BRANCH_ID);
+
+    const dokuRes = PaymentGatewayService.handleWebhook({
+      order: { invoice_number: dokuOrdId, amount: 40000 },
+      transaction: { status: 'SUCCESS' }
+    }, { skipSignatureCheck: true, provider: 'doku' });
+    assert.equal(dokuRes.payment_status, 'settlement');
+    const dokuPay = db.prepare('SELECT provider, payment_method FROM order_payments WHERE order_id = ?').get(dokuOrdId);
+    assert.equal(dokuPay.provider, 'doku');
+    assert.equal(dokuPay.payment_method, 'doku');
+
+    const midOrdId = `ord_iso_mid_${Date.now()}`;
+    db.prepare(`
+      INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+      VALUES (?, ?, ?, ?, 'Mid Cust', '08123', 'dine_in', 'customer_app', 40000, 40000, 'midtrans', 'pending')
+    `).run(midOrdId, `XN-${midOrdId}`, BRAND_ID, BRANCH_ID);
+
+    const midRes = PaymentGatewayService.handleWebhook({
+      order_id: midOrdId,
+      transaction_status: 'settlement',
+      gross_amount: '40000.00',
+      payment_type: 'qris',
+      fraud_status: 'accept',
+      status_code: '200'
+    }, { skipSignatureCheck: true, provider: 'midtrans' });
+    assert.equal(midRes.payment_status, 'settlement');
+    const midPay = db.prepare('SELECT provider, payment_method FROM order_payments WHERE order_id = ?').get(midOrdId);
+    assert.equal(midPay.provider, 'midtrans');
+    assert.equal(midPay.payment_method, 'midtrans');
+  });
 });
 

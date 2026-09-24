@@ -71,7 +71,11 @@ class PaymentRepository {
     );
   }
 
-  ensurePendingPayment({ paymentId, orderId, provider = 'midtrans', paymentMethod = 'midtrans', merchantId = null, amount, createdAt, updatedAt }) {
+  ensurePendingPayment({ paymentId, orderId, provider, paymentMethod, merchantId = null, amount, createdAt, updatedAt }) {
+    const validProviders = ['cash', 'midtrans', 'doku'];
+    if (!provider || !validProviders.includes(provider) || !paymentMethod || !validProviders.includes(paymentMethod)) {
+      throw new Error('INVALID_PAYMENT_PROVIDER');
+    }
     return this.db.execute(`
       INSERT INTO order_payments (
         id, order_id, provider, payment_method, merchant_id, snap_token,

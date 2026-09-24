@@ -172,9 +172,9 @@ class PaymentGatewayService {
     return crypto.createHash('sha512').update(raw).digest('hex') === signature_key;
   }
 
-  static handleWebhook(webhookData, { skipSignatureCheck = false, provider = 'midtrans', headers = {}, notificationPath = '' } = {}) {
+  static handleWebhook(webhookData, { skipSignatureCheck = false, provider = null, headers = {}, notificationPath = '' } = {}) {
     if (!provider || !['doku', 'midtrans'].includes(provider)) {
-      throw new Error('[PaymentGatewayService] INVALID_PAYMENT_PROVIDER: Provider webhook tidak valid atau tidak didukung.');
+      throw new Error('[PaymentGatewayService] INVALID_PAYMENT_PROVIDER: Provider webhook wajib diisi secara eksplisit dan harus valid ("doku" atau "midtrans").');
     }
     const orderId = provider === 'doku'
       ? (webhookData.order && webhookData.order.invoice_number) || ''
@@ -315,7 +315,7 @@ class PaymentGatewayService {
                 const tbl = diningTableRepository.findTableIdByNumberOrLabel(order.branch_id, order.table_number);
                 if (tbl) tableIds = [tbl.id];
               }
-              if (tableIds.length > 0) DiningTableService.createOrAttachDiningSession({ branch_id: order.branch_id, table_ids: tableIds, order_id: order.id, customer_name: order.customer_name, customer_phone: order.customer_phone, guest_count: 1, hold_reference_id: order.id });
+              if (tableIds.length > 0) DiningTableService.createOrAttachDiningSession({ branch_id: order.branch_id, table_ids: tableIds, order_id: order.id, customer_name: order.customer_name, customer_phone: order.customer_phone, guest_count: 1, hold_reference_id: order.id, channel: order.order_channel || 'customer_app' });
             } catch (dineErr) { console.warn('[PaymentGatewayService] Dine-in table settlement warning:', dineErr.message); }
           }
         }

@@ -82,18 +82,35 @@
     // Splash tertutup lebih cepat — robot terlihat 1 detik, lalu skeleton
     // menggantikan. Boot yang gagal tetap punya jalan keluar.
     (function () {
-      var done = false;
-      window.__xentraHideSplash = function () {
-        if (done) return;
-        done = true;
+      window.Xentra = window.Xentra || {};
+      window.Xentra.showSplash = function (message) {
+        var el = document.getElementById('x-splash');
+        if (el) {
+          el.style.display = 'flex';
+          var txt = document.getElementById('x-splash-text');
+          if (txt && typeof message === 'string') {
+            txt.textContent = message;
+          }
+        }
+      };
+      window.Xentra.hideSplash = function () {
         var el = document.getElementById('x-splash');
         if (el) el.style.display = 'none';
       };
+      window.__xentraHideSplash = window.Xentra.hideSplash;
+
+      // Auto-hide splash when user navigates back (via browser back button or bfcache)
+      window.addEventListener('pageshow', function () {
+        if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+          window.Xentra.hideSplash();
+        }
+      });
+
       setTimeout(window.__xentraHideSplash, 3000);
     })();
   </script>
 
-  <div id="x-splash" style="position:fixed;inset:0;z-index:9999;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
+  <div id="x-splash" style="position:fixed;inset:0;z-index:99999;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:'Plus Jakarta Sans',system-ui,sans-serif;">
     <style>
       #x-splash .bot-arm-l, #x-splash .bot-arm-r { transform-box: fill-box; transform-origin: 50% 0%; }
       #x-splash .bot-float { animation: bot-float 2.6s ease-in-out infinite alternate; }
@@ -145,7 +162,7 @@
     </svg>
 
     <img src="/assets/img/xentra-logo.png" alt="" style="width:56px;height:56px;object-fit:contain;opacity:.9;margin-top:2px;">
-    <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Memuat…</span>
+    <div id="x-splash-text" style="color:#64748b;font-size:13px;font-weight:600;letter-spacing:-0.01em;margin-top:2px;">Memuat…</div>
   </div>
 
   <div id="xentra-home-view" class="x-page">
@@ -339,19 +356,15 @@
   <script src="/assets/js/core/router.js"></script>
   <script src="/assets/js/core/pwa-runtime.js"></script>
   <script src="/assets/js/core/promo-reward-cart.js"></script>
-  <script src="/assets/js/core/delivery-schedule.js"></script>
-  <script src="/assets/js/core/fulfillment-environments.js"></script>
   <script src="/assets/js/location.js"></script>
   <script src="/assets/js/core/discovery.js"></script>
-  <script src="/assets/js/core/location-picker.js"></script>
   <!-- M6: Canonical media delivery consumer module — must load before home.js -->
   <script src="/assets/js/core/media.js"></script>
 
-  <!-- Page Controllers — Home is CRITICAL_BOOT. checkout / order-received /
-       aux-pages are ROUTE_ONLY and are lazy-loaded on first navigation by the
-       SPA router below (loadScriptOnce + ensureController). -->
-  <script src="/assets/js/core/table-qr.js"></script>
-  <script src="/assets/js/core/payment-gateway.js"></script>
+  <!-- Page Controllers — Home is CRITICAL_BOOT.
+       checkout, order-received, aux-pages, location-picker, table-qr,
+       payment-gateway, fulfillment-environments, and delivery-schedule
+       are ROUTE/ACTION_ONLY and are lazy-loaded on demand below. -->
   <script src="/assets/js/pages/home.js"></script>
 
   <!-- ═══════════════════════════════════════════════════
@@ -418,23 +431,103 @@
         return loadStylesheetOnce('/assets/css/checkout.css');
       };
 
-      // Gate the picker's open() on its lazy CSS so it NEVER appears unstyled.
-      // The picker module itself is eager (location-picker.js loads at boot), so
-      // a single wrapper here covers every caller (home / checkout / aux) without
-      // touching those modules. Idempotent + falls back to opening if CSS fails.
-      (function gateLocationPickerCss() {
-        var P = window.XentraLocationPicker;
-        if (!P || typeof P.open !== 'function' || P.__xentraCssGated) return;
-        var origOpen = P.open;
-        P.open = function () {
-          var self = this;
-          var args = arguments;
-          window.Xentra.ensureLocationPickerCss()
-            .then(function () { return origOpen.apply(self, args); })
-            .catch(function () { return origOpen.apply(self, args); });
-        };
-        P.__xentraCssGated = true;
-      })();
+      // ── Lazy Module Loaders for ACTION_ONLY features ──
+      window.Xentra.ensurePaymentGateway = function () {
+        if (window.Xentra && window.Xentra.PaymentGateway) return Promise.resolve(window.Xentra.PaymentGateway);
+        return loadScriptOnce('/assets/js/core/payment-gateway.js').then(function () {
+          return window.Xentra.PaymentGateway;
+        });
+      };
+
+      window.Xentra.ensureTableQr = function () {
+        if (window.Xentra && window.Xentra.TableQr && window.Xentra.TableQr.__isRealModule) {
+          return Promise.resolve(window.Xentra.TableQr);
+        }
+        return loadScriptOnce('/assets/js/core/table-qr.js').then(function () {
+          return window.Xentra.TableQr;
+        });
+      };
+
+      // Lightweight stub for Table QR scanner on Home
+      window.Xentra.TableQr = {
+        open: function (cb) {
+          window.Xentra.ensureTableQr().then(function (T) {
+            if (T && typeof T.open === 'function') T.open(cb);
+          });
+        }
+      };
+
+      // Lightweight standalone updateHomeLocationBar for instant Home first paint without loading 85KB location-picker.js
+      function updateHomeLocationBar() {
+        var bar = document.getElementById('x-home-loc-bar');
+        var heroPill = document.getElementById('x-hero-loc-pill');
+        var heroPillText = document.getElementById('x-hero-loc-text');
+        var Store = window.Xentra && window.Xentra.Store;
+        var dest = null;
+        try {
+          dest = (Store && Store.getActiveDestination && Store.getActiveDestination()) ||
+            (Store && Store.getState().activeDestination) ||
+            (Store && Store.getState().location);
+        } catch (_) {}
+        var titleEl = bar ? bar.querySelector('.x-locbar-title') : null;
+        var tagEl = bar ? bar.querySelector('.x-locbar-source-tag') : null;
+        var addrEl = bar ? bar.querySelector('.x-locbar-address') : null;
+        if (!dest || (!dest.address && !dest.formatted_address)) {
+          if (titleEl) titleEl.textContent = 'Pilih lokasi pengiriman';
+          if (tagEl) tagEl.style.display = 'none';
+          if (addrEl) addrEl.textContent = 'Ketuk untuk memilih alamat atau koordinat';
+          if (heroPillText) heroPillText.textContent = 'Lokasimu';
+          return;
+        }
+        var addr = dest.address || dest.formatted_address;
+        var label = dest.label || (addr ? addr.split(',')[0].trim() : 'Lokasi Terpilih');
+        if (titleEl) titleEl.textContent = label;
+        if (tagEl) {
+          tagEl.style.display = 'inline-block';
+          tagEl.textContent = (dest.source === 'gps') ? 'GPS' : ((dest.source === 'favorite') ? 'Favorit' : 'Alamat');
+        }
+        if (addrEl) addrEl.textContent = addr;
+        if (heroPillText) heroPillText.textContent = label;
+      }
+
+      window.Xentra.ensureLocationPicker = function () {
+        if (window.XentraLocationPicker && window.XentraLocationPicker.__isRealModule) {
+          return Promise.resolve(window.XentraLocationPicker);
+        }
+        return Promise.all([
+          window.Xentra.ensureLocationPickerCss(),
+          loadScriptOnce('/assets/js/core/location-picker.js')
+        ]).then(function () {
+          return window.XentraLocationPicker;
+        });
+      };
+
+      // Lightweight stub for LocationPicker: handles immediate updateBar without loading heavy module,
+      // and lazy-loads full module + CSS on first open()
+      window.XentraLocationPicker = {
+        open: function (opts) {
+          return window.Xentra.ensureLocationPicker().then(function (P) {
+            if (P && typeof P.open === 'function') return P.open(opts);
+          });
+        },
+        updateBar: updateHomeLocationBar
+      };
+
+      // Global click delegation for location picker buttons
+      document.addEventListener('click', function (e) {
+        var pill = e.target && e.target.closest('#x-hero-loc-pill, [data-action="open-location-picker"]');
+        if (pill && (!window.XentraLocationPicker || !window.XentraLocationPicker.__isRealModule)) {
+          e.preventDefault();
+          e.stopPropagation();
+          window.XentraLocationPicker.open({
+            onSelect: function () {
+              if (window.XentraHome && typeof window.XentraHome.refresh === 'function') {
+                window.XentraHome.refresh();
+              }
+            }
+          });
+        }
+      });
 
       var CONTROLLER_SRC = {
         checkout: '/assets/js/pages/checkout.js',
@@ -448,8 +541,22 @@
       function ensureController(view) {
         var src = CONTROLLER_SRC[view];
         if (!src) return Promise.resolve();
-        if (view === 'checkout' && window.Xentra && window.Xentra.Checkout) return Promise.resolve();
-        if (view === 'order-received' && window.Xentra && window.Xentra.OrderReceived) return Promise.resolve();
+        if (view === 'checkout') {
+          return Promise.all([
+            window.Xentra.ensurePaymentGateway ? window.Xentra.ensurePaymentGateway() : Promise.resolve(),
+            (window.Xentra && window.Xentra.Checkout) ? Promise.resolve() : Promise.all([
+              loadScriptOnce('/assets/js/core/fulfillment-environments.js'),
+              loadScriptOnce('/assets/js/core/delivery-schedule.js'),
+              loadScriptOnce(src)
+            ])
+          ]);
+        }
+        if (view === 'order-received') {
+          return Promise.all([
+            window.Xentra.ensurePaymentGateway ? window.Xentra.ensurePaymentGateway() : Promise.resolve(),
+            (window.Xentra && window.Xentra.OrderReceived) ? Promise.resolve() : loadScriptOnce(src)
+          ]);
+        }
         if ((view === 'affiliate' || view === 'history' || view === 'profile') && window.XentraAuxPages) return Promise.resolve();
         return loadScriptOnce(src);
       }

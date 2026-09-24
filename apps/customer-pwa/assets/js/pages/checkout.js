@@ -75,8 +75,94 @@
     cashTendered: null,
     cashTenderedType: null,
     recipient: Store.getRecipient() || { type: 'self', name: '', phone: '' },
-    isSubmitting: false
+    isSubmitting: false,
+    isRedirectingToPayment: false
   };
+
+  // ── Xentra Robot Splash Controller (Floating, Flapping Arms, Winking Eyes) ──
+  function getRobotSplashHtml(message) {
+    return '' +
+      '<style>' +
+      '  #x-splash { position:fixed;inset:0;z-index:99999;background:#ffffff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:\'Plus Jakarta Sans\',system-ui,sans-serif; }' +
+      '  #x-splash .bot-arm-l, #x-splash .bot-arm-r { transform-box: fill-box; transform-origin: 50% 0%; }' +
+      '  #x-splash .bot-float { animation: bot-float 2.6s ease-in-out infinite alternate; }' +
+      '  #x-splash .bot-shadow { animation: bot-shadow 2.6s ease-in-out infinite alternate; }' +
+      '  #x-splash .bot-eye { animation: bot-blink 4.2s steps(1, end) infinite; transform-box: fill-box; transform-origin: center; }' +
+      '  #x-splash .bot-arm-l { animation: bot-flap-l 1.3s ease-in-out infinite alternate; }' +
+      '  #x-splash .bot-arm-r { animation: bot-flap-r 1.3s ease-in-out infinite alternate; }' +
+      '  @keyframes bot-float { from { transform: translateY(0); } to { transform: translateY(-4px); } }' +
+      '  @keyframes bot-shadow { from { transform: scaleX(1); opacity:.18; } to { transform: scaleX(.78); opacity:.10; } }' +
+      '  @keyframes bot-blink { 0%, 44%, 48%, 92%, 96%, 100% { transform: scaleY(1); } 46% { transform: scaleY(.12); } 94% { transform: scaleY(.12); } }' +
+      '  @keyframes bot-flap-l { from { transform: rotate(-22deg); } to { transform: rotate(22deg); } }' +
+      '  @keyframes bot-flap-r { from { transform: rotate(22deg); } to { transform: rotate(-22deg); } }' +
+      '  @media (prefers-reduced-motion: reduce) { #x-splash .bot-float, #x-splash .bot-shadow, #x-splash .bot-eye, #x-splash .bot-arm-l, #x-splash .bot-arm-r { animation: none; } }' +
+      '</style>' +
+      '<svg width="88" height="96" viewBox="0 0 92 100" aria-hidden="true">' +
+      '  <defs>' +
+      '    <linearGradient id="botBody" x1="0" y1="0" x2="0" y2="1">' +
+      '      <stop offset="0" stop-color="#ffffff"></stop>' +
+      '      <stop offset="1" stop-color="#e9eef3"></stop>' +
+      '    </linearGradient>' +
+      '  </defs>' +
+      '  <ellipse class="bot bot-shadow" cx="46" cy="96" rx="16" ry="4" fill="#111827" opacity=".15"></ellipse>' +
+      '  <g class="bot bot-float">' +
+      '    <ellipse class="bot bot-arm-l" cx="15" cy="52" rx="4.4" ry="16" fill="#ffffff" stroke="#d1d5db" stroke-width="1.4"></ellipse>' +
+      '    <ellipse class="bot bot-arm-r" cx="77" cy="52" rx="4.4" ry="16" fill="#ffffff" stroke="#d1d5db" stroke-width="1.4"></ellipse>' +
+      '    <path d="M46 8 C62 8 72 22 72 44 C72 78 54 94 46 94 C38 94 20 78 20 44 C20 22 30 8 46 8 Z" fill="url(#botBody)" stroke="#d1d5db" stroke-width="1.6"></path>' +
+      '    <rect x="26" y="20" width="40" height="34" rx="17" fill="#111827"></rect>' +
+      '    <g class="bot bot-eye">' +
+      '      <ellipse cx="38.5" cy="37" rx="6.2" ry="7" fill="#ffffff"></ellipse>' +
+      '      <ellipse cx="53.5" cy="37" rx="6.2" ry="7" fill="#ffffff"></ellipse>' +
+      '    </g>' +
+      '  </g>' +
+      '</svg>' +
+      '<img src="/assets/img/xentra-logo.png" alt="" style="width:56px;height:56px;object-fit:contain;opacity:.9;margin-top:2px;">' +
+      '<div id="x-splash-text" style="color:#64748b;font-size:13px;font-weight:600;letter-spacing:-0.01em;margin-top:2px;">' + (message || 'Memuat…') + '</div>';
+  }
+
+  function showPaymentSplash(message) {
+    var el = document.getElementById('x-splash');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'x-splash';
+      document.body.appendChild(el);
+    }
+    el.innerHTML = getRobotSplashHtml(message);
+    el.style.display = 'flex';
+    el.style.position = 'fixed';
+    el.style.inset = '0';
+    el.style.zIndex = '99999';
+    el.style.background = '#ffffff';
+    el.style.opacity = '1';
+    el.style.visibility = 'visible';
+    var txt = document.getElementById('x-splash-text');
+    if (txt && message) txt.textContent = message;
+  }
+
+  function hidePaymentSplash() {
+    var el = document.getElementById('x-splash');
+    if (el) {
+      el.style.display = 'none';
+      el.style.visibility = 'hidden';
+    }
+  }
+
+  window.Xentra = window.Xentra || {};
+  window.Xentra.showSplash = showPaymentSplash;
+  window.Xentra.hideSplash = hidePaymentSplash;
+
+  window.addEventListener('pageshow', function () {
+    hidePaymentSplash();
+    state.isSubmitting = false;
+    state.isRedirectingToPayment = false;
+    var btn = $('x-btn-submit-order');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = submitCtaLabel(state.fulfillment.type === 'reservation');
+      btn.style.opacity = '1';
+    }
+    syncPayVisual();
+  });
 
   // ── Helper formatters ──
   function $(id) { return document.getElementById(id); }
@@ -514,6 +600,20 @@
       var prev = state.openBill ? JSON.stringify(state.openBill) : 'null';
       var next = bill ? JSON.stringify(bill) : 'null';
       state.openBill = bill;
+      if (bill && Array.isArray(bill.tables) && bill.tables.length > 0) {
+        var billTable = bill.tables[0];
+        var bId = billTable.id;
+        var bNum = billTable.table_number || billTable.label || '';
+        switchFulfillmentEnvironment('dine_in');
+        state.fulfillment.table_ids = [bId];
+        state.fulfillment.tableNumber = bNum;
+        if (Store && Store.setMyTable) {
+          Store.setMyTable({ id: bId, number: bNum, hadOpenBill: true });
+        }
+        if (Store && Store.setOrderType) {
+          Store.setOrderType('dine_in');
+        }
+      }
       // Jangan pernah render di tengah proses submit.
       if (prev !== next && !state.isSubmitting) renderLayout();
       return bill;
@@ -575,7 +675,12 @@
       var storedTable = (Store.getMyTable && Store.getMyTable()) || null;
       var storedOrderType = Store.getState().orderType;
       var storedIsDineIn = storedOrderType === 'dine_in' || storedOrderType === 'dinein';
-      if (storedIsDineIn && storedTable && storedTable.id && !((state.fulfillment.table_ids || []).length)) {
+      if (storedTable && storedTable.hadOpenBill && storedTable.id) {
+        switchFulfillmentEnvironment('dine_in');
+        state.fulfillment.table_ids = [storedTable.id];
+        state.fulfillment.tableNumber = storedTable.number || '';
+        if (Store.setOrderType) Store.setOrderType('dine_in');
+      } else if (storedIsDineIn && storedTable && storedTable.id && !((state.fulfillment.table_ids || []).length)) {
         switchFulfillmentEnvironment('dine_in');
         state.fulfillment.table_ids = [storedTable.id];
         state.fulfillment.tableNumber = storedTable.number || '';
@@ -622,17 +727,22 @@
     loadUpsell();
     quoteNow();
 
-    var G = window.Xentra && window.Xentra.PaymentGateway;
-    if (G && typeof G.loadConfig === 'function') {
-      G.loadConfig().then(function (cfg) {
-        if (cfg && cfg.active_provider && isOnlinePayment(state.paymentMethod)) {
-          state.paymentMethod = cfg.active_provider;
-        } else if ((!cfg || !cfg.active_provider) && isOnlinePayment(state.paymentMethod)) {
-          state.paymentMethod = 'cash';
-        }
-        syncPayVisual();
-      });
-    }
+    var ensureGW = (window.Xentra && typeof window.Xentra.ensurePaymentGateway === 'function')
+      ? window.Xentra.ensurePaymentGateway()
+      : Promise.resolve(window.Xentra && window.Xentra.PaymentGateway);
+
+    ensureGW.then(function (G) {
+      if (G && typeof G.loadConfig === 'function') {
+        return G.loadConfig().then(function (cfg) {
+          if (cfg && cfg.active_provider && isOnlinePayment(state.paymentMethod)) {
+            state.paymentMethod = cfg.active_provider;
+          } else if ((!cfg || !cfg.active_provider) && isOnlinePayment(state.paymentMethod)) {
+            state.paymentMethod = 'cash';
+          }
+          syncPayVisual();
+        });
+      }
+    }).catch(function () {});
 
     // Restore payment state persisted before Google Auth redirect.
     // The broker return handler navigates to #checkout which re-creates this
@@ -746,6 +856,7 @@
     var isReservation = state.fulfillment.type === 'reservation';
 
     if (!items.length) {
+      if (state.isSubmitting || state.isRedirectingToPayment) return;
       lastRowKeys = null;
       lastRowDiscount = 0;
       if (!isReservation) {
@@ -883,6 +994,12 @@
   }
 
   function renderEmpty() {
+    if (state.isSubmitting || state.isRedirectingToPayment) {
+      if (window.Xentra && typeof window.Xentra.showSplash === 'function') {
+        window.Xentra.showSplash('Mengarahkan ke pembayaran…');
+      }
+      return;
+    }
     checkoutContainer.innerHTML =
       '<div class="xentra-checkout x-checkout-alt2">' +
       '  <div class="x-alt-header"><button type="button" id="x-back-empty" class="x-alt-back" aria-label="Kembali"><img src="/assets/icons/arrowback.svg" alt=""></button><span>Checkout Pesanan</span></div>' +
@@ -1006,58 +1123,56 @@
         '  </div>'
       ) : '') +
 
-      // 6. Card 5: Payment Summary & Methods Card
-      '  <div class="x-card x-alt-summary-card" id="x-payment-summary-card" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
-      '    <div class="x-alt-summary-title" style="font-size:15px;font-weight:700;color:#111;margin-bottom:12px;">Ringkasan pembayaran</div>' +
+      // 6. Card 5: Payment Summary & Methods Card (Hidden on Reservation)
       (!isReservation ? (
+        '  <div class="x-card x-alt-summary-card" id="x-payment-summary-card" style="margin:0 14px 10px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.04);">' +
+        '    <div class="x-alt-summary-title" style="font-size:15px;font-weight:700;color:#111;margin-bottom:12px;">Ringkasan pembayaran</div>' +
         '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Harga</span><span id="x-sum-subtotal" style="font-weight:600;color:#111;">' + fmtIDR(subtotal) + '</span></div>' +
         (isDelivery ? '<div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#666;padding:3px 0;"><span>Biaya Penanganan dan Pengiriman</span><span id="x-sum-delivery" style="font-weight:600;color:#111;">' + fmtIDR(fee) + '</span></div>' : '') +
         (discount > 0 ? '<div class="x-alt-sum-row x-alt-discount-row" style="display:flex;justify-content:space-between;font-size:13.5px;color:#ef4444;font-weight:700;padding:3px 0;"><span>Diskon</span><span id="x-sum-discount">-' + fmtIDR(discount) + '</span></div>' : '') +
         '    <div class="x-alt-sum-divider" style="height:1px;background:#f0f0f0;margin:12px 0 10px;"></div>' +
-        '    <div class="x-alt-sum-total" style="display:flex;align-items:baseline;justify-content:space-between;"><span style="font-size:15px;font-weight:700;color:#111;">Total pembayaran</span><div style="display:flex;align-items:baseline;gap:8px;">' + (oldTotal > grand ? '<s id="x-sum-oldtotal" style="color:#9ca3af;font-size:13px;text-decoration:line-through;">' + fmtIDR(oldTotal) + '</s>' : '') + '<b id="x-sum-total" style="font-size:18px;font-weight:800;color:#111;">' + fmtIDR(grand) + '</b></div></div>'
-      ) : (
-        '    <div class="x-alt-sum-row" style="display:flex;justify-content:space-between;font-size:13.5px;padding:3px 0;"><span>Biaya Booking Reservasi</span><span style="color:#16a34a;font-weight:700;">Gratis (Rp0)</span></div>'
-      )) +
-      '    <div class="x-alt-pay-methods" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-      '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'cash' ? 'is-active' : '') + '" id="x-opt-cash" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'cash' ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'cash' ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
-      '        <img src="/assets/icons/cashblack.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
-      '        <div style="display:flex;flex-direction:column;min-width:0;">' +
-      '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + payMethodLabel().title + '</span>' +
-      '          <span style="font-size:11px;color:#777;">' + payMethodLabel().sub + '</span>' +
-      '        </div>' +
-      '      </button>' +
-      '      <button type="button" class="x-alt-pay-opt ' + (isOnlinePayment(state.paymentMethod) ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (isOnlinePayment(state.paymentMethod) ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (isOnlinePayment(state.paymentMethod) ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
-      '        <img src="/assets/icons/qrisgreen.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
-      '        <div style="display:flex;flex-direction:column;min-width:0;">' +
-      '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Online Pay</span>' +
-      '          <span style="font-size:11px;color:#777;">QRIS / E-Wallet</span>' +
-      '        </div>' +
-      '      </button>' +
-      '    </div>' +
-      (state.openBill ? (
-        '    <div id="x-open-bill" style="margin-top:12px;padding:12px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;">' +
-        '      <div style="font-size:11.5px;color:#047857;font-weight:700;">TAGIHAN MEJA ' + UI.escape(billTableLabel()) + '</div>' +
-        '      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px;">' +
-        '        <span style="font-size:12px;color:#065f46;">Total pesanan</span>' +
-        '        <b id="x-open-bill-total" style="font-size:14px;font-weight:800;color:#064e3b;">' + fmtIDR(Number(state.openBill.total_bill) || 0) + '</b>' +
-        '      </div>' +
-        '      <div style="font-size:11px;color:#047857;margin-top:4px;">Pesanan tambahan otomatis masuk ke tagihan ini.</div>' +
-        '    </div>'
+        '    <div class="x-alt-sum-total" style="display:flex;align-items:baseline;justify-content:space-between;"><span style="font-size:15px;font-weight:700;color:#111;">Total pembayaran</span><div style="display:flex;align-items:baseline;gap:8px;">' + (oldTotal > grand ? '<s id="x-sum-oldtotal" style="color:#9ca3af;font-size:13px;text-decoration:line-through;">' + fmtIDR(oldTotal) + '</s>' : '') + '<b id="x-sum-total" style="font-size:18px;font-weight:800;color:#111;">' + fmtIDR(grand) + '</b></div></div>' +
+        '    <div class="x-alt-pay-methods" style="margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '      <button type="button" class="x-alt-pay-opt ' + (state.paymentMethod === 'cash' ? 'is-active' : '') + '" id="x-opt-cash" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (state.paymentMethod === 'cash' ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (state.paymentMethod === 'cash' ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
+        '        <img src="/assets/icons/cashblack.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
+        '        <div style="display:flex;flex-direction:column;min-width:0;">' +
+        '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + payMethodLabel().title + '</span>' +
+        '          <span style="font-size:11px;color:#777;">' + payMethodLabel().sub + '</span>' +
+        '        </div>' +
+        '      </button>' +
+        '      <button type="button" class="x-alt-pay-opt ' + (isOnlinePayment(state.paymentMethod) ? 'is-active' : '') + '" id="x-opt-online" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1.5px solid ' + (isOnlinePayment(state.paymentMethod) ? 'var(--x-primary)' : '#e5e7eb') + ';border-radius:14px;background:' + (isOnlinePayment(state.paymentMethod) ? 'var(--x-primary-bg)' : '#fff') + ';cursor:pointer;text-align:left;font-family:inherit;">' +
+        '        <img src="/assets/icons/qrisgreen.svg" alt="" style="width:24px;height:24px;object-fit:contain;flex-shrink:0;">' +
+        '        <div style="display:flex;flex-direction:column;min-width:0;">' +
+        '          <span style="font-size:13px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Online Pay</span>' +
+        '          <span style="font-size:11px;color:#777;">QRIS / E-Wallet</span>' +
+        '        </div>' +
+        '      </button>' +
+        '    </div>' +
+        (state.openBill ? (
+          '    <div id="x-open-bill" style="margin-top:12px;padding:12px 14px;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;">' +
+          '      <div style="font-size:11.5px;color:#047857;font-weight:700;">TAGIHAN MEJA ' + UI.escape(billTableLabel()) + '</div>' +
+          '      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px;">' +
+          '        <span style="font-size:12px;color:#065f46;">Total pesanan</span>' +
+          '        <b id="x-open-bill-total" style="font-size:14px;font-weight:800;color:#064e3b;">' + fmtIDR(Number(state.openBill.total_bill) || 0) + '</b>' +
+          '      </div>' +
+          '      <div style="font-size:11px;color:#047857;margin-top:4px;">Pesanan tambahan otomatis masuk ke tagihan ini.</div>' +
+          '    </div>'
+        ) : '') +
+        (needsCashTendered() && state.cashTendered ? (
+          '    <div id="x-tender-selected-summary" style="margin-top:12px;padding:10px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;display:flex;align-items:center;justify-content:space-between;">' +
+          '      <div style="display:flex;flex-direction:column;">' +
+          '        <span style="font-size:11.5px;color:#6b7280;font-weight:500;">Uang Tunai Disiapkan</span>' +
+          '        <span style="font-size:14px;font-weight:800;color:#111827;">' + fmtIDR(state.cashTendered) + '</span>' +
+          '        <span style="font-size:11.5px;color:#6b7280;font-weight:500;margin-top:3px;">Kembalian <b id="x-sum-change" style="font-size:12.5px;font-weight:800;color:#059669;">' + fmtIDR(tenderChange()) + '</b></span>' +
+          '      </div>' +
+          '      <button type="button" id="x-btn-change-tender" style="border:none;background:#e5e7eb;color:#374151;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit;">Ubah</button>' +
+          '    </div>'
+        ) : '') +
+        '    <div class="x-alt-trust" style="font-size:11.5px;color:#6b7280;text-align:center;margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:3px;">' +
+        '      <div style="display:flex;align-items:center;gap:4px;"><span>🔒</span><span>Transaksi aman dan terenkripsi</span></div>' +
+        '    </div>' +
+        '  </div>'
       ) : '') +
-      (needsCashTendered() && state.cashTendered ? (
-        '    <div id="x-tender-selected-summary" style="margin-top:12px;padding:10px 14px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;display:flex;align-items:center;justify-content:space-between;">' +
-        '      <div style="display:flex;flex-direction:column;">' +
-        '        <span style="font-size:11.5px;color:#6b7280;font-weight:500;">Uang Tunai Disiapkan</span>' +
-        '        <span style="font-size:14px;font-weight:800;color:#111827;">' + fmtIDR(state.cashTendered) + '</span>' +
-        '        <span style="font-size:11.5px;color:#6b7280;font-weight:500;margin-top:3px;">Kembalian <b id="x-sum-change" style="font-size:12.5px;font-weight:800;color:#059669;">' + fmtIDR(tenderChange()) + '</b></span>' +
-        '      </div>' +
-        '      <button type="button" id="x-btn-change-tender" style="border:none;background:#e5e7eb;color:#374151;font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;cursor:pointer;font-family:inherit;">Ubah</button>' +
-        '    </div>'
-      ) : '') +
-      '    <div class="x-alt-trust" style="font-size:11.5px;color:#6b7280;text-align:center;margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:3px;">' +
-      '      <div style="display:flex;align-items:center;gap:4px;"><span>🔒</span><span>Transaksi aman dan terenkripsi</span></div>' +
-      '    </div>' +
-      '  </div>' +
 
       // 7. Sticky Submit CTA Bar
       (isReservation ? '' : ('  <div class="x-alt-cta-bar" style="position:fixed;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;padding:12px 14px max(12px,env(safe-area-inset-bottom));background:#fff;box-shadow:0 -4px 18px rgba(0,0,0,.08);z-index:1000;"><button type="button" id="x-btn-submit-order" class="x-alt-submit-btn" style="width:100%;height:50px;border-radius:999px;border:0;background:var(--x-primary);color:var(--x-primary-text, #111);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">' + submitCtaLabel(isReservation) + '</button></div>')) +
@@ -1133,8 +1248,10 @@
   }
 
   function payMethodLabel() {
-    return isPayAtCashier()
-      ? { title: 'Cash Tunai', sub: 'Bayar di kasir' }
+    var t = state.fulfillment.type;
+    var atCounter = (t === 'dinein' || t === 'dine_in' || t === 'pickup');
+    return atCounter
+      ? { title: 'Cash Tunai', sub: 'Bayar ke kasir' }
       : { title: 'Tunai (COD)', sub: 'Bayar ke driver' };
   }
 
@@ -1149,7 +1266,8 @@
   function isOnlinePayment(method) {
     var G = window.Xentra && window.Xentra.PaymentGateway;
     if (G && typeof G.isOnlineMethod === 'function') return G.isOnlineMethod(method);
-    return (G && typeof G.isOnlineMethod === 'function') ? G.isOnlineMethod(method) : false;
+    var m = String(method || '').toLowerCase();
+    return m === 'midtrans' || m === 'doku';
   }
 
   function submitCtaLabel(isReservation) {
@@ -1555,19 +1673,45 @@
     var optOn = $('x-opt-online');
     if (optOn) {
       optOn.onclick = function () {
-        // Provider online yang dipakai adalah provider yang AKTIF, bukan selalu
-        // nama provider yang aktif. Dulu nilainya ditulis langsung, jadi saat DOKU
-        // yang aktif pesanan tetap diminta ke gateway yang salah.
-        var method = onlinePaymentMethod();
-        if (!method) {
-          toast('Pembayaran online belum tersedia atau belum dikonfigurasi.');
+        var G = window.Xentra && window.Xentra.PaymentGateway;
+
+        var applyOnlineMethod = function (method) {
+          if (!method) {
+            if (UI && UI.toast) {
+              UI.toast('Pembayaran online belum tersedia atau belum dikonfigurasi.');
+            }
+            return;
+          }
+          state.paymentMethod = method;
+          state.cashTendered = null;
+          state.cashTenderedType = null;
+          renderLayout();
+          syncPayVisual();
+        };
+
+        var immediate = onlinePaymentMethod();
+        if (immediate) {
+          applyOnlineMethod(immediate);
           return;
         }
-        state.paymentMethod = method;
-        state.cashTendered = null;
-        state.cashTenderedType = null;
-        renderLayout();
-        syncPayVisual();
+
+        // Jika gateway belum siap atau config belum selesai dimuat, ambil config secara dinamis
+        var ensureGateway = (window.Xentra && typeof window.Xentra.ensurePaymentGateway === 'function')
+          ? window.Xentra.ensurePaymentGateway()
+          : Promise.resolve(G);
+
+        ensureGateway.then(function (gw) {
+          var targetGW = gw || (window.Xentra && window.Xentra.PaymentGateway);
+          if (targetGW && typeof targetGW.loadConfig === 'function') {
+            return targetGW.loadConfig(true);
+          }
+          return null;
+        }).then(function (cfg) {
+          var method = (cfg && cfg.active_provider) || onlinePaymentMethod();
+          applyOnlineMethod(method);
+        }).catch(function () {
+          applyOnlineMethod('');
+        });
       };
     }
 
@@ -1741,10 +1885,17 @@
       reservation: isReservationAvail
     };
 
+    var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
+    var hasActiveTableLock = Boolean((lockedTable && lockedTable.hadOpenBill) || (state.openBill && state.openBill.tables && state.openBill.tables.length > 0));
+    var activeTableId = (lockedTable && lockedTable.hadOpenBill && lockedTable.id) || (state.openBill && state.openBill.tables && state.openBill.tables[0] && state.openBill.tables[0].id) || null;
+    var activeTableNum = (lockedTable && lockedTable.hadOpenBill && lockedTable.number) || (state.openBill && state.openBill.tables && state.openBill.tables[0] && (state.openBill.tables[0].table_number || state.openBill.tables[0].label)) || '';
+
     // Initial committed values
     var committedType = state.fulfillment.type || 'delivery';
     if (committedType === 'dinein') committedType = 'dine_in';
-    if (!availabilityMap[committedType]) {
+    if (hasActiveTableLock) {
+      committedType = 'dine_in';
+    } else if (!availabilityMap[committedType]) {
       // Fallback to first available type
       if (isDeliveryAvail) committedType = 'delivery';
       else if (isPickupAvail) committedType = 'pickup';
@@ -1754,16 +1905,18 @@
 
     // Clone committed state into DRAFT
     var draft = {
-      type: committedType,
+      type: hasActiveTableLock ? 'dine_in' : committedType,
       scheduled: Boolean(state.fulfillment.scheduled),
       date: state.fulfillment.date || 'Hari ini',
       timeSlot: state.fulfillment.timeSlot || '16:00-16:30',
-      tableNumber: state.fulfillment.tableNumber || '',
+      tableNumber: hasActiveTableLock ? activeTableNum : (state.fulfillment.tableNumber || ''),
       // Satu meja saja — termasuk pilihan lama yang tersimpan (lihat
       // ALLOW_MULTI_TABLE_SELECT) supaya tidak ada cara menyelundupkan 2 meja.
-      selectedTableIds: Array.isArray(state.fulfillment.table_ids)
-        ? (ALLOW_MULTI_TABLE_SELECT ? state.fulfillment.table_ids.slice() : state.fulfillment.table_ids.slice(0, 1))
-        : [],
+      selectedTableIds: (hasActiveTableLock && activeTableId)
+        ? [activeTableId]
+        : (Array.isArray(state.fulfillment.table_ids)
+          ? (ALLOW_MULTI_TABLE_SELECT ? state.fulfillment.table_ids.slice() : state.fulfillment.table_ids.slice(0, 1))
+          : []),
       reservationDate: state.fulfillment.reservationDate || '',
       reservationTime: state.fulfillment.reservationTime || '12:00',
       guestCount: state.fulfillment.guestCount || 2,
@@ -1869,6 +2022,11 @@
         btn.onclick = function () {
           var chosen = btn.dataset.type;
           if (!availabilityMap[chosen]) return; // Guard: rejection on unavailable
+          var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
+          if (lockedTable && lockedTable.hadOpenBill && chosen !== 'dine_in') {
+            if (UI && UI.toast) UI.toast('Ingin pindah meja? Hubungi kasir.');
+            return;
+          }
           draft.type = chosen;
           // Switching away from the schedulable types (delivery/pickup) clears
           // scheduling; switching between delivery and pickup keeps it.
@@ -2519,6 +2677,13 @@
     }
 
     function autoRecommendTable() {
+      var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
+      if (lockedTable && lockedTable.hadOpenBill) {
+        draft.selectedTableIds = [lockedTable.id];
+        draft.tableNumber = lockedTable.number || computeSelectedTableNumbers(draft.selectedTableIds);
+        renderFloorCanvas();
+        return;
+      }
       if (!dineInLayoutData) return;
       var fb = getFulfillmentBranch();
       var curBranch = state.matchedBranch || (fb ? { id: fb.id } : null) || (availableBranches && availableBranches[0]) || null;
@@ -2595,6 +2760,15 @@
           var tnum = card.dataset.tableNumber;
           var isSel = card.classList.contains('is-selected');
 
+          var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
+          if (lockedTable && lockedTable.hadOpenBill && String(lockedTable.id) !== String(tid)) {
+            if (UI && UI.toast) UI.toast('Ingin pindah meja? Hubungi kasir.');
+            return;
+          }
+          if (lockedTable && lockedTable.hadOpenBill && isSel) {
+            return;
+          }
+
           if (!draft.selectedTableIds) draft.selectedTableIds = [];
 
           if (isSel) {
@@ -2612,8 +2786,10 @@
     }
 
     function renderTableHtml(t, sectionBaseY) {
-      var isSelected = (draft.selectedTableIds || []).indexOf(t.id) !== -1;
-      var isUnavailable = t.operational_state !== 'available';
+      var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
+      var isMyLockedTable = Boolean(lockedTable && lockedTable.hadOpenBill && String(lockedTable.id) === String(t.id));
+      var isSelected = (draft.selectedTableIds || []).indexOf(t.id) !== -1 || isMyLockedTable;
+      var isUnavailable = t.operational_state !== 'available' && !isMyLockedTable;
 
       var relY = (t.y != null ? t.y : 0) - (sectionBaseY || 0);
       if (relY < 0) relY = 0;
@@ -2688,6 +2864,12 @@
             if (UI && UI.toast) UI.toast('Ingin pindah meja? Hubungi kasir.');
             return;
           }
+        }
+
+        var lockedTable = (Store.getMyTable && Store.getMyTable()) || null;
+        if (lockedTable && lockedTable.hadOpenBill && draft.type !== 'dine_in') {
+          if (UI && UI.toast) UI.toast('Ingin pindah meja? Hubungi kasir.');
+          return;
         }
 
         // Commit to state.fulfillment — tipe berganti lebih dulu supaya penulisan
@@ -4023,6 +4205,12 @@
     }
 
     state.isSubmitting = true;
+    if (isOnlinePayment(state.paymentMethod)) {
+      state.isRedirectingToPayment = true;
+      if (window.Xentra && typeof window.Xentra.showSplash === 'function') {
+        window.Xentra.showSplash('Menyiapkan pembayaran…');
+      }
+    }
     var btn = $('x-btn-submit-order');
     if (btn) {
       btn.disabled = true;
@@ -4034,6 +4222,10 @@
 
     function handleAuthFailure(errData) {
       state.isSubmitting = false;
+      state.isRedirectingToPayment = false;
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
       if (btn) {
         btn.disabled = false;
         btn.textContent = state.fulfillment.type === 'reservation' ? 'Konfirmasi Reservasi' : 'Pesan Sekarang';
@@ -4078,6 +4270,10 @@
     }).then(function (verRes) {
       if (verRes && !verRes.is_valid) {
         state.isSubmitting = false;
+        state.isRedirectingToPayment = false;
+        if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+          window.Xentra.hideSplash();
+        }
         if (btn) { btn.disabled = false; btn.textContent = 'Pesan Sekarang'; btn.style.opacity = '1'; }
         showPrePaymentVerificationDialog(verRes, function () {
           // Retry submit with updated prices
@@ -4103,6 +4299,10 @@
       // NEVER fall through to create-order — an unverified order must not be placed.
       // Restore button and show retry message so the customer can try again.
       state.isSubmitting = false;
+      state.isRedirectingToPayment = false;
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
       if (btn) {
         btn.disabled = false;
         btn.textContent = state.fulfillment.type === 'reservation' ? 'Konfirmasi Reservasi' : 'Pesan Sekarang';
@@ -4163,9 +4363,21 @@
     var isDelivery = fulType === 'delivery';
     var isReservation = fulType === 'reservation';
 
+    if (isOnlinePayment(state.paymentMethod)) {
+      state.isRedirectingToPayment = true;
+      if (window.Xentra && typeof window.Xentra.showSplash === 'function') {
+        window.Xentra.showSplash('Menyiapkan pembayaran…');
+      }
+    }
+
     // Reservation requires a chosen arrival date (server remains the authority
     // for the same-day rejection).
     if (isReservation && !state.fulfillment.reservationDate) {
+      state.isSubmitting = false;
+      state.isRedirectingToPayment = false;
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
       if (btn) btn.textContent = 'Konfirmasi Reservasi';
       if (UI && UI.toast) UI.toast('Silakan pilih tanggal reservasi terlebih dahulu.');
       return;
@@ -4237,21 +4449,72 @@
     };
 
     function onSuccess(orderId, snapToken, redirectUrl) {
-      state.isSubmitting = false;
+      var isOnline = isOnlinePayment(state.paymentMethod) || Boolean(snapToken || redirectUrl);
+
+      if (isOnline) {
+        state.isRedirectingToPayment = true;
+        state.isSubmitting = true;
+        if (window.Xentra && typeof window.Xentra.showSplash === 'function') {
+          window.Xentra.showSplash('Mengarahkan ke pembayaran…');
+        }
+      } else {
+        state.isSubmitting = false;
+      }
+
       if (Store && typeof Store.clearRecipient === 'function') Store.clearRecipient();
       state.recipient = { type: 'self', name: '', phone: '' };
-      // Jalur ke gateway diurus modul bersama: ia memuat Snap.js dengan client key
-      // yang dikonfigurasi (Midtrans), atau mengarahkan ke halaman DOKU. Sebelum ini
-      // halaman memanggil window.snap langsung, padahal Snap.js tidak pernah dimuat
-      // di PWA — jadi pembayaran online tidak pernah benar-benar terbuka.
-      var Gateway = window.Xentra && window.Xentra.PaymentGateway;
-      var backToOrder = function () { Router.navigate('order-received', { orderId: orderId }); };
-      if (Gateway && (snapToken || redirectUrl)) {
-        Gateway.pay({
-          snapToken: snapToken,
-          redirectUrl: redirectUrl,
-          handlers: { onSuccess: backToOrder, onPending: backToOrder, onError: backToOrder, onClose: backToOrder }
-        }).catch(function () { backToOrder(); });
+
+      if (state.fulfillment.type === 'dine_in') {
+        var fTableId = (state.fulfillment.table_ids && state.fulfillment.table_ids[0]) || '';
+        var fTableNum = state.fulfillment.tableNumber || '';
+        if (fTableId && Store && Store.setMyTable) {
+          Store.setMyTable({ id: fTableId, number: fTableNum, hadOpenBill: true });
+          if (Store.setOrderType) Store.setOrderType('dine_in');
+        }
+      }
+
+      var backToOrder = function () {
+        state.isSubmitting = false;
+        state.isRedirectingToPayment = false;
+        if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+          window.Xentra.hideSplash();
+        }
+        Router.navigate('order-received', { orderId: orderId });
+      };
+
+      if (isOnline) {
+        var ensureGW = (window.Xentra && typeof window.Xentra.ensurePaymentGateway === 'function')
+          ? window.Xentra.ensurePaymentGateway()
+          : Promise.resolve(window.Xentra && window.Xentra.PaymentGateway);
+
+        ensureGW.then(function (Gateway) {
+          if (Gateway && (snapToken || redirectUrl)) {
+            return Gateway.pay({
+              snapToken: snapToken,
+              redirectUrl: redirectUrl,
+              handlers: {
+                onSuccess: backToOrder,
+                onPending: backToOrder,
+                onError: backToOrder,
+                onClose: function () {
+                  if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+                    window.Xentra.hideSplash();
+                  }
+                  backToOrder();
+                }
+              }
+            });
+          } else {
+            backToOrder();
+          }
+        }).catch(function () {
+          state.isSubmitting = false;
+          state.isRedirectingToPayment = false;
+          if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+            window.Xentra.hideSplash();
+          }
+          backToOrder();
+        });
       } else {
         backToOrder();
       }
@@ -4279,6 +4542,10 @@
 
     function onFail(errData) {
       state.isSubmitting = false;
+      state.isRedirectingToPayment = false;
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
       if (btn) {
         btn.disabled = false;
         btn.textContent = state.fulfillment.type === 'reservation' ? 'Konfirmasi Reservasi' : 'Pesan Sekarang';
@@ -4338,7 +4605,7 @@
   // Registered ONCE at module scope. Reacts to cart, location, and customerSession mutations
   // and delegates rendering to syncRowsFromItems. Delivery re-quote is scheduled.
   Store.subscribe(function (mutation) {
-    if (!checkoutContainer || state.isSubmitting) return;
+    if (!checkoutContainer || state.isSubmitting || state.isRedirectingToPayment) return;
     if (Router && Router.getCurrentView && Router.getCurrentView() !== 'checkout') return;
     if (checkoutContainer.style.display === 'none') return;
     var mt = mutation && mutation.type;

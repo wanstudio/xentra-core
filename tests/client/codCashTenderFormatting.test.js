@@ -221,8 +221,8 @@ test('T9: paying at the counter (dine-in & pickup) changes the label, CTA and te
     'prepared cash must be derived from that predicate');
 
   // Label + subtitle per fulfillment type.
-  assert.ok(code.includes("? { title: 'Cash Tunai', sub: 'Bayar di kasir' }"),
-    'counter payments are labelled Cash Tunai / Bayar di kasir');
+  assert.ok(code.includes("? { title: 'Cash Tunai', sub: 'Bayar ke kasir' }"),
+    'counter payments are labelled Cash Tunai / Bayar ke kasir');
   assert.ok(code.includes(": { title: 'Tunai (COD)', sub: 'Bayar ke driver' };"),
     'delivery COD is labelled Tunai (COD) / Bayar ke driver');
 

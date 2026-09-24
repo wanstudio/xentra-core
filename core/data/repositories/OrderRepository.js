@@ -185,6 +185,10 @@ class OrderRepository {
   }
 
   ensurePendingPayment({ paymentId, orderId, provider, paymentMethod, merchantId, amount, createdAt, updatedAt }) {
+    const validProviders = ['cash', 'midtrans', 'doku'];
+    if (!provider || !validProviders.includes(provider) || !paymentMethod || !validProviders.includes(paymentMethod)) {
+      throw new Error('INVALID_PAYMENT_PROVIDER');
+    }
     return this.db.execute(`
       INSERT INTO order_payments (
         id, order_id, provider, payment_method, merchant_id, snap_token, payment_status, amount, created_at, updated_at

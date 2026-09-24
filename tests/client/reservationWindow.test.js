@@ -65,3 +65,11 @@ test('RSV-03: server/dashboard receives an ISO date, never the Besok label', () 
 test('RSV-04: server rejects same-day-or-earlier reservation dates', () => {
   assert.ok(placementSrc.includes('SAME_DAY_RESERVATION_REJECTED'), 'server must reject same-day reservations');
 });
+
+test('RSV-05: card Ringkasan Pembayaran di-hide pada checkout jika tipe Reservasi terpilih', () => {
+  // Card 5 (x-payment-summary-card) harus dibungkus dengan (!isReservation ? ...)
+  assert.ok(
+    /(!isReservation\s*\?\s*\(\s*'  <div class="x-card x-alt-summary-card" id="x-payment-summary-card")/.test(checkoutSrc),
+    'x-payment-summary-card harus disembunyikan saat isReservation bernilai true'
+  );
+});

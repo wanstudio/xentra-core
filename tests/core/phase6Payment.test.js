@@ -423,11 +423,11 @@ describe('Phase 6 — Payment Implementation & Critical Invariants', () => {
       gross_amount: String(seed.grandTotal)
     };
 
-    const first = PaymentGatewayService.handleWebhook(webhookPayload, { skipSignatureCheck: true });
+    const first = PaymentGatewayService.handleWebhook(webhookPayload, { skipSignatureCheck: true, provider: 'midtrans' });
     assert.strictEqual(first.success, true);
     assert.strictEqual(first.payment_status, 'settlement');
 
-    const second = PaymentGatewayService.handleWebhook(webhookPayload, { skipSignatureCheck: true });
+    const second = PaymentGatewayService.handleWebhook(webhookPayload, { skipSignatureCheck: true, provider: 'midtrans' });
     assert.strictEqual(second.success, true);
     assert.strictEqual(second.idempotent, true, 'Subsequent webhook must be marked idempotent');
 

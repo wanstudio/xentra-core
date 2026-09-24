@@ -49,8 +49,11 @@
   // by someone else), '' = the empty state is rendered.
   var lastProductsHtml = null;
 
-  // Lightweight performance instrumentation (gated by debug or ?perf=1)
+  // Lightweight performance instrumentation (gated by debug or ?perf=1, plus User Timing marks)
   function perfLog(mark, label) {
+    if (typeof performance !== 'undefined' && typeof performance.mark === 'function') {
+      try { performance.mark(mark); } catch (_) {}
+    }
     if (typeof window !== 'undefined' && (window.__XENTRA_DEBUG || (window.location && window.location.search && window.location.search.indexOf('perf=1') !== -1))) {
       var ts = (typeof performance !== 'undefined' && performance.now) ? Math.round(performance.now()) : Date.now();
       console.log('[PERF][' + ts + 'ms] ' + mark + (label ? ': ' + label : ''));
@@ -2368,12 +2371,16 @@
     // (baru scan, belum pesan) bukan alasan menghapus meja.
     function reconcileMyTable() {
       var table = (Store.getMyTable && Store.getMyTable()) || null;
-      if (!table || !API || !API.get) return;
+      if (!API || !API.get) return;
       API.get('/customer/dining-session').then(function (res) {
-        var current = (Store.getMyTable && Store.getMyTable()) || null;
-        if (!current) return;
+        var current = (Store.getMyTable && Store.getMyTable()) || {};
         if (res && res.success && res.session) {
-          if (!current.hadOpenBill) Store.setMyTable({ id: current.id, number: current.number, hadOpenBill: true });
+          var sTable = (res.session.tables && res.session.tables[0]) || null;
+          var sId = sTable ? sTable.id : (current.id || null);
+          var sNum = sTable ? (sTable.table_number || sTable.label || '') : (current.number || '');
+          if (sId) {
+            Store.setMyTable({ id: sId, number: sNum, hadOpenBill: true });
+          }
         } else if (current.hadOpenBill) {
           Store.clearMyTable();
         }

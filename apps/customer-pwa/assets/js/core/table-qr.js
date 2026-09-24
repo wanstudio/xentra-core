@@ -9,6 +9,8 @@
 (function () {
   'use strict';
 
+  if (window.Xentra && window.Xentra.TableQr && window.Xentra.TableQr.__isRealModule) return;
+
   var onToken = null;
 
   // ── Scanner QR meja (di dalam aplikasi) ──
@@ -141,6 +143,7 @@
 
   window.Xentra = window.Xentra || {};
   window.Xentra.TableQr = {
+    __isRealModule: true,
     open: function (handler) {
       onToken = typeof handler === 'function' ? handler : null;
       openTableQrScanner();

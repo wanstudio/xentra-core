@@ -1933,16 +1933,30 @@
 
   function updateBMTableStats(tables) {
     var avail = 0, occupied = 0, held = 0, blocked = 0;
+    var occupiedPwa = 0, occupiedPos = 0;
     (tables || []).forEach(function (t) {
       var st = t.operational_state || 'available';
-      if (st === 'available') avail++;
-      else if (st === 'occupied') occupied++;
-      else if (st === 'held') held++;
-      else if (st === 'blocked' || st === 'out_of_service') blocked++;
+      if (st === 'available') {
+        avail++;
+      } else if (st === 'occupied') {
+        occupied++;
+        if (t.session_channel === 'pos_cashier') {
+          occupiedPos++;
+        } else {
+          occupiedPwa++;
+        }
+      } else if (st === 'held') {
+        held++;
+      } else if (st === 'blocked' || st === 'out_of_service') {
+        blocked++;
+      }
     });
 
     if ($('bm-tables-stat-available')) $('bm-tables-stat-available').textContent = avail;
     if ($('bm-tables-stat-occupied')) $('bm-tables-stat-occupied').textContent = occupied;
+    if ($('bm-tables-stat-occupied-breakdown')) {
+      $('bm-tables-stat-occupied-breakdown').textContent = 'PWA: ' + occupiedPwa + ' | Kasir: ' + occupiedPos;
+    }
     if ($('bm-tables-stat-held')) $('bm-tables-stat-held').textContent = held;
     if ($('bm-tables-stat-blocked')) $('bm-tables-stat-blocked').textContent = blocked;
   }
@@ -1962,6 +1976,8 @@
       var st = t.operational_state || 'available';
       if (_bmTablesState.filterStatus === 'available') return st === 'available';
       if (_bmTablesState.filterStatus === 'occupied') return st === 'occupied';
+      if (_bmTablesState.filterStatus === 'occupied_pwa') return st === 'occupied' && t.session_channel !== 'pos_cashier';
+      if (_bmTablesState.filterStatus === 'occupied_pos') return st === 'occupied' && t.session_channel === 'pos_cashier';
       if (_bmTablesState.filterStatus === 'held') return st === 'held';
       if (_bmTablesState.filterStatus === 'blocked') return (st === 'blocked' || st === 'out_of_service');
       return true;
@@ -1996,6 +2012,18 @@
         actionsHtml = '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%;" disabled>Sedang Digunakan</button>';
       }
 
+      var channelBadge = '';
+      if (st === 'occupied') {
+        if (t.session_channel === 'pos_cashier') {
+          channelBadge = '<div style="margin-top:6px; display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:2px 8px; border-radius:12px; background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;"><span>🖥️ Diisi oleh Kasir (POS)</span></div>';
+        } else {
+          channelBadge = '<div style="margin-top:6px; display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; padding:2px 8px; border-radius:12px; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0;"><span>📱 Dipesan via PWA Customer</span></div>';
+        }
+        if (t.session_customer_name) {
+          channelBadge += '<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Pelanggan: <strong>' + esc(t.session_customer_name) + '</strong></div>';
+        }
+      }
+
       return '<div class="x-card" style="padding:16px; border:1px solid ' + cfg.border + '; border-radius:10px; background:' + cfg.bg + '; display:flex; flex-direction:column; justify-content:space-between; min-height:160px;">' +
         '<div>' +
           '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">' +
@@ -2003,7 +2031,8 @@
             cfg.badge +
           '</div>' +
           '<div style="font-size:12px; color:var(--text-muted); margin-bottom:4px;">Kapasitas: <strong>' + (t.capacity || 4) + ' Kursi</strong></div>' +
-          (t.notes ? ('<div style="font-size:11px; color:#b91c1c; margin-bottom:8px; font-style:italic;">Catatan: ' + esc(t.notes) + '</div>') : '') +
+          channelBadge +
+          (t.notes ? ('<div style="font-size:11px; color:#b91c1c; margin-top:4px; margin-bottom:8px; font-style:italic;">Catatan: ' + esc(t.notes) + '</div>') : '') +
         '</div>' +
         '<div style="margin-top:12px;">' + actionsHtml +
           '<button type="button" class="x-btn-secondary" style="font-size:12px; padding:6px 12px; width:100%; margin-top:8px;" onclick="openBMTableQr(\'' + esc(t.id) + '\', \'' + esc(t.label || ('Meja ' + t.table_number)) + '\')">QR Meja</button>' +

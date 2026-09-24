@@ -168,7 +168,8 @@ class CashSettlementService {
               customer_name: order.customer_name,
               customer_phone: order.customer_phone,
               guest_count: order.guest_count || 1,
-              hold_reference_id: order.id
+              hold_reference_id: order.id,
+              channel: order.order_channel || 'pos_cashier'
             });
           }
         } catch (dineErr) {

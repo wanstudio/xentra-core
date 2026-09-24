@@ -37,12 +37,16 @@
 
   function api() { return window.Xentra && window.Xentra.API; }
 
-  function loadConfig() {
-    if (configPromise) return configPromise;
+  function loadConfig(forceReload) {
+    if (!forceReload) {
+      if (gatewayConfig) return Promise.resolve(gatewayConfig);
+      if (configPromise) return configPromise;
+    }
     var API = api();
     if (!API || typeof API.get !== 'function') return Promise.resolve(null);
     configPromise = API.get('/payment/config').then(function (res) {
       gatewayConfig = (res && res.payment_gateway) ? res.payment_gateway : null;
+      if (!gatewayConfig) configPromise = null;
       return gatewayConfig;
     }).catch(function () {
       // Gagal mengambil konfigurasi bukan alasan untuk menyerah: biarkan pemanggil
@@ -149,6 +153,9 @@
       // Snap.js, tidak menyentuh window.snap, dan tidak meminta kredensial Midtrans.
       if (provider === 'doku') {
         if (!redirectUrl) throw new Error('DOKU_REDIRECT_MISSING');
+        if (window.Xentra && typeof window.Xentra.showSplash === 'function') {
+          window.Xentra.showSplash('Mengarahkan ke pembayaran…');
+        }
         window.location.href = redirectUrl;
         return { opened: 'redirect', provider: provider };
       }
@@ -156,6 +163,9 @@
       // Midtrans memakai Snap. Hanya di jalur ini kredensial Midtrans dibutuhkan.
       if (!snapToken) throw new Error('NO_PAYMENT_INSTRUCTION');
       return loadSnap().then(function (snap) {
+        if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+          window.Xentra.hideSplash();
+        }
         snap.pay(snapToken, {
           onSuccess: handlers.onSuccess,
           onPending: handlers.onPending,
