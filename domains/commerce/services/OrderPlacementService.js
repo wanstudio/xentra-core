@@ -37,6 +37,7 @@ class OrderPlacementService {
     selection_mode = null,
     table_number = null,
     reservation_date = null,
+    reservation_time = null,
     guest_count = null,
     client_transaction_id = null,
     shift_id = null,
@@ -72,7 +73,7 @@ class OrderPlacementService {
     if (effectiveOrderType === 'reservation') {
       let reservationResult;
       try {
-        reservationResult = DiningTableService.createReservation({ brand_id, branch_id, customer, order_channel, selection_mode, reservation_date, guest_count, notes });
+        reservationResult = DiningTableService.createReservation({ brand_id, branch_id, customer, order_channel, selection_mode, reservation_date, reservation_time, guest_count, notes });
       } catch (err) {
         console.error('[OrderPlacementService] Reservation insert error:', err.message);
         return { success: false, status: 'ORDER_CREATION_FAILED', errors: [err.message] };
