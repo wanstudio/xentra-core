@@ -142,8 +142,23 @@
         orders.forEach(function (ord) {
           var statusColor = ord.status === 'completed' ? '#00A637' : (ord.status === 'cancelled' || ord.status === 'rejected' ? '#ef4444' : '#0284c7');
           var statusLabel = ord.status === 'completed' ? 'Selesai' : (ord.status === 'cancelled' ? 'Dibatalkan' : (ord.status === 'rejected' ? 'Ditolak' : 'Diproses'));
-          var itemsText = (ord.items || []).map(function (it) { return it.quantity + 'x ' + it.product_name; }).join(', ') || 'Item pesanan';
+          var isReservation = ord.order_type === 'reservation';
+          var itemsText = isReservation
+            ? 'Reservasi meja'
+            : ((ord.items || []).map(function (it) { return it.quantity + 'x ' + it.product_name; }).join(', ') || 'Item pesanan');
           var dateStr = ord.created_at ? new Date(ord.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+          var reservationInfo = '';
+          if (isReservation) {
+            var reservationDate = ord.reservation_date || '';
+            var reservationTime = ord.reservation_time || '';
+            var guestCount = Number(ord.guest_count || 0);
+            reservationInfo =
+              '<div class="x-history-date" style="margin-top:6px;color:#92400e;font-weight:700;">' +
+              'Reservasi: ' + UI.escape(reservationDate || '—') +
+              (reservationTime ? ' • ' + UI.escape(reservationTime) : '') +
+              (guestCount > 0 ? ' • ' + guestCount + ' tamu' : '') +
+              '</div>';
+          }
 
           html +=
             '<div class="x-history-card" data-order-id="' + UI.escape(ord.id) + '">' +
@@ -155,6 +170,7 @@
             '    <span class="x-history-status" style="color:' + statusColor + ';background:' + statusColor + '15;">' + UI.escape(statusLabel) + '</span>' +
             '  </div>' +
             '  <div class="x-history-items">' + UI.escape(itemsText) + '</div>' +
+            reservationInfo +
             '  <div class="x-history-card-foot">' +
             '    <div>' +
             '      <span class="lbl">Total Pembayaran</span>' +
