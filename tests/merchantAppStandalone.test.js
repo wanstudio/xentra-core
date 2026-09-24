@@ -18,6 +18,7 @@ const { JSDOM } = require('jsdom');
 const ROOT = path.join(__dirname, '..');
 const HTML_PATH = path.join(ROOT, 'apps/merchant-app/index.html');
 const JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/merchant-app.js');
+const ORDER_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/orders.js');
 const SHARED_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/shared.js');
 const BRANCH_CATALOG_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/branch-catalog.js');
 
@@ -58,6 +59,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
 
     win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(ORDER_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(JS_PATH, 'utf8'));
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
     await new Promise((r) => setTimeout(r, 200));
@@ -100,44 +102,69 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(html.includes('/merchant-shared/css/dashboard.css'), 'must load the shared surface stylesheet');
     assert.ok(html.includes('/merchant-shared/js/shared.js'), 'must load shared.js');
     assert.ok(html.includes('/merchant-shared/js/branch-catalog.js'), 'must load branch-catalog.js');
+    assert.ok(html.includes('/merchant-app/assets/js/orders.js'), 'must load orders.js');
     assert.ok(html.includes('/merchant-app/assets/js/merchant-app.js'), 'must load merchant-app.js');
   });
 
-  await t.test('3. Order Center behaviour from BM-2 is preserved', () => {
+  await t.test('2b. Order Center module is the canonical implementation', () => {
     const js = fs.readFileSync(JS_PATH, 'utf8');
-    assert.ok(js.includes('bm-order-card-attention'), 'mobile attention card styling hook');
-    assert.ok(js.includes('playNewOrderAudibleChime'), 'audible new-order chime');
-    assert.ok(js.includes('seenPendingOrderIds'), 'diff-based new order detection');
-    assert.ok(js.includes('acceptance_deadline_at'), 'acceptance deadline comes from the server field');
-    assert.ok(!js.includes('ACCEPTANCE_WINDOW_MS'), 'no local deadline reconstruction');
-    assert.ok(!js.includes('+ 180000'), 'no hard-coded acceptance window');
-    assert.ok(js.includes('/branch-acceptance'), 'ACCEPT goes through the dedicated branch-acceptance endpoint');
+    const orderJs = fs.readFileSync(ORDER_JS_PATH, 'utf8');
+    for (const name of [
+      'startBMOrdersPolling',
+      'loadBMOrders',
+      'renderBMOrdersTable',
+      'advanceBMOrderStatus',
+      'openBMRejectModal',
+      'viewBMOrderDetail',
+      'checkInBMReservation',
+      'noShowBMReservation'
+    ]) {
+      const count = (orderJs.match(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\(', 'g')) || []).length;
+      assert.equal(count, 1, name + ' must have exactly one implementation in orders.js');
+      assert.ok(!js.includes('function ' + name + '(') && !js.includes('async function ' + name + '('),
+        name + ' must not be implemented in merchant-app.js');
+    }
+  });
+
+  await t.test('3. Order Center is extracted from the shell and behaviour is preserved', () => {
+    const js = fs.readFileSync(JS_PATH, 'utf8');
+    const orderJs = fs.readFileSync(ORDER_JS_PATH, 'utf8');
+    assert.ok(orderJs.includes('async function loadBMOrders('), 'loadBMOrders must live in orders.js');
+    assert.ok(!js.includes('async function loadBMOrders('), 'merchant-app.js must not contain loadBMOrders implementation');
+    assert.ok(orderJs.includes('bm-order-card-attention'), 'mobile attention card styling hook');
+    assert.ok(orderJs.includes('playNewOrderAudibleChime'), 'audible new-order chime');
+    assert.ok(orderJs.includes('seenPendingOrderIds'), 'diff-based new order detection');
+    assert.ok(orderJs.includes('acceptance_deadline_at'), 'acceptance deadline comes from the server field');
+    assert.ok(!orderJs.includes('ACCEPTANCE_WINDOW_MS'), 'no local deadline reconstruction');
+    assert.ok(!orderJs.includes('+ 180000'), 'no hard-coded acceptance window');
+    assert.ok(orderJs.includes('/branch-acceptance'), 'ACCEPT goes through the dedicated branch-acceptance endpoint');
   });
 
   await t.test('6. reservation orders have dedicated filter/data/actions in Merchant App', () => {
     const html = fs.readFileSync(HTML_PATH, 'utf8');
     const js = fs.readFileSync(JS_PATH, 'utf8');
+    const orderJs = fs.readFileSync(ORDER_JS_PATH, 'utf8');
 
     assert.ok(html.includes('<option value="reservation">Reservasi</option>'),
       'order type filter must expose Reservation');
 
-    assert.ok(js.includes('RESERVASI'), 'reservation must not be rendered as pickup');
-    assert.ok(js.includes('reservationGuests'), 'reservation guest count must be rendered');
-    assert.ok(js.includes('reservationInfo'), 'reservation date/time summary must be rendered');
-    assert.ok(js.includes('/pos/reservations/'),
+    assert.ok(orderJs.includes('RESERVASI'), 'reservation must not be rendered as pickup');
+    assert.ok(orderJs.includes('reservationGuests'), 'reservation guest count must be rendered');
+    assert.ok(orderJs.includes('reservationInfo'), 'reservation date/time summary must be rendered');
+    assert.ok(orderJs.includes('/pos/reservations/'),
       'Merchant App must call the reservation operational API');
-    assert.ok(js.includes('checkInBMReservation'),
+    assert.ok(orderJs.includes('checkInBMReservation'),
       'Merchant App must expose reservation check-in action');
-    assert.ok(js.includes('noShowBMReservation'),
+    assert.ok(orderJs.includes('noShowBMReservation'),
       'Merchant App must expose reservation no-show action');
-    assert.ok(js.includes('getBMReservationScheduleMs'),
+    assert.ok(orderJs.includes('getBMReservationScheduleMs'),
       'queue must classify reservation schedule explicitly');
-    assert.ok(js.includes('aIsUpcomingReservation'),
+    assert.ok(orderJs.includes('aIsUpcomingReservation'),
       'queue must keep upcoming reservations in a dedicated visibility tier');
 
-    assert.ok(js.includes('bm-detail-reservation-datetime'),
+    assert.ok(orderJs.includes('bm-detail-reservation-datetime'),
       'detail view must expose reservation schedule');
-    assert.ok(js.includes('bm-detail-reservation-guests'),
+    assert.ok(orderJs.includes('bm-detail-reservation-guests'),
       'detail view must expose guest count');
     assert.ok(/Reservasi\\s*\\(\\s*\\(\\d\+\\)\\s*Tamu/i.test(js) === false,
       'guest count parser must not contain an invalid double-escaped regex');
@@ -194,7 +221,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
 
     // merchant-app.js consumes the shared contract through XentraShared; use
     // lightweight stubs here so the test isolates queue rendering and sorting.
-    win.eval(fs.readFileSync(JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(ORDER_JS_PATH, 'utf8'));
     await win.loadBMOrders();
 
     const cardIds = Array.from(win.document.querySelectorAll('#bm-orders-cards-container [data-order-id]'))
