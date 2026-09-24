@@ -17,8 +17,7 @@
   var getAuthHeaders = S.getAuthHeaders;
   var getStoredUser = S.getStoredUser;
   var getBMTargetBranchId = window.getBMTargetBranchId;
-  var XentraBranchCatalog = window.XentraBranchCatalog;
-  var loadInlineBranchCatalog = XentraBranchCatalog && XentraBranchCatalog.loadInlineBranchCatalog;
+  var XentraMerchantBranchCatalog = window.XentraMerchantBranchCatalog;
 
   var _bmMenuState = {
     products: [],
@@ -36,7 +35,7 @@
     var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
-    XentraBranchCatalog.state.branchId = branchId;
+    XentraMerchantBranchCatalog.state.branchId = branchId;
 
     var tbody = $('bm-menu-tbody');
     if (tbody && (!_bmMenuState.products || !_bmMenuState.products.length)) {
@@ -61,7 +60,7 @@
       if (currentSeq !== _bmMenuState.fetchSeq) return;
 
       if (catRes.ok && catData.success) {
-        XentraBranchCatalog.state.catalogData = catData;
+        XentraMerchantBranchCatalog.state.catalogData = catData;
         _bmMenuState.categories = catData.categories || [];
         _bmMenuState.availableProducts = catData.available_master_products || [];
         renderBMMenuCategoriesBar();
@@ -345,7 +344,7 @@
       showToast('❌ Cabang tidak valid atau belum dipilih.');
       return;
     }
-    XentraBranchCatalog.state.branchId = branchId;
+    XentraMerchantBranchCatalog.state.branchId = branchId;
     openBranchCategoryCreateModal();
   };
 
@@ -354,7 +353,7 @@
 
     var branchId = getBMTargetBranchId();
     if (!branchId) return;
-    XentraBranchCatalog.state.branchId = branchId;
+    XentraMerchantBranchCatalog.state.branchId = branchId;
 
     try {
       var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/categories/' + encodeURIComponent(catId), {
@@ -539,7 +538,7 @@
       });
       var data = await res.json();
       if (res.ok && data.success) {
-        XentraBranchCatalog.state.catalogData = data;
+        XentraMerchantBranchCatalog.state.catalogData = data;
         _bmMenuState.availableProducts = data.available_master_products || [];
 
         // Distinguish between already adopted and available master products
@@ -811,7 +810,6 @@
       showToast('✅ Berhasil menambahkan ' + successCount + ' menu ke cabang!');
       closeBMAddCatalogModal();
       if (typeof loadBMMenu === 'function') await loadBMMenu();
-      if (typeof loadInlineBranchCatalog === 'function') loadInlineBranchCatalog();
     } else {
       showToast('❌ ' + (lastError || 'Gagal mengadopsi produk terpilih.'));
     }
@@ -819,6 +817,7 @@
 
 
   // The shared branch-catalog module refreshes the BM menu after mutations.
+  var Catalog = window.XentraMerchantBranchCatalog;
   if (Catalog) {
     Catalog.setHooks({ refreshBMMenu: function () { loadBMMenu(); } });
     Catalog.setBmMenuState(_bmMenuState);
