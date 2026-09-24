@@ -45,6 +45,7 @@ router.get('/admin/finance/overview', requireAuth(['owner', 'brand_manager', 'br
     const cashSettled = paymentReport.summary?.cash_settled || 0;
     const midtransSettled = paymentReport.summary?.midtrans_settled || 0;
     const dokuSettled = paymentReport.summary?.doku_settled || 0;
+    const qrisStaticSettled = paymentReport.summary?.qris_static_settled || 0;
     const totalPending = paymentReport.summary?.total_pending || 0;
 
     let totalTxCount = 0;
@@ -64,6 +65,7 @@ router.get('/admin/finance/overview', requireAuth(['owner', 'brand_manager', 'br
           cash_settled: cashSettled,
           midtrans_settled: midtransSettled,
           doku_settled: dokuSettled,
+          qris_static_settled: qrisStaticSettled,
           total_pending: totalPending,
           transaction_count: totalTxCount,
           unreconciled_count: pendingRecon.length,
@@ -220,6 +222,18 @@ router.get('/admin/finance/payment-methods', requireAuth(['owner', 'brand_manage
             { code: 'credit_card', name: 'Kartu Kredit', icon: '💳', enabled: midtransMethods.credit_card !== false },
             { code: 'bank_transfer', name: 'Bank Transfer', icon: '🏛️', enabled: midtransMethods.bank_transfer !== false }
           ]
+        },
+        {
+          code: 'qris_static',
+          name: 'QRIS Statis',
+          provider: 'qris_static',
+          is_enabled: Boolean(effectiveConfig.qris_static && effectiveConfig.qris_static.image_url),
+          type: 'static_manual',
+          settlement_mode: 'manual_cashier',
+          description: 'QRIS statis merchant untuk pembayaran manual/fallback di POS',
+          image_url: (effectiveConfig.qris_static && effectiveConfig.qris_static.image_url) || effectiveConfig.qris_static_image_url || null,
+          merchant_name: (effectiveConfig.qris_static && effectiveConfig.qris_static.merchant_name) || '',
+          instructions: (effectiveConfig.qris_static && effectiveConfig.qris_static.instructions) || ''
         },
         {
           code: 'doku',
