@@ -49,6 +49,23 @@ const app = require('../server/app');
 const { createPngBuffer, createJpegBuffer } = require('./helpers/testImageHelper');
 
 // ── Synthetic real image (sharp-generated — passes binary validation) ──────
+test('M5 media routes are isolated from api.js', () => {
+  const apiPath = require.resolve('../server/routes/api');
+  const mediaRoutePath = require.resolve('../server/routes/media-entities');
+  const apiSource = fs.readFileSync(apiPath, 'utf8');
+  const mediaRouteSource = fs.readFileSync(mediaRoutePath, 'utf8');
+
+  const entityRouteMatches = apiSource.match(/router\\.(?:get|post|delete)\\('\/admin\\/media\\/entity\\//g) || [];
+  assert.equal(entityRouteMatches.length, 0, 'canonical entity media routes must not be implemented inline in api.js');
+  assert.ok(mediaRouteSource.includes('module.exports = function registerMediaEntityRoutes'),
+    'media-entities.js must own canonical entity media routes');
+  assert.equal(
+    (apiSource.match(/registerMediaEntityRoutes\\(router,/g) || []).length,
+    1,
+    'api.js must register canonical entity media routes exactly once'
+  );
+});
+
 async function createSyntheticJpeg(width = 400, height = 400) {
   const raw = Buffer.alloc(width * height * 3);
   for (let i = 0; i < raw.length; i += 3) {
