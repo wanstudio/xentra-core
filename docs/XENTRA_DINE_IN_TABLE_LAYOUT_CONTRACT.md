@@ -205,28 +205,57 @@ Owner, Branch Manager, and Staff with the appropriate permission may configure/e
 - `order_channel` remains separate from `order_type`.
 - Checkout orchestrates the flow but does not own table business logic.
 
-## 13. Locked Scenario Matrix
+## 13. Locked Scenario Baseline — 17 Scenarios
 
-| # | Scenario | Expected result |
+**Status:** LOCKED / AUTHORITATIVE — BASE PLANNING + ACCEPTANCE BASELINE  
+**Decision Date:** 2026-09-24
+
+This 17-scenario matrix is the authoritative baseline for Dine-in implementation planning, backend invariants, acceptance criteria, security audit, and automated tests. It supersedes the earlier 16-scenario matrix.
+
+### Normal Scenarios
+
+| # | Situation | Expected result |
 |---|---|---|
-| 1 | Customer datang → Scan QR → Online | Valid; order diproses sesuai lifecycle. |
-| 2 | Customer datang → Floor Plan → Online | Valid; QR tidak diperlukan. |
-| 3 | Customer datang → Scan QR → Cash | Order masuk Merchant; customer diverifikasi secara operasional. |
-| 4 | Customer datang → Floor Plan → Cash | Order masuk Merchant; customer diverifikasi secara operasional. |
-| 5 | Customer di luar restoran → Floor Plan → Online | Valid; physical presence bukan syarat online payment. |
-| 6 | Customer di luar restoran → Floor Plan → Cash → tidak datang | Merchant menunggu sesuai timeout → Cancel/Reject. |
-| 7 | Customer memilih Table 05 → kemudian mencoba Table 06 sebelum order accepted | Tidak membuat dua konteks aktif; customer harus menyelesaikan/cancel konteks sebelumnya sesuai lifecycle. |
-| 8 | Customer A aktif di Table 05 → Customer B mencoba memakai session A | Reject; session ownership wajib diverifikasi server-side. |
-| 9 | Customer A aktif di Table 05 → mencoba pindah sendiri ke Table 06 | Reject; tidak ada customer self-transfer. |
-| 10 | Customer A membuat banyak order cash dengan banyak akun/meja | Setiap order tetap melalui Merchant acceptance; order cash tanpa customer hadir dapat ditolak/cancel. |
-| 11 | Dua customer bersamaan memilih Table 05 | Server-side concurrency/availability check memastikan tidak ada dua active assignments. |
-| 12 | Customer membayar online lalu tidak datang | Payment tetap valid; Xentra tidak memerlukan proof-of-presence untuk online payment. |
-| 13 | Customer membayar online → Merchant accepts → customer pesan tambahan | Additional order masuk Dining Session yang sama. |
-| 14 | Dining Session sudah completed → customer mencoba order tambahan | Reject; session lama tidak dapat dipakai kembali. |
-| 15 | Customer spam submit order yang sama | Satu order saja melalui idempotency/client transaction ID. |
-| 16 | QR Table 05 dipakai sebagai shortcut oleh customer lain | QR hanya mengidentifikasi Table; authorization/session ownership tetap divalidasi server-side. |
+| 1 | Datang → Scan QR → pilih menu → Online | Normal. |
+| 2 | Datang → Floor Plan → pilih meja → Online | Normal. |
+| 3 | Datang → Scan QR → Cash → datang ke kasir | Normal; masuk Merchant operational flow. |
+| 4 | Datang → Floor Plan → Cash → datang | Normal; masuk Merchant operational flow. |
+| 5 | Customer sudah punya session → pesan minuman lagi | Masuk Dining Session yang sama. |
 
-## 14. Fraud Boundary
+### Aneh / Fraud Scenarios
+
+| # | Situation | Expected result |
+|---|---|---|
+| 6 | Orang di rumah → Floor Plan → Table 05 → Online | Valid. Physical presence bukan syarat online payment; customer menanggung konsekuensi jika tidak datang. |
+| 7 | Orang di rumah → Floor Plan → Table 05 → Cash → tidak datang | Order tetap pending customer arrival; setelah operational timeout tanpa customer → Cancel/Reject. |
+| 8 | 10 akun → 10 meja → Cash | Semua tetap pending customer arrival, bukan otomatis Active/Occupied. Merchant menerima yang customer-nya hadir. Server membatasi 1 pending/active Dine-in context per customer account. |
+| 9 | Customer A → Table 05 → Cash → sebelum diterima mencoba pindah Table 06 | Tidak otomatis pindah. Order tetap Table 05. Pindah melalui cancel/reject lalu order baru sesuai lifecycle. |
+| 10 | Customer A → Table 05 → Online → paid → diterima → pindah Table 06 | Customer tidak boleh self-transfer. Perubahan meja hanya melalui Merchant/POS. |
+| 11 | Customer A → Table 05 → Online → paid → tidak datang | Payment tetap valid. Tidak memerlukan proof-of-presence; refund/cancel bila ada adalah operational/payment policy. |
+| 12 | Customer A → Table 05 → Online → paid → datang | Normal: Merchant process → Dining Session → Additional Order. |
+| 13 | Customer A scan QR Table 05 → kemudian scan QR Table 06 | Tidak membuat session kedua. Customer sudah memiliki pending/active Dine-in context; perpindahan melalui lifecycle yang sesuai. |
+| 14 | Customer B scan QR Table 05 sementara A sudah active | Reject. Table 05 tidak boleh memiliki dua concurrent active Dining Sessions. |
+| 15 | Customer B memanggil API memakai session A | Reject. Session ownership wajib diverifikasi server-side. |
+| 16 | Session A completed → customer pesan lagi memakai session lama | Reject. Completed session tidak dapat dipakai kembali. |
+| 17 | Customer spam tombol Bayar/Order | Hanya satu order melalui client_transaction_id/idempotency. |
+
+## 14. Backend Security / Domain Invariants
+
+- QR dan Floor Plan hanya cara mendapatkan/menentukan Table ID; bukan security mechanism.
+- One customer → one pending/active Dine-in context per Branch.
+- One Table tidak boleh dimiliki dua concurrent active Dining Sessions.
+- Session ownership wajib diverifikasi server-side.
+- Branch ↔ session ↔ table ↔ order relationship wajib konsisten.
+- Completed/rejected session tidak dapat dipakai ulang.
+- Customer tidak boleh self-transfer.
+- Duplicate order wajib idempotent.
+- Table availability wajib server-authoritative dan aman terhadap race condition.
+- Customer-side selection tidak otomatis berarti Active Dining Session; Active Session dimulai pada approved Merchant operational acceptance boundary.
+- Online payment tidak membutuhkan proof-of-presence.
+- Cash Dine-in tetap melalui Merchant operational acceptance/presence verification dan timeout cancellation.
+- Additional order menggunakan Active Dining Session yang sama.
+
+## 15. Fraud Boundary
 
 Fraud control Xentra tidak mencoba membuktikan bahwa setiap customer online benar-benar berada di restoran.
 
@@ -236,8 +265,12 @@ Fraud control Xentra tidak mencoba membuktikan bahwa setiap customer online bena
 - Session: ownership, Branch, Table, lifecycle, dan reuse wajib divalidasi server-side.
 - Customer: satu pending/active Dine-in context per Branch dan satu Table dalam customer flow.
 
-## 15. Explicit Non-Goals / Do Not Invent
+## 16. Explicit Non-Goals / Do Not Invent
 
 Do not invent customer-initiated table transfer workflows, post-start automatic table reassignment, multi-table customer selection, GPS proof-of-presence requirements, or other table lifecycle policies not defined here.
 
 Customer-side Multi-Table Dine-in is explicitly **not** a feature for the current MVP/business contract.
+
+## 17. Planning Rule
+
+The 17 scenarios above are mandatory acceptance criteria for Dine-in implementation and automated test coverage. Any implementation that cannot be mapped to these scenarios/invariants, or conflicts with them, requires a new explicit business/architecture decision.
