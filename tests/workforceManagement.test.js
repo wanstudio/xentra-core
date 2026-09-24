@@ -50,6 +50,44 @@ function request(method, path, body, headers = {}) {
   });
 }
 
+describe('Workforce Route Boundary', () => {
+  it('WF-ROUTE-BOUNDARY: workforce HTTP routes are isolated from api.js', () => {
+    const apiSource = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+    const workforceSource = fs.readFileSync(require.resolve('../server/routes/workforce'), 'utf8');
+
+    const routes = [
+      "router.get('/admin/users'",
+      "router.get('/admin/users/:id'",
+      "router.post('/admin/users'",
+      "router.put('/admin/users/:id'",
+      "router.post('/admin/users/:id/disable'",
+      "router.post('/admin/users/:id/enable'",
+      "router.delete('/admin/users/:id'",
+      "router.post('/admin/users/:id/role'",
+      "router.post('/admin/users/:id/scope'",
+      "router.post('/auth/change-password'",
+      "router.post('/admin/users/:id/reset-password'",
+      "router.post('/auth/reset-password'",
+      "router.post('/auth/logout'",
+      "router.get('/admin/security-audit'",
+      "router.post('/admin/invitations'",
+      "router.get('/admin/invitations'",
+      "router.post('/admin/invitations/:id/resend'",
+      "router.post('/admin/invitations/:id/revoke'",
+      "router.get('/invitations/validate/:token'",
+      "router.post('/invitations/accept'",
+      "router.post('/admin/invitations/accept'"
+    ];
+
+    for (const route of routes) {
+      assert.equal(apiSource.includes(route), false, route + ' must not remain inline in api.js');
+      assert.equal(workforceSource.includes(route), true, route + ' must live in workforce.js');
+    }
+
+    assert.equal((apiSource.match(/registerWorkforceRoutes\\(router,/g) || []).length, 1);
+  });
+});
+
 describe('Workforce Management', () => {
   let db;
   let ownerToken;
