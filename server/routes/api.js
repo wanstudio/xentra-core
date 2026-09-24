@@ -9493,7 +9493,7 @@ router.post('/admin/products/:productId/image', requireAuth(['owner', 'brand_man
     }
 
     fs.mkdirSync(PRODUCT_IMAGE_DIR, { recursive: true });
-    const fileName = `${req.params.productId}-${Date.now()}.${validation.info.ext}`;
+    const fileName = `${req.params.productId}-${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${validation.info.ext}`;
     fs.writeFileSync(path.join(PRODUCT_IMAGE_DIR, fileName), validation.buffer);
 
     const imageUrl = `/assets/uploads/products/${fileName}`;

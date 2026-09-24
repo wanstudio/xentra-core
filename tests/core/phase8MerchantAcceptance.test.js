@@ -834,7 +834,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
   });
 
   it('31. Regression: P7 customer waiting flow unaffected by acceptance changes', async () => {
-    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending', orderType: 'dine_in' });
+    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending', orderType: 'delivery' });
 
     const custRes = await request('GET', `/orders/${ord.orderId}`, null, { Authorization: `Bearer ${customerToken}` });
     assert.equal(custRes.status, 200);
