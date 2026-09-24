@@ -130,12 +130,80 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
       'Merchant App must expose reservation check-in action');
     assert.ok(js.includes('noShowBMReservation'),
       'Merchant App must expose reservation no-show action');
+    assert.ok(js.includes('getBMReservationScheduleMs'),
+      'queue must classify reservation schedule explicitly');
+    assert.ok(js.includes('aIsUpcomingReservation'),
+      'queue must keep upcoming reservations in a dedicated visibility tier');
+
     assert.ok(js.includes('bm-detail-reservation-datetime'),
       'detail view must expose reservation schedule');
     assert.ok(js.includes('bm-detail-reservation-guests'),
       'detail view must expose guest count');
     assert.ok(/Reservasi\\s*\\(\\s*\\(\\d\+\\)\\s*Tamu/i.test(js) === false,
       'guest count parser must not contain an invalid double-escaped regex');
+  });
+
+  await t.test('7. upcoming reservations stay visible in operational queue order', async () => {
+    const dom = new JSDOM('<table><tbody id="bm-orders-tbody"></tbody></table><div id="bm-orders-cards-container"></div>', {
+      url: 'https://app.mybangjo.com/merchant-app/',
+      runScripts: 'dangerously'
+    });
+    const win = dom.window;
+
+    const escapeHtml = (value) => String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    win.XentraShared = {
+      API_BASE: 'https://example.test',
+      $: (id) => win.document.getElementById(id),
+      esc: escapeHtml,
+      formatMoney: (v) => String(v || 0),
+      showToast: () => {},
+      adminFetch: async () => ({
+        ok: true,
+        json: async () => ({
+          success: true,
+          orders: [
+            { id: 'regular-confirmed', order_number: 'REG-1', status: 'confirmed', order_type: 'delivery', created_at: '2099-01-01T12:00:00' },
+            { id: 'reservation-late', order_number: 'RSV-LATE', status: 'confirmed', order_type: 'reservation', scheduled_slot_start: '2099-01-02T18:00:00' },
+            { id: 'reservation-soon', order_number: 'RSV-SOON', status: 'confirmed', order_type: 'reservation', scheduled_slot_start: '2099-01-02T12:00:00' }
+          ]
+        })
+      }),
+      getAuthHeaders: () => ({}),
+      getStoredUser: () => ({ branch_id: 'branch-test' }),
+      isBranchManager: () => true,
+      checkAuth: () => true,
+      clearStoredSession: () => {},
+      redirectToLogin: () => {},
+      handleHandoffExchange: () => {},
+      validateServerSession: () => {},
+      enforceSurface: () => {}
+    };
+    win.XentraBranchCatalog = {
+      getActiveBranchId: () => 'branch-test',
+      loadInlineBranchCatalog: () => {}
+    };
+
+    win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
+    // The test source only needs the shared globals/functions exposed above.
+    win.eval(fs.readFileSync(JS_PATH, 'utf8'));
+    await win.loadBMOrders();
+
+    const cardIds = Array.from(win.document.querySelectorAll('#bm-orders-cards-container [data-order-id]'))
+      .map((el) => el.getAttribute('data-order-id'));
+
+    assert.deepEqual(
+      cardIds,
+      ['reservation-soon', 'reservation-late', 'regular-confirmed'],
+      'upcoming reservations must be surfaced before ordinary non-pending orders and ordered by nearest schedule'
+    );
+
+    win.close();
   });
 
   await t.test('5. tombol keluar di header benar-benar mengeluarkan pengguna', async () => {
