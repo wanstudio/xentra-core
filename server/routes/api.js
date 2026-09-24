@@ -21,6 +21,7 @@ const registerPaymentWebhooks = require('./webhooks');
 const registerSettingsRoutes = require('./settings');
 const registerAdminMarketingPromotionRoutes = require('./admin-marketing-promotions');
 const registerAdminMarketingBannerRoutes = require('./admin-marketing-banners');
+const { createBannerHelpers } = require('./banner-helpers');
 const registerAdminReportingRoutes = require('./admin-reporting');
 const registerAdminFinanceRoutes = require('./admin-finance');
 const registerMediaUploadRoutes = require('./media-upload');
@@ -48,6 +49,7 @@ const { ImageValidator } = require('../../core/domain');
 const { MediaService } = require('../../core/media');
 const { BannerContentService, BannerAssignmentService } = require('../../domains/banner');
 const mediaService = new MediaService();
+const { bannerMediaDelivery, parseLegacyBrandBanners } = createBannerHelpers(mediaService);
 const bannerContentService = new BannerContentService({ media: mediaService });
 const bannerAssignmentService = new BannerAssignmentService();
 
@@ -1957,12 +1959,7 @@ registerOperationalOrderRoutes(router, {
 // 9.1 Staff / POS Cash Settlement Endpoint (Authorized Cashiers, Branch Managers, & Brand Owners)
 registerPosRoutes(router, {
   db,
-  requireAuth,
-  PaymentService,
-  CashSettlementService,
-  PosShiftService,
-  OfflineReconciliationService,
-  PosLocalOperationService
+  requireAuth
 });
 
 // Payment-provider webhooks are isolated in server/routes/webhooks.js.
@@ -5097,8 +5094,6 @@ registerAdminReportingRoutes(router, {
 });
 registerAdminFinanceRoutes(router, {
   requireAuth,
-  ReportingEngine,
-  overviewReportingRepo,
   corePaymentRepo
 });
 
@@ -5216,8 +5211,7 @@ registerAdminMarketingBannerRoutes(router, {
   requireAuth,
   bannerContentService,
   bannerAssignmentService,
-  bannerMediaDelivery,
-  parseLegacyBrandBanners
+  mediaService
 });
 
 // 6.01 Create Marketing Promotion (Owner / Brand Manager)
