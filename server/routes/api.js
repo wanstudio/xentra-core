@@ -12094,6 +12094,86 @@ router.post('/dine-in/tables/:id/block', requireAuth(['owner', 'brand_manager', 
   }
 });
 
+// Staff / POS: Reservation operational lifecycle
+router.post('/pos/reservations/:id/check-in', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const reservation = db.prepare(
+      "SELECT id, brand_id, branch_id, order_type FROM orders WHERE id = ? AND brand_id = ?"
+    ).get(req.params.id, req.brand_id);
+
+    if (!reservation) {
+      return res.status(404).json({ success: false, error: 'RESERVATION_NOT_FOUND' });
+    }
+    if (reservation.order_type !== 'reservation') {
+      return res.status(400).json({ success: false, error: 'NOT_A_RESERVATION' });
+    }
+
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (!assignedBranchId || reservation.branch_id !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya dapat check-in reservasi pada cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const tableNumber = String((req.body && (req.body.table_number || req.body.tableNumber)) || '').trim();
+    if (!tableNumber) {
+      return res.status(400).json({ success: false, error: 'TABLE_NUMBER_REQUIRED' });
+    }
+
+    const { PosOrderService } = require('../../domains/pos');
+    const result = PosOrderService.checkInReservation({
+      reservation_order_id: reservation.id,
+      table_number: tableNumber
+    });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    const status = /FORBIDDEN_BRANCH_SCOPE/.test(err.message) ? 403 : 400;
+    return res.status(status).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/reservations/:id/no-show', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const reservation = db.prepare(
+      "SELECT id, brand_id, branch_id, order_type FROM orders WHERE id = ? AND brand_id = ?"
+    ).get(req.params.id, req.brand_id);
+
+    if (!reservation) {
+      return res.status(404).json({ success: false, error: 'RESERVATION_NOT_FOUND' });
+    }
+    if (reservation.order_type !== 'reservation') {
+      return res.status(400).json({ success: false, error: 'NOT_A_RESERVATION' });
+    }
+
+    if (req.user.role === 'branch_manager') {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (!assignedBranchId || reservation.branch_id !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Branch Manager hanya dapat membatalkan no-show reservasi pada cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const reason = String((req.body && (req.body.reason || req.body.note)) || '').trim();
+    const { PosOrderService } = require('../../domains/pos');
+    const result = PosOrderService.cancelNoShowReservation({
+      reservation_order_id: reservation.id,
+      actor_id: req.user.id || req.user.username || 'branch_manager',
+      reason: reason || 'No-Show: Melewati batas toleransi kedatangan'
+    });
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    const status = /FORBIDDEN_BRANCH_SCOPE/.test(err.message) ? 403 : 400;
+    return res.status(status).json({ success: false, error: err.message });
+  }
+});
+
 // Staff / POS: Complete Active Dining Session (Releases tables)
 router.post('/dine-in/sessions/:id/complete', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
