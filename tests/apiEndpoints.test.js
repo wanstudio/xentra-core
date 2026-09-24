@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const app = require('../server/app');
 const db = require('../server/database/db');
+const fs = require('node:fs');
 
 // Suites assert against demo branches/products/promotions, which are not auto-seeded.
 require('./helpers/demoFixtures.js')();
@@ -457,6 +458,31 @@ test('API Merchant Auth: POST /api/v1/auth/merchant/login authenticates owner', 
   // Test /auth/merchant/me without token -> 401 Unauthorized
   const unauthRes = await mockFetch('/api/v1/auth/merchant/me');
   assert.strictEqual(unauthRes.status, 401);
+});
+
+test('API Customer Order Routes: extracted module is canonical and registered before kitchen routes', () => {
+  const apiPath = require.resolve('../server/routes/api');
+  const modulePath = require.resolve('../server/routes/customer-orders');
+  const apiSource = fs.readFileSync(apiPath, 'utf8');
+  const moduleSource = fs.readFileSync(modulePath, 'utf8');
+
+  for (const route of [
+    "router.get('/orders/:id'",
+    "router.get('/customer/orders'",
+    "router.post('/orders/:id/cancel'"
+  ]) {
+    const moduleCount = moduleSource.split(route).length - 1;
+    const apiCount = apiSource.split(route).length - 1;
+    assert.equal(moduleCount, 1, route + ' must have one canonical implementation in customer-orders.js');
+    assert.equal(apiCount, 0, route + ' must not remain implemented inline in api.js');
+  }
+
+  assert.ok(apiSource.includes("const registerCustomerOrderRoutes = require('./customer-orders');"),
+    'api.js must import customer-orders route module');
+  const registrationIndex = apiSource.indexOf('registerCustomerOrderRoutes(router, {');
+  const kitchenIndex = apiSource.indexOf("router.get('/kitchen/queue'");
+  assert.ok(registrationIndex >= 0 && kitchenIndex >= 0 && registrationIndex < kitchenIndex,
+    'customer order routes must stay registered before the kitchen routes');
 });
 
 test('API Auth Merchant Me: route is registered exactly once', () => {
