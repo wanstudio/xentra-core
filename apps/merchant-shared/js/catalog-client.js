@@ -32,7 +32,91 @@
     return adminFetch(target, opts);
   }
 
+
+  function getBranchCatalog(branchId) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/catalog');
+  }
+
+  function setBranchProductAvailability(branchId, productId, isAvailable) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId), {
+      method: 'PATCH',
+      body: JSON.stringify({ is_available: isAvailable })
+    });
+  }
+
+  function removeBranchProduct(branchId, productId) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId), {
+      method: 'DELETE'
+    });
+  }
+
+  function uploadBranchProductImage(branchId, productId, payload) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId) + '/image', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  function updateBranchProductOverride(branchId, productId, payload) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId) + '/override', {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  function createBranchCategory(branchId, payload) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/categories', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  function updateBranchCategory(branchId, categoryId, payload) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/categories/' + encodeURIComponent(categoryId), {
+      method: 'PATCH',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  function uploadBranchCategoryImage(branchId, categoryId, payload) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/categories/' + encodeURIComponent(categoryId) + '/image', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  function deleteBranchCategory(branchId, categoryId) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/categories/' + encodeURIComponent(categoryId), {
+      method: 'DELETE'
+    });
+  }
+
+  function reorderBranchCategories(branchId, orderedIds) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/categories/reorder', {
+      method: 'PUT',
+      body: JSON.stringify({ order: orderedIds })
+    });
+  }
+
+  function adoptProduct(branchId, payload) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/adopt', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
   window.XentraCatalogClient = {
-    request: request
+    request: request,
+    getBranchCatalog: getBranchCatalog,
+    setBranchProductAvailability: setBranchProductAvailability,
+    removeBranchProduct: removeBranchProduct,
+    uploadBranchProductImage: uploadBranchProductImage,
+    updateBranchProductOverride: updateBranchProductOverride,
+    createBranchCategory: createBranchCategory,
+    updateBranchCategory: updateBranchCategory,
+    uploadBranchCategoryImage: uploadBranchCategoryImage,
+    deleteBranchCategory: deleteBranchCategory,
+    reorderBranchCategories: reorderBranchCategories,
+    adoptProduct: adoptProduct
   };
 })(window);
