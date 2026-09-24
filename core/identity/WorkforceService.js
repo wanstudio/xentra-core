@@ -346,7 +346,7 @@ class WorkforceService {
         throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only change scope of Cashier accounts.' };
       }
       if (actor_role === 'branch_manager') {
-        if (target.branch_id !== actor_branch_id) {
+        if (targetContext.branch_id !== actor_branch_id) {
           throw { status: 403, code: 'FORBIDDEN_BRANCH_SCOPE', message: 'Managers can only change scope of Cashier accounts within their branch.' };
         }
         if (newBranchId && newBranchId !== actor_branch_id) {
@@ -367,8 +367,6 @@ class WorkforceService {
 
     return { ...target, branch_id: newBranchId || null };
   }
-
-  // ==================== PASSWORD MANAGEMENT ====================
 
   // ==================== PASSWORD MANAGEMENT ====================
 
@@ -418,13 +416,13 @@ class WorkforceService {
 
     // Authorization checks
     if (actor_role === 'brand_manager') {
-      if (target.role !== 'cashier') {
+      if (targetContext.role !== 'cashier') {
         throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only reset Cashier passwords.' };
       }
     }
 
     if (actor_role === 'branch_manager') {
-      if (target.role !== 'cashier') {
+      if (targetContext.role !== 'cashier') {
         throw { status: 403, code: 'FORBIDDEN_ROLE_CEILING', message: 'Managers can only reset Cashier passwords.' };
       }
       if (target.branch_id !== actor_branch_id) {
