@@ -254,6 +254,15 @@ router.get('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
         ],
         methods: [
           { code: 'cash', name: 'Tunai Kasir', enabled: true, mode: 'pos_cashier' },
+          {
+            code: 'qris_static',
+            name: 'QRIS Statis',
+            enabled: Boolean(effectiveConfig.qris_static && effectiveConfig.qris_static.image_url),
+            mode: 'static_manual',
+            image_url: (effectiveConfig.qris_static && effectiveConfig.qris_static.image_url) || effectiveConfig.qris_static_image_url || '',
+            merchant_name: (effectiveConfig.qris_static && effectiveConfig.qris_static.merchant_name) || '',
+            instructions: (effectiveConfig.qris_static && effectiveConfig.qris_static.instructions) || ''
+          },
           { code: 'midtrans', name: 'Midtrans Payment Gateway', enabled: Boolean(effectiveConfig.server_key || process.env.MIDTRANS_SERVER_KEY), mode: 'online', is_active_provider: activeProvider === 'midtrans' },
           { code: 'doku', name: 'DOKU Payment Gateway', enabled: Boolean(effectiveConfig.client_id && effectiveConfig.secret_key), mode: 'online', is_active_provider: activeProvider === 'doku' }
         ]
@@ -345,7 +354,50 @@ router.put('/admin/settings/commerce/payments', requireAuth(['owner', 'brand_man
   }
 });
 
-// 4.3b Kredensial per provider — SATU pintu masuk per gateway.
+router.put('/admin/settings/commerce/payments/qris-static', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const { branch_id, enabled, image_url, merchant_name, instructions } = req.body || {};
+    const isBranchScope = Boolean(branch_id && branch_id !== 'all');
+    let existing = {};
+
+    if (isBranchScope) {
+      const row = corePaymentRepo.findBranchPaymentConfig(branch_id, req.brand_id);
+      if (row && row.payment_config_override) {
+        try { existing = JSON.parse(row.payment_config_override) || {}; } catch (_) {}
+      }
+    } else {
+      const brandRow = corePaymentRepo.findBrandPaymentConfig(req.brand_id);
+      if (brandRow && brandRow.default_payment_config) {
+        try { existing = JSON.parse(brandRow.default_payment_config) || {}; } catch (_) {}
+      }
+    }
+
+    const merged = Object.assign({}, existing);
+    const qris = Object.assign({}, (merged.qris_static && typeof merged.qris_static === 'object') ? merged.qris_static : {});
+
+    if (typeof enabled !== 'undefined') qris.enabled = Boolean(enabled);
+    if (typeof image_url !== 'undefined') qris.image_url = String(image_url || '').trim();
+    if (typeof merchant_name !== 'undefined') qris.merchant_name = String(merchant_name || '').trim();
+    if (typeof instructions !== 'undefined') qris.instructions = String(instructions || '').trim();
+
+    merged.qris_static = qris;
+    const jsonStr = JSON.stringify(merged);
+
+    if (isBranchScope) {
+      const belongs = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branch_id, req.brand_id);
+      if (!belongs) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan atau bukan milik brand ini.' });
+      corePaymentRepo.updateBranchPaymentConfig(branch_id, jsonStr);
+      return res.json({ success: true, is_branch_override: true, qris_static: qris });
+    }
+
+    corePaymentRepo.updateBrandPaymentConfig(req.brand_id, jsonStr);
+    res.json({ success: true, is_branch_override: false, qris_static: qris });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// // 4.3b Kredensial per provider — SATU pintu masuk per gateway.
 // Menyimpan kredensial DOKU hanya menyentuh field DOKU; Midtrans tidak dibaca,
 // tidak ditulis, dan tidak tersentuh. Endpoint terpisah ini membuat pencampuran
 // itu tidak mungkin secara struktur, bukan sekadar dijaga oleh percabangan.
