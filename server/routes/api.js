@@ -703,7 +703,7 @@ registerCustomerRoutes(router, {
   requireCustomerAuth,
   CustomerIdentityService: require('../../core/identity').CustomerIdentityService,
   CustomerRepository: require('../../core/data/repositories').CustomerRepository,
-  DiningTableService: require('../../domains/pos').DiningTableService
+  DiningTableService: require('../../domains/dining').DiningTableService
 });
 
 registerCustomerAddressRoutes(router, { db, crypto, requireCustomerAuth });
@@ -724,7 +724,7 @@ registerCustomerOrderRoutes(router, {
   AcceptanceTimeoutService,
   OrderStateMachine,
   requireCustomerAuth,
-  DiningTableService: require('../../domains/pos').DiningTableService
+  DiningTableService: require('../../domains/dining').DiningTableService
 });
 
 // Operational order lifecycle routes are isolated in server/routes/operational-orders.js.
