@@ -95,6 +95,7 @@ test('Kapasitas reservasi: diisi manual per cabang', async (t) => {
   });
 
   await t.test('guest_count di atas kapasitas cabang ditolak di server', () => {
+    db.prepare('UPDATE branches SET reservation_max_guests = ? WHERE id = ?').run(25, BRANCH);
     const future = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
     const result = DiningTableService.createReservation({
       brand_id: 'brand_bangjo',
