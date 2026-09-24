@@ -64,6 +64,8 @@ class ProductOptionsModel {
       if (group.type === 'variant' && group.options.length > 50) throw new Error(`Variant group "${group.name}" terlalu banyak pilihan.`);
       if (group.type === 'addon' && group.options.length > 50) throw new Error(`Add-on group "${group.name}" terlalu banyak pilihan.`);
       if (group.max != null && group.max < group.min) throw new Error(`Batas pilihan group "${group.name}" tidak valid.`);
+      if (group.min > group.options.length) throw new Error(`Minimum pilihan pada "${group.name}" melebihi jumlah opsi yang tersedia.`);
+      if (group.max != null && group.max > group.options.length) throw new Error(`Maksimum pilihan pada "${group.name}" melebihi jumlah opsi yang tersedia.`);
 
       const optionIds = new Set();
       for (const option of group.options) {
