@@ -27,6 +27,7 @@ const CONTEXT_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/context.js'
 const MENU_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/menu.js');
 const STOCK_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/stock.js');
 const PROMOTIONS_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/promotions.js');
+const STAFF_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/staff.js');
 const SHARED_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/shared.js');
 const BRANCH_CATALOG_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/branch-catalog.js');
 
@@ -75,6 +76,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     win.eval(fs.readFileSync(TABLES_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(STOCK_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(PROMOTIONS_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(STAFF_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(ORDER_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(JS_PATH, 'utf8'));
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
@@ -126,8 +128,30 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(html.includes('/merchant-app/assets/js/tables.js'), 'must load tables.js');
     assert.ok(html.includes('/merchant-app/assets/js/stock.js'), 'must load stock.js');
     assert.ok(html.includes('/merchant-app/assets/js/promotions.js'), 'must load promotions.js');
+    assert.ok(html.includes('/merchant-app/assets/js/staff.js'), 'must load staff.js');
     assert.ok(html.includes('/merchant-app/assets/js/orders.js'), 'must load orders.js');
     assert.ok(html.includes('/merchant-app/assets/js/merchant-app.js'), 'must load merchant-app.js');
+  });
+
+  await t.test('2i. Staff module is the canonical implementation', () => {
+    const js = fs.readFileSync(JS_PATH, 'utf8');
+    const staffJs = fs.readFileSync(STAFF_JS_PATH, 'utf8');
+
+    for (const name of [
+      'loadBMStaff',
+      'renderBMStaffTable',
+      'openBMAddCashierModal',
+      'toggleBMStaffStatus',
+      'resetBMStaffPassword'
+    ]) {
+      const count = (staffJs.match(new RegExp('(?:async\\s+)?function\\s+' + name + '\\s*\\(', 'g')) || []).length;
+      assert.equal(count, 1, name + ' must have exactly one implementation in staff.js');
+      assert.ok(!js.includes('function ' + name + '(') && !js.includes('async function ' + name + '('),
+        name + ' must not be implemented in merchant-app.js');
+    }
+
+    assert.ok(staffJs.includes('var _bmStaffState = {'), '_bmStaffState must live in staff.js');
+    assert.ok(!js.includes('var _bmStaffState = {'), '_bmStaffState must not live in merchant-app.js');
   });
 
   await t.test('2h. Promotions module is the canonical implementation', () => {
