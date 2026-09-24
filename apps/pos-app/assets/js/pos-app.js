@@ -60,6 +60,22 @@
     el.textContent=online?'ONLINE':'OFFLINE'; el.className='pos-status '+(online?'online':'offline');
   }
 
+  function renderShiftStatus() {
+    var text=$('pos-shift-status-text'), dot=$('pos-shift-status-dot'), btn=$('btn-pos-shift-status');
+    if(!text || !dot || !btn) return;
+    if(!state.shift) {
+      text.textContent='Shift belum dibuka';
+      dot.className='pos-shift-dot';
+      btn.className='pos-shift-status';
+      btn.title='Buka shift';
+      return;
+    }
+    text.textContent='Shift aktif · '+money(state.shift.starting_float);
+    dot.className='pos-shift-dot active';
+    btn.className='pos-shift-status active';
+    btn.title='Kelola shift aktif';
+  }
+
   function getPosPinProfiles() {
     try {
       var raw=JSON.parse(localStorage.getItem(POS_PIN_CACHE_KEY) || 'null');
@@ -628,10 +644,13 @@
     }catch(e){
       state.shift=getPosShiftCache(state.user && state.user.id);
     }
-    renderShift(); renderCart();
+    renderShiftStatus();
+    renderShift();
+    renderCart();
   }
 
   function renderShift(){
+    renderShiftStatus();
     var box=$('pos-shift-card'); if(!box)return;
     if(!state.shift){
       box.innerHTML='<h3>Belum ada shift aktif</h3><p>Kasir harus membuka shift sebelum penjualan dapat diselesaikan.</p>'+
@@ -655,7 +674,7 @@
 
   async function openShift(){
     var amount=Number($('pos-starting-float').value||0);
-    try{var d=await request('/pos/shifts/open',{method:'POST',headers:headers(),body:JSON.stringify({branch_id:state.branchId,starting_float:amount})});state.shift=d.shift;renderShift();renderCart();toast('Shift dibuka.');}
+    try{var d=await request('/pos/shifts/open',{method:'POST',headers:headers(),body:JSON.stringify({branch_id:state.branchId,starting_float:amount})});state.shift=d.shift;savePosShiftCache();renderShift();renderCart();toast('Shift dibuka.');}
     catch(e){toast(e.message);}
   }
 
@@ -672,7 +691,7 @@
     if(!state.shift)return;
     var actual=prompt('Masukkan uang fisik aktual di laci'); if(actual===null)return;
     actual=Number(actual); if(!Number.isFinite(actual)||actual<0)return toast('Nominal tidak valid.');
-    try{var d=await request('/pos/shifts/'+encodeURIComponent(state.shift.id)+'/close',{method:'POST',headers:headers(),body:JSON.stringify({actual_cash:actual})});state.shift=null;renderShift();renderCart();toast('Shift ditutup. Variance: '+money(d.shift && d.shift.variance));}
+    try{var d=await request('/pos/shifts/'+encodeURIComponent(state.shift.id)+'/close',{method:'POST',headers:headers(),body:JSON.stringify({actual_cash:actual})});state.shift=null;savePosShiftCache();renderShift();renderCart();toast('Shift ditutup. Variance: '+money(d.shift && d.shift.variance));}
     catch(e){toast(e.message);}
   }
 
@@ -817,12 +836,14 @@
     $('btn-pos-hold').onclick=holdSale;
     $('btn-pos-select-table').onclick=function(){setView('meja');};
     $('btn-pos-load-sales').onclick=loadSales;
+    $('btn-pos-shift-status').onclick=function(){setView('shift');};
     $('btn-pos-logout').onclick=function(){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(USER_KEY);window.location.replace('/login');};
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
   }
 
   async function boot(){
     bind();
+    renderShiftStatus();
     try{
       if(!await consumeGoogleHandoff())return;
       if(!await ensureSession())return;
