@@ -218,6 +218,57 @@ describe('Phase 9 — Branch Manager Order Operations', () => {
     assert.ok(!ids.includes(ordB.orderId), 'Should NOT include Branch B order');
   });
 
+  // P9-01R: Upcoming reservation must survive the API page limit
+  it('P9-01R: upcoming confirmed reservation is visible ahead of newer historical order within a limited page', async () => {
+    const reservation = seedOrder({
+      branchId: BRANCH_A_ID,
+      status: 'confirmed',
+      orderType: 'reservation',
+      subtotal: 0,
+      grandTotal: 0,
+      paymentMethod: 'cash',
+      paymentStatus: 'pending'
+    });
+    const regular = seedOrder({
+      branchId: BRANCH_A_ID,
+      status: 'confirmed',
+      orderType: 'delivery'
+    });
+
+    const tomorrow = new Date(Date.now() + 86400000);
+    const reservationDate = tomorrow.toISOString().slice(0, 10);
+    db.prepare(`
+      UPDATE orders
+      SET created_at = datetime('now', '-30 days'),
+          scheduled_slot_start = ?
+      WHERE id = ?
+    `).run(reservationDate + 'T19:00:00', reservation.orderId);
+
+    const res = await request('GET', `/admin/branches/${BRANCH_A_ID}/orders?limit=1`, null, {
+      Authorization: `Bearer ${bmAToken}`
+    });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.data.orders.length, 1);
+    assert.equal(res.data.orders[0].id, reservation.orderId,
+      'upcoming reservation must not be pushed out by a newer ordinary order');
+
+    const pending = seedOrder({
+      branchId: BRANCH_A_ID,
+      status: 'pending',
+      orderType: 'delivery'
+    });
+
+    const pendingFirst = await request('GET', `/admin/branches/${BRANCH_A_ID}/orders?limit=1`, null, {
+      Authorization: `Bearer ${bmAToken}`
+    });
+
+    assert.equal(pendingFirst.status, 200);
+    assert.equal(pendingFirst.orders.length, 1);
+    assert.equal(pendingFirst.data, undefined);
+    assert.equal(pendingFirst.data, undefined);
+  });
+
   // P9-02: Cross-branch order visibility denied
   it('P9-02: Cross-branch order visibility is denied with 403 FORBIDDEN_BRANCH_ACCESS', async () => {
     const res = await request('GET', `/admin/branches/${BRANCH_B_ID}/orders`, null, {
