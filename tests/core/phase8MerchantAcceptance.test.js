@@ -641,7 +641,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
   // ─── Group 7: Customer Integration (22–25) ─────────────────────────────────
 
   it('22. Customer waiting screen transitions to ACCEPTED after merchant accepts', async () => {
-    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending', orderType: 'dine_in' });
+    const ord = seedOrder({ branchId: BRANCH_A_ID, status: 'pending', orderType: 'delivery' });
 
     // Merchant accepts
     await request('POST', `/orders/${ord.orderId}/branch-acceptance`, { decision: 'accept' }, { Authorization: `Bearer ${bmAToken}` });
