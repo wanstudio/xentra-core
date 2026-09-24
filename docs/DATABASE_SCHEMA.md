@@ -30,7 +30,8 @@ CREATE TABLE organizations (
     slug VARCHAR(100) UNIQUE NOT NULL,
     plan VARCHAR(50) DEFAULT 'pro',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    options_config JSON -- Master Product option groups/options for POS MVP
 );
 ```
 
@@ -362,7 +363,7 @@ CREATE TABLE order_items (
     quantity INT NOT NULL,
     item_subtotal DECIMAL(12, 2) NOT NULL,
     item_note TEXT,
-    modifiers_snapshot JSON,
+    modifiers_snapshot JSON, -- Immutable resolved POS option snapshot
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
