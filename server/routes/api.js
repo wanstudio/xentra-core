@@ -20,9 +20,6 @@ const OrderStateMachine = require('../services/OrderStateMachine');
 const AcceptanceTimeoutService = require('../services/AcceptanceTimeoutService');
 const RouteService = require('../services/RouteService');
 const { PromotionEngineService } = require('../../domains/promotion');
-const { CustomerIdentityService } = require('../../core/identity');
-const { CustomerRepository } = require('../../core/data/repositories');
-const { DiningTableService } = require('../../domains/pos');
 const { InventoryStockService, InventoryMovementModel } = require('../../domains/inventory');
 const CatalogService = require('../../domains/commerce/services/CatalogService');
 const PricingPolicyModel = require('../../domains/commerce/models/PricingPolicyModel');
@@ -2026,9 +2023,9 @@ registerCustomerRoutes(router, {
   RateLimiter,
   TokenSessionStore,
   requireCustomerAuth,
-  CustomerIdentityService,
-  CustomerRepository,
-  DiningTableService
+  CustomerIdentityService: require('../../core/identity').CustomerIdentityService,
+  CustomerRepository: require('../../core/data/repositories').CustomerRepository,
+  DiningTableService: require('../../domains/pos').DiningTableService
 });
 
 registerCustomerAddressRoutes(router, { db, crypto, requireCustomerAuth });
