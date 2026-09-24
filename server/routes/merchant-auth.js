@@ -632,7 +632,11 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
         });
   
         // Now lookup newly created / reconciled identity
-        identity = authProviderService.findIdentity('google', verifiedClaims.sub);
+        identity = authProviderService.findIdentity(
+          'google',
+          verifiedClaims.sub,
+          acceptResult.brand_id || req.brand_id || null
+        );
         if (!identity && acceptResult.user) {
           identity = {
             userId: acceptResult.user_id,
@@ -640,7 +644,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
           };
         }
       } else {
-        identity = authProviderService.findIdentity('google', verifiedClaims.sub);
+        identity = authProviderService.findIdentity('google', verifiedClaims.sub, req.brand_id || null);
       }
   
       if (!identity) {
