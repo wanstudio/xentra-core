@@ -20,6 +20,7 @@ const HTML_PATH = path.join(ROOT, 'apps/merchant-app/index.html');
 const JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/merchant-app.js');
 const ORDER_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/orders.js');
 const HARI_INI_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/hari-ini.js');
+const JAM_OPERASIONAL_JS_PATH = path.join(ROOT, 'apps/merchant-app/assets/js/jam-operasional.js');
 const SHARED_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/shared.js');
 const BRANCH_CATALOG_JS_PATH = path.join(ROOT, 'apps/merchant-shared/js/branch-catalog.js');
 
@@ -107,6 +108,16 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(html.includes('/merchant-app/assets/js/hari-ini.js'), 'must load hari-ini.js');
     assert.ok(html.includes('/merchant-app/assets/js/orders.js'), 'must load orders.js');
     assert.ok(html.includes('/merchant-app/assets/js/merchant-app.js'), 'must load merchant-app.js');
+  });
+
+  await t.test('2c. Jam Operasional module is the canonical implementation', () => {
+    const js = fs.readFileSync(JS_PATH, 'utf8');
+    const jamJs = fs.readFileSync(JAM_OPERASIONAL_JS_PATH, 'utf8');
+
+    const count = (jamJs.match(/(?:async\\s+)?function\\s+loadBMJamOperasional\\s*\\(/g) || []).length;
+    assert.equal(count, 1, 'loadBMJamOperasional must have exactly one implementation in jam-operasional.js');
+    assert.ok(!js.includes('async function loadBMJamOperasional(') && !js.includes('function loadBMJamOperasional('),
+      'loadBMJamOperasional must not be implemented in merchant-app.js');
   });
 
   await t.test('2a. Hari Ini module is the canonical implementation', () => {
