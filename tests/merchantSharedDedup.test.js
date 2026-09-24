@@ -40,7 +40,7 @@ test('MERCHANT SHARED — single source, no duplication', async (t) => {
   });
 
   await t.test('2. auth/session guards are defined once, in merchant-shared', () => {
-    ['isBranchManager', 'checkAuth', 'handleHandoffExchange', 'validateServerSession'].forEach((fn) => {
+    ['checkAuth', 'handleHandoffExchange', 'validateServerSession'].forEach((fn) => {
       assert.ok(
         new RegExp('function ' + fn + '\\(').test(SHARED_JS),
         'shared.js must define ' + fn
@@ -54,6 +54,11 @@ test('MERCHANT SHARED — single source, no duplication', async (t) => {
         'merchant-app.js must not redefine ' + fn
       );
     });
+  });
+
+  await t.test('2b. role-specific catalog helper does not leak into generic shared', () => {
+    assert.ok(!SHARED_JS.includes('function isBranchManager('), 'shared.js must not own role-specific isBranchManager');
+    assert.ok(BRANCH_CATALOG_JS.includes('function isBranchManager('), 'branch-catalog.js must own its role-specific helper');
   });
 
   await t.test('3. branch catalog helpers are defined once, in merchant-shared', () => {
