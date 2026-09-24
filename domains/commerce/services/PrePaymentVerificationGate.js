@@ -233,6 +233,7 @@ class PrePaymentVerificationGate {
         base_unit_price: basePrice,
         options: optionResolution.snapshot,
         modifiers_snapshot: optionResolution.snapshot,
+        note: String(item.note || item.item_note || '').trim(),
         subtotal: actualPrice * requestedQty,
         current_stock: currentStock,
         branch_low_stock_threshold: masterProduct.branch_low_stock_threshold
