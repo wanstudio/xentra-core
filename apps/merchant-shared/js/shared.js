@@ -6,8 +6,9 @@
  *
  * Exposes to window:
  *   window.XentraShared      — auth/session helpers, DOM utils, formatters
- *   window.XentraActionMenu  — reusable overflow action menu controller
- *   window.XentraCropEditor  — reusable image crop / zoom editor controller
+ *
+ * UI primitives live in separate merchant-shared modules and are loaded after
+ * this file: action-menu.js and crop-editor.js.
  *
  * Compatibility contract:
  *   - dashboard.js re-aliases these globals at the top of its IIFE so its
