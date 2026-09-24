@@ -335,9 +335,40 @@
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
   }
 
+  async function handleHandoffExchange() {
+    var urlParams = new URLSearchParams(window.location.search);
+    var handoffTicket = urlParams.get('handoff');
+    if (!handoffTicket) return false;
+
+    urlParams.delete('handoff');
+    var cleanQuery = urlParams.toString();
+    var cleanUrl = window.location.pathname + (cleanQuery ? '?' + cleanQuery : '') + window.location.hash;
+    window.history.replaceState({}, document.title, cleanUrl);
+
+    try {
+      var res = await fetch(API + '/auth/handoff/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket: handoffTicket })
+      });
+      var data = await res.json();
+      if (res.ok && data && data.success && data.token) {
+        localStorage.setItem(TOKEN_KEY, data.token);
+        if (data.user) {
+          localStorage.setItem(USER_KEY, JSON.stringify(data.user));
+        }
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   async function boot(){
     bind();
     try{
+      await handleHandoffExchange();
       if(!await ensureSession())return;
       await loadTerminal();
       await loadShift();

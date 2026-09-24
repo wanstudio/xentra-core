@@ -4051,14 +4051,12 @@
       // Branch Manager is served by the standalone Merchant App.
       window.location.replace('/merchant/' + window.location.hash);
       return;
-    } else {
-      var isStaff = role === 'cashier' || role === 'kitchen';
-      document.querySelectorAll('.x-nav-item').forEach(function (btn) {
-        var target = btn.dataset.route || btn.dataset.tab;
-        if (isStaff && (target === 'team' || target === 'settings' || target === 'branches' || target === 'customers' || target === 'marketing' || target === 'finance')) {
-          btn.style.display = 'none';
-        }
-      });
+    } else if (role === 'cashier') {
+      window.location.replace('/pos/' + window.location.hash);
+      return;
+    } else if (role === 'kitchen') {
+      window.location.replace('/kitchen/' + window.location.hash);
+      return;
     }
 
     // Marketing campaign builder button is exclusive to Owner
@@ -8754,6 +8752,16 @@
     // KDS is held/future and must not become an active login destination.
     if (isBranchManager()) {
       window.location.replace('/merchant/' + window.location.hash);
+      return;
+    }
+
+    var currentUser = getStoredUser();
+    if (currentUser && currentUser.role === 'cashier') {
+      window.location.replace('/pos/' + window.location.hash);
+      return;
+    }
+    if (currentUser && currentUser.role === 'kitchen') {
+      window.location.replace('/kitchen/' + window.location.hash);
       return;
     }
 
