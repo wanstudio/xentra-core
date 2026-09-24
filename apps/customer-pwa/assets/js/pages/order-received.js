@@ -135,6 +135,13 @@
     var payStatus = (payment.payment_status || order.payment_status || 'pending').toLowerCase();
     var isOnline = isOnlineMethod(payMethod);
 
+    // Reservation is a booking lifecycle, not a payment/fulfillment order.
+    // Keep it outside generic payment and cooking-progress surfaces.
+    if (order.order_type === 'reservation') {
+      renderReservationOrder(data);
+      return;
+    }
+
     // P6.5 PAYMENT FAILURE: Online payment cancelled, denied, or expired
     if (isOnline && (payStatus === 'deny' || payStatus === 'cancel' || payStatus === 'expire')) {
       renderPaymentFailed(data, payStatus);
@@ -186,6 +193,61 @@
 
     // P7.5 ACCEPTED and beyond (confirmed/preparing/ready/out_for_delivery/completed)
     renderFulfillmentOrder(data);
+  }
+
+  // ─── Reservation booking surface ─────────────────────────────────────────
+  function renderReservationOrder(data) {
+    if (!targetContainer) return;
+    var order = data.order || {};
+    var branchName = order.branch_name || 'Restoran';
+    var orderNumber = order.order_number || ('XTR-' + order.id);
+    var date = order.reservation_date || '';
+    var time = order.reservation_time || '';
+    var guests = Number(order.guest_count || 0);
+    var status = order.status || 'confirmed';
+
+    if (status === 'cancelled') {
+      renderCancelled(order, data.items);
+      return;
+    }
+
+    var scheduleText = date
+      ? UI.escape(date) + (time ? ' • ' + UI.escape(time) : '')
+      : 'Jadwal belum tersedia';
+
+    targetContainer.style.display = 'block';
+    targetContainer.innerHTML =
+      '<div id="x-reservation-screen" style="max-width:480px;margin:0 auto;padding-bottom:40px;background:#f8f9fa;min-height:100vh;">' +
+      '  <div class="x-aux-header" style="background:#fff;margin-bottom:12px;">' +
+      '    <button type="button" class="x-aux-back-btn" id="x-btn-reservation-back" aria-label="Kembali">' +
+      '      <img src="/assets/icons/arrowback.svg" alt="Kembali">' +
+      '    </button>' +
+      '    <h1 class="x-aux-title">Reservasi</h1>' +
+      '  </div>' +
+      '  <div style="background:#fff;padding:28px 18px;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,0.06);margin-bottom:12px;">' +
+      '    <div style="font-size:48px;margin-bottom:12px;">📅</div>' +
+      '    <h1 style="font-size:20px;font-weight:800;color:#111;margin:0 0 8px;">Reservasi Berhasil</h1>' +
+      '    <p style="font-size:13px;color:#6b7280;margin:0;line-height:1.5;">Reservasimu sudah tercatat di ' + UI.escape(branchName) + '.</p>' +
+      '  </div>' +
+      '  <div style="background:#fff;margin:0 14px 12px;border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:12px;box-shadow:0 4px 14px rgba(0,0,0,0.05);">' +
+      '    <div style="display:flex;justify-content:space-between;gap:16px;"><span style="color:#6b7280;font-size:13px;">Tanggal & Jam</span><strong style="font-size:13px;color:#111;text-align:right;">' + scheduleText + '</strong></div>' +
+      '    <div style="display:flex;justify-content:space-between;gap:16px;"><span style="color:#6b7280;font-size:13px;">Jumlah Tamu</span><strong style="font-size:13px;color:#111;">' + (guests > 0 ? guests + ' orang' : '—') + '</strong></div>' +
+      '    <div style="display:flex;justify-content:space-between;gap:16px;"><span style="color:#6b7280;font-size:13px;">Nomor Reservasi</span><strong style="font-size:13px;color:#111;">' + UI.escape(orderNumber) + '</strong></div>' +
+      '    <div style="display:flex;justify-content:space-between;gap:16px;"><span style="color:#6b7280;font-size:13px;">Total</span><strong style="font-size:13px;color:#111;">Rp 0</strong></div>' +
+      '  </div>' +
+      (order.order_note ? '  <div style="background:#fff;margin:0 14px 12px;border-radius:16px;padding:14px 18px;box-shadow:0 4px 14px rgba(0,0,0,0.05);">' +
+        '    <div style="font-size:12px;font-weight:800;color:#6b7280;letter-spacing:.04em;margin-bottom:6px;">CATATAN</div>' +
+        '    <div style="font-size:13px;color:#4b5563;line-height:1.5;">' + UI.escape(order.order_note) + '</div>' +
+      '  </div>' : '') +
+      '  <div style="padding:0 14px;">' +
+      '    <button type="button" id="x-btn-reservation-back-home" style="display:block;width:100%;height:48px;font-size:15px;font-weight:800;border:none;border-radius:24px;cursor:pointer;background:var(--x-primary);color:var(--x-primary-text);">Kembali ke Menu</button>' +
+      '  </div>' +
+      '</div>';
+
+    var back = document.getElementById('x-btn-reservation-back');
+    if (back && Router) back.onclick = function () { Router.navigate('history'); };
+    var backHome = document.getElementById('x-btn-reservation-back-home');
+    if (backHome && Router) backHome.onclick = function () { Router.navigate('home'); };
   }
 
   // ─── P6.3 PAYMENT PENDING SURFACE ─────────────────────────────────────────
