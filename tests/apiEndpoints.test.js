@@ -596,6 +596,35 @@ test('API Platform routes: implementation is isolated from api.js', () => {
   }
 });
 
+test('API Branch catalog routes: implementation is isolated from api.js', () => {
+  const api = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const branchCatalog = fs.readFileSync(require.resolve('../server/routes/admin-branch-catalog'), 'utf8');
+
+  const routes = [
+    "router.get('/admin/branches/:id/products'",
+    "router.post('/admin/branches/:id/products'",
+    "router.patch('/admin/branches/:id/products/:productId'",
+    "router.get('/admin/branches/:id/catalog'",
+    "router.post('/admin/branches/:id/adopt'",
+    "router.delete('/admin/branches/:id/products/:productId'",
+    "router.post('/admin/branches/:id/sync-catalog'",
+    "router.patch('/admin/branches/:id/products/:productId/override'",
+    "router.post('/admin/branches/:id/categories'",
+    "router.patch('/admin/branches/:id/categories/:catId'",
+    "router.delete('/admin/branches/:id/categories/:catId'",
+    "router.put('/admin/branches/:id/categories/reorder'",
+    "router.get('/admin/branches/:id/products/:productId/categories'",
+    "router.post('/admin/branches/:id/products/:productId/categories'",
+    "router.delete('/admin/branches/:id/products/:productId/categories/:catId'",
+    "router.get('/admin/branches/:id/categories/:catId/products'"
+  ];
+
+  for (const route of routes) {
+    assert.ok(branchCatalog.includes(route), route + ' must live in admin-branch-catalog.js');
+    assert.equal(api.includes(route), false, route + ' must not remain inline in api.js');
+  }
+});
+
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
     method: 'POST',
