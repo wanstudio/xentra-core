@@ -8,12 +8,7 @@
 module.exports = function registerPosRoutes(router, deps) {
   const {
     db,
-    requireAuth,
-    PaymentService,
-    CashSettlementService,
-    PosShiftService,
-    OfflineReconciliationService,
-    PosLocalOperationService
+    requireAuth
   } = deps;
 
 router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
