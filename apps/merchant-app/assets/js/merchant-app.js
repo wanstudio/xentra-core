@@ -1736,7 +1736,7 @@
     if (Number.isInteger(explicit) && explicit > 0) return explicit;
 
     var note = String(ord.order_note || ord.notes || ord.order_notes || '');
-    var match = /Reservasi\\s*\\(\\s*(\\d+)\\s*Tamu/i.exec(note);
+    var match = /Reservasi\s*\(\s*(\d+)\s*Tamu/i.exec(note);
     return match ? Number(match[1]) : 0;
   }
 
