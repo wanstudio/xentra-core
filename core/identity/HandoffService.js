@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const db = require('../../server/database/db');
+const WorkforceMembershipService = require('./WorkforceMembershipService');
 const { BrandRepository } = require('../data/repositories');
 
 class HandoffService {
@@ -112,8 +113,10 @@ class HandoffService {
       throw { status: 400, code: 'INVALID_BRAND_ID', message: 'Brand ID is required for handoff ticket creation.' };
     }
 
-    // Verify user exists and has permission for this brand
-    const user = this.db.prepare('SELECT id, brand_id, organization_id, role, status FROM users WHERE id = ?').get(userId);
+    // Verify user exists and resolve the user's relationship to the TARGET brand.
+    const user = this.db.prepare(
+      'SELECT id, username, email, full_name, status, email_verified_at, brand_id, organization_id, branch_id, role FROM users WHERE id = ?'
+    ).get(userId);
     if (!user) {
       throw { status: 404, code: 'USER_NOT_FOUND', message: 'User not found.' };
     }
@@ -121,20 +124,44 @@ class HandoffService {
       throw { status: 403, code: 'ACCOUNT_DISABLED', message: 'User account is not active.' };
     }
 
-    // Verify target brand exists
-    const brand = validatedReturn ? validatedReturn.brand : this.db.prepare('SELECT id, organization_id, custom_domain FROM brands WHERE id = ?').get(targetBrandId);
+    const brand = validatedReturn
+      ? validatedReturn.brand
+      : this.db.prepare('SELECT id, organization_id, custom_domain FROM brands WHERE id = ?').get(targetBrandId);
     if (!brand) {
       throw { status: 404, code: 'BRAND_NOT_FOUND', message: 'Target brand not found.' };
     }
 
-    // Tenant / Organization authorization boundary:
-    // Owner can access brands within their organization; others must match user.brand_id
-    const isBrandAllowed = (user.brand_id === brand.id) ||
-      (user.role === 'owner' && user.organization_id && user.organization_id === brand.organization_id);
-
-    if (!isBrandAllowed) {
-      throw { status: 403, code: 'FORBIDDEN_TENANT_ACCESS', message: 'User does not have access to the target brand.' };
+    // A handoff is authorized by an explicit workforce membership for the
+    // target brand. Owner-in-one-business must not implicitly grant access to
+    // every other brand in the same organization.
+    const membershipService = new WorkforceMembershipService(this.db);
+    let membership = membershipService.findByUserAndBrand(userId, targetBrandId);
+    if (!membership && user.brand_id === targetBrandId && user.role) {
+      membership = membershipService.ensureMembership({
+        userId: user.id,
+        brandId: targetBrandId,
+        organizationId: user.organization_id || brand.organization_id,
+        role: user.role,
+        branchId: user.branch_id || null,
+        status: user.status || 'active'
+      });
     }
+
+    if (!membership || membership.status !== 'active') {
+      throw {
+        status: 403,
+        code: 'FORBIDDEN_TENANT_ACCESS',
+        message: 'User does not have an active workforce membership for the target brand.'
+      };
+    }
+
+    const userContext = {
+      ...user,
+      role: membership.role,
+      brand_id: membership.brand_id,
+      organization_id: membership.organization_id,
+      branch_id: membership.branch_id
+    };
 
     // Generate cryptographically secure ticket code
     const ticketCode = 'xnt_hdf_' + crypto.randomBytes(24).toString('hex');
@@ -145,7 +172,7 @@ class HandoffService {
       userId: user.id,
       brandId: brand.id,
       organizationId: brand.organization_id,
-      role: user.role,
+      role: userContext.role,
       expiresAt,
       used: false
     });
@@ -157,7 +184,8 @@ class HandoffService {
       returnUrlObj.searchParams.set('handoff', ticketCode);
       redirectUrl = returnUrlObj.toString();
     } else if (brand.custom_domain) {
-      redirectUrl = `https://${brand.custom_domain}/dashboard/?handoff=${ticketCode}`;
+      const surfacePath = (userContext.role === 'cashier') ? '/pos/' : '/dashboard/';
+      redirectUrl = `https://${brand.custom_domain}${surfacePath}?handoff=${ticketCode}`;
     }
 
     return {
@@ -215,22 +243,31 @@ class HandoffService {
       };
     }
 
-    // Fetch fresh user record
+    // Fetch fresh user record plus the target-brand membership so the
+    // exchanged session always carries the correct role/scope.
+    const membershipService = new WorkforceMembershipService(this.db);
     const user = this.db.prepare(`
-      SELECT id, brand_id, organization_id, branch_id, username, email, full_name, role, status, email_verified_at
+      SELECT id, username, email, full_name, status, email_verified_at
       FROM users
       WHERE id = ?
     `).get(entry.userId);
 
-    if (!user || user.status !== 'active') {
-      throw { status: 403, code: 'USER_INACTIVE', message: 'User account is inactive or not found.' };
+    const membership = membershipService.findByUserAndBrand(entry.userId, entry.brandId);
+    if (!user || user.status !== 'active' || !membership || membership.status !== 'active') {
+      throw { status: 403, code: 'USER_INACTIVE', message: 'User account or workforce membership is inactive or not found.' };
     }
 
+    const contextualUser = {
+      ...user,
+      role: membership.role,
+      organization_id: membership.organization_id,
+      brand_id: membership.brand_id,
+      branch_id: membership.branch_id,
+      email_verified: Boolean(user.email_verified_at)
+    };
+
     return {
-      user: {
-        ...user,
-        email_verified: Boolean(user.email_verified_at)
-      },
+      user: contextualUser,
       brandId: entry.brandId,
       organizationId: entry.organizationId
     };

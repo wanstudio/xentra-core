@@ -10,6 +10,7 @@ const AuthorizationService = require('./AuthorizationService');
 const RoleBoundaryEnforcement = require('./RoleBoundaryEnforcement');
 const WorkforceService = require('./WorkforceService');
 const WorkforceInvitationService = require('./WorkforceInvitationService');
+const WorkforceMembershipService = require('./WorkforceMembershipService');
 const PosPinCredentialService = require('./PosPinCredentialService');
 const RegistrationService = require('./RegistrationService');
 const EmailVerificationService = require('./EmailVerificationService');
@@ -20,6 +21,7 @@ const ExistingTenantResolver = require('./ExistingTenantResolver');
 const OwnershipClaimService = require('./OwnershipClaimService');
 const TenantOwnershipTransferService = require('./TenantOwnershipTransferService');
 const CustomerIdentityService = require('./CustomerIdentityService');
+const GoogleAuthService = require('../../server/services/GoogleAuthService');
 const { EmailProvider, defaultEmailProvider, ResendEmailAdapter } = require('./EmailProvider');
 
 module.exports = {
@@ -31,11 +33,13 @@ module.exports = {
   RoleBoundaryEnforcement,
   WorkforceService,
   WorkforceInvitationService,
+  WorkforceMembershipService,
   PosPinCredentialService,
   RegistrationService,
   EmailVerificationService,
   PlatformBootstrapService,
   AuthProviderService,
+  GoogleAuthService,
   HandoffService,
   ExistingTenantResolver,
   OwnershipClaimService,

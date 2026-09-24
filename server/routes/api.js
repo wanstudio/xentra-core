@@ -346,6 +346,8 @@ const TokenSessionStore = {
       organization_id: user.organization_id || null,
       branchId: user.branch_id || null,
       branch_id: user.branch_id || null,
+      membershipId: user.membership_id || user.membershipId || null,
+      membership_id: user.membership_id || user.membershipId || null,
       status: user.status || 'active',
       email_verified: user.email_verified !== undefined ? Boolean(user.email_verified) : true,
       expiresAt
@@ -672,10 +674,10 @@ function requireAuth(allowedRoles = []) {
       });
     }
 
-    // P9-17 AUTHORITATIVE ACCOUNT STATUS ENFORCEMENT
-    // A workforce account disabled/suspended AFTER login must not keep operating
-    // with a pre-disable session. Status is read from the DB (authoritative),
-    // never from client input or the cached session snapshot.
+    // P9-17 AUTHORITATIVE ACCOUNT STATUS + WORKFORCE MEMBERSHIP ENFORCEMENT
+    // User authentication is global, but workforce authorization is resolved
+    // per business membership. This prevents a role in Business A from leaking
+    // into Business B.
     if (session.userId) {
       const account = db.prepare('SELECT status FROM users WHERE id = ?').get(session.userId);
       if (account && account.status && account.status !== 'active') {
@@ -685,23 +687,59 @@ function requireAuth(allowedRoles = []) {
           message: 'Akun Anda telah dinonaktifkan. Hubungi administrator.'
         });
       }
+
+      if (session.brandId) {
+        const membership = db.prepare(`
+          SELECT id, organization_id, brand_id, branch_id, role, status
+          FROM workforce_memberships
+          WHERE user_id = ? AND brand_id = ?
+          LIMIT 1
+        `).get(session.userId, session.brandId);
+
+        if (membership) {
+          if (membership.status !== 'active') {
+            return res.status(403).json({
+              success: false,
+              error: 'ACCOUNT_DISABLED',
+              message: 'Akun Anda tidak aktif pada bisnis ini.'
+            });
+          }
+
+          session.membershipId = membership.id;
+          session.membership_id = membership.id;
+          session.role = membership.role;
+          session.brandId = membership.brand_id;
+          session.brand_id = membership.brand_id;
+          session.organizationId = membership.organization_id;
+          session.organization_id = membership.organization_id;
+          session.branchId = membership.branch_id || null;
+          session.branch_id = membership.branch_id || null;
+        }
+      }
     }
 
-    // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT via Core Identity
+    // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT
+    // Normal tenant operations require the session's explicit business
+    // membership. Owner status in Business A does NOT authorize Business B.
     let isTenantAuthorized = session.brandId === req.brand_id;
     const isInvitationAcceptRoute = req.path === '/invitations/accept' || (req.originalUrl && req.originalUrl.includes('/invitations/accept'));
+
     if (isInvitationAcceptRoute) {
-      // Recipient is accepting an invitation to join a brand/workforce; tenant authorization is governed by invitation acceptance
+      // Invitation acceptance is authorized by the invitation itself.
       isTenantAuthorized = true;
     } else if (!isTenantAuthorized) {
-      const isIdentityRoute = req.path === '/auth/merchant/me' || (req.originalUrl && req.originalUrl.includes('/auth/merchant/me')) ||
-          req.path === '/auth/handoff/create' || (req.originalUrl && req.originalUrl.includes('/auth/handoff/create'));
-      const isOnboardingRoute = session.role === 'owner' && (req.path.includes('/onboarding/') || (req.originalUrl && req.originalUrl.includes('/onboarding/')));
+      const isIdentityRoute =
+        req.path === '/auth/merchant/me' ||
+        (req.originalUrl && req.originalUrl.includes('/auth/merchant/me')) ||
+        req.path === '/auth/handoff/create' ||
+        (req.originalUrl && req.originalUrl.includes('/auth/handoff/create'));
+
+      const isOnboardingRoute =
+        session.role === 'owner' &&
+        (req.path.includes('/onboarding/') || (req.originalUrl && req.originalUrl.includes('/onboarding/')));
+
       if (isIdentityRoute || isOnboardingRoute) {
-        // Safe profile, handoff generation, and owner business onboarding/setup choice
         isTenantAuthorized = true;
-      } else if (session.role === 'owner' && session.organizationId && req.brand && req.brand.organization_id) {
-        isTenantAuthorized = session.organizationId === req.brand.organization_id;
       }
     }
 

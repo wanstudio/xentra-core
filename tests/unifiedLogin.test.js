@@ -117,7 +117,7 @@ test('UNIFIED LOGIN — one entry point, server-resolved landing', async (t) => 
       ['uul_owner', 'owner', '/owner/'],
       ['uul_brand', 'brand_manager', '/owner/'],
       ['uul_bm', 'branch_manager', '/merchant/'],
-      ['uul_cashier', 'cashier', '/owner/'],
+      ['uul_cashier', 'cashier', '/pos/'],
       // KDS capability is OFF in MVP → kitchen has no dedicated surface
       ['uul_kitchen', 'kitchen', '/owner/']
     ];

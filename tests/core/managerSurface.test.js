@@ -379,7 +379,9 @@ describe('Phase 6 — Manager Surface Foundation Tests (MGR-01 to MGR-20)', () =
     assert.equal(acceptRes.status, 200);
     assert.equal(acceptRes.data.role, 'branch_manager');
 
-    const updatedUser = db.prepare('SELECT role FROM users WHERE id = ?').get(reg.data.user.id);
+    const updatedUser = db.prepare(
+      'SELECT role FROM workforce_memberships WHERE user_id = ? AND brand_id = ?'
+    ).get(reg.data.user.id, testBrandId);
     assert.equal(updatedUser.role, 'branch_manager');
   });
 
@@ -411,12 +413,14 @@ describe('Phase 6 — Manager Surface Foundation Tests (MGR-01 to MGR-20)', () =
     assert.equal(acceptRes.status, 200);
     assert.equal(acceptRes.data.branch_id, testBranch2Id);
 
-    const updatedUser = db.prepare('SELECT branch_id FROM users WHERE id = ?').get(reg.data.user.id);
+    const updatedUser = db.prepare(
+      'SELECT branch_id FROM workforce_memberships WHERE user_id = ? AND brand_id = ?'
+    ).get(reg.data.user.id, testBrandId);
     assert.equal(updatedUser.branch_id, testBranch2Id);
   });
 
-  // MGR-12: Cross-brand access is rejected (WORKFORCE_SCOPE_CONFLICT)
-  it('MGR-12: User bound to another brand cannot accept cross-brand invitation (WORKFORCE_SCOPE_CONFLICT)', async () => {
+  // MGR-12: Existing workforce identity can receive a membership in another business
+  it('MGR-12: Existing user can accept cross-business invitation without overwriting existing business scope', async () => {
     const otherBrandId = 'brand_other_brand_12';
     const otherOrgId = 'org_other_org_12';
     const now = new Date().toISOString();
@@ -442,15 +446,6 @@ describe('Phase 6 — Manager Surface Foundation Tests (MGR-01 to MGR-20)', () =
       created_by: 'seed'
     });
 
-    const loginRes = await request('POST', '/api/v1/auth/merchant/login', {
-      username: 'other_bm_user',
-      password: 'Password123!'
-    }, {
-      Host: 'other.com'
-    });
-    const otherToken = loginRes.data.token;
-
-    // Invitation for testBrandId
     const service = new WorkforceInvitationService();
     const inv = await service.createInvitation({
       actor: { actor_id: ownerUser.id, actor_role: 'owner' },
@@ -461,15 +456,30 @@ describe('Phase 6 — Manager Surface Foundation Tests (MGR-01 to MGR-20)', () =
       branch_id: testBranch1Id
     });
 
-    const acceptRes = await request('POST', '/api/v1/invitations/accept', {
-      token: inv.rawToken
-    }, {
-      Authorization: `Bearer ${otherToken}`
+    const acceptRes = await service.acceptInvitation({
+      authenticatedUser: { id: otherUser.id, email },
+      rawToken: inv.rawToken
     });
 
-    assert.equal(acceptRes.status, 409);
-    assert.equal(acceptRes.data.success, false);
-    assert.equal(acceptRes.data.error, 'WORKFORCE_SCOPE_CONFLICT');
+    assert.equal(acceptRes.success, true);
+    assert.equal(acceptRes.role, 'branch_manager');
+    assert.equal(acceptRes.brand_id, testBrandId);
+
+    const originalMembership = db.prepare(
+      'SELECT role, branch_id FROM workforce_memberships WHERE user_id = ? AND brand_id = ?'
+    ).get(otherUser.id, otherBrandId);
+    const addedMembership = db.prepare(
+      'SELECT role, branch_id FROM workforce_memberships WHERE user_id = ? AND brand_id = ?'
+    ).get(otherUser.id, testBrandId);
+
+    assert.equal(originalMembership.role, 'branch_manager');
+    assert.equal(originalMembership.branch_id, 'branch_other_12');
+    assert.equal(addedMembership.role, 'branch_manager');
+    assert.equal(addedMembership.branch_id, testBranch1Id);
+
+    const userRow = db.prepare('SELECT brand_id, branch_id, role FROM users WHERE id = ?').get(otherUser.id);
+    assert.equal(userRow.brand_id, otherBrandId);
+    assert.equal(userRow.branch_id, 'branch_other_12');
   });
 
   // MGR-13: Owner cannot be demoted through invitation (WORKFORCE_ROLE_CONFLICT)

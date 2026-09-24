@@ -15,42 +15,77 @@ class AuthProviderService {
    * @param {string} providerUserId Unique subject identifier from provider (e.g. sub)
    * @returns {Object|null} The provider record with attached user, or null if not found
    */
-  findIdentity(provider, providerUserId) {
-    if (!provider || !providerUserId) {
-      return null;
-    }
+  findIdentity(provider, providerUserId, brandId = null) {
+    if (!provider || !providerUserId) return null;
 
     const cleanProvider = String(provider).trim().toLowerCase();
     const cleanProviderUserId = String(providerUserId).trim();
 
-    const row = this.db.prepare(`
-      SELECT 
-        uap.id as provider_link_id,
-        uap.user_id,
-        uap.provider,
-        uap.provider_user_id,
-        uap.email as provider_email,
-        uap.metadata as provider_metadata,
-        uap.linked_at,
-        u.id,
-        u.brand_id,
-        u.organization_id,
-        u.branch_id,
-        u.username,
-        u.email,
-        u.full_name,
-        u.role,
-        u.status,
-        u.email_verified_at,
-        u.password_hash
-      FROM user_auth_providers uap
-      JOIN users u ON uap.user_id = u.id
-      WHERE uap.provider = ? AND uap.provider_user_id = ?
-    `).get(cleanProvider, cleanProviderUserId);
-
-    if (!row) {
-      return null;
+    let row;
+    if (brandId) {
+      row = this.db.prepare(`
+        SELECT
+          uap.id as provider_link_id,
+          uap.user_id,
+          uap.provider,
+          uap.provider_user_id,
+          uap.email as provider_email,
+          uap.metadata as provider_metadata,
+          uap.linked_at,
+          u.id,
+          CASE WHEN wm.id IS NOT NULL THEN wm.brand_id ELSE u.brand_id END AS brand_id,
+          CASE WHEN wm.id IS NOT NULL THEN wm.organization_id ELSE u.organization_id END AS organization_id,
+          CASE WHEN wm.id IS NOT NULL THEN wm.branch_id ELSE u.branch_id END AS branch_id,
+          u.username,
+          u.email,
+          u.full_name,
+          CASE WHEN wm.id IS NOT NULL THEN wm.role ELSE u.role END AS role,
+          u.status,
+          CASE WHEN wm.id IS NOT NULL THEN wm.status ELSE COALESCE(u.status, 'active') END AS membership_status,
+          u.email_verified_at,
+          u.password_hash,
+          wm.id AS membership_id
+        FROM user_auth_providers uap
+        JOIN users u ON uap.user_id = u.id
+        LEFT JOIN workforce_memberships wm
+          ON wm.user_id = u.id AND wm.brand_id = ?
+        WHERE uap.provider = ? AND uap.provider_user_id = ?
+          AND (
+            wm.id IS NOT NULL
+            OR u.brand_id = ?
+            OR u.brand_id IS NULL
+          )
+        LIMIT 1
+      `).get(String(brandId), cleanProvider, cleanProviderUserId, String(brandId));
+    } else {
+      row = this.db.prepare(`
+        SELECT
+          uap.id as provider_link_id,
+          uap.user_id,
+          uap.provider,
+          uap.provider_user_id,
+          uap.email as provider_email,
+          uap.metadata as provider_metadata,
+          uap.linked_at,
+          u.id,
+          u.brand_id,
+          u.organization_id,
+          u.branch_id,
+          u.username,
+          u.email,
+          u.full_name,
+          u.role,
+          u.status,
+          u.email_verified_at,
+          u.password_hash
+        FROM user_auth_providers uap
+        JOIN users u ON uap.user_id = u.id
+        WHERE uap.provider = ? AND uap.provider_user_id = ?
+      `).get(cleanProvider, cleanProviderUserId);
     }
+
+    if (!row) return null;
+    if (row.membership_status && row.membership_status !== 'active') return null;
 
     return {
       providerLinkId: row.provider_link_id,
@@ -60,6 +95,7 @@ class AuthProviderService {
       providerEmail: row.provider_email,
       providerMetadata: row.provider_metadata ? JSON.parse(row.provider_metadata) : null,
       linkedAt: row.linked_at,
+      membershipId: row.membership_id || null,
       user: {
         id: row.id,
         brand_id: row.brand_id,

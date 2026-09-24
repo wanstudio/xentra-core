@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const db = require('../../server/database/db');
+const WorkforceMembershipService = require('./WorkforceMembershipService');
 
 const BCRYPT_ROUNDS = 12;
 
@@ -159,6 +160,15 @@ class RegistrationService {
         INSERT INTO users (id, brand_id, organization_id, branch_id, username, email, password_hash, full_name, role, status, password_changed_at, email_verified_at, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'owner', 'active', ?, NULL, ?, ?)
       `).run(userId, brandId, orgId, branchId, candidateUsername, cleanEmail, passwordHash, finalFullName, now, now, now);
+
+      new WorkforceMembershipService(this.db).ensureMembership({
+        userId,
+        organizationId: orgId,
+        brandId,
+        branchId,
+        role: 'owner',
+        status: 'active'
+      });
 
       this.db.exec('COMMIT;');
     } catch (err) {
@@ -358,6 +368,15 @@ class RegistrationService {
         VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'owner', 'active', NULL, ?, ?, ?)
       `).run(userId, brandId, orgId, branchId, candidateUsername, cleanEmail, finalFullName, now, now, now);
 
+      new WorkforceMembershipService(this.db).ensureMembership({
+        userId,
+        organizationId: orgId,
+        brandId,
+        branchId,
+        role: 'owner',
+        status: 'active'
+      });
+
       // 6. Link Google Auth Provider atomically
       this.db.prepare(`
         INSERT INTO user_auth_providers (
@@ -516,7 +535,26 @@ class RegistrationService {
       this.db.prepare(`INSERT INTO branches (id, brand_id, name, slug, address_text, latitude, longitude, phone, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`).run(branchId, brandId, finalBranchName, branchSlug, branchAddress, Number(latitude), Number(longitude), branchPhone, now, now);
       this.db.prepare(`INSERT INTO branch_delivery_settings (id, branch_id, is_delivery_active, is_pickup_active, max_radius_km, free_delivery_km, price_per_km, min_order_amount, created_at, updated_at) VALUES (?, ?, 1, 1, 10.0, 2.0, 3000.0, 15000.0, ?, ?)`).run(bdsId, branchId, now, now);
       
-      this.db.prepare(`UPDATE users SET brand_id = ?, organization_id = ?, branch_id = ?, updated_at = ? WHERE id = ?`).run(brandId, orgId, branchId, now, userId);
+      // Identity-only onboarding may populate legacy scope fields. Once a User
+      // already has another business membership, do NOT overwrite that
+      // membership's compatibility fields just because they create another business.
+      this.db.prepare(`
+        UPDATE users
+        SET brand_id = CASE WHEN brand_id IS NULL THEN ? ELSE brand_id END,
+            organization_id = CASE WHEN organization_id IS NULL THEN ? ELSE organization_id END,
+            branch_id = CASE WHEN brand_id IS NULL THEN ? ELSE branch_id END,
+            updated_at = ?
+        WHERE id = ?
+      `).run(brandId, orgId, branchId, now, userId);
+
+      new WorkforceMembershipService(this.db).ensureMembership({
+        userId,
+        organizationId: orgId,
+        brandId,
+        branchId,
+        role: 'owner',
+        status: 'active'
+      });
       this.db.exec('COMMIT;');
     } catch (err) {
       try { this.db.exec('ROLLBACK;'); } catch (_) {}
