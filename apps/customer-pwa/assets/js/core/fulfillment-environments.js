@@ -188,16 +188,19 @@
         var tableNumber = ownsTable ? (env.state.tableNumber || null) : null;
         var tableIds = ownsTable && Array.isArray(env.state.table_ids) ? env.state.table_ids.slice() : [];
         var reservationDate = ownsReservation ? (env.state.reservationDate || null) : null;
+        var reservationTime = ownsReservation ? (env.state.reservationTime || '12:00') : null;
         var guestCount = (ownsTable || ownsReservation) ? (env.state.guestCount || null) : null;
 
         fulfillment.table_number = tableNumber;
         fulfillment.table_ids = tableIds;
         fulfillment.reservation_date = reservationDate;
+        fulfillment.reservation_time = reservationTime;
         fulfillment.guest_count = guestCount;
 
         topLevel.table_number = tableNumber;
         topLevel.table_ids = tableIds;
         topLevel.reservation_date = reservationDate;
+        topLevel.reservation_time = reservationTime;
         topLevel.guest_count = guestCount;
 
         return { fulfillment: fulfillment, topLevel: topLevel };
