@@ -14,7 +14,7 @@ const assert = require('node:assert');
 const app = require('../server/app');
 // Suites assert against demo branches/products/promotions, which are not auto-seeded.
 require('./helpers/demoFixtures.js')();
-const CatalogService = require('../domains/commerce/services/CatalogService');
+const CatalogService = require('../domains/catalog/services/CatalogService');
 const NON_IMAGE_BASE64 = Buffer.from('%PDF-1.4\nnot an image at all').toString('base64');
 
 const BARAT = 'branch_bangjo_barat';
