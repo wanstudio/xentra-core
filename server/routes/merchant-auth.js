@@ -506,6 +506,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
       const authResult = service.authenticateWithPin({
         brandId: req.brand_id,
         branchId,
+        terminalId: body.terminal_id,
         pin: body.pin
       });
 
