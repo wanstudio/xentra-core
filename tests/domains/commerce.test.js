@@ -226,6 +226,7 @@ test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell pre
     ],
     delivery_fee: 10000,
     payment_method: 'cash',
+    order_channel: 'pos_cashier',
     trace_context: { correlation_id: 'corr_test_order_flow' }
   });
 
@@ -251,6 +252,7 @@ test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell pre
     branch_id: 'branch_test',
     customer: { name: 'Customer Race', phone: '6288888888' },
     payment_method: 'cash',
+    order_channel: 'pos_cashier',
     items: [{ product_id: 'prod_limited', quantity: 3, expected_price: 50000 }]
   });
   assert.strictEqual(raceResult.success, false);
