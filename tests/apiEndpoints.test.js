@@ -625,6 +625,27 @@ test('API Branch catalog routes: implementation is isolated from api.js', () => 
   }
 });
 
+test('API Marketing promotion routes: implementation is isolated from api.js', () => {
+  const api = fs.readFileSync(require.resolve('../server/routes/api'), 'utf8');
+  const promotions = fs.readFileSync(require.resolve('../server/routes/admin-marketing-promotions'), 'utf8');
+
+  for (const route of [
+    "router.post('/admin/marketing/promotions'",
+    "router.put('/admin/marketing/promotions/:id'",
+    "router.patch('/admin/marketing/promotions/:id/presentation'",
+    "router.delete('/admin/marketing/promotions/:id'",
+    "router.post('/admin/marketing/promotions/:id/scopes'",
+    "router.patch('/admin/marketing/promotions/:id/branch-activation'",
+    "router.get('/admin/marketing/redemptions'"
+  ]) {
+    assert.ok(promotions.includes(route), route + ' must live in admin-marketing-promotions.js');
+    assert.equal(api.includes(route), false, route + ' must not remain inline in api.js');
+  }
+
+  assert.ok(promotions.includes('function logPromotionSecurityEvent('),
+    'promotion audit helper must stay with promotion routes');
+});
+
 test('API Admin Branch Creation: Valid Branch with WhatsApp succeeds', async () => {
   const loginRes = await mockFetch('/api/v1/auth/merchant/login', {
     method: 'POST',
