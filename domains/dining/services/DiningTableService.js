@@ -10,6 +10,7 @@ const { DiningTableRepository, OrderRepository, BranchRepository } = require('..
 const Template01 = require('../templates/Template01');
 
 const HOLD_DURATION_MINUTES = 15;
+const RESERVATION_NO_SHOW_GRACE_MINUTES = 60;
 
 // Ganti token QR meja setiap sesinya ditutup?
 //
@@ -409,15 +410,66 @@ class DiningTableService {
     }
   }
 
-  /** Cancel an overdue reservation as no-show without changing inventory. */
+  /** Cancel a reservation as no-show only after its scheduled arrival + grace period. */
   static cancelNoShowReservation({ reservation_order_id, reason = 'No-Show: Melewati batas toleransi kedatangan' } = {}) {
     if (!reservation_order_id) throw new Error('[DiningTableService] "reservation_order_id" is required.');
     const order = orderRepository.findById(reservation_order_id);
     if (!order) throw new Error(`[DiningTableService] Data reservasi dengan ID ${reservation_order_id} tidak ditemukan.`);
     if (order.order_type !== 'reservation') throw new Error(`[DiningTableService] Order ${reservation_order_id} bukan tipe reservation.`);
-    const now = new Date().toISOString();
-    orderRepository.cancelReservationNoShow({ orderId: reservation_order_id, reason, updatedAt: now });
-    return { success: true, status: 'CANCELLED_NO_SHOW', order_id: reservation_order_id, order_number: order.order_number, branch_id: order.branch_id, reason };
+    if (order.status !== 'confirmed') {
+      throw new Error(`[DiningTableService] RESERVATION_NO_SHOW_INVALID_STATUS: Reservation harus berstatus "confirmed", bukan "${order.status}".`);
+    }
+
+    if (!order.scheduled_slot_start) {
+      throw new Error('[DiningTableService] RESERVATION_NO_SHOW_SCHEDULE_MISSING: Reservation tidak memiliki jadwal kedatangan yang dapat diverifikasi.');
+    }
+
+    const timezone = branchRepository.findBranchTimezone(order.branch_id);
+    const now = new Date();
+    let nowLocal = null;
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+      }).formatToParts(now).reduce((acc, part) => {
+        if (part.type !== 'literal') acc[part.type] = part.value;
+        return acc;
+      }, {});
+      nowLocal = parts.year + '-' + parts.month + '-' + parts.day + 'T' + parts.hour + ':' + parts.minute + ':' + parts.second;
+    } catch (_) {
+      nowLocal = now.toISOString().slice(0, 19);
+    }
+
+    const graceMs = RESERVATION_NO_SHOW_GRACE_MINUTES * 60 * 1000;
+    const scheduledRaw = String(order.scheduled_slot_start);
+    const scheduledMs = Date.parse(scheduledRaw.length === 19 ? scheduledRaw + 'Z' : scheduledRaw);
+    const nowMs = Date.parse(nowLocal + 'Z');
+    if (!Number.isFinite(scheduledMs) || !Number.isFinite(nowMs)) {
+      throw new Error('[DiningTableService] RESERVATION_NO_SHOW_SCHEDULE_INVALID: Jadwal reservasi tidak valid.');
+    }
+    if (nowMs < scheduledMs + graceMs) {
+      throw new Error('[DiningTableService] RESERVATION_NO_SHOW_TOO_EARLY: Reservation belum melewati grace period no-show.');
+    }
+
+    const updated = orderRepository.cancelReservationNoShow({ orderId: reservation_order_id, reason, updatedAt: now.toISOString() });
+    if (!updated || updated.changes !== 1) {
+      throw new Error('[DiningTableService] RESERVATION_NO_SHOW_CANCEL_FAILED: Reservation gagal dibatalkan sebagai no-show.');
+    }
+    return {
+      success: true,
+      status: 'CANCELLED_NO_SHOW',
+      order_id: reservation_order_id,
+      order_number: order.order_number,
+      branch_id: order.branch_id,
+      reason,
+      grace_period_minutes: RESERVATION_NO_SHOW_GRACE_MINUTES
+    };
   }
 
   static validateTablesAvailable(branchId, tableIds, customerPhone = null) {
