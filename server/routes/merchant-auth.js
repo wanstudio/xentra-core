@@ -446,6 +446,125 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
   router.post('/auth/merchant/login', handleMerchantLogin);
   router.post('/auth/login', handleMerchantLogin);
   
+  // 10.1.1 POS PIN credential endpoints.
+  // POS PIN belongs to the canonical Cashier identity but is never a general login credential.
+  router.get('/auth/pos-pin', requireAuth(['cashier']), (req, res) => {
+    try {
+      const { PosPinCredentialService } = require('../../core/identity');
+      const service = new PosPinCredentialService();
+      const userId = req.user.id || req.user.userId;
+      res.json({ success: true, ...service.getCredentialForUser(userId, req.brand_id) });
+    } catch (err) {
+      const status = err.status || 500;
+      res.status(status).json({ success: false, code: err.code || 'POS_PIN_ERROR', error: err.message || 'Gagal memuat POS PIN.' });
+    }
+  });
+
+  router.put('/auth/pos-pin', requireAuth(['cashier']), (req, res) => {
+    try {
+      const { PosPinCredentialService, WorkforceService } = require('../../core/identity');
+      const service = new PosPinCredentialService();
+      const userId = req.user.id || req.user.userId;
+      const result = service.setPinForSelf({ userId, brandId: req.brand_id, pin: req.body && req.body.pin });
+
+      const workforce = new WorkforceService();
+      workforce.logSecurityEvent({
+        actor_id: userId,
+        actor_role: 'cashier',
+        action: 'POS_PIN_SET',
+        target_user_id: userId,
+        target_role: 'cashier',
+        brand_id: req.brand_id,
+        branch_id: req.user.branch_id || req.user.branchId,
+        result: 'success'
+      });
+
+      res.json({ success: true, message: 'PIN POS berhasil disimpan.', ...result });
+    } catch (err) {
+      const status = err.status || 500;
+      res.status(status).json({ success: false, code: err.code || 'POS_PIN_ERROR', error: err.message || 'Gagal menyimpan POS PIN.' });
+    }
+  });
+
+  router.post('/auth/pos/pin', (req, res) => {
+    try {
+      const { PosPinCredentialService, WorkforceService } = require('../../core/identity');
+      const service = new PosPinCredentialService();
+      const body = req.body || {};
+      const branchId = body.branch_id;
+      const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+      const rateLimitKey = 'pos-pin-login:' + (req.brand_id || 'unknown') + ':' + (branchId || 'unknown') + ':' + clientIp;
+      const rateCheck = RateLimiter.check(rateLimitKey, 10, 300);
+      if (!rateCheck.allowed) {
+        return res.status(429).json({
+          success: false,
+          code: 'TOO_MANY_REQUESTS',
+          error: 'Terlalu banyak percobaan PIN. Coba lagi dalam ' + rateCheck.retryAfter + ' detik.'
+        });
+      }
+
+      const authResult = service.authenticateWithPin({
+        brandId: req.brand_id,
+        branchId,
+        pin: body.pin
+      });
+
+      const user = authResult.user;
+      const { token, expiresAt } = TokenSessionStore.createSession(user, req.brand_id);
+      RateLimiter.reset(rateLimitKey);
+
+      const workforce = new WorkforceService();
+      workforce.logSecurityEvent({
+        actor_id: user.id,
+        actor_role: 'cashier',
+        action: 'POS_PIN_LOGIN_SUCCESS',
+        target_user_id: user.id,
+        target_role: 'cashier',
+        brand_id: req.brand_id,
+        branch_id: user.branch_id,
+        result: 'success'
+      });
+
+      res.json({
+        success: true,
+        token,
+        expires_at: new Date(expiresAt).toISOString(),
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          full_name: user.full_name,
+          role: 'cashier',
+          branch_id: user.branch_id,
+          email_verified: user.email_verified
+        },
+        offline_credential: authResult.offline_credential,
+        landing: '/pos/',
+        entitlements: { kds: false }
+      });
+    } catch (err) {
+      const status = err.status || 500;
+      if (status === 401 || status === 423) {
+        try {
+          const { WorkforceService } = require('../../core/identity');
+          const workforce = new WorkforceService();
+          workforce.logSecurityEvent({
+            action: 'POS_PIN_LOGIN_FAILED',
+            brand_id: req.brand_id,
+            branch_id: req.body && req.body.branch_id,
+            result: 'failure',
+            metadata: { reason: err.code || 'INVALID_POS_PIN' }
+          });
+        } catch (_) {}
+      }
+      res.status(status).json({
+        success: false,
+        code: err.code || 'POS_PIN_LOGIN_ERROR',
+        error: err.message || 'PIN Kasir tidak valid.'
+      });
+    }
+  });
+
   // 10.2 Google Authentication & Account Linking Endpoints
   const GoogleAuthService = require('../services/GoogleAuthService');
   const { AuthProviderService } = require('../../core/identity');
