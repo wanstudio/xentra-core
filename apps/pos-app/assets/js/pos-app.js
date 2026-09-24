@@ -829,16 +829,56 @@
     box.querySelectorAll('[data-print]').forEach(function(b){b.onclick=function(){printReceipt(b.dataset.print);};});
   }
 
+  function tableStateLabel(st){
+    return ({available:'Tersedia',held:'Ditahan',reserved:'Reservasi',occupied:'Terisi',blocked:'Diblokir',out_of_service:'Tidak tersedia'})[st]||st;
+  }
+
+  function applySelectedTable(t){
+    if(!t)return;
+    state.selectedTable=t;
+    state.orderType='dine_in';
+    document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x.dataset.type==='dine_in');});
+    var ctx=$('pos-table-context'); if(ctx)ctx.classList.remove('hidden');
+    renderCart();
+  }
+
+  function openTableSelector(){
+    if(!state.branchId)return toast('Cabang POS belum tersedia.');
+    request('/dine-in/layout?branch_id='+encodeURIComponent(state.branchId),{headers:headers()}).then(function(d){
+      var tables=(d.layout&&d.layout.tables)||[];
+      var html='<h3>Pilih Meja</h3><p>Pilih meja yang menjadi konteks transaksi Dine-in. Cart yang sudah dibuat tetap dipertahankan.</p><div class="pos-table-picker">';
+      if(!tables.length) html+='<div class="pos-empty">Belum ada meja aktif di cabang ini.</div>';
+      tables.forEach(function(t){
+        var st=t.operational_state||t.status||'available';
+        var can=st==='available';
+        var selected=state.selectedTable&&String(state.selectedTable.id)===String(t.id);
+        html+='<button type="button" class="pos-table-pick '+(can?'':'disabled')+(selected?' selected':'')+'" '+(can?'':'disabled')+' data-table-pick="'+esc(t.id)+'"><span><strong>'+esc(t.label||('Meja '+t.table_number))+'</strong><small>'+esc(String(t.capacity||4))+' kursi · '+esc(tableStateLabel(st))+'</small></span><b>'+(selected?'✓':can?'Pilih':'Tidak tersedia')+'</b></button>';
+      });
+      html+='</div><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-table-picker-cancel">Batal</button></div>';
+      showModal(html);
+      $('pos-table-picker-cancel').onclick=hideModal;
+      document.querySelectorAll('[data-table-pick]').forEach(function(btn){btn.onclick=function(){
+        var t=tables.find(function(x){return String(x.id)===String(btn.dataset.tablePick);});
+        if(!t||(t.operational_state||t.status||'available')!=='available')return;
+        applySelectedTable(t); hideModal(); setView('kasir');
+      };});
+    }).catch(function(e){toast(e.message||'Layout meja tidak dapat dimuat.');});
+  }
+
   async function loadTables(){
     try{
       var d=await request('/dine-in/layout?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
       var tables=(d.layout&&d.layout.tables)||[]; var box=$('pos-table-grid'); if(!box)return;
       box.innerHTML=tables.map(function(t){
         var st=t.operational_state||t.status||'available'; var can=st==='available';
-        return '<div class="pos-table-card '+esc(st)+'"><h3>'+esc(t.label||('Meja '+t.table_number))+'</h3><p>'+esc(String(t.capacity||4))+' kursi · '+esc(st)+'</p>'+
-          '<button type="button" class="pos-btn small '+(can?'':'ghost')+'" '+(can?'':'disabled')+' data-table="'+esc(t.id)+'">Gunakan untuk Sale</button></div>';
+        return '<div class="pos-table-card '+esc(st)+'"><h3>'+esc(t.label||('Meja '+t.table_number))+'</h3><p>'+esc(String(t.capacity||4))+' kursi · '+esc(tableStateLabel(st))+'</p>'+
+          '<button type="button" class="pos-btn small '+(can?'':'ghost')+'" '+(can?'':'disabled')+' data-table="'+esc(t.id)+'">'+(can?'Gunakan untuk Sale':'Tidak tersedia')+'</button></div>';
       }).join('');
-      box.querySelectorAll('[data-table]').forEach(function(b){b.onclick=function(){var t=tables.find(function(x){return String(x.id)===String(b.dataset.table);});if(!t)return;state.selectedTable=t;$('pos-selected-table').textContent=t.label||('Meja '+t.table_number);state.orderType='dine_in';document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x.dataset.type==='dine_in');});setView('kasir');};});
+      box.querySelectorAll('[data-table]').forEach(function(btn){btn.onclick=function(){
+        var t=tables.find(function(x){return String(x.id)===String(btn.dataset.table);});
+        if(!t)return;
+        applySelectedTable(t); setView('kasir');
+      };});
     }catch(e){$('pos-table-grid').innerHTML='<div class="pos-empty">Layout meja tidak dapat dimuat.</div>';}
   }
 
