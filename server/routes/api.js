@@ -3318,22 +3318,41 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
       ? `[ACCEPT by ${actorLabel}] ${note ? note : ''}`.trim()
       : `[REJECT by ${actorLabel}] ${String(reason).trim()}`;
 
-    const result = OrderStateMachine.transition({
-      order_id: order.id,
-      target_status: targetStatus,
-      actor_type: 'branch_actor',
-      actor_id: req.user.userId || req.user.username,
-      note: actorNote
-    });
-
-    // Baseline: Customer -> QR/Floor Plan -> 1 Table -> Order -> Merchant -> Accept -> Dining Session ACTIVE
     const fullOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
-    if (fullOrder && fullOrder.order_type === 'dine_in') {
-      const { DiningTableService } = require('../../domains/pos');
-      const { DiningTableRepository } = require('../../core/data/repositories');
-      const diningRepo = new DiningTableRepository();
 
-      if (decision === 'accept') {
+    // 1. Idempotency: if already in targetStatus, return success directly without duplicating side-effects
+    if (fullOrder && fullOrder.status === targetStatus) {
+      const result = OrderStateMachine.transition({
+        order_id: order.id,
+        target_status: targetStatus,
+        actor_type: 'branch_actor',
+        actor_id: req.user.userId || req.user.username,
+        note: actorNote
+      });
+      return res.json({ success: true, decision, ...result });
+    }
+
+    // 2. Validate state transition capability before running operational side-effects
+    if (fullOrder && !OrderStateMachine.canTransition(fullOrder.status, targetStatus)) {
+      OrderStateMachine.transition({
+        order_id: order.id,
+        target_status: targetStatus,
+        actor_type: 'branch_actor',
+        actor_id: req.user.userId || req.user.username,
+        note: actorNote
+      });
+    }
+
+    if (decision === 'accept') {
+      let sessionResult = null;
+
+      // 1. If dine-in, validate table and activate dining session atomically
+      // Invariant: An order CANNOT be confirmed if its Dining Session fails to activate.
+      if (fullOrder && fullOrder.order_type === 'dine_in') {
+        const { DiningTableService } = require('../../domains/pos');
+        const { DiningTableRepository } = require('../../core/data/repositories');
+        const diningRepo = new DiningTableRepository();
+
         let tableIds = [];
         const activeHolds = diningRepo.findActiveHolds(fullOrder.id);
         if (activeHolds && activeHolds.length > 0) {
@@ -3341,27 +3360,97 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
         } else if (fullOrder.table_number) {
           const tbl = diningRepo.findTableIdByNumberOrLabel(fullOrder.branch_id, fullOrder.table_number);
           if (tbl) tableIds = [tbl.id];
+        } else if (fullOrder.dining_session_id) {
+          const sessTables = diningRepo.findSessionTables(fullOrder.dining_session_id);
+          if (sessTables && sessTables.length > 0) tableIds = sessTables.map(t => t.table_id);
         }
 
-        if (tableIds.length > 0) {
-          try {
-            const sessionResult = DiningTableService.createOrAttachDiningSession({
-              branch_id: fullOrder.branch_id,
-              table_ids: tableIds,
-              order_id: fullOrder.id,
-              customer_name: fullOrder.customer_name,
-              customer_phone: fullOrder.customer_phone,
-              guest_count: fullOrder.guest_count || 1,
-              hold_reference_id: fullOrder.id,
-              channel: fullOrder.order_channel || 'customer_app',
-              session_id: fullOrder.dining_session_id || null
-            });
-            result.dining_session_id = sessionResult.session_id;
-          } catch (sessionErr) {
-            console.error('[BranchAcceptance Dine-in Session Warning]:', sessionErr.message);
-          }
+        if (tableIds.length === 0) {
+          return res.status(400).json({
+            success: false,
+            status: 'TABLE_REQUIRED',
+            error: 'Gagal menerima pesanan: meja tidak ditemukan atau hold telah kedaluwarsa.'
+          });
         }
-      } else if (decision === 'reject') {
+
+        // createOrAttachDiningSession enforces table availability atomically.
+        // If table is already occupied/blocked/mismatched, it throws and stops acceptance.
+        sessionResult = DiningTableService.createOrAttachDiningSession({
+          branch_id: fullOrder.branch_id,
+          table_ids: tableIds,
+          order_id: fullOrder.id,
+          customer_name: fullOrder.customer_name,
+          customer_phone: fullOrder.customer_phone,
+          guest_count: fullOrder.guest_count || 1,
+          hold_reference_id: fullOrder.id,
+          channel: fullOrder.order_channel || 'customer_app',
+          session_id: fullOrder.dining_session_id || null
+        });
+      }
+
+      // 2. Deduct inventory stock for the accepted order (idempotent)
+      // For cash orders, stock was not deducted while pending. If stock is insufficient, abort accept.
+      try {
+        const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
+        OrderPlacementService.deductStockForSettledOrder(order.id);
+      } catch (stockErr) {
+        if (sessionResult && sessionResult.session_id) {
+          const { DiningTableService } = require('../../domains/pos');
+          try {
+            DiningTableService.completeDiningSession(sessionResult.session_id, 'Stock deduction rollback');
+            DiningTableService.holdTablesForPayment({
+              branch_id: fullOrder.branch_id,
+              table_ids: sessionResult.table_ids,
+              customer_phone: fullOrder.customer_phone,
+              hold_reference_id: fullOrder.id,
+              channel: 'customer_app'
+            });
+          } catch (_) {}
+        }
+        return res.status(400).json({
+          success: false,
+          status: 'OUT_OF_STOCK',
+          error: `Gagal menerima pesanan: ${stockErr.message}`
+        });
+      }
+
+      // 3. Transition order status from pending -> confirmed (ACCEPTED)
+      try {
+        const result = OrderStateMachine.transition({
+          order_id: order.id,
+          target_status: 'confirmed',
+          actor_type: 'branch_actor',
+          actor_id: req.user.userId || req.user.username,
+          note: actorNote
+        });
+
+        if (sessionResult) {
+          result.dining_session_id = sessionResult.session_id;
+        }
+
+        return res.json({ success: true, decision, ...result });
+      } catch (stateErr) {
+        if (sessionResult && sessionResult.session_id) {
+          const { DiningTableService } = require('../../domains/pos');
+          try {
+            DiningTableService.completeDiningSession(sessionResult.session_id, 'State transition rollback');
+          } catch (_) {}
+        }
+        return res.status(400).json({ success: false, error: stateErr.message });
+      }
+    }
+
+    if (decision === 'reject') {
+      const result = OrderStateMachine.transition({
+        order_id: order.id,
+        target_status: 'rejected',
+        actor_type: 'branch_actor',
+        actor_id: req.user.userId || req.user.username,
+        note: actorNote
+      });
+
+      if (fullOrder && fullOrder.order_type === 'dine_in') {
+        const { DiningTableService } = require('../../domains/pos');
         try {
           DiningTableService.releaseHold({
             branch_id: fullOrder.branch_id,
@@ -3372,9 +3461,9 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
           console.error('[BranchAcceptance Release Hold Warning]:', relErr.message);
         }
       }
-    }
 
-    res.json({ success: true, decision, ...result });
+      return res.json({ success: true, decision, ...result });
+    }
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }

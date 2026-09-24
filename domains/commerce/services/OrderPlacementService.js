@@ -404,7 +404,9 @@ class OrderPlacementService {
           note: formattedItemNote
         });
 
-        if (effectivePaymentMethod === 'cash') {
+        // Only deduct stock at creation if order is already confirmed (e.g. pos_cashier walk-in sales)
+        // For orders that enter pending state (customer_app cash/online), stock is deducted upon merchant acceptance
+        if (insertedStatus === 'confirmed') {
           const bpBefore = inventoryRepository.findBranchProduct(branch_id, item.product_id);
           const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
           const deductResult = inventoryRepository.deductBranchProduct({ quantity: item.quantity, branchId: branch_id, productId: item.product_id });
@@ -470,7 +472,7 @@ class OrderPlacementService {
         updatedAt: now
       });
 
-      if (effectivePaymentMethod === 'cash' && verification.applied_promos && verification.applied_promos.length > 0) {
+      if (insertedStatus === 'confirmed' && verification.applied_promos && verification.applied_promos.length > 0) {
         const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
         PromotionEngineService.recordRedemptions({ order_id: orderId, brand_id, branch_id, customer_phone: customer.phone, promotions: verification.applied_promos });
       }
@@ -517,7 +519,7 @@ class OrderPlacementService {
       return { success: false, status: 'OUT_OF_STOCK', errors: [txErr.message || 'Terjadi kegagalan pemesanan karena perubahan ketersediaan stok.'], price_diffs: [] };
     }
 
-    if (effectivePaymentMethod === 'cash') {
+    if (insertedStatus === 'confirmed') {
       for (const item of verifiedItems) {
         const remainingStock = item.current_stock - item.quantity;
         const branchThreshold = item.branch_low_stock_threshold != null ? item.branch_low_stock_threshold : LowStockThresholdModel.DEFAULT_THRESHOLD;
@@ -568,9 +570,9 @@ class OrderPlacementService {
         const isVirtualPromo = (item.unit_price === 0 || Number(item.unit_price) === 0) &&
           (item.note?.includes('Promo') || item.note?.includes('Bonus') || String(item.product_id).startsWith('prm_') || String(item.product_id).startsWith('reward_'));
         const bpBefore = inventoryRepository.findBranchProduct(order.branch_id, item.product_id);
-        if (!bpBefore && isVirtualPromo) continue;
+        if (!bpBefore) continue;
 
-        const prevStock = bpBefore ? Number(bpBefore.stock || 0) : 0;
+        const prevStock = Number(bpBefore.stock || 0);
         const deductResult = inventoryRepository.deductBranchProduct({ quantity: item.quantity, branchId: order.branch_id, productId: item.product_id });
         if (!deductResult || deductResult.changes === 0) {
           throw new Error(`[OUT_OF_STOCK_RACE] Stok untuk produk "${item.product_name || item.product_id}" tidak mencukupi saat pembayaran diselesaikan (tersisa ${prevStock}, diminta ${item.quantity}).`);
