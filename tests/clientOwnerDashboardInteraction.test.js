@@ -10,6 +10,7 @@ const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
 const CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/dashboard.css');
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
+const CATALOG_CLIENT_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/catalog-client.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/branch-catalog-ui.js');
 
 test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async (t) => {
@@ -22,6 +23,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
   // index.html loads merchant-shared js before dashboard.js; mirror that order.
   function evalApp(win) {
     win.eval(sharedJs);
+    win.eval(fs.readFileSync(CATALOG_CLIENT_JS_PATH, 'utf8'));
     win.eval(branchCatalogJs);
     win.eval(js);
   }
