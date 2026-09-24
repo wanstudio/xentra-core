@@ -1,7 +1,7 @@
 /**
  * XENTRA CORE — OWNER BRANCH CATALOG UI
  *
- * Owner-only catalog management UI. Data/transport operations are delegated to
+ * Owner Dashboard UI only. API/data transport is provided by
  * merchant-shared/js/catalog-client.js.
  */
 (function () {
@@ -18,14 +18,8 @@
   var currentManagingBranchId = null;
   var currentBranchCatalogData = null;
 
-  function getActiveBranchId() {
-    if (currentManagingBranchId) return currentManagingBranchId;
-    if (currentBranchCatalogData && currentBranchCatalogData.branch && currentBranchCatalogData.branch.id) {
-      return currentBranchCatalogData.branch.id;
-    }
-    return null;
-  }
-
+  window.openBranchCatalogModal = async function (branchId) {
+    currentManagingBranchId = branchId;
     var modal = $('modal-branch-catalog');
     if (!modal) return;
     modal.style.display = 'flex';
@@ -220,6 +214,270 @@
      MODUL 3.2: BRANCH PRODUCT OVERRIDE — name / description / image_url
      Master Product Default + Branch Optional Override
      ========================================================================= */
+  var _overrideProductId = null;
+  var _bpSelectedFile = null; // staged photo File to upload on save
+  var _bpCropSpec = null;
+
+  (function initBranchProductPhoto() {
+    var fileInput = $('override-img-file');
+    if (!fileInput) return;
+    fileInput.addEventListener('change', function () {
+      var file = fileInput.files && fileInput.files[0];
+      if (!file) { _bpSelectedFile = null; _bpCropSpec = null; return; }
+
+      var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (allowed.indexOf(file.type) === -1) {
+        showToast('❌ Format gambar tidak didukung. Gunakan JPG, PNG, atau WEBP.');
+        fileInput.value = '';
+        return;
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        showToast('❌ Ukuran gambar melebihi batas maksimal 20MB.');
+        fileInput.value = '';
+        return;
+      }
+
+      _bpSelectedFile = file;
+
+      XentraCropEditor.open({
+        source: file,
+        assetType: 'product',
+        aspectRatio: 1.0,
+        title: 'Potong & Posisikan Foto Cabang (1:1)',
+        onConfirm: function (cropSpec, previewDataUrl) {
+          _bpCropSpec = cropSpec;
+          var previewImg = $('override-img-preview');
+          var previewMono = $('override-img-preview-mono');
+          if (previewImg) {
+            previewImg.src = previewDataUrl || URL.createObjectURL(file);
+            previewImg.style.display = 'block';
+          }
+          if (previewMono) previewMono.style.display = 'none';
+          $('override-img-status').textContent = '🟡 OVERRIDE baru (potongan disesuaikan)';
+          showToast('✓ Potongan foto menu cabang disesuaikan.');
+        },
+        onCancel: function () {
+          var reader = new FileReader();
+          reader.onload = function (e) {
+            var previewImg = $('override-img-preview');
+            var previewMono = $('override-img-preview-mono');
+            if (!previewImg) return;
+            previewImg.src = e.target.result;
+            previewImg.style.display = 'block';
+            if (previewMono) previewMono.style.display = 'none';
+            $('override-img-status').textContent = '🟡 OVERRIDE baru (belum disimpan)';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    });
+  })();
+
+  window.openBranchOverrideModal = function (productDataRaw) {
+    var p;
+    try { p = JSON.parse(productDataRaw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'")); } catch (e) { showToast('❌ Gagal membuka override.'); return; }
+    _overrideProductId = p.product_id;
+    _bpSelectedFile = null;
+
+    var modal = $('modal-branch-override');
+    if (!modal) { showToast('❌ Modal override tidak ditemukan di HTML.'); return; }
+
+    // Product heading
+    $('override-product-heading').textContent = 'Edit Menu: ' + (p.master_name || p.name || p.product_id);
+
+    // Name row
+    $('override-name-input').value     = p.name_override != null ? p.name_override : '';
+    $('override-name-master').textContent = p.master_name || '(tidak ada)';
+    $('override-name-status').textContent  = p.name_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
+
+    // Description row
+    $('override-desc-input').value     = p.description_override != null ? p.description_override : '';
+    $('override-desc-master').textContent = p.master_description || '(tidak ada)';
+    $('override-desc-status').textContent  = p.description_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
+
+    // Photo row — live override URL preview'd from the catalog payload
+    var imgInput = $('override-img-file');
+    if (imgInput) imgInput.value = '';
+    var hasImg = p.image_url || p.image_override || p.master_image_url;
+    var previewImg = $('override-img-preview');
+    var previewMono = $('override-img-preview-mono');
+    if (hasImg) {
+      previewImg.src = p.image_url || p.master_image_url;
+      previewImg.style.display = 'block';
+      previewMono.style.display = 'none';
+    } else {
+      previewImg.style.display = 'none';
+      previewMono.style.display = 'block';
+      previewMono.textContent = (p.name || p.master_name || '?').trim().slice(0, 1).toUpperCase();
+    }
+    $('override-img-status').textContent = p.image_override ? '🟡 OVERRIDE aktif' : '🟢 DEFAULT (ikut Master)';
+
+    // Price row — pricing policy drives editability (same UX as adopt modal)
+    var isRange = String(p.pricing_mode).toLowerCase() === 'range';
+    var priceInput = $('override-price-input');
+    var priceHint = $('override-price-hint');
+    if (isRange) {
+      priceInput.readOnly = false;
+      priceInput.value = p.price != null ? p.price : (p.master_price != null ? p.master_price : '');
+      priceInput.min = p.min_price != null ? p.min_price : p.master_price;
+      priceInput.max = p.max_price != null ? p.max_price : p.master_price;
+      priceHint.innerHTML = '💡 <strong>Range Harga Fleksibel:</strong> Cabang diizinkan menentukan harga antara <strong>' + formatMoney(p.min_price) + '</strong> s/d <strong>' + formatMoney(p.max_price) + '</strong>.';
+    } else {
+      priceInput.readOnly = true;
+      priceInput.value = p.price != null ? p.price : (p.master_price != null ? p.master_price : '');
+      priceHint.innerHTML = '🔒 <strong>Harga Terkunci:</strong> Ditetapkan paten oleh Pemilik Resto (Owner) sebesar <strong>' + formatMoney(p.master_price) + '</strong>.';
+    }
+
+    // Category row — branch categories of the currently managed branch
+    var cats = (currentBranchCatalogData && currentBranchCatalogData.categories) || (bmMenuState && bmMenuState.categories) || [];
+    var catSelect = $('override-category-select');
+    if (catSelect) {
+      var catOptions = cats.map(function (c) {
+        return '<option value="' + c.id + '"' + (String(p.branch_category_id) === String(c.id) ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+      });
+      catOptions.unshift('<option value="">Tanpa Kategori</option>');
+      catSelect.innerHTML = catOptions.join('');
+    }
+
+    // M:N Category Checkbox List (Phase 3)
+    var catListEl = $('override-categories-list');
+    if (catListEl) {
+      var activeCatIds = Array.isArray(p.category_ids) && p.category_ids.length > 0
+        ? p.category_ids.map(String)
+        : (p.branch_category_id ? [String(p.branch_category_id)] : []);
+      if (!cats.length) {
+        catListEl.innerHTML = '<span class="text-muted" style="font-size:12px; grid-column:1/-1; padding:12px 0;">Belum ada kategori cabang dibuat. Buat kategori terlebih dahulu di tab Kategori Cabang.</span>';
+      } else {
+        catListEl.innerHTML = cats.map(function (c) {
+          var isChecked = activeCatIds.indexOf(String(c.id)) !== -1;
+          return '<label class="x-category-chip-card' + (isChecked ? ' is-checked' : '') + '">' +
+            '<input type="checkbox" class="override-cat-checkbox" value="' + esc(c.id) + '"' + (isChecked ? ' checked' : '') + ' onchange="this.closest(\'.x-category-chip-card\').classList.toggle(\'is-checked\', this.checked)" />' +
+            '<span title="' + esc(c.name) + '">' + esc(c.name) + '</span>' +
+          '</label>';
+        }).join('');
+      }
+    }
+
+    modal.style.display = 'flex';
+  };
+
+  window.closeBranchOverrideModal = function () {
+    var modal = $('modal-branch-override');
+    if (modal) modal.style.display = 'none';
+    _overrideProductId = null;
+    _bpSelectedFile = null;
+  };
+
+  window.saveBranchProductOverride = async function () {
+    if (!currentManagingBranchId || !_overrideProductId) return;
+    var btn = $('btn-save-override');
+    btn.disabled = true;
+    btn.textContent = 'Menyimpan...';
+
+    // Empty string = user wants to clear the override (send null)
+    var nameVal = $('override-name-input').value;
+    var descVal = $('override-desc-input').value;
+
+    var payload = {};
+    payload.name        = nameVal.trim()  !== '' ? nameVal.trim()  : null;
+    payload.description = descVal.trim()  !== '' ? descVal.trim()  : null;
+
+    // price — lock mode is readonly (input disabled); range mode always sent so
+    // the server re-validates against the locked PricingPolicyModel.
+    var pricingMode = String($('override-price-input').readOnly ? 'lock' : 'range').toLowerCase();
+    if (pricingMode === 'range') {
+      payload.price = Number($('override-price-input').value);
+    }
+
+    // category — collect M:N checkboxes if present, otherwise fallback to select
+    var catListEl = $('override-categories-list');
+    if (catListEl && catListEl.querySelectorAll('.override-cat-checkbox').length > 0) {
+      var checkedCbs = catListEl.querySelectorAll('.override-cat-checkbox:checked');
+      var checkedIds = Array.from(checkedCbs).map(function (cb) { return cb.value; });
+      payload.category_ids = checkedIds;
+      payload.branch_category_id = checkedIds.length > 0 ? checkedIds[0] : null;
+    } else {
+      var catVal = $('override-category-select') ? $('override-category-select').value : '';
+      payload.branch_category_id = catVal !== '' ? catVal : null;
+      if (catVal !== '') payload.category_ids = [catVal];
+    }
+
+    try {
+      // 1. Staged photo (if any) — upload first, server returns the override URL.
+      if (_bpSelectedFile) {
+        var base64 = await new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve(reader.result); };
+          reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
+          reader.readAsDataURL(_bpSelectedFile);
+        });
+
+        var branchImgPayload = { image_base64: base64, mime_type: _bpSelectedFile.type };
+        if (_bpCropSpec) {
+          branchImgPayload.crop_spec = _bpCropSpec;
+        }
+
+        var imgRes = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/image', {
+          method: 'POST',
+                    body: JSON.stringify(branchImgPayload)
+        });
+        var imgData = {};
+        try {
+          imgData = await imgRes.json();
+        } catch (_) {
+          imgData = { success: false, error: 'Respon server tidak valid saat mengunggah gambar.' };
+        }
+        if (!imgRes.ok || !imgData.success) {
+          showToast('❌ ' + (imgData.error || imgData.message || 'Gagal mengunggah gambar.'));
+          return;
+        }
+      }
+
+      // 2. Text + price + category overrides
+      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
+        method: 'PATCH',
+                body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('✅ Perubahan menu cabang berhasil disimpan!');
+        window.closeBranchOverrideModal();
+        reloadBranchCatalogView();
+      } else {
+        showToast('❌ ' + (data.message || data.error || 'Gagal menyimpan perubahan.'));
+      }
+    } catch (err) {
+      showToast('❌ Kesalahan jaringan saat menyimpan perubahan.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Simpan';
+    }
+  };
+
+  window.clearBranchProductOverride = async function () {
+    if (!currentManagingBranchId || !_overrideProductId) return;
+    if (!confirm('Kembalikan semua nilai ke Master? Nama, deskripsi, foto, harga, dan kategori dikembalikan ke pengaturan asal produk Master.')) return;
+    var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
+      method: 'PATCH',       body: JSON.stringify({ name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] })
+    });
+    var data = await res.json();
+    if (data.success) {
+      showToast('✅ Semua nilai dikembalikan ke Master.');
+      window.closeBranchOverrideModal();
+      reloadBranchCatalogView();
+    } else {
+      showToast('❌ ' + (data.error || 'Gagal menghapus override.'));
+    }
+  };
+
+  window.promptAddBranchCategory = async function () {
+    if (!currentManagingBranchId) return;
+    var name = prompt('Nama Kategori Baru untuk Cabang ini:');
+    if (!name || !name.trim()) return;
+
+    try {
+      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/categories', {
+        method: 'POST',
                 body: JSON.stringify({ name: name.trim() })
       });
       var data = await res.json();
@@ -345,16 +603,6 @@
 
   var branchCatalogFilter = 'all'; // active branch category filter ('all' or catId)
 
-  function getActiveBranchId() {
-    if (currentManagingBranchId) return currentManagingBranchId;
-    if (currentBranchCatalogData && currentBranchCatalogData.branch && currentBranchCatalogData.branch.id) {
-      return currentBranchCatalogData.branch.id;
-    }
-    if (_bceCurrentCat && _bceCurrentCat.branch_id) {
-      return _bceCurrentCat.branch_id;
-    }
-    var user = getStoredUser();
-    if (user && user.branch_id) return user.branch_id;
   window.XentraOwnerBranchCatalog = {
     state: {
       get branchId() { return currentManagingBranchId; },
@@ -362,7 +610,11 @@
       get catalogData() { return currentBranchCatalogData; },
       set catalogData(v) { currentBranchCatalogData = v; }
     },
-    getActiveBranchId: getActiveBranchId,
+    getActiveBranchId: function () {
+      return currentManagingBranchId ||
+        (currentBranchCatalogData && currentBranchCatalogData.branch && currentBranchCatalogData.branch.id) ||
+        null;
+    },
     setHooks: function (h) {
       if (!h) return;
       Object.keys(h).forEach(function (k) { if (Object.prototype.hasOwnProperty.call(hooks, k)) hooks[k] = h[k]; });
