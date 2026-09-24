@@ -46,8 +46,7 @@
     if (availableContainer) availableContainer.innerHTML = '<p class="text-muted" style="font-size:13px;">Memuat produk rekomendasi Owner...</p>';
 
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/catalog', {
-              });
+      var res = await CatalogClient.getBranchCatalog(currentManagingBranchId);
       var data = await res.json();
       if (!data.success) {
         showToast('❌ ' + (data.error || 'Gagal memuat katalog cabang.'));
@@ -174,10 +173,7 @@
   window.toggleBranchProductAvailability = async function (productId, nextAvail) {
     if (!currentManagingBranchId) return;
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
-        method: 'PATCH',
-                body: JSON.stringify({ is_available: nextAvail })
-      });
+      var res = await CatalogClient.setBranchProductAvailability(currentManagingBranchId, productId, nextAvail);
       var data = await res.json();
       if (data.success) {
         showToast('Ketersediaan menu cabang diperbarui.');
@@ -195,9 +191,7 @@
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.')) return;
 
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + productId, {
-        method: 'DELETE',
-              });
+      var res = await CatalogClient.removeBranchProduct(currentManagingBranchId, productId);
       var data = await res.json();
       if (data.success) {
         showToast('✅ Produk dihapus dari katalog cabang.');
@@ -417,10 +411,7 @@
           branchImgPayload.crop_spec = _bpCropSpec;
         }
 
-        var imgRes = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/image', {
-          method: 'POST',
-                    body: JSON.stringify(branchImgPayload)
-        });
+        var imgRes = await CatalogClient.uploadBranchProductImage(currentManagingBranchId, _overrideProductId, branchImgPayload);
         var imgData = {};
         try {
           imgData = await imgRes.json();
@@ -434,10 +425,7 @@
       }
 
       // 2. Text + price + category overrides
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
-        method: 'PATCH',
-                body: JSON.stringify(payload)
-      });
+      var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, payload);
       var data = await res.json();
       if (data.success) {
         showToast('✅ Perubahan menu cabang berhasil disimpan!');
@@ -457,9 +445,7 @@
   window.clearBranchProductOverride = async function () {
     if (!currentManagingBranchId || !_overrideProductId) return;
     if (!confirm('Kembalikan semua nilai ke Master? Nama, deskripsi, foto, harga, dan kategori dikembalikan ke pengaturan asal produk Master.')) return;
-    var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/products/' + _overrideProductId + '/override', {
-      method: 'PATCH',       body: JSON.stringify({ name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] })
-    });
+    var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, { name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] });
     var data = await res.json();
     if (data.success) {
       showToast('✅ Semua nilai dikembalikan ke Master.');
@@ -476,10 +462,7 @@
     if (!name || !name.trim()) return;
 
     try {
-      var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/categories', {
-        method: 'POST',
-                body: JSON.stringify({ name: name.trim() })
-      });
+      var res = await CatalogClient.createBranchCategory(currentManagingBranchId, { name: name.trim() });
       var data = await res.json();
       if (data.success) {
         showToast('✅ Kategori cabang berhasil dibuat!');
@@ -566,14 +549,11 @@
       var priceVal = Number($('adopt-price').value);
 
       try {
-        var res = await CatalogClient.request( '/admin/branches/' + currentManagingBranchId + '/adopt', {
-          method: 'POST',
-                    body: JSON.stringify({
+        var res = await CatalogClient.adoptProduct(currentManagingBranchId, {
             product_id: prodId,
             branch_category_id: catId || undefined,
             price: priceVal
-          })
-        });
+          });
         var data = await res.json();
         if (data.success) {
           showToast('✅ Menu berhasil diadopsi ke cabang!');
