@@ -151,6 +151,7 @@ test('successful reservation check-in creates the dining session and converts th
   assert.equal(table.current_session_id, order.dining_session_id);
 
   DiningTableService.completeDiningSession(order.dining_session_id);
+});
 
 test('reservation no-show cannot cancel before scheduled time plus grace period', () => {
   const id = 'ord_res_no_show_guard_' + Date.now();
@@ -187,7 +188,7 @@ test('checked-in reservation cannot be cancelled as no-show', () => {
     ) VALUES (?, ?, ?, ?, 'Checked In Guard', '081900001112',
               'dine_in', 'staff', 0, 0, 0,
               'cash', 'active_table', ?, ?, ?)
-  `).run(id, 'RES-CHECKED-IN-GUARD-' + id, BRANCH_A, BRANCH_A, now, now, now);
+  `).run(id, 'RES-CHECKED-IN-GUARD-' + id, BRAND_ID, BRANCH_A, now, now, now);
 
   assert.throws(
     () => DiningTableService.cancelNoShowReservation({ reservation_order_id: id }),
