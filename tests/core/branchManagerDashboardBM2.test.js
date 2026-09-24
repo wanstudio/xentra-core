@@ -38,7 +38,7 @@ process.env.JWT_SECRET = 'test-secret-bm2-orders-and-tables';
 
 const app = require('../../server/app');
 const db = require('../../server/database/db');
-const { DiningTableService } = require('../../domains/pos');
+const { DiningTableService } = require('../../domains/dining');
 
 let server;
 let baseUrl;
