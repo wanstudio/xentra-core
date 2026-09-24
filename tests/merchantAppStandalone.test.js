@@ -114,6 +114,30 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(js.includes('/branch-acceptance'), 'ACCEPT goes through the dedicated branch-acceptance endpoint');
   });
 
+  await t.test('6. reservation orders have dedicated filter/data/actions in Merchant App', () => {
+    const html = fs.readFileSync(HTML_PATH, 'utf8');
+    const js = fs.readFileSync(JS_PATH, 'utf8');
+
+    assert.ok(html.includes('<option value="reservation">Reservasi</option>'),
+      'order type filter must expose Reservation');
+
+    assert.ok(js.includes('RESERVASI'), 'reservation must not be rendered as pickup');
+    assert.ok(js.includes('reservationGuests'), 'reservation guest count must be rendered');
+    assert.ok(js.includes('reservationInfo'), 'reservation date/time summary must be rendered');
+    assert.ok(js.includes('/pos/reservations/'),
+      'Merchant App must call the reservation operational API');
+    assert.ok(js.includes('checkInBMReservation'),
+      'Merchant App must expose reservation check-in action');
+    assert.ok(js.includes('noShowBMReservation'),
+      'Merchant App must expose reservation no-show action');
+    assert.ok(js.includes('bm-detail-reservation-datetime'),
+      'detail view must expose reservation schedule');
+    assert.ok(js.includes('bm-detail-reservation-guests'),
+      'detail view must expose guest count');
+    assert.ok(/Reservasi\\s*\\(\\s*\\(\\d\+\\)\\s*Tamu/i.test(js) === false,
+      'guest count parser must not contain an invalid double-escaped regex');
+  });
+
   await t.test('5. tombol keluar di header benar-benar mengeluarkan pengguna', async () => {
     const html = fs.readFileSync(HTML_PATH, 'utf8');
     const dom = new JSDOM(html, {
