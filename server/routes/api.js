@@ -6324,19 +6324,6 @@ const corePromotionRepo = new CorePromotionRepo();
 registerPaymentConfigRoutes(router, { corePaymentRepo });
 
 // Promotion audit helper and management routes are isolated in server/routes/admin-marketing-promotions.js.
-) {
-  try {
-    const id = 'sal_' + crypto.randomBytes(16).toString('hex');
-    const safeMetadata = metadata ? JSON.stringify(metadata) : null;
-    db.prepare(`
-      INSERT INTO security_audit_log (id, actor_id, actor_role, action, target_user_id, target_role, brand_id, organization_id, branch_id, result, metadata, created_at)
-      VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, datetime('now'))
-    `).run(id, actor_id || null, actor_role || null, action, brand_id || null, organization_id || null, branch_id || null, result, safeMetadata);
-  } catch (e) {
-    console.warn('[Promotion Audit Log Error]:', e.message);
-  }
-}
-
 // 1. Finance Overview API
 router.get('/admin/finance/overview', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
