@@ -658,8 +658,9 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
     win.Xentra.OrderReceived.mount(container, ord.orderId);
     await new Promise(r => setTimeout(r, 20));
 
-    assert.ok(container.innerHTML.includes('Pesanan Diterima Cabang!'));
-    assert.ok(container.innerHTML.includes('Status Alur Pesanan'));
+    assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Must render unified tracking screen');
+    assert.ok(container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must display accepted phase title');
+    assert.ok(container.innerHTML.includes('id="x-order-progress"'), 'Must render tracking progress');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -735,7 +736,8 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
     win.Xentra.OrderReceived.mount(container, ord.orderId);
     await new Promise(r => setTimeout(r, 20));
 
-    assert.ok(container.innerHTML.includes('Pesanan Diterima Cabang!'));
+    assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Must render unified tracking screen after refresh');
+    assert.ok(container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must preserve accepted phase after refresh');
     win.Xentra.OrderReceived.unmount();
   });
 
