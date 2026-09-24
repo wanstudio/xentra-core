@@ -158,6 +158,129 @@ class OrderPlacementService {
       };
     }
 
+    let effectiveDiningSessionId = dining_session_id || null;
+    let resolvedTableNumber = table_number || null;
+    let resolvedTableIds = Array.isArray(table_ids) ? [...table_ids] : [];
+
+    if (effectiveOrderType === 'dine_in') {
+      const { DiningTableRepository } = require('../../../core/data/repositories');
+      const diningTableRepo = new DiningTableRepository();
+
+      if (resolvedTableIds.length === 0 && resolvedTableNumber) {
+        const tbl = diningTableRepo.findTableIdByNumberOrLabel(branch_id, resolvedTableNumber);
+        if (tbl) resolvedTableIds.push(tbl.id);
+      }
+
+      if (resolvedTableIds.length === 0 && !resolvedTableNumber) {
+        return {
+          success: false,
+          status: 'TABLE_REQUIRED',
+          errors: ['Meja (table_number atau table_ids) wajib disertakan untuk pesanan dine-in.']
+        };
+      }
+
+      // Validate that all resolved tables exist and belong to branch_id
+      for (const tid of resolvedTableIds) {
+        const tRow = diningTableRepo.findTableForBranch(tid, branch_id);
+        if (!tRow || !tRow.is_active) {
+          return {
+            success: false,
+            status: 'BRANCH_TABLE_MISMATCH',
+            errors: [`Meja "${tid}" tidak ditemukan atau tidak aktif pada cabang ini.`]
+          };
+        }
+        if (!resolvedTableNumber) {
+          resolvedTableNumber = tRow.table_number;
+        }
+      }
+
+      if (resolvedTableNumber && resolvedTableIds.length === 0) {
+        return {
+          success: false,
+          status: 'BRANCH_TABLE_MISMATCH',
+          errors: [`Meja "${resolvedTableNumber}" tidak ditemukan pada cabang ini.`]
+        };
+      }
+
+      const authenticatedCustomerPhone = customer?.phone ? String(customer.phone).trim() : null;
+
+      // 1. If caller supplied an explicit dining_session_id
+      if (effectiveDiningSessionId) {
+        const session = diningTableRepo.findDiningSession(effectiveDiningSessionId);
+        if (!session) {
+          return {
+            success: false,
+            status: 'SESSION_NOT_FOUND',
+            errors: [`Sesi meja "${effectiveDiningSessionId}" tidak ditemukan.`]
+          };
+        }
+        if (session.branch_id !== branch_id) {
+          return {
+            success: false,
+            status: 'BRANCH_SESSION_MISMATCH',
+            errors: [`Sesi meja "${effectiveDiningSessionId}" bukan milik cabang ini.`]
+          };
+        }
+        if (session.status !== 'active') {
+          return {
+            success: false,
+            status: 'COMPLETED_SESSION_REUSE_REJECTED',
+            errors: [`Sesi meja "${effectiveDiningSessionId}" sudah ditutup (${session.status}) dan tidak dapat digunakan kembali.`]
+          };
+        }
+        if (order_channel === 'customer_app' && session.customer_phone && authenticatedCustomerPhone && session.customer_phone !== authenticatedCustomerPhone) {
+          return {
+            success: false,
+            status: 'UNAUTHORIZED_SESSION_ACCESS',
+            errors: ['Sesi meja ini milik pelanggan lain. Anda tidak dapat bergabung atau membuat pesanan pada sesi ini.']
+          };
+        }
+        const sessTables = diningTableRepo.findSessionTables(session.id).map(r => r.table_id);
+        if (resolvedTableIds.length > 0) {
+          const mismatch = resolvedTableIds.some(tid => !sessTables.includes(tid));
+          if (mismatch) {
+            return {
+              success: false,
+              status: 'TABLE_SESSION_MISMATCH',
+              errors: ['Meja yang dipesan tidak sesuai dengan meja pada sesi aktif ini.']
+            };
+          }
+        }
+      } else if (order_channel === 'customer_app' && authenticatedCustomerPhone) {
+        // 2. No explicit session_id: check if customer already has an active session at branch_id
+        const existingSession = diningTableRepo.findActiveSessionByCustomer(branch_id, authenticatedCustomerPhone);
+        if (existingSession) {
+          const sessTables = diningTableRepo.findSessionTables(existingSession.id).map(r => r.table_id);
+          if (resolvedTableIds.length > 0) {
+            const isSelfTransfer = resolvedTableIds.some(tid => !sessTables.includes(tid));
+            if (isSelfTransfer) {
+              return {
+                success: false,
+                status: 'CUSTOMER_TABLE_TRANSFER_FORBIDDEN',
+                errors: ['Anda sudah memiliki sesi aktif di meja lain pada cabang ini. Pelanggan tidak diizinkan memindahkan meja sendiri. Silakan hubungi kasir/staf untuk pindah meja.']
+              };
+            }
+          }
+          effectiveDiningSessionId = existingSession.id;
+        } else {
+          // 3. Customer has no active session yet. Verify table is not occupied by another customer
+          for (const tid of resolvedTableIds) {
+            const occ = diningTableRepo.findCurrentSessionForTable(tid);
+            if (occ && occ.operational_state === 'occupied' && occ.current_session_id) {
+              const activeSess = diningTableRepo.findDiningSessionById(occ.current_session_id);
+              if (activeSess && activeSess.status === 'active' && activeSess.customer_phone !== authenticatedCustomerPhone) {
+                return {
+                  success: false,
+                  status: 'TABLE_ALREADY_OCCUPIED',
+                  errors: ['Meja sedang digunakan oleh pelanggan lain.']
+                };
+              }
+            }
+          }
+        }
+      }
+    }
+
     const { PaymentGatewayService } = require('../../payment');
     const paymentValidation = PaymentGatewayService.validatePaymentMethod(payment_method, { branch_id, brand_id });
     if (!paymentValidation.valid) {
@@ -216,7 +339,7 @@ class OrderPlacementService {
         orderType: effectiveOrderType,
         orderChannel: order_channel,
         selectionMode: selection_mode || 'CUSTOMER_SELECTED',
-        tableNumber: table_number,
+        tableNumber: resolvedTableNumber,
         fulfillmentScheduleType: fulfillment_schedule_type,
         scheduledSlotStart: scheduled_slot_start,
         scheduledSlotEnd: scheduled_slot_end,
@@ -227,7 +350,7 @@ class OrderPlacementService {
         paymentMethod: effectivePaymentMethod,
         status: insertedStatus,
         orderNote: notes,
-        diningSessionId: dining_session_id || null,
+        diningSessionId: effectiveDiningSessionId,
         cashTendered: (effectivePaymentMethod === 'cash' && cash_tendered !== null && cash_tendered !== undefined) ? Number(cash_tendered) : null,
         createdAt: now,
         updatedAt: now
@@ -389,7 +512,7 @@ class OrderPlacementService {
     return {
       success: true,
       status: 'VERIFIED',
-      order: { id: orderId, order_number: orderNumber, brand_id, branch_id, order_type: effectiveOrderType, order_channel, table_number, reservation_date, guest_count, subtotal, delivery_fee, grand_total: grandTotal, payment_method: effectivePaymentMethod, cash_tendered: (effectivePaymentMethod === 'cash' && cash_tendered !== null && cash_tendered !== undefined) ? Number(cash_tendered) : null, status: insertedStatus, items: verifiedItems, created_at: now }
+      order: { id: orderId, order_number: orderNumber, brand_id, branch_id, order_type: effectiveOrderType, order_channel, table_number: resolvedTableNumber, dining_session_id: effectiveDiningSessionId, reservation_date, guest_count, subtotal, delivery_fee, grand_total: grandTotal, payment_method: effectivePaymentMethod, cash_tendered: (effectivePaymentMethod === 'cash' && cash_tendered !== null && cash_tendered !== undefined) ? Number(cash_tendered) : null, status: insertedStatus, items: verifiedItems, created_at: now }
     };
   }
 

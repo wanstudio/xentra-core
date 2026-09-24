@@ -61,12 +61,22 @@ class DiningTableRepository {
 
   findTableForBranch(tableId, branchId) {
     return this.db.queryOne(`
-      SELECT t.id, t.table_number, t.is_active,
-             COALESCE(s.operational_state, 'available') as operational_state
+      SELECT t.id, t.branch_id, t.table_number, t.label, t.is_active,
+             COALESCE(s.operational_state, 'available') as operational_state,
+             s.current_session_id
       FROM branch_tables t
       LEFT JOIN branch_table_states s ON s.table_id = t.id
       WHERE t.id = ? AND t.branch_id = ?
     `, [tableId, branchId]);
+  }
+
+  findActiveSessionByCustomer(branchId, customerPhone) {
+    if (!branchId || !customerPhone) return null;
+    return this.db.queryOne(`
+      SELECT * FROM dining_sessions
+      WHERE branch_id = ? AND customer_phone = ? AND status = 'active'
+      ORDER BY opened_at DESC LIMIT 1
+    `, [branchId, customerPhone]);
   }
 
   findActiveHolds(referenceId) {
@@ -243,7 +253,7 @@ class DiningTableRepository {
 
   findDiningSessionById(sessionId) {
     return this.db.queryOne(
-      "SELECT id, status, customer_phone, branch_id FROM dining_sessions WHERE id = ? AND status = 'active'",
+      "SELECT id, status, customer_name, customer_phone, branch_id, channel, opened_at FROM dining_sessions WHERE id = ? AND status = 'active'",
       [sessionId]
     );
   }

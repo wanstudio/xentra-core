@@ -2169,6 +2169,8 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
       order_type,
       selection_mode,
       table_number,
+      table_ids: tableIdsToHold,
+      dining_session_id: req.body.dining_session_id || req.body.sessionId || null,
       reservation_date,
       guest_count,
       pwa_runtime,
@@ -2215,7 +2217,8 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
             customer_phone: customer.phone,
             guest_count: guest_count || 1,
             hold_reference_id: null,
-            channel: 'customer_app'
+            channel: 'customer_app',
+            session_id: order.dining_session_id || null
           });
         }
       } catch (tblHoldErr) {
@@ -11953,7 +11956,8 @@ router.post('/dine-in/sessions/:id/reassign-tables', requireAuth(['owner', 'bran
     const { table_ids } = req.body;
     const result = DiningTableService.reassignSessionTables({
       session_id: req.params.id,
-      new_table_ids: table_ids
+      new_table_ids: table_ids,
+      actor: req.user
     });
     res.json({ success: true, ...result });
   } catch (err) {

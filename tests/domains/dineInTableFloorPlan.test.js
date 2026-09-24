@@ -195,7 +195,8 @@ test('Dine-In Table Floor Plan & DiningTableService Invariants', async (t) => {
 
     DiningTableService.reassignSessionTables({
       session_id: sessionRes.session_id,
-      new_table_ids: [table5.id]
+      new_table_ids: [table5.id],
+      actor: { role: 'branch_manager', branch_id: branchId }
     });
     state = DiningTableService.getBranchLayout(branchId);
     t4 = state.tables.find(t => t.id === table4.id);

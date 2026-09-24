@@ -61,7 +61,7 @@ function openBill(tableId, customerName) {
     branch_id: BRANCH,
     table_ids: [tableId],
     customer_name: customerName,
-    customer_phone: '08120000009',
+    customer_phone: customerName === 'Budi' ? '08129999999' : '08120000009',
     guest_count: 2
   });
   if (result && result.session_id) createdSessions.push(result.session_id);
