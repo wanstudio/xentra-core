@@ -7,7 +7,7 @@
 'use strict';
 
 const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
-const { DiningTableService } = require('../../domains/pos');
+const { DiningTableService } = require('../../domains/dining');
 const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
 
 module.exports = function registerCheckoutRoutes(router, deps) {
@@ -438,7 +438,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     // 3. Dine-in Table Validation and Concurrency Hold
     let tableIdsToHold = [];
     if (order_type === 'dine_in') {
-      const { DiningTableService } = require('../../domains/pos');
+      const { DiningTableService } = require('../../domains/dining');
       let reqTableIds = [];
       if (req.body.table_id) {
         reqTableIds.push(req.body.table_id);
@@ -596,7 +596,7 @@ router.post(['/checkout/create-order', '/checkout/submit'], async (req, res) => 
     // Both Cash and Online hold the table pending merchant acceptance or payment.
     // If the customer already has an active session, order is already linked to it.
     if (order_type === 'dine_in' && tableIdsToHold.length > 0 && !order.dining_session_id) {
-      const { DiningTableService } = require('../../domains/pos');
+      const { DiningTableService } = require('../../domains/dining');
       try {
         DiningTableService.holdTablesForPayment({
           branch_id: branch.id,
