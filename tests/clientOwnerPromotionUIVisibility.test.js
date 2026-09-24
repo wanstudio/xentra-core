@@ -11,6 +11,7 @@ const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashb
 const MERCHANT_APP_HTML_PATH = path.join(__dirname, '../apps/merchant-app/index.html');
 const MERCHANT_APP_JS_PATH = path.join(__dirname, '../apps/merchant-app/assets/js/merchant-app.js');
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
+const CATALOG_CLIENT_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/catalog-client.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-app/assets/js/branch-catalog-ui.js');
 
 test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Lifecycle', async (t) => {
@@ -199,6 +200,7 @@ test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Li
     win.fetch = async () => ({ ok: true, status: 200, json: async () => ({ success: true, data: {} }), text: async () => '{}' });
 
     win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(CATALOG_CLIENT_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(MERCHANT_APP_JS_PATH, 'utf8'));
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
