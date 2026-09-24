@@ -62,6 +62,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     win.eval(fs.readFileSync(SHARED_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(HARI_INI_JS_PATH, 'utf8'));
+    win.eval(fs.readFileSync(JAM_OPERASIONAL_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(ORDER_JS_PATH, 'utf8'));
     win.eval(fs.readFileSync(JS_PATH, 'utf8'));
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
@@ -106,6 +107,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(html.includes('/merchant-shared/js/shared.js'), 'must load shared.js');
     assert.ok(html.includes('/merchant-shared/js/branch-catalog.js'), 'must load branch-catalog.js');
     assert.ok(html.includes('/merchant-app/assets/js/hari-ini.js'), 'must load hari-ini.js');
+    assert.ok(html.includes('/merchant-app/assets/js/jam-operasional.js'), 'must load jam-operasional.js');
     assert.ok(html.includes('/merchant-app/assets/js/orders.js'), 'must load orders.js');
     assert.ok(html.includes('/merchant-app/assets/js/merchant-app.js'), 'must load merchant-app.js');
   });
