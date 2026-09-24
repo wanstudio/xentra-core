@@ -37,6 +37,12 @@ describe('POS ↔ Merchant App surface boundary', () => {
     assert.ok(auth.includes("case 'cashier':\n        // Cashier owns the transaction-execution surface; management stays in Merchant App.\n        return '/pos/';"));
   });
 
+  it('prevents operational roles from using the Owner Dashboard as a fallback surface', () => {
+    const dashboard = read('apps/merchant-dashboard/assets/js/dashboard.js');
+    assert.ok(dashboard.includes("var enforceSurface = _shared.enforceSurface || window.XentraShared.enforceSurface;"));
+    assert.ok(dashboard.includes("enforceSurface(['/owner/', '/dashboard/', '/dashboard']);"));
+  });
+
   it('serves the standalone POS surface', () => {
     const app = read('server/app.js');
     assert.ok(app.includes("app.use('/pos/assets'"));
