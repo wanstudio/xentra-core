@@ -4376,19 +4376,27 @@ router.post('/auth/resend-verification', async (req, res) => {
 
 // GET /auth/merchant/me: Authenticated operator/merchant profile
 router.get('/auth/merchant/me', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
+  const brand = req.brand || null;
+  const userId = req.user.id || req.user.userId;
+  const brandId = req.user.brandId || req.user.brand_id || req.brand_id || null;
+  const branchId = req.user.branchId || req.user.branch_id || null;
+  const organizationId = req.user.organizationId || req.user.organization_id || null;
+
   res.json({
     success: true,
     user: {
-      id: req.user.id || req.user.userId,
+      id: userId,
       username: req.user.username,
       email: req.user.email,
-      full_name: req.user.full_name,
+      full_name: req.user.full_name || req.user.fullName,
       role: req.user.role,
-      brand_id: req.user.brandId || req.user.brand_id,
-      organization_id: req.user.organizationId || req.user.organization_id,
-      branch_id: req.user.branchId || req.user.branch_id,
-      email_verified: req.user.email_verified
+      brand_id: brandId,
+      organization_id: organizationId,
+      branch_id: branchId,
+      email_verified: req.user.email_verified !== undefined ? req.user.email_verified : true,
+      brand_name: brand ? brand.name : null
     },
+    brand: serializePublicBrand(brand),
     ...landingPayload(req.user.role)
   });
 });
@@ -6259,23 +6267,6 @@ function serializePublicBrand(brand) {
   };
 }
 
-// P1 SECURE ME ENDPOINT: Strictly verifies Bearer token session and sanitizes brand DTO (FINDING 10)
-router.get('/auth/merchant/me', requireAuth(), (req, res) => {
-  res.json({
-    success: true,
-    user: {
-      id: req.user.userId,
-      username: req.user.username,
-      email: req.user.email,
-      full_name: req.user.fullName,
-      role: req.user.role,
-      branch_id: req.user.branchId || null,
-      email_verified: req.user.email_verified !== undefined ? req.user.email_verified : true,
-      brand_name: req.brand ? req.brand.name : 'Bangjo Resto'
-    },
-    brand: serializePublicBrand(req.brand)
-  });
-});
 
 
 
