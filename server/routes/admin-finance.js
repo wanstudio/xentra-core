@@ -7,10 +7,12 @@
 module.exports = function registerAdminFinanceRoutes(router, deps) {
   const {
     requireAuth,
-    ReportingEngine,
-    overviewReportingRepo,
     corePaymentRepo
   } = deps;
+
+  const { ReportingEngine } = require('../../domains/reporting');
+  const { ReportingRepository } = require('../../core/data/repositories');
+  const overviewReportingRepo = new ReportingRepository();
 
 router.get('/admin/finance/overview', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
