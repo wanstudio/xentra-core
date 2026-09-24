@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#111827">
+  <title>Xentra POS — Kasir</title>
+  <link rel="stylesheet" href="/pos/assets/css/pos.css?v=1.0.0">
+</head>
+<body>
+  <div class="pos-shell">
+    <header class="pos-topbar">
+      <div>
+        <div class="pos-brand">XENTRA POS</div>
+        <div class="pos-context"><span id="pos-branch-name">Memuat cabang…</span> · <span id="pos-cashier-name">Kasir</span></div>
+      </div>
+      <div class="pos-top-actions">
+        <span id="pos-connection-badge" class="pos-status online">ONLINE</span>
+        <button type="button" class="pos-icon-btn" id="btn-pos-logout" title="Keluar">↪</button>
+      </div>
+    </header>
+
+    <main class="pos-main">
+      <section id="pos-view-kasir" class="pos-view active">
+        <div class="pos-sale-layout">
+          <div class="pos-menu-pane">
+            <div class="pos-pane-head">
+              <div>
+                <h1>Kasir</h1>
+                <p>Pilih menu, atur pesanan, lalu selesaikan pembayaran.</p>
+              </div>
+              <button type="button" class="pos-btn ghost" id="btn-pos-refresh-menu">↻</button>
+            </div>
+
+            <div class="pos-order-type" id="pos-order-type">
+              <button class="active" data-type="dine_in">Dine-in</button>
+              <button data-type="pickup">Pickup</button>
+              <button data-type="delivery">Delivery</button>
+            </div>
+
+            <div id="pos-table-context" class="pos-context-strip hidden">
+              <div><strong>Meja</strong><span id="pos-selected-table">Belum dipilih</span></div>
+              <button type="button" class="pos-btn small" id="btn-pos-select-table">Pilih Meja</button>
+            </div>
+
+            <div class="pos-search-row">
+              <input id="pos-menu-search" type="search" autocomplete="off" placeholder="Cari menu…">
+            </div>
+            <div id="pos-category-tabs" class="pos-category-tabs"></div>
+            <div id="pos-product-grid" class="pos-product-grid">
+              <div class="pos-empty">Memuat menu cabang…</div>
+            </div>
+          </div>
+
+          <aside class="pos-cart-pane">
+            <div class="pos-cart-head">
+              <div>
+                <h2>Pesanan</h2>
+                <span id="pos-cart-meta">0 item</span>
+              </div>
+              <div class="pos-cart-actions">
+                <button type="button" class="pos-btn small ghost" id="btn-pos-hold">Tahan</button>
+                <button type="button" class="pos-btn small danger ghost" id="btn-pos-clear">Kosongkan</button>
+              </div>
+            </div>
+            <div id="pos-cart-items" class="pos-cart-items">
+              <div class="pos-empty">Belum ada item.</div>
+            </div>
+            <div class="pos-cart-footer">
+              <div class="pos-note-row">
+                <input id="pos-customer-name" type="text" placeholder="Nama tamu (opsional)">
+              </div>
+              <div class="pos-note-row">
+                <input id="pos-order-note" type="text" placeholder="Catatan order (opsional)">
+              </div>
+              <div class="pos-totals">
+                <div><span>Subtotal</span><strong id="pos-subtotal">Rp0</strong></div>
+                <div class="grand"><span>Total</span><strong id="pos-total">Rp0</strong></div>
+              </div>
+              <button type="button" class="pos-pay-btn" id="btn-pos-pay" disabled>Bayar <span id="pos-pay-total">Rp0</span></button>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="pos-view-transaksi" class="pos-view">
+        <div class="pos-page-head"><h1>Transaksi</h1><p>Riwayat transaksi POS cabang dan akses cetak ulang struk.</p></div>
+        <div class="pos-filter-row"><button type="button" class="pos-btn ghost" id="btn-pos-load-sales">↻ Refresh</button></div>
+        <div id="pos-sales-list" class="pos-list"></div>
+      </section>
+
+      <section id="pos-view-meja" class="pos-view">
+        <div class="pos-page-head"><h1>Meja</h1><p>Konteks transaksi dine-in. POS tidak mengelola layout atau administrasi meja cabang.</p></div>
+        <div id="pos-table-grid" class="pos-table-grid"></div>
+      </section>
+
+      <section id="pos-view-shift" class="pos-view">
+        <div class="pos-page-head"><h1>Shift</h1><p>Kelola shift kasir, uang awal, cash in/out, dan penutupan kas.</p></div>
+        <div id="pos-shift-card" class="pos-shift-card"></div>
+      </section>
+    </main>
+
+    <nav class="pos-bottom-nav">
+      <button type="button" class="active" data-view="kasir"><span>▣</span><b>Kasir</b></button>
+      <button type="button" data-view="transaksi"><span>▤</span><b>Transaksi</b></button>
+      <button type="button" data-view="meja"><span>⌂</span><b>Meja</b></button>
+      <button type="button" data-view="shift"><span>◷</span><b>Shift</b></button>
+    </nav>
+  </div>
+
+  <div id="pos-modal" class="pos-modal hidden">
+    <div class="pos-modal-card" id="pos-modal-card"></div>
+  </div>
+  <div id="pos-toast" class="pos-toast"></div>
+
+  <script src="/pos/assets/js/pos-app.js?v=1.0.0"></script>
+</body>
+</html>
