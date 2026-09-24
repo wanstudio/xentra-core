@@ -17,10 +17,8 @@
     cart: [],
     held: [],
     sales: [],
-    terminalId: localStorage.getItem('xentra_pos_terminal_id') || ('pos_' + Math.random().toString(36).slice(2, 10))
+    terminalId: localStorage.getItem('xentra_pos_terminal_id') || null
   };
-
-  localStorage.setItem('xentra_pos_terminal_id', state.terminalId);
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -150,6 +148,18 @@
     return true;
   }
 
+  async function loadTerminal(){
+    try{
+      var d=await request('/pos/terminal/current',{headers:headers()});
+      state.terminalId=d.terminal ? d.terminal.id : null;
+      if(state.terminalId) localStorage.setItem('xentra_pos_terminal_id',state.terminalId);
+      return !!state.terminalId;
+    }catch(e){
+      state.terminalId=null;
+      return false;
+    }
+  }
+
   async function loadShift(){
     try{
       var d=await request('/pos/shifts/current',{headers:headers()});
@@ -227,7 +237,20 @@
       client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)
     };
     try{
-      var d=await request('/pos/sales',{method:'POST',headers:headers(),body:JSON.stringify(payload)});
+      var d;
+      if(!navigator.onLine){
+        if(!state.terminalId){ toast('POS offline belum siap: terminal cabang belum terdaftar.'); return; }
+        d=await request('/pos/local/sale',{method:'POST',headers:headers(),body:JSON.stringify({
+          terminal_id:state.terminalId, branch_id:state.branchId, shift_id:state.shift.id,
+          order_type:state.orderType, payment_method:'cash', amount_tendered:amountTendered,
+          customer:payload.customer, items:payload.items, client_transaction_id:payload.client_transaction_id,
+          offline_created_at:new Date().toISOString(), config_version:1
+        })});
+        hideModal(); resetSale();
+        toast('Penjualan tersimpan lokal. Akan disinkronkan saat online.');
+        return;
+      }
+      d=await request('/pos/sales',{method:'POST',headers:headers(),body:JSON.stringify(payload)});
       hideModal(); var order=d.order||{}; var change=Number(order.change||0);
       showModal('<h3>Pembayaran Berhasil</h3><p>Sale '+esc(order.order_number||order.id||'')+' selesai.</p><div class="pos-payment-total">'+money(order.grand_total||total())+'</div><div class="pos-change">Kembalian: '+money(change)+'</div><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-sale-close">Selesai</button><button class="pos-btn" id="pos-sale-print">Cetak Struk</button></div>');
       $('pos-sale-close').onclick=function(){hideModal();resetSale();}; $('pos-sale-print').onclick=function(){printReceipt(order.id);};
@@ -316,10 +339,11 @@
     bind();
     try{
       if(!await ensureSession())return;
+      await loadTerminal();
       await loadShift();
       await loadMenu();
       setView('kasir');
-      window.addEventListener('online',function(){setConnection(true);loadMenu();});
+      window.addEventListener('online',function(){setConnection(true);loadTerminal();loadMenu();request('/pos/local/sync-outbox',{method:'POST',headers:headers(),body:JSON.stringify({terminal_id:state.terminalId,branch_id:state.branchId})}).catch(function(){});});
       window.addEventListener('offline',function(){setConnection(false);});
       setConnection(navigator.onLine);
     }catch(e){toast(e.message||'Gagal memuat POS.');}
