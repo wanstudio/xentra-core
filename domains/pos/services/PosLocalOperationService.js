@@ -166,7 +166,8 @@ class PosLocalOperationService {
         unit_price: price,
         quantity: qty,
         subtotal: itemSub,
-        note: it.note || it.notes || ''
+        note: it.note || it.notes || '',
+        options: Array.isArray(it.options) ? it.options : []
       };
     });
 
@@ -235,7 +236,8 @@ class PosLocalOperationService {
           unitPrice: item.unit_price,
           quantity: item.quantity,
           itemSubtotal: item.subtotal,
-          note: item.note
+          note: item.note,
+          modifiersSnapshot: JSON.stringify(item.options || [])
         });
 
         // Deduct local branch stock
