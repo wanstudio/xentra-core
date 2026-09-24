@@ -188,7 +188,7 @@ it('P9-00: operational order lifecycle routes are isolated from api.js', () => {
     assert.equal(moduleSource.includes(pattern), true, pattern + ' must live in operational-orders.js');
   }
 
-  assert.equal((apiSource.match(/registerOperationalOrderRoutes\\(router,/g) || []).length, 1);
+  assert.equal((apiSource.match(/registerOperationalOrderRoutes\(router,/g) || []).length, 1);
 });
 
 describe('Phase 9 — Branch Manager Order Operations', () => {
@@ -241,6 +241,9 @@ describe('Phase 9 — Branch Manager Order Operations', () => {
 
   // P9-01R: Upcoming reservation must survive the API page limit
   it('P9-01R: upcoming confirmed reservation is visible ahead of newer historical order within a limited page', async () => {
+    db.prepare("DELETE FROM order_items WHERE order_id LIKE 'p9_ord_%'").run();
+    db.prepare("DELETE FROM orders WHERE id LIKE 'p9_ord_%'").run();
+
     const reservation = seedOrder({
       branchId: BRANCH_A_ID,
       status: 'confirmed',

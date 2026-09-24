@@ -84,7 +84,7 @@ describe('Workforce Route Boundary', () => {
       assert.equal(workforceSource.includes(route), true, route + ' must live in workforce.js');
     }
 
-    assert.equal((apiSource.match(/registerWorkforceRoutes\\(router,/g) || []).length, 1);
+    assert.equal((apiSource.match(/registerWorkforceRoutes\(router,/g) || []).length, 1);
   });
 });
 

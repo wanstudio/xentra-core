@@ -294,6 +294,35 @@ app.get([/^\/merchant-app(\/.*)?$/, /^\/merchant(\/.*)?$/], async (req, res) => 
   res.sendFile(path.join(__dirname, '../apps/merchant-app/index.html'));
 });
 
+
+// POS App Assets (standalone cashier execution surface)
+app.use('/pos/assets', express.static(path.join(__dirname, '../apps/pos-app/assets'), {
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
+
+// POS App entry point. Cashier is routed here by the unified auth landing resolver.
+app.get([/^\/pos(\/.*)?$/, /^\/pos-app(\/.*)?$/], async (req, res) => {
+  if (!isSaaSHost(req)) {
+    const cleanHost = (req.headers.host || '').split(':')[0].trim().toLowerCase();
+    await brandRepository.ready();
+    const brand = brandRepository.findByCustomDomain(cleanHost);
+    if (!brand) {
+      return res.status(404).json({
+        success: false,
+        error: 'TENANT_NOT_FOUND',
+        message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
+      });
+    }
+  }
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/pos-app/index.html'));
+});
+
 // Health Check with Persistence & DB Readiness Verification
 app.get('/health', (req, res) => {
   let isDbReady = false;

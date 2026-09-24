@@ -100,13 +100,13 @@ test('OWNER DASHBOARD SETTINGS — route boundary is isolated', () => {
   const apiSource = require('node:fs').readFileSync(apiPath, 'utf8');
   const settingsSource = require('node:fs').readFileSync(settingsPath, 'utf8');
 
-  const inline = apiSource.match(/router\\.(?:get|put)\\('\/admin\\/settings\\//g) || [];
-  const isolated = settingsSource.match(/router\\.(?:get|put)\\('\/admin\\/settings\\//g) || [];
+  const inline = apiSource.match(/router\.(?:get|put)\('\/admin\/settings\//g) || [];
+  const isolated = settingsSource.match(/router\.(?:get|put)\('\/admin\/settings\//g) || [];
 
   assert.equal(inline.length, 0, 'admin settings routes must not be implemented inline in api.js');
   assert.ok(isolated.length > 0, 'settings.js must own admin settings routes');
   assert.equal(
-    (apiSource.match(/registerSettingsRoutes\\(router,/g) || []).length,
+    (apiSource.match(/registerSettingsRoutes\(router,/g) || []).length,
     1,
     'api.js must register settings routes exactly once'
   );
@@ -117,17 +117,17 @@ test('MARKETING OVERVIEW — route boundary is isolated', () => {
   const marketingSource = require('node:fs').readFileSync(require.resolve('../server/routes/admin-marketing-overview'), 'utf8');
 
   assert.equal(
-    (apiSource.match(/router\\.get\\('\/admin\\/marketing\\/overview'/g) || []).length,
+    (apiSource.match(/router\.get\('\/admin\/marketing\/overview'/g) || []).length,
     0,
     'marketing overview must not remain inline in api.js'
   );
   assert.equal(
-    (marketingSource.match(/router\\.get\\('\/admin\\/marketing\\/overview'/g) || []).length,
+    (marketingSource.match(/router\.get\('\/admin\/marketing\/overview'/g) || []).length,
     1,
     'marketing overview must be implemented once in its route module'
   );
   assert.equal(
-    (apiSource.match(/registerAdminMarketingOverviewRoutes\\(router,/g) || []).length,
+    (apiSource.match(/registerAdminMarketingOverviewRoutes\(router,/g) || []).length,
     1,
     'api.js must register marketing overview exactly once'
   );
