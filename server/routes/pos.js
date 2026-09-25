@@ -276,9 +276,12 @@ router.get('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
 router.post('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
-    const { table_number = '', customer_name = 'Tamu', items = [], order_type = 'dine_in' } = req.body || {};
+    const { table_number = '', customer_name = 'Tamu', customer_phone = '', items = [], order_type = 'dine_in' } = req.body || {};
     if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
     if (!Array.isArray(items) || !items.length) return res.status(400).json({ success: false, error: 'Tidak ada item untuk ditahan.' });
+    if (String(order_type || 'dine_in').toLowerCase() === 'dine_in' && !String(table_number || '').trim()) {
+      return res.status(400).json({ success: false, error: 'Meja wajib dipilih untuk pesanan dine-in.' });
+    }
 
     const { PosOrderService } = require('../../domains/pos');
     const validOrderTypes = Object.values(PosOrderService.ORDER_TYPES || {
@@ -296,6 +299,7 @@ router.post('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
       branch_id: branchId,
       table_number: table_number || '',
       customer_name: customer_name || 'Tamu',
+      customer_phone: customer_phone || '',
       items,
       order_type: normalizedOrderType
     });
@@ -310,8 +314,16 @@ router.delete('/pos/held-orders/:id', requireAuth(['cashier']), (req, res) => {
     const branchId = req.user.branch_id || req.user.branchId;
     if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
     const now = new Date().toISOString();
+    const held = db.prepare("SELECT id, order_type, table_number FROM pos_held_orders WHERE id = ? AND branch_id = ? AND status = 'held'").get(req.params.id, branchId);
+    if (!held) return res.status(404).json({ success: false, error: 'Pesanan ditahan tidak ditemukan atau sudah tidak aktif.' });
     db.prepare("UPDATE pos_held_orders SET status = 'cancelled', updated_at = ? WHERE id = ? AND branch_id = ?").run(now, req.params.id, branchId);
-    res.json({ success: true, message: 'Pesanan ditahan telah dibatalkan.' });
+    if (held.order_type === 'dine_in') {
+      try {
+        const { DiningTableService } = require('../../domains/dining');
+        DiningTableService.releaseHold({ branch_id: branchId, hold_reference_id: held.id, reason: 'cancelled' });
+      } catch (_) {}
+    }
+    res.json({ success: true, message: 'Pesanan ditahan telah dibatalkan dan meja dikembalikan ke status tersedia.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
