@@ -2160,67 +2160,86 @@
       var checks=data.checks||[];
       if(!checks.length){toast('Order belum memiliki item yang dapat dibagi.');return;}
 
-      function checkTotal(check){
-        return (check.items||[]).reduce(function(sum,it){return sum+(Number(it.unit_price)||0)*(Number(it.quantity)||0);},0);
-      }
+      function checkTotal(check){ return Number(check.allocated_amount||0); }
       function renderCheck(check){
         var items=(check.items||[]).map(function(it){
-          return '<div class="pos-check-item">' +
-            '<div><strong>'+esc(it.product_name||'Item')+'</strong><small>'+money(it.unit_price)+' × '+esc(String(it.quantity))+'</small></div>' +
-            '<input class="pos-check-qty" type="number" min="0" max="'+esc(String(it.quantity))+'" value="0" data-check-item="'+esc(it.order_item_id)+'" aria-label="Jumlah '+esc(it.product_name||'item')+' untuk split">' +
-          '</div>';
+          return '<div class="pos-check-item"><div><strong>'+esc(it.product_name||'Item')+'</strong><small>'+money(it.unit_price)+' × '+esc(String(it.quantity))+'</small></div></div>';
         }).join('');
-        var hasSplittable=(check.items||[]).some(function(it){return Number(it.quantity)>1;}) || (check.items||[]).length>1;
-        var splitBtn=check.status==='open' && hasSplittable
-          ? '<button type="button" class="pos-btn small" data-split-check="'+esc(check.id)+'">Pisahkan item terpilih</button>' : '';
-        var mergeBtn=(check.status==='open' && Number(check.check_number)!==1)
+        var paid=Number(check.paid_amount||0), remaining=Number(check.remaining_amount||0);
+        var hasSplittable=check.status==='open' && remaining>0;
+        var splitBtn=hasSplittable ? '<button type="button" class="pos-btn small" data-split-amount="'+esc(check.id)+'">Split Nominal</button>' : '';
+        var itemBtn=hasSplittable && (check.items||[]).length ? '<button type="button" class="pos-btn small ghost" data-split-check="'+esc(check.id)+'">Split Item</button>' : '';
+        var payBtn=check.status==='open' && remaining>0 ? '<button type="button" class="pos-btn small" data-pay-check="'+esc(check.id)+'">Bayar</button>' : '';
+        var mergeBtn=(check.status==='open' && Number(check.check_number)!==1 && paid===0)
           ? '<button type="button" class="pos-btn small ghost danger" data-merge-check="'+esc(check.id)+'">Gabungkan ke Check #1</button>' : '';
+        var payments=(check.payments||[]).map(function(p){
+          return '<div class="pos-check-payment"><span>'+esc(p.payer_name||p.payment_method||'Payment')+'</span><strong>'+money(p.amount)+'</strong></div>';
+        }).join('');
         return '<div class="pos-check-card">' +
           '<div class="pos-check-head"><div><strong>Check #'+esc(String(check.check_number))+'</strong><small>'+esc(check.status==='open'?'Terbuka':'Tertutup')+'</small></div><strong>'+money(checkTotal(check))+'</strong></div>' +
+          '<div style="font-size:13px;margin:6px 0">Dibayar: <strong>'+money(paid)+'</strong> · Sisa: <strong>'+money(remaining)+'</strong></div>' +
           '<div class="pos-check-items">'+(items||'<div class="pos-empty">Tidak ada item.</div>')+'</div>' +
-          '<div class="pos-check-actions">'+splitBtn+mergeBtn+'</div>' +
+          (payments ? '<div class="pos-check-payments">'+payments+'</div>' : '') +
+          '<div class="pos-check-actions">'+splitBtn+itemBtn+payBtn+mergeBtn+'</div>' +
         '</div>';
       }
 
       showModal(
         '<h3>Split / Merge Bill</h3>' +
-        '<p>Ini tetap <strong>1 Order</strong>. Yang dibagi hanya check/tagihan; meja dan Dining Session tidak berubah.</p>' +
+        '<p>Ini tetap <strong>1 Order</strong>. Check adalah alokasi tagihan; Payment adalah uang yang benar-benar dibayar. Satu Check boleh punya banyak Payment.</p>' +
+        '<div style="font-size:14px;margin-bottom:10px">Total Order: <strong>'+money(data.order.grand_total)+'</strong></div>' +
         '<div class="pos-check-manager-list">'+checks.map(renderCheck).join('')+'</div>' +
         '<div class="pos-modal-actions"><button type="button" class="pos-btn ghost" id="pos-check-manager-close">Tutup</button></div>'
       );
-
       if($('pos-check-manager-close')) $('pos-check-manager-close').onclick=hideModal;
+
+      $('pos-modal-card').querySelectorAll('[data-split-amount]').forEach(function(btn){
+        btn.onclick=async function(){
+          var amount=prompt('Nominal untuk Check baru:', '');
+          amount=Number(String(amount||'').replace(/[^0-9]/g,''));
+          if(!amount)return;
+          try{
+            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-amount',{method:'POST',headers:headers(),body:JSON.stringify({source_check_id:btn.dataset.splitAmount,amount:amount})});
+            toast('Check nominal berhasil dibuat.'); openCheckManager(orderId);
+          }catch(e){toast(e.message);}
+        };
+      });
+
+      $('pos-modal-card').querySelectorAll('[data-pay-check]').forEach(function(btn){
+        btn.onclick=async function(){
+          var amount=prompt('Nominal pembayaran:', '');
+          amount=Number(String(amount||'').replace(/[^0-9]/g,''));
+          if(!amount)return;
+          var payer=prompt('Nama pembayar (opsional):','');
+          var tendered=prompt('Uang diterima (Cash):',String(amount));
+          tendered=Number(String(tendered||'').replace(/[^0-9]/g,''));
+          try{
+            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/'+encodeURIComponent(btn.dataset.payCheck)+'/pay',{method:'POST',headers:headers(),body:JSON.stringify({amount:amount,payment_method:'cash',payer_name:payer||null,amount_tendered:tendered})});
+            toast('Pembayaran tercatat.'); openCheckManager(orderId);
+          }catch(e){toast(e.message);}
+        };
+      });
 
       $('pos-modal-card').querySelectorAll('[data-split-check]').forEach(function(btn){
         btn.onclick=async function(){
-          var sourceId=btn.dataset.splitCheck;
-          var card=btn.closest('.pos-check-card');
-          var inputs=card ? card.querySelectorAll('[data-check-item]') : [];
-          var splitItems=[];
-          inputs.forEach(function(input){
-            var qty=Math.floor(Number(input.value)||0);
-            if(qty>0) splitItems.push({order_item_id:input.dataset.checkItem,quantity:qty});
+          var sourceId=btn.dataset.splitCheck, card=btn.closest('.pos-check-card'), inputs=[];
+          var html='<h3>Split Item</h3><p>Masukkan quantity item yang dipindahkan ke Check baru.</p>';
+          (checks.find(function(c){return c.id===sourceId;}).items||[]).forEach(function(it){
+            html+='<div style="display:flex;justify-content:space-between;gap:8px;margin:8px 0"><span>'+esc(it.product_name)+' × '+it.quantity+'</span><input data-check-item="'+esc(it.order_item_id)+'" type="number" min="0" max="'+it.quantity+'" value="0" style="width:70px"></div>';
           });
-          if(!splitItems.length){toast('Pilih item dan jumlah yang ingin dipisahkan.');return;}
-          try{
-            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split',{
-              method:'POST',headers:headers(),body:JSON.stringify({source_check_id:sourceId,split_items:splitItems})
-            });
-            toast('Check baru berhasil dibuat.');
-            openCheckManager(orderId);
-          }catch(e){toast(e.message);}
+          html+='<div class="pos-modal-actions"><button id="pos-split-item-submit" class="pos-btn">Pisahkan</button></div>';
+          showModal(html);
+          $('pos-split-item-submit').onclick=async function(){
+            var splitItems=[]; $('pos-modal-card').querySelectorAll('[data-check-item]').forEach(function(i){var q=Math.floor(Number(i.value)||0);if(q>0)splitItems.push({order_item_id:i.dataset.checkItem,quantity:q});});
+            if(!splitItems.length){toast('Pilih item.');return;}
+            try{await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split',{method:'POST',headers:headers(),body:JSON.stringify({source_check_id:sourceId,split_items:splitItems})});toast('Check item berhasil dibuat.');openCheckManager(orderId);}catch(e){toast(e.message);}
+          };
         };
       });
 
       $('pos-modal-card').querySelectorAll('[data-merge-check]').forEach(function(btn){
         btn.onclick=async function(){
-          try{
-            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/merge',{
-              method:'POST',headers:headers(),body:JSON.stringify({target_check_id:checks[0].id,source_check_id:btn.dataset.mergeCheck})
-            });
-            toast('Check berhasil digabung.');
-            openCheckManager(orderId);
-          }catch(e){toast(e.message);}
+          try{await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/merge',{method:'POST',headers:headers(),body:JSON.stringify({target_check_id:checks[0].id,source_check_id:btn.dataset.mergeCheck})});toast('Check berhasil digabung.');openCheckManager(orderId);}catch(e){toast(e.message);}
         };
       });
     }catch(e){toast(e.message);}
