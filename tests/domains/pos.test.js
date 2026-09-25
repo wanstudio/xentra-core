@@ -1049,3 +1049,65 @@ test('POS Dine-In Hold materializes as Merchant pending order without duplicatin
     reason: 'cancelled'
   });
 });
+
+
+test('POS P1 — Split/Merge uses canonical Order checks without creating a second order or table', async () => {
+  const held = PosOrderService.holdOrder({
+    branch_id: 'branch_pos',
+    table_number: '12',
+    customer_name: 'Split Check Customer',
+    items: [
+      { product_id: 'prod_pos_1', quantity: 1, unit_price: 20000 },
+      { product_id: 'prod_pos_2', quantity: 1, unit_price: 8000 }
+    ],
+    order_type: 'dine_in'
+  });
+
+  const materialized = await PosOrderService.materializeHeldOrder({
+    held_order_id: held.id,
+    brand_id: 'brand_pos'
+  });
+  const orderId = materialized.order_id;
+
+  const initial = PosOrderService.getOrderChecks({ order_id: orderId, branch_id: 'branch_pos' });
+  assert.strictEqual(initial.checks.length, 1);
+  assert.strictEqual(initial.checks[0].items.length, 2);
+
+  const sourceCheckId = initial.checks[0].id;
+  const itemToMove = initial.checks[0].items.find(i => i.product_id === 'prod_pos_2');
+  assert.ok(itemToMove);
+
+  const split = PosOrderService.splitOrderCheck({
+    order_id: orderId,
+    branch_id: 'branch_pos',
+    source_check_id: sourceCheckId,
+    split_items: [{ order_item_id: itemToMove.order_item_id, quantity: 1 }]
+  });
+
+  assert.strictEqual(split.checks.length, 2);
+  assert.strictEqual(split.checks[0].items.length, 1);
+  assert.strictEqual(split.checks[1].items.length, 1);
+
+  const orders = db.prepare("SELECT id FROM orders WHERE id = ?").all(orderId);
+  assert.strictEqual(orders.length, 1, 'Split must not create another Commerce Order');
+
+  const holds = db.prepare("SELECT hold_reference_id, status FROM branch_table_holds WHERE hold_reference_id = ?").all(orderId);
+  assert.strictEqual(holds.length, 1, 'Split must keep one Dining table hold');
+  assert.strictEqual(holds[0].status, 'active');
+
+  const merged = PosOrderService.mergeOrderChecks({
+    order_id: orderId,
+    branch_id: 'branch_pos',
+    target_check_id: split.checks[0].id,
+    source_check_id: split.checks[1].id
+  });
+
+  assert.strictEqual(merged.checks.length, 1);
+  assert.strictEqual(merged.checks[0].items.length, 2);
+
+  DiningTableService.releaseHold({
+    branch_id: 'branch_pos',
+    hold_reference_id: orderId,
+    reason: 'cancelled'
+  });
+});
