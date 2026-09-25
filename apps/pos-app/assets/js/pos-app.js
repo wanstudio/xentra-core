@@ -2171,8 +2171,7 @@
         var equalBtn=hasSplittable ? '<button type="button" class="pos-btn small ghost" data-split-evenly="'+esc(check.id)+'">Bagi Rata</button>' : '';
         var itemBtn=hasSplittable && (check.items||[]).length ? '<button type="button" class="pos-btn small ghost" data-split-check="'+esc(check.id)+'">Split Item</button>' : '';
         var payBtn=check.status==='open' && remaining>0 ? '<button type="button" class="pos-btn small" data-pay-check="'+esc(check.id)+'">Bayar</button>' : '';
-        var mergeBtn=(check.status==='open' && Number(check.check_number)!==1 && paid===0)
-          ? '<button type="button" class="pos-btn small ghost danger" data-merge-check="'+esc(check.id)+'">Gabungkan ke Check #1</button>' : '';
+
         var payments=(check.payments||[]).map(function(p){
           return '<div class="pos-check-payment"><span>'+esc(p.payer_name||p.payment_method||'Payment')+'</span><strong>'+money(p.amount)+'</strong></div>';
         }).join('');
@@ -2181,17 +2180,37 @@
           '<div style="font-size:13px;margin:6px 0">Dibayar: <strong>'+money(paid)+'</strong> · Sisa: <strong>'+money(remaining)+'</strong></div>' +
           '<div class="pos-check-items">'+(items||'<div class="pos-empty">Tidak ada item.</div>')+'</div>' +
           (payments ? '<div class="pos-check-payments">'+payments+'</div>' : '') +
-          '<div class="pos-check-actions">'+equalBtn+splitBtn+itemBtn+payBtn+mergeBtn+'</div>' +
+          '<div class="pos-check-actions">'+equalBtn+splitBtn+itemBtn+payBtn+'</div>' +
         '</div>';
       }
 
+      var canResetSplit=checks.length>1 && checks.every(function(check){return check.status==='open' && Number(check.paid_amount||0)===0;});
+      var resetSplitBtn=canResetSplit ? '<button type="button" class="pos-btn small ghost danger" id="pos-reset-split">↩ Batalkan Pembagian</button>' : '';
+      var resetHelp=checks.length>1 ? '<p class="pos-form-help">Kalau semua tagihan belum dibayar, pembagian bisa dibatalkan dan kembali menjadi 1 tagihan.</p>' : '';
       showModal(
         '<h3>Split / Merge Bill</h3>' +
         '<p>Ini tetap <strong>1 Order</strong>. Check adalah alokasi tagihan; Payment adalah uang yang benar-benar dibayar. Satu Check boleh punya banyak Payment.</p>' +
         '<div style="font-size:14px;margin-bottom:10px">Total Order: <strong>'+money(data.order.grand_total)+'</strong></div>' +
         '<div class="pos-check-manager-list">'+checks.map(renderCheck).join('')+'</div>' +
-        '<div class="pos-modal-actions"><button type="button" class="pos-btn ghost" id="pos-check-manager-close">Tutup</button></div>'
+        resetHelp +
+        '<div class="pos-modal-actions">'+resetSplitBtn+'<button type="button" class="pos-btn ghost" id="pos-check-manager-close">Tutup</button></div>'
       );
+      if($('pos-reset-split')){
+        $('pos-reset-split').onclick=async function(){
+          if(!confirm('Batalkan pembagian dan kembali menjadi 1 tagihan? Semua check harus belum dibayar.'))return;
+          var btn=this;
+          btn.disabled=true;
+          try{
+            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/reset',{method:'POST',headers:headers()});
+            toast('Pembagian dibatalkan. Kembali menjadi 1 tagihan.');
+            openCheckManager(orderId);
+          }catch(e){
+            btn.disabled=false;
+            toast(e.message);
+          }
+        };
+      }
+
       if($('pos-check-manager-close')) $('pos-check-manager-close').onclick=hideModal;
 
       $('pos-modal-card').querySelectorAll('[data-split-evenly]').forEach(function(btn){
@@ -2300,23 +2319,7 @@
         };
       });
 
-      $('pos-modal-card').querySelectorAll('[data-merge-check]').forEach(function(btn){
-        btn.onclick=async function(){
-          if(!confirm('Gabungkan Check ini ke Check #1? Alokasi tagihan akan dikembalikan ke Check #1.'))return;
-          btn.disabled=true;
-          try{
-            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/merge',{
-              method:'POST',headers:headers(),
-              body:JSON.stringify({target_check_id:checks[0].id,source_check_id:btn.dataset.mergeCheck})
-            });
-            toast('Check berhasil digabung.');
-            openCheckManager(orderId);
-          }catch(e){
-            btn.disabled=false;
-            toast(e.message);
-          }
-        };
-      });
+;
     }catch(e){toast(e.message);}
   }
 
