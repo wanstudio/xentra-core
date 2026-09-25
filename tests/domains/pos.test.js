@@ -1002,3 +1002,50 @@ test('POS Dine-In table reservation — cashier hold immediately marks table as 
   assert.strictEqual(released.operational_state, 'available');
 });
 
+
+
+test('POS Dine-In Hold materializes as Merchant pending order without duplicating the table claim', async () => {
+  const held = PosOrderService.holdOrder({
+    branch_id: 'branch_pos',
+    table_number: '12',
+    customer_name: 'Merchant Queue Customer',
+    items: [{ product_id: 'prod_pos_1', quantity: 1, unit_price: 20000 }],
+    order_type: 'dine_in'
+  });
+
+  const materialized = await PosOrderService.materializeHeldOrder({
+    held_order_id: held.id,
+    brand_id: 'brand_pos'
+  });
+
+  assert.ok(materialized.order_id);
+  assert.strictEqual(materialized.order.status, 'pending');
+  assert.strictEqual(materialized.order.order_channel, 'pos_cashier');
+  assert.strictEqual(materialized.order.order_type, 'dine_in');
+
+  const linked = db.prepare('SELECT order_id FROM pos_held_orders WHERE id = ?').get(held.id);
+  assert.strictEqual(linked.order_id, materialized.order_id);
+
+  const activeHold = db.prepare(
+    'SELECT hold_reference_id, status FROM branch_table_holds WHERE hold_reference_id = ?'
+  ).get(materialized.order_id);
+  assert.ok(activeHold);
+  assert.strictEqual(activeHold.status, 'active');
+
+  const merchantOrder = db.prepare(
+    'SELECT id, status, order_channel, order_type FROM orders WHERE id = ?'
+  ).get(materialized.order_id);
+  assert.deepStrictEqual(merchantOrder, {
+    id: materialized.order_id,
+    status: 'pending',
+    order_channel: 'pos_cashier',
+    order_type: 'dine_in'
+  });
+
+  // Clean up the dining claim; the order remains a valid pending fixture.
+  DiningTableService.releaseHold({
+    branch_id: 'branch_pos',
+    hold_reference_id: materialized.order_id,
+    reason: 'cancelled'
+  });
+});
