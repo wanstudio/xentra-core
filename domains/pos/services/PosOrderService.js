@@ -261,6 +261,34 @@ class PosOrderService {
     return PosOrderService.getOrderChecks({ order_id, branch_id });
   }
 
+  /** Split the unpaid remainder of one check into N equal check allocations. */
+  static splitOrderCheckEvenly({ order_id, branch_id, source_check_id, parts }) {
+    const n = Number(parts);
+    if (!Number.isInteger(n) || n < 2 || n > 99) throw new Error('[PosOrderService] Jumlah bagian harus 2 sampai 99.');
+    const current = PosOrderService.getOrderChecks({ order_id, branch_id });
+    const source = current.checks.find(c => String(c.id) === String(source_check_id));
+    if (!source || source.status !== 'open') throw new Error('[PosOrderService] Check sumber tidak ditemukan atau sudah tidak OPEN.');
+    const paid = posBillRepository.findCheckPaidAmount(source.id);
+    if (paid > 0) throw new Error('[PosOrderService] Check yang sudah menerima pembayaran tidak dapat dibagi rata.');
+    const total = Number(source.allocated_amount || 0);
+    if (total <= 0) throw new Error('[PosOrderService] Check tidak memiliki saldo untuk dibagi.');
+    const base = Math.floor(total / n);
+    const remainder = total - (base * n);
+    if (base <= 0) throw new Error('[PosOrderService] Nominal Check terlalu kecil untuk dibagi sebanyak itu.');
+    const now = new Date().toISOString();
+    const nextNumber = current.checks.reduce((max, c) => Math.max(max, Number(c.check_number) || 0), 0) + 1;
+    posBillRepository.beginTransaction();
+    try {
+      // Keep the source as part #1; distribute rounding remainder to the first part.
+      posBillRepository.updateCheckAmount(source.id, base + remainder, now);
+      for (let i = 1; i < n; i++) {
+        posBillRepository.createCheck({ id: 'check_' + crypto.randomBytes(8).toString('hex'), orderId: order_id, checkNumber: nextNumber + i - 1, allocatedAmount: base, now });
+      }
+      posBillRepository.commit();
+    } catch (err) { try { posBillRepository.rollback(); } catch (_) {} throw err; }
+    return PosOrderService.getOrderChecks({ order_id, branch_id });
+  }
+
   /**
    * Records one payment contribution against an existing Check.
    * One Check may receive multiple payments.
@@ -303,7 +331,7 @@ class PosOrderService {
       if (value > lockedRemaining) throw new Error('[PosOrderService] Pembayaran melebihi sisa Check.');
       posBillRepository.createCheckPayment({ id: paymentId, checkId: check_id, orderId: order_id, paymentMethod: payment_method, provider: payment_method, amount: value, payerName: payer_name, actorId: actor_id, rawPayment: JSON.stringify({ amount_tendered: amount_tendered }), settledAt: now, now });
       const afterPaid = lockedPaid + value;
-      if (afterPaid >= Number(lockedCheck.allocated_amount)) posBillRepository.updateCheckAmount(lockedCheck.id, Number(lockedCheck.allocated_amount), now);
+      if (afterPaid >= Number(lockedCheck.allocated_amount)) posBillRepository.setCheckStatus(lockedCheck.id, 'paid', now);
       posBillRepository.commit();
     } catch (err) { try { posBillRepository.rollback(); } catch (_) {} throw err; }
     const updated = PosOrderService.getOrderChecks({ order_id, branch_id });
