@@ -266,6 +266,14 @@ class DiningTableRepository {
     `, [status, updatedAt, holdId]);
   }
 
+  rebindHoldReference({ fromReferenceId, toReferenceId, updatedAt }) {
+    return this.db.execute(`
+      UPDATE branch_table_holds
+      SET hold_reference_id = ?, updated_at = ?
+      WHERE hold_reference_id = ? AND status = 'active'
+    `, [toReferenceId, updatedAt, fromReferenceId]);
+  }
+
   findDiningSession(sessionId) {
     return this.db.queryOne(
       'SELECT * FROM dining_sessions WHERE id = ?',
