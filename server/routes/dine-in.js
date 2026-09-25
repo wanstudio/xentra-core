@@ -223,7 +223,7 @@ router.post('/dine-in/tables/:id/release', requireAuth(['owner', 'brand_manager'
     }
 
     try {
-      db.prepare("UPDATE branch_table_holds SET status = 'released', updated_at = ? WHERE table_id = ? AND status = 'held'").run(now, tableId);
+      db.prepare("UPDATE branch_table_holds SET status = 'released', updated_at = ? WHERE table_id = ? AND status = 'active'").run(now, tableId);
     } catch (_) {}
 
     db.prepare(`
