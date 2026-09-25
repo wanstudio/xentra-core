@@ -612,7 +612,9 @@ const handleAcceptInvitation = async (req, res) => {
       rawToken: token
     });
 
-    let redirectUrl = '/dashboard/';
+    // Preserve the unified role-based landing contract after invitation acceptance.
+    // Cashiers execute transactions in POS; management roles use the dashboard.
+    let redirectUrl = result.role === 'cashier' ? '/pos/' : '/dashboard/';
     const host = req.headers.host || '';
     const cleanHost = host.split(':')[0].trim().toLowerCase();
     if (result.brand_id && cleanHost === 'xentra.cloud') {
