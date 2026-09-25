@@ -586,6 +586,28 @@ class DiningTableService {
     return { success: true, hold_reference_id: holdRef, table_ids: resolvedTableIds, expires_at: expiresAt.toISOString(), duration_minutes: HOLD_DURATION_MINUTES };
   }
 
+  static rebindHoldReference({ branch_id, from_reference_id, to_reference_id }) {
+    if (!from_reference_id || !to_reference_id) {
+      throw new Error('[DiningTableService] from_reference_id and to_reference_id are required.');
+    }
+    const holds = repository.findActiveHolds(from_reference_id);
+    if (!holds || holds.length === 0) return { rebound: 0 };
+    const now = new Date().toISOString();
+    repository.beginTransaction();
+    try {
+      repository.rebindHoldReference({
+        fromReferenceId: from_reference_id,
+        toReferenceId: to_reference_id,
+        updatedAt: now
+      });
+      repository.commitTransaction();
+    } catch (err) {
+      try { repository.rollbackTransaction(); } catch (_) {}
+      throw err;
+    }
+    return { rebound: holds.length, hold_reference_id: to_reference_id };
+  }
+
   static releaseHold({ branch_id, hold_reference_id, reason = 'cancelled' }, { dbTransactionProvided = false } = {}) {
     if (!hold_reference_id) return { released: 0 };
     const holds = repository.findActiveHolds(hold_reference_id);
