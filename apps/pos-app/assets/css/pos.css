@@ -574,3 +574,37 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-check-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 
 .pos-field{display:flex;flex-direction:column;gap:6px;margin:10px 0}.pos-field>span{font-size:12px;font-weight:800;color:#475569}.pos-input,.pos-input-nominal{width:100%;height:46px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a;font-size:16px;font-weight:700;padding:0 12px;outline:none}.pos-input:focus,.pos-input-nominal:focus{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.08)}.pos-input-nominal-wrap{display:flex;align-items:center;border:1px solid #cbd5e1;border-radius:10px;background:#fff;overflow:hidden}.pos-input-nominal-wrap:focus-within{border-color:#0f172a;box-shadow:0 0 0 3px rgba(15,23,42,.08)}.pos-input-prefix{padding:0 0 0 12px;font-size:15px;font-weight:800;color:#64748b}.pos-input-nominal-wrap .pos-input-nominal{border:0;box-shadow:none;border-radius:0;padding-left:6px}.pos-input-nominal-wrap .pos-input-nominal:focus{box-shadow:none}.pos-form-help{font-size:12px;color:#64748b;margin:4px 0 12px}.pos-payment-summary{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;margin:10px 0;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0}.pos-payment-summary span{font-size:12px;color:#64748b;font-weight:700}.pos-payment-summary strong{font-size:16px;color:#0f172a}.pos-btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* Simplified cashier split-bill flow */
+.pos-simple-bill-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px}
+.pos-simple-bill-head h3{margin:0 0 4px}
+.pos-simple-bill-head p{margin:0;color:#64748b;font-size:12px}
+.pos-simple-bill-total{font-size:20px;font-weight:800;color:#0f172a;white-space:nowrap}
+.pos-simple-choice-title,.pos-simple-section-title{font-size:14px;font-weight:800;color:#0f172a;margin:10px 0 8px}
+.pos-simple-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:8px 0 14px}
+.pos-simple-choice{appearance:none;border:1px solid #dbe1e8;background:#fff;border-radius:14px;padding:16px 14px;text-align:left;cursor:pointer;font:inherit;min-height:76px}
+.pos-simple-choice:hover{border-color:#94a3b8;background:#f8fafc}
+.pos-simple-choice strong{display:block;font-size:14px;color:#0f172a}
+.pos-simple-choice small{display:block;color:#64748b;font-size:11px;line-height:1.4;margin-top:4px}
+.pos-simple-link{width:100%;border:0;background:transparent;color:#475569;font-size:12px;font-weight:700;text-align:left;padding:4px 2px 12px;cursor:pointer}
+.pos-simple-check-list{margin-top:8px}
+.pos-simple-check-card{padding:13px}
+.pos-simple-check-card .pos-check-head{margin-bottom:8px}
+.pos-simple-check-card .pos-check-head strong:last-child{font-size:16px}
+.pos-check-balance{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#64748b;padding:8px 10px;background:#f8fafc;border-radius:10px}
+.pos-check-balance strong{color:#0f172a}
+.pos-check-paid{margin-top:9px;padding:9px 10px;border-radius:10px;background:#f0fdf4;color:#166534;font-size:12px;font-weight:800}
+.pos-simple-summary{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid #e2e8f0;background:#f8fafc;border-radius:11px;font-size:12px;color:#64748b;margin-bottom:10px}
+.pos-simple-summary strong{color:#0f172a}
+.pos-simple-summary span{font-weight:800;color:#0f172a}
+.pos-simple-secondary-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+.pos-simple-secondary-actions .pos-btn{flex:1;min-width:130px}
+.pos-simple-item-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #f1f5f9}
+.pos-simple-item-row span{display:flex;flex-direction:column;gap:3px}
+.pos-simple-item-row strong{font-size:12px;color:#0f172a}
+.pos-simple-item-row small{font-size:11px;color:#64748b}
+.pos-simple-item-row input{width:64px;height:38px;border:1px solid #cbd5e1;border-radius:9px;text-align:center;font-weight:700}
+@media(max-width:520px){
+  .pos-simple-choice-grid{grid-template-columns:1fr}
+  .pos-simple-bill-total{font-size:18px}
+}
