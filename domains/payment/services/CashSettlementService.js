@@ -23,7 +23,8 @@ class CashSettlementService {
     amount,
     amount_tendered = null,
     cashier_id = null,
-    shift_id = null
+    shift_id = null,
+    skip_shift_increment = false
   }) {
     const validation = PaymentModel.validatePaymentParams({
       order_id,
@@ -96,7 +97,7 @@ class CashSettlementService {
       }
     }
 
-    if (shift_id) {
+    if (shift_id && !skip_shift_increment) {
       const shiftRecord = posShiftRepository.findById(shift_id);
       if (!shiftRecord) {
         throw new Error(`[CashSettlementService] Shift kasir dengan ID "${shift_id}" tidak ditemukan.`);
@@ -119,7 +120,7 @@ class CashSettlementService {
 
     paymentRepository.beginTransaction();
     try {
-      if (shift_id) {
+      if (shift_id && !skip_shift_increment) {
         const shiftInTx = posShiftRepository.findStatusById(shift_id);
         if (!shiftInTx || shiftInTx.status !== 'open') {
           throw new Error(`[SHIFT_ALREADY_CLOSED]: Shift kasir "${shift_id}" sudah ditutup dan tidak dapat menerima transaksi kas.`);
