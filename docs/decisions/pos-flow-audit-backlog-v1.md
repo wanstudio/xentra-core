@@ -23,17 +23,21 @@ This document is a **problem backlog and discussion anchor**, not an implementat
 ## Open problems to discuss one by one
 
 ### P1 — Split / Merge after Hold materialization
+**Status:** ✅ RESOLVED / IMPLEMENTED
 **Severity:** 🔴
 
 Current split/merge logic is still primarily `pos_held_orders`-based.
 
 Potential consequence: cashier working state can diverge from the canonical Commerce Order already visible in Merchant.
 
-Questions to resolve:
-- Should split/merge operate on the canonical Order after materialization?
-- What happens to Dining table/session context during split/merge?
-- How are payment references and inventory effects kept consistent?
-- Should split/merge be temporarily restricted until canonical-order support is complete?
+Resolution:
+- Split/merge operates on a canonical Commerce Order after materialization.
+- Split creates an open check under the same Order; it never creates another Order, table, or Dining Session.
+- Merge combines open checks under the same Order.
+- Dining/table context remains attached to the canonical Order.
+- `pos_held_orders` remains only the cashier working reference.
+- Payment allocation across multiple methods remains a separate Payment lifecycle concern; split/merge must not create duplicate Orders to simulate payment splitting.
+- Implementation contract: `docs/decisions/pos-split-merge-canonical-check-v1.md`.
 
 ### P2 — Resume semantics
 **Severity:** 🔴
@@ -159,6 +163,6 @@ For each problem:
 
 ## Current state
 
-**All P1–P10 remain OPEN.**
+**P1 is RESOLVED / IMPLEMENTED. P2–P10 remain OPEN.**
 
 No item is approved for implementation by this document alone.
