@@ -19,7 +19,7 @@ class PosBillRepository {
   }
 
   findChecks(orderId) {
-    return this.db.queryAll(`SELECT id, order_id, check_number, status, created_at, updated_at FROM pos_order_checks WHERE order_id = ? ORDER BY check_number ASC`, [orderId]);
+    return this.db.queryMany(`SELECT id, order_id, check_number, status, created_at, updated_at FROM pos_order_checks WHERE order_id = ? ORDER BY check_number ASC`, [orderId]);
   }
 
   findCheck(checkId) {
@@ -27,7 +27,7 @@ class PosBillRepository {
   }
 
   findCheckItems(checkId) {
-    return this.db.queryAll(`SELECT ci.id, ci.check_id, ci.order_item_id, ci.quantity, oi.product_id, oi.product_name, oi.unit_price, oi.note, oi.modifiers_snapshot FROM pos_order_check_items ci JOIN order_items oi ON oi.id = ci.order_item_id WHERE ci.check_id = ? ORDER BY oi.created_at ASC, oi.id ASC`, [checkId]);
+    return this.db.queryMany(`SELECT ci.id, ci.check_id, ci.order_item_id, ci.quantity, oi.product_id, oi.product_name, oi.unit_price, oi.note, oi.modifiers_snapshot FROM pos_order_check_items ci JOIN order_items oi ON oi.id = ci.order_item_id WHERE ci.check_id = ? ORDER BY oi.created_at ASC, oi.id ASC`, [checkId]);
   }
 
   findAllAllocatedQuantity(orderItemId) {
