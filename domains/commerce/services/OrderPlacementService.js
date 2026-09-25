@@ -128,7 +128,11 @@ class OrderPlacementService {
     }
     const effectivePaymentMethod = paymentValidation.provider;
 
-    const insertedStatus = (effectivePaymentMethod === 'cash' && order_channel === 'pos_cashier')
+    // A cashier HOLD is already an operational order, but it must wait for
+    // Branch Manager acceptance before becoming confirmed. Normal POS sales
+    // remain immediately confirmed/settled according to the existing contract.
+    const isPosHeldOrder = Boolean(hold_reference_id && order_channel === 'pos_cashier');
+    const insertedStatus = (effectivePaymentMethod === 'cash' && order_channel === 'pos_cashier' && !isPosHeldOrder)
       ? 'confirmed'
       : 'pending';
 
