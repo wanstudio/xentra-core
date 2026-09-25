@@ -33,6 +33,7 @@ class PosOrderRepository {
     branchId,
     tableNumber,
     customerName,
+    orderType = 'dine_in',
     itemsPayload,
     status = 'held',
     createdAt,
@@ -40,13 +41,14 @@ class PosOrderRepository {
   }) {
     return this.db.execute(`
       INSERT INTO pos_held_orders (
-        id, branch_id, table_number, customer_name, items_payload, status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        id, branch_id, table_number, customer_name, order_type, items_payload, status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       id,
       branchId,
       String(tableNumber ?? ''),
       customerName,
+      orderType || 'dine_in',
       itemsPayload,
       status,
       createdAt,

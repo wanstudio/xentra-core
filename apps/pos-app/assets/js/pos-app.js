@@ -78,6 +78,48 @@
       }
     });
   }
+
+  function getShiftCashierName(s) {
+    var rawName = (s && (s.cashier_name || s.cashier_username)) || '';
+    if (!rawName) {
+      var u = user() || {};
+      rawName = u.full_name || u.name || u.username || '';
+    }
+    if (!rawName) return 'Kasir';
+    var name = String(rawName).trim();
+    if (name.indexOf('@') > 0) name = name.split('@')[0];
+    if (/^[a-z0-9_.-]+$/.test(name)) {
+      name = name.charAt(0).toUpperCase() + name.slice(1);
+    }
+    return name;
+  }
+
+  function formatShiftDateTime(isoString) {
+    if (!isoString) return '';
+    try {
+      var d = new Date(isoString);
+      if (isNaN(d.getTime())) return String(isoString);
+      var months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sept', 'Okt', 'Nov', 'Des'];
+      var day = d.getDate();
+      var month = months[d.getMonth()] || '';
+      var year = d.getFullYear();
+      var hh = String(d.getHours()).padStart(2, '0');
+      var mm = String(d.getMinutes()).padStart(2, '0');
+      return 'open ' + day + ' ' + month + ' ' + year + ' · ' + hh + '.' + mm + ' WIB';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function formatShiftSubtitle(s) {
+    if (!s) return 'Operasional';
+    var cashier = getShiftCashierName(s);
+    var dt = formatShiftDateTime(s.opened_at);
+    if (dt) {
+      return cashier + ' · ' + dt;
+    }
+    return cashier;
+  }
   function token() { return localStorage.getItem(TOKEN_KEY) || ''; }
   function headers() {
     var h = { 'Content-Type': 'application/json' };
@@ -166,6 +208,17 @@
     return Object.keys(profiles).map(function(id){return profiles[id];}).filter(function(profile){
       return profile && profile.branch_id && String(profile.branch_id)===String(branchId) && profile.offline_credential && profile.user;
     });
+  }
+
+  function getPosPinCache(userId) {
+    var profiles=getPosPinProfiles();
+    if (userId && profiles[String(userId)]) return profiles[String(userId)];
+    if (state.user && state.user.id && profiles[String(state.user.id)]) return profiles[String(state.user.id)];
+    var u = user();
+    if (u && u.id && profiles[String(u.id)]) return profiles[String(u.id)];
+    var keys = Object.keys(profiles);
+    if (keys.length > 0) return profiles[keys[0]];
+    return null;
   }
 
   function savePosMenuCache() {
@@ -479,20 +532,24 @@
     }
     var t = total();
     var totalQty = state.cart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0);
+    var isDineIn = state.orderType === 'dine_in';
     var tableLabel = formatTableLabel(state.selectedTable);
+    var orderTypeLabel = isDineIn ? tableLabel : (state.orderType === 'pickup' ? 'Pickup' : 'Delivery');
 
     var html = '<div class="pos-modal-head-row">' +
       '<div class="pos-modal-head-title">' +
         '<h3>Rincian Pesanan</h3>' +
-        '<p>'+totalQty+' item · '+tableLabel+'</p>' +
+        '<p>'+totalQty+' item · '+esc(orderTypeLabel)+'</p>' +
       '</div>' +
       '<button type="button" class="pos-modal-close-icon" id="pos-order-modal-close" title="Tutup" aria-label="Tutup">✕</button>' +
     '</div>';
 
-    html += '<div class="pos-order-modal-table-row">' +
-      '<span><strong>Meja:</strong> '+esc(tableLabel)+'</span>' +
-      '<button type="button" class="pos-btn small ghost" id="pos-order-modal-change-table">Ubah Meja</button>' +
-    '</div>';
+    if (isDineIn) {
+      html += '<div class="pos-order-modal-table-row">' +
+        '<span><strong>Meja:</strong> '+esc(tableLabel)+'</span>' +
+        '<button type="button" class="pos-btn small ghost" id="pos-order-modal-change-table">Ubah Meja</button>' +
+      '</div>';
+    }
 
     html += '<div class="pos-order-modal-items">';
     state.cart.forEach(function(it, idx){
@@ -551,9 +608,11 @@
     showModal(html);
 
     $('pos-order-modal-close').onclick = hideModal;
-    $('pos-order-modal-change-table').onclick = function(){
-      openTableSelector();
-    };
+    if ($('pos-order-modal-change-table')) {
+      $('pos-order-modal-change-table').onclick = function(){
+        openTableSelector();
+      };
+    }
     $('pos-order-modal-hold').onclick = async function(){
       var cn = $('pos-modal-cust-name');
       var on = $('pos-modal-order-note');
@@ -613,6 +672,10 @@
   }
 
   function renderCart() {
+    var isDineIn = state.orderType === 'dine_in';
+    var tableCtx = $('pos-table-context');
+    if (tableCtx) tableCtx.classList.toggle('hidden', !isDineIn);
+
     var box=$('pos-cart-items'), meta=$('pos-cart-meta'), subtotal=$('pos-subtotal'), grand=$('pos-total'), pay=$('pos-pay-total'), btn=$('btn-pos-pay');
     if (meta) meta.textContent=state.cart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0)+' item';
     if (subtotal) subtotal.textContent=money(total());
@@ -1075,7 +1138,7 @@
       return !!token() || !!state.user;
     }
     try {
-      var me=await requestWithTimeout('/auth/merchant/me',{headers:headers()},1800);
+      var me=await requestWithTimeout('/auth/merchant/me',{headers:headers()},5000);
       if(me && me.brand) applyBrandInfo(me.brand);
       applyCashierUser(me.user);
       if(state.user.role!=='cashier'){ window.location.replace(me.landing || '/merchant/'); return false; }
@@ -1084,12 +1147,18 @@
       return true;
     } catch(err) {
       var cached=getPosPinCache();
-      // Network/timeout may use local PIN; a real server-side 401 can also be
-      // recovered through the cached POS credential without accepting the old token.
+      // Network/timeout/offline or expired session can be unlocked via PIN gate
       if(cached && cached.offline_credential) {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-        await openPinUnlockGate(err && err.code==='NETWORK_TIMEOUT' ? true : true);
+        if (err && err.status === 401) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+        }
+        await openPinUnlockGate(err && (err.code==='NETWORK_TIMEOUT' || !navigator.onLine));
+        return true;
+      }
+      // If network error/timeout but we have user in memory/storage, don't immediately redirect to login
+      if (err && (err.code==='NETWORK_TIMEOUT' || !navigator.onLine) && user()) {
+        applyCashierUser(user());
         return true;
       }
       window.location.replace('/login');
@@ -1229,11 +1298,11 @@
       return;
     }
 
-    var subtitle = 'Shift #' + esc(s.id) + (s.opened_at ? ' · dibuka ' + esc(s.opened_at) : '');
+    var subtitle = formatShiftSubtitle(s);
     html = '<div class="pos-modal-head-row">' +
       '<div class="pos-modal-head-title">' +
         '<h3>Shift Kasir</h3>' +
-        '<p>Operasional · ' + subtitle + '</p>' +
+        '<p>' + esc(subtitle) + '</p>' +
       '</div>' +
       '<button type="button" class="pos-modal-close-icon" id="pos-shift-modal-close" title="Tutup" aria-label="Tutup">✕</button>' +
     '</div>';
@@ -1342,7 +1411,7 @@
       '</div>' +
 
       '<div class="pos-form-row">' +
-        '<label for="pos-cash-move-reason">Keterangan / Alasan (Opsional)</label>' +
+        '<label for="pos-cash-move-reason">Keterangan / Alasan (Wajib)</label>' +
         '<input id="pos-cash-move-reason" type="text" placeholder="' + (isCashIn ? 'Contoh: Tambah modal kembalian' : 'Contoh: Beli es batu / operasional') + '">' +
       '</div>' +
     '</div>';
@@ -1368,10 +1437,7 @@
       bindNominalInput(amtInput);
       bindModalEnter(amtInput, function(){
         var r = $('pos-cash-move-reason');
-        if (r) { r.focus(); } else {
-          var btn = $('btn-pos-cash-move-submit');
-          if (btn) btn.click();
-        }
+        if (r) r.focus();
       });
     }
 
@@ -1387,6 +1453,10 @@
       var amount = parseNominal(amtInput ? amtInput.value : 0);
       if (!Number.isFinite(amount) || amount <= 0) return toast('Nominal tidak valid.');
       var reason = ($('pos-cash-move-reason') ? $('pos-cash-move-reason').value : '').trim();
+      if (!reason) {
+        if ($('pos-cash-move-reason')) $('pos-cash-move-reason').focus();
+        return toast('Keterangan / alasan ' + (isCashIn ? 'Cash In' : 'Cash Out') + ' wajib diisi.');
+      }
       try {
         var d = await request('/pos/shifts/' + encodeURIComponent(state.shift.id) + '/cash-movement', {
           method: 'POST',
@@ -1530,7 +1600,7 @@
     var s = state.shift;
     box.innerHTML = '<div class="pos-shift-card-header">' +
       '<h3>' + (s.active_break ? 'Sedang Istirahat' : 'Shift Aktif') + '</h3>' +
-      '<p>' + esc(s.id) + ' · dibuka ' + esc(s.opened_at || '') + '</p>' +
+      '<p>' + esc(formatShiftSubtitle(s)) + '</p>' +
       '</div>' +
       '<div class="pos-shift-grid">' +
         '<div class="pos-shift-metric"><span>Modal Awal</span><strong>' + money(s.starting_float) + '</strong></div>' +
@@ -1789,13 +1859,26 @@
       h=held.find(function(x){return String(x.id)===String(heldId);});
     }
     if(!h)return toast('Pesanan ditahan tidak ditemukan.');
-    state.orderType='dine_in';
-    state.selectedTable={table_number:h.table_number};
-    if($('pos-selected-table')) $('pos-selected-table').textContent='Meja '+h.table_number;
-    if($('pos-customer-name')) $('pos-customer-name').value=h.customer_name||'';
+
+    var restoredType = h.order_type || (h.table_number ? 'dine_in' : 'pickup');
+    state.orderType = restoredType;
+    document.querySelectorAll('.pos-order-type button').forEach(function(x){
+      x.classList.toggle('active', x.dataset.type === restoredType);
+    });
+
+    if (restoredType === 'dine_in') {
+      state.selectedTable = h.table_number ? { table_number: h.table_number } : null;
+      if ($('pos-selected-table')) $('pos-selected-table').textContent = h.table_number ? ('Meja ' + h.table_number) : 'Belum dipilih';
+    } else {
+      state.selectedTable = null;
+    }
+    var ctx = $('pos-table-context');
+    if (ctx) ctx.classList.toggle('hidden', restoredType !== 'dine_in');
+
+    if ($('pos-customer-name')) $('pos-customer-name').value = h.customer_name || '';
     try{
-      state.cart=JSON.parse(h.items_payload||'[]');
-    }catch(_){state.cart=[];}
+      state.cart = JSON.parse(h.items_payload || '[]');
+    }catch(_){state.cart = [];}
     try{
       await request('/pos/held-orders/'+encodeURIComponent(heldId)+'/resume',{method:'POST',headers:headers()});
     }catch(_){}
@@ -1804,7 +1887,8 @@
     await updateHeldCount();
     if(state.transaksiTab==='held') renderHeldSales();
     setView('kasir');
-    toast('Pesanan Meja '+(h.table_number||'—')+' berhasil dibuka kembali di kasir.');
+    var labelInfo = (restoredType === 'dine_in' && h.table_number) ? ('Meja ' + h.table_number) : (h.customer_name || (restoredType === 'pickup' ? 'Pickup' : restoredType === 'delivery' ? 'Delivery' : 'Pesanan'));
+    toast('Pesanan ' + esc(labelInfo) + ' berhasil dibuka kembali di kasir.');
   }
 
   async function cancelHeld(heldId){
@@ -1825,9 +1909,11 @@
       var items=[]; try{items=JSON.parse(h.items_payload||'[]');}catch(_){}
       var subtotal=items.reduce(function(s,i){return s+(Number(i.unit_price)||0)*Number(i.quantity||0)},0);
       var itemSummary=items.map(function(i){return (i.quantity||1)+'x '+(i.name||'Item');}).join(', ');
+      var oType = h.order_type || (h.table_number ? 'dine_in' : 'pickup');
+      var typeTitle = (oType === 'dine_in') ? ('Meja ' + esc(h.table_number || '—')) : (oType === 'pickup' ? 'Pickup' : oType === 'delivery' ? 'Delivery' : esc(oType));
       return '<div class="pos-held-modal-card">' +
         '<div class="pos-held-modal-main">' +
-          '<strong>Meja '+esc(h.table_number||'—')+' · '+esc(h.customer_name||'Tamu')+'</strong>' +
+          '<strong>' + typeTitle + ' · ' + esc(h.customer_name || 'Tamu') + '</strong>' +
           '<div class="pos-held-modal-desc">'+esc(itemSummary||'Item')+'</div>' +
           '<div class="pos-held-modal-price">'+money(subtotal)+'</div>' +
         '</div>' +
@@ -1889,7 +1975,9 @@
       var items=[]; try{items=JSON.parse(h.items_payload||'[]');}catch(_){}
       var subtotal=items.reduce(function(s,i){return s+(Number(i.unit_price)||0)*Number(i.quantity||0)},0);
       var itemSummary=items.map(function(i){return (i.quantity||1)+'x '+(i.name||'Item');}).join(', ');
-      return '<div class="pos-held-row"><div class="pos-held-main"><strong>Meja '+esc(h.table_number||'—')+'</strong><small>Tamu: '+esc(h.customer_name||'Tamu')+' · '+esc(h.created_at||'')+'</small></div><div class="pos-held-items">'+esc(itemSummary||'—')+'</div><div class="pos-held-total">'+money(subtotal)+'</div><div class="pos-held-actions"><button type="button" class="pos-btn small ghost danger" data-cancel-held-row="'+esc(h.id)+'">Batal</button><button type="button" class="pos-btn small" data-resume-held-row="'+esc(h.id)+'">Buka di Kasir</button></div></div>';
+      var oType = h.order_type || (h.table_number ? 'dine_in' : 'pickup');
+      var typeTitle = (oType === 'dine_in') ? ('Meja ' + esc(h.table_number || '—')) : (oType === 'pickup' ? 'Pickup' : oType === 'delivery' ? 'Delivery' : esc(oType));
+      return '<div class="pos-held-row"><div class="pos-held-main"><strong>' + typeTitle + '</strong><small>Tamu: '+esc(h.customer_name||'Tamu')+' · '+esc(h.created_at||'')+'</small></div><div class="pos-held-items">'+esc(itemSummary||'—')+'</div><div class="pos-held-total">'+money(subtotal)+'</div><div class="pos-held-actions"><button type="button" class="pos-btn small ghost danger" data-cancel-held-row="'+esc(h.id)+'">Batal</button><button type="button" class="pos-btn small" data-resume-held-row="'+esc(h.id)+'">Buka di Kasir</button></div></div>';
     }).join('');
     box.querySelectorAll('[data-resume-held-row]').forEach(function(b){b.onclick=function(){resumeHeld(b.dataset.resumeHeldRow);};});
     box.querySelectorAll('[data-cancel-held-row]').forEach(function(b){b.onclick=function ancient(){cancelHeld(b.dataset.cancelHeldRow);};});
@@ -2128,7 +2216,20 @@
         setView(b.dataset.view);
       };
     });
-    document.querySelectorAll('.pos-order-type button').forEach(function(b){b.onclick=function(){state.orderType=b.dataset.type;document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x===b);});$('pos-table-context').classList.toggle('hidden',state.orderType!=='dine_in');if(state.orderType!=='dine_in'){state.selectedTable=null;renderCart();}else{renderCart();}};});
+    document.querySelectorAll('.pos-order-type button').forEach(function(b){
+      b.onclick=function(){
+        state.orderType=b.dataset.type;
+        document.querySelectorAll('.pos-order-type button').forEach(function(x){
+          x.classList.toggle('active',x===b);
+        });
+        if(state.orderType!=='dine_in'){
+          state.selectedTable=null;
+        }
+        var ctx=$('pos-table-context');
+        if(ctx) ctx.classList.toggle('hidden', state.orderType!=='dine_in');
+        renderCart();
+      };
+    });
     var searchInput=$('pos-menu-search'), clearSearchBtn=$('btn-pos-clear-search');
     if(searchInput){
       searchInput.oninput=function(){

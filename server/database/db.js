@@ -1041,6 +1041,21 @@ function initSchema(targetDb) {
     CREATE INDEX IF NOT EXISTS idx_customer_sessions_brand_phone ON customer_sessions(brand_id, phone);
     CREATE INDEX IF NOT EXISTS idx_customer_sessions_expires_at ON customer_sessions(expires_at);
 
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      brand_id TEXT,
+      organization_id TEXT,
+      branch_id TEXT,
+      role TEXT NOT NULL,
+      session_data TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
+
 
     CREATE TABLE IF NOT EXISTS promotions (
       id TEXT PRIMARY KEY,
@@ -1338,6 +1353,7 @@ function initSchema(targetDb) {
       branch_id TEXT NOT NULL,
       table_number TEXT,
       customer_name TEXT,
+      order_type TEXT DEFAULT 'dine_in',
       items_payload TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'held', -- 'held', 'settled', 'cancelled'
       created_at TEXT DEFAULT (datetime('now')),
@@ -1651,6 +1667,7 @@ function initSchema(targetDb) {
   try { targetDb.exec("ALTER TABLE orders ADD COLUMN recipient_type TEXT NOT NULL DEFAULT 'self';"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN recipient_name TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN recipient_phone TEXT;'); } catch (e) {}
+  try { targetDb.exec("ALTER TABLE pos_held_orders ADD COLUMN order_type TEXT DEFAULT 'dine_in';"); } catch (e) {}
 
   // F05 Migration Safety: inspect existing duplicate rows before establishing UNIQUE constraint
   try {
@@ -1982,6 +1999,26 @@ function initSchema(targetDb) {
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_customers_org_id ON customers(organization_id);'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE customer_addresses ADD COLUMN customer_id TEXT;'); } catch (e) {}
   try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_customer_addresses_customer_id ON customer_addresses(brand_id, customer_id);'); } catch (e) {}
+
+  // Workforce / Merchant Sessions persistence
+  try {
+    targetDb.exec(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        token TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        brand_id TEXT,
+        organization_id TEXT,
+        branch_id TEXT,
+        role TEXT NOT NULL,
+        session_data TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+      CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
+    `);
+  } catch (e) {}
 
   // Migrate existing branch_products:
   // 1. Fill legacy snapshot columns (product_name, etc.) idempotently from master for pre-override rows.

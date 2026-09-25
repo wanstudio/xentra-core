@@ -38,6 +38,7 @@ test('PosOrderRepository exposes semantic held-order mutations', () => {
     branchId: 'branch-1',
     tableNumber: 'A1',
     customerName: 'Tamu',
+    orderType: 'dine_in',
     itemsPayload: '[]',
     createdAt: '2026-09-10T00:00:00.000Z',
     updatedAt: '2026-09-10T00:00:00.000Z'
@@ -47,6 +48,29 @@ test('PosOrderRepository exposes semantic held-order mutations', () => {
 
   assert.equal(calls.execute.length, 3);
   assert.match(calls.execute[0].sql, /INSERT INTO pos_held_orders/);
+  assert.equal(calls.execute[0].params[4], 'dine_in');
   assert.match(calls.execute[1].sql, /UPDATE pos_held_orders/);
   assert.match(calls.execute[2].sql, /SET status =/);
+});
+
+test('PosOrderRepository supports holding orders for non-dine_in types (pickup, delivery)', () => {
+  const calls = { one: [], execute: [], executeResult: { changes: 1 } };
+  const repo = new PosOrderRepository(makeDataAccess(calls));
+
+  repo.insertHeldOrder({
+    id: 'held-pickup-1',
+    branchId: 'branch-1',
+    tableNumber: '',
+    customerName: 'Budi (Pickup)',
+    orderType: 'pickup',
+    itemsPayload: '[{"name":"Kopi"}]',
+    createdAt: '2026-09-10T00:00:00.000Z',
+    updatedAt: '2026-09-10T00:00:00.000Z'
+  });
+
+  assert.equal(calls.execute.length, 1);
+  assert.match(calls.execute[0].sql, /order_type/);
+  assert.equal(calls.execute[0].params[2], '');
+  assert.equal(calls.execute[0].params[3], 'Budi (Pickup)');
+  assert.equal(calls.execute[0].params[4], 'pickup');
 });

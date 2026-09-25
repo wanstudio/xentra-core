@@ -56,6 +56,7 @@ class PosOrderService {
       branchId: branch_id,
       tableNumber: table_number,
       customerName: customer_name,
+      orderType: order_type,
       itemsPayload: payloadJson,
       status: 'held',
       createdAt: now,

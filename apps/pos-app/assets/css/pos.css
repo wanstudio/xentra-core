@@ -321,6 +321,7 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
   .pos-order-type button{flex:1!important;text-align:center!important;padding:7px 4px!important;font-size:12px!important;font-weight:700!important;border-radius:8px!important;border:0!important;background:transparent!important;color:#64748b!important;transition:all .15s ease}
   .pos-order-type button.active{background:#ffffff!important;color:#0f172a!important;box-shadow:0 1px 3px rgba(0,0,0,0.08)!important;font-weight:800!important}
   .pos-context-strip{display:flex!important;align-items:center!important;justify-content:space-between!important;width:100%!important;background:#eff6ff!important;border:1px solid #bfdbfe!important;border-radius:10px!important;padding:7px 12px!important;font-size:12px!important;box-sizing:border-box!important}
+  .pos-context-strip.hidden{display:none!important}
 
   /* Search & Category Pills */
   .pos-search-row{margin-bottom:10px!important;padding:0!important;width:100%!important}

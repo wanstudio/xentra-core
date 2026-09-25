@@ -337,7 +337,7 @@ const TokenSessionStore = {
   createSession(user, brand_id, ttlSeconds = 86400) {
     const token = 'xnt_auth_' + crypto.randomBytes(24).toString('hex');
     const expiresAt = Date.now() + ttlSeconds * 1000;
-    this.sessions.set(token, {
+    const sessionObj = {
       id: user.id,
       userId: user.id,
       username: user.username,
@@ -354,7 +354,28 @@ const TokenSessionStore = {
       status: user.status || 'active',
       email_verified: user.email_verified !== undefined ? Boolean(user.email_verified) : true,
       expiresAt
-    });
+    };
+    this.sessions.set(token, sessionObj);
+
+    // L2: Persist user session to SQLite
+    try {
+      db.prepare(`
+        INSERT OR REPLACE INTO user_sessions (token, user_id, brand_id, organization_id, branch_id, role, session_data, expires_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+      `).run(
+        token,
+        user.id,
+        brand_id || null,
+        user.organization_id || null,
+        user.branch_id || null,
+        user.role,
+        JSON.stringify(sessionObj),
+        expiresAt
+      );
+    } catch (dbErr) {
+      console.error('[TokenSessionStore] Failed to persist user session to SQLite:', dbErr.message);
+    }
+
     return { token, expiresAt };
   },
   createCustomerSession(phone, brand_id, ttlSeconds = 2592000, extra = {}) {
@@ -447,9 +468,11 @@ const TokenSessionStore = {
     if (cachedSession) {
       if (Date.now() > cachedSession.expiresAt) {
         this.sessions.delete(token);
-        // Clean up expired in SQLite if it was customer token
+        // Clean up expired in SQLite
         if (token.startsWith('xnt_cust_')) {
           try { db.prepare('DELETE FROM customer_sessions WHERE token = ?').run(token); } catch (_) {}
+        } else if (token.startsWith('xnt_auth_')) {
+          try { db.prepare('DELETE FROM user_sessions WHERE token = ?').run(token); } catch (_) {}
         }
         return null;
       }
@@ -484,7 +507,47 @@ const TokenSessionStore = {
         this.sessions.set(token, hydrated);
         return hydrated;
       } catch (dbErr) {
-        console.error('[TokenSessionStore] SQLite session lookup failed:', dbErr.message);
+        console.error('[TokenSessionStore] SQLite customer session lookup failed:', dbErr.message);
+        return null;
+      }
+    }
+
+    // L2: SQLite backing for workforce / merchant sessions
+    if (token.startsWith('xnt_auth_')) {
+      try {
+        const row = db.prepare('SELECT token, user_id, brand_id, organization_id, branch_id, role, session_data, expires_at FROM user_sessions WHERE token = ?').get(token);
+        if (!row) return null;
+
+        if (Date.now() > Number(row.expires_at)) {
+          try { db.prepare('DELETE FROM user_sessions WHERE token = ?').run(token); } catch (_) {}
+          return null;
+        }
+
+        let hydrated = null;
+        try {
+          hydrated = JSON.parse(row.session_data);
+        } catch (_) {}
+
+        if (!hydrated || typeof hydrated !== 'object') {
+          hydrated = {
+            id: row.user_id,
+            userId: row.user_id,
+            role: row.role,
+            brandId: row.brand_id,
+            brand_id: row.brand_id,
+            organizationId: row.organization_id,
+            organization_id: row.organization_id,
+            branchId: row.branch_id,
+            branch_id: row.branch_id,
+            expiresAt: Number(row.expires_at)
+          };
+        }
+
+        // Hydrate L1 memory cache
+        this.sessions.set(token, hydrated);
+        return hydrated;
+      } catch (dbErr) {
+        console.error('[TokenSessionStore] SQLite user session lookup failed:', dbErr.message);
         return null;
       }
     }
@@ -497,6 +560,8 @@ const TokenSessionStore = {
       this.revokedTokens.add(token);
       if (token.startsWith('xnt_cust_')) {
         try { db.prepare('DELETE FROM customer_sessions WHERE token = ?').run(token); } catch (_) {}
+      } else if (token.startsWith('xnt_auth_')) {
+        try { db.prepare('DELETE FROM user_sessions WHERE token = ?').run(token); } catch (_) {}
       }
     }
   },
@@ -507,6 +572,24 @@ const TokenSessionStore = {
         this.sessions.delete(token);
       }
     }
+    try {
+      db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(userId);
+    } catch (_) {}
+  },
+  revokeUserSessionsExcept(userId, currentToken) {
+    for (const [token, session] of this.sessions.entries()) {
+      if ((session.userId === userId || session.id === userId) && token !== currentToken) {
+        this.sessions.delete(token);
+        this.revokedTokens.add(token);
+      }
+    }
+    try {
+      if (currentToken) {
+        db.prepare('DELETE FROM user_sessions WHERE user_id = ? AND token != ?').run(userId, currentToken);
+      } else {
+        db.prepare('DELETE FROM user_sessions WHERE user_id = ?').run(userId);
+      }
+    } catch (_) {}
   },
   destroyAllUserSessions(userId) {
     this.revokeUserSessions(userId);

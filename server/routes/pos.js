@@ -262,7 +262,7 @@ router.get('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
     const branchId = req.user.branch_id || req.user.branchId;
     if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
     const held = db.prepare(`
-      SELECT id, branch_id, table_number, customer_name, items_payload, status, created_at, updated_at
+      SELECT id, branch_id, table_number, customer_name, COALESCE(order_type, 'dine_in') AS order_type, items_payload, status, created_at, updated_at
       FROM pos_held_orders
       WHERE branch_id = ? AND status = 'held'
       ORDER BY updated_at DESC
@@ -279,15 +279,25 @@ router.post('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
     const { table_number = '', customer_name = 'Tamu', items = [], order_type = 'dine_in' } = req.body || {};
     if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
     if (!Array.isArray(items) || !items.length) return res.status(400).json({ success: false, error: 'Tidak ada item untuk ditahan.' });
-    if (order_type !== 'dine_in') return res.status(400).json({ success: false, error: 'Hold Sale hanya untuk transaksi dine-in/table bill.' });
 
     const { PosOrderService } = require('../../domains/pos');
+    const validOrderTypes = Object.values(PosOrderService.ORDER_TYPES || {
+      DINE_IN: 'dine_in',
+      PICKUP: 'pickup',
+      DELIVERY: 'delivery',
+      RESERVATION: 'reservation'
+    });
+    const normalizedOrderType = String(order_type || 'dine_in').toLowerCase();
+    if (!validOrderTypes.includes(normalizedOrderType)) {
+      return res.status(400).json({ success: false, error: `Tipe pesanan tidak valid: ${order_type}` });
+    }
+
     const held = PosOrderService.holdOrder({
       branch_id: branchId,
       table_number: table_number || '',
       customer_name: customer_name || 'Tamu',
       items,
-      order_type
+      order_type: normalizedOrderType
     });
     res.status(201).json({ success: true, held_order: held });
   } catch (err) {
@@ -384,9 +394,11 @@ router.get('/pos/shifts/current', requireAuth(['owner', 'brand_manager', 'branch
     }
 
     const shift = db.prepare(`
-      SELECT * FROM pos_shifts 
-      WHERE cashier_id = ? AND branch_id = ? AND status = 'open'
-      ORDER BY opened_at DESC LIMIT 1
+      SELECT s.*, COALESCE(u.full_name, u.username) AS cashier_name
+      FROM pos_shifts s
+      LEFT JOIN users u ON u.id = s.cashier_id
+      WHERE s.cashier_id = ? AND s.branch_id = ? AND s.status = 'open'
+      ORDER BY s.opened_at DESC LIMIT 1
     `).get(targetCashierId, userBranchId);
 
     let activeBreak=null;
@@ -470,6 +482,11 @@ router.post('/pos/shifts/open', requireAuth(['owner', 'brand_manager', 'branch_m
       starting_float: Number(starting_float) || 0
     });
 
+    const userRow = db.prepare('SELECT full_name, username FROM users WHERE id = ?').get(targetCashierId);
+    if (userRow && shift) {
+      shift.cashier_name = userRow.full_name || userRow.username;
+    }
+
     res.status(201).json({
       success: true,
       message: 'Shift kasir berhasil dibuka.',
@@ -547,6 +564,10 @@ router.post('/pos/shifts/:id/cash-movement', requireAuth(['owner', 'brand_manage
     if (!amount || !Number.isFinite(Number(amount)) || Number(amount) <= 0) {
       return res.status(400).json({ success: false, error: 'Jumlah uang (amount) harus berupa angka positif.' });
     }
+    const cleanReason = String(reason || '').trim();
+    if (!cleanReason) {
+      return res.status(400).json({ success: false, error: 'Keterangan / alasan mutasi kas wajib diisi.' });
+    }
 
     const { PosShiftService } = require('../../domains/pos');
     const updatedShift = PosShiftService.recordCashMovement({
@@ -557,6 +578,11 @@ router.post('/pos/shifts/:id/cash-movement', requireAuth(['owner', 'brand_manage
       actor_id: cashierId,
       actor_role: req.user.role
     });
+
+    const userRow = db.prepare('SELECT full_name, username FROM users WHERE id = ?').get(shift.cashier_id);
+    if (userRow && updatedShift) {
+      updatedShift.cashier_name = userRow.full_name || userRow.username;
+    }
 
     res.json({
       success: true,

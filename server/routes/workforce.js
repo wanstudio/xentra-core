@@ -349,9 +349,13 @@ router.post('/auth/change-password', requireAuth(['owner', 'brand_manager', 'bra
     
     // Revoke all sessions for this user except the current one
     const userId = req.user.userId || req.user.id;
-    for (const [token, session] of TokenSessionStore.sessions.entries()) {
-      if ((session.userId === userId || session.id === userId) && token !== currentToken) {
-        TokenSessionStore.sessions.delete(token);
+    if (TokenSessionStore.revokeUserSessionsExcept) {
+      TokenSessionStore.revokeUserSessionsExcept(userId, currentToken);
+    } else {
+      for (const [token, session] of TokenSessionStore.sessions.entries()) {
+        if ((session.userId === userId || session.id === userId) && token !== currentToken) {
+          TokenSessionStore.sessions.delete(token);
+        }
       }
     }
 

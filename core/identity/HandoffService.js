@@ -157,7 +157,8 @@ class HandoffService {
       returnUrlObj.searchParams.set('handoff', ticketCode);
       redirectUrl = returnUrlObj.toString();
     } else if (brand.custom_domain) {
-      redirectUrl = `https://${brand.custom_domain}/dashboard/?handoff=${ticketCode}`;
+      const landingPath = user.role === 'cashier' ? '/pos/' : '/dashboard/';
+      redirectUrl = `https://${brand.custom_domain}${landingPath}?handoff=${ticketCode}`;
     }
 
     return {

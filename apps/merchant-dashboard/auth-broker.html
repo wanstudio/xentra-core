@@ -290,9 +290,9 @@
         }).then(function (res) {
           return res.json().then(function (data) {
             if (res.ok && data && data.success) {
-              // Link mode success: if redirect_url provided, use it; otherwise return to returnTo with success
+              // Normal merchant auth success: if redirect_url provided, use it
               if (data.redirect_url) {
-                statusEl.textContent = isLinkMode ? 'Akun Google berhasil dihubungkan! Mengalihkan...' : 'Authorized! Returning to dashboard...';
+                statusEl.textContent = isLinkMode ? 'Akun Google berhasil dihubungkan! Mengalihkan...' : 'Authorized! Returning to application...';
                 window.location.replace(data.redirect_url);
                 return;
               }
@@ -309,6 +309,18 @@
                   returnWrap.style.display = 'block';
                 }
                 return;
+              }
+              // If authenticated successfully with returnTo, but no redirect_url (e.g. handoff ticket missing), redirect back to returnTo
+              if (returnTo) {
+                try {
+                  var dest = new URL(returnTo);
+                  if (data.handoff_ticket) {
+                    dest.searchParams.set('handoff', data.handoff_ticket);
+                  }
+                  statusEl.textContent = 'Authorized! Mengalihkan...';
+                  window.location.replace(dest.toString());
+                  return;
+                } catch (_) {}
               }
             }
 
