@@ -351,22 +351,232 @@
     updateHeldCount();
   }
 
-  function showPosAuthGate(offlineReason) {
+  function showPosAuthGate(offlineReason, setupMode) {
     var gate=$('pos-auth-gate'); if(!gate) return;
     var badge=$('pos-auth-badge'), subtitle=$('pos-auth-subtitle'), input=$('pos-login-pin'), error=$('pos-pin-login-error');
-    if(offlineReason){
-      badge.textContent='OFFLINE / PIN TERSIMPAN'; badge.className='pos-auth-badge offline';
-      subtitle.textContent='Koneksi ke Core tidak tersedia atau terlalu lambat. Masukkan PIN POS untuk membuka salah satu kasir yang sudah pernah digunakan di terminal ini.';
+    var form=$('pos-pin-login-form'), divider=document.querySelector('.pos-auth-divider');
+    var googleBtn=$('btn-pos-google-login'), accountBtn=$('btn-pos-account-login');
+    setupMode=!!setupMode;
+    if(setupMode){
+      badge.textContent='AKTIVASI TERMINAL'; badge.className='pos-auth-badge';
+      subtitle.textContent='Perangkat POS ini belum diaktifkan. Owner atau Manager harus masuk dengan akun Xentra untuk menghubungkan perangkat ini ke cabang.';
+      if(form) form.style.display='none';
+      if(divider) divider.style.display='none';
+      if(googleBtn) googleBtn.style.display='flex';
+      if(accountBtn){
+        accountBtn.textContent='Masuk dengan akun Xentra untuk aktivasi';
+        accountBtn.style.display='block';
+      }
     }else{
-      badge.textContent='PIN Kasir'; badge.className='pos-auth-badge';
-      subtitle.textContent='Masukkan PIN 6 digit untuk masuk cepat ke akun Kasir.';
+      if(form) form.style.display='';
+      if(divider) divider.style.display='';
+      if(googleBtn) googleBtn.style.display='flex';
+      if(accountBtn){
+        accountBtn.textContent='Gunakan email / password';
+        accountBtn.style.display='block';
+      }
+      if(offlineReason){
+        badge.textContent='OFFLINE / PIN TERSIMPAN'; badge.className='pos-auth-badge offline';
+        subtitle.textContent='Koneksi ke Core tidak tersedia atau terlalu lambat. Masukkan PIN POS untuk membuka salah satu kasir yang sudah pernah digunakan di terminal ini.';
+      }else{
+        badge.textContent='PIN Kasir'; badge.className='pos-auth-badge';
+        subtitle.textContent='Masukkan PIN 6 digit untuk masuk cepat ke akun Kasir.';
+      }
     }
     if(error) error.textContent='';
-    if(input){input.value='';setTimeout(function(){input.focus();},50);}
+    if(input){
+      input.value='';
+      if(!setupMode) setTimeout(function(){input.focus();},50);
+    }
     gate.style.display='flex';
   }
 
   function hidePosAuthGate(){var gate=$('pos-auth-gate');if(gate)gate.style.display='none';}
+
+  function isTerminalManagerRole(role){
+    return ['owner','brand_manager','branch_manager'].includes(role);
+  }
+
+  function isTerminalSetupRequested(){
+    try{
+      var params=new URLSearchParams(window.location.search);
+      if(params.get('terminal_setup')==='1') return true;
+      return sessionStorage.getItem('xentra_pos_terminal_setup_requested')==='1';
+    }catch(_){ return false; }
+  }
+
+  function clearTerminalSetupMarker(){
+    try{sessionStorage.removeItem('xentra_pos_terminal_setup_requested');}catch(_){}
+    try{
+      var params=new URLSearchParams(window.location.search);
+      if(params.has('terminal_setup')){
+        params.delete('terminal_setup');
+        var cleanQuery=params.toString();
+        var cleanUrl=window.location.pathname+(cleanQuery?'?'+cleanQuery:'')+window.location.hash;
+        window.history.replaceState({},document.title,cleanUrl);
+      }
+    }catch(_){}
+  }
+
+  function getPosDeviceIdentifier(){
+    var key='xentra_pos_device_identifier_v1';
+    var current=localStorage.getItem(key);
+    if(current) return current;
+    var raw='';
+    try{
+      if(window.crypto && typeof window.crypto.randomUUID==='function') raw=window.crypto.randomUUID();
+    }catch(_){}
+    if(!raw) raw='posweb_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,12);
+    try{localStorage.setItem(key,raw);}catch(_){}
+    return raw;
+  }
+
+  async function getTerminalBranchesForManager(managerUser){
+    if(managerUser && managerUser.role==='branch_manager'){
+      if(!managerUser.branch_id) throw new Error('Manager cabang belum memiliki cabang.');
+      return [{id:managerUser.branch_id,name:managerUser.branch_name||'Cabang terdaftar'}];
+    }
+    var d=await request('/admin/branches',{headers:headers()});
+    var branches=(d.branches||[]).filter(function(b){
+      return b && b.id && !b.is_archived && Number(b.is_active)!==0;
+    });
+    return branches;
+  }
+
+  async function bootstrapTerminalForManager(managerUser){
+    if(!isTerminalManagerRole(managerUser && managerUser.role)){
+      return false;
+    }
+
+    var branches;
+    try{
+      branches=await getTerminalBranchesForManager(managerUser);
+    }catch(err){
+      clearTerminalSetupMarker();
+      window.location.replace((managerUser && managerUser.role==='branch_manager')?'/merchant/':'/owner/');
+      return false;
+    }
+
+    if(!branches.length){
+      clearTerminalSetupMarker();
+      throw new Error('Belum ada cabang aktif yang dapat digunakan untuk terminal POS.');
+    }
+
+    return await new Promise(function(resolve){
+      var defaultBranchId=(managerUser && managerUser.branch_id) || branches[0].id;
+      var options=branches.map(function(b){
+        return '<option value="'+esc(b.id)+'"'+(String(b.id)===String(defaultBranchId)?' selected':'')+'>'+esc(b.name||b.id)+'</option>';
+      }).join('');
+      var initialName='Terminal POS - '+String((branches.find(function(b){return String(b.id)===String(defaultBranchId);})||branches[0]).name||'Kasir');
+      var html=
+        '<div class="pos-modal-head-row">'+
+          '<div class="pos-modal-head-title"><h3>Aktifkan Terminal POS</h3><p>Otorisasi Owner / Manager</p></div>'+
+          '<button type="button" class="pos-modal-close-icon" id="pos-terminal-bootstrap-close" title="Tutup" aria-label="Tutup">✕</button>'+
+        '</div>'+
+        '<div class="pos-shift-modal-body">'+
+          '<div class="pos-shift-open-notice">'+
+            '<div class="pos-shift-notice-icon">🖥️</div>'+
+            '<div class="pos-shift-notice-text"><strong>Hubungkan perangkat ini ke cabang</strong><span>Terminal tetap milik cabang dan setelah diaktifkan dapat dipakai bergantian oleh kasir.</span></div>'+
+          '</div>'+
+          '<div class="pos-form-row"><label for="pos-terminal-branch">Cabang</label><select id="pos-terminal-branch" class="pos-input">'+options+'</select></div>'+
+          '<div class="pos-form-row"><label for="pos-terminal-name">Nama terminal</label><input id="pos-terminal-name" class="pos-input" type="text" value="'+esc(initialName)+'" maxlength="80" autocomplete="off"></div>'+
+          '<div id="pos-terminal-bootstrap-error" class="pos-auth-error"></div>'+
+          '<div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-terminal-bootstrap-cancel" type="button">Batal</button><button class="pos-btn" id="pos-terminal-bootstrap-save" type="button">Aktifkan Terminal</button></div>'+
+        '</div>';
+      showModal(html);
+
+      var closeBtn=$('pos-terminal-bootstrap-close');
+      var cancelBtn=$('pos-terminal-bootstrap-cancel');
+      var saveBtn=$('pos-terminal-bootstrap-save');
+      var branchInput=$('pos-terminal-branch');
+      var nameInput=$('pos-terminal-name');
+      var errorEl=$('pos-terminal-bootstrap-error');
+
+      function abortSetup(){
+        hideModal();
+        clearTerminalSetupMarker();
+        window.location.replace((managerUser.role==='branch_manager')?'/merchant/':'/owner/');
+        resolve(false);
+      }
+
+      if(closeBtn) closeBtn.onclick=abortSetup;
+      if(cancelBtn) cancelBtn.onclick=abortSetup;
+
+      if(saveBtn) saveBtn.onclick=async function(){
+        var branchId=branchInput && branchInput.value;
+        var deviceName=(nameInput && nameInput.value || '').trim() || initialName;
+        if(!branchId){
+          if(errorEl) errorEl.textContent='Cabang wajib dipilih.';
+          return;
+        }
+        saveBtn.disabled=true;
+        saveBtn.textContent='Memeriksa...';
+        if(errorEl) errorEl.textContent='';
+        try{
+          var current=await request('/pos/terminal/current?branch_id='+encodeURIComponent(branchId),{headers:headers()});
+          var terminal=current && current.terminal ? current.terminal : null;
+          if(!terminal){
+            saveBtn.textContent='Mengaktifkan...';
+            var registered=await request('/pos/terminal/register',{
+              method:'POST',
+              headers:headers(),
+              body:JSON.stringify({
+                branch_id:branchId,
+                device_name:deviceName,
+                device_identifier:getPosDeviceIdentifier(),
+                config_version:1
+              })
+            });
+            terminal=registered && registered.terminal;
+          }
+          if(!terminal || !terminal.id) throw new Error('Terminal tidak berhasil didaftarkan.');
+          state.terminalId=terminal.id;
+          state.branchId=terminal.branch_id || branchId;
+          localStorage.setItem('xentra_pos_terminal_id',String(state.terminalId));
+          localStorage.setItem('xentra_pos_branch_id',String(state.branchId));
+          clearTerminalSetupMarker();
+          hideModal();
+
+          // Manager authentication was only used to perform terminal administration.
+          // Do not leave the Manager session active on the cashier execution surface.
+          var managerToken=token();
+          if(managerToken){
+            fetch(API+'/auth/logout',{
+              method:'POST',
+              headers:{'Content-Type':'application/json','Authorization':'Bearer '+managerToken}
+            }).catch(function(){});
+          }
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          state.user=null;
+          state.shift=null;
+
+          var unlocked=await openPinUnlockGate(false,false);
+          resolve(!!unlocked || !!token());
+        }catch(err){
+          if(errorEl) errorEl.textContent=err.message || 'Gagal mengaktifkan terminal.';
+          saveBtn.disabled=false;
+          saveBtn.textContent='Aktifkan Terminal';
+        }
+      };
+    });
+  }
+
+  async function clearPosSessionAndReturnToPin(){
+    var currentToken=token();
+    if(currentToken){
+      fetch(API+'/auth/logout',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+currentToken}
+      }).catch(function(){});
+    }
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    state.user=null;
+    state.shift=null;
+    state.offlineMode=false;
+    window.location.replace('/pos/');
+  }
 
   async function onlinePinLogin(pin) {
     var branchId=state.branchId || localStorage.getItem('xentra_pos_branch_id') || null;
@@ -419,9 +629,9 @@
     var invalid=new Error('PIN Kasir salah atau belum pernah didaftarkan pada terminal ini.'); invalid.code='INVALID_OFFLINE_POS_PIN'; throw invalid;
   }
 
-  function openPinUnlockGate(offlineReason) {
+  function openPinUnlockGate(offlineReason, setupMode) {
     return new Promise(function(resolve,reject){
-      showPosAuthGate(offlineReason);
+      showPosAuthGate(offlineReason, setupMode);
       var form=$('pos-pin-login-form'), input=$('pos-login-pin'), error=$('pos-pin-login-error'), btn=$('btn-pos-pin-login');
       if (!form) return reject(new Error('POS PIN form tidak tersedia.'));
       form.onsubmit=async function(e){
@@ -442,12 +652,19 @@
       };
       var googleBtn=$('btn-pos-google-login');
       if (googleBtn) googleBtn.onclick=function(){
-        var returnUrl=window.location.origin + '/pos/';
+        var returnUrl=window.location.origin + '/pos/' + (setupMode ? '?terminal_setup=1' : '');
         var brokerUrl='https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent(returnUrl);
         window.location.href=brokerUrl;
       };
       var accountBtn=$('btn-pos-account-login');
-      if (accountBtn) accountBtn.onclick=function(){ window.location.replace('/login'); };
+      if (accountBtn) accountBtn.onclick=function(){
+        if(setupMode){
+          try{sessionStorage.setItem('xentra_pos_terminal_setup_requested','1');}catch(_){}
+          window.location.replace('/login?pos_terminal_setup=1');
+          return;
+        }
+        window.location.replace('/login');
+      };
     });
   }
 
@@ -1133,13 +1350,24 @@
   }
 
   async function ensureSession(){
+    var setupRequested=isTerminalSetupRequested();
     if(!token()){
-      await openPinUnlockGate(!navigator.onLine);
+      var hasTerminalContext=!!(state.terminalId && (state.branchId || localStorage.getItem('xentra_pos_branch_id')));
+      await openPinUnlockGate(!navigator.onLine, !hasTerminalContext || setupRequested);
       return !!token() || !!state.user;
     }
     try {
       var me=await requestWithTimeout('/auth/merchant/me',{headers:headers()},5000);
       if(me && me.brand) applyBrandInfo(me.brand);
+
+      if(me && me.user && isTerminalManagerRole(me.user.role)){
+        if(setupRequested){
+          return await bootstrapTerminalForManager(me.user);
+        }
+        window.location.replace(me.landing || (me.user.role==='branch_manager'?'/merchant/':'/owner/'));
+        return false;
+      }
+
       applyCashierUser(me.user);
       if(state.user.role!=='cashier'){ window.location.replace(me.landing || '/merchant/'); return false; }
       if(!state.branchId){ toast('Akun kasir belum memiliki cabang.'); return false; }
@@ -1153,7 +1381,7 @@
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
         }
-        await openPinUnlockGate(err && (err.code==='NETWORK_TIMEOUT' || !navigator.onLine));
+        await openPinUnlockGate(err && (err.code==='NETWORK_TIMEOUT' || !navigator.onLine), false);
         return true;
       }
       // If network error/timeout but we have user in memory/storage, don't immediately redirect to login
@@ -1178,8 +1406,14 @@
 
   async function loadTerminal(){
     try{
-      var d=await request('/pos/terminal/current',{headers:headers()});
+      var d=await request('/pos/terminal/current',{
+        headers:headers()
+      });
       state.terminalId=d.terminal ? d.terminal.id : (localStorage.getItem('xentra_pos_terminal_id') || null);
+      if(d && d.terminal && d.terminal.branch_id){
+        state.branchId=d.terminal.branch_id;
+        localStorage.setItem('xentra_pos_branch_id',String(state.branchId));
+      }
       if(state.terminalId) localStorage.setItem('xentra_pos_terminal_id',state.terminalId);
       return !!state.terminalId;
     }catch(e){
@@ -2274,7 +2508,7 @@
     if($('btn-pos-refresh-shift')) $('btn-pos-refresh-shift').onclick=function(){ renderShift(); openShiftModal(); };
     $('btn-pos-shift-status').onclick=openShiftModal;
     $('btn-pos-close-shift-top').onclick=openCloseShiftModal;
-    $('btn-pos-logout').onclick=function(){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(USER_KEY);window.location.replace('/login');};
+    $('btn-pos-logout').onclick=function(){clearPosSessionAndReturnToPin();};
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
     if($('pos-mcart-trigger-order')){
       $('pos-mcart-trigger-order').onclick=function(e){
