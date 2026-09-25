@@ -1130,3 +1130,70 @@ test('POS P1 — Split/Merge uses canonical Order checks without creating a seco
     reason: 'cancelled'
   });
 });
+
+
+test('POS Split Reset — unpaid split returns to one full Check and paid split cannot be reset', async () => {
+  const held = PosOrderService.holdOrder({
+    branch_id: 'branch_pos',
+    table_number: '12',
+    customer_name: 'Reset Split Customer',
+    items: [
+      { product_id: 'prod_pos_1', quantity: 1, unit_price: 20000 },
+      { product_id: 'prod_pos_2', quantity: 1, unit_price: 8000 }
+    ],
+    order_type: 'dine_in'
+  });
+
+  const materialized = await PosOrderService.materializeHeldOrder({ held_order_id: held.id, brand_id: 'brand_pos' });
+  const orderId = materialized.order_id;
+  const initial = PosOrderService.getOrderChecks({ order_id: orderId, branch_id: 'branch_pos' });
+  assert.strictEqual(initial.checks.length, 1);
+  assert.strictEqual(Number(initial.checks[0].allocated_amount), Number(initial.order.grand_total));
+
+  const split = PosOrderService.splitOrderCheckEvenly({
+    order_id: orderId,
+    branch_id: 'branch_pos',
+    source_check_id: initial.checks[0].id,
+    parts: 2
+  });
+  assert.strictEqual(split.checks.length, 2);
+  assert.strictEqual(
+    split.checks.reduce((sum, check) => sum + Number(check.allocated_amount || 0), 0),
+    Number(split.order.grand_total)
+  );
+
+  const reset = PosOrderService.resetOrderChecks({ order_id: orderId, branch_id: 'branch_pos' });
+  assert.strictEqual(reset.checks.length, 1);
+  assert.strictEqual(Number(reset.checks[0].allocated_amount), Number(reset.order.grand_total));
+
+  const splitAgain = PosOrderService.splitOrderCheckEvenly({
+    order_id: orderId,
+    branch_id: 'branch_pos',
+    source_check_id: reset.checks[0].id,
+    parts: 2
+  });
+  const paidCheck = splitAgain.checks[0];
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: `cashier_reset_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    starting_float: 50000
+  });
+
+  PosOrderService.payCheck({
+    order_id: orderId,
+    branch_id: 'branch_pos',
+    check_id: paidCheck.id,
+    amount: Number(paidCheck.allocated_amount),
+    payment_method: 'cash',
+    actor_id: shift.cashier_id,
+    amount_tendered: Number(paidCheck.allocated_amount),
+    shift_id: shift.id
+  });
+
+  assert.throws(
+    () => PosOrderService.resetOrderChecks({ order_id: orderId, branch_id: 'branch_pos' }),
+    /tidak dapat dibatalkan karena sudah ada pembayaran/
+  );
+
+  DiningTableService.releaseHold({ branch_id: 'branch_pos', hold_reference_id: orderId, reason: 'cancelled' });
+});
