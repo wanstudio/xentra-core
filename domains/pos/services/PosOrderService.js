@@ -475,6 +475,9 @@ class PosOrderService {
     if (target.status !== 'open' || source.status !== 'open') {
       throw new Error('[PosOrderService] Hanya check OPEN yang dapat digabung.');
     }
+    if (posBillRepository.findCheckPaidAmount(target.id) > 0) {
+      throw new Error('[PosOrderService] Check tujuan yang sudah menerima pembayaran tidak dapat menerima hasil merge.');
+    }
     if (posBillRepository.findCheckPaidAmount(source.id) > 0) {
       throw new Error('[PosOrderService] Check sumber yang sudah menerima pembayaran tidak dapat digabung.');
     }
