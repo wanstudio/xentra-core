@@ -412,12 +412,17 @@ class PosOrderService {
     if (!moves.length) throw new Error('[PosOrderService] Kuantitas split tidak valid.');
 
     const sourceMap = new Map(source.items.map(item => [String(item.order_item_id), Number(item.quantity) || 0]));
+    let movedTotal = 0;
+    let sourceTotal = 0;
     for (const move of moves) {
       const available = sourceMap.get(move.order_item_id) || 0;
+      sourceTotal += available;
       if (move.quantity > available) {
         throw new Error('[PosOrderService] Kuantitas split melebihi item pada check sumber.');
       }
+      movedTotal += move.quantity;
     }
+    if (movedTotal >= sourceTotal) throw new Error('[PosOrderService] Check sumber tidak boleh menjadi kosong.');
 
     const now = new Date().toISOString();
     const nextNumber = Math.max(0, ...view.checks.map(c => Number(c.check_number) || 0)) + 1;
