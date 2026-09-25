@@ -1659,6 +1659,10 @@ function initSchema(targetDb) {
 
   try { targetDb.exec('ALTER TABLE media_assets ADD COLUMN crop_spec TEXT;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE pos_order_checks ADD COLUMN allocated_amount REAL NOT NULL DEFAULT 0;"); } catch (e) {}
+  try {
+    targetDb.exec("UPDATE pos_order_checks SET allocated_amount = COALESCE((SELECT SUM(oi.unit_price * ci.quantity) FROM pos_order_check_items ci JOIN order_items oi ON oi.id = ci.order_item_id WHERE ci.check_id = pos_order_checks.id), 0) WHERE allocated_amount = 0;");
+    targetDb.exec("UPDATE pos_order_checks SET allocated_amount = (SELECT grand_total FROM orders WHERE orders.id = pos_order_checks.order_id) WHERE allocated_amount = 0 AND check_number = 1 AND (SELECT COUNT(*) FROM pos_order_checks c2 WHERE c2.order_id = pos_order_checks.order_id) = 1;");
+  } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN branch_id TEXT;'); } catch (e) {}
   // POS Cashier PIN credential fields: same workforce identity, POS-only authentication method.
   // Idempotent for existing production databases.
