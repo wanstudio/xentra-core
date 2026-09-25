@@ -86,6 +86,7 @@ class PosOrderService {
         customerName: customer_name,
         orderType: order_type,
         itemsPayload: payloadJson,
+        customerPhone: customer_phone || '',
         status: 'held',
         createdAt: now,
         updatedAt: now
@@ -120,7 +121,7 @@ class PosOrderService {
    * Merchant App can receive and accept it. The POS hold remains the cashier
    * working reference; the canonical Order becomes the operational reference.
    */
-  static async materializeHeldOrder({ held_order_id }) {
+  static async materializeHeldOrder({ held_order_id, brand_id }) {
     const held = posOrderRepository.findHeldById(held_order_id);
     if (!held || held.status !== 'held') {
       throw new Error('[PosOrderService] Held order tidak ditemukan atau sudah tidak aktif.');
@@ -135,7 +136,7 @@ class PosOrderService {
     if (!items.length) throw new Error('[PosOrderService] Held order tidak memiliki item.');
 
     const placement = await OrderPlacementService.submitOrder({
-      brand_id: held.brand_id || null,
+      brand_id,
       branch_id: held.branch_id,
       customer: {
         name: held.customer_name || 'Tamu',
