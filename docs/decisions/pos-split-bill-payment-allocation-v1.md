@@ -116,13 +116,53 @@ A **Check** represents an allocation of the Order's bill for a payer.
 
 A **Payment** represents the actual settlement event and payment method.
 
+**A Check is not the same thing as a payer or a single payment.**
+
 Therefore:
 
 - A Check can be created/allocated before payment.
 - A Check may be partially or fully paid according to the payment lifecycle.
-- Multiple payments can settle the same Order/check allocation when the payment flow requires it.
+- **One Check may be settled by multiple Payments.**
+- **One Payment settles one contribution amount and records its own payment method/actor metadata.**
+- A payer does not need a dedicated Check merely because they contribute money.
+- Example: Check B = Rp100.000 can be settled by B = Rp70.000 + C = Rp30.000.
+- B and C do not need separate Checks in that scenario.
+- If a Check is partially paid, its remaining unpaid balance stays attached to that same Check.
+- Multiple payments may settle the same Check until its allocated amount is fully paid.
+- Multiple payments/checks remain children of the same canonical Order.
 - Payment processing must not create duplicate Orders.
 - The canonical Order remains the accounting/commercial anchor.
+
+### Example: A pays own food, B and C combine to pay the remainder
+
+```
+Order total: Rp150.000
+
+Check A — Rp50.000
+  Payment A → Rp50.000
+  Status: PAID
+
+Check B — Rp100.000
+  Payment B → Rp70.000
+  Payment C → Rp30.000
+  Status: PAID
+
+Order
+  └── Rp150.000 fully settled
+```
+
+This is a valid **combined payment** scenario.
+
+The model must also support:
+
+```
+Check B — Rp100.000
+  Payment B → Rp40.000
+  Payment C → Rp35.000
+  Payment D → Rp25.000
+```
+
+The number of payment contributors is not constrained to the number of checks.
 
 ## Remaining-balance invariant
 
@@ -145,6 +185,14 @@ B can allocate     Rp65.000 maximum
 B cannot allocate  Rp70.000
 ```
 
+For an already-created Check, payment validation is separate:
+
+```
+check_remaining = check_allocation - valid_paid_amounts_for_that_check
+```
+
+A payment may never exceed the remaining amount of its target Check.
+
 Rounding, discounts, service charges, tax, and other order-level adjustments must be resolved into the canonical payable total before the final allocation amount is accepted.
 
 ## UX contract
@@ -160,14 +208,19 @@ Then the cashier can choose how to determine the next payer's amount:
 
 Equal split can be presented as a quick helper rather than a separate business model.
 
+During payment, the cashier must be able to select an existing Check and record one or more payments against that Check until its balance reaches zero.
+
 The UI should always show:
 
 - Original Order total.
 - Amount already paid.
 - Amount allocated to other checks/payers.
 - Current remaining balance.
-- Amount being assigned to the current payer.
-- Final remaining balance.
+- Current Check allocation.
+- Current Check amount already paid.
+- Current Check remaining balance.
+- Amount being assigned/paid now.
+- Final Order remaining balance.
 
 ## Cross-reference: established restaurant POS patterns
 
@@ -188,7 +241,7 @@ The current P1 implementation already establishes:
 - item/quantity allocation;
 - no duplicate Order or Dining Session.
 
-The next implementation step is to extend the check/payment layer so **amount-based allocation is first-class**, while preserving the current item-based option.
+The next implementation step is to extend the check/payment layer so **amount-based allocation is first-class** and **multiple payments per Check are first-class**, while preserving the current item-based option.
 
 No implementation should introduce duplicate Commerce Orders, duplicate Dining Sessions, or synthetic tables to model split payments.
 
