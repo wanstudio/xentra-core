@@ -2209,13 +2209,30 @@
 
       $('pos-modal-card').querySelectorAll('[data-split-amount]').forEach(function(btn){
         btn.onclick=async function(){
-          var html='<h3>Bagi Nominal</h3><p>Masukkan nominal yang dipindahkan ke Check baru. Sisa Check sumber tetap terbuka.</p><label class="pos-field"><span>Nominal</span><input id="pos-split-amount" class="pos-input" inputmode="numeric" type="number" min="1" placeholder="Contoh: 50000"></label><div class="pos-modal-actions"><button id="pos-split-amount-submit" class="pos-btn">Buat Check</button><button id="pos-split-amount-cancel" class="pos-btn ghost">Batal</button></div>';
+          var html='<h3>Bagi Nominal</h3><p>Masukkan nominal yang dipindahkan ke Check baru. Sisa Check sumber tetap terbuka.</p><label class="pos-field"><span>Nominal</span><div class="pos-input-nominal-wrap"><span class="pos-input-prefix">Rp</span><input id="pos-split-amount" class="pos-input-nominal" inputmode="numeric" pattern="[0-9.]*" type="text" min="1" placeholder="0" autocomplete="off"></div></label><div class="pos-modal-actions"><button id="pos-split-amount-submit" class="pos-btn">Buat Check</button><button id="pos-split-amount-cancel" class="pos-btn ghost">Batal</button></div>';
           showModal(html); $('pos-split-amount-cancel').onclick=hideModal;
-          $('pos-split-amount-submit').onclick=async function(){ var amount=Number($('pos-split-amount').value)||0; if(!amount){toast('Masukkan nominal.');return;} try{await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-amount',{method:'POST',headers:headers(),body:JSON.stringify({source_check_id:btn.dataset.splitAmount,amount:amount})});toast('Check nominal berhasil dibuat.');openCheckManager(orderId);}catch(e){toast(e.message);} }; return;
-          try{
-            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-amount',{method:'POST',headers:headers(),body:JSON.stringify({source_check_id:btn.dataset.splitAmount,amount:amount})});
-            toast('Check nominal berhasil dibuat.'); openCheckManager(orderId);
-          }catch(e){toast(e.message);}
+          var splitAmountInput=$('pos-split-amount');
+          bindNominalInput(splitAmountInput);
+          setTimeout(function(){if(splitAmountInput)splitAmountInput.focus();},80);
+          $('pos-split-amount-submit').onclick=async function(){
+            var submitBtn=this;
+            var amount=parseNominal(splitAmountInput ? splitAmountInput.value : 0);
+            if(!amount){toast('Masukkan nominal.');return;}
+            if(amount<1){toast('Nominal minimal Rp1.');return;}
+            submitBtn.disabled=true;
+            try{
+              await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-amount',{
+                method:'POST',headers:headers(),
+                body:JSON.stringify({source_check_id:btn.dataset.splitAmount,amount:amount})
+              });
+              toast('Check nominal berhasil dibuat.');
+              openCheckManager(orderId);
+            }catch(e){
+              submitBtn.disabled=false;
+              toast(e.message);
+            }
+          };
+          bindModalEnter(splitAmountInput,$('pos-split-amount-submit')); 
         };
       });
 
@@ -2225,24 +2242,43 @@
           var remaining=check ? Number(check.remaining_amount||0) : 0;
           var html='<h3>Bayar Check #'+esc(String(check.check_number))+'</h3>' +
             '<div class="pos-payment-summary"><span>Sisa tagihan</span><strong>'+money(remaining)+'</strong></div>' +
-            '<label class="pos-field"><span>Nominal dibayar</span><input id="pos-pay-amount" class="pos-input" inputmode="numeric" type="number" min="1" max="'+remaining+'" value="'+remaining+'"></label>' +
+            '<label class="pos-field"><span>Nominal dibayar</span><div class="pos-input-nominal-wrap"><span class="pos-input-prefix">Rp</span><input id="pos-pay-amount" class="pos-input-nominal" inputmode="numeric" pattern="[0-9.]*" type="text" value="'+formatNominal(remaining)+'" autocomplete="off"></div></label>' +
             '<label class="pos-field"><span>Nama pembayar <small>(opsional)</small></span><input id="pos-pay-payer" class="pos-input" type="text" placeholder="Contoh: Budi"></label>' +
-            '<label class="pos-field"><span>Uang diterima</span><input id="pos-pay-tendered" class="pos-input" inputmode="numeric" type="number" min="1" value="'+remaining+'"></label>' +
+            '<label class="pos-field"><span>Uang diterima</span><div class="pos-input-nominal-wrap"><span class="pos-input-prefix">Rp</span><input id="pos-pay-tendered" class="pos-input-nominal" inputmode="numeric" pattern="[0-9.]*" type="text" value="'+formatNominal(remaining)+'" autocomplete="off"></div></label>' +
             '<div id="pos-pay-change" class="pos-payment-summary"><span>Kembalian</span><strong>'+money(0)+'</strong></div>' +
             '<div class="pos-modal-actions"><button id="pos-pay-submit" class="pos-btn">Catat Pembayaran</button><button id="pos-pay-cancel" class="pos-btn ghost">Batal</button></div>';
           showModal(html);
           var amt=$('pos-pay-amount'), tend=$('pos-pay-tendered'), change=$('pos-pay-change');
-          function updateChange(){var a=Number(amt.value)||0,t=Number(tend.value)||0;if(change)change.innerHTML='<span>Kembalian</span><strong>'+money(Math.max(0,t-a))+'</strong>';};
-          amt.oninput=updateChange; tend.oninput=updateChange; updateChange();
+          function updateChange(){
+            var a=parseNominal(amt ? amt.value : 0),t=parseNominal(tend ? tend.value : 0);
+            var valid=t>=a && a>0;
+            if(change)change.innerHTML='<span>Kembalian</span><strong>'+money(Math.max(0,t-a))+'</strong>';
+            var submitBtn=$('pos-pay-submit');
+            if(submitBtn)submitBtn.disabled=!valid;
+          }
+          bindNominalInput(amt,updateChange);
+          bindNominalInput(tend,updateChange);
+          bindModalEnter(amt,function(){var input=tend;if(input){input.focus();input.select();}});
+          bindModalEnter(tend,function(){var submitBtn=$('pos-pay-submit');if(submitBtn&&!submitBtn.disabled)submitBtn.click();});
+          updateChange();
           $('pos-pay-cancel').onclick=hideModal;
           $('pos-pay-submit').onclick=async function(){
-            var amount=Number(amt.value)||0,tendered=Number(tend.value)||0;
+            var amount=parseNominal(amt ? amt.value : 0),tendered=parseNominal(tend ? tend.value : 0);
             if(!amount||amount>remaining){toast('Nominal pembayaran tidak valid.');return;}
             if(tendered<amount){toast('Uang diterima belum cukup.');return;}
+            var submitBtn=this;
+            submitBtn.disabled=true;
             try{
-              await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/'+encodeURIComponent(btn.dataset.payCheck)+'/pay',{method:'POST',headers:headers(),body:JSON.stringify({amount:amount,payment_method:'cash',payer_name:$('pos-pay-payer').value.trim()||null,amount_tendered:tendered})});
-              toast('Pembayaran tercatat.'); openCheckManager(orderId);
-            }catch(e){toast(e.message);}
+              await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/'+encodeURIComponent(btn.dataset.payCheck)+'/pay',{
+                method:'POST',headers:headers(),
+                body:JSON.stringify({amount:amount,payment_method:'cash',payer_name:$('pos-pay-payer').value.trim()||null,amount_tendered:tendered})
+              });
+              toast('Pembayaran tercatat.');
+              openCheckManager(orderId);
+            }catch(e){
+              submitBtn.disabled=false;
+              toast(e.message);
+            }
           };
         };
       });
@@ -2250,7 +2286,7 @@
       $('pos-modal-card').querySelectorAll('[data-split-check]').forEach(function(btn){
         btn.onclick=async function(){
           var sourceId=btn.dataset.splitCheck, card=btn.closest('.pos-check-card'), inputs=[];
-          var html='<h3>Split Item</h3><p>Masukkan quantity item yang dipindahkan ke Check baru.</p>';
+          var html='<h3>Split Item</h3><p>Masukkan quantity item yang dipindahkan ke Check baru.</p><p class="pos-form-help">Jumlah harus berupa angka dan tidak boleh melebihi quantity pada Check sumber.</p>';
           (checks.find(function(c){return c.id===sourceId;}).items||[]).forEach(function(it){
             html+='<div style="display:flex;justify-content:space-between;gap:8px;margin:8px 0"><span>'+esc(it.product_name)+' × '+it.quantity+'</span><input data-check-item="'+esc(it.order_item_id)+'" type="number" min="0" max="'+it.quantity+'" value="0" style="width:70px"></div>';
           });
@@ -2266,7 +2302,19 @@
 
       $('pos-modal-card').querySelectorAll('[data-merge-check]').forEach(function(btn){
         btn.onclick=async function(){
-          try{await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/merge',{method:'POST',headers:headers(),body:JSON.stringify({target_check_id:checks[0].id,source_check_id:btn.dataset.mergeCheck})});toast('Check berhasil digabung.');openCheckManager(orderId);}catch(e){toast(e.message);}
+          if(!confirm('Gabungkan Check ini ke Check #1? Alokasi tagihan akan dikembalikan ke Check #1.'))return;
+          btn.disabled=true;
+          try{
+            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/merge',{
+              method:'POST',headers:headers(),
+              body:JSON.stringify({target_check_id:checks[0].id,source_check_id:btn.dataset.mergeCheck})
+            });
+            toast('Check berhasil digabung.');
+            openCheckManager(orderId);
+          }catch(e){
+            btn.disabled=false;
+            toast(e.message);
+          }
         };
       });
     }catch(e){toast(e.message);}
