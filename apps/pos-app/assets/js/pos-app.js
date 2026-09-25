@@ -2153,6 +2153,77 @@
     }catch(e){toast(e.message);}
   }
 
+  async function openCheckManager(orderId){
+    if(!orderId){toast('Bill ini belum memiliki order canonical.');return;}
+    try{
+      var data=await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks',{headers:headers()});
+      var checks=data.checks||[];
+      if(!checks.length){toast('Order belum memiliki item yang dapat dibagi.');return;}
+
+      function checkTotal(check){
+        return (check.items||[]).reduce(function(sum,it){return sum+(Number(it.unit_price)||0)*(Number(it.quantity)||0);},0);
+      }
+      function renderCheck(check){
+        var items=(check.items||[]).map(function(it){
+          return '<div class="pos-check-item">' +
+            '<div><strong>'+esc(it.product_name||'Item')+'</strong><small>'+money(it.unit_price)+' × '+esc(String(it.quantity))+'</small></div>' +
+            '<input class="pos-check-qty" type="number" min="0" max="'+esc(String(it.quantity))+'" value="0" data-check-item="'+esc(it.order_item_id)+'" aria-label="Jumlah '+esc(it.product_name||'item')+' untuk split">' +
+          '</div>';
+        }).join('');
+        var splitBtn=check.status==='open' && (check.items||[]).length>1
+          ? '<button type="button" class="pos-btn small" data-split-check="'+esc(check.id)+'">Pisahkan item terpilih</button>' : '';
+        var mergeBtn=(check.status==='open' && Number(check.check_number)!==1)
+          ? '<button type="button" class="pos-btn small ghost danger" data-merge-check="'+esc(check.id)+'">Gabungkan ke Check #1</button>' : '';
+        return '<div class="pos-check-card">' +
+          '<div class="pos-check-head"><div><strong>Check #'+esc(String(check.check_number))+'</strong><small>'+esc(check.status==='open'?'Terbuka':'Tertutup')+'</small></div><strong>'+money(checkTotal(check))+'</strong></div>' +
+          '<div class="pos-check-items">'+(items||'<div class="pos-empty">Tidak ada item.</div>')+'</div>' +
+          '<div class="pos-check-actions">'+splitBtn+mergeBtn+'</div>' +
+        '</div>';
+      }
+
+      showModal(
+        '<h3>Split / Merge Bill</h3>' +
+        '<p>Ini tetap <strong>1 Order</strong>. Yang dibagi hanya check/tagihan; meja dan Dining Session tidak berubah.</p>' +
+        '<div class="pos-check-manager-list">'+checks.map(renderCheck).join('')+'</div>' +
+        '<div class="pos-modal-actions"><button type="button" class="pos-btn ghost" id="pos-check-manager-close">Tutup</button></div>'
+      );
+
+      if($('pos-check-manager-close')) $('pos-check-manager-close').onclick=hideModal;
+
+      $('pos-modal-card').querySelectorAll('[data-split-check]').forEach(function(btn){
+        btn.onclick=async function(){
+          var sourceId=btn.dataset.splitCheck;
+          var inputs=$('pos-modal-card').querySelectorAll('[data-check-item]');
+          var splitItems=[];
+          inputs.forEach(function(input){
+            var qty=Math.floor(Number(input.value)||0);
+            if(qty>0) splitItems.push({order_item_id:input.dataset.checkItem,quantity:qty});
+          });
+          if(!splitItems.length){toast('Pilih item dan jumlah yang ingin dipisahkan.');return;}
+          try{
+            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split',{
+              method:'POST',headers:headers(),body:JSON.stringify({source_check_id:sourceId,split_items:splitItems})
+            });
+            toast('Check baru berhasil dibuat.');
+            openCheckManager(orderId);
+          }catch(e){toast(e.message);}
+        };
+      });
+
+      $('pos-modal-card').querySelectorAll('[data-merge-check]').forEach(function(btn){
+        btn.onclick=async function(){
+          try{
+            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/merge',{
+              method:'POST',headers:headers(),body:JSON.stringify({target_check_id:checks[0].id,source_check_id:btn.dataset.mergeCheck})
+            });
+            toast('Check berhasil digabung.');
+            openCheckManager(orderId);
+          }catch(e){toast(e.message);}
+        };
+      });
+    }catch(e){toast(e.message);}
+  }
+
   async function openHeld(){
     var held=await updateHeldCount();
     if(!held.length){toast('Tidak ada pesanan yang ditahan.');return;}
@@ -2170,6 +2241,7 @@
         '</div>' +
         '<div class="pos-held-modal-actions">' +
           '<button type="button" class="pos-btn small ghost danger" data-cancel-held="'+esc(h.id)+'">Batal</button>' +
+          (h.order_id ? '<button type="button" class="pos-btn small ghost" data-check-held="'+esc(h.order_id)+'">Split</button>' : '') +
           '<button type="button" class="pos-btn small" data-resume-held="'+esc(h.id)+'">Buka</button>' +
         '</div>' +
       '</div>';
@@ -2177,6 +2249,7 @@
     if($('pos-held-modal-close')) $('pos-held-modal-close').onclick=hideModal;
     $('pos-modal-card').querySelectorAll('[data-resume-held]').forEach(function(b){b.onclick=function(){resumeHeld(b.dataset.resumeHeld);};});
     $('pos-modal-card').querySelectorAll('[data-cancel-held]').forEach(function(b){b.onclick=function(){cancelHeld(b.dataset.cancelHeld);};});
+    $('pos-modal-card').querySelectorAll('[data-check-held]').forEach(function(b){b.onclick=function(){openCheckManager(b.dataset.checkHeld);};});
   }
 
   function updateTransaksiStats(){
@@ -2231,7 +2304,8 @@
       return '<div class="pos-held-row"><div class="pos-held-main"><strong>' + typeTitle + '</strong><small>Tamu: '+esc(h.customer_name||'Tamu')+' · '+esc(h.created_at||'')+'</small></div><div class="pos-held-items">'+esc(itemSummary||'—')+'</div><div class="pos-held-total">'+money(subtotal)+'</div><div class="pos-held-actions"><button type="button" class="pos-btn small ghost danger" data-cancel-held-row="'+esc(h.id)+'">Batal</button><button type="button" class="pos-btn small" data-resume-held-row="'+esc(h.id)+'">Buka di Kasir</button></div></div>';
     }).join('');
     box.querySelectorAll('[data-resume-held-row]').forEach(function(b){b.onclick=function(){resumeHeld(b.dataset.resumeHeldRow);};});
-    box.querySelectorAll('[data-cancel-held-row]').forEach(function(b){b.onclick=function ancient(){cancelHeld(b.dataset.cancelHeldRow);};});
+    box.querySelectorAll('[data-cancel-held-row]').forEach(function(b){b.onclick=function(){cancelHeld(b.dataset.cancelHeldRow);};});
+    box.querySelectorAll('[data-check-held-row]').forEach(function(b){b.onclick=function(){openCheckManager(b.dataset.checkHeldRow);};});
   }
 
   function switchTransaksiTab(tab){
