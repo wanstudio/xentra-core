@@ -968,6 +968,31 @@ function initSchema(targetDb) {
       FOREIGN KEY (order_id) REFERENCES orders(id)
     );
 
+    CREATE TABLE IF NOT EXISTS pos_order_checks (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      check_number INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+      UNIQUE (order_id, check_number)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pos_order_checks_order ON pos_order_checks(order_id, status);
+
+    CREATE TABLE IF NOT EXISTS pos_order_check_items (
+      id TEXT PRIMARY KEY,
+      check_id TEXT NOT NULL,
+      order_item_id TEXT NOT NULL,
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (check_id) REFERENCES pos_order_checks(id) ON DELETE CASCADE,
+      FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE CASCADE,
+      UNIQUE (check_id, order_item_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pos_order_check_items_item ON pos_order_check_items(order_item_id);
+
     CREATE TABLE IF NOT EXISTS product_categories (
       product_id TEXT NOT NULL,
       category_id TEXT NOT NULL,
