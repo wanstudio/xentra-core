@@ -200,7 +200,7 @@ class PosOrderService {
       const checkId = `check_${crypto.randomBytes(8).toString('hex')}`;
       posBillRepository.beginTransaction();
       try {
-        posBillRepository.createCheck({ id: checkId, orderId: order_id, checkNumber: 1, now });
+        posBillRepository.createCheck({ id: checkId, orderId: order_id, checkNumber: 1, allocatedAmount: Number(order.grand_total), now });
         for (const item of orderItems) {
           posBillRepository.upsertCheckItem({
             id: `check_item_${crypto.randomBytes(8).toString('hex')}`,
@@ -225,6 +225,76 @@ class PosOrderService {
         items: posBillRepository.findCheckItems(check.id)
       }))
     };
+  }
+
+  /**
+   * Allocates a nominal amount from one OPEN check into a new OPEN check.
+   * The source check remains responsible for its existing unpaid balance.
+   */
+  static splitOrderCheckByAmount({ order_id, branch_id, source_check_id, amount }) {
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) throw new Error('[PosOrderService] Nominal split harus lebih dari 0.');
+    const current = PosOrderService.getOrderChecks({ order_id, branch_id });
+    const source = current.checks.find(c => String(c.id) === String(source_check_id));
+    if (!source || source.status !== 'open') throw new Error('[PosOrderService] Check sumber tidak ditemukan atau sudah tidak OPEN.');
+    const paid = posBillRepository.findCheckPaidAmount(source.id);
+    const remaining = Number(source.allocated_amount || 0) - paid;
+    if (value >= remaining) throw new Error('[PosOrderService] Nominal split harus lebih kecil dari sisa Check sumber.');
+    const nextNumber = current.checks.reduce((max, c) => Math.max(max, Number(c.check_number) || 0), 0) + 1;
+    const now = new Date().toISOString();
+    const newCheckId = 'check_' + crypto.randomBytes(8).toString('hex');
+    posBillRepository.beginTransaction();
+    try {
+      const locked = posBillRepository.findCheck(source.id);
+      const lockedPaid = posBillRepository.findCheckPaidAmount(source.id);
+      const lockedRemaining = Number(locked.allocated_amount || 0) - lockedPaid;
+      if (value >= lockedRemaining) throw new Error('[PosOrderService] Nominal split melebihi sisa Check sumber.');
+      posBillRepository.updateCheckAmount(source.id, Number(locked.allocated_amount) - value, now);
+      posBillRepository.createCheck({ id: newCheckId, orderId: order_id, checkNumber: nextNumber, allocatedAmount: value, now });
+      posBillRepository.commit();
+    } catch (err) { try { posBillRepository.rollback(); } catch (_) {} throw err; }
+    return PosOrderService.getOrderChecks({ order_id, branch_id });
+  }
+
+  /**
+   * Records one payment contribution against an existing Check.
+   * One Check may receive multiple payments.
+   */
+  static payCheck({ order_id, branch_id, check_id, amount, payment_method = 'cash', payer_name = null, actor_id = null, amount_tendered = null }) {
+    const value = Number(amount);
+    if (!Number.isFinite(value) || value <= 0) throw new Error('[PosOrderService] Nominal pembayaran harus lebih dari 0.');
+    const allowed = ['cash', 'qris_static', 'midtrans', 'doku'];
+    if (!allowed.includes(payment_method)) throw new Error('[PosOrderService] Metode pembayaran tidak valid.');
+    const order = posBillRepository.findOrder(order_id);
+    if (!order || String(order.branch_id) !== String(branch_id)) throw new Error('[PosOrderService] Order tidak ditemukan atau bukan milik cabang kasir.');
+    const check = posBillRepository.findCheck(check_id);
+    if (!check || String(check.order_id) !== String(order_id) || check.status !== 'open') throw new Error('[PosOrderService] Check tidak ditemukan atau sudah ditutup.');
+    const checkPaid = posBillRepository.findCheckPaidAmount(check_id);
+    const checkRemaining = Number(check.allocated_amount || 0) - checkPaid;
+    if (value > checkRemaining) throw new Error('[PosOrderService] Pembayaran melebihi sisa Check.');
+    const orderPaid = posBillRepository.findOrderPaidAmount(order_id);
+    const orderRemaining = Number(order.grand_total) - orderPaid;
+    if (value > orderRemaining) throw new Error('[PosOrderService] Pembayaran melebihi sisa Order.');
+    if (payment_method === 'cash') {
+      const tendered = Number(amount_tendered);
+      if (!Number.isFinite(tendered) || tendered < value) throw new Error('[PosOrderService] Uang diterima harus cukup untuk pembayaran ini.');
+    }
+    const now = new Date().toISOString();
+    const paymentId = 'checkpay_' + crypto.randomBytes(8).toString('hex');
+    posBillRepository.beginTransaction();
+    try {
+      const lockedCheck = posBillRepository.findCheck(check_id);
+      const lockedPaid = posBillRepository.findCheckPaidAmount(check_id);
+      const lockedRemaining = Number(lockedCheck.allocated_amount || 0) - lockedPaid;
+      if (value > lockedRemaining) throw new Error('[PosOrderService] Pembayaran melebihi sisa Check.');
+      posBillRepository.createCheckPayment({ id: paymentId, checkId: check_id, orderId: order_id, paymentMethod: payment_method, provider: payment_method, amount: value, payerName: payer_name, actorId: actor_id, rawPayment: JSON.stringify({ amount_tendered: amount_tendered }), settledAt: now, now });
+      const afterPaid = lockedPaid + value;
+      if (afterPaid >= Number(lockedCheck.allocated_amount)) posBillRepository.updateCheckAmount(lockedCheck.id, Number(lockedCheck.allocated_amount), now);
+      posBillRepository.commit();
+    } catch (err) { try { posBillRepository.rollback(); } catch (_) {} throw err; }
+    const updated = PosOrderService.getOrderChecks({ order_id, branch_id });
+    const updatedCheck = updated.checks.find(c => c.id === check_id);
+    return { success: true, payment: { id: paymentId, check_id, order_id, amount: value, payment_method, payer_name, payment_status: 'settlement', amount_tendered: amount_tendered == null ? null : Number(amount_tendered), change: payment_method === 'cash' ? Math.max(0, Number(amount_tendered) - value) : 0 }, check: updatedCheck, order_remaining: Number(order.grand_total) - posBillRepository.findOrderPaidAmount(order_id) };
   }
 
   /**
