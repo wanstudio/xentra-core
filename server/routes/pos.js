@@ -262,7 +262,7 @@ router.get('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
     const branchId = req.user.branch_id || req.user.branchId;
     if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
     const held = db.prepare(`
-      SELECT id, branch_id, table_number, customer_name, COALESCE(order_type, 'dine_in') AS order_type, items_payload, status, created_at, updated_at
+      SELECT id, branch_id, table_number, customer_name, customer_phone, order_id, COALESCE(order_type, 'dine_in') AS order_type, items_payload, status, created_at, updated_at
       FROM pos_held_orders
       WHERE branch_id = ? AND status = 'held'
       ORDER BY updated_at DESC
@@ -303,7 +303,28 @@ router.post('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
       items,
       order_type: normalizedOrderType
     });
-    res.status(201).json({ success: true, held_order: held });
+
+    // A Hold Bill is immediately promoted to the canonical Commerce Order so
+    // Merchant App can see it as a real pending operational order. The POS
+    // hold remains only as the cashier-side working reference.
+    let operationalOrder;
+    try {
+      operationalOrder = await PosOrderService.materializeHeldOrder({
+        held_order_id: held.id,
+        brand_id: req.brand_id
+      });
+    } catch (materializeErr) {
+      try { posOrderRepository.cancelHeldOrder({ heldOrderId: held.id, updatedAt: new Date().toISOString(), status: 'cancelled' }); } catch (_) {}
+      if (normalizedOrderType === 'dine_in') {
+        try {
+          const { DiningTableService } = require('../../domains/dining');
+          DiningTableService.releaseHold({ branch_id: branchId, hold_reference_id: held.id, reason: 'cancelled' });
+        } catch (_) {}
+      }
+      return res.status(400).json({ success: false, error: materializeErr.message });
+    }
+
+    res.status(201).json({ success: true, held_order: { ...held, order_id: operationalOrder.order_id }, order: operationalOrder.order });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }
@@ -314,8 +335,23 @@ router.delete('/pos/held-orders/:id', requireAuth(['cashier']), (req, res) => {
     const branchId = req.user.branch_id || req.user.branchId;
     if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
     const now = new Date().toISOString();
-    const held = db.prepare("SELECT id, order_type, table_number FROM pos_held_orders WHERE id = ? AND branch_id = ? AND status = 'held'").get(req.params.id, branchId);
+    const held = db.prepare("SELECT id, order_id, order_type, table_number FROM pos_held_orders WHERE id = ? AND branch_id = ? AND status = 'held'").get(req.params.id, branchId);
     if (!held) return res.status(404).json({ success: false, error: 'Pesanan ditahan tidak ditemukan atau sudah tidak aktif.' });
+    if (held.order_id) {
+      const canonical = db.prepare('SELECT id, status FROM orders WHERE id = ? AND branch_id = ?').get(held.order_id, branchId);
+      if (canonical && canonical.status === 'pending') {
+        const { OrderStateMachine } = require('../../domains/orders');
+        OrderStateMachine.transition({
+          order_id: canonical.id,
+          target_status: 'cancelled',
+          actor_type: 'staff',
+          actor_id: req.user.userId || req.user.username || 'cashier',
+          note: '[CANCEL by POS cashier] Hold Bill dibatalkan oleh kasir.'
+        });
+      } else if (canonical && canonical.status !== 'cancelled' && canonical.status !== 'rejected') {
+        return res.status(409).json({ success: false, error: 'Pesanan sudah diproses Merchant dan tidak dapat dibatalkan sebagai Hold Bill.' });
+      }
+    }
     db.prepare("UPDATE pos_held_orders SET status = 'cancelled', updated_at = ? WHERE id = ? AND branch_id = ?").run(now, req.params.id, branchId);
     if (held.order_type === 'dine_in') {
       try {
