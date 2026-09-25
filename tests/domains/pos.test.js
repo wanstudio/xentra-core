@@ -955,4 +955,50 @@ test('POS 18 — Batch Sync Isolation: failure in one transaction does not roll 
   assert.strictEqual(shiftAfter.expected_cash, 66000);
 });
 
+test('POS Dine-In table reservation — cashier hold immediately marks table as dipesan and prevents double assignment', () => {
+  const held = PosOrderService.holdOrder({
+    branch_id: 'branch_pos',
+    table_number: '12',
+    customer_name: 'Customer A',
+    items: [{ product_id: 'prod_pos_1', quantity: 1, unit_price: 20000 }],
+    order_type: 'dine_in'
+  });
+
+  const layout = DiningTableService.getBranchLayout('branch_pos');
+  const table = layout.tables.find(t => t.table_number === '12');
+  assert.ok(table);
+  assert.strictEqual(table.operational_state, 'held');
+
+  assert.throws(() => {
+    PosOrderService.holdOrder({
+      branch_id: 'branch_pos',
+      table_number: '12',
+      customer_name: 'Customer B',
+      items: [{ product_id: 'prod_pos_2', quantity: 1, unit_price: 8000 }],
+      order_type: 'dine_in'
+    });
+  }, /CONCURRENCY_HOLD_CONFLICT|TABLE_UNAVAILABLE/);
+
+  const rebound = DiningTableService.rebindHoldReference({
+    branch_id: 'branch_pos',
+    from_reference_id: held.id,
+    to_reference_id: 'ord_pos_reservation_test'
+  });
+  assert.strictEqual(rebound.rebound, 1);
+
+  const reboundHolds = db.prepare(
+    "SELECT hold_reference_id, status FROM branch_table_holds WHERE hold_reference_id = ?"
+  ).all('ord_pos_reservation_test');
+  assert.strictEqual(reboundHolds.length, 1);
+  assert.strictEqual(reboundHolds[0].status, 'active');
+
+  DiningTableService.releaseHold({
+    branch_id: 'branch_pos',
+    hold_reference_id: 'ord_pos_reservation_test',
+    reason: 'cancelled'
+  });
+
+  const released = DiningTableService.getBranchLayout('branch_pos').tables.find(t => t.table_number === '12');
+  assert.strictEqual(released.operational_state, 'available');
+});
 
