@@ -497,6 +497,22 @@ router.post('/pos/orders/:id/checks/:checkId/pay', requireAuth(['cashier']), (re
   }
 });
 
+router.post('/pos/orders/:id/checks/reset', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+
+    const result = PosOrderService.resetOrderChecks({
+      order_id: req.params.id,
+      branch_id: branchId
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/pos/orders/:id/checks/merge', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
