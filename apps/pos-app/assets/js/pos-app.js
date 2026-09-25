@@ -2230,7 +2230,7 @@
   }
 
   function tableStateLabel(st){
-    return ({available:'Tersedia',held:'Ditahan',reserved:'Reservasi',occupied:'Terisi',blocked:'Diblokir',out_of_service:'Tidak tersedia'})[st]||st;
+    return ({available:'Tersedia',held:'Dipesan',reserved:'Reservasi',occupied:'Terisi',blocked:'Diblokir',out_of_service:'Tidak tersedia'})[st]||st;
   }
 
   function applySelectedTable(t){
