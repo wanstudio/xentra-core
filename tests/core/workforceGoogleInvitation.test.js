@@ -438,6 +438,7 @@ describe('Workforce Google Invitation (INV-GOOGLE-01 to INV-GOOGLE-09)', () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.user.role, 'cashier', 'Role must remain cashier from invitation');
     assert.equal(res.body.user.branch_id, TEST_BRANCH_ID, 'Branch must remain assigned branch');
+    assert.equal(res.body.redirect_url, '/pos/', 'Invited cashier must land in POS, not the management dashboard');
 
     const userInDb = db.prepare('SELECT role, branch_id FROM users WHERE email = ?').get(inviteEmail);
     assert.equal(userInDb.role, 'cashier');
