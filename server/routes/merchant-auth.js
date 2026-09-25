@@ -925,8 +925,9 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
       if (acceptResult) {
         responsePayload.is_new_user = Boolean(acceptResult.is_new_user);
         responsePayload.invitation_accepted = true;
-        // Invited workforce members always go to dashboard, never to /onboarding
-        responsePayload.redirect_url = handoffInfo ? handoffInfo.redirect_url : '/dashboard/';
+        // Preserve the unified role-based landing contract after invitation acceptance.
+        // Cashiers execute transactions in POS; management roles use their management surface.
+        responsePayload.redirect_url = handoffInfo ? handoffInfo.redirect_url : resolveLanding(user.role);
       }
   
       if (handoffInfo) {
