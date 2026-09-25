@@ -273,7 +273,7 @@ router.get('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
   }
 });
 
-router.post('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
+router.post('/pos/held-orders', requireAuth(['cashier']), async (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
     const { table_number = '', customer_name = 'Tamu', customer_phone = '', items = [], order_type = 'dine_in' } = req.body || {};
@@ -314,7 +314,7 @@ router.post('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
         brand_id: req.brand_id
       });
     } catch (materializeErr) {
-      try { posOrderRepository.cancelHeldOrder({ heldOrderId: held.id, updatedAt: new Date().toISOString(), status: 'cancelled' }); } catch (_) {}
+      try { db.prepare("UPDATE pos_held_orders SET status = 'cancelled', updated_at = ? WHERE id = ?").run(new Date().toISOString(), held.id); } catch (_) {}
       if (normalizedOrderType === 'dine_in') {
         try {
           const { DiningTableService } = require('../../domains/dining');
@@ -340,7 +340,7 @@ router.delete('/pos/held-orders/:id', requireAuth(['cashier']), (req, res) => {
     if (held.order_id) {
       const canonical = db.prepare('SELECT id, status FROM orders WHERE id = ? AND branch_id = ?').get(held.order_id, branchId);
       if (canonical && canonical.status === 'pending') {
-        const { OrderStateMachine } = require('../../domains/orders');
+        const OrderStateMachine = require('../services/OrderStateMachine');
         OrderStateMachine.transition({
           order_id: canonical.id,
           target_status: 'cancelled',
