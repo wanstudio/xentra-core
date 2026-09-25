@@ -1,6 +1,6 @@
 # Xentra — POS Split Bill / Payment Allocation Contract v1
 
-**Status:** LOCKED CONTRACT / IMPLEMENTATION PENDING  
+**Status:** LOCKED CONTRACT / PARTIALLY IMPLEMENTED  
 **Decision date:** 2026-09-26  
 **Scope:** POS dine-in billing when multiple people at one table want to pay separately
 
@@ -241,7 +241,9 @@ The current P1 implementation already establishes:
 - item/quantity allocation;
 - no duplicate Order or Dining Session.
 
-The next implementation step is to extend the check/payment layer so **amount-based allocation is first-class** and **multiple payments per Check are first-class**, while preserving the current item-based option.
+Implementation started and the backend now supports **amount-based allocation**, **multiple payments per Check**, persisted check allocation amounts, per-Check remaining balances, and active-shift validation for POS cash contributions. The existing item-based split remains supported.
+
+Remaining implementation work is primarily UX hardening, richer payment-provider flows, and automated regression coverage for the new combined-payment paths.
 
 No implementation should introduce duplicate Commerce Orders, duplicate Dining Sessions, or synthetic tables to model split payments.
 
