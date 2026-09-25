@@ -58,6 +58,7 @@ class PosBillRepository {
     this.db.execute('UPDATE pos_order_check_items SET quantity = ?, updated_at = ? WHERE check_id = ? AND order_item_id = ?', [quantity, now, checkId, orderItemId]);
   }
   updateCheckAmount(checkId, allocatedAmount, now) { this.db.execute('UPDATE pos_order_checks SET allocated_amount = ?, updated_at = ? WHERE id = ?', [allocatedAmount, now, checkId]); }
+  setCheckStatus(checkId, status, now) { this.db.execute('UPDATE pos_order_checks SET status = ?, updated_at = ? WHERE id = ?', [status, now, checkId]); }
   findCheckPayments(checkId) { return this.db.queryMany('SELECT * FROM pos_check_payments WHERE check_id = ? ORDER BY created_at ASC, id ASC', [checkId]); }
   findOrderPaidAmount(orderId) { const r = this.db.queryOne("SELECT COALESCE(SUM(amount),0) AS amount FROM pos_check_payments WHERE order_id = ? AND payment_status = 'settlement'", [orderId]); return Number(r && r.amount) || 0; }
   findCheckPaidAmount(checkId) { const r = this.db.queryOne("SELECT COALESCE(SUM(amount),0) AS amount FROM pos_check_payments WHERE check_id = ? AND payment_status = 'settlement'", [checkId]); return Number(r && r.amount) || 0; }
