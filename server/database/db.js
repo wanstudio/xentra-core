@@ -1658,6 +1658,7 @@ function initSchema(targetDb) {
   `);
 
   try { targetDb.exec('ALTER TABLE media_assets ADD COLUMN crop_spec TEXT;'); } catch (e) {}
+  try { targetDb.exec("ALTER TABLE pos_order_checks ADD COLUMN allocated_amount REAL NOT NULL DEFAULT 0;"); } catch (e) {}
   try { targetDb.exec('ALTER TABLE users ADD COLUMN branch_id TEXT;'); } catch (e) {}
   // POS Cashier PIN credential fields: same workforce identity, POS-only authentication method.
   // Idempotent for existing production databases.
