@@ -485,7 +485,7 @@ class PosOrderService {
     const now = new Date().toISOString();
     posBillRepository.beginTransaction();
     try {
-      let movedAmount = 0;
+      const movedAmount = Number(source.allocated_amount || 0);
       for (const item of source.items) {
         const existing = posBillRepository.findCheckItem(target.id, item.order_item_id);
         if (existing) {
@@ -504,10 +504,70 @@ class PosOrderService {
             now
           });
         }
-        movedAmount += Number(item.unit_price || 0) * Number(item.quantity || 0);
-      }
+        }
+      // The check allocation is authoritative. Item prices are only metadata;
+      // amount/equal splits can create checks without item assignments.
       posBillRepository.updateCheckAmount(target.id, Number(target.allocated_amount || 0) + movedAmount, now);
       posBillRepository.deleteCheck(source.id);
+      posBillRepository.commit();
+    } catch (err) {
+      try { posBillRepository.rollback(); } catch (_) {}
+      throw err;
+    }
+
+    return PosOrderService.getOrderChecks({ order_id, branch_id });
+  }
+
+  /**
+   * Resets a split back to one Check (#1).
+   * Safe only while every check is OPEN and has received no payment.
+   * This is the cashier-facing "Batalkan Pembagian" action.
+   */
+  static resetOrderChecks({ order_id, branch_id }) {
+    const current = PosOrderService.getOrderChecks({ order_id, branch_id });
+    const checks = current.checks || [];
+    if (checks.length <= 1) return current;
+
+    const target = checks.find(c => Number(c.check_number) === 1);
+    if (!target) throw new Error('[PosOrderService] Check utama (#1) tidak ditemukan.');
+
+    for (const check of checks) {
+      if (check.status !== 'open' || Number(check.paid_amount || 0) > 0) {
+        throw new Error('[PosOrderService] Pembagian tidak dapat dibatalkan karena sudah ada pembayaran.');
+      }
+    }
+
+    const now = new Date().toISOString();
+    posBillRepository.beginTransaction();
+    try {
+      let restoredAmount = Number(target.allocated_amount || 0);
+      for (const source of checks) {
+        if (source.id === target.id) continue;
+        restoredAmount += Number(source.allocated_amount || 0);
+
+        for (const item of source.items || []) {
+          const existing = posBillRepository.findCheckItem(target.id, item.order_item_id);
+          if (existing) {
+            posBillRepository.updateCheckItemQuantity(
+              target.id,
+              item.order_item_id,
+              Number(existing.quantity) + Number(item.quantity),
+              now
+            );
+          } else {
+            posBillRepository.upsertCheckItem({
+              id: `check_item_${crypto.randomBytes(8).toString('hex')}`,
+              checkId: target.id,
+              orderItemId: item.order_item_id,
+              quantity: Number(item.quantity),
+              now
+            });
+          }
+        }
+        posBillRepository.deleteCheck(source.id);
+      }
+
+      posBillRepository.updateCheckAmount(target.id, restoredAmount, now);
       posBillRepository.commit();
     } catch (err) {
       try { posBillRepository.rollback(); } catch (_) {}
