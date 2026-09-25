@@ -724,15 +724,56 @@ router.post('/pos/offline-sync/batch', requireAuth(['owner', 'brand_manager', 'b
 });
 
 
-// Cashier can only inspect the terminal bound to their own branch.
+// Terminal binding is readable by Cashier for normal POS boot and by
+// Manager/Owner for the explicit first-time terminal activation flow.
 // Registration remains a Manager/Owner administrative capability.
-router.get('/pos/terminal/current', requireAuth(['cashier']), (req, res) => {
+router.get('/pos/terminal/current', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
-    const branchId = req.user.branch_id || req.user.branchId;
-    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const role = req.user.role;
+    const assignedBranchId = req.user.branch_id || req.user.branchId || null;
+    const requestedBranchId = req.query && req.query.branch_id ? String(req.query.branch_id) : null;
+
+    let branchId = assignedBranchId;
+    if (role === 'branch_manager') {
+      if (requestedBranchId && assignedBranchId && requestedBranchId !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Akses ditolak: Manajer cabang hanya dapat melihat terminal cabangnya sendiri.'
+        });
+      }
+      branchId = assignedBranchId;
+    } else if (role === 'cashier') {
+      if (requestedBranchId && assignedBranchId && requestedBranchId !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Akses ditolak: Kasir hanya dapat melihat terminal cabangnya sendiri.'
+        });
+      }
+      branchId = assignedBranchId;
+    } else {
+      // Owner / Brand Manager may inspect a selected branch during terminal
+      // activation. The selected branch must still belong to the authenticated brand.
+      branchId = requestedBranchId || assignedBranchId;
+    }
+
+    if (!branchId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cabang (branch_id) wajib ditentukan.'
+      });
+    }
+
+    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branchId, req.brand_id);
+    if (!branch) {
+      return res.status(404).json({
+        success: false,
+        error: 'Cabang tidak ditemukan pada brand ini.'
+      });
+    }
+
     const { PosLocalOperationService } = require('../../domains/pos');
     const terminal = PosLocalOperationService.getActiveTerminal(branchId);
-    res.json({ success: true, terminal: terminal || null, registered: !!terminal });
+    res.json({ success: true, terminal: terminal || null, registered: !!terminal, branch_id: branchId });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
