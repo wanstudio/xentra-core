@@ -241,20 +241,27 @@ class PosOrderService {
     if (!source) throw new Error('[PosOrderService] Check sumber tidak ditemukan.');
     if (source.status !== 'open') throw new Error('[PosOrderService] Check sumber sudah tidak OPEN.');
 
+    // The check allocation is authoritative. Aggregate duplicate payload rows,
+    // then validate against the current persisted allocation instead of trusting
+    // a potentially stale quantity rendered by the POS UI.
     const requested = new Map();
     for (const raw of split_items) {
-      const itemId = String(raw.order_item_id || raw.item_id || '');
+      const itemId = String(raw.order_item_id || raw.item_id || '').trim();
       const qty = Number(raw.quantity);
-      if (!itemId || !Number.isInteger(qty) || qty <= 0) {
+      if (!itemId || !Number.isSafeInteger(qty) || qty <= 0) {
         throw new Error('[PosOrderService] Item split tidak valid.');
       }
       requested.set(itemId, (requested.get(itemId) || 0) + qty);
     }
 
     for (const [itemId, qty] of requested) {
-      const sourceItem = source.items.find(i => String(i.order_item_id) === itemId);
-      if (!sourceItem || qty > Number(sourceItem.quantity)) {
-        throw new Error('[PosOrderService] Jumlah split melebihi quantity pada check sumber.');
+      const sourceItem = posBillRepository.findCheckItem(source.id, itemId);
+      const available = sourceItem ? Number(sourceItem.quantity) : 0;
+      if (!sourceItem) {
+        throw new Error('[PosOrderService] Item ' + itemId + ' tidak ada pada Check #' + source.check_number + '.');
+      }
+      if (!Number.isSafeInteger(available) || qty > available) {
+        throw new Error('[PosOrderService] Quantity split ' + qty + ' melebihi quantity tersedia ' + available + ' pada Check #' + source.check_number + '.');
       }
     }
 
@@ -267,18 +274,27 @@ class PosOrderService {
     }
 
     const nextNumber = current.checks.reduce((max, c) => Math.max(max, Number(c.check_number) || 0), 0) + 1;
-    const newCheckId = `check_${crypto.randomBytes(8).toString('hex')}`;
+    const newCheckId = 'check_' + crypto.randomBytes(8).toString('hex');
     const now = new Date().toISOString();
 
     posBillRepository.beginTransaction();
     try {
+      // Re-validate inside the write transaction to close the race window.
+      for (const [itemId, qty] of requested) {
+        const lockedSourceItem = posBillRepository.findCheckItem(source.id, itemId);
+        const available = lockedSourceItem ? Number(lockedSourceItem.quantity) : 0;
+        if (!lockedSourceItem || qty > available) {
+          throw new Error('[PosOrderService] Quantity split ' + qty + ' melebihi quantity tersedia ' + available + ' pada Check #' + source.check_number + '.');
+        }
+      }
+
       posBillRepository.createCheck({ id: newCheckId, orderId: order_id, checkNumber: nextNumber, now });
       for (const [itemId, qty] of requested) {
-        const sourceItem = source.items.find(i => String(i.order_item_id) === itemId);
+        const sourceItem = posBillRepository.findCheckItem(source.id, itemId);
         const remaining = Number(sourceItem.quantity) - qty;
         posBillRepository.updateCheckItemQuantity(source.id, itemId, remaining, now);
         posBillRepository.upsertCheckItem({
-          id: `check_item_${crypto.randomBytes(8).toString('hex')}`,
+          id: 'check_item_' + crypto.randomBytes(8).toString('hex'),
           checkId: newCheckId,
           orderItemId: itemId,
           quantity: qty,
