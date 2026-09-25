@@ -50,18 +50,58 @@ class PosOrderService {
     const heldId = `held_${crypto.randomBytes(6).toString('hex')}`;
     const now = new Date().toISOString();
     const payloadJson = JSON.stringify(items);
+    let tableHoldCreated = false;
 
-    posOrderRepository.insertHeldOrder({
-      id: heldId,
-      branchId: branch_id,
-      tableNumber: table_number,
-      customerName: customer_name,
-      orderType: order_type,
-      itemsPayload: payloadJson,
-      status: 'held',
-      createdAt: now,
-      updatedAt: now
-    });
+    // A cashier-created dine-in order claims the table immediately.
+    // The order may still be pending operational/payment flow, but the table
+    // must no longer appear AVAILABLE to another cashier.
+    if (order_type === 'dine_in' && table_number) {
+      try {
+        const layout = DiningTableService.getBranchLayout(branch_id);
+        const table = (layout.tables || []).find(t =>
+          String(t.table_number) === String(table_number) ||
+          String(t.label) === String(table_number)
+        );
+        if (!table) {
+          throw new Error(`[PosOrderService] Meja "${table_number}" tidak ditemukan pada cabang ini.`);
+        }
+        DiningTableService.holdTablesForPayment({
+          branch_id,
+          table_id: table.id,
+          customer_phone: '',
+          hold_reference_id: heldId,
+          channel: 'pos_cashier'
+        });
+        tableHoldCreated = true;
+      } catch (err) {
+        throw err;
+      }
+    }
+
+    try {
+      posOrderRepository.insertHeldOrder({
+        id: heldId,
+        branchId: branch_id,
+        tableNumber: table_number,
+        customerName: customer_name,
+        orderType: order_type,
+        itemsPayload: payloadJson,
+        status: 'held',
+        createdAt: now,
+        updatedAt: now
+      });
+    } catch (err) {
+      if (tableHoldCreated) {
+        try {
+          DiningTableService.releaseHold({
+            branch_id,
+            hold_reference_id: heldId,
+            reason: 'cancelled'
+          });
+        } catch (_) {}
+      }
+      throw err;
+    }
 
     return {
       id: heldId,
@@ -321,6 +361,21 @@ class PosOrderService {
     }
 
     const order = placementResult.order;
+
+    // The temporary cashier table hold must follow the real Order ID so the
+    // normal acceptance/payment cancellation/release paths can resolve it.
+    if (held_order_id && order_type === 'dine_in') {
+      try {
+        DiningTableService.rebindHoldReference({
+          branch_id,
+          from_reference_id: held_order_id,
+          to_reference_id: order.id
+        });
+      } catch (err) {
+        throw new Error('[PosOrderService] Gagal mengikat reservasi meja ke order: ' + err.message);
+      }
+    }
+
     const grandTotal = order.grand_total;
     let changeAmount = 0;
     let payment = null;
