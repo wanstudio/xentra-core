@@ -116,6 +116,64 @@ class PosOrderService {
   }
 
   /**
+   * Materializes a cashier-held bill as a canonical Commerce Order so the
+   * Merchant App can receive and accept it. The POS hold remains the cashier
+   * working reference; the canonical Order becomes the operational reference.
+   */
+  static async materializeHeldOrder({ held_order_id }) {
+    const held = posOrderRepository.findHeldById(held_order_id);
+    if (!held || held.status !== 'held') {
+      throw new Error('[PosOrderService] Held order tidak ditemukan atau sudah tidak aktif.');
+    }
+
+    if (held.order_id) {
+      const existing = orderRepository.findById(held.order_id);
+      if (existing) return { ...held, order_id: existing.id, order: existing };
+    }
+
+    const items = JSON.parse(held.items_payload || '[]');
+    if (!items.length) throw new Error('[PosOrderService] Held order tidak memiliki item.');
+
+    const placement = await OrderPlacementService.submitOrder({
+      brand_id: held.brand_id || null,
+      branch_id: held.branch_id,
+      customer: {
+        name: held.customer_name || 'Tamu',
+        phone: held.customer_phone || ''
+      },
+      items,
+      delivery_fee: 0,
+      payment_method: 'cash',
+      order_channel: 'pos_cashier',
+      order_type: held.order_type || 'dine_in',
+      table_number: held.table_number || null,
+      hold_reference_id: held.id,
+      notes: 'POS Cashier Order [held]'
+    });
+
+    if (!placement || !placement.success || !placement.order) {
+      throw new Error((placement && placement.errors && placement.errors[0]) || (placement && placement.error) || 'Gagal membuat order operasional dari Hold Bill.');
+    }
+
+    const order = placement.order;
+    if (held.order_type === 'dine_in') {
+      DiningTableService.rebindHoldReference({
+        branch_id: held.branch_id,
+        from_reference_id: held.id,
+        to_reference_id: order.id
+      });
+    }
+
+    posOrderRepository.setHeldOrderOrderId({
+      heldOrderId: held.id,
+      orderId: order.id,
+      updatedAt: new Date().toISOString()
+    });
+
+    return { ...held, order_id: order.id, order };
+  }
+
+  /**
    * Appends items to an existing open table bill (used for additional orders from Customer App or Kasir).
    * 
    * @param {Object} params
