@@ -136,6 +136,39 @@ describe('Workforce Handoff Redirect & Tenant Boundary (WH-01 to WH-04)', () => 
     assert.equal(meRes.body.user.branch_id, TEST_BRANCH_ID);
   });
 
+  it('WH-05: POST /api/v1/invitations/accept on tenant domain routes invited cashier to POS', async () => {
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const invId = 'wiv_' + crypto.randomBytes(8).toString('hex');
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+
+    db.prepare(`
+      INSERT INTO workforce_invitations (
+        id, organization_id, brand_id, branch_id, email, role,
+        invited_by_user_id, status, token_hash, expires_at, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, 'cashier_invite_test@test.com', 'cashier', 'usr_wh_bm', 'pending', ?, ?, ?, ?)
+    `).run(invId, TEST_ORG_ID, TEST_BRAND_ID, TEST_BRANCH_ID, tokenHash, expiresAt, now, now);
+
+    db.prepare(`
+      INSERT OR IGNORE INTO users (id, brand_id, organization_id, branch_id, username, password_hash, full_name, email, role, status, created_at, updated_at)
+      VALUES ('usr_wh_cashier_invited', ?, ?, ?, 'cashier_invited', '$2b$10$abcdef', 'Invited Cashier', 'cashier_invite_test@test.com', 'cashier', 'active', ?, ?)
+    `).run(TEST_BRAND_ID, TEST_ORG_ID, TEST_BRANCH_ID, now, now);
+
+    const invitedCashier = db.prepare('SELECT * FROM users WHERE id = ?').get('usr_wh_cashier_invited');
+    const { token: sessionToken } = global.TokenSessionStore.createSession(invitedCashier, TEST_BRAND_ID);
+
+    const res = await rawRequest('POST', '/api/v1/invitations/accept', {
+      'Host': TEST_DOMAIN,
+      'Authorization': `Bearer ${sessionToken}`
+    }, { token: rawToken });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.role, 'cashier');
+    assert.equal(res.body.redirect_url, '/pos/');
+  });
+
   it('WH-04: POST /api/v1/invitations/accept on xentra.cloud includes redirect_url with handoff ticket to brand custom_domain', async () => {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
