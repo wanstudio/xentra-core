@@ -431,6 +431,20 @@ router.post('/pos/orders/:id/checks/split', requireAuth(['cashier']), (req, res)
   }
 });
 
+router.post('/pos/orders/:id/checks/split-evenly', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    const { source_check_id, parts } = req.body || {};
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const result = PosOrderService.splitOrderCheckEvenly({
+      order_id: req.params.id, branch_id: branchId, source_check_id, parts
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/pos/orders/:id/checks/split-amount', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
