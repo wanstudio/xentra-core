@@ -2170,7 +2170,8 @@
             '<input class="pos-check-qty" type="number" min="0" max="'+esc(String(it.quantity))+'" value="0" data-check-item="'+esc(it.order_item_id)+'" aria-label="Jumlah '+esc(it.product_name||'item')+' untuk split">' +
           '</div>';
         }).join('');
-        var splitBtn=check.status==='open' && (check.items||[]).length>1
+        var hasSplittable=(check.items||[]).some(function(it){return Number(it.quantity)>1;}) || (check.items||[]).length>1;
+        var splitBtn=check.status==='open' && hasSplittable
           ? '<button type="button" class="pos-btn small" data-split-check="'+esc(check.id)+'">Pisahkan item terpilih</button>' : '';
         var mergeBtn=(check.status==='open' && Number(check.check_number)!==1)
           ? '<button type="button" class="pos-btn small ghost danger" data-merge-check="'+esc(check.id)+'">Gabungkan ke Check #1</button>' : '';
@@ -2193,7 +2194,8 @@
       $('pos-modal-card').querySelectorAll('[data-split-check]').forEach(function(btn){
         btn.onclick=async function(){
           var sourceId=btn.dataset.splitCheck;
-          var inputs=$('pos-modal-card').querySelectorAll('[data-check-item]');
+          var card=btn.closest('.pos-check-card');
+          var inputs=card ? card.querySelectorAll('[data-check-item]') : [];
           var splitItems=[];
           inputs.forEach(function(input){
             var qty=Math.floor(Number(input.value)||0);
