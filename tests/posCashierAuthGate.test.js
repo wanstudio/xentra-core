@@ -7,6 +7,7 @@ const ROOT = path.resolve(__dirname, '..');
 const indexHtml = fs.readFileSync(path.join(ROOT, 'apps/pos-app/index.html'), 'utf8');
 const posJs = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/js/pos-app.js'), 'utf8');
 const posCss = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/css/pos.css'), 'utf8');
+const loginHtml = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/login.html'), 'utf8');
 
 test('POS cashier gate exposes PIN, direct Google, and account fallback', () => {
   assert.match(indexHtml, /id="pos-pin-login-form"/);
@@ -35,8 +36,8 @@ test('POS cashier logout returns to the POS PIN gate', () => {
   assert.match(posJs, /localStorage\.removeItem\(TOKEN_KEY\);/);
   assert.match(posJs, /localStorage\.removeItem\(USER_KEY\);/);
   assert.match(posJs, /window\.location\.replace\('\/pos\/'\)/);
-  assert.match(posJs, /btn-pos-logout\)\.onclick=function\(\)\{clearPosSessionAndReturnToPin\(\);\};/);
-  assert.doesNotMatch(posJs, /btn-pos-logout\)\.onclick=function\(\)\{[^\n]*window\.location\.replace\('\/login'\)/);
+  assert.ok(posJs.includes("$('btn-pos-logout').onclick=function(){clearPosSessionAndReturnToPin();};"));
+  assert.doesNotMatch(posJs, /\$\('btn-pos-logout'\)\.onclick=function\(\)\{[^\n]*window\.location\.replace\('\/login'\)/);
 });
 
 test('POS terminal bootstrap is manager-authorized and persists terminal identity', () => {
@@ -48,6 +49,13 @@ test('POS terminal bootstrap is manager-authorized and persists terminal identit
   assert.match(posJs, /xentra_pos_terminal_id/);
   assert.match(posJs, /xentra_pos_branch_id/);
   assert.match(posJs, /openPinUnlockGate\(false,false\)/);
+});
+
+test('Unified login preserves the explicit POS terminal setup handoff for managers', () => {
+  assert.match(loginHtml, /posTerminalSetupRequested/);
+  assert.match(loginHtml, /postLoginTarget/);
+  assert.match(loginHtml, /return '\/pos\/\?terminal_setup=1';/);
+  assert.match(loginHtml, /pos_terminal_setup=1/);
 });
 
 test('POS auth assets use a cache-busted revision', () => {
