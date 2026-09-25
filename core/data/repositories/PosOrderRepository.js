@@ -64,6 +64,14 @@ class PosOrderRepository {
     `, [itemsPayload, updatedAt, heldOrderId]);
   }
 
+  setHeldOrderOrderId({ heldOrderId, orderId, updatedAt }) {
+    return this.db.execute(`
+      UPDATE pos_held_orders
+      SET order_id = ?, updated_at = ?
+      WHERE id = ?
+    `, [orderId, updatedAt, heldOrderId]);
+  }
+
   cancelHeldOrder({ heldOrderId, updatedAt, status = 'cancelled' }) {
     return this.db.execute(`
       UPDATE pos_held_orders
