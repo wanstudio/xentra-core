@@ -1668,6 +1668,9 @@ function initSchema(targetDb) {
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN recipient_name TEXT;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE orders ADD COLUMN recipient_phone TEXT;'); } catch (e) {}
   try { targetDb.exec("ALTER TABLE pos_held_orders ADD COLUMN order_type TEXT DEFAULT 'dine_in';"); } catch (e) {}
+  // POS Hold -> Merchant operational order linkage.
+  try { targetDb.exec('ALTER TABLE pos_held_orders ADD COLUMN order_id TEXT;'); } catch (e) {}
+  try { targetDb.exec('CREATE INDEX IF NOT EXISTS idx_pos_held_orders_order_id ON pos_held_orders(order_id);'); } catch (e) {}
 
   // F05 Migration Safety: inspect existing duplicate rows before establishing UNIQUE constraint
   try {
