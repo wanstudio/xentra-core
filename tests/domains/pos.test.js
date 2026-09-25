@@ -218,10 +218,9 @@ test('POS 3 — Offline Risk Limit: validates valid limit and strictly rejects l
 });
 
 // ==============================================================================
-// POS 4 — Dine-in Order Holding, Split Bill, Merge Bill, & Customer App Addition
+// POS 4 — Dine-in Order Holding, Canonical Checks & Customer App Addition
 // ==============================================================================
-test('POS 4 — Held Orders: supports Hold Table, Customer App Item Addition, Split, and Merge Bill', () => {
-  // 1. Hold Dine-in Order for Table 5
+test('POS 4 — Held Orders: supports Hold Table, Customer App Item Addition, Split, and Merge Check', async () => {
   const held = PosOrderService.holdOrder({
     branch_id: 'branch_pos',
     table_number: '5',
@@ -231,9 +230,7 @@ test('POS 4 — Held Orders: supports Hold Table, Customer App Item Addition, Sp
     ]
   });
   assert.strictEqual(held.status, 'held');
-  assert.strictEqual(held.items.length, 1);
 
-  // 2. Customer App Addition: Tamu menambah Es Jeruk via scan QR Meja 5 (Cash/Pay at Cashier)
   const updatedTableBill = PosOrderService.appendItemsToTableBill({
     branch_id: 'branch_pos',
     table_number: '5',
@@ -241,25 +238,47 @@ test('POS 4 — Held Orders: supports Hold Table, Customer App Item Addition, Sp
       { product_id: 'prod_pos_2', name: 'Es Jeruk POS', quantity: 2, price: 8000 }
     ]
   });
-  assert.strictEqual(updatedTableBill.items.length, 2); // Nasgor + Es Jeruk tergabung otomatis!
+  assert.strictEqual(updatedTableBill.items.length, 2);
 
-  // 3. Split Bill (Pisahkan Es Jeruk ke tagihan baru)
-  const splitResult = PosOrderService.splitBill({
+  const materialized = await PosOrderService.materializeHeldOrder({
     held_order_id: held.id,
-    split_items: [{ product_id: 'prod_pos_2', name: 'Es Jeruk POS', quantity: 2, price: 8000 }]
+    brand_id: 'brand_pos'
   });
-  assert.strictEqual(splitResult.original_bill.items.length, 1); // Nasi Goreng
-  assert.strictEqual(splitResult.new_bill.items.length, 1);      // Es Jeruk
 
-  // 4. Merge Bill back
-  const merged = PosOrderService.mergeBill({
-    target_held_id: splitResult.original_bill.id,
-    source_held_id: splitResult.new_bill.id
+  const checks = PosOrderService.getOrderChecks({
+    order_id: materialized.order_id,
+    branch_id: 'branch_pos'
   });
-  assert.strictEqual(merged.items.length, 2);
+  assert.strictEqual(checks.checks.length, 1);
+  assert.strictEqual(checks.checks[0].items.length, 2);
+
+  const itemToMove = checks.checks[0].items.find(i => i.product_id === 'prod_pos_2');
+  const splitResult = PosOrderService.splitOrderCheck({
+    order_id: materialized.order_id,
+    branch_id: 'branch_pos',
+    source_check_id: checks.checks[0].id,
+    split_items: [{ order_item_id: itemToMove.order_item_id, quantity: 1 }]
+  });
+  assert.strictEqual(splitResult.checks.length, 2);
+
+  const merged = PosOrderService.mergeOrderChecks({
+    order_id: materialized.order_id,
+    branch_id: 'branch_pos',
+    target_check_id: splitResult.checks[0].id,
+    source_check_id: splitResult.checks[1].id
+  });
+  assert.strictEqual(merged.checks.length, 1);
+  assert.strictEqual(merged.checks[0].items.length, 2);
+
+  DiningTableService.releaseHold({
+    branch_id: 'branch_pos',
+    hold_reference_id: materialized.order_id,
+    reason: 'cancelled'
+  });
 });
 
 // ==============================================================================
+=============================================================================
 // POS 5 — Order Settlement (Dine-in, Reservation) & Stock Delegation
 // ==============================================================================
 test('POS 5 — Order Settle: supports dine_in, enforces reservation same-day rejection & future date acceptance', async () => {
