@@ -42,7 +42,7 @@ class PosOrderService {
    * @param {string} [params.order_type='dine_in'] - 'dine_in' | 'reservation'
    * @returns {Object} Held order record
    */
-  static holdOrder({ branch_id, table_number = '', customer_name = 'Tamu Meja', items = [], order_type = 'dine_in' }) {
+  static holdOrder({ branch_id, table_number = '', customer_name = 'Tamu Meja', customer_phone = '', items = [], order_type = 'dine_in' }) {
     if (!branch_id || !Array.isArray(items) || items.length === 0) {
       throw new Error('[PosOrderService] "branch_id" and non-empty "items" are required to hold an order.');
     }
@@ -68,7 +68,7 @@ class PosOrderService {
         DiningTableService.holdTablesForPayment({
           branch_id,
           table_id: table.id,
-          customer_phone: '',
+          customer_phone: customer_phone || '',
           hold_reference_id: heldId,
           channel: 'pos_cashier'
         });
