@@ -313,6 +313,7 @@ class PosOrderService {
     const source = current.checks.find(c => String(c.id) === String(source_check_id));
     if (!source) throw new Error('[PosOrderService] Check sumber tidak ditemukan.');
     if (source.status !== 'open') throw new Error('[PosOrderService] Check sumber sudah tidak OPEN.');
+    if (posBillRepository.findCheckPaidAmount(source.id) > 0) throw new Error('[PosOrderService] Check yang sudah menerima pembayaran tidak dapat di-split.');
 
     // The check allocation is authoritative. Aggregate duplicate payload rows,
     // then validate against the current persisted allocation instead of trusting
@@ -406,6 +407,9 @@ class PosOrderService {
     if (!target || !source) throw new Error('[PosOrderService] Check target/source tidak ditemukan.');
     if (target.status !== 'open' || source.status !== 'open') {
       throw new Error('[PosOrderService] Hanya check OPEN yang dapat digabung.');
+    }
+    if (posBillRepository.findCheckPaidAmount(source.id) > 0) {
+      throw new Error('[PosOrderService] Check sumber yang sudah menerima pembayaran tidak dapat digabung.');
     }
 
     const now = new Date().toISOString();
