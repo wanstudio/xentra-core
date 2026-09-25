@@ -23,7 +23,7 @@ class PosBillRepository {
   }
 
   findChecks(orderId) {
-    return this.db.queryMany(`SELECT id, order_id, check_number, status, created_at, updated_at FROM pos_order_checks WHERE order_id = ? ORDER BY check_number ASC`, [orderId]);
+    return this.db.queryMany(`SELECT id, order_id, check_number, status, allocated_amount, created_at, updated_at FROM pos_order_checks WHERE order_id = ? ORDER BY check_number ASC`, [orderId]);
   }
 
   findCheck(checkId) {
@@ -43,8 +43,8 @@ class PosBillRepository {
     return this.db.queryOne('SELECT id, check_id, order_item_id, quantity FROM pos_order_check_items WHERE check_id = ? AND order_item_id = ?', [checkId, orderItemId]);
   }
 
-  createCheck({ id, orderId, checkNumber, now }) {
-    this.db.execute(`INSERT INTO pos_order_checks (id, order_id, check_number, status, created_at, updated_at) VALUES (?, ?, ?, 'open', ?, ?)`, [id, orderId, checkNumber, now, now]);
+  createCheck({ id, orderId, checkNumber, allocatedAmount = 0, now }) {
+    this.db.execute(`INSERT INTO pos_order_checks (id, order_id, check_number, status, allocated_amount, created_at, updated_at) VALUES (?, ?, ?, 'open', ?, ?, ?)`, [id, orderId, checkNumber, allocatedAmount, now, now]);
     return this.findCheck(id);
   }
 
@@ -57,6 +57,11 @@ class PosBillRepository {
     if (quantity <= 0) return this.deleteCheckItem(checkId, orderItemId);
     this.db.execute('UPDATE pos_order_check_items SET quantity = ?, updated_at = ? WHERE check_id = ? AND order_item_id = ?', [quantity, now, checkId, orderItemId]);
   }
+  updateCheckAmount(checkId, allocatedAmount, now) { this.db.execute('UPDATE pos_order_checks SET allocated_amount = ?, updated_at = ? WHERE id = ?', [allocatedAmount, now, checkId]); }
+  findCheckPayments(checkId) { return this.db.queryMany('SELECT * FROM pos_check_payments WHERE check_id = ? ORDER BY created_at ASC, id ASC', [checkId]); }
+  findOrderPaidAmount(orderId) { const r = this.db.queryOne("SELECT COALESCE(SUM(amount),0) AS amount FROM pos_check_payments WHERE order_id = ? AND payment_status = 'settlement'", [orderId]); return Number(r && r.amount) || 0; }
+  findCheckPaidAmount(checkId) { const r = this.db.queryOne("SELECT COALESCE(SUM(amount),0) AS amount FROM pos_check_payments WHERE check_id = ? AND payment_status = 'settlement'", [checkId]); return Number(r && r.amount) || 0; }
+  createCheckPayment({ id, checkId, orderId, paymentMethod, provider, amount, paymentStatus = 'settlement', payerName = null, actorId = null, rawPayment = null, settledAt, now }) { this.db.execute(`INSERT INTO pos_check_payments (id, check_id, order_id, payment_method, provider, amount, payment_status, payer_name, actor_id, raw_payment, settled_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [id, checkId, orderId, paymentMethod, provider, amount, paymentStatus, payerName, actorId, rawPayment, settledAt, now, now]); return this.db.queryOne('SELECT * FROM pos_check_payments WHERE id = ?', [id]); }
   deleteCheck(checkId) { this.db.execute('DELETE FROM pos_order_checks WHERE id = ?', [checkId]); }
 }
 
