@@ -316,6 +316,13 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
           }, { dbTransactionProvided: true });
         }
 
+        // Close the POS-side Hold Bill pointer as well so the cashier does not
+        // keep a stale bill after Merchant rejects the canonical order.
+        try {
+          db.prepare("UPDATE pos_held_orders SET status = 'cancelled', updated_at = ? WHERE order_id = ? AND status = 'held'")
+            .run(new Date().toISOString(), fullOrder.id);
+        } catch (_) {}
+
         orderRepo.commitTransaction();
         return res.json({ success: true, decision, ...result });
       }
