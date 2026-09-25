@@ -32,7 +32,7 @@
     if (s == null) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
-  function money(n) { return 'Rp' + Number(n || 0).toLocaleString('id-ID'); }
+  function money(n) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); }
   function formatNominal(num) {
     if (num == null || num === '') return '';
     var clean = String(num).replace(/\D/g, '');
