@@ -173,9 +173,9 @@ The UI should always show:
 
 The same separation appears in major restaurant POS products:
 
-- **Square for Restaurants** documents splitting a bill/check by item or seat, and separately describes splitting a payment by amount. It explicitly describes amount splitting as entering amounts until the full balance is covered. urlSquare for Restaurants split bill/payment documentationhttps://squareup.com/help/us/en/article/8165-split-a-payment-and-check-with-square-for-restaurants
-- **Toast POS** documents splitting payments evenly and splitting checks by item; its documentation also describes manually entering payment amounts when the desired split is not covered by the standard item split flow. urlToast POS split checks documentationhttps://support.toasttab.com/en/article/Splitting-Checks-by-Item-1492811097734
-- **Lightspeed Restaurant** documents equal-part splitting and selected-item splitting, with separate numbered receipts/checks under the same payment workflow. urlLightspeed Restaurant bill splitting documentationhttps://resto-support.lightspeedhq.com/hc/en-us/articles/226405708-Splitting-a-bill
+- **Square for Restaurants** documents splitting a bill/check by item or seat, and separately describes splitting a payment by amount. It explicitly describes amount splitting as entering amounts until the full balance is covered. [Square for Restaurants split bill/payment documentation](https://squareup.com/help/us/en/article/8165-split-a-payment-and-check-with-square-for-restaurants)
+- **Toast POS** documents splitting payments evenly and splitting checks by item; its documentation also describes manually entering payment amounts when the desired split is not covered by the standard item split flow. [Toast POS split checks documentation](https://support.toasttab.com/en/article/Splitting-Checks-by-Item-1492811097734)
+- **Lightspeed Restaurant** documents equal-part splitting and selected-item splitting, with separate numbered receipts/checks under the same payment workflow. [Lightspeed Restaurant bill splitting documentation](https://resto-support.lightspeedhq.com/hc/en-us/articles/226405708-Splitting-a-bill)
 
 These references validate the business need for multiple allocation methods. Xentra-specific canonical Order/Dining invariants remain defined by this contract.
 
