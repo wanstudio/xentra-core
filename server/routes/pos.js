@@ -460,6 +460,12 @@ router.post('/pos/orders/:id/checks/:checkId/pay', requireAuth(['cashier']), (re
     if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
       return res.status(400).json({ success: false, error: 'amount positif wajib diisi.' });
     }
+    let effectiveShiftId = null;
+    if (payment_method === 'cash') {
+      const activeShift = db.prepare("SELECT id FROM pos_shifts WHERE cashier_id = ? AND branch_id = ? AND status = 'open' ORDER BY opened_at DESC LIMIT 1").get(cashierId, branchId);
+      if (!activeShift) return res.status(400).json({ success: false, error: 'Kasir belum memiliki shift aktif.' });
+      effectiveShiftId = activeShift.id;
+    }
     const result = PosOrderService.payCheck({
       order_id: req.params.id,
       branch_id: branchId,
@@ -468,7 +474,8 @@ router.post('/pos/orders/:id/checks/:checkId/pay', requireAuth(['cashier']), (re
       payment_method,
       payer_name,
       actor_id: cashierId,
-      amount_tendered: amount_tendered == null ? null : Number(amount_tendered)
+      amount_tendered: amount_tendered == null ? null : Number(amount_tendered),
+      shift_id: effectiveShiftId
     });
     res.json(result);
   } catch (err) {
