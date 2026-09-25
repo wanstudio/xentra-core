@@ -431,6 +431,51 @@ router.post('/pos/orders/:id/checks/split', requireAuth(['cashier']), (req, res)
   }
 });
 
+router.post('/pos/orders/:id/checks/split-amount', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    const { source_check_id, amount } = req.body || {};
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    if (!source_check_id || !Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, error: 'source_check_id dan amount positif wajib diisi.' });
+    }
+    const result = PosOrderService.splitOrderCheckByAmount({
+      order_id: req.params.id,
+      branch_id: branchId,
+      source_check_id,
+      amount: Number(amount)
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/orders/:id/checks/:checkId/pay', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    const cashierId = req.user.id || req.user.userId;
+    const { amount, payment_method = 'cash', payer_name = null, amount_tendered = null } = req.body || {};
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, error: 'amount positif wajib diisi.' });
+    }
+    const result = PosOrderService.payCheck({
+      order_id: req.params.id,
+      branch_id: branchId,
+      check_id: req.params.checkId,
+      amount: Number(amount),
+      payment_method,
+      payer_name,
+      actor_id: cashierId,
+      amount_tendered: amount_tendered == null ? null : Number(amount_tendered)
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/pos/orders/:id/checks/merge', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
