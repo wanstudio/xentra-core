@@ -515,6 +515,23 @@
       var urlParams = new URLSearchParams(window.location.search);
       var isPlatform = urlParams.get('context') === 'platform' || (urlParams.get('context') !== 'client' && host === 'xentra.cloud');
 
+      // POS terminal setup is a managerial bootstrap only. It is intentionally
+      // carried through the unified login page so Owner/Manager can authenticate
+      // normally and then return to /pos/ for terminal activation.
+      var posTerminalSetupRequested =
+        urlParams.get('pos_terminal_setup') === '1' ||
+        sessionStorage.getItem('xentra_pos_terminal_setup_requested') === '1';
+
+      function postLoginTarget(data, fallback) {
+        var role = data && data.user && data.user.role;
+        var managerial = role === 'owner' || role === 'brand_manager' || role === 'branch_manager';
+        if (posTerminalSetupRequested && managerial) {
+          sessionStorage.removeItem('xentra_pos_terminal_setup_requested');
+          return '/pos/?terminal_setup=1';
+        }
+        return fallback;
+      }
+
       var storeNameBadge = document.getElementById('store-name-badge');
       var cardTitle = document.querySelector('.x-card-title');
       if (isPlatform) {
@@ -608,7 +625,7 @@
               if (data.user) {
                 localStorage.setItem(USER_KEY, JSON.stringify(data.user));
               }
-              window.location.href = data.landing || '/dashboard/';
+              window.location.href = postLoginTarget(data, data.landing || '/dashboard/');
             } else {
               var errBox = document.getElementById('login-error');
               if (errBox) {
@@ -653,7 +670,7 @@
         }
         fetch('/api/v1/auth/merchant/me', { headers: { 'Authorization': 'Bearer ' + existingToken } })
           .then(function (r) { return r.json(); })
-          .then(function (d) { window.location.href = (d && d.landing) || '/dashboard/'; })
+          .then(function (d) { window.location.href = postLoginTarget(d, (d && d.landing) || '/dashboard/'); })
           .catch(function () { window.location.href = '/dashboard/'; });
         return;
       }
@@ -770,7 +787,7 @@
             }
 
             setTimeout(function () {
-              window.location.href = data.redirect_url || data.landing || '/dashboard/';
+              window.location.href = postLoginTarget(data, data.redirect_url || data.landing || '/dashboard/');
             }, 250);
             return;
           }
@@ -924,7 +941,7 @@
                 localStorage.setItem(TOKEN_KEY, data.token);
                 if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
                 if (googleStatus) { googleStatus.textContent = 'Login Google berhasil! Mengalihkan...'; googleStatus.style.color = '#166534'; }
-                setTimeout(function () { window.location.href = data.redirect_url || data.landing || '/dashboard/'; }, 250);
+                setTimeout(function () { window.location.href = postLoginTarget(data, data.redirect_url || data.landing || '/dashboard/'); }, 250);
                 return;
               }
               var msg;
@@ -986,7 +1003,7 @@
           btnGoogleLogin.addEventListener('click', function (e) {
             e.preventDefault();
             var currentOrigin = window.location.origin;
-            var returnUrl = currentOrigin + '/login';
+            var returnUrl = currentOrigin + '/login' + (posTerminalSetupRequested ? '?pos_terminal_setup=1' : '');
             var redirectTarget = 'https://xentra.cloud/auth/broker?return_to=' + encodeURIComponent(returnUrl);
             if (claimDomain) {
               redirectTarget += '&claim_domain=' + encodeURIComponent(claimDomain);
