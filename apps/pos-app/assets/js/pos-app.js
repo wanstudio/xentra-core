@@ -2221,16 +2221,29 @@
 
       $('pos-modal-card').querySelectorAll('[data-pay-check]').forEach(function(btn){
         btn.onclick=async function(){
-          var amount=prompt('Nominal pembayaran:', '');
-          amount=Number(String(amount||'').replace(/[^0-9]/g,''));
-          if(!amount)return;
-          var payer=prompt('Nama pembayar (opsional):','');
-          var tendered=prompt('Uang diterima (Cash):',String(amount));
-          tendered=Number(String(tendered||'').replace(/[^0-9]/g,''));
-          try{
-            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/'+encodeURIComponent(btn.dataset.payCheck)+'/pay',{method:'POST',headers:headers(),body:JSON.stringify({amount:amount,payment_method:'cash',payer_name:payer||null,amount_tendered:tendered})});
-            toast('Pembayaran tercatat.'); openCheckManager(orderId);
-          }catch(e){toast(e.message);}
+          var check=checks.find(function(x){return x.id===btn.dataset.payCheck;});
+          var remaining=check ? Number(check.remaining_amount||0) : 0;
+          var html='<h3>Bayar Check #'+esc(String(check.check_number))+'</h3>' +
+            '<div class="pos-payment-summary"><span>Sisa tagihan</span><strong>'+money(remaining)+'</strong></div>' +
+            '<label class="pos-field"><span>Nominal dibayar</span><input id="pos-pay-amount" class="pos-input" inputmode="numeric" type="number" min="1" max="'+remaining+'" value="'+remaining+'"></label>' +
+            '<label class="pos-field"><span>Nama pembayar <small>(opsional)</small></span><input id="pos-pay-payer" class="pos-input" type="text" placeholder="Contoh: Budi"></label>' +
+            '<label class="pos-field"><span>Uang diterima</span><input id="pos-pay-tendered" class="pos-input" inputmode="numeric" type="number" min="1" value="'+remaining+'"></label>' +
+            '<div id="pos-pay-change" class="pos-payment-summary"><span>Kembalian</span><strong>'+money(0)+'</strong></div>' +
+            '<div class="pos-modal-actions"><button id="pos-pay-submit" class="pos-btn">Catat Pembayaran</button><button id="pos-pay-cancel" class="pos-btn ghost">Batal</button></div>';
+          showModal(html);
+          var amt=$('pos-pay-amount'), tend=$('pos-pay-tendered'), change=$('pos-pay-change');
+          function updateChange(){var a=Number(amt.value)||0,t=Number(tend.value)||0;if(change)change.innerHTML='<span>Kembalian</span><strong>'+money(Math.max(0,t-a))+'</strong>';};
+          amt.oninput=updateChange; tend.oninput=updateChange; updateChange();
+          $('pos-pay-cancel').onclick=hideModal;
+          $('pos-pay-submit').onclick=async function(){
+            var amount=Number(amt.value)||0,tendered=Number(tend.value)||0;
+            if(!amount||amount>remaining){toast('Nominal pembayaran tidak valid.');return;}
+            if(tendered<amount){toast('Uang diterima belum cukup.');return;}
+            try{
+              await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/'+encodeURIComponent(btn.dataset.payCheck)+'/pay',{method:'POST',headers:headers(),body:JSON.stringify({amount:amount,payment_method:'cash',payer_name:$('pos-pay-payer').value.trim()||null,amount_tendered:tendered})});
+              toast('Pembayaran tercatat.'); openCheckManager(orderId);
+            }catch(e){toast(e.message);}
+          };
         };
       });
 
