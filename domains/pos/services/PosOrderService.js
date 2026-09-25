@@ -23,6 +23,8 @@ const posOrderRepository = new PosOrderRepository();
 const posBillRepository = new PosBillRepository();
 const { PaymentRepository } = require('../../../core/data/repositories');
 const paymentRepository = new PaymentRepository();
+const { PosShiftRepository } = require('../../../core/data/repositories');
+const posShiftRepository = new PosShiftRepository();
 
 class PosOrderService {
   static ORDER_TYPES = {
@@ -263,7 +265,7 @@ class PosOrderService {
    * Records one payment contribution against an existing Check.
    * One Check may receive multiple payments.
    */
-  static payCheck({ order_id, branch_id, check_id, amount, payment_method = 'cash', payer_name = null, actor_id = null, amount_tendered = null }) {
+  static payCheck({ order_id, branch_id, check_id, amount, payment_method = 'cash', payer_name = null, actor_id = null, amount_tendered = null, shift_id = null }) {
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0) throw new Error('[PosOrderService] Nominal pembayaran harus lebih dari 0.');
     const allowed = ['cash', 'qris_static', 'midtrans', 'doku'];
@@ -281,11 +283,20 @@ class PosOrderService {
     if (payment_method === 'cash') {
       const tendered = Number(amount_tendered);
       if (!Number.isFinite(tendered) || tendered < value) throw new Error('[PosOrderService] Uang diterima harus cukup untuk pembayaran ini.');
+      if (!shift_id) throw new Error('[PosOrderService] Shift kasir aktif wajib untuk pembayaran Cash.');
+      const shift = posShiftRepository.findById(shift_id);
+      if (!shift || shift.status !== 'open' || shift.branch_id !== order.branch_id || (actor_id && shift.cashier_id !== actor_id)) throw new Error('[PosOrderService] Shift kasir tidak valid untuk pembayaran ini.');
     }
     const now = new Date().toISOString();
     const paymentId = 'checkpay_' + crypto.randomBytes(8).toString('hex');
     posBillRepository.beginTransaction();
     try {
+      if (payment_method === 'cash') {
+        const shiftInTx = posShiftRepository.findStatusById(shift_id);
+        if (!shiftInTx || shiftInTx.status !== 'open') throw new Error('[PosOrderService] Shift kasir sudah ditutup.');
+        const shiftUpdate = posShiftRepository.incrementCashSales({ shiftId: shift_id, branchId: order.branch_id, amount: value });
+        if (!shiftUpdate || shiftUpdate.changes !== 1) throw new Error('[PosOrderService] Gagal mencatat kas ke shift.');
+      }
       const lockedCheck = posBillRepository.findCheck(check_id);
       const lockedPaid = posBillRepository.findCheckPaidAmount(check_id);
       const lockedRemaining = Number(lockedCheck.allocated_amount || 0) - lockedPaid;
