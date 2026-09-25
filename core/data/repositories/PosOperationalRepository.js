@@ -31,7 +31,31 @@ class PosOperationalRepository {
   }
 
   findActiveTerminalByBranch(branchId) {
+    if (!branchId) return null;
     return this.db.queryOne("SELECT * FROM pos_terminals WHERE branch_id = ? AND status = 'active' LIMIT 1", [branchId]);
+  }
+
+  getOrCreateActiveTerminal(branchId) {
+    if (!branchId) return null;
+    let terminal = this.findActiveTerminalByBranch(branchId);
+    if (!terminal) {
+      const branch = this.db.queryOne("SELECT id, name FROM branches WHERE id = ?", [branchId]);
+      if (branch) {
+        const terminalId = `pos_term_${branchId.replace(/[^a-zA-Z0-9]/g, '').slice(-8)}_${Math.random().toString(36).slice(2, 6)}`;
+        const now = new Date().toISOString();
+        this.insertTerminal({
+          id: terminalId,
+          branchId: branch.id,
+          deviceName: `Terminal Utama (${branch.name || 'Cabang'})`,
+          deviceIdentifier: `web-terminal-${branch.id}`,
+          configVersion: 1,
+          createdAt: now,
+          updatedAt: now
+        });
+        terminal = this.findTerminalById(terminalId);
+      }
+    }
+    return terminal;
   }
 
   insertTerminal({ id, branchId, deviceName, deviceIdentifier, configVersion = 1, createdAt, updatedAt }) {
