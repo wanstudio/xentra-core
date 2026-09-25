@@ -334,6 +334,34 @@ class PosOrderService {
       if (afterPaid >= Number(lockedCheck.allocated_amount)) posBillRepository.setCheckStatus(lockedCheck.id, 'paid', now);
       posBillRepository.commit();
     } catch (err) { try { posBillRepository.rollback(); } catch (_) {} throw err; }
+
+    // Check payments are the cashier's split-tender ledger. Only when the
+    // entire canonical Order is paid do we finalize the authoritative
+    // order_payments record and trigger the normal Dining Session settlement.
+    const afterChecks = PosOrderService.getOrderChecks({ order_id, branch_id });
+    const orderPaidAfter = afterChecks.checks.reduce((sum, check) => sum + Number(check.paid_amount || 0), 0);
+    const orderGrandTotal = Number(afterChecks.order.grand_total || 0);
+    if (orderPaidAfter >= orderGrandTotal) {
+      const allCash = afterChecks.checks.every(check =>
+        (check.payments || []).every(payment => payment.payment_method === 'cash')
+      );
+      if (!allCash) {
+        throw new Error('[PosOrderService] Settlement akhir split payment non-Cash belum didukung. Selesaikan dengan pembayaran Cash untuk transaksi ini.');
+      }
+      const { CashSettlementService } = require('../../payment');
+      CashSettlementService.settleCashPayment({
+        order_id,
+        amount: orderGrandTotal,
+        // Per-payment tendered/change already lives in pos_check_payments.
+        // Use the canonical amount here only to finalize order_payments without
+        // double-counting the cash drawer.
+        amount_tendered: orderGrandTotal,
+        cashier_id: actor_id,
+        shift_id,
+        skip_shift_increment: true
+      });
+    }
+
     const updated = PosOrderService.getOrderChecks({ order_id, branch_id });
     const updatedCheck = updated.checks.find(c => c.id === check_id);
     return { success: true, payment: { id: paymentId, check_id, order_id, amount: value, payment_method, payer_name, payment_status: 'settlement', amount_tendered: amount_tendered == null ? null : Number(amount_tendered), change: payment_method === 'cash' ? Math.max(0, Number(amount_tendered) - value) : 0 }, check: updatedCheck, order_remaining: Number(order.grand_total) - posBillRepository.findOrderPaidAmount(order_id) };
