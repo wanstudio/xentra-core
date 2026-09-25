@@ -560,3 +560,15 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-table-pick strong{font-size:13px}
 .pos-table-pick small{font-size:11px;color:var(--muted)}
 .pos-table-pick b{font-size:11px;white-space:nowrap}
+
+.pos-check-manager-list{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow-y:auto;margin:12px 0}
+.pos-check-card{border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:12px}
+.pos-check-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px}
+.pos-check-head strong{font-size:13px;color:#0f172a}
+.pos-check-head small{display:block;color:#64748b;font-size:11px;margin-top:2px}
+.pos-check-items{display:flex;flex-direction:column}
+.pos-check-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 0;border-top:1px solid #f1f5f9}
+.pos-check-item strong{display:block;font-size:12px;color:#0f172a}
+.pos-check-item small{display:block;font-size:11px;color:#64748b;margin-top:2px}
+.pos-check-qty{width:64px;height:36px;border:1px solid #cbd5e1;border-radius:9px;text-align:center;font-weight:700}
+.pos-check-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
