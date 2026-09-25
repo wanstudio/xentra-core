@@ -384,6 +384,79 @@ router.post('/pos/held-orders/:id/resume', requireAuth(['cashier']), (req, res) 
   }
 });
 
+/**
+ * POS canonical check management.
+ * Split/Merge changes check allocation inside ONE Commerce Order.
+ * It must never create another order or Dining Session.
+ */
+router.get('/pos/orders/:id/checks', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+
+    const result = PosOrderService.getOrderChecks({
+      order_id: req.params.id,
+      branch_id: branchId
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/orders/:id/checks/split', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+
+    const { source_check_id, split_items } = req.body || {};
+    if (!source_check_id) {
+      return res.status(400).json({ success: false, error: 'source_check_id wajib diisi.' });
+    }
+    if (!Array.isArray(split_items) || !split_items.length) {
+      return res.status(400).json({ success: false, error: 'Pilih item yang ingin dipisahkan.' });
+    }
+
+    const result = PosOrderService.splitOrderCheck({
+      order_id: req.params.id,
+      branch_id: branchId,
+      source_check_id,
+      split_items
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/orders/:id/checks/merge', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+
+    const { target_check_id, source_check_id } = req.body || {};
+    if (!target_check_id || !source_check_id) {
+      return res.status(400).json({ success: false, error: 'target_check_id dan source_check_id wajib diisi.' });
+    }
+    if (String(target_check_id) === String(source_check_id)) {
+      return res.status(400).json({ success: false, error: 'Check sumber dan tujuan tidak boleh sama.' });
+    }
+
+    const result = PosOrderService.mergeOrderChecks({
+      order_id: req.params.id,
+      branch_id: branchId,
+      target_check_id,
+      source_check_id
+    });
+
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/pos/orders/:id/receipt', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
