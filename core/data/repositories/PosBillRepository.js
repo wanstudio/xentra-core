@@ -9,7 +9,7 @@
 const DataAccess = require('../DataAccess');
 
 class PosBillRepository {
-  constructor(dataAccess = new DataAccess()) { this.db = dataAccess; }
+  constructor(dataAccess = DataAccess) { this.db = dataAccess; }
   beginTransaction() { return this.db.exec('BEGIN IMMEDIATE;'); }
   commit() { return this.db.exec('COMMIT;'); }
   rollback() { return this.db.exec('ROLLBACK;'); }
