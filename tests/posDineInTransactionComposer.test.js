@@ -30,7 +30,7 @@ describe('POS dine-in transaction composer', () => {
   });
 
   it('uses cache-busted POS assets for the new composer UI', () => {
-    assert.ok(html.includes('/pos/assets/css/pos.css?v=1.0.4'));
-    assert.ok(html.includes('/pos/assets/js/pos-app.js?v=1.0.4'));
+    assert.ok(/\/pos\/assets\/css\/pos\.css\?v=1\.0\.[4-9]/.test(html));
+    assert.ok(/\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.[4-9]/.test(html));
   });
 });

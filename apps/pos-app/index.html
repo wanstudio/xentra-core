@@ -2,68 +2,51 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
   <meta name="theme-color" content="#0f172a">
   <title>Xentra POS — Kasir</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/pos/assets/css/pos.css?v=1.0.4">
+  <link rel="stylesheet" href="/pos/assets/css/pos.css?v=1.0.9">
   <!-- cache-compat: /pos/assets/css/pos.css?v=1.0.1 /pos/assets/js/pos-app.js?v=1.0.1 -->
 </head>
 <body>
   <div class="pos-shell">
     <header class="pos-topbar">
-      <!-- ROW 1 (Atas): Logo Bangjo B hijau + Bangjo Kasir di kiri; Pesan, Notifikasi, User di kanan -->
-      <div class="pos-topbar-row pos-topbar-row-top">
+      <!-- Sisi Kiri: Logo, Nama Resto, bawahnya Nama Cabang -->
+      <div class="pos-topbar-left">
         <div class="pos-brand-block">
           <div class="pos-client-logo-box" id="pos-client-logo-box">
-            <img id="pos-client-logo-img" class="pos-client-logo-img hidden" alt="Logo Brand" onerror="this.classList.add('hidden');if(document.getElementById('pos-client-logo-letter'))document.getElementById('pos-client-logo-letter').classList.remove('hidden');">
-            <span id="pos-client-logo-letter" class="pos-bangjo-letter">B</span>
+            <img id="pos-client-logo-img" class="pos-client-logo-img" src="/assets/pwa/icon-192.png" alt="Logo Brand" onerror="this.onerror=null;this.src='/assets/pwa/icon-192.png';">
           </div>
           <div class="pos-brand-meta">
-            <span class="pos-brand-name">Kasir POS</span>
-            <span class="pos-branch-subtitle" id="pos-branch-name">Memuat Cabang…</span>
-          </div>
-        </div>
-
-        <div class="pos-topbar-actions-top">
-          <button type="button" class="pos-icon-tool-btn" id="btn-pos-messages" title="Pesan & Antrean">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-            </svg>
-          </button>
-          <button type="button" class="pos-icon-tool-btn" id="btn-pos-notif" title="Notifikasi">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-            </svg>
-            <span class="pos-tool-badge-dot"></span>
-          </button>
-          <span id="pos-connection-badge" class="pos-status online" title="Status Jaringan Server (Online / Offline)">ONLINE</span>
-          <div class="pos-user-area">
-            <div class="pos-user-pill" title="Profil Kasir">
-              <span class="pos-user-icon">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="12" cy="7" r="4"></circle>
-                </svg>
-              </span>
-              <span id="pos-cashier-name" class="pos-user-name">Kasir</span>
+            <div class="pos-brand-title-wrap">
+              <span class="pos-brand-name" id="pos-brand-name">Bangjo Resto</span>
             </div>
-            <button type="button" class="pos-icon-tool-btn pos-btn-logout-clean" id="btn-pos-logout" title="Keluar">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
+            <div class="pos-brand-branch-wrap">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pos-branch-icon">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
               </svg>
-            </button>
+              <span class="pos-branch-subtitle" id="pos-branch-name-desktop">Bangjo Pringsewu</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- ROW 2 (Bawah): Kiri toggle hijau/kuning (o ) Shift Aktif / ( o) Istirahat, Kanan (End Shift) -->
-      <div class="pos-topbar-row pos-topbar-row-bottom">
+      <!-- Cabang Pill (Khusus Mobile: Baris ke-2 Tengah) -->
+      <div class="pos-topbar-branch-center" id="pos-topbar-branch-center" title="Cabang Aktif">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="pos-branch-icon">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+          <circle cx="12" cy="10" r="3"></circle>
+        </svg>
+        <span class="pos-branch-subtitle" id="pos-branch-name">Bangjo Pringsewu</span>
+      </div>
+
+      <!-- Sisi Kanan: Urutan Desktop/Tablet: toggle shift aktif, tombol end shift, pesan, notifikasi, status online/offline, user, logout -->
+      <div class="pos-topbar-right">
+        <!-- 1. Toggle Shift Aktif -->
         <div class="pos-shift-toggle-container">
           <button type="button" class="pos-shift-status" id="btn-pos-shift-status" data-view="shift" title="Ubah status shift / istirahat">
             <span class="pos-toggle-track">
@@ -73,14 +56,51 @@
           </button>
         </div>
 
+        <!-- 2. Tombol End Shift -->
         <div class="pos-shift-end-container">
           <button type="button" class="pos-shift-close-top" id="btn-pos-close-shift-top" title="Tutup Shift">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="15" y1="9" x2="9" y2="15"></line>
               <line x1="9" y1="9" x2="15" y2="15"></line>
             </svg>
             <span>End Shift</span>
+          </button>
+        </div>
+
+        <!-- 3, 4, 5, 6, 7. Tools: Indikator, Pesan, Notifikasi, User, Logout -->
+        <div class="pos-topbar-actions-tools">
+          <span id="pos-connection-badge" class="pos-status online" title="Status Jaringan Server (Online / Offline)">
+            <span class="pos-status-pulse"></span>
+            <span class="pos-status-text">ONLINE</span>
+          </span>
+          <button type="button" class="pos-icon-tool-btn" id="btn-pos-messages" title="Pesan & Antrean">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </button>
+          <button type="button" class="pos-icon-tool-btn" id="btn-pos-notif" title="Notifikasi">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+            <span class="pos-tool-badge-dot"></span>
+          </button>
+          <button type="button" class="pos-user-pill pos-icon-tool-btn pos-user-tool-btn" id="pos-user-profile-btn" title="Profil Kasir">
+            <span class="pos-user-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </span>
+            <span id="pos-cashier-name" class="pos-user-name">Kasir</span>
+          </button>
+          <button type="button" class="pos-icon-tool-btn pos-btn-logout-clean" id="btn-pos-logout" title="Keluar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
           </button>
         </div>
       </div>
@@ -142,15 +162,16 @@
             </div>
           </div>
 
-          <aside class="pos-cart-pane">
+          <aside class="pos-cart-pane" id="pos-cart-pane">
             <div class="pos-cart-head">
-              <div>
+              <div class="pos-title-wrap">
                 <h2>Pesanan</h2>
-                <span id="pos-cart-meta">0 item</span>
+                <span id="pos-cart-meta" class="pos-menu-stats">0 item</span>
               </div>
               <div class="pos-cart-actions">
-                <button type="button" class="pos-btn small ghost" id="btn-pos-hold">Tahan</button>
-                <button type="button" class="pos-btn small danger ghost" id="btn-pos-clear">Kosongkan</button>
+                <button type="button" class="pos-btn small ghost" id="btn-pos-hold" title="Tahan pesanan saat ini (Hold Bill)">Tahan</button>
+                <button type="button" class="pos-btn small ghost pos-btn-held-trigger" id="btn-pos-open-held" title="Buka daftar pesanan yang ditahan">Ditahan (<span id="pos-held-count">0</span>)</button>
+                <button type="button" class="pos-btn small danger ghost" id="btn-pos-clear" title="Kosongkan pesanan">Kosongkan</button>
               </div>
             </div>
             <div id="pos-cart-items" class="pos-cart-items">
@@ -174,20 +195,98 @@
       </section>
 
       <section id="pos-view-transaksi" class="pos-view">
-        <div class="pos-page-head"><h1>Transaksi</h1><p>Riwayat transaksi POS cabang dan akses cetak ulang struk.</p></div>
-        <div class="pos-filter-row"><button type="button" class="pos-btn ghost" id="btn-pos-load-sales">↻ Refresh</button></div>
-        <div id="pos-sales-list" class="pos-list"></div>
+        <div class="pos-pane pos-transaksi-pane">
+          <div class="pos-pane-head">
+            <div class="pos-title-wrap">
+              <h1>Transaksi &amp; <br class="pos-mobile-br">Pesanan</h1>
+              <span class="pos-menu-stats" id="pos-transaksi-stats">0 Transaksi</span>
+            </div>
+            <div class="pos-pane-actions">
+              <button type="button" class="pos-btn ghost small pos-btn-refresh" id="btn-pos-load-sales" title="Muat ulang transaksi">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+          <div class="pos-transaksi-toolbar">
+            <div class="pos-transaksi-tabs">
+              <button type="button" class="pos-tab-pill active" id="tab-transaksi-sales">Transaksi Selesai</button>
+              <button type="button" class="pos-tab-pill" id="tab-transaksi-held">Pesanan Ditahan (Hold Bill) <span id="pos-transaksi-held-count" class="pos-badge-count">0</span></button>
+            </div>
+          </div>
+          <div id="pos-sales-list" class="pos-list"></div>
+          <div id="pos-held-list" class="pos-list hidden"></div>
+        </div>
       </section>
 
       <section id="pos-view-meja" class="pos-view">
-        <div class="pos-page-head"><h1>Meja</h1><p>Konteks transaksi dine-in. POS tidak mengelola layout atau administrasi meja cabang.</p></div>
-        <div id="pos-table-grid" class="pos-table-grid"></div>
+        <div class="pos-pane pos-meja-pane">
+          <div class="pos-pane-head">
+            <div class="pos-title-wrap">
+              <h1>Meja Dine-in</h1>
+              <span class="pos-menu-stats" id="pos-table-stats">Memuat meja…</span>
+            </div>
+            <div class="pos-pane-actions">
+              <button type="button" class="pos-btn ghost small pos-btn-refresh" id="btn-pos-refresh-tables" title="Muat ulang daftar meja">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+          <div id="pos-table-grid" class="pos-table-grid"></div>
+        </div>
       </section>
 
       <section id="pos-view-shift" class="pos-view">
-        <div class="pos-page-head"><h1>Shift</h1><p>Kelola shift kasir, uang awal, cash in/out, dan penutupan kas.</p></div>
-        <div id="pos-shift-card" class="pos-shift-card"></div>
+        <div class="pos-pane pos-shift-pane">
+          <div class="pos-pane-head">
+            <div class="pos-title-wrap">
+              <h1>Shift Kasir</h1>
+              <span class="pos-menu-stats">Operasional</span>
+            </div>
+            <div class="pos-pane-actions">
+              <button type="button" class="pos-btn ghost small pos-btn-refresh" id="btn-pos-refresh-shift" title="Muat ulang shift">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+          <div id="pos-shift-card" class="pos-shift-card-inner"></div>
+        </div>
       </section>
+
+      <!-- Floating Bottom Cart Bar for Mobile View -->
+      <div id="pos-mobile-cart-bar" class="pos-mobile-cart-bar hidden">
+        <div class="pos-mcart-info" id="pos-mcart-trigger-order" role="button" tabindex="0" title="Buka rincian pesanan">
+          <div class="pos-mcart-icon-wrap">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <path d="M16 10a4 4 0 0 1-8 0"></path>
+            </svg>
+            <span id="pos-mcart-qty" class="pos-mcart-badge">0</span>
+          </div>
+          <div class="pos-mcart-summary">
+            <span class="pos-mcart-label">Pesanan Kasir</span>
+            <strong id="pos-mcart-total" class="pos-mcart-price">Rp0</strong>
+          </div>
+        </div>
+        <button type="button" class="pos-mcart-action-btn" id="btn-pos-mcart-checkout" title="Bayar Sekarang">
+          <span>Bayar Sekarang</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
     </main>
 
     <nav class="pos-bottom-nav">
@@ -257,6 +356,6 @@
   </div>
   <div id="pos-toast" class="pos-toast"></div>
 
-  <script src="/pos/assets/js/pos-app.js?v=1.0.4"></script>
+  <script src="/pos/assets/js/pos-app.js?v=1.0.9"></script>
 </body>
 </html>

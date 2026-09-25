@@ -190,6 +190,134 @@ router.post('/dine-in/tables/:id/block', requireAuth(['owner', 'brand_manager', 
   }
 });
 
+// Staff / POS: Release an occupied, held, reserved, or blocked table back to available
+router.post('/dine-in/tables/:id/release', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const tableId = req.params.id;
+    const table = db.prepare('SELECT id, branch_id, table_number, label FROM branch_tables WHERE id = ?').get(tableId);
+    if (!table) {
+      return res.status(404).json({ success: false, error: 'Meja tidak ditemukan.' });
+    }
+
+    if (['branch_manager', 'cashier'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (table.branch_id !== assignedBranchId) {
+        return res.status(403).json({
+          success: false,
+          error: 'FORBIDDEN_BRANCH_SCOPE',
+          message: 'Staf hanya memiliki kewenangan pada meja cabang yang ditugaskan.'
+        });
+      }
+    }
+
+    const stateRow = db.prepare('SELECT current_session_id, operational_state FROM branch_table_states WHERE table_id = ?').get(tableId);
+    const now = new Date().toISOString();
+    const actorId = req.user.id || req.user.userId || 'cashier';
+
+    if (stateRow && stateRow.current_session_id) {
+      try {
+        DiningTableService.completeDiningSession(stateRow.current_session_id, actorId);
+      } catch (err) {
+        db.prepare("UPDATE dining_sessions SET status = 'completed', closed_at = ?, updated_at = ? WHERE id = ?").run(now, now, stateRow.current_session_id);
+      }
+    }
+
+    try {
+      db.prepare("UPDATE branch_table_holds SET status = 'released', updated_at = ? WHERE table_id = ? AND status = 'held'").run(now, tableId);
+    } catch (_) {}
+
+    db.prepare(`
+      INSERT INTO branch_table_states (table_id, operational_state, current_session_id, notes, updated_at)
+      VALUES (?, 'available', NULL, 'Released by cashier', ?)
+      ON CONFLICT(table_id) DO UPDATE SET
+        operational_state = 'available',
+        current_session_id = NULL,
+        notes = 'Released by cashier',
+        updated_at = excluded.updated_at
+    `).run(tableId, now);
+
+    res.json({
+      success: true,
+      message: `Meja ${table.label || ('Meja ' + table.table_number)} berhasil dikosongkan (tersedia kembali).`,
+      table_id: tableId,
+      operational_state: 'available'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Staff / POS: Transfer / Move customer from one table to another available table
+router.post('/dine-in/tables/:id/transfer', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
+  try {
+    const sourceTableId = req.params.id;
+    const { target_table_id } = req.body || {};
+    if (!target_table_id) {
+      return res.status(400).json({ success: false, error: 'target_table_id wajib ditentukan.' });
+    }
+
+    const sourceTable = db.prepare('SELECT id, branch_id, table_number, label FROM branch_tables WHERE id = ?').get(sourceTableId);
+    const targetTable = db.prepare('SELECT id, branch_id, table_number, label FROM branch_tables WHERE id = ?').get(target_table_id);
+
+    if (!sourceTable) return res.status(404).json({ success: false, error: 'Meja asal tidak ditemukan.' });
+    if (!targetTable) return res.status(404).json({ success: false, error: 'Meja tujuan tidak ditemukan.' });
+
+    if (sourceTable.branch_id !== targetTable.branch_id) {
+      return res.status(400).json({ success: false, error: 'Meja asal dan tujuan harus berada di cabang yang sama.' });
+    }
+
+    if (['branch_manager', 'cashier'].includes(req.user.role)) {
+      const assignedBranchId = req.user.branchId || req.user.branch_id;
+      if (sourceTable.branch_id !== assignedBranchId) {
+        return res.status(403).json({ success: false, error: 'FORBIDDEN_BRANCH_SCOPE', message: 'Akses ditolak untuk cabang ini.' });
+      }
+    }
+
+    const targetState = db.prepare('SELECT operational_state FROM branch_table_states WHERE table_id = ?').get(target_table_id);
+    if (targetState && targetState.operational_state !== 'available') {
+      return res.status(400).json({ success: false, error: `Meja tujuan (${targetTable.label || ('Meja ' + targetTable.table_number)}) sedang ${targetState.operational_state}, tidak dapat digunakan.` });
+    }
+
+    const sourceState = db.prepare('SELECT current_session_id, operational_state FROM branch_table_states WHERE table_id = ?').get(sourceTableId);
+    const now = new Date().toISOString();
+
+    if (sourceState && sourceState.current_session_id) {
+      DiningTableService.reassignSessionTables({
+        session_id: sourceState.current_session_id,
+        new_table_ids: [target_table_id],
+        actor: req.user
+      });
+    } else {
+      const activeState = (sourceState && sourceState.operational_state) || 'occupied';
+      db.prepare(`
+        INSERT INTO branch_table_states (table_id, operational_state, current_session_id, notes, updated_at)
+        VALUES (?, 'available', NULL, 'Transferred to another table', ?)
+        ON CONFLICT(table_id) DO UPDATE SET operational_state = 'available', current_session_id = NULL, notes = 'Transferred', updated_at = excluded.updated_at
+      `).run(sourceTableId, now);
+
+      db.prepare(`
+        INSERT INTO branch_table_states (table_id, operational_state, current_session_id, notes, updated_at)
+        VALUES (?, ?, NULL, 'Transferred from previous table', ?)
+        ON CONFLICT(table_id) DO UPDATE SET operational_state = excluded.operational_state, notes = excluded.notes, updated_at = excluded.updated_at
+      `).run(target_table_id, activeState, now);
+    }
+
+    try {
+      db.prepare("UPDATE pos_held_orders SET table_number = ? WHERE branch_id = ? AND table_number = ? AND status = 'held'")
+        .run(targetTable.table_number, sourceTable.branch_id, sourceTable.table_number);
+    } catch (_) {}
+
+    res.json({
+      success: true,
+      message: `Meja berhasil dipindahkan dari ${sourceTable.label || ('Meja ' + sourceTable.table_number)} ke ${targetTable.label || ('Meja ' + targetTable.table_number)}.`,
+      source_table_id: sourceTableId,
+      target_table_id: target_table_id
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Staff / POS: Reservation operational lifecycle
 router.post('/pos/reservations/:id/check-in', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {

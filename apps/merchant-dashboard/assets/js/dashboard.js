@@ -4154,7 +4154,12 @@
      ========================================================================= */
 
   var getStoredUser = _shared.getStoredUser || window.XentraShared.getStoredUser;
-  var isBranchManager = _shared.isBranchManager || window.XentraShared.isBranchManager;
+  var isBranchManager = (_shared && typeof _shared.isBranchManager === 'function' ? _shared.isBranchManager : null) ||
+    (window.XentraShared && typeof window.XentraShared.isBranchManager === 'function' ? window.XentraShared.isBranchManager : null) ||
+    function () {
+      var u = (typeof getStoredUser === 'function' ? getStoredUser() : null);
+      return !!(u && (u.role === 'branch_manager' || u.role === 'manager'));
+    };
   var checkAuth = _shared.checkAuth || window.XentraShared.checkAuth;
   var handleHandoffExchange = _shared.handleHandoffExchange || window.XentraShared.handleHandoffExchange;
   var validateServerSession = _shared.validateServerSession || window.XentraShared.validateServerSession;

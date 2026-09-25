@@ -178,6 +178,14 @@ app.use('/dashboard/assets', express.static(path.join(__dirname, '../apps/mercha
     res.setHeader('Expires', '0');
   }
 }));
+app.use('/merchant-dashboard/assets', express.static(path.join(__dirname, '../apps/merchant-dashboard/assets'), {
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // Shared Merchant Frontend Infrastructure (merchant-shared/)
 // Serves apps/merchant-shared/ at /merchant-shared for all dashboard surfaces.

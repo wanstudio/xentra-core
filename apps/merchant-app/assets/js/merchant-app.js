@@ -19,7 +19,11 @@
   var adminFetch = S.adminFetch;
   var getAuthHeaders = S.getAuthHeaders;
   var getStoredUser = S.getStoredUser;
-  var isBranchManager = S.isBranchManager;
+  var isBranchManager = (S && typeof S.isBranchManager === 'function' ? S.isBranchManager : null) ||
+    function () {
+      var u = (S && typeof S.getStoredUser === 'function' ? S.getStoredUser() : null);
+      return !!(u && (u.role === 'branch_manager' || u.role === 'manager'));
+    };
   var checkAuth = S.checkAuth;
   var clearStoredSession = S.clearStoredSession;
   var redirectToLogin = S.redirectToLogin;

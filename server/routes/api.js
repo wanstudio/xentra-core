@@ -251,15 +251,20 @@ router.get('/brand/info', (req, res) => {
     const brandId = req.brand_id;
 
     let logoDeliveryUrl = req.brand.logo_url || null;
-    try {
-      const logoMediaId = Object.prototype.hasOwnProperty.call(req.brand, 'logo_media_id')
-        ? req.brand.logo_media_id
-        : (db.prepare('SELECT logo_media_id FROM brands WHERE id = ?').get(brandId) || {}).logo_media_id;
-      if (logoMediaId) {
-        const logoDelivery = bannerMediaDelivery(brandId, logoMediaId);
-        if (logoDelivery.preview_url) logoDeliveryUrl = logoDelivery.preview_url;
-      }
-    } catch (_) {}
+    if (!logoDeliveryUrl) {
+      try {
+        const logoMediaId = Object.prototype.hasOwnProperty.call(req.brand, 'logo_media_id')
+          ? req.brand.logo_media_id
+          : (db.prepare('SELECT logo_media_id FROM brands WHERE id = ?').get(brandId) || {}).logo_media_id;
+        if (logoMediaId) {
+          const logoDelivery = bannerMediaDelivery(brandId, logoMediaId);
+          if (logoDelivery.preview_url) logoDeliveryUrl = logoDelivery.preview_url;
+        }
+      } catch (_) {}
+    }
+    if (!logoDeliveryUrl) {
+      logoDeliveryUrl = '/assets/pwa/icon-192.png';
+    }
 
     const enrichedBanners = resolveCustomerBannerPayload(req, brandId);
 
@@ -944,11 +949,24 @@ function serializePublicBrand(brand) {
     ];
   }
 
+  let logoUrl = brand.logo_url || null;
+  if (!logoUrl && brand.logo_media_id) {
+    try {
+      const logoDelivery = bannerMediaDelivery(brand.id, brand.logo_media_id);
+      if (logoDelivery && logoDelivery.preview_url) {
+        logoUrl = logoDelivery.preview_url;
+      }
+    } catch (_) {}
+  }
+  if (!logoUrl) {
+    logoUrl = '/assets/pwa/icon-192.png';
+  }
+
   return {
     id: brand.id,
     name: brand.name,
     slug: brand.slug,
-    logo_url: brand.logo_url || '/assets/pwa/icon-192.png',
+    logo_url: logoUrl,
     primary_color: brand.primary_color || '#b6ff00',
     custom_domain: brand.custom_domain || 'app.mybangjo.com',
     tagline: brand.tagline || 'Official Online Food Ordering',

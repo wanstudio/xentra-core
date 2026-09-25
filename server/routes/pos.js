@@ -10,6 +10,8 @@ module.exports = function registerPosRoutes(router, deps) {
     db,
     requireAuth
   } = deps;
+  const PaymentGatewayService = require('../../domains/payment/services/PaymentGatewayService');
+  const { PosOrderService } = require('../../domains/pos');
 
 router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
@@ -137,7 +139,6 @@ router.post('/pos/sales', requireAuth(['cashier']), async (req, res) => {
       if (!PaymentGatewayService._hasValidCredentials(gatewayConfig)) return res.status(400).json({ success: false, error: 'Payment Gateway belum dikonfigurasi dengan kredensial yang valid.' });
     } else if (payment_mode === 'qris_static') {
       const qris = PaymentGatewayService.resolveStaticQrisConfig(branchId, req.brand_id);
-      if (!qris.enabled) return res.status(400).json({ success: false, error: 'QRIS statis belum dikonfigurasi untuk cabang ini.' });
       resolvedPaymentMethod = 'qris_static';
     } else if (!resolvedPaymentMethod) resolvedPaymentMethod = 'cash';
     else if (!['cash', 'midtrans', 'doku', 'qris_static'].includes(resolvedPaymentMethod)) return res.status(400).json({ success: false, error: 'Mode pembayaran POS tidak valid.' });
@@ -194,7 +195,7 @@ router.get('/pos/payment-methods', requireAuth(['cashier']), (req, res) => {
     res.json({ success: true, payment_modes: [
       { code: 'cash', name: 'Cash', enabled: true, offline_supported: true, provider: 'cash' },
       { code: 'payment_gateway', name: 'Payment Gateway', enabled: Boolean(activeProvider && PaymentGatewayService._hasValidCredentials(config)), offline_supported: false, provider: activeProvider || null },
-      { code: 'qris_static', name: 'QRIS Statis', enabled: qrisStatic.enabled, offline_supported: false, provider: 'qris_static', qris_static: qrisStatic }
+      { code: 'qris_static', name: 'QRIS Statis', enabled: true, offline_supported: false, provider: 'qris_static', qris_static: qrisStatic }
     ]});
   } catch (err) { res.status(500).json({ success: false, error: err.message }); }
 });
@@ -291,6 +292,30 @@ router.post('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
     res.status(201).json({ success: true, held_order: held });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/pos/held-orders/:id', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const now = new Date().toISOString();
+    db.prepare("UPDATE pos_held_orders SET status = 'cancelled', updated_at = ? WHERE id = ? AND branch_id = ?").run(now, req.params.id, branchId);
+    res.json({ success: true, message: 'Pesanan ditahan telah dibatalkan.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/held-orders/:id/resume', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const now = new Date().toISOString();
+    db.prepare("UPDATE pos_held_orders SET status = 'resumed', updated_at = ? WHERE id = ? AND branch_id = ?").run(now, req.params.id, branchId);
+    res.json({ success: true, message: 'Pesanan ditahan telah dibuka kembali.' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

@@ -43,7 +43,20 @@ class DiningTableRepository {
         ds.channel as session_channel,
         ds.customer_name as session_customer_name,
         ds.customer_phone as session_customer_phone,
-        ds.opened_at as session_opened_at
+        ds.opened_at as session_opened_at,
+        (
+          CASE 
+            WHEN ds.channel IN ('customer_app', 'qr_customer', 'web', 'dine_in_qr', 'app') THEN 1
+            WHEN EXISTS (
+              SELECT 1 FROM orders ord 
+              WHERE ord.branch_id = t.branch_id 
+                AND (ord.table_number = t.table_number OR ord.table_number = t.label)
+                AND ord.order_channel != 'pos_cashier'
+                AND ord.status IN ('pending', 'confirmed', 'processing', 'ready', 'active')
+            ) THEN 1
+            ELSE 0
+          END
+        ) as is_app_order
       FROM branch_tables t
       LEFT JOIN branch_table_states s ON s.table_id = t.id
       LEFT JOIN dining_sessions ds ON ds.id = s.current_session_id AND ds.status = 'active'

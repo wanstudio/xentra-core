@@ -32,6 +32,52 @@
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
   }
   function money(n) { return 'Rp' + Number(n || 0).toLocaleString('id-ID'); }
+  function formatNominal(num) {
+    if (num == null || num === '') return '';
+    var clean = String(num).replace(/\D/g, '');
+    if (!clean) return '';
+    clean = clean.replace(/^0+(?=\d)/, '');
+    return clean.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  }
+  function parseNominal(val) {
+    if (val == null) return 0;
+    var clean = String(val).replace(/\D/g, '');
+    return clean ? Number(clean) : 0;
+  }
+  function bindNominalInput(input, onValueChange) {
+    if (!input) return;
+    input.addEventListener('input', function() {
+      var raw = this.value;
+      var cursor = this.selectionEnd;
+      var prevLen = raw.length;
+      var formatted = formatNominal(raw);
+      this.value = formatted;
+      if (cursor != null && formatted.length !== prevLen) {
+        var diff = formatted.length - prevLen;
+        var newPos = Math.max(0, cursor + diff);
+        this.setSelectionRange(newPos, newPos);
+      }
+      if (typeof onValueChange === 'function') {
+        onValueChange(parseNominal(formatted), formatted);
+      }
+    });
+  }
+
+  function bindModalEnter(input, actionOrNext) {
+    if (!input) return;
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (typeof actionOrNext === 'function') {
+          actionOrNext();
+        } else if (actionOrNext && typeof actionOrNext.focus === 'function' && (actionOrNext.tagName === 'INPUT' || actionOrNext.tagName === 'TEXTAREA')) {
+          actionOrNext.focus();
+        } else if (actionOrNext && typeof actionOrNext.click === 'function') {
+          actionOrNext.click();
+        }
+      }
+    });
+  }
   function token() { return localStorage.getItem(TOKEN_KEY) || ''; }
   function headers() {
     var h = { 'Content-Type': 'application/json' };
@@ -57,7 +103,9 @@
   }
   function setConnection(online) {
     var el=$('pos-connection-badge'); if(!el)return;
-    el.textContent=online?'ONLINE':'OFFLINE'; el.className='pos-status '+(online?'online':'offline');
+    el.className='pos-status '+(online?'online':'offline');
+    el.innerHTML='<span class="pos-status-pulse"></span><span class="pos-status-text">'+(online?'ONLINE':'OFFLINE')+'</span>';
+    el.title=online?'Server Terhubung (Online)':'Server Terputus (Offline)';
   }
 
   function renderShiftStatus() {
@@ -208,23 +256,26 @@
   function applyBrandInfo(brandData) {
     if(!brandData) return;
     state.brand=brandData;
-    var logoImg=$('pos-client-logo-img'), letter=$('pos-client-logo-letter');
-    if(brandData.logo_url && logoImg){
-      logoImg.src=brandData.logo_url;
-      logoImg.classList.remove('hidden');
-      if(letter) letter.classList.add('hidden');
-    }else{
-      if(logoImg) logoImg.classList.add('hidden');
-      if(letter){
-        letter.classList.remove('hidden');
-        letter.textContent=(brandData.name||'B').charAt(0).toUpperCase();
-      }
+    var logoImg=$('pos-client-logo-img');
+    var rawUrl=brandData.logo_url;
+    if(!rawUrl || rawUrl.includes('logo-test') || rawUrl.includes('med_f354dbe8da0bea01')){
+      rawUrl='/assets/pwa/icon-192.png';
+    }
+    if(logoImg){
+      logoImg.src=rawUrl;
+    }
+    if($('pos-brand-name') && brandData.name){
+      $('pos-brand-name').textContent=brandData.name;
     }
   }
 
   async function loadBrandInfo() {
     try{
       var cached=JSON.parse(localStorage.getItem('xentra_pos_brand_info')||'null');
+      if(cached && cached.logo_url && (cached.logo_url.includes('logo-test') || cached.logo_url.includes('med_f354dbe8da0bea01'))){
+        localStorage.removeItem('xentra_pos_brand_info');
+        cached=null;
+      }
       if(cached) applyBrandInfo(cached);
       var d=await request('/brand/info');
       if(d && d.brand){
@@ -238,10 +289,13 @@
     state.user=userData;
     state.branchId=userData.branch_id || userData.branchId || null;
     if(state.branchId) localStorage.setItem('xentra_pos_branch_id',String(state.branchId));
-    var cleanBranchName=userData.branch_name || (state.brand && state.brand.name) || 'Kasir';
+    var cleanBranchName=userData.branch_name || (state.brand && state.brand.name) || 'Bangjo Pringsewu';
     if ($('pos-branch-name')) $('pos-branch-name').textContent=cleanBranchName;
+    if ($('pos-branch-name-desktop')) $('pos-branch-name-desktop').textContent=cleanBranchName;
+    if (userData.brand_name && $('pos-brand-name')) $('pos-brand-name').textContent=userData.brand_name;
     if ($('pos-cashier-name')) $('pos-cashier-name').textContent=userData.full_name || userData.username || 'Kasir';
     loadBrandInfo();
+    updateHeldCount();
   }
 
   function showPosAuthGate(offlineReason) {
@@ -348,10 +402,19 @@
   function setView(view) {
     document.querySelectorAll('.pos-view').forEach(function(v){ v.classList.toggle('active', v.id === 'pos-view-' + view); });
     document.querySelectorAll('.pos-bottom-nav button').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-view') === view); });
+    var mCartBar = $('pos-mobile-cart-bar');
+    if (mCartBar) {
+      if (view !== 'kasir' || !state.cart.length) {
+        mCartBar.classList.add('hidden');
+        closeMobileCartOverlay();
+      } else {
+        mCartBar.classList.remove('hidden');
+      }
+    }
     if (view === 'kasir') loadMenu();
     if (view === 'transaksi') loadSales();
     if (view === 'meja') loadTables();
-    if (view === 'shift') renderShift();
+    if (view === 'shift') { renderShift(); openShiftModal(); }
   }
 
   function total() {
@@ -402,6 +465,153 @@
     return num ? ('Meja ' + num) : 'Belum dipilih';
   }
 
+  function openMobileCartOverlay() {
+    openOrderDetailsModal();
+  }
+
+  function closeMobileCartOverlay() {
+    hideModal();
+  }
+
+  function openOrderDetailsModal() {
+    if (!state.cart.length) {
+      return toast('Keranjang pesanan masih kosong.');
+    }
+    var t = total();
+    var totalQty = state.cart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0);
+    var tableLabel = formatTableLabel(state.selectedTable);
+
+    var html = '<div class="pos-modal-head-row">' +
+      '<div class="pos-modal-head-title">' +
+        '<h3>Rincian Pesanan</h3>' +
+        '<p>'+totalQty+' item · '+tableLabel+'</p>' +
+      '</div>' +
+      '<button type="button" class="pos-modal-close-icon" id="pos-order-modal-close" title="Tutup" aria-label="Tutup">✕</button>' +
+    '</div>';
+
+    html += '<div class="pos-order-modal-table-row">' +
+      '<span><strong>Meja:</strong> '+esc(tableLabel)+'</span>' +
+      '<button type="button" class="pos-btn small ghost" id="pos-order-modal-change-table">Ubah Meja</button>' +
+    '</div>';
+
+    html += '<div class="pos-order-modal-items">';
+    state.cart.forEach(function(it, idx){
+      var optSummary = (it.options && it.options.length) ? optionSummary(it.options) : '';
+      html += '<div class="pos-order-modal-item">' +
+        '<div style="min-width:0;flex:1">' +
+          '<div class="pos-order-modal-item-name">'+esc(it.name)+'</div>' +
+          '<div class="pos-order-modal-item-meta">'+money(it.unit_price) + (optSummary ? '<div class="pos-order-modal-item-options">'+esc(optSummary)+'</div>' : '') + (it.note ? '<div class="pos-order-modal-item-note">Catatan: '+esc(it.note)+'</div>' : '') + '</div>' +
+        '</div>' +
+        '<div class="pos-cart-item-actions">' +
+          '<button type="button" class="pos-qty minus" data-order-modal-idx="'+idx+'" data-order-modal-d="-1" aria-label="Kurangi">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+          '</button>' +
+          '<span class="pos-qty-value">'+it.quantity+'</span>' +
+          '<button type="button" class="pos-qty plus" data-order-modal-idx="'+idx+'" data-order-modal-d="1" aria-label="Tambah">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+          '</button>' +
+        '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+
+    var custVal = $('pos-customer-name') ? $('pos-customer-name').value : '';
+    var noteVal = $('pos-order-note') ? $('pos-order-note').value : '';
+
+    html += '<div class="pos-form-row">' +
+      '<label>Nama Tamu (opsional)</label>' +
+      '<input type="text" id="pos-modal-cust-name" value="'+esc(custVal)+'" placeholder="Nama tamu">' +
+    '</div>';
+    html += '<div class="pos-form-row">' +
+      '<label>Catatan Order (opsional)</label>' +
+      '<input type="text" id="pos-modal-order-note" value="'+esc(noteVal)+'" placeholder="Catatan untuk dapur/bar">' +
+    '</div>';
+
+    html += '<div class="pos-order-modal-totals">' +
+      '<div class="pos-order-modal-subtotal"><span>Subtotal</span><strong>'+money(t)+'</strong></div>' +
+      '<div class="pos-order-modal-grand"><span>Total Tagihan</span><strong>'+money(t)+'</strong></div>' +
+    '</div>';
+
+    var heldCount = (state.held && state.held.length) ? state.held.length : ($('pos-held-count') ? (Number($('pos-held-count').textContent) || 0) : 0);
+
+    html += '<div class="pos-order-modal-actions">' +
+      '<div class="pos-order-modal-btn-row">' +
+        '<button type="button" class="pos-btn ghost small" id="pos-order-modal-hold" title="Tahan pesanan saat ini (Hold Bill)">Tahan</button>' +
+        '<button type="button" class="pos-btn ghost small" id="pos-order-modal-open-held" title="Buka daftar pesanan yang ditahan">Ditahan (<span id="pos-order-modal-held-count">'+heldCount+'</span>)</button>' +
+        '<button type="button" class="pos-btn ghost danger small" id="pos-order-modal-clear" title="Hapus pesanan">Delete</button>' +
+      '</div>' +
+      '<button type="button" class="pos-order-modal-pay-btn" id="pos-order-modal-pay">' +
+        '<span>Bayar '+money(t)+'</span>' +
+        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
+          '<polyline points="9 18 15 12 9 6"></polyline>' +
+        '</svg>' +
+      '</button>' +
+    '</div>';
+
+    showModal(html);
+
+    $('pos-order-modal-close').onclick = hideModal;
+    $('pos-order-modal-change-table').onclick = function(){
+      openTableSelector();
+    };
+    $('pos-order-modal-hold').onclick = async function(){
+      var cn = $('pos-modal-cust-name');
+      var on = $('pos-modal-order-note');
+      if (cn && $('pos-customer-name')) $('pos-customer-name').value = cn.value;
+      if (on && $('pos-order-note')) $('pos-order-note').value = on.value;
+      if(state.orderType==='dine_in' && !state.selectedTable){
+        return toast('Pilih meja sebelum menahan bill.');
+      }
+      await holdSale();
+      hideModal();
+    };
+    $('pos-order-modal-open-held').onclick = function(){
+      openHeld();
+    };
+    $('pos-order-modal-clear').onclick = function(){
+      resetSale();
+      hideModal();
+    };
+    $('pos-order-modal-pay').onclick = function(){
+      var cn = $('pos-modal-cust-name');
+      var on = $('pos-modal-order-note');
+      if (cn && $('pos-customer-name')) $('pos-customer-name').value = cn.value;
+      if (on && $('pos-order-note')) $('pos-order-note').value = on.value;
+      openPayModal();
+    };
+
+    var cnInput = $('pos-modal-cust-name');
+    if (cnInput) {
+      cnInput.oninput = function(){ if($('pos-customer-name')) $('pos-customer-name').value = cnInput.value; };
+      bindModalEnter(cnInput, function(){
+        var on = $('pos-modal-order-note');
+        if (on) on.focus();
+      });
+    }
+    var onInput = $('pos-modal-order-note');
+    if (onInput) {
+      onInput.oninput = function(){ if($('pos-order-note')) $('pos-order-note').value = onInput.value; };
+      bindModalEnter(onInput, function(){
+        var btn = $('pos-order-modal-pay');
+        if (btn) btn.click();
+      });
+    }
+
+    document.querySelectorAll('[data-order-modal-idx]').forEach(function(btn){
+      btn.onclick = function(e){
+        e.stopPropagation();
+        var idx = Number(btn.getAttribute('data-order-modal-idx'));
+        var d = Number(btn.getAttribute('data-order-modal-d'));
+        changeQty(idx, d);
+        if (!state.cart.length) {
+          hideModal();
+        } else {
+          openOrderDetailsModal();
+        }
+      };
+    });
+  }
+
   function renderCart() {
     var box=$('pos-cart-items'), meta=$('pos-cart-meta'), subtotal=$('pos-subtotal'), grand=$('pos-total'), pay=$('pos-pay-total'), btn=$('btn-pos-pay');
     if (meta) meta.textContent=state.cart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0)+' item';
@@ -412,6 +622,28 @@
     var tableLabel=$('pos-selected-table'),tableBtn=$('btn-pos-select-table');
     if(tableLabel) tableLabel.textContent=formatTableLabel(state.selectedTable);
     if(tableBtn) tableBtn.textContent=state.selectedTable?'Ubah':'Pilih Meja';
+
+    var cartTableLabel=$('pos-cart-selected-table'), cartTableBtn=$('btn-pos-cart-select-table');
+    if(cartTableLabel) cartTableLabel.textContent=formatTableLabel(state.selectedTable);
+    if(cartTableBtn) cartTableBtn.textContent=state.selectedTable?'Ubah':'Pilih Meja';
+
+    var totalQty = state.cart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0);
+    var mCartBar = $('pos-mobile-cart-bar');
+    if (mCartBar) {
+      var activeView = document.querySelector('.pos-view.active');
+      var isKasir = !activeView || activeView.id === 'pos-view-kasir';
+      if (totalQty > 0 && isKasir) {
+        mCartBar.classList.remove('hidden');
+        var mQty = $('pos-mcart-qty');
+        var mTotal = $('pos-mcart-total');
+        if (mQty) mQty.textContent = totalQty;
+        if (mTotal) mTotal.textContent = money(total());
+      } else {
+        mCartBar.classList.add('hidden');
+        closeMobileCartOverlay();
+      }
+    }
+
     updateMenuCardBadges();
     if (!box) return;
     if (!state.cart.length) { box.innerHTML='<div class="pos-empty">Belum ada item.</div>'; return; }
@@ -579,6 +811,10 @@
       addConfiguredProduct(p,readSelections(),$('pos-item-note').value.trim());
       hideModal();
     };
+    bindModalEnter($('pos-item-note'), function(){
+      var btn = $('pos-option-add');
+      if (btn) btn.click();
+    });
   }
 
   var CATEGORY_PALETTES = [
@@ -840,6 +1076,7 @@
     }
     try {
       var me=await requestWithTimeout('/auth/merchant/me',{headers:headers()},1800);
+      if(me && me.brand) applyBrandInfo(me.brand);
       applyCashierUser(me.user);
       if(state.user.role!=='cashier'){ window.location.replace(me.landing || '/merchant/'); return false; }
       if(!state.branchId){ toast('Akun kasir belum memiliki cabang.'); return false; }
@@ -893,44 +1130,431 @@
     renderShiftStatus();
     renderShift();
     renderCart();
+    updateTransaksiStats();
+  }
+
+  function openShiftModal(){
+    renderShiftStatus();
+    var s = state.shift;
+    var html = '';
+
+    if (!s) {
+      html = '<div class="pos-modal-head-row">' +
+        '<div class="pos-modal-head-title">' +
+          '<h3>Shift Kasir</h3>' +
+          '<p>Operasional · Buka shift baru</p>' +
+        '</div>' +
+        '<button type="button" class="pos-modal-close-icon" id="pos-shift-modal-close" title="Tutup" aria-label="Tutup">✕</button>' +
+      '</div>';
+
+      html += '<div class="pos-shift-modal-body">' +
+        '<div class="pos-shift-open-notice">' +
+          '<div class="pos-shift-notice-icon">' +
+            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+              '<circle cx="12" cy="12" r="10"></circle>' +
+              '<polyline points="12 6 12 12 16 14"></polyline>' +
+            '</svg>' +
+          '</div>' +
+          '<div class="pos-shift-notice-text">' +
+            '<strong>Shift Belum Dibuka</strong>' +
+            '<span>Kasir harus membuka shift sebelum penjualan dapat diselesaikan.</span>' +
+          '</div>' +
+        '</div>' +
+
+        '<div class="pos-form-row">' +
+          '<label for="pos-starting-float">Modal Kas Awal di Laci (Rp)</label>' +
+          '<div class="pos-input-nominal-wrap">' +
+            '<span class="pos-input-prefix">Rp</span>' +
+            '<input id="pos-starting-float" type="text" inputmode="numeric" pattern="[0-9]*" value="0" placeholder="0" class="pos-input-nominal" autocomplete="off">' +
+          '</div>' +
+          '<div class="pos-shift-float-chips">' +
+            '<button type="button" class="pos-btn-quick-cash active" data-float-val="0">Rp0</button>' +
+            '<button type="button" class="pos-btn-quick-cash" data-float-val="50000">50k</button>' +
+            '<button type="button" class="pos-btn-quick-cash" data-float-val="100000">100k</button>' +
+            '<button type="button" class="pos-btn-quick-cash" data-float-val="200000">200k</button>' +
+            '<button type="button" class="pos-btn-quick-cash" data-float-val="500000">500k</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+      html += '<div class="pos-modal-actions">' +
+        '<button type="button" class="pos-btn ghost" id="pos-shift-modal-cancel">Batal</button>' +
+        '<button type="button" class="pos-btn" id="btn-pos-open-shift-modal">Buka Shift Sekarang</button>' +
+      '</div>';
+
+      showModal(html, 'pos-modal-shift-start');
+      $('pos-shift-modal-close').onclick = hideModal;
+      $('pos-shift-modal-cancel').onclick = hideModal;
+      var floatInput = $('pos-starting-float');
+      if (floatInput) {
+        setTimeout(function(){ floatInput.focus(); floatInput.select(); }, 120);
+        document.querySelectorAll('[data-float-val]').forEach(function(chip){
+          chip.onclick = function(){
+            document.querySelectorAll('[data-float-val]').forEach(function(c){ c.classList.remove('active'); });
+            chip.classList.add('active');
+            floatInput.value = formatNominal(chip.dataset.floatVal);
+            floatInput.focus();
+          };
+        });
+        bindNominalInput(floatInput, function(numVal){
+          document.querySelectorAll('[data-float-val]').forEach(function(c){
+            c.classList.toggle('active', parseNominal(c.dataset.floatVal) === numVal);
+          });
+        });
+        bindModalEnter(floatInput, function(){
+          var btn = $('btn-pos-open-shift-modal');
+          if (btn) btn.click();
+        });
+      }
+      $('btn-pos-open-shift-modal').onclick = async function(){
+        var amount = parseNominal(floatInput ? floatInput.value : 0);
+        if (!Number.isFinite(amount) || amount < 0) return toast('Nominal modal awal tidak valid.');
+        try {
+          var d = await request('/pos/shifts/open', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ branch_id: state.branchId, starting_float: amount })
+          });
+          state.shift = d.shift;
+          savePosShiftCache();
+          renderShiftStatus();
+          renderShift();
+          renderCart();
+          toast('Shift kasir berhasil dibuka.');
+          openShiftModal();
+        } catch(e) {
+          toast(e.message);
+        }
+      };
+      return;
+    }
+
+    var subtitle = 'Shift #' + esc(s.id) + (s.opened_at ? ' · dibuka ' + esc(s.opened_at) : '');
+    html = '<div class="pos-modal-head-row">' +
+      '<div class="pos-modal-head-title">' +
+        '<h3>Shift Kasir</h3>' +
+        '<p>Operasional · ' + subtitle + '</p>' +
+      '</div>' +
+      '<button type="button" class="pos-modal-close-icon" id="pos-shift-modal-close" title="Tutup" aria-label="Tutup">✕</button>' +
+    '</div>';
+
+    html += '<div class="pos-shift-modal-body">' +
+      '<div class="pos-shift-status-strip ' + (s.active_break ? 'is-break' : 'is-active') + '">' +
+        '<div class="pos-shift-badge-wrap">' +
+          '<span class="pos-shift-status-dot-pulse"></span>' +
+          '<span class="pos-shift-status-title">' + (s.active_break ? 'Sedang Istirahat' : 'Shift Sedang Aktif') + '</span>' +
+        '</div>' +
+        '<button type="button" class="pos-btn small ghost pos-btn-break-toggle" id="btn-pos-shift-break-toggle">' +
+          (s.active_break ? '▶ Selesai Istirahat' : '☕ Mulai Istirahat') +
+        '</button>' +
+      '</div>' +
+
+      '<div class="pos-shift-modal-grid">' +
+        '<div class="pos-shift-metric-card">' +
+          '<span class="pos-metric-label">Modal Kas Awal</span>' +
+          '<strong class="pos-metric-val">' + money(s.starting_float) + '</strong>' +
+        '</div>' +
+        '<div class="pos-shift-metric-card">' +
+          '<span class="pos-metric-label">Penjualan Tunai</span>' +
+          '<strong class="pos-metric-val positive">+' + money(s.total_cash_sales) + '</strong>' +
+        '</div>' +
+        '<div class="pos-shift-metric-card">' +
+          '<span class="pos-metric-label">Cash In (Masuk)</span>' +
+          '<strong class="pos-metric-val positive">+' + money(s.total_cash_in) + '</strong>' +
+        '</div>' +
+        '<div class="pos-shift-metric-card">' +
+          '<span class="pos-metric-label">Cash Out (Keluar)</span>' +
+          '<strong class="pos-metric-val negative">-' + money(s.total_cash_out) + '</strong>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="pos-shift-expected-card">' +
+        '<div class="pos-expected-header">' +
+          '<div class="pos-expected-title">' +
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+              '<rect x="2" y="4" width="20" height="16" rx="2"></rect>' +
+              '<line x1="2" y1="10" x2="22" y2="10"></line>' +
+            '</svg>' +
+            '<span>Kas Ekspektasi di Laci</span>' +
+          '</div>' +
+          '<small>Modal + Tunai + In - Out</small>' +
+        '</div>' +
+        '<div class="pos-expected-amount">' + money(s.expected_cash) + '</div>' +
+      '</div>' +
+
+      '<div class="pos-shift-modal-actions-row">' +
+        '<button type="button" class="pos-btn ghost" id="btn-pos-modal-cash-in">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+          '<span>Cash In</span>' +
+        '</button>' +
+        '<button type="button" class="pos-btn ghost" id="btn-pos-modal-cash-out">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+          '<span>Cash Out</span>' +
+        '</button>' +
+        '<button type="button" class="pos-btn danger ghost" id="btn-pos-modal-close-shift">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>' +
+          '<span>Tutup Shift</span>' +
+        '</button>' +
+      '</div>' +
+    '</div>';
+
+    showModal(html);
+    $('pos-shift-modal-close').onclick = hideModal;
+    $('btn-pos-shift-break-toggle').onclick = async function(){
+      await toggleShiftBreak();
+      if (state.shift) openShiftModal();
+    };
+    $('btn-pos-modal-cash-in').onclick = function(){ openCashMoveModal('in'); };
+    $('btn-pos-modal-cash-out').onclick = function(){ openCashMoveModal('out'); };
+    $('btn-pos-modal-close-shift').onclick = function(){ openCloseShiftModal(); };
+  }
+
+  function openCashMoveModal(type){
+    if (!state.shift) return;
+    var isCashIn = type === 'in';
+    var title = isCashIn ? 'Cash In (Kas Masuk)' : 'Cash Out (Kas Keluar)';
+    var subtitle = isCashIn
+      ? 'Catat uang masuk ke laci kasir di luar transaksi penjualan'
+      : 'Catat pengeluaran uang tunai dari laci kasir';
+
+    var html = '<div class="pos-modal-head-row">' +
+      '<div class="pos-modal-head-title">' +
+        '<h3>' + title + '</h3>' +
+        '<p>' + subtitle + '</p>' +
+      '</div>' +
+      '<button type="button" class="pos-modal-close-icon" id="pos-cash-move-close" title="Kembali" aria-label="Kembali">✕</button>' +
+    '</div>';
+
+    html += '<div class="pos-shift-modal-body">' +
+      '<div class="pos-form-row">' +
+        '<label for="pos-cash-move-amount">Nominal ' + (isCashIn ? 'Kas Masuk' : 'Kas Keluar') + ' (Rp)</label>' +
+        '<div class="pos-input-nominal-wrap">' +
+          '<span class="pos-input-prefix">Rp</span>' +
+          '<input id="pos-cash-move-amount" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" class="pos-input-nominal" autocomplete="off">' +
+        '</div>' +
+        '<div class="pos-shift-float-chips">' +
+          '<button type="button" class="pos-btn-quick-cash" data-cm-val="10000">10k</button>' +
+          '<button type="button" class="pos-btn-quick-cash" data-cm-val="20000">20k</button>' +
+          '<button type="button" class="pos-btn-quick-cash" data-cm-val="50000">50k</button>' +
+          '<button type="button" class="pos-btn-quick-cash" data-cm-val="100000">100k</button>' +
+          '<button type="button" class="pos-btn-quick-cash" data-cm-val="200000">200k</button>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="pos-form-row">' +
+        '<label for="pos-cash-move-reason">Keterangan / Alasan (Opsional)</label>' +
+        '<input id="pos-cash-move-reason" type="text" placeholder="' + (isCashIn ? 'Contoh: Tambah modal kembalian' : 'Contoh: Beli es batu / operasional') + '">' +
+      '</div>' +
+    '</div>';
+
+    html += '<div class="pos-modal-actions">' +
+      '<button type="button" class="pos-btn ghost" id="pos-cash-move-cancel">Batal</button>' +
+      '<button type="button" class="pos-btn" id="btn-pos-cash-move-submit">Simpan ' + (isCashIn ? 'Cash In' : 'Cash Out') + '</button>' +
+    '</div>';
+
+    showModal(html);
+    $('pos-cash-move-close').onclick = openShiftModal;
+    $('pos-cash-move-cancel').onclick = openShiftModal;
+
+    var amtInput = $('pos-cash-move-amount');
+    if (amtInput) {
+      setTimeout(function(){ amtInput.focus(); }, 120);
+      document.querySelectorAll('[data-cm-val]').forEach(function(btn){
+        btn.onclick = function(){
+          amtInput.value = formatNominal(btn.dataset.cmVal);
+          amtInput.focus();
+        };
+      });
+      bindNominalInput(amtInput);
+      bindModalEnter(amtInput, function(){
+        var r = $('pos-cash-move-reason');
+        if (r) { r.focus(); } else {
+          var btn = $('btn-pos-cash-move-submit');
+          if (btn) btn.click();
+        }
+      });
+    }
+
+    var reasonInput = $('pos-cash-move-reason');
+    if (reasonInput) {
+      bindModalEnter(reasonInput, function(){
+        var btn = $('btn-pos-cash-move-submit');
+        if (btn) btn.click();
+      });
+    }
+
+    $('btn-pos-cash-move-submit').onclick = async function(){
+      var amount = parseNominal(amtInput ? amtInput.value : 0);
+      if (!Number.isFinite(amount) || amount <= 0) return toast('Nominal tidak valid.');
+      var reason = ($('pos-cash-move-reason') ? $('pos-cash-move-reason').value : '').trim();
+      try {
+        var d = await request('/pos/shifts/' + encodeURIComponent(state.shift.id) + '/cash-movement', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ type: type, amount: amount, reason: reason })
+        });
+        state.shift = d.shift;
+        savePosShiftCache();
+        renderShiftStatus();
+        renderShift();
+        renderCart();
+        toast(isCashIn ? 'Cash In berhasil dicatat.' : 'Cash Out berhasil dicatat.');
+        openShiftModal();
+      } catch(e) {
+        toast(e.message);
+      }
+    };
+  }
+
+  function openCloseShiftModal(){
+    if (!state.shift) return;
+    var s = state.shift;
+    var expected = Number(s.expected_cash || 0);
+
+    var html = '<div class="pos-modal-head-row">' +
+      '<div class="pos-modal-head-title">' +
+        '<h3>Tutup Shift Kasir</h3>' +
+        '<p>Hitung dan masukkan uang fisik aktual di laci kasir saat ini</p>' +
+      '</div>' +
+      '<button type="button" class="pos-modal-close-icon" id="pos-close-shift-close" title="Tutup" aria-label="Tutup">✕</button>' +
+    '</div>';
+
+    html += '<div class="pos-shift-modal-body">' +
+      '<div class="pos-shift-expected-card" style="margin-bottom:12px">' +
+        '<div class="pos-expected-header">' +
+          '<div class="pos-expected-title">' +
+            '<span>Kas Ekspektasi Sistem</span>' +
+          '</div>' +
+          '<small>Total uang yang seharusnya ada di laci</small>' +
+        '</div>' +
+        '<div class="pos-expected-amount">' + money(expected) + '</div>' +
+      '</div>' +
+
+      '<div class="pos-form-row">' +
+        '<label for="pos-close-actual-cash">Uang Fisik Aktual di Laci (Rp)</label>' +
+        '<div class="pos-input-nominal-wrap">' +
+          '<span class="pos-input-prefix">Rp</span>' +
+          '<input id="pos-close-actual-cash" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="0" class="pos-input-nominal" autocomplete="off">' +
+        '</div>' +
+        '<div style="margin-top:6px">' +
+          '<button type="button" class="pos-btn small ghost" id="btn-pos-exact-drawer">Uang Pas Sesuai Sistem (' + money(expected) + ')</button>' +
+        '</div>' +
+        '<div id="pos-close-variance-preview" class="pos-variance-preview match">Selisih Kas: Rp0 (Sesuai)</div>' +
+      '</div>' +
+    '</div>';
+
+    html += '<div class="pos-modal-actions">' +
+      '<button type="button" class="pos-btn ghost" id="pos-close-shift-cancel">Batal</button>' +
+      '<button type="button" class="pos-btn danger" id="btn-pos-confirm-close-shift">Konfirmasi & Tutup Shift</button>' +
+    '</div>';
+
+    showModal(html);
+    $('pos-close-shift-close').onclick = function(){
+      if (state.shift) openShiftModal(); else hideModal();
+    };
+    $('pos-close-shift-cancel').onclick = function(){
+      if (state.shift) openShiftModal(); else hideModal();
+    };
+
+    var actualInput = $('pos-close-actual-cash');
+    var varPreview = $('pos-close-variance-preview');
+
+    function updateVariance(overrideVal){
+      if (!actualInput || !varPreview) return;
+      var actualVal = overrideVal != null ? overrideVal : parseNominal(actualInput.value || 0);
+      var diff = actualVal - expected;
+      if (diff === 0) {
+        varPreview.className = 'pos-variance-preview match';
+        varPreview.textContent = '✅ Selisih Kas: Rp0 (Sesuai / Pas)';
+      } else if (diff < 0) {
+        varPreview.className = 'pos-variance-preview danger';
+        varPreview.textContent = '⚠️ Selisih Kas: -' + money(Math.abs(diff)) + ' (Kurang / Defisit)';
+      } else {
+        varPreview.className = 'pos-variance-preview warning';
+        varPreview.textContent = 'ℹ️ Selisih Kas: +' + money(diff) + ' (Lebih / Surplus)';
+      }
+    }
+
+    if (actualInput) {
+      setTimeout(function(){ actualInput.focus(); }, 120);
+      bindNominalInput(actualInput, function(val){ updateVariance(val); });
+      bindModalEnter(actualInput, function(){
+        var btn = $('btn-pos-confirm-close-shift');
+        if (btn) btn.click();
+      });
+      $('btn-pos-exact-drawer').onclick = function(){
+        actualInput.value = formatNominal(expected);
+        updateVariance(expected);
+        actualInput.focus();
+      };
+    }
+
+    $('btn-pos-confirm-close-shift').onclick = async function(){
+      var actual = parseNominal(actualInput ? actualInput.value : 0);
+      if (!Number.isFinite(actual) || actual < 0) return toast('Nominal uang fisik tidak valid.');
+      try {
+        var d = await request('/pos/shifts/' + encodeURIComponent(state.shift.id) + '/close', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ actual_cash: actual })
+        });
+        state.shift = null;
+        savePosShiftCache();
+        renderShiftStatus();
+        renderShift();
+        renderCart();
+        updateTransaksiStats();
+        hideModal();
+        var variance = (d.shift && typeof d.shift.variance === 'number') ? d.shift.variance : 0;
+        var varMsg = variance === 0 ? 'Kas pas.' : (variance < 0 ? 'Minus ' + money(Math.abs(variance)) : 'Lebih ' + money(variance));
+        toast('Shift ditutup. ' + varMsg);
+      } catch(e) {
+        toast(e.message);
+      }
+    };
   }
 
   function renderShift(){
     renderShiftStatus();
-    var box=$('pos-shift-card'); if(!box)return;
-    if(!state.shift){
-      box.innerHTML='<h3>Belum ada shift aktif</h3><p>Kasir harus membuka shift sebelum penjualan dapat diselesaikan.</p>'+
-        '<div class="pos-form-row"><label>Modal Kas Awal</label><input id="pos-starting-float" type="number" min="0" value="0"></div>'+
-        '<div class="pos-shift-actions"><button class="pos-btn" id="btn-pos-open-shift">Buka Shift</button></div>';
-      $('btn-pos-open-shift').onclick=openShift;
+    var box = $('pos-shift-card');
+    if (!box) return;
+    if (!state.shift) {
+      box.innerHTML = '<div style="text-align:center;padding:24px 16px">' +
+        '<h3 style="margin-bottom:6px">Belum Ada Shift Aktif</h3>' +
+        '<p style="color:#64748b;font-size:13px;margin-bottom:16px">Kasir harus membuka shift sebelum penjualan dapat diselesaikan.</p>' +
+        '<button type="button" class="pos-btn" id="btn-pos-open-shift-card">Buka Shift Sekarang</button>' +
+      '</div>';
+      if ($('btn-pos-open-shift-card')) $('btn-pos-open-shift-card').onclick = openShiftModal;
       return;
     }
-    var s=state.shift;
-    box.innerHTML='<h3>'+ (s.active_break ? 'Sedang Istirahat' : 'Shift Aktif') +'</h3><p>'+esc(s.id)+' · dibuka '+esc(s.opened_at || '')+'</p>'+
-      '<div class="pos-shift-grid">'+
-      '<div class="pos-shift-metric"><span>Modal Awal</span><strong>'+money(s.starting_float)+'</strong></div>'+
-      '<div class="pos-shift-metric"><span>Penjualan Tunai</span><strong>'+money(s.total_cash_sales)+'</strong></div>'+
-      '<div class="pos-shift-metric"><span>Cash In</span><strong>'+money(s.total_cash_in)+'</strong></div>'+
-      '<div class="pos-shift-metric"><span>Cash Out</span><strong>'+money(s.total_cash_out)+'</strong></div>'+
-      '<div class="pos-shift-metric"><span>Kas Ekspektasi</span><strong>'+money(s.expected_cash)+'</strong></div>'+
-      '</div>'+
-      '<div class="pos-shift-actions"><button class="pos-btn ghost" id="btn-pos-cash-in">Cash In</button><button class="pos-btn ghost" id="btn-pos-cash-out">Cash Out</button><button class="pos-btn danger ghost" id="btn-pos-close-shift">Tutup Shift</button></div>';
-    $('btn-pos-cash-in').onclick=function(){cashMove('in');}; $('btn-pos-cash-out').onclick=function(){cashMove('out');}; $('btn-pos-close-shift').onclick=closeShift;
+    var s = state.shift;
+    box.innerHTML = '<div class="pos-shift-card-header">' +
+      '<h3>' + (s.active_break ? 'Sedang Istirahat' : 'Shift Aktif') + '</h3>' +
+      '<p>' + esc(s.id) + ' · dibuka ' + esc(s.opened_at || '') + '</p>' +
+      '</div>' +
+      '<div class="pos-shift-grid">' +
+        '<div class="pos-shift-metric"><span>Modal Awal</span><strong>' + money(s.starting_float) + '</strong></div>' +
+        '<div class="pos-shift-metric"><span>Penjualan Tunai</span><strong>' + money(s.total_cash_sales) + '</strong></div>' +
+        '<div class="pos-shift-metric"><span>Cash In</span><strong>' + money(s.total_cash_in) + '</strong></div>' +
+        '<div class="pos-shift-metric"><span>Cash Out</span><strong>' + money(s.total_cash_out) + '</strong></div>' +
+        '<div class="pos-shift-metric"><span>Kas Ekspektasi</span><strong>' + money(s.expected_cash) + '</strong></div>' +
+      '</div>' +
+      '<div class="pos-shift-actions">' +
+        '<button class="pos-btn ghost" id="btn-pos-cash-in">Cash In</button>' +
+        '<button class="pos-btn ghost" id="btn-pos-cash-out">Cash Out</button>' +
+        '<button class="pos-btn danger ghost" id="btn-pos-close-shift">Tutup Shift</button>' +
+      '</div>';
+    if ($('btn-pos-cash-in')) $('btn-pos-cash-in').onclick = function(){ openCashMoveModal('in'); };
+    if ($('btn-pos-cash-out')) $('btn-pos-cash-out').onclick = function(){ openCashMoveModal('out'); };
+    if ($('btn-pos-close-shift')) $('btn-pos-close-shift').onclick = openCloseShiftModal;
   }
 
   async function openShift(){
-    var amount=Number($('pos-starting-float').value||0);
-    try{var d=await request('/pos/shifts/open',{method:'POST',headers:headers(),body:JSON.stringify({branch_id:state.branchId,starting_float:amount})});state.shift=d.shift;savePosShiftCache();renderShift();renderCart();toast('Shift dibuka.');}
-    catch(e){toast(e.message);}
+    openShiftModal();
   }
 
   async function cashMove(type){
-    if(!state.shift)return;
-    var amount=prompt(type==='in'?'Nominal Cash In':'Nominal Cash Out'); if(amount===null)return;
-    amount=Number(amount); if(!Number.isFinite(amount)||amount<=0)return toast('Nominal tidak valid.');
-    var reason=prompt('Keterangan (opsional)')||'';
-    try{var d=await request('/pos/shifts/'+encodeURIComponent(state.shift.id)+'/cash-movement',{method:'POST',headers:headers(),body:JSON.stringify({type:type,amount:amount,reason:reason})});state.shift=d.shift;renderShift();toast(type==='in'?'Cash In dicatat.':'Cash Out dicatat.');}
-    catch(e){toast(e.message);}
+    openCashMoveModal(type);
   }
 
   async function toggleShiftBreak(){
@@ -938,35 +1562,61 @@
     var endpoint=state.shift.active_break ? 'end' : 'start';
     try{
       var d=await request('/pos/shifts/'+encodeURIComponent(state.shift.id)+'/break/'+endpoint,{method:'POST',headers:headers()});
-      state.shift.active_break=endpoint==='start'?d.break:null;
+      state.shift=d.shift||(endpoint==='start'?Object.assign({},state.shift,{active_break:d.break}):Object.assign({},state.shift,{active_break:null}));
       savePosShiftCache(); renderShiftStatus(); renderCart(); renderShift();
       toast(endpoint==='start'?'Istirahat dimulai.':'Kembali bertugas.');
     }catch(e){toast(e.message);}
   }
 
   async function closeShift(){
-    if(!state.shift)return;
-    var actual=prompt('Masukkan uang fisik aktual di laci'); if(actual===null)return;
-    actual=Number(actual); if(!Number.isFinite(actual)||actual<0)return toast('Nominal tidak valid.');
-    try{var d=await request('/pos/shifts/'+encodeURIComponent(state.shift.id)+'/close',{method:'POST',headers:headers(),body:JSON.stringify({actual_cash:actual})});state.shift=null;savePosShiftCache();renderShift();renderCart();toast('Shift ditutup. Variance: '+money(d.shift && d.shift.variance));}
-    catch(e){toast(e.message);}
+    openCloseShiftModal();
   }
 
   function paymentModeInfo(mode){ return state.paymentModes.find(function(m){return m.code===mode;}) || {code:mode,name:mode,enabled:true}; }
 
   function paymentModeBody(mode,totalAmount){
     var info=paymentModeInfo(mode);
-    if(mode==='cash') return '<div class="pos-form-row"><label>Uang Diterima</label><input id="pos-amount-tendered" type="number" min="'+totalAmount+'" value="'+totalAmount+'"></div><div id="pos-change-preview" class="pos-change">Kembalian: '+money(0)+'</div>';
+    if(mode==='cash') {
+      var denominations=[
+        { val: 10000, label: '10k' },
+        { val: 20000, label: '20k' },
+        { val: 50000, label: '50k' },
+        { val: 100000, label: '100k' }
+      ];
+      var buttonsHtml='<button type="button" class="pos-btn-quick-cash active" data-cash-val="exact">Uang Pas</button>' +
+        denominations.map(function(d){
+          var isDisabled=d.val < totalAmount;
+          return '<button type="button" class="pos-btn-quick-cash" data-cash-val="'+d.val+'"'+(isDisabled?' disabled title="Nominal di bawah tagihan"':'')+'>'+d.label+'</button>';
+        }).join('');
+
+      return '<div class="pos-form-row">' +
+        '<label>Uang Diterima (Pilih nominal atau ketik custom)</label>' +
+        '<div class="pos-input-nominal-wrap">' +
+          '<span class="pos-input-prefix">Rp</span>' +
+          '<input id="pos-amount-tendered" type="text" inputmode="numeric" pattern="[0-9]*" value="'+formatNominal(totalAmount)+'" placeholder="0" class="pos-input-nominal" autocomplete="off">' +
+        '</div>' +
+        '<div class="pos-quick-cash-grid">' +
+          buttonsHtml +
+        '</div>' +
+      '</div>' +
+      '<div id="pos-change-preview" class="pos-change">Kembalian: '+money(0)+'</div>';
+    }
     if(mode==='payment_gateway') return '<div class="pos-payment-pending"><strong>Payment Gateway</strong><span>Provider: '+esc(String(info.provider||'—').toUpperCase())+'</span><small>Pembayaran dibuat melalui gateway aktif dan POS menunggu status settlement.</small></div>';
     var q=info.qris_static||{};
-    return '<div class="pos-qris-panel"><div class="pos-payment-total">'+money(totalAmount)+'</div>'+(q.merchant_name?'<div class="pos-qris-merchant">'+esc(q.merchant_name)+'</div>':'')+'<img class="pos-qris-image" src="'+esc(q.image_url||'')+'" alt="QRIS Statis"><p class="pos-qris-instructions">'+esc(q.instructions||'Verifikasi pembayaran pelanggan sebelum konfirmasi.')+'</p></div>';
+    var qrisImgHtml = q.image_url
+      ? '<img class="pos-qris-image" src="'+esc(q.image_url)+'" alt="QRIS Statis">'
+      : '<div class="pos-qris-placeholder"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg><span>Scan QRIS Kasir di Meja / Counter</span></div>';
+    return '<div class="pos-qris-panel"><div class="pos-payment-total">'+money(totalAmount)+'</div>'+(q.merchant_name?'<div class="pos-qris-merchant">'+esc(q.merchant_name)+'</div>':'')+qrisImgHtml+'<p class="pos-qris-instructions">'+esc(q.instructions||'Verifikasi pembayaran pelanggan sebelum konfirmasi.')+'</p></div>';
   }
 
   function openPayModal(){
     if(!state.cart.length)return;
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
     if(state.shift.active_break)return toast('Akhiri istirahat sebelum melanjutkan transaksi.');
+    state.autoPayAfterTable=true;
     if(state.orderType==='dine_in'&&!state.selectedTable){openTableSelector();return;}
+    state.autoPayAfterTable=false;
+    closeMobileCartOverlay();
     var t=total();
     var modes=state.paymentModes.filter(function(m){return m.enabled;});
     if(!modes.some(function(m){return m.code==='cash';}))modes.unshift({code:'cash',name:'Cash',enabled:true,offline_supported:true,provider:'cash'});
@@ -975,12 +1625,55 @@
     document.querySelectorAll('[data-pay-mode]').forEach(function(btn){btn.onclick=function(){state.activePaymentMode=btn.dataset.payMode;document.querySelectorAll('[data-pay-mode]').forEach(function(x){x.classList.toggle('active',x===btn);});$('pos-payment-mode-body').innerHTML=paymentModeBody(state.activePaymentMode,t);bindCashPreview();};});
     bindCashPreview();
     $('pos-pay-cancel').onclick=hideModal;
-    $('pos-pay-confirm').onclick=function(){var amount=$('pos-amount-tendered');submitSale(state.activePaymentMode,amount?Number(amount.value||0):null);};
+    $('pos-pay-confirm').onclick=function(){var amount=$('pos-amount-tendered');submitSale(state.activePaymentMode,amount?parseNominal(amount.value):null);};
   }
 
   function bindCashPreview(){
     var amount=$('pos-amount-tendered'),preview=$('pos-change-preview');
-    if(amount&&preview)amount.oninput=function(){preview.textContent='Kembalian: '+money(Math.max(0,Number(amount.value||0)-total()));};
+    if(!amount||!preview)return;
+    var t=total();
+    function updateChange(){
+      var val=parseNominal(amount.value||0);
+      var diff=val-t;
+      var confirmBtn=$('pos-pay-confirm');
+      if(diff>=0){
+        preview.className='pos-change';
+        preview.textContent='Kembalian: '+money(diff);
+        if(confirmBtn) confirmBtn.disabled=false;
+      } else {
+        preview.className='pos-change danger';
+        preview.textContent='Uang kurang: '+money(Math.abs(diff));
+        if(confirmBtn) confirmBtn.disabled=true;
+      }
+      document.querySelectorAll('.pos-btn-quick-cash').forEach(function(b){
+        var cv=b.dataset.cashVal;
+        var isMatch=!b.disabled && ((cv==='exact' && val===t) || (Number(cv)===val));
+        b.classList.toggle('active',isMatch);
+      });
+    }
+    bindNominalInput(amount, updateChange);
+    document.querySelectorAll('.pos-btn-quick-cash').forEach(function(btn){
+      btn.onclick=function(){
+        if(btn.disabled) return;
+        var cv=btn.dataset.cashVal;
+        if(cv==='exact') {
+          amount.value=formatNominal(t);
+        } else {
+          var num=Number(cv);
+          if(num < t) return;
+          amount.value=formatNominal(num);
+        }
+        updateChange();
+        amount.focus();
+      };
+    });
+    bindModalEnter(amount, function(){
+      var confirmBtn = $('pos-pay-confirm');
+      if (confirmBtn && !confirmBtn.disabled) {
+        confirmBtn.click();
+      }
+    });
+    updateChange();
   }
 
   function showPaymentSuccess(order,change){
@@ -1000,7 +1693,10 @@
 
   function showStaticQrisPending(d){
     var p=d.payment||{},oid=d.order_id||((d.order||{}).id)||'',q=p.qris_static||{};
-    showModal('<h3>QRIS Statis</h3><p>Tagihan '+money(d.grand_total||0)+'</p>' +(q.merchant_name?'<div class="pos-qris-merchant">'+esc(q.merchant_name)+'</div>':'')+'<img class="pos-qris-image" src="'+esc(q.image_url||'')+'" alt="QRIS Statis"><p class="pos-qris-instructions">'+esc(q.instructions||'Verifikasi pembayaran pelanggan sebelum konfirmasi.')+'</p><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-qris-cancel">Belum Bayar</button><button class="pos-btn" id="pos-qris-confirm">Saya Sudah Verifikasi</button></div>');
+    var qrisImgHtml = q.image_url
+      ? '<img class="pos-qris-image" src="'+esc(q.image_url)+'" alt="QRIS Statis">'
+      : '<div class="pos-qris-placeholder"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg><span>Scan QRIS Kasir di Meja / Counter</span></div>';
+    showModal('<h3>QRIS Statis</h3><p>Tagihan '+money(d.grand_total||0)+'</p>' +(q.merchant_name?'<div class="pos-qris-merchant">'+esc(q.merchant_name)+'</div>':'')+qrisImgHtml+'<p class="pos-qris-instructions">'+esc(q.instructions||'Verifikasi pembayaran pelanggan sebelum konfirmasi.')+'</p><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-qris-cancel">Belum Bayar</button><button class="pos-btn" id="pos-qris-confirm">Saya Sudah Verifikasi</button></div>');
     $('pos-qris-cancel').onclick=function(){request('/pos/orders/'+encodeURIComponent(oid)+'/cancel-qris-static',{method:'POST',headers:headers(),body:JSON.stringify({reason:'QRIS statis belum dibayar.'})}).then(function(){hideModal();resetSale();loadSales();}).catch(function(e){toast(e.message);});};
     $('pos-qris-confirm').onclick=function(){var note=prompt('Referensi transaksi (opsional)')||'';request('/pos/orders/'+encodeURIComponent(oid)+'/confirm-qris-static',{method:'POST',headers:headers(),body:JSON.stringify({reference_note:note})}).then(function(result){if(result&&result.success){showPaymentSuccess({id:oid,order_number:result.order_number,grand_total:d.grand_total},null);loadSales();}}).catch(function(e){toast(e.message);});};
   }
@@ -1009,6 +1705,12 @@
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
     if(state.orderType==='dine_in'&&!state.selectedTable){hideModal();openTableSelector();return;}
     if(!navigator.onLine&&paymentMode!=='cash')return toast('Payment Gateway dan QRIS Statis membutuhkan koneksi internet pada POS.');
+    if(paymentMode==='cash'){
+      var numTendered=Number(amountTendered||0);
+      if(!Number.isFinite(numTendered)||numTendered < total()){
+        return toast('Uang yang diterima kurang dari total tagihan.');
+      }
+    }
     var payload={branch_id:state.branchId,shift_id:state.shift.id,order_type:state.orderType,payment_mode:paymentMode,amount_tendered:paymentMode==='cash'?amountTendered:null,customer:{name:$('pos-customer-name').value.trim(),phone:'',table_number:state.selectedTable?state.selectedTable.table_number:null},items:state.cart.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,options:i.options||[],note:i.note||''};}),client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)};
     try{
       var d;
@@ -1034,15 +1736,44 @@
 
   function resetSale(){state.cart=[];state.selectedTable=null;$('pos-selected-table').textContent='Belum dipilih';$('pos-customer-name').value='';$('pos-order-note').value='';renderCart();}
 
-  function showModal(html){$('pos-modal-card').innerHTML=html;$('pos-modal').classList.remove('hidden');}
-  function hideModal(){$('pos-modal').classList.add('hidden');$('pos-modal-card').innerHTML='';}
+  function showModal(html, extraClass){
+    var card = $('pos-modal-card');
+    if (card) card.innerHTML = html;
+    var modal = $('pos-modal');
+    if (modal) {
+      modal.className = 'pos-modal' + (extraClass ? ' ' + extraClass : '');
+      modal.classList.remove('hidden');
+    }
+  }
+  function hideModal(){
+    state.autoPayAfterTable = false;
+    var modal = $('pos-modal');
+    if (modal) {
+      modal.className = 'pos-modal hidden';
+    }
+    var card = $('pos-modal-card');
+    if (card) {
+      card.innerHTML = '';
+    }
+  }
+
+  async function updateHeldCount(){
+    var held=await loadHeld();
+    var count=held.length;
+    if($('pos-held-count')) $('pos-held-count').textContent=String(count);
+    if($('pos-transaksi-held-count')) $('pos-transaksi-held-count').textContent=String(count);
+    return held;
+  }
 
   async function holdSale(){
     if(!state.cart.length)return toast('Cart masih kosong.');
     if(state.orderType==='dine_in' && !state.selectedTable)return toast('Pilih meja sebelum menahan bill.');
     try{
       await request('/pos/held-orders',{method:'POST',headers:headers(),body:JSON.stringify({branch_id:state.branchId,table_number:state.selectedTable?state.selectedTable.table_number:'',customer_name:$('pos-customer-name').value.trim()||'Tamu',order_type:state.orderType,items:state.cart})});
-      toast('Pesanan ditahan.'); resetSale();
+      toast('Pesanan ditahan (Hold Bill).');
+      resetSale();
+      await updateHeldCount();
+      if(state.transaksiTab==='held') renderHeldSales();
     }catch(e){toast(e.message);}
   }
 
@@ -1050,11 +1781,84 @@
     try{var d=await request('/pos/held-orders?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});state.held=d.held_orders||[];return state.held;}catch(e){return [];}
   }
 
+  async function resumeHeld(heldId){
+    var held=state.held||[];
+    var h=held.find(function(x){return String(x.id)===String(heldId);});
+    if(!h){
+      held=await loadHeld();
+      h=held.find(function(x){return String(x.id)===String(heldId);});
+    }
+    if(!h)return toast('Pesanan ditahan tidak ditemukan.');
+    state.orderType='dine_in';
+    state.selectedTable={table_number:h.table_number};
+    if($('pos-selected-table')) $('pos-selected-table').textContent='Meja '+h.table_number;
+    if($('pos-customer-name')) $('pos-customer-name').value=h.customer_name||'';
+    try{
+      state.cart=JSON.parse(h.items_payload||'[]');
+    }catch(_){state.cart=[];}
+    try{
+      await request('/pos/held-orders/'+encodeURIComponent(heldId)+'/resume',{method:'POST',headers:headers()});
+    }catch(_){}
+    hideModal();
+    renderCart();
+    await updateHeldCount();
+    if(state.transaksiTab==='held') renderHeldSales();
+    setView('kasir');
+    toast('Pesanan Meja '+(h.table_number||'—')+' berhasil dibuka kembali di kasir.');
+  }
+
+  async function cancelHeld(heldId){
+    if(!confirm('Batalkan pesanan yang ditahan ini?')) return;
+    try{
+      await request('/pos/held-orders/'+encodeURIComponent(heldId),{method:'DELETE',headers:headers()});
+      toast('Pesanan ditahan dibatalkan.');
+      await updateHeldCount();
+      if(state.transaksiTab==='held') renderHeldSales();
+      else if(!$('pos-modal').classList.contains('hidden')) openHeld();
+    }catch(e){toast(e.message);}
+  }
+
   async function openHeld(){
-    var held=await loadHeld();
+    var held=await updateHeldCount();
     if(!held.length){toast('Tidak ada pesanan yang ditahan.');return;}
-    showModal('<h3>Pesanan Ditahan</h3><p>Pilih bill untuk dilanjutkan.</p><div>'+held.map(function(h){return '<button class="pos-btn ghost" data-held="'+esc(h.id)+'" style="display:block;width:100%;margin:7px 0;text-align:left;">Meja '+esc(h.table_number||'—')+' · '+esc(h.customer_name||'Tamu')+' · '+money(JSON.parse(h.items_payload||'[]').reduce(function(s,i){return s+(Number(i.unit_price)||0)*Number(i.quantity||0)},0))+'</button>';}).join('')+'</div>');
-    $('pos-modal-card').querySelectorAll('[data-held]').forEach(function(b){b.onclick=function(){var h=held.find(function(x){return String(x.id)===String(b.dataset.held);});if(!h)return;state.orderType='dine_in';state.selectedTable={table_number:h.table_number};state.cart=JSON.parse(h.items_payload||'[]');hideModal();renderCart();};});
+    showModal('<h3>Pesanan Ditahan (Hold Bill)</h3><p>Pilih bill untuk dilanjutkan atau dibatalkan.</p><div class="pos-held-modal-list">'+held.map(function(h){
+      var items=[]; try{items=JSON.parse(h.items_payload||'[]');}catch(_){}
+      var subtotal=items.reduce(function(s,i){return s+(Number(i.unit_price)||0)*Number(i.quantity||0)},0);
+      var itemSummary=items.map(function(i){return (i.quantity||1)+'x '+(i.name||'Item');}).join(', ');
+      return '<div class="pos-held-modal-card">' +
+        '<div class="pos-held-modal-main">' +
+          '<strong>Meja '+esc(h.table_number||'—')+' · '+esc(h.customer_name||'Tamu')+'</strong>' +
+          '<div class="pos-held-modal-desc">'+esc(itemSummary||'Item')+'</div>' +
+          '<div class="pos-held-modal-price">'+money(subtotal)+'</div>' +
+        '</div>' +
+        '<div class="pos-held-modal-actions">' +
+          '<button type="button" class="pos-btn small ghost danger" data-cancel-held="'+esc(h.id)+'">Batal</button>' +
+          '<button type="button" class="pos-btn small" data-resume-held="'+esc(h.id)+'">Buka</button>' +
+        '</div>' +
+      '</div>';
+    }).join('')+'</div><div class="pos-modal-actions"><button type="button" class="pos-btn ghost" id="pos-held-modal-close">Tutup</button></div>');
+    if($('pos-held-modal-close')) $('pos-held-modal-close').onclick=hideModal;
+    $('pos-modal-card').querySelectorAll('[data-resume-held]').forEach(function(b){b.onclick=function(){resumeHeld(b.dataset.resumeHeld);};});
+    $('pos-modal-card').querySelectorAll('[data-cancel-held]').forEach(function(b){b.onclick=function(){cancelHeld(b.dataset.cancelHeld);};});
+  }
+
+  function updateTransaksiStats(){
+    var badge=$('pos-transaksi-stats');
+    if(!badge)return;
+    var shiftStart = (state.shift && state.shift.opened_at) ? new Date(state.shift.opened_at).getTime() : 0;
+    var todayStart = new Date();
+    todayStart.setHours(0,0,0,0);
+    var startTime = (shiftStart > 0) ? shiftStart : todayStart.getTime();
+    var sales = state.sales || [];
+    var count = sales.filter(function(s){
+      var t = s.created_at ? new Date(s.created_at).getTime() : 0;
+      var ps = (s.payment_status || '').toLowerCase();
+      var isPaid = !ps || ps === 'paid' || ps === 'settled' || ps === 'settlement';
+      var st = (s.status || '').toLowerCase();
+      var isNotCancelled = st !== 'cancelled' && st !== 'rejected' && st !== 'void';
+      return t >= startTime && isPaid && isNotCancelled;
+    }).length;
+    badge.textContent = count + ' Transaksi';
   }
 
   async function loadSales(){
@@ -1062,15 +1866,45 @@
       var d=await request('/pos/sales?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
       state.sales=d.sales||[]; renderSales();
     }catch(e){if($('pos-sales-list'))$('pos-sales-list').innerHTML='<div class="pos-empty">Riwayat transaksi tidak tersedia.</div>';}
+    await updateHeldCount();
+    updateTransaksiStats();
+    if(state.transaksiTab==='held') renderHeldSales();
   }
 
   function renderSales(){
+    updateTransaksiStats();
     var box=$('pos-sales-list');if(!box)return;
     if(!state.sales.length){box.innerHTML='<div class="pos-empty">Belum ada transaksi POS.</div>';return;}
     box.innerHTML=state.sales.map(function(s){
       return '<div class="pos-sale-row"><div class="pos-sale-main"><strong>#'+esc(s.order_number||s.id)+'</strong><small>'+esc(s.created_at||'')+'</small></div><div>'+esc((s.order_type||'').toUpperCase())+'</div><div><span class="pos-badge ok">'+esc(s.payment_status||'paid')+'</span></div><div class="pos-sale-total">'+money(s.grand_total)+'</div><div><button class="pos-btn small ghost" data-print="'+esc(s.id)+'">Struk</button></div></div>';
     }).join('');
     box.querySelectorAll('[data-print]').forEach(function(b){b.onclick=function(){printReceipt(b.dataset.print);};});
+  }
+
+  function renderHeldSales(){
+    var box=$('pos-held-list'); if(!box)return;
+    var held=state.held||[];
+    if(!held.length){box.innerHTML='<div class="pos-empty">Tidak ada pesanan yang sedang ditahan.</div>';return;}
+    box.innerHTML=held.map(function(h){
+      var items=[]; try{items=JSON.parse(h.items_payload||'[]');}catch(_){}
+      var subtotal=items.reduce(function(s,i){return s+(Number(i.unit_price)||0)*Number(i.quantity||0)},0);
+      var itemSummary=items.map(function(i){return (i.quantity||1)+'x '+(i.name||'Item');}).join(', ');
+      return '<div class="pos-held-row"><div class="pos-held-main"><strong>Meja '+esc(h.table_number||'—')+'</strong><small>Tamu: '+esc(h.customer_name||'Tamu')+' · '+esc(h.created_at||'')+'</small></div><div class="pos-held-items">'+esc(itemSummary||'—')+'</div><div class="pos-held-total">'+money(subtotal)+'</div><div class="pos-held-actions"><button type="button" class="pos-btn small ghost danger" data-cancel-held-row="'+esc(h.id)+'">Batal</button><button type="button" class="pos-btn small" data-resume-held-row="'+esc(h.id)+'">Buka di Kasir</button></div></div>';
+    }).join('');
+    box.querySelectorAll('[data-resume-held-row]').forEach(function(b){b.onclick=function(){resumeHeld(b.dataset.resumeHeldRow);};});
+    box.querySelectorAll('[data-cancel-held-row]').forEach(function(b){b.onclick=function ancient(){cancelHeld(b.dataset.cancelHeldRow);};});
+  }
+
+  function switchTransaksiTab(tab){
+    state.transaksiTab=tab;
+    var tabSales=$('tab-transaksi-sales'), tabHeld=$('tab-transaksi-held');
+    var salesList=$('pos-sales-list'), heldList=$('pos-held-list');
+    if(tabSales) tabSales.classList.toggle('active', tab==='sales');
+    if(tabHeld) tabHeld.classList.toggle('active', tab==='held');
+    if(salesList) salesList.classList.toggle('hidden', tab!=='sales');
+    if(heldList) heldList.classList.toggle('hidden', tab!=='held');
+    if(tab==='held') renderHeldSales();
+    else renderSales();
   }
 
   function tableStateLabel(st){
@@ -1100,34 +1934,200 @@
       });
       html+='</div><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-table-picker-cancel">Batal</button></div>';
       showModal(html);
-      $('pos-table-picker-cancel').onclick=hideModal;
+      $('pos-table-picker-cancel').onclick=function(){
+        state.autoPayAfterTable=false;
+        hideModal();
+      };
       document.querySelectorAll('[data-table-pick]').forEach(function(btn){btn.onclick=function(){
         var t=tables.find(function(x){return String(x.id)===String(btn.dataset.tablePick);});
         if(!t||(t.operational_state||t.status||'available')!=='available')return;
-        applySelectedTable(t); hideModal(); setView('kasir');
+        applySelectedTable(t);
+        var autoPay = Boolean(state.autoPayAfterTable);
+        state.autoPayAfterTable = false;
+        hideModal();
+        setView('kasir');
+        if(autoPay){
+          openPayModal();
+        }
       };});
     }).catch(function(e){toast(e.message||'Layout meja tidak dapat dimuat.');});
+  }
+
+  function openTableActionMenu(t, tables){
+    var st = t.operational_state || t.status || 'available';
+    var isApp = Boolean(t.is_app_order || (t.session_channel && t.session_channel !== 'pos'));
+    var isAvailable = st === 'available';
+    var tableName = t.label || ('Meja ' + t.table_number);
+
+    var html = '<div class="pos-table-action-sheet">' +
+      '<div class="pos-table-action-header">' +
+        '<div class="pos-table-action-title">' +
+          '<h3>' + esc(tableName) + '</h3>' +
+          (isApp ? '<span class="pos-table-app-icon" title="Dipesan melalui Aplikasi / QR"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg> App</span>' : '') +
+        '</div>' +
+        '<span class="pos-badge ' + (isAvailable ? 'ok' : 'pending') + '">' + esc(tableStateLabel(st)) + '</span>' +
+      '</div>' +
+      '<p class="pos-table-action-desc">Kapasitas: ' + esc(String(t.capacity || 4)) + ' kursi' + (t.session_customer_name ? ' · Tamu: ' + esc(t.session_customer_name) : '') + (isApp ? ' · (Pesanan via Aplikasi / QR)' : '') + '</p>' +
+      '<div class="pos-table-actions-list">' +
+        (!isAvailable ? '<button type="button" class="pos-action-sheet-btn danger" id="btn-table-release"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg> Release Meja (Kosongkan)</span><small>Kembalikan status meja menjadi Tersedia</small></button>' : '') +
+        (!isAvailable ? '<button type="button" class="pos-action-sheet-btn" id="btn-table-transfer"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 14 20 9 15 4"></polyline><path d="M4 20v-7a4 4 0 0 1 4-4h12"></path></svg> Pindah Meja (Transfer Tamu)</span><small>Pindahkan pesanan tamu ke meja kosong lainnya</small></button>' : '') +
+        '<button type="button" class="pos-action-sheet-btn" id="btn-table-toggle-block"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line></svg> ' + (st === 'blocked' ? 'Buka Blokir Meja' : 'Blokir Meja') + '</span><small>' + (st === 'blocked' ? 'Meja kembali dapat dipakai untuk pesanan' : 'Tandai meja sedang rusak atau tidak dipakai') + '</small></button>' +
+        (isAvailable ? '<button type="button" class="pos-action-sheet-btn" id="btn-table-use-sale"><span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Pilih untuk Transaksi Kasir</span><small>Gunakan meja ini sebagai konteks dine-in</small></button>' : '') +
+      '</div>' +
+      '<div class="pos-modal-actions"><button type="button" class="pos-btn ghost" id="btn-table-action-close">Tutup</button></div>' +
+    '</div>';
+
+    showModal(html);
+    if($('btn-table-action-close')) $('btn-table-action-close').onclick = hideModal;
+
+    if($('btn-table-release')) {
+      $('btn-table-release').onclick = async function(){
+        if(!confirm('Kosongkan ' + tableName + ' dan kembalikan ke status Tersedia?')) return;
+        try {
+          var res = await request('/dine-in/tables/' + encodeURIComponent(t.id) + '/release', { method: 'POST', headers: headers() });
+          toast(res.message || 'Meja berhasil dikosongkan.');
+          hideModal();
+          loadTables();
+        } catch(e) {
+          toast(e.message || 'Gagal me-release meja.');
+        }
+      };
+    }
+
+    if($('btn-table-transfer')) {
+      $('btn-table-transfer').onclick = function(){
+        openTableTransferPicker(t, tables);
+      };
+    }
+
+    if($('btn-table-toggle-block')) {
+      $('btn-table-toggle-block').onclick = async function(){
+        var isBlocked = st !== 'blocked';
+        try {
+          var res = await request('/dine-in/tables/' + encodeURIComponent(t.id) + '/block', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ is_blocked: isBlocked, reason: isBlocked ? 'Manual block by cashier' : 'Unblocked' })
+          });
+          toast(isBlocked ? 'Meja telah diblokir.' : 'Blokir meja dibuka.');
+          hideModal();
+          loadTables();
+        } catch(e) {
+          toast(e.message || 'Gagal mengubah status blokir meja.');
+        }
+      };
+    }
+
+    if($('btn-table-use-sale')) {
+      $('btn-table-use-sale').onclick = function(){
+        applySelectedTable(t);
+        hideModal();
+        setView('kasir');
+      };
+    }
+  }
+
+  function openTableTransferPicker(sourceTable, allTables){
+    var avail = allTables.filter(function(x){
+      return String(x.id) !== String(sourceTable.id) && ((x.operational_state || x.status || 'available') === 'available');
+    });
+
+    var html = '<div class="pos-table-action-sheet">' +
+      '<div class="pos-table-action-header">' +
+        '<div class="pos-table-action-title">' +
+          '<h3>Pindah dari ' + esc(sourceTable.label || ('Meja ' + sourceTable.table_number)) + '</h3>' +
+        '</div>' +
+      '</div>' +
+      '<p class="pos-table-action-desc">Pilih meja tujuan yang sedang kosong untuk memindahkan tamu / pesanan:</p>' +
+      '<div class="pos-table-picker">';
+
+    if(!avail.length) {
+      html += '<div class="pos-empty">Tidak ada meja kosong lain yang tersedia saat ini.</div>';
+    } else {
+      avail.forEach(function(tb){
+        html += '<button type="button" class="pos-table-pick" data-transfer-target="' + esc(tb.id) + '">' +
+          '<span><strong>' + esc(tb.label || ('Meja ' + tb.table_number)) + '</strong><small>' + esc(String(tb.capacity || 4)) + ' kursi · Tersedia</small></span>' +
+          '<b>Pilih Meja</b></button>';
+      });
+    }
+
+    html += '</div>' +
+      '<div class="pos-modal-actions">' +
+        '<button type="button" class="pos-btn ghost" id="btn-transfer-cancel">Batal</button>' +
+      '</div>' +
+    '</div>';
+
+    showModal(html);
+    if($('btn-transfer-cancel')) $('btn-transfer-cancel').onclick = function(){ openTableActionMenu(sourceTable, allTables); };
+
+    document.querySelectorAll('[data-transfer-target]').forEach(function(btn){
+      btn.onclick = async function(){
+        var targetId = btn.dataset.transferTarget;
+        var targetTb = allTables.find(function(x){ return String(x.id) === String(targetId); });
+        var targetName = targetTb ? (targetTb.label || ('Meja ' + targetTb.table_number)) : 'meja tujuan';
+
+        try {
+          var res = await request('/dine-in/tables/' + encodeURIComponent(sourceTable.id) + '/transfer', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify({ target_table_id: targetId })
+          });
+          toast(res.message || ('Tamu berhasil dipindahkan ke ' + targetName + '.'));
+          hideModal();
+          loadTables();
+        } catch(e) {
+          toast(e.message || 'Gagal memindahkan meja.');
+        }
+      };
+    });
   }
 
   async function loadTables(){
     try{
       var d=await request('/dine-in/layout?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});
-      var tables=(d.layout&&d.layout.tables)||[]; var box=$('pos-table-grid'); if(!box)return;
+      var tables=(d.layout&&d.layout.tables)||[];
+      var availCount=tables.filter(function(t){return (t.operational_state||t.status||'available')==='available';}).length;
+      if($('pos-table-stats')) $('pos-table-stats').textContent='Sisa '+availCount+' meja';
+      var box=$('pos-table-grid'); if(!box)return;
       box.innerHTML=tables.map(function(t){
         var st=t.operational_state||t.status||'available'; var can=st==='available';
-        return '<div class="pos-table-card '+esc(st)+'"><h3>'+esc(t.label||('Meja '+t.table_number))+'</h3><p>'+esc(String(t.capacity||4))+' kursi · '+esc(tableStateLabel(st))+'</p>'+
-          '<button type="button" class="pos-btn small '+(can?'':'ghost')+'" '+(can?'':'disabled')+' data-table="'+esc(t.id)+'">'+(can?'Gunakan untuk Sale':'Tidak tersedia')+'</button></div>';
+        var isApp=Boolean(t.is_app_order || (t.session_channel && t.session_channel !== 'pos'));
+        return '<div class="pos-table-card '+esc(st)+'">'+
+          '<div class="pos-table-card-header">'+
+            '<div class="pos-table-title-group">'+
+              '<h3>'+esc(t.label||('Meja '+t.table_number))+'</h3>'+
+              (isApp ? '<span class="pos-table-app-icon" title="Dipesan melalui Aplikasi / QR" aria-label="Pesanan Aplikasi"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg></span>' : '')+
+            '</div>'+
+            '<button type="button" class="pos-btn-kebab" data-table-kebab="'+esc(t.id)+'" title="Opsi Meja" aria-label="Opsi Meja">'+
+              '<svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.8125 8.90625C2.43954 8.90625 2.08185 8.75809 1.81813 8.49437C1.55441 8.23065 1.40625 7.87296 1.40625 7.5C1.40625 7.12704 1.55441 6.76935 1.81813 6.50563C2.08185 6.24191 2.43954 6.09375 2.8125 6.09375C3.18546 6.09375 3.54315 6.24191 3.80687 6.50563C4.07059 6.76935 4.21875 7.12704 4.21875 7.5C4.21875 7.87296 4.07059 8.23065 3.80687 8.49437C3.54315 8.75809 3.18546 8.90625 2.8125 8.90625ZM7.5 8.90625C7.12704 8.90625 6.76935 8.75809 6.50563 8.49437C6.24191 8.23065 6.09375 7.87296 6.09375 7.5C6.09375 7.12704 6.24191 6.76935 6.50563 6.50563C6.76935 6.24191 7.12704 6.09375 7.5 6.09375C7.87296 6.09375 8.23065 6.24191 8.49437 6.50563C8.75809 6.76935 8.90625 7.12704 8.90625 7.5C8.90625 7.87296 8.75809 8.23065 8.49437 8.49437C8.23065 8.75809 7.87296 8.90625 7.5 8.90625ZM12.1875 8.90625C11.8145 8.90625 11.4569 8.75809 11.1931 8.49437C10.9294 8.23065 10.7813 7.87296 10.7812 7.5C10.7812 7.12704 10.9294 6.76935 11.1931 6.50563C11.4569 6.24191 11.8145 6.09375 12.1875 6.09375C12.5605 6.09375 12.9181 6.24191 13.1819 6.50563C13.4456 6.76935 13.5937 7.12704 13.5938 7.5C13.5937 7.87296 13.4456 8.23065 13.1819 8.49437C12.9181 8.75809 12.5605 8.90625 12.1875 8.90625Z" fill="currentColor"/></svg>'+
+            '</button>'+
+          '</div>'+
+          '<p>'+esc(String(t.capacity||4))+' kursi · '+esc(tableStateLabel(st))+'</p>'+
+          '<button type="button" class="pos-btn small '+(can?'':'ghost')+'" '+(can?'':'disabled')+' data-table="'+esc(t.id)+'">'+(can?'Pilih meja':'Tidak tersedia')+'</button></div>';
       }).join('');
       box.querySelectorAll('[data-table]').forEach(function(btn){btn.onclick=function(){
         var t=tables.find(function(x){return String(x.id)===String(btn.dataset.table);});
         if(!t)return;
         applySelectedTable(t); setView('kasir');
       };});
-    }catch(e){$('pos-table-grid').innerHTML='<div class="pos-empty">Layout meja tidak dapat dimuat.</div>';}
+      box.querySelectorAll('[data-table-kebab]').forEach(function(btn){btn.onclick=function(e){
+        e.stopPropagation();
+        var t=tables.find(function(x){return String(x.id)===String(btn.dataset.tableKebab);});
+        if(t) openTableActionMenu(t, tables);
+      };});
+    }catch(e){
+      if($('pos-table-stats')) $('pos-table-stats').textContent='0 meja';
+      if($('pos-table-grid')) $('pos-table-grid').innerHTML='<div class="pos-empty">Layout meja tidak dapat dimuat.</div>';
+    }
   }
 
   function bind(){
-    document.querySelectorAll('.pos-bottom-nav button').forEach(function(b){b.onclick=function(){setView(b.dataset.view);};});
+    document.querySelectorAll('.pos-bottom-nav button').forEach(function(b){
+      b.onclick=function(){
+        if(b.dataset.view==='shift'){ openShiftModal(); return; }
+        setView(b.dataset.view);
+      };
+    });
     document.querySelectorAll('.pos-order-type button').forEach(function(b){b.onclick=function(){state.orderType=b.dataset.type;document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x===b);});$('pos-table-context').classList.toggle('hidden',state.orderType!=='dine_in');if(state.orderType!=='dine_in'){state.selectedTable=null;renderCart();}else{renderCart();}};});
     var searchInput=$('pos-menu-search'), clearSearchBtn=$('btn-pos-clear-search');
     if(searchInput){
@@ -1164,12 +2164,64 @@
     $('btn-pos-pay').onclick=openPayModal;
     $('btn-pos-clear').onclick=function(){resetSale();};
     $('btn-pos-hold').onclick=holdSale;
+    if($('btn-pos-open-held')) $('btn-pos-open-held').onclick=openHeld;
+    if($('tab-transaksi-sales')) $('tab-transaksi-sales').onclick=function(){switchTransaksiTab('sales');};
+    if($('tab-transaksi-held')) $('tab-transaksi-held').onclick=function(){switchTransaksiTab('held');};
     $('btn-pos-select-table').onclick=function(){openTableSelector();};
     $('btn-pos-load-sales').onclick=loadSales;
-    $('btn-pos-shift-status').onclick=function(){if(!state.shift){setView('shift');return;}toggleShiftBreak();};
-    $('btn-pos-close-shift-top').onclick=closeShift;
+    if($('btn-pos-refresh-tables')) $('btn-pos-refresh-tables').onclick=loadTables;
+    if($('btn-pos-refresh-shift')) $('btn-pos-refresh-shift').onclick=function(){ renderShift(); openShiftModal(); };
+    $('btn-pos-shift-status').onclick=openShiftModal;
+    $('btn-pos-close-shift-top').onclick=openCloseShiftModal;
     $('btn-pos-logout').onclick=function(){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(USER_KEY);window.location.replace('/login');};
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
+    if($('pos-mcart-trigger-order')){
+      $('pos-mcart-trigger-order').onclick=function(e){
+        e.stopPropagation();
+        openMobileCartOverlay();
+      };
+    }
+    if($('btn-pos-mcart-checkout')){
+      $('btn-pos-mcart-checkout').onclick=function(e){
+        e.stopPropagation();
+        openPayModal();
+      };
+    }
+    if($('pos-mobile-cart-bar')){
+      $('pos-mobile-cart-bar').onclick=function(e){
+        if(e.target.closest('#btn-pos-mcart-checkout')){
+          openPayModal();
+        } else {
+          openMobileCartOverlay();
+        }
+      };
+    }
+    if($('btn-pos-cart-close')){
+      $('btn-pos-cart-close').onclick=function(e){
+        e.stopPropagation();
+        closeMobileCartOverlay();
+      };
+    }
+    if($('btn-pos-cart-select-table')){
+      $('btn-pos-cart-select-table').onclick=function(e){
+        e.stopPropagation();
+        openTableSelector();
+      };
+    }
+    var cartPane=$('pos-cart-pane');
+    if(cartPane){
+      cartPane.onclick=function(e){
+        if(e.target===cartPane){
+          closeMobileCartOverlay();
+        }
+      };
+    }
+    window.addEventListener('keydown', function(e){
+      if(e.key==='Escape'){
+        closeMobileCartOverlay();
+        hideModal();
+      }
+    });
   }
 
   async function boot(){
@@ -1182,6 +2234,9 @@
       await loadTerminal();
       await loadShift();
       await loadMenu();
+      await updateHeldCount();
+      loadSales().catch(function(){});
+      loadTables().catch(function(){});
       setView('kasir');
       window.addEventListener('online',function(){
         setConnection(!state.offlineMode);

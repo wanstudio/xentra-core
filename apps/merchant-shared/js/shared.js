@@ -115,6 +115,14 @@
     } catch (_) { return null; }
   }
 
+  /**
+   * Returns true if the stored user has branch_manager or manager role.
+   */
+  function isBranchManager() {
+    var u = getStoredUser();
+    return !!(u && (u.role === 'branch_manager' || u.role === 'manager'));
+  }
+
   /* =========================================================================
      DOM / FORMAT HELPERS
      ========================================================================= */
@@ -293,6 +301,7 @@
     redirectToLogin:    redirectToLogin,
     adminFetch:         adminFetch,
     getStoredUser:      getStoredUser,
+    isBranchManager:    isBranchManager,
     checkAuth:          checkAuth,
     handleHandoffExchange: handleHandoffExchange,
     validateServerSession: validateServerSession,

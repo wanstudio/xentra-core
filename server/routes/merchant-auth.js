@@ -1,5 +1,15 @@
 const crypto = require('crypto');
 const GoogleAuthService = require('../services/GoogleAuthService');
+const {
+  RegistrationService,
+  WorkforceService,
+  WorkforceInvitationService,
+  AuthProviderService,
+  HandoffService,
+  ExistingTenantResolver,
+  EmailVerificationService,
+  PosPinCredentialService
+} = require('../../core/identity');
 
 module.exports = function registerMerchantAuthRoutes(router, deps) {
   const {
@@ -265,12 +275,36 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
   
   // GET /auth/merchant/me: Authenticated operator/merchant profile
   router.get('/auth/merchant/me', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
-    const brand = req.brand || null;
+    let brand = req.brand || null;
     const userId = req.user.id || req.user.userId;
     const brandId = req.user.brandId || req.user.brand_id || req.brand_id || null;
     const branchId = req.user.branchId || req.user.branch_id || null;
     const organizationId = req.user.organizationId || req.user.organization_id || null;
-  
+
+    if (!brand && brandId) {
+      try {
+        brand = db.prepare('SELECT * FROM brands WHERE id = ?').get(brandId) || null;
+      } catch (_) {}
+    }
+
+    let branchName = null;
+    let resolvedBranchId = branchId;
+    if (resolvedBranchId) {
+      try {
+        const b = db.prepare('SELECT name FROM branches WHERE id = ?').get(resolvedBranchId);
+        if (b) branchName = b.name;
+      } catch (_) {}
+    }
+    if (!branchName && brandId) {
+      try {
+        const activeBranch = db.prepare('SELECT id, name FROM branches WHERE brand_id = ? AND is_active = 1 LIMIT 1').get(brandId);
+        if (activeBranch) {
+          branchName = activeBranch.name;
+          if (!resolvedBranchId) resolvedBranchId = activeBranch.id;
+        }
+      } catch (_) {}
+    }
+
     res.json({
       success: true,
       user: {
@@ -282,6 +316,7 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
         brand_id: brandId,
         organization_id: organizationId,
         branch_id: branchId,
+        branch_name: branchName,
         email_verified: req.user.email_verified !== undefined ? req.user.email_verified : true,
         brand_name: brand ? brand.name : null
       },
@@ -567,8 +602,6 @@ module.exports = function registerMerchantAuthRoutes(router, deps) {
   });
 
   // 10.2 Google Authentication & Account Linking Endpoints
-  const GoogleAuthService = require('../services/GoogleAuthService');
-  const { AuthProviderService } = require('../../core/identity');
   
   // In-memory store for short-lived Google account linking tokens.
   // These tokens are issued by /auth/google/link-init and consumed by /auth/google (link_token mode).
