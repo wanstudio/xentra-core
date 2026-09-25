@@ -90,6 +90,13 @@ router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager'
       shift_id: effectiveShiftId
     });
 
+    // If this canonical order originated from a POS Hold Bill, close the
+    // cashier-side working reference after successful settlement.
+    try {
+      db.prepare("UPDATE pos_held_orders SET status = 'settled', updated_at = ? WHERE order_id = ? AND branch_id = ? AND status = 'held'")
+        .run(new Date().toISOString(), orderId, order.branch_id);
+    } catch (_) {}
+
     res.json({
       success: true,
       message: result.message || 'Pembayaran tunai berhasil diselesaikan.',
