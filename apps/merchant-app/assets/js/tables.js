@@ -108,7 +108,7 @@
       if (_bmTablesState.filterStatus === 'occupied') return st === 'occupied';
       if (_bmTablesState.filterStatus === 'occupied_pwa') return st === 'occupied' && t.session_channel !== 'pos_cashier';
       if (_bmTablesState.filterStatus === 'occupied_pos') return st === 'occupied' && t.session_channel === 'pos_cashier';
-      if (_bmTablesState.filterStatus === 'held') return st === 'held';
+      if (_bmTablesState.filterStatus === 'held') return st === 'held' || st === 'reserved';
       if (_bmTablesState.filterStatus === 'blocked') return (st === 'blocked' || st === 'out_of_service');
       return true;
     });
@@ -121,7 +121,7 @@
     var stateCardConfigs = {
       available: { bg: '#ffffff', border: '#bbf7d0', badge: '<span class="x-badge x-badge-success">TERSEDIA</span>' },
       occupied: { bg: '#ffffff', border: '#bfdbfe', badge: '<span class="x-badge x-badge-info">TERISI</span>' },
-      held: { bg: '#ffffff', border: '#fde68a', badge: '<span class="x-badge x-badge-warning">DITAHAN</span>' },
+      held: { bg: '#ffffff', border: '#fde68a', badge: '<span class="x-badge x-badge-warning">DIPESAN</span>' },\n      reserved: { bg: '#ffffff', border: '#fde68a', badge: '<span class="x-badge x-badge-warning">DIPESAN</span>' },
       blocked: { bg: '#fef2f2', border: '#fecaca', badge: '<span class="x-badge x-badge-danger">DIBLOKIR</span>' },
       out_of_service: { bg: '#fef2f2', border: '#fecaca', badge: '<span class="x-badge x-badge-danger">RUSAK</span>' }
     };
