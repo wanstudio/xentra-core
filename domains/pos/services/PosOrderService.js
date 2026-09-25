@@ -222,6 +222,9 @@ class PosOrderService {
       order,
       checks: checks.map(check => ({
         ...check,
+        paid_amount: posBillRepository.findCheckPaidAmount(check.id),
+        remaining_amount: Math.max(0, Number(check.allocated_amount || 0) - posBillRepository.findCheckPaidAmount(check.id)),
+        payments: posBillRepository.findCheckPayments(check.id),
         items: posBillRepository.findCheckItems(check.id)
       }))
     };
@@ -358,7 +361,15 @@ class PosOrderService {
         }
       }
 
-      posBillRepository.createCheck({ id: newCheckId, orderId: order_id, checkNumber: nextNumber, now });
+      const movedAmount = Array.from(requested.entries()).reduce((sum, [itemId, qty]) => {
+        const sourceItem = posBillRepository.findCheckItem(source.id, itemId);
+        const orderItem = posBillRepository.findOrderItems(order_id).find(i => String(i.id) === String(itemId));
+        return sum + (orderItem ? Number(orderItem.unit_price || 0) * qty : 0);
+      }, 0);
+      const sourceAllocated = Number(source.allocated_amount || 0);
+      if (movedAmount <= 0 || movedAmount >= sourceAllocated) throw new Error('[PosOrderService] Nilai item split tidak valid untuk alokasi Check.');
+      posBillRepository.updateCheckAmount(source.id, sourceAllocated - movedAmount, now);
+      posBillRepository.createCheck({ id: newCheckId, orderId: order_id, checkNumber: nextNumber, allocatedAmount: movedAmount, now });
       for (const [itemId, qty] of requested) {
         const sourceItem = posBillRepository.findCheckItem(source.id, itemId);
         const remaining = Number(sourceItem.quantity) - qty;
@@ -400,6 +411,7 @@ class PosOrderService {
     const now = new Date().toISOString();
     posBillRepository.beginTransaction();
     try {
+      let movedAmount = 0;
       for (const item of source.items) {
         const existing = posBillRepository.findCheckItem(target.id, item.order_item_id);
         if (existing) {
@@ -418,7 +430,9 @@ class PosOrderService {
             now
           });
         }
+        movedAmount += Number(item.unit_price || 0) * Number(item.quantity || 0);
       }
+      posBillRepository.updateCheckAmount(target.id, Number(target.allocated_amount || 0) + movedAmount, now);
       posBillRepository.deleteCheck(source.id);
       posBillRepository.commit();
     } catch (err) {
