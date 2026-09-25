@@ -58,7 +58,7 @@ describe('POS ↔ Merchant App surface boundary', () => {
     assert.ok(pos.includes("router.get('/pos/held-orders', requireAuth(['cashier'])"));
     assert.ok(pos.includes("router.post('/pos/held-orders', requireAuth(['cashier'])"));
     assert.ok(pos.includes("router.get('/pos/orders/:id/receipt', requireAuth(['cashier'])"));
-    assert.ok(pos.includes("router.get('/pos/terminal/current', requireAuth(['cashier'])"));
+    assert.ok(pos.includes("router.get('/pos/terminal/current', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier'])"));
     assert.ok(pos.includes("router.post('/pos/terminal/register', requireAuth(['owner', 'brand_manager', 'branch_manager'])"));
   });
 
