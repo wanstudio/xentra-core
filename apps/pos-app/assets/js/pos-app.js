@@ -2167,7 +2167,8 @@
         }).join('');
         var paid=Number(check.paid_amount||0), remaining=Number(check.remaining_amount||0);
         var hasSplittable=check.status==='open' && remaining>0;
-        var splitBtn=hasSplittable ? '<button type="button" class="pos-btn small" data-split-amount="'+esc(check.id)+'">Split Nominal</button>' : '';
+        var splitBtn=hasSplittable ? '<button type="button" class="pos-btn small" data-split-amount="'+esc(check.id)+'">Bagi Nominal</button>' : '';
+        var equalBtn=hasSplittable ? '<button type="button" class="pos-btn small ghost" data-split-evenly="'+esc(check.id)+'">Bagi Rata</button>' : '';
         var itemBtn=hasSplittable && (check.items||[]).length ? '<button type="button" class="pos-btn small ghost" data-split-check="'+esc(check.id)+'">Split Item</button>' : '';
         var payBtn=check.status==='open' && remaining>0 ? '<button type="button" class="pos-btn small" data-pay-check="'+esc(check.id)+'">Bayar</button>' : '';
         var mergeBtn=(check.status==='open' && Number(check.check_number)!==1 && paid===0)
@@ -2180,7 +2181,7 @@
           '<div style="font-size:13px;margin:6px 0">Dibayar: <strong>'+money(paid)+'</strong> · Sisa: <strong>'+money(remaining)+'</strong></div>' +
           '<div class="pos-check-items">'+(items||'<div class="pos-empty">Tidak ada item.</div>')+'</div>' +
           (payments ? '<div class="pos-check-payments">'+payments+'</div>' : '') +
-          '<div class="pos-check-actions">'+splitBtn+itemBtn+payBtn+mergeBtn+'</div>' +
+          '<div class="pos-check-actions">'+equalBtn+splitBtn+itemBtn+payBtn+mergeBtn+'</div>' +
         '</div>';
       }
 
@@ -2193,11 +2194,24 @@
       );
       if($('pos-check-manager-close')) $('pos-check-manager-close').onclick=hideModal;
 
+      $('pos-modal-card').querySelectorAll('[data-split-evenly]').forEach(function(btn){
+        btn.onclick=async function(){
+          var html='<h3>Bagi Rata</h3><p>Sisa Check akan dibagi menjadi beberapa Check. Pembagian rupiah yang tidak habis dibagi akan masuk ke bagian pertama.</p><label class="pos-field"><span>Jumlah orang / bagian</span><input id="pos-evenly-parts" class="pos-input" type="number" min="2" max="99" value="2"></label><div class="pos-modal-actions"><button id="pos-evenly-submit" class="pos-btn">Buat Check</button><button id="pos-evenly-cancel" class="pos-btn ghost">Batal</button></div>';
+          showModal(html);
+          $('pos-evenly-cancel').onclick=hideModal;
+          $('pos-evenly-submit').onclick=async function(){
+            var parts=Math.floor(Number($('pos-evenly-parts').value)||0);
+            if(parts<2){toast('Minimal 2 bagian.');return;}
+            try{await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-evenly',{method:'POST',headers:headers(),body:JSON.stringify({source_check_id:btn.dataset.splitEvenly,parts:parts})});toast('Check berhasil dibagi rata.');openCheckManager(orderId);}catch(e){toast(e.message);}
+          };
+        };
+      });
+
       $('pos-modal-card').querySelectorAll('[data-split-amount]').forEach(function(btn){
         btn.onclick=async function(){
-          var amount=prompt('Nominal untuk Check baru:', '');
-          amount=Number(String(amount||'').replace(/[^0-9]/g,''));
-          if(!amount)return;
+          var html='<h3>Bagi Nominal</h3><p>Masukkan nominal yang dipindahkan ke Check baru. Sisa Check sumber tetap terbuka.</p><label class="pos-field"><span>Nominal</span><input id="pos-split-amount" class="pos-input" inputmode="numeric" type="number" min="1" placeholder="Contoh: 50000"></label><div class="pos-modal-actions"><button id="pos-split-amount-submit" class="pos-btn">Buat Check</button><button id="pos-split-amount-cancel" class="pos-btn ghost">Batal</button></div>';
+          showModal(html); $('pos-split-amount-cancel').onclick=hideModal;
+          $('pos-split-amount-submit').onclick=async function(){ var amount=Number($('pos-split-amount').value)||0; if(!amount){toast('Masukkan nominal.');return;} try{await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-amount',{method:'POST',headers:headers(),body:JSON.stringify({source_check_id:btn.dataset.splitAmount,amount:amount})});toast('Check nominal berhasil dibuat.');openCheckManager(orderId);}catch(e){toast(e.message);} }; return;
           try{
             await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-amount',{method:'POST',headers:headers(),body:JSON.stringify({source_check_id:btn.dataset.splitAmount,amount:amount})});
             toast('Check nominal berhasil dibuat.'); openCheckManager(orderId);
