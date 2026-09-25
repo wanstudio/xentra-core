@@ -2154,173 +2154,229 @@
   }
 
   async function openCheckManager(orderId){
-    if(!orderId){toast('Bill ini belum memiliki order canonical.');return;}
+    if(!orderId){toast('Tagihan ini belum memiliki order.');return;}
     try{
       var data=await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks',{headers:headers()});
       var checks=data.checks||[];
-      if(!checks.length){toast('Order belum memiliki item yang dapat dibagi.');return;}
+      if(!checks.length){toast('Tagihan belum siap dibagi.');return;}
 
       function checkTotal(check){ return Number(check.allocated_amount||0); }
-      function renderCheck(check){
-        var items=(check.items||[]).map(function(it){
-          return '<div class="pos-check-item"><div><strong>'+esc(it.product_name||'Item')+'</strong><small>'+money(it.unit_price)+' × '+esc(String(it.quantity))+'</small></div></div>';
+      function renderPayments(check){
+        return (check.payments||[]).map(function(p){
+          return '<div class="pos-check-payment"><span>'+esc(p.payer_name||'Pembayaran')+'</span><strong>'+money(p.amount)+'</strong></div>';
         }).join('');
-        var paid=Number(check.paid_amount||0), remaining=Number(check.remaining_amount||0);
-        var hasSplittable=check.status==='open' && remaining>0;
-        var splitBtn=hasSplittable ? '<button type="button" class="pos-btn small" data-split-amount="'+esc(check.id)+'">Bagi Nominal</button>' : '';
-        var equalBtn=hasSplittable ? '<button type="button" class="pos-btn small ghost" data-split-evenly="'+esc(check.id)+'">Bagi Rata</button>' : '';
-        var itemBtn=hasSplittable && (check.items||[]).length ? '<button type="button" class="pos-btn small ghost" data-split-check="'+esc(check.id)+'">Split Item</button>' : '';
-        var payBtn=check.status==='open' && remaining>0 ? '<button type="button" class="pos-btn small" data-pay-check="'+esc(check.id)+'">Bayar</button>' : '';
-
-        var payments=(check.payments||[]).map(function(p){
-          return '<div class="pos-check-payment"><span>'+esc(p.payer_name||p.payment_method||'Payment')+'</span><strong>'+money(p.amount)+'</strong></div>';
-        }).join('');
-        return '<div class="pos-check-card">' +
-          '<div class="pos-check-head"><div><strong>Check #'+esc(String(check.check_number))+'</strong><small>'+esc(check.status==='open'?'Terbuka':'Tertutup')+'</small></div><strong>'+money(checkTotal(check))+'</strong></div>' +
-          '<div style="font-size:13px;margin:6px 0">Dibayar: <strong>'+money(paid)+'</strong> · Sisa: <strong>'+money(remaining)+'</strong></div>' +
-          '<div class="pos-check-items">'+(items||'<div class="pos-empty">Tidak ada item.</div>')+'</div>' +
+      }
+      function renderCheck(check, index){
+        var paid=Number(check.paid_amount||0);
+        var remaining=Number(check.remaining_amount||0);
+        var total=checkTotal(check);
+        var payments=renderPayments(check);
+        var isPaid=remaining<=0;
+        var label=checks.length===1 ? 'Tagihan' : 'Bagian '+(index+1);
+        return '<div class="pos-check-card pos-simple-check-card">' +
+          '<div class="pos-check-head"><div><strong>'+label+'</strong><small>'+(isPaid?'LUNAS':('Sisa '+money(remaining)))+'</small></div><strong>'+money(total)+'</strong></div>' +
+          '<div class="pos-check-balance"><span>Sudah dibayar</span><strong>'+money(paid)+'</strong></div>' +
           (payments ? '<div class="pos-check-payments">'+payments+'</div>' : '') +
-          '<div class="pos-check-actions">'+equalBtn+splitBtn+itemBtn+payBtn+'</div>' +
+          (isPaid ? '<div class="pos-check-paid">✓ Lunas</div>' : '<div class="pos-check-actions"><button type="button" class="pos-btn" data-pay-check="'+esc(check.id)+'">Bayar '+money(remaining)+'</button></div>') +
         '</div>';
       }
 
-      var canResetSplit=checks.length>1 && checks.every(function(check){return check.status==='open' && Number(check.paid_amount||0)===0;});
-      var resetSplitBtn=canResetSplit ? '<button type="button" class="pos-btn small ghost danger" id="pos-reset-split">↩ Batalkan Pembagian</button>' : '';
-      var resetHelp=checks.length>1 ? '<p class="pos-form-help">Kalau semua tagihan belum dibayar, pembagian bisa dibatalkan dan kembali menjadi 1 tagihan.</p>' : '';
+      var total=Number(data.order.grand_total||0);
+      var paidOrder=checks.reduce(function(sum,check){return sum+Number(check.paid_amount||0);},0);
+      var remainingOrder=Math.max(0,total-paidOrder);
+      var hasSplit=checks.length>1;
+      var allUnpaid=checks.every(function(check){return Number(check.paid_amount||0)===0 && check.status==='open';});
+      var firstOpen=checks.find(function(check){return check.status==='open' && Number(check.remaining_amount||0)>0;});
+      var mainActions='';
+
+      if(!hasSplit){
+        mainActions=
+          '<div class="pos-simple-choice-title">Mau bayar bagaimana?</div>' +
+          '<div class="pos-simple-choice-grid">' +
+            '<button type="button" class="pos-simple-choice" id="pos-pay-one"><strong>Satu Orang</strong><small>Bayar seluruh tagihan</small></button>' +
+            '<button type="button" class="pos-simple-choice" id="pos-pay-many"><strong>Masing-masing</strong><small>Bagikan tagihan</small></button>' +
+          '</div>';
+      }else{
+        mainActions=
+          '<div class="pos-simple-section-title">Pembayaran</div>' +
+          '<div class="pos-simple-summary">Sudah dibayar <strong>'+money(paidOrder)+'</strong><span>Sisa '+money(remainingOrder)+'</span></div>' +
+          (firstOpen ? '<div class="pos-simple-secondary-actions"><button type="button" class="pos-btn ghost small" id="pos-add-amount">+ Atur Nominal</button><button type="button" class="pos-btn ghost small" id="pos-add-item">Pilih Menu</button></div>' : '') +
+          (allUnpaid ? '<button type="button" class="pos-btn ghost small danger" id="pos-reset-split">↩ Batalkan Pembagian</button>' : '');
+      }
+
       showModal(
-        '<h3>Split / Merge Bill</h3>' +
-        '<p>Ini tetap <strong>1 Order</strong>. Check adalah alokasi tagihan; Payment adalah uang yang benar-benar dibayar. Satu Check boleh punya banyak Payment.</p>' +
-        '<div style="font-size:14px;margin-bottom:10px">Total Order: <strong>'+money(data.order.grand_total)+'</strong></div>' +
-        '<div class="pos-check-manager-list">'+checks.map(renderCheck).join('')+'</div>' +
-        resetHelp +
-        '<div class="pos-modal-actions">'+resetSplitBtn+'<button type="button" class="pos-btn ghost" id="pos-check-manager-close">Tutup</button></div>'
+        '<div class="pos-simple-bill-head">' +
+          '<div><h3>Bayar</h3><p>'+ (hasSplit ? 'Pilih bagian yang mau dibayar.' : 'Satu meja, satu tagihan.') +'</p></div>' +
+          '<div class="pos-simple-bill-total">'+money(total)+'</div>' +
+        '</div>' +
+        mainActions +
+        '<div class="pos-check-manager-list pos-simple-check-list">'+checks.map(renderCheck).join('')+'</div>' +
+        '<div class="pos-modal-actions"><button type="button" class="pos-btn ghost" id="pos-check-manager-close">Tutup</button></div>'
       );
-      if($('pos-reset-split')){
-        $('pos-reset-split').onclick=async function(){
-          if(!confirm('Batalkan pembagian dan kembali menjadi 1 tagihan? Semua check harus belum dibayar.'))return;
-          var btn=this;
-          btn.disabled=true;
+
+      function openEvenlyFlow(){
+        var html='<h3>Bagi Rata</h3>' +
+          '<p class="pos-form-help">Berapa orang yang mau bayar?</p>' +
+          '<label class="pos-field"><span>Jumlah orang</span><input id="pos-evenly-parts" class="pos-input" type="number" min="2" max="99" value="2" inputmode="numeric"></label>' +
+          '<div class="pos-modal-actions"><button id="pos-evenly-submit" class="pos-btn">Lanjut</button><button id="pos-evenly-cancel" class="pos-btn ghost">Batal</button></div>';
+        showModal(html);
+        $('pos-evenly-cancel').onclick=function(){openCheckManager(orderId);};
+        $('pos-evenly-submit').onclick=async function(){
+          var parts=Math.floor(Number($('pos-evenly-parts').value)||0);
+          if(parts<2){toast('Minimal 2 orang.');return;}
           try{
-            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/reset',{method:'POST',headers:headers()});
-            toast('Pembagian dibatalkan. Kembali menjadi 1 tagihan.');
+            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-evenly',{
+              method:'POST',headers:headers(),body:JSON.stringify({source_check_id:checks[0].id,parts:parts})
+            });
+            toast('Tagihan dibagi rata.');
             openCheckManager(orderId);
-          }catch(e){
-            btn.disabled=false;
-            toast(e.message);
-          }
+          }catch(e){toast(e.message);}
+        };
+      }
+
+      function openAmountFlow(sourceId){
+        var source=checks.find(function(c){return c.id===sourceId;}) || firstOpen;
+        var sourceRemaining=source ? Number(source.remaining_amount||0) : remainingOrder;
+        var html='<h3>Atur Nominal</h3>' +
+          '<p class="pos-form-help">Masukkan berapa yang dibayar orang ini. Sisanya tetap menjadi tagihan berikutnya.</p>' +
+          '<div class="pos-payment-summary"><span>Sisa tagihan</span><strong>'+money(sourceRemaining)+'</strong></div>' +
+          '<label class="pos-field"><span>Nominal orang ini</span><div class="pos-input-nominal-wrap"><span class="pos-input-prefix">Rp</span><input id="pos-split-amount" class="pos-input-nominal" inputmode="numeric" pattern="[0-9.]*" type="text" placeholder="0" autocomplete="off"></div></label>' +
+          '<div class="pos-modal-actions"><button id="pos-split-amount-submit" class="pos-btn">Tambahkan</button><button id="pos-split-amount-cancel" class="pos-btn ghost">Batal</button></div>';
+        showModal(html);
+        $('pos-split-amount-cancel').onclick=function(){openCheckManager(orderId);};
+        var input=$('pos-split-amount');
+        bindNominalInput(input);
+        setTimeout(function(){if(input)input.focus();},80);
+        $('pos-split-amount-submit').onclick=async function(){
+          var amount=parseNominal(input ? input.value : 0);
+          if(!amount){toast('Masukkan nominal.');return;}
+          if(amount>=sourceRemaining){toast('Nominal harus lebih kecil dari sisa tagihan.');return;}
+          var submit=this; submit.disabled=true;
+          try{
+            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-amount',{
+              method:'POST',headers:headers(),body:JSON.stringify({source_check_id:source.id,amount:amount})
+            });
+            toast('Bagian tagihan ditambahkan.');
+            openCheckManager(orderId);
+          }catch(e){submit.disabled=false;toast(e.message);}
+        };
+        bindModalEnter(input,$('pos-split-amount-submit'));
+      }
+
+      function openItemFlow(sourceId){
+        var source=checks.find(function(c){return c.id===sourceId;}) || firstOpen;
+        if(!source || !(source.items||[]).length){toast('Belum ada menu yang bisa dipilih.');return;}
+        var html='<h3>Pilih Menu</h3><p class="pos-form-help">Pilih menu yang dibayar orang ini.</p>';
+        (source.items||[]).forEach(function(it){
+          html+='<div class="pos-simple-item-row"><span><strong>'+esc(it.product_name||'Item')+'</strong><small>'+money(it.unit_price)+' × '+it.quantity+'</small></span><input data-check-item="'+esc(it.order_item_id)+'" type="number" min="0" max="'+it.quantity+'" value="0" inputmode="numeric"></div>';
+        });
+        html+='<div class="pos-modal-actions"><button id="pos-item-submit" class="pos-btn">Tambahkan</button><button id="pos-item-cancel" class="pos-btn ghost">Batal</button></div>';
+        showModal(html);
+        $('pos-item-cancel').onclick=function(){openCheckManager(orderId);};
+        $('pos-item-submit').onclick=async function(){
+          var splitItems=[];
+          $('pos-modal-card').querySelectorAll('[data-check-item]').forEach(function(input){
+            var q=Math.floor(Number(input.value)||0);
+            if(q>0)splitItems.push({order_item_id:input.dataset.checkItem,quantity:q});
+          });
+          if(!splitItems.length){toast('Pilih minimal satu menu.');return;}
+          var submit=this; submit.disabled=true;
+          try{
+            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split',{
+              method:'POST',headers:headers(),body:JSON.stringify({source_check_id:source.id,split_items:splitItems})
+            });
+            toast('Bagian menu ditambahkan.');
+            openCheckManager(orderId);
+          }catch(e){submit.disabled=false;toast(e.message);}
         };
       }
 
       if($('pos-check-manager-close')) $('pos-check-manager-close').onclick=hideModal;
 
-      $('pos-modal-card').querySelectorAll('[data-split-evenly]').forEach(function(btn){
-        btn.onclick=async function(){
-          var html='<h3>Bagi Rata</h3><p>Sisa Check akan dibagi menjadi beberapa Check. Pembagian rupiah yang tidak habis dibagi akan masuk ke bagian pertama.</p><label class="pos-field"><span>Jumlah orang / bagian</span><input id="pos-evenly-parts" class="pos-input" type="number" min="2" max="99" value="2"></label><div class="pos-modal-actions"><button id="pos-evenly-submit" class="pos-btn">Buat Check</button><button id="pos-evenly-cancel" class="pos-btn ghost">Batal</button></div>';
-          showModal(html);
-          $('pos-evenly-cancel').onclick=hideModal;
-          $('pos-evenly-submit').onclick=async function(){
-            var parts=Math.floor(Number($('pos-evenly-parts').value)||0);
-            if(parts<2){toast('Minimal 2 bagian.');return;}
-            try{await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-evenly',{method:'POST',headers:headers(),body:JSON.stringify({source_check_id:btn.dataset.splitEvenly,parts:parts})});toast('Check berhasil dibagi rata.');openCheckManager(orderId);}catch(e){toast(e.message);}
-          };
+      if($('pos-pay-one')){
+        $('pos-pay-one').onclick=function(){
+          var check=checks[0];
+          if(check && Number(check.remaining_amount||0)>0) openPayCheck(orderId,check);
         };
-      });
+      }
 
-      $('pos-modal-card').querySelectorAll('[data-split-amount]').forEach(function(btn){
-        btn.onclick=async function(){
-          var html='<h3>Bagi Nominal</h3><p>Masukkan nominal yang dipindahkan ke Check baru. Sisa Check sumber tetap terbuka.</p><label class="pos-field"><span>Nominal</span><div class="pos-input-nominal-wrap"><span class="pos-input-prefix">Rp</span><input id="pos-split-amount" class="pos-input-nominal" inputmode="numeric" pattern="[0-9.]*" type="text" min="1" placeholder="0" autocomplete="off"></div></label><div class="pos-modal-actions"><button id="pos-split-amount-submit" class="pos-btn">Buat Check</button><button id="pos-split-amount-cancel" class="pos-btn ghost">Batal</button></div>';
-          showModal(html); $('pos-split-amount-cancel').onclick=hideModal;
-          var splitAmountInput=$('pos-split-amount');
-          bindNominalInput(splitAmountInput);
-          setTimeout(function(){if(splitAmountInput)splitAmountInput.focus();},80);
-          $('pos-split-amount-submit').onclick=async function(){
-            var submitBtn=this;
-            var amount=parseNominal(splitAmountInput ? splitAmountInput.value : 0);
-            if(!amount){toast('Masukkan nominal.');return;}
-            if(amount<1){toast('Nominal minimal Rp1.');return;}
-            submitBtn.disabled=true;
-            try{
-              await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split-amount',{
-                method:'POST',headers:headers(),
-                body:JSON.stringify({source_check_id:btn.dataset.splitAmount,amount:amount})
-              });
-              toast('Check nominal berhasil dibuat.');
-              openCheckManager(orderId);
-            }catch(e){
-              submitBtn.disabled=false;
-              toast(e.message);
-            }
-          };
-          bindModalEnter(splitAmountInput,$('pos-split-amount-submit')); 
+      if($('pos-pay-many')){
+        $('pos-pay-many').onclick=function(){
+          showModal(
+            '<h3>Masing-masing</h3>' +
+            '<p class="pos-form-help">Bagaimana mau membagi tagihan?</p>' +
+            '<div class="pos-simple-choice-grid">' +
+              '<button type="button" class="pos-simple-choice" id="pos-evenly-choice"><strong>Bagi Rata</strong><small>Jumlah orang sama rata</small></button>' +
+              '<button type="button" class="pos-simple-choice" id="pos-amount-choice"><strong>Atur Nominal</strong><small>Setiap orang bayar sesuai kesepakatan</small></button>' +
+            '</div>' +
+            '<button type="button" class="pos-simple-link" id="pos-item-choice">Cara lainnya: Pilih Menu</button>'
+          );
+          $('pos-evenly-choice').onclick=openEvenlyFlow;
+          $('pos-amount-choice').onclick=function(){openAmountFlow(checks[0].id);};
+          $('pos-item-choice').onclick=function(){openItemFlow(checks[0].id);};
         };
-      });
+      }
+
+      if($('pos-add-amount')) $('pos-add-amount').onclick=function(){openAmountFlow(firstOpen && firstOpen.id);};
+      if($('pos-add-item')) $('pos-add-item').onclick=function(){openItemFlow(firstOpen && firstOpen.id);};
+
+      if($('pos-reset-split')){
+        $('pos-reset-split').onclick=async function(){
+          if(!confirm('Batalkan pembagian dan kembali menjadi satu tagihan? Semua bagian harus belum dibayar.'))return;
+          var btn=this; btn.disabled=true;
+          try{
+            await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/reset',{method:'POST',headers:headers()});
+            toast('Pembagian dibatalkan.');
+            openCheckManager(orderId);
+          }catch(e){btn.disabled=false;toast(e.message);}
+        };
+      }
 
       $('pos-modal-card').querySelectorAll('[data-pay-check]').forEach(function(btn){
-        btn.onclick=async function(){
-          var check=checks.find(function(x){return x.id===btn.dataset.payCheck;});
-          var remaining=check ? Number(check.remaining_amount||0) : 0;
-          var html='<h3>Bayar Check #'+esc(String(check.check_number))+'</h3>' +
-            '<div class="pos-payment-summary"><span>Sisa tagihan</span><strong>'+money(remaining)+'</strong></div>' +
-            '<label class="pos-field"><span>Nominal dibayar</span><div class="pos-input-nominal-wrap"><span class="pos-input-prefix">Rp</span><input id="pos-pay-amount" class="pos-input-nominal" inputmode="numeric" pattern="[0-9.]*" type="text" value="'+formatNominal(remaining)+'" autocomplete="off"></div></label>' +
-            '<label class="pos-field"><span>Nama pembayar <small>(opsional)</small></span><input id="pos-pay-payer" class="pos-input" type="text" placeholder="Contoh: Budi"></label>' +
-            '<label class="pos-field"><span>Uang diterima</span><div class="pos-input-nominal-wrap"><span class="pos-input-prefix">Rp</span><input id="pos-pay-tendered" class="pos-input-nominal" inputmode="numeric" pattern="[0-9.]*" type="text" value="'+formatNominal(remaining)+'" autocomplete="off"></div></label>' +
-            '<div id="pos-pay-change" class="pos-payment-summary"><span>Kembalian</span><strong>'+money(0)+'</strong></div>' +
-            '<div class="pos-modal-actions"><button id="pos-pay-submit" class="pos-btn">Catat Pembayaran</button><button id="pos-pay-cancel" class="pos-btn ghost">Batal</button></div>';
-          showModal(html);
-          var amt=$('pos-pay-amount'), tend=$('pos-pay-tendered'), change=$('pos-pay-change');
-          function updateChange(){
-            var a=parseNominal(amt ? amt.value : 0),t=parseNominal(tend ? tend.value : 0);
-            var valid=t>=a && a>0;
-            if(change)change.innerHTML='<span>Kembalian</span><strong>'+money(Math.max(0,t-a))+'</strong>';
-            var submitBtn=$('pos-pay-submit');
-            if(submitBtn)submitBtn.disabled=!valid;
-          }
-          bindNominalInput(amt,updateChange);
-          bindNominalInput(tend,updateChange);
-          bindModalEnter(amt,function(){var input=tend;if(input){input.focus();input.select();}});
-          bindModalEnter(tend,function(){var submitBtn=$('pos-pay-submit');if(submitBtn&&!submitBtn.disabled)submitBtn.click();});
-          updateChange();
-          $('pos-pay-cancel').onclick=hideModal;
-          $('pos-pay-submit').onclick=async function(){
-            var amount=parseNominal(amt ? amt.value : 0),tendered=parseNominal(tend ? tend.value : 0);
-            if(!amount||amount>remaining){toast('Nominal pembayaran tidak valid.');return;}
-            if(tendered<amount){toast('Uang diterima belum cukup.');return;}
-            var submitBtn=this;
-            submitBtn.disabled=true;
-            try{
-              await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/'+encodeURIComponent(btn.dataset.payCheck)+'/pay',{
-                method:'POST',headers:headers(),
-                body:JSON.stringify({amount:amount,payment_method:'cash',payer_name:$('pos-pay-payer').value.trim()||null,amount_tendered:tendered})
-              });
-              toast('Pembayaran tercatat.');
-              openCheckManager(orderId);
-            }catch(e){
-              submitBtn.disabled=false;
-              toast(e.message);
-            }
-          };
-        };
+        var check=checks.find(function(x){return x.id===btn.dataset.payCheck;});
+        btn.onclick=function(){if(check)openPayCheck(orderId,check);};
       });
-
-      $('pos-modal-card').querySelectorAll('[data-split-check]').forEach(function(btn){
-        btn.onclick=async function(){
-          var sourceId=btn.dataset.splitCheck, card=btn.closest('.pos-check-card'), inputs=[];
-          var html='<h3>Split Item</h3><p>Masukkan quantity item yang dipindahkan ke Check baru.</p><p class="pos-form-help">Jumlah harus berupa angka dan tidak boleh melebihi quantity pada Check sumber.</p>';
-          (checks.find(function(c){return c.id===sourceId;}).items||[]).forEach(function(it){
-            html+='<div style="display:flex;justify-content:space-between;gap:8px;margin:8px 0"><span>'+esc(it.product_name)+' × '+it.quantity+'</span><input data-check-item="'+esc(it.order_item_id)+'" type="number" min="0" max="'+it.quantity+'" value="0" style="width:70px"></div>';
-          });
-          html+='<div class="pos-modal-actions"><button id="pos-split-item-submit" class="pos-btn">Pisahkan</button></div>';
-          showModal(html);
-          $('pos-split-item-submit').onclick=async function(){
-            var splitItems=[]; $('pos-modal-card').querySelectorAll('[data-check-item]').forEach(function(i){var q=Math.floor(Number(i.value)||0);if(q>0)splitItems.push({order_item_id:i.dataset.checkItem,quantity:q});});
-            if(!splitItems.length){toast('Pilih item.');return;}
-            try{await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split',{method:'POST',headers:headers(),body:JSON.stringify({source_check_id:sourceId,split_items:splitItems})});toast('Check item berhasil dibuat.');openCheckManager(orderId);}catch(e){toast(e.message);}
-          };
-        };
-      });
-
-;
     }catch(e){toast(e.message);}
+  }
+
+  async function openPayCheck(orderId,check){
+    var remaining=Number(check.remaining_amount||0);
+    if(remaining<=0){toast('Tagihan ini sudah lunas.');return;}
+    var html='<h3>Bayar</h3>' +
+      '<div class="pos-payment-summary"><span>Sisa tagihan</span><strong>'+money(remaining)+'</strong></div>' +
+      '<label class="pos-field"><span>Nominal dibayar</span><div class="pos-input-nominal-wrap"><span class="pos-input-prefix">Rp</span><input id="pos-pay-amount" class="pos-input-nominal" inputmode="numeric" pattern="[0-9.]*" type="text" value="'+formatNominal(remaining)+'" autocomplete="off"></div></label>' +
+      '<label class="pos-field"><span>Nama pembayar <small>(opsional)</small></span><input id="pos-pay-payer" class="pos-input" type="text" placeholder="Contoh: Budi"></label>' +
+      '<label class="pos-field"><span>Uang diterima</span><div class="pos-input-nominal-wrap"><span class="pos-input-prefix">Rp</span><input id="pos-pay-tendered" class="pos-input-nominal" inputmode="numeric" pattern="[0-9.]*" type="text" value="'+formatNominal(remaining)+'" autocomplete="off"></div></label>' +
+      '<div id="pos-pay-change" class="pos-payment-summary"><span>Kembalian</span><strong>'+money(0)+'</strong></div>' +
+      '<div class="pos-modal-actions"><button id="pos-pay-submit" class="pos-btn">Bayar</button><button id="pos-pay-cancel" class="pos-btn ghost">Batal</button></div>';
+    showModal(html);
+    var amt=$('pos-pay-amount'), tend=$('pos-pay-tendered'), change=$('pos-pay-change');
+    function updateChange(){
+      var a=parseNominal(amt ? amt.value : 0),t=parseNominal(tend ? tend.value : 0);
+      var valid=t>=a && a>0;
+      if(change)change.innerHTML='<span>Kembalian</span><strong>'+money(Math.max(0,t-a))+'</strong>';
+      var submitBtn=$('pos-pay-submit'); if(submitBtn)submitBtn.disabled=!valid;
+    }
+    bindNominalInput(amt,updateChange);
+    bindNominalInput(tend,updateChange);
+    bindModalEnter(amt,function(){var input=tend;if(input){input.focus();input.select();}});
+    bindModalEnter(tend,function(){var submitBtn=$('pos-pay-submit');if(submitBtn&&!submitBtn.disabled)submitBtn.click();});
+    updateChange();
+    $('pos-pay-cancel').onclick=function(){openCheckManager(orderId);};
+    $('pos-pay-submit').onclick=async function(){
+      var amount=parseNominal(amt ? amt.value : 0),tendered=parseNominal(tend ? tend.value : 0);
+      if(!amount||amount>remaining){toast('Nominal pembayaran tidak valid.');return;}
+      if(tendered<amount){toast('Uang diterima belum cukup.');return;}
+      var submitBtn=this; submitBtn.disabled=true;
+      try{
+        await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/'+encodeURIComponent(check.id)+'/pay',{
+          method:'POST',headers:headers(),
+          body:JSON.stringify({amount:amount,payment_method:'cash',payer_name:$('pos-pay-payer').value.trim()||null,amount_tendered:tendered})
+        });
+        toast('Pembayaran tercatat.');
+        openCheckManager(orderId);
+      }catch(e){submitBtn.disabled=false;toast(e.message);}
+    };
   }
 
   async function openHeld(){
