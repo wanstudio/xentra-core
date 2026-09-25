@@ -18,6 +18,10 @@ class PosBillRepository {
     return this.db.queryOne("SELECT id, brand_id, branch_id, order_channel, order_type, status, grand_total FROM orders WHERE id = ?", [orderId]);
   }
 
+  findOrderItems(orderId) {
+    return this.db.queryMany(`SELECT id, product_id, product_name, quantity, unit_price, note, modifiers_snapshot, created_at FROM order_items WHERE order_id = ? ORDER BY created_at ASC, id ASC`, [orderId]);
+  }
+
   findChecks(orderId) {
     return this.db.queryMany(`SELECT id, order_id, check_number, status, created_at, updated_at FROM pos_order_checks WHERE order_id = ? ORDER BY check_number ASC`, [orderId]);
   }
