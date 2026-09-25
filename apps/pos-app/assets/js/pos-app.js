@@ -23,7 +23,8 @@
     terminalId: localStorage.getItem('xentra_pos_terminal_id') || null,
     paymentModes: [],
     activePaymentMode: 'cash',
-    offlineMode: false
+    offlineMode: false,
+    activeHeldOrderId: null
   };
 
   function $(id) { return document.getElementById(id); }
@@ -2015,6 +2016,21 @@
         return toast('Uang yang diterima kurang dari total tagihan.');
       }
     }
+
+    // A held POS bill is already a canonical Merchant Order. Never create a
+    // second order when the cashier resumes it; settle the existing order.
+    if(state.activeHeldOrderId){
+      if(paymentMode !== 'cash') return toast('Hold Bill yang sudah dikirim ke Merchant saat ini dilunasi melalui Cash.');
+      try{
+        var existing = await request('/pos/orders/'+encodeURIComponent(state.activeHeldOrderId)+'/settle-cash',{method:'POST',headers:headers(),body:JSON.stringify({amount_tendered:Number(amountTendered),shift_id:state.shift.id})});
+        if(existing && existing.success){
+          hideModal();showPaymentSuccess({id:state.activeHeldOrderId,order_number:existing.order_number||state.activeHeldOrderId,grand_total:total(),change:existing.change||0},Number(existing.change||0));resetSale();loadShift();loadSales();updateHeldCount();
+          return;
+        }
+        return toast((existing&&existing.error)||'Gagal melunasi Hold Bill.');
+      }catch(e){return toast(e.message);}
+    }
+
     var payload={branch_id:state.branchId,shift_id:state.shift.id,order_type:state.orderType,payment_mode:paymentMode,amount_tendered:paymentMode==='cash'?amountTendered:null,customer:{name:$('pos-customer-name').value.trim(),phone:'',table_number:state.selectedTable?state.selectedTable.table_number:null},items:state.cart.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,options:i.options||[],note:i.note||''};}),client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)};
     try{
       var d;
@@ -2038,7 +2054,7 @@
     }catch(e){toast(e.message);}
   }
 
-  function resetSale(){state.cart=[];state.selectedTable=null;$('pos-selected-table').textContent='Belum dipilih';$('pos-customer-name').value='';$('pos-order-note').value='';renderCart();}
+  function resetSale(){state.cart=[];state.selectedTable=null;state.activeHeldOrderId=null;$('pos-selected-table').textContent='Belum dipilih';$('pos-customer-name').value='';$('pos-order-note').value='';renderCart();}
 
   function showModal(html, extraClass){
     var card = $('pos-modal-card');
@@ -2096,6 +2112,7 @@
 
     var restoredType = h.order_type || (h.table_number ? 'dine_in' : 'pickup');
     state.orderType = restoredType;
+    state.activeHeldOrderId = h.order_id || null;
     document.querySelectorAll('.pos-order-type button').forEach(function(x){
       x.classList.toggle('active', x.dataset.type === restoredType);
     });
