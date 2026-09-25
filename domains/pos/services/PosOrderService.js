@@ -14,12 +14,13 @@
  */
 const crypto = require('crypto');
 const { events } = require('../../../core');
-const { OrderRepository, PosOrderRepository } = require('../../../core/data/repositories');
+const { OrderRepository, PosOrderRepository, PosBillRepository } = require('../../../core/data/repositories');
 const { OrderPlacementService } = require('../../commerce');
 const { DiningTableService } = require('../../dining');
 
 const orderRepository = new OrderRepository();
 const posOrderRepository = new PosOrderRepository();
+const posBillRepository = new PosBillRepository();
 const { PaymentRepository } = require('../../../core/data/repositories');
 const paymentRepository = new PaymentRepository();
 
@@ -321,6 +322,167 @@ class PosOrderService {
       items: mergedItems,
       status: 'held'
     };
+  }
+
+  /**
+   * Returns the POS billing checks for ONE canonical Commerce Order.
+   * Checks are a billing view only; the Order and Dining Session remain canonical.
+   */
+  static getOrderChecks({ order_id, branch_id }) {
+    const order = posBillRepository.findOrder(order_id);
+    if (!order || order.branch_id !== branch_id || order.order_channel !== 'pos_cashier') {
+      throw new Error('[PosOrderService] Order POS tidak ditemukan dalam scope kasir.');
+    }
+
+    const items = orderRepository.findItems(order_id);
+    if (!items.length) return { order, checks: [] };
+
+    let checks = posBillRepository.findChecks(order_id);
+    if (!checks.length) {
+      const now = new Date().toISOString();
+      const checkId = `check_${crypto.randomBytes(6).toString('hex')}`;
+      posBillRepository.beginTransaction();
+      try {
+        posBillRepository.createCheck({ id: checkId, orderId: order_id, checkNumber: 1, now });
+        items.forEach(item => {
+          posBillRepository.upsertCheckItem({
+            id: `checkitem_${crypto.randomBytes(6).toString('hex')}`,
+            checkId,
+            orderItemId: item.id,
+            quantity: Number(item.quantity) || 0,
+            now
+          });
+        });
+        posBillRepository.commit();
+      } catch (err) {
+        try { posBillRepository.rollback(); } catch (_) {}
+        throw err;
+      }
+      checks = posBillRepository.findChecks(order_id);
+    } else {
+      // New items added after a split are assigned to the first open check.
+      const openPrimary = checks.find(c => Number(c.check_number) === 1 && c.status === 'open');
+      if (openPrimary) {
+        const now = new Date().toISOString();
+        items.forEach(item => {
+          const allocated = posBillRepository.findAllAllocatedQuantity(item.id);
+          const remaining = (Number(item.quantity) || 0) - allocated;
+          if (remaining > 0) {
+            const existing = posBillRepository.findCheckItem(openPrimary.id, item.id);
+            posBillRepository.upsertCheckItem({
+              id: existing ? existing.id : `checkitem_${crypto.randomBytes(6).toString('hex')}`,
+              checkId: openPrimary.id,
+              orderItemId: item.id,
+              quantity: (existing ? Number(existing.quantity) : 0) + remaining,
+              now
+            });
+          }
+        });
+      }
+    }
+
+    checks = posBillRepository.findChecks(order_id);
+    return {
+      order,
+      checks: checks.map(check => ({
+        ...check,
+        items: posBillRepository.findCheckItems(check.id).map(item => ({
+          ...item,
+          quantity: Number(item.quantity) || 0,
+          line_total: (Number(item.unit_price) || 0) * (Number(item.quantity) || 0)
+        }))
+      }))
+    };
+  }
+
+  /**
+   * Splits item quantities into a new OPEN check without creating a second Order.
+   * Only open checks may be split. Paid/closed checks are immutable.
+   */
+  static splitOrderCheck({ order_id, branch_id, source_check_id, split_items = [] }) {
+    const view = PosOrderService.getOrderChecks({ order_id, branch_id });
+    const source = view.checks.find(c => c.id === source_check_id);
+    if (!source || source.status !== 'open') throw new Error('[PosOrderService] Check sumber tidak dapat di-split.');
+    if (!Array.isArray(split_items) || split_items.length === 0) throw new Error('[PosOrderService] Pilih minimal satu item untuk split.');
+
+    const moves = split_items.map(x => ({
+      order_item_id: String(x.order_item_id || ''),
+      quantity: Math.floor(Number(x.quantity) || 0)
+    })).filter(x => x.order_item_id && x.quantity > 0);
+    if (!moves.length) throw new Error('[PosOrderService] Kuantitas split tidak valid.');
+
+    const sourceMap = new Map(source.items.map(item => [String(item.order_item_id), Number(item.quantity) || 0]));
+    for (const move of moves) {
+      const available = sourceMap.get(move.order_item_id) || 0;
+      if (move.quantity > available) {
+        throw new Error('[PosOrderService] Kuantitas split melebihi item pada check sumber.');
+      }
+    }
+
+    const now = new Date().toISOString();
+    const nextNumber = Math.max(0, ...view.checks.map(c => Number(c.check_number) || 0)) + 1;
+    const newCheckId = `check_${crypto.randomBytes(6).toString('hex')`;
+
+    posBillRepository.beginTransaction();
+    try {
+      posBillRepository.createCheck({ id: newCheckId, orderId: order_id, checkNumber: nextNumber, now });
+      for (const move of moves) {
+        const sourceItem = posBillRepository.findCheckItem(source_check_id, move.order_item_id);
+        const remaining = (Number(sourceItem.quantity) || 0) - move.quantity;
+        posBillRepository.updateCheckItemQuantity(source_check_id, move.order_item_id, remaining, now);
+        posBillRepository.upsertCheckItem({
+          id: `checkitem_${crypto.randomBytes(6).toString('hex')}`,
+          checkId: newCheckId,
+          orderItemId: move.order_item_id,
+          quantity: move.quantity,
+          now
+        });
+      }
+      posBillRepository.commit();
+    } catch (err) {
+      try { posBillRepository.rollback(); } catch (_) {}
+      throw err;
+    }
+
+    return PosOrderService.getOrderChecks({ order_id, branch_id });
+  }
+
+  /**
+   * Combines two OPEN checks belonging to the same canonical Order.
+   * No order, table, or dining session is created/deleted.
+   */
+  static mergeOrderChecks({ order_id, branch_id, target_check_id, source_check_id }) {
+    if (String(target_check_id) === String(source_check_id)) {
+      throw new Error('[PosOrderService] Check tujuan dan sumber harus berbeda.');
+    }
+    const view = PosOrderService.getOrderChecks({ order_id, branch_id });
+    const target = view.checks.find(c => c.id === target_check_id);
+    const source = view.checks.find(c => c.id === source_check_id);
+    if (!target || !source || target.status !== 'open' || source.status !== 'open') {
+      throw new Error('[PosOrderService] Hanya check OPEN yang dapat digabung.');
+    }
+
+    const now = new Date().toISOString();
+    posBillRepository.beginTransaction();
+    try {
+      for (const item of source.items) {
+        const existing = posBillRepository.findCheckItem(target.id, item.order_item_id);
+        posBillRepository.upsertCheckItem({
+          id: existing ? existing.id : `checkitem_${crypto.randomBytes(6).toString('hex')}`,
+          checkId: target.id,
+          orderItemId: item.order_item_id,
+          quantity: (existing ? Number(existing.quantity) : 0) + (Number(item.quantity) || 0),
+          now
+        });
+      }
+      posBillRepository.deleteCheck(source.id);
+      posBillRepository.commit();
+    } catch (err) {
+      try { posBillRepository.rollback(); } catch (_) {}
+      throw err;
+    }
+
+    return PosOrderService.getOrderChecks({ order_id, branch_id });
   }
 
   /**
