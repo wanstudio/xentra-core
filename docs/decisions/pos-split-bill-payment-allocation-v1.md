@@ -232,6 +232,16 @@ The same separation appears in major restaurant POS products:
 
 These references validate the business need for multiple allocation methods. Xentra-specific canonical Order/Dining invariants remain defined by this contract.
 
+## Cancel / Reset Split UX Contract
+
+When a cashier creates a split and then changes their mind, POS must provide a clear **Batalkan Pembagian** action instead of requiring the cashier to understand check-to-check merge semantics.
+
+The reset action is allowed only when **all checks are OPEN and have received zero payments**. It restores all check allocations and any assigned items into Check #1, deletes the other checks, and returns the UI to a single full-order tagihan.
+
+If any check has already received a payment, the reset action is rejected. The cashier must continue the existing payment/merge lifecycle rather than silently rewriting an already-paid allocation.
+
+The cashier-facing UI should prefer **Batalkan Pembagian** over exposing low-level "Gabungkan ke Check #1" mechanics for this undo scenario.
+
 ## Relationship to current implementation
 
 The current P1 implementation already establishes:
@@ -241,7 +251,7 @@ The current P1 implementation already establishes:
 - item/quantity allocation;
 - no duplicate Order or Dining Session.
 
-Implementation started and the backend now supports **amount-based allocation**, **multiple payments per Check**, persisted check allocation amounts, per-Check remaining balances, and active-shift validation for POS cash contributions. The existing item-based split remains supported.
+Implementation started and the backend now supports **amount-based allocation**, **multiple payments per Check**, persisted check allocation amounts, per-Check remaining balances, active-shift validation for POS cash contributions, and a safe unpaid **Batalkan Pembagian** reset flow. The existing item-based split remains supported.
 
 Remaining implementation work is primarily UX hardening, richer payment-provider flows, and automated regression coverage for the new combined-payment paths.
 
