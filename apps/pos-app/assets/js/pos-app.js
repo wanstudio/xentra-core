@@ -22,7 +22,8 @@
     paymentModes: [],
     activePaymentMode: 'cash',
     offlineMode: false,
-    coreConnection: null
+    coreConnection: null,
+    branchOperationalOpen: null
   };
 
   function $(id) { return document.getElementById(id); }
