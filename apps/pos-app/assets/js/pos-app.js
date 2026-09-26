@@ -2333,9 +2333,9 @@
             '<h3>Masing-masing</h3>' +
             '<p class="pos-form-help">Bagaimana mau membagi tagihan?</p>' +
             '<div class="pos-simple-choice-list">' +
-              '<button type="button" class="pos-simple-choice" id="pos-item-choice"><strong>Bayar Berdasarkan Menu</strong><small>Jika customer ingin membayar apa yang dia pesan saja.</small></button>' +
-              '<button type="button" class="pos-simple-choice" id="pos-evenly-choice"><strong>Bagi Rata</strong><small>Jika total tagihan ingin dibagi rata antar orang.</small></button>' +
-              '<button type="button" class="pos-simple-choice" id="pos-amount-choice"><strong>Atur Nominal</strong><small>Jika setiap orang ingin membayar nominal tertentu.</small></button>' +
+              '<button type="button" class="pos-simple-choice" id="pos-item-choice"><strong>Bayar Berdasarkan Menu</strong><small>Jika customer ingin membayar menu yang dipesannya saja.</small></button>' +
+              '<button type="button" class="pos-simple-choice" id="pos-evenly-choice"><strong>Bagi Rata</strong><small>Jika pembayaran tagihan ingin dibagi rata antar customer.</small></button>' +
+              '<button type="button" class="pos-simple-choice" id="pos-amount-choice"><strong>Atur Nominal</strong><small>Jika customer ingin membayar dengan nominal tertentu, lalu sisanya dibayarkan customer berikutnya sampai seluruh tagihan lunas, dalam satu transaksi.</small></button>' +
             '</div>'
           );
           $('pos-evenly-choice').onclick=openEvenlyFlow;
