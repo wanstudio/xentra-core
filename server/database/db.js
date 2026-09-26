@@ -915,6 +915,7 @@ function initSchema(targetDb) {
       subtotal REAL,
       note TEXT,
       modifiers_snapshot TEXT DEFAULT NULL,
+      addition_batch_id TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     );
