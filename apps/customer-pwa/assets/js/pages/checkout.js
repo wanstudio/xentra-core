@@ -4243,7 +4243,7 @@
     var btn = $('x-btn-submit-order');
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Memverifikasi pesanan…';
+      btn.textContent = isAdditionalDineIn ? 'Memverifikasi tambahan…' : 'Memverifikasi pesanan…';
       btn.style.opacity = '0.7';
     }
 
