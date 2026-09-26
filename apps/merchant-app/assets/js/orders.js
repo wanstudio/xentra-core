@@ -223,7 +223,7 @@
         _bmOrdersState.seenPendingOrderIds = currentPendingIds;
         _bmOrdersState.orders = data.orders;
 
-        renderBMOrdersTable();
+        renderBMOrdersFeed();
       } else {
         if (tbody && !isBg) {
           tbody.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-danger">Gagal memuat pesanan: ' + esc(data.error || 'Terjadi kesalahan') + '</td></tr>';
@@ -358,7 +358,7 @@
     } else if (status === 'ready') {
       if (type === 'dine_in') {
         projection.stateLabel = 'Siap disajikan';
-        projection.actionLabel = 'Tandai Disajikan';
+        projection.actionLabel = 'Selesaikan Pesanan';
       } else if (type === 'pickup') {
         projection.stateLabel = 'Siap diambil';
         projection.actionLabel = 'Tandai Diambil';
@@ -507,7 +507,7 @@
 
       var detail = '<button type="button" class="bm-order-detail-action" onclick="viewBMOrderDetail(\'' + esc(ord.id) + '\')">Detail</button>';
 
-      return '<article class="bm-order-feed-card' + attentionClass + '">' +
+      return '<article class="bm-order-feed-card' + attentionClass + '" data-order-id="' + esc(ord.id) + '">' +
         '<div class="bm-order-feed-top">' +
           '<div class="bm-order-feed-context">' +
             '<span class="bm-order-type-pill ' + typeClass + '">' + esc(typeLabel) + '</span>' +
