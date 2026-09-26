@@ -37,6 +37,14 @@ class DeliveryDispatchService {
     driver_phone,
     assigned_by = null
   }) {
+    const order = orderRepository.findById(order_id);
+    if (!order) {
+      throw new Error('[DeliveryDispatchService] Order "' + order_id + '" tidak ditemukan.');
+    }
+    if (order.order_type !== 'delivery') {
+      throw new Error('[DeliveryDispatchService] Hanya Order Fulfillment Environment delivery yang dapat diberi driver.');
+    }
+
     if (provider_type === DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER) {
       return BranchDriverProvider.assignDriver({
         order_id,
