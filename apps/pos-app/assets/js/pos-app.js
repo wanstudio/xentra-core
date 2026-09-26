@@ -718,6 +718,30 @@
   }
 
 
+  function composer() {
+    return state.composer;
+  }
+
+  function currentOrderType() {
+    return composer().getOrderType();
+  }
+
+  function currentTable() {
+    return composer().getTable();
+  }
+
+  function currentOrderId() {
+    return composer().getOrderId();
+  }
+
+  function currentHeldBillId() {
+    return composer().getHeldBillId();
+  }
+
+  function currentItems() {
+    return composer().getDisplayItems();
+  }
+
   function setView(view) {
     document.querySelectorAll('.pos-view').forEach(function(v){ v.classList.toggle('active', v.id === 'pos-view-' + view); });
     document.querySelectorAll('.pos-bottom-nav button').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-view') === view); });
