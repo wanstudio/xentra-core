@@ -4493,10 +4493,8 @@ input[type="file"].x-input,
     transition: color .15s ease, fill .15s ease;
   }
 
-  .x-merchant-mobile-nav-item span,
-  .x-merchant-app .x-merchant-mobile-nav-item span,
-  .x-merchant-mobile-nav-item.active span,
-  .x-merchant-app .x-merchant-mobile-nav-item.active span {
+  .x-merchant-mobile-nav-item > span:not(.x-mobile-nav-badge),
+  .x-merchant-app .x-merchant-mobile-nav-item > span:not(.x-mobile-nav-badge) {
     font-size: 11px !important;
     line-height: 1.1 !important;
     font-weight: 700 !important;
@@ -4529,7 +4527,13 @@ input[type="file"].x-input,
     background: #08a94f !important;
   }
 
-  .x-mobile-nav-badge {
+  .x-mobile-nav-badge,
+  .x-merchant-mobile-nav .x-mobile-nav-badge,
+  .x-merchant-app .x-merchant-mobile-nav .x-mobile-nav-badge,
+  .x-merchant-mobile-nav-item .x-mobile-nav-badge,
+  .x-merchant-app .x-merchant-mobile-nav-item .x-mobile-nav-badge,
+  span.x-mobile-nav-badge,
+  span#mobile-orders-count {
     position: absolute !important;
     top: 0 !important;
     right: calc(50% - 18px) !important;
@@ -4538,7 +4542,7 @@ input[type="file"].x-input,
     padding: 0 5px !important;
     border-radius: 9px !important;
     background: #ef3340 !important;
-    color: #ffffff !important;
+    color: #ffffff !important; /* badge berlatar merah selalu bertulisan putih */
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
@@ -4546,6 +4550,11 @@ input[type="file"].x-input,
     line-height: 1 !important;
     font-weight: 800 !important;
     box-sizing: border-box !important;
+  }
+
+  .x-mobile-notification-badge,
+  span#mobile-notification-count {
+    color: #ffffff !important;
   }
 
   .x-dash-main > .x-tab-content {
