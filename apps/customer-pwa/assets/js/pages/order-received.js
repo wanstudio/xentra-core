@@ -905,51 +905,27 @@
     var orderType = order.order_type || 'delivery';
     var status = order.status;
     var isCash = (payment.payment_method || order.payment_method || 'cash') === 'cash';
+    var phase = resolveOrderPhase(status, orderType);
 
-    var statusTitle = 'Pesanan Diterima Cabang!';
-    var statusDesc = 'Cabang telah mengonfirmasi pesananmu. Dapur sedang menyiapkan makanan.';
-    var badgeIcon = '✓';
+
+    var statusTitle = phase.title;
+    var statusDesc = phase.currentPhase && phase.currentPhase.description
+      ? phase.currentPhase.description
+      : 'Status pesananmu diperbarui oleh cabang.';
+    var badgeIcon = phase.badge;
 
     if (status === 'preparing') {
-      statusTitle = 'Sedang Disiapkan di Dapur';
-      statusDesc = 'Dapur cabang sedang memasak dan menyiapkan pesananmu.';
       badgeIcon = '🍳';
     } else if (status === 'ready') {
-      if (orderType === 'delivery') {
-        statusTitle = 'Pesanan Siap Diantar';
-        statusDesc = 'Makanan sudah selesai dimasak dan siap diserahkan kepada kurir.';
-      } else if (orderType === 'pickup') {
-        statusTitle = 'Pesanan Siap Diambil!';
-        statusDesc = 'Makananmu sudah siap. Silakan ambil di konter cabang ' + UI.escape(order.branch_name || '') + '.';
-      } else if (orderType === 'dine_in') {
-        statusTitle = 'Pesanan Siap Disajikan';
-        statusDesc = 'Makananmu sudah siap dan akan segera disajikan ke mejamu.';
-      } else {
-        statusTitle = 'Pesanan Siap';
-        statusDesc = 'Pesananmu sudah selesai disiapkan.';
-      }
       badgeIcon = '🔔';
     } else if (status === 'out_for_delivery') {
-      statusTitle = 'Dalam Pengantaran Kurir';
-      statusDesc = 'Kurir sedang dalam perjalanan mengantarkan pesanan ke alamat tujuan.';
       badgeIcon = '🛵';
     } else if (status === 'completed') {
-      statusTitle = 'Pesanan Selesai';
-      statusDesc = 'Pesanan telah selesai dinikmati. Terima kasih telah memesan di ' + UI.escape(order.branch_name || 'kami') + '!';
       badgeIcon = '🎉';
-    } else if (orderType === 'reservation') {
-      statusTitle = 'Reservasi Berhasil Dikonfirmasi!';
-      statusDesc = 'Reservasi mejamu sudah tercatat di cabang ' + UI.escape(order.branch_name || '') + '. Kasir akan melakukan Check-in saat kamu tiba.';
     }
 
-    // Stepper completion rules
-    var step1Done = true; // Acceptance is completed
-    var step2Done = ['preparing', 'ready', 'out_for_delivery', 'completed'].includes(status);
-    var step3Done = ['ready', 'out_for_delivery', 'completed'].includes(status);
-    if (orderType === 'delivery') {
-      step3Done = ['out_for_delivery', 'completed'].includes(status);
-    }
-    var step4Done = (status === 'completed');
+    // Primary phase completion comes entirely from the Fulfillment Environment
+    // projection so each purchase type can have its own number of phases.
 
     var itemsHtml = '';
     if (items.length > 0) {
@@ -1002,19 +978,17 @@
       '  <div style="background:#fff;padding:18px;margin:12px 14px;box-shadow:0 4px 14px rgba(0,0,0,0.06);border-radius:16px;">' +
       '    <h2 style="font-size:15px;font-weight:800;margin:0 0 16px;color:#111;">Status Alur Pesanan</h2>' +
       '    <div style="display:flex;flex-direction:column;gap:16px;">' +
-      (orderType === 'reservation' ? (
-        renderStep(1, 'Reservasi Tercatat', 'Jadwal kedatangan sudah tercatat di sistem', step1Done) +
-        renderStep(2, 'Menunggu Waktu Kedatangan', 'Silakan hadir sesuai jadwal reservasi', step2Done) +
-        renderStep(3, 'Check-in di Outlet', 'Kasir melakukan Check-in dan membuka meja aktif', step3Done) +
-        renderStep(4, 'Selesai', 'Kunjungan dan transaksi diselesaikan', step4Done)
-      ) : (
-        renderStep(1, 'Pesanan Diterima Cabang', 'Cabang telah mengonfirmasi penerimaan pesanan', step1Done) +
-        renderStep(2, 'Dapur Menyiapkan', 'Restoran sedang menyiapkan makananmu', step2Done) +
-        renderStep(3, orderType === 'delivery' ? 'Dalam Pengantaran' : (orderType === 'pickup' ? 'Siap Diambil di Cabang' : 'Siap Disajikan di Meja'),
-          orderType === 'delivery' ? 'Kurir sedang dalam perjalanan ke lokasimu' : (orderType === 'pickup' ? 'Makanan siap diambil di konter cabang' : 'Makanan siap disajikan di mejamu'),
-          step3Done) +
-        renderStep(4, 'Selesai', 'Pesanan telah selesai dinikmati', step4Done)
-      )) +
+      phase.steps.map(function (stepLabel, idx) {
+        var done = idx < phase.doneCount;
+        return renderStep(
+          idx + 1,
+          stepLabel,
+          idx === phase.currentPhaseIndex && phase.currentPhase && phase.currentPhase.description
+            ? phase.currentPhase.description
+            : 'Tahap ' + (idx + 1) + ' pada alur ' + phase.label,
+          done
+        );
+      }).join('') +
       '    </div>' +
       '  </div>' +
 
