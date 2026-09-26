@@ -18,6 +18,24 @@
   var adminFetch = S.adminFetch;
   var getAuthHeaders = S.getAuthHeaders;
   var getStoredUser = S.getStoredUser;
+  var FulfillmentEnv = window.Xentra && window.Xentra.FulfillmentEnvironments;
+
+  function getBMOrderType(ord) {
+    return (ord && (ord.order_type || ord.fulfillment_type)) || 'delivery';
+  }
+
+  function getBMStatusBadgeHtml(ord) {
+    var type = getBMOrderType(ord);
+    var status = String((ord && ord.status) || '');
+    var label = FulfillmentEnv && typeof FulfillmentEnv.getStatusLabel === 'function'
+      ? FulfillmentEnv.getStatusLabel(type, status)
+      : status.replace(/_/g, ' ');
+    var cls = 'x-badge-warning';
+    if (['rejected', 'cancelled', 'timeout', 'fulfillment_exception'].indexOf(status) !== -1) cls = 'x-badge-danger';
+    else if (status === 'ready' || status === 'completed') cls = 'x-badge-success';
+    else if (status === 'confirmed' || status === 'preparing' || status === 'out_for_delivery') cls = 'x-badge-info';
+    return '<span class="x-badge ' + cls + '">' + esc(label.toUpperCase()) + '</span>';
+  }
 
   var _bmOrdersState = {
     orders: [],
@@ -325,18 +343,6 @@
       return;
     }
 
-    var statusBadges = {
-      pending: '<span class="x-badge x-badge-warning">MENUNGGU KONFIRMASI</span>',
-      confirmed: '<span class="x-badge x-badge-info">DITERIMA (CONFIRMED)</span>',
-      preparing: '<span class="x-badge x-badge-info">SEDANG DISIAPKAN</span>',
-      ready: '<span class="x-badge x-badge-success">SIAP (READY)</span>',
-      out_for_delivery: '<span class="x-badge x-badge-info">PENGIRIMAN</span>',
-      completed: '<span class="x-badge x-badge-success">SELESAI</span>',
-      rejected: '<span class="x-badge x-badge-danger">DITOLAK</span>',
-      cancelled: '<span class="x-badge x-badge-danger">DIBATALKAN</span>',
-      timeout: '<span class="x-badge x-badge-danger">TIMEOUT</span>'
-    };
-
     var now = Date.now();
 
     var rowsHtml = [];
@@ -365,7 +371,7 @@
       var isNewPending = (ord.status === 'pending') && !!_bmOrdersState.newPendingOrderIds[ord.id];
 
       // Build deadline / status representation (shared logic)
-      var statusBadgeHtml = statusBadges[ord.status] || ('<span class="x-badge">' + esc(ord.status.toUpperCase()) + '</span>');
+      var statusBadgeHtml = getBMStatusBadgeHtml(ord);
       var countdownHtml = '';
       if (ord.status === 'pending') {
         if (!ord.acceptance_deadline_at) {
