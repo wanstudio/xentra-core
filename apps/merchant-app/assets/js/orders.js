@@ -367,6 +367,10 @@
         : '';
       var tableInfo = ord.table_number ? ('Meja ' + esc(ord.table_number)) : '—';
       var totalStr = formatMoney(ord.grand_total || ord.subtotal || 0);
+      var pendingAdditionCount = Number(ord.pending_additions_count || 0);
+      var pendingAdditionBadge = pendingAdditionCount > 0
+        ? '<span class="x-badge x-badge-warning" style="margin-left:4px;">+' + pendingAdditionCount + ' TAMBAHAN</span>'
+        : '';
 
       var isNewPending = (ord.status === 'pending') && !!_bmOrdersState.newPendingOrderIds[ord.id];
 
@@ -403,7 +407,7 @@
         }
       }
 
-      var statusCol = statusBadgeHtml + countdownHtml;
+      var statusCol = statusBadgeHtml + pendingAdditionBadge + countdownHtml;
       var isAccepting = !!_bmOrdersState.inFlightAccept[ord.id];
       var isMutatingStatus = !!(_bmOrdersState.inFlightStatus && _bmOrdersState.inFlightStatus[ord.id]);
 
@@ -536,7 +540,7 @@
               '<span class="bm-order-card-total-val">' + totalStr + '</span>' +
             '</div>' +
             '<div class="bm-order-card-status-wrap">' +
-              statusBadgeHtml +
+              statusBadgeHtml + pendingAdditionBadge +
               countdownHtml +
             '</div>' +
           '</div>' +
