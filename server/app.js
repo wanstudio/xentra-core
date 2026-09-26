@@ -155,6 +155,22 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
   res.sendFile(path.join(__dirname, '../apps/customer-pwa/assets/pwa/service-worker.js'));
 });
 
+// Merchant PWA Manifest & Service Worker Routes — explicitly served before express.static / HTML catch-alls
+app.get(['/merchant-app/manifest.json', '/merchant/manifest.json'], (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.sendFile(path.join(__dirname, '../apps/merchant-app/manifest.json'));
+});
+
+app.get(['/merchant-app/sw.js', '/merchant-app/service-worker.js', '/merchant/sw.js', '/merchant/service-worker.js'], (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, '../apps/merchant-app/sw.js'));
+});
+
 // Serve Public Static Assets — setHeaders ensures Cloudflare does not cache JS/CSS
 // (express.static default is 'public, max-age=0' which Cloudflare treats as cacheable)
 const _noCacheHeaders = (res) => {
@@ -274,7 +290,7 @@ app.get([/^\/dashboard(\/.*)?$/, /^\/owner(\/.*)?$/], async (req, res) => {
 });
 
 // Merchant App Assets (standalone Branch Manager operating surface)
-app.use('/merchant-app/assets', express.static(path.join(__dirname, '../apps/merchant-app/assets'), {
+app.use(['/merchant-app/assets', '/merchant/assets'], express.static(path.join(__dirname, '../apps/merchant-app/assets'), {
   maxAge: 0,
   setHeaders: (res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

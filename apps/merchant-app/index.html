@@ -4,6 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Xentra Merchant — Operasional Cabang</title>
+  <meta name="description" content="Aplikasi Operasional Cabang & Merchant Xentra">
+  <meta name="theme-color" content="#00a651">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Merchant">
+  <link rel="apple-touch-icon" href="/merchant-app/assets/icons/icon-192.png">
+  <link rel="manifest" href="/merchant-app/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -1529,6 +1537,14 @@
       <section class="x-mobile-account-section">
         <h2>Info lainnya</h2>
         <div class="x-mobile-account-list-card">
+          <button type="button" class="x-mobile-account-row" id="btn-mobile-account-install" onclick="window.promptMerchantInstall()">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true" style="color:var(--x-brand-primary, #00a651);">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Pasang Aplikasi Merchant</span>
+            <span class="x-mobile-account-new" style="background:var(--x-brand-primary, #00a651); color:#ffffff; font-weight:700;">Install</span>
+            <span class="x-mobile-account-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+          </button>
           <button type="button" class="x-mobile-account-row">
             <span class="x-mobile-account-leading-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 0 0 0 18M12 3a14 14 0 0 1 0 18"/></svg>
@@ -1630,5 +1646,102 @@
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/orders.js?v=1.0.1"></script>
   <script src="/merchant-app/assets/js/merchant-app.js?v=1.0.2"></script>
+
+  <!-- ═══════════════════════════════════════════════════
+       MERCHANT PWA ENGINE (Service Worker & Install Flow)
+       ═══════════════════════════════════════════════════ -->
+  <script>
+    (function () {
+      'use strict';
+
+      // 1. Capture beforeinstallprompt for install capability
+      window.__xentra_merchant_deferred_prompt = null;
+      var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || !!navigator.standalone;
+
+      function updateInstallUi() {
+        var btnInstall = document.getElementById('btn-mobile-account-install');
+        if (!btnInstall) return;
+        if (isStandalone) {
+          btnInstall.style.display = 'none';
+        } else {
+          btnInstall.style.display = 'flex';
+        }
+      }
+
+      window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        window.__xentra_merchant_deferred_prompt = e;
+        updateInstallUi();
+      });
+
+      window.addEventListener('appinstalled', function () {
+        window.__xentra_merchant_deferred_prompt = null;
+        isStandalone = true;
+        updateInstallUi();
+        console.log('[Merchant PWA] App successfully installed');
+      });
+
+      window.promptMerchantInstall = function () {
+        var promptEvent = window.__xentra_merchant_deferred_prompt;
+        if (promptEvent && typeof promptEvent.prompt === 'function') {
+          promptEvent.prompt();
+          var choicePromise = promptEvent.userChoice || Promise.resolve({ outcome: 'unknown' });
+          choicePromise.then(function (result) {
+            window.__xentra_merchant_deferred_prompt = null;
+            if (result && result.outcome === 'accepted') {
+              console.log('[Merchant PWA] User accepted install prompt');
+            }
+            updateInstallUi();
+          }).catch(function () {
+            window.__xentra_merchant_deferred_prompt = null;
+          });
+        } else {
+          // If iOS Safari or browser without native prompt:
+          var isIos = /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.MSStream;
+          if (isIos) {
+            alert('Untuk memasang aplikasi Merchant di iPhone/iPad: Tekan tombol Share (Bagikan) di Safari, lalu pilih "Tambah ke Layar Utama" (Add to Home Screen).');
+          } else {
+            alert('Untuk memasang aplikasi Merchant: Buka menu peramban (titik tiga di kanan atas) lalu pilih "Instal aplikasi" atau "Tambahkan ke Layar Utama".');
+          }
+        }
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updateInstallUi);
+      } else {
+        updateInstallUi();
+      }
+
+      // 2. Service Worker Registration
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/merchant-app/sw.js', { scope: '/merchant-app/' })
+            .then(function (reg) {
+              reg.addEventListener('updatefound', function () {
+                var newWorker = reg.installing;
+                if (newWorker) {
+                  newWorker.addEventListener('statechange', function () {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      newWorker.postMessage({ action: 'skipWaiting' });
+                    }
+                  });
+                }
+              });
+            })
+            .catch(function (err) {
+              console.warn('[Merchant PWA] Service Worker registration failed:', err);
+            });
+
+          var refreshing = false;
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            if (!refreshing) {
+              refreshing = true;
+              window.location.reload();
+            }
+          });
+        });
+      }
+    })();
+  </script>
 </body>
 </html>
