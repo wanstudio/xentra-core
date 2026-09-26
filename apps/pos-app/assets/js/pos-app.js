@@ -3090,15 +3090,14 @@
     });
     document.querySelectorAll('.pos-order-type button').forEach(function(b){
       b.onclick=function(){
-        state.orderType=b.dataset.type;
-        document.querySelectorAll('.pos-order-type button').forEach(function(x){
-          x.classList.toggle('active',x===b);
-        });
-        if(state.orderType!=='dine_in'){
-          state.selectedTable=null;
+        try{
+          composer().setOrderType(b.dataset.type);
+        }catch(e){
+          return toast(e.message);
         }
+        document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x===b);});
         var ctx=$('pos-table-context');
-        if(ctx) ctx.classList.toggle('hidden', state.orderType!=='dine_in');
+        if(ctx)ctx.classList.toggle('hidden',composer().getOrderType()!=='dine_in');
         renderCart();
       };
     });
