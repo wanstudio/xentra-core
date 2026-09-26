@@ -13,7 +13,7 @@ const posBillRepository = new PosBillRepository();
 const ALLOWED_PARENT_STATUSES = ['confirmed', 'preparing', 'ready'];
 
 class OrderAdditionService {
-  static _loadParent({ order_id, brand_id, branch_id }) {
+  static _loadParent({ order_id, brand_id, branch_id, allowInactiveRead = false }) {
     const order = orderRepository.findById(order_id);
     if (!order) throw new Error('[OrderAdditionService] Order tidak ditemukan.');
     if (String(order.brand_id) !== String(brand_id) || String(order.branch_id) !== String(branch_id)) {
@@ -23,7 +23,9 @@ class OrderAdditionService {
       throw new Error('[OrderAdditionService] Additional Order hanya tersedia untuk Dine-in.');
     }
     if (!ALLOWED_PARENT_STATUSES.includes(order.status)) {
-      throw new Error('[OrderAdditionService] Order Dine-in sudah tidak menerima tambahan.');
+      if (!allowInactiveRead) {
+        throw new Error('[OrderAdditionService] Order Dine-in sudah tidak menerima tambahan.');
+      }
     }
     if (!order.dining_session_id) {
       throw new Error('[OrderAdditionService] Dining Session aktif tidak ditemukan.');
@@ -51,7 +53,7 @@ class OrderAdditionService {
   }
 
   static listForOrder({ order_id, brand_id, branch_id }) {
-    const order = this._loadParent({ order_id, brand_id, branch_id });
+    const order = this._loadParent({ order_id, brand_id, branch_id, allowInactiveRead: true });
     const items = orderRepository.findItems(order_id);
     const additions = additionRepository.findByOrderId(order_id).map(addition => ({
       ...addition,
