@@ -52,12 +52,11 @@ class ManualQrisSettlementService {
     paymentRepository.beginTransaction();
     try {
       paymentRepository.updatePaymentWebhook({ orderId: order_id, paymentStatus: 'settlement', webhookResponse: JSON.stringify({ mode: 'qris_static_manual', cashier_id, reference_note: String(reference_note || '').trim(), verified_at: now }), settledAt: now, updatedAt: now, provider: 'qris_static', paymentMethod: 'qris_static' });
-      if (order.status === 'pending') {
-        const changed = orderRepository.updateStatusIfCurrent({ orderId: order_id, targetStatus: 'confirmed', currentStatus: 'pending' });
-        if (!changed || changed.changes !== 1) throw new Error('[ManualQrisSettlementService] Order berubah bersamaan.');
-        orderRepository.insertStatusLog({ logId: 'log_' + crypto.randomBytes(8).toString('hex'), orderId: order_id, previousStatus: 'pending', newStatus: 'confirmed', actorType: 'cashier', actorId: cashier_id, note: 'QRIS statis diverifikasi manual oleh kasir.' });
+      // Static QRIS verification settles the payment only. It must not turn
+      // AWAITING_BRANCH_ACCEPTANCE into ACCEPTED.
+      if (['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed'].includes(order.status)) {
+        OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
       }
-      OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
       recordPromoRedemptions(order);
       if (order.order_type === 'dine_in') {
         const holds = paymentRepository.findActiveDiningHolds(order.id);
@@ -72,7 +71,7 @@ class ManualQrisSettlementService {
     } catch (err) { try { paymentRepository.rollbackTransaction(); } catch (_) {} throw err; }
     events.EventBus.publish({ type: 'payment.settled', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id, brand_id: order.brand_id, provider: 'qris_static', payment_method: 'qris_static', amount: Number(order.grand_total), settled_at: now, cashier_id } }).catch(() => {});
     events.EventBus.publish({ type: 'pos.order.settled', producer: 'pos', payload: { order_id, order_number: order.order_number, branch_id, shift_id: null, order_type: order.order_type, table_number: order.table_number, payment_method: 'qris_static', grand_total: Number(order.grand_total), amount_tendered: null, change: 0 } }).catch(() => {});
-    return { success: true, status: 'SETTLED', order_id, order_number: order.order_number, payment_status: 'settlement', order_status: 'confirmed', payment: { method: 'qris_static', provider: 'qris_static', status: 'settlement', reference_note: String(reference_note || '').trim() } };
+    return { success: true, status: 'SETTLED', order_id, order_number: order.order_number, payment_status: 'settlement', order_status: order.status, payment: { method: 'qris_static', provider: 'qris_static', status: 'settlement', reference_note: String(reference_note || '').trim() } };
   }
 
   static cancelStaticQrisPayment({ order_id, cashier_id, branch_id, reason = 'QRIS statis dibatalkan oleh kasir.' }) {

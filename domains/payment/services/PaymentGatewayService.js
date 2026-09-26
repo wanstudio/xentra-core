@@ -280,18 +280,8 @@ class PaymentGatewayService {
 
       if (shouldSettle) {
         let currentOrderState = paymentRepository.findOrderStatus(orderId);
-        if (order && order.order_channel === 'pos_cashier' && currentOrderState && currentOrderState.status === 'pending') {
-          const confirmedResult = orderRepository.updateStatusIfCurrent({ orderId, targetStatus: 'confirmed', currentStatus: 'pending' });
-          if (confirmedResult && confirmedResult.changes === 1) {
-            orderRepository.insertStatusLog({
-              logId: 'log_' + crypto.randomBytes(8).toString('hex'),
-              orderId, previousStatus: 'pending', newStatus: 'confirmed',
-              actorType: 'payment', actorId: gateway.name,
-              note: 'POS gateway payment settled; cashier sale confirmed.'
-            });
-            currentOrderState = { status: 'confirmed' };
-          }
-        }
+        // Payment settlement is financially authoritative only. It must never
+        // perform Branch Acceptance (pending -> confirmed) or activate Dining.
         const terminalOrderStatuses = ['rejected', 'timeout', 'cancelled', 'fulfillment_exception'];
         if (currentOrderState && terminalOrderStatuses.includes(currentOrderState.status)) {
           orderStatusAfterSettlement = 'fulfillment_exception';
@@ -301,7 +291,10 @@ class PaymentGatewayService {
             updatedAt: now
           });
           releaseClaimIfNeverAccepted(orderId, currentOrderState.status, `Settlement after order left AWAITING (${currentOrderState.status})`);
-        } else {
+        } else if (currentOrderState && isConsumingOrderStatus(currentOrderState.status)) {
+          // Operational side effects belong after Branch Acceptance. A payment
+          // settlement for an AWAITING order records money only and leaves the
+          // order/table/session lifecycle untouched.
           const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
           OrderPlacementService.deductStockForSettledOrder(orderId, { dbTransactionProvided: true });
 

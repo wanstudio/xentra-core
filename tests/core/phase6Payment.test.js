@@ -30,7 +30,7 @@ const db = require('../../server/database/db');
 
 // Suites assert against demo branches/products/promotions, which are not auto-seeded.
 require('../helpers/demoFixtures.js')();
-const { PaymentGatewayService } = require('../../domains/payment');
+const { PaymentGatewayService, ManualQrisSettlementService } = require('../../domains/payment');
 const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
 const PrePaymentVerificationGate = require('../../domains/commerce/services/PrePaymentVerificationGate');
 
@@ -468,5 +468,32 @@ describe('Phase 6 — Payment Implementation & Critical Invariants', () => {
 
     const orderAfter = db.prepare('SELECT status FROM orders WHERE id = ?').get(seed.orderId);
     assert.strictEqual(orderAfter.status, 'confirmed', 'Only branch acceptance transitions order to confirmed');
+  });
+
+
+  it("13. Regression: POS gateway settlement never bypasses Merchant acceptance", () => {
+    const orderId = makeOrderId();
+    const now = new Date().toISOString();
+    db.prepare("INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'POS Gateway', '081200000099', 'dine_in', 'pos_cashier', 75000, 75000, 'midtrans', 'pending', ?, ?)").run(orderId, makeOrderNum(), BRAND_ID, BRANCH_ID, now, now);
+    db.prepare("INSERT INTO order_payments (id, order_id, provider, payment_method, payment_status, amount, created_at, updated_at) VALUES (?, ?, 'midtrans', 'midtrans', 'pending', 75000, ?, ?)").run("pay_" + crypto.randomBytes(4).toString("hex"), orderId, now, now);
+
+    const result = PaymentGatewayService.handleWebhook({ order_id: orderId, transaction_status: "settlement", gross_amount: "75000.00" }, { skipSignatureCheck: true, provider: "midtrans" });
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.payment_status, "settlement");
+    assert.strictEqual(db.prepare("SELECT status FROM orders WHERE id = ?").get(orderId).status, "pending");
+  });
+
+  it("14. Regression: static QRIS settlement never bypasses Merchant acceptance", () => {
+    const now = new Date().toISOString();
+    db.prepare("UPDATE branches SET payment_config_override = ? WHERE id = ?").run(JSON.stringify({ qris_static: { enabled: true, image_url: "https://example.test/qris.png", merchant_name: "P6 QRIS" } }), BRANCH_ID);
+    const orderId = makeOrderId();
+    db.prepare("INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'POS QRIS', '081200000100', 'dine_in', 'pos_cashier', 60000, 60000, 'qris_static', 'pending', ?, ?)").run(orderId, makeOrderNum(), BRAND_ID, BRANCH_ID, now, now);
+    db.prepare("INSERT INTO order_payments (id, order_id, provider, payment_method, payment_status, amount, created_at, updated_at) VALUES (?, ?, 'qris_static', 'qris_static', 'pending', 60000, ?, ?)").run("pay_" + crypto.randomBytes(4).toString("hex"), orderId, now, now);
+
+    const result = ManualQrisSettlementService.settleStaticQrisPayment({ order_id: orderId, cashier_id: "cashier_p6", branch_id: BRANCH_ID, reference_note: "regression" });
+    assert.strictEqual(result.success, true);
+    assert.strictEqual(result.payment_status, "settlement");
+    assert.strictEqual(result.order_status, "pending");
+    assert.strictEqual(db.prepare("SELECT status FROM orders WHERE id = ?").get(orderId).status, "pending");
   });
 });

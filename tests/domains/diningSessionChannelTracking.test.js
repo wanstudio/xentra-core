@@ -122,3 +122,34 @@ test('Dining Channel Tracking 3 — CashSettlementService forwards order_channel
 
   DiningTableService.completeDiningSession(stateRow.current_session_id);
 });
+
+
+test('Dining Completion Guard — unpaid order keeps session/table active until settlement', () => {
+  const tableId = `tbl_completion_guard_${Date.now()}`;
+  const orderId = `ord_completion_guard_${Date.now()}`;
+  db.prepare("INSERT INTO branch_tables (id, branch_id, table_number, label, capacity, is_active) VALUES (?, 'branch_dinetrack', 'GUARD-1', 'Meja Guard 1', 4, 1)").run(tableId);
+  db.prepare("INSERT OR REPLACE INTO branch_table_states (table_id, operational_state, current_session_id, notes, updated_at) VALUES (?, 'available', NULL, NULL, datetime('now'))").run(tableId);
+  db.prepare("INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status, table_number) VALUES (?, ?, 'brand_dinetrack', 'branch_dinetrack', 'Guard Customer', '081234567899', 'dine_in', 'pos_cashier', 50000, 50000, 'cash', 'confirmed', 'GUARD-1')").run(orderId, `ORD-GUARD-${Date.now()}`);
+  db.prepare("INSERT INTO order_payments (id, order_id, provider, payment_method, payment_status, amount, created_at, updated_at) VALUES (?, ?, 'cash', 'cash', 'pending', 50000, datetime('now'), datetime('now'))").run(`pay_guard_${Date.now()}`, orderId);
+
+  const session = DiningTableService.createOrAttachDiningSession({
+    branch_id: 'branch_dinetrack',
+    table_ids: [tableId],
+    order_id: orderId,
+    customer_name: 'Guard Customer',
+    customer_phone: '081234567899',
+    channel: 'pos_cashier'
+  });
+
+  assert.throws(() => DiningTableService.completeDiningSession(session.session_id, 'cashier_guard'), /PAYMENT_REQUIRED/);
+  const blockedState = db.prepare('SELECT operational_state, current_session_id FROM branch_table_states WHERE table_id = ?').get(tableId);
+  assert.strictEqual(blockedState.operational_state, 'occupied');
+  assert.strictEqual(blockedState.current_session_id, session.session_id);
+
+  db.prepare("UPDATE order_payments SET payment_status = 'settlement', settled_at = datetime('now'), updated_at = datetime('now') WHERE order_id = ?").run(orderId);
+  const completed = DiningTableService.completeDiningSession(session.session_id, 'cashier_guard');
+  assert.strictEqual(completed.status, 'completed');
+  const releasedState = db.prepare('SELECT operational_state, current_session_id FROM branch_table_states WHERE table_id = ?').get(tableId);
+  assert.strictEqual(releasedState.operational_state, 'available');
+  assert.strictEqual(releasedState.current_session_id, null);
+});

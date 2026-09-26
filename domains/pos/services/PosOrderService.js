@@ -935,7 +935,7 @@ class PosOrderService {
     return {
       success: true,
       status: payment && payment.status === 'settlement' ? 'SETTLED' : 'PAYMENT_PENDING',
-      order: { ...order, order_type, table_number: tableNumber, amount_tendered, change: changeAmount, payment_method, status: payment && payment.status === 'settlement' ? 'confirmed' : 'pending' },
+      order: { ...order, order_type, table_number: tableNumber, amount_tendered, change: changeAmount, payment_method, status: order.status },
       payment
     };
   }

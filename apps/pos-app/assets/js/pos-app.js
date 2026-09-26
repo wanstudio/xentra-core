@@ -24,6 +24,7 @@
     paymentModes: [],
     activePaymentMode: 'cash',
     offlineMode: false,
+    coreConnection: null,
     activeHeldOrderId: null,
     activeHeldBillId: null
   };
@@ -153,13 +154,56 @@
     el.innerHTML = '<div class="pos-toast-inner">' + iconSvg + '<span>' + esc(msg) + '</span></div>';
     el.classList.add('show');
     clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, dur);
+  function setPosStatus(level,title,detail){
+    var el=$('pos-connection-badge'); if(!el)return;
+    var normalized=['ready','caution','stop'].indexOf(level)!==-1 ? level : 'caution';
+    el.className='pos-status '+normalized;
+    el.dataset.status=normalized;
+    el.setAttribute('aria-label','Status POS: '+title);
+    var titleEl=el.querySelector('.pos-status-tooltip-title');
+    var detailEl=el.querySelector('.pos-status-tooltip-detail');
+    if(titleEl) titleEl.textContent=title;
+    if(detailEl) detailEl.textContent=detail || '';
   }
 
-  function setConnection(online) {
-    var el=$('pos-connection-badge'); if(!el)return;
-    el.className='pos-status '+(online?'online':'offline');
-    el.innerHTML='<span class="pos-status-pulse"></span><span class="pos-status-text">'+(online?'ONLINE':'OFFLINE')+'</span>';
-    el.title=online?'Server Terhubung (Online)':'Server Terputus (Offline)';
+  function updatePosReadiness(){
+    if(navigator.onLine===false || state.offlineMode){
+      setPosStatus('caution','Koneksi terputus','POS sedang mencoba menyambungkan kembali. Operasi offline yang diizinkan tetap dapat digunakan.');
+      return;
+    }
+    if(state.coreConnection===false){
+      setPosStatus('stop','Terjadi gangguan sistem','POS belum dapat terhubung ke sistem. Periksa koneksi atau hubungi operator/admin.');
+      return;
+    }
+    if(state.coreConnection!==true){
+      setPosStatus('caution','Menghubungkan…','POS sedang memeriksa koneksi dan kesiapan sistem.');
+      return;
+    }
+    if(!state.terminalId){
+      setPosStatus('stop','Terminal belum siap','Terminal POS belum terdaftar. Hubungi operator/admin.');
+      return;
+    }
+    if(!state.shift){
+      setPosStatus('caution','Shift belum dibuka','Buka shift kasir untuk mulai transaksi.');
+      return;
+    }
+    setPosStatus('ready','Siap digunakan','POS siap untuk transaksi.');
+  }
+
+  function bindPosStatus(){
+    var el=$('pos-connection-badge'); if(!el || el.dataset.bound==='1')return;
+    el.dataset.bound='1';
+    el.onclick=function(e){
+      e.stopPropagation();
+      var isOpen=el.classList.toggle('is-open');
+      el.setAttribute('aria-expanded',isOpen?'true':'false');
+    };
+    document.addEventListener('click',function(e){
+      if(!el.contains(e.target)){
+        el.classList.remove('is-open');
+        el.setAttribute('aria-expanded','false');
+      }
+    });
   }
 
   function renderShiftStatus() {
@@ -1286,9 +1330,11 @@
       state.menu={categories:data.categories||[],products:catalogProducts};
       savePosMenuCache();
       renderMenu();
-      setConnection(true);
+      state.coreConnection=true;
+      updatePosReadiness();
     }catch(e){
-      setConnection(false);
+      state.coreConnection=false;
+      updatePosReadiness();
       var cachedMenu=getPosMenuCache(state.branchId);
       if(cachedMenu){ state.menu=cachedMenu; renderMenu(); return; }
       if($('pos-product-grid'))$('pos-product-grid').innerHTML='<div class="pos-empty">Menu tidak dapat dimuat. Periksa koneksi.</div>';
@@ -1437,9 +1483,11 @@
         state.branchId=d.terminal.branch_id;
         localStorage.setItem('xentra_pos_branch_id',String(state.branchId));
       }
+      state.coreConnection=true;
       if(state.terminalId) localStorage.setItem('xentra_pos_terminal_id',state.terminalId);
       return !!state.terminalId;
     }catch(e){
+      state.coreConnection=false;
       state.terminalId=state.terminalId || localStorage.getItem('xentra_pos_terminal_id') || null;
       return !!state.terminalId;
     }
@@ -1457,6 +1505,7 @@
     renderShift();
     renderCart();
     updateTransaksiStats();
+    updatePosReadiness();
   }
 
   function openShiftModal(){
@@ -2868,6 +2917,8 @@
     $('btn-pos-shift-status').onclick=openShiftModal;
     $('btn-pos-close-shift-top').onclick=openCloseShiftModal;
     $('btn-pos-logout').onclick=function(){clearPosSessionAndReturnToPin();};
+    bindPosStatus();
+    bindPosStatus();
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
     if($('pos-mcart-trigger-order')){
       $('pos-mcart-trigger-order').onclick=function(e){
@@ -2933,16 +2984,18 @@
       loadTables().catch(function(){});
       setView('kasir');
       window.addEventListener('online',function(){
-        setConnection(!state.offlineMode);
+        setPosStatus('caution','Menghubungkan kembali…','POS sedang mencoba menyambungkan kembali ke sistem.');
         if(state.offlineMode && token()) state.offlineMode=false;
         loadTerminal();
+        loadShift();
         loadMenu();
         if(token()) {
           request('/pos/local/sync-outbox',{method:'POST',headers:headers(),body:JSON.stringify({terminal_id:state.terminalId,branch_id:state.branchId})}).catch(function(){});
         }
       });
-      window.addEventListener('offline',function(){setConnection(false);});
-      setConnection(!state.offlineMode && navigator.onLine);
+      window.addEventListener('offline',function(){state.coreConnection=false;
+      updatePosReadiness();});
+      updatePosReadiness();
     }catch(e){toast(e.message||'Gagal memuat POS.');}
   }
 
