@@ -749,9 +749,10 @@
   }
 
   function updateMenuCardBadges(){
+    var menuCart=getComposerCart();
     document.querySelectorAll('.pos-product[data-product-id]').forEach(function(card){
       var pid=card.dataset.productId;
-      var qty=state.cart.reduce(function(acc,item){
+      var qty=menuCart.reduce(function(acc,item){
         return String(item.product_id)===String(pid)?acc+(Number(item.quantity)||0):acc;
       },0);
       var badge=card.querySelector('.pos-product-cart-badge');
