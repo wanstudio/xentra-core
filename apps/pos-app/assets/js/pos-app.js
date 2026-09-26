@@ -765,7 +765,7 @@
   }
 
   function updateMenuCardBadges(){
-    var menuCart=getComposerCart();
+    var menuCart=composer().getDisplayItems();
     document.querySelectorAll('.pos-product[data-product-id]').forEach(function(card){
       var pid=card.dataset.productId;
       var qty=menuCart.reduce(function(acc,item){
@@ -818,17 +818,18 @@
   }
 
   function openOrderDetailsModal() {
-    var displayCart=activeDisplayCart();
+    var tx=composer();
+    var displayCart=tx.getDisplayItems();
     if (!displayCart.length) {
       return toast(state.activeAdditionalMode ? 'Belum ada item tambahan.' : 'Keranjang pesanan masih kosong.');
     }
-    var t=state.activeAdditionalMode ? additionalTotal() : total();
+    var t=tx.total();
     var totalQty=displayCart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0);
     var isDineIn=state.orderType==='dine_in';
     var tableLabel=formatTableLabel(state.selectedTable);
     var orderTypeLabel=isDineIn ? tableLabel : (state.orderType==='pickup'?'Pickup':'Delivery');
-    var locked=isOrderLockedForEditing();
-    var additionMode=!!state.activeAdditionalMode;
+    var locked=tx.isExisting();
+    var additionMode=tx.isAddition();
 
     var html='<div class="pos-modal-head-row">'+
       '<div class="pos-modal-head-title">'+
@@ -926,39 +927,16 @@
         var idx=Number(btn.getAttribute('data-order-modal-idx'));
         var d=Number(btn.getAttribute('data-order-modal-d'));
         changeQty(idx,d);
-        if(!activeDisplayCart().length) hideModal();
+        if(!composer().getDisplayItems().length) hideModal();
         else openOrderDetailsModal();
       };
     });
-  }
-
-  function getComposerMode() {
-    if (state.activeAdditionalMode) return 'addition';
-    if (state.composerMode === 'existing' && state.activeHeldOrderId && state.activeOrderLocked && state.cart.length > 0) return 'existing';
-    return 'new';
-  }
-
-  function getComposerCart() {
-    return getComposerMode() === 'addition' ? state.additionalCart : state.cart;
-  }
-
-  function isOrderLockedForEditing() {
-    return getComposerMode() === 'existing';
   }
 
   function showOrderLockedWarning() {
     toast('Pesanan sudah diproses Merchant dan tidak dapat diubah. Gunakan + Tambah Pesanan untuk menambah menu.');
   }
 
-  function activeDisplayCart() {
-    return state.activeAdditionalMode ? state.additionalCart : state.cart;
-  }
-
-  function additionalTotal() {
-    return state.additionalCart.reduce(function(sum,it){
-      return sum + (Number(it.unit_price)||0) * (Number(it.quantity)||0);
-    },0);
-  }
 
   function renderCart() {
     var tx=composer();
@@ -1336,7 +1314,7 @@
         var color=getCategoryColor(p.category_id,catIndex);
         var hasOpts=optionGroups(p).length>0;
 
-        var composerCart=getComposerCart();
+        var composerCart=composer().getDisplayItems();
         var cartQty=composerCart.reduce(function(acc,item){
           return String(item.product_id)===String(p.id)?acc+(Number(item.quantity)||0):acc;
         },0);
