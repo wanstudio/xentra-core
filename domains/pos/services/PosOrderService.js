@@ -331,8 +331,10 @@ class PosOrderService {
       }
       const lockedCheck = posBillRepository.findCheck(check_id);
       const lockedPaid = posBillRepository.findCheckPaidAmount(check_id);
-      const lockedRemaining = Number(lockedCheck.allocated_amount || 0) - lockedPaid;
-      if (value > lockedRemaining) throw new Error('[PosOrderService] Pembayaran melebihi sisa Check.');
+      const lockedRemaining = Math.max(0, Number(lockedCheck.allocated_amount || 0) - lockedPaid);
+      if (value > lockedRemaining + 0.000001) {
+        throw new Error('[PosOrderService] Pembayaran melebihi sisa Check. Sisa Check: Rp ' + lockedRemaining.toLocaleString('id-ID') + ', pembayaran: Rp ' + value.toLocaleString('id-ID') + '.');
+      }
       posBillRepository.createCheckPayment({ id: paymentId, checkId: check_id, orderId: order_id, paymentMethod: payment_method, provider: payment_method, amount: value, payerName: payer_name, actorId: actor_id, rawPayment: JSON.stringify({ amount_tendered: amount_tendered }), settledAt: now, now });
       const afterPaid = lockedPaid + value;
       if (afterPaid >= Number(lockedCheck.allocated_amount)) posBillRepository.setCheckStatus(lockedCheck.id, 'paid', now);
