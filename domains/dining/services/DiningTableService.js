@@ -803,8 +803,49 @@ class DiningTableService {
 
     const now = new Date().toISOString();
     const associatedTables = repository.findSessionTables(sessionId);
+    const acceptedStatuses = new Set(['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed']);
+    const nonPayableTerminalStatuses = new Set(['cancelled', 'rejected', 'timeout', 'expired', 'fulfillment_exception']);
+
+    const assertSessionClosable = () => {
+      const sessionOrders = orderRepository.findDiningSessionOrdersWithPayment(sessionId);
+      const blockers = sessionOrders.filter(order => {
+        const status = String(order.status || '');
+        if (nonPayableTerminalStatuses.has(status)) return false;
+
+        const grandTotal = Number(order.grand_total || 0);
+        if (grandTotal <= 0) return false;
+
+        if (!acceptedStatuses.has(status)) return true;
+
+        const settledAmount = Math.max(
+          Number(order.order_payment_settled_amount || 0),
+          Number(order.check_payment_settled_amount || 0)
+        );
+        return settledAmount + 0.000001 < grandTotal;
+      });
+
+      if (blockers.length > 0) {
+        const order = blockers[0];
+        const status = String(order.status || '');
+        if (!acceptedStatuses.has(status)) {
+          throw new Error(`[DiningTableService] ORDER_NOT_ACCEPTED: Order ${order.order_number || order.id} belum diterima Merchant dan sesi belum dapat ditutup.`);
+        }
+
+        const settledAmount = Math.max(
+          Number(order.order_payment_settled_amount || 0),
+          Number(order.check_payment_settled_amount || 0)
+        );
+        const remaining = Math.max(0, Number(order.grand_total || 0) - settledAmount);
+        throw new Error(`[DiningTableService] PAYMENT_REQUIRED: Order ${order.order_number || order.id} belum lunas (sisa Rp ${remaining.toLocaleString('id-ID')}) sehingga sesi belum dapat ditutup.`);
+      }
+    };
+
     repository.beginTransaction();
     try {
+      // Re-check inside the write transaction so a payment settlement racing
+      // with table completion cannot cause the table to be released early.
+      assertSessionClosable();
+
       repository.completeDiningSession({ sessionId, closedAt: now, updatedAt: now });
       for (const row of associatedTables) repository.updateTableState({ tableId: row.table_id, operationalState: 'available', currentSessionId: null, notes: 'Session completed', updatedAt: now });
       repository.commitTransaction();
