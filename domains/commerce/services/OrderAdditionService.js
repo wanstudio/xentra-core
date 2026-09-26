@@ -138,7 +138,7 @@ class OrderAdditionService {
     return { success: true, status: 'PENDING_ACCEPTANCE', addition: additionRepository.findById(additionId), items: verifiedItems };
   }
 
-  static decide({ order_id, addition_id, brand_id, branch_id, decision, actor_id = null, reason = '' }) {
+  static async decide({ order_id, addition_id, brand_id, branch_id, decision, actor_id = null, reason = '' }) {
     const order = this._loadParent({ order_id, brand_id, branch_id });
     const addition = additionRepository.findById(addition_id);
     if (!addition || String(addition.order_id) !== String(order.id)) {

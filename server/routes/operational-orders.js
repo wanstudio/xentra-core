@@ -141,7 +141,7 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
 // A rejected branch is NEVER silently rematched to another branch, and an
 // order with a settled payment cannot be branch-rejected (refund flow first).
 // Additional Order Acceptance: same Branch/Dining authority as the parent Dine-in Order.
-router.post('/orders/:id/additions/:additionId/branch-acceptance', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+router.post('/orders/:id/additions/:additionId/branch-acceptance', requireAuth(['owner', 'brand_manager', 'branch_manager']), async (req, res) => {
   try {
     const { decision, reason = '' } = req.body || {};
     if (!decision || !['accept', 'reject'].includes(decision)) {
@@ -160,7 +160,7 @@ router.post('/orders/:id/additions/:additionId/branch-acceptance', requireAuth([
     const parent = db.prepare(scopeSql).get(...scopeParams);
     if (!parent) return res.status(404).json({ success: false, error: 'Order tidak ditemukan pada kewenangan cabang Anda.' });
 
-    const result = OrderAdditionService.decide({
+    const result = await OrderAdditionService.decide({
       order_id: parent.id,
       addition_id: req.params.additionId,
       brand_id: req.brand_id,

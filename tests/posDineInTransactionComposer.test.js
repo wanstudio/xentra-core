@@ -7,20 +7,22 @@ const ROOT = path.resolve(__dirname, '..');
 const js = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/js/pos-app.js'), 'utf8');
 const html = fs.readFileSync(path.join(ROOT, 'apps/pos-app/index.html'), 'utf8');
 const css = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/css/pos.css'), 'utf8');
+const composerJs = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/js/TransactionComposer.js'), 'utf8');
 
 describe('POS dine-in transaction composer', () => {
   it('keeps table context inside the cashier draft-sale flow', () => {
     assert.ok(js.includes('function openTableSelector()'));
     assert.ok(js.includes('function applySelectedTable(t)'));
-    assert.ok(js.includes("if(state.orderType==='dine_in'&&!state.selectedTable){openTableSelector();return;}"));
+    assert.ok(js.includes("if(tx.getOrderType()==='dine_in'&&!tx.getTable()){openTableSelector();return;}"));
     assert.ok(js.includes("btn-pos-select-table').onclick=function(){openTableSelector();}"));
     assert.ok(html.includes('id="pos-table-context" class="pos-context-strip"'));
   });
 
   it('allows menu-first and table-first without clearing cart', () => {
-    assert.ok(js.includes('state.selectedTable=t;'));
+    assert.ok(js.includes('composer().setTable(t);'));
     assert.ok(js.includes('renderCart();'));
-    assert.ok(!js.includes("if(state.orderType==='dine_in'&&!state.selectedTable)return toast('Pilih meja untuk transaksi dine-in.')"));
+    assert.ok(!js.includes('state.selectedTable'));
+    assert.ok(!js.includes('state.orderType'));
   });
 
   it('keeps unavailable table states non-selectable', () => {
@@ -30,7 +32,13 @@ describe('POS dine-in transaction composer', () => {
   });
 
   it('uses cache-busted POS assets for the new composer UI', () => {
-    assert.ok(/\/pos\/assets\/css\/pos\.css\?v=1\.0\.(?:[4-9]|\d{2,})/.test(html));
-    assert.ok(/\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.(?:[4-9]|\d{2,})/.test(html));
+    assert.ok(/\/pos\/assets\/css\/pos\.css\?v=1\.0\.11/.test(html));
+    assert.ok(/\/pos\/assets\/js\/TransactionComposer\.js\?v=1\.0\.11/.test(html));
+    assert.ok(/\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.11/.test(html));
+    assert.ok(html.indexOf('/pos/assets/js/TransactionComposer.js?v=1.0.11') < html.indexOf('/pos/assets/js/pos-app.js?v=1.0.11'));
+    assert.ok(composerJs.includes('MODES'));
+    assert.ok(composerJs.includes("NEW: 'new'"));
+    assert.ok(composerJs.includes("EXISTING: 'existing'"));
+    assert.ok(composerJs.includes("ADDITION: 'addition'"));
   });
 });

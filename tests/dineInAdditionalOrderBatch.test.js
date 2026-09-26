@@ -35,7 +35,7 @@ describe('Dine-in Additional Order Batch contract', () => {
 
   it('does not deduct stock at draft submission', () => {
     const submitStart = additionService.indexOf('static async submit(');
-    const submitEnd = additionService.indexOf('\n  static decide(', submitStart);
+    const submitEnd = additionService.indexOf('decide(', submitStart);
     const submitBlock = additionService.slice(submitStart, submitEnd);
     assert.ok(!submitBlock.includes('deductStockForItems'));
   });
@@ -52,15 +52,15 @@ describe('Dine-in Additional Order Batch contract', () => {
   });
 
   it('locks the accepted parent order while preserving payment allocation', () => {
-    assert.ok(posJs.includes('activeOrderLocked'));
-    assert.ok(posJs.includes('isOrderLockedForEditing'));
+    assert.ok(posJs.includes("composer().isExisting()"));
+    assert.ok(posJs.includes("tx.canAdd()"));
     assert.ok(posJs.includes('showOrderLockedWarning'));
-    assert.ok(posJs.includes('await openCheckManager(state.activeHeldOrderId);'));
+    assert.ok(posJs.includes('await openCheckManager(orderId);'));
     const manyPaymentStart = posJs.indexOf('async function openManyPaymentFromCart(){');
     const manyPaymentEnd = posJs.indexOf('function resetSale(){', manyPaymentStart);
     const manyPaymentBlock = posJs.slice(manyPaymentStart, manyPaymentEnd);
     assert.ok(!manyPaymentBlock.includes("/pos/held-orders/"));
-    assert.ok(posJs.includes('if(state.activeOrderLocked) return showOrderLockedWarning();'));
+    assert.ok(posJs.includes("if(tx.isExisting()) return showOrderLockedWarning();"));
   });
 
   it('routes an active customer dine-in cart into the existing order instead of create-order', () => {
@@ -80,6 +80,12 @@ describe('Dine-in Additional Order Batch contract', () => {
     assert.ok(additionService.includes('findByClientTransactionId'));
   });
 
+  it('does not expose Additional Order on an empty/new composer', () => {
+    assert.ok(posJs.includes("new window.XentraPos.TransactionComposer({ orderType: 'dine_in' })"));
+    assert.ok(posJs.includes("var canAdd=isDineIn && tx.canAdd();"));
+    assert.ok(posJs.includes("composer().isAddition()"));
+  });
+
   it('provides explicit additional-order UX and locked styling', () => {
     assert.ok(posHtml.includes('id="btn-pos-additional-order"'));
     assert.ok(posHtml.includes('id="pos-order-addition-banner"'));
@@ -93,7 +99,7 @@ describe('Dine-in Additional Order Batch contract', () => {
     const start = posJs.indexOf('async function openManyPaymentFromCart(){');
     const end = posJs.indexOf('\n  function resetSale(){', start);
     const block = posJs.slice(start, end);
-    assert.ok(block.includes('await openCheckManager(state.activeHeldOrderId);'));
+    assert.ok(block.includes('await openCheckManager(orderId);'));
     assert.ok(!block.includes("method:'PUT'"));
     assert.ok(!block.includes('/pos/held-orders/'));
   });
