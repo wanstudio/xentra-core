@@ -900,12 +900,17 @@
     var tableCtx = $('pos-table-context');
     if (tableCtx) tableCtx.classList.toggle('hidden', !isDineIn);
 
-    var box=$('pos-cart-items'), meta=$('pos-cart-meta'), subtotal=$('pos-subtotal'), grand=$('pos-total'), pay=$('pos-pay-total'), btn=$('btn-pos-pay');
+    var box=$('pos-cart-items'), meta=$('pos-cart-meta'), subtotal=$('pos-subtotal'), grand=$('pos-total'), pay=$('pos-pay-total'), btn=$('btn-pos-pay'), payManyBtn=$('btn-pos-pay-many');
     if (meta) meta.textContent=state.cart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0)+' item';
     if (subtotal) subtotal.textContent=money(total());
     if (grand) grand.textContent=money(total());
     if (pay) pay.textContent=money(total());
     if (btn) btn.disabled=!state.cart.length || !state.shift || !!state.shift.active_break;
+    if (payManyBtn) {
+      var canManyPay=isDineIn && !!state.activeHeldOrderId && !!state.cart.length && !!state.shift && !state.shift.active_break;
+      payManyBtn.classList.toggle('hidden',!canManyPay);
+      payManyBtn.disabled=!canManyPay;
+    }
     var tableLabel=$('pos-selected-table'),tableBtn=$('btn-pos-select-table');
     if(tableLabel) tableLabel.textContent=formatTableLabel(state.selectedTable);
     if(tableBtn) tableBtn.textContent=state.selectedTable?'Ubah':'Pilih Meja';
@@ -2056,6 +2061,18 @@
     }catch(e){toast(e.message);}
   }
 
+  async function openManyPaymentFromCart(){
+    if(!state.activeHeldOrderId) return toast('Bayar masing-masing tersedia setelah pesanan Hold dibuka kembali di kasir.');
+    if(!state.cart.length) return toast('Cart masih kosong.');
+    try{
+      if(state.activeHeldBillId){
+        var customerName=$('pos-customer-name').value.trim()||'Tamu';
+        await request('/pos/held-orders/'+encodeURIComponent(state.activeHeldBillId),{method:'PUT',headers:headers(),body:JSON.stringify({items:state.cart,customer_name:customerName,customer_phone:''})});
+      }
+      await openCheckManager(state.activeHeldOrderId);
+    }catch(e){toast(e.message);}
+  }
+
   function resetSale(){state.cart=[];state.selectedTable=null;state.activeHeldOrderId=null;state.activeHeldBillId=null;$('pos-selected-table').textContent='Belum dipilih';$('pos-customer-name').value='';$('pos-order-note').value='';renderCart();}
 
   function showModal(html, extraClass){
@@ -2195,23 +2212,24 @@
 
       if(!hasSplit){
         mainActions=
-          '<div class="pos-simple-choice-title">Mau bayar bagaimana?</div>' +
-          '<div class="pos-simple-choice-grid pos-payment-choice-grid">' +
-            '<button type="button" class="pos-simple-choice" id="pos-pay-one"><strong>Satu Orang</strong><small>Bayar seluruh tagihan</small></button>' +
-            '<button type="button" class="pos-simple-choice" id="pos-pay-many"><strong>Masing-masing</strong><small>Bagikan tagihan</small></button>' +
-          '</div>';
+          '<div class="pos-simple-choice-title">Bagaimana pembayarannya?</div>' +
+          '<div class="pos-simple-choice-list">' +
+            '<button type="button" class="pos-simple-choice" id="pos-item-choice"><strong>Bayar Berdasarkan Menu</strong><small>Jika customer ingin membayar menu yang dipesannya saja.</small></button>' +
+            '<button type="button" class="pos-simple-choice" id="pos-evenly-choice"><strong>Bagi Rata</strong><small>Jika pembayaran tagihan ingin dibagi rata antar customer.</small></button>' +
+            '<button type="button" class="pos-simple-choice" id="pos-amount-choice"><strong>Atur Nominal</strong><small>Jika customer ingin membayar dengan nominal tertentu, lalu sisanya dibayarkan customer berikutnya sampai seluruh tagihan lunas, dalam satu transaksi.</small></button>' +
+          '</div>' +
+          '<div class="pos-simple-secondary-actions pos-payment-group-secondary"><button type="button" class="pos-btn ghost small" id="pos-payment-group">Gabungkan Tagihan</button></div>';
       }else{
-          '<div class="pos-simple-secondary-actions"><button type="button" class="pos-btn ghost small" id="pos-payment-group">Gabungkan Tagihan</button></div>' +
         mainActions=
           '<div class="pos-simple-section-title">Pembayaran</div>' +
           '<div class="pos-simple-summary">Sudah dibayar <strong>'+money(paidOrder)+'</strong><span>Sisa '+money(remainingOrder)+'</span></div>' +
-          (firstOpen ? '<div class="pos-simple-secondary-actions"><button type="button" class="pos-btn ghost small" id="pos-add-amount">+ Atur Nominal</button><button type="button" class="pos-btn ghost small" id="pos-add-item">Pilih Menu</button></div>' : '') +
+          (firstOpen ? '<div class="pos-simple-secondary-actions"><button type="button" class="pos-btn ghost small" id="pos-add-amount">Atur Nominal</button><button type="button" class="pos-btn ghost small" id="pos-add-item">Bayar Berdasarkan Menu</button></div>' : '') +
           (allUnpaid ? '<button type="button" class="pos-btn ghost small danger" id="pos-reset-split">↩ Batalkan Pembagian</button>' : '');
       }
 
       showModal(
         '<div class="pos-simple-bill-head">' +
-          '<div><h3>Bayar</h3><p>'+ (hasSplit ? 'Pilih bagian yang mau dibayar.' : 'Satu meja, satu tagihan.') +'</p></div>' +
+          '<div><h3>'+ (hasSplit ? 'Bayar' : 'Masing-masing') +'</h3><p>'+ (hasSplit ? 'Pilih bagian yang mau dibayar.' : 'Pilih cara pembayaran untuk tagihan ini.') +'</p></div>' +
           '<div class="pos-simple-bill-total">'+money(total)+'</div>' +
         '</div>' +
         mainActions +
@@ -2320,30 +2338,6 @@
       }
 
       if($('pos-check-manager-close')) $('pos-check-manager-close').onclick=hideModal;
-
-      if($('pos-pay-one')){
-        $('pos-pay-one').onclick=function(){
-          var check=checks[0];
-          if(check && Number(check.remaining_amount||0)>0) openPayCheck(orderId,check);
-        };
-      }
-
-      if($('pos-pay-many')){
-        $('pos-pay-many').onclick=function(){
-          showModal(
-            '<h3>Masing-masing</h3>' +
-            '<p class="pos-form-help">Bagaimana mau membagi tagihan?</p>' +
-            '<div class="pos-simple-choice-list">' +
-              '<button type="button" class="pos-simple-choice" id="pos-item-choice"><strong>Bayar Berdasarkan Menu</strong><small>Jika customer ingin membayar menu yang dipesannya saja.</small></button>' +
-              '<button type="button" class="pos-simple-choice" id="pos-evenly-choice"><strong>Bagi Rata</strong><small>Jika pembayaran tagihan ingin dibagi rata antar customer.</small></button>' +
-              '<button type="button" class="pos-simple-choice" id="pos-amount-choice"><strong>Atur Nominal</strong><small>Jika customer ingin membayar dengan nominal tertentu, lalu sisanya dibayarkan customer berikutnya sampai seluruh tagihan lunas, dalam satu transaksi.</small></button>' +
-            '</div>'
-          );
-          $('pos-evenly-choice').onclick=openEvenlyFlow;
-          $('pos-amount-choice').onclick=function(){openAmountFlow(checks[0].id);};
-          $('pos-item-choice').onclick=function(){openItemFlow(checks[0].id);};
-        };
-      }
 
       if($('pos-add-amount')) $('pos-add-amount').onclick=function(){openAmountFlow(firstOpen && firstOpen.id);};
       if($('pos-add-item')) $('pos-add-item').onclick=function(){openItemFlow(firstOpen && firstOpen.id);};
@@ -2489,7 +2483,7 @@
         '</div>' +
         '<div class="pos-held-modal-actions">' +
           '<button type="button" class="pos-btn small ghost danger" data-cancel-held="'+esc(h.id)+'">Batal</button>' +
-          (h.order_id ? '<button type="button" class="pos-btn small ghost" data-check-held="'+esc(h.order_id)+'">Split</button>' : '') +
+
           '<button type="button" class="pos-btn small" data-resume-held="'+esc(h.id)+'">Buka</button>' +
         '</div>' +
       '</div>';
@@ -2497,7 +2491,7 @@
     if($('pos-held-modal-close')) $('pos-held-modal-close').onclick=hideModal;
     $('pos-modal-card').querySelectorAll('[data-resume-held]').forEach(function(b){b.onclick=function(){resumeHeld(b.dataset.resumeHeld);};});
     $('pos-modal-card').querySelectorAll('[data-cancel-held]').forEach(function(b){b.onclick=function(){cancelHeld(b.dataset.cancelHeld);};});
-    $('pos-modal-card').querySelectorAll('[data-check-held]').forEach(function(b){b.onclick=function(){openCheckManager(b.dataset.checkHeld);};});
+
   }
 
   function updateTransaksiStats(){
@@ -2549,11 +2543,11 @@
       var itemSummary=items.map(function(i){return (i.quantity||1)+'x '+(i.name||'Item');}).join(', ');
       var oType = h.order_type || (h.table_number ? 'dine_in' : 'pickup');
       var typeTitle = (oType === 'dine_in') ? ('Meja ' + esc(h.table_number || '—')) : (oType === 'pickup' ? 'Pickup' : oType === 'delivery' ? 'Delivery' : esc(oType));
-      return '<div class="pos-held-row"><div class="pos-held-main"><strong>' + typeTitle + '</strong><small>Tamu: '+esc(h.customer_name||'Tamu')+' · '+esc(h.created_at||'')+'</small></div><div class="pos-held-items">'+esc(itemSummary||'—')+'</div><div class="pos-held-total">'+money(subtotal)+'</div><div class="pos-held-actions"><button type="button" class="pos-btn small ghost danger" data-cancel-held-row="'+esc(h.id)+'">Batal</button>'+(h.order_id ? '<button type="button" class="pos-btn small ghost" data-check-held-row="'+esc(h.order_id)+'">Split / Merge</button>' : '')+'<button type="button" class="pos-btn small" data-resume-held-row="'+esc(h.id)+'">Buka di Kasir</button></div></div>';
+       return '<div class="pos-held-row"><div class="pos-held-main"><strong>' + typeTitle + '</strong><small>Tamu: '+esc(h.customer_name||'Tamu')+' · '+esc(h.created_at||'')+'</small></div><div class="pos-held-items">'+esc(itemSummary||'—')+'</div><div class="pos-held-total">'+money(subtotal)+'</div><div class="pos-held-actions"><button type="button" class="pos-btn small ghost danger" data-cancel-held-row="'+esc(h.id)+'">Batal</button><button type="button" class="pos-btn small" data-resume-held-row="'+esc(h.id)+'">Buka di Kasir</button></div></div>';
     }).join('');
     box.querySelectorAll('[data-resume-held-row]').forEach(function(b){b.onclick=function(){resumeHeld(b.dataset.resumeHeldRow);};});
     box.querySelectorAll('[data-cancel-held-row]').forEach(function(b){b.onclick=function(){cancelHeld(b.dataset.cancelHeldRow);};});
-    box.querySelectorAll('[data-check-held-row]').forEach(function(b){b.onclick=function(){openCheckManager(b.dataset.checkHeldRow);};});
+
   }
 
   function switchTransaksiTab(tab){
@@ -2836,6 +2830,7 @@
     });
     $('btn-pos-refresh-menu').onclick=loadMenu;
     $('btn-pos-pay').onclick=openPayModal;
+    if($('btn-pos-pay-many')) $('btn-pos-pay-many').onclick=openManyPaymentFromCart;
     $('btn-pos-clear').onclick=function(){resetSale();};
     $('btn-pos-hold').onclick=holdSale;
     if($('btn-pos-open-held')) $('btn-pos-open-held').onclick=openHeld;

@@ -662,3 +662,10 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 @media(max-width:520px){
   .pos-payment-group-row{grid-template-columns:minmax(0,1fr) auto 24px}
 }
+
+/* Reopened-order payment entry: direct settlement is primary, split settlement is secondary. */
+.pos-cart-payment-actions{display:flex;flex-direction:column;gap:8px}
+.pos-pay-many-btn{width:100%;min-height:42px;border:1px solid #dbe1e8;border-radius:11px;background:#fff;color:#0f172a;font-size:13px;font-weight:800;cursor:pointer;transition:all .15s ease}
+.pos-pay-many-btn:hover:not(:disabled){background:#f8fafc;border-color:#94a3b8}
+.pos-pay-many-btn:disabled{opacity:.45;cursor:not-allowed}
+.pos-payment-group-secondary{margin-top:2px}
