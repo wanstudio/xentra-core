@@ -2358,23 +2358,44 @@
   }
 
   async function holdSale(){
-    if(state.activeOrderLocked) return showOrderLockedWarning();
-    if(state.activeAdditionalMode) return toast('Tambahan pesanan dikirim langsung, bukan melalui Hold Bill.');
-    if(!state.cart.length)return toast('Cart masih kosong.');
-    if(state.orderType==='dine_in' && !state.selectedTable)return toast('Pilih meja sebelum menahan bill.');
+    var tx=composer();
+    if(tx.isExisting()) return showOrderLockedWarning();
+    if(tx.isAddition()) return toast('Tambahan pesanan dikirim langsung, bukan melalui Hold Bill.');
+    var items=tx.getDisplayItems();
+    var orderType=tx.getOrderType();
+    var table=tx.getTable();
+    if(!items.length)return toast('Cart masih kosong.');
+    if(orderType==='dine_in'&&!table)return toast('Pilih meja sebelum menahan bill.');
+
     try{
       var customerName=$('pos-customer-name').value.trim()||'Tamu';
-      if(state.activeHeldBillId){
-        await request('/pos/held-orders/'+encodeURIComponent(state.activeHeldBillId),{method:'PUT',headers:headers(),body:JSON.stringify({items:state.cart,customer_name:customerName,customer_phone:''})});
+      var heldBillId=tx.getHeldBillId();
+      if(heldBillId){
+        await request('/pos/held-orders/'+encodeURIComponent(heldBillId),{
+          method:'PUT',
+          headers:headers(),
+          body:JSON.stringify({items:items,customer_name:customerName,customer_phone:''})
+        });
         toast('Hold Bill diperbarui. Meja tetap dipesan.');
       }else{
-        await request('/pos/held-orders',{method:'POST',headers:headers(),body:JSON.stringify({branch_id:state.branchId,table_number:state.selectedTable?state.selectedTable.table_number:'',customer_name:customerName,order_type:state.orderType,items:state.cart})});
+        await request('/pos/held-orders',{
+          method:'POST',
+          headers:headers(),
+          body:JSON.stringify({
+            branch_id:state.branchId,
+            table_number:table?table.table_number:'',
+            customer_name:customerName,
+            order_type:orderType,
+            items:items
+          })
+        });
         toast('Pesanan ditahan (Hold Bill).');
       }
-      resetSale(); await updateHeldCount(); if(state.transaksiTab==='held') renderHeldSales();
+      resetSale();
+      await updateHeldCount();
+      if(state.transaksiTab==='held') renderHeldSales();
     }catch(e){toast(e.message);}
   }
-
   async function loadHeld(){
     try{var d=await request('/pos/held-orders?branch_id='+encodeURIComponent(state.branchId),{headers:headers()});state.held=d.held_orders||[];return state.held;}catch(e){return [];}
   }
