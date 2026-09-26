@@ -1,15 +1,15 @@
 /**
  * Customer Order Detail Status Header — targeted verification.
  *
- * ODH-01  newly created delivery (pending) → PESANAN DIBUAT, step 1 done
+ * ODH-01  newly created delivery (pending) → MENUNGGU DITERIMA, step 1 done
  * ODH-02  preparing delivery → SEDANG DISIAPKAN, steps 1-2 done
- * ODH-03  delivering delivery → SEDANG DIANTAR, steps 1-3 done
- * ODH-04  completed delivery → PESANAN SELESAI, all done
- * ODH-05  newly created pickup (pending) → PESANAN DIBUAT
+ * ODH-03  delivering delivery → SEDANG DIANTAR, steps 1-4 done
+ * ODH-04  completed delivery → SELESAI DIANTAR, all done
+ * ODH-05  newly created pickup (pending) → MENUNGGU DITERIMA
  * ODH-06  preparing pickup → SEDANG DISIAPKAN
  * ODH-07  ready pickup → SIAP DIAMBIL, steps 1-3 done
- * ODH-08  completed pickup → PESANAN SELESAI
- * ODH-09  confirmed → PESANAN DIBUAT (no new status invented)
+ * ODH-08  completed pickup → SUDAH DIAMBIL
+ * ODH-09  confirmed → PESANAN DITERIMA (existing lifecycle)
  * ODH-10  delivery never shows "Siap diambil"; pickup never shows "Sedang diantar"
  * ODH-11  title + progress come from ONE source (resolveOrderPhase)
  * ODH-12  forbidden terms absent from tracking layout
@@ -29,6 +29,11 @@ const ROOT = path.resolve(__dirname, '../..');
 const src = fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/pages/order-received.js'), 'utf8');
 const apiSrc = fs.readFileSync(path.join(ROOT, 'server/routes/api.js'), 'utf8');
 
+// The resolver now projects through the shared Fulfillment Environment contract.
+// Load that browser-global module before extracting the resolver below.
+globalThis.window = globalThis;
+require(path.join(ROOT, 'apps/customer-pwa/assets/js/core/fulfillment-environments.js'));
+
 // Extract the self-contained phase resolver + distance formatter and eval them.
 function extractFn(name) {
   const start = src.indexOf('function ' + name + '(');
@@ -45,11 +50,11 @@ function extractFn(name) {
 const resolveOrderPhase = extractFn('resolveOrderPhase');
 const fmtDistance = extractFn('fmtDistance');
 
-test('ODH-01: newly created delivery (pending) → PESANAN DIBUAT', () => {
+test('ODH-01: newly created delivery (pending) → MENUNGGU DITERIMA', () => {
   const ph = resolveOrderPhase('pending', 'delivery');
-  assert.equal(ph.title, 'PESANAN DIBUAT');
+  assert.equal(ph.title, 'MENUNGGU DITERIMA');
   assert.equal(ph.doneCount, 1);
-  assert.deepEqual(ph.steps, ['Pesanan dibuat', 'Sedang disiapkan', 'Siap / Diantar', 'Selesai']);
+  assert.deepEqual(ph.steps, ['Pesanan diterima', 'Sedang disiapkan', 'Siap diantar', 'Sedang diantar', 'Selesai diantar']);
 });
 
 test('ODH-02: preparing delivery → SEDANG DISIAPKAN', () => {
@@ -61,20 +66,20 @@ test('ODH-02: preparing delivery → SEDANG DISIAPKAN', () => {
 test('ODH-03: delivering delivery → SEDANG DIANTAR', () => {
   const ph = resolveOrderPhase('out_for_delivery', 'delivery');
   assert.equal(ph.title, 'SEDANG DIANTAR');
-  assert.equal(ph.doneCount, 3);
+  assert.equal(ph.doneCount, 4);
 });
 
 test('ODH-04: completed delivery → PESANAN SELESAI', () => {
   const ph = resolveOrderPhase('completed', 'delivery');
-  assert.equal(ph.title, 'PESANAN SELESAI');
-  assert.equal(ph.doneCount, 4);
+  assert.equal(ph.title, 'SELESAI DIANTAR');
+  assert.equal(ph.doneCount, 5);
 });
 
-test('ODH-05: newly created pickup (pending) → PESANAN DIBUAT', () => {
+test('ODH-05: newly created pickup (pending) → MENUNGGU DITERIMA', () => {
   const ph = resolveOrderPhase('pending', 'pickup');
-  assert.equal(ph.title, 'PESANAN DIBUAT');
+  assert.equal(ph.title, 'MENUNGGU DITERIMA');
   assert.equal(ph.doneCount, 1);
-  assert.deepEqual(ph.steps, ['Pesanan dibuat', 'Sedang disiapkan', 'Siap diambil', 'Selesai']);
+  assert.deepEqual(ph.steps, ['Pesanan diterima', 'Sedang disiapkan', 'Siap diambil', 'Sudah diambil']);
 });
 
 test('ODH-06: preparing pickup → SEDANG DISIAPKAN', () => {
@@ -91,20 +96,19 @@ test('ODH-07: ready pickup → SIAP DIAMBIL', () => {
 
 test('ODH-08: completed pickup → PESANAN SELESAI', () => {
   const ph = resolveOrderPhase('completed', 'pickup');
-  assert.equal(ph.title, 'PESANAN SELESAI');
+  assert.equal(ph.title, 'SUDAH DIAMBIL');
   assert.equal(ph.doneCount, 4);
 });
 
-test('ODH-09: confirmed → PESANAN DIBUAT (existing lifecycle, no new status)', () => {
+test('ODH-09: confirmed → PESANAN DITERIMA (existing lifecycle, no new status)', () => {
   for (const t of ['delivery', 'pickup']) {
     const ph = resolveOrderPhase('confirmed', t);
-    assert.equal(ph.title, 'PESANAN DIBUAT');
+    assert.equal(ph.title, 'PESANAN DITERIMA');
     assert.equal(ph.doneCount, 1);
   }
-  // ready (delivery) stays inside the preparation phase — no invented title.
   const rdy = resolveOrderPhase('ready', 'delivery');
-  assert.equal(rdy.title, 'SEDANG DISIAPKAN');
-  assert.equal(rdy.doneCount, 2);
+  assert.equal(rdy.title, 'SIAP DIANTAR');
+  assert.equal(rdy.doneCount, 3);
 });
 
 test('ODH-10: delivery never shows pickup labels and vice versa', () => {
@@ -116,9 +120,10 @@ test('ODH-10: delivery never shows pickup labels and vice versa', () => {
   }
 });
 
-test('ODH-10b: delivery phase-3 is Siap / Diantar until courier takes over', () => {
-  assert.equal(resolveOrderPhase('pending', 'delivery').steps[2], 'Siap / Diantar');
-  assert.equal(resolveOrderPhase('out_for_delivery', 'delivery').steps[2], 'Sedang diantar');
+test('ODH-10b: delivery primary phases remain stable while delivery substate changes', () => {
+  assert.equal(resolveOrderPhase('pending', 'delivery').steps.length, 5);
+  assert.equal(resolveOrderPhase('ready', 'delivery').steps[2], 'Siap diantar');
+  assert.equal(resolveOrderPhase('out_for_delivery', 'delivery').steps[3], 'Sedang diantar');
 });
 
 test('ODH-10c: recipient falls back to buyer identity, never a bare Saya', () => {
