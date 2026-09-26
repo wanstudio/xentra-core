@@ -1590,6 +1590,24 @@
     }
   }
 
+  async function refreshBranchOperationalState(){
+    if(!token() || state.coreConnection !== true) return;
+    try{
+      var d=await request('/pos/terminal/current',{headers:headers()});
+      if(d && d.branch){
+        state.branchOperationalOpen = d.branch.is_open_override === true && d.branch.is_active !== false;
+        state.branchStatusReason = state.branchOperationalOpen ? 'open' : (d.branch.is_open_override === false ? 'closed' : 'inactive');
+      }else{
+        state.branchOperationalOpen = null;
+        state.branchStatusReason = 'unknown';
+      }
+      updatePosReadiness();
+    }catch(e){
+      // Keep the last known branch state during a transient refresh failure,
+      // while Core reachability remains independently represented.
+    }
+  }
+
   async function loadShift(){
     try{
       var d=await request('/pos/shifts/current',{headers:headers()});
