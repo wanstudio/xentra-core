@@ -4487,7 +4487,18 @@ input[type="file"].x-input,
     overflow-y: auto !important;
     overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
-    padding: 16px 16px calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 16px 16px calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Bottom spacer to guarantee the last card in every tab has generous breathing room above fixed bottom navbar */
+  .x-merchant-app .x-tab-content.active::after {
+    content: "" !important;
+    display: block !important;
+    height: 32px !important;
+    width: 100% !important;
+    clear: both !important;
+    flex-shrink: 0 !important;
+    pointer-events: none !important;
   }
 
   /* White cards inside the putih-kebiruan curved frame */
