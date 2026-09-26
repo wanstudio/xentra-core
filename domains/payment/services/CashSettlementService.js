@@ -85,19 +85,30 @@ class CashSettlementService {
       if (existingPayment.provider && existingPayment.provider !== 'cash') {
         throw new Error(`[CashSettlementService Provider Conflict]: Pembayaran untuk pesanan "${order_id}" sudah terdaftar dengan provider online "${existingPayment.provider}".`);
       }
-      if (Math.round(Number(existingPayment.amount)) !== Math.round(Number(order.grand_total))) {
-        throw new Error(`[SETTLEMENT_AMOUNT_MISMATCH]: Record pembayaran sebelumnya (Rp ${existingPayment.amount}) tidak sesuai dengan tagihan pesanan (Rp ${order.grand_total}).`);
-      }
-      if (existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT) {
+      const existingAmount = Number(existingPayment.amount || 0);
+      const currentGrandTotal = Number(order.grand_total || 0);
+
+      if (existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT &&
+          Math.round(existingAmount) === Math.round(currentGrandTotal)) {
         return {
           success: true,
           idempotent: true,
           payment_id: existingPayment.id,
           order_id,
-          amount: Number(existingPayment.amount),
+          amount: currentGrandTotal,
           payment_status: PaymentModel.STATUSES.SETTLEMENT,
           message: 'Pembayaran tunai sudah diselesaikan sebelumnya.'
         };
+      }
+
+      // Dine-in Additional Order may increase the current canonical total
+      // after an earlier settlement. Detailed payment history remains in
+      // pos_check_payments; order_payments is the current cumulative summary.
+      if (existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT &&
+          existingAmount < currentGrandTotal) {
+        // Allowed: settleCashPayment below updates the existing summary row.
+      } else if (Math.round(existingAmount) !== Math.round(currentGrandTotal)) {
+        throw new Error(`[SETTLEMENT_AMOUNT_MISMATCH]: Record pembayaran sebelumnya (Rp ${existingPayment.amount}) tidak sesuai dengan tagihan pesanan (Rp ${order.grand_total}).`);
       }
     }
 
