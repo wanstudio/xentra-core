@@ -154,6 +154,8 @@
     el.innerHTML = '<div class="pos-toast-inner">' + iconSvg + '<span>' + esc(msg) + '</span></div>';
     el.classList.add('show');
     clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, dur);
+  }
+
   function setPosStatus(level,title,detail){
     var el=$('pos-connection-badge'); if(!el)return;
     var normalized=['ready','caution','stop'].indexOf(level)!==-1 ? level : 'caution';
@@ -2917,7 +2919,6 @@
     $('btn-pos-shift-status').onclick=openShiftModal;
     $('btn-pos-close-shift-top').onclick=openCloseShiftModal;
     $('btn-pos-logout').onclick=function(){clearPosSessionAndReturnToPin();};
-    bindPosStatus();
     bindPosStatus();
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
     if($('pos-mcart-trigger-order')){

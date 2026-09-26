@@ -298,41 +298,8 @@ class PaymentGatewayService {
           const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
           OrderPlacementService.deductStockForSettledOrder(orderId, { dbTransactionProvided: true });
 
-          const promoItems = paymentRepository.findOrderItemsWithPromoMarker(orderId);
-          const promoRedemptionsToRecord = [];
-          if (promoItems && promoItems.length > 0 && order && order.customer_phone) {
-            for (const it of promoItems) {
-              let promoId = null;
-              const marker = '[PROMO:';
-              const markerStart = typeof it.note === 'string' ? it.note.indexOf(marker) : -1;
-              if (markerStart >= 0) {
-                const idStart = markerStart + marker.length;
-                const idEnd = it.note.indexOf(']', idStart);
-                if (idEnd > idStart) promoId = it.note.slice(idStart, idEnd);
-              } else if (String(it.product_id).startsWith('prm_')) {
-                promoId = it.product_id;
-              }
-              if (!promoId) continue;
-
-              const promoRow = promotionRepository.findPromotion(promoId);
-              if (!promoRow) continue;
-              const activeRedemptions = promotionRepository.countCustomerRedemptions({ promotionId: promoId, customerPhone: order.customer_phone });
-              const maxLimit = Number(promoRow.max_redemptions_per_customer || 1);
-              if (activeRedemptions >= maxLimit) throw new Error(`[PROMO_LIMIT_EXCEEDED_RACE] Batas klaim promo "${promoId}" (${maxLimit}x) telah digunakan oleh pesanan lain milik pelanggan.`);
-
-              let benefitAmount = Number(it.unit_price || 0);
-              if (benefitAmount === 0) {
-                const rewardProduct = promotionRepository.findRewardProductPrice(it.product_id);
-                benefitAmount = rewardProduct ? Number(rewardProduct.v || 0) : 0;
-              }
-              promoRedemptionsToRecord.push({ promo_id: promoId, benefit_amount: benefitAmount });
-            }
-          }
-
-          if (promoRedemptionsToRecord.length > 0) {
-            const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-            PromotionEngineService.recordRedemptions({ order_id: orderId, brand_id: order?.brand_id, branch_id: order?.branch_id, customer_phone: order?.customer_phone, promotions: promoRedemptionsToRecord });
-          }
+          const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+          PromotionEngineService.recordOrderRedemptions(order);
 
           if (order && order.order_type === 'dine_in') {
             // Invariant: payment completion alone does not activate the dining session.

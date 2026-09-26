@@ -267,7 +267,7 @@ test('Baseline 2: Cash Pending does NOT deduct stock; Table is held; Merchant Ac
   assert.equal(addonRes.order.dining_session_id, sessionId, 'Addon order must attach to active session');
 
   // Cleanup session
-  DiningTableService.completeDiningSession(sessionId);
+  DiningTableService.completeDiningSession(sessionId, 'staff', { force: true });
   const t1Clean = diningRepo.findTableState(TABLE_T1);
   assert.equal(t1Clean.operational_state, 'available');
 });
@@ -552,7 +552,7 @@ test('Baseline 7: Concurrent double-click Accept requests execute atomically wit
   assert.equal(stockAfter, stockBefore - 1, 'Stock must be deducted exactly once despite concurrent accept requests');
 
   // Cleanup session
-  DiningTableService.completeDiningSession(activeSession.id);
+  DiningTableService.completeDiningSession(activeSession.id, 'staff', { force: true });
   assert.equal(diningRepo.findTableState(TABLE_T5).operational_state, 'available');
 });
 

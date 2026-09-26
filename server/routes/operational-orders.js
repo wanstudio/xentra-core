@@ -281,7 +281,11 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
         const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
         OrderPlacementService.deductStockForSettledOrder(order.id, { dbTransactionProvided: true });
 
-        // 3. Transition order status from pending -> confirmed (ACCEPTED)
+        // 3. Record promo redemptions for accepted order atomically
+        const PromotionEngineService = require('../../domains/promotion/services/PromotionEngineService');
+        PromotionEngineService.recordOrderRedemptions(fullOrder);
+
+        // 4. Transition order status from pending -> confirmed (ACCEPTED)
         const result = OrderStateMachine.transition({
           order_id: order.id,
           target_status: 'confirmed',
@@ -328,6 +332,43 @@ router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manage
       }
     } catch (err) {
       try { orderRepo.rollbackTransaction(); } catch (_) {}
+      const isConcurrencyException = err.message && (err.message.includes('[OUT_OF_STOCK_RACE]') || err.message.includes('[PROMO_LIMIT_EXCEEDED_RACE]'));
+      if (isConcurrencyException) {
+        const { PaymentRepository } = require('../../core/data/repositories');
+        const paymentRepo = new PaymentRepository();
+        const payRecord = paymentRepo.findPaymentByOrderId(fullOrder.id);
+        if (payRecord && payRecord.payment_status === 'settlement') {
+          try {
+            orderRepo.beginTransaction();
+            const now = new Date().toISOString();
+            const notePrefix = err.message.includes('[PROMO_LIMIT_EXCEEDED_RACE]')
+              ? `[Kendala Promo / Perlu Penyesuaian/Refund]: ${err.message}`
+              : `[Kendala Stok / Perlu Refund]: ${err.message}`;
+            paymentRepo.markFulfillmentException({ orderId: fullOrder.id, note: notePrefix, updatedAt: now });
+            orderRepo.commitTransaction();
+            const { events } = require('../../core');
+            events.EventBus.publish({
+              type: 'payment.fulfillment_exception',
+              producer: 'commerce',
+              payload: {
+                payment_id: payRecord.id,
+                order_id: fullOrder.id,
+                branch_id: fullOrder.branch_id,
+                brand_id: fullOrder.brand_id,
+                error: err.message,
+                settled_at: now
+              }
+            }).catch(() => {});
+            return res.status(400).json({
+              success: false,
+              order_status: 'fulfillment_exception',
+              error: notePrefix
+            });
+          } catch (_) {
+            try { orderRepo.rollbackTransaction(); } catch (_) {}
+          }
+        }
+      }
       return res.status(400).json({ success: false, error: err.message });
     }
   } catch (outerErr) {

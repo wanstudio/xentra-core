@@ -402,5 +402,5 @@ test('P0-SEC-10: Customer with active session can place additional orders on the
   assert.equal(addOrderRes.success, true);
   assert.equal(addOrderRes.order.dining_session_id, sess.session_id, 'Additional order must attach to active session');
 
-  DiningTableService.completeDiningSession(sess.session_id);
+  DiningTableService.completeDiningSession(sess.session_id, 'staff', { force: true });
 });

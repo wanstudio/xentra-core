@@ -305,9 +305,28 @@ test('Payment 3 — Midtrans Webhook: verifies SHA512 signature, advances status
   assert.strictEqual(payRecord.payment_status, 'settlement');
   assert.strictEqual(payRecord.payment_method, 'midtrans');
 
+  // Payment settlement is financially authoritative only: stock remains 10 while pending
+  const stockRowBeforeAccept = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pay', 'prod_mid_1');
+  assert.strictEqual(stockRowBeforeAccept.stock, 10, 'Stock must NOT be decremented before Branch ACCEPT');
+
+  // 3. Operational Acceptance Boundary: Branch ACCEPT transitions pending -> confirmed and deducts stock atomically
+  const OrderPlacementService = require('../../domains/commerce/services/OrderPlacementService');
+  const OrderStateMachine = require('../../server/services/OrderStateMachine');
+  OrderPlacementService.deductStockForSettledOrder(orderId);
+  OrderStateMachine.transition({
+    order_id: orderId,
+    target_status: 'confirmed',
+    actor_type: 'branch_actor',
+    actor_id: 'usr_bm_mid',
+    note: 'Branch acceptance for settled order'
+  });
+
+  const orderAfterAccept = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(orderAfterAccept.status, 'confirmed');
+
   // Verify Atomic Stock Deduction: 10 - 2 = 8
   const stockRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_pay', 'prod_mid_1');
-  assert.strictEqual(stockRow.stock, 8, 'Stock must be decremented from 10 to 8 on settlement');
+  assert.strictEqual(stockRow.stock, 8, 'Stock must be decremented from 10 to 8 after Branch ACCEPT');
 
   // Verify Inventory Movement Ledger
   const movements = db.prepare('SELECT * FROM inventory_movements WHERE reference_id = ?').all(orderNumber);
@@ -315,7 +334,7 @@ test('Payment 3 — Midtrans Webhook: verifies SHA512 signature, advances status
   assert.strictEqual(movements[0].quantity, -2);
   assert.strictEqual(movements[0].movement_type, 'sale_deduction');
 
-  // 3. Idempotent Test: Same webhook sent a second time -> DROPPED (No duplicate deduction)
+  // 4. Idempotent Test: Same webhook sent a second time -> DROPPED (No duplicate deduction)
   const duplicateResult = PaymentGatewayService.handleWebhook(webhookPayload, { provider: 'midtrans' });
   assert.strictEqual(duplicateResult.success, true);
   assert.strictEqual(duplicateResult.idempotent, true);
@@ -378,7 +397,7 @@ test('Payment 5 — Concurrency Race: Stock Depleted on Settlement marks fulfill
   // Order demands 3 items (stock is only 1)
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Race', '62812345678', 'delivery', 'customer_app', 150000, 150000, 'midtrans', 'pending')
+    VALUES (?, ?, 'brand_pay', 'branch_pay', 'Budi Race', '62812345678', 'delivery', 'customer_app', 150000, 150000, 'midtrans', 'confirmed')
   `).run(orderId, orderNumber);
 
   db.prepare(`
@@ -635,8 +654,8 @@ test('Payment 9 — Webhook Concurrency Race & Idempotent Retry: First settlemen
 
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, subtotal, grand_total, payment_method, status)
-    VALUES (?, ?, ?, ?, 'Customer Race', ?, 'delivery', 25000, 25000, 'midtrans', 'pending'),
-           (?, ?, ?, ?, 'Customer Race', ?, 'delivery', 25000, 25000, 'midtrans', 'pending')
+    VALUES (?, ?, ?, ?, 'Customer Race', ?, 'delivery', 25000, 25000, 'midtrans', 'confirmed'),
+           (?, ?, ?, ?, 'Customer Race', ?, 'delivery', 25000, 25000, 'midtrans', 'confirmed')
   `).run(orderIdA, orderNumA, brandId, branchId, customerPhone, orderIdB, orderNumB, brandId, branchId, customerPhone);
 
   db.prepare(`
@@ -663,7 +682,7 @@ test('Payment 9 — Webhook Concurrency Race & Idempotent Retry: First settlemen
   const resA = PaymentGatewayService.handleWebhook(webhookPayloadA, { skipSignatureCheck: true, provider: 'midtrans' });
   assert.strictEqual(resA.payment_status, 'settlement');
   const orderAInDb = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderIdA);
-  assert.strictEqual(orderAInDb.status, 'pending', 'money settled but order still AWAITING_BRANCH_ACCEPTANCE (R5 check-2)');
+  assert.strictEqual(orderAInDb.status, 'confirmed', 'order remains confirmed after settlement');
 
   // Verify redemption recorded for Order A
   const rdmA = db.prepare("SELECT * FROM promotion_redemptions WHERE order_id = ? AND status = 'active'").get(orderIdA);

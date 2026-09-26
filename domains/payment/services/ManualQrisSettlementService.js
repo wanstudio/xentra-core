@@ -10,35 +10,6 @@ const paymentRepository = new PaymentRepository();
 const orderRepository = new OrderRepository();
 const promotionRepository = new PromotionRepository();
 
-function recordPromoRedemptions(order) {
-  if (!order || !order.customer_phone) return;
-  const items = paymentRepository.findOrderItemsWithPromoMarker(order.id);
-  const promotions = [];
-  for (const it of items || []) {
-    let promoId = null;
-    const marker = '[PROMO:';
-    const start = typeof it.note === 'string' ? it.note.indexOf(marker) : -1;
-    if (start >= 0) {
-      const idStart = start + marker.length;
-      const idEnd = it.note.indexOf(']', idStart);
-      if (idEnd > idStart) promoId = it.note.slice(idStart, idEnd);
-    } else if (String(it.product_id || '').startsWith('prm_')) promoId = it.product_id;
-    if (!promoId) continue;
-    const promoRow = promotionRepository.findPromotion(promoId);
-    if (!promoRow) continue;
-    const used = promotionRepository.countCustomerRedemptions({ promotionId: promoId, customerPhone: order.customer_phone });
-    const maxLimit = Number(promoRow.max_redemptions_per_customer || 1);
-    if (used >= maxLimit) throw new Error('[PROMO_LIMIT_EXCEEDED_RACE] Promo tidak dapat diredeem ulang.');
-    let benefitAmount = Number(it.unit_price || 0);
-    if (benefitAmount === 0) { const reward = promotionRepository.findRewardProductPrice(it.product_id); benefitAmount = reward ? Number(reward.v || 0) : 0; }
-    promotions.push({ promo_id: promoId, benefit_amount: benefitAmount });
-  }
-  if (promotions.length) {
-    const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-    PromotionEngineService.recordRedemptions({ order_id: order.id, brand_id: order.brand_id, branch_id: order.branch_id, customer_phone: order.customer_phone, promotions });
-  }
-}
-
 class ManualQrisSettlementService {
   static settleStaticQrisPayment({ order_id, cashier_id, branch_id, reference_note = '' }) {
     const order = paymentRepository.findOrder(order_id);
@@ -56,8 +27,9 @@ class ManualQrisSettlementService {
       // AWAITING_BRANCH_ACCEPTANCE into ACCEPTED.
       if (['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed'].includes(order.status)) {
         OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
+        const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
+        PromotionEngineService.recordOrderRedemptions(order);
       }
-      recordPromoRedemptions(order);
       if (order.order_type === 'dine_in') {
         const holds = paymentRepository.findActiveDiningHolds(order.id);
         let tableIds = (holds || []).map(h => h.table_id);

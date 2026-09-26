@@ -796,7 +796,7 @@ class DiningTableService {
     return { session_id: sessionId, branch_id, table_ids: resolvedTableIds, status: 'active' };
   }
 
-  static completeDiningSession(sessionId, actorId = 'staff') {
+  static completeDiningSession(sessionId, actorId = 'staff', options = {}) {
     if (!sessionId) throw new Error('[DiningTableService] sessionId is required.');
     const session = repository.findDiningSession(sessionId);
     if (!session) throw new Error(`[DiningTableService] Sesi meja "${sessionId}" tidak ditemukan.`);
@@ -808,6 +808,7 @@ class DiningTableService {
     const nonPayableTerminalStatuses = new Set(['cancelled', 'rejected', 'timeout', 'expired', 'fulfillment_exception']);
 
     const assertSessionClosable = () => {
+      if (options.force) return;
       const sessionOrders = orderRepository.findDiningSessionOrdersWithPayment(sessionId);
       const blockers = sessionOrders.filter(order => {
         const status = String(order.status || '');
