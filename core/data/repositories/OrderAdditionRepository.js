@@ -29,10 +29,18 @@ class OrderAdditionRepository {
     return Number(row?.next_sequence || 1);
   }
 
-  insertBatch({ id, orderId, branchId, diningSessionId, sequenceNo, sourceChannel, createdBy, itemsPayload, subtotal, createdAt, updatedAt }) {
+  findByClientTransactionId(orderId, clientTransactionId) {
+    if (!clientTransactionId) return null;
+    return this.db.queryOne(
+      'SELECT * FROM order_addition_batches WHERE order_id = ? AND client_transaction_id = ? LIMIT 1',
+      [orderId, clientTransactionId]
+    );
+  }
+
+  insertBatch({ id, orderId, branchId, diningSessionId, sequenceNo, sourceChannel, createdBy, clientTransactionId = null, itemsPayload, subtotal, createdAt, updatedAt }) {
     return this.db.execute(
-      "INSERT INTO order_addition_batches (id, order_id, branch_id, dining_session_id, sequence_no, source_channel, created_by, items_payload, subtotal, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_acceptance', ?, ?)",
-      [id, orderId, branchId, diningSessionId, sequenceNo, sourceChannel, createdBy || null, itemsPayload, Number(subtotal || 0), createdAt, updatedAt]
+      "INSERT INTO order_addition_batches (id, order_id, branch_id, dining_session_id, sequence_no, source_channel, created_by, client_transaction_id, items_payload, subtotal, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_acceptance', ?, ?)",
+      [id, orderId, branchId, diningSessionId, sequenceNo, sourceChannel, createdBy || null, clientTransactionId || null, itemsPayload, Number(subtotal || 0), createdAt, updatedAt]
     );
   }
 
