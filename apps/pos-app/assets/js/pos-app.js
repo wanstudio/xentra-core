@@ -1561,10 +1561,22 @@
         localStorage.setItem('xentra_pos_branch_id',String(state.branchId));
       }
       state.coreConnection=true;
+      if(d && d.branch){
+        state.branchOperationalOpen = d.branch.is_open_override === true && d.branch.is_active !== false;
+        state.branchStatusReason = state.branchOperationalOpen ? 'open' : (d.branch.is_open_override === false ? 'closed' : 'inactive');
+      }else{
+        // Never infer GO from missing branch state. The readiness classifier
+        // must not become green when branch operational state is unknown.
+        state.branchOperationalOpen = null;
+        state.branchStatusReason = 'unknown';
+      }
       if(state.terminalId) localStorage.setItem('xentra_pos_terminal_id',state.terminalId);
+      updatePosReadiness();
       return !!state.terminalId;
     }catch(e){
       state.coreConnection=false;
+      state.branchOperationalOpen=null;
+      state.branchStatusReason='unknown';
       state.terminalId=state.terminalId || localStorage.getItem('xentra_pos_terminal_id') || null;
       return !!state.terminalId;
     }
