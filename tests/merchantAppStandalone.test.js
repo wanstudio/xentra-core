@@ -426,6 +426,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     win.eval(fs.readFileSync(ORDER_JS_PATH, 'utf8'));
     await win.loadBMOrders();
 
+    win.setBMOrdersView('all');
     const cardIds = Array.from(win.document.querySelectorAll('#bm-orders-cards-container [data-order-id]'))
       .map((el) => el.getAttribute('data-order-id'));
 
