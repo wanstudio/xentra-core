@@ -4223,10 +4223,10 @@
         name: state.fulfillment.reservationName.trim(),
         phone: state.fulfillment.reservationPhone.trim()
       };
-    } else if (!state.paymentMethod) {
+    } else if (!isAdditionalDineIn && !state.paymentMethod) {
       if (UI && UI.toast) UI.toast('Silakan pilih metode pembayaran terlebih dahulu.');
       return;
-    } else if (needsCashTendered() && (!state.cashTendered || Number(state.cashTendered) <= 0)) {
+    } else if (!isAdditionalDineIn && needsCashTendered() && (!state.cashTendered || Number(state.cashTendered) <= 0)) {
       openCashTenderSheet();
       return;
     }
