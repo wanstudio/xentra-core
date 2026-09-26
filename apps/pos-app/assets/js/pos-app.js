@@ -2270,7 +2270,7 @@
       function openItemFlow(sourceId){
         var source=checks.find(function(c){return c.id===sourceId;}) || firstOpen;
         if(!source || !(source.items||[]).length){toast('Belum ada menu yang bisa dipilih.');return;}
-        var html='<h3>Bayar Berdasarkan Menu</h3><p class="pos-form-help">Pilih menu yang menjadi tanggungan orang ini.</p>';
+        var html='<h3>Bayar Berdasarkan Menu</h3>';
         (source.items||[]).forEach(function(it){
           var maxQty=Math.max(0,Number(it.quantity)||0);
           html+='<div class="pos-simple-item-row">' +
@@ -2282,9 +2282,10 @@
             '</div>' +
             '<input data-check-item="'+esc(it.order_item_id)+'" type="hidden" value="0">';
         });
-        html+='<div class="pos-modal-actions"><button id="pos-item-submit" class="pos-btn">Tambahkan</button><button id="pos-item-cancel" class="pos-btn ghost">Batal</button></div>';
+        html+='<div class="pos-modal-actions pos-modal-nav"><button type="button" id="pos-item-back" class="pos-btn ghost">Kembali</button><div class="pos-modal-nav-right"><button type="button" id="pos-item-submit" class="pos-btn">Tambahkan</button><button type="button" id="pos-item-close" class="pos-btn ghost">Tutup</button></div></div>';
         showModal(html);
-        $('pos-item-cancel').onclick=function(){openCheckManager(orderId);};
+        $('pos-item-back').onclick=function(){openCheckManager(orderId);};
+        $('pos-item-close').onclick=hideModal;
         $('pos-modal-card').querySelectorAll('[data-item-minus],[data-item-plus]').forEach(function(btn){
           btn.onclick=function(){
             var id=btn.dataset.itemMinus||btn.dataset.itemPlus;
@@ -2331,10 +2332,10 @@
           showModal(
             '<h3>Masing-masing</h3>' +
             '<p class="pos-form-help">Bagaimana mau membagi tagihan?</p>' +
-            '<div class="pos-simple-choice-grid">' +
-              '<button type="button" class="pos-simple-choice" id="pos-item-choice"><strong>Bayar Berdasarkan Menu</strong></button>' +
-              '<button type="button" class="pos-simple-choice" id="pos-evenly-choice"><strong>Bagi Rata</strong></button>' +
-              '<button type="button" class="pos-simple-choice" id="pos-amount-choice"><strong>Atur Nominal</strong></button>' +
+            '<div class="pos-simple-choice-list">' +
+              '<button type="button" class="pos-simple-choice" id="pos-item-choice"><strong>Bayar Berdasarkan Menu</strong><small>Jika customer ingin membayar apa yang dia pesan saja.</small></button>' +
+              '<button type="button" class="pos-simple-choice" id="pos-evenly-choice"><strong>Bagi Rata</strong><small>Jika total tagihan ingin dibagi rata antar orang.</small></button>' +
+              '<button type="button" class="pos-simple-choice" id="pos-amount-choice"><strong>Atur Nominal</strong><small>Jika setiap orang ingin membayar nominal tertentu.</small></button>' +
             '</div>'
           );
           $('pos-evenly-choice').onclick=openEvenlyFlow;

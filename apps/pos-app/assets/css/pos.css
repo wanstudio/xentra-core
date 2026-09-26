@@ -636,3 +636,11 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 
 /* Payment method choice: use the full two-column width; three-column is reserved for split methods. */
 .pos-payment-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+
+/* Split-bill method choices: vertical, full-width hierarchy. */
+.pos-simple-choice-list{display:flex;flex-direction:column;gap:10px;margin:10px 0 4px}
+.pos-simple-choice-list .pos-simple-choice{width:100%;min-height:72px;padding:14px 16px;align-items:flex-start;justify-content:center;box-sizing:border-box}
+.pos-simple-choice-list .pos-simple-choice strong{font-size:14px;line-height:1.25}
+.pos-simple-choice-list .pos-simple-choice small{font-size:12px;line-height:1.4;margin-top:4px}
+.pos-modal-nav{justify-content:space-between;align-items:center}
+.pos-modal-nav-right{display:flex;align-items:center;gap:8px}
