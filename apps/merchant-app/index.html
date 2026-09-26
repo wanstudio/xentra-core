@@ -2,14 +2,14 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Xentra Merchant — Operasional Cabang</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — tokens, toast, action-menu, crop editor, shell styles -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.2">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.4">
 </head>
 <body class="x-merchant-app">
   <div class="x-dash-layout">
@@ -1588,7 +1588,7 @@
   <!-- Mobile-first Merchant navigation: visual source of truth -->
   <nav class="x-merchant-mobile-nav" id="x-merchant-mobile-nav" aria-label="Navigasi Merchant">
     <button type="button" class="x-merchant-mobile-nav-item active" data-route="hari-ini" onclick="navigateTo('hari-ini')">
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M12 3L2 12h3v8h5v-5a2 2 0 0 1 4 0v5h5v-8h3L12 3z"/></svg>
       <span>Beranda</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="pesanan" onclick="navigateTo('pesanan')">
@@ -1597,15 +1597,15 @@
       <span class="x-mobile-nav-badge" id="mobile-orders-count">5</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="menu" onclick="navigateTo('menu')">
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.48L23 5.05h-5.02L18.06 22.99zM2.87 21.51c.1.84.79 1.48 1.63 1.48h1.66l.08-17.94H1.22l1.65 16.46zM11 2h2v7.12l5.44 5.44-1.41 1.41L12 10.94l-5.03 5.03-1.41-1.41L11 9.12V2z"/></svg>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M3 4.2v4.3l4.5 4.5 10.8 10.8c.8.8 2.2.8 3 0s.8-2.2 0-3L10.5 10l.3-2.5C10.8 5 9 3.5 6.5 3.5c-.8 0-1.8.3-2.5.7l-1 0z"/><path d="M13.8 7.2l2.2-2.2.7.7-1.4 1.4 1.4 1.4 1.4-1.4-.7-.7 2.2-2.2 1.4 1.4-2.2 2.2.7.7 1.4-1.4 1.4 1.4-1.4 1.4-.7-.7-2.2 2.2c-.8.8-2 1.1-3 .7l-1.8 1.8-1.5-1.5 1.8-1.8c-.4-1-.1-2.2.7-3z"/><path d="M7.8 14.8l-4.6 4.6c-.8.8-.8 2.2 0 3s2.2.8 3 0l4.6-4.6-3-3z"/></svg>
       <span>Menu</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="stok" onclick="navigateTo('stok')">
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M7 2h10a2 2 0 0 1 2 2v7H5V4a2 2 0 0 1 2-2zm-2 11h14v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7zm3-6.5a.75.75 0 0 0-1.5 0v3a.75.75 0 0 0 1.5 0v-3zm0 9a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0v-4z"/></svg>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M7 2h10a2 2 0 0 1 2 2v5H5V4a2 2 0 0 1 2-2zm-2 9h14v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-9zm3-5a.75.75 0 0 0-1.5 0v2a.75.75 0 0 0 1.5 0V6zm0 7a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0v-4z"/></svg>
       <span>Stock</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="promo" onclick="navigateTo('promo')">
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7zm6.7 9.5-1.4-1.4 6-6 1.4 1.4-6 6zm-1.2-4.5a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm5 5a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4z"/></svg>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M20 5H4c-1.1 0-2 .9-2 2v3c1.1 0 2 .9 2 2s-.9 2-2 2v3c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2v-3c-1.1 0-2-.9-2-2s.9-2 2-2V7c0-1.1-.9-2-2-2zm-9.3 4.2c.7 0 1.3.6 1.3 1.3s-.6 1.3-1.3 1.3-1.3-.6-1.3-1.3.6-1.3 1.3-1.3zm-1.4 7.6l6-8 1.4 1-6 8-1.4-1zm4 1.4c-.7 0-1.3-.6-1.3-1.3s.6-1.3 1.3-1.3 1.3.6 1.3 1.3-.6 1.3-1.3 1.3z" fill-rule="evenodd"/></svg>
       <span>Promo</span>
     </button>
   </nav>

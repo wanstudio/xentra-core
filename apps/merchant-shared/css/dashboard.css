@@ -39,6 +39,9 @@ html, body {
   color: var(--text-main);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 input, button, select, textarea, optgroup {
@@ -4152,60 +4155,6 @@ input[type="file"].x-input,
     padding: 14px;
   }
 
-  .x-merchant-mobile-nav {
-    position: fixed;
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 80;
-    min-height: 68px;
-    padding: 7px 7px calc(7px + env(safe-area-inset-bottom));
-    background: rgba(255,255,255,.97);
-    border-top: 1px solid #e5e7eb;
-    box-shadow: 0 -6px 22px rgba(15,23,42,.08);
-    backdrop-filter: blur(14px);
-  }
-
-  .x-merchant-mobile-nav-item {
-    position: relative;
-    border: 0;
-    background: transparent;
-    color: #475569;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    min-width: 0;
-    min-height: 54px;
-    border-radius: 12px;
-    cursor: pointer;
-    font-size: 10px;
-    font-weight: 800;
-  }
-
-  .x-merchant-mobile-nav-item svg {
-    color: currentColor;
-  }
-
-  .x-merchant-mobile-nav-item.active {
-    color: #15803d;
-    background: #f0fdf4;
-  }
-
-  .x-merchant-mobile-nav-item.active::before {
-    content: "";
-    position: absolute;
-    top: -7px;
-    left: 26%;
-    right: 26%;
-    height: 3px;
-    border-radius: 0 0 6px 6px;
-    background: #16a34a;
-  }
-
   .bm-order-search input {
     font-size: 16px;
   }
@@ -4243,25 +4192,34 @@ input[type="file"].x-input,
 .x-merchant-app .x-hamburger { display:none !important; }
 .x-merchant-app .x-dash-main { width:100%; margin-left:0 !important; padding-bottom:100px; }
 .x-merchant-app .x-dash-topbar { padding-left:clamp(16px,3vw,32px); padding-right:clamp(16px,3vw,32px); }
-.x-merchant-app .x-tab-content { max-width:1180px; width:100%; margin:0 auto; }
-.x-merchant-app .x-merchant-mobile-nav {
-  display:grid; position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
-  width:min(680px,calc(100vw - 28px)); min-height:66px; padding:7px;
-  grid-template-columns:repeat(5,1fr); gap:4px; z-index:80;
-  background:rgba(255,255,255,.96); border:1px solid #e2e8f0; border-radius:20px;
-  box-shadow:0 14px 40px rgba(15,23,42,.14); backdrop-filter:blur(16px);
+.x-merchant-app .x-tab-content { max-width:1180px; width:100%; margin:0 auto; box-sizing:border-box; }
+.x-merchant-app .table-responsive,
+.x-merchant-app .x-table-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
-.x-merchant-app .x-merchant-mobile-nav-item {
-  border:0; background:transparent; color:#64748b; min-height:52px; border-radius:14px;
-  display:flex; align-items:center; justify-content:center; flex-direction:column;
-  gap:3px; font-size:10px; font-weight:800; cursor:pointer;
-}
-.x-merchant-app .x-merchant-mobile-nav-item.active { color:#15803d; background:#f0fdf4; }
 @media(max-width:768px){
-  .x-merchant-app .x-dash-topbar{padding:9px 12px}
-  .x-merchant-app .x-tab-content{padding:10px !important}
-  .x-merchant-app .x-merchant-mobile-nav{bottom:max(8px,env(safe-area-inset-bottom));width:calc(100vw - 16px);border-radius:18px}
-  .x-merchant-app .x-dash-main{padding-bottom:88px}
+  html {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  body.x-merchant-app {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    position: relative !important;
+  }
+  .x-merchant-app .x-dash-layout {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  .x-merchant-app .x-dash-topbar{padding:9px 12px; width:100% !important; max-width:100% !important; box-sizing:border-box !important;}
+  .x-merchant-app .x-tab-content{padding:10px !important; width:100% !important; max-width:100% !important; overflow-x:hidden !important; box-sizing:border-box !important;}
+  .x-merchant-app .x-dash-main{padding-bottom:84px; width:100% !important; max-width:100% !important; overflow-x:hidden !important; box-sizing:border-box !important;}
 }
 @media(min-width:769px){
   .x-merchant-app .x-dash-topbar{max-width:1180px;width:100%;margin:0 auto;border-left:1px solid #eef2f7;border-right:1px solid #eef2f7}
@@ -4475,84 +4433,119 @@ input[type="file"].x-input,
     left: 2px;
   }
 
-  .x-merchant-mobile-nav {
-    position: fixed;
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 200;
-    height: 66px;
-    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
-    box-sizing: border-box;
-    background: #ffffff;
-    border: 0;
-    border-radius: 24px 24px 0 0;
-    box-shadow: 0 -4px 18px rgba(0,0,0,.07);
-    backdrop-filter: none;
+  .x-merchant-mobile-nav,
+  .x-merchant-app .x-merchant-mobile-nav {
+    position: fixed !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    margin: 0 !important;
+    transform: none !important;
+    z-index: 200 !important;
+    min-height: 68px !important;
+    height: calc(68px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+    border: 0 !important;
+    border-top: 0 !important;
+    border-radius: 28px 28px 0 0 !important;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
+    backdrop-filter: none !important;
   }
 
-  .x-merchant-mobile-nav-item {
-    position: relative;
-    min-width: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: #111111;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    padding: 4px 2px 0;
-    cursor: pointer;
-    font-size: 11px;
-    line-height: 1.1;
-    font-weight: 700;
+  .x-merchant-mobile-nav-item,
+  .x-merchant-app .x-merchant-mobile-nav-item {
+    position: relative !important;
+    min-width: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: #222222 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    padding: 2px 2px 0 !important;
+    cursor: pointer !important;
+    font-size: 11px !important;
+    line-height: 1.1 !important;
+    font-weight: 700 !important;
+    outline: none !important;
+    box-shadow: none !important;
+    -webkit-tap-highlight-color: transparent !important;
   }
 
-  .x-merchant-mobile-nav-item svg {
-    width: 24px;
-    height: 24px;
-    color: currentColor;
-    fill: currentColor;
-    overflow: visible;
+  .x-merchant-mobile-nav-item svg,
+  .x-merchant-app .x-merchant-mobile-nav-item svg {
+    width: 24px !important;
+    height: 24px !important;
+    color: #222222 !important;
+    fill: currentColor !important;
+    overflow: visible !important;
+    display: block !important;
+    transition: color .15s ease, fill .15s ease;
   }
 
-  .x-merchant-mobile-nav-item.active {
-    color: #0cae4b;
-    background: transparent;
+  .x-merchant-mobile-nav-item span,
+  .x-merchant-app .x-merchant-mobile-nav-item span,
+  .x-merchant-mobile-nav-item.active span,
+  .x-merchant-app .x-merchant-mobile-nav-item.active span {
+    font-size: 11px !important;
+    line-height: 1.1 !important;
+    font-weight: 700 !important;
+    color: #111111 !important; /* tulisan menu bottom tetap hitam */
+    white-space: nowrap !important;
   }
 
-  .x-merchant-mobile-nav-item.active::before {
-    content: "";
-    position: absolute;
-    top: -6px;
-    left: calc(50% - 22px);
-    width: 44px;
-    height: 4px;
-    border-radius: 0 0 4px 4px;
-    background: #08a94f;
+  .x-merchant-mobile-nav-item.active,
+  .x-merchant-app .x-merchant-mobile-nav-item.active {
+    color: #08a94f !important;
+    background: transparent !important;
+  }
+
+  .x-merchant-mobile-nav-item.active svg,
+  .x-merchant-app .x-merchant-mobile-nav-item.active svg {
+    color: #08a94f !important; /* hanya icon yang berubah warna */
+    fill: #08a94f !important;
+  }
+
+  .x-merchant-mobile-nav-item.active::before,
+  .x-merchant-app .x-merchant-mobile-nav-item.active::before {
+    content: "" !important;
+    position: absolute !important;
+    top: -8px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 48px !important;
+    height: 4px !important;
+    border-radius: 0 0 4px 4px !important;
+    background: #08a94f !important;
   }
 
   .x-mobile-nav-badge {
-    position: absolute;
-    top: 2px;
-    right: calc(50% - 18px);
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    border-radius: 9px;
-    background: #ef3340;
-    color: #ffffff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    line-height: 1;
-    font-weight: 800;
-    box-sizing: border-box;
+    position: absolute !important;
+    top: 0 !important;
+    right: calc(50% - 18px) !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    padding: 0 5px !important;
+    border-radius: 9px !important;
+    background: #ef3340 !important;
+    color: #ffffff !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    font-weight: 800 !important;
+    box-sizing: border-box !important;
   }
 
   .x-dash-main > .x-tab-content {
