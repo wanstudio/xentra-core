@@ -2054,23 +2054,23 @@
   }
 
   async function openPayModal(){
-    if(state.activeAdditionalMode) return submitAdditionalOrder();
-    if(!state.cart.length)return;
+    var tx=composer();
+    if(tx.isAddition()) return submitAdditionalOrder();
+    if(!tx.hasItems())return;
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
     if(state.shift.active_break)return toast('Akhiri istirahat sebelum melanjutkan transaksi.');
 
-    // Refresh accepted-order total/items before showing payment. This picks up
-    // any Additional Batch that Merchant has accepted since the last POS view.
-    if(state.activeOrderLocked && state.activeHeldOrderId){
+    if(tx.isExisting()&&tx.getOrderId()){
       try{
-        await refreshActiveOrderContext(state.activeHeldOrderId);
+        await refreshActiveOrderContext(tx.getOrderId());
       }catch(e){
         return toast(e.message);
       }
+      if(!composer().hasItems()) return toast('Order aktif belum memiliki item.');
     }
 
     state.autoPayAfterTable=true;
-    if(state.orderType==='dine_in'&&!state.selectedTable){openTableSelector();return;}
+    if(tx.getOrderType()==='dine_in'&&!tx.getTable()){openTableSelector();return;}
     state.autoPayAfterTable=false;
     closeMobileCartOverlay();
     var t=total();
