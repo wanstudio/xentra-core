@@ -1320,9 +1320,11 @@
         var color=getCategoryColor(p.category_id,catIndex);
         var hasOpts=optionGroups(p).length>0;
 
-        var cartQty=state.cart.reduce(function(acc,item){
+        var composerCart=getComposerCart();
+        var cartQty=composerCart.reduce(function(acc,item){
           return String(item.product_id)===String(p.id)?acc+(Number(item.quantity)||0):acc;
         },0);
+        var orderLocked=isOrderLockedForEditing();
 
         var initials=(pName||'').split(' ').slice(0,2).map(function(w){return w.charAt(0);}).join('').toUpperCase()||'P';
         var mediaHtml='';
@@ -1351,7 +1353,7 @@
           '</button>'
         ) : '';
 
-        return '<div role="button" tabindex="0" class="pos-product '+(unavailable?'disabled':'')+(cartQty>0?' in-cart':'')+'" data-product-id="'+esc(p.id)+'">'+
+        return '<div role="button" tabindex="0" class="pos-product '+(unavailable?'disabled ':'')+(orderLocked?'order-locked ':'')+(cartQty>0?'in-cart':'')+'" data-product-id="'+esc(p.id)+'" aria-disabled="'+(orderLocked?'true':'false')+'">'+
           (cartQty>0?'<span class="pos-product-cart-badge">'+cartQty+'</span>':'')+
           mediaHtml+
           '<div class="pos-product-body">'+
