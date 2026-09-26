@@ -2269,13 +2269,35 @@
       function openItemFlow(sourceId){
         var source=checks.find(function(c){return c.id===sourceId;}) || firstOpen;
         if(!source || !(source.items||[]).length){toast('Belum ada menu yang bisa dipilih.');return;}
-        var html='<h3>Pilih Menu</h3><p class="pos-form-help">Pilih menu yang dibayar orang ini.</p>';
+        var html='<h3>Bayar Berdasarkan Menu</h3><p class="pos-form-help">Pilih menu yang menjadi tanggungan orang ini.</p>';
         (source.items||[]).forEach(function(it){
-          html+='<div class="pos-simple-item-row"><span><strong>'+esc(it.product_name||'Item')+'</strong><small>'+money(it.unit_price)+' × '+it.quantity+'</small></span><input data-check-item="'+esc(it.order_item_id)+'" type="number" min="0" max="'+it.quantity+'" value="0" inputmode="numeric"></div>';
+          var maxQty=Math.max(0,Number(it.quantity)||0);
+          html+='<div class="pos-simple-item-row">' +
+            '<span><strong>'+esc(it.product_name||'Item')+'</strong><small>'+money(it.unit_price)+' × '+it.quantity+'</small></span>' +
+            '<div class="pos-item-stepper" role="group" aria-label="Jumlah yang dibayar">' +
+              '<button type="button" class="pos-item-stepper-btn" data-item-minus="'+esc(it.order_item_id)+'" aria-label="Kurangi">−</button>' +
+              '<span class="pos-item-stepper-value" data-item-qty="'+esc(it.order_item_id)+'">0</span>' +
+              '<button type="button" class="pos-item-stepper-btn" data-item-plus="'+esc(it.order_item_id)+'" aria-label="Tambah">+</button>' +
+            '</div>' +
+            '<input data-check-item="'+esc(it.order_item_id)+'" type="hidden" value="0">';
         });
         html+='<div class="pos-modal-actions"><button id="pos-item-submit" class="pos-btn">Tambahkan</button><button id="pos-item-cancel" class="pos-btn ghost">Batal</button></div>';
         showModal(html);
         $('pos-item-cancel').onclick=function(){openCheckManager(orderId);};
+        $('pos-modal-card').querySelectorAll('[data-item-minus],[data-item-plus]').forEach(function(btn){
+          btn.onclick=function(){
+            var id=btn.dataset.itemMinus||btn.dataset.itemPlus;
+            var input=$('pos-modal-card').querySelector('[data-check-item="'+CSS.escape(id)+'"]');
+            var valueEl=$('pos-modal-card').querySelector('[data-item-qty="'+CSS.escape(id)+'"]');
+            if(!input||!valueEl)return;
+            var item=(source.items||[]).find(function(x){return String(x.order_item_id)===String(id);});
+            var maxQty=item?Math.max(0,Number(item.quantity)||0):0;
+            var current=Math.floor(Number(input.value)||0);
+            var next=btn.dataset.itemPlus!==undefined ? Math.min(maxQty,current+1) : Math.max(0,current-1);
+            input.value=String(next);
+            valueEl.textContent=String(next);
+          };
+        });
         $('pos-item-submit').onclick=async function(){
           var splitItems=[];
           $('pos-modal-card').querySelectorAll('[data-check-item]').forEach(function(input){
