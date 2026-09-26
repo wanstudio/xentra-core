@@ -4604,3 +4604,70 @@ input[type="file"].x-input,
     font-size: 16px;
   }
 }
+
+
+/* Mobile Account — reference-driven account screen */
+.x-mobile-account-page { display:none; }
+@media(max-width:768px){
+  .x-mobile-account-page{
+    position:fixed;
+    inset:0;
+    z-index:500;
+    display:none;
+    overflow-y:auto;
+    background:#f3f3f5;
+    color:#222;
+    font-family:"Plus Jakarta Sans",sans-serif;
+  }
+  body.x-mobile-account-open .x-mobile-account-page{display:block;}
+  body.x-mobile-account-open .x-dash-layout,
+  body.x-mobile-account-open .x-merchant-mobile-nav{display:none !important;}
+  .x-mobile-account-statusbar-spacer{height:78px;}
+  .x-mobile-account-header{height:74px;padding:0 28px;display:flex;align-items:center;gap:10px;box-sizing:border-box;}
+  .x-mobile-account-header h1{margin:0;font-size:28px;line-height:1;font-weight:800;letter-spacing:-.6px;}
+  .x-mobile-account-back{width:44px;height:44px;padding:0;border:0;background:transparent;display:flex;align-items:center;justify-content:center;color:#4b4b4b;}
+  .x-mobile-account-back svg{width:34px;height:34px;}
+  .x-mobile-account-content{padding:28px 27px 46px;box-sizing:border-box;}
+  .x-mobile-account-profile-card{width:100%;min-height:174px;padding:26px 25px;border:0;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:space-between;text-align:left;color:#222;}
+  .x-mobile-account-profile-copy{min-width:0;display:flex;flex-direction:column;gap:7px;}
+  .x-mobile-account-name-row{display:flex;align-items:center;gap:10px;min-width:0;}
+  .x-mobile-account-name-row strong{font-size:27px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .x-mobile-account-name-row span{flex:0 0 auto;padding:5px 11px;border-radius:18px;background:#e63248;color:#fff;font-size:17px;font-weight:800;}
+  .x-mobile-account-profile-copy>span:not(.x-mobile-account-role){font-size:21px;line-height:1.15;color:#5b5b5b;}
+  .x-mobile-account-chevron{font-size:44px;line-height:1;font-weight:300;color:#4e4e4e;}
+  .x-mobile-account-profile-chevron{width:58px;height:58px;border-radius:50%;background:#dfffe1;color:#0a8e35;display:flex;align-items:center;justify-content:center;font-size:48px;flex:0 0 58px;}
+  .x-mobile-account-section{margin-top:48px;}
+  .x-mobile-account-section h2{margin:0 0 24px;padding:0 27px;font-size:26px;line-height:1.1;font-weight:800;letter-spacing:-.4px;}
+  .x-mobile-account-list-card{width:100%;border-radius:30px;background:#fff;overflow:hidden;}
+  .x-mobile-account-single-row{min-height:88px;border:1px solid #ddd;display:flex;align-items:center;padding:0 28px;box-sizing:border-box;text-align:left;}
+  .x-mobile-account-leading-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex:0 0 36px;color:#4d4d4d;}
+  .x-mobile-account-leading-icon svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+  .x-mobile-account-single-row .x-mobile-account-leading-icon svg{fill:currentColor;stroke:currentColor;}
+  .x-mobile-account-row-label{margin-left:22px;min-width:0;flex:1;font-size:24px;line-height:1.2;font-weight:700;}
+  .x-mobile-account-row{width:100%;min-height:92px;padding:0 27px;border:0;border-bottom:1px solid #dedede;background:#fff;display:flex;align-items:center;text-align:left;color:#2d2d2d;}
+  .x-mobile-account-row:last-child{border-bottom:0;}
+  .x-mobile-account-row .x-mobile-account-row-label{font-size:22px;}
+  .x-mobile-account-new{margin-left:auto;margin-right:18px;padding:3px 7px;border-radius:10px;background:#078c2c;color:#fff;font-size:14px;font-weight:800;}
+  .x-mobile-account-value{margin-left:auto;margin-right:20px;color:#666;font-size:18px;}
+  .x-mobile-account-row .x-mobile-account-chevron{margin-left:12px;}
+  .x-mobile-account-logout{width:100%;height:82px;margin-top:54px;border:2px solid #df2942;border-radius:42px;background:transparent;color:#cf1836;font-size:25px;font-weight:800;}
+}
+@media(max-width:420px){
+  .x-mobile-account-statusbar-spacer{height:52px;}
+  .x-mobile-account-header{height:68px;padding:0 22px;}
+  .x-mobile-account-header h1{font-size:24px;}
+  .x-mobile-account-content{padding:22px 20px 34px;}
+  .x-mobile-account-profile-card{min-height:150px;padding:20px;border-radius:27px;}
+  .x-mobile-account-name-row strong{font-size:22px;}
+  .x-mobile-account-name-row span{font-size:14px;padding:4px 9px;}
+  .x-mobile-account-profile-copy>span:not(.x-mobile-account-role){font-size:18px;}
+  .x-mobile-account-profile-chevron{width:50px;height:50px;flex-basis:50px;font-size:42px;}
+  .x-mobile-account-section{margin-top:38px;}
+  .x-mobile-account-section h2{font-size:22px;padding:0 20px;margin-bottom:18px;}
+  .x-mobile-account-single-row{min-height:76px;padding:0 20px;}
+  .x-mobile-account-row{min-height:78px;padding:0 20px;}
+  .x-mobile-account-row-label,.x-mobile-account-row .x-mobile-account-row-label{font-size:19px;}
+  .x-mobile-account-leading-icon{width:32px;height:32px;flex-basis:32px;}
+  .x-mobile-account-leading-icon svg{width:26px;height:26px;}
+  .x-mobile-account-logout{height:68px;margin-top:42px;font-size:21px;}
+}
