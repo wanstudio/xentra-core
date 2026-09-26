@@ -1164,13 +1164,15 @@
   }
 
   function addProduct(p){
-    if (optionGroups(p).length > 0) {
+    if(composer().isExisting()) return showOrderLockedWarning();
+    if(optionGroups(p).length > 0) {
       return openProductOptions(p);
     }
     return addConfiguredProduct(p,[], '');
   }
 
   function openProductOptions(p){
+    if(composer().isExisting()) return showOrderLockedWarning();
     var groups=optionGroups(p);
     var title=p.name || p.product_name || 'Produk';
     var html='<h3>'+esc(title)+'</h3><p>Pilih opsi untuk item ini. Harga akhir akan diverifikasi oleh Core saat pembayaran.</p>';
