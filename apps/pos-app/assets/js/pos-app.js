@@ -2356,6 +2356,11 @@
     state.orderType = restoredType;
     state.activeHeldOrderId = h.order_id || null;
     state.activeHeldBillId = h.id || null;
+    state.activeOrderLocked = false;
+    state.activeAdditionalMode = false;
+    state.additionalCart = [];
+    state.pendingAdditions = [];
+
     document.querySelectorAll('.pos-order-type button').forEach(function(x){
       x.classList.toggle('active', x.dataset.type === restoredType);
     });
@@ -2370,18 +2375,36 @@
     if (ctx) ctx.classList.toggle('hidden', restoredType !== 'dine_in');
 
     if ($('pos-customer-name')) $('pos-customer-name').value = h.customer_name || '';
-    try{
-      state.cart = JSON.parse(h.items_payload || '[]');
-    }catch(_){state.cart = [];}
+    try{ state.cart = JSON.parse(h.items_payload || '[]'); }catch(_){state.cart = [];}
+
+    // The Hold row is only the cashier working reference. Once a canonical
+    // Order has been accepted by Merchant, use the canonical Order as display
+    // source so local Hold snapshots cannot drift from reality.
+    if(h.order_id){
+      try{
+        await refreshActiveOrderContext(h.order_id);
+      }catch(err){
+        // Pending POS orders may still rely on the editable Hold snapshot.
+        state.activeOrderLocked=false;
+        state.pendingAdditions=[];
+        try{state.cart=JSON.parse(h.items_payload||'[]');}catch(_){state.cart=[];}
+      }
+    }
+
     hideModal();
     renderCart();
+    renderMenu();
     await updateHeldCount();
     if(state.transaksiTab==='held') renderHeldSales();
     setView('kasir');
-    var labelInfo = (restoredType === 'dine_in' && h.table_number) ? ('Meja ' + h.table_number) : (h.customer_name || (restoredType === 'pickup' ? 'Pickup' : restoredType === 'delivery' ? 'Delivery' : 'Pesanan'));
-    toast('Pesanan ' + esc(labelInfo) + ' dibuka. Tambah/ubah menu, lalu pilih Hold lagi.');
-  }
 
+    var labelInfo = (restoredType === 'dine_in' && h.table_number) ? ('Meja ' + h.table_number) : (h.customer_name || (restoredType === 'pickup' ? 'Pickup' : restoredType === 'delivery' ? 'Delivery' : 'Pesanan'));
+    if(state.activeOrderLocked){
+      toast('Pesanan ' + esc(labelInfo) + ' dibuka. Pesanan lama sudah diproses Merchant; gunakan + Tambah Pesanan untuk menu baru.');
+    }else{
+      toast('Pesanan ' + esc(labelInfo) + ' dibuka. Tambah/ubah menu, lalu pilih Hold lagi.');
+    }
+  }
   async function cancelHeld(heldId){
     if(!confirm('Batalkan pesanan yang ditahan ini?')) return;
     try{
