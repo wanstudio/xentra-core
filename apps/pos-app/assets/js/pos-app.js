@@ -945,31 +945,92 @@
     });
   }
 
+  function getComposerCart() {
+    return state.activeAdditionalMode ? state.additionalCart : state.cart;
+  }
+
+  function isOrderLockedForEditing() {
+    return !!state.activeOrderLocked && !state.activeAdditionalMode;
+  }
+
+  function showOrderLockedWarning() {
+    toast('Pesanan sudah diproses Merchant dan tidak dapat diubah. Gunakan + Tambah Pesanan untuk menambah menu.');
+  }
+
+  function activeDisplayCart() {
+    return state.activeAdditionalMode ? state.additionalCart : state.cart;
+  }
+
+  function additionalTotal() {
+    return state.additionalCart.reduce(function(sum,it){
+      return sum + (Number(it.unit_price)||0) * (Number(it.quantity)||0);
+    },0);
+  }
+
   function renderCart() {
     var isDineIn = state.orderType === 'dine_in';
+    var displayCart = activeDisplayCart();
+    var displayTotal = state.activeAdditionalMode ? additionalTotal() : total();
     var tableCtx = $('pos-table-context');
     if (tableCtx) tableCtx.classList.toggle('hidden', !isDineIn);
 
-    var box=$('pos-cart-items'), meta=$('pos-cart-meta'), subtotal=$('pos-subtotal'), grand=$('pos-total'), pay=$('pos-pay-total'), btn=$('btn-pos-pay'), payManyBtn=$('btn-pos-pay-many');
-    if (meta) meta.textContent=state.cart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0)+' item';
-    if (subtotal) subtotal.textContent=money(total());
-    if (grand) grand.textContent=money(total());
-    if (pay) pay.textContent=money(total());
-    if (btn) btn.disabled=!state.cart.length || !state.shift || !!state.shift.active_break;
+    var box=$('pos-cart-items'), meta=$('pos-cart-meta'), subtotal=$('pos-subtotal'), grand=$('pos-total'), pay=$('pos-pay-total'), btn=$('btn-pos-pay'), payManyBtn=$('btn-pos-pay-many'), additionBtn=$('btn-pos-additional-order');
+    if (meta) meta.textContent=displayCart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0)+' item';
+    if (subtotal) subtotal.textContent=money(displayTotal);
+    if (grand) grand.textContent=money(displayTotal);
+    if (pay) pay.textContent=money(displayTotal);
+
+    if (btn) {
+      btn.querySelector('span') && (btn.querySelector('span').textContent = state.activeAdditionalMode ? 'Kirim Tambahan '+money(displayTotal) : 'Bayar '+money(displayTotal));
+      btn.disabled=!displayCart.length || !state.shift || !!state.shift.active_break;
+      btn.classList.toggle('pos-btn-additional-submit', !!state.activeAdditionalMode);
+    }
     if (payManyBtn) {
-      var canManyPay=isDineIn && !!state.activeHeldOrderId && !!state.cart.length && !!state.shift && !state.shift.active_break;
+      var canManyPay=isDineIn && !state.activeAdditionalMode && !!state.activeHeldOrderId && !!state.cart.length && !!state.shift && !state.shift.active_break;
       payManyBtn.classList.toggle('hidden',!canManyPay);
       payManyBtn.disabled=!canManyPay;
     }
+    if (additionBtn) {
+      var canAdd=isDineIn && !!state.activeOrderLocked && !state.activeAdditionalMode && !!state.activeHeldOrderId;
+      additionBtn.hidden=!canAdd;
+      additionBtn.textContent=canAdd ? '+ Tambah Pesanan' : '+ Tambah Pesanan';
+    }
+
+    var holdBtn=$('btn-pos-hold'), clearBtn=$('btn-pos-clear');
+    if (holdBtn) holdBtn.hidden=!!state.activeOrderLocked;
+    if (clearBtn) clearBtn.hidden=!!state.activeOrderLocked;
+
     var tableLabel=$('pos-selected-table'),tableBtn=$('btn-pos-select-table');
     if(tableLabel) tableLabel.textContent=formatTableLabel(state.selectedTable);
-    if(tableBtn) tableBtn.textContent=state.selectedTable?'Ubah':'Pilih Meja';
+    if(tableBtn) {
+      tableBtn.textContent=state.selectedTable?'Ubah':'Pilih Meja';
+      tableBtn.hidden=!!state.activeOrderLocked;
+    }
 
     var cartTableLabel=$('pos-cart-selected-table'), cartTableBtn=$('btn-pos-cart-select-table');
     if(cartTableLabel) cartTableLabel.textContent=formatTableLabel(state.selectedTable);
-    if(cartTableBtn) cartTableBtn.textContent=state.selectedTable?'Ubah':'Pilih Meja';
+    if(cartTableBtn) {
+      cartTableBtn.textContent=state.selectedTable?'Ubah':'Pilih Meja';
+      cartTableBtn.hidden=!!state.activeOrderLocked;
+    }
 
-    var totalQty = state.cart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0);
+    var custInput=$('pos-customer-name'), noteInput=$('pos-order-note');
+    if(custInput){
+      custInput.readOnly=!!state.activeOrderLocked || !!state.activeAdditionalMode;
+      custInput.classList.toggle('pos-input-locked', custInput.readOnly);
+    }
+    if(noteInput){
+      noteInput.readOnly=!!state.activeOrderLocked || !!state.activeAdditionalMode;
+      noteInput.classList.toggle('pos-input-locked', noteInput.readOnly);
+    }
+
+    var additionBanner=$('pos-order-addition-banner');
+    if(additionBanner){
+      additionBanner.classList.toggle('hidden',!state.activeAdditionalMode);
+      additionBanner.textContent=state.activeAdditionalMode ? 'Tambah Pesanan — item ini akan masuk ke order Meja ' + (state.selectedTable ? (state.selectedTable.table_number || '') : '') : '';
+    }
+
+    var totalQty = displayCart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0);
     var mCartBar = $('pos-mobile-cart-bar');
     if (mCartBar) {
       var activeView = document.querySelector('.pos-view.active');
@@ -979,7 +1040,9 @@
         var mQty = $('pos-mcart-qty');
         var mTotal = $('pos-mcart-total');
         if (mQty) mQty.textContent = totalQty;
-        if (mTotal) mTotal.textContent = money(total());
+        if (mTotal) mTotal.textContent = money(displayTotal);
+        var mBtn=$('btn-pos-mcart-checkout');
+        if(mBtn) mBtn.querySelector('span') && (mBtn.querySelector('span').textContent = state.activeAdditionalMode ? 'Kirim Tambahan' : 'Bayar Sekarang');
       } else {
         mCartBar.classList.add('hidden');
         closeMobileCartOverlay();
@@ -988,33 +1051,47 @@
 
     updateMenuCardBadges();
     if (!box) return;
-    if (!state.cart.length) { box.innerHTML='<div class="pos-empty">Belum ada item.</div>'; return; }
-    box.innerHTML=state.cart.map(function(it,idx){
-      return '<div class="pos-cart-item"><div><div class="pos-cart-item-name">'+esc(it.name)+'</div><div class="pos-cart-item-meta">'+money(it.unit_price)+(it.options&&it.options.length?'<div class="pos-cart-item-options">'+esc(optionSummary(it.options))+'</div>':'')+(it.note?'<div class="pos-cart-item-note">Catatan: '+esc(it.note)+'</div>':'')+'</div></div>' +
+    if (!displayCart.length) {
+      box.innerHTML=state.activeAdditionalMode ? '<div class="pos-empty">Belum ada item tambahan.</div>' : '<div class="pos-empty">Belum ada item.</div>';
+      return;
+    }
+
+    var locked = isOrderLockedForEditing();
+    box.innerHTML=displayCart.map(function(it,idx){
+      return '<div class="pos-cart-item'+(locked?' pos-cart-item-locked':'')+'"><div><div class="pos-cart-item-name">'+esc(it.name)+'</div><div class="pos-cart-item-meta">'+money(it.unit_price)+(it.options&&it.options.length?'<div class="pos-cart-item-options">'+esc(optionSummary(it.options))+'</div>':'')+(it.note?'<div class="pos-cart-item-note">Catatan: '+esc(it.note)+'</div>':'')+'</div></div>' +
         '<div class="pos-cart-item-actions">' +
-          '<button type="button" class="pos-qty minus" data-idx="'+idx+'" data-d="-1" aria-label="Kurangi">' +
+          '<button type="button" class="pos-qty minus" data-idx="'+idx+'" data-d="-1" aria-label="Kurangi"'+(locked?' aria-disabled="true"':'')+'>'+
             '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
           '</button>' +
           '<span class="pos-qty-value">'+it.quantity+'</span>' +
-          '<button type="button" class="pos-qty plus" data-idx="'+idx+'" data-d="1" aria-label="Tambah">' +
+          '<button type="button" class="pos-qty plus" data-idx="'+idx+'" data-d="1" aria-label="Tambah"'+(locked?' aria-disabled="true"':'')+'>'+
             '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
           '</button>' +
         '</div></div>';
     }).join('');
-    box.querySelectorAll('.pos-qty').forEach(function(b){ b.onclick=function(e){ e.stopPropagation(); changeQty(Number(b.dataset.idx), Number(b.dataset.d)); }; });
+    box.querySelectorAll('.pos-qty').forEach(function(b){
+      b.onclick=function(e){
+        e.stopPropagation();
+        changeQty(Number(b.dataset.idx), Number(b.dataset.d));
+      };
+    });
   }
 
   function changeQty(i,d){
-    if(!state.cart[i])return;
-    state.cart[i].quantity += d;
-    if(state.cart[i].quantity<=0) state.cart.splice(i,1);
+    var cart=getComposerCart();
+    if(isOrderLockedForEditing()) return showOrderLockedWarning();
+    if(!cart[i])return;
+    cart[i].quantity += d;
+    if(cart[i].quantity<=0) cart.splice(i,1);
     renderCart();
   }
 
   function decrementProduct(p, e){
     if (e && e.stopPropagation) e.stopPropagation();
-    for (var i = state.cart.length - 1; i >= 0; i--) {
-      if (String(state.cart[i].product_id) === String(p.id)) {
+    if(isOrderLockedForEditing()) return showOrderLockedWarning();
+    var cart=getComposerCart();
+    for (var i = cart.length - 1; i >= 0; i--) {
+      if (String(cart[i].product_id) === String(p.id)) {
         changeQty(i, -1);
         break;
       }
@@ -1023,9 +1100,11 @@
 
   function incrementProduct(p, e){
     if (e && e.stopPropagation) e.stopPropagation();
+    if(isOrderLockedForEditing()) return showOrderLockedWarning();
+    var cart=getComposerCart();
     if (optionGroups(p).length > 0) {
-      for (var i = state.cart.length - 1; i >= 0; i--) {
-        if (String(state.cart[i].product_id) === String(p.id)) {
+      for (var i = cart.length - 1; i >= 0; i--) {
+        if (String(cart[i].product_id) === String(p.id)) {
           changeQty(i, 1);
           return;
         }
@@ -1034,6 +1113,7 @@
     }
     return addConfiguredProduct(p, [], '');
   }
+
 
   function productOptions(p){
     var cfg=p && p.options_config;
