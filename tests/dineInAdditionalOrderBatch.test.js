@@ -80,6 +80,13 @@ describe('Dine-in Additional Order Batch contract', () => {
     assert.ok(additionService.includes('findByClientTransactionId'));
   });
 
+  it('does not expose Additional Order on an empty/new composer', () => {
+    assert.ok(posJs.includes("function getComposerMode()"));
+    assert.ok(posJs.includes("if (state.composerMode === 'existing' && state.activeHeldOrderId && state.activeOrderLocked && state.cart.length > 0) return 'existing';"));
+    assert.ok(posJs.includes("var canAdd=isDineIn && getComposerMode() === 'existing';"));
+    assert.ok(posJs.includes("state.composerMode='new';"));
+  });
+
   it('provides explicit additional-order UX and locked styling', () => {
     assert.ok(posHtml.includes('id="btn-pos-additional-order"'));
     assert.ok(posHtml.includes('id="pos-order-addition-banner"'));
