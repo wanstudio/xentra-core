@@ -50,7 +50,7 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
 
     const statusFilter = req.query.status;
     let query = `
-      SELECT o.*, b.name as branch_name 
+      SELECT o.*, b.name as branch_name, COALESCE((SELECT SUM(cp.amount) FROM pos_check_payments cp WHERE cp.order_id = o.id AND cp.payment_status = 'settlement'), 0) AS paid_amount 
       FROM orders o
       LEFT JOIN branches b ON b.id = o.branch_id
       WHERE o.brand_id = ? AND o.branch_id = ?
@@ -104,7 +104,8 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
       items: db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(ord.id),
       delivery: db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(ord.id),
       payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id),
-      pending_additions_count: Number((db.prepare("SELECT COUNT(*) AS count FROM order_addition_batches WHERE order_id = ? AND status = 'pending_acceptance'").get(ord.id) || {}).count || 0)
+      pending_additions_count: Number((db.prepare("SELECT COUNT(*) AS count FROM order_addition_batches WHERE order_id = ? AND status = 'pending_acceptance'").get(ord.id) || {}).count || 0),
+      outstanding_amount: Math.max(0, Number(ord.grand_total || 0) - Number(ord.paid_amount || 0))
     }));
 
     res.json({ success: true, branch_id: req.params.id, orders: enriched });
@@ -199,7 +200,8 @@ router.get('/admin/orders', requireAuth(['owner', 'brand_manager', 'branch_manag
       items: db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(ord.id),
       delivery: db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(ord.id),
       payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id),
-      pending_additions_count: Number((db.prepare("SELECT COUNT(*) AS count FROM order_addition_batches WHERE order_id = ? AND status = 'pending_acceptance'").get(ord.id) || {}).count || 0)
+      pending_additions_count: Number((db.prepare("SELECT COUNT(*) AS count FROM order_addition_batches WHERE order_id = ? AND status = 'pending_acceptance'").get(ord.id) || {}).count || 0),
+      outstanding_amount: Math.max(0, Number(ord.grand_total || 0) - Number(ord.paid_amount || 0))
     }));
 
     res.json({ success: true, orders: enriched });

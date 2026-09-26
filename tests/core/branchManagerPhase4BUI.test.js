@@ -311,8 +311,8 @@ describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
   });
 
   it('P4B-10: Cache-busting query is applied in HTML', () => {
-    assert.ok(html.includes('href="/merchant-shared/css/dashboard.css?v=1.0.0"'), 'Merchant App stylesheet must carry a version query');
-    assert.ok(html.includes('src="/merchant-app/assets/js/merchant-app.js?v=1.0.0"'), 'merchant-app.js must carry a version query');
+    assert.ok(/href="\/merchant-shared\/css\/dashboard\.css\?v=1\.0\.\d+"/.test(html), 'Merchant App stylesheet must carry a version query');
+    assert.ok(/src="\/merchant-app\/assets\/js\/merchant-app\.js\?v=1\.0\.\d+"/.test(html), 'merchant-app.js must carry a version query');
     assert.ok(legacyHtml.includes('src="/dashboard/assets/js/dashboard.js?v='), 'legacy dashboard.js must carry a version query');
   });
 

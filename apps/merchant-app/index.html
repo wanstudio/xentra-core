@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — tokens, toast, action-menu, crop editor, shell styles -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.0">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.1">
 </head>
 <body>
   <div class="x-dash-layout">
@@ -355,85 +355,54 @@
       <!-- BM-2: Pesanan & Meja Operational Surfaces -->
       <!-- TAB: BM-PESANAN (Operational Order Queue & Details) -->
       <section id="tab-bm-pesanan" class="x-tab-content" data-tab="bm-pesanan">
-        <!-- Order Queue List View -->
-        <div id="bm-orders-list-view">
-          <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+        <!-- Mobile-first operational inbox -->
+        <div id="bm-orders-list-view" class="bm-order-center">
+          <section class="bm-order-center-head">
+            <div class="bm-order-center-heading">
               <div>
-                <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Antrean Pesanan Cabang</h3>
-                <p class="text-muted" style="font-size:13px; margin:0;">
-                  Kelola siklus hidup pesanan cabang: penerimaan (Branch Acceptance), proses dapur, hingga selesai.
-                </p>
+                <span class="bm-section-kicker">OPERASIONAL</span>
+                <h3>Pesanan</h3>
+                <p>Kerjakan yang perlu ditangani. Detail lainnya tetap satu tap.</p>
               </div>
-              <div style="display:flex; gap:10px; align-items:center;">
-                <button type="button" class="x-btn-secondary" id="btn-bm-orders-refresh" onclick="loadBMOrders()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                  <span>Segarkan</span>
-                </button>
-              </div>
+              <button type="button" class="bm-icon-btn" id="btn-bm-orders-refresh" onclick="loadBMOrders()" aria-label="Segarkan pesanan" title="Segarkan">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              </button>
             </div>
 
-            <!-- Filters Bar -->
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-color);">
-              <div>
-                <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">CARI PESANAN</label>
-                <input type="text" id="bm-orders-search" placeholder="Nomor / Pelanggan / Telp..." class="x-input" style="width:100%; font-size:13px;" oninput="onBMOrdersFilterChange()">
-              </div>
-              <div>
-                <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">STATUS PESANAN</label>
-                <select id="bm-orders-filter-status" class="x-input" style="width:100%; font-size:13px;" onchange="onBMOrdersFilterChange()">
-                  <option value="all">Semua Status</option>
-                  <option value="pending">Menunggu Konfirmasi (Pending)</option>
-                  <option value="confirmed">Diterima (Confirmed)</option>
-                  <option value="preparing">Sedang Disiapkan (Preparing)</option>
-                  <option value="ready">Siap (Ready)</option>
-                  <option value="out_for_delivery">Dalam Pengiriman</option>
-                  <option value="completed">Selesai (Completed)</option>
-                  <option value="rejected">Ditolak (Rejected)</option>
-                  <option value="cancelled">Dibatalkan (Cancelled)</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:11px; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">TIPE PESANAN</label>
-                <select id="bm-orders-filter-type" class="x-input" style="width:100%; font-size:13px;" onchange="onBMOrdersFilterChange()">
-                  <option value="all">Semua Tipe Layanan</option>
-                  <option value="delivery">Delivery</option>
-                  <option value="pickup">Pickup</option>
-                  <option value="dine_in">Dine-In (Makan di Tempat)</option>
-                  <option value="reservation">Reservasi</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <!-- Orders Table & Mobile Cards Panel -->
-          <div class="x-card-panel">
-            <!-- Desktop Table View -->
-            <div class="x-table-responsive bm-orders-desktop-table">
-              <table class="x-table">
-                <thead>
-                  <tr>
-                    <th>No. Pesanan</th>
-                    <th>Waktu</th>
-                    <th>Pelanggan</th>
-                    <th>Tipe Layanan</th>
-                    <th>Meja</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th class="text-right">Aksi Operasional</th>
-                  </tr>
-                </thead>
-                <tbody id="bm-orders-tbody">
-                  <tr><td colspan="8" class="text-center py-6 text-muted">Memuat data pesanan cabang...</td></tr>
-                </tbody>
-              </table>
+            <div class="bm-order-queue-tabs" role="tablist" aria-label="Antrean pesanan">
+              <button type="button" id="bm-orders-view-attention" class="bm-order-queue-tab active" role="tab" aria-selected="true" onclick="setBMOrdersView('attention')">
+                Perlu tindakan <span id="bm-orders-attention-count" class="bm-order-count">0</span>
+              </button>
+              <button type="button" id="bm-orders-view-all" class="bm-order-queue-tab" role="tab" aria-selected="false" onclick="setBMOrdersView('all')">
+                Semua <span id="bm-orders-all-count" class="bm-order-count">0</span>
+              </button>
             </div>
 
-            <!-- Mobile Cards View -->
-            <div id="bm-orders-cards-container" class="bm-orders-mobile-cards" aria-live="polite">
-              <div class="text-center py-6 text-muted">Memuat data pesanan cabang...</div>
+            <div class="bm-order-type-scroller" id="bm-orders-type-chips" role="tablist" aria-label="Jenis layanan">
+              <button type="button" class="bm-order-type-chip active" data-order-type="all" onclick="setBMOrderTypeFilter('all')">Semua</button>
+              <button type="button" class="bm-order-type-chip" data-order-type="dine_in" onclick="setBMOrderTypeFilter('dine_in')">Dine-in</button>
+              <button type="button" class="bm-order-type-chip" data-order-type="pickup" onclick="setBMOrderTypeFilter('pickup')">Pickup</button>
+              <button type="button" class="bm-order-type-chip" data-order-type="delivery" onclick="setBMOrderTypeFilter('delivery')">Delivery</button>
+              <button type="button" class="bm-order-type-chip" data-order-type="reservation" onclick="setBMOrderTypeFilter('reservation')">Reservasi</button>
             </div>
-          </div>
+
+            <div class="bm-order-search-row">
+              <div class="bm-order-search">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="search" id="bm-orders-search" placeholder="Cari nama, nomor pesanan, atau telepon" autocomplete="off" oninput="onBMOrdersFilterChange()">
+              </div>
+            </div>
+          </section>
+
+          <section class="bm-order-feed" aria-live="polite">
+            <div id="bm-orders-cards-container" class="bm-orders-mobile-cards">
+              <div class="bm-order-empty">
+                <div class="bm-order-empty-icon">🍽️</div>
+                <strong>Memuat pesanan…</strong>
+                <span>Sebentar, kami mengambil antrean cabang.</span>
+              </div>
+            </div>
+          </section>
         </div>
 
         <!-- Order Detail Panel (Integrated into Tab) -->
@@ -1489,6 +1458,30 @@
     </div>
   </div>
 
+  <!-- Mobile-first Merchant navigation: primary task surface, not a collapsed sidebar -->
+  <nav class="x-merchant-mobile-nav" id="x-merchant-mobile-nav" aria-label="Navigasi Merchant">
+    <button type="button" class="x-merchant-mobile-nav-item" data-route="hari-ini" onclick="navigateTo('hari-ini')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg>
+      <span>Beranda</span>
+    </button>
+    <button type="button" class="x-merchant-mobile-nav-item" data-route="pesanan" onclick="navigateTo('pesanan')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+      <span>Pesanan</span>
+    </button>
+    <button type="button" class="x-merchant-mobile-nav-item" data-route="menu" onclick="navigateTo('menu')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v10"></path><path d="M3 3v10a3 3 0 0 0 6 0V3"></path><path d="M6 16v5"></path><path d="M16 3v18"></path><path d="M16 3c3 0 5 2 5 5s-2 5-5 5"></path></svg>
+      <span>Menu</span>
+    </button>
+    <button type="button" class="x-merchant-mobile-nav-item" data-route="stok" onclick="navigateTo('stok')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5Z"></path><path d="M3.3 7 12 12l8.7-5"></path><path d="M12 22V12"></path></svg>
+      <span>Stock</span>
+    </button>
+    <button type="button" class="x-merchant-mobile-nav-item" data-route="promo" onclick="navigateTo('promo')">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 7 10 10"></path><path d="M8 2h4l10 10-8 8L4 10V6a4 4 0 0 1 4-4Z"></path><circle cx="9" cy="7" r="1"></circle></svg>
+      <span>Promo</span>
+    </button>
+  </nav>
+
   <!-- Modal: Owner Promotion Campaign Builder / Editor (Reworked UX) -->
 
   <!-- Merchant App runtime -->
@@ -1507,7 +1500,7 @@
   <script src="/merchant-app/assets/js/stock.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
-  <script src="/merchant-app/assets/js/orders.js?v=1.0.0"></script>
-  <script src="/merchant-app/assets/js/merchant-app.js?v=1.0.0"></script>
+  <script src="/merchant-app/assets/js/orders.js?v=1.0.1"></script>
+  <script src="/merchant-app/assets/js/merchant-app.js?v=1.0.1"></script>
 </body>
 </html>
