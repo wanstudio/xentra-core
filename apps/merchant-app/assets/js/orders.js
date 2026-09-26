@@ -879,13 +879,15 @@
       }
 
       var ord = data.order;
+      var ordType = getBMOrderType(ord);
       if ($('bm-detail-order-number')) $('bm-detail-order-number').textContent = '#' + (ord.order_number || ord.id);
       if ($('bm-detail-status-badge')) {
-        $('bm-detail-status-badge').textContent = (ord.status || '').toUpperCase();
-        $('bm-detail-status-badge').className = 'x-badge ' + (ord.status === 'completed' || ord.status === 'ready' ? 'x-badge-success' : (ord.status === 'rejected' || ord.status === 'cancelled' || ord.status === 'timeout' ? 'x-badge-danger' : 'x-badge-warning'));
+        var detailStatusLabel = FulfillmentEnv && typeof FulfillmentEnv.getStatusLabel === 'function'
+          ? FulfillmentEnv.getStatusLabel(ordType, ord.status)
+          : String(ord.status || '').replace(/_/g, ' ');
+        $('bm-detail-status-badge').textContent = detailStatusLabel.toUpperCase();
+        $('bm-detail-status-badge').className = 'x-badge ' + (['completed', 'ready'].indexOf(ord.status) !== -1 ? 'x-badge-success' : (['rejected', 'cancelled', 'timeout', 'fulfillment_exception'].indexOf(ord.status) !== -1 ? 'x-badge-danger' : 'x-badge-warning'));
       }
-
-      var ordType = ord.order_type || ord.fulfillment_type || 'delivery';
       if ($('bm-detail-cust-name')) $('bm-detail-cust-name').textContent = ord.customer_name || 'Pelanggan';
       if ($('bm-detail-cust-phone')) $('bm-detail-cust-phone').textContent = ord.customer_phone || '—';
       if ($('bm-detail-fulfillment-badge')) $('bm-detail-fulfillment-badge').textContent = ordType.toUpperCase();
