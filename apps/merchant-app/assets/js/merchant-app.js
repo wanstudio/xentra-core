@@ -99,9 +99,16 @@
     var meta = BM_ROUTE_META[route] || BM_ROUTE_META['hari-ini'];
     var tabId = meta.tab;
 
-    // Sidebar active state
+    // Sidebar active state (desktop)
     document.querySelectorAll('#x-dash-nav .x-nav-item[data-route]').forEach(function (btn) {
       btn.classList.toggle('active', btn.dataset.route === route);
+    });
+
+    // Bottom navigation active state (mobile)
+    document.querySelectorAll('#x-merchant-mobile-nav .x-merchant-mobile-nav-item[data-route]').forEach(function (btn) {
+      var isActive = btn.dataset.route === route;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-current', isActive ? 'page' : 'false');
     });
 
     // Show the matching content section
