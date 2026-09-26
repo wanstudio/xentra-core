@@ -2296,6 +2296,8 @@
   }
 
   async function holdSale(){
+    if(state.activeOrderLocked) return showOrderLockedWarning();
+    if(state.activeAdditionalMode) return toast('Tambahan pesanan dikirim langsung, bukan melalui Hold Bill.');
     if(!state.cart.length)return toast('Cart masih kosong.');
     if(state.orderType==='dine_in' && !state.selectedTable)return toast('Pilih meja sebelum menahan bill.');
     try{
