@@ -2331,10 +2331,10 @@
             '<h3>Masing-masing</h3>' +
             '<p class="pos-form-help">Bagaimana mau membagi tagihan?</p>' +
             '<div class="pos-simple-choice-grid">' +
-              '<button type="button" class="pos-simple-choice" id="pos-evenly-choice"><strong>Bagi Rata</strong><small>Jumlah orang sama rata</small></button>' +
-              '<button type="button" class="pos-simple-choice" id="pos-amount-choice"><strong>Atur Nominal</strong><small>Setiap orang bayar sesuai kesepakatan</small></button>' +
-            '</div>' +
-            '<button type="button" class="pos-simple-link" id="pos-item-choice">Cara lainnya: Pilih Menu</button>'
+              '<button type="button" class="pos-simple-choice" id="pos-item-choice"><strong>Bayar Berdasarkan Menu</strong></button>' +
+              '<button type="button" class="pos-simple-choice" id="pos-evenly-choice"><strong>Bagi Rata</strong></button>' +
+              '<button type="button" class="pos-simple-choice" id="pos-amount-choice"><strong>Atur Nominal</strong></button>' +
+            '</div>'
           );
           $('pos-evenly-choice').onclick=openEvenlyFlow;
           $('pos-amount-choice').onclick=function(){openAmountFlow(checks[0].id);};
