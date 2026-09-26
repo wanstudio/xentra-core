@@ -1318,7 +1318,7 @@
         var cartQty=composerCart.reduce(function(acc,item){
           return String(item.product_id)===String(p.id)?acc+(Number(item.quantity)||0):acc;
         },0);
-        var orderLocked=isOrderLockedForEditing();
+        var orderLocked=composer().isExisting();
 
         var initials=(pName||'').split(' ').slice(0,2).map(function(w){return w.charAt(0);}).join('').toUpperCase()||'P';
         var mediaHtml='';
