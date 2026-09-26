@@ -595,6 +595,7 @@
       return Promise.resolve(null);
     }
     return API.get('/customer/dining-session').then(function (res) {
+      state.openBillLoaded = true;
       var bill = (res && res.success && res.session) ? res.session : null;
       // Hanya render ulang kalau billnya benar-benar berubah; "tidak ada bill"
       // bukan perubahan, jadi halaman tidak di-render sia-sia saat dibuka.
@@ -619,6 +620,7 @@
       if (prev !== next && !state.isSubmitting) renderLayout();
       return bill;
     }).catch(function () {
+      state.openBillLoaded = true;
       state.openBill = null;
       return null;
     });
