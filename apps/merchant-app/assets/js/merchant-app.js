@@ -289,7 +289,55 @@
    * tombolnya tampil tapi tidak melakukan apa pun — persis seperti keluhan
    * "tidak bisa logout".
    */
+  function populateMobileAccount() {
+    var user = getStoredUser ? getStoredUser() : null;
+    if (!user) return;
+    var name = user.full_name || user.username || user.email || 'Pengguna';
+    var roleMap = { owner: 'Pemilik', branch_manager: 'Pemilik', manager: 'Manager', cashier: 'Kasir' };
+    var role = roleMap[String(user.role || '').toLowerCase()] || 'Pemilik';
+    var nameEl = $('mobile-account-name');
+    var roleEl = $('mobile-account-role');
+    var emailEl = $('mobile-account-email');
+    var phoneEl = $('mobile-account-phone');
+    if (nameEl) nameEl.textContent = name;
+    if (roleEl) roleEl.textContent = role;
+    if (emailEl) emailEl.textContent = user.email || '-';
+    if (phoneEl) phoneEl.textContent = user.phone || user.phone_number || '-';
+  }
+
+  function closeMobileAccount() {
+    document.body.classList.remove('x-mobile-account-open');
+    var page = $('x-mobile-account-page');
+    if (page) page.setAttribute('aria-hidden', 'true');
+  }
+
+  function openMobileAccount() {
+    populateMobileAccount();
+    document.body.classList.add('x-mobile-account-open');
+    var page = $('x-mobile-account-page');
+    if (page) page.setAttribute('aria-hidden', 'false');
+  }
+
+  function logoutFromMobileAccount() {
+    if (!confirm('Apakah Anda ingin keluar?')) return;
+    clearStoredSession();
+    redirectToLogin();
+  }
+
+  function initMobileAccount() {
+    var profile = $('mobile-user-profile');
+    var back = $('btn-mobile-account-back');
+    var logout = $('btn-mobile-account-logout');
+    if (profile) profile.addEventListener('click', openMobileAccount);
+    if (back) back.addEventListener('click', closeMobileAccount);
+    if (logout) logout.addEventListener('click', logoutFromMobileAccount);
+  }
+
+  window.openMobileAccount = openMobileAccount;
+  window.closeMobileAccount = closeMobileAccount;
+
   function initAuthListeners() {
+    initMobileAccount();
     var btnLogout = $('btn-logout');
     if (!btnLogout) return;
     btnLogout.addEventListener('click', function () {
