@@ -2196,7 +2196,7 @@
       if(!hasSplit){
         mainActions=
           '<div class="pos-simple-choice-title">Mau bayar bagaimana?</div>' +
-          '<div class="pos-simple-choice-grid">' +
+          '<div class="pos-simple-choice-grid pos-payment-choice-grid">' +
             '<button type="button" class="pos-simple-choice" id="pos-pay-one"><strong>Satu Orang</strong><small>Bayar seluruh tagihan</small></button>' +
             '<button type="button" class="pos-simple-choice" id="pos-pay-many"><strong>Masing-masing</strong><small>Bagikan tagihan</small></button>' +
           '</div>';

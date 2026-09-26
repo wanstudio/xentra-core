@@ -632,3 +632,7 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-card-stepper .pos-stepper-icon{width:10px;height:10px}
 .pos-card-stepper .pos-stepper-value{font-size:12px;min-width:18px}
 .pos-item-stepper.pos-stepper{margin-left:auto}
+
+
+/* Payment method choice: use the full two-column width; three-column is reserved for split methods. */
+.pos-payment-choice-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
