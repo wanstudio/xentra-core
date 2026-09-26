@@ -400,29 +400,38 @@ Exceptions MUST be defined in the environment where they occur rather than added
 
 ## 15. Non-Goals
 
-This contract does NOT authorize:
-- implementation of new APIs;
-- database migration;
-- replacement of the existing Order model;
-- creation of duplicate Orders per environment;
-- creation of duplicate payment records per environment;
-- creation of separate inventories per environment;
-- immediate replacement of the existing Order State Machine;
-- implementation of Driver App/COD in this review step;
-- changing already locked Dine-in rules without an explicit new decision.
+This contract does not authorize:
+- replacing the canonical Commerce Order;
+- duplicate Orders, payment ledgers, or inventory pools per environment;
+- a second competing global Order/fulfillment state machine;
+- changing already locked Dine-in rules;
+- inventing new purchase types;
+- treating UI projection as authorization or domain authority.
+
+Driver execution/COD implementation remains subject to the existing Driver + COD contract and its own vertical implementation boundary. This contract defines how that delivery environment is represented; it does not invent a new Driver identity system.
 
 ## 16. Cross-Reference Result
 
-The cross-reference found no blocker to the environment model. Industry patterns also separate fulfillment progress from payment status, timing, and activity history. Xentra therefore adopts the environment projection model described here.
+The final cross-reference found no conceptual blocker.
 
-1. Are **Dine-in / Pickup / Delivery / Reservation** the correct independent Fulfillment Environments?
-2. Are the proposed human-facing phases understandable to real branch staff?
-3. Should any environment have fewer or more phases?
-4. Which role owns each environment-specific completion action?
-5. Which phases should be visible to Customer, Merchant, Cashier, Driver, and Owner?
-6. Which exception cases are mandatory for MVP?
-7. Should any environment introduce an additional subflow without becoming a new global state machine?
-8. What exact technical representation should be used underneath the environment projection?
+Current official SaaS references reviewed:
+- Square Order Manager separates fulfillment status, order type/source, payment status, scheduling/fulfillment timing, and activity history.
+- Toast Orders Hub separates approval/preparation/ready/completion from first-party driver assignment and delivery progress, with role permissions around delivery completion.
+
+Xentra therefore adopts the same architectural separation at the level appropriate to its own domain:
+- primary phase ≠ every operational event;
+- timing ≠ phase;
+- payment ≠ fulfillment;
+- activity history ≠ phase;
+- exceptions are side paths;
+- environment handoffs are explicit;
+- authorization remains server-side.
+
+Reference sources:
+- https://squareup.com/help/us/en/article/6923-pickup-orders-on-square-point-of-sale
+- https://developer.squareup.com/docs/orders-api/fulfillments
+- https://support.toasttab.com/en/article/Order-Hub-Overview
+- https://support.toasttab.com/en/article/Managing-Off-Premise-Orders-with-Orders-Hub
 
 ## 17. Implementation Rule
 
@@ -438,6 +447,16 @@ Implementation MUST prefer:
 
 over a universal operational state machine that tries to serve every purchase type.
 
-**Status: LOCKED — implementation may proceed under this contract.**
+**Status: LOCKED — implementation authorized.**
+
+Initial implementation record:
+- Fulfillment Environment projection extended in `apps/customer-pwa/assets/js/core/fulfillment-environments.js`.
+- Customer order tracking wired to environment-specific phases/labels.
+- Merchant Order Center wired to environment-specific status labels.
+- Backend OrderStateMachine now rejects transitions that do not belong to the order's fulfillment environment.
+- Delivery Job lifecycle now keeps `delivered` separate from canonical Order `completed`.
+- Regression coverage added for environment isolation, projections, transition compatibility, and Delivery completion semantics.
+
+Verification constraint: full `npm test` was not run in this environment because the available runtime could not resolve GitHub/DNS for a fresh repository checkout. Source-level verification was performed through the repository files and targeted contract tests were added.
 
 Any later change to environment phases, completion authority, handoff semantics, or shared-vs-independent boundaries requires a new explicit decision.
