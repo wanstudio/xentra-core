@@ -1492,6 +1492,7 @@
     renderShift();
     renderCart();
     updateTransaksiStats();
+    updatePosReadiness();
   }
 
   function openShiftModal(){
@@ -2894,6 +2895,7 @@
     $('btn-pos-close-shift-top').onclick=openCloseShiftModal;
     $('btn-pos-logout').onclick=function(){clearPosSessionAndReturnToPin();};
     bindPosStatus();
+    bindPosStatus();
     $('pos-modal').onclick=function(e){if(e.target===this)hideModal();};
     if($('pos-mcart-trigger-order')){
       $('pos-mcart-trigger-order').onclick=function(e){
@@ -2962,6 +2964,7 @@
         setPosStatus('caution','Menghubungkan kembali…','POS sedang mencoba menyambungkan kembali ke sistem.');
         if(state.offlineMode && token()) state.offlineMode=false;
         loadTerminal();
+        loadShift();
         loadMenu();
         if(token()) {
           request('/pos/local/sync-outbox',{method:'POST',headers:headers(),body:JSON.stringify({terminal_id:state.terminalId,branch_id:state.branchId})}).catch(function(){});
