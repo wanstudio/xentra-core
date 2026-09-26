@@ -425,7 +425,7 @@ router.post('/pos/orders/:id/additions', requireAuth(['cashier']), async (req, r
   try {
     const branchId = req.user.branch_id || req.user.branchId;
     const cashierId = req.user.id || req.user.userId;
-    const { items = [] } = req.body || {};
+    const { items = [], client_transaction_id = null } = req.body || {};
     if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
     const result = await OrderAdditionService.submit({
       order_id: req.params.id,
@@ -433,7 +433,8 @@ router.post('/pos/orders/:id/additions', requireAuth(['cashier']), async (req, r
       branch_id: branchId,
       items,
       source_channel: 'pos_cashier',
-      created_by: cashierId
+      created_by: cashierId,
+      client_transaction_id: client_transaction_id || ('posadd_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8))
     });
     res.status(201).json(result);
   } catch (err) {
