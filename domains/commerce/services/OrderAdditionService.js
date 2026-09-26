@@ -62,8 +62,18 @@ class OrderAdditionService {
     return { order, items, additions };
   }
 
-  static async submit({ order_id, brand_id, branch_id, items, source_channel = 'pos_cashier', created_by = null }) {
+  static async submit({ order_id, brand_id, branch_id, items, source_channel = 'pos_cashier', created_by = null, client_transaction_id = null }) {
     const order = this._loadParent({ order_id, brand_id, branch_id });
+    const existing = additionRepository.findByClientTransactionId(order.id, client_transaction_id);
+    if (existing) {
+      return {
+        success: true,
+        idempotent: true,
+        status: existing.status === 'pending_acceptance' ? 'PENDING_ACCEPTANCE' : existing.status,
+        addition: existing,
+        items: JSON.parse(existing.items_payload || '[]')
+      };
+    }
     const verifiedItems = this._verifiedItems({ brand_id, branch_id, order, items });
     const subtotal = verifiedItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
     const now = new Date().toISOString();
@@ -78,6 +88,7 @@ class OrderAdditionService {
       sequenceNo,
       sourceChannel,
       createdBy,
+      clientTransactionId: client_transaction_id,
       itemsPayload: JSON.stringify(verifiedItems),
       subtotal,
       createdAt: now,
