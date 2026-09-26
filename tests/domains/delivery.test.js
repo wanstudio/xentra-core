@@ -130,27 +130,41 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
   assert.ok(assignedEvent);
   assert.strictEqual(assignedEvent.payload.driver_name, 'Budi Kurir');
 
-  // 2. Transition status: on_delivery
+  // 2. Driver pickup
   DeliveryDispatchService.updateStatus({
     order_id: orderId,
-    status: DeliveryModel.STATUS.ON_DELIVERY
+    status: DeliveryModel.STATUS.PICKED_UP,
+    actor_id: 'driver_1'
+  });
+
+  const pickedUpRecord = DeliveryDispatchService.getDelivery(orderId);
+  assert.strictEqual(pickedUpRecord.status, 'picked_up');
+
+  // 3. Driver starts delivery: Delivery Job + canonical Order diverge correctly
+  DeliveryDispatchService.updateStatus({
+    order_id: orderId,
+    status: DeliveryModel.STATUS.ON_DELIVERY,
+    actor_id: 'driver_1'
   });
 
   const onDelRecord = DeliveryDispatchService.getDelivery(orderId);
   assert.strictEqual(onDelRecord.status, 'on_delivery');
+  const onDelOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(onDelOrder.status, 'out_for_delivery');
 
-  // 3. Complete Delivery: delivered
+  // 4. Driver completes delivery: Delivery Job becomes delivered,
+  // canonical Commerce Order becomes completed (never delivered).
   DeliveryDispatchService.updateStatus({
     order_id: orderId,
-    status: DeliveryModel.STATUS.DELIVERED
+    status: DeliveryModel.STATUS.DELIVERED,
+    actor_id: 'driver_1'
   });
 
   const deliveredRecord = DeliveryDispatchService.getDelivery(orderId);
   assert.strictEqual(deliveredRecord.status, 'delivered');
 
-  // Verify order status advanced to delivered
   const orderRecord = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
-  assert.strictEqual(orderRecord.status, 'delivered');
+  assert.strictEqual(orderRecord.status, 'completed');
 
   // Verify Event
   assert.ok(completedEvent);
