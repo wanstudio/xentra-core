@@ -773,6 +773,7 @@ class PosOrderService {
     payment_method = 'cash',
     amount_tendered = null,
     reservation_date = null,
+    reservation_time = null,
     guest_count = null,
     customer = {},
     items = [],
@@ -833,6 +834,7 @@ class PosOrderService {
       order_type,
       table_number: tableNumber,
       reservation_date,
+      reservation_time,
       guest_count,
       notes: `POS Cashier Order [${order_type}]`,
       trace_context: {
@@ -864,7 +866,9 @@ class PosOrderService {
     let changeAmount = 0;
     let payment = null;
 
-    if (payment_method === 'cash' && order_type !== 'reservation') {
+    if (order_type === 'reservation') {
+      payment = { method: payment_method || 'none', provider: 'reservation', status: 'settlement' };
+    } else if (payment_method === 'cash') {
       if (typeof amount_tendered === 'number') {
         if (amount_tendered < grandTotal) throw new Error('[PosOrderService] Uang diterima kurang dari total tagihan.');
         changeAmount = amount_tendered - grandTotal;

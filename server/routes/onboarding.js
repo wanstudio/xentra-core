@@ -6,7 +6,8 @@
  */
 'use strict';
 
-const { GoogleAuthService, AuthProviderService, RegistrationService, OwnershipClaimService, TenantOwnershipTransferService, HandoffService, WorkforceService } = require('../../core/identity');
+const GoogleAuthService = require('../services/GoogleAuthService');
+const { AuthProviderService, RegistrationService, OwnershipClaimService, TenantOwnershipTransferService, HandoffService, WorkforceService } = require('../../core/identity');
 
 module.exports = function registerOnboardingRoutes(router, deps) {
   const { db, crypto, TokenSessionStore, requireAuth } = deps;

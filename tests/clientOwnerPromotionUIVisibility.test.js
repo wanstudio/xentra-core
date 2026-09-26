@@ -13,17 +13,18 @@ const MERCHANT_APP_JS_PATH = path.join(__dirname, '../apps/merchant-app/assets/j
 const SHARED_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/shared.js');
 const CATALOG_CLIENT_JS_PATH = path.join(__dirname, '../apps/merchant-shared/js/catalog-client.js');
 const BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-app/assets/js/branch-catalog-ui.js');
+const OWNER_BRANCH_CATALOG_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/branch-catalog-ui.js');
 
 test('CLIENT OWNER DASHBOARD — Marketing / Promotion Workspace Visibility & Lifecycle', async (t) => {
   const html = fs.readFileSync(HTML_PATH, 'utf8');
   const js = fs.readFileSync(JS_PATH, 'utf8');
   const sharedJs = fs.readFileSync(SHARED_JS_PATH, 'utf8');
-  const branchCatalogJs = fs.readFileSync(BRANCH_CATALOG_JS_PATH, 'utf8');
+  const ownerCatalogJs = fs.readFileSync(OWNER_BRANCH_CATALOG_JS_PATH, 'utf8');
 
   // index.html loads merchant-shared js before dashboard.js; mirror that order.
   function evalApp(win) {
     win.eval(sharedJs);
-    win.eval(branchCatalogJs);
+    win.eval(ownerCatalogJs);
     win.eval(js);
   }
 

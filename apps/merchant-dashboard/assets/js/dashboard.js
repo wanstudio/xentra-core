@@ -23,8 +23,10 @@
   var XentraCropEditor = window.XentraCropEditor;
 
   // Owner branch-catalog UI is owned by this dashboard surface.
-  var XentraOwnerBranchCatalog = window.XentraOwnerBranchCatalog;
-  var getActiveBranchId = XentraOwnerBranchCatalog.getActiveBranchId;
+  var XentraOwnerBranchCatalog = window.XentraOwnerBranchCatalog || {};
+  var getActiveBranchId = typeof XentraOwnerBranchCatalog.getActiveBranchId === 'function'
+    ? XentraOwnerBranchCatalog.getActiveBranchId.bind(XentraOwnerBranchCatalog)
+    : function () { return null; };
 
   // Legacy dashboard Branch Manager menu view remains local to this surface.
   function loadInlineBranchCatalog() {

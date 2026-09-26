@@ -344,7 +344,8 @@ describe('BM-1 — Branch Manager Dashboard Shell + Access + Hari Ini', () => {
 
   it('BM1-14: dashboard.js defines BM_ROUTE_META with all 9 canonical routes and loads Hari Ini', () => {
     const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
-    const js = fs.readFileSync(jsPath, 'utf8');
+    const hariIniPath = path.join(__dirname, '../../apps/merchant-app/assets/js/hari-ini.js');
+    const js = fs.readFileSync(jsPath, 'utf8') + '\n' + fs.readFileSync(hariIniPath, 'utf8');
 
     assert.ok(js.includes('var BM_ROUTE_META ='), 'Missing BM_ROUTE_META');
     assert.ok(js.includes('function renderBranchManagerNavigation()'), 'Missing renderBranchManagerNavigation');

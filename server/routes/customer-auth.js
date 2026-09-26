@@ -6,7 +6,8 @@
  */
 'use strict';
 
-const { GoogleAuthService, CustomerIdentityService } = require('../../core/identity');
+const GoogleAuthService = require('../services/GoogleAuthService');
+const { CustomerIdentityService } = require('../../core/identity');
 
 module.exports = function registerCustomerAuthRoutes(router, deps) {
   const { db, crypto, RateLimiter, TokenSessionStore } = deps;

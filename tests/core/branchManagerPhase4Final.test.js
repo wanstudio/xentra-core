@@ -268,7 +268,8 @@ describe('BM Phase 4 Final — Branch Manager Operational Center (Hari Ini)', ()
 
   it('P4F-11: dashboard.js implements split status rendering and calm empty states', () => {
     const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
-    const js = fs.readFileSync(jsPath, 'utf8');
+    const hariIniPath = path.join(__dirname, '../../apps/merchant-app/assets/js/hari-ini.js');
+    const js = fs.readFileSync(jsPath, 'utf8') + '\n' + (fs.existsSync(hariIniPath) ? fs.readFileSync(hariIniPath, 'utf8') : '');
 
     // Split state text
     assert.ok(js.includes('"CABANG: BUKA"'), 'Missing CABANG: BUKA text');

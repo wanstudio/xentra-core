@@ -26,7 +26,13 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '../..');
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
-const apiRoutes = () => read('server/routes/api.js');
+const apiRoutes = () => {
+  try {
+    return read('server/routes/customer.js') + '\n' + read('server/routes/api.js');
+  } catch (_) {
+    return read('server/routes/api.js');
+  }
+};
 const checkoutJs = () => read('apps/customer-pwa/assets/js/pages/checkout.js');
 const auxPages = () => read('apps/customer-pwa/assets/js/pages/aux-pages.js');
 const apiClient = () => read('apps/customer-pwa/assets/js/core/api.js');

@@ -14,7 +14,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const APP = path.resolve(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
-const code = fs.readFileSync(APP, 'utf8');
+const TABLES = path.resolve(__dirname, '../../apps/merchant-app/assets/js/tables.js');
+const code = fs.readFileSync(APP, 'utf8') + '\n' + (fs.existsSync(TABLES) ? fs.readFileSync(TABLES, 'utf8') : '');
 
 test('QR-01: setiap kartu meja punya tombol QR', () => {
   assert.ok(code.includes('openBMTableQr('), 'kartu meja harus memanggil openBMTableQr');

@@ -110,7 +110,7 @@ test('Branch Manager can check-in a reservation through the API', () => {
     assert.equal(body.order.table_number, 'R1');
 
     const row = db.prepare('SELECT order_type, status FROM orders WHERE id = ?').get(booking.order_id);
-    assert.deepEqual(row, { order_type: 'dine_in', status: 'active_table' });
+    assert.deepEqual({ ...row }, { order_type: 'dine_in', status: 'active_table' });
   });
 });
 
@@ -136,7 +136,7 @@ test('Branch Manager can no-show cancel an overdue reservation through the API',
     assert.equal(body.status, 'CANCELLED_NO_SHOW');
 
     const row = db.prepare('SELECT order_type, status FROM orders WHERE id = ?').get(booking.order_id);
-    assert.deepEqual(row, { order_type: 'reservation', status: 'cancelled' });
+    assert.deepEqual({ ...row }, { order_type: 'reservation', status: 'cancelled' });
   });
 });
 

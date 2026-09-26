@@ -576,7 +576,13 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
 
   it('BM3-20: dashboard.js implements loadBMMenu, toggleBMProductAvailability, loadBMStock, submitBMStockAdjustment, and loadBMPromotions', () => {
     const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
-    const js = fs.readFileSync(jsPath, 'utf8');
+    const menuPath = path.join(__dirname, '../../apps/merchant-app/assets/js/menu.js');
+    const stockPath = path.join(__dirname, '../../apps/merchant-app/assets/js/stock.js');
+    const promoPath = path.join(__dirname, '../../apps/merchant-app/assets/js/promotions.js');
+    const js = [jsPath, menuPath, stockPath, promoPath]
+      .filter(p => fs.existsSync(p))
+      .map(p => fs.readFileSync(p, 'utf8'))
+      .join('\n');
 
     assert.ok(js.includes('async function loadBMMenu()'), 'Missing loadBMMenu');
     assert.ok(js.includes('async function toggleBMProductAvailability('), 'Missing toggleBMProductAvailability');
@@ -796,7 +802,11 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
 
   it('BM3-27: dashboard.js implements Phase 2 BM Menu functions and modal triggers', () => {
     const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
-    const js = fs.readFileSync(jsPath, 'utf8');
+    const menuPath = path.join(__dirname, '../../apps/merchant-app/assets/js/menu.js');
+    const js = [jsPath, menuPath]
+      .filter(p => fs.existsSync(p))
+      .map(p => fs.readFileSync(p, 'utf8'))
+      .join('\n');
 
     assert.ok(js.includes('openBMAddCatalogModal'), 'Missing openBMAddCatalogModal');
     assert.ok(js.includes('promptAddBMBranchCategory'), 'Missing promptAddBMBranchCategory');

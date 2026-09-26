@@ -23,8 +23,7 @@
   };
 
   async function loadBMTables() {
-    var user = getStoredUser();
-    var branchId = user ? (user.branch_id || user.branchId) : null;
+    var branchId = getBMTargetBranchId();
     if (!branchId) return;
 
     var grid = $('bm-tables-grid');
@@ -121,7 +120,8 @@
     var stateCardConfigs = {
       available: { bg: '#ffffff', border: '#bbf7d0', badge: '<span class="x-badge x-badge-success">TERSEDIA</span>' },
       occupied: { bg: '#ffffff', border: '#bfdbfe', badge: '<span class="x-badge x-badge-info">TERISI</span>' },
-      held: { bg: '#ffffff', border: '#fde68a', badge: '<span class="x-badge x-badge-warning">DIPESAN</span>' },\n      reserved: { bg: '#ffffff', border: '#fde68a', badge: '<span class="x-badge x-badge-warning">DIPESAN</span>' },
+      held: { bg: '#ffffff', border: '#fde68a', badge: '<span class="x-badge x-badge-warning">DIPESAN</span>' },
+      reserved: { bg: '#ffffff', border: '#fde68a', badge: '<span class="x-badge x-badge-warning">DIPESAN</span>' },
       blocked: { bg: '#fef2f2', border: '#fecaca', badge: '<span class="x-badge x-badge-danger">DIBLOKIR</span>' },
       out_of_service: { bg: '#fef2f2', border: '#fecaca', badge: '<span class="x-badge x-badge-danger">RUSAK</span>' }
     };

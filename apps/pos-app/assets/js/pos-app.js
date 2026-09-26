@@ -147,9 +147,14 @@
   }
   function toast(msg) {
     var el = $('pos-toast'); if (!el) return;
-    el.textContent = msg; el.classList.add('show');
-    clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, 2200);
+    var isLong = (msg || '').length > 25;
+    var dur = isLong ? 3000 : 2200;
+    var iconSvg = '<span class="pos-toast-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></span>';
+    el.innerHTML = '<div class="pos-toast-inner">' + iconSvg + '<span>' + esc(msg) + '</span></div>';
+    el.classList.add('show');
+    clearTimeout(toast._t); toast._t = setTimeout(function(){ el.classList.remove('show'); }, dur);
   }
+
   function setConnection(online) {
     var el=$('pos-connection-badge'); if(!el)return;
     el.className='pos-status '+(online?'online':'offline');
@@ -769,9 +774,10 @@
     '</div>';
 
     if (isDineIn) {
-      html += '<div class="pos-order-modal-table-row">' +
+      var tableSelectedClass = state.selectedTable ? 'pos-table-selected' : 'pos-table-unselected';
+      html += '<div class="pos-order-modal-table-row ' + tableSelectedClass + '">' +
         '<span><strong>Meja:</strong> '+esc(tableLabel)+'</span>' +
-        '<button type="button" class="pos-btn small ghost" id="pos-order-modal-change-table">Ubah Meja</button>' +
+        '<button type="button" class="pos-btn small" id="pos-order-modal-change-table">'+(state.selectedTable ? 'Ubah Meja' : 'Pilih Meja')+'</button>' +
       '</div>';
     }
 
@@ -800,8 +806,8 @@
     var noteVal = $('pos-order-note') ? $('pos-order-note').value : '';
 
     html += '<div class="pos-form-row">' +
-      '<label>Nama Tamu (opsional)</label>' +
-      '<input type="text" id="pos-modal-cust-name" value="'+esc(custVal)+'" placeholder="Nama tamu">' +
+      '<label>Nama Customer (wajib)</label>' +
+      '<input type="text" id="pos-modal-cust-name" value="'+esc(custVal)+'">' +
     '</div>';
     html += '<div class="pos-form-row">' +
       '<label>Catatan Order (opsional)</label>' +
@@ -834,7 +840,11 @@
     $('pos-order-modal-close').onclick = hideModal;
     if ($('pos-order-modal-change-table')) {
       $('pos-order-modal-change-table').onclick = function(){
-        openTableSelector();
+        openTableSelector(function(){
+          openOrderDetailsModal();
+        }, function(){
+          openOrderDetailsModal();
+        });
       };
     }
     $('pos-order-modal-hold').onclick = async function(){
@@ -898,7 +908,12 @@
   function renderCart() {
     var isDineIn = state.orderType === 'dine_in';
     var tableCtx = $('pos-table-context');
-    if (tableCtx) tableCtx.classList.toggle('hidden', !isDineIn);
+    var hasTable = Boolean(state.selectedTable);
+    if (tableCtx) {
+      tableCtx.classList.toggle('hidden', !isDineIn);
+      tableCtx.classList.toggle('pos-table-selected', isDineIn && hasTable);
+      tableCtx.classList.toggle('pos-table-unselected', isDineIn && !hasTable);
+    }
 
     var box=$('pos-cart-items'), meta=$('pos-cart-meta'), subtotal=$('pos-subtotal'), grand=$('pos-total'), pay=$('pos-pay-total'), btn=$('btn-pos-pay'), payManyBtn=$('btn-pos-pay-many');
     if (meta) meta.textContent=state.cart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0)+' item';
@@ -1594,12 +1609,12 @@
       '</div>' +
 
       '<div class="pos-shift-modal-actions-row">' +
-        '<button type="button" class="pos-btn ghost" id="btn-pos-modal-cash-in">' +
-          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+        '<button type="button" class="pos-btn pos-btn-shift-cashin" id="btn-pos-modal-cash-in">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
           '<span>Cash In</span>' +
         '</button>' +
-        '<button type="button" class="pos-btn ghost" id="btn-pos-modal-cash-out">' +
-          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
+        '<button type="button" class="pos-btn pos-btn-shift-cashout" id="btn-pos-modal-cash-out">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
           '<span>Cash Out</span>' +
         '</button>' +
         '<button type="button" class="pos-btn danger ghost" id="btn-pos-modal-close-shift">' +
@@ -1615,12 +1630,12 @@
       await toggleShiftBreak();
       if (state.shift) openShiftModal();
     };
-    $('btn-pos-modal-cash-in').onclick = function(){ openCashMoveModal('in'); };
-    $('btn-pos-modal-cash-out').onclick = function(){ openCashMoveModal('out'); };
+    $('btn-pos-modal-cash-in').onclick = function(){ openCashMoveModal('in', true); };
+    $('btn-pos-modal-cash-out').onclick = function(){ openCashMoveModal('out', true); };
     $('btn-pos-modal-close-shift').onclick = function(){ openCloseShiftModal(); };
   }
 
-  function openCashMoveModal(type){
+  function openCashMoveModal(type, returnToShift){
     if (!state.shift) return;
     var isCashIn = type === 'in';
     var title = isCashIn ? 'Cash In (Kas Masuk)' : 'Cash Out (Kas Keluar)';
@@ -1633,7 +1648,7 @@
         '<h3>' + title + '</h3>' +
         '<p>' + subtitle + '</p>' +
       '</div>' +
-      '<button type="button" class="pos-modal-close-icon" id="pos-cash-move-close" title="Kembali" aria-label="Kembali">✕</button>' +
+      '<button type="button" class="pos-modal-close-icon" id="pos-cash-move-close" title="Tutup" aria-label="Tutup">✕</button>' +
     '</div>';
 
     html += '<div class="pos-shift-modal-body">' +
@@ -1664,8 +1679,11 @@
     '</div>';
 
     showModal(html);
-    $('pos-cash-move-close').onclick = openShiftModal;
-    $('pos-cash-move-cancel').onclick = openShiftModal;
+    var onDismiss = function(){
+      if (returnToShift) openShiftModal(); else hideModal();
+    };
+    $('pos-cash-move-close').onclick = onDismiss;
+    $('pos-cash-move-cancel').onclick = onDismiss;
 
     var amtInput = $('pos-cash-move-amount');
     if (amtInput) {
@@ -1757,7 +1775,14 @@
 
     html += '<div class="pos-modal-actions">' +
       '<button type="button" class="pos-btn ghost" id="pos-close-shift-cancel">Batal</button>' +
-      '<button type="button" class="pos-btn danger" id="btn-pos-confirm-close-shift">Konfirmasi & Tutup Shift</button>' +
+      '<button type="button" class="pos-btn pos-btn-confirm-close-shift" id="btn-pos-confirm-close-shift">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
+          '<circle cx="12" cy="12" r="10"></circle>' +
+          '<line x1="15" y1="9" x2="9" y2="15"></line>' +
+          '<line x1="9" y1="9" x2="15" y2="15"></line>' +
+        '</svg>' +
+        '<span>Konfirmasi &amp; Tutup Shift</span>' +
+      '</button>' +
     '</div>';
 
     showModal(html);

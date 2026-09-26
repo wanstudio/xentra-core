@@ -105,10 +105,11 @@ function request(method, pathName, body = null, headers = {}) {
 describe('BM Phase 4B — Branch Manager Dashboard UI Hardening Suite', () => {
   const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
   const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
+  const menuPath = path.join(__dirname, '../../apps/merchant-app/assets/js/menu.js');
   const cssPath = path.join(__dirname, '../../apps/merchant-shared/css/dashboard.css');
 
   const html = fs.readFileSync(htmlPath, 'utf8');
-  const js = fs.readFileSync(jsPath, 'utf8');
+  const js = [jsPath, menuPath].filter(p => fs.existsSync(p)).map(p => fs.readFileSync(p, 'utf8')).join('\n');
   const css = fs.readFileSync(cssPath, 'utf8');
   // Owner/Platform surface stays in the legacy dashboard.
   const legacyHtml = fs.readFileSync(path.join(__dirname, '../../apps/merchant-dashboard/index.html'), 'utf8');

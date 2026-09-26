@@ -229,7 +229,7 @@ router.get('/customer/orders', requireCustomerAuth(), (req, res) => {
       // Legacy session without customer_id: only access unlinked legacy orders with no customer_id
       orders = db.prepare(`
         SELECT o.id, o.order_number, o.status, o.order_type, o.subtotal, o.delivery_fee, o.discount_amount,
-               o.grand_total, o.payment_method, o.created_at, b.name as branch_name
+               o.grand_total, o.payment_method, o.order_note, o.scheduled_slot_start, o.created_at, b.name as branch_name
         FROM orders o
         JOIN branches b ON b.id = o.branch_id
         WHERE b.brand_id = ? AND o.customer_id IS NULL AND o.customer_phone = ?

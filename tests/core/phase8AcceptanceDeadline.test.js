@@ -211,7 +211,8 @@ describe('Phase 8.1 — Merchant Dashboard Server-Authoritative Acceptance Deadl
 
   it('5. apps/merchant-app/assets/js/merchant-app.js contains no local deadline reconstruction', () => {
     const dashboardJsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
-    const code = fs.readFileSync(dashboardJsPath, 'utf8');
+    const ordersJsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/orders.js');
+    const code = fs.readFileSync(dashboardJsPath, 'utf8') + '\n' + fs.readFileSync(ordersJsPath, 'utf8');
 
     assert.ok(!code.includes('ACCEPTANCE_WINDOW_MS'), 'No ACCEPTANCE_WINDOW_MS constant should exist');
     assert.ok(!code.includes('+ 180000'), 'No hardcoded + 180000 millisecond arithmetic allowed');

@@ -19,7 +19,7 @@ class PosBillRepository {
   }
 
   findOrderItems(orderId) {
-    return this.db.queryMany(`SELECT id, product_id, product_name, quantity, unit_price, note, modifiers_snapshot, created_at FROM order_items WHERE order_id = ? ORDER BY created_at ASC, id ASC`, [orderId]);
+    return this.db.queryMany(`SELECT id, product_id, product_name, quantity, unit_price, item_subtotal, subtotal, note, modifiers_snapshot, created_at FROM order_items WHERE order_id = ? ORDER BY created_at ASC, id ASC`, [orderId]);
   }
 
   findChecks(orderId) {
@@ -27,11 +27,11 @@ class PosBillRepository {
   }
 
   findCheck(checkId) {
-    return this.db.queryOne('SELECT id, order_id, check_number, status, created_at, updated_at FROM pos_order_checks WHERE id = ?', [checkId]);
+    return this.db.queryOne('SELECT id, order_id, check_number, status, allocated_amount, created_at, updated_at FROM pos_order_checks WHERE id = ?', [checkId]);
   }
 
   findCheckItems(checkId) {
-    return this.db.queryMany(`SELECT ci.id, ci.check_id, ci.order_item_id, ci.quantity, oi.product_id, oi.product_name, oi.unit_price, oi.note, oi.modifiers_snapshot FROM pos_order_check_items ci JOIN order_items oi ON oi.id = ci.order_item_id WHERE ci.check_id = ? ORDER BY oi.created_at ASC, oi.id ASC`, [checkId]);
+    return this.db.queryMany(`SELECT ci.id, ci.check_id, ci.order_item_id, ci.quantity, oi.product_id, oi.product_name, oi.unit_price, oi.item_subtotal, oi.subtotal, oi.note, oi.modifiers_snapshot FROM pos_order_check_items ci JOIN order_items oi ON oi.id = ci.order_item_id WHERE ci.check_id = ? ORDER BY oi.created_at ASC, oi.id ASC`, [checkId]);
   }
 
   findAllAllocatedQuantity(orderItemId) {

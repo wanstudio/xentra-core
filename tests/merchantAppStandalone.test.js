@@ -121,7 +121,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(html.includes('/merchant-shared/css/shared.css'), 'must load merchant-shared css');
     assert.ok(html.includes('/merchant-shared/css/dashboard.css'), 'must load the shared surface stylesheet');
     assert.ok(html.includes('/merchant-shared/js/shared.js'), 'must load shared.js');
-    assert.ok(html.includes('/merchant-shared/js/branch-catalog-ui.js'), 'must load branch-catalog-ui.js');
+    assert.ok(html.includes('/merchant-app/assets/js/branch-catalog-ui.js'), 'must load branch-catalog-ui.js');
     assert.ok(html.includes('/merchant-app/assets/js/context.js'), 'must load context.js');
     assert.ok(html.includes('/merchant-app/assets/js/menu.js'), 'must load menu.js');
     assert.ok(html.includes('/merchant-app/assets/js/hari-ini.js'), 'must load hari-ini.js');

@@ -116,20 +116,20 @@
 
     // Order queue polling: exactly one poller, only while the queue is visible.
     if (tabId === 'bm-pesanan') {
-      startBMOrdersPolling();
-      loadBMOrders();
+      if (typeof startBMOrdersPolling === 'function') startBMOrdersPolling();
+      if (typeof loadBMOrders === 'function') loadBMOrders();
     } else {
-      stopBMOrdersPolling();
+      if (typeof stopBMOrdersPolling === 'function') stopBMOrdersPolling();
     }
 
-    if (tabId === 'bm-meja') loadBMTables();
-    if (tabId === 'bm-menu') loadBMMenu();
-    if (tabId === 'bm-stok') loadBMStock();
-    if (tabId === 'bm-promo') loadBMPromotions();
-    if (tabId === 'hari-ini') loadHariIni();
-    if (tabId === 'bm-staff') loadBMStaff();
-    if (tabId === 'bm-jam-operasional') loadBMJamOperasional();
-    if (tabId === 'bm-reports') loadBMReports();
+    if (tabId === 'bm-meja' && typeof loadBMTables === 'function') loadBMTables();
+    if (tabId === 'bm-menu' && typeof loadBMMenu === 'function') loadBMMenu();
+    if (tabId === 'bm-stok' && typeof loadBMStock === 'function') loadBMStock();
+    if (tabId === 'bm-promo' && typeof loadBMPromotions === 'function') loadBMPromotions();
+    if (tabId === 'hari-ini' && typeof loadHariIni === 'function') loadHariIni();
+    if (tabId === 'bm-staff' && typeof loadBMStaff === 'function') loadBMStaff();
+    if (tabId === 'bm-jam-operasional' && typeof loadBMJamOperasional === 'function') loadBMJamOperasional();
+    if (tabId === 'bm-reports' && typeof loadBMReports === 'function') loadBMReports();
   }
   window.applyRoute = applyRoute;
 

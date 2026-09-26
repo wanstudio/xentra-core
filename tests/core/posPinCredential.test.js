@@ -1,6 +1,6 @@
 'use strict';
 
-const { test, describe, beforeEach } = require('node:test');
+const { test, describe, before, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 
@@ -10,6 +10,12 @@ const PosPinCredentialService = require('../../core/identity/PosPinCredentialSer
 describe('POS Cashier PIN Credential', () => {
   const brandId = 'brand_bangjo';
   let branchId;
+
+  before(() => {
+    db.prepare("INSERT OR IGNORE INTO organizations (id, name, slug) VALUES ('org_bangjo', 'Bangjo Holding', 'bangjo-holding')").run();
+    db.prepare("INSERT OR IGNORE INTO brands (id, organization_id, name, slug, custom_domain) VALUES ('brand_bangjo', 'org_bangjo', 'Bangjo', 'bangjo', 'app.mybangjo.com')").run();
+    db.prepare("INSERT OR IGNORE INTO branches (id, brand_id, name, slug, whatsapp_number, address_text, is_active, latitude, longitude) VALUES ('branch_bangjo_main', 'brand_bangjo', 'Bangjo Pusat', 'bangjo-pusat', '62812345678', 'Jl. Sudirman', 1, -6.2, 106.8)").run();
+  });
 
   beforeEach(() => {
     const branch = db.prepare('SELECT id FROM branches WHERE brand_id = ? ORDER BY id LIMIT 1').get(brandId);
@@ -58,7 +64,13 @@ describe('POS Cashier PIN Credential', () => {
     assert.ok(row.pos_pin_hash);
     assert.equal(String(row.pos_pin_hash).includes('482731'), false);
 
-    const auth = service.authenticateWithPin({ brandId, branchId, pin: '482731' });
+    const terminalId = 'term_test_' + crypto.randomBytes(4).toString('hex');
+    db.prepare(`
+      INSERT INTO pos_terminals (id, branch_id, device_name, device_identifier, status)
+      VALUES (?, ?, 'Test POS', 'pos_dev_1', 'active')
+    `).run(terminalId, branchId);
+
+    const auth = service.authenticateWithPin({ brandId, branchId, pin: '482731', terminalId });
     assert.equal(auth.success, true);
     assert.equal(auth.user.id, userId);
     assert.equal(auth.user.role, 'cashier');

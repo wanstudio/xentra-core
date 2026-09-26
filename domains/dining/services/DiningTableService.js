@@ -49,7 +49,8 @@ class DiningTableService {
 
       if (template && Array.isArray(template.tables)) {
         for (const t of template.tables) {
-          const tableId = `tbl_${branchId}_${t.table_number}`;
+          const existing = repository.findTableIdByNumberOrLabel(branchId, t.table_number);
+          const tableId = existing ? existing.id : `tbl_${branchId}_${t.table_number}`;
           const qrToken = `qr_${crypto.randomBytes(8).toString('hex')}`;
           repository.upsertBranchTable({
             tableId, branchId, tableNumber: t.table_number, label: t.label, capacity: t.capacity,
@@ -276,7 +277,7 @@ class DiningTableService {
   /** Create a reservation using the existing Order record as the persistence model. */
   static createReservation({ brand_id, branch_id, customer, order_channel = 'customer_app', selection_mode = null, reservation_date = null, reservation_time = '12:00', guest_count = null, notes = '' } = {}) {
     if (!reservation_date) return { success: false, status: 'VALIDATION_ERROR', errors: ['Tanggal reservasi wajib diisi untuk tipe pesanan reservation.'] };
-    const reservationTime = String(reservation_time || '').trim();
+    const reservationTime = String(reservation_time || '12:00').trim();
     const timeMatch = /^(\d{2}):(\d{2})$/.exec(reservationTime);
     if (!timeMatch) {
       return { success: false, status: 'INVALID_RESERVATION_TIME', errors: ['Jam reservasi wajib menggunakan format HH:MM.'] };

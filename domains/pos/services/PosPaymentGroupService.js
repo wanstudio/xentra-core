@@ -158,26 +158,33 @@ class PosPaymentGroupService {
     return { group, orders: repository.findGroupOrders(group_id) };
   }
 
-  static settleCashGroup({ group_id, branch_id, cashier_id, shift_id, amount_tendered }) {
-    const group = repository.findGroup(group_id);
+  static settleCashGroup({ group_id = null, order_id = null, order_ids = [], actor_id = null, branch_id, cashier_id = null, shift_id, amount_tendered }) {
+    const actor = cashier_id || actor_id;
+    let groupId = group_id;
+    if (!groupId) {
+      if (!order_id) throw new Error('[PosPaymentGroupService] group_id atau order_id wajib diisi.');
+      const created = this.createGroup({ order_id, branch_id, order_ids, actor_id: actor });
+      groupId = created.group.id;
+    }
+    const group = repository.findGroup(groupId);
     if (!group) throw new Error('[PosPaymentGroupService] Gabungan Tagihan tidak ditemukan.');
     if (String(group.branch_id) !== String(branch_id)) throw new Error('[PosPaymentGroupService] Gabungan Tagihan bukan milik cabang ini.');
     if (group.status !== 'open') {
       if (group.status === 'settled') {
-        return { success: true, idempotent: true, group: this.getGroup({ group_id, branch_id }).group };
+        return { success: true, idempotent: true, group: this.getGroup({ group_id: groupId, branch_id }).group };
       }
       throw new Error('[PosPaymentGroupService] Gabungan Tagihan sudah tidak dapat dibayar.');
     }
 
     const tendered = Number(amount_tendered);
-    const members = repository.findGroupOrders(group_id);
+    const members = repository.findGroupOrders(groupId);
     if (members.length < 2) throw new Error('[PosPaymentGroupService] Gabungan Tagihan membutuhkan minimal dua order.');
     const total = members.reduce((sum, row) => sum + (Number(row.allocated_amount) || 0), 0);
     if (Math.round(total) !== Math.round(Number(group.total_amount))) throw new Error('[PosPaymentGroupService] Total Gabungan Tagihan tidak konsisten.');
     if (!Number.isFinite(tendered) || tendered <= 0 || tendered < total) throw new Error('[PosPaymentGroupService] Uang diterima belum mencukupi total Gabungan Tagihan.');
 
     const shift = posShiftRepository.findById(shift_id);
-    if (!shift || shift.status !== 'open' || String(shift.branch_id) !== String(branch_id) || String(shift.cashier_id) !== String(cashier_id)) {
+    if (!shift || shift.status !== 'open' || String(shift.branch_id) !== String(branch_id) || (actor && String(shift.cashier_id) !== String(actor))) {
       throw new Error('[PosPaymentGroupService] Shift kasir aktif tidak valid.');
     }
 
@@ -188,7 +195,7 @@ class PosPaymentGroupService {
 
     paymentRepository.beginTransaction();
     try {
-      const lockedGroup = repository.findGroup(group_id);
+      const lockedGroup = repository.findGroup(groupId);
       if (!lockedGroup || lockedGroup.status !== 'open') throw new Error('[PosPaymentGroupService] Gabungan Tagihan sudah diproses oleh kasir lain.');
 
       const lockedShift = posShiftRepository.findStatusById(shift_id);
@@ -203,29 +210,29 @@ class PosPaymentGroupService {
           order_id: member.order_id,
           amount: Number(member.allocated_amount),
           amount_tendered: Number(member.allocated_amount),
-          cashier_id,
+          cashier_id: actor,
           shift_id,
           skip_shift_increment: true,
           manage_transaction: false,
-          payment_group_id: group_id
+          payment_group_id: groupId
         });
         if (!result || !result.success) throw new Error('[PosPaymentGroupService] Gagal melunasi salah satu tagihan anggota.');
       }
 
       repository.createPayment({
         id: groupPaymentId,
-        groupId: group_id,
+        groupId,
         paymentMethod: 'cash',
         provider: 'cash',
         amount: total,
         amountTendered: tendered,
         changeAmount: change,
-        actorId: cashier_id,
+        actorId: actor,
         shiftId: shift_id,
         settledAt: now,
         now
       });
-      repository.markGroupSettled(group_id, now);
+      repository.markGroupSettled(groupId, now);
       paymentRepository.commitTransaction();
     } catch (err) {
       try { paymentRepository.rollbackTransaction(); } catch (_) {}
@@ -234,12 +241,12 @@ class PosPaymentGroupService {
 
     return {
       success: true,
-      payment_group_id: group_id,
+      payment_group_id: groupId,
       payment_id: groupPaymentId,
       amount: total,
       amount_tendered: tendered,
       change,
-      group: this.getGroup({ group_id, branch_id }).group
+      group: this.getGroup({ group_id: groupId, branch_id }).group
     };
   }
 }

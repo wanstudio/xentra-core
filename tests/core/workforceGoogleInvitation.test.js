@@ -200,7 +200,7 @@ describe('Workforce Google Invitation (INV-GOOGLE-01 to INV-GOOGLE-09)', () => {
     assert.equal(res.body.user.email, inviteEmail);
     assert.equal(res.body.user.role, 'branch_manager');
     assert.equal(res.body.user.branch_id, TEST_BRANCH_ID);
-    assert.equal(res.body.redirect_url, '/dashboard/');
+    assert.equal(res.body.redirect_url, '/merchant/');
     assert.equal(res.body.is_new_user, true);
 
     // Verify invitation is marked accepted

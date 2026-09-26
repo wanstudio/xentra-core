@@ -312,7 +312,7 @@
   };
 
   // Adopt Product Modal Actions
-  window.openAdoptModal = function (productId) {
+  window.openMerchantAdoptModal = function (productId) {
     if (!currentBranchCatalogData) return;
     var p = currentBranchCatalogData.available_master_products.find(function (x) { return String(x.id) === String(productId); });
     if (!p) return;
@@ -358,7 +358,7 @@
     $('modal-adopt-product').style.display = 'flex';
   };
 
-  window.closeAdoptModal = function () {
+  window.closeMerchantAdoptModal = function () {
     $('modal-adopt-product').style.display = 'none';
   };
 
@@ -393,7 +393,7 @@
         var data = await res.json();
         if (data.success) {
           showToast('✅ Menu berhasil diadopsi ke cabang!');
-          window.closeAdoptModal();
+          window.closeMerchantAdoptModal();
           // Refresh the correct panel depending on role/view
           if (isBranchManager()) {
             if (typeof hooks.refreshBMMenu === 'function') hooks.refreshBMMenu();
@@ -1063,7 +1063,7 @@
             '<div style="margin:4px 0;">' + modeBadge + '</div>',
             '<div class="x-product-card-price">Harga Dasar Owner: ' + formatMoney(p.price) + '</div>',
             '<div class="x-product-card-actions">',
-              '<button type="button" class="x-btn-primary" style="padding:6px 12px;font-size:12px;" onclick="openAdoptModal(\'' + p.id + '\')">\uFF0B Adopsi ke Cabang</button>',
+              '<button type="button" class="x-btn-primary" style="padding:6px 12px;font-size:12px;" onclick="openMerchantAdoptModal(\'' + p.id + '\')">\uFF0B Adopsi ke Cabang</button>',
             '</div>',
           '</div>',
         '</div>'
@@ -1116,7 +1116,7 @@
     var formAdoptInline = $('form-adopt-product');
     if (!formAdoptInline) return;
     // We'll patch the success callback — store original handler then re-listen
-    // (already set above; we monkey-patch via reload override in openAdoptModal closure)
+    // (already set above; we monkey-patch via reload override in openMerchantAdoptModal closure)
   })();
 
   window.XentraMerchantBranchCatalog = {

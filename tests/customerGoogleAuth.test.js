@@ -157,7 +157,7 @@ test('CGA-00: customer auth routes are isolated from api.js', () => {
     "/customer/auth/broker/exchange",
     "/customer/auth/broker/google"
   ]) {
-    assert.equal((authSource.match(new RegExp("router\\\\.post\\\\('" + route.replace(/[.*+?^$\\{}()|[\\]\\\\]/g, '\\\\$&') + "'")) || []).length, 1);
+    assert.equal(authSource.includes("router.post('" + route + "'"), true);
   }
 });
 

@@ -286,8 +286,8 @@ describe('BM-4 — Branch Manager Dashboard: Staff, Jam Operasional & Reports', 
     assert.ok(html.includes('id="btn-bm-toggle-online-orders"'), 'Missing btn-bm-toggle-online-orders');
   });
 
-  it('BM4-12: merchant-app.js has one canonical Staff implementation and uses the standalone BM cashier modal', () => {
-    const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
+  it('BM4-12: staff.js has one canonical Staff implementation and uses the standalone BM cashier modal', () => {
+    const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/staff.js');
     const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
     const js = fs.readFileSync(jsPath, 'utf8');
     const html = fs.readFileSync(htmlPath, 'utf8');

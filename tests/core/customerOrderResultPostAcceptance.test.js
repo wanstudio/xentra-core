@@ -538,7 +538,7 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     assert.equal(cancelRes.status, 400, 'confirmed reservation remains outside normal customer cancellation');
     assert.equal(cancelRes.data.status, 'CUSTOMER_CANCEL_NOT_ALLOWED');
     assert.deepEqual(
-      db.prepare('SELECT order_type, status FROM orders WHERE id = ?').get(orderId),
+      { ...db.prepare('SELECT order_type, status FROM orders WHERE id = ?').get(orderId) },
       { order_type: 'reservation', status: 'confirmed' },
       'reservation must remain confirmed when normal customer cancel is rejected'
     );

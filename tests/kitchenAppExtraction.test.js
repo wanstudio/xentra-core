@@ -25,7 +25,7 @@ const exists = (p) => fs.existsSync(path.join(ROOT, p));
 
 const KITCHEN_HTML = read('apps/kitchen-app/index.html');
 const KITCHEN_JS = read('apps/kitchen-app/assets/js/kitchen-app.js');
-const MERCHANT_APP_JS = read('apps/merchant-app/assets/js/merchant-app.js');
+const MERCHANT_APP_JS = read('apps/merchant-app/assets/js/merchant-app.js') + '\n' + read('apps/merchant-app/assets/js/orders.js');
 const DASHBOARD_JS = read('apps/merchant-dashboard/assets/js/dashboard.js');
 const LOGIN_HTML = read('apps/merchant-dashboard/login.html');
 const APP_SERVER = read('server/app.js');

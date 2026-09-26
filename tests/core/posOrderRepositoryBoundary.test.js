@@ -48,7 +48,7 @@ test('PosOrderRepository exposes semantic held-order mutations', () => {
 
   assert.equal(calls.execute.length, 3);
   assert.match(calls.execute[0].sql, /INSERT INTO pos_held_orders/);
-  assert.equal(calls.execute[0].params[4], 'dine_in');
+  assert.equal(calls.execute[0].params[5], 'dine_in');
   assert.match(calls.execute[1].sql, /UPDATE pos_held_orders/);
   assert.match(calls.execute[2].sql, /SET status =/);
 });
@@ -72,5 +72,5 @@ test('PosOrderRepository supports holding orders for non-dine_in types (pickup, 
   assert.match(calls.execute[0].sql, /order_type/);
   assert.equal(calls.execute[0].params[2], '');
   assert.equal(calls.execute[0].params[3], 'Budi (Pickup)');
-  assert.equal(calls.execute[0].params[4], 'pickup');
+  assert.equal(calls.execute[0].params[5], 'pickup');
 });

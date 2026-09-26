@@ -53,7 +53,7 @@ test('MERCHANT SHARED — boundary ownership', async (t) => {
       'deleteBranchCategory',
       'reorderBranchCategories',
       'adoptProduct'
-    ].forEach((fn) => assert.match(CATALOG_CLIENT_JS, new RegExp('function ' + fn + '\(')));
+    ].forEach((fn) => assert.ok(CATALOG_CLIENT_JS.includes('function ' + fn + '('), 'catalog-client.js must export function ' + fn));
 
     assert.doesNotMatch(CATALOG_CLIENT_JS, /document\.getElementById|innerHTML|XentraCropEditor/);
     assert.doesNotMatch(SHARED_JS, /BranchCatalog|branch catalog/i);

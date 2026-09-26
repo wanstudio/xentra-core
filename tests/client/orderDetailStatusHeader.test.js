@@ -27,7 +27,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '../..');
 const src = fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/pages/order-received.js'), 'utf8');
-const apiSrc = fs.readFileSync(path.join(ROOT, 'server/routes/api.js'), 'utf8');
+const apiSrc = fs.readFileSync(path.join(ROOT, 'server/routes/customer-orders.js'), 'utf8');
 
 // Extract the self-contained phase resolver + distance formatter and eval them.
 function extractFn(name) {
