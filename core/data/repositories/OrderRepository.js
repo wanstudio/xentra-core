@@ -254,6 +254,34 @@ class OrderRepository {
     `, [orderId]);
   }
 
+  findDiningSessionOrdersWithPayment(diningSessionId) {
+    return this.db.queryMany(`
+      SELECT
+        o.id,
+        o.order_number,
+        o.status,
+        o.order_type,
+        o.grand_total,
+        COALESCE(op.paid_amount, 0) AS order_payment_settled_amount,
+        COALESCE(pc.paid_amount, 0) AS check_payment_settled_amount
+      FROM orders o
+      LEFT JOIN (
+        SELECT order_id, MAX(amount) AS paid_amount
+        FROM order_payments
+        WHERE payment_status = 'settlement'
+        GROUP BY order_id
+      ) op ON op.order_id = o.id
+      LEFT JOIN (
+        SELECT order_id, COALESCE(SUM(amount), 0) AS paid_amount
+        FROM pos_check_payments
+        WHERE payment_status = 'settlement'
+        GROUP BY order_id
+      ) pc ON pc.order_id = o.id
+      WHERE o.dining_session_id = ?
+      ORDER BY o.created_at ASC, o.id ASC
+    `, [diningSessionId]);
+  }
+
   updateStatusIfCurrent({ orderId, targetStatus, currentStatus }) {
     return this.db.execute(`
       UPDATE orders
