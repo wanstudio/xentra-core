@@ -90,21 +90,22 @@ The current purchase-type set is:
 
 Each environment is independent at the UX/operational layer.
 
-### A. DINE-IN Environment — Proposed Human Flow
+### A. DINE-IN Environment — Locked Human Flow
 
 Real-world mental model:
 
-`Datang → Pesanan diterima → Makan → Bayar → Selesai`
+`Datang → Pesanan diterima → Disiapkan → Disajikan → Selesai`
 
-Proposed operational phases:
+Primary operational phases:
 
 | Phase | Human label | Primary authority |
 |---|---|---|
-| 1 | Menunggu diterima | Branch Manager / authorized operational staff |
-| 2 | Sedang diproses | Kitchen / operational staff |
-| 3 | Sedang menikmati | Active Dining Session |
-| 4 | Siap diselesaikan | Cashier/POS + operational boundary |
-| 5 | Selesai | Authorized staff according to Dining Session contract |
+| 1 | Pesanan diterima | Branch Manager / authorized operational staff |
+| 2 | Sedang disiapkan | Kitchen / operational staff |
+| 3 | Siap disajikan | Kitchen / operational staff |
+| 4 | Pesanan selesai | Authorized Dining Session actor |
+
+`Sedang menikmati` adalah context dari Active Dining Session, bukan primary phase. Payment settlement juga merupakan financial event, bukan primary fulfillment phase.
 
 Important:
 - Table identity and Dining Session remain Dine-in-specific concerns.
@@ -165,21 +166,21 @@ Important:
 - Delivery completion MUST NOT be expressed as a Dine-in-style session completion.
 - Delivery MUST NOT require Cashier to operate delivery progress.
 
-### D. RESERVATION Environment — Proposed Human Flow
+### D. RESERVATION Environment — Locked Human Flow
 
 Real-world mental model:
 
-`Buat reservasi → Dikonfirmasi → Menunggu kedatangan → Tamu datang → Selesai / masuk Dine-in`
+`Buat reservasi → Dikonfirmasi → Menunggu kedatangan`
 
-Proposed operational phases:
+Primary operational phases:
 
 | Phase | Human label | Primary authority |
 |---|---|---|
-| 1 | Menunggu konfirmasi | Reservation/Branch Manager |
-| 2 | Sudah dikonfirmasi | Reservation/Branch Manager |
-| 3 | Menunggu kedatangan | Reservation/Branch Manager |
-| 4 | Tamu sudah datang | Branch operational staff |
-| 5 | Dialihkan ke Dine-in | Dine-in operational boundary |
+| 1 | Reservasi dibuat | Reservation / Branch Manager |
+| 2 | Reservasi dikonfirmasi | Reservation / Branch Manager |
+| 3 | Menunggu kedatangan | Reservation / Branch Manager |
+
+`Tamu datang` adalah arrival/check-in event. `Masuk Dine-in` adalah explicit handoff ke Dine-in Environment, bukan primary phase Reservation.
 
 Important:
 - Reservation is not an active Dine-in session merely because a reservation exists.
