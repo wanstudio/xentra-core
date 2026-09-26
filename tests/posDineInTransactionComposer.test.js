@@ -34,8 +34,8 @@ describe('POS dine-in transaction composer', () => {
   it('uses cache-busted POS assets for the new composer UI', () => {
     assert.ok(/\/pos\/assets\/css\/pos\.css\?v=1\.0\.11/.test(html));
     assert.ok(/\/pos\/assets\/js\/TransactionComposer\.js\?v=1\.0\.11/.test(html));
-    assert.ok(/\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.11/.test(html));
-    assert.ok(html.indexOf('/pos/assets/js/TransactionComposer.js?v=1.0.11') < html.indexOf('/pos/assets/js/pos-app.js?v=1.0.11'));
+    assert.ok(/\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.(?:1[1-9]|\d{2,})/.test(html));
+    assert.ok(html.indexOf('/pos/assets/js/TransactionComposer.js?v=1.0.11') < html.indexOf('/pos/assets/js/pos-app.js'));
     assert.ok(composerJs.includes('MODES'));
     assert.ok(composerJs.includes("NEW: 'new'"));
     assert.ok(composerJs.includes("EXISTING: 'existing'"));

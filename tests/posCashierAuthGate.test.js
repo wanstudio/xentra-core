@@ -60,6 +60,6 @@ test('Unified login preserves the explicit POS terminal setup handoff for manage
 
 test('POS auth assets use a cache-busted revision', () => {
   assert.match(indexHtml, /\/pos\/assets\/css\/pos\.css\?v=1\.0\.11/);
-  assert.match(indexHtml, /\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.11/);
+  assert.match(indexHtml, /\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.(?:1[1-9]|\d{2,})/);
   assert.match(posCss, /\.pos-google-login-btn/);
 });

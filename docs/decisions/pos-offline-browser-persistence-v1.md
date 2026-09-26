@@ -1,59 +1,67 @@
-# 🔒 Xentra — POS Offline Browser Persistence v1
+# POS Offline Browser Persistence v1
 
-**Status: LOCKED — development constraint**  
-**Decision date:** 25 September 2026
+**Status:** SUPERSEDED / DEVELOPMENT HOLD RETIRED  
+**Superseded by:** `docs/decisions/pos-offline-browser-operational-store-v1.md`  
+**Date superseded:** 26 September 2026
 
 ## Decision
 
-Browser-side durable transaction persistence is intentionally **NOT enabled during the current development/refactor phase**.
+The former development hold that prohibited browser-side durable POS transaction persistence is now retired.
 
-The existing Xentra backend offline/reconciliation engine remains part of the architecture and may continue to be audited, tested, and stabilized. However, POS browser code must **not** introduce or depend on an IndexedDB transaction outbox yet.
+The explicit implementation decision **POS Durable Browser Operational Store & Recovery v1** activates the browser-local persistence foundation using native IndexedDB.
 
-## Why
+This does **not** activate the full offline POS business model.
 
-Xentra POS is web-based. Browser-local state survives independently from server processes and source deployments. Introducing durable IndexedDB transaction data too early can let stale development state survive reloads and refactors, making local schema changes and debugging harder.
+## Current boundary
 
-The development environment must not accidentally turn browser-local transaction data into a hidden second source of truth while POS contracts are still changing.
+Browser POS now has a durable operational working store for:
+- local POS operation records;
+- stable `client_transaction_id` / operation identity;
+- synchronization metadata and lifecycle;
+- recovery of interrupted synchronization;
+- branch/terminal-scoped last-known snapshots;
+- local operational-effect evidence/intents.
 
-## Current development boundary
+The store is not an authoritative replacement for Xentra Core.
 
-- RAM / JavaScript state may be used for normal runtime state.
-- Existing localStorage may remain for small identifiers, preferences, and non-transactional cache.
-- **Do not add an IndexedDB transaction queue/outbox for POS sales yet.**
-- Do not claim browser POS sales are fully durable offline until this decision is revised.
-- Existing backend `PosLocalOperationService`, `OfflineReconciliationService`, server sync queue, idempotency, and conflict handling remain valid and may be stabilized independently.
+Core remains authoritative for:
+- Order system of record;
+- Inventory authority;
+- Payment/provider verification;
+- RBAC/authentication and authorization;
+- Dining table/session ownership;
+- final reconciliation and conflict governance.
 
-## Future MVP activation
+## Explicitly not activated
 
-Once the POS API, payment, shift, terminal, inventory, authentication, pricing, and reconciliation contracts are sufficiently stable, a new explicit decision may activate:
+The following remain separate implementation gates:
+- POS presence / lease;
+- Offline Dine-in Table Claim;
+- Local Operational Acceptance semantics;
+- customer-channel degradation when POS presence is stale;
+- provider-confirmed online payment while offline;
+- multi-terminal branch semantics;
+- automatic last-write-wins table reconciliation.
 
-```text
-POS Browser
-   ↓
-IndexedDB durable local state
-   ↓
-Sync Bridge
-   ↓
-Xentra Core
-   ↓
-Reconciliation
-   ↓
-SYNCED / CONFLICT / FAILED
-```
+P3 and P4 from the POS Flow Audit Backlog remain gated by these contracts.
 
-IndexedDB will then be a durable browser-local transport/working store only. It will **not** become the authoritative authority for inventory, payment, orders, or RBAC.
+## Important distinction
 
-## Cache boundary
+The browser-local store is a durable transport/working layer.
 
-Service Worker/static-asset cache and application data persistence are separate:
+`operational_state` and `sync_state` remain separate.
 
-- Service Worker cache → application assets / app shell.
-- IndexedDB → future POS durable business-data queue/cache.
+Example:
+- Operational state = `LOCAL_RECORDED`
+- Sync state = `PENDING_SYNC`
 
-Do not mix these mechanisms when diagnosing stale application state.
+An interrupted `SYNCING` operation is recovered to `PENDING_SYNC` without creating a new transaction identity. Server replay remains safe because the same `client_transaction_id` is preserved.
 
-## Non-goals of this hold
+## Relationship to prior hold
 
-This decision does not remove or disable the existing backend offline/reconciliation code. It only prevents premature browser-side durable transaction persistence during active POS development.
+The prior hold existed to prevent premature hidden local transaction state while the POS contracts were still moving.
 
-**Any activation of IndexedDB POS transaction persistence requires a new explicit decision/revision.**
+The architecture contract has now been made explicit, the durable store schema/recovery boundary has been implemented and regression-tested, and the activation has therefore been intentionally revised.
+
+**Git source of truth:**  
+`docs/decisions/pos-offline-browser-operational-store-v1.md`

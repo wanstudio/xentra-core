@@ -142,6 +142,6 @@ Color is supplemented by text when the indicator is inspected/activated; users a
 
 The POS frontend now removes the visible ONLINE/OFFLINE label, uses semantic `READY / CAUTION / STOP` classes, and supports the same status detail through desktop hover/focus and mobile tap.
 
-The current frontend wiring uses available runtime signals (Core reachability, terminal state, shift state, connectivity/offline mode). The contract also reserves Branch operational state, maintenance, and future authoritative readiness inputs for the final readiness evaluator.
+The current frontend wiring uses authoritative/runtime signals including Branch operational state, Core reachability, terminal state, shift state, connectivity/offline mode, and synchronization/recovery conditions. Branch closure is a RED/STOP condition for the cashier readiness signal. Online-order pause remains a separate Branch capability and does not directly turn the POS lamp RED.
 
 **Any change to the GREEN / YELLOW / RED meaning or the desktop/mobile interaction model requires a new explicit decision/revision.**

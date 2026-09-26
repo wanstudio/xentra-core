@@ -11,6 +11,26 @@ Capture the remaining POS flow gaps discovered after locking the contract that a
 
 This document is a **problem backlog and discussion anchor**, not an implementation approval. Each item will be discussed and resolved individually before code changes are made.
 
+## 🔒 Architecture prerequisite — Offline POS
+
+**Status:** ✅ RESOLVED / LOCKED ARCHITECTURE BOUNDARY
+
+Before P3/P4 implementation, Xentra has locked the architecture boundary in:
+
+`docs/decisions/pos-offline-architecture-boundary-v1.md`
+
+The boundary establishes that:
+
+- device connectivity, Core reachability, POS presence/lease, local operational state, and server synchronization state are separate conditions;
+- Core remains the central business authority;
+- browser POS must not claim durable offline transaction safety from RAM or `navigator.onLine` alone;
+- the backend offline reconciliation/idempotency engine may be reused, but true browser-local offline execution requires a durable local operational store;
+- offline Dine-in table claims are provisional local claims and must not use generic last-write-wins reconciliation;
+- offline physical Cash execution may have local operational acceptance, which is distinct from Core synchronization;
+- new remote table-based dine-in claims require a server-visible POS presence/staleness mechanism before safe degradation can be enforced.
+
+**Implementation gate:** P3 and P4 remain OPEN, but they must be implemented only after the prerequisite architecture and its dependent contracts are respected. The architecture decision itself does **not** activate IndexedDB or offline Dine-in behavior.
+
 ## Locked architectural premise
 
 - `orders` is the canonical commercial order.
@@ -18,12 +38,13 @@ This document is a **problem backlog and discussion anchor**, not an implementat
 - Dining/Core remains authoritative for table/session state and concurrency.
 - POS must not create a second table/session state machine.
 - Merchant operational acceptance remains a meaningful lifecycle boundary.
+- Offline POS local authority is bounded and provisional; it does not replace Core as permanent business authority.
 - No new implementation is authorized merely by this audit document.
 
 ## Open problems to discuss one by one
 
 ### P1 — Split / Merge after Hold materialization
-**Status:** ✅ RESOLVED / IMPLEMENTED
+**Status:** ✅ RESOLVED / IMPLEMENTED  
 **Severity:** 🔴
 
 Current split/merge logic is still primarily `pos_held_orders`-based.
@@ -55,37 +76,48 @@ Questions to resolve:
 ### P3 — Offline Dine-in table claim
 **Severity:** 🔴
 
-Offline POS sales currently record the transaction locally but do not claim/hold the Dining table centrally.
+Offline POS execution currently records a transaction through the backend offline engine, but the browser POS does not yet have a durable device-local table claim mechanism.
 
-Potential consequence: offline cashier can sell for a table that Core/Dining still considers available.
+Potential consequence: a browser POS cannot safely preserve a table claim when Core is genuinely unreachable, and Core cannot currently know the POS's stale presence.
+
+Architecture prerequisite is now resolved, but downstream implementation remains open.
 
 Questions to resolve:
-- What local table-lock semantics are required offline?
-- How is the table claim reconciled when reconnecting?
+- What exact durable local claim record is created?
+- What lease/revision metadata is needed?
+- How is a provisional claim reconciled into Dining/Core?
 - What happens if the same table was taken online while the POS was offline?
-- Which side wins, and under what explicit conflict rule?
+- How is the physical table conflict exposed to Manager without deleting the historical sale?
 
 ### P4 — Offline sale vs Merchant acceptance
 **Severity:** 🔴
 
 Offline POS sale currently behaves as an already-confirmed physical sale, unlike the online POS Hold flow where the canonical order enters Merchant as `pending`.
 
+Architecture now explicitly permits the distinction:
+
+Local Operational Acceptance ≠ Core Synchronization.
+
+However, the browser POS currently cannot safely execute that local transaction path when Core is genuinely unreachable because the existing `/pos/local/sale` path is still server-backed. Durable browser-local persistence and local execution semantics therefore remain implementation work.
+
 Questions to resolve:
-- Is bypassing Merchant acceptance intentional for offline physical cash sales?
-- If yes, what exact reconciliation contract applies?
-- When syncing a dine-in offline sale, how is the Dining Session created/attached and the table moved to OCCUPIED?
-- How is conflict with an existing online order handled?
+- What local operational state is written before sync?
+- Which offline actions are accepted immediately by the terminal?
+- How is the local state mapped into canonical Order/Dining state during reconciliation?
+- When is a Dining Session created or attached?
+- How are payment and Shift effects reconciled without duplicate financial effects?
+- How is conflict with an existing online Order handled?
 
 ### P5 — Merchant acceptance → Dining Session
+**Status:** ✅ RESOLVED / IMPLEMENTED  
 **Severity:** 🔴
 
-Need verify that Merchant acceptance creates/attaches the Dining Session exactly once for POS dine-in, consistent with the locked Dining contract.
-
-Questions to resolve:
-- Does ACCEPT immediately create Active Dining Session?
-- Is payment settlement separate from session creation?
-- How are retries/idempotency handled?
-- Must the Dining hold be converted/rebound at acceptance?
+Resolution:
+- ACCEPT is the operational boundary for `pending → confirmed`.
+- For dine-in, ACCEPT creates/attaches the Active Dining Session exactly once inside the acceptance transaction.
+- Payment settlement remains separate from session creation.
+- Acceptance is idempotent; repeated identical ACCEPT requests do not recreate the Dining Session.
+- Existing Dining holds are converted/rebound to the canonical Order/session context.
 
 ### P6 — Table transfer vs canonical Order
 **Severity:** 🟠
@@ -108,17 +140,18 @@ Questions to resolve:
 - Can a second Dining Session accidentally be created?
 - Are additional customer items appended to the intended canonical bill/order model?
 - How are POS and customer channels represented without creating duplicate table authority?
+- How does the flow behave when POS presence is stale/offline?
 
 ### P8 — Payment method vs Merchant acceptance lifecycle
+**Status:** ✅ RESOLVED / IMPLEMENTED  
 **Severity:** 🟠
 
-Cash, static QRIS, and gateway payments may currently trigger different order/Dining transitions.
-
-Questions to resolve:
-- Is the canonical lifecycle always ACCEPT → payment/settlement → completion?
-- Can successful payment transition a POS pending order to confirmed before Merchant acceptance?
-- Which transitions are allowed for each payment method?
-- Must all payment methods converge on the same Dining lifecycle?
+Resolution:
+- Payment settlement is payment-only and never performs `pending → confirmed`.
+- Merchant Acceptance remains the exclusive operational acceptance boundary for connected flows.
+- Static QRIS/manual verification follows the same rule.
+- Pending paid orders remain pending until Merchant acceptance.
+- Cash, gateway, and static QRIS respect the same acceptance boundary; only payment mechanics differ.
 
 ### P9 — Cancellation after Merchant acceptance
 **Severity:** 🟠
@@ -163,6 +196,8 @@ For each problem:
 
 ## Current state
 
-**P1 is RESOLVED / IMPLEMENTED. P2–P10 remain OPEN.**
+**Architecture prerequisite is RESOLVED / LOCKED. Durable browser POS operational store + recovery is RESOLVED / IMPLEMENTED FOUNDATION. P1, P5, and P8 are RESOLVED / IMPLEMENTED. P2, P3, P4, P6, P7, P9, and P10 remain OPEN.**
 
-No item is approved for implementation by this document alone.
+P3/P4 implementation is explicitly gated by `docs/decisions/pos-offline-architecture-boundary-v1.md`. The durable browser operational-store prerequisite is now implemented; POS presence/lease remains the next architecture gate before P3/P4 execution.
+
+No item is approved for implementation by this backlog alone.
