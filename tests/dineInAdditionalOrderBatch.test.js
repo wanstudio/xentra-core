@@ -13,6 +13,7 @@ const orderRepo = fs.readFileSync(path.join(ROOT, 'core/data/repositories/OrderR
 const posRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/pos.js'), 'utf8');
 const operationalRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/operational-orders.js'), 'utf8');
 const customerRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/customer.js'), 'utf8');
+const customerCheckoutJs = fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/pages/checkout.js'), 'utf8');
 
 describe('Dine-in Additional Order Batch contract', () => {
   it('keeps additions under one canonical Commerce Order', () => {
@@ -56,6 +57,23 @@ describe('Dine-in Additional Order Batch contract', () => {
     assert.ok(posJs.includes('await openCheckManager(state.activeHeldOrderId);'));
     assert.ok(posJs.includes("await request('/pos/held-orders/'+encodeURIComponent(state.activeHeldBillId)"));
     assert.ok(posJs.includes('if(state.activeOrderLocked) return showOrderLockedWarning();'));
+  });
+
+  it('routes an active customer dine-in cart into the existing order instead of create-order', () => {
+    assert.ok(customerCheckoutJs.includes('getActiveDineInOrderId'));
+    assert.ok(customerCheckoutJs.includes('/customer/dining-session/additions'));
+    assert.ok(customerCheckoutJs.includes('proceedCreateAdditionalOrder(items)'));
+    assert.ok(customerCheckoutJs.includes('if (isAdditionalDineIn)'));
+    assert.ok(customerRoutes.includes('active_order_id: activeOrders.length ? activeOrders[activeOrders.length - 1].id : null'));
+  });
+
+  it('persists an idempotency key for additional batches', () => {
+    const schema = fs.readFileSync(path.join(ROOT, 'server/database/db.js'), 'utf8');
+    assert.ok(schema.includes('order_addition_batches'));
+    assert.ok(schema.includes('client_transaction_id TEXT'));
+    assert.ok(schema.includes('idx_order_addition_batches_client_tx'));
+    assert.ok(additionRepo.includes('findByClientTransactionId'));
+    assert.ok(additionService.includes('findByClientTransactionId'));
   });
 
   it('provides explicit additional-order UX and locked styling', () => {
