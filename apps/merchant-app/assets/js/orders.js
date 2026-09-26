@@ -366,7 +366,7 @@
     } else if (status === 'ready') {
       if (type === 'dine_in') {
         projection.stateLabel = 'Siap disajikan';
-        projection.actionLabel = 'Tandai Disajikan';
+        projection.actionLabel = 'Selesaikan Pesanan';
       } else if (type === 'pickup') {
         projection.stateLabel = 'Siap diambil';
         projection.actionLabel = 'Tandai Diambil';
@@ -565,6 +565,304 @@
   }
 
 
+  async function advanceBMOrderStatus(orderId, currentStatus, fulfillmentType, btnEl) {
+    if (currentStatus === 'pending') {
+      if (!confirm('Terima pesanan #' + orderId + '? Dapur akan mulai mempersiapkan pesanan.')) return;
+      if (_bmOrdersState.inFlightAccept[orderId]) return;
+      _bmOrdersState.inFlightAccept[orderId] = true;
+
+      if (btnEl) {
+        btnEl.disabled = true;
+        btnEl.dataset.originalText = btnEl.innerHTML;
+        btnEl.innerHTML = 'Memproses...';
+      }
+
+      try {
+        var res = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/branch-acceptance', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ decision: 'accept', note: 'Diterima oleh Branch Manager' })
+        });
+        var data = await res.json();
+        if (res.ok && data.success) {
+          showToast('Pesanan berhasil diterima (CONFIRMED).');
+          loadBMOrders();
+          if (typeof loadHariIni === 'function') loadHariIni();
+          var detailView = $('bm-orders-detail-view');
+          if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
+            viewBMOrderDetail(orderId);
+          }
+        } else {
+          showToast('Gagal menerima pesanan: ' + (data.error || 'Terjadi kesalahan'));
+          loadBMOrders();
+          if (typeof loadHariIni === 'function') loadHariIni();
+          var detailView = $('bm-orders-detail-view');
+          if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
+            viewBMOrderDetail(orderId);
+          }
+        }
+      } catch (e) {
+        showToast('Kesalahan jaringan.');
+      } finally {
+        delete _bmOrdersState.inFlightAccept[orderId];
+        if (btnEl) {
+          btnEl.disabled = false;
+          if (btnEl.dataset.originalText) btnEl.innerHTML = btnEl.dataset.originalText;
+        }
+      }
+      return;
+    }
+
+    var isDelivery = (fulfillmentType === 'delivery');
+    // MVP: Branch Manager handles the full required operational order flow,
+    // including cooking stages. The same Core endpoint and state machine are
+    // reused; KDS remains an optional future add-on.
+    var nextMap = {
+      confirmed: 'preparing',
+      preparing: 'ready',
+      ready: isDelivery ? 'out_for_delivery' : 'completed'
+    };
+
+    var nextStatus = nextMap[currentStatus];
+    if (!nextStatus) {
+      showToast('Status tidak dapat diubah lagi.');
+      return;
+    }
+
+    // In-flight / double-click protection for status updates
+    _bmOrdersState.inFlightStatus = _bmOrdersState.inFlightStatus || {};
+    if (_bmOrdersState.inFlightStatus[orderId]) return;
+    _bmOrdersState.inFlightStatus[orderId] = true;
+
+    if (btnEl) {
+      btnEl.disabled = true;
+      btnEl.dataset.originalText = btnEl.innerHTML;
+      btnEl.innerHTML = 'Menyimpan...';
+    }
+
+    try {
+      // MVP uses this same Core endpoint for BM kitchen-stage actions and
+      // dispatch. Future KDS uses the same endpoint with its own role boundary.
+      var patchRes = await adminFetch(API_BASE + '/kitchen/orders/' + encodeURIComponent(orderId) + '/status', {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: nextStatus, note: 'Status diperbarui oleh Branch Manager' })
+      });
+      var patchData = await patchRes.json();
+      if (patchRes.ok && patchData.success) {
+        showToast('Status pesanan berhasil diubah menjadi ' + nextStatus.toUpperCase());
+        loadBMOrders();
+        if (typeof loadHariIni === 'function') loadHariIni();
+        var detailView = $('bm-orders-detail-view');
+        if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
+          viewBMOrderDetail(orderId);
+        }
+      } else {
+        showToast('Gagal mengubah status: ' + (patchData.message || patchData.error || 'Terjadi kesalahan'));
+        loadBMOrders();
+        if (typeof loadHariIni === 'function') loadHariIni();
+        var detailView = $('bm-orders-detail-view');
+        if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
+          viewBMOrderDetail(orderId);
+        }
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan saat memperbarui status.');
+    } finally {
+      delete _bmOrdersState.inFlightStatus[orderId];
+      if (btnEl) {
+        btnEl.disabled = false;
+        if (btnEl.dataset.originalText) btnEl.innerHTML = btnEl.dataset.originalText;
+      }
+    }
+  }
+  window.advanceBMOrderStatus = advanceBMOrderStatus;
+
+  /* =========================================================================
+     BRANCH ACCEPTANCE: REJECTION MODAL & SUBMIT
+     ========================================================================= */
+  var _bmRejectOrigin = 'orders';
+
+  function openBMRejectModal(orderId, origin) {
+    _bmRejectOrigin = origin || 'orders';
+    var modal = $('modal-bm-reject-order');
+    var idInput = $('bm-reject-order-id');
+    var reasonInput = $('bm-reject-reason-input');
+    var errorEl = $('bm-reject-error');
+    var subtitle = $('bm-reject-order-subtitle');
+    var btnText = $('bm-reject-btn-text');
+    var confirmBtn = $('btn-bm-confirm-reject');
+
+    if (idInput) idInput.value = orderId;
+    if (reasonInput) reasonInput.value = '';
+    if (errorEl) errorEl.style.display = 'none';
+    if (subtitle) subtitle.textContent = 'Pesanan #' + orderId;
+    if (btnText) btnText.textContent = 'Konfirmasi Tolak Pesanan';
+    if (confirmBtn) confirmBtn.disabled = false;
+
+    if (modal) modal.style.display = 'flex';
+    if (reasonInput) setTimeout(function () { reasonInput.focus(); }, 50);
+  }
+  window.openBMRejectModal = openBMRejectModal;
+
+  function closeBMRejectModal() {
+    var modal = $('modal-bm-reject-order');
+    if (modal) modal.style.display = 'none';
+    var idInput = $('bm-reject-order-id');
+    if (idInput) idInput.value = '';
+  }
+  window.closeBMRejectModal = closeBMRejectModal;
+
+  function setBMRejectReason(reasonText) {
+    var reasonInput = $('bm-reject-reason-input');
+    var errorEl = $('bm-reject-error');
+    if (reasonInput) {
+      reasonInput.value = reasonText;
+      reasonInput.focus();
+    }
+    if (errorEl) errorEl.style.display = 'none';
+  }
+  window.setBMRejectReason = setBMRejectReason;
+
+  async function submitBMRejectOrder(event) {
+    if (event && event.preventDefault) event.preventDefault();
+
+    var idInput = $('bm-reject-order-id');
+    var reasonInput = $('bm-reject-reason-input');
+    var errorEl = $('bm-reject-error');
+    var confirmBtn = $('btn-bm-confirm-reject');
+    var btnText = $('bm-reject-btn-text');
+
+    var orderId = idInput ? idInput.value.trim() : '';
+    var reason = reasonInput ? reasonInput.value.trim() : '';
+
+    if (!orderId) {
+      closeBMRejectModal();
+      return;
+    }
+
+    if (!reason) {
+      if (errorEl) {
+        errorEl.textContent = 'Alasan penolakan wajib diisi untuk catatan audit.';
+        errorEl.style.display = 'block';
+      }
+      if (reasonInput) reasonInput.focus();
+      return;
+    }
+
+    if (confirmBtn) confirmBtn.disabled = true;
+    if (btnText) btnText.textContent = 'Menolak Pesanan...';
+
+    try {
+      var res = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/branch-acceptance', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ decision: 'reject', reason: reason })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Pesanan #' + orderId + ' telah ditolak.');
+        closeBMRejectModal();
+        if (_bmRejectOrigin === 'hari-ini' && typeof loadHariIni === 'function') {
+          loadHariIni();
+        }
+        loadBMOrders();
+        var detailView = $('bm-orders-detail-view');
+        if (detailView && detailView.style.display !== 'none' && $('bm-detail-order-number') && $('bm-detail-order-number').textContent.indexOf(orderId) !== -1) {
+          viewBMOrderDetail(orderId);
+        }
+      } else {
+        showToast('Gagal menolak pesanan: ' + (data.error || 'Terjadi kesalahan'));
+        if (confirmBtn) confirmBtn.disabled = false;
+        if (btnText) btnText.textContent = 'Konfirmasi Tolak Pesanan';
+        loadBMOrders();
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan.');
+      if (confirmBtn) confirmBtn.disabled = false;
+      if (btnText) btnText.textContent = 'Konfirmasi Tolak Pesanan';
+    }
+  }
+  window.submitBMRejectOrder = submitBMRejectOrder;
+
+  function rejectBMOrder(orderId) {
+    openBMRejectModal(orderId, 'orders');
+  }
+  window.rejectBMOrder = rejectBMOrder;
+
+  function getBMReservationGuestCount(ord) {
+    if (!ord) return 0;
+    var explicit = Number(ord.guest_count);
+    if (Number.isInteger(explicit) && explicit > 0) return explicit;
+
+    var note = String(ord.order_note || ord.notes || ord.order_notes || '');
+    var match = /Reservasi\s*\(\s*(\d+)\s*Tamu/i.exec(note);
+    return match ? Number(match[1]) : 0;
+  }
+
+  function formatBMReservationDateTime(ord) {
+    var raw = ord && (ord.scheduled_slot_start || '');
+    var date = String(ord && (ord.reservation_date || raw.substring(0, 10)) || '').trim();
+    var time = String(ord && (ord.reservation_time || raw.substring(11, 16)) || '').trim();
+    if (!date) return '—';
+    return date + (time ? ' • ' + time : '');
+  }
+
+  async function checkInBMReservation(orderId) {
+    var tableNumber = prompt('Masukkan nomor meja untuk check-in reservasi:');
+    if (tableNumber === null) return;
+    tableNumber = String(tableNumber).trim();
+    if (!tableNumber) {
+      showToast('Nomor meja wajib diisi.');
+      return;
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/pos/reservations/' + encodeURIComponent(orderId) + '/check-in', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ table_number: tableNumber })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Reservasi #' + orderId + ' berhasil check-in di meja ' + tableNumber + '.');
+        await loadBMOrders({ background: true });
+        viewBMOrderDetail(orderId);
+      } else {
+        showToast('Check-in gagal: ' + (data.error || 'Terjadi kesalahan'));
+        loadBMOrders({ background: true });
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan saat check-in reservasi.');
+    }
+  }
+  window.checkInBMReservation = checkInBMReservation;
+
+  async function noShowBMReservation(orderId) {
+    if (!confirm('Tandai reservasi #' + orderId + ' sebagai NO-SHOW? Ini hanya berhasil setelah jadwal + grace period.')) return;
+
+    try {
+      var res = await adminFetch(API_BASE + '/pos/reservations/' + encodeURIComponent(orderId) + '/no-show', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({})
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast('Reservasi #' + orderId + ' ditandai NO-SHOW.');
+        await loadBMOrders({ background: true });
+        closeBMOrderDetail();
+      } else {
+        showToast('No-show gagal: ' + (data.error || 'Belum melewati grace period'));
+        loadBMOrders({ background: true });
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan saat memproses no-show.');
+    }
+  }
+  window.noShowBMReservation = noShowBMReservation;
+
+  
   async function viewBMOrderDetail(orderId) {
     _bmOrdersState.currentDetailOrderId = orderId;
     var listView = $('bm-orders-list-view');
@@ -798,228 +1096,6 @@
   }
   window.closeBMOrderDetail = closeBMOrderDetail;
 
-  async function advanceBMOrderStatus(orderId, currentStatus, fulfillmentType, btnEl) {
-    if (currentStatus === 'pending') {
-      if (!confirm('Terima pesanan #' + orderId + '? Dapur akan mulai mempersiapkan pesanan.')) return;
-      if (_bmOrdersState.inFlightAccept[orderId]) return;
-      _bmOrdersState.inFlightAccept[orderId] = true;
-
-      if (btnEl) {
-        btnEl.disabled = true;
-        btnEl.dataset.originalText = btnEl.innerHTML;
-        btnEl.innerHTML = 'Memproses...';
-      }
-
-      try {
-        var res = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/branch-acceptance', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify({ decision: 'accept', note: 'Diterima oleh Branch Manager' })
-        });
-        var data = await res.json();
-        if (res.ok && data.success) {
-          showToast('Pesanan berhasil diterima (CONFIRMED).');
-          loadBMOrders();
-          if (typeof loadHariIni === 'function') loadHariIni();
-          var detailView = $('bm-orders-detail-view');
-          if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
-            viewBMOrderDetail(orderId);
-          }
-        } else {
-          showToast('Gagal menerima pesanan: ' + (data.error || 'Terjadi kesalahan'));
-          loadBMOrders();
-          if (typeof loadHariIni === 'function') loadHariIni();
-          var detailView = $('bm-orders-detail-view');
-          if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
-            viewBMOrderDetail(orderId);
-          }
-        }
-      } catch (e) {
-        showToast('Kesalahan jaringan.');
-      } finally {
-        delete _bmOrdersState.inFlightAccept[orderId];
-        if (btnEl) {
-          btnEl.disabled = false;
-          if (btnEl.dataset.originalText) btnEl.innerHTML = btnEl.dataset.originalText;
-        }
-      }
-      return;
-    }
-
-    var isDelivery = (fulfillmentType === 'delivery');
-    // MVP: Branch Manager handles the full required operational order flow,
-    // including cooking stages. The same Core endpoint and state machine are
-    // reused; KDS remains an optional future add-on.
-    var nextMap = {
-      confirmed: 'preparing',
-      preparing: 'ready',
-      ready: isDelivery ? 'out_for_delivery' : 'completed'
-    };
-
-    var nextStatus = nextMap[currentStatus];
-    if (!nextStatus) {
-      showToast('Status tidak dapat diubah lagi.');
-      return;
-    }
-
-    // In-flight / double-click protection for status updates
-    _bmOrdersState.inFlightStatus = _bmOrdersState.inFlightStatus || {};
-    if (_bmOrdersState.inFlightStatus[orderId]) return;
-    _bmOrdersState.inFlightStatus[orderId] = true;
-
-    if (btnEl) {
-      btnEl.disabled = true;
-      btnEl.dataset.originalText = btnEl.innerHTML;
-      btnEl.innerHTML = 'Menyimpan...';
-    }
-
-    try {
-      // MVP uses this same Core endpoint for BM kitchen-stage actions and
-      // dispatch. Future KDS uses the same endpoint with its own role boundary.
-      var patchRes = await adminFetch(API_BASE + '/kitchen/orders/' + encodeURIComponent(orderId) + '/status', {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ status: nextStatus, note: 'Status diperbarui oleh Branch Manager' })
-      });
-      var patchData = await patchRes.json();
-      if (patchRes.ok && patchData.success) {
-        showToast('Status pesanan berhasil diubah menjadi ' + nextStatus.toUpperCase());
-        loadBMOrders();
-        if (typeof loadHariIni === 'function') loadHariIni();
-        var detailView = $('bm-orders-detail-view');
-        if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
-          viewBMOrderDetail(orderId);
-        }
-      } else {
-        showToast('Gagal mengubah status: ' + (patchData.error || 'Terjadi kesalahan'));
-        loadBMOrders();
-        if (typeof loadHariIni === 'function') loadHariIni();
-        var detailView = $('bm-orders-detail-view');
-        if (detailView && detailView.style.display !== 'none' && _bmOrdersState.currentDetailOrderId === orderId) {
-          viewBMOrderDetail(orderId);
-        }
-      }
-    } catch (e) {
-      showToast('Kesalahan jaringan saat memperbarui status.');
-    } finally {
-      delete _bmOrdersState.inFlightStatus[orderId];
-      if (btnEl) {
-        btnEl.disabled = false;
-        if (btnEl.dataset.originalText) btnEl.innerHTML = btnEl.dataset.originalText;
-      }
-    }
-  }
-  window.advanceBMOrderStatus = advanceBMOrderStatus;
-
-  var _bmRejectOrigin = 'orders';
-
-  function openBMRejectModal(orderId, origin) {
-    _bmRejectOrigin = origin || 'orders';
-    var modal = $('modal-bm-reject-order');
-    var idInput = $('bm-reject-order-id');
-    var reasonInput = $('bm-reject-reason-input');
-    var errorEl = $('bm-reject-error');
-    var subtitle = $('bm-reject-order-subtitle');
-    var btnText = $('bm-reject-btn-text');
-    var confirmBtn = $('btn-bm-confirm-reject');
-
-    if (idInput) idInput.value = orderId;
-    if (reasonInput) reasonInput.value = '';
-    if (errorEl) errorEl.style.display = 'none';
-    if (subtitle) subtitle.textContent = 'Pesanan #' + orderId;
-    if (btnText) btnText.textContent = 'Konfirmasi Tolak Pesanan';
-    if (confirmBtn) confirmBtn.disabled = false;
-
-    if (modal) modal.style.display = 'flex';
-    if (reasonInput) setTimeout(function () { reasonInput.focus(); }, 50);
-  }
-  window.openBMRejectModal = openBMRejectModal;
-
-  function closeBMRejectModal() {
-    var modal = $('modal-bm-reject-order');
-    if (modal) modal.style.display = 'none';
-    var idInput = $('bm-reject-order-id');
-    if (idInput) idInput.value = '';
-  }
-  window.closeBMRejectModal = closeBMRejectModal;
-
-  function setBMRejectReason(reasonText) {
-    var reasonInput = $('bm-reject-reason-input');
-    var errorEl = $('bm-reject-error');
-    if (reasonInput) {
-      reasonInput.value = reasonText;
-      reasonInput.focus();
-    }
-    if (errorEl) errorEl.style.display = 'none';
-  }
-  window.setBMRejectReason = setBMRejectReason;
-
-  async function submitBMRejectOrder(event) {
-    if (event && event.preventDefault) event.preventDefault();
-
-    var idInput = $('bm-reject-order-id');
-    var reasonInput = $('bm-reject-reason-input');
-    var errorEl = $('bm-reject-error');
-    var confirmBtn = $('btn-bm-confirm-reject');
-    var btnText = $('bm-reject-btn-text');
-
-    var orderId = idInput ? idInput.value.trim() : '';
-    var reason = reasonInput ? reasonInput.value.trim() : '';
-
-    if (!orderId) {
-      closeBMRejectModal();
-      return;
-    }
-
-    if (!reason) {
-      if (errorEl) {
-        errorEl.textContent = 'Alasan penolakan wajib diisi untuk catatan audit.';
-        errorEl.style.display = 'block';
-      }
-      if (reasonInput) reasonInput.focus();
-      return;
-    }
-
-    if (confirmBtn) confirmBtn.disabled = true;
-    if (btnText) btnText.textContent = 'Menolak Pesanan...';
-
-    try {
-      var res = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/branch-acceptance', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ decision: 'reject', reason: reason })
-      });
-      var data = await res.json();
-      if (res.ok && data.success) {
-        showToast('Pesanan #' + orderId + ' telah ditolak.');
-        closeBMRejectModal();
-        if (_bmRejectOrigin === 'hari-ini' && typeof loadHariIni === 'function') {
-          loadHariIni();
-        }
-        loadBMOrders();
-        var detailView = $('bm-orders-detail-view');
-        if (detailView && detailView.style.display !== 'none' && $('bm-detail-order-number') && $('bm-detail-order-number').textContent.indexOf(orderId) !== -1) {
-          viewBMOrderDetail(orderId);
-        }
-      } else {
-        showToast('Gagal menolak pesanan: ' + (data.error || 'Terjadi kesalahan'));
-        if (confirmBtn) confirmBtn.disabled = false;
-        if (btnText) btnText.textContent = 'Konfirmasi Tolak Pesanan';
-        loadBMOrders();
-      }
-    } catch (e) {
-      showToast('Kesalahan jaringan.');
-      if (confirmBtn) confirmBtn.disabled = false;
-      if (btnText) btnText.textContent = 'Konfirmasi Tolak Pesanan';
-    }
-  }
-  window.submitBMRejectOrder = submitBMRejectOrder;
-
-  function rejectBMOrder(orderId) {
-    openBMRejectModal(orderId, 'orders');
-  }
-  window.rejectBMOrder = rejectBMOrder;
-
   async function decideBMOrderAddition(orderId, additionId, decision) {
     var reason = '';
     if (decision === 'accept') {
@@ -1051,80 +1127,6 @@
     }
   }
   window.decideBMOrderAddition = decideBMOrderAddition;
-
-  function getBMReservationGuestCount(ord) {
-    if (!ord) return 0;
-    var explicit = Number(ord.guest_count);
-    if (Number.isInteger(explicit) && explicit > 0) return explicit;
-
-    var note = String(ord.order_note || ord.notes || ord.order_notes || '');
-    var match = /Reservasi\s*\(\s*(\d+)\s*Tamu/i.exec(note);
-    return match ? Number(match[1]) : 0;
-  }
-  window.getBMReservationGuestCount = getBMReservationGuestCount;
-
-  function formatBMReservationDateTime(ord) {
-    var raw = ord && (ord.scheduled_slot_start || '');
-    var date = String(ord && (ord.reservation_date || raw.substring(0, 10)) || '').trim();
-    var time = String(ord && (ord.reservation_time || raw.substring(11, 16)) || '').trim();
-    if (!date) return '—';
-    return date + (time ? ' • ' + time : '');
-  }
-  window.formatBMReservationDateTime = formatBMReservationDateTime;
-
-  async function checkInBMReservation(orderId) {
-    var tableNumber = prompt('Masukkan nomor meja untuk check-in reservasi:');
-    if (tableNumber === null) return;
-    tableNumber = String(tableNumber).trim();
-    if (!tableNumber) {
-      showToast('Nomor meja wajib diisi.');
-      return;
-    }
-
-    try {
-      var res = await adminFetch(API_BASE + '/pos/reservations/' + encodeURIComponent(orderId) + '/check-in', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ table_number: tableNumber })
-      });
-      var data = await res.json();
-      if (res.ok && data.success) {
-        showToast('Reservasi #' + orderId + ' berhasil check-in di meja ' + tableNumber + '.');
-        await loadBMOrders({ background: true });
-        viewBMOrderDetail(orderId);
-      } else {
-        showToast('Check-in gagal: ' + (data.error || 'Terjadi kesalahan'));
-        loadBMOrders({ background: true });
-      }
-    } catch (e) {
-      showToast('Kesalahan jaringan saat check-in reservasi.');
-    }
-  }
-  window.checkInBMReservation = checkInBMReservation;
-
-  async function noShowBMReservation(orderId) {
-    if (!confirm('Tandai reservasi #' + orderId + ' sebagai NO-SHOW? Ini hanya berhasil setelah jadwal + grace period.')) return;
-
-    try {
-      var res = await adminFetch(API_BASE + '/pos/reservations/' + encodeURIComponent(orderId) + '/no-show', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({})
-      });
-      var data = await res.json();
-      if (res.ok && data.success) {
-        showToast('Reservasi #' + orderId + ' ditandai NO-SHOW.');
-        await loadBMOrders({ background: true });
-        closeBMOrderDetail();
-      } else {
-        showToast('No-show gagal: ' + (data.error || 'Belum melewati grace period'));
-        loadBMOrders({ background: true });
-      }
-    } catch (e) {
-      showToast('Kesalahan jaringan saat memproses no-show.');
-    }
-  }
-  window.noShowBMReservation = noShowBMReservation;
 
   window.renderBMOrdersTable = renderBMOrdersFeed;
 

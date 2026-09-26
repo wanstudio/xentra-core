@@ -4232,3 +4232,37 @@ input[type="file"].x-input,
     font-size: 11px;
   }
 }
+
+
+/* ==========================================================================
+   XENTRA MERCHANT APP — UI-FIRST SHELL
+   Visual surface intentionally independent from fulfillment/payment logic.
+   ========================================================================== */
+.x-merchant-app .x-dash-sidebar,
+.x-merchant-app .x-sidebar-overlay,
+.x-merchant-app .x-hamburger { display:none !important; }
+.x-merchant-app .x-dash-main { width:100%; margin-left:0 !important; padding-bottom:100px; }
+.x-merchant-app .x-dash-topbar { padding-left:clamp(16px,3vw,32px); padding-right:clamp(16px,3vw,32px); }
+.x-merchant-app .x-tab-content { max-width:1180px; width:100%; margin:0 auto; }
+.x-merchant-app .x-merchant-mobile-nav {
+  display:grid; position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
+  width:min(680px,calc(100vw - 28px)); min-height:66px; padding:7px;
+  grid-template-columns:repeat(5,1fr); gap:4px; z-index:80;
+  background:rgba(255,255,255,.96); border:1px solid #e2e8f0; border-radius:20px;
+  box-shadow:0 14px 40px rgba(15,23,42,.14); backdrop-filter:blur(16px);
+}
+.x-merchant-app .x-merchant-mobile-nav-item {
+  border:0; background:transparent; color:#64748b; min-height:52px; border-radius:14px;
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  gap:3px; font-size:10px; font-weight:800; cursor:pointer;
+}
+.x-merchant-app .x-merchant-mobile-nav-item.active { color:#15803d; background:#f0fdf4; }
+@media(max-width:768px){
+  .x-merchant-app .x-dash-topbar{padding:9px 12px}
+  .x-merchant-app .x-tab-content{padding:10px !important}
+  .x-merchant-app .x-merchant-mobile-nav{bottom:max(8px,env(safe-area-inset-bottom));width:calc(100vw - 16px);border-radius:18px}
+  .x-merchant-app .x-dash-main{padding-bottom:88px}
+}
+@media(min-width:769px){
+  .x-merchant-app .x-dash-topbar{max-width:1180px;width:100%;margin:0 auto;border-left:1px solid #eef2f7;border-right:1px solid #eef2f7}
+}
