@@ -14,13 +14,14 @@ const posRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/pos.js'), 'utf8
 const operationalRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/operational-orders.js'), 'utf8');
 const customerRoutes = fs.readFileSync(path.join(ROOT, 'server/routes/customer.js'), 'utf8');
 const customerCheckoutJs = fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/pages/checkout.js'), 'utf8');
+const schemaJs = fs.readFileSync(path.join(ROOT, 'server/database/db.js'), 'utf8');
 
 describe('Dine-in Additional Order Batch contract', () => {
   it('keeps additions under one canonical Commerce Order', () => {
     assert.ok(additionService.includes('order_addition_batches'));
     assert.ok(additionService.includes('order_id: order.id'));
     assert.ok(!additionService.includes('submitOrder({'));
-    assert.ok(additionRepo.includes('UNIQUE'));
+    assert.ok(schemaJs.includes('UNIQUE (order_id, sequence_no)'));
     assert.ok(orderRepo.includes('addition_batch_id'));
   });
 
@@ -55,7 +56,10 @@ describe('Dine-in Additional Order Batch contract', () => {
     assert.ok(posJs.includes('isOrderLockedForEditing'));
     assert.ok(posJs.includes('showOrderLockedWarning'));
     assert.ok(posJs.includes('await openCheckManager(state.activeHeldOrderId);'));
-    assert.ok(posJs.includes("await request('/pos/held-orders/'+encodeURIComponent(state.activeHeldBillId)"));
+    const manyPaymentStart = posJs.indexOf('async function openManyPaymentFromCart(){');
+    const manyPaymentEnd = posJs.indexOf('\\n  function resetSale(){', manyPaymentStart);
+    const manyPaymentBlock = posJs.slice(manyPaymentStart, manyPaymentEnd);
+    assert.ok(!manyPaymentBlock.includes("/pos/held-orders/"));
     assert.ok(posJs.includes('if(state.activeOrderLocked) return showOrderLockedWarning();'));
   });
 
