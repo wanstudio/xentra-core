@@ -2034,10 +2034,22 @@
     return '<div class="pos-qris-panel"><div class="pos-payment-total">'+money(totalAmount)+'</div>'+(q.merchant_name?'<div class="pos-qris-merchant">'+esc(q.merchant_name)+'</div>':'')+qrisImgHtml+'<p class="pos-qris-instructions">'+esc(q.instructions||'Verifikasi pembayaran pelanggan sebelum konfirmasi.')+'</p></div>';
   }
 
-  function openPayModal(){
+  async function openPayModal(){
+    if(state.activeAdditionalMode) return submitAdditionalOrder();
     if(!state.cart.length)return;
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
     if(state.shift.active_break)return toast('Akhiri istirahat sebelum melanjutkan transaksi.');
+
+    // Refresh accepted-order total/items before showing payment. This picks up
+    // any Additional Batch that Merchant has accepted since the last POS view.
+    if(state.activeOrderLocked && state.activeHeldOrderId){
+      try{
+        await refreshActiveOrderContext(state.activeHeldOrderId);
+      }catch(e){
+        return toast(e.message);
+      }
+    }
+
     state.autoPayAfterTable=true;
     if(state.orderType==='dine_in'&&!state.selectedTable){openTableSelector();return;}
     state.autoPayAfterTable=false;
