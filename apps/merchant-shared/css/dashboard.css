@@ -4487,8 +4487,19 @@ input[type="file"].x-input,
     overflow-y: auto !important;
     overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch !important;
-    padding: 16px 16px calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 16px 16px 0 !important;
     box-sizing: border-box !important;
+  }
+
+  /* Physical bottom spacer to guarantee exact 50px clearance above fixed bottom navbar across all browsers */
+  .x-merchant-app .x-tab-content.active::after {
+    content: "" !important;
+    display: block !important;
+    height: calc(118px + env(safe-area-inset-bottom, 0px)) !important;
+    width: 100% !important;
+    clear: both !important;
+    flex-shrink: 0 !important;
+    pointer-events: none !important;
   }
 
   /* White cards inside the putih-kebiruan curved frame */
@@ -4501,7 +4512,7 @@ input[type="file"].x-input,
     margin-bottom: 16px !important;
   }
 
-  /* Match clearance between last card and bottom navbar to the 16px inter-card gap */
+  /* Reset margin on the last child so the 118px spacer creates precisely 50px visible clearance */
   .x-merchant-app .x-tab-content > *:last-child,
   .x-merchant-app .x-tab-content .x-hari-ini-container > *:last-child,
   .x-merchant-app .x-tab-content .x-card-panel:last-child {
