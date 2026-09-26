@@ -1,12 +1,12 @@
 # 🔒 Xentra — Offline POS Architecture Boundary v1
 
-**Status:** LOCKED / ARCHITECTURE BOUNDARY — IMPLEMENTATION NOT YET ACTIVATED
+**Status:** LOCKED / ARCHITECTURE BOUNDARY — FOUNDATION IMPLEMENTED; P3/P4 NOT ACTIVATED
 **Decision date:** 2026-09-26
 **Repository:** wanstudio/xentra-core
 
 ## Purpose
 
-Define the architectural boundary for Xentra POS when Xentra-Core is unreachable, before implementing P3 (Offline Dine-in Table Claim) and P4 (Offline Sale vs Merchant Acceptance).
+Define the architectural boundary for Xentra POS when Xentra-Core is unreachable, before implementing P3 (Offline Dine-in Table Claim) and P4 (Offline Sale vs Merchant Acceptance). The durable browser operational-store foundation is now implemented under a separate explicit decision; this page remains the governing architecture boundary.
 
 This document resolves the architecture. It does not by itself authorize every downstream implementation detail.
 
@@ -83,7 +83,7 @@ The backend already contains an offline operational foundation:
 - idempotent order ingestion;
 - cross-channel inventory conflict records.
 
-However, the current browser POS still calls /pos/local/sale when navigator.onLine is false. That endpoint still requires a reachable Core. Therefore the current browser implementation does not yet provide true device-local offline transaction persistence.
+At the time this boundary was locked, the browser POS still called /pos/local/sale when navigator.onLine was false, which required a reachable Core. The separate `pos-offline-browser-operational-store-v1` implementation has now added durable device-local operational persistence. P3/P4 remain gated and full offline Dine-in is still not activated.
 
 ### Locked activation rule
 
@@ -100,7 +100,7 @@ POS Browser
 
 The local store remains an operational transport/working store. It does not become the authoritative inventory, payment, RBAC, or management authority.
 
-The existing development constraint remains in force: do not activate the IndexedDB transaction outbox merely because this architecture contract exists. A separate implementation step must enable it after its schema and recovery contract are tested.
+The former browser-persistence development hold has been explicitly superseded by `pos-offline-browser-operational-store-v1`. The durable browser operational-store foundation is implemented and regression-covered; this does not activate Offline Dine-in Table Claim or Local Operational Acceptance.
 
 ## 5. Offline Dine-in table claim
 
@@ -303,7 +303,7 @@ This architecture decision does not authorize immediate implementation of all of
 
 Implementation must proceed in this order:
 
-1. Durable browser POS operational store and recovery contract.
+1. Durable browser POS operational store and recovery contract — **RESOLVED / IMPLEMENTED FOUNDATION**.
 2. POS presence/lease contract so Core can detect stale terminal presence.
 3. Offline table claim contract and reconciliation conflict semantics.
 4. Offline sale / local operational acceptance contract.
@@ -324,7 +324,7 @@ This decision does not introduce:
 - automatic POS-over-PWA or PWA-over-POS business priority;
 - a second Dining state machine;
 - a requirement for multiple POS terminals per Branch;
-- activation of browser IndexedDB transaction persistence by itself;
+- activation of P3/P4 or full offline Dine-in behavior by this decision alone;
 - silent conversion of every offline operation into a normal online Merchant Acceptance event.
 
 ## 16. Relationship to existing locked decisions
@@ -345,15 +345,17 @@ This document is the prerequisite architecture boundary for P3 and P4.
 
 Verified against GitHub main at:
 
-c8c05aa279d5a21cd864bb884d93982c13d4f9bf
+f5d7a66b932e0fb5b066c753c9b2e9d59fbed022
 
 At this source state:
 
 - backend offline reconciliation/idempotency exists;
 - browser POS has offline PIN/session/cache support;
 - browser POS falls back to /pos/local/sale when navigator.onLine is false;
-- browser POS does not yet have an IndexedDB transaction outbox;
-- POS table layout is fetched from Core and has no local durable table-claim store;
+- browser POS now has a durable IndexedDB operational store and recovery foundation;
+- POS table layout is still fetched from Core and there is no local durable table-claim store;
 - no POS heartbeat/lease mechanism was found.
 
-Therefore downstream P3/P4 implementation remains gated by this architecture boundary.
+Therefore downstream P3/P4 implementation remains gated by this architecture boundary and by their specific contracts.
+
+**Implementation decision:** `docs/decisions/pos-offline-browser-operational-store-v1.md` is the explicit activation revision for the durable browser foundation.
