@@ -1066,7 +1066,7 @@ router.get('/pos/terminal/current', requireAuth(['owner', 'brand_manager', 'bran
       });
     }
 
-    const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(branchId, req.brand_id);
+    const branch = db.prepare('SELECT id, name, is_active, is_open_override FROM branches WHERE id = ? AND brand_id = ?').get(branchId, req.brand_id);
     if (!branch) {
       return res.status(404).json({
         success: false,
@@ -1076,7 +1076,7 @@ router.get('/pos/terminal/current', requireAuth(['owner', 'brand_manager', 'bran
 
     const { PosLocalOperationService } = require('../../domains/pos');
     const terminal = PosLocalOperationService.getActiveTerminal(branchId);
-    res.json({ success: true, terminal: terminal || null, registered: !!terminal, branch_id: branchId });
+    res.json({ success: true, terminal: terminal || null, registered: !!terminal, branch_id: branchId, branch: { id: branch.id, name: branch.name, is_active: branch.is_active === 1, is_open_override: branch.is_open_override === 1 } });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
