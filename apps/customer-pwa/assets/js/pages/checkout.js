@@ -76,7 +76,8 @@
     cashTenderedType: null,
     recipient: Store.getRecipient() || { type: 'self', name: '', phone: '' },
     isSubmitting: false,
-    isRedirectingToPayment: false
+    isRedirectingToPayment: false,
+    openBillLoaded: false
   };
 
   // ── Xentra Robot Splash Controller (Floating, Flapping Arms, Winking Eyes) ──
