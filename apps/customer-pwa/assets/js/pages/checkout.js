@@ -4111,6 +4111,90 @@
   // The pwa_runtime context (display_mode + install_state) is sent to the
   // authoritative PrePaymentVerificationGate; the client never decides whether
   // a claimed reward may be paid.
+  function getActiveDineInOrderId() {
+    if (!state.openBill) return null;
+    if (state.openBill.active_order_id) return String(state.openBill.active_order_id);
+    var orders = Array.isArray(state.openBill.orders) ? state.openBill.orders : [];
+    var active = orders.filter(function (o) {
+      return o && !o.is_cancelled && o.status !== 'cancelled';
+    });
+    return active.length ? String(active[active.length - 1].id) : null;
+  }
+
+  function hasActiveDineInBill() {
+    return state.fulfillment.type === 'dine_in' && !!getActiveDineInOrderId();
+  }
+
+  function submitCustomerAdditionalOrder(items) {
+    var orderId = getActiveDineInOrderId();
+    if (!orderId) return;
+    var btn = $('x-btn-submit-order');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Mengirim tambahan…';
+    }
+
+    var payloadItems = items.map(function (i) {
+      return {
+        id: i.id,
+        product_id: i.product_id || i.id,
+        quantity: Number(i.quantity) || 1,
+        expected_price: Number(i.price) || 0,
+        name: i.name || '',
+        note: i.note || (Store.getNote ? Store.getNote(i.id, i.branch_id) : ''),
+        branch_id: i.branch_id || null,
+        options: i.options || i.modifiers || []
+      };
+    });
+
+    API.post('/customer/dining-session/additions', {
+      order_id: orderId,
+      items: payloadItems
+    }).then(function (res) {
+      if (!res || !res.success) {
+        throw new Error((res && (res.message || res.error)) || 'Tambahan pesanan gagal dikirim.');
+      }
+
+      // Remove only the lines successfully handed off as an Additional Batch.
+      items.forEach(function (i) {
+        if (Store && Store.removeCartItem) {
+          Store.removeCartItem(i.id, i.branch_id);
+        } else if (Store && Store.setQty) {
+          Store.setQty(i.id, 0, i.branch_id);
+        }
+      });
+
+      state.isSubmitting = false;
+      state.isRedirectingToPayment = false;
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Pesan Sekarang';
+        btn.style.opacity = '1';
+      }
+
+      refreshOpenBill().then(function () {
+        renderLayout();
+        calculateTotals();
+      });
+      if (UI && UI.toast) UI.toast('Tambahan pesanan dikirim. Menunggu resto menerima pesanan.');
+    }).catch(function (err) {
+      state.isSubmitting = false;
+      state.isRedirectingToPayment = false;
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Kirim Tambahan';
+        btn.style.opacity = '1';
+      }
+      if (UI && UI.toast) UI.toast(err.message || 'Tambahan pesanan gagal dikirim.');
+    });
+  }
+
   function executePrePaymentAndSubmit() {
     if (state.isSubmitting) return;
 
