@@ -19,7 +19,7 @@ class PosBillRepository {
   }
 
   findOrderItems(orderId) {
-    return this.db.queryMany(`SELECT id, product_id, product_name, quantity, unit_price, item_subtotal, subtotal, note, modifiers_snapshot, created_at FROM order_items WHERE order_id = ? ORDER BY created_at ASC, id ASC`, [orderId]);
+    return this.db.queryMany(`SELECT id, product_id, product_name, quantity, unit_price, item_subtotal, subtotal, addition_batch_id, note, modifiers_snapshot, created_at FROM order_items WHERE order_id = ? ORDER BY created_at ASC, id ASC`, [orderId]);
   }
 
   findChecks(orderId) {

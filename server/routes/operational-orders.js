@@ -15,6 +15,8 @@ module.exports = function registerOperationalOrderRoutes(router, deps) {
     AcceptanceTimeoutService
   } = deps;
 
+  const { OrderAdditionService } = require('../../domains/commerce/services/OrderAdditionService');
+
 // Kitchen Display Queue (Strictly Tenant-Scoped & Branch-Scoped for Operator Roles)
 router.get('/kitchen/queue', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier', 'kitchen']), (req, res) => {
   // If user is a branch-level operator, strictly enforce their assigned branch
@@ -138,6 +140,42 @@ router.patch('/kitchen/orders/:id/status', requireAuth(['owner', 'brand_manager'
 // reason, timestamp), and idempotent for repeated identical decisions.
 // A rejected branch is NEVER silently rematched to another branch, and an
 // order with a settled payment cannot be branch-rejected (refund flow first).
+// Additional Order Acceptance: same Branch/Dining authority as the parent Dine-in Order.
+router.post('/orders/:id/additions/:additionId/branch-acceptance', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  try {
+    const { decision, reason = '' } = req.body || {};
+    if (!decision || !['accept', 'reject'].includes(decision)) {
+      return res.status(400).json({ success: false, error: 'decision wajib bernilai "accept" atau "reject".' });
+    }
+
+    const scopeSql = `
+      SELECT o.id, o.branch_id
+      FROM orders o
+      JOIN branches b ON b.id = o.branch_id
+      WHERE o.id = ? AND b.brand_id = ?
+      ${req.user.role === 'branch_manager' && (req.user.branch_id || req.user.branchId) ? ' AND o.branch_id = ?' : ''}
+    `;
+    const scopeParams = [req.params.id, req.brand_id];
+    if (req.user.role === 'branch_manager' && (req.user.branch_id || req.user.branchId)) scopeParams.push(req.user.branch_id || req.user.branchId);
+    const parent = db.prepare(scopeSql).get(...scopeParams);
+    if (!parent) return res.status(404).json({ success: false, error: 'Order tidak ditemukan pada kewenangan cabang Anda.' });
+
+    const result = OrderAdditionService.decide({
+      order_id: parent.id,
+      addition_id: req.params.additionId,
+      brand_id: req.brand_id,
+      branch_id: parent.branch_id,
+      decision,
+      actor_id: req.user.userId || req.user.username || 'branch_actor',
+      reason
+    });
+
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/orders/:id/branch-acceptance', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
   try {
     const { decision, reason = '', note = '' } = req.body;

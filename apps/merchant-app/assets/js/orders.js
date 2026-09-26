@@ -367,6 +367,10 @@
         : '';
       var tableInfo = ord.table_number ? ('Meja ' + esc(ord.table_number)) : '—';
       var totalStr = formatMoney(ord.grand_total || ord.subtotal || 0);
+      var pendingAdditionCount = Number(ord.pending_additions_count || 0);
+      var pendingAdditionBadge = pendingAdditionCount > 0
+        ? '<span class="x-badge x-badge-warning" style="margin-left:4px;">+' + pendingAdditionCount + ' TAMBAHAN</span>'
+        : '';
 
       var isNewPending = (ord.status === 'pending') && !!_bmOrdersState.newPendingOrderIds[ord.id];
 
@@ -403,7 +407,7 @@
         }
       }
 
-      var statusCol = statusBadgeHtml + countdownHtml;
+      var statusCol = statusBadgeHtml + pendingAdditionBadge + countdownHtml;
       var isAccepting = !!_bmOrdersState.inFlightAccept[ord.id];
       var isMutatingStatus = !!(_bmOrdersState.inFlightStatus && _bmOrdersState.inFlightStatus[ord.id]);
 
@@ -536,7 +540,7 @@
               '<span class="bm-order-card-total-val">' + totalStr + '</span>' +
             '</div>' +
             '<div class="bm-order-card-status-wrap">' +
-              statusBadgeHtml +
+              statusBadgeHtml + pendingAdditionBadge +
               countdownHtml +
             '</div>' +
           '</div>' +
@@ -778,6 +782,38 @@
   }
   window.rejectBMOrder = rejectBMOrder;
 
+  async function decideBMOrderAddition(orderId, additionId, decision) {
+    var reason = '';
+    if (decision === 'accept') {
+      if (!confirm('Terima tambahan pesanan ini? Item akan masuk ke pesanan dan stok akan dipotong.')) return;
+    } else if (decision === 'reject') {
+      reason = prompt('Alasan penolakan tambahan:') || '';
+      if (!reason.trim()) return;
+    } else {
+      return;
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/additions/' + encodeURIComponent(additionId) + '/branch-acceptance', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ decision: decision, reason: reason })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast(decision === 'accept' ? 'Tambahan pesanan diterima.' : 'Tambahan pesanan ditolak.');
+        loadBMOrders({ background: true });
+        loadHariIni();
+        if (_bmOrdersState.currentDetailOrderId === orderId) viewBMOrderDetail(orderId);
+      } else {
+        showToast((decision === 'accept' ? 'Gagal menerima tambahan: ' : 'Gagal menolak tambahan: ') + (data.error || 'Terjadi kesalahan'));
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.decideBMOrderAddition = decideBMOrderAddition;
+
   function getBMReservationGuestCount(ord) {
     if (!ord) return 0;
     var explicit = Number(ord.guest_count);
@@ -981,6 +1017,38 @@
             '</tr>';
           }).join('');
         }
+      }
+
+      // Pending Additional Orders require their own explicit acceptance action.
+      var pendingAdditions = (ord.additions || []).filter(function (addition) {
+        return addition.status === 'pending_acceptance';
+      });
+      var tbodyAdditions = $('bm-detail-items-tbody');
+      if (tbodyAdditions && pendingAdditions.length) {
+        var currentItemsHtml = tbodyAdditions.innerHTML;
+        var additionsHtml = pendingAdditions.map(function (addition) {
+          var header = '<tr><td colspan="5" style="background:#fff7ed;border-top:2px solid #fed7aa;padding:10px 12px;">' +
+            '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;">' +
+              '<div><strong>Tambahan #' + esc(addition.sequence_no) + '</strong> <span class="x-badge x-badge-warning">MENUNGGU DITERIMA</span>' +
+                '<small style="display:block;color:#6b7280;margin-top:3px;">' + esc(addition.source_channel || 'POS') + ' · ' + esc(addition.created_at || '') + '</small></div>' +
+              '<div style="display:flex;gap:6px;">' +
+                '<button type="button" class="x-btn-primary" style="font-size:11px;padding:5px 9px;" onclick="decideBMOrderAddition(\'' + esc(ord.id) + '\',\'' + esc(addition.id) + '\',\'accept\')">Terima</button>' +
+                '<button type="button" class="x-btn-secondary" style="font-size:11px;padding:5px 9px;color:#dc2626;border-color:#fecaca;" onclick="decideBMOrderAddition(\'' + esc(ord.id) + '\',\'' + esc(addition.id) + '\',\'reject\')">Tolak</button>' +
+              '</div>' +
+            '</div></td></tr>';
+          var itemsHtml = (addition.items || []).map(function (it) {
+            var sub = it.subtotal != null ? it.subtotal : ((it.unit_price || 0) * (it.quantity || 1));
+            return '<tr>' +
+              '<td><span style="padding-left:12px;">↳ ' + esc(it.name || it.product_name || it.product_id) + '</span></td>' +
+              '<td>' + formatMoney(it.unit_price || 0) + '</td>' +
+              '<td>' + (it.quantity || 1) + '</td>' +
+              '<td><small class="text-muted">' + esc(it.note || '—') + '</small></td>' +
+              '<td class="text-right"><strong>' + formatMoney(sub) + '</strong></td>' +
+            '</tr>';
+          }).join('');
+          return header + itemsHtml;
+        }).join('');
+        tbodyAdditions.innerHTML = currentItemsHtml + additionsHtml;
       }
 
       // Render audit logs

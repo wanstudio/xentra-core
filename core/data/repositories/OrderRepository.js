@@ -161,12 +161,20 @@ class OrderRepository {
     ]);
   }
 
-  insertItem({ id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note, modifiersSnapshot = null }) {
+  insertItem({ id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note, modifiersSnapshot = null, additionBatchId = null }) {
     return this.db.execute(`
       INSERT INTO order_items (
-        id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note, modifiers_snapshot
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note, modifiersSnapshot]);
+        id, order_id, product_id, product_name, unit_price, quantity, item_subtotal, note, modifiers_snapshot, addition_batch_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note, modifiersSnapshot, additionBatchId || null]);
+  }
+
+  updateOrderFinancialSnapshot({ orderId, subtotal, grandTotal, updatedAt }) {
+    return this.db.execute(`
+      UPDATE orders
+      SET subtotal = ?, grand_total = ?, total_amount = ?, updated_at = ?
+      WHERE id = ?
+    `, [Number(subtotal), Number(grandTotal), Number(grandTotal), updatedAt, orderId]);
   }
 
   deleteItems(orderId) { return this.db.execute('DELETE FROM order_items WHERE order_id = ?', [orderId]); }

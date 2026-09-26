@@ -12,6 +12,7 @@ module.exports = function registerPosRoutes(router, deps) {
   } = deps;
   const PaymentGatewayService = require('../../domains/payment/services/PaymentGatewayService');
   const { PosOrderService, PosPaymentGroupService } = require('../../domains/pos');
+  const { OrderAdditionService } = require('../../domains/commerce');
 
 router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
@@ -401,6 +402,46 @@ router.post('/pos/held-orders/:id/resume', requireAuth(['cashier']), (req, res) 
  * Split/Merge changes check allocation inside ONE Commerce Order.
  * It must never create another order or Dining Session.
  */
+/**
+ * Dine-in Additional Order Batch.
+ * Additions are child operational records under one canonical Commerce Order.
+ */
+router.get('/pos/orders/:id/additions', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const result = OrderAdditionService.listForOrder({
+      order_id: req.params.id,
+      brand_id: req.brand_id,
+      branch_id: branchId
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/orders/:id/additions', requireAuth(['cashier']), async (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    const cashierId = req.user.id || req.user.userId;
+    const { items = [], client_transaction_id = null } = req.body || {};
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const result = await OrderAdditionService.submit({
+      order_id: req.params.id,
+      brand_id: req.brand_id,
+      branch_id: branchId,
+      items,
+      source_channel: 'pos_cashier',
+      created_by: cashierId,
+      client_transaction_id: client_transaction_id || ('posadd_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8))
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.get('/pos/orders/:id/checks', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;

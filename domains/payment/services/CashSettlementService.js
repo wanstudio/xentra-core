@@ -72,33 +72,56 @@ class CashSettlementService {
     }
 
     const tendered = Number(amount_tendered);
-    if (tendered < amount) {
-      throw new Error(`[CashSettlementService] Uang yang diterima (Rp ${tendered.toLocaleString('id-ID')}) kurang dari total tagihan (Rp ${amount.toLocaleString('id-ID')}).`);
-    }
-
-    if (Math.round(Number(amount)) !== Math.round(Number(order.grand_total))) {
-      throw new Error(`[SETTLEMENT_AMOUNT_MISMATCH]: Nominal kas (Rp ${amount}) tidak sesuai dengan total tagihan pesanan (Rp ${order.grand_total}).`);
-    }
 
     const existingPayment = paymentRepository.findPaymentByOrderId(order_id);
     if (existingPayment) {
       if (existingPayment.provider && existingPayment.provider !== 'cash') {
         throw new Error(`[CashSettlementService Provider Conflict]: Pembayaran untuk pesanan "${order_id}" sudah terdaftar dengan provider online "${existingPayment.provider}".`);
       }
-      if (Math.round(Number(existingPayment.amount)) !== Math.round(Number(order.grand_total))) {
-        throw new Error(`[SETTLEMENT_AMOUNT_MISMATCH]: Record pembayaran sebelumnya (Rp ${existingPayment.amount}) tidak sesuai dengan tagihan pesanan (Rp ${order.grand_total}).`);
-      }
-      if (existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT) {
+      const existingAmount = Number(existingPayment.amount || 0);
+      const currentGrandTotal = Number(order.grand_total || 0);
+
+      if (existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT &&
+          Math.round(existingAmount) === Math.round(currentGrandTotal)) {
         return {
           success: true,
           idempotent: true,
           payment_id: existingPayment.id,
           order_id,
-          amount: Number(existingPayment.amount),
+          amount: currentGrandTotal,
           payment_status: PaymentModel.STATUSES.SETTLEMENT,
           message: 'Pembayaran tunai sudah diselesaikan sebelumnya.'
         };
       }
+
+      // Dine-in Additional Order may increase the current canonical total
+      // after an earlier settlement. Detailed payment history remains in
+      // pos_check_payments; order_payments is the current cumulative summary.
+      if (existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT &&
+          existingAmount < currentGrandTotal) {
+        // Allowed: settleCashPayment below updates the existing summary row.
+      } else if (Math.round(existingAmount) !== Math.round(currentGrandTotal)) {
+        throw new Error(`[SETTLEMENT_AMOUNT_MISMATCH]: Record pembayaran sebelumnya (Rp ${existingPayment.amount}) tidak sesuai dengan tagihan pesanan (Rp ${order.grand_total}).`);
+      }
+    }
+
+    const priorSettledAmount = existingPayment && existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT
+      ? Number(existingPayment.amount || 0)
+      : 0;
+    const amountDue = Math.max(0, expectedAmount - priorSettledAmount);
+    if (amountDue <= 0 && existingPayment && existingPayment.payment_status === PaymentModel.STATUSES.SETTLEMENT) {
+      return {
+        success: true,
+        idempotent: true,
+        payment_id: existingPayment.id,
+        order_id,
+        amount: 0,
+        payment_status: PaymentModel.STATUSES.SETTLEMENT,
+        message: 'Pembayaran tunai sudah diselesaikan sebelumnya.'
+      };
+    }
+    if (tendered < amountDue) {
+      throw new Error(`[CashSettlementService] Uang yang diterima (Rp ${tendered.toLocaleString('id-ID')}) kurang dari sisa tagihan (Rp ${amountDue.toLocaleString('id-ID')}).`);
     }
 
     if (shift_id && !skip_shift_increment) {
@@ -117,7 +140,7 @@ class CashSettlementService {
       }
     }
 
-    const change = tendered - amount;
+    const change = tendered - amountDue;
     const generatedPaymentId = `pay_cash_${crypto.randomBytes(6).toString('hex')}`;
     const actualPaymentId = existingPayment ? existingPayment.id : generatedPaymentId;
     const now = new Date().toISOString();
@@ -133,7 +156,7 @@ class CashSettlementService {
         const shiftUpdateRes = posShiftRepository.incrementCashSales({
           shiftId: shift_id,
           branchId: order.branch_id,
-          amount
+          amount: amountDue
         });
 
         if (shiftUpdateRes.changes !== 1) {
@@ -144,9 +167,9 @@ class CashSettlementService {
       paymentRepository.settleCashPayment({
         paymentId: actualPaymentId,
         orderId: order_id,
-        amount,
+        amount: expectedAmount,
         settledAt: now,
-        rawPayment: JSON.stringify({ amount_tendered: tendered, change, cashier_id, shift_id, payment_group_id }),
+        rawPayment: JSON.stringify({ amount_tendered: tendered, change, cashier_id, shift_id, payment_group_id, amount_due: amountDue, prior_settled_amount: priorSettledAmount }),
         createdAt: now,
         updatedAt: now
       });
@@ -223,7 +246,7 @@ class CashSettlementService {
         brand_id: order.brand_id,
         provider: 'cash',
         payment_method: 'cash',
-        amount,
+        amount: amountDue,
         amount_tendered: tendered,
         change,
         settled_at: now
@@ -236,7 +259,7 @@ class CashSettlementService {
       order_id,
       payment_status: 'settlement',
       provider: 'cash',
-      amount,
+      amount: amountDue,
       amount_tendered: tendered,
       change,
       settled_at: now

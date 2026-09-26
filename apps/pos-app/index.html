@@ -172,11 +172,13 @@
                 <span id="pos-cart-meta" class="pos-menu-stats">0 item</span>
               </div>
               <div class="pos-cart-actions">
+                <button type="button" class="pos-btn small" id="btn-pos-additional-order" title="Tambah pesanan ke order dine-in" hidden>+ Tambah Pesanan</button>
                 <button type="button" class="pos-btn small ghost" id="btn-pos-hold" title="Tahan pesanan saat ini (Hold Bill)">Tahan</button>
                 <button type="button" class="pos-btn small ghost pos-btn-held-trigger" id="btn-pos-open-held" title="Buka daftar pesanan yang ditahan">Ditahan (<span id="pos-held-count">0</span>)</button>
                 <button type="button" class="pos-btn small danger ghost" id="btn-pos-clear" title="Kosongkan pesanan">Kosongkan</button>
               </div>
             </div>
+            <div id="pos-order-addition-banner" class="pos-order-addition-banner hidden"></div>
             <div id="pos-cart-items" class="pos-cart-items">
               <div class="pos-empty">Belum ada item.</div>
             </div>

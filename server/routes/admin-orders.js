@@ -103,7 +103,8 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
       acceptance_deadline_at: ord.acceptance_deadline_at || AcceptanceTimeoutService.computeAcceptanceDeadlineAt(ord),
       items: db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(ord.id),
       delivery: db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(ord.id),
-      payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id)
+      payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id),
+      pending_additions_count: Number((db.prepare("SELECT COUNT(*) AS count FROM order_addition_batches WHERE order_id = ? AND status = 'pending_acceptance'").get(ord.id) || {}).count || 0)
     }));
 
     res.json({ success: true, branch_id: req.params.id, orders: enriched });
@@ -197,7 +198,8 @@ router.get('/admin/orders', requireAuth(['owner', 'brand_manager', 'branch_manag
       ...ord,
       items: db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(ord.id),
       delivery: db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(ord.id),
-      payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id)
+      payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id),
+      pending_additions_count: Number((db.prepare("SELECT COUNT(*) AS count FROM order_addition_batches WHERE order_id = ? AND status = 'pending_acceptance'").get(ord.id) || {}).count || 0)
     }));
 
     res.json({ success: true, orders: enriched });
@@ -240,6 +242,10 @@ router.get('/admin/orders/:id', requireAuth(['owner', 'brand_manager', 'branch_m
     const delivery = db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(order.id);
     const payment = db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(order.id);
     const logs = db.prepare('SELECT previous_status, new_status, note, created_at FROM order_status_logs WHERE order_id = ? ORDER BY created_at ASC').all(order.id);
+    const additions = db.prepare('SELECT * FROM order_addition_batches WHERE order_id = ? ORDER BY sequence_no ASC, created_at ASC').all(order.id).map((addition) => ({
+      ...addition,
+      items: JSON.parse(addition.items_payload || '[]')
+    }));
 
     // If dine-in order with dining_session_id, retrieve all session additions
     let sessionOrders = [];
@@ -261,6 +267,8 @@ router.get('/admin/orders/:id', requireAuth(['owner', 'brand_manager', 'branch_m
         delivery: delivery || null,
         payment: payment || null,
         status_logs: logs || [],
+        additions: additions || [],
+        pending_additions_count: additions.filter((a) => a.status === 'pending_acceptance').length,
         session_orders: sessionOrders
       }
     });

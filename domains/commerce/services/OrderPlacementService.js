@@ -359,6 +359,85 @@ class OrderPlacementService {
     };
   }
 
+  static deductStockForItems({
+    order_id,
+    items = [],
+    reference_id,
+    actor_id = 'merchant_acceptance',
+    notes = 'Additional Order stock deduction',
+    dbTransactionProvided = false
+  }) {
+    if (!order_id) throw new Error('[OrderPlacementService] order_id wajib diisi.');
+    if (!reference_id) throw new Error('[OrderPlacementService] reference_id wajib diisi.');
+    if (!Array.isArray(items) || !items.length) return { success: true, deducted_items: [] };
+
+    const order = orderRepository.findById(order_id);
+    if (!order) throw new Error('[OrderPlacementService] Order "' + order_id + '" tidak ditemukan.');
+
+    const existingMovement = inventoryRepository.findSaleDeductionByReference(reference_id);
+    if (existingMovement) return { success: true, idempotent: true, deducted_items: [] };
+
+    const now = new Date().toISOString();
+    const deductedItems = [];
+    const ownsTransaction = !dbTransactionProvided;
+    if (ownsTransaction) inventoryRepository.beginTransaction();
+
+    try {
+      for (const item of items) {
+        const quantity = Number(item.quantity || 0);
+        if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+          throw new Error('[OrderPlacementService] Quantity Additional Order tidak valid.');
+        }
+
+        const bpBefore = inventoryRepository.findBranchProduct(order.branch_id, item.product_id);
+        if (!bpBefore) continue;
+
+        const prevStock = Number(bpBefore.stock || 0);
+        const deductResult = inventoryRepository.deductBranchProduct({
+          quantity,
+          branchId: order.branch_id,
+          productId: item.product_id
+        });
+
+        if (!deductResult || deductResult.changes === 0) {
+          throw new Error('[OUT_OF_STOCK_RACE] Stok untuk produk "' + (item.product_name || item.name || item.product_id) + '" tidak mencukupi untuk Additional Order (tersisa ' + prevStock + ', diminta ' + quantity + ').');
+        }
+
+        const currentStock = prevStock - quantity;
+        inventoryRepository.insertMovement({
+          id: 'mov_' + crypto.randomBytes(6).toString('hex'),
+          branchId: order.branch_id,
+          productId: item.product_id,
+          movementType: 'sale_deduction',
+          quantity: -quantity,
+          previousStock: prevStock,
+          currentStock,
+          referenceId: reference_id,
+          mutationId: reference_id + ':' + String(item.product_id) + ':' + String(deductedItems.length),
+          actorId: actor_id,
+          notes,
+          createdAt: now
+        });
+
+        deductedItems.push({
+          product_id: item.product_id,
+          product_name: item.product_name || item.name || item.product_id,
+          quantity,
+          previous_stock: prevStock,
+          current_stock: currentStock
+        });
+      }
+
+      if (ownsTransaction) inventoryRepository.commitTransaction();
+      return { success: true, deducted_items: deductedItems };
+    } catch (err) {
+      if (ownsTransaction) {
+        try { inventoryRepository.rollbackTransaction(); } catch (_) {}
+      }
+      throw err;
+    }
+  }
+
   static deductStockForSettledOrder(orderId, { dbTransactionProvided = false } = {}) {
     const order = orderRepository.findById(orderId);
     if (!order) throw new Error(`[OrderPlacementService] Order "${orderId}" tidak ditemukan.`);
