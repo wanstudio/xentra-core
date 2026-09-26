@@ -69,4 +69,19 @@ describe('Merchant PWA Installable — Architecture & Contract Verification', ()
     assert.ok(serverCode.includes('/merchant-app/sw.js'), 'server/app.js must route /merchant-app/sw.js');
     assert.ok(serverCode.includes('Service-Worker-Allowed'), 'server/app.js must send Service-Worker-Allowed header');
   });
+
+  it('6. Cross-PWA Isolation: Customer SW and Merchant SW do not intercept each other', () => {
+    const customerSw = fs.readFileSync(path.join(__dirname, '../apps/customer-pwa/assets/pwa/service-worker.js'), 'utf8');
+    const merchantSw = fs.readFileSync(swPath, 'utf8');
+
+    // Customer SW must explicitly bypass merchant and pos routes
+    assert.ok(customerSw.includes('url.pathname.startsWith("/merchant-app")'), 'Customer SW must bypass /merchant-app');
+    assert.ok(customerSw.includes('url.pathname.startsWith("/merchant")'), 'Customer SW must bypass /merchant');
+    assert.ok(customerSw.includes('url.pathname.startsWith("/pos")'), 'Customer SW must bypass /pos');
+
+    // Merchant SW must explicitly bypass customer checkout, pos, and foreign surfaces
+    assert.ok(merchantSw.includes('url.pathname.startsWith("/checkout")'), 'Merchant SW must bypass /checkout');
+    assert.ok(merchantSw.includes('url.pathname.startsWith("/pos")'), 'Merchant SW must bypass /pos');
+    assert.ok(merchantSw.includes('url.pathname.startsWith("/merchant-app/")'), 'Merchant SW must guard navigations to merchant scope');
+  });
 });

@@ -148,12 +148,20 @@ self.addEventListener("fetch", function (event) {
 
   var url = new URL(event.request.url);
 
-  // Operational APIs, auth, webhooks, or SSE are strictly Network-Only (NEVER cached)
+  // Operational APIs, auth, webhooks, or foreign surfaces (Customer PWA, POS PWA, Owner)
+  // are strictly bypassed (Network-Only) to preserve 100% PWA isolation.
   if (
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/auth/") ||
     url.pathname.startsWith("/login") ||
-    url.pathname.startsWith("/webhooks/")
+    url.pathname.startsWith("/signin") ||
+    url.pathname.startsWith("/signup") ||
+    url.pathname.startsWith("/webhooks/") ||
+    url.pathname.startsWith("/pos") ||
+    url.pathname.startsWith("/dashboard") ||
+    url.pathname.startsWith("/owner") ||
+    url.pathname.startsWith("/checkout") ||
+    url.pathname.startsWith("/order-received")
   ) {
     return;
   }
@@ -168,6 +176,13 @@ self.addEventListener("fetch", function (event) {
     return;
   }
 
-  // HTML / Navigations / Manifest: Network-First
-  event.respondWith(networkFirst(event));
+  // Scope guard: Only intercept navigations or manifest inside the Merchant scope
+  if (
+    url.pathname === "/merchant-app" ||
+    url.pathname.startsWith("/merchant-app/") ||
+    url.pathname === "/merchant" ||
+    url.pathname.startsWith("/merchant/")
+  ) {
+    event.respondWith(networkFirst(event));
+  }
 });

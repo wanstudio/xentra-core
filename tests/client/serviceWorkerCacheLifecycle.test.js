@@ -316,10 +316,10 @@ test('P0 #4 — media derivatives are Cache-First', async () => {
   assert.deepStrictEqual(ctx.network.requested, [], 'cached media must not hit the network');
 });
 
-test('P0 #4 — API and dashboard are never intercepted', async () => {
+test('P0 #4 — API, dashboard, and isolated operational PWAs (Merchant, POS) are never intercepted', async () => {
   const ctx = boot(SW, {});
   await install(ctx);
-  for (const p of ['/api/v1/orders', '/api/v1/customers/session', '/dashboard/index.html']) {
+  for (const p of ['/api/v1/orders', '/api/v1/customers/session', '/dashboard/index.html', '/merchant-app/', '/merchant/index.html', '/pos/index.html']) {
     ctx.network.requested.length = 0;
     const res = await fetchEvent(ctx, req(U(p)));
     assert.strictEqual(res, null, `${p} must not be handled by the SW (bypass)`);
