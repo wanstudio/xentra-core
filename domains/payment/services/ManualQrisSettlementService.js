@@ -1,43 +1,12 @@
 'use strict';
 
 const crypto = require('crypto');
-const { PaymentRepository, OrderRepository, PromotionRepository } = require('../../../core/data/repositories');
+const { PaymentRepository, OrderRepository } = require('../../../core/data/repositories');
 const { events } = require('../../../core');
 const PaymentModel = require('../models/PaymentModel');
-const { OrderPlacementService } = require('../../commerce');
-
 const paymentRepository = new PaymentRepository();
 const orderRepository = new OrderRepository();
 const promotionRepository = new PromotionRepository();
-
-function recordPromoRedemptions(order) {
-  if (!order || !order.customer_phone) return;
-  const items = paymentRepository.findOrderItemsWithPromoMarker(order.id);
-  const promotions = [];
-  for (const it of items || []) {
-    let promoId = null;
-    const marker = '[PROMO:';
-    const start = typeof it.note === 'string' ? it.note.indexOf(marker) : -1;
-    if (start >= 0) {
-      const idStart = start + marker.length;
-      const idEnd = it.note.indexOf(']', idStart);
-      if (idEnd > idStart) promoId = it.note.slice(idStart, idEnd);
-    } else if (String(it.product_id || '').startsWith('prm_')) promoId = it.product_id;
-    if (!promoId) continue;
-    const promoRow = promotionRepository.findPromotion(promoId);
-    if (!promoRow) continue;
-    const used = promotionRepository.countCustomerRedemptions({ promotionId: promoId, customerPhone: order.customer_phone });
-    const maxLimit = Number(promoRow.max_redemptions_per_customer || 1);
-    if (used >= maxLimit) throw new Error('[PROMO_LIMIT_EXCEEDED_RACE] Promo tidak dapat diredeem ulang.');
-    let benefitAmount = Number(it.unit_price || 0);
-    if (benefitAmount === 0) { const reward = promotionRepository.findRewardProductPrice(it.product_id); benefitAmount = reward ? Number(reward.v || 0) : 0; }
-    promotions.push({ promo_id: promoId, benefit_amount: benefitAmount });
-  }
-  if (promotions.length) {
-    const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-    PromotionEngineService.recordRedemptions({ order_id: order.id, brand_id: order.brand_id, branch_id: order.branch_id, customer_phone: order.customer_phone, promotions });
-  }
-}
 
 class ManualQrisSettlementService {
   static settleStaticQrisPayment({ order_id, cashier_id, branch_id, reference_note = '' }) {
@@ -52,21 +21,9 @@ class ManualQrisSettlementService {
     paymentRepository.beginTransaction();
     try {
       paymentRepository.updatePaymentWebhook({ orderId: order_id, paymentStatus: 'settlement', webhookResponse: JSON.stringify({ mode: 'qris_static_manual', cashier_id, reference_note: String(reference_note || '').trim(), verified_at: now }), settledAt: now, updatedAt: now, provider: 'qris_static', paymentMethod: 'qris_static' });
-      // Static QRIS verification settles the payment only. It must not turn
-      // AWAITING_BRANCH_ACCEPTANCE into ACCEPTED.
-      if (['confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed'].includes(order.status)) {
-        OrderPlacementService.deductStockForSettledOrder(order_id, { dbTransactionProvided: true });
-      }
-      recordPromoRedemptions(order);
-      if (order.order_type === 'dine_in') {
-        const holds = paymentRepository.findActiveDiningHolds(order.id);
-        let tableIds = (holds || []).map(h => h.table_id);
-        if (!tableIds.length && order.table_number) { const t = paymentRepository.findBranchTableByNumberOrLabel(order.branch_id, order.table_number); if (t) tableIds = [t.id]; }
-        if (tableIds.length) {
-          const { DiningTableService } = require('../../dining');
-          DiningTableService.createOrAttachDiningSession({ branch_id: order.branch_id, table_ids: tableIds, order_id: order.id, customer_name: order.customer_name, customer_phone: order.customer_phone, guest_count: order.guest_count || 1, hold_reference_id: order.id, channel: 'pos_cashier' });
-        }
-      }
+      // Static QRIS verification is a financial event only.
+      // Branch acceptance, stock consumption, promo consumption and Dining Session
+      // activation belong to their authoritative operational boundaries.
       paymentRepository.commitTransaction();
     } catch (err) { try { paymentRepository.rollbackTransaction(); } catch (_) {} throw err; }
     events.EventBus.publish({ type: 'payment.settled', producer: 'payment', payload: { payment_id: payment.id, order_id, branch_id, brand_id: order.brand_id, provider: 'qris_static', payment_method: 'qris_static', amount: Number(order.grand_total), settled_at: now, cashier_id } }).catch(() => {});
