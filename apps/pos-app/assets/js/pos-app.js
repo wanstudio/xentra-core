@@ -177,6 +177,10 @@
       setPosStatus('stop','Terminal belum siap','Terminal POS belum terdaftar. Hubungi operator/admin.');
       return;
     }
+    if(state.branchOperationalOpen === false){
+      setPosStatus('stop','Merchant sedang tutup','Cabang sedang ditutup. Buka cabang kembali sebelum memulai transaksi baru.');
+      return;
+    }
     if(!state.shift){
       setPosStatus('caution','Shift belum dibuka','Buka shift kasir untuk mulai transaksi.');
       return;
