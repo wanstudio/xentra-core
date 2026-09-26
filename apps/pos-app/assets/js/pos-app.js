@@ -180,7 +180,15 @@
       return;
     }
     if(state.branchOperationalOpen === false){
-      setPosStatus('stop','Merchant sedang tutup','Cabang sedang ditutup. Buka cabang kembali sebelum memulai transaksi baru.');
+      if(state.branchStatusReason === 'inactive'){
+        setPosStatus('stop','Cabang tidak aktif','Cabang tidak aktif. Hubungi admin/operator.');
+      }else{
+        setPosStatus('stop','Merchant sedang tutup','Cabang sedang ditutup. Buka cabang kembali sebelum memulai transaksi baru.');
+      }
+      return;
+    }
+    if(state.branchOperationalOpen === null){
+      setPosStatus('caution','Status cabang belum diketahui','POS sedang memeriksa status operasional cabang.');
       return;
     }
     if(!state.shift){
