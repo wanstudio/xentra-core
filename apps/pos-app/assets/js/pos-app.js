@@ -25,7 +25,9 @@
     coreConnection: null,
     branchOperationalOpen: null,
     branchStatusReason: null,
-    branchReadinessRefreshTimer: null
+    branchReadinessRefreshTimer: null,
+    offlineStoreReady: false,
+    offlineSyncInFlight: false
   };
 
   function $(id) { return document.getElementById(id); }
@@ -309,6 +311,115 @@
       var entry=JSON.parse(localStorage.getItem(POS_SHIFT_CACHE_PREFIX + userId) || 'null');
       return entry ? entry.shift : null;
     } catch (_) { return null; }
+  }
+
+  function getOfflineStore() {
+    return window.XentraPos && window.XentraPos.PosOfflineStore
+      ? window.XentraPos.PosOfflineStore
+      : null;
+  }
+
+  function getOfflineScope() {
+    return {
+      branch_id: state.branchId,
+      terminal_id: state.terminalId
+    };
+  }
+
+  async function ensureOfflineStore() {
+    var store = getOfflineStore();
+    if (!store || !store.isSupported()) {
+      throw new Error('Penyimpanan offline perangkat tidak tersedia. Transaksi offline tidak dapat dipastikan tersimpan.');
+    }
+    if (!state.branchId || !state.terminalId) {
+      throw new Error('POS offline belum siap: cabang atau terminal belum diketahui.');
+    }
+    if (!state.offlineStoreReady) {
+      await store.initialize();
+      await store.recover(getOfflineScope());
+      state.offlineStoreReady = true;
+    }
+    return store;
+  }
+
+  function isCoreUnreachableError(err) {
+    if (!err) return false;
+    if (err.status) return false;
+    if (err.code === 'NETWORK_TIMEOUT') return true;
+    if (err.name === 'TypeError') return true;
+    return /failed to fetch|networkerror|load failed|network request failed/i.test(String(err.message || ''));
+  }
+
+  async function persistOfflineSale(payload, offlineCreatedAt) {
+    var store = await ensureOfflineStore();
+    return store.createOfflineSale({
+      branch_id: payload.branch_id,
+      terminal_id: state.terminalId,
+      shift_id: payload.shift_id,
+      cashier_id: state.user && state.user.id ? state.user.id : null,
+      order_type: payload.order_type,
+      payment_method: 'cash',
+      amount_tendered: payload.amount_tendered,
+      customer: payload.customer,
+      items: payload.items,
+      client_transaction_id: payload.client_transaction_id,
+      offline_created_at: offlineCreatedAt,
+      config_version: 1
+    });
+  }
+
+  async function syncBrowserOfflineOutbox() {
+    if (state.offlineSyncInFlight || !navigator.onLine || !token() || !state.branchId || !state.terminalId) return;
+    var store;
+    try {
+      store = await ensureOfflineStore();
+    } catch (_) {
+      return;
+    }
+
+    var pending = await store.listPending(getOfflineScope());
+    if (!pending.length) return;
+
+    state.offlineSyncInFlight = true;
+    try {
+      for (var idx = 0; idx < pending.length; idx++) {
+        var operation = pending[idx];
+        await store.markSyncing(operation.operation_id);
+        try {
+          var result = await request('/pos/local/sale', {
+            method: 'POST',
+            headers: headers(),
+            body: JSON.stringify(operation.payload)
+          });
+          var serverOrderId = result && (
+            result.order_id ||
+            (result.order && result.order.id) ||
+            (result.order && result.order_id)
+          );
+          await store.markSynced(operation.operation_id, { server_order_id: serverOrderId || null });
+        } catch (err) {
+          if (err && err.status === 409) {
+            await store.markConflict(operation.operation_id, { message: err.message });
+          } else if (err && err.status >= 400 && err.status < 500) {
+            await store.markFailed(operation.operation_id, { message: err.message });
+          } else {
+            await store.requeue(operation.operation_id, err.message || 'Koneksi terputus saat sinkronisasi.');
+            break;
+          }
+        }
+      }
+    } finally {
+      state.offlineSyncInFlight = false;
+    }
+
+    request('/pos/local/sync-outbox', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({
+        terminal_id: state.terminalId,
+        branch_id: state.branchId
+      })
+    }).catch(function () {});
   }
 
   function base64FromBytes(bytes) {
@@ -2254,16 +2365,35 @@
 
     try{
       var d;
-      if(!navigator.onLine){
+      if(!navigator.onLine || state.coreConnection===false){
         if(!state.terminalId)return toast('POS offline belum siap: terminal cabang belum terdaftar.');
-        await request('/pos/local/sale',{method:'POST',headers:headers(),body:JSON.stringify({terminal_id:state.terminalId,branch_id:state.branchId,shift_id:state.shift.id,order_type:orderType,payment_method:'cash',amount_tendered:amountTendered,customer:payload.customer,items:payload.items,client_transaction_id:payload.client_transaction_id,offline_created_at:new Date().toISOString(),config_version:1})});
-        hideModal();resetSale();toast('Penjualan tersimpan lokal. Akan disinkronkan saat online.');return;
+        try{
+          var offlineCreatedAt=new Date().toISOString();
+          await persistOfflineSale(payload,offlineCreatedAt);
+          hideModal();resetSale();toast('Penjualan tersimpan di perangkat. Akan disinkronkan saat sistem kembali tersedia.');return;
+        }catch(offlineErr){
+          return toast(offlineErr.message || 'Penjualan offline tidak dapat disimpan dengan aman.');
+        }
       }
       d=await request('/pos/sales',{method:'POST',headers:headers(),body:JSON.stringify(payload)});
       if(paymentMode==='cash'||d.status==='SETTLED'){hideModal();showPaymentSuccess(d.order||{},Number((d.order||{}).change||0));loadShift();loadSales();}
       else if(paymentMode==='payment_gateway'){hideModal();showGatewayPending(d);}
       else if(paymentMode==='qris_static'){hideModal();showStaticQrisPending(d);}
-    }catch(e){toast(e.message);}
+    }catch(e){
+      if(paymentMode==='cash' && isCoreUnreachableError(e)){
+        try{
+          var fallbackCreatedAt=new Date().toISOString();
+          await persistOfflineSale(payload,fallbackCreatedAt);
+          hideModal();resetSale();
+          toast('Sistem tidak terjangkau. Penjualan diamankan di perangkat dan akan disinkronkan saat kembali tersedia.');
+          return;
+        }catch(offlineErr){
+          toast(offlineErr.message || e.message);
+          return;
+        }
+      }
+      toast(e.message);
+    }
   }
 
   async function printReceipt(orderId){
@@ -3261,15 +3391,18 @@
       loadSales().catch(function(){});
       loadTables().catch(function(){});
       setView('kasir');
+      await ensureOfflineStore().catch(function(err){
+        state.offlineStoreReady=false;
+        if(window.console && console.warn) console.warn('[Xentra POS] Offline store belum siap:',err.message);
+      });
+      syncBrowserOfflineOutbox().catch(function(){});
       window.addEventListener('online',function(){
         setPosStatus('caution','Menghubungkan kembali…','POS sedang mencoba menyambungkan kembali ke sistem.');
         if(state.offlineMode && token()) state.offlineMode=false;
         loadTerminal();
         loadShift();
         loadMenu();
-        if(token()) {
-          request('/pos/local/sync-outbox',{method:'POST',headers:headers(),body:JSON.stringify({terminal_id:state.terminalId,branch_id:state.branchId})}).catch(function(){});
-        }
+        syncBrowserOfflineOutbox().catch(function(){});
       });
       window.addEventListener('offline',function(){state.coreConnection=false;
       updatePosReadiness();});
