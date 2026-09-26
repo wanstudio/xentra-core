@@ -103,7 +103,8 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
       acceptance_deadline_at: ord.acceptance_deadline_at || AcceptanceTimeoutService.computeAcceptanceDeadlineAt(ord),
       items: db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(ord.id),
       delivery: db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(ord.id),
-      payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id)
+      payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id),
+      pending_additions_count: Number((db.prepare("SELECT COUNT(*) AS count FROM order_addition_batches WHERE order_id = ? AND status = 'pending_acceptance'").get(ord.id) || {}).count || 0)
     }));
 
     res.json({ success: true, branch_id: req.params.id, orders: enriched });
@@ -197,7 +198,8 @@ router.get('/admin/orders', requireAuth(['owner', 'brand_manager', 'branch_manag
       ...ord,
       items: db.prepare('SELECT * FROM order_items WHERE order_id = ?').all(ord.id),
       delivery: db.prepare('SELECT * FROM order_deliveries WHERE order_id = ?').get(ord.id),
-      payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id)
+      payment: db.prepare('SELECT * FROM order_payments WHERE order_id = ?').get(ord.id),
+      pending_additions_count: Number((db.prepare("SELECT COUNT(*) AS count FROM order_addition_batches WHERE order_id = ? AND status = 'pending_acceptance'").get(ord.id) || {}).count || 0)
     }));
 
     res.json({ success: true, orders: enriched });
