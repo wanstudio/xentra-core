@@ -13,7 +13,7 @@ describe('POS dine-in transaction composer', () => {
   it('keeps table context inside the cashier draft-sale flow', () => {
     assert.ok(js.includes('function openTableSelector()'));
     assert.ok(js.includes('function applySelectedTable(t)'));
-    assert.ok(js.includes("if(state.orderType==='dine_in'&&!state.selectedTable){openTableSelector();return;}"));
+    assert.ok(js.includes("if(tx.getOrderType()==='dine_in'&&!tx.getTable()){openTableSelector();return;}"));
     assert.ok(js.includes("btn-pos-select-table').onclick=function(){openTableSelector();}"));
     assert.ok(html.includes('id="pos-table-context" class="pos-context-strip"'));
   });
@@ -21,7 +21,8 @@ describe('POS dine-in transaction composer', () => {
   it('allows menu-first and table-first without clearing cart', () => {
     assert.ok(js.includes('composer().setTable(t);'));
     assert.ok(js.includes('renderCart();'));
-    assert.ok(!js.includes("if(state.orderType==='dine_in'&&!state.selectedTable)return toast('Pilih meja untuk transaksi dine-in.')"));
+    assert.ok(!js.includes('state.selectedTable'));
+    assert.ok(!js.includes('state.orderType'));
   });
 
   it('keeps unavailable table states non-selectable', () => {
