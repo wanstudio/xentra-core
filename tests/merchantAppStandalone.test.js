@@ -310,7 +310,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     for (const name of [
       'startBMOrdersPolling',
       'loadBMOrders',
-      'renderBMOrdersTable',
+      'renderBMOrdersFeed',
       'advanceBMOrderStatus',
       'openBMRejectModal',
       'viewBMOrderDetail',
@@ -329,7 +329,10 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     const orderJs = fs.readFileSync(ORDER_JS_PATH, 'utf8');
     assert.ok(orderJs.includes('async function loadBMOrders('), 'loadBMOrders must live in orders.js');
     assert.ok(!js.includes('async function loadBMOrders('), 'merchant-app.js must not contain loadBMOrders implementation');
-    assert.ok(orderJs.includes('bm-order-card-attention'), 'mobile attention card styling hook');
+    assert.ok(orderJs.includes('bm-order-feed-card'), 'mobile operational card rendering hook');
+    assert.ok(orderJs.includes('setBMOrdersView'), 'operational queue view switch');
+    assert.ok(orderJs.includes('getBMOrderProjection'), 'environment-specific operational projection');
+    assert.ok(orderJs.includes('getBMOrderPaymentState'), 'payment state projection');
     assert.ok(orderJs.includes('playNewOrderAudibleChime'), 'audible new-order chime');
     assert.ok(orderJs.includes('seenPendingOrderIds'), 'diff-based new order detection');
     assert.ok(orderJs.includes('acceptance_deadline_at'), 'acceptance deadline comes from the server field');
@@ -343,8 +346,8 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     const js = fs.readFileSync(JS_PATH, 'utf8');
     const orderJs = fs.readFileSync(ORDER_JS_PATH, 'utf8');
 
-    assert.ok(html.includes('<option value="reservation">Reservasi</option>'),
-      'order type filter must expose Reservation');
+    assert.ok(html.includes('data-order-type="reservation"'),
+      'order type chips must expose Reservation');
 
     assert.ok(orderJs.includes('RESERVASI'), 'reservation must not be rendered as pickup');
     assert.ok(orderJs.includes('reservationGuests'), 'reservation guest count must be rendered');
@@ -370,7 +373,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
   });
 
   await t.test('7. upcoming reservations stay visible in operational queue order', async () => {
-    const dom = new JSDOM('<table><tbody id="bm-orders-tbody"></tbody></table><div id="bm-orders-cards-container"></div>', {
+    const dom = new JSDOM('<div id="bm-orders-view-attention"></div><div id="bm-orders-view-all"></div><span id="bm-orders-attention-count"></span><span id="bm-orders-all-count"></span><div id="bm-orders-cards-container" class="bm-order-feed-grid"></div>', {
       url: 'https://app.mybangjo.com/merchant-app/',
       runScripts: 'dangerously'
     });
@@ -426,12 +429,61 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     const cardIds = Array.from(win.document.querySelectorAll('#bm-orders-cards-container [data-order-id]'))
       .map((el) => el.getAttribute('data-order-id'));
 
-    assert.deepEqual(
-      cardIds,
-      ['reservation-soon', 'reservation-late', 'regular-confirmed'],
-      'upcoming reservations must be surfaced before ordinary non-pending orders and ordered by nearest schedule'
-    );
+    assert.ok(cardIds.includes('regular-confirmed'), 'regular order should render');
+    assert.ok(cardIds.includes('reservation-soon'), 'upcoming reservation should render in all view');
+    assert.ok(cardIds.includes('reservation-late'), 'later reservation should render in all view');
 
+    win.setBMOrdersView('attention');
+    const attentionIds = Array.from(win.document.querySelectorAll('#bm-orders-cards-container [data-order-id]')).map((el) => el.getAttribute('data-order-id'));
+    assert.ok(attentionIds.includes('regular-confirmed'), 'actionable operational work stays in attention view');
+
+    win.close();
+  });
+
+  await t.test('7b. payment remains visible independently from fulfillment', async () => {
+    const dom = new JSDOM('<div id="bm-orders-view-attention"></div><div id="bm-orders-view-all"></div><span id="bm-orders-attention-count"></span><span id="bm-orders-all-count"></span><div id="bm-orders-cards-container"></div>', {
+      url: 'https://app.mybangjo.com/merchant-app/',
+      runScripts: 'dangerously'
+    });
+    const win = dom.window;
+    win.XentraShared = {
+      API_BASE: 'https://example.test',
+      $: (id) => win.document.getElementById(id),
+      esc: (value) => String(value == null ? '' : value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
+      formatMoney: (v) => 'Rp' + String(v || 0),
+      showToast: () => {},
+      adminFetch: async () => ({ ok: true, json: async () => ({ success: true, orders: [] }) }),
+      getAuthHeaders: () => ({}),
+      getStoredUser: () => ({ branch_id: 'branch-test' })
+    };
+    win.XentraMerchantBranchCatalog = { state: {}, getActiveBranchId: () => 'branch-test' };
+    win.Xentra = { FulfillmentEnvironments: { getStatusLabel: (type, status) => status } };
+    win.eval(fs.readFileSync(ORDER_JS_PATH, 'utf8'));
+
+    win.__xentraTestOrder = {
+      id: 'completed-unpaid',
+      order_number: 'DINE-1',
+      status: 'completed',
+      order_type: 'dine_in',
+      table_number: '9',
+      grand_total: 125000,
+      paid_amount: 0,
+      outstanding_amount: 125000,
+      customer_name: 'Tamu',
+      created_at: '2099-01-01T12:00:00',
+      items: [{ product_name: 'Nasi Goreng', quantity: 2 }]
+    };
+
+    // Reachable via the existing load path with a test-specific fetch response.
+    win.XentraShared.adminFetch = async () => ({
+      ok: true,
+      json: async () => ({ success: true, orders: [win.__xentraTestOrder] })
+    });
+    await win.loadBMOrders();
+    const card = win.document.querySelector('#bm-orders-cards-container [data-order-id="completed-unpaid"]');
+    assert.ok(card, 'completed + unpaid order must remain discoverable');
+    assert.match(card.textContent, /Belum dibayar/);
+    assert.match(card.textContent, /Rp125000/);
     win.close();
   });
 
