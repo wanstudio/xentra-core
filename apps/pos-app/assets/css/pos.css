@@ -618,3 +618,17 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
   .pos-simple-choice-grid{grid-template-columns:1fr}
   .pos-simple-bill-total{font-size:18px}
 }
+
+
+/* POS Stepper component — shared increment/decrement control. */
+.pos-stepper{display:inline-flex;align-items:center;gap:5px;background:#f8fafc;border:1px solid #dbe1e8;border-radius:999px;padding:3px 5px;flex:0 0 auto}
+.pos-stepper-btn{width:32px;height:32px;border:1px solid #e2e8f0;border-radius:50%;background:#fff;color:#0f172a;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:background .15s ease,color .15s ease,border-color .15s ease,transform .1s ease}
+.pos-stepper-btn:hover{background:#0f172a;color:#fff;border-color:#0f172a}
+.pos-stepper-btn:active{transform:scale(.94)}
+.pos-stepper-icon{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:2.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.pos-stepper-value{min-width:24px;text-align:center;font-size:13px;font-weight:800;color:#0f172a;line-height:1}
+.pos-card-stepper.pos-stepper{gap:3px;padding:2px 4px}
+.pos-card-stepper .pos-stepper-btn{width:24px;height:24px}
+.pos-card-stepper .pos-stepper-icon{width:10px;height:10px}
+.pos-card-stepper .pos-stepper-value{font-size:12px;min-width:18px}
+.pos-item-stepper.pos-stepper{margin-left:auto}

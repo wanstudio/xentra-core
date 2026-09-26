@@ -46,6 +46,11 @@
     var clean = String(val).replace(/\D/g, '');
     return clean ? Number(clean) : 0;
   }
+  function posStepperIcon(type) {
+    if (type === 'plus') return '<svg class="pos-stepper-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+    return '<svg class="pos-stepper-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+  }
+
   function bindNominalInput(input, onValueChange) {
     if (!input) return;
     input.addEventListener('input', function() {
@@ -1200,14 +1205,10 @@
         }
 
         var stepperHtml = !unavailable ? (
-          '<div class="pos-card-stepper '+(cartQty>0?'':'hidden')+'">' +
-            '<button type="button" class="pos-card-qty-btn minus" data-action="minus" aria-label="Kurangi">' +
-              '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
-            '</button>' +
-            '<span class="pos-card-qty-val">' + (cartQty||0) + '</span>' +
-            '<button type="button" class="pos-card-qty-btn plus" data-action="plus" aria-label="Tambah">' +
-              '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
-            '</button>' +
+          '<div class="pos-card-stepper pos-stepper '+(cartQty>0?'':'hidden')+'">' +
+            '<button type="button" class="pos-card-qty-btn pos-stepper-btn minus" data-action="minus" aria-label="Kurangi">' + posStepperIcon('minus') + '</button>' +
+            '<span class="pos-card-qty-val pos-stepper-value">' + (cartQty||0) + '</span>' +
+            '<button type="button" class="pos-card-qty-btn pos-stepper-btn plus" data-action="plus" aria-label="Tambah">' + posStepperIcon('plus') + '</button>' +
           '</div>' +
           '<button type="button" class="pos-product-add-btn '+(cartQty>0?'hidden':'')+'" data-action="add" aria-label="Tambah ke pesanan">' +
             '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
@@ -2274,10 +2275,10 @@
           var maxQty=Math.max(0,Number(it.quantity)||0);
           html+='<div class="pos-simple-item-row">' +
             '<span><strong>'+esc(it.product_name||'Item')+'</strong><small>'+money(it.unit_price)+' × '+it.quantity+'</small></span>' +
-            '<div class="pos-item-stepper" role="group" aria-label="Jumlah yang dibayar">' +
-              '<button type="button" class="pos-item-stepper-btn" data-item-minus="'+esc(it.order_item_id)+'" aria-label="Kurangi">−</button>' +
-              '<span class="pos-item-stepper-value" data-item-qty="'+esc(it.order_item_id)+'">0</span>' +
-              '<button type="button" class="pos-item-stepper-btn" data-item-plus="'+esc(it.order_item_id)+'" aria-label="Tambah">+</button>' +
+            '<div class="pos-item-stepper pos-stepper" role="group" aria-label="Jumlah yang dibayar">' +
+              '<button type="button" class="pos-item-stepper-btn pos-stepper-btn" data-item-minus="'+esc(it.order_item_id)+'" aria-label="Kurangi">'+posStepperIcon('minus')+'</button>' +
+              '<span class="pos-item-stepper-value pos-stepper-value" data-item-qty="'+esc(it.order_item_id)+'">0</span>' +
+              '<button type="button" class="pos-item-stepper-btn pos-stepper-btn" data-item-plus="'+esc(it.order_item_id)+'" aria-label="Tambah">'+posStepperIcon('plus')+'</button> +
             '</div>' +
             '<input data-check-item="'+esc(it.order_item_id)+'" type="hidden" value="0">';
         });
