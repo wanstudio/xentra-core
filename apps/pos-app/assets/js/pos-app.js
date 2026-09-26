@@ -2870,8 +2870,11 @@
 
   function applySelectedTable(t){
     if(!t)return;
-    state.selectedTable=t;
-    state.orderType='dine_in';
+    try{
+      composer().setTable(t);
+    }catch(e){
+      return toast(e.message);
+    }
     document.querySelectorAll('.pos-order-type button').forEach(function(x){x.classList.toggle('active',x.dataset.type==='dine_in');});
     var ctx=$('pos-table-context'); if(ctx)ctx.classList.remove('hidden');
     renderCart();
