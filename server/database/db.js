@@ -1014,6 +1014,54 @@ function initSchema(targetDb) {
     CREATE INDEX IF NOT EXISTS idx_pos_check_payments_check ON pos_check_payments(check_id, payment_status);
     CREATE INDEX IF NOT EXISTS idx_pos_check_payments_order ON pos_check_payments(order_id, payment_status);
 
+    CREATE TABLE IF NOT EXISTS pos_payment_groups (
+      id TEXT PRIMARY KEY,
+      group_number TEXT UNIQUE NOT NULL,
+      brand_id TEXT NOT NULL,
+      branch_id TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      total_amount REAL NOT NULL DEFAULT 0,
+      payment_method TEXT DEFAULT NULL,
+      created_by TEXT,
+      settled_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id),
+      FOREIGN KEY (branch_id) REFERENCES branches(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pos_payment_groups_branch_status ON pos_payment_groups(branch_id, status);
+
+    CREATE TABLE IF NOT EXISTS pos_payment_group_orders (
+      id TEXT PRIMARY KEY,
+      group_id TEXT NOT NULL,
+      order_id TEXT NOT NULL,
+      allocated_amount REAL NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (group_id) REFERENCES pos_payment_groups(id) ON DELETE CASCADE,
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+      UNIQUE (group_id, order_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_pos_payment_group_orders_order ON pos_payment_group_orders(order_id);
+
+    CREATE TABLE IF NOT EXISTS pos_payment_group_payments (
+      id TEXT PRIMARY KEY,
+      group_id TEXT NOT NULL,
+      payment_method TEXT NOT NULL,
+      provider TEXT NOT NULL,
+      amount REAL NOT NULL CHECK (amount > 0),
+      amount_tendered REAL NOT NULL,
+      change_amount REAL NOT NULL DEFAULT 0,
+      actor_id TEXT,
+      shift_id TEXT,
+      payment_status TEXT NOT NULL DEFAULT 'settlement',
+      settled_at TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (group_id) REFERENCES pos_payment_groups(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_pos_payment_group_payments_group ON pos_payment_group_payments(group_id, payment_status);
+
     CREATE TABLE IF NOT EXISTS product_categories (
       product_id TEXT NOT NULL,
       category_id TEXT NOT NULL,

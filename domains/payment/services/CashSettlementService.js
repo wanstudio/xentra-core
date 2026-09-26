@@ -4,7 +4,8 @@ const crypto = require('crypto');
 const {
   PaymentRepository,
   DiningTableRepository,
-  PosShiftRepository
+  PosShiftRepository,
+  PosBillRepository
 } = require('../../../core/data/repositories');
 const { events } = require('../../../core');
 const PaymentModel = require('../models/PaymentModel');
@@ -12,6 +13,7 @@ const PaymentModel = require('../models/PaymentModel');
 const paymentRepository = new PaymentRepository();
 const diningTableRepository = new DiningTableRepository();
 const posShiftRepository = new PosShiftRepository();
+const posBillRepository = new PosBillRepository();
 
 class CashSettlementService {
   /**
@@ -24,7 +26,9 @@ class CashSettlementService {
     amount_tendered = null,
     cashier_id = null,
     shift_id = null,
-    skip_shift_increment = false
+    skip_shift_increment = false,
+    manage_transaction = true,
+    payment_group_id = null
   }) {
     const validation = PaymentModel.validatePaymentParams({
       order_id,
@@ -118,7 +122,7 @@ class CashSettlementService {
     const actualPaymentId = existingPayment ? existingPayment.id : generatedPaymentId;
     const now = new Date().toISOString();
 
-    paymentRepository.beginTransaction();
+    if (manage_transaction) paymentRepository.beginTransaction();
     try {
       if (shift_id && !skip_shift_increment) {
         const shiftInTx = posShiftRepository.findStatusById(shift_id);
@@ -142,12 +146,37 @@ class CashSettlementService {
         orderId: order_id,
         amount,
         settledAt: now,
-        rawPayment: JSON.stringify({ amount_tendered: tendered, change, cashier_id, shift_id }),
+        rawPayment: JSON.stringify({ amount_tendered: tendered, change, cashier_id, shift_id, payment_group_id }),
         createdAt: now,
         updatedAt: now
       });
 
       paymentRepository.markOrderPaidByCash({ orderId: order_id, updatedAt: now });
+
+      if (payment_group_id) {
+        const checks = posBillRepository.findChecks(order_id);
+        if (checks.length === 1) {
+          const check = checks[0];
+          const checkPaid = posBillRepository.findCheckPaidAmount(check.id);
+          if (Number(checkPaid) < Number(order.grand_total)) {
+            posBillRepository.createCheckPayment({
+              id: `gcp_${crypto.randomBytes(6).toString('hex')}`,
+              checkId: check.id,
+              orderId: order_id,
+              paymentMethod: 'cash',
+              provider: 'cash',
+              amount: Number(order.grand_total) - Number(checkPaid),
+              paymentStatus: 'settlement',
+              payerName: null,
+              actorId: cashier_id,
+              rawPayment: JSON.stringify({ payment_group_id }),
+              settledAt: now,
+              now
+            });
+          }
+          posBillRepository.setCheckStatus(check.id, 'paid', now);
+        }
+      }
 
       if (order && order.order_type === 'dine_in') {
         try {
@@ -178,9 +207,9 @@ class CashSettlementService {
         }
       }
 
-      paymentRepository.commitTransaction();
+      if (manage_transaction) paymentRepository.commitTransaction();
     } catch (err) {
-      try { paymentRepository.rollbackTransaction(); } catch (_) {}
+      if (manage_transaction) { try { paymentRepository.rollbackTransaction(); } catch (_) {} }
       throw err;
     }
 

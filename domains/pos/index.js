@@ -6,6 +6,7 @@ const PosShiftModel = require('./models/PosShiftModel');
 const OfflineRiskLimitModel = require('./models/OfflineRiskLimitModel');
 const PosShiftService = require('./services/PosShiftService');
 const PosOrderService = require('./services/PosOrderService');
+const PosPaymentGroupService = require('./services/PosPaymentGroupService');
 const PosHardwareRouter = require('./services/PosHardwareRouter');
 const OfflineReconciliationService = require('./services/OfflineReconciliationService');
 
@@ -69,6 +70,7 @@ module.exports = {
   OfflineRiskLimitModel,
   PosShiftService,
   PosOrderService,
+  PosPaymentGroupService,
   PosHardwareRouter,
   OfflineReconciliationService,
   // @deprecated compatibility exports; use require('../../domains/dining') instead.

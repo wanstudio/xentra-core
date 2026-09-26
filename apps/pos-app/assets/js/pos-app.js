@@ -2201,6 +2201,7 @@
             '<button type="button" class="pos-simple-choice" id="pos-pay-many"><strong>Masing-masing</strong><small>Bagikan tagihan</small></button>' +
           '</div>';
       }else{
+          '<div class="pos-simple-secondary-actions"><button type="button" class="pos-btn ghost small" id="pos-payment-group">Gabungkan Tagihan</button></div>' +
         mainActions=
           '<div class="pos-simple-section-title">Pembayaran</div>' +
           '<div class="pos-simple-summary">Sudah dibayar <strong>'+money(paidOrder)+'</strong><span>Sisa '+money(remainingOrder)+'</span></div>' +
@@ -2278,7 +2279,7 @@
             '<div class="pos-item-stepper pos-stepper" role="group" aria-label="Jumlah yang dibayar">' +
               '<button type="button" class="pos-item-stepper-btn pos-stepper-btn" data-item-minus="'+esc(it.order_item_id)+'" aria-label="Kurangi">'+posStepperIcon('minus')+'</button>' +
               '<span class="pos-item-stepper-value pos-stepper-value" data-item-qty="'+esc(it.order_item_id)+'">0</span>' +
-              '<button type="button" class="pos-item-stepper-btn pos-stepper-btn" data-item-plus="'+esc(it.order_item_id)+'" aria-label="Tambah">'+posStepperIcon('plus')+'</button> +
+              '<button type="button" class="pos-item-stepper-btn pos-stepper-btn" data-item-plus="'+esc(it.order_item_id)+'" aria-label="Tambah">'+posStepperIcon('plus')+'</button>' +
             '</div>' +
             '<input data-check-item="'+esc(it.order_item_id)+'" type="hidden" value="0">';
         });
@@ -2347,6 +2348,7 @@
       if($('pos-add-amount')) $('pos-add-amount').onclick=function(){openAmountFlow(firstOpen && firstOpen.id);};
       if($('pos-add-item')) $('pos-add-item').onclick=function(){openItemFlow(firstOpen && firstOpen.id);};
 
+      if($('pos-payment-group')) $('pos-payment-group').onclick=function(){openPaymentGroupFlow(orderId);};
       if($('pos-reset-split')){
         $('pos-reset-split').onclick=async function(){
           if(!confirm('Batalkan pembagian dan kembali menjadi satu tagihan? Semua bagian harus belum dibayar.'))return;
@@ -2364,6 +2366,59 @@
         btn.onclick=function(){if(check)openPayCheck(orderId,check);};
       });
     }catch(e){toast(e.message);}
+  }
+
+  async function openPaymentGroupFlow(orderId){
+    try{
+      var data=await request('/pos/orders/'+encodeURIComponent(orderId)+'/payment-group/candidates',{headers:headers()});
+      var current=data.order||{}, candidates=data.candidates||[];
+      if(!candidates.length){toast('Tidak ada tagihan dine-in lain yang bisa digabung.');return;}
+      var html='<h3>Gabungkan Tagihan</h3><p class="pos-form-help">Pilih tagihan dari meja lain yang masih menjadi satu rombongan.</p>' +
+        '<div class="pos-payment-group-list">' +
+          '<div class="pos-payment-group-row current"><div><strong>Meja '+esc(current.table_number||'—')+'</strong><small>#'+esc(current.order_number||current.id||'')+'</small></div><strong>'+money(current.grand_total||0)+'</strong><span class="pos-payment-group-check">✓</span></div>' +
+          candidates.map(function(item){return '<label class="pos-payment-group-row"><div><strong>Meja '+esc(item.table_number||'—')+'</strong><small>#'+esc(item.order_number||item.id||'')+'</small></div><strong>'+money(item.grand_total||0)+'</strong><input type="checkbox" value="'+esc(item.id)+'" data-payment-group-order></label>';}).join('') +
+        '</div>' +
+        '<div class="pos-modal-actions pos-modal-nav"><button type="button" id="pos-payment-group-back" class="pos-btn ghost">Kembali</button><div class="pos-modal-nav-right"><button type="button" id="pos-payment-group-next" class="pos-btn">Lanjut</button><button type="button" id="pos-payment-group-close" class="pos-btn ghost">Tutup</button></div></div>';
+      showModal(html);
+      $('pos-payment-group-back').onclick=function(){openCheckManager(orderId);};
+      $('pos-payment-group-close').onclick=hideModal;
+      $('pos-payment-group-next').onclick=function(){
+        var selected=[];
+        $('pos-modal-card').querySelectorAll('[data-payment-group-order]:checked').forEach(function(input){selected.push(input.value);});
+        if(!selected.length){toast('Pilih minimal satu tagihan lain.');return;}
+        var selectedRows=candidates.filter(function(item){return selected.indexOf(String(item.id))>=0;});
+        var total=Number(current.grand_total||0)+selectedRows.reduce(function(sum,item){return sum+Number(item.grand_total||0);},0);
+        openPaymentGroupPay({sourceOrderId:orderId,orderIds:selected,orders:[current].concat(selectedRows),total:total});
+      };
+    }catch(e){toast(e.message);}
+  }
+
+  function openPaymentGroupPay(group){
+    var total=Number(group.total||0);
+    var html='<h3>Bayar Gabungan</h3><p class="pos-form-help">Beberapa tagihan, satu pembayaran.</p>' +
+      '<div class="pos-payment-group-summary">'+group.orders.map(function(item){return '<div><span>Meja '+esc(item.table_number||'—')+' · #'+esc(item.order_number||item.id||'')+'</span><strong>'+money(item.grand_total||item.amount||0)+'</strong></div>';}).join('')+'</div>' +
+      '<div class="pos-payment-summary"><span>Total gabungan</span><strong>'+money(total)+'</strong></div>' +
+      '<label class="pos-field"><span>Uang diterima</span><div class="pos-input-nominal-wrap"><span class="pos-input-prefix">Rp</span><input id="pos-group-tendered" class="pos-input-nominal" inputmode="numeric" pattern="[0-9.]*" type="text" value="'+formatNominal(total)+'" autocomplete="off"></div></label>' +
+      '<div id="pos-group-change" class="pos-payment-summary"><span>Kembalian</span><strong>'+money(0)+'</strong></div>' +
+      '<div class="pos-modal-actions pos-modal-nav"><button type="button" id="pos-group-back" class="pos-btn ghost">Kembali</button><div class="pos-modal-nav-right"><button type="button" id="pos-group-submit" class="pos-btn">Bayar '+money(total)+'</button><button type="button" id="pos-group-close" class="pos-btn ghost">Tutup</button></div></div>';
+    showModal(html);
+    var input=$('pos-group-tendered'), change=$('pos-group-change'), submit=$('pos-group-submit');
+    function updateChange(){var tendered=parseNominal(input?input.value:0);if(change)change.innerHTML='<span>Kembalian</span><strong>'+money(Math.max(0,tendered-total))+'</strong>';if(submit)submit.disabled=tendered<total;}
+    bindNominalInput(input,updateChange); updateChange();
+    $('pos-group-back').onclick=function(){openPaymentGroupFlow(group.sourceOrderId);};
+    $('pos-group-close').onclick=hideModal;
+    bindModalEnter(input,function(){if(submit&&!submit.disabled)submit.click();});
+    submit.onclick=async function(){
+      var tendered=parseNominal(input?input.value:0);
+      if(tendered<total){toast('Uang diterima belum cukup.');return;}
+      submit.disabled=true;
+      try{
+        await request('/pos/orders/'+encodeURIComponent(group.sourceOrderId)+'/payment-group/settle-cash',{
+          method:'POST',headers:headers(),body:JSON.stringify({order_ids:group.orderIds,amount_tendered:tendered})
+        });
+        toast('Gabungan Tagihan berhasil dibayar.');hideModal();loadSales();
+      }catch(e){submit.disabled=false;toast(e.message);}
+    };
   }
 
   async function openPayCheck(orderId,check){

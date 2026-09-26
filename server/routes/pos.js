@@ -11,7 +11,7 @@ module.exports = function registerPosRoutes(router, deps) {
     requireAuth
   } = deps;
   const PaymentGatewayService = require('../../domains/payment/services/PaymentGatewayService');
-  const { PosOrderService } = require('../../domains/pos');
+  const { PosOrderService, PosPaymentGroupService } = require('../../domains/pos');
 
 router.post('/pos/orders/:id/settle-cash', requireAuth(['owner', 'brand_manager', 'branch_manager', 'cashier']), (req, res) => {
   try {
@@ -546,6 +546,46 @@ router.post('/pos/orders/:id/checks/merge', requireAuth(['cashier']), (req, res)
     });
 
     res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/pos/orders/:id/payment-group/candidates', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const result = PosPaymentGroupService.getCandidates({
+      order_id: req.params.id,
+      branch_id: branchId
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/pos/orders/:id/payment-group/settle-cash', requireAuth(['cashier']), (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    const cashierId = req.user.id || req.user.userId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+
+    const shift = db.prepare(
+      "SELECT id FROM pos_shifts WHERE cashier_id = ? AND branch_id = ? AND status = 'open' ORDER BY opened_at DESC LIMIT 1"
+    ).get(cashierId, branchId);
+    if (!shift) return res.status(400).json({ success: false, error: 'Kasir belum membuka shift aktif.' });
+
+    const result = PosPaymentGroupService.settleCashGroup({
+      order_id: req.params.id,
+      branch_id: branchId,
+      order_ids: Array.isArray(req.body && req.body.order_ids) ? req.body.order_ids : [],
+      actor_id: cashierId,
+      shift_id: shift.id,
+      amount_tendered: req.body && req.body.amount_tendered
+    });
+
+    res.json(result);
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
   }

@@ -7,6 +7,7 @@ const {
   OfflineRiskLimitModel,
   PosShiftService,
   PosOrderService,
+  PosPaymentGroupService,
   PosHardwareRouter,
   OfflineReconciliationService,
   identity,
@@ -972,6 +973,87 @@ test('POS 18 — Batch Sync Isolation: failure in one transaction does not roll 
   const shiftAfter = db.prepare('SELECT total_cash_sales, expected_cash FROM pos_shifts WHERE id = ?').get(shift.id);
   assert.strictEqual(shiftAfter.total_cash_sales, 16000);
   assert.strictEqual(shiftAfter.expected_cash, 66000);
+});
+
+test('POS Payment Group — combines three dine-in orders into one cash settlement without merging Orders or Dining Sessions', async () => {
+  const suffix = Date.now().toString(36);
+  const tables = ['31', '32', '33'].map(n => n + suffix.slice(-4));
+  tables.forEach((tableNumber, index) => {
+    const tableId = 'tbl_pos_pg_' + index + '_' + suffix;
+    db.prepare('INSERT OR IGNORE INTO branch_tables (id, branch_id, table_number, label, capacity, qr_token, is_active) VALUES (?, ?, ?, ?, 6, ?, 1)')
+      .run(tableId, 'branch_pos', tableNumber, 'Meja ' + tableNumber, 'qr-pg-' + suffix + '-' + index);
+    db.prepare('INSERT OR IGNORE INTO branch_table_states (table_id, operational_state, current_session_id, updated_at) VALUES (?, \'available\', NULL, datetime(\'now\'))')
+      .run(tableId);
+  });
+
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: 'cashier_payment_group_' + suffix,
+    starting_float: 50000
+  });
+
+  const heldBills = tables.map((tableNumber, index) => PosOrderService.holdOrder({
+    branch_id: 'branch_pos',
+    table_number: tableNumber,
+    customer_name: 'Group Customer ' + index,
+    items: [{ product_id: 'prod_pos_1', quantity: 1, unit_price: 20000 }],
+    order_type: 'dine_in'
+  }));
+
+  const orders = [];
+  for (const held of heldBills) {
+    const materialized = await PosOrderService.materializeHeldOrder({
+      held_order_id: held.id,
+      brand_id: 'brand_pos'
+    });
+    db.prepare("UPDATE orders SET status = 'confirmed' WHERE id = ?").run(materialized.order_id);
+    orders.push(materialized.order_id);
+  }
+
+  const total = orders.length * 20000;
+  const candidates = PosPaymentGroupService.getCandidates({
+    order_id: orders[0],
+    branch_id: 'branch_pos'
+  });
+  assert.strictEqual(candidates.candidates.filter(c => orders.includes(c.id)).length, 2);
+
+  const result = PosPaymentGroupService.settleCashGroup({
+    order_id: orders[0],
+    branch_id: 'branch_pos',
+    order_ids: orders.slice(1),
+    actor_id: shift.cashier_id,
+    shift_id: shift.id,
+    amount_tendered: 70000
+  });
+
+  assert.strictEqual(result.success, true);
+  assert.strictEqual(result.amount, total);
+  assert.strictEqual(result.change, 10000);
+
+  const group = db.prepare('SELECT status, total_amount FROM pos_payment_groups WHERE id = ?').get(result.payment_group_id);
+  assert.strictEqual(group.status, 'settled');
+  assert.strictEqual(Number(group.total_amount), total);
+
+  const groupOrders = db.prepare('SELECT COUNT(*) AS c FROM pos_payment_group_orders WHERE group_id = ?').get(result.payment_group_id);
+  assert.strictEqual(Number(groupOrders.c), 3);
+
+  const groupPayments = db.prepare('SELECT COUNT(*) AS c FROM pos_payment_group_payments WHERE group_id = ? AND payment_status = \'settlement\'').get(result.payment_group_id);
+  assert.strictEqual(Number(groupPayments.c), 1);
+
+  const orderCount = db.prepare('SELECT COUNT(*) AS c FROM orders WHERE id IN (' + orders.map(() => '?').join(',') + ')').get(...orders);
+  assert.strictEqual(Number(orderCount.c), 3);
+
+  const orderPaymentCount = db.prepare("SELECT COUNT(*) AS c FROM order_payments WHERE order_id IN (" + orders.map(() => '?').join(',') + ") AND payment_status = 'settlement'").get(...orders);
+  assert.strictEqual(Number(orderPaymentCount.c), 3);
+
+  const checkPaymentCount = db.prepare("SELECT COUNT(*) AS c FROM pos_check_payments WHERE order_id IN (" + orders.map(() => '?').join(',') + ") AND payment_status = 'settlement'").get(...orders);
+  assert.strictEqual(Number(checkPaymentCount.c), 3);
+
+  const shiftAfter = db.prepare('SELECT total_cash_sales FROM pos_shifts WHERE id = ?').get(shift.id);
+  assert.strictEqual(Number(shiftAfter.total_cash_sales), total);
+
+  const paidOrders = db.prepare("SELECT COUNT(*) AS c FROM orders WHERE id IN (" + orders.map(() => '?').join(',') + ") AND payment_method = 'cash'").get(...orders);
+  assert.strictEqual(Number(paidOrders.c), 3);
 });
 
 test('POS Dine-In table reservation — cashier hold immediately marks table as dipesan and prevents double assignment', () => {
