@@ -15,24 +15,14 @@
     menu: { categories: [], products: [] },
     category: 'all',
     search: '',
-    orderType: 'dine_in',
-    selectedTable: null,
-    cart: [],
     held: [],
+    composer: new window.XentraPos.TransactionComposer({ orderType: 'dine_in' }),
     sales: [],
     terminalId: localStorage.getItem('xentra_pos_terminal_id') || null,
     paymentModes: [],
     activePaymentMode: 'cash',
     offlineMode: false,
-    coreConnection: null,
-    activeHeldOrderId: null,
-    activeHeldBillId: null,
-    activeOrderLocked: false,
-    composerMode: 'new',
-    activeAdditionalMode: false,
-    additionalCart: [],
-    pendingAdditions: [],
-    additionalClientTransactionId: null
+    coreConnection: null
   };
 
   function $(id) { return document.getElementById(id); }
