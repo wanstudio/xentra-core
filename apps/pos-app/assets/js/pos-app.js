@@ -2409,44 +2409,46 @@
     }
     if(!h)return toast('Pesanan ditahan tidak ditemukan.');
 
-    var restoredType = h.order_type || (h.table_number ? 'dine_in' : 'pickup');
-    state.orderType = restoredType;
-    state.activeHeldOrderId = h.order_id || null;
-    state.activeHeldBillId = h.id || null;
-    state.activeOrderLocked = false;
-    state.composerMode = 'new';
-    state.activeAdditionalMode = false;
-    state.additionalCart = [];
-    state.pendingAdditions = [];
+    var restoredType=h.order_type||(h.table_number?'dine_in':'pickup');
+    var restoredTable=h.table_number?{table_number:h.table_number}:null;
+    var items=[];
+    try{items=JSON.parse(h.items_payload||'[]');}catch(_){items=[];}
 
-    document.querySelectorAll('.pos-order-type button').forEach(function(x){
-      x.classList.toggle('active', x.dataset.type === restoredType);
+    composer().openExisting({
+      orderId:h.order_id||null,
+      heldBillId:h.id||null,
+      orderType:restoredType,
+      table:restoredTable,
+      order:null,
+      items:items,
+      pendingAdditions:[]
     });
 
-    if (restoredType === 'dine_in') {
-      state.selectedTable = h.table_number ? { table_number: h.table_number } : null;
-      if ($('pos-selected-table')) $('pos-selected-table').textContent = h.table_number ? ('Meja ' + h.table_number) : 'Belum dipilih';
-    } else {
-      state.selectedTable = null;
+    document.querySelectorAll('.pos-order-type button').forEach(function(x){
+      x.classList.toggle('active',x.dataset.type===restoredType);
+    });
+
+    if(restoredType==='dine_in'&&restoredTable&&$('pos-selected-table')){
+      $('pos-selected-table').textContent='Meja '+restoredTable.table_number;
+    }else if($('pos-selected-table')){
+      $('pos-selected-table').textContent='Belum dipilih';
     }
-    var ctx = $('pos-table-context');
-    if (ctx) ctx.classList.toggle('hidden', restoredType !== 'dine_in');
 
-    if ($('pos-customer-name')) $('pos-customer-name').value = h.customer_name || '';
-    try{ state.cart = JSON.parse(h.items_payload || '[]'); }catch(_){state.cart = [];}
+    if($('pos-customer-name')) $('pos-customer-name').value=h.customer_name||'';
+    var ctx=$('pos-table-context'); if(ctx)ctx.classList.toggle('hidden',restoredType!=='dine_in');
 
-    // The Hold row is only the cashier working reference. Once a canonical
-    // Order has been accepted by Merchant, use the canonical Order as display
-    // source so local Hold snapshots cannot drift from reality.
     if(h.order_id){
       try{
         await refreshActiveOrderContext(h.order_id);
       }catch(err){
-        // Pending POS orders may still rely on the editable Hold snapshot.
-        state.activeOrderLocked=false;
-        state.pendingAdditions=[];
-        try{state.cart=JSON.parse(h.items_payload||'[]');}catch(_){state.cart=[];}
+        // Keep the Hold snapshot as the editable NEW composer only if the
+        // canonical order cannot be refreshed.
+        composer().startNew({orderType:restoredType,table:restoredTable});
+        items.forEach(function(item){ composer().addItem(item); });
       }
+    }else{
+      composer().startNew({orderType:restoredType,table:restoredTable});
+      items.forEach(function(item){ composer().addItem(item); });
     }
 
     hideModal();
@@ -2456,11 +2458,11 @@
     if(state.transaksiTab==='held') renderHeldSales();
     setView('kasir');
 
-    var labelInfo = (restoredType === 'dine_in' && h.table_number) ? ('Meja ' + h.table_number) : (h.customer_name || (restoredType === 'pickup' ? 'Pickup' : restoredType === 'delivery' ? 'Delivery' : 'Pesanan'));
-    if(state.activeOrderLocked){
-      toast('Pesanan ' + esc(labelInfo) + ' dibuka. Pesanan lama sudah diproses Merchant; gunakan + Tambah Pesanan untuk menu baru.');
+    var labelInfo=(restoredType==='dine_in'&&restoredTable)?('Meja '+restoredTable.table_number):(h.customer_name||(restoredType==='pickup'?'Pickup':restoredType==='delivery'?'Delivery':'Pesanan'));
+    if(composer().isExisting()){
+      toast('Pesanan '+esc(labelInfo)+' dibuka. Pesanan lama sudah diproses Merchant; gunakan + Tambah Pesanan untuk menu baru.');
     }else{
-      toast('Pesanan ' + esc(labelInfo) + ' dibuka. Tambah/ubah menu, lalu pilih Hold lagi.');
+      toast('Pesanan '+esc(labelInfo)+' dibuka. Tambah/ubah menu, lalu pilih Hold lagi.');
     }
   }
   async function cancelHeld(heldId){
