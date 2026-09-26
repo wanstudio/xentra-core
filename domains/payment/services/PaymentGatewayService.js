@@ -292,79 +292,9 @@ class PaymentGatewayService {
           });
           releaseClaimIfNeverAccepted(orderId, currentOrderState.status, `Settlement after order left AWAITING (${currentOrderState.status})`);
         } else if (currentOrderState && isConsumingOrderStatus(currentOrderState.status)) {
-          // Operational side effects belong after Branch Acceptance. A payment
-          // settlement for an AWAITING order records money only and leaves the
-          // order/table/session lifecycle untouched.
-          const OrderPlacementService = require('../../commerce/services/OrderPlacementService');
-          OrderPlacementService.deductStockForSettledOrder(orderId, { dbTransactionProvided: true });
-
-          const promoItems = paymentRepository.findOrderItemsWithPromoMarker(orderId);
-          const promoRedemptionsToRecord = [];
-          if (promoItems && promoItems.length > 0 && order && order.customer_phone) {
-            for (const it of promoItems) {
-              let promoId = null;
-              const marker = '[PROMO:';
-              const markerStart = typeof it.note === 'string' ? it.note.indexOf(marker) : -1;
-              if (markerStart >= 0) {
-                const idStart = markerStart + marker.length;
-                const idEnd = it.note.indexOf(']', idStart);
-                if (idEnd > idStart) promoId = it.note.slice(idStart, idEnd);
-              } else if (String(it.product_id).startsWith('prm_')) {
-                promoId = it.product_id;
-              }
-              if (!promoId) continue;
-
-              const promoRow = promotionRepository.findPromotion(promoId);
-              if (!promoRow) continue;
-              const activeRedemptions = promotionRepository.countCustomerRedemptions({ promotionId: promoId, customerPhone: order.customer_phone });
-              const maxLimit = Number(promoRow.max_redemptions_per_customer || 1);
-              if (activeRedemptions >= maxLimit) throw new Error(`[PROMO_LIMIT_EXCEEDED_RACE] Batas klaim promo "${promoId}" (${maxLimit}x) telah digunakan oleh pesanan lain milik pelanggan.`);
-
-              let benefitAmount = Number(it.unit_price || 0);
-              if (benefitAmount === 0) {
-                const rewardProduct = promotionRepository.findRewardProductPrice(it.product_id);
-                benefitAmount = rewardProduct ? Number(rewardProduct.v || 0) : 0;
-              }
-              promoRedemptionsToRecord.push({ promo_id: promoId, benefit_amount: benefitAmount });
-            }
-          }
-
-          if (promoRedemptionsToRecord.length > 0) {
-            const PromotionEngineService = require('../../promotion/services/PromotionEngineService');
-            PromotionEngineService.recordRedemptions({ order_id: orderId, brand_id: order?.brand_id, branch_id: order?.branch_id, customer_phone: order?.customer_phone, promotions: promoRedemptionsToRecord });
-          }
-
-          if (order && order.order_type === 'dine_in') {
-            // Invariant: payment completion alone does not activate the dining session.
-            // Active Dining Session begins when the Merchant operationally accepts the order.
-            // If the order has already been operationally accepted, ensure session is created/attached.
-            if (order.status === 'confirmed') {
-              try {
-                const { DiningTableService } = require('../../dining');
-                let tableIds = [];
-                const activeHold = diningTableRepository.findActiveHolds(order.id);
-                if (activeHold && activeHold.length > 0) tableIds = activeHold.map(h => h.table_id);
-                else if (order.table_number) {
-                  const tbl = diningTableRepository.findTableIdByNumberOrLabel(order.branch_id, order.table_number);
-                  if (tbl) tableIds = [tbl.id];
-                }
-                if (tableIds.length > 0) {
-                  DiningTableService.createOrAttachDiningSession({
-                    branch_id: order.branch_id,
-                    table_ids: tableIds,
-                    order_id: order.id,
-                    customer_name: order.customer_name,
-                    customer_phone: order.customer_phone,
-                    guest_count: 1,
-                    hold_reference_id: order.id,
-                    channel: order.order_channel || 'customer_app'
-                  });
-                }
-              } catch (dineErr) {
-                console.warn('[PaymentGatewayService] Dine-in table settlement warning:', dineErr.message);
-              }
-            }
-          }
+          // Settlement after operational acceptance remains financial-only.
+          // Stock/promo/Dining Session side effects already occurred (or were
+          // intentionally omitted) at their authoritative operational boundary.
         }
       } else if (['cancel', 'deny', 'expire'].includes(newPaymentStatus)) {
         const cancelOrderResult = paymentRepository.cancelPendingOrder({ orderId: orderId, updatedAt: now });
