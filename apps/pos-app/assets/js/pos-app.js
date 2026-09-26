@@ -2237,22 +2237,13 @@
     }catch(e){toast(e.message);}
   }
   function resetSale(){
-    state.cart=[];
-    state.additionalCart=[];
-    state.pendingAdditions=[];
-    state.selectedTable=null;
-    state.activeHeldOrderId=null;
-    state.activeHeldBillId=null;
-    state.activeOrderLocked=false;
-    state.composerMode='new';
-    state.activeAdditionalMode=false;
+    composer().reset();
     if($('pos-selected-table')) $('pos-selected-table').textContent='Belum dipilih';
     if($('pos-customer-name')) $('pos-customer-name').value='';
     if($('pos-order-note')) $('pos-order-note').value='';
     renderCart();
     renderMenu();
   }
-
   async function refreshActiveOrderContext(orderId){
     if(!orderId) return null;
     var data=await request('/pos/orders/'+encodeURIComponent(orderId)+'/additions',{headers:headers()});
