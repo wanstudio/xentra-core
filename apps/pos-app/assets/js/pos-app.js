@@ -2211,7 +2211,88 @@
       await openCheckManager(state.activeHeldOrderId);
     }catch(e){toast(e.message);}
   }
-  function resetSale(){state.cart=[];state.selectedTable=null;state.activeHeldOrderId=null;state.activeHeldBillId=null;$('pos-selected-table').textContent='Belum dipilih';$('pos-customer-name').value='';$('pos-order-note').value='';renderCart();}
+  function resetSale(){
+    state.cart=[];
+    state.additionalCart=[];
+    state.pendingAdditions=[];
+    state.selectedTable=null;
+    state.activeHeldOrderId=null;
+    state.activeHeldBillId=null;
+    state.activeOrderLocked=false;
+    state.activeAdditionalMode=false;
+    if($('pos-selected-table')) $('pos-selected-table').textContent='Belum dipilih';
+    if($('pos-customer-name')) $('pos-customer-name').value='';
+    if($('pos-order-note')) $('pos-order-note').value='';
+    renderCart();
+    renderMenu();
+  }
+
+  async function refreshActiveOrderContext(orderId){
+    if(!orderId) return null;
+    var data=await request('/pos/orders/'+encodeURIComponent(orderId)+'/additions',{headers:headers()});
+    if(!data || !data.order) throw new Error('Order aktif tidak ditemukan.');
+    state.activeOrderLocked=['confirmed','preparing','ready'].indexOf(String(data.order.status))!==-1;
+    state.pendingAdditions=(data.additions||[]).filter(function(a){return a.status==='pending_acceptance';});
+    if(state.activeOrderLocked){
+      state.cart=(data.items||[]).map(function(it){
+        return {
+          product_id:it.product_id,
+          name:it.product_name||it.name||'Produk',
+          unit_price:Number(it.unit_price||0),
+          quantity:Number(it.quantity||0),
+          note:it.note||'',
+          options:(function(){try{return JSON.parse(it.modifiers_snapshot||'[]');}catch(_){return [];} })(),
+          addition_batch_id:it.addition_batch_id||null
+        };
+      }).filter(function(it){return it.quantity>0;});
+    }
+    return data;
+  }
+
+  function enterAdditionalOrderMode(){
+    if(!state.activeOrderLocked || state.activeAdditionalMode) return;
+    state.activeAdditionalMode=true;
+    state.additionalCart=[];
+    if($('pos-order-note')) $('pos-order-note').value='';
+    hideModal();
+    renderCart();
+    renderMenu();
+    toast('Mode Tambah Pesanan aktif. Pilih menu tambahan lalu kirim.');
+  }
+
+  function cancelAdditionalOrderMode(){
+    state.activeAdditionalMode=false;
+    state.additionalCart=[];
+    hideModal();
+    renderCart();
+    renderMenu();
+  }
+
+  async function submitAdditionalOrder(){
+    if(!state.activeHeldOrderId) return toast('Order aktif tidak ditemukan.');
+    if(!state.additionalCart.length) return toast('Belum ada menu tambahan.');
+    try{
+      var btn=$('btn-pos-pay');
+      if(btn) btn.disabled=true;
+      var result=await request('/pos/orders/'+encodeURIComponent(state.activeHeldOrderId)+'/additions',{
+        method:'POST',
+        headers:headers(),
+        body:JSON.stringify({items:state.additionalCart})
+      });
+      state.activeAdditionalMode=false;
+      state.additionalCart=[];
+      state.pendingAdditions=(state.pendingAdditions||[]).concat(result.addition?[result.addition]:[]);
+      hideModal();
+      await refreshActiveOrderContext(state.activeHeldOrderId);
+      renderCart();
+      renderMenu();
+      toast('Tambahan pesanan dikirim. Menunggu Merchant menerima.');
+    }catch(e){
+      toast(e.message);
+      renderCart();
+    }
+  }
+
 
   function showModal(html, extraClass){
     var card = $('pos-modal-card');
