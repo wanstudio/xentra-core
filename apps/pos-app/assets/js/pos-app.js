@@ -3274,6 +3274,9 @@
       window.addEventListener('offline',function(){state.coreConnection=false;
       updatePosReadiness();});
       updatePosReadiness();
+      if(state.branchReadinessRefreshTimer) clearInterval(state.branchReadinessRefreshTimer);
+      state.branchReadinessRefreshTimer=setInterval(refreshBranchOperationalState,30000);
+      window.addEventListener('focus',function(){ refreshBranchOperationalState(); });
     }catch(e){toast(e.message||'Gagal memuat POS.');}
   }
 
