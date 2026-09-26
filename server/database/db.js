@@ -919,6 +919,29 @@ function initSchema(targetDb) {
       FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS order_addition_batches (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      branch_id TEXT NOT NULL,
+      dining_session_id TEXT,
+      sequence_no INTEGER NOT NULL,
+      source_channel TEXT NOT NULL DEFAULT 'pos_cashier',
+      created_by TEXT,
+      items_payload TEXT NOT NULL,
+      subtotal REAL NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'pending_acceptance',
+      accepted_at TEXT,
+      rejected_at TEXT,
+      rejection_reason TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+      UNIQUE (order_id, sequence_no)
+    );
+    CREATE INDEX IF NOT EXISTS idx_order_addition_batches_order_status
+      ON order_addition_batches(order_id, status);
+
     CREATE TABLE IF NOT EXISTS order_status_logs (
       id TEXT PRIMARY KEY,
       order_id TEXT NOT NULL,
@@ -2325,6 +2348,11 @@ function bootstrapEssentialTenant(targetDb) {
  */
   // Existing databases: add the new allocation column idempotently.
   try { targetDb.exec("ALTER TABLE pos_order_checks ADD COLUMN allocated_amount REAL NOT NULL DEFAULT 0;"); } catch (_) {}
+
+  // Dine-in Additional Order Batch: existing order_items gain a provenance reference.
+  try { targetDb.exec("ALTER TABLE order_items ADD COLUMN addition_batch_id TEXT;"); } catch (_) {}
+  try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_order_items_addition_batch_id ON order_items(addition_batch_id);"); } catch (_) {}
+
 
 function seedDemoData(targetDb, explicitBrandId) {
   if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PRODUCTION_DEMO_SEED !== '1') {
