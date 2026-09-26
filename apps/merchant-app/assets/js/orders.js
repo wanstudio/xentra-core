@@ -782,6 +782,38 @@
   }
   window.rejectBMOrder = rejectBMOrder;
 
+  async function decideBMOrderAddition(orderId, additionId, decision) {
+    var reason = '';
+    if (decision === 'accept') {
+      if (!confirm('Terima tambahan pesanan ini? Item akan masuk ke pesanan dan stok akan dipotong.')) return;
+    } else if (decision === 'reject') {
+      reason = prompt('Alasan penolakan tambahan:') || '';
+      if (!reason.trim()) return;
+    } else {
+      return;
+    }
+
+    try {
+      var res = await adminFetch(API_BASE + '/orders/' + encodeURIComponent(orderId) + '/additions/' + encodeURIComponent(additionId) + '/branch-acceptance', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ decision: decision, reason: reason })
+      });
+      var data = await res.json();
+      if (res.ok && data.success) {
+        showToast(decision === 'accept' ? 'Tambahan pesanan diterima.' : 'Tambahan pesanan ditolak.');
+        loadBMOrders({ background: true });
+        loadHariIni();
+        if (_bmOrdersState.currentDetailOrderId === orderId) viewBMOrderDetail(orderId);
+      } else {
+        showToast((decision === 'accept' ? 'Gagal menerima tambahan: ' : 'Gagal menolak tambahan: ') + (data.error || 'Terjadi kesalahan'));
+      }
+    } catch (e) {
+      showToast('Kesalahan jaringan.');
+    }
+  }
+  window.decideBMOrderAddition = decideBMOrderAddition;
+
   function getBMReservationGuestCount(ord) {
     if (!ord) return 0;
     var explicit = Number(ord.guest_count);
