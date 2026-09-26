@@ -4201,16 +4201,15 @@ input[type="file"].x-input,
   -webkit-overflow-scrolling: touch;
 }
 @media(max-width:768px){
-  html {
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow-x: hidden !important;
-  }
+  html,
   body.x-merchant-app {
     width: 100% !important;
     max-width: 100% !important;
-    overflow-x: hidden !important;
-    position: relative !important;
+    height: 100% !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    position: fixed !important;
+    inset: 0 !important;
     background: #e8e8ea !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -4218,16 +4217,27 @@ input[type="file"].x-input,
   .x-merchant-app .x-dash-layout {
     width: 100% !important;
     max-width: 100% !important;
+    height: 100% !important;
+    height: 100dvh !important;
+    display: flex !important;
+    flex-direction: column !important;
     background: #e8e8ea !important;
-    overflow: visible !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   .x-merchant-app .x-dash-main {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
     width: 100% !important;
     max-width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
     background: #e8e8ea !important;
+    overflow: hidden !important;
+    margin: 0 !important;
     padding: 0 !important;
-    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
-    overflow: visible !important;
   }
 }
 @media(min-width:769px){
@@ -4247,13 +4257,14 @@ input[type="file"].x-input,
 }
 
 @media (max-width: 768px) {
-  /* Sticky Row 1: Stays on top when scrolling */
+  /* Topbar (Row 1 + Row 2): Stays fixed on top */
   .x-dash-topbar,
   .x-merchant-app .x-dash-topbar {
-    position: sticky !important;
+    flex: 0 0 auto !important;
+    position: relative !important;
     top: 0 !important;
     z-index: 100 !important;
-    padding: max(12px, env(safe-area-inset-top)) 16px 8px !important;
+    padding: max(12px, env(safe-area-inset-top)) 16px 12px !important;
     background: #e8e8ea !important;
     border: 0 !important;
     box-shadow: none !important;
@@ -4374,19 +4385,17 @@ input[type="file"].x-input,
     fill: currentColor !important;
   }
 
-  /* Row 2: Operational status row (NOT sticky — scrolls with page, slides under sticky Row 1) */
+  /* Row 2: Operational status row (inside topbar, stays on top) */
   .x-mobile-operational-row {
-    margin: 0 !important;
+    margin-top: 10px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     gap: 10px !important;
     width: 100% !important;
-    padding: 2px 16px 14px !important;
+    padding: 0 !important;
     box-sizing: border-box !important;
-    background: #e8e8ea !important;
-    position: relative !important;
-    z-index: 20 !important;
+    background: transparent !important;
   }
 
   .x-mobile-status-control {
@@ -4454,18 +4463,17 @@ input[type="file"].x-input,
     left: 2px !important;
   }
 
-  /* White content container with top curved corner radius sitting on grey background layer */
+  /* Curved frame (stays on top, cards scroll inside):
+     Background is putih-kebiruan (#f0f4f8), top-left and top-right curve radius 28px */
   .x-merchant-app .x-tab-content {
-    background: #ffffff !important;
+    background: #f0f4f8 !important; /* putih-kebiruan */
     border-radius: 28px 28px 0 0 !important;
-    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.04) !important;
-    padding: 16px 16px calc(84px + env(safe-area-inset-bottom, 0px)) !important;
-    min-height: calc(100vh - 120px) !important;
-    position: relative !important;
-    z-index: 30 !important;
+    box-shadow: 0 -3px 14px rgba(0, 0, 0, 0.05) !important;
     box-sizing: border-box !important;
     width: 100% !important;
     max-width: 100% !important;
+    margin: 0 !important;
+    position: relative !important;
   }
 
   .x-merchant-app .x-tab-content:not(.active) {
@@ -4473,7 +4481,23 @@ input[type="file"].x-input,
   }
 
   .x-merchant-app .x-tab-content.active {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
     display: block !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 16px 16px calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* White cards inside the putih-kebiruan curved frame */
+  .x-merchant-app .x-tab-content .x-card-panel,
+  .x-merchant-app .x-tab-content .x-bm-hero-banner {
+    background: #ffffff !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(0, 0, 0, 0.05) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+    margin-bottom: 16px !important;
   }
 
   .x-merchant-mobile-nav,
