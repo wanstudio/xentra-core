@@ -62,6 +62,26 @@ describe('POS ↔ Merchant App surface boundary', () => {
     assert.ok(pos.includes("router.post('/pos/terminal/register', requireAuth(['owner', 'brand_manager', 'branch_manager'])"));
   });
 
+  it('uses a human traffic-light readiness indicator instead of a technical online/offline label', () => {
+    const html = read('apps/pos-app/index.html');
+    const css = read('apps/pos-app/assets/css/pos.css');
+    const js = read('apps/pos-app/assets/js/pos-app.js');
+    assert.ok(html.includes('id="pos-connection-badge"'));
+    assert.ok(html.includes('aria-haspopup="true"'));
+    assert.ok(!html.includes('>ONLINE<'), 'POS must not expose a visible ONLINE label');
+    assert.ok(!html.includes('>OFFLINE<'), 'POS must not expose a visible OFFLINE label');
+    assert.ok(js.includes('setPosStatus'));
+    assert.ok(js.includes("setPosStatus('ready'"));
+    assert.ok(js.includes("setPosStatus('caution'"));
+    assert.ok(js.includes("setPosStatus('stop'"));
+    assert.ok(js.includes('state.coreConnection'));
+    assert.ok(js.includes('navigator.onLine===false'));
+    assert.ok(css.includes('.pos-status.ready .pos-status-pulse'));
+    assert.ok(css.includes('.pos-status.caution .pos-status-pulse'));
+    assert.ok(css.includes('.pos-status.stop .pos-status-pulse'));
+    assert.ok(css.includes('.pos-status.is-open .pos-status-tooltip'));
+  });
+
   it('connects POS frontend to Sale, Shift, Table, Offline and Receipt contracts', () => {
     const js = read('apps/pos-app/assets/js/pos-app.js');
     for (const endpoint of [
