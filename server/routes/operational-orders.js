@@ -153,10 +153,10 @@ router.post('/orders/:id/additions/:additionId/branch-acceptance', requireAuth([
       FROM orders o
       JOIN branches b ON b.id = o.branch_id
       WHERE o.id = ? AND b.brand_id = ?
-      ${req.user.role === 'branch_manager' && req.user.branchId ? ' AND o.branch_id = ?' : ''}
+      ${req.user.role === 'branch_manager' && (req.user.branch_id || req.user.branchId) ? ' AND o.branch_id = ?' : ''}
     `;
     const scopeParams = [req.params.id, req.brand_id];
-    if (req.user.role === 'branch_manager' && req.user.branchId) scopeParams.push(req.user.branchId);
+    if (req.user.role === 'branch_manager' && (req.user.branch_id || req.user.branchId)) scopeParams.push(req.user.branch_id || req.user.branchId);
     const parent = db.prepare(scopeSql).get(...scopeParams);
     if (!parent) return res.status(404).json({ success: false, error: 'Order tidak ditemukan pada kewenangan cabang Anda.' });
 
