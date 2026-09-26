@@ -140,12 +140,14 @@ function buildOpenBill(sessionId, brandId) {
     };
   });
 
+  const activeOrders = billOrders.filter((o) => !o.is_cancelled);
   return {
     session_id: session.id,
     opened_at: session.opened_at,
     customer_name: session.customer_name,
     tables: tables.map((t) => ({ id: t.id, table_number: t.table_number, label: t.label })),
     orders: billOrders,
+    active_order_id: activeOrders.length ? activeOrders[activeOrders.length - 1].id : null,
     total_bill: totalBill,
     outstanding_total: outstanding
   };
