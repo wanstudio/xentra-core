@@ -6,6 +6,10 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 
+function nocoreBranchReadinessCondition(js) {
+  return js.includes('is_delivery_active') && js.includes("setPosStatus('stop','Merchant sedang tutup'");
+}
+
 describe('POS ↔ Merchant App surface boundary', () => {
   it('has a standalone POS application with execution-first navigation', () => {
     const html = read('apps/pos-app/index.html');
@@ -75,6 +79,13 @@ describe('POS ↔ Merchant App surface boundary', () => {
     assert.ok(js.includes("setPosStatus('caution'"));
     assert.ok(js.includes("setPosStatus('stop'"));
     assert.ok(js.includes('state.coreConnection'));
+    assert.ok(js.includes('state.branchOperationalOpen'));
+    assert.ok(js.includes("setPosStatus('stop','Merchant sedang tutup'"));
+    assert.ok(js.includes("d.branch.is_open_override"));
+    assert.ok(js.includes('setInterval(refreshBranchOperationalState,30000)'));
+    assert.ok(js.includes("addEventListener('focus',function(){ refreshBranchOperationalState(); })"));
+    assert.ok(!js.includes('is_delivery_active'));
+    assert.ok(nocoreBranchReadinessCondition(js) === false, 'Branch online-order state must not directly drive POS readiness');
     assert.ok(js.includes('navigator.onLine===false'));
     assert.ok(css.includes('.pos-status.ready .pos-status-pulse'));
     assert.ok(css.includes('.pos-status.caution .pos-status-pulse'));
