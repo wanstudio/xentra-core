@@ -602,6 +602,10 @@
       var prev = state.openBill ? JSON.stringify(state.openBill) : 'null';
       var next = bill ? JSON.stringify(bill) : 'null';
       state.openBill = bill;
+      if (bill && bill.branch_id) {
+        currentBranchId = String(bill.branch_id);
+      }
+
       if (bill && Array.isArray(bill.tables) && bill.tables.length > 0) {
         var billTable = bill.tables[0];
         var bId = billTable.id;
