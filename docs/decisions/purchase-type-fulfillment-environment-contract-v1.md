@@ -449,7 +449,7 @@ over a universal operational state machine that tries to serve every purchase ty
 
 **Status: LOCKED — implementation authorized.**
 
-Initial implementation record:
+Implementation record — current HEAD `ec480f60ff00fdee39031b7a2ecdb401c661e016c`:
 - Fulfillment Environment projection extended in `apps/customer-pwa/assets/js/core/fulfillment-environments.js`.
 - Customer order tracking wired to environment-specific phases/labels.
 - Merchant Order Center wired to environment-specific status labels.
