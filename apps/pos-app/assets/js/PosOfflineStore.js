@@ -267,25 +267,33 @@
     var operation = buildSaleOperation(input);
     var effects = createEffectRecords(operation);
 
-    return transactionPromise([STORES.OPERATIONS, STORES.EFFECTS], 'readwrite', function (tx) {
-      var operationStore = tx.objectStore(STORES.OPERATIONS);
-      var effectStore = tx.objectStore(STORES.EFFECTS);
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction([STORES.OPERATIONS, STORES.EFFECTS], 'readwrite');
+        var operationStore = tx.objectStore(STORES.OPERATIONS);
+        var effectStore = tx.objectStore(STORES.EFFECTS);
+        var resolvedOperation = operation;
 
-      getOperationInternal(operationStore, operation.operation_id).then(function (existing) {
-        if (existing) {
-          return;
-        }
+        tx.oncomplete = function () { resolve(resolvedOperation); };
+        tx.onerror = function () { reject(tx.error || new Error('IndexedDB transaction failed.')); };
+        tx.onabort = function () { reject(tx.error || new Error('IndexedDB transaction aborted.')); };
 
-        operationStore.put(operation);
-        effects.forEach(function (effect) {
-          effectStore.put(effect);
-        });
-      }).catch(function (err) {
-        try { tx.abort(); } catch (_) {}
-        throw err;
+        var getReq = operationStore.get(operation.operation_id);
+        getReq.onsuccess = function (event) {
+          var existing = event.target.result;
+          if (existing) {
+            resolvedOperation = existing;
+            return;
+          }
+          operationStore.put(operation);
+          effects.forEach(function (effect) {
+            effectStore.put(effect);
+          });
+        };
+        getReq.onerror = function () {
+          try { tx.abort(); } catch (_) {}
+        };
       });
-
-      return operation;
     });
   }
 
@@ -317,15 +325,33 @@
   }
 
   function updateOperation(operationId, updater) {
-    return transactionPromise([STORES.OPERATIONS], 'readwrite', function (tx) {
-      var store = tx.objectStore(STORES.OPERATIONS);
-      getOperationInternal(store, operationId).then(function (row) {
-        if (!row) throw new Error('OFFLINE_OPERATION_NOT_FOUND');
-        var updated = updater(Object.assign({}, row));
-        updated.updated_at = nowIso();
-        store.put(updated);
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction([STORES.OPERATIONS], 'readwrite');
+        var store = tx.objectStore(STORES.OPERATIONS);
+        tx.oncomplete = function () { resolve(operationId); };
+        tx.onerror = function () { reject(tx.error || new Error('IndexedDB transaction failed.')); };
+        tx.onabort = function () { reject(tx.error || new Error('IndexedDB transaction aborted.')); };
+
+        var getReq = store.get(operationId);
+        getReq.onsuccess = function (event) {
+          var row = event.target.result;
+          if (!row) {
+            try { tx.abort(); } catch (_) {}
+            return;
+          }
+          try {
+            var updated = updater(Object.assign({}, row));
+            updated.updated_at = nowIso();
+            store.put(updated);
+          } catch (err) {
+            try { tx.abort(); } catch (_) {}
+          }
+        };
+        getReq.onerror = function () {
+          try { tx.abort(); } catch (_) {}
+        };
       });
-      return operationId;
     });
   }
 
