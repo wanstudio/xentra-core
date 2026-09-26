@@ -52,15 +52,15 @@ describe('Dine-in Additional Order Batch contract', () => {
   });
 
   it('locks the accepted parent order while preserving payment allocation', () => {
-    assert.ok(posJs.includes('activeOrderLocked'));
-    assert.ok(posJs.includes('isOrderLockedForEditing'));
+    assert.ok(posJs.includes("composer().isExisting()"));
+    assert.ok(posJs.includes("composer().canAdd()"));
     assert.ok(posJs.includes('showOrderLockedWarning'));
-    assert.ok(posJs.includes('await openCheckManager(state.activeHeldOrderId);'));
+    assert.ok(posJs.includes('await openCheckManager(orderId);'));
     const manyPaymentStart = posJs.indexOf('async function openManyPaymentFromCart(){');
     const manyPaymentEnd = posJs.indexOf('\\n  function resetSale(){', manyPaymentStart);
     const manyPaymentBlock = posJs.slice(manyPaymentStart, manyPaymentEnd);
     assert.ok(!manyPaymentBlock.includes("/pos/held-orders/"));
-    assert.ok(posJs.includes('if(state.activeOrderLocked) return showOrderLockedWarning();'));
+    assert.ok(posJs.includes("if(tx.isExisting()) return showOrderLockedWarning();"));
   });
 
   it('routes an active customer dine-in cart into the existing order instead of create-order', () => {
@@ -81,10 +81,9 @@ describe('Dine-in Additional Order Batch contract', () => {
   });
 
   it('does not expose Additional Order on an empty/new composer', () => {
-    assert.ok(posJs.includes("function getComposerMode()"));
-    assert.ok(posJs.includes("if (state.composerMode === 'existing' && state.activeHeldOrderId && state.activeOrderLocked && state.cart.length > 0) return 'existing';"));
-    assert.ok(posJs.includes("var canAdd=isDineIn && getComposerMode() === 'existing';"));
-    assert.ok(posJs.includes("state.composerMode='new';"));
+    assert.ok(posJs.includes("new window.XentraPos.TransactionComposer({ orderType: 'dine_in' })"));
+    assert.ok(posJs.includes("var canAdd=isDineIn && tx.canAdd();"));
+    assert.ok(posJs.includes("composer().isAddition()"));
   });
 
   it('provides explicit additional-order UX and locked styling', () => {
@@ -100,7 +99,7 @@ describe('Dine-in Additional Order Batch contract', () => {
     const start = posJs.indexOf('async function openManyPaymentFromCart(){');
     const end = posJs.indexOf('\n  function resetSale(){', start);
     const block = posJs.slice(start, end);
-    assert.ok(block.includes('await openCheckManager(state.activeHeldOrderId);'));
+    assert.ok(block.includes('await openCheckManager(orderId);'));
     assert.ok(!block.includes("method:'PUT'"));
     assert.ok(!block.includes('/pos/held-orders/'));
   });
