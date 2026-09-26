@@ -256,7 +256,14 @@
     var searchBtn = $('btn-global-search');
     if (searchBtn) searchBtn.style.display = 'none';
     var topbarBrandBadge = $('topbar-brand-badge');
-    if (topbarBrandBadge) topbarBrandBadge.style.display = 'none';
+    if (topbarBrandBadge) topbarBrandBadge.style.display = 'flex';
+    var topbarBrandName = $('topbar-brand-name');
+    if (topbarBrandName) topbarBrandName.textContent = user.branch_name || user.brand_name || 'MyBangjo';
+    var mobileAvatar = $('mobile-user-avatar');
+    if (mobileAvatar && user.full_name) {
+      mobileAvatar.textContent = user.full_name.charAt(0).toUpperCase();
+      mobileAvatar.classList.add('has-initial');
+    }
 
     // Branch context is locked to the authenticated branch; no switcher affordance.
     var branchSelectorWrap = $('x-branch-selector');
