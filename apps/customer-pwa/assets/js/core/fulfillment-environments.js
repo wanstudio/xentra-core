@@ -1,31 +1,21 @@
 /**
- * Fulfillment Environments — isolasi Delivery, Pickup, Dine-in, Reservation.
+ * Xentra Fulfillment Environments
  *
- * Masalahnya: checkout dulu punya SATU `state.fulfillment` yang dipakai bersama
- * keempat tipe. Akibatnya nilai milik satu tipe bisa terbaca tipe lain — memilih
- * meja dine-in lalu pindah ke delivery, dan `table_ids` ikut terkirim di payload
- * delivery. Perubahan satu tipe merembet ke tipe lain.
+ * Shared customer-checkout isolation + fulfillment presentation contract.
  *
- * Aturannya sekarang:
+ * One canonical Commerce Order remains shared. Each purchase type gets its own
+ * operational environment with its own phases, labels, actions, timing/context,
+ * exceptions and handoff semantics.
  *
- *   CHECKOUT
- *   ├── Shared Core              (cart, customer, payment, order, branch)
- *   └── Fulfillment Environment  (delivery | pickup | dine_in | reservation)
- *
- * Setiap environment MEMILIKI objek state sendiri. Tidak ada field fulfillment
- * yang dibagi. Saat tipe berganti, environment lama di-unmount (listenernya
- * dilepas, state sementaranya direset) dan environment baru di-mount.
- *
- * Modul ini murni logika — tidak menyentuh DOM saat dimuat, supaya bisa diuji di
- * Node tanpa browser.
+ * This module is intentionally presentation/coordination metadata only. It is
+ * NOT a replacement for server-side authorization or the canonical backend
+ * Order/Payment/Dining/Delivery state machines.
  */
 (function () {
   'use strict';
 
   var TYPES = ['delivery', 'pickup', 'dine_in', 'reservation'];
 
-  // Alias lama 'dinein' masih tersimpan di Store/localStorage dari versi
-  // sebelumnya, jadi normalisasi dilakukan di satu tempat saja.
   function normalize(type) {
     if (type === 'dinein') return 'dine_in';
     return TYPES.indexOf(type) !== -1 ? type : 'delivery';
@@ -35,8 +25,6 @@
     return type === 'delivery' || type === 'pickup';
   }
 
-  // Field fulfillment yang HARUS dipisah per tipe. Dipakai sebagai daftar
-  // kepemilikan: environment hanya mengirim field yang memang miliknya.
   var OWNERSHIP = {
     delivery: { schedule: true, address: true, deliveryFee: true, table: false, reservation: false },
     pickup: { schedule: true, address: false, deliveryFee: false, table: false, reservation: false },
@@ -44,9 +32,198 @@
     reservation: { schedule: false, address: false, deliveryFee: false, table: false, reservation: true }
   };
 
-  // Nilai netral untuk field yang bukan milik tipe ini. Dikirim eksplisit supaya
-  // bentuk payload di server tidak berubah, tetapi TIDAK PERNAH berisi nilai
-  // sisa dari tipe lain.
+  /*
+   * Human-facing environment contract.
+   *
+   * Primary phases are deliberately smaller than the complete event graph.
+   * Assignment, arrival, cash handover, payment settlement and other events
+   * remain substates/actions/context rather than being forced into new phases.
+   */
+  var PRESENTATIONS = {
+    delivery: {
+      label: 'Delivery',
+      phases: [
+        { key: 'accepted', label: 'Pesanan diterima', description: 'Cabang sudah menerima pesanan.' },
+        { key: 'preparing', label: 'Sedang disiapkan', description: 'Pesanan sedang disiapkan.' },
+        { key: 'ready', label: 'Siap diantar', description: 'Pesanan siap diserahkan untuk pengantaran.' },
+        { key: 'delivering', label: 'Sedang diantar', description: 'Pesanan sedang menuju alamat tujuan.' },
+        { key: 'completed', label: 'Selesai diantar', description: 'Pesanan sudah selesai diantar.' }
+      ],
+      statusLabels: {
+        pending: 'Menunggu diterima',
+        confirmed: 'Pesanan diterima',
+        preparing: 'Sedang disiapkan',
+        ready: 'Siap diantar',
+        out_for_delivery: 'Sedang diantar',
+        completed: 'Selesai diantar',
+        rejected: 'Pesanan ditolak',
+        cancelled: 'Pesanan dibatalkan',
+        timeout: 'Waktu penerimaan habis',
+        fulfillment_exception: 'Perlu penanganan'
+      },
+      completion: { label: 'Selesai diantar', actor: 'driver' },
+      handoffs: ['branch_to_driver', 'driver_to_customer', 'cod_to_cashier'],
+      exceptions: ['customer_unavailable', 'customer_refuses_cod', 'driver_reassignment', 'delivery_failed', 'cash_variance'],
+      timing: true
+    },
+
+    pickup: {
+      label: 'Pickup',
+      phases: [
+        { key: 'accepted', label: 'Pesanan diterima', description: 'Cabang sudah menerima pesanan.' },
+        { key: 'preparing', label: 'Sedang disiapkan', description: 'Pesanan sedang disiapkan.' },
+        { key: 'ready', label: 'Siap diambil', description: 'Pesanan sudah siap di konter.' },
+        { key: 'completed', label: 'Sudah diambil', description: 'Pesanan sudah diserahkan kepada pelanggan.' }
+      ],
+      statusLabels: {
+        pending: 'Menunggu diterima',
+        confirmed: 'Pesanan diterima',
+        preparing: 'Sedang disiapkan',
+        ready: 'Siap diambil',
+        completed: 'Sudah diambil',
+        rejected: 'Pesanan ditolak',
+        cancelled: 'Pesanan dibatalkan',
+        timeout: 'Waktu penerimaan habis',
+        fulfillment_exception: 'Perlu penanganan'
+      },
+      completion: { label: 'Sudah diambil', actor: 'fulfillment_handoff' },
+      handoffs: ['branch_to_customer'],
+      exceptions: ['customer_unavailable', 'customer_cancellation', 'item_unavailable'],
+      timing: true
+    },
+
+    dine_in: {
+      label: 'Dine-in',
+      phases: [
+        { key: 'accepted', label: 'Pesanan diterima', description: 'Cabang sudah menerima pesanan dan konteks meja aktif.' },
+        { key: 'preparing', label: 'Sedang disiapkan', description: 'Pesanan sedang disiapkan.' },
+        { key: 'ready', label: 'Siap disajikan', description: 'Pesanan siap disajikan ke meja.' },
+        { key: 'completed', label: 'Pesanan selesai', description: 'Pesanan ini sudah selesai.' }
+      ],
+      statusLabels: {
+        pending: 'Menunggu diterima',
+        confirmed: 'Pesanan diterima',
+        preparing: 'Sedang disiapkan',
+        ready: 'Siap disajikan',
+        completed: 'Pesanan selesai',
+        active_table: 'Sedang makan',
+        rejected: 'Pesanan ditolak',
+        cancelled: 'Pesanan dibatalkan',
+        timeout: 'Waktu penerimaan habis',
+        fulfillment_exception: 'Perlu penanganan'
+      },
+      completion: { label: 'Pesanan selesai', actor: 'dine_in_order_authority' },
+      handoffs: ['branch_to_kitchen', 'kitchen_to_table'],
+      exceptions: ['customer_absent_cash', 'table_blocked', 'session_not_closable'],
+      timing: false
+    },
+
+    reservation: {
+      label: 'Reservasi',
+      phases: [
+        { key: 'created', label: 'Reservasi dibuat', description: 'Permintaan reservasi sudah tercatat.' },
+        { key: 'confirmed', label: 'Reservasi dikonfirmasi', description: 'Reservasi sudah dikonfirmasi cabang.' },
+        { key: 'arrival', label: 'Menunggu kedatangan', description: 'Tamu tinggal datang sesuai jadwal.' }
+      ],
+      statusLabels: {
+        pending: 'Menunggu konfirmasi',
+        confirmed: 'Reservasi dikonfirmasi',
+        cancelled: 'Reservasi dibatalkan',
+        rejected: 'Reservasi ditolak',
+        timeout: 'Waktu penerimaan habis',
+        active_table: 'Tamu sudah datang'
+      },
+      completion: { label: 'Handoff ke Dine-in', actor: 'branch_operational' },
+      handoffs: ['reservation_to_dine_in'],
+      exceptions: ['customer_late', 'no_show', 'reservation_cancelled', 'check_in_failed'],
+      timing: true
+    }
+  };
+
+  var STATUS_PHASE_INDEX = {
+    delivery: {
+      pending: 0, confirmed: 0, preparing: 1, ready: 2, out_for_delivery: 3, completed: 4
+    },
+    pickup: {
+      pending: 0, confirmed: 0, preparing: 1, ready: 2, completed: 3
+    },
+    dine_in: {
+      pending: 0, confirmed: 0, preparing: 1, ready: 2, completed: 3, active_table: 0
+    },
+    reservation: {
+      pending: 0, confirmed: 1, active_table: 2
+    }
+  };
+
+  function getPresentation(type) {
+    return PRESENTATIONS[normalize(type)];
+  }
+
+  function getStatusLabel(type, status) {
+    var p = getPresentation(type);
+    if (p.statusLabels[status]) return p.statusLabels[status];
+    return String(status || '').replace(/_/g, ' ');
+  }
+
+  function getStatusPhaseIndex(type, status, context) {
+    var t = normalize(type);
+    var c = context || {};
+    if (t === 'delivery' && c.deliveryStatus) {
+      var ds = String(c.deliveryStatus);
+      if (ds === 'on_delivery' || ds === 'delivered') return ds === 'delivered' ? 4 : 3;
+      if (ds === 'picked_up') return 3;
+    }
+    var map = STATUS_PHASE_INDEX[t] || STATUS_PHASE_INDEX.delivery;
+    return Object.prototype.hasOwnProperty.call(map, status) ? map[status] : 0;
+  }
+
+  function project(type, status, context) {
+    var t = normalize(type);
+    var p = getPresentation(t);
+    var c = context || {};
+    var idx = getStatusPhaseIndex(t, status, c);
+    if (idx < 0) idx = 0;
+    if (idx >= p.phases.length) idx = p.phases.length - 1;
+
+    return {
+      type: t,
+      label: p.label,
+      phases: p.phases,
+      currentPhaseIndex: idx,
+      currentPhase: p.phases[idx],
+      statusLabel: getStatusLabel(t, status),
+      completion: p.completion,
+      handoffs: p.handoffs.slice(),
+      exceptions: p.exceptions.slice(),
+      timing: p.timing,
+      isException: ['rejected', 'cancelled', 'timeout', 'fulfillment_exception'].indexOf(status) !== -1
+    };
+  }
+
+  function action(type, surface, status, context) {
+    var t = normalize(type);
+    var s = String(surface || '');
+    var c = context || {};
+    var ds = c.deliveryStatus || '';
+    if (t === 'delivery') {
+      if (s === 'merchant' && status === 'ready') return { label: 'Atur Pengantaran', authority: 'branch_manager', kind: 'dispatch' };
+      if (s === 'merchant' && status === 'out_for_delivery') return { label: 'Menunggu Driver', authority: 'driver', kind: 'wait' };
+      if (s === 'driver' && ds === 'on_delivery') return { label: 'Selesai Antar', authority: 'driver', kind: 'complete_delivery' };
+      if (s === 'driver' && ds === 'picked_up') return { label: 'Mulai Antar', authority: 'driver', kind: 'start_delivery' };
+      if (s === 'driver' && (ds === 'assigned' || status === 'ready')) return { label: 'Ambil Pesanan', authority: 'driver', kind: 'pickup' };
+    }
+    if (t === 'pickup' && s === 'merchant' && status === 'ready') {
+      return { label: 'Tunggu Pelanggan', authority: 'fulfillment_handoff', kind: 'wait' };
+    }
+    if (t === 'dine_in' && s === 'merchant' && status === 'ready') {
+      return { label: 'Siap Disajikan', authority: 'dine_in_operational', kind: 'serve' };
+    }
+    if (t === 'reservation' && s === 'merchant' && status === 'confirmed') {
+      return { label: 'Tunggu Kedatangan', authority: 'branch_operational', kind: 'wait' };
+    }
+    return null;
+  }
+
   function neutralState() {
     return {
       tableNumber: '',
@@ -81,9 +258,6 @@
     return base;
   }
 
-  // ── Environment ──
-  // Satu objek per tipe. `state` miliknya sendiri; `listeners` melacak listener
-  // miliknya sendiri supaya bisa dilepas saat unmount.
   function createEnvironment(type) {
     var t = normalize(type);
 
@@ -101,8 +275,18 @@
         return isSchedulable(t);
       },
 
-      // Listener milik environment ini. Dilepas semua saat unmount, jadi tidak
-      // ada handler tipe lama yang masih hidup setelah tipe berganti.
+      getPresentation: function () {
+        return getPresentation(t);
+      },
+
+      project: function (status, context) {
+        return project(t, status, context);
+      },
+
+      action: function (surface, status, context) {
+        return action(t, surface, status, context);
+      },
+
       on: function (target, event, handler, options) {
         if (!target || typeof target.addEventListener !== 'function') return handler;
         target.addEventListener(event, handler, options);
@@ -114,7 +298,7 @@
         for (var i = env.listeners.length - 1; i >= 0; i--) {
           var l = env.listeners[i];
           if (l.target === target && l.event === event && (!handler || l.handler === handler)) {
-            try { l.target.removeEventListener(l.event, l.handler, l.options); } catch (e) { /* sudah lepas */ }
+            try { l.target.removeEventListener(l.event, l.handler, l.options); } catch (e) {}
             env.listeners.splice(i, 1);
           }
         }
@@ -123,12 +307,11 @@
       teardownListeners: function () {
         for (var i = 0; i < env.listeners.length; i++) {
           var l = env.listeners[i];
-          try { l.target.removeEventListener(l.event, l.handler, l.options); } catch (e) { /* sudah lepas */ }
+          try { l.target.removeEventListener(l.event, l.handler, l.options); } catch (e) {}
         }
         env.listeners.length = 0;
       },
 
-      // State sementara dibuang; environment kembali ke bentuk bersihnya.
       reset: function () {
         env.state = defaultState(t);
         return env.state;
@@ -145,8 +328,6 @@
         return env.state;
       },
 
-      // Validasi khusus tipe ini. Dipanggil pipeline order bersama; tipe lain
-      // tidak pernah ikut memeriksa.
       validate: function (ctx) {
         ctx = ctx || {};
         if (t === 'delivery') {
@@ -168,16 +349,12 @@
           }
           return { ok: true, message: '' };
         }
-        // reservation
         if (!env.state.reservationDate) {
           return { ok: false, message: 'Silakan pilih tanggal reservasi terlebih dahulu.' };
         }
         return { ok: true, message: '' };
       },
 
-      // Field yang boleh masuk payload. Field milik tipe lain SELALU netral,
-      // walaupun state environment ini ternyata terisi — jadi tidak ada jalan
-      // nilai fulfillment bocor ke tipe lain.
       payloadFields: function () {
         var ownsTable = env.owns('table');
         var ownsReservation = env.owns('reservation');
@@ -210,7 +387,6 @@
     return env;
   }
 
-  // ── Registry & switching ──
   var registry = null;
   var active = null;
 
@@ -230,21 +406,12 @@
     return active;
   }
 
-  /**
-   * Ganti environment aktif.
-   *
-   * Urutannya penting: environment LAMA di-unmount lebih dulu (listener dilepas,
-   * state sementaranya dibuang), baru yang baru di-mount. Jadi tidak ada listener
-   * atau nilai sisa dari tipe sebelumnya yang masih hidup.
-   */
   function switchTo(nextType) {
     var reg = getRegistry();
     var next = reg[normalize(nextType)];
     var prev = getActive();
 
     if (prev === next) {
-      // Tipe sama: tidak ada yang di-unmount, state tetap. Berbeda dengan
-      // berpindah tipe, di sini nilai yang sudah diisi tamu harus bertahan.
       next.mounted = true;
       return next;
     }
@@ -260,8 +427,6 @@
     return reg[normalize(type)].state;
   }
 
-  // Dipakai tes dan dipakai checkout saat memuat ulang halaman: kembalikan semua
-  // environment ke keadaan bersih tanpa mengubah tipe aktif.
   function resetAll() {
     var reg = getRegistry();
     for (var i = 0; i < TYPES.length; i++) {
@@ -273,8 +438,13 @@
   window.Xentra = window.Xentra || {};
   window.Xentra.FulfillmentEnvironments = {
     TYPES: TYPES,
+    PRESENTATIONS: PRESENTATIONS,
     normalize: normalize,
     isSchedulable: isSchedulable,
+    getPresentation: getPresentation,
+    getStatusLabel: getStatusLabel,
+    project: project,
+    action: action,
     create: createEnvironment,
     getActive: getActive,
     getState: getState,

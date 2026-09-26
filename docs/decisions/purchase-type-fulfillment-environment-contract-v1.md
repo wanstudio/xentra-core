@@ -1,6 +1,6 @@
 # Xentra — Purchase Type / Fulfillment Environment Contract v1
 
-**Status: DRAFT — REVIEW REQUIRED BEFORE IMPLEMENTATION**
+**Status: LOCKED — BUSINESS / UX / ARCHITECTURE CONTRACT v1**
 **Date:** 2026-09-26
 **Scope:** Commerce fulfillment UX, operational workflow, phase model, human-facing labels, and authority boundaries
 
@@ -19,7 +19,7 @@ A Fulfillment Environment is the operational experience for one purchase type. I
 
 The environments are siblings, not variants that inherit one universal operational UI flow.
 
-This contract is intentionally a **review draft**. It is not implementation authorization until the business/UX direction is approved.
+This contract was cross-referenced against the current Xentra source and current restaurant SaaS fulfillment patterns, then approved for implementation on 2026-09-26.
 
 ## 2. Core Principle
 
@@ -90,21 +90,22 @@ The current purchase-type set is:
 
 Each environment is independent at the UX/operational layer.
 
-### A. DINE-IN Environment — Proposed Human Flow
+### A. DINE-IN Environment — Locked Human Flow
 
 Real-world mental model:
 
-`Datang → Pesanan diterima → Makan → Bayar → Selesai`
+`Datang → Pesanan diterima → Disiapkan → Disajikan → Selesai`
 
-Proposed operational phases:
+Primary operational phases:
 
 | Phase | Human label | Primary authority |
 |---|---|---|
-| 1 | Menunggu diterima | Branch Manager / authorized operational staff |
-| 2 | Sedang diproses | Kitchen / operational staff |
-| 3 | Sedang menikmati | Active Dining Session |
-| 4 | Siap diselesaikan | Cashier/POS + operational boundary |
-| 5 | Selesai | Authorized staff according to Dining Session contract |
+| 1 | Pesanan diterima | Branch Manager / authorized operational staff |
+| 2 | Sedang disiapkan | Kitchen / operational staff |
+| 3 | Siap disajikan | Kitchen / operational staff |
+| 4 | Pesanan selesai | Authorized Dining Session actor |
+
+`Sedang menikmati` adalah context dari Active Dining Session, bukan primary phase. Payment settlement juga merupakan financial event, bukan primary fulfillment phase.
 
 Important:
 - Table identity and Dining Session remain Dine-in-specific concerns.
@@ -165,26 +166,50 @@ Important:
 - Delivery completion MUST NOT be expressed as a Dine-in-style session completion.
 - Delivery MUST NOT require Cashier to operate delivery progress.
 
-### D. RESERVATION Environment — Proposed Human Flow
+### D. RESERVATION Environment — Locked Human Flow
 
 Real-world mental model:
 
-`Buat reservasi → Dikonfirmasi → Menunggu kedatangan → Tamu datang → Selesai / masuk Dine-in`
+`Buat reservasi → Dikonfirmasi → Menunggu kedatangan`
 
-Proposed operational phases:
+Primary operational phases:
 
 | Phase | Human label | Primary authority |
 |---|---|---|
-| 1 | Menunggu konfirmasi | Reservation/Branch Manager |
-| 2 | Sudah dikonfirmasi | Reservation/Branch Manager |
-| 3 | Menunggu kedatangan | Reservation/Branch Manager |
-| 4 | Tamu sudah datang | Branch operational staff |
-| 5 | Dialihkan ke Dine-in | Dine-in operational boundary |
+| 1 | Reservasi dibuat | Reservation / Branch Manager |
+| 2 | Reservasi dikonfirmasi | Reservation / Branch Manager |
+| 3 | Menunggu kedatangan | Reservation / Branch Manager |
+
+`Tamu datang` adalah arrival/check-in event. `Masuk Dine-in` adalah explicit handoff ke Dine-in Environment, bukan primary phase Reservation.
 
 Important:
 - Reservation is not an active Dine-in session merely because a reservation exists.
 - When the customer actually arrives, the reservation may hand off into the Dine-in environment according to the approved reservation contract.
 - Reservation UI must not inherit Delivery or Pickup phases.
+
+## 5.1 Phase, Substate, Event, Timing, and Exception Separation
+
+A primary phase is the smallest set of user-facing steps that meaningfully changes the operator's mental model.
+
+The following MUST NOT automatically become primary phases:
+- driver assignment;
+- customer arrival;
+- payment settlement;
+- cash handover;
+- ETA/time windows;
+- internal audit events.
+
+These belong to substates, actions, timing/context, financial state, handoff, or activity history as appropriate.
+
+Conceptual model:
+
+`Fulfillment Environment → Primary Phases + Substates/Actions + Timing + Exceptions + Handoffs + Activity History`
+
+Timing is independent from phase. A scheduled order may wait for its processing window without inventing additional UI phases.
+
+Exceptions are side paths from the normal flow, not forced into the happy-path phase list.
+
+Handoffs between environments are explicit business events.
 
 ## 6. Human Labeling Rule
 
@@ -376,33 +401,40 @@ Exceptions MUST be defined in the environment where they occur rather than added
 
 ## 15. Non-Goals
 
-This contract does NOT authorize:
-- implementation of new APIs;
-- database migration;
-- replacement of the existing Order model;
-- creation of duplicate Orders per environment;
-- creation of duplicate payment records per environment;
-- creation of separate inventories per environment;
-- immediate replacement of the existing Order State Machine;
-- implementation of Driver App/COD in this review step;
-- changing already locked Dine-in rules without an explicit new decision.
+This contract does not authorize:
+- replacing the canonical Commerce Order;
+- duplicate Orders, payment ledgers, or inventory pools per environment;
+- a second competing global Order/fulfillment state machine;
+- changing already locked Dine-in rules;
+- inventing new purchase types;
+- treating UI projection as authorization or domain authority.
 
-## 16. Review Questions Before Implementation
+Driver execution/COD implementation remains subject to the existing Driver + COD contract and its own vertical implementation boundary. This contract defines how that delivery environment is represented; it does not invent a new Driver identity system.
 
-The following points require explicit review before implementation:
+## 16. Cross-Reference Result
 
-1. Are **Dine-in / Pickup / Delivery / Reservation** the correct independent Fulfillment Environments?
-2. Are the proposed human-facing phases understandable to real branch staff?
-3. Should any environment have fewer or more phases?
-4. Which role owns each environment-specific completion action?
-5. Which phases should be visible to Customer, Merchant, Cashier, Driver, and Owner?
-6. Which exception cases are mandatory for MVP?
-7. Should any environment introduce an additional subflow without becoming a new global state machine?
-8. What exact technical representation should be used underneath the environment projection?
+The final cross-reference found no conceptual blocker.
 
-## 17. Implementation Rule After Approval
+Current official SaaS references reviewed:
+- Square Order Manager separates fulfillment status, order type/source, payment status, scheduling/fulfillment timing, and activity history.
+- Toast Orders Hub separates approval/preparation/ready/completion from first-party driver assignment and delivery progress, with role permissions around delivery completion.
 
-Only after this review is approved should implementation proceed.
+Xentra therefore adopts the same architectural separation at the level appropriate to its own domain:
+- primary phase ≠ every operational event;
+- timing ≠ phase;
+- payment ≠ fulfillment;
+- activity history ≠ phase;
+- exceptions are side paths;
+- environment handoffs are explicit;
+- authorization remains server-side.
+
+Reference sources:
+- https://squareup.com/help/us/en/article/6923-pickup-orders-on-square-point-of-sale
+- https://developer.squareup.com/docs/orders-api/fulfillments
+- https://support.toasttab.com/en/article/Order-Hub-Overview
+- https://support.toasttab.com/en/article/Managing-Off-Premise-Orders-with-Orders-Hub
+
+## 17. Implementation Rule
 
 Implementation MUST prefer:
 
@@ -416,4 +448,16 @@ Implementation MUST prefer:
 
 over a universal operational state machine that tries to serve every purchase type.
 
-**Current status remains DRAFT until explicit approval.**
+**Status: LOCKED — implementation authorized.**
+
+Implementation record — current HEAD `ec480f60ff00fdee39031b7a2ecdb401c661e016c`:
+- Fulfillment Environment projection extended in `apps/customer-pwa/assets/js/core/fulfillment-environments.js`.
+- Customer order tracking wired to environment-specific phases/labels.
+- Merchant Order Center wired to environment-specific status labels.
+- Backend OrderStateMachine now rejects transitions that do not belong to the order's fulfillment environment.
+- Delivery Job lifecycle now keeps `delivered` separate from canonical Order `completed`.
+- Regression coverage added for environment isolation, projections, transition compatibility, and Delivery completion semantics.
+
+Verification constraint: full `npm test` was not run in this environment because the available runtime could not resolve GitHub/DNS for a fresh repository checkout. Source-level verification was performed through the repository files and targeted contract tests were added.
+
+Any later change to environment phases, completion authority, handoff semantics, or shared-vs-independent boundaries requires a new explicit decision.

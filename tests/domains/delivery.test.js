@@ -94,7 +94,7 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
   const orderNumber = `ORD-DEL-${Date.now()}`;
   db.prepare(`
     INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
-    VALUES (?, ?, 'brand_del', 'branch_del', 'Pak Joko', '62812345678', 'delivery', 'customer_app', 50000, 50000, 'midtrans', 'confirmed')
+    VALUES (?, ?, 'brand_del', 'branch_del', 'Pak Joko', '62812345678', 'delivery', 'customer_app', 50000, 50000, 'midtrans', 'ready')
   `).run(orderId, orderNumber);
 
   let assignedEvent = null;
@@ -130,29 +130,61 @@ test('Delivery 3 — Branch Driver Provider: assigns internal driver and advance
   assert.ok(assignedEvent);
   assert.strictEqual(assignedEvent.payload.driver_name, 'Budi Kurir');
 
-  // 2. Transition status: on_delivery
+  // 2. Driver pickup
   DeliveryDispatchService.updateStatus({
     order_id: orderId,
-    status: DeliveryModel.STATUS.ON_DELIVERY
+    status: DeliveryModel.STATUS.PICKED_UP,
+    actor_id: 'driver_1'
+  });
+
+  const pickedUpRecord = DeliveryDispatchService.getDelivery(orderId);
+  assert.strictEqual(pickedUpRecord.status, 'picked_up');
+
+  // 3. Driver starts delivery: Delivery Job + canonical Order diverge correctly
+  DeliveryDispatchService.updateStatus({
+    order_id: orderId,
+    status: DeliveryModel.STATUS.ON_DELIVERY,
+    actor_id: 'driver_1'
   });
 
   const onDelRecord = DeliveryDispatchService.getDelivery(orderId);
   assert.strictEqual(onDelRecord.status, 'on_delivery');
+  const onDelOrder = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
+  assert.strictEqual(onDelOrder.status, 'out_for_delivery');
 
-  // 3. Complete Delivery: delivered
+  // 4. Driver completes delivery: Delivery Job becomes delivered,
+  // canonical Commerce Order becomes completed (never delivered).
   DeliveryDispatchService.updateStatus({
     order_id: orderId,
-    status: DeliveryModel.STATUS.DELIVERED
+    status: DeliveryModel.STATUS.DELIVERED,
+    actor_id: 'driver_1'
   });
 
   const deliveredRecord = DeliveryDispatchService.getDelivery(orderId);
   assert.strictEqual(deliveredRecord.status, 'delivered');
 
-  // Verify order status advanced to delivered
   const orderRecord = db.prepare('SELECT status FROM orders WHERE id = ?').get(orderId);
-  assert.strictEqual(orderRecord.status, 'delivered');
+  assert.strictEqual(orderRecord.status, 'completed');
 
   // Verify Event
   assert.ok(completedEvent);
   assert.strictEqual(completedEvent.payload.order_id, orderId);
+});
+
+test('Delivery 4 — driver assignment rejects non-delivery fulfillment environments', () => {
+  const orderId = 'ord_test_pickup_driver_' + Date.now();
+  db.prepare(`
+    INSERT INTO orders (id, order_number, brand_id, branch_id, customer_name, customer_phone, order_type, order_channel, subtotal, grand_total, payment_method, status)
+    VALUES (?, ?, 'brand_del', 'branch_del', 'Siti', '62812345678', 'pickup', 'customer_app', 30000, 30000, 'cash', 'ready')
+  `).run(orderId, 'ORD-PICKUP-' + Date.now());
+
+  assert.throws(
+    () => DeliveryDispatchService.assign({
+      order_id: orderId,
+      provider_type: DeliveryModel.PROVIDER_TYPES.BRANCH_DRIVER,
+      driver_name: 'Budi Kurir',
+      driver_phone: '081299998888'
+    }),
+    /Hanya Order Fulfillment Environment delivery/
+  );
 });

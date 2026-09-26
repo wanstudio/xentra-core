@@ -1,5 +1,6 @@
 const { OrderRepository } = require('../../core/data/repositories');
 const { isConsumingOrderStatus } = require('../../core/domain/OrderStatusContract');
+const FulfillmentEnvironmentService = require('../../domains/commerce/services/FulfillmentEnvironmentService');
 const crypto = require('crypto');
 
 const orderRepository = new OrderRepository();
@@ -62,6 +63,15 @@ class OrderStateMachine {
           `Perubahan status pesanan tidak valid: dari "${currentStatus}" ke "${target_status}".`
         );
       }
+
+      // Fulfillment Environment boundary: the same canonical Order statuses
+      // may represent different operational meanings by purchase type. Never
+      // allow a transition that belongs to another environment.
+      FulfillmentEnvironmentService.assertTransition(
+        order.order_type || 'delivery',
+        currentStatus,
+        target_status
+      );
 
       if (target_status === 'cancelled' || target_status === 'rejected' || target_status === 'timeout') {
         const settledPayment = orderRepository.findPaymentSettlement(order_id);
