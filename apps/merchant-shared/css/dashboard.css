@@ -4278,7 +4278,7 @@ input[type="file"].x-input,
 
 @media (max-width: 768px) {
   body.x-merchant-app {
-    padding-bottom: 174px;
+    padding-bottom: 84px;
     background: #ffffff;
   }
 
@@ -4286,9 +4286,8 @@ input[type="file"].x-input,
     position: sticky;
     top: 0;
     z-index: 100;
-    min-height: 248px;
     padding: 0;
-    background: #e9e9e9;
+    background: #e8e8ea;
     border: 0;
     box-shadow: none;
     backdrop-filter: none;
@@ -4299,38 +4298,38 @@ input[type="file"].x-input,
   .x-mobile-topbar {
     display: block;
     width: 100%;
-    padding: 100px 35px 16px;
+    padding: max(12px, env(safe-area-inset-top)) 16px 12px;
     box-sizing: border-box;
-    background: #e9e9e9;
+    background: #e8e8ea;
   }
 
   .x-mobile-topbar-main {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     width: 100%;
   }
 
   .x-mobile-branch-pill {
     min-width: 0;
     flex: 1 1 auto;
-    height: 64px;
-    padding: 0 18px;
+    height: 42px;
+    padding: 0 14px 0 8px;
     display: flex;
     align-items: center;
-    gap: 14px;
-    border-radius: 34px;
+    gap: 10px;
+    border-radius: 21px;
     background: #ffffff;
-    color: #171717;
+    color: #111111;
     box-sizing: border-box;
-    box-shadow: 0 1px 1px rgba(0,0,0,.02);
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
   }
 
   .x-mobile-branch-logo {
-    width: 34px;
-    height: 34px;
-    flex: 0 0 34px;
-    border-radius: 9px;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
+    border-radius: 6px;
     object-fit: cover;
   }
 
@@ -4339,132 +4338,129 @@ input[type="file"].x-input,
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 24px;
-    line-height: 1;
+    font-size: 15px;
+    line-height: 1.2;
     font-weight: 700;
-    letter-spacing: -.4px;
+    letter-spacing: -.2px;
   }
 
   .x-mobile-topbar-actions {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
   }
 
   .x-mobile-circle-btn {
     position: relative;
-    width: 62px;
-    height: 62px;
+    width: 42px;
+    height: 42px;
     border: 0;
     border-radius: 50%;
     background: #ffffff;
-    color: #171717;
+    color: #111111;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     padding: 0;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
   }
 
   .x-mobile-circle-btn svg {
-    width: 30px;
-    height: 30px;
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
   }
 
   .x-mobile-notification-badge {
     position: absolute;
-    top: -5px;
-    right: -2px;
-    min-width: 30px;
-    height: 30px;
-    padding: 0 7px;
-    border-radius: 15px;
+    top: -3px;
+    right: -3px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: #ef3340;
     color: #ffffff;
-    font-size: 15px;
+    font-size: 11px;
     font-weight: 800;
     line-height: 1;
+    box-sizing: border-box;
   }
 
   .x-mobile-profile-icon {
-    width: 31px;
-    height: 31px;
+    width: 22px;
+    height: 22px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
   }
 
   .x-mobile-profile-icon svg {
-    width: 34px;
-    height: 34px;
-  }
-
-  .x-mobile-profile-icon.has-initial {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    background: #171717;
-    color: #ffffff;
-    font-size: 17px;
-    font-weight: 800;
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
   }
 
   .x-mobile-operational-row {
-    margin-top: 14px;
+    margin-top: 10px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
+    gap: 10px;
   }
 
   .x-mobile-status-control {
-    height: 54px;
-    min-width: 155px;
+    height: 36px;
+    min-width: 105px;
     border: 0;
-    border-radius: 28px;
-    padding: 0 12px;
+    border-radius: 18px;
+    padding: 0 12px 0 5px;
     display: inline-flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 11px;
+    gap: 8px;
     background: #ffffff;
-    color: #242424;
-    font-size: 20px;
+    color: #111111;
+    font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
   }
 
   .x-mobile-online-control {
     margin-left: auto;
     justify-content: flex-end;
-    min-width: 242px;
-    gap: 9px;
+    min-width: 155px;
+    padding: 0 5px 0 12px;
+    gap: 8px;
   }
 
   .x-mobile-switch {
     position: relative;
-    width: 54px;
-    height: 34px;
-    flex: 0 0 54px;
-    border-radius: 18px;
+    width: 38px;
+    height: 22px;
+    flex: 0 0 38px;
+    border-radius: 11px;
     background: #c8c8c8;
-    transition: none;
+    transition: background .15s ease;
   }
 
   .x-mobile-switch span {
     position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 28px;
-    height: 28px;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     background: #ffffff;
-    box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    box-shadow: 0 1px 2px rgba(0,0,0,.25);
+    transition: left .15s ease;
   }
 
   .x-mobile-switch.is-on {
@@ -4472,55 +4468,53 @@ input[type="file"].x-input,
   }
 
   .x-mobile-switch.is-on span {
-    left: 23px;
+    left: 18px;
   }
 
   .x-mobile-switch.is-off span {
-    left: 3px;
+    left: 2px;
   }
 
   .x-merchant-mobile-nav {
     position: fixed;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(5, 1fr);
     left: 0;
     right: 0;
     bottom: 0;
     z-index: 200;
-    height: 172px;
-    min-height: 172px;
-    padding: 13px 28px calc(13px + env(safe-area-inset-bottom));
+    height: 66px;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
     box-sizing: border-box;
     background: #ffffff;
     border: 0;
-    border-radius: 30px 30px 0 0;
-    box-shadow: 0 -5px 24px rgba(0,0,0,.09);
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -4px 18px rgba(0,0,0,.07);
     backdrop-filter: none;
   }
 
   .x-merchant-mobile-nav-item {
     position: relative;
     min-width: 0;
-    min-height: 126px;
     border: 0;
     border-radius: 0;
     background: transparent;
-    color: #171717;
+    color: #111111;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    padding: 12px 2px 0;
+    gap: 4px;
+    padding: 4px 2px 0;
     cursor: pointer;
-    font-size: 20px;
+    font-size: 11px;
     line-height: 1.1;
     font-weight: 700;
   }
 
   .x-merchant-mobile-nav-item svg {
-    width: 31px;
-    height: 31px;
+    width: 24px;
+    height: 24px;
     color: currentColor;
     fill: currentColor;
     overflow: visible;
@@ -4534,28 +4528,28 @@ input[type="file"].x-input,
   .x-merchant-mobile-nav-item.active::before {
     content: "";
     position: absolute;
-    top: -13px;
-    left: 12%;
-    right: 12%;
-    height: 6px;
-    border-radius: 0 0 8px 8px;
+    top: -6px;
+    left: calc(50% - 22px);
+    width: 44px;
+    height: 4px;
+    border-radius: 0 0 4px 4px;
     background: #08a94f;
   }
 
   .x-mobile-nav-badge {
     position: absolute;
-    top: 13px;
-    right: 15%;
-    min-width: 30px;
-    height: 30px;
-    padding: 0 7px;
-    border-radius: 16px;
+    top: 2px;
+    right: calc(50% - 18px);
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
     background: #ef3340;
     color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 15px;
+    font-size: 10px;
     line-height: 1;
     font-weight: 800;
     box-sizing: border-box;
@@ -4566,46 +4560,6 @@ input[type="file"].x-input,
   }
 }
 
-@media (max-width: 420px) {
-  .x-mobile-topbar {
-    padding-left: 35px;
-    padding-right: 35px;
-  }
-
-  .x-mobile-branch-pill span {
-    font-size: 21px;
-  }
-
-  .x-mobile-circle-btn {
-    width: 58px;
-    height: 58px;
-  }
-
-  .x-mobile-operational-row {
-    gap: 8px;
-  }
-
-  .x-mobile-status-control {
-    min-width: 0;
-    font-size: 18px;
-  }
-
-  .x-mobile-online-control {
-    min-width: 0;
-    flex: 1 1 auto;
-  }
-
-  .x-merchant-mobile-nav {
-    padding-left: 14px;
-    padding-right: 14px;
-  }
-
-  .x-merchant-mobile-nav-item {
-    font-size: 16px;
-  }
-}
-
-
 /* Mobile Account — reference-driven account screen */
 .x-mobile-account-page { display:none; }
 @media(max-width:768px){
@@ -4615,59 +4569,39 @@ input[type="file"].x-input,
     z-index:500;
     display:none;
     overflow-y:auto;
-    background:#f3f3f5;
-    color:#222;
+    background:#f5f5f7;
+    color:#111111;
     font-family:"Plus Jakarta Sans",sans-serif;
   }
   body.x-mobile-account-open .x-mobile-account-page{display:block;}
   body.x-mobile-account-open .x-dash-layout,
   body.x-mobile-account-open .x-merchant-mobile-nav{display:none !important;}
-  .x-mobile-account-statusbar-spacer{height:78px;}
-  .x-mobile-account-header{height:74px;padding:0 28px;display:flex;align-items:center;gap:10px;box-sizing:border-box;}
-  .x-mobile-account-header h1{margin:0;font-size:28px;line-height:1;font-weight:800;letter-spacing:-.6px;}
-  .x-mobile-account-back{width:44px;height:44px;padding:0;border:0;background:transparent;display:flex;align-items:center;justify-content:center;color:#4b4b4b;}
-  .x-mobile-account-back svg{width:34px;height:34px;}
-  .x-mobile-account-content{padding:28px 27px 46px;box-sizing:border-box;}
-  .x-mobile-account-profile-card{width:100%;min-height:174px;padding:26px 25px;border:0;border-radius:30px;background:#fff;display:flex;align-items:center;justify-content:space-between;text-align:left;color:#222;}
-  .x-mobile-account-profile-copy{min-width:0;display:flex;flex-direction:column;gap:7px;}
-  .x-mobile-account-name-row{display:flex;align-items:center;gap:10px;min-width:0;}
-  .x-mobile-account-name-row strong{font-size:27px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .x-mobile-account-name-row span{flex:0 0 auto;padding:5px 11px;border-radius:18px;background:#e63248;color:#fff;font-size:17px;font-weight:800;}
-  .x-mobile-account-profile-copy>span:not(.x-mobile-account-role){font-size:21px;line-height:1.15;color:#5b5b5b;}
-  .x-mobile-account-chevron{font-size:44px;line-height:1;font-weight:300;color:#4e4e4e;}
-  .x-mobile-account-profile-chevron{width:58px;height:58px;border-radius:50%;background:#dfffe1;color:#0a8e35;display:flex;align-items:center;justify-content:center;font-size:48px;flex:0 0 58px;}
-  .x-mobile-account-section{margin-top:48px;}
-  .x-mobile-account-section h2{margin:0 0 24px;padding:0 27px;font-size:26px;line-height:1.1;font-weight:800;letter-spacing:-.4px;}
-  .x-mobile-account-list-card{width:100%;border-radius:30px;background:#fff;overflow:hidden;}
-  .x-mobile-account-single-row{min-height:88px;border:1px solid #ddd;display:flex;align-items:center;padding:0 28px;box-sizing:border-box;text-align:left;}
-  .x-mobile-account-leading-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex:0 0 36px;color:#4d4d4d;}
-  .x-mobile-account-leading-icon svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
-  .x-mobile-account-single-row .x-mobile-account-leading-icon svg{fill:currentColor;stroke:currentColor;}
-  .x-mobile-account-row-label{margin-left:22px;min-width:0;flex:1;font-size:24px;line-height:1.2;font-weight:700;}
-  .x-mobile-account-row{width:100%;min-height:92px;padding:0 27px;border:0;border-bottom:1px solid #dedede;background:#fff;display:flex;align-items:center;text-align:left;color:#2d2d2d;}
+  .x-mobile-account-statusbar-spacer{height:max(16px, env(safe-area-inset-top));}
+  .x-mobile-account-header{height:52px;padding:0 16px;display:flex;align-items:center;gap:12px;box-sizing:border-box;}
+  .x-mobile-account-header h1{margin:0;font-size:20px;line-height:1;font-weight:700;letter-spacing:-.3px;color:#111111;}
+  .x-mobile-account-back{width:36px;height:36px;padding:0;border:0;background:transparent;display:flex;align-items:center;justify-content:center;color:#111111;cursor:pointer;}
+  .x-mobile-account-back svg{width:24px;height:24px;}
+  .x-mobile-account-content{padding:16px 16px 36px;box-sizing:border-box;max-width:600px;margin:0 auto;}
+  .x-mobile-account-profile-card{width:100%;padding:18px 16px;border:0;border-radius:18px;background:#ffffff;display:flex;align-items:center;justify-content:space-between;text-align:left;color:#111111;box-shadow:0 1px 3px rgba(0,0,0,.03);cursor:pointer;}
+  .x-mobile-account-profile-copy{min-width:0;display:flex;flex-direction:column;gap:4px;}
+  .x-mobile-account-name-row{display:flex;align-items:center;gap:8px;min-width:0;}
+  .x-mobile-account-name-row strong{font-size:17px;line-height:1.2;font-weight:700;color:#111111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .x-mobile-account-role-divider{color:#d1d5db;font-size:14px;font-weight:300;}
+  .x-mobile-account-name-row span#mobile-account-role{flex:0 0 auto;padding:2px 8px;border-radius:10px;background:#e5283b;color:#ffffff;font-size:11px;font-weight:700;line-height:1.2;}
+  .x-mobile-account-profile-copy>span:not(.x-mobile-account-role-divider):not(#mobile-account-role){font-size:13px;line-height:1.3;color:#666666;}
+  .x-mobile-account-chevron{color:#999999;display:flex;align-items:center;}
+  .x-mobile-account-profile-chevron{width:36px;height:36px;border-radius:50%;background:#e8f9ed;color:#0da03d;display:flex;align-items:center;justify-content:center;flex:0 0 36px;}
+  .x-mobile-account-section{margin-top:24px;}
+  .x-mobile-account-section h2{margin:0 0 10px 4px;padding:0;font-size:15px;line-height:1.2;font-weight:700;color:#111111;letter-spacing:-.2px;}
+  .x-mobile-account-list-card{width:100%;border-radius:18px;background:#ffffff;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.03);}
+  .x-mobile-account-single-row{min-height:52px;border:0;display:flex;align-items:center;padding:0 16px;box-sizing:border-box;text-align:left;width:100%;background:#ffffff;cursor:pointer;}
+  .x-mobile-account-leading-icon{width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex:0 0 22px;color:#222222;}
+  .x-mobile-account-leading-icon svg{width:20px;height:20px;}
+  .x-mobile-account-row-label{margin-left:14px;min-width:0;flex:1;font-size:14px;line-height:1.2;font-weight:600;color:#111111;}
+  .x-mobile-account-row{width:100%;height:52px;padding:0 16px;border:0;border-bottom:1px solid #f2f2f4;background:#ffffff;display:flex;align-items:center;text-align:left;color:#111111;cursor:pointer;}
   .x-mobile-account-row:last-child{border-bottom:0;}
-  .x-mobile-account-row .x-mobile-account-row-label{font-size:22px;}
-  .x-mobile-account-new{margin-left:auto;margin-right:18px;padding:3px 7px;border-radius:10px;background:#078c2c;color:#fff;font-size:14px;font-weight:800;}
-  .x-mobile-account-value{margin-left:auto;margin-right:20px;color:#666;font-size:18px;}
-  .x-mobile-account-row .x-mobile-account-chevron{margin-left:12px;}
-  .x-mobile-account-logout{width:100%;height:82px;margin-top:54px;border:2px solid #df2942;border-radius:42px;background:transparent;color:#cf1836;font-size:25px;font-weight:800;}
-}
-@media(max-width:420px){
-  .x-mobile-account-statusbar-spacer{height:52px;}
-  .x-mobile-account-header{height:68px;padding:0 22px;}
-  .x-mobile-account-header h1{font-size:24px;}
-  .x-mobile-account-content{padding:22px 20px 34px;}
-  .x-mobile-account-profile-card{min-height:150px;padding:20px;border-radius:27px;}
-  .x-mobile-account-name-row strong{font-size:22px;}
-  .x-mobile-account-name-row span{font-size:14px;padding:4px 9px;}
-  .x-mobile-account-profile-copy>span:not(.x-mobile-account-role){font-size:18px;}
-  .x-mobile-account-profile-chevron{width:50px;height:50px;flex-basis:50px;font-size:42px;}
-  .x-mobile-account-section{margin-top:38px;}
-  .x-mobile-account-section h2{font-size:22px;padding:0 20px;margin-bottom:18px;}
-  .x-mobile-account-single-row{min-height:76px;padding:0 20px;}
-  .x-mobile-account-row{min-height:78px;padding:0 20px;}
-  .x-mobile-account-row-label,.x-mobile-account-row .x-mobile-account-row-label{font-size:19px;}
-  .x-mobile-account-leading-icon{width:32px;height:32px;flex-basis:32px;}
-  .x-mobile-account-leading-icon svg{width:26px;height:26px;}
-  .x-mobile-account-logout{height:68px;margin-top:42px;font-size:21px;}
+  .x-mobile-account-new{margin-left:auto;margin-right:8px;padding:2px 7px;border-radius:6px;background:#00880d;color:#ffffff;font-size:11px;font-weight:700;}
+  .x-mobile-account-value{margin-left:auto;margin-right:8px;color:#888888;font-size:13px;}
+  .x-mobile-account-logout{width:100%;height:48px;margin-top:28px;border:1.5px solid #e5283b;border-radius:24px;background:#ffffff;color:#e5283b;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s ease;}
+  .x-mobile-account-logout:active{background:#fde8ea;}
 }

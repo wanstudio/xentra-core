@@ -264,11 +264,7 @@
     if (topbarBrandName) topbarBrandName.textContent = user.branch_name || user.brand_name || 'MyBangjo';
     var desktopTopbarBrandName = $('desktop-topbar-brand-name');
     if (desktopTopbarBrandName) desktopTopbarBrandName.textContent = user.brand_name || 'Bangjo Resto';
-    var mobileAvatar = $('mobile-user-avatar');
-    if (mobileAvatar && user.full_name) {
-      mobileAvatar.textContent = user.full_name.charAt(0).toUpperCase();
-      mobileAvatar.classList.add('has-initial');
-    }
+
 
     // Branch context is locked to the authenticated branch; no switcher affordance.
     var branchSelectorWrap = $('x-branch-selector');

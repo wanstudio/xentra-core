@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — tokens, toast, action-menu, crop editor, shell styles -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.1">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.2">
 </head>
 <body class="x-merchant-app">
   <div class="x-dash-layout">
@@ -104,12 +104,12 @@
             </div>
             <div class="x-mobile-topbar-actions">
               <button type="button" class="x-mobile-circle-btn x-mobile-notification-btn" id="btn-notifications" aria-label="Notifikasi" title="Notifikasi">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17h16l-1.8-2.1V10a6.2 6.2 0 0 0-12.4 0v4.9L4 17Z" fill="currentColor"></path><path d="M9.5 20h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4-8 5-8-5V6l8 5 8-5v2z"/></svg>
                 <span class="x-mobile-notification-badge" id="mobile-notification-count">12</span>
               </button>
               <button type="button" class="x-mobile-circle-btn x-mobile-profile-btn" id="mobile-user-profile" aria-label="Profil">
                 <span class="x-mobile-profile-icon" id="mobile-user-avatar">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="currentColor"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6" fill="currentColor"></path></svg>
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                 </span>
               </button>
             </div>
@@ -1492,7 +1492,7 @@
     <div class="x-mobile-account-statusbar-spacer"></div>
     <header class="x-mobile-account-header">
       <button type="button" class="x-mobile-account-back" id="btn-mobile-account-back" aria-label="Kembali">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       </button>
       <h1>Akun</h1>
     </header>
@@ -1502,22 +1502,27 @@
         <div class="x-mobile-account-profile-copy">
           <div class="x-mobile-account-name-row">
             <strong id="mobile-account-name">Pemilik Toko</strong>
+            <span class="x-mobile-account-role-divider" aria-hidden="true">|</span>
             <span id="mobile-account-role">Pemilik</span>
           </div>
           <span id="mobile-account-email">-</span>
           <span id="mobile-account-phone">-</span>
         </div>
-        <span class="x-mobile-account-chevron x-mobile-account-profile-chevron">›</span>
+        <span class="x-mobile-account-chevron x-mobile-account-profile-chevron" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </span>
       </button>
 
       <section class="x-mobile-account-section">
         <h2>Pengaturan GoFood</h2>
         <button type="button" class="x-mobile-account-list-card x-mobile-account-single-row">
           <span class="x-mobile-account-leading-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-2.5 8.5-2.5 8.5h17S18 16 18 9Z"></path><path d="M9.5 20h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 22c1.1 0 2-.9 2-2h-4a2 2 0 0 0 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg>
           </span>
           <span class="x-mobile-account-row-label">Notifikasi</span>
-          <span class="x-mobile-account-chevron">›</span>
+          <span class="x-mobile-account-chevron" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </span>
         </button>
       </section>
 
@@ -1525,32 +1530,53 @@
         <h2>Info lainnya</h2>
         <div class="x-mobile-account-list-card">
           <button type="button" class="x-mobile-account-row">
-            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M4 12h16M12 4a12 12 0 0 1 0 16M12 4a12 12 0 0 0 0 16"></path></svg></span>
-            <span class="x-mobile-account-row-label">Bahasa</span><span class="x-mobile-account-new">Baru</span><span class="x-mobile-account-chevron">›</span>
+            <span class="x-mobile-account-leading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3a14 14 0 0 0 0 18M12 3a14 14 0 0 1 0 18"/></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Bahasa</span><span class="x-mobile-account-new">Baru</span>
+            <span class="x-mobile-account-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
           </button>
           <button type="button" class="x-mobile-account-row">
-            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 9h14v9H5z"></path><path d="M8 9V6h8v3M9 18v2h6v-2"></path></svg></span>
-            <span class="x-mobile-account-row-label">Printer</span><span class="x-mobile-account-chevron">›</span>
+            <span class="x-mobile-account-leading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19 8h-1V3H6v5H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zM8 5h8v3H8V5zm8 12v2H8v-4h8v2zm2-2v-2H6v2H4v-4c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v4h-2z"/><circle cx="18" cy="11.5" r="1"/></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Printer</span>
+            <span class="x-mobile-account-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
           </button>
           <button type="button" class="x-mobile-account-row">
-            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-1.1 1-1.7 1.2-1.7 2.7M12 17h.01"></path></svg></span>
-            <span class="x-mobile-account-row-label">Bantuan</span><span class="x-mobile-account-chevron">›</span>
+            <span class="x-mobile-account-leading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 15a1.25 1.25 0 1 1 1.25-1.25A1.25 1.25 0 0 1 12 17zm1.6-6.08-.8.82A2 2 0 0 0 12 13.5v.5h-1.5v-.5a3.1 3.1 0 0 1 1.1-2.4l1-1a1.5 1.5 0 1 0-2.6-1.1H8.5a3 3 0 1 1 5.1 2.42z"/></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Bantuan</span>
+            <span class="x-mobile-account-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
           </button>
           <button type="button" class="x-mobile-account-row">
-            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5.2-3.5 8.4-8 10-4.5-1.6-8-4.8-8-10V6z"></path><path d="M12 9v4M12 16h.01"></path></svg></span>
-            <span class="x-mobile-account-row-label">Kebijakan privasi</span><span class="x-mobile-account-chevron">›</span>
+            <span class="x-mobile-account-leading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2 4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Kebijakan privasi</span>
+            <span class="x-mobile-account-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
           </button>
           <button type="button" class="x-mobile-account-row">
-            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h10l4 4v10H5z"></path><path d="M15 5v4h4M9 12h6M9 15h4"></path></svg></span>
-            <span class="x-mobile-account-row-label">Syarat dan Ketentuan</span><span class="x-mobile-account-chevron">›</span>
+            <span class="x-mobile-account-leading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 9h-2V9h2v2zm0 6h-2v-4h2v4zm0-11V3.5L18.5 9H13z"/></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Syarat dan Ketentuan</span>
+            <span class="x-mobile-account-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
           </button>
           <button type="button" class="x-mobile-account-row">
-            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"></path></svg></span>
-            <span class="x-mobile-account-row-label">Beri kami nilai</span><span class="x-mobile-account-value">v5.51.0</span><span class="x-mobile-account-chevron">›</span>
+            <span class="x-mobile-account-leading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="m12 17.27 6.18 3.73-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Beri kami nilai</span><span class="x-mobile-account-value">v5.51.0</span>
+            <span class="x-mobile-account-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
           </button>
           <button type="button" class="x-mobile-account-row">
-            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span>
-            <span class="x-mobile-account-row-label">Pengaturan akun</span><span class="x-mobile-account-chevron">›</span>
+            <span class="x-mobile-account-leading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Pengaturan akun</span>
+            <span class="x-mobile-account-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
           </button>
         </div>
       </section>
@@ -1562,24 +1588,24 @@
   <!-- Mobile-first Merchant navigation: visual source of truth -->
   <nav class="x-merchant-mobile-nav" id="x-merchant-mobile-nav" aria-label="Navigasi Merchant">
     <button type="button" class="x-merchant-mobile-nav-item active" data-route="hari-ini" onclick="navigateTo('hari-ini')">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.2 10.7 12 3.5l8.8 7.2v9.1a1.2 1.2 0 0 1-1.2 1.2h-5.1v-6.1H9.5V21H4.4a1.2 1.2 0 0 1-1.2-1.2Z"></path></svg>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
       <span>Beranda</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="pesanan" onclick="navigateTo('pesanan')">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.2h16v9.1A2.7 2.7 0 0 1 17.3 21H6.7A2.7 2.7 0 0 1 4 18.3Z"></path><path d="M6.1 9.2 8.3 5h7.4l2.2 4.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path><path d="M4 11.7h16" fill="none" stroke="currentColor" stroke-width="1.8"></path></svg>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M12 4.5a1.5 1.5 0 0 1 1.45 1.1A8.003 8.003 0 0 1 20 13.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1 8.003 8.003 0 0 1 6.55-7.9A1.5 1.5 0 0 1 12 4.5ZM3 17.5a1 1 0 0 1 1-1h16a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Z"/></svg>
       <span>Pesanan</span>
       <span class="x-mobile-nav-badge" id="mobile-orders-count">5</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="menu" onclick="navigateTo('menu')">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 3.3v7.1a2.9 2.9 0 0 0 5.8 0V3.3M8 3.3v17.4M18.4 3.3v17.4M18.4 3.3c1.8 1.8 2.4 4.4 0 6.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path></svg>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.48L23 5.05h-5.02L18.06 22.99zM2.87 21.51c.1.84.79 1.48 1.63 1.48h1.66l.08-17.94H1.22l1.65 16.46zM11 2h2v7.12l5.44 5.44-1.41 1.41L12 10.94l-5.03 5.03-1.41-1.41L11 9.12V2z"/></svg>
       <span>Menu</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="stok" onclick="navigateTo('stok')">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4v10l-8 4-8-4Z"></path><path d="m4 7 8 4 8-4M12 11v10" fill="none" stroke="#fff" stroke-width="1.5"></path></svg>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M7 2h10a2 2 0 0 1 2 2v7H5V4a2 2 0 0 1 2-2zm-2 11h14v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7zm3-6.5a.75.75 0 0 0-1.5 0v3a.75.75 0 0 0 1.5 0v-3zm0 9a.75.75 0 0 0-1.5 0v4a.75.75 0 0 0 1.5 0v-4z"/></svg>
       <span>Stock</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="promo" onclick="navigateTo('promo')">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14"></path><path d="M8 3h4l9 9-8 8-10-10V6a3 3 0 0 1 3-3Z"></path><circle cx="9" cy="7" r="1.1"></circle><path d="M14.5 14.5h.01M17 17h.01" stroke-width="3"></path></svg>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7zm6.7 9.5-1.4-1.4 6-6 1.4 1.4-6 6zm-1.2-4.5a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4zm5 5a1.2 1.2 0 1 1 0-2.4 1.2 1.2 0 0 1 0 2.4z"/></svg>
       <span>Promo</span>
     </button>
   </nav>
@@ -1603,6 +1629,6 @@
   <script src="/merchant-app/assets/js/promotions.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/staff.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/orders.js?v=1.0.1"></script>
-  <script src="/merchant-app/assets/js/merchant-app.js?v=1.0.1"></script>
+  <script src="/merchant-app/assets/js/merchant-app.js?v=1.0.2"></script>
 </body>
 </html>
