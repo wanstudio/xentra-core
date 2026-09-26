@@ -2247,32 +2247,33 @@
   async function refreshActiveOrderContext(orderId){
     if(!orderId) return null;
     var data=await request('/pos/orders/'+encodeURIComponent(orderId)+'/additions',{headers:headers()});
-    if(!data || !data.order) throw new Error('Order aktif tidak ditemukan.');
-    state.activeOrderLocked=['confirmed','preparing','ready'].indexOf(String(data.order.status))!==-1;
-    state.pendingAdditions=(data.additions||[]).filter(function(a){return a.status==='pending_acceptance';});
-    state.composerMode = state.activeOrderLocked ? 'existing' : 'new';
-    if(state.activeOrderLocked){
-      state.cart=(data.items||[]).map(function(it){
-        return {
-          product_id:it.product_id,
-          name:it.product_name||it.name||'Produk',
-          unit_price:Number(it.unit_price||0),
-          quantity:Number(it.quantity||0),
-          note:it.note||'',
-          options:(function(){try{return JSON.parse(it.modifiers_snapshot||'[]');}catch(_){return [];} })(),
-          addition_batch_id:it.addition_batch_id||null
-        };
-      }).filter(function(it){return it.quantity>0;});
-    }
-    if (!state.cart.length) {
-      state.activeOrderLocked = false;
-      state.composerMode = 'new';
-    } else if (state.activeOrderLocked) {
-      state.composerMode = 'existing';
-    }
+    if(!data||!data.order) throw new Error('Order aktif tidak ditemukan.');
+
+    var existing=composer().snapshot();
+    var canonicalItems=(data.items||[]).map(function(it){
+      return {
+        product_id:it.product_id,
+        name:it.product_name||it.name||'Produk',
+        unit_price:Number(it.unit_price||0),
+        quantity:Number(it.quantity||0),
+        note:it.note||'',
+        options:(function(){try{return JSON.parse(it.modifiers_snapshot||'[]');}catch(_){return [];}})(),
+        addition_batch_id:it.addition_batch_id||null
+      };
+    }).filter(function(it){return it.quantity>0;});
+
+    composer().refreshExisting({
+      orderId:orderId,
+      heldBillId:existing.held_bill_id,
+      orderType:existing.order_type,
+      table:existing.table,
+      order:data.order,
+      items:canonicalItems,
+      pendingAdditions:(data.additions||[]).filter(function(a){return a.status==='pending_acceptance';})
+    });
+
     return data;
   }
-
   function enterAdditionalOrderMode(){
     if(!state.activeOrderLocked || state.activeAdditionalMode) return;
     state.composerMode='addition';
