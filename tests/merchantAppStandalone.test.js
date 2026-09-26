@@ -488,6 +488,30 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     win.close();
   });
 
+  await t.test('3b. Merchant Order Center follows the mobile source of truth', () => {
+    const html = fs.readFileSync(HTML_PATH, 'utf8');
+    const orderJs = fs.readFileSync(ORDER_JS_PATH, 'utf8');
+    const appJs = fs.readFileSync(JS_PATH, 'utf8');
+
+    assert.ok(html.includes('id="x-merchant-mobile-nav"'), 'mobile bottom navigation is present');
+    assert.ok(html.includes('data-route="pesanan"'), 'Pesanan is a primary mobile task');
+    assert.ok(html.includes('id="bm-orders-view-attention"'), 'Perlu tindakan is the primary queue');
+    assert.ok(html.includes('id="bm-orders-view-all"'), 'Semua remains available as secondary queue');
+    assert.ok(html.includes('data-order-type="dine_in"'), 'Dine-in is a context filter');
+    assert.ok(html.includes('data-order-type="pickup"'), 'Pickup is a context filter');
+    assert.ok(html.includes('data-order-type="delivery"'), 'Delivery is a context filter');
+    assert.ok(html.includes('data-order-type="reservation"'), 'Reservation is a context filter');
+    assert.ok(!html.includes('id="bm-orders-filter-status"'), 'generic status dropdown is removed');
+    assert.ok(!html.includes('class="bm-orders-desktop-table"'), 'generic order table is removed from the Order Center list');
+    assert.ok(orderJs.includes('function renderBMOrdersFeed()'), 'Order Center renders a card feed');
+    assert.ok(orderJs.includes('function getBMOrderProjection(ord)'), 'environment-specific action projection exists');
+    assert.ok(orderJs.includes('function getBMOrderPaymentState(ord)'), 'payment status is projected separately');
+    assert.ok(orderJs.includes('Tandai Disajikan'), 'Dine-in ready state has a human action');
+    assert.ok(orderJs.includes('Tandai Diambil'), 'Pickup ready state has a human action');
+    assert.ok(orderJs.includes('Kirim Pesanan'), 'Delivery ready state has a human action');
+    assert.ok(appJs.includes('#x-merchant-mobile-nav .x-merchant-mobile-nav-item[data-route]'), 'route state syncs the mobile bottom navigation');
+  });
+
   await t.test('5. tombol keluar di header benar-benar mengeluarkan pengguna', async () => {
     const html = fs.readFileSync(HTML_PATH, 'utf8');
     const dom = new JSDOM(html, {
