@@ -4442,7 +4442,7 @@ input[type="file"].x-input,
   .x-mobile-online-control {
     margin-left: auto;
     justify-content: flex-end;
-    min-width: 276px;
+    min-width: 242px;
     gap: 9px;
   }
 
