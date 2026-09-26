@@ -1,6 +1,6 @@
 # Xentra — Purchase Type / Fulfillment Environment Contract v1
 
-**Status: DRAFT — REVIEW REQUIRED BEFORE IMPLEMENTATION**
+**Status: LOCKED — BUSINESS / UX / ARCHITECTURE CONTRACT v1**
 **Date:** 2026-09-26
 **Scope:** Commerce fulfillment UX, operational workflow, phase model, human-facing labels, and authority boundaries
 
@@ -19,7 +19,7 @@ A Fulfillment Environment is the operational experience for one purchase type. I
 
 The environments are siblings, not variants that inherit one universal operational UI flow.
 
-This contract is intentionally a **review draft**. It is not implementation authorization until the business/UX direction is approved.
+This contract was cross-referenced against the current Xentra source and current restaurant SaaS fulfillment patterns, then approved for implementation on 2026-09-26.
 
 ## 2. Core Principle
 
@@ -185,6 +185,30 @@ Important:
 - Reservation is not an active Dine-in session merely because a reservation exists.
 - When the customer actually arrives, the reservation may hand off into the Dine-in environment according to the approved reservation contract.
 - Reservation UI must not inherit Delivery or Pickup phases.
+
+## 5.1 Phase, Substate, Event, Timing, and Exception Separation
+
+A primary phase is the smallest set of user-facing steps that meaningfully changes the operator's mental model.
+
+The following MUST NOT automatically become primary phases:
+- driver assignment;
+- customer arrival;
+- payment settlement;
+- cash handover;
+- ETA/time windows;
+- internal audit events.
+
+These belong to substates, actions, timing/context, financial state, handoff, or activity history as appropriate.
+
+Conceptual model:
+
+`Fulfillment Environment → Primary Phases + Substates/Actions + Timing + Exceptions + Handoffs + Activity History`
+
+Timing is independent from phase. A scheduled order may wait for its processing window without inventing additional UI phases.
+
+Exceptions are side paths from the normal flow, not forced into the happy-path phase list.
+
+Handoffs between environments are explicit business events.
 
 ## 6. Human Labeling Rule
 
@@ -387,9 +411,9 @@ This contract does NOT authorize:
 - implementation of Driver App/COD in this review step;
 - changing already locked Dine-in rules without an explicit new decision.
 
-## 16. Review Questions Before Implementation
+## 16. Cross-Reference Result
 
-The following points require explicit review before implementation:
+The cross-reference found no blocker to the environment model. Industry patterns also separate fulfillment progress from payment status, timing, and activity history. Xentra therefore adopts the environment projection model described here.
 
 1. Are **Dine-in / Pickup / Delivery / Reservation** the correct independent Fulfillment Environments?
 2. Are the proposed human-facing phases understandable to real branch staff?
@@ -400,9 +424,7 @@ The following points require explicit review before implementation:
 7. Should any environment introduce an additional subflow without becoming a new global state machine?
 8. What exact technical representation should be used underneath the environment projection?
 
-## 17. Implementation Rule After Approval
-
-Only after this review is approved should implementation proceed.
+## 17. Implementation Rule
 
 Implementation MUST prefer:
 
@@ -416,4 +438,6 @@ Implementation MUST prefer:
 
 over a universal operational state machine that tries to serve every purchase type.
 
-**Current status remains DRAFT until explicit approval.**
+**Status: LOCKED — implementation may proceed under this contract.**
+
+Any later change to environment phases, completion authority, handoff semantics, or shared-vs-independent boundaries requires a new explicit decision.
