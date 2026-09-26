@@ -56,44 +56,73 @@
       
       <!-- Top Navbar -->
       <header class="x-dash-topbar">
-        <div class="x-topbar-left">
-          <!-- Mobile hamburger button -->
-          <button type="button" class="x-hamburger" id="btn-hamburger" aria-label="Buka menu" aria-expanded="false" aria-controls="x-dash-sidebar">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-          </button>
-          <div>
-            <h1 id="dash-page-title">Overview</h1>
-            <p id="dash-page-subtitle">Ringkasan bisnis dan aktivitas terkini</p>
+        <!-- Desktop shell: preserved for desktop Merchant App -->
+        <div class="x-topbar-desktop">
+          <div class="x-topbar-left">
+            <button type="button" class="x-hamburger" id="btn-hamburger" aria-label="Buka menu" aria-expanded="false" aria-controls="x-dash-sidebar">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            <div>
+              <h1 id="dash-page-title">Overview</h1>
+              <p id="dash-page-subtitle">Ringkasan bisnis dan aktivitas terkini</p>
+            </div>
+          </div>
+          <div class="x-topbar-right">
+            <div class="x-topbar-brand-badge" id="topbar-brand-badge" title="Brand Context">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 0 2-2V9"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+              <span id="desktop-topbar-brand-name">Bangjo Resto</span>
+            </div>
+            <div class="x-branch-context-badge" id="dash-bm-branch-badge" title="Authenticated Branch Context">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+              <span id="dash-bm-branch-name">Cabang</span>
+            </div>
+            <button type="button" class="x-topbar-icon-btn" id="btn-global-search" style="display: none;" aria-label="Cari" title="Cari">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </button>
+            <button type="button" class="x-topbar-icon-btn" id="btn-notifications-desktop" aria-label="Notifikasi" title="Notifikasi">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+            </button>
+            <div class="x-admin-profile">
+              <div class="x-avatar" id="dash-user-avatar">A</div>
+              <div class="x-user-meta">
+                <span id="dash-user-name">Pemilik Toko</span>
+                <small class="x-user-role" id="dash-user-role">Owner</small>
+              </div>
+              <button type="button" class="x-btn-logout" id="btn-logout" title="Keluar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+              </button>
+            </div>
           </div>
         </div>
-        <div class="x-topbar-right">
-          <!-- Brand context badge -->
-          <div class="x-topbar-brand-badge" id="topbar-brand-badge" title="Brand Context">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-            <span id="topbar-brand-name">Bangjo Resto</span>
-          </div>
-          <!-- Branch context badge — branch context is locked to the session branch -->
-          <div class="x-branch-context-badge" id="dash-bm-branch-badge" style="display: none;" title="Authenticated Branch Context">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-            <span id="dash-bm-branch-name">Cabang</span>
-          </div>
-          <!-- Search entry point (disabled/hidden in Phase 4A until search API is available) -->
-          <button type="button" class="x-topbar-icon-btn" id="btn-global-search" style="display: none;" aria-label="Cari" title="Cari">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-          </button>
-          <!-- Notifications entry point -->
-          <button type="button" class="x-topbar-icon-btn" id="btn-notifications" aria-label="Notifikasi" title="Notifikasi">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
-          </button>
-          <!-- User profile -->
-          <div class="x-admin-profile" id="dash-user-profile">
-            <div class="x-avatar" id="dash-user-avatar">A</div>
-            <div class="x-user-meta">
-              <span id="dash-user-name">Pemilik Toko</span>
-              <small class="x-user-role" id="dash-user-role">Owner</small>
+
+        <!-- Mobile shell: exact visual reference supplied for Merchant Home -->
+        <div class="x-mobile-topbar">
+          <div class="x-mobile-topbar-main">
+            <div class="x-mobile-branch-pill" id="mobile-branch-badge" title="Cabang aktif">
+              <img src="/assets/pwa/icon-192.png" alt="" class="x-mobile-branch-logo">
+              <span id="topbar-brand-name">MyBangjo Pringsewu</span>
             </div>
-            <button type="button" class="x-btn-logout" id="btn-logout" title="Keluar">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            <div class="x-mobile-topbar-actions">
+              <button type="button" class="x-mobile-circle-btn x-mobile-notification-btn" id="btn-notifications" aria-label="Notifikasi" title="Notifikasi">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17h16l-1.8-2.1V10a6.2 6.2 0 0 0-12.4 0v4.9L4 17Z" fill="currentColor"></path><path d="M9.5 20h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+                <span class="x-mobile-notification-badge" id="mobile-notification-count">12</span>
+              </button>
+              <button type="button" class="x-mobile-circle-btn x-mobile-profile-btn" id="mobile-user-profile" aria-label="Profil">
+                <span class="x-mobile-profile-icon" id="mobile-user-avatar">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="currentColor"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6" fill="currentColor"></path></svg>
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div class="x-mobile-operational-row">
+            <button type="button" class="x-mobile-status-control" id="btn-mobile-toggle-open" onclick="toggleBranchOpen()" aria-label="Status cabang">
+              <span class="x-mobile-switch is-on" id="mobile-open-switch"><span></span></span>
+              <span id="mobile-open-label">Buka</span>
+            </button>
+            <button type="button" class="x-mobile-status-control x-mobile-online-control" id="btn-mobile-toggle-online" onclick="toggleBranchOnlineOrders()" aria-label="Order online">
+              <span>Order online:</span>
+              <span class="x-mobile-switch is-on" id="mobile-online-switch"><span></span></span>
             </button>
           </div>
         </div>
@@ -1458,26 +1487,99 @@
     </div>
   </div>
 
-  <!-- Mobile-first Merchant navigation: primary task surface, not a collapsed sidebar -->
+  <!-- Mobile account page: opened from the top-bar profile button -->
+  <section class="x-mobile-account-page" id="x-mobile-account-page" aria-hidden="true">
+    <div class="x-mobile-account-statusbar-spacer"></div>
+    <header class="x-mobile-account-header">
+      <button type="button" class="x-mobile-account-back" id="btn-mobile-account-back" aria-label="Kembali">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </button>
+      <h1>Akun</h1>
+    </header>
+
+    <main class="x-mobile-account-content">
+      <button type="button" class="x-mobile-account-profile-card" id="mobile-account-profile-card">
+        <div class="x-mobile-account-profile-copy">
+          <div class="x-mobile-account-name-row">
+            <strong id="mobile-account-name">Pemilik Toko</strong>
+            <span id="mobile-account-role">Pemilik</span>
+          </div>
+          <span id="mobile-account-email">-</span>
+          <span id="mobile-account-phone">-</span>
+        </div>
+        <span class="x-mobile-account-chevron x-mobile-account-profile-chevron">›</span>
+      </button>
+
+      <section class="x-mobile-account-section">
+        <h2>Pengaturan GoFood</h2>
+        <button type="button" class="x-mobile-account-list-card x-mobile-account-single-row">
+          <span class="x-mobile-account-leading-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-2.5 8.5-2.5 8.5h17S18 16 18 9Z"></path><path d="M9.5 20h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+          </span>
+          <span class="x-mobile-account-row-label">Notifikasi</span>
+          <span class="x-mobile-account-chevron">›</span>
+        </button>
+      </section>
+
+      <section class="x-mobile-account-section">
+        <h2>Info lainnya</h2>
+        <div class="x-mobile-account-list-card">
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M4 12h16M12 4a12 12 0 0 1 0 16M12 4a12 12 0 0 0 0 16"></path></svg></span>
+            <span class="x-mobile-account-row-label">Bahasa</span><span class="x-mobile-account-new">Baru</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 9h14v9H5z"></path><path d="M8 9V6h8v3M9 18v2h6v-2"></path></svg></span>
+            <span class="x-mobile-account-row-label">Printer</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-1.1 1-1.7 1.2-1.7 2.7M12 17h.01"></path></svg></span>
+            <span class="x-mobile-account-row-label">Bantuan</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5.2-3.5 8.4-8 10-4.5-1.6-8-4.8-8-10V6z"></path><path d="M12 9v4M12 16h.01"></path></svg></span>
+            <span class="x-mobile-account-row-label">Kebijakan privasi</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h10l4 4v10H5z"></path><path d="M15 5v4h4M9 12h6M9 15h4"></path></svg></span>
+            <span class="x-mobile-account-row-label">Syarat dan Ketentuan</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"></path></svg></span>
+            <span class="x-mobile-account-row-label">Beri kami nilai</span><span class="x-mobile-account-value">v5.51.0</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span>
+            <span class="x-mobile-account-row-label">Pengaturan akun</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+        </div>
+      </section>
+
+      <button type="button" class="x-mobile-account-logout" id="btn-mobile-account-logout">Keluar</button>
+    </main>
+  </section>
+
+  <!-- Mobile-first Merchant navigation: visual source of truth -->
   <nav class="x-merchant-mobile-nav" id="x-merchant-mobile-nav" aria-label="Navigasi Merchant">
-    <button type="button" class="x-merchant-mobile-nav-item" data-route="hari-ini" onclick="navigateTo('hari-ini')">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5 10v10h14V10"></path><path d="M9 20v-6h6v6"></path></svg>
+    <button type="button" class="x-merchant-mobile-nav-item active" data-route="hari-ini" onclick="navigateTo('hari-ini')">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.2 10.7 12 3.5l8.8 7.2v9.1a1.2 1.2 0 0 1-1.2 1.2h-5.1v-6.1H9.5V21H4.4a1.2 1.2 0 0 1-1.2-1.2Z"></path></svg>
       <span>Beranda</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="pesanan" onclick="navigateTo('pesanan')">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.2h16v9.1A2.7 2.7 0 0 1 17.3 21H6.7A2.7 2.7 0 0 1 4 18.3Z"></path><path d="M6.1 9.2 8.3 5h7.4l2.2 4.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"></path><path d="M4 11.7h16" fill="none" stroke="currentColor" stroke-width="1.8"></path></svg>
       <span>Pesanan</span>
+      <span class="x-mobile-nav-badge" id="mobile-orders-count">5</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="menu" onclick="navigateTo('menu')">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v10"></path><path d="M3 3v10a3 3 0 0 0 6 0V3"></path><path d="M6 16v5"></path><path d="M16 3v18"></path><path d="M16 3c3 0 5 2 5 5s-2 5-5 5"></path></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 3.3v7.1a2.9 2.9 0 0 0 5.8 0V3.3M8 3.3v17.4M18.4 3.3v17.4M18.4 3.3c1.8 1.8 2.4 4.4 0 6.2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path></svg>
       <span>Menu</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="stok" onclick="navigateTo('stok')">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5Z"></path><path d="M3.3 7 12 12l8.7-5"></path><path d="M12 22V12"></path></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 7 8-4 8 4v10l-8 4-8-4Z"></path><path d="m4 7 8 4 8-4M12 11v10" fill="none" stroke="#fff" stroke-width="1.5"></path></svg>
       <span>Stock</span>
     </button>
     <button type="button" class="x-merchant-mobile-nav-item" data-route="promo" onclick="navigateTo('promo')">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 7 10 10"></path><path d="M8 2h4l10 10-8 8L4 10V6a4 4 0 0 1 4-4Z"></path><circle cx="9" cy="7" r="1"></circle></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 14 14"></path><path d="M8 3h4l9 9-8 8-10-10V6a3 3 0 0 1 3-3Z"></path><circle cx="9" cy="7" r="1.1"></circle><path d="M14.5 14.5h.01M17 17h.01" stroke-width="3"></path></svg>
       <span>Promo</span>
     </button>
   </nav>

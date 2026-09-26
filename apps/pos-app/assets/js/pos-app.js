@@ -3051,6 +3051,66 @@
     box.querySelectorAll('[data-print]').forEach(function(b){b.onclick=function(){printReceipt(b.dataset.print);};});
   }
 
+  async function openSplitMergeManager(orderId, heldId){
+    if(!orderId){toast('Pesanan ini belum memiliki Order.');return;}
+    try{
+      var data=await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks',{headers:headers()});
+      var checks=data.checks||[];
+      if(!checks.length){toast('Tagihan belum siap dibagi.');return;}
+      function checkTotal(check){return Number(check.allocated_amount||0);}
+      function renderItems(check){
+        var items=check.items||[];
+        if(!items.length)return '<div class="pos-empty pos-check-empty">Belum ada item di bagian ini.</div>';
+        return '<div class="pos-split-item-list">'+items.map(function(it){
+          var qty=Math.max(0,Number(it.quantity)||0);
+          return '<div class="pos-split-item-row"><div class="pos-split-item-info"><strong>'+esc(it.product_name||'Item')+'</strong><small>'+money(it.unit_price||0)+' · tersedia '+qty+'</small></div><div class="pos-split-stepper"><button type="button" class="pos-item-stepper-btn" data-split-minus="'+esc(it.order_item_id)+'" aria-label="Kurangi">−</button><span data-split-qty="'+esc(it.order_item_id)+'">0</span><button type="button" class="pos-item-stepper-btn" data-split-plus="'+esc(it.order_item_id)+'" data-max="'+qty+'" aria-label="Tambah">+</button></div></div>';
+        }).join('')+'</div>';
+      }
+      function renderCheck(check,index){
+        var paid=Number(check.paid_amount||0), remaining=Number(check.remaining_amount||0);
+        var primary=index===0;
+        var canMerge=!primary && check.status==='open' && paid===0;
+        return '<div class="pos-split-check-card '+(primary?'primary':'')+'"><div class="pos-split-check-head"><div><strong>'+ (primary?'Tagihan Utama':'Tagihan '+(index+1)) +'</strong><small>'+(remaining<=0?'LUNAS':('Sisa '+money(remaining)))+'</small></div><strong>'+money(checkTotal(check))+'</strong></div>'+renderItems(check)+(canMerge?'<button type="button" class="pos-btn small ghost danger pos-split-merge-btn" data-merge-check="'+esc(check.id)+'">Gabungkan ke Tagihan Utama</button>':'')+'</div>';
+      }
+      var html='<div class="pos-split-manager"><div class="pos-simple-bill-head"><div><h3>Split / Gabungkan Tagihan</h3><p>Pesanan tetap <strong>1 Order</strong>. Meja dan Dining Session tidak berubah.</p></div><div class="pos-simple-bill-total">'+money(data.order&&data.order.grand_total||0)+'</div></div><div class="pos-split-contract-note">Pindahkan jumlah menu dari Tagihan Utama ke tagihan baru. Jangan buat order baru untuk rombongan yang sama.</div><div class="pos-check-manager-list pos-split-check-list">'+checks.map(renderCheck).join('')+'</div><div class="pos-modal-actions"><button type="button" class="pos-btn ghost" id="pos-split-manager-close">Tutup</button><button type="button" class="pos-btn" id="pos-split-create" disabled>Buat Tagihan Baru</button></div></div>';
+      showModal(html);
+      $('pos-split-manager-close').onclick=hideModal;
+      var selected={};
+      function sync(){
+        var total=Object.keys(selected).reduce(function(sum,k){return sum+(Number(selected[k])||0);},0);
+        $('pos-split-create').disabled=total<=0;
+        document.querySelectorAll('[data-split-qty]').forEach(function(el){el.textContent=String(selected[el.dataset.splitQty]||0);});
+      }
+      function changeQty(id,delta,max){
+        var next=Math.max(0,Math.min(max,(Number(selected[id])||0)+delta));
+        selected[id]=next;
+        if(next===0)delete selected[id];
+        sync();
+      }
+      document.querySelectorAll('[data-split-plus]').forEach(function(btn){btn.onclick=function(){changeQty(btn.dataset.splitPlus,1,Number(btn.dataset.max)||0);};});
+      document.querySelectorAll('[data-split-minus]').forEach(function(btn){btn.onclick=function(){changeQty(btn.dataset.splitMinus,-1,99);};});
+      $('pos-split-create').onclick=async function(){
+        var splitItems=Object.keys(selected).map(function(id){return {order_item_id:id,quantity:Number(selected[id])};}).filter(function(x){return x.quantity>0;});
+        if(!splitItems.length)return;
+        var btn=this; btn.disabled=true;
+        try{
+          await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/split',{method:'POST',headers:headers(),body:JSON.stringify({source_check_id:checks[0].id,split_items:splitItems})});
+          toast('Tagihan baru dibuat. Tetap 1 Order.');
+          openSplitMergeManager(orderId,heldId);
+        }catch(e){btn.disabled=false;toast(e.message);}
+      };
+      document.querySelectorAll('[data-merge-check]').forEach(function(btn){btn.onclick=async function(){
+        if(!confirm('Gabungkan tagihan ini kembali ke Tagihan Utama?'))return;
+        btn.disabled=true;
+        try{
+          await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks/merge',{method:'POST',headers:headers(),body:JSON.stringify({target_check_id:checks[0].id,source_check_id:btn.dataset.mergeCheck})});
+          toast('Tagihan digabungkan kembali. Tetap 1 Order.');
+          openSplitMergeManager(orderId,heldId);
+        }catch(e){btn.disabled=false;toast(e.message);}
+      };});
+    }catch(e){toast(e.message);}
+  }
+
   function renderHeldSales(){
     var box=$('pos-held-list'); if(!box)return;
     var held=state.held||[];
@@ -3061,9 +3121,10 @@
       var itemSummary=items.map(function(i){return (i.quantity||1)+'x '+(i.name||'Item');}).join(', ');
       var oType = h.order_type || (h.table_number ? 'dine_in' : 'pickup');
       var typeTitle = (oType === 'dine_in') ? ('Meja ' + esc(h.table_number || '—')) : (oType === 'pickup' ? 'Pickup' : oType === 'delivery' ? 'Delivery' : esc(oType));
-       return '<div class="pos-held-row"><div class="pos-held-main"><strong>' + typeTitle + '</strong><small>Tamu: '+esc(h.customer_name||'Tamu')+' · '+esc(h.created_at||'')+'</small></div><div class="pos-held-items">'+esc(itemSummary||'—')+'</div><div class="pos-held-total">'+money(subtotal)+'</div><div class="pos-held-actions"><button type="button" class="pos-btn small ghost danger" data-cancel-held-row="'+esc(h.id)+'">Batal</button><button type="button" class="pos-btn small" data-resume-held-row="'+esc(h.id)+'">Buka di Kasir</button></div></div>';
+       return '<div class="pos-held-row"><div class="pos-held-main"><strong>' + typeTitle + '</strong><small>Tamu: '+esc(h.customer_name||'Tamu')+' · '+esc(h.created_at||'')+'</small></div><div class="pos-held-items">'+esc(itemSummary||'—')+'</div><div class="pos-held-total">'+money(subtotal)+'</div><div class="pos-held-actions">'+(h.order_id?'<button type="button" class="pos-btn small ghost" data-split-held-row="'+esc(h.id)+'">Split</button>':'')+'<button type="button" class="pos-btn small ghost danger" data-cancel-held-row="'+esc(h.id)+'">Batal</button><button type="button" class="pos-btn small" data-resume-held-row="'+esc(h.id)+'">Buka di Kasir</button></div></div>';
     }).join('');
     box.querySelectorAll('[data-resume-held-row]').forEach(function(b){b.onclick=function(){resumeHeld(b.dataset.resumeHeldRow);};});
+    box.querySelectorAll('[data-split-held-row]').forEach(function(b){b.onclick=function(){var h=held.find(function(x){return String(x.id)===String(b.dataset.splitHeldRow);});if(h&&h.order_id) openSplitMergeManager(h.order_id,h.id);};});
     box.querySelectorAll('[data-cancel-held-row]').forEach(function(b){b.onclick=function(){cancelHeld(b.dataset.cancelHeldRow);};});
 
   }

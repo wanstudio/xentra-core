@@ -575,6 +575,37 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     win.close();
   });
 
+  await t.test('5b. mobile account opens from profile and logout clears the merchant session', async () => {
+    const html = fs.readFileSync(HTML_PATH, 'utf8');
+    const dom = new JSDOM(html, { url: 'https://app.mybangjo.com/merchant-app/', runScripts: 'dangerously' });
+    const win = dom.window;
+    win.localStorage.setItem('xentra_merchant_token', 'test-token');
+    win.localStorage.setItem('xentra_merchant_user', JSON.stringify({
+      id:'u-1', role:'owner', full_name:'Ikhwan Sujatmiko', email:'test@example.com', phone:'+62 812'
+    }));
+    let redirected=false;
+    win.checkAppRoute=function(){ redirected=true; };
+    win.confirm=function(){ return true; };
+    win.eval(fs.readFileSync(SHARED_JS_PATH,'utf8'));
+    win.eval(fs.readFileSync(JS_PATH,'utf8'));
+    win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
+    await new Promise(r=>setTimeout(r,50));
+    const profile=win.document.getElementById('mobile-user-profile');
+    const page=win.document.getElementById('x-mobile-account-page');
+    assert.ok(profile,'mobile profile button exists');
+    assert.ok(page,'mobile account page exists');
+    profile.click();
+    assert.equal(win.document.body.classList.contains('x-mobile-account-open'),true,'profile opens account page');
+    assert.equal(win.document.getElementById('mobile-account-name').textContent,'Ikhwan Sujatmiko');
+    const logout=win.document.getElementById('btn-mobile-account-logout');
+    assert.ok(logout,'account logout button exists');
+    logout.click();
+    assert.equal(win.localStorage.getItem('xentra_merchant_token'),null,'account logout clears token');
+    assert.equal(win.localStorage.getItem('xentra_merchant_user'),null,'account logout clears user');
+    assert.equal(redirected,true,'account logout redirects to login');
+    win.close();
+  });
+
   await t.test('4. Merchant App is served at /merchant-app without changing /dashboard', () => {
     const appSource = fs.readFileSync(path.join(ROOT, 'server/app.js'), 'utf8');
     assert.ok(appSource.includes("'/merchant-app/assets'"), '/merchant-app/assets must be mounted');

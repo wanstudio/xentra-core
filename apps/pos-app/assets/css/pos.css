@@ -726,4 +726,27 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-btn-confirm-close-shift{border:1.5px solid rgba(239,68,68,.45)!important;background:rgba(239,68,68,.12)!important;color:#dc2626!important;border-radius:12px;height:44px;padding:0 18px;font-size:13px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .15s ease}
 .pos-btn-confirm-close-shift:hover{background:rgba(239,68,68,.25)!important;color:#b91c1c!important;border-color:#ef4444!important}
 
-
+/* Split / Merge Check manager */
+.pos-split-manager{display:flex;flex-direction:column;gap:12px}
+.pos-split-contract-note{padding:10px 12px;border:1px solid var(--border,#e2e8f0);border-radius:10px;background:var(--surface-muted,#f8fafc);font-size:12px;line-height:1.45;color:var(--text-muted,#64748b)}
+.pos-split-check-list{max-height:58vh}
+.pos-split-check-card{border:1px solid var(--border,#e2e8f0);border-radius:14px;padding:12px;background:#fff}
+.pos-split-check-card.primary{border-color:#cbd5e1}
+.pos-split-check-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.pos-split-check-head>div{display:flex;flex-direction:column;gap:3px}
+.pos-split-check-head small{font-size:11px;color:var(--text-muted,#64748b)}
+.pos-split-item-list{display:flex;flex-direction:column;gap:7px}
+.pos-split-item-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border-radius:10px;background:#f8fafc}
+.pos-split-item-info{min-width:0;display:flex;flex-direction:column;gap:2px}
+.pos-split-item-info strong{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pos-split-item-info small{font-size:11px;color:var(--text-muted,#64748b)}
+.pos-split-stepper{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.pos-split-stepper>span{min-width:20px;text-align:center;font-weight:700}
+.pos-split-stepper .pos-item-stepper-btn{width:32px;height:32px;border:1px solid var(--border,#cbd5e1);border-radius:9px;background:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:18px;line-height:1;cursor:pointer}
+.pos-split-merge-btn{margin-top:10px;width:100%}
+.pos-check-empty{padding:8px 0;font-size:12px}
+@media (max-width:640px){
+  .pos-split-manager .pos-simple-bill-head{gap:8px}
+  .pos-split-contract-note{font-size:11px}
+  .pos-split-check-card{padding:10px}
+}
