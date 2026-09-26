@@ -4269,6 +4269,17 @@
       return;
     }
 
+    // Ensure the server has answered whether this customer already has an active
+    // Dine-in bill before deciding whether this checkout creates an order or
+    // submits an Additional Batch.
+    if (fulType === 'dine_in' && !state.openBillLoaded) {
+      refreshOpenBill().then(function () {
+        executePrePaymentAndSubmit();
+      });
+      return;
+    }
+
+    var isAdditionalDineIn = hasActiveDineInBill() && items.length > 0;
     var fulBranch = getFulfillmentBranch();
     var branchId = (state.matchedBranch && state.matchedBranch.id) || (fulBranch && fulBranch.id) || (currentBranchId && currentBranchId !== '__unassigned__' ? currentBranchId : undefined);
 
