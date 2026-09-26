@@ -17,7 +17,7 @@ describe('TransactionComposer', () => {
   it('starts in NEW mode with no action-specific state', () => {
     const c = makeComposer();
     assert.strictEqual(c.getMode(), 'new');
-    assert.deepStrictEqual(c.getDisplayItems(), []);
+    assert.strictEqual(c.getDisplayItems().length, 0);
     assert.strictEqual(c.getOrderId(), null);
     assert.strictEqual(c.getHeldBillId(), null);
     assert.strictEqual(c.canAdd(), false);
