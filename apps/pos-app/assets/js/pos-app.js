@@ -747,7 +747,7 @@
     document.querySelectorAll('.pos-bottom-nav button').forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-view') === view); });
     var mCartBar = $('pos-mobile-cart-bar');
     if (mCartBar) {
-      if (view !== 'kasir' || !state.cart.length) {
+      if (view !== 'kasir' || !composer().hasItems()) {
         mCartBar.classList.add('hidden');
         closeMobileCartOverlay();
       } else {
@@ -761,7 +761,7 @@
   }
 
   function total() {
-    return state.cart.reduce(function(sum,it){ return sum + (Number(it.unit_price)||0) * (Number(it.quantity)||0); }, 0);
+    return composer().total();
   }
 
   function updateMenuCardBadges(){
