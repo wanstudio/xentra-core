@@ -4201,6 +4201,7 @@
     var fulType = state.fulfillment.type;
     var isReservation = fulType === 'reservation';
     var items = getCheckoutItems();
+    var isAdditionalDineIn = hasActiveDineInBill() && items.length > 0;
 
     if (!isReservation && !items.length) {
       if (UI && UI.toast) UI.toast('Keranjang belanja kosong');
