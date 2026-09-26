@@ -267,3 +267,55 @@ test('ENV-17: normalisasi tipe lama dinein tetap diterima', () => {
   assert.strictEqual(FE.switchTo('dinein').type, 'dine_in',
     'nilai lama dari penyimpanan tetap dipetakan ke environment yang benar');
 });
+
+
+// ── ENV-18..22: shared human-facing environment projection ──
+
+test('ENV-18: delivery has five primary phases and human labels', () => {
+  const FE = loadEnvironments();
+  const p = FE.project('delivery', 'ready');
+  assert.strictEqual(p.phases.length, 5, 'delivery harus punya lima primary phases');
+  assert.deepStrictEqual(
+    p.phases.map((x) => x.label),
+    ['Pesanan diterima', 'Sedang disiapkan', 'Siap diantar', 'Sedang diantar', 'Selesai diantar']
+  );
+  assert.strictEqual(p.statusLabel, 'Siap diantar');
+  assert.strictEqual(p.currentPhaseIndex, 2);
+});
+
+test('ENV-19: pickup has four phases and never exposes driver language', () => {
+  const FE = loadEnvironments();
+  const p = FE.project('pickup', 'ready');
+  assert.strictEqual(p.phases.length, 4);
+  assert.strictEqual(p.statusLabel, 'Siap diambil');
+  assert.ok(!p.phases.some((x) => /driver|antar/i.test(x.label)), 'pickup tidak boleh punya phase driver/delivery');
+});
+
+test('ENV-20: dine-in labels reflect dining context without claiming session closure', () => {
+  const FE = loadEnvironments();
+  const p = FE.project('dine_in', 'ready');
+  assert.strictEqual(p.statusLabel, 'Siap disajikan');
+  assert.strictEqual(p.completion.label, 'Pesanan selesai');
+  assert.notStrictEqual(p.completion.label, 'Sesi selesai');
+});
+
+test('ENV-21: reservation has explicit arrival phase and explicit Dine-in handoff', () => {
+  const FE = loadEnvironments();
+  const p = FE.project('reservation', 'confirmed');
+  assert.deepStrictEqual(
+    p.phases.map((x) => x.label),
+    ['Reservasi dibuat', 'Reservasi dikonfirmasi', 'Menunggu kedatangan']
+  );
+  assert.ok(p.handoffs.includes('reservation_to_dine_in'));
+  assert.strictEqual(p.statusLabel, 'Reservasi dikonfirmasi');
+});
+
+test('ENV-22: delivery driver substates change the projection without creating extra primary phases', () => {
+  const FE = loadEnvironments();
+  const p = FE.project('delivery', 'ready', { deliveryStatus: 'on_delivery' });
+  assert.strictEqual(p.currentPhaseIndex, 3);
+  assert.strictEqual(p.phases.length, 5, 'delivery substate tidak menambah primary phase');
+  const action = FE.action('delivery', 'driver', 'ready', { deliveryStatus: 'on_delivery' });
+  assert.strictEqual(action.label, 'Selesai Antar');
+  assert.strictEqual(action.authority, 'driver');
+});
