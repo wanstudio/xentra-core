@@ -4491,11 +4491,11 @@ input[type="file"].x-input,
     box-sizing: border-box !important;
   }
 
-  /* Physical bottom spacer to guarantee exact 50px clearance above fixed bottom navbar across all browsers */
+  /* Physical bottom spacer to guarantee exact 60px clearance above fixed bottom navbar across all browsers */
   .x-merchant-app .x-tab-content.active::after {
     content: "" !important;
     display: block !important;
-    height: calc(118px + env(safe-area-inset-bottom, 0px)) !important;
+    height: calc(128px + env(safe-area-inset-bottom, 0px)) !important;
     width: 100% !important;
     clear: both !important;
     flex-shrink: 0 !important;
@@ -4512,7 +4512,7 @@ input[type="file"].x-input,
     margin-bottom: 16px !important;
   }
 
-  /* Reset margin on the last child so the 118px spacer creates precisely 50px visible clearance */
+  /* Reset margin on the last child so the 128px spacer creates precisely 60px visible clearance */
   .x-merchant-app .x-tab-content > *:last-child,
   .x-merchant-app .x-tab-content .x-hari-ini-container > *:last-child,
   .x-merchant-app .x-tab-content .x-card-panel:last-child {
