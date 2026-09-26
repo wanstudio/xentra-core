@@ -2889,7 +2889,7 @@
       tables.forEach(function(t){
         var st=t.operational_state||t.status||'available';
         var can=st==='available';
-        var selected=state.selectedTable&&String(state.selectedTable.id)===String(t.id);
+        var selected=currentTable()&&String(currentTable().id)===String(t.id);
         html+='<button type="button" class="pos-table-pick '+(can?'':'disabled')+(selected?' selected':'')+'" '+(can?'':'disabled')+' data-table-pick="'+esc(t.id)+'"><span><strong>'+esc(t.label||('Meja '+t.table_number))+'</strong><small>'+esc(String(t.capacity||4))+' kursi · '+esc(tableStateLabel(st))+'</small></span><b>'+(selected?'✓':can?'Pilih':'Tidak tersedia')+'</b></button>';
       });
       html+='</div><div class="pos-modal-actions"><button class="pos-btn ghost" id="pos-table-picker-cancel">Batal</button></div>';
@@ -3133,7 +3133,7 @@
       }
     });
     $('btn-pos-refresh-menu').onclick=loadMenu;
-    $('btn-pos-pay').onclick=function(){ if(state.activeAdditionalMode) submitAdditionalOrder(); else openPayModal(); };
+    $('btn-pos-pay').onclick=function(){ if(composer().isAddition()) submitAdditionalOrder(); else openPayModal(); };
     if($('btn-pos-pay-many')) $('btn-pos-pay-many').onclick=openManyPaymentFromCart;
     if($('btn-pos-additional-order')) $('btn-pos-additional-order').onclick=enterAdditionalOrderMode;
     $('btn-pos-clear').onclick=function(){resetSale();};
@@ -3160,7 +3160,7 @@
     if($('btn-pos-mcart-checkout')){
       $('btn-pos-mcart-checkout').onclick=function(e){
         e.stopPropagation();
-        if(state.activeAdditionalMode) submitAdditionalOrder(); else openPayModal();
+        if(composer().isAddition()) submitAdditionalOrder(); else openPayModal();
       };
     }
     if($('pos-mobile-cart-bar')){
