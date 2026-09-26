@@ -429,10 +429,22 @@ class PosOrderService {
         }
       }
 
+      const orderItems = posBillRepository.findOrderItems(order_id);
       const movedAmount = Array.from(requested.entries()).reduce((sum, [itemId, qty]) => {
-        const sourceItem = posBillRepository.findCheckItem(source.id, itemId);
-        const orderItem = posBillRepository.findOrderItems(order_id).find(i => String(i.id) === String(itemId));
-        return sum + (orderItem ? Number(orderItem.unit_price || 0) * qty : 0);
+        const orderItem = orderItems.find(i => String(i.id) === String(itemId));
+        if (!orderItem) return sum;
+
+        // For "Pilih Menu", the check must carry the item's actual charged
+        // line value, not merely unit_price. This matters when an item has
+        // modifiers, item-level adjustments, or another persisted line total.
+        const lineQuantity = Number(orderItem.quantity || 0);
+        const lineTotal = Number(
+          orderItem.item_subtotal != null
+            ? orderItem.item_subtotal
+            : (orderItem.subtotal != null ? orderItem.subtotal : Number(orderItem.unit_price || 0) * lineQuantity)
+        );
+        const perUnitAllocated = lineQuantity > 0 ? (lineTotal / lineQuantity) : 0;
+        return sum + (perUnitAllocated * qty);
       }, 0);
       const sourceAllocated = Number(source.allocated_amount || 0);
       if (movedAmount <= 0 || movedAmount >= sourceAllocated) throw new Error('[PosOrderService] Nilai item split tidak valid untuk alokasi Check.');
