@@ -821,13 +821,13 @@
     var tx=composer();
     var displayCart=tx.getDisplayItems();
     if (!displayCart.length) {
-      return toast(state.activeAdditionalMode ? 'Belum ada item tambahan.' : 'Keranjang pesanan masih kosong.');
+      return toast(tx.isAddition() ? 'Belum ada item tambahan.' : 'Keranjang pesanan masih kosong.');
     }
     var t=tx.total();
     var totalQty=displayCart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0);
-    var isDineIn=state.orderType==='dine_in';
-    var tableLabel=formatTableLabel(state.selectedTable);
-    var orderTypeLabel=isDineIn ? tableLabel : (state.orderType==='pickup'?'Pickup':'Delivery');
+    var isDineIn=tx.getOrderType()==='dine_in';
+    var tableLabel=formatTableLabel(tx.getTable());
+    var orderTypeLabel=isDineIn ? tableLabel : (tx.getOrderType()==='pickup'?'Pickup':'Delivery');
     var locked=tx.isExisting();
     var additionMode=tx.isAddition();
 
