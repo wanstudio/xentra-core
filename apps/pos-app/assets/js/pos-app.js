@@ -2340,6 +2340,17 @@
   }
 
   async function openPayCheck(orderId,check){
+    // Always refresh the selected check before opening payment. The split
+    // screen is an allocation editor, so its check balance may be stale if
+    // another cashier/device has just changed the payment ledger.
+    try {
+      var latest=await request('/pos/orders/'+encodeURIComponent(orderId)+'/checks',{headers:headers()});
+      var latestCheck=(latest.checks||[]).find(function(c){return String(c.id)===String(check.id);});
+      if(latestCheck) check=latestCheck;
+    } catch(e) {
+      // Keep the already-rendered check as fallback; payment is revalidated
+      // transactionally by PosOrderService.
+    }
     var remaining=Number(check.remaining_amount||0);
     if(remaining<=0){toast('Tagihan ini sudah lunas.');return;}
     var html='<h3>Bayar</h3>' +
