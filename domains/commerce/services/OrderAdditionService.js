@@ -51,8 +51,13 @@ class OrderAdditionService {
   }
 
   static listForOrder({ order_id, brand_id, branch_id }) {
-    this._loadParent({ order_id, brand_id, branch_id });
-    return additionRepository.findByOrderId(order_id);
+    const order = this._loadParent({ order_id, brand_id, branch_id });
+    const items = orderRepository.findItems(order_id);
+    const additions = additionRepository.findByOrderId(order_id).map(addition => ({
+      ...addition,
+      items: JSON.parse(addition.items_payload || '[]')
+    }));
+    return { order, items, additions };
   }
 
   static async submit({ order_id, brand_id, branch_id, items, source_channel = 'pos_cashier', created_by = null }) {
