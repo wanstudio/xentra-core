@@ -590,19 +590,61 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     win.eval(fs.readFileSync(JS_PATH,'utf8'));
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
     await new Promise(r=>setTimeout(r,50));
+
+    // 1. Mobile profile button exists
     const profile=win.document.getElementById('mobile-user-profile');
     const page=win.document.getElementById('x-mobile-account-page');
     assert.ok(profile,'mobile profile button exists');
     assert.ok(page,'mobile account page exists');
+
+    // 2. Clicking profile opens Account screen
     profile.click();
     assert.equal(win.document.body.classList.contains('x-mobile-account-open'),true,'profile opens account page');
-    assert.equal(win.document.getElementById('mobile-account-name').textContent,'Ikhwan Sujatmiko');
+
+    // 3. Account screen contains required elements and copy
+    assert.ok(page.textContent.includes('Akun'), 'Account screen must contain Akun header');
+    assert.equal(win.document.getElementById('mobile-account-name').textContent,'Ikhwan Sujatmiko', 'Profile name');
+    assert.equal(win.document.getElementById('mobile-account-email').textContent,'test@example.com', 'Profile email');
+    assert.equal(win.document.getElementById('mobile-account-phone').textContent,'+62 812', 'Profile phone');
+    assert.ok(page.textContent.includes('Pengaturan GoFood'), 'Contains Pengaturan GoFood');
+    assert.ok(page.textContent.includes('Notifikasi'), 'Contains Notifikasi');
+    assert.ok(page.textContent.includes('Info lainnya'), 'Contains Info lainnya');
+    assert.ok(page.textContent.includes('Bahasa'), 'Contains Bahasa');
+    assert.ok(page.textContent.includes('Printer'), 'Contains Printer');
+    assert.ok(page.textContent.includes('Bantuan'), 'Contains Bantuan');
+    assert.ok(page.textContent.includes('Kebijakan privasi'), 'Contains Kebijakan privasi');
+    assert.ok(page.textContent.includes('Syarat dan Ketentuan'), 'Contains Syarat dan Ketentuan');
+    assert.ok(page.textContent.includes('Beri kami nilai'), 'Contains Beri kami nilai');
+    assert.ok(page.textContent.includes('Pengaturan akun'), 'Contains Pengaturan akun');
+
+    // Back button closes Account screen
+    const backBtn=win.document.getElementById('btn-mobile-account-back');
+    assert.ok(backBtn, 'Back button exists');
+    backBtn.click();
+    assert.equal(win.document.body.classList.contains('x-mobile-account-open'), false, 'Back button closes account page');
+
+    // Reopen to test logout
+    profile.click();
+    assert.equal(win.document.body.classList.contains('x-mobile-account-open'), true);
+
+    // 4. Clicking Keluar clears merchant session
     const logout=win.document.getElementById('btn-mobile-account-logout');
     assert.ok(logout,'account logout button exists');
     logout.click();
     assert.equal(win.localStorage.getItem('xentra_merchant_token'),null,'account logout clears token');
     assert.equal(win.localStorage.getItem('xentra_merchant_user'),null,'account logout clears user');
+
+    // 5. Clicking Keluar redirects to /login
     assert.equal(redirected,true,'account logout redirects to login');
+
+    // 6. Existing mobile bottom navigation routes remain intact
+    const nav=win.document.getElementById('x-merchant-mobile-nav');
+    assert.ok(nav, 'mobile bottom nav exists');
+    ['hari-ini', 'pesanan', 'menu', 'stok', 'promo'].forEach(r => {
+      const item = nav.querySelector(`[data-route="${r}"]`);
+      assert.ok(item, `nav item for ${r} exists in mobile bottom nav`);
+    });
+
     win.close();
   });
 

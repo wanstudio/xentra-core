@@ -78,6 +78,7 @@
   function navigateTo(route) {
     if (!route) return;
     closeMobileSidebar();
+    closeMobileAccount();
     if (window.location.hash === '#' + route) {
       applyRoute(route);
     } else {
