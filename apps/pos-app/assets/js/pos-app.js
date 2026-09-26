@@ -2158,9 +2158,13 @@
   }
 
   async function submitSale(paymentMode,amountTendered){
+    var tx=composer();
+    if(tx.isAddition()) return submitAdditionalOrder();
+    if(!tx.hasItems()) return toast('Cart masih kosong.');
     if(!state.shift)return toast('Buka shift terlebih dahulu.');
-    if(state.orderType==='dine_in'&&!state.selectedTable){hideModal();openTableSelector();return;}
+    if(tx.getOrderType()==='dine_in'&&!tx.getTable()){hideModal();openTableSelector();return;}
     if(!navigator.onLine&&paymentMode!=='cash')return toast('Payment Gateway dan QRIS Statis membutuhkan koneksi internet pada POS.');
+
     if(paymentMode==='cash'){
       var numTendered=Number(amountTendered||0);
       if(!Number.isFinite(numTendered)||numTendered < total()){
@@ -2168,26 +2172,44 @@
       }
     }
 
-    // A held POS bill is already a canonical Merchant Order. Never create a
-    // second order when the cashier resumes it; settle the existing order.
-    if(state.activeHeldOrderId){
-      if(paymentMode !== 'cash') return toast('Hold Bill yang sudah dikirim ke Merchant saat ini dilunasi melalui Cash.');
+    var orderId=tx.getOrderId();
+    if(orderId){
+      if(paymentMode!=='cash')return toast('Order yang sudah dibuka dari transaksi sebelumnya saat ini dilunasi melalui Cash.');
       try{
-        var existing = await request('/pos/orders/'+encodeURIComponent(state.activeHeldOrderId)+'/settle-cash',{method:'POST',headers:headers(),body:JSON.stringify({amount_tendered:Number(amountTendered),shift_id:state.shift.id})});
-        if(existing && existing.success){
-          hideModal();showPaymentSuccess({id:state.activeHeldOrderId,order_number:existing.order_number||state.activeHeldOrderId,grand_total:total(),change:existing.change||0},Number(existing.change||0));resetSale();loadShift();loadSales();updateHeldCount();
+        var existing=await request('/pos/orders/'+encodeURIComponent(orderId)+'/settle-cash',{method:'POST',headers:headers(),body:JSON.stringify({amount_tendered:Number(amountTendered),shift_id:state.shift.id})});
+        if(existing&&existing.success){
+          hideModal();
+          showPaymentSuccess({id:orderId,order_number:existing.order_number||orderId,grand_total:existing.grand_total||total()},Number(existing.change||0));
+          resetSale();loadShift();loadSales();updateHeldCount();
           return;
         }
-        return toast((existing&&existing.error)||'Gagal melunasi Hold Bill.');
+        return toast((existing&&existing.error)||'Gagal melunasi Order.');
       }catch(e){return toast(e.message);}
     }
 
-    var payload={branch_id:state.branchId,shift_id:state.shift.id,order_type:state.orderType,payment_mode:paymentMode,amount_tendered:paymentMode==='cash'?amountTendered:null,customer:{name:$('pos-customer-name').value.trim(),phone:'',table_number:state.selectedTable?state.selectedTable.table_number:null},items:state.cart.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,options:i.options||[],note:i.note||''};}),client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)};
+    var table=tx.getTable();
+    var orderType=tx.getOrderType();
+    var items=tx.getDisplayItems();
+    var payload={
+      branch_id:state.branchId,
+      shift_id:state.shift.id,
+      order_type:orderType,
+      payment_mode:paymentMode,
+      amount_tendered:paymentMode==='cash'?amountTendered:null,
+      customer:{
+        name:$('pos-customer-name').value.trim(),
+        phone:'',
+        table_number:table?table.table_number:null
+      },
+      items:items.map(function(i){return {product_id:i.product_id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,expected_price:i.unit_price,options:i.options||[],note:i.note||''};}),
+      client_transaction_id:'pos_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)
+    };
+
     try{
       var d;
       if(!navigator.onLine){
         if(!state.terminalId)return toast('POS offline belum siap: terminal cabang belum terdaftar.');
-        await request('/pos/local/sale',{method:'POST',headers:headers(),body:JSON.stringify({terminal_id:state.terminalId,branch_id:state.branchId,shift_id:state.shift.id,order_type:state.orderType,payment_method:'cash',amount_tendered:amountTendered,customer:payload.customer,items:payload.items,client_transaction_id:payload.client_transaction_id,offline_created_at:new Date().toISOString(),config_version:1})});
+        await request('/pos/local/sale',{method:'POST',headers:headers(),body:JSON.stringify({terminal_id:state.terminalId,branch_id:state.branchId,shift_id:state.shift.id,order_type:orderType,payment_method:'cash',amount_tendered:amountTendered,customer:payload.customer,items:payload.items,client_transaction_id:payload.client_transaction_id,offline_created_at:new Date().toISOString(),config_version:1})});
         hideModal();resetSale();toast('Penjualan tersimpan lokal. Akan disinkronkan saat online.');return;
       }
       d=await request('/pos/sales',{method:'POST',headers:headers(),body:JSON.stringify(payload)});
@@ -2196,6 +2218,7 @@
       else if(paymentMode==='qris_static'){hideModal();showStaticQrisPending(d);}
     }catch(e){toast(e.message);}
   }
+
   async function printReceipt(orderId){
     try{
       var d=await request('/pos/orders/'+encodeURIComponent(orderId)+'/receipt',{headers:headers()});
