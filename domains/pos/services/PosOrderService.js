@@ -303,8 +303,12 @@ class PosOrderService {
     const check = posBillRepository.findCheck(check_id);
     if (!check || String(check.order_id) !== String(order_id) || check.status !== 'open') throw new Error('[PosOrderService] Check tidak ditemukan atau sudah ditutup.');
     const checkPaid = posBillRepository.findCheckPaidAmount(check_id);
-    const checkRemaining = Number(check.allocated_amount || 0) - checkPaid;
-    if (value > checkRemaining) throw new Error('[PosOrderService] Pembayaran melebihi sisa Check.');
+    const checkRemaining = Math.max(0, Number(check.allocated_amount || 0) - checkPaid);
+    // POS currency is stored in whole rupiah. Allow only a tiny floating-point
+    // tolerance so persisted decimal arithmetic cannot reject an exact payment.
+    if (value > checkRemaining + 0.000001) {
+      throw new Error('[PosOrderService] Pembayaran melebihi sisa Check. Sisa Check: Rp ' + checkRemaining.toLocaleString('id-ID') + ', pembayaran: Rp ' + value.toLocaleString('id-ID') + '.');
+    }
     const orderPaid = posBillRepository.findOrderPaidAmount(order_id);
     const orderRemaining = Number(order.grand_total) - orderPaid;
     if (value > orderRemaining) throw new Error('[PosOrderService] Pembayaran melebihi sisa Order.');
