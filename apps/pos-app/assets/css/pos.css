@@ -75,7 +75,7 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-context-strip.pos-table-selected span{color:#15803d}
 .pos-context-strip.pos-table-selected .pos-btn{background:#fff;border-color:rgba(34,197,94,.45);color:#15803d}
 .pos-context-strip.pos-table-selected .pos-btn:hover{background:rgba(34,197,94,.22);border-color:#22c55e;color:#166534}
-.hidden{display:none!important}
+[hidden],.hidden{display:none!important}
 .pos-mobile-br{display:none}
 .pos-search-row{margin-bottom:14px;padding:0 2px}
 .pos-search-wrap{position:relative;display:flex;align-items:center;background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;transition:all .15s ease;box-shadow:0 1px 2px rgba(0,0,0,.02)}

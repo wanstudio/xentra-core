@@ -992,17 +992,25 @@
     if (additionBtn) {
       var canAdd=isDineIn && tx.canAdd();
       additionBtn.hidden=!canAdd;
+      additionBtn.classList.toggle('hidden', !canAdd);
     }
 
     var holdBtn=$('btn-pos-hold'), clearBtn=$('btn-pos-clear');
-    if (holdBtn) holdBtn.hidden=isExisting || isAddition;
-    if (clearBtn) clearBtn.hidden=isExisting;
+    if (holdBtn) {
+      holdBtn.hidden=isExisting || isAddition;
+      holdBtn.classList.toggle('hidden', isExisting || isAddition);
+    }
+    if (clearBtn) {
+      clearBtn.hidden=isExisting;
+      clearBtn.classList.toggle('hidden', isExisting);
+    }
 
     var tableLabel=$('pos-selected-table'),tableBtn=$('btn-pos-select-table');
     if(tableLabel) tableLabel.textContent=formatTableLabel(tx.getTable());
     if(tableBtn) {
       tableBtn.textContent=tx.getTable()?'Ubah':'Pilih Meja';
       tableBtn.hidden=isExisting || isAddition;
+      tableBtn.classList.toggle('hidden', isExisting || isAddition);
     }
 
     var cartTableLabel=$('pos-cart-selected-table'), cartTableBtn=$('btn-pos-cart-select-table');
@@ -1010,6 +1018,7 @@
     if(cartTableBtn) {
       cartTableBtn.textContent=tx.getTable()?'Ubah':'Pilih Meja';
       cartTableBtn.hidden=isExisting || isAddition;
+      cartTableBtn.classList.toggle('hidden', isExisting || isAddition);
     }
 
     var custInput=$('pos-customer-name'), noteInput=$('pos-order-note');
