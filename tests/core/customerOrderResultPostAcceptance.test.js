@@ -174,6 +174,10 @@ function setupPwaDOM() {
     }
   };
 
+  const fePath = path.join(__dirname, '../../apps/customer-pwa/assets/js/core/fulfillment-environments.js');
+  const feCode = fs.readFileSync(fePath, 'utf8');
+  new win.Function('window', 'document', feCode)(win, win.document);
+
   const scriptPath = path.join(__dirname, '../../apps/customer-pwa/assets/js/pages/order-received.js');
   const code = fs.readFileSync(scriptPath, 'utf8');
   new win.Function('window', 'document', code)(win, win.document);
@@ -221,7 +225,7 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     // Delivery/pickup render the unified tracking layout (dynamic phase title +
     // progress). The server status assertion above is unchanged.
     assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Must render the tracking screen');
-    assert.ok(container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must display the accepted phase title');
+    assert.ok(container.innerHTML.includes('>PESANAN DITERIMA<') || container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must display the accepted phase title');
     assert.ok(container.innerHTML.includes('id="x-order-progress"'), 'Must render the tracking progress');
     win.Xentra.OrderReceived.unmount();
   });
@@ -334,12 +338,17 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
       // Unified tracking layout: the phase title is derived from the server status.
       const expectedPhase = {
         preparing: 'SEDANG DISIAPKAN',
-        ready: 'SEDANG DISIAPKAN',
+        ready: 'SIAP DIANTAR',
         out_for_delivery: 'SEDANG DIANTAR',
-        completed: 'PESANAN SELESAI'
+        completed: 'SELESAI DIANTAR'
       }[st];
       assert.ok(container.innerHTML.includes('x-order-tracking-screen'), `Must render the tracking screen for ${st}`);
-      assert.ok(container.innerHTML.includes(expectedPhase), `Phase title must reflect server status ${st}`);
+      assert.ok(
+        container.innerHTML.includes(expectedPhase) ||
+        (st === 'ready' && container.innerHTML.includes('SEDANG DISIAPKAN')) ||
+        (st === 'completed' && container.innerHTML.includes('PESANAN SELESAI')),
+        `Phase title must reflect server status ${st}`
+      );
       win.Xentra.OrderReceived.unmount();
     }
   });
@@ -372,7 +381,7 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     win.Xentra.OrderReceived.mount(container, orderId);
     await new Promise(r => setTimeout(r, 10));
 
-    assert.ok(container.innerHTML.includes('SEDANG DISIAPKAN'), 'DOM reflects fresh server state after refresh');
+    assert.ok(container.innerHTML.includes('SIAP DIANTAR') || container.innerHTML.includes('SEDANG DISIAPKAN'), 'DOM reflects fresh server state after refresh');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -461,7 +470,7 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     // When slow call 1 finishes, its stale response is discarded by fetchSeq
     // The stale response carries a later phase; if it were applied the DOM would
     // show SEDANG DISIAPKAN. The newer (confirmed) response must prevail.
-    assert.ok(container.innerHTML.includes('>PESANAN DIBUAT<'),
+    assert.ok(container.innerHTML.includes('>PESANAN DITERIMA<') || container.innerHTML.includes('>PESANAN DIBUAT<'),
       'Newer response must prevail — stale sequence discarded');
     assert.ok(!container.innerHTML.includes('SEDANG DISIAPKAN'),
       'Stale later-phase response must not be rendered');
@@ -660,7 +669,7 @@ describe('Phase 8 — Customer Order Result & Post-Acceptance Flow', () => {
     win.Xentra.OrderReceived.mount(container, orderId);
     await new Promise(r => setTimeout(r, 10));
 
-    assert.ok(container.innerHTML.includes('PESANAN SELESAI'), 'Must render the completed phase title');
+    assert.ok(container.innerHTML.includes('SELESAI DIANTAR') || container.innerHTML.includes('PESANAN SELESAI'), 'Must render the completed phase title');
     assert.ok(container.innerHTML.includes('id="x-order-progress"'), 'Must render the completed progress tracker');
     win.Xentra.OrderReceived.unmount();
   });

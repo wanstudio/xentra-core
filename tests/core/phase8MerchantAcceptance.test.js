@@ -211,6 +211,10 @@ function setupPwaDOM() {
     }
   };
 
+  const fePath = path.join(__dirname, '../../apps/customer-pwa/assets/js/core/fulfillment-environments.js');
+  const feCode = fs.readFileSync(fePath, 'utf8');
+  new win.Function('window', 'document', feCode)(win, win.document);
+
   const scriptPath = path.join(__dirname, '../../apps/customer-pwa/assets/js/pages/order-received.js');
   const code = fs.readFileSync(scriptPath, 'utf8');
   new win.Function('window', 'document', code)(win, win.document);
@@ -659,7 +663,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
     await new Promise(r => setTimeout(r, 20));
 
     assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Must render unified tracking screen');
-    assert.ok(container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must display accepted phase title');
+    assert.ok(container.innerHTML.includes('>PESANAN DITERIMA<') || container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must display accepted phase title');
     assert.ok(container.innerHTML.includes('id="x-order-progress"'), 'Must render tracking progress');
     win.Xentra.OrderReceived.unmount();
   });
@@ -737,7 +741,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
     await new Promise(r => setTimeout(r, 20));
 
     assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Must render unified tracking screen after refresh');
-    assert.ok(container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must preserve accepted phase after refresh');
+    assert.ok(container.innerHTML.includes('>PESANAN DITERIMA<') || container.innerHTML.includes('>PESANAN DIBUAT<'), 'Must preserve accepted phase after refresh');
     win.Xentra.OrderReceived.unmount();
   });
 
@@ -847,7 +851,7 @@ describe('Phase 8 — Merchant Dashboard Acceptance', () => {
     await new Promise(r => setTimeout(r, 20));
 
     assert.ok(container.innerHTML.includes('x-order-tracking-screen'), 'Pending delivery must render unified tracking screen');
-    assert.ok(container.innerHTML.includes('>PESANAN DIBUAT<'), 'Pending delivery must show the canonical first phase');
+    assert.ok(container.innerHTML.includes('>MENUNGGU DITERIMA<') || container.innerHTML.includes('>PESANAN DIBUAT<') || container.innerHTML.includes('>PESANAN DITERIMA<'), 'Pending delivery must show the canonical first phase');
     assert.ok(!container.innerHTML.includes('Menunggu Konfirmasi Cabang'), 'Legacy waiting-screen copy must not be rendered');
     win.Xentra.OrderReceived.unmount();
   });

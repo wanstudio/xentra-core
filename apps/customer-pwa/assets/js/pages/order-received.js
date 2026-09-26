@@ -404,21 +404,47 @@
 
     // Backward-compatible fallback for stale deployments.
     var isPickup = type === 'pickup';
-    var steps = isPickup
-      ? ['Pesanan diterima', 'Sedang disiapkan', 'Siap diambil', 'Sudah diambil']
-      : ['Pesanan diterima', 'Sedang disiapkan', 'Siap diantar', 'Sedang diantar', 'Selesai diantar'];
+    var isDineIn = type === 'dine_in';
+    var isReservation = type === 'reservation';
+    var steps;
     var idx = 0;
-    if (status === 'preparing') idx = 1;
-    else if (status === 'ready') idx = 2;
-    else if (status === 'out_for_delivery') idx = 3;
-    else if (status === 'completed') idx = isPickup ? 3 : 4;
+    if (isPickup) {
+      steps = ['Pesanan diterima', 'Sedang disiapkan', 'Siap diambil', 'Sudah diambil'];
+      if (status === 'preparing') idx = 1;
+      else if (status === 'ready') idx = 2;
+      else if (status === 'completed') idx = 3;
+    } else if (isDineIn) {
+      steps = ['Pesanan diterima', 'Sedang disiapkan', 'Siap disajikan', 'Pesanan selesai'];
+      if (status === 'preparing') idx = 1;
+      else if (status === 'ready') idx = 2;
+      else if (status === 'completed') idx = 3;
+    } else if (isReservation) {
+      steps = ['Reservasi dibuat', 'Reservasi dikonfirmasi', 'Menunggu kedatangan'];
+      if (status === 'confirmed') idx = 1;
+      else if (status === 'active_table') idx = 2;
+    } else {
+      steps = ['Pesanan diterima', 'Sedang disiapkan', 'Siap diantar', 'Sedang diantar', 'Selesai diantar'];
+      if (status === 'preparing') idx = 1;
+      else if (status === 'ready') idx = 2;
+      else if (status === 'out_for_delivery') idx = 3;
+      else if (status === 'completed') idx = 4;
+    }
+
+    var title = 'PESANAN DITERIMA';
+    if (status === 'preparing') title = 'SEDANG DISIAPKAN';
+    else if (status === 'ready') title = isPickup ? 'SIAP DIAMBIL' : (isDineIn ? 'SIAP DISAJIKAN' : 'SIAP DIANTAR');
+    else if (status === 'out_for_delivery') title = 'SEDANG DIANTAR';
+    else if (status === 'completed') title = isPickup ? 'SUDAH DIAMBIL' : (isDineIn ? 'PESANAN SELESAI' : 'SELESAI DIANTAR');
+    else if (status === 'pending') title = 'MENUNGGU DITERIMA';
+
     return {
-      title: isPickup
-        ? (status === 'ready' ? 'SIAP DIAMBIL' : (status === 'completed' ? 'SUDAH DIAMBIL' : 'PESANAN DIBUAT'))
-        : (status === 'out_for_delivery' ? 'SEDANG DIANTAR' : (status === 'completed' ? 'SELESAI DIANTAR' : 'PESANAN DIBUAT')),
-      badge: isPickup ? '🛍️' : '🛵',
+      title: title,
+      badge: isPickup ? '🛍️' : (isDineIn ? '🍽️' : (isReservation ? '📅' : '🛵')),
       steps: steps,
-      doneCount: idx + 1
+      doneCount: idx + 1,
+      currentPhaseIndex: idx,
+      currentPhase: { label: steps[idx] || '', description: '' },
+      label: isPickup ? 'Pickup' : (isDineIn ? 'Dine-in' : (isReservation ? 'Reservasi' : 'Delivery'))
     };
   }
 
@@ -908,20 +934,40 @@
     var phase = resolveOrderPhase(status, orderType);
 
 
-    var statusTitle = phase.title;
-    var statusDesc = phase.currentPhase && phase.currentPhase.description
-      ? phase.currentPhase.description
-      : 'Status pesananmu diperbarui oleh cabang.';
-    var badgeIcon = phase.badge;
+    var statusTitle = 'Pesanan Diterima Cabang!';
+    var statusDesc = 'Cabang telah mengonfirmasi pesananmu. Dapur sedang menyiapkan makanan.';
+    var badgeIcon = '✓';
 
     if (status === 'preparing') {
+      statusTitle = 'Sedang Disiapkan di Dapur';
+      statusDesc = 'Dapur cabang sedang memasak dan menyiapkan pesananmu.';
       badgeIcon = '🍳';
     } else if (status === 'ready') {
+      if (orderType === 'delivery') {
+        statusTitle = 'Pesanan Siap Diantar';
+        statusDesc = 'Makanan sudah selesai dimasak dan siap diserahkan kepada kurir.';
+      } else if (orderType === 'pickup') {
+        statusTitle = 'Pesanan Siap Diambil!';
+        statusDesc = 'Makananmu sudah siap. Silakan ambil di konter cabang ' + UI.escape(order.branch_name || '') + '.';
+      } else if (orderType === 'dine_in') {
+        statusTitle = 'Pesanan Siap Disajikan';
+        statusDesc = 'Makananmu sudah siap dan akan segera disajikan ke mejamu.';
+      } else {
+        statusTitle = 'Pesanan Siap';
+        statusDesc = 'Pesananmu sudah selesai disiapkan.';
+      }
       badgeIcon = '🔔';
     } else if (status === 'out_for_delivery') {
+      statusTitle = 'Dalam Pengantaran Kurir';
+      statusDesc = 'Kurir sedang dalam perjalanan mengantarkan pesanan ke alamat tujuan.';
       badgeIcon = '🛵';
     } else if (status === 'completed') {
+      statusTitle = 'Pesanan Selesai';
+      statusDesc = 'Pesanan telah selesai dinikmati. Terima kasih telah memesan di ' + UI.escape(order.branch_name || 'kami') + '!';
       badgeIcon = '🎉';
+    } else if (orderType === 'reservation') {
+      statusTitle = 'Reservasi Berhasil Dikonfirmasi!';
+      statusDesc = 'Reservasi mejamu sudah tercatat di cabang ' + UI.escape(order.branch_name || '') + '. Kasir akan melakukan Check-in saat kamu tiba.';
     }
 
     // Primary phase completion comes entirely from the Fulfillment Environment
