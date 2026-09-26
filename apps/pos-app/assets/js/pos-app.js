@@ -30,7 +30,8 @@
     activeOrderLocked: false,
     activeAdditionalMode: false,
     additionalCart: [],
-    pendingAdditions: []
+    pendingAdditions: [],
+    additionalClientTransactionId: null
   };
 
   function $(id) { return document.getElementById(id); }
@@ -2237,6 +2238,7 @@
     if(!state.activeOrderLocked || state.activeAdditionalMode) return;
     state.activeAdditionalMode=true;
     state.additionalCart=[];
+    state.additionalClientTransactionId='posadd_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
     if($('pos-order-note')) $('pos-order-note').value='';
     hideModal();
     renderCart();
@@ -2247,6 +2249,7 @@
   function cancelAdditionalOrderMode(){
     state.activeAdditionalMode=false;
     state.additionalCart=[];
+    state.additionalClientTransactionId=null;
     hideModal();
     renderCart();
     renderMenu();
@@ -2261,10 +2264,11 @@
       var result=await request('/pos/orders/'+encodeURIComponent(state.activeHeldOrderId)+'/additions',{
         method:'POST',
         headers:headers(),
-        body:JSON.stringify({items:state.additionalCart})
+        body:JSON.stringify({items:state.additionalCart,client_transaction_id:state.additionalClientTransactionId})
       });
       state.activeAdditionalMode=false;
       state.additionalCart=[];
+      state.additionalClientTransactionId=null;
       state.pendingAdditions=(state.pendingAdditions||[]).concat(result.addition?[result.addition]:[]);
       hideModal();
       await refreshActiveOrderContext(state.activeHeldOrderId);
