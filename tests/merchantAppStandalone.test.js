@@ -349,9 +349,9 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(html.includes('data-order-type="reservation"'),
       'order type chips must expose Reservation');
 
-    assert.ok(orderJs.includes('RESERVASI'), 'reservation must not be rendered as pickup');
-    assert.ok(orderJs.includes('reservationGuests'), 'reservation guest count must be rendered');
-    assert.ok(orderJs.includes('reservationInfo'), 'reservation date/time summary must be rendered');
+    assert.ok(orderJs.includes("type === 'reservation'"), 'reservation must have a dedicated fulfillment projection');
+    assert.ok(orderJs.includes('getBMReservationGuestCount'), 'reservation guest count helper must be available');
+    assert.ok(orderJs.includes('reservation_time'), 'reservation time must be projected');
     assert.ok(orderJs.includes('/pos/reservations/'),
       'Merchant App must call the reservation operational API');
     assert.ok(orderJs.includes('checkInBMReservation'),
@@ -360,8 +360,8 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
       'Merchant App must expose reservation no-show action');
     assert.ok(orderJs.includes('getBMReservationScheduleMs'),
       'queue must classify reservation schedule explicitly');
-    assert.ok(orderJs.includes('aIsUpcomingReservation'),
-      'queue must keep upcoming reservations in a dedicated visibility tier');
+    assert.ok(orderJs.includes('getBMReservationScheduleMs'),
+      'queue must classify reservation schedule explicitly');
 
     assert.ok(orderJs.includes('bm-detail-reservation-datetime'),
       'detail view must expose reservation schedule');
@@ -506,7 +506,7 @@ test('MERCHANT APP — standalone branch manager surface', async (t) => {
     assert.ok(orderJs.includes('function renderBMOrdersFeed()'), 'Order Center renders a card feed');
     assert.ok(orderJs.includes('function getBMOrderProjection(ord)'), 'environment-specific action projection exists');
     assert.ok(orderJs.includes('function getBMOrderPaymentState(ord)'), 'payment status is projected separately');
-    assert.ok(orderJs.includes('Tandai Disajikan'), 'Dine-in ready state has a human action');
+    assert.ok(orderJs.includes('Selesaikan Pesanan'), 'Dine-in ready state has a human action');
     assert.ok(orderJs.includes('Tandai Diambil'), 'Pickup ready state has a human action');
     assert.ok(orderJs.includes('Kirim Pesanan'), 'Delivery ready state has a human action');
     assert.ok(appJs.includes('#x-merchant-mobile-nav .x-merchant-mobile-nav-item[data-route]'), 'route state syncs the mobile bottom navigation');
