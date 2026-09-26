@@ -1088,40 +1088,48 @@
   }
 
   function changeQty(i,d){
-    var cart=getComposerCart();
-    if(isOrderLockedForEditing()) return showOrderLockedWarning();
-    if(!cart[i])return;
-    cart[i].quantity += d;
-    if(cart[i].quantity<=0) cart.splice(i,1);
-    renderCart();
+    try{
+      composer().changeQty(i,d);
+      renderCart();
+    }catch(e){
+      showOrderLockedWarning();
+    }
   }
 
   function decrementProduct(p, e){
-    if (e && e.stopPropagation) e.stopPropagation();
-    if(isOrderLockedForEditing()) return showOrderLockedWarning();
-    var cart=getComposerCart();
-    for (var i = cart.length - 1; i >= 0; i--) {
-      if (String(cart[i].product_id) === String(p.id)) {
-        changeQty(i, -1);
-        break;
-      }
-    }
-  }
-
-  function incrementProduct(p, e){
-    if (e && e.stopPropagation) e.stopPropagation();
-    if(isOrderLockedForEditing()) return showOrderLockedWarning();
-    var cart=getComposerCart();
-    if (optionGroups(p).length > 0) {
-      for (var i = cart.length - 1; i >= 0; i--) {
-        if (String(cart[i].product_id) === String(p.id)) {
-          changeQty(i, 1);
+    if(e&&e.stopPropagation)e.stopPropagation();
+    try{
+      var items=composer().getDisplayItems();
+      for(var i=items.length-1;i>=0;i--){
+        if(String(items[i].product_id)===String(p.id)){
+          composer().changeQty(i,-1);
+          renderCart();
           return;
         }
       }
-      return openProductOptions(p);
+    }catch(err){
+      showOrderLockedWarning();
     }
-    return addConfiguredProduct(p, [], '');
+  }
+
+  function incrementProduct(p,e){
+    if(e&&e.stopPropagation)e.stopPropagation();
+    try{
+      var items=composer().getDisplayItems();
+      if(optionGroups(p).length>0){
+        for(var i=items.length-1;i>=0;i--){
+          if(String(items[i].product_id)===String(p.id)){
+            composer().changeQty(i,1);
+            renderCart();
+            return;
+          }
+        }
+        return openProductOptions(p);
+      }
+      return addConfiguredProduct(p,[], '');
+    }catch(err){
+      showOrderLockedWarning();
+    }
   }
 
 
