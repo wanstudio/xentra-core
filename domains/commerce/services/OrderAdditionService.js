@@ -74,31 +74,65 @@ class OrderAdditionService {
         items: JSON.parse(existing.items_payload || '[]')
       };
     }
+
     const verifiedItems = this._verifiedItems({ brand_id, branch_id, order, items });
     const subtotal = verifiedItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
     const now = new Date().toISOString();
-    const sequenceNo = additionRepository.nextSequence(order.id);
     const additionId = 'add_' + crypto.randomBytes(8).toString('hex');
 
-    additionRepository.insertBatch({
-      id: additionId,
-      orderId: order.id,
-      branchId: order.branch_id,
-      diningSessionId: order.dining_session_id,
-      sequenceNo,
-      sourceChannel,
-      createdBy,
-      clientTransactionId: client_transaction_id,
-      itemsPayload: JSON.stringify(verifiedItems),
-      subtotal,
-      createdAt: now,
-      updatedAt: now
-    });
+    orderRepository.beginTransaction();
+    try {
+      const lockedOrder = this._loadParent({ order_id, brand_id, branch_id });
+      const lockedExisting = additionRepository.findByClientTransactionId(lockedOrder.id, client_transaction_id);
+      if (lockedExisting) {
+        orderRepository.rollbackTransaction();
+        return {
+          success: true,
+          idempotent: true,
+          status: lockedExisting.status === 'pending_acceptance' ? 'PENDING_ACCEPTANCE' : lockedExisting.status,
+          addition: lockedExisting,
+          items: JSON.parse(lockedExisting.items_payload || '[]')
+        };
+      }
+
+      const sequenceNo = additionRepository.nextSequence(lockedOrder.id);
+      additionRepository.insertBatch({
+        id: additionId,
+        orderId: lockedOrder.id,
+        branchId: lockedOrder.branch_id,
+        diningSessionId: lockedOrder.dining_session_id,
+        sequenceNo,
+        sourceChannel: source_channel,
+        createdBy: created_by,
+        clientTransactionId: client_transaction_id,
+        itemsPayload: JSON.stringify(verifiedItems),
+        subtotal,
+        createdAt: now,
+        updatedAt: now
+      });
+
+      orderRepository.commitTransaction();
+    } catch (err) {
+      try { orderRepository.rollbackTransaction(); } catch (_) {}
+      if (client_transaction_id && (String(err.message || '').includes('idx_order_addition_batches_client_tx') || String(err.message || '').includes('order_id, client_transaction_id'))) {
+        const duplicate = additionRepository.findByClientTransactionId(order.id, client_transaction_id);
+        if (duplicate) {
+          return {
+            success: true,
+            idempotent: true,
+            status: duplicate.status === 'pending_acceptance' ? 'PENDING_ACCEPTANCE' : duplicate.status,
+            addition: duplicate,
+            items: JSON.parse(duplicate.items_payload || '[]')
+          };
+        }
+      }
+      throw err;
+    }
 
     await events.EventBus.publish({
       type: 'commerce.order.addition.created',
       producer: 'commerce',
-      payload: { order_id: order.id, order_number: order.order_number, addition_id: additionId, sequence_no: sequenceNo, branch_id: order.branch_id, dining_session_id: order.dining_session_id, source_channel, items: verifiedItems, subtotal }
+      payload: { order_id: order.id, order_number: order.order_number, addition_id: additionId, sequence_no: additionRepository.findById(additionId).sequence_no, branch_id: order.branch_id, dining_session_id: order.dining_session_id, source_channel, items: verifiedItems, subtotal }
     }).catch(() => {});
 
     return { success: true, status: 'PENDING_ACCEPTANCE', addition: additionRepository.findById(additionId), items: verifiedItems };
