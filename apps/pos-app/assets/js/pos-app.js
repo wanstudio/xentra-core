@@ -952,7 +952,9 @@
     if (pay) pay.textContent=money(displayTotal);
 
     if (btn) {
-      btn.querySelector('span') && (btn.querySelector('span').textContent = state.activeAdditionalMode ? 'Kirim Tambahan '+money(displayTotal) : 'Bayar '+money(displayTotal));
+      btn.innerHTML = state.activeAdditionalMode
+        ? 'Kirim Tambahan <span>'+money(displayTotal)+'</span>'
+        : 'Bayar <span>'+money(displayTotal)+'</span>';
       btn.disabled=!displayCart.length || !state.shift || !!state.shift.active_break;
       btn.classList.toggle('pos-btn-additional-submit', !!state.activeAdditionalMode);
     }
