@@ -2206,14 +2206,11 @@
     if(!state.activeHeldOrderId) return toast('Bayar masing-masing tersedia setelah pesanan Hold dibuka kembali di kasir.');
     if(!state.cart.length) return toast('Cart masih kosong.');
     try{
-      if(state.activeHeldBillId){
-        var customerName=$('pos-customer-name').value.trim()||'Tamu';
-        await request('/pos/held-orders/'+encodeURIComponent(state.activeHeldBillId),{method:'PUT',headers:headers(),body:JSON.stringify({items:state.cart,customer_name:customerName,customer_phone:''})});
-      }
+      // Payment allocation is a Check-level operation. Never mutate the
+      // canonical Order/pos_held_orders merely to open the allocation UI.
       await openCheckManager(state.activeHeldOrderId);
     }catch(e){toast(e.message);}
   }
-
   function resetSale(){state.cart=[];state.selectedTable=null;state.activeHeldOrderId=null;state.activeHeldBillId=null;$('pos-selected-table').textContent='Belum dipilih';$('pos-customer-name').value='';$('pos-order-note').value='';renderCart();}
 
   function showModal(html, extraClass){
