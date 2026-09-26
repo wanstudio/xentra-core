@@ -1019,6 +1019,38 @@
         }
       }
 
+      // Pending Additional Orders require their own explicit acceptance action.
+      var pendingAdditions = (ord.additions || []).filter(function (addition) {
+        return addition.status === 'pending_acceptance';
+      });
+      var tbodyAdditions = $('bm-detail-items-tbody');
+      if (tbodyAdditions && pendingAdditions.length) {
+        var currentItemsHtml = tbodyAdditions.innerHTML;
+        var additionsHtml = pendingAdditions.map(function (addition) {
+          var header = '<tr><td colspan="5" style="background:#fff7ed;border-top:2px solid #fed7aa;padding:10px 12px;">' +
+            '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;">' +
+              '<div><strong>Tambahan #' + esc(addition.sequence_no) + '</strong> <span class="x-badge x-badge-warning">MENUNGGU DITERIMA</span>' +
+                '<small style="display:block;color:#6b7280;margin-top:3px;">' + esc(addition.source_channel || 'POS') + ' · ' + esc(addition.created_at || '') + '</small></div>' +
+              '<div style="display:flex;gap:6px;">' +
+                '<button type="button" class="x-btn-primary" style="font-size:11px;padding:5px 9px;" onclick="decideBMOrderAddition(\'' + esc(ord.id) + '\',\'' + esc(addition.id) + '\',\'accept\')">Terima</button>' +
+                '<button type="button" class="x-btn-secondary" style="font-size:11px;padding:5px 9px;color:#dc2626;border-color:#fecaca;" onclick="decideBMOrderAddition(\'' + esc(ord.id) + '\',\'' + esc(addition.id) + '\',\'reject\')">Tolak</button>' +
+              '</div>' +
+            '</div></td></tr>';
+          var itemsHtml = (addition.items || []).map(function (it) {
+            var sub = it.subtotal != null ? it.subtotal : ((it.unit_price || 0) * (it.quantity || 1));
+            return '<tr>' +
+              '<td><span style="padding-left:12px;">↳ ' + esc(it.name || it.product_name || it.product_id) + '</span></td>' +
+              '<td>' + formatMoney(it.unit_price || 0) + '</td>' +
+              '<td>' + (it.quantity || 1) + '</td>' +
+              '<td><small class="text-muted">' + esc(it.note || '—') + '</small></td>' +
+              '<td class="text-right"><strong>' + formatMoney(sub) + '</strong></td>' +
+            '</tr>';
+          }).join('');
+          return header + itemsHtml;
+        }).join('');
+        tbodyAdditions.innerHTML = currentItemsHtml + additionsHtml;
+      }
+
       // Render audit logs
       var logsList = $('bm-detail-logs-list');
       if (logsList) {
