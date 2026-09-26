@@ -12,24 +12,21 @@ const posHtml = fs.readFileSync(path.join(ROOT, 'apps/pos-app/index.html'), 'utf
 
 function makeFakeIndexedDB() {
   const databases = {};
+
   function clone(v) {
     return v == null ? v : JSON.parse(JSON.stringify(v));
   }
-  function request(value, fail) {
-    const r = { result: undefined, error: null, onsuccess: null, onerror: null };
-    queueMicrotask(() => {
-      if (fail) {
-        r.error = fail instanceof Error ? fail : new Error(String(fail));
-        if (r.onerror) r.onerror({ target: r });
-      } else {
-        r.result = clone(value);
-        if (r.onsuccess) r.onsuccess({ target: r });
-      }
-    });
-    return r;
-  }
+
   function open(name, version) {
-    const req = { result: null, error: null, onsuccess: null, onerror: null, onupgradeneeded: null, onblocked: null };
+    const req = {
+      result: null,
+      error: null,
+      onsuccess: null,
+      onerror: null,
+      onupgradeneeded: null,
+      onblocked: null
+    };
+
     queueMicrotask(() => {
       let db = databases[name];
       const first = !db;
@@ -43,8 +40,10 @@ function makeFakeIndexedDB() {
       }
       if (req.onsuccess) req.onsuccess({ target: req });
     });
+
     return req;
   }
+
   function makeDb(db) {
     return {
       objectStoreNames: {
@@ -55,12 +54,12 @@ function makeFakeIndexedDB() {
           db.stores[name] = { keyPath: options.keyPath, rows: {} };
           db.storeNames.push(name);
         }
-        return {
-          createIndex() {}
-        };
+        return { createIndex() {} };
       },
       transaction: (names, mode) => {
         let finished = false;
+        let pending = 0;
+        let completionScheduled = false;
         const tx = {
           error: null,
           oncomplete: null,
@@ -74,30 +73,57 @@ function makeFakeIndexedDB() {
           objectStore(name) {
             const backing = db.stores[name];
             if (!backing) throw new Error('STORE_NOT_FOUND:' + name);
+
+            function schedule(value) {
+              pending += 1;
+              const req = {
+                result: undefined,
+                error: null,
+                onsuccess: null,
+                onerror: null
+              };
+              queueMicrotask(() => {
+                req.result = clone(value);
+                pending -= 1;
+                if (req.onsuccess) req.onsuccess({ target: req });
+                scheduleComplete();
+              });
+              return req;
+            }
+
             return {
               put(value) {
                 backing.rows[value[backing.keyPath]] = clone(value);
-                return request(value);
+                return schedule(value);
               },
               get(key) {
-                return request(backing.rows[key] || undefined);
+                return schedule(backing.rows[key] || undefined);
               },
               getAll() {
-                return request(Object.values(backing.rows));
+                return schedule(Object.values(backing.rows));
               }
             };
           }
         };
-        queueMicrotask(() => {
-          if (finished) return;
-          finished = true;
-          if (tx.oncomplete) tx.oncomplete();
-        });
+
+        function scheduleComplete() {
+          if (completionScheduled || finished) return;
+          completionScheduled = true;
+          queueMicrotask(() => {
+            completionScheduled = false;
+            if (finished || pending !== 0) return;
+            finished = true;
+            if (tx.oncomplete) tx.oncomplete();
+          });
+        }
+
+        scheduleComplete();
         return tx;
       },
       close() {}
     };
   }
+
   return { open };
 }
 
