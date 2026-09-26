@@ -171,6 +171,50 @@ router.get('/customer/dining-session', requireCustomerAuth(), (req, res) => {
   }
 });
 
+router.post('/customer/dining-session/additions', requireCustomerAuth(), async (req, res) => {
+  try {
+    const customerPhone = req.customer.phone;
+    const { order_id, items = [] } = req.body || {};
+    if (!customerPhone) return res.status(400).json({ success: false, error: 'Identitas customer belum memiliki nomor WhatsApp.' });
+    if (!order_id) return res.status(400).json({ success: false, error: 'order_id wajib diisi.' });
+
+    const owner = db.prepare(`
+      SELECT o.id, o.branch_id, o.dining_session_id
+      FROM orders o
+      JOIN dining_sessions ds ON ds.id = o.dining_session_id
+      JOIN branches b ON b.id = o.branch_id
+      WHERE o.id = ?
+        AND o.order_type = 'dine_in'
+        AND ds.status = 'active'
+        AND ds.customer_phone = ?
+        AND b.brand_id = ?
+      LIMIT 1
+    `).get(order_id, customerPhone, req.brand_id);
+
+    if (!owner) {
+      return res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN_DINING_SESSION',
+        message: 'Order tidak berada pada Dining Session aktif milik Anda.'
+      });
+    }
+
+    const { OrderAdditionService } = require('../../domains/commerce');
+    const result = await OrderAdditionService.submit({
+      order_id: owner.id,
+      brand_id: req.brand_id,
+      branch_id: owner.branch_id,
+      items,
+      source_channel: 'customer_app',
+      created_by: req.customer.customerId || req.customer.customer_id || customerPhone
+    });
+
+    return res.status(201).json(result);
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/customer/dining-session/claim', requireCustomerAuth(), (req, res) => {
   try {
     const { qr_token, branch_id } = req.body || {};
