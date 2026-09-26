@@ -384,40 +384,44 @@
     if (btn && Router) btn.onclick = function () { Router.navigate('home'); };
   }
 
-  // ─── Customer phase model (SINGLE SOURCE for status title + progress) ──
-  // Backend lifecycle (OrderStateMachine, unchanged):
-  //   pending → confirmed → preparing → ready → out_for_delivery → completed
-  // Pickup short-circuits: ready → completed (no `ready_for_pickup` status exists).
-  // Both the big title and the progress steps below derive from this ONE
-  // function, so they can never disagree about the active phase.
-  function resolveOrderPhase(status, orderType) {
-    var isPickup = orderType === 'pickup';
-    // Phase-3 label is dynamic: "Siap / Diantar" while the courier has not
-    // taken over, "Sedang diantar" once delivery is active or finished.
-    var delivering = status === 'out_for_delivery' || status === 'completed';
-    var step3 = isPickup ? 'Siap diambil' : (delivering ? 'Sedang diantar' : 'Siap / Diantar');
-    var steps = ['Pesanan dibuat', 'Sedang disiapkan', step3, 'Selesai'];
-    var title = 'PESANAN DIBUAT';
-    var badge = '🧾';
-    var doneCount = 1; // the order exists → "Pesanan dibuat" is done
-    if (status === 'preparing') {
-      title = 'SEDANG DISIAPKAN'; badge = '🍳'; doneCount = 2;
-    } else if (status === 'ready') {
-      if (isPickup) { title = 'SIAP DIAMBIL'; badge = '🔔'; doneCount = 3; }
-      else { title = 'SEDANG DISIAPKAN'; badge = '🍳'; doneCount = 2; }
-    } else if (status === 'out_for_delivery') {
-      // out_for_delivery is a delivery-only transition (ready → completed for
-      // pickup). If it ever appears on pickup, stay in the pickup phase.
-      if (isPickup) { title = 'SIAP DIAMBIL'; badge = '🔔'; doneCount = 3; }
-      else { title = 'SEDANG DIANTAR'; badge = '🛵'; doneCount = 3; }
-    } else if (status === 'completed') {
-      title = 'PESANAN SELESAI'; badge = '🎉'; doneCount = 4;
+  // ─── Customer fulfillment projection ─────────────────────────────────────
+  // Primary phases come from the shared Fulfillment Environment contract.
+  // Backend status remains authoritative; this function only projects it into
+  // customer-facing language and the appropriate phase count for the order type.
+  function resolveOrderPhase(status, orderType, context) {
+    var FE = window.Xentra && window.Xentra.FulfillmentEnvironments;
+    var type = FE && FE.normalize ? FE.normalize(orderType || 'delivery') : (orderType || 'delivery');
+
+    if (FE && typeof FE.project === 'function') {
+      var projected = FE.project(type, status, context || {});
+      return {
+        title: String(projected.statusLabel || projected.currentPhase.label || '').toUpperCase(),
+        badge: type === 'delivery' ? '🛵' : (type === 'pickup' ? '🛍️' : (type === 'dine_in' ? '🍽️' : '📅')),
+        steps: projected.phases.map(function (p) { return p.label; }),
+        doneCount: projected.currentPhaseIndex + (projected.isException ? 0 : 1)
+      };
     }
-    // pending / confirmed → PESANAN DIBUAT, doneCount = 1
-    return { title: title, badge: badge, steps: steps, doneCount: doneCount };
+
+    // Backward-compatible fallback for stale deployments.
+    var isPickup = type === 'pickup';
+    var steps = isPickup
+      ? ['Pesanan diterima', 'Sedang disiapkan', 'Siap diambil', 'Sudah diambil']
+      : ['Pesanan diterima', 'Sedang disiapkan', 'Siap diantar', 'Sedang diantar', 'Selesai diantar'];
+    var idx = 0;
+    if (status === 'preparing') idx = 1;
+    else if (status === 'ready') idx = 2;
+    else if (status === 'out_for_delivery') idx = 3;
+    else if (status === 'completed') idx = isPickup ? 3 : 4;
+    return {
+      title: isPickup
+        ? (status === 'ready' ? 'SIAP DIAMBIL' : (status === 'completed' ? 'SUDAH DIAMBIL' : 'PESANAN DIBUAT'))
+        : (status === 'out_for_delivery' ? 'SEDANG DIANTAR' : (status === 'completed' ? 'SELESAI DIANTAR' : 'PESANAN DIBUAT')),
+      badge: isPickup ? '🛍️' : '🛵',
+      steps: steps,
+      doneCount: idx + 1
+    };
   }
 
-  // Vertical timeline: ● done (theme) / ○ todo, connected by │ lines.
   function renderPhaseProgress(phase) {
     var html = '<div id="x-order-progress" style="display:flex;flex-direction:column;">';
     for (var i = 0; i < phase.steps.length; i++) {
