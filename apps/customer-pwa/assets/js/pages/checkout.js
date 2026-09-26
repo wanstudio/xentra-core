@@ -4449,6 +4449,81 @@
     };
   }
 
+  function proceedCreateAdditionalOrder(items) {
+    var orderId = getActiveDineInOrderId();
+    var btn = $('x-btn-submit-order');
+    if (!orderId) {
+      state.isSubmitting = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Pesan Sekarang';
+      }
+      if (UI && UI.toast) UI.toast('Tagihan meja aktif tidak ditemukan. Silakan muat ulang halaman.');
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Mengirim tambahan…';
+    }
+
+    var payloadItems = items.map(function (i) {
+      return {
+        id: i.id,
+        product_id: i.product_id || i.id,
+        quantity: Number(i.quantity) || 1,
+        expected_price: Number(i.price) || 0,
+        name: i.name || '',
+        note: i.note || (Store.getNote ? Store.getNote(i.id, i.branch_id) : ''),
+        branch_id: i.branch_id || null,
+        options: i.options || i.modifiers || []
+      };
+    });
+
+    API.post('/customer/dining-session/additions', {
+      order_id: orderId,
+      items: payloadItems
+    }).then(function (res) {
+      if (!res || !res.success) {
+        throw new Error((res && (res.message || res.error)) || 'Tambahan pesanan gagal dikirim.');
+      }
+
+      items.forEach(function (i) {
+        if (Store && Store.removeCartItem) Store.removeCartItem(i.id, i.branch_id);
+        else if (Store && Store.setQty) Store.setQty(i.id, 0, i.branch_id);
+      });
+
+      state.isSubmitting = false;
+      state.isRedirectingToPayment = false;
+      state.cashTendered = null;
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Pesan Sekarang';
+        btn.style.opacity = '1';
+      }
+      refreshOpenBill().then(function () {
+        renderLayout();
+        calculateTotals();
+      });
+      if (UI && UI.toast) UI.toast('Tambahan pesanan dikirim. Menunggu resto menerima pesanan.');
+    }).catch(function (err) {
+      state.isSubmitting = false;
+      state.isRedirectingToPayment = false;
+      if (window.Xentra && typeof window.Xentra.hideSplash === 'function') {
+        window.Xentra.hideSplash();
+      }
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Kirim Tambahan';
+        btn.style.opacity = '1';
+      }
+      if (UI && UI.toast) UI.toast(err.message || 'Tambahan pesanan gagal dikirim.');
+    });
+  }
+
   function proceedCreateOrder() {
     var btn = $('x-btn-submit-order');
     if (btn) btn.textContent = 'Memproses pesanan…';
