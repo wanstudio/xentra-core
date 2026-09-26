@@ -7,6 +7,7 @@ const ROOT = path.resolve(__dirname, '..');
 const js = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/js/pos-app.js'), 'utf8');
 const html = fs.readFileSync(path.join(ROOT, 'apps/pos-app/index.html'), 'utf8');
 const css = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/css/pos.css'), 'utf8');
+const composerJs = fs.readFileSync(path.join(ROOT, 'apps/pos-app/assets/js/TransactionComposer.js'), 'utf8');
 
 describe('POS dine-in transaction composer', () => {
   it('keeps table context inside the cashier draft-sale flow', () => {
@@ -18,7 +19,7 @@ describe('POS dine-in transaction composer', () => {
   });
 
   it('allows menu-first and table-first without clearing cart', () => {
-    assert.ok(js.includes('state.selectedTable=t;'));
+    assert.ok(js.includes('composer().setTable(t);'));
     assert.ok(js.includes('renderCart();'));
     assert.ok(!js.includes("if(state.orderType==='dine_in'&&!state.selectedTable)return toast('Pilih meja untuk transaksi dine-in.')"));
   });
@@ -30,7 +31,13 @@ describe('POS dine-in transaction composer', () => {
   });
 
   it('uses cache-busted POS assets for the new composer UI', () => {
-    assert.ok(/\/pos\/assets\/css\/pos\.css\?v=1\.0\.[4-9]/.test(html));
-    assert.ok(/\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.[4-9]/.test(html));
+    assert.ok(/\/pos\/assets\/css\/pos\.css\?v=1\.0\.11/.test(html));
+    assert.ok(/\/pos\/assets\/js\/TransactionComposer\.js\?v=1\.0\.11/.test(html));
+    assert.ok(/\/pos\/assets\/js\/pos-app\.js\?v=1\.0\.11/.test(html));
+    assert.ok(html.indexOf('TransactionComposer.js') < html.indexOf('pos-app.js'));
+    assert.ok(composerJs.includes('MODES'));
+    assert.ok(composerJs.includes("NEW: 'new'"));
+    assert.ok(composerJs.includes("EXISTING: 'existing'"));
+    assert.ok(composerJs.includes("ADDITION: 'addition'"));
   });
 });
