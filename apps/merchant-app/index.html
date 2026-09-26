@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — tokens, toast, action-menu, crop editor, shell styles -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.5">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.6">
 </head>
 <body class="x-merchant-app">
   <div class="x-dash-layout">
@@ -95,7 +95,7 @@
           </div>
         </div>
 
-        <!-- Mobile shell: exact visual reference supplied for Merchant Home -->
+        <!-- Mobile shell: exact visual reference supplied for Merchant Home (Row 1 stays sticky) -->
         <div class="x-mobile-topbar">
           <div class="x-mobile-topbar-main">
             <div class="x-mobile-branch-pill" id="mobile-branch-badge" title="Cabang aktif">
@@ -114,19 +114,20 @@
               </button>
             </div>
           </div>
-
-          <div class="x-mobile-operational-row">
-            <button type="button" class="x-mobile-status-control" id="btn-mobile-toggle-open" onclick="toggleBranchOpen()" aria-label="Status cabang">
-              <span class="x-mobile-switch is-on" id="mobile-open-switch"><span></span></span>
-              <span id="mobile-open-label">Buka</span>
-            </button>
-            <button type="button" class="x-mobile-status-control x-mobile-online-control" id="btn-mobile-toggle-online" onclick="toggleBranchOnlineOrders()" aria-label="Order online">
-              <span>Order online:</span>
-              <span class="x-mobile-switch is-on" id="mobile-online-switch"><span></span></span>
-            </button>
-          </div>
         </div>
       </header>
+
+      <!-- Row 2: Operational status row (scrolls with page, slides under sticky Row 1) -->
+      <div class="x-mobile-operational-row">
+        <button type="button" class="x-mobile-status-control" id="btn-mobile-toggle-open" onclick="toggleBranchOpen()" aria-label="Status cabang">
+          <span class="x-mobile-switch is-on" id="mobile-open-switch"><span></span></span>
+          <span id="mobile-open-label">Buka</span>
+        </button>
+        <button type="button" class="x-mobile-status-control x-mobile-online-control" id="btn-mobile-toggle-online" onclick="toggleBranchOnlineOrders()" aria-label="Order online">
+          <span>Order online:</span>
+          <span class="x-mobile-switch is-on" id="mobile-online-switch"><span></span></span>
+        </button>
+      </div>
       <section id="tab-hari-ini" class="x-tab-content" data-tab="hari-ini">
         <div class="x-hari-ini-container">
           <!-- 1. Operational Status & Controls Surface -->
