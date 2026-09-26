@@ -802,146 +802,116 @@
   }
 
   function openOrderDetailsModal() {
-    if (!state.cart.length) {
-      return toast('Keranjang pesanan masih kosong.');
+    var displayCart=activeDisplayCart();
+    if (!displayCart.length) {
+      return toast(state.activeAdditionalMode ? 'Belum ada item tambahan.' : 'Keranjang pesanan masih kosong.');
     }
-    var t = total();
-    var totalQty = state.cart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0);
-    var isDineIn = state.orderType === 'dine_in';
-    var tableLabel = formatTableLabel(state.selectedTable);
-    var orderTypeLabel = isDineIn ? tableLabel : (state.orderType === 'pickup' ? 'Pickup' : 'Delivery');
+    var t=state.activeAdditionalMode ? additionalTotal() : total();
+    var totalQty=displayCart.reduce(function(n,i){return n+(Number(i.quantity)||0);},0);
+    var isDineIn=state.orderType==='dine_in';
+    var tableLabel=formatTableLabel(state.selectedTable);
+    var orderTypeLabel=isDineIn ? tableLabel : (state.orderType==='pickup'?'Pickup':'Delivery');
+    var locked=isOrderLockedForEditing();
+    var additionMode=!!state.activeAdditionalMode;
 
-    var html = '<div class="pos-modal-head-row">' +
-      '<div class="pos-modal-head-title">' +
-        '<h3>Rincian Pesanan</h3>' +
-        '<p>'+totalQty+' item · '+esc(orderTypeLabel)+'</p>' +
-      '</div>' +
-      '<button type="button" class="pos-modal-close-icon" id="pos-order-modal-close" title="Tutup" aria-label="Tutup">✕</button>' +
+    var html='<div class="pos-modal-head-row">'+
+      '<div class="pos-modal-head-title">'+
+        '<h3>'+(additionMode?'Tambah Pesanan':'Rincian Pesanan')+'</h3>'+
+        '<p>'+totalQty+' item · '+esc(orderTypeLabel)+'</p>'+
+      '</div>'+
+      '<button type="button" class="pos-modal-close-icon" id="pos-order-modal-close" title="Tutup" aria-label="Tutup">✕</button>'+
     '</div>';
 
-    if (isDineIn) {
-      html += '<div class="pos-order-modal-table-row">' +
-        '<span><strong>Meja:</strong> '+esc(tableLabel)+'</span>' +
-        '<button type="button" class="pos-btn small ghost" id="pos-order-modal-change-table">Ubah Meja</button>' +
+    if(additionMode){
+      html+='<div class="pos-order-addition-banner">Tambahan ini akan masuk ke Order yang sama setelah Merchant menerima pesanan.</div>';
+    } else if(locked){
+      html+='<div class="pos-order-locked-note">🔒 Pesanan sudah diproses Merchant. Menu lama tidak dapat diubah.</div>';
+    }
+
+    if(isDineIn){
+      html+='<div class="pos-order-modal-table-row"><span><strong>Meja:</strong> '+esc(tableLabel)+'</span>'+
+        (additionMode||locked?'':'<button type="button" class="pos-btn small ghost" id="pos-order-modal-change-table">Ubah Meja</button>')+
       '</div>';
     }
 
-    html += '<div class="pos-order-modal-items">';
-    state.cart.forEach(function(it, idx){
-      var optSummary = (it.options && it.options.length) ? optionSummary(it.options) : '';
-      html += '<div class="pos-order-modal-item">' +
-        '<div style="min-width:0;flex:1">' +
-          '<div class="pos-order-modal-item-name">'+esc(it.name)+'</div>' +
-          '<div class="pos-order-modal-item-meta">'+money(it.unit_price) + (optSummary ? '<div class="pos-order-modal-item-options">'+esc(optSummary)+'</div>' : '') + (it.note ? '<div class="pos-order-modal-item-note">Catatan: '+esc(it.note)+'</div>' : '') + '</div>' +
-        '</div>' +
-        '<div class="pos-cart-item-actions">' +
-          '<button type="button" class="pos-qty minus" data-order-modal-idx="'+idx+'" data-order-modal-d="-1" aria-label="Kurangi">' +
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
-          '</button>' +
-          '<span class="pos-qty-value">'+it.quantity+'</span>' +
-          '<button type="button" class="pos-qty plus" data-order-modal-idx="'+idx+'" data-order-modal-d="1" aria-label="Tambah">' +
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>' +
-          '</button>' +
-        '</div>' +
+    html+='<div class="pos-order-modal-items">';
+    displayCart.forEach(function(it,idx){
+      var optSummary=(it.options&&it.options.length)?optionSummary(it.options):'';
+      html+='<div class="pos-order-modal-item">'+
+        '<div style="min-width:0;flex:1">'+
+          '<div class="pos-order-modal-item-name">'+esc(it.name)+'</div>'+
+          '<div class="pos-order-modal-item-meta">'+money(it.unit_price)+(optSummary?'<div class="pos-order-modal-item-options">'+esc(optSummary)+'</div>':'')+(it.note?'<div class="pos-order-modal-item-note">Catatan: '+esc(it.note)+'</div>':'')+'</div>'+
+        '</div>'+
+        '<div class="pos-cart-item-actions">'+
+          '<button type="button" class="pos-qty minus" data-order-modal-idx="'+idx+'" data-order-modal-d="-1" aria-label="Kurangi"'+(locked?' aria-disabled="true"':'')+'>'+
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>'+
+          '</button>'+
+          '<span class="pos-qty-value">'+it.quantity+'</span>'+
+          '<button type="button" class="pos-qty plus" data-order-modal-idx="'+idx+'" data-order-modal-d="1" aria-label="Tambah"'+(locked?' aria-disabled="true"':'')+'>'+
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>'+
+          '</button>'+
+        '</div>'+
       '</div>';
     });
-    html += '</div>';
+    html+='</div>';
 
-    var custVal = $('pos-customer-name') ? $('pos-customer-name').value : '';
-    var noteVal = $('pos-order-note') ? $('pos-order-note').value : '';
+    if(!additionMode){
+      var custVal=$('pos-customer-name')?$('pos-customer-name').value:'';
+      var noteVal=$('pos-order-note')?$('pos-order-note').value:'';
+      html+='<div class="pos-form-row"><label>Nama Tamu (opsional)</label><input type="text" id="pos-modal-cust-name" value="'+esc(custVal)+'" placeholder="Nama tamu"'+(locked?' readonly':'')+'></div>';
+      html+='<div class="pos-form-row"><label>Catatan Order (opsional)</label><input type="text" id="pos-modal-order-note" value="'+esc(noteVal)+'" placeholder="Catatan untuk dapur/bar"'+(locked?' readonly':'')+'></div>';
+    }
 
-    html += '<div class="pos-form-row">' +
-      '<label>Nama Tamu (opsional)</label>' +
-      '<input type="text" id="pos-modal-cust-name" value="'+esc(custVal)+'" placeholder="Nama tamu">' +
-    '</div>';
-    html += '<div class="pos-form-row">' +
-      '<label>Catatan Order (opsional)</label>' +
-      '<input type="text" id="pos-modal-order-note" value="'+esc(noteVal)+'" placeholder="Catatan untuk dapur/bar">' +
-    '</div>';
+    html+='<div class="pos-order-modal-totals"><div class="pos-order-modal-subtotal"><span>Subtotal</span><strong>'+money(t)+'</strong></div>'+
+      '<div class="pos-order-modal-grand"><span>'+ (additionMode?'Total Tambahan':'Total Tagihan') +'</span><strong>'+money(t)+'</strong></div></div>';
 
-    html += '<div class="pos-order-modal-totals">' +
-      '<div class="pos-order-modal-subtotal"><span>Subtotal</span><strong>'+money(t)+'</strong></div>' +
-      '<div class="pos-order-modal-grand"><span>Total Tagihan</span><strong>'+money(t)+'</strong></div>' +
-    '</div>';
-
-    var heldCount = (state.held && state.held.length) ? state.held.length : ($('pos-held-count') ? (Number($('pos-held-count').textContent) || 0) : 0);
-
-    html += '<div class="pos-order-modal-actions">' +
-      '<div class="pos-order-modal-btn-row">' +
-        '<button type="button" class="pos-btn ghost small" id="pos-order-modal-hold" title="Tahan pesanan saat ini (Hold Bill)">Tahan</button>' +
-        '<button type="button" class="pos-btn ghost small" id="pos-order-modal-open-held" title="Buka daftar pesanan yang ditahan">Ditahan (<span id="pos-order-modal-held-count">'+heldCount+'</span>)</button>' +
-        '<button type="button" class="pos-btn ghost danger small" id="pos-order-modal-clear" title="Hapus pesanan">Delete</button>' +
-      '</div>' +
-      '<button type="button" class="pos-order-modal-pay-btn" id="pos-order-modal-pay">' +
-        '<span>Bayar '+money(t)+'</span>' +
-        '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">' +
-          '<polyline points="9 18 15 12 9 6"></polyline>' +
-        '</svg>' +
-      '</button>' +
-    '</div>';
+    var heldCount=(state.held&&state.held.length)?state.held.length:($('pos-held-count')?(Number($('pos-held-count').textContent)||0):0);
+    html+='<div class="pos-order-modal-actions"><div class="pos-order-modal-btn-row">';
+    if(!additionMode){
+      html+='<button type="button" class="pos-btn ghost small" id="pos-order-modal-open-held">Ditahan (<span id="pos-order-modal-held-count">'+heldCount+'</span>)</button>';
+    } else {
+      html+='<button type="button" class="pos-btn ghost small" id="pos-order-modal-addition-cancel">Batal Tambahan</button>';
+    }
+    html+='</div><button type="button" class="pos-order-modal-pay-btn" id="pos-order-modal-pay"><span>'+(additionMode?'Kirim Tambahan':'Bayar '+money(t))+'</span>'+
+      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button></div>';
 
     showModal(html);
 
-    $('pos-order-modal-close').onclick = hideModal;
-    if ($('pos-order-modal-change-table')) {
-      $('pos-order-modal-change-table').onclick = function(){
-        openTableSelector();
-      };
-    }
-    $('pos-order-modal-hold').onclick = async function(){
-      var cn = $('pos-modal-cust-name');
-      var on = $('pos-modal-order-note');
-      if (cn && $('pos-customer-name')) $('pos-customer-name').value = cn.value;
-      if (on && $('pos-order-note')) $('pos-order-note').value = on.value;
-      if(state.orderType==='dine_in' && !state.selectedTable){
-        return toast('Pilih meja sebelum menahan bill.');
+    $('pos-order-modal-close').onclick=hideModal;
+    if($('pos-order-modal-change-table')) $('pos-order-modal-change-table').onclick=function(){openTableSelector();};
+    if($('pos-order-modal-open-held')) $('pos-order-modal-open-held').onclick=function(){openHeld();};
+    if($('pos-order-modal-addition-cancel')) $('pos-order-modal-addition-cancel').onclick=function(){cancelAdditionalOrderMode();};
+
+    $('pos-order-modal-pay').onclick=function(){
+      if(additionMode){
+        submitAdditionalOrder();
+        return;
       }
-      await holdSale();
-      hideModal();
-    };
-    $('pos-order-modal-open-held').onclick = function(){
-      openHeld();
-    };
-    $('pos-order-modal-clear').onclick = function(){
-      resetSale();
-      hideModal();
-    };
-    $('pos-order-modal-pay').onclick = function(){
-      var cn = $('pos-modal-cust-name');
-      var on = $('pos-modal-order-note');
-      if (cn && $('pos-customer-name')) $('pos-customer-name').value = cn.value;
-      if (on && $('pos-order-note')) $('pos-order-note').value = on.value;
+      var cn=$('pos-modal-cust-name'), on=$('pos-modal-order-note');
+      if(cn&&$('pos-customer-name')&&!locked) $('pos-customer-name').value=cn.value;
+      if(on&&$('pos-order-note')&&!locked) $('pos-order-note').value=on.value;
       openPayModal();
     };
 
-    var cnInput = $('pos-modal-cust-name');
-    if (cnInput) {
-      cnInput.oninput = function(){ if($('pos-customer-name')) $('pos-customer-name').value = cnInput.value; };
-      bindModalEnter(cnInput, function(){
-        var on = $('pos-modal-order-note');
-        if (on) on.focus();
-      });
+    var cnInput=$('pos-modal-cust-name');
+    if(cnInput){
+      cnInput.oninput=function(){if($('pos-customer-name')&&!locked)$('pos-customer-name').value=cnInput.value;};
+      bindModalEnter(cnInput,function(){var on=$('pos-modal-order-note');if(on)on.focus();});
     }
-    var onInput = $('pos-modal-order-note');
-    if (onInput) {
-      onInput.oninput = function(){ if($('pos-order-note')) $('pos-order-note').value = onInput.value; };
-      bindModalEnter(onInput, function(){
-        var btn = $('pos-order-modal-pay');
-        if (btn) btn.click();
-      });
+    var onInput=$('pos-modal-order-note');
+    if(onInput){
+      onInput.oninput=function(){if($('pos-order-note')&&!locked)$('pos-order-note').value=onInput.value;};
+      bindModalEnter(onInput,function(){var payBtn=$('pos-order-modal-pay');if(payBtn)payBtn.click();});
     }
 
     document.querySelectorAll('[data-order-modal-idx]').forEach(function(btn){
-      btn.onclick = function(e){
+      btn.onclick=function(e){
         e.stopPropagation();
-        var idx = Number(btn.getAttribute('data-order-modal-idx'));
-        var d = Number(btn.getAttribute('data-order-modal-d'));
-        changeQty(idx, d);
-        if (!state.cart.length) {
-          hideModal();
-        } else {
-          openOrderDetailsModal();
-        }
+        var idx=Number(btn.getAttribute('data-order-modal-idx'));
+        var d=Number(btn.getAttribute('data-order-modal-d'));
+        changeQty(idx,d);
+        if(!activeDisplayCart().length) hideModal();
+        else openOrderDetailsModal();
       };
     });
   }
