@@ -28,6 +28,7 @@
     activeHeldOrderId: null,
     activeHeldBillId: null,
     activeOrderLocked: false,
+    composerMode: 'new',
     activeAdditionalMode: false,
     additionalCart: [],
     pendingAdditions: [],
@@ -917,12 +918,18 @@
     });
   }
 
+  function getComposerMode() {
+    if (state.activeAdditionalMode) return 'addition';
+    if (state.composerMode === 'existing' && state.activeHeldOrderId && state.activeOrderLocked && state.cart.length > 0) return 'existing';
+    return 'new';
+  }
+
   function getComposerCart() {
-    return state.activeAdditionalMode ? state.additionalCart : state.cart;
+    return getComposerMode() === 'addition' ? state.additionalCart : state.cart;
   }
 
   function isOrderLockedForEditing() {
-    return !!state.activeOrderLocked && !state.activeAdditionalMode;
+    return getComposerMode() === 'existing';
   }
 
   function showOrderLockedWarning() {
@@ -965,7 +972,7 @@
       payManyBtn.disabled=!canManyPay;
     }
     if (additionBtn) {
-      var canAdd=isDineIn && !!state.activeOrderLocked && !state.activeAdditionalMode && !!state.activeHeldOrderId;
+      var canAdd=isDineIn && getComposerMode() === 'existing';
       additionBtn.hidden=!canAdd;
       additionBtn.textContent=canAdd ? '+ Tambah Pesanan' : '+ Tambah Pesanan';
     }
@@ -2204,6 +2211,7 @@
     state.activeHeldOrderId=null;
     state.activeHeldBillId=null;
     state.activeOrderLocked=false;
+    state.composerMode='new';
     state.activeAdditionalMode=false;
     if($('pos-selected-table')) $('pos-selected-table').textContent='Belum dipilih';
     if($('pos-customer-name')) $('pos-customer-name').value='';
@@ -2218,6 +2226,7 @@
     if(!data || !data.order) throw new Error('Order aktif tidak ditemukan.');
     state.activeOrderLocked=['confirmed','preparing','ready'].indexOf(String(data.order.status))!==-1;
     state.pendingAdditions=(data.additions||[]).filter(function(a){return a.status==='pending_acceptance';});
+    state.composerMode = state.activeOrderLocked ? 'existing' : 'new';
     if(state.activeOrderLocked){
       state.cart=(data.items||[]).map(function(it){
         return {
@@ -2231,11 +2240,18 @@
         };
       }).filter(function(it){return it.quantity>0;});
     }
+    if (!state.cart.length) {
+      state.activeOrderLocked = false;
+      state.composerMode = 'new';
+    } else if (state.activeOrderLocked) {
+      state.composerMode = 'existing';
+    }
     return data;
   }
 
   function enterAdditionalOrderMode(){
     if(!state.activeOrderLocked || state.activeAdditionalMode) return;
+    state.composerMode='addition';
     state.activeAdditionalMode=true;
     state.additionalCart=[];
     state.additionalClientTransactionId='posadd_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
@@ -2250,6 +2266,7 @@
     state.activeAdditionalMode=false;
     state.additionalCart=[];
     state.additionalClientTransactionId=null;
+    state.composerMode=state.activeHeldOrderId && state.activeOrderLocked && state.cart.length ? 'existing' : 'new';
     hideModal();
     renderCart();
     renderMenu();
@@ -2269,6 +2286,7 @@
       state.activeAdditionalMode=false;
       state.additionalCart=[];
       state.additionalClientTransactionId=null;
+      state.composerMode='existing';
       state.pendingAdditions=(state.pendingAdditions||[]).concat(result.addition?[result.addition]:[]);
       hideModal();
       await refreshActiveOrderContext(state.activeHeldOrderId);
@@ -2347,6 +2365,7 @@
     state.activeHeldOrderId = h.order_id || null;
     state.activeHeldBillId = h.id || null;
     state.activeOrderLocked = false;
+    state.composerMode = 'new';
     state.activeAdditionalMode = false;
     state.additionalCart = [];
     state.pendingAdditions = [];
