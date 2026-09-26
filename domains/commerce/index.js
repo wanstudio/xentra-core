@@ -7,6 +7,7 @@ const LowStockThresholdModel = require('./models/LowStockThresholdModel');
 const PrePaymentVerificationGate = require('./services/PrePaymentVerificationGate');
 const OrderPlacementService = require('./services/OrderPlacementService');
 const FulfillmentEnvironmentService = require('./services/FulfillmentEnvironmentService');
+const OrderAdditionService = require('./services/OrderAdditionService');
 
 const COMMERCE_IDENTITY = {
   name: 'commerce',
@@ -61,5 +62,6 @@ module.exports = {
   CatalogService,
   PrePaymentVerificationGate,
   OrderPlacementService,
-  FulfillmentEnvironmentService
+  FulfillmentEnvironmentService,
+  OrderAdditionService
 };
