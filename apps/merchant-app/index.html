@@ -1487,6 +1487,78 @@
     </div>
   </div>
 
+  <!-- Mobile account page: opened from the top-bar profile button -->
+  <section class="x-mobile-account-page" id="x-mobile-account-page" aria-hidden="true">
+    <div class="x-mobile-account-statusbar-spacer"></div>
+    <header class="x-mobile-account-header">
+      <button type="button" class="x-mobile-account-back" id="btn-mobile-account-back" aria-label="Kembali">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </button>
+      <h1>Akun</h1>
+    </header>
+
+    <main class="x-mobile-account-content">
+      <button type="button" class="x-mobile-account-profile-card" id="mobile-account-profile-card">
+        <div class="x-mobile-account-profile-copy">
+          <div class="x-mobile-account-name-row">
+            <strong id="mobile-account-name">Pemilik Toko</strong>
+            <span id="mobile-account-role">Pemilik</span>
+          </div>
+          <span id="mobile-account-email">-</span>
+          <span id="mobile-account-phone">-</span>
+        </div>
+        <span class="x-mobile-account-chevron x-mobile-account-profile-chevron">›</span>
+      </button>
+
+      <section class="x-mobile-account-section">
+        <h2>Pengaturan GoFood</h2>
+        <button type="button" class="x-mobile-account-list-card x-mobile-account-single-row">
+          <span class="x-mobile-account-leading-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-2.5 8.5-2.5 8.5h17S18 16 18 9Z"></path><path d="M9.5 20h5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+          </span>
+          <span class="x-mobile-account-row-label">Notifikasi</span>
+          <span class="x-mobile-account-chevron">›</span>
+        </button>
+      </section>
+
+      <section class="x-mobile-account-section">
+        <h2>Info lainnya</h2>
+        <div class="x-mobile-account-list-card">
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"></circle><path d="M4 12h16M12 4a12 12 0 0 1 0 16M12 4a12 12 0 0 0 0 16"></path></svg></span>
+            <span class="x-mobile-account-row-label">Bahasa</span><span class="x-mobile-account-new">Baru</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 9h14v9H5z"></path><path d="M8 9V6h8v3M9 18v2h6v-2"></path></svg></span>
+            <span class="x-mobile-account-row-label">Printer</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M9.5 9a2.5 2.5 0 1 1 4.2 1.8c-1.1 1-1.7 1.2-1.7 2.7M12 17h.01"></path></svg></span>
+            <span class="x-mobile-account-row-label">Bantuan</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5.2-3.5 8.4-8 10-4.5-1.6-8-4.8-8-10V6z"></path><path d="M12 9v4M12 16h.01"></path></svg></span>
+            <span class="x-mobile-account-row-label">Kebijakan privasi</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 5h10l4 4v10H5z"></path><path d="M15 5v4h4M9 12h6M9 15h4"></path></svg></span>
+            <span class="x-mobile-account-row-label">Syarat dan Ketentuan</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"></path></svg></span>
+            <span class="x-mobile-account-row-label">Beri kami nilai</span><span class="x-mobile-account-value">v5.51.0</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+          <button type="button" class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.5 20c.8-4 3.3-6 7.5-6s6.7 2 7.5 6"></path></svg></span>
+            <span class="x-mobile-account-row-label">Pengaturan akun</span><span class="x-mobile-account-chevron">›</span>
+          </button>
+        </div>
+      </section>
+
+      <button type="button" class="x-mobile-account-logout" id="btn-mobile-account-logout">Keluar</button>
+    </main>
+  </section>
+
   <!-- Mobile-first Merchant navigation: visual source of truth -->
   <nav class="x-merchant-mobile-nav" id="x-merchant-mobile-nav" aria-label="Navigasi Merchant">
     <button type="button" class="x-merchant-mobile-nav-item active" data-route="hari-ini" onclick="navigateTo('hari-ini')">
