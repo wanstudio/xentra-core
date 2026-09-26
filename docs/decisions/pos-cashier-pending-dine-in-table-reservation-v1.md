@@ -75,3 +75,14 @@ This is intentionally different from:
 
 - `occupied` = **TERISI** — customer is in an active Dining Session.
 - `reserved` = **RESERVASI** — scheduled reservation concept.
+
+
+## 2026-09-26 — Hold Resume/Edit/Re-Hold Contract
+
+- **Buka di Kasir bukan lifecycle transition.** Membuka Hold Bill hanya memasukkan bill yang sama ke editing state POS.
+- `pos_held_orders.status` tetap **held** selama bill masih aktif; legacy `resumed` dinormalisasi kembali ke `held`.
+- Setelah bill dibuka, kasir boleh menambah/mengubah item lalu menekan **Hold lagi**.
+- **Hold lagi wajib update row Hold yang sama**, bukan membuat Hold Bill baru.
+- Canonical Commerce `orders` yang terkait juga di-update in-place selama status masih `pending` dan belum ada pembayaran.
+- Dining table hold tidak dibuat ulang; tetap satu active hold yang direferensikan oleh canonical `order.id`.
+- Jika Merchant sudah menerima/memproses order, atau pembayaran sudah dimulai, bill tidak boleh diedit ulang dari Hold.

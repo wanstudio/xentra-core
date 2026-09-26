@@ -53,6 +53,7 @@ class PosBillRepository {
   }
 
   deleteCheckItem(checkId, orderItemId) { this.db.execute('DELETE FROM pos_order_check_items WHERE check_id = ? AND order_item_id = ?', [checkId, orderItemId]); }
+  deleteAllCheckItems(checkId) { this.db.execute('DELETE FROM pos_order_check_items WHERE check_id = ?', [checkId]); }
   updateCheckItemQuantity(checkId, orderItemId, quantity, now) {
     if (quantity <= 0) return this.deleteCheckItem(checkId, orderItemId);
     this.db.execute('UPDATE pos_order_check_items SET quantity = ?, updated_at = ? WHERE check_id = ? AND order_item_id = ?', [quantity, now, checkId, orderItemId]);

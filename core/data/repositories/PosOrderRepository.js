@@ -66,6 +66,13 @@ class PosOrderRepository {
     `, [itemsPayload, updatedAt, heldOrderId]);
   }
 
+  updateHeldSnapshot({ heldOrderId, customerName, customerPhone = '', itemsPayload, updatedAt }) {
+    return this.db.execute(`
+      UPDATE pos_held_orders SET customer_name = ?, customer_phone = ?, items_payload = ?, status = 'held', updated_at = ?
+      WHERE id = ? AND status IN ('held', 'resumed')
+    `, [customerName, customerPhone || '', itemsPayload, updatedAt, heldOrderId]);
+  }
+
   setHeldOrderOrderId({ heldOrderId, orderId, updatedAt }) {
     return this.db.execute(`
       UPDATE pos_held_orders

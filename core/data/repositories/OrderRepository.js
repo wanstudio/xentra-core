@@ -169,6 +169,15 @@ class OrderRepository {
     `, [id, orderId, productId, productName, unitPrice, quantity, itemSubtotal, note, modifiersSnapshot]);
   }
 
+  deleteItems(orderId) { return this.db.execute('DELETE FROM order_items WHERE order_id = ?', [orderId]); }
+
+  updatePendingOrderSnapshot({ orderId, customerName, customerPhone = '', subtotal, grandTotal, updatedAt }) {
+    return this.db.execute(`
+      UPDATE orders SET customer_name = ?, customer_phone = ?, subtotal = ?, grand_total = ?, total_amount = ?, updated_at = ?
+      WHERE id = ? AND status = 'pending' AND order_channel = 'pos_cashier'
+    `, [customerName || 'Pelanggan', customerPhone || '', Number(subtotal), Number(grandTotal), Number(grandTotal), updatedAt, orderId]);
+  }
+
   insertDelivery({
     id, orderId, destinationAddress, destinationLatitude, destinationLongitude,
     actualRoadDistanceMeters, actualDurationSeconds, chargeableDistanceKm,

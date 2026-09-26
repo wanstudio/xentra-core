@@ -24,7 +24,8 @@
     paymentModes: [],
     activePaymentMode: 'cash',
     offlineMode: false,
-    activeHeldOrderId: null
+    activeHeldOrderId: null,
+    activeHeldBillId: null
   };
 
   function $(id) { return document.getElementById(id); }
@@ -2054,7 +2055,7 @@
     }catch(e){toast(e.message);}
   }
 
-  function resetSale(){state.cart=[];state.selectedTable=null;state.activeHeldOrderId=null;$('pos-selected-table').textContent='Belum dipilih';$('pos-customer-name').value='';$('pos-order-note').value='';renderCart();}
+  function resetSale(){state.cart=[];state.selectedTable=null;state.activeHeldOrderId=null;state.activeHeldBillId=null;$('pos-selected-table').textContent='Belum dipilih';$('pos-customer-name').value='';$('pos-order-note').value='';renderCart();}
 
   function showModal(html, extraClass){
     var card = $('pos-modal-card');
@@ -2089,11 +2090,15 @@
     if(!state.cart.length)return toast('Cart masih kosong.');
     if(state.orderType==='dine_in' && !state.selectedTable)return toast('Pilih meja sebelum menahan bill.');
     try{
-      await request('/pos/held-orders',{method:'POST',headers:headers(),body:JSON.stringify({branch_id:state.branchId,table_number:state.selectedTable?state.selectedTable.table_number:'',customer_name:$('pos-customer-name').value.trim()||'Tamu',order_type:state.orderType,items:state.cart})});
-      toast('Pesanan ditahan (Hold Bill).');
-      resetSale();
-      await updateHeldCount();
-      if(state.transaksiTab==='held') renderHeldSales();
+      var customerName=$('pos-customer-name').value.trim()||'Tamu';
+      if(state.activeHeldBillId){
+        await request('/pos/held-orders/'+encodeURIComponent(state.activeHeldBillId),{method:'PUT',headers:headers(),body:JSON.stringify({items:state.cart,customer_name:customerName,customer_phone:''})});
+        toast('Hold Bill diperbarui. Meja tetap dipesan.');
+      }else{
+        await request('/pos/held-orders',{method:'POST',headers:headers(),body:JSON.stringify({branch_id:state.branchId,table_number:state.selectedTable?state.selectedTable.table_number:'',customer_name:customerName,order_type:state.orderType,items:state.cart})});
+        toast('Pesanan ditahan (Hold Bill).');
+      }
+      resetSale(); await updateHeldCount(); if(state.transaksiTab==='held') renderHeldSales();
     }catch(e){toast(e.message);}
   }
 
@@ -2113,6 +2118,7 @@
     var restoredType = h.order_type || (h.table_number ? 'dine_in' : 'pickup');
     state.orderType = restoredType;
     state.activeHeldOrderId = h.order_id || null;
+    state.activeHeldBillId = h.id || null;
     document.querySelectorAll('.pos-order-type button').forEach(function(x){
       x.classList.toggle('active', x.dataset.type === restoredType);
     });
@@ -2130,16 +2136,13 @@
     try{
       state.cart = JSON.parse(h.items_payload || '[]');
     }catch(_){state.cart = [];}
-    try{
-      await request('/pos/held-orders/'+encodeURIComponent(heldId)+'/resume',{method:'POST',headers:headers()});
-    }catch(_){}
     hideModal();
     renderCart();
     await updateHeldCount();
     if(state.transaksiTab==='held') renderHeldSales();
     setView('kasir');
     var labelInfo = (restoredType === 'dine_in' && h.table_number) ? ('Meja ' + h.table_number) : (h.customer_name || (restoredType === 'pickup' ? 'Pickup' : restoredType === 'delivery' ? 'Delivery' : 'Pesanan'));
-    toast('Pesanan ' + esc(labelInfo) + ' berhasil dibuka kembali di kasir.');
+    toast('Pesanan ' + esc(labelInfo) + ' dibuka. Tambah/ubah menu, lalu pilih Hold lagi.');
   }
 
   async function cancelHeld(heldId){

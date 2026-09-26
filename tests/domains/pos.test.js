@@ -1070,6 +1070,30 @@ test('POS Dine-In Hold materializes as Merchant pending order without duplicatin
 });
 
 
+test('POS Hold resume/edit/re-hold reuses the same Hold, Order, and Dining table claim', async () => {
+  const held = PosOrderService.holdOrder({ branch_id: 'branch_pos', table_number: '12', customer_name: 'Resume Edit Customer', items: [{ product_id: 'prod_pos_1', quantity: 1, unit_price: 20000 }], order_type: 'dine_in' });
+  const materialized = await PosOrderService.materializeHeldOrder({ held_order_id: held.id, brand_id: 'brand_pos' });
+  const before = db.prepare('SELECT id, order_id, status FROM pos_held_orders WHERE id = ?').get(held.id);
+  assert.deepStrictEqual(before, { id: held.id, order_id: materialized.order_id, status: 'held' });
+  const updated = await PosOrderService.updateHeldOrder({ held_order_id: held.id, brand_id: 'brand_pos', branch_id: 'branch_pos', customer_name: 'Resume Edit Customer', items: [{ product_id: 'prod_pos_1', quantity: 1, unit_price: 20000, expected_price: 20000 }, { product_id: 'prod_pos_2', quantity: 1, unit_price: 8000, expected_price: 8000 }] });
+  assert.strictEqual(updated.success, true);
+  assert.strictEqual(updated.held_order.id, held.id);
+  assert.strictEqual(updated.held_order.order_id, materialized.order_id);
+  assert.strictEqual(updated.held_order.status, 'held');
+  assert.strictEqual(updated.order.id, materialized.order_id);
+  assert.strictEqual(updated.order.status, 'pending');
+  assert.strictEqual(Number(updated.order.grand_total), 28000);
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS c FROM orders WHERE id = ?').get(materialized.order_id).c, 1);
+  assert.strictEqual(db.prepare('SELECT COUNT(*) AS c FROM pos_held_orders WHERE id = ?').get(held.id).c, 1);
+  const orderItems = db.prepare('SELECT product_id, quantity, item_subtotal FROM order_items WHERE order_id = ? ORDER BY product_id').all(materialized.order_id);
+  assert.deepStrictEqual(orderItems.map(i => [i.product_id, Number(i.quantity), Number(i.item_subtotal)]), [['prod_pos_1', 1, 20000], ['prod_pos_2', 1, 8000]]);
+  const hold = db.prepare('SELECT hold_reference_id, status FROM branch_table_holds WHERE hold_reference_id = ?').all(materialized.order_id);
+  assert.deepStrictEqual(hold, [{ hold_reference_id: materialized.order_id, status: 'active' }]);
+  const tableHoldCount = db.prepare('SELECT COUNT(*) AS c FROM branch_table_holds WHERE branch_id = ? AND table_id = ? AND status = \'active\'').get('branch_pos', 'tbl_pos_12').c;
+  assert.strictEqual(Number(tableHoldCount), 1);
+  DiningTableService.releaseHold({ branch_id: 'branch_pos', hold_reference_id: materialized.order_id, reason: 'cancelled' });
+});
+
 test('POS P1 — Split/Merge uses canonical Order checks without creating a second order or table', async () => {
   const held = PosOrderService.holdOrder({
     branch_id: 'branch_pos',

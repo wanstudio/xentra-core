@@ -178,6 +178,46 @@ class PosOrderService {
   }
 
 
+  /** Updates a materialized Hold Bill in place; opening a bill never creates a new Hold/Order. */
+  static async updateHeldOrder({ held_order_id, brand_id, branch_id, items = [], customer_name = 'Tamu', customer_phone = '' }) {
+    if (!held_order_id || !brand_id || !branch_id || !Array.isArray(items) || !items.length) throw new Error('[PosOrderService] Data Hold Bill tidak lengkap.');
+    let held = posOrderRepository.findHeldById(held_order_id);
+    if (!held || !['held', 'resumed'].includes(held.status) || String(held.branch_id) !== String(branch_id)) throw new Error('[PosOrderService] Hold Bill tidak ditemukan atau sudah tidak aktif.');
+    if (!held.order_id) { await PosOrderService.materializeHeldOrder({ held_order_id, brand_id }); held = posOrderRepository.findHeldById(held_order_id); }
+    const order = orderRepository.findById(held.order_id);
+    if (!order || String(order.branch_id) !== String(branch_id) || String(order.brand_id) !== String(brand_id)) throw new Error('[PosOrderService] Canonical Order untuk Hold Bill tidak ditemukan.');
+    if (order.status !== 'pending' || order.order_channel !== 'pos_cashier') throw new Error('[PosOrderService] Hold Bill tidak dapat diedit karena pesanan sudah diproses Merchant.');
+    const checks = posBillRepository.findChecks(order.id);
+    for (const check of checks) if (check.status !== 'open' || posBillRepository.findCheckPaidAmount(check.id) > 0) throw new Error('[PosOrderService] Hold Bill tidak dapat diedit setelah pembayaran dimulai.');
+    if (checks.length > 1) throw new Error('[PosOrderService] Batalkan pembagian tagihan terlebih dahulu sebelum mengubah isi Hold Bill.');
+    const PrePaymentVerificationGate = require('../../commerce/services/PrePaymentVerificationGate');
+    const verification = PrePaymentVerificationGate.verify({ branch_id, brand_id, items, customer: { name: customer_name || 'Tamu', phone: customer_phone || '' } });
+    if (!verification.is_valid) throw new Error((verification.errors || ['Isi Hold Bill tidak dapat diverifikasi.']).join(' '));
+    const verifiedItems = verification.verified_items || [];
+    const subtotal = verifiedItems.reduce((sum, item) => sum + Number(item.subtotal || 0), 0);
+    const grandTotal = Math.max(0, subtotal + Number(order.delivery_fee || 0) - Number(order.discount_amount || 0));
+    const now = new Date().toISOString();
+    posBillRepository.beginTransaction();
+    try {
+      const lockedOrder = orderRepository.findById(order.id);
+      const lockedHeld = posOrderRepository.findHeldById(held_order_id);
+      if (!lockedOrder || lockedOrder.status !== 'pending' || lockedOrder.order_channel !== 'pos_cashier' || !lockedHeld || !['held', 'resumed'].includes(lockedHeld.status)) throw new Error('[PosOrderService] Hold Bill sudah diproses atau tidak aktif.');
+      const existingCheck = checks[0];
+      if (existingCheck) { posBillRepository.deleteAllCheckItems(existingCheck.id); posBillRepository.updateCheckAmount(existingCheck.id, grandTotal, now); posBillRepository.setCheckStatus(existingCheck.id, 'open', now); }
+      orderRepository.deleteItems(order.id);
+      for (const item of verifiedItems) {
+        const note = item.promo_id ? ('[PROMO:' + item.promo_id + '] ' + (item.notes || item.note || '')).trim() : (item.notes || item.note || '');
+        orderRepository.insertItem({ id: 'item_' + crypto.randomBytes(6).toString('hex'), orderId: order.id, productId: item.product_id, productName: item.name, unitPrice: item.unit_price, quantity: item.quantity, itemSubtotal: item.subtotal, note, modifiersSnapshot: JSON.stringify(item.modifiers_snapshot || item.options || []) });
+      }
+      orderRepository.updatePendingOrderSnapshot({ orderId: order.id, customerName: customer_name || 'Tamu', customerPhone: customer_phone || '', subtotal, grandTotal, updatedAt: now });
+      posOrderRepository.updateHeldSnapshot({ heldOrderId: held_order_id, customerName: customer_name || 'Tamu', customerPhone: customer_phone || '', itemsPayload: JSON.stringify(items), updatedAt: now });
+      if (existingCheck) for (const item of posBillRepository.findOrderItems(order.id)) posBillRepository.upsertCheckItem({ id: 'check_item_' + crypto.randomBytes(8).toString('hex'), checkId: existingCheck.id, orderItemId: item.id, quantity: Number(item.quantity), now });
+      posBillRepository.commit();
+    } catch (err) { try { posBillRepository.rollback(); } catch (_) {} throw err; }
+    const updatedHeld = posOrderRepository.findHeldById(held_order_id);
+    return { success: true, held_order: updatedHeld, order: orderRepository.findById(order.id), items: JSON.parse(updatedHeld.items_payload || '[]') };
+  }
+
   /**
    * Returns the POS billing checks for one canonical Commerce Order.
    * Checks are only an allocation layer; they never create Orders or Dining Sessions.

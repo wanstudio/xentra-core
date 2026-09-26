@@ -268,6 +268,7 @@ router.get('/pos/held-orders', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
     if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    try { db.prepare("UPDATE pos_held_orders SET status = 'held', updated_at = ? WHERE branch_id = ? AND status = 'resumed'").run(new Date().toISOString(), branchId); } catch (_) {}
     const held = db.prepare(`
       SELECT id, branch_id, table_number, customer_name, customer_phone, order_id, COALESCE(order_type, 'dine_in') AS order_type, items_payload, status, created_at, updated_at
       FROM pos_held_orders
@@ -337,6 +338,16 @@ router.post('/pos/held-orders', requireAuth(['cashier']), async (req, res) => {
   }
 });
 
+router.put('/pos/held-orders/:id', requireAuth(['cashier']), async (req, res) => {
+  try {
+    const branchId = req.user.branch_id || req.user.branchId;
+    if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
+    const { items = [], customer_name = 'Tamu', customer_phone = '' } = req.body || {};
+    const result = await PosOrderService.updateHeldOrder({ held_order_id: req.params.id, brand_id: req.brand_id, branch_id: branchId, items, customer_name, customer_phone });
+    res.json(result);
+  } catch (err) { res.status(400).json({ success: false, error: err.message }); }
+});
+
 router.delete('/pos/held-orders/:id', requireAuth(['cashier']), (req, res) => {
   try {
     const branchId = req.user.branch_id || req.user.branchId;
@@ -377,8 +388,9 @@ router.post('/pos/held-orders/:id/resume', requireAuth(['cashier']), (req, res) 
     const branchId = req.user.branch_id || req.user.branchId;
     if (!branchId) return res.status(400).json({ success: false, error: 'Kasir belum memiliki cabang.' });
     const now = new Date().toISOString();
-    db.prepare("UPDATE pos_held_orders SET status = 'resumed', updated_at = ? WHERE id = ? AND branch_id = ?").run(now, req.params.id, branchId);
-    res.json({ success: true, message: 'Pesanan ditahan telah dibuka kembali.' });
+    const result = db.prepare("UPDATE pos_held_orders SET status = 'held', updated_at = ? WHERE id = ? AND branch_id = ? AND status IN ('held', 'resumed')").run(now, req.params.id, branchId);
+    if (!result || result.changes !== 1) return res.status(404).json({ success: false, error: 'Pesanan ditahan tidak ditemukan atau sudah tidak aktif.' });
+    res.json({ success: true, message: 'Pesanan ditahan tetap aktif dan siap diedit di kasir.' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
