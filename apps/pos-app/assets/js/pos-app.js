@@ -2275,11 +2275,11 @@
     return data;
   }
   function enterAdditionalOrderMode(){
-    if(!state.activeOrderLocked || state.activeAdditionalMode) return;
-    state.composerMode='addition';
-    state.activeAdditionalMode=true;
-    state.additionalCart=[];
-    state.additionalClientTransactionId='posadd_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
+    try{
+      composer().beginAddition();
+    }catch(e){
+      return toast(e.message);
+    }
     if($('pos-order-note')) $('pos-order-note').value='';
     hideModal();
     renderCart();
@@ -2288,36 +2288,39 @@
   }
 
   function cancelAdditionalOrderMode(){
-    state.activeAdditionalMode=false;
-    state.additionalCart=[];
-    state.additionalClientTransactionId=null;
-    state.composerMode=state.activeHeldOrderId && state.activeOrderLocked && state.cart.length ? 'existing' : 'new';
+    composer().cancelAddition();
     hideModal();
     renderCart();
     renderMenu();
   }
 
   async function submitAdditionalOrder(){
-    if(!state.activeHeldOrderId) return toast('Order aktif tidak ditemukan.');
-    if(!state.additionalCart.length) return toast('Belum ada menu tambahan.');
+    var tx=composer();
+    if(!tx.isAddition()) return;
+    var orderId=tx.getOrderId();
+    var items=tx.getAdditionItems();
+    if(!orderId) return toast('Order aktif tidak ditemukan.');
+    if(!items.length) return toast('Belum ada menu tambahan.');
+
     try{
       var btn=$('btn-pos-pay');
       if(btn) btn.disabled=true;
-      var result=await request('/pos/orders/'+encodeURIComponent(state.activeHeldOrderId)+'/additions',{
+      var result=await request('/pos/orders/'+encodeURIComponent(orderId)+'/additions',{
         method:'POST',
         headers:headers(),
-        body:JSON.stringify({items:state.additionalCart,client_transaction_id:state.additionalClientTransactionId})
+        body:JSON.stringify({
+          items:items,
+          client_transaction_id:tx.getClientTransactionId()
+        })
       });
-      state.activeAdditionalMode=false;
-      state.additionalCart=[];
-      state.additionalClientTransactionId=null;
-      state.composerMode='existing';
-      state.pendingAdditions=(state.pendingAdditions||[]).concat(result.addition?[result.addition]:[]);
+
+      composer().completeAdditionSubmission();
       hideModal();
-      await refreshActiveOrderContext(state.activeHeldOrderId);
+      await refreshActiveOrderContext(orderId);
       renderCart();
       renderMenu();
       toast('Tambahan pesanan dikirim. Menunggu Merchant menerima.');
+      return result;
     }catch(e){
       toast(e.message);
       renderCart();
