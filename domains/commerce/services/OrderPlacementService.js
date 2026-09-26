@@ -413,7 +413,7 @@ class OrderPlacementService {
           previousStock: prevStock,
           currentStock,
           referenceId: reference_id,
-          mutationId: reference_id,
+          mutationId: reference_id + ':' + String(item.product_id) + ':' + String(deductedItems.length),
           actorId: actor_id,
           notes,
           createdAt: now
