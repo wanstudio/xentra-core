@@ -1132,6 +1132,73 @@ test('POS P1 — Split/Merge uses canonical Order checks without creating a seco
 });
 
 
+test('POS Split By Item — pays the selected item check using its persisted line total', async () => {
+  const held = PosOrderService.holdOrder({
+    branch_id: 'branch_pos',
+    table_number: '13',
+    customer_name: 'Item Split Payment Customer',
+    items: [
+      { product_id: 'prod_pos_1', quantity: 1, unit_price: 20000 },
+      { product_id: 'prod_pos_2', quantity: 1, unit_price: 8000 }
+    ],
+    order_type: 'dine_in'
+  });
+
+  const materialized = await PosOrderService.materializeHeldOrder({
+    held_order_id: held.id,
+    brand_id: 'brand_pos'
+  });
+  const orderId = materialized.order_id;
+  const initial = PosOrderService.getOrderChecks({ order_id: orderId, branch_id: 'branch_pos' });
+  const source = initial.checks[0];
+  const item = source.items.find(i => i.product_id === 'prod_pos_2');
+  assert.ok(item);
+
+  // Simulate a persisted line total that differs from unit_price (e.g. an
+  // item-level modifier/adjustment). "Pilih Menu" must charge the line value.
+  db.prepare('UPDATE order_items SET item_subtotal = ?, subtotal = ? WHERE id = ?')
+    .run(10000, 10000, item.order_item_id);
+
+  const split = PosOrderService.splitOrderCheck({
+    order_id: orderId,
+    branch_id: 'branch_pos',
+    source_check_id: source.id,
+    split_items: [{ order_item_id: item.order_item_id, quantity: 1 }]
+  });
+
+  const itemCheck = split.checks.find(c => c.items.some(i => String(i.order_item_id) === String(item.order_item_id)));
+  assert.ok(itemCheck);
+  assert.strictEqual(Number(itemCheck.allocated_amount), 10000);
+
+  const shift = PosShiftService.openShift({
+    branch_id: 'branch_pos',
+    cashier_id: 'cashier_item_split_' + Date.now(),
+    starting_float: 50000
+  });
+
+  const paid = PosOrderService.payCheck({
+    order_id: orderId,
+    branch_id: 'branch_pos',
+    check_id: itemCheck.id,
+    amount: 10000,
+    payment_method: 'cash',
+    actor_id: shift.cashier_id,
+    amount_tendered: 10000,
+    shift_id: shift.id
+  });
+
+  assert.strictEqual(paid.success, true);
+  assert.strictEqual(Number(paid.check.paid_amount), 10000);
+  assert.strictEqual(Number(paid.check.remaining_amount), 0);
+
+  DiningTableService.releaseHold({
+    branch_id: 'branch_pos',
+    hold_reference_id: orderId,
+    reason: 'cancelled'
+  });
+});
+
+
 test('POS Split Reset — unpaid split returns to one full Check and paid split cannot be reset', async () => {
   const held = PosOrderService.holdOrder({
     branch_id: 'branch_pos',
