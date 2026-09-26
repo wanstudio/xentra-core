@@ -77,7 +77,8 @@
     recipient: Store.getRecipient() || { type: 'self', name: '', phone: '' },
     isSubmitting: false,
     isRedirectingToPayment: false,
-    openBillLoaded: false
+    openBillLoaded: false,
+    additionalClientTransactionId: null
   };
 
   // ── Xentra Robot Splash Controller (Floating, Flapping Arms, Winking Eyes) ──
@@ -4390,8 +4391,10 @@
 
   function proceedCreateAdditionalOrder(items) {
     var orderId = getActiveDineInOrderId();
+    if (!state.additionalClientTransactionId) state.additionalClientTransactionId = 'custadd_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,10);
     var btn = $('x-btn-submit-order');
     if (!orderId) {
+      state.additionalClientTransactionId = null;
       state.isSubmitting = false;
       if (btn) {
         btn.disabled = false;
@@ -4421,7 +4424,8 @@
 
     API.post('/customer/dining-session/additions', {
       order_id: orderId,
-      items: payloadItems
+      items: payloadItems,
+      client_transaction_id: state.additionalClientTransactionId
     }).then(function (res) {
       if (!res || !res.success) {
         throw new Error((res && (res.message || res.error)) || 'Tambahan pesanan gagal dikirim.');
