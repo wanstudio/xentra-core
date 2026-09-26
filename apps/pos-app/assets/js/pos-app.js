@@ -26,7 +26,11 @@
     offlineMode: false,
     coreConnection: null,
     activeHeldOrderId: null,
-    activeHeldBillId: null
+    activeHeldBillId: null,
+    activeOrderLocked: false,
+    activeAdditionalMode: false,
+    additionalCart: [],
+    pendingAdditions: []
   };
 
   function $(id) { return document.getElementById(id); }
