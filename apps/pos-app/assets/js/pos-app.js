@@ -2229,12 +2229,11 @@
   }
 
   async function openManyPaymentFromCart(){
-    if(!state.activeHeldOrderId) return toast('Bayar masing-masing tersedia setelah pesanan Hold dibuka kembali di kasir.');
-    if(!state.cart.length) return toast('Cart masih kosong.');
+    var orderId=composer().getOrderId();
+    if(!orderId) return toast('Bayar masing-masing tersedia setelah pesanan dibuka kembali di kasir.');
+    if(!composer().isExisting()) return toast('Split pembayaran hanya tersedia untuk Order yang sudah dibuka.');
     try{
-      // Payment allocation is a Check-level operation. Never mutate the
-      // canonical Order/pos_held_orders merely to open the allocation UI.
-      await openCheckManager(state.activeHeldOrderId);
+      await openCheckManager(orderId);
     }catch(e){toast(e.message);}
   }
   function resetSale(){
