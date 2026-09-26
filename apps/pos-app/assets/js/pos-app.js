@@ -1167,29 +1167,25 @@
   }
 
   function addConfiguredProduct(p,selections,note){
-    if (isOrderLockedForEditing()) return showOrderLockedWarning();
     if (p.is_available === 0 || p.is_available === false) return toast('Menu sedang tidak tersedia.');
-    var cart=getComposerCart();
     var cleanSelections=Array.isArray(selections)?selections:[];
-    var lineKey=optionSelectionKey(cleanSelections);
-    var hit=cart.find(function(i){
-      return String(i.product_id)===String(p.id) && optionSelectionKey(i.options||[])===lineKey && String(i.note||'')===String(note||'');
-    });
     var unitPrice=clientOptionPrice(p,cleanSelections);
-    if(hit) hit.quantity += 1;
-    else cart.push({
-      product_id:p.id,
-      name:p.name || p.product_name || 'Produk',
-      unit_price:unitPrice,
-      quantity:1,
-      options:cleanSelections,
-      note:note||''
-    });
-    renderCart();
+    try{
+      composer().addItem({
+        product_id:p.id,
+        name:p.name || p.product_name || 'Produk',
+        unit_price:unitPrice,
+        quantity:1,
+        options:cleanSelections,
+        note:note||''
+      });
+      renderCart();
+    }catch(e){
+      showOrderLockedWarning();
+    }
   }
 
   function addProduct(p){
-    if (isOrderLockedForEditing()) return showOrderLockedWarning();
     if (optionGroups(p).length > 0) {
       return openProductOptions(p);
     }
