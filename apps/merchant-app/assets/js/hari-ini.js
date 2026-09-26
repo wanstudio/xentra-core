@@ -82,6 +82,16 @@
             onlineBtn.className = isDeliveryActive ? "x-btn-secondary" : "x-btn-primary";
             onlineBtn.style.color = isDeliveryActive ? "var(--text-main)" : "#ffffff";
           }
+
+          // Mobile Home visual reference — mirror the same branch state.
+          var mobileOpenSwitch = $("mobile-open-switch");
+          var mobileOpenLabel = $("mobile-open-label");
+          var mobileOnlineSwitch = $("mobile-online-switch");
+          if (mobileOpenSwitch) mobileOpenSwitch.classList.toggle("is-on", isOpen);
+          if (mobileOpenSwitch) mobileOpenSwitch.classList.toggle("is-off", !isOpen);
+          if (mobileOpenLabel) mobileOpenLabel.textContent = isOpen ? "Buka" : "Tutup";
+          if (mobileOnlineSwitch) mobileOnlineSwitch.classList.toggle("is-on", isDeliveryActive);
+          if (mobileOnlineSwitch) mobileOnlineSwitch.classList.toggle("is-off", !isDeliveryActive);
           // Live WIB date context
           var dateEl = $("bm-hero-date");
           if (dateEl) {
