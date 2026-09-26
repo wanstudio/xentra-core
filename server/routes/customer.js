@@ -96,7 +96,7 @@ router.patch('/customer/profile/phone', requireCustomerAuth(), (req, res) => {
 // karangan sendiri, supaya bill orang lain tidak mungkin ikut terbaca).
 function buildOpenBill(sessionId, brandId) {
   const session = db.prepare(`
-    SELECT ds.id, ds.opened_at, ds.customer_name
+    SELECT ds.id, ds.branch_id, ds.opened_at, ds.customer_name
     FROM dining_sessions ds
     JOIN branches b ON b.id = ds.branch_id
     WHERE ds.id = ? AND ds.status = 'active' AND b.brand_id = ?
@@ -143,6 +143,7 @@ function buildOpenBill(sessionId, brandId) {
   const activeOrders = billOrders.filter((o) => !o.is_cancelled);
   return {
     session_id: session.id,
+    branch_id: session.branch_id,
     opened_at: session.opened_at,
     customer_name: session.customer_name,
     tables: tables.map((t) => ({ id: t.id, table_number: t.table_number, label: t.label })),
