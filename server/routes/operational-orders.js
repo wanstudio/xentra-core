@@ -160,7 +160,7 @@ router.post('/orders/:id/additions/:additionId/branch-acceptance', requireAuth([
     const parent = db.prepare(scopeSql).get(...scopeParams);
     if (!parent) return res.status(404).json({ success: false, error: 'Order tidak ditemukan pada kewenangan cabang Anda.' });
 
-    const result = OrderAdditionService.decide({
+    const result = await OrderAdditionService.decide({
       order_id: parent.id,
       addition_id: req.params.additionId,
       brand_id: req.brand_id,
