@@ -3057,8 +3057,9 @@
       }
     });
     $('btn-pos-refresh-menu').onclick=loadMenu;
-    $('btn-pos-pay').onclick=openPayModal;
+    $('btn-pos-pay').onclick=function(){ if(state.activeAdditionalMode) submitAdditionalOrder(); else openPayModal(); };
     if($('btn-pos-pay-many')) $('btn-pos-pay-many').onclick=openManyPaymentFromCart;
+    if($('btn-pos-additional-order')) $('btn-pos-additional-order').onclick=enterAdditionalOrderMode;
     $('btn-pos-clear').onclick=function(){resetSale();};
     $('btn-pos-hold').onclick=holdSale;
     if($('btn-pos-open-held')) $('btn-pos-open-held').onclick=openHeld;
@@ -3083,7 +3084,7 @@
     if($('btn-pos-mcart-checkout')){
       $('btn-pos-mcart-checkout').onclick=function(e){
         e.stopPropagation();
-        openPayModal();
+        if(state.activeAdditionalMode) submitAdditionalOrder(); else openPayModal();
       };
     }
     if($('pos-mobile-cart-bar')){
