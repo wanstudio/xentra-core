@@ -196,8 +196,8 @@ For each problem:
 
 ## Current state
 
-**Architecture prerequisite is RESOLVED / LOCKED. P1, P5, and P8 are RESOLVED / IMPLEMENTED. P2, P3, P4, P6, P7, P9, and P10 remain OPEN.**
+**Architecture prerequisite is RESOLVED / LOCKED. Durable browser POS operational store + recovery is RESOLVED / IMPLEMENTED FOUNDATION. P1, P5, and P8 are RESOLVED / IMPLEMENTED. P2, P3, P4, P6, P7, P9, and P10 remain OPEN.**
 
-P3/P4 implementation is explicitly gated by `docs/decisions/pos-offline-architecture-boundary-v1.md`.
+P3/P4 implementation is explicitly gated by `docs/decisions/pos-offline-architecture-boundary-v1.md`. The durable browser operational-store prerequisite is now implemented; POS presence/lease remains the next architecture gate before P3/P4 execution.
 
 No item is approved for implementation by this backlog alone.
