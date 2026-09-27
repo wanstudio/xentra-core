@@ -557,6 +557,111 @@
         return fallback;
       }
 
+      function validateSubdomainRole(user) {
+        var role = user && user.role;
+        var currentHost = window.location.hostname;
+        var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+        if (!match) return { allowed: true };
+
+        var prefix = currentHost.split('.')[0].toLowerCase();
+        var baseDomain = match[1];
+
+        // Merchant App (m.* / merchant.*) -> only branch_manager / manager
+        if (prefix === 'm' || prefix === 'merchant') {
+          if (role === 'branch_manager' || role === 'manager') {
+            return { allowed: true };
+          }
+          if (role === 'owner' || role === 'brand_manager') {
+            return {
+              allowed: false,
+              targetUrl: 'https://owner.' + baseDomain + '/',
+              targetLabel: 'owner.' + baseDomain,
+              message: 'Aplikasi ini khusus merchant. Silakan buka owner.' + baseDomain
+            };
+          }
+          if (role === 'cashier') {
+            return {
+              allowed: false,
+              targetUrl: 'https://pos.' + baseDomain + '/',
+              targetLabel: 'pos.' + baseDomain,
+              message: 'Aplikasi ini khusus merchant. Silakan buka pos.' + baseDomain
+            };
+          }
+          return {
+            allowed: false,
+            message: 'Aplikasi ini khusus merchant. Akun Anda tidak memiliki akses ke aplikasi ini.'
+          };
+        }
+
+        // Owner Dashboard (owner.* / dashboard.*) -> only owner / brand_manager
+        if (prefix === 'owner' || prefix === 'dashboard') {
+          if (role === 'owner' || role === 'brand_manager') {
+            return { allowed: true };
+          }
+          if (role === 'branch_manager' || role === 'manager') {
+            return {
+              allowed: false,
+              targetUrl: 'https://m.' + baseDomain + '/',
+              targetLabel: 'm.' + baseDomain,
+              message: 'Aplikasi ini khusus owner. Silakan buka m.' + baseDomain
+            };
+          }
+          if (role === 'cashier') {
+            return {
+              allowed: false,
+              targetUrl: 'https://pos.' + baseDomain + '/',
+              targetLabel: 'pos.' + baseDomain,
+              message: 'Aplikasi ini khusus owner. Silakan buka pos.' + baseDomain
+            };
+          }
+          return {
+            allowed: false,
+            message: 'Aplikasi ini khusus owner. Akun Anda tidak memiliki akses ke aplikasi ini.'
+          };
+        }
+
+        // POS App (pos.* / kasir.*) -> cashier (or manager during terminal setup)
+        if (prefix === 'pos' || prefix === 'kasir') {
+          if (role === 'cashier' || posTerminalSetupRequested) {
+            return { allowed: true };
+          }
+          if (role === 'branch_manager' || role === 'manager') {
+            return {
+              allowed: false,
+              targetUrl: 'https://m.' + baseDomain + '/',
+              targetLabel: 'm.' + baseDomain,
+              message: 'Aplikasi ini khusus kasir. Silakan buka m.' + baseDomain
+            };
+          }
+          if (role === 'owner' || role === 'brand_manager') {
+            return {
+              allowed: false,
+              targetUrl: 'https://owner.' + baseDomain + '/',
+              targetLabel: 'owner.' + baseDomain,
+              message: 'Aplikasi ini khusus kasir. Silakan buka owner.' + baseDomain
+            };
+          }
+          return {
+            allowed: false,
+            message: 'Aplikasi ini khusus kasir. Akun Anda tidak memiliki akses ke aplikasi ini.'
+          };
+        }
+
+        return { allowed: true };
+      }
+
+      function showRoleMismatchError(validation) {
+        var errBox = document.getElementById('login-error');
+        if (errBox) {
+          if (validation.targetUrl) {
+            errBox.innerHTML = '⚠️ ' + validation.message + '<div style="margin-top:10px;"><a href="' + validation.targetUrl + '" class="x-btn-primary" style="display:inline-block;padding:8px 16px;text-decoration:none;font-size:13px;border-radius:6px;background:#0284c7;color:#fff;">Buka ' + validation.targetLabel + ' &rarr;</a></div>';
+          } else {
+            errBox.textContent = '⚠️ ' + validation.message;
+          }
+          errBox.style.display = 'block';
+        }
+      }
+
       var storeNameBadge = document.getElementById('store-name-badge');
       var cardTitle = document.querySelector('.x-card-title');
       if (isPlatform) {
@@ -608,7 +713,24 @@
         if (errBox) {
           var errorDesc = urlParams.get('error_description');
           var displayMsg;
-          if (authError === 'ACCOUNT_NOT_LINKED') {
+          if (authError === 'ROLE_MISMATCH') {
+            var targetParam = urlParams.get('target');
+            var currentHost = window.location.hostname;
+            var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+            var baseDomain = match ? match[1] : '';
+            var targetHost = targetParam && baseDomain ? (targetParam + '.' + baseDomain) : '';
+            var targetUrl = targetHost ? ('https://' + targetHost + '/') : '';
+
+            var appType = (currentHost.startsWith('m.') || currentHost.startsWith('merchant.')) ? 'merchant' : ((currentHost.startsWith('owner.') || currentHost.startsWith('dashboard.')) ? 'owner' : 'kasir');
+            displayMsg = 'Aplikasi ini khusus ' + appType + '.' + (targetHost ? ' Silakan buka ' + targetHost : '');
+            if (targetUrl) {
+              errBox.innerHTML = '⚠️ ' + displayMsg + '<div style="margin-top:10px;"><a href="' + targetUrl + '" class="x-btn-primary" style="display:inline-block;padding:8px 16px;text-decoration:none;font-size:13px;border-radius:6px;background:#0284c7;color:#fff;">Buka ' + targetHost + ' &rarr;</a></div>';
+            } else {
+              errBox.textContent = '⚠️ ' + displayMsg;
+            }
+            errBox.style.display = 'block';
+            urlParams.delete('target');
+          } else if (authError === 'ACCOUNT_NOT_LINKED') {
             // Set pending link flag so password login can trigger Google linking
             if (!isPlatform) {
               sessionStorage.setItem('xentra_pending_google_link', '1');
@@ -616,15 +738,21 @@
             displayMsg = isPlatform
               ? '⚠️ Akun Google ini belum terhubung ke akun Platform. Silakan hubungi administrator atau masuk menggunakan username dan password.'
               : '⚠️ Akun Google ini belum terhubung ke akun restoran. Silakan masuk menggunakan username dan password terlebih dahulu untuk menghubungkan akun Google Anda.';
+            errBox.textContent = displayMsg;
+            errBox.style.display = 'block';
           } else if (authError === 'FORBIDDEN_TENANT_ACCESS') {
             displayMsg = '⚠️ Akun Google Anda tidak memiliki akses ke restoran ini.';
+            errBox.textContent = displayMsg;
+            errBox.style.display = 'block';
           } else if (authError === 'ACCOUNT_DISABLED') {
             displayMsg = '⚠️ Akun telah dinonaktifkan. Hubungi administrator.';
+            errBox.textContent = displayMsg;
+            errBox.style.display = 'block';
           } else {
             displayMsg = '❌ ' + (errorDesc || 'Autentikasi Google gagal. Silakan coba lagi atau gunakan username/password.');
+            errBox.textContent = displayMsg;
+            errBox.style.display = 'block';
           }
-          errBox.textContent = displayMsg;
-          errBox.style.display = 'block';
         }
         urlParams.delete('error');
         urlParams.delete('error_description');
@@ -646,6 +774,11 @@
         }).then(function (res) {
           return res.json().then(function (data) {
             if (res.ok && data && data.success && data.token) {
+              var validation = validateSubdomainRole(data.user);
+              if (!validation.allowed) {
+                showRoleMismatchError(validation);
+                return;
+              }
               localStorage.setItem(TOKEN_KEY, data.token);
               if (data.user) {
                 localStorage.setItem(USER_KEY, JSON.stringify(data.user));
@@ -695,7 +828,18 @@
         }
         fetch('/api/v1/auth/merchant/me', { headers: { 'Authorization': 'Bearer ' + existingToken } })
           .then(function (r) { return r.json(); })
-          .then(function (d) { window.location.href = postLoginTarget(d, (d && d.landing) || '/dashboard/'); })
+          .then(function (d) {
+            if (d && d.user) {
+              var validation = validateSubdomainRole(d.user);
+              if (!validation.allowed) {
+                localStorage.removeItem(TOKEN_KEY);
+                localStorage.removeItem(USER_KEY);
+                showRoleMismatchError(validation);
+                return;
+              }
+            }
+            window.location.href = postLoginTarget(d, (d && d.landing) || '/dashboard/');
+          })
           .catch(function () { window.location.href = '/dashboard/'; });
         return;
       }
@@ -748,6 +892,14 @@
           } catch (_) {}
 
           if (data && data.success && data.token) {
+            var validation = validateSubdomainRole(data.user);
+            if (!validation.allowed) {
+              btn.disabled = false;
+              btn.innerHTML = '<span>Masuk</span>';
+              showRoleMismatchError(validation);
+              return;
+            }
+
             localStorage.setItem(TOKEN_KEY, data.token);
             localStorage.setItem(USER_KEY, JSON.stringify(data.user));
 
@@ -963,6 +1115,11 @@
           }).then(function (res) {
             return res.json().then(function (data) {
               if (res.ok && data && data.success && data.token) {
+                var validation = validateSubdomainRole(data.user);
+                if (!validation.allowed) {
+                  showRoleMismatchError(validation);
+                  return;
+                }
                 localStorage.setItem(TOKEN_KEY, data.token);
                 if (data.user) localStorage.setItem(USER_KEY, JSON.stringify(data.user));
                 if (googleStatus) { googleStatus.textContent = 'Login Google berhasil! Mengalihkan...'; googleStatus.style.color = '#166534'; }

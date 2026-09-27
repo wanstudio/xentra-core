@@ -4188,12 +4188,13 @@
 
     if (isBM) {
       // Branch Manager is served by the standalone Merchant App.
-      var bmRedirect = '/merchant/' + window.location.hash;
       var match = window.location.hostname.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
       if (match) {
-        bmRedirect = window.location.protocol + '//m.' + match[1] + '/' + window.location.hash;
+        if (typeof clearStoredSession === 'function') clearStoredSession();
+        window.location.replace('/login?error=ROLE_MISMATCH&target=m' + window.location.hash);
+        return;
       }
-      window.location.replace(bmRedirect);
+      window.location.replace('/merchant/' + window.location.hash);
       return;
     } else {
       var isStaff = role === 'cashier' || role === 'kitchen';
@@ -8869,12 +8870,13 @@
     // Branch Manager gets the dedicated Merchant App surface.
     // KDS is held/future and must not become an active login destination.
     if (isBranchManager()) {
-      var bmRedirect = '/merchant/' + window.location.hash;
       var match = window.location.hostname.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
       if (match) {
-        bmRedirect = window.location.protocol + '//m.' + match[1] + '/' + window.location.hash;
+        if (typeof clearStoredSession === 'function') clearStoredSession();
+        window.location.replace('/login?error=ROLE_MISMATCH&target=m' + window.location.hash);
+        return;
       }
-      window.location.replace(bmRedirect);
+      window.location.replace('/merchant/' + window.location.hash);
       return;
     }
 

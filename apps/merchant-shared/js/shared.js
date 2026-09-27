@@ -87,20 +87,17 @@
     var currentHost = window.location.hostname;
     var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
     if (match) {
-      var baseDomain = match[1];
-      var protocol = window.location.protocol;
-      if (_landing === '/merchant/' || _landing === '/merchant-app/') {
-        window.location.replace(protocol + '//m.' + baseDomain + '/' + window.location.hash);
-        return true;
-      }
+      var targetRole = '';
       if (_landing === '/owner/' || _landing === '/dashboard/' || _landing === '/dashboard') {
-        window.location.replace(protocol + '//owner.' + baseDomain + '/' + window.location.hash);
-        return true;
+        targetRole = 'owner';
+      } else if (_landing === '/pos/' || _landing === '/pos-app/') {
+        targetRole = 'pos';
+      } else if (_landing === '/merchant/' || _landing === '/merchant-app/') {
+        targetRole = 'm';
       }
-      if (_landing === '/pos/' || _landing === '/pos-app/') {
-        window.location.replace(protocol + '//pos.' + baseDomain + '/' + window.location.hash);
-        return true;
-      }
+      clearStoredSession();
+      window.location.replace('/login?error=ROLE_MISMATCH' + (targetRole ? '&target=' + targetRole : '') + window.location.hash);
+      return true;
     }
 
     window.location.replace(_landing + window.location.hash);

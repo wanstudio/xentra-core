@@ -1658,12 +1658,33 @@
         if(setupRequested){
           return await bootstrapTerminalForManager(me.user);
         }
+        var curH = window.location.hostname;
+        var matchH = curH.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+        if (matchH) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          var targetR = me.user.role === 'branch_manager' ? 'm' : 'owner';
+          window.location.replace('/login?error=ROLE_MISMATCH&target=' + targetR);
+          return false;
+        }
         window.location.replace(me.landing || (me.user.role==='branch_manager'?'/merchant/':'/owner/'));
         return false;
       }
 
       applyCashierUser(me.user);
-      if(state.user.role!=='cashier'){ window.location.replace(me.landing || '/merchant/'); return false; }
+      if(state.user.role!=='cashier'){
+        var curH = window.location.hostname;
+        var matchH = curH.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+        if (matchH) {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(USER_KEY);
+          var targetR = state.user.role === 'branch_manager' ? 'm' : 'owner';
+          window.location.replace('/login?error=ROLE_MISMATCH&target=' + targetR);
+          return false;
+        }
+        window.location.replace(me.landing || '/merchant/');
+        return false;
+      }
       if(!state.branchId){ toast('Akun kasir belum memiliki cabang.'); return false; }
       await ensurePosPinConfigured();
       return true;
