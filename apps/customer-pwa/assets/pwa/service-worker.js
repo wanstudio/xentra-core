@@ -187,8 +187,8 @@ self.addEventListener("fetch", function (event) {
   // Multi-PWA Isolation & Live Operational Data:
   // API calls, auth, dashboard, and isolated operational PWA surfaces (Merchant, POS)
   // are never intercepted by Customer SW → always live network state, no cross-PWA collision.
+  if (url.pathname.startsWith("/api/")) return;
   if (
-    url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/auth/") ||
     url.pathname.startsWith("/login") ||
     url.pathname.startsWith("/signin") ||
