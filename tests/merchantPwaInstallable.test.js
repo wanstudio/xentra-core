@@ -50,7 +50,7 @@ describe('Merchant PWA Installable — Architecture & Contract Verification', ()
     assert.ok(html.includes('mobile-web-app-capable'), 'Missing mobile-web-app-capable meta');
     assert.ok(html.includes('apple-touch-icon'), 'Missing apple-touch-icon link');
     assert.ok(html.includes('/merchant-app/sw.js'), 'Missing /merchant-app/sw.js service worker registration');
-    assert.ok(html.includes("scope: '/merchant-app/'"), 'Service worker registration must scope to /merchant-app/');
+    assert.ok(html.includes("scope: swScope") && html.includes("'/merchant-app/'"), 'Service worker registration must support /merchant-app/ scope');
   });
 
   it('4. Merchant Service Worker enforces Network-Only for APIs and isolated cache namespace', () => {

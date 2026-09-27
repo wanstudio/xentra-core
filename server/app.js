@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const dotenv = require('dotenv');
 
 function isTestExecution() {
@@ -159,7 +160,21 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
 app.get(['/merchant-app/manifest.json', '/merchant/manifest.json'], (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, '../apps/merchant-app/manifest.json'));
+
+  const fwdHost = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].toLowerCase();
+  const isDedicatedSubdomain = fwdHost.startsWith('m.') || fwdHost.startsWith('merchant.');
+
+  const manifestPath = path.join(__dirname, '../apps/merchant-app/manifest.json');
+  if (isDedicatedSubdomain) {
+    try {
+      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      data.id = '/';
+      data.start_url = '/';
+      data.scope = '/';
+      return res.json(data);
+    } catch (_) {}
+  }
+  res.sendFile(manifestPath);
 });
 
 app.get(['/merchant-app/sw.js', '/merchant-app/service-worker.js', '/merchant/sw.js', '/merchant/service-worker.js'], (req, res) => {
@@ -169,6 +184,36 @@ app.get(['/merchant-app/sw.js', '/merchant-app/service-worker.js', '/merchant/sw
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, '../apps/merchant-app/sw.js'));
+});
+
+// POS PWA Manifest & Service Worker Routes
+app.get(['/pos/manifest.json', '/pos-app/manifest.json'], (req, res) => {
+  res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+  const fwdHost = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].toLowerCase();
+  const isDedicatedSubdomain = fwdHost.startsWith('pos.') || fwdHost.startsWith('kasir.');
+
+  const manifestPath = path.join(__dirname, '../apps/pos-app/manifest.json');
+  if (isDedicatedSubdomain) {
+    try {
+      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      data.id = '/';
+      data.start_url = '/';
+      data.scope = '/';
+      return res.json(data);
+    } catch (_) {}
+  }
+  res.sendFile(manifestPath);
+});
+
+app.get(['/pos/sw.js', '/pos-app/sw.js', '/pos/service-worker.js', '/pos-app/service-worker.js'], (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Service-Worker-Allowed', '/');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, '../apps/pos-app/sw.js'));
 });
 
 // Serve Public Static Assets — setHeaders ensures Cloudflare does not cache JS/CSS
