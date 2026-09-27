@@ -85,19 +85,34 @@
 
     // Check if we are on an isolated subdomain
     var currentHost = window.location.hostname;
-    var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+    var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
     if (match) {
-      var targetRole = '';
-      if (_landing === '/owner/' || _landing === '/dashboard/' || _landing === '/dashboard') {
-        targetRole = 'owner';
-      } else if (_landing === '/pos/' || _landing === '/pos-app/') {
-        targetRole = 'pos';
-      } else if (_landing === '/merchant/' || _landing === '/merchant-app/') {
-        targetRole = 'm';
+      var prefix = currentHost.split('.')[0].toLowerCase();
+      var isManagerialSubdomain = prefix === 'm' || prefix === 'merchant' || prefix === 'owner' || prefix === 'dashboard';
+
+      // On Managerial PWA (m.* / merchant.*):
+      // Both Owner and Branch Manager surfaces are valid within this environment!
+      if (isManagerialSubdomain) {
+        if (_landing === '/owner/' || _landing === '/dashboard/' || _landing === '/dashboard') {
+          window.location.replace('/dashboard/' + window.location.hash);
+          return true;
+        }
+        if (_landing === '/merchant/' || _landing === '/merchant-app/') {
+          window.location.replace('/merchant/' + window.location.hash);
+          return true;
+        }
+        // Non-managerial role (e.g. cashier) on managerial subdomain: reject
+        clearStoredSession();
+        window.location.replace('/login?error=ROLE_MISMATCH&target=pos' + window.location.hash);
+        return true;
       }
-      clearStoredSession();
-      window.location.replace('/login?error=ROLE_MISMATCH' + (targetRole ? '&target=' + targetRole : '') + window.location.hash);
-      return true;
+
+      // On POS subdomain (pos.* / kasir.*):
+      if (prefix === 'pos' || prefix === 'kasir') {
+        clearStoredSession();
+        window.location.replace('/login?error=ROLE_MISMATCH&target=m' + window.location.hash);
+        return true;
+      }
     }
 
     window.location.replace(_landing + window.location.hash);

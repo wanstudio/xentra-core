@@ -4187,13 +4187,7 @@
     if (branchPanel) branchPanel.style.display = isBM ? '' : 'none';
 
     if (isBM) {
-      // Branch Manager is served by the standalone Merchant App.
-      var match = window.location.hostname.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
-      if (match) {
-        if (typeof clearStoredSession === 'function') clearStoredSession();
-        window.location.replace('/login?error=ROLE_MISMATCH&target=m' + window.location.hash);
-        return;
-      }
+      // Branch Manager is served by the dedicated Merchant App within the managerial environment.
       window.location.replace('/merchant/' + window.location.hash);
       return;
     } else {
@@ -8870,12 +8864,6 @@
     // Branch Manager gets the dedicated Merchant App surface.
     // KDS is held/future and must not become an active login destination.
     if (isBranchManager()) {
-      var match = window.location.hostname.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
-      if (match) {
-        if (typeof clearStoredSession === 'function') clearStoredSession();
-        window.location.replace('/login?error=ROLE_MISMATCH&target=m' + window.location.hash);
-        return;
-      }
       window.location.replace('/merchant/' + window.location.hash);
       return;
     }

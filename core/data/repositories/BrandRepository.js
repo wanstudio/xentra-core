@@ -70,12 +70,13 @@ class BrandRepository {
     `, [clean]);
 
     if (!brand && typeof clean === 'string') {
-      const match = clean.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+      const match = clean.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
       if (match) {
         const baseDomain = match[1];
         const candidates = [
           baseDomain,
           'app.' + baseDomain,
+          'customer.' + baseDomain,
           'dashboard.' + baseDomain,
           'owner.' + baseDomain,
           'm.' + baseDomain,

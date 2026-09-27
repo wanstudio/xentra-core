@@ -1659,12 +1659,11 @@
           return await bootstrapTerminalForManager(me.user);
         }
         var curH = window.location.hostname;
-        var matchH = curH.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+        var matchH = curH.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
         if (matchH) {
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
-          var targetR = me.user.role === 'branch_manager' ? 'm' : 'owner';
-          window.location.replace('/login?error=ROLE_MISMATCH&target=' + targetR);
+          window.location.replace('/login?error=ROLE_MISMATCH&target=m');
           return false;
         }
         window.location.replace(me.landing || (me.user.role==='branch_manager'?'/merchant/':'/owner/'));
@@ -1674,12 +1673,11 @@
       applyCashierUser(me.user);
       if(state.user.role!=='cashier'){
         var curH = window.location.hostname;
-        var matchH = curH.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+        var matchH = curH.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
         if (matchH) {
           localStorage.removeItem(TOKEN_KEY);
           localStorage.removeItem(USER_KEY);
-          var targetR = state.user.role === 'branch_manager' ? 'm' : 'owner';
-          window.location.replace('/login?error=ROLE_MISMATCH&target=' + targetR);
+          window.location.replace('/login?error=ROLE_MISMATCH&target=m');
           return false;
         }
         window.location.replace(me.landing || '/merchant/');

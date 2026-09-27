@@ -531,7 +531,7 @@
         }
 
         var currentHost = window.location.hostname;
-        var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+        var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
         if (match) {
           var prefix = currentHost.split('.')[0].toLowerCase();
           var baseDomain = match[1];
@@ -539,13 +539,13 @@
 
           // Branch Manager / Manager -> Merchant App
           if (role === 'branch_manager' || role === 'manager') {
-            if (prefix === 'm' || prefix === 'merchant') return '/';
-            return protocol + '//m.' + baseDomain + '/';
+            if (prefix === 'm' || prefix === 'merchant') return '/merchant/';
+            return protocol + '//m.' + baseDomain + '/merchant/';
           }
           // Owner / Brand Manager -> Owner Dashboard
           if (role === 'owner' || role === 'brand_manager') {
-            if (prefix === 'owner' || prefix === 'dashboard') return '/';
-            return protocol + '//owner.' + baseDomain + '/';
+            if (prefix === 'm' || prefix === 'merchant') return '/dashboard/';
+            return protocol + '//m.' + baseDomain + '/dashboard/';
           }
           // Cashier -> POS App
           if (role === 'cashier') {
@@ -560,63 +560,28 @@
       function validateSubdomainRole(user) {
         var role = user && user.role;
         var currentHost = window.location.hostname;
-        var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+        var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
         if (!match) return { allowed: true };
 
         var prefix = currentHost.split('.')[0].toLowerCase();
         var baseDomain = match[1];
 
-        // Merchant App (m.* / merchant.*) -> only branch_manager / manager
-        if (prefix === 'm' || prefix === 'merchant') {
-          if (role === 'branch_manager' || role === 'manager') {
+        // Managerial Environment (m.* / merchant.* / owner.* / dashboard.*) -> Owner, Brand Manager, Branch Manager
+        if (prefix === 'm' || prefix === 'merchant' || prefix === 'owner' || prefix === 'dashboard') {
+          if (role === 'owner' || role === 'brand_manager' || role === 'branch_manager' || role === 'manager') {
             return { allowed: true };
-          }
-          if (role === 'owner' || role === 'brand_manager') {
-            return {
-              allowed: false,
-              targetUrl: 'https://owner.' + baseDomain + '/',
-              targetLabel: 'owner.' + baseDomain,
-              message: 'Aplikasi ini khusus merchant. Silakan buka owner.' + baseDomain
-            };
           }
           if (role === 'cashier') {
             return {
               allowed: false,
               targetUrl: 'https://pos.' + baseDomain + '/',
               targetLabel: 'pos.' + baseDomain,
-              message: 'Aplikasi ini khusus merchant. Silakan buka pos.' + baseDomain
+              message: 'Aplikasi ini khusus manajerial (Owner & Manager). Silakan buka pos.' + baseDomain
             };
           }
           return {
             allowed: false,
-            message: 'Aplikasi ini khusus merchant. Akun Anda tidak memiliki akses ke aplikasi ini.'
-          };
-        }
-
-        // Owner Dashboard (owner.* / dashboard.*) -> only owner / brand_manager
-        if (prefix === 'owner' || prefix === 'dashboard') {
-          if (role === 'owner' || role === 'brand_manager') {
-            return { allowed: true };
-          }
-          if (role === 'branch_manager' || role === 'manager') {
-            return {
-              allowed: false,
-              targetUrl: 'https://m.' + baseDomain + '/',
-              targetLabel: 'm.' + baseDomain,
-              message: 'Aplikasi ini khusus owner. Silakan buka m.' + baseDomain
-            };
-          }
-          if (role === 'cashier') {
-            return {
-              allowed: false,
-              targetUrl: 'https://pos.' + baseDomain + '/',
-              targetLabel: 'pos.' + baseDomain,
-              message: 'Aplikasi ini khusus owner. Silakan buka pos.' + baseDomain
-            };
-          }
-          return {
-            allowed: false,
-            message: 'Aplikasi ini khusus owner. Akun Anda tidak memiliki akses ke aplikasi ini.'
+            message: 'Aplikasi ini khusus manajerial (Owner & Manager). Akun Anda tidak memiliki akses ke aplikasi ini.'
           };
         }
 
@@ -625,20 +590,12 @@
           if (role === 'cashier' || posTerminalSetupRequested) {
             return { allowed: true };
           }
-          if (role === 'branch_manager' || role === 'manager') {
+          if (role === 'branch_manager' || role === 'manager' || role === 'owner' || role === 'brand_manager') {
             return {
               allowed: false,
               targetUrl: 'https://m.' + baseDomain + '/',
               targetLabel: 'm.' + baseDomain,
               message: 'Aplikasi ini khusus kasir. Silakan buka m.' + baseDomain
-            };
-          }
-          if (role === 'owner' || role === 'brand_manager') {
-            return {
-              allowed: false,
-              targetUrl: 'https://owner.' + baseDomain + '/',
-              targetLabel: 'owner.' + baseDomain,
-              message: 'Aplikasi ini khusus kasir. Silakan buka owner.' + baseDomain
             };
           }
           return {
@@ -716,12 +673,13 @@
           if (authError === 'ROLE_MISMATCH') {
             var targetParam = urlParams.get('target');
             var currentHost = window.location.hostname;
-            var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+            var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
             var baseDomain = match ? match[1] : '';
             var targetHost = targetParam && baseDomain ? (targetParam + '.' + baseDomain) : '';
             var targetUrl = targetHost ? ('https://' + targetHost + '/') : '';
 
-            var appType = (currentHost.startsWith('m.') || currentHost.startsWith('merchant.')) ? 'merchant' : ((currentHost.startsWith('owner.') || currentHost.startsWith('dashboard.')) ? 'owner' : 'kasir');
+            var isManagerial = currentHost.startsWith('m.') || currentHost.startsWith('merchant.') || currentHost.startsWith('owner.') || currentHost.startsWith('dashboard.');
+            var appType = isManagerial ? 'manajerial (Owner & Manager)' : 'kasir';
             displayMsg = 'Aplikasi ini khusus ' + appType + '.' + (targetHost ? ' Silakan buka ' + targetHost : '');
             if (targetUrl) {
               errBox.innerHTML = '⚠️ ' + displayMsg + '<div style="margin-top:10px;"><a href="' + targetUrl + '" class="x-btn-primary" style="display:inline-block;padding:8px 16px;text-decoration:none;font-size:13px;border-radius:6px;background:#0284c7;color:#fff;">Buka ' + targetHost + ' &rarr;</a></div>';

@@ -141,15 +141,16 @@ app.get(['/invite/:token', '/invite/:token/'], (req, res) => {
 
 function getRequestSubdomainType(req) {
   const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].trim().toLowerCase();
-  if (host.startsWith('m.') || host.startsWith('merchant.')) return 'merchant';
+  if (host.startsWith('m.') || host.startsWith('merchant.')) return 'managerial';
   if (host.startsWith('owner.') || host.startsWith('dashboard.')) return 'owner';
   if (host.startsWith('pos.') || host.startsWith('kasir.')) return 'pos';
+  if (host.startsWith('customer.')) return 'customer';
   return null;
 }
 
 function getBaseTenantDomain(req) {
   const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].trim().toLowerCase();
-  const match = host.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+  const match = host.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app|customer)\.(.+)$/);
   return match ? match[1] : host;
 }
 
@@ -160,13 +161,16 @@ app.get(['/manifest.json', '/pwa/manifest.json'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
   const subType = getRequestSubdomainType(req);
-  if (subType === 'merchant') {
+  if (subType === 'managerial' || subType === 'owner') {
     const manifestPath = path.join(__dirname, '../apps/merchant-app/manifest.json');
     try {
       const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       data.id = '/';
       data.start_url = '/';
       data.scope = '/';
+      data.name = 'Bangjo Managerial';
+      data.short_name = 'Managerial';
+      data.description = 'Aplikasi Manajerial & Operasional Bangjo (Owner & Manager)';
       return res.json(data);
     } catch (_) {
       return res.sendFile(manifestPath);
@@ -196,7 +200,7 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
   res.setHeader('Expires', '0');
 
   const subType = getRequestSubdomainType(req);
-  if (subType === 'merchant') {
+  if (subType === 'managerial' || subType === 'owner') {
     return res.sendFile(path.join(__dirname, '../apps/merchant-app/sw.js'));
   }
   if (subType === 'pos') {
@@ -324,11 +328,18 @@ app.get(['/', '/landing', '/landing/'], async (req, res, next) => {
   }
 
   const subType = getRequestSubdomainType(req);
-  if (subType === 'merchant') {
+  if (subType === 'managerial') {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    return res.sendFile(path.join(__dirname, '../apps/merchant-app/index.html'));
+    return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/managerial-entry.html'));
   }
   if (subType === 'owner') {
+    if (process.env.NODE_ENV !== 'test') {
+      const base = getBaseTenantDomain(req);
+      if (base) {
+        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+        return res.redirect(302, `${proto}://m.${base}/dashboard/`);
+      }
+    }
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
   }
@@ -372,6 +383,16 @@ app.get(['/login', '/login/'], async (req, res) => {
         message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
       });
     }
+
+    const subType = getRequestSubdomainType(req);
+    if (subType === 'owner' && process.env.NODE_ENV !== 'test') {
+      const base = getBaseTenantDomain(req);
+      if (base) {
+        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+        const qs = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+        return res.redirect(302, `${proto}://m.${base}/login${qs}`);
+      }
+    }
   }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/login.html'));
@@ -398,14 +419,24 @@ app.get([/^\/dashboard(\/.*)?$/, /^\/owner(\/.*)?$/], async (req, res) => {
     }
 
     const subType = getRequestSubdomainType(req);
+    // If on owner.*, redirect to m.* managerial domain
     if (subType === 'owner') {
-      return res.redirect(301, '/');
+      if (process.env.NODE_ENV !== 'test') {
+        const base = getBaseTenantDomain(req);
+        if (base) {
+          const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+          return res.redirect(302, `${proto}://m.${base}/dashboard/`);
+        }
+      }
     }
+    // If on customer (app.) or pos, redirect to managerial m.* domain
     if (process.env.NODE_ENV !== 'test') {
       const base = getBaseTenantDomain(req);
-      if (base && base !== cleanHost) {
-        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-        return res.redirect(302, `${proto}://owner.${base}/`);
+      if (subType === 'pos' || subType === 'customer' || cleanHost.startsWith('app.')) {
+        if (base && base !== cleanHost) {
+          const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+          return res.redirect(302, `${proto}://m.${base}/dashboard/`);
+        }
       }
     }
   }
@@ -439,14 +470,14 @@ app.get([/^\/merchant-app(\/.*)?$/, /^\/merchant(\/.*)?$/], async (req, res) => 
     }
 
     const subType = getRequestSubdomainType(req);
-    if (subType === 'merchant') {
-      return res.redirect(301, '/');
-    }
+    // If on customer (app.) or pos, redirect to managerial m.* domain
     if (process.env.NODE_ENV !== 'test') {
       const base = getBaseTenantDomain(req);
-      if (base && base !== cleanHost) {
-        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-        return res.redirect(302, `${proto}://m.${base}/`);
+      if (subType === 'pos' || subType === 'customer' || cleanHost.startsWith('app.')) {
+        if (base && base !== cleanHost) {
+          const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+          return res.redirect(302, `${proto}://m.${base}/merchant/`);
+        }
       }
     }
   }
@@ -550,9 +581,9 @@ app.get('*', (req, res) => {
   }
 
   const subType = getRequestSubdomainType(req);
-  if (subType === 'merchant') {
+  if (subType === 'managerial') {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    return res.sendFile(path.join(__dirname, '../apps/merchant-app/index.html'));
+    return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/managerial-entry.html'));
   }
   if (subType === 'owner') {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
