@@ -529,6 +529,31 @@
           sessionStorage.removeItem('xentra_pos_terminal_setup_requested');
           return '/pos/?terminal_setup=1';
         }
+
+        var currentHost = window.location.hostname;
+        var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+        if (match) {
+          var prefix = currentHost.split('.')[0].toLowerCase();
+          var baseDomain = match[1];
+          var protocol = window.location.protocol;
+
+          // Branch Manager / Manager -> Merchant App
+          if (role === 'branch_manager' || role === 'manager') {
+            if (prefix === 'm' || prefix === 'merchant') return '/';
+            return protocol + '//m.' + baseDomain + '/';
+          }
+          // Owner / Brand Manager -> Owner Dashboard
+          if (role === 'owner' || role === 'brand_manager') {
+            if (prefix === 'owner' || prefix === 'dashboard') return '/';
+            return protocol + '//owner.' + baseDomain + '/';
+          }
+          // Cashier -> POS App
+          if (role === 'cashier') {
+            if (prefix === 'pos' || prefix === 'kasir') return '/';
+            return protocol + '//pos.' + baseDomain + '/';
+          }
+        }
+
         return fallback;
       }
 

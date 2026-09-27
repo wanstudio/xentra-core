@@ -94,7 +94,7 @@ app.use(cors({
       // Authoritative check against registered client domains via BrandRepository / Domain Registry
       await brandRepository.ready();
       const brand = brandRepository.findByCustomDomain(rawHostname);
-      if (brand && brand.custom_domain && brand.custom_domain.toLowerCase().trim() === rawHostname) {
+      if (brand) {
         return callback(null, true);
       }
     } catch (_) {
@@ -139,11 +139,52 @@ app.get(['/invite/:token', '/invite/:token/'], (req, res) => {
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/invite.html'));
 });
 
+function getRequestSubdomainType(req) {
+  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].trim().toLowerCase();
+  if (host.startsWith('m.') || host.startsWith('merchant.')) return 'merchant';
+  if (host.startsWith('owner.') || host.startsWith('dashboard.')) return 'owner';
+  if (host.startsWith('pos.') || host.startsWith('kasir.')) return 'pos';
+  return null;
+}
+
+function getBaseTenantDomain(req) {
+  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].trim().toLowerCase();
+  const match = host.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+  return match ? match[1] : host;
+}
+
 // PWA Manifest & Service Worker Routes — MUST come before express.static
 // so Cloudflare always sees the explicit no-store headers, not express.static defaults.
 app.get(['/manifest.json', '/pwa/manifest.json'], (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+  const subType = getRequestSubdomainType(req);
+  if (subType === 'merchant') {
+    const manifestPath = path.join(__dirname, '../apps/merchant-app/manifest.json');
+    try {
+      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      data.id = '/';
+      data.start_url = '/';
+      data.scope = '/';
+      return res.json(data);
+    } catch (_) {
+      return res.sendFile(manifestPath);
+    }
+  }
+  if (subType === 'pos') {
+    const manifestPath = path.join(__dirname, '../apps/pos-app/manifest.json');
+    try {
+      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      data.id = '/';
+      data.start_url = '/';
+      data.scope = '/';
+      return res.json(data);
+    } catch (_) {
+      return res.sendFile(manifestPath);
+    }
+  }
+
   res.sendFile(path.join(__dirname, '../apps/customer-pwa/assets/pwa/manifest.json'));
 });
 
@@ -153,6 +194,15 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
+
+  const subType = getRequestSubdomainType(req);
+  if (subType === 'merchant') {
+    return res.sendFile(path.join(__dirname, '../apps/merchant-app/sw.js'));
+  }
+  if (subType === 'pos') {
+    return res.sendFile(path.join(__dirname, '../apps/pos-app/sw.js'));
+  }
+
   res.sendFile(path.join(__dirname, '../apps/customer-pwa/assets/pwa/service-worker.js'));
 });
 
@@ -267,10 +317,27 @@ function isSaaSHost(req) {
   return host === 'xentra.cloud' || host === 'localhost' || host === '127.0.0.1';
 }
 
-app.get(['/', '/landing', '/landing/'], (req, res, next) => {
-  if (!isSaaSHost(req)) return next();
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/landing.html'));
+app.get(['/', '/landing', '/landing/'], async (req, res, next) => {
+  if (isSaaSHost(req)) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/landing.html'));
+  }
+
+  const subType = getRequestSubdomainType(req);
+  if (subType === 'merchant') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(path.join(__dirname, '../apps/merchant-app/index.html'));
+  }
+  if (subType === 'owner') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
+  }
+  if (subType === 'pos') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(path.join(__dirname, '../apps/pos-app/index.html'));
+  }
+
+  return next();
 });
 app.get(['/signin', '/signin/'], (req, res, next) => {
   if (!isSaaSHost(req)) return next();
@@ -329,6 +396,18 @@ app.get([/^\/dashboard(\/.*)?$/, /^\/owner(\/.*)?$/], async (req, res) => {
         message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
       });
     }
+
+    const subType = getRequestSubdomainType(req);
+    if (subType === 'owner') {
+      return res.redirect(301, '/');
+    }
+    if (process.env.NODE_ENV !== 'test') {
+      const base = getBaseTenantDomain(req);
+      if (base && base !== cleanHost) {
+        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+        return res.redirect(302, `${proto}://owner.${base}/`);
+      }
+    }
   }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
@@ -358,6 +437,18 @@ app.get([/^\/merchant-app(\/.*)?$/, /^\/merchant(\/.*)?$/], async (req, res) => 
         message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
       });
     }
+
+    const subType = getRequestSubdomainType(req);
+    if (subType === 'merchant') {
+      return res.redirect(301, '/');
+    }
+    if (process.env.NODE_ENV !== 'test') {
+      const base = getBaseTenantDomain(req);
+      if (base && base !== cleanHost) {
+        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+        return res.redirect(302, `${proto}://m.${base}/`);
+      }
+    }
   }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.sendFile(path.join(__dirname, '../apps/merchant-app/index.html'));
@@ -386,6 +477,18 @@ app.get([/^\/pos(\/.*)?$/, /^\/pos-app(\/.*)?$/], async (req, res) => {
         error: 'TENANT_NOT_FOUND',
         message: 'Brand/Tenant tidak ditemukan untuk host yang diberikan.'
       });
+    }
+
+    const subType = getRequestSubdomainType(req);
+    if (subType === 'pos') {
+      return res.redirect(301, '/');
+    }
+    if (process.env.NODE_ENV !== 'test') {
+      const base = getBaseTenantDomain(req);
+      if (base && base !== cleanHost) {
+        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+        return res.redirect(302, `${proto}://pos.${base}/`);
+      }
     }
   }
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -436,7 +539,7 @@ app.get(['/order-received', '/order-received/:id', '/order-received/'], (req, re
   res.sendFile(path.join(__dirname, '../apps/customer-pwa/order-received.html'));
 });
 
-// Fallback: SaaS Control Plane redirects to public landing page; Tenant domains serve customer PWA
+// Fallback: SaaS Control Plane redirects to public landing page; Subdomains serve their respective app; Tenant domains serve customer PWA
 app.get('*', (req, res) => {
   const host = req.headers.host || '';
   const cleanHost = host.split(':')[0].trim().toLowerCase();
@@ -444,6 +547,20 @@ app.get('*', (req, res) => {
   // On xentra.cloud SaaS control plane, send unmatched paths to the public landing page
   if (cleanHost === 'xentra.cloud') {
     return res.redirect(302, '/');
+  }
+
+  const subType = getRequestSubdomainType(req);
+  if (subType === 'merchant') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(path.join(__dirname, '../apps/merchant-app/index.html'));
+  }
+  if (subType === 'owner') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/index.html'));
+  }
+  if (subType === 'pos') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(path.join(__dirname, '../apps/pos-app/index.html'));
   }
 
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

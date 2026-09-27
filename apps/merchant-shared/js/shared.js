@@ -82,6 +82,27 @@
     // The surface's canonical path is always in its own accepted set, so the
     // guard can never bounce a page back to itself.
     if (paths.indexOf(_landing) !== -1) return false;
+
+    // Check if we are on an isolated subdomain
+    var currentHost = window.location.hostname;
+    var match = currentHost.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+    if (match) {
+      var baseDomain = match[1];
+      var protocol = window.location.protocol;
+      if (_landing === '/merchant/' || _landing === '/merchant-app/') {
+        window.location.replace(protocol + '//m.' + baseDomain + '/' + window.location.hash);
+        return true;
+      }
+      if (_landing === '/owner/' || _landing === '/dashboard/' || _landing === '/dashboard') {
+        window.location.replace(protocol + '//owner.' + baseDomain + '/' + window.location.hash);
+        return true;
+      }
+      if (_landing === '/pos/' || _landing === '/pos-app/') {
+        window.location.replace(protocol + '//pos.' + baseDomain + '/' + window.location.hash);
+        return true;
+      }
+    }
+
     window.location.replace(_landing + window.location.hash);
     return true;
   }

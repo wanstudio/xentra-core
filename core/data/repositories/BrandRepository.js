@@ -62,12 +62,37 @@ class BrandRepository {
       const cached = readDomainCache(clean);
       if (cached) return cached;
     }
-    const brand = this.db.queryOne(`
+    let brand = this.db.queryOne(`
       SELECT *
       FROM brands
       WHERE lower(trim(custom_domain)) = ?
       LIMIT 1
     `, [clean]);
+
+    if (!brand && typeof clean === 'string') {
+      const match = clean.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+      if (match) {
+        const baseDomain = match[1];
+        const candidates = [
+          baseDomain,
+          'app.' + baseDomain,
+          'dashboard.' + baseDomain,
+          'owner.' + baseDomain,
+          'm.' + baseDomain,
+          'merchant.' + baseDomain,
+          'pos.' + baseDomain,
+          'kasir.' + baseDomain
+        ];
+        const placeholders = candidates.map(() => '?').join(',');
+        brand = this.db.queryOne(`
+          SELECT *
+          FROM brands
+          WHERE lower(trim(custom_domain)) IN (${placeholders})
+          LIMIT 1
+        `, candidates);
+      }
+    }
+
     if (cacheable && brand) writeDomainCache(clean, brand);
     return brand;
   }

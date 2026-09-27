@@ -4186,10 +4186,14 @@
     if (ownerPanel) ownerPanel.style.display = isBM ? 'none' : '';
     if (branchPanel) branchPanel.style.display = isBM ? '' : 'none';
 
-    // Role-based sidebar nav item visibility
     if (isBM) {
       // Branch Manager is served by the standalone Merchant App.
-      window.location.replace('/merchant/' + window.location.hash);
+      var bmRedirect = '/merchant/' + window.location.hash;
+      var match = window.location.hostname.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+      if (match) {
+        bmRedirect = window.location.protocol + '//m.' + match[1] + '/' + window.location.hash;
+      }
+      window.location.replace(bmRedirect);
       return;
     } else {
       var isStaff = role === 'cashier' || role === 'kitchen';
@@ -8865,7 +8869,12 @@
     // Branch Manager gets the dedicated Merchant App surface.
     // KDS is held/future and must not become an active login destination.
     if (isBranchManager()) {
-      window.location.replace('/merchant/' + window.location.hash);
+      var bmRedirect = '/merchant/' + window.location.hash;
+      var match = window.location.hostname.match(/^(?:m|merchant|owner|dashboard|pos|kasir|admin|app)\.(.+)$/);
+      if (match) {
+        bmRedirect = window.location.protocol + '//m.' + match[1] + '/' + window.location.hash;
+      }
+      window.location.replace(bmRedirect);
       return;
     }
 
