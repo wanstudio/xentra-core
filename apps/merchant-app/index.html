@@ -610,86 +610,54 @@
       </section>
 
       <!-- BM-3: Menu, Promo, Stok -->
-      <!-- TAB: BM-MENU (Branch Operational Menu Availability) -->
+      <!-- TAB: BM-MENU — Locked Menu IA v1 -->
       <section id="tab-bm-menu" class="x-tab-content" data-tab="bm-menu">
-        <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+        <div class="x-card-panel x-merchant-op-panel">
+          <div class="x-merchant-screen-head">
             <div>
-              <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Ketersediaan Menu Cabang</h3>
-              <p class="text-muted" style="font-size:13px; margin:0;">
-                Atur menu yang dijual di cabang ini. Tambah produk dari katalog master, kelola kategori cabang, dan sesuaikan ketersediaan harian.
-              </p>
+              <h3>Menu</h3>
+              <p>Kelola menu yang dijual di cabang. Ketersediaan adalah status penjualan, bukan stok fisik.</p>
             </div>
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-              <button type="button" class="x-btn-primary" id="btn-bm-menu-add-catalog" onclick="openBMAddCatalogModal()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
-                <span>＋ Tambah dari Katalog</span>
-              </button>
-              <button type="button" class="x-btn-secondary" id="btn-bm-menu-add-category" onclick="promptAddBMBranchCategory()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
-                <span>＋ Kategori Cabang</span>
-              </button>
-              <button type="button" class="x-btn-secondary" id="btn-bm-menu-refresh" onclick="loadBMMenu()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                <span>Segarkan</span>
-              </button>
+            <div class="x-menu-primary-actions">
+              <button type="button" class="x-btn-primary" id="btn-bm-menu-add-catalog" onclick="openBMAddCatalogModal">＋ Tambah Menu</button>
+              <button type="button" class="x-btn-secondary" id="btn-bm-menu-add-category" onclick="promptAddBMBranchCategory()">Kategori</button>
+              <button type="button" class="x-btn-secondary" id="btn-bm-menu-refresh" onclick="loadBMMenu()">Segarkan</button>
             </div>
           </div>
-
-          <!-- Menu Overview KPI Cards -->
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-color);">
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
-              <div style="font-size:11px; font-weight:700; color:#64748b;">TOTAL MENU DIALOKASIKAN</div>
-              <div id="bm-menu-stat-total" style="font-size:22px; font-weight:800; color:#1e293b; margin-top:4px;">0</div>
-            </div>
-            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px;">
-              <div style="font-size:11px; font-weight:700; color:#15803d;">TERSEDIA (AKTIF DI CABANG)</div>
-              <div id="bm-menu-stat-available" style="font-size:22px; font-weight:800; color:#166534; margin-top:4px;">0</div>
-            </div>
-            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px;">
-              <div style="font-size:11px; font-weight:700; color:#b91c1c;">HABIS / TIDAK TERSEDIA</div>
-              <div id="bm-menu-stat-unavailable" style="font-size:22px; font-weight:800; color:#991b1b; margin-top:4px;">0</div>
-            </div>
+          <div class="x-menu-search-row">
+            <input type="search" id="bm-menu-search" class="x-input" placeholder="Cari menu..." oninput="onBMMenuFilterChange()" aria-label="Cari menu">
+            <select id="bm-menu-filter-status" class="x-input" onchange="onBMMenuFilterChange()" aria-label="Filter ketersediaan">
+              <option value="all">Semua</option>
+              <option value="available">Tersedia</option>
+              <option value="unavailable">Tidak tersedia</option>
+            </select>
           </div>
         </div>
 
-        <!-- Branch Categories Bar Panel -->
-        <div class="x-card-panel" style="margin-bottom:20px; padding:16px 20px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <span style="font-size:13px; font-weight:700; color:#475569;">Kategori Cabang:</span>
-            <span id="bm-menu-cat-filter-label" class="text-muted" style="font-size:12px;">Semua kategori</span>
+        <div class="x-card-panel x-menu-category-panel">
+          <div class="x-menu-category-head">
+            <strong>Kategori</strong>
+            <span id="bm-menu-cat-filter-label" class="text-muted">Semua kategori</span>
           </div>
-          <div id="bm-menu-categories-bar" style="display:flex; flex-wrap:wrap; gap:8px; min-height:36px; align-items:center;">
-            <span class="text-muted" style="font-size:13px;">Memuat kategori...</span>
+          <div id="bm-menu-categories-bar" class="x-menu-category-bar">
+            <span class="text-muted">Memuat kategori...</span>
           </div>
         </div>
 
-        <!-- Filter & Menu Table Panel -->
-        <div class="x-card-panel">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; flex:1;">
-              <input type="text" id="bm-menu-search" class="x-input" placeholder="Cari nama produk..." style="font-size:13px; max-width:280px;" oninput="onBMMenuFilterChange()">
-              <select id="bm-menu-filter-status" class="x-input" style="font-size:13px; max-width:200px;" onchange="onBMMenuFilterChange()">
-                <option value="all">Semua Status Ketersediaan</option>
-                <option value="available">Hanya Tersedia (Available)</option>
-                <option value="unavailable">Hanya Habis (Unavailable)</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="table-responsive">
-            <table class="x-table">
+        <div class="x-card-panel x-merchant-list-panel">
+          <div class="table-responsive x-merchant-mobile-list">
+            <table class="x-table x-merchant-mobile-table">
               <thead>
                 <tr>
                   <th>Produk</th>
-                  <th>Kategori Cabang</th>
-                  <th>Harga Cabang</th>
-                  <th>Stok Saat Ini</th>
-                  <th>Status Operasional</th>
-                  <th>Status Master</th>
+                  <th>Kategori</th>
+                  <th>Harga</th>
+                  <th>Ketersediaan</th>
                   <th style="text-align:right;">Aksi</th>
                 </tr>
               </thead>
               <tbody id="bm-menu-tbody">
-                <tr><td colspan="7" class="text-center py-6 text-muted">Memuat daftar menu cabang...</td></tr>
+                <tr><td colspan="5" class="text-center py-6 text-muted">Memuat daftar menu cabang...</td></tr>
               </tbody>
             </table>
           </div>
