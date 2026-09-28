@@ -429,9 +429,9 @@
         '<td data-label="Ketersediaan"><span class="x-badge ' + (isAvail ? 'x-badge-success' : 'x-badge-danger') + '">' + (isAvail ? 'TERSEDIA' : 'TIDAK TERSEDIA') + '</span></td>' +
         '<td data-label="Aksi" style="text-align:right;"><div class="x-menu-row-actions">' + toggleBtn +
           '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu ' + esc(p.product_name || p.name) + '" onclick="XentraActionMenu.open(this, [' +
-            '{ label: \'Edit Menu / Kategori Cabang\', icon: \'edit\', onClick: function() { openBranchOverrideModal(\'' + productDataJson + '\'); } },' +
+            '{ label: \'Edit Menu / Kategori Cabang\', icon: \'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>\', onClick: function() { openBranchOverrideModal(\'' + productDataJson + '\'); } },' +
             '{ divider: true },' +
-            '{ label: \'Hapus dari Cabang\', icon: \'trash\', destructive: true, onClick: function() { removeBMBranchProduct(\'' + esc(p.product_id) + '\', \'' + esc(p.product_name || p.name) + '\'); } }' +
+            '{ label: \'Hapus dari Cabang\', icon: \'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>\', destructive: true, onClick: function() { removeBMBranchProduct(\'' + esc(p.product_id) + '\', \'' + esc(p.product_name || p.name) + '\'); } }' +
           '])"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg></button>' +
         '</div></td>' +
       '</tr>';
