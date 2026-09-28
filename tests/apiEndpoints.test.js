@@ -2906,9 +2906,10 @@ test('BRANCH CATALOG 2: POST /admin/branches/:id/adopt enforces PricingPolicyMod
   // Must enforce owner base price 25000 in lock mode
   assert.strictEqual(data.adopted.price, 25000);
 
-  const bp = db.prepare("SELECT price, is_available FROM branch_products WHERE branch_id = 'branch_bangjo_barat' AND product_id = 'prod_test_lock'").get();
+  const bp = db.prepare("SELECT price, is_available, stock FROM branch_products WHERE branch_id = 'branch_bangjo_barat' AND product_id = 'prod_test_lock'").get();
   assert.strictEqual(bp.price, 25000);
   assert.strictEqual(bp.is_available, 1);
+  assert.strictEqual(bp.stock, null, 'Catalog adoption must not fabricate physical stock');
 });
 
 test('BRANCH CATALOG 3: POST /admin/branches/:id/adopt enforces PricingPolicyModel RANGE mode (accepts within, rejects outside)', async () => {
