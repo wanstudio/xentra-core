@@ -563,6 +563,12 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(html.includes('id="tab-bm-menu"'), 'Missing tab-bm-menu');
     assert.ok(html.includes('id="bm-menu-tbody"'), 'Missing bm-menu-tbody');
     assert.ok(html.includes('id="bm-menu-stat-total"'), 'Missing bm-menu-stat-total');
+    assert.ok(html.includes('id="bm-menu-home-view"'), 'Missing Menu hub view');
+    assert.ok(html.includes('id="bm-menu-categories-view"'), 'Missing category list view');
+    assert.ok(html.includes('id="bm-menu-category-detail-view"'), 'Missing category detail view');
+    assert.ok(html.includes('id="btn-bm-menu-open-categories"'), 'Missing Menu -> Kategori dan menu navigation');
+    assert.ok(html.includes('id="btn-bm-menu-categories-back"'), 'Missing category back navigation');
+    assert.ok(html.includes('id="btn-bm-menu-category-detail-back"'), 'Missing category detail back navigation');
 
     assert.ok(html.includes('id="tab-bm-promo"'), 'Missing tab-bm-promo');
     assert.ok(html.includes('id="bm-promo-list"'), 'Missing bm-promo-list');
@@ -595,6 +601,9 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(js.includes("return 'untracked';"), 'Stock UI must distinguish NULL/untracked from zero');
     assert.ok(js.includes('Belum dilacak'), 'Stock UI must expose untracked state');
     assert.ok(js.includes('function renderBMMenuTable()'), 'Menu UI renderer must exist');
+    assert.ok(js.includes('function setBMMenuView(view)'), 'Missing hierarchical Menu view controller');
+    assert.ok(js.includes('window.openBMMenuCategories'), 'Missing Menu -> category navigation');
+    assert.ok(js.includes('window.openBMMenuCategoryDetail'), 'Missing category -> menu navigation');
     assert.ok(js.includes('x-menu-action-trigger'), 'Menu action trigger must be rendered');
     assert.ok(js.includes("actionTrigger.addEventListener('click'"), 'Menu actions must use DOM event listeners');
     const menuRenderStart = js.indexOf('function renderBMMenuTable()');
