@@ -304,3 +304,224 @@ those statements are superseded by this addendum.
 Existing domain ownership, role, scope, and KDS boundaries are not superseded.
 
 **LOCKED — THIS ADDENDUM IS THE DESIGN SOURCE OF TRUTH FOR THE XENTRA MERCHANT APP.**
+
+---
+
+# 🔒 MENU & STOCK UX PLANNING — VISUAL LANGUAGE + REUSABLE UI CONTRACT v1
+
+**Decision date:** 2026-09-29  
+**Status:** LOCKED — PLANNING BASELINE
+
+## 1. Purpose
+
+This addendum locks the direction for the next Menu and Stock UX work.
+
+The GoFood Merchant screenshots supplied during review are **visual/interaction references only**. They are not the information architecture, business hierarchy, or workflow specification for Xentra.
+
+Xentra Menu and Stock IA must be derived from Xentra's own merchant jobs, domain model, branch scope, permissions, catalog model, inventory model, and existing operational contracts.
+
+## 2. What is borrowed from the reference
+
+The reference is used only for the desired mobile-native feel:
+
+- comfortable touch targets;
+- clear typography hierarchy;
+- generous but purposeful spacing;
+- clean list rows and dividers;
+- compact status/badge treatments;
+- restrained use of color;
+- direct back/navigation affordances;
+- native-feeling toggles;
+- cards/sections where they improve grouping;
+- bottom-sheet/action-sheet interaction where appropriate;
+- warning/attention surfaces;
+- progressive disclosure;
+- minimal chrome and horizontal scrolling.
+
+Do **not** copy the reference product's IA, category hierarchy, business rules, terminology, or exact UI.
+
+## 3. Existing Xentra UI is the first source for reusable primitives
+
+Before creating any new Menu/Stock component, audit the existing Xentra surfaces, especially:
+
+- Customer PWA;
+- Merchant App;
+- Merchant Dashboard;
+- POS;
+- merchant-shared;
+- existing customer/merchant assets and styles.
+
+Existing mature patterns must be reused where suitable.
+
+Do not create parallel versions of already-mature primitives merely to make the new screens.
+
+## 4. Reusable UI inventory
+
+The audit must classify existing patterns into reusable groups:
+
+### Page/shell primitives
+
+- top bar;
+- back affordance;
+- bottom navigation;
+- page header;
+- section header;
+- list container;
+- list item;
+- card;
+- divider;
+- sticky action/footer area.
+
+### Interaction primitives
+
+- toggle;
+- tabs/segmented controls;
+- checkbox/radio;
+- bottom sheet;
+- action sheet;
+- modal/dialog;
+- confirmation;
+- toast/snackbar;
+- loading/skeleton;
+- empty state;
+- error state.
+
+### Semantic states
+
+- available;
+- unavailable;
+- low stock;
+- out of stock;
+- saving;
+- saved;
+- warning;
+- error;
+- disabled;
+- scheduled/pending where applicable.
+
+### Assets
+
+- navigation icons;
+- commerce/menu/stock icons;
+- operational icons;
+- status icons;
+- existing Customer PWA illustrations and food/category assets where genuinely reusable.
+
+The canonical source of an asset/component must be recorded before it is promoted into a shared library.
+
+## 5. Library rule
+
+The objective is to **document and consolidate existing mature UI**, not redesign the component system.
+
+Promote a pattern into the appropriate shared library only when:
+
+1. it is already used successfully in Xentra;
+2. its visual/interaction contract is understood;
+3. it is genuinely reusable across Merchant/POS/Customer where applicable;
+4. ownership and canonical source are clear;
+5. duplication can be reduced without creating unwanted coupling.
+
+Missing primitives may be added only after confirming that no suitable existing implementation exists.
+
+## 6. Component vs pattern
+
+Reusable documentation must capture behavior, not only CSS.
+
+For each promoted primitive document:
+
+- purpose;
+- anatomy;
+- variants;
+- states;
+- interaction;
+- loading behavior;
+- error/rollback behavior where relevant;
+- accessibility/touch requirements;
+- existing source/canonical implementation;
+- allowed surfaces.
+
+Example: a Toggle contract must describe ON/OFF/disabled/loading and mutation feedback, not merely its colors and dimensions.
+
+## 7. Menu IA rule
+
+Menu hierarchy is **not locked to GoBiz**.
+
+The Menu information architecture will be designed from Xentra merchant jobs and existing Xentra domain relationships.
+
+The design must make common tasks fast while remaining scalable for:
+
+- categories;
+- products/items;
+- multiple category assignment;
+- branch assortment;
+- availability;
+- price/field overrides;
+- product options/variations;
+- ordering/sorting;
+- add/remove from branch;
+- future scheduling where supported.
+
+The final IA must minimize navigation depth for frequent tasks without introducing duplicate domain concepts.
+
+## 8. Stock IA rule
+
+Stock hierarchy is also independent from GoBiz.
+
+The Stock UX must reflect Xentra's authoritative inventory model and distinguish:
+
+- product availability;
+- physical stock;
+- low-stock threshold;
+- stock adjustment;
+- stock movement/history;
+- branch scope.
+
+UI must not create a second inventory authority.
+
+Product options/variations must not become a separate inventory pool unless a future domain decision explicitly introduces that capability.
+
+## 9. Backend boundary
+
+This planning decision is a UI/UX projection only.
+
+Do not rewrite or duplicate:
+
+- Catalog authority;
+- Inventory authority;
+- Pricing policy;
+- branch-scope enforcement;
+- RBAC;
+- audit/movement ledger;
+- existing APIs;
+- existing state machines.
+
+Menu and Stock screens should bind to the existing authoritative Core contracts.
+
+## 10. Implementation order
+
+1. Audit existing UI primitives and assets.
+2. Produce the reusable UI/pattern inventory.
+3. Document canonical source and ownership.
+4. Consolidate only genuinely reusable patterns into the appropriate shared library.
+5. Design and review Xentra-specific Menu IA.
+6. Design and review Xentra-specific Stock IA.
+7. Implement Menu using the shared library.
+8. Implement Stock using the shared library.
+9. Run existing regression tests and relevant UI tests.
+10. Only then consider any missing primitive or asset work.
+
+## 11. Non-goals
+
+This lock does not authorize:
+
+- copying GoBiz/GrabMerchant IA;
+- creating a second catalog system;
+- creating a second inventory system;
+- recreating existing Customer PWA icons/assets without audit;
+- creating duplicate bottom sheets/toggles/navbar/top bars;
+- changing Owner Dashboard IA;
+- changing POS domain authority;
+- changing backend business contracts unrelated to Menu/Stock.
+
+**LOCKED — GoBiz is a visual/ergonomic reference only. Xentra's Menu and Stock IA must be independently designed from Xentra's own domain and merchant jobs. Existing mature Xentra UI primitives and assets are the first candidates for reuse and library consolidation.**
+
