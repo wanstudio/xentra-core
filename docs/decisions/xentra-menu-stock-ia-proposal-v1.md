@@ -261,3 +261,52 @@ The IA requirement remains:
 **NULL = Belum dilacak**, never Habis.
 
 **LOCKED — IA approved for implementation. Backend/domain contracts remain authoritative.**
+
+
+## 🔒 LOCKED ADDENDUM — Menu Hierarchy & Navigation v2
+**Date: 29 September 2026**
+
+The Menu module hierarchy is now locked as a navigation relationship, not a copy of GoBiz IA.
+
+### Canonical Menu hierarchy
+
+Menu → Kategori dan menu → Pilih kategori → Daftar menu dalam kategori → Pilih menu → Ubah menu
+
+Category management remains a sibling operation to category browsing: Kategori dan menu → pilih kategori → daftar menu, or Kategori dan menu → ubah kategori.
+
+### Menu module hub
+
+The Merchant App Menu entry point is a module hub with:
+- **Kategori dan menu** — implemented and navigable.
+- **Variasi menu** — reserved capability; not presented as an active workflow until the underlying Xentra variation contract exists.
+- **Jadwal menu** — reserved capability; not presented as an active workflow until the underlying Xentra scheduling contract exists.
+
+This prevents dead-end screens and prevents the UI from inventing unsupported backend capabilities.
+
+### Screen responsibilities
+
+- **Menu**: module entry point, not a giant CRUD table.
+- **Kategori dan menu**: branch-scoped category index.
+- **Category detail**: menu items belonging to the selected branch category.
+- **Ubah kategori**: edits the category entity only.
+- **Ubah menu**: edits the menu item / branch override through the existing progressive catalog override flow.
+- **Stock** remains a separate bottom-navigation surface and remains the physical inventory authority.
+
+### Navigation behavior
+
+- Menu opens at the Menu hub.
+- Kategori dan menu opens the category index.
+- Selecting a category opens its menu list.
+- Selecting/editing a menu uses the existing progressive catalog override flow.
+- Back navigation returns one level at a time.
+- Category membership remains multi-category; a menu may therefore appear in more than one category.
+- Fast availability remains available at the menu-item level.
+- No new backend authority or second state machine is introduced.
+
+### GoBiz reference boundary
+
+The supplied GoBiz screens are used only for native-feeling hierarchy, touch ergonomics, list/divider treatment, progressive disclosure, and the visual relationship between category and item screens.
+
+They do not define Xentra business rules, branch scope, Catalog authority, Inventory authority, or unsupported capabilities.
+
+**LOCKED — Menu hierarchy v2 is now the implementation contract for Merchant App Menu.**
