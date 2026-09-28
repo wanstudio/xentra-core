@@ -933,6 +933,8 @@ function serializePublicBrand(brand) {
     primary_color: brand.primary_color || '#b6ff00',
     custom_domain: brand.custom_domain || 'app.mybangjo.com',
     tagline: brand.tagline || 'Official Online Food Ordering',
+    merchant_pwa_icon_url: brand.merchant_pwa_icon_url || null,
+    pos_pwa_icon_url: brand.pos_pwa_icon_url || null,
     banners
   };
 }

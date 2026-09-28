@@ -156,7 +156,45 @@ function getBaseTenantDomain(req) {
 
 // PWA Manifest & Service Worker Routes — MUST come before express.static
 // so Cloudflare always sees the explicit no-store headers, not express.static defaults.
-app.get(['/manifest.json', '/pwa/manifest.json'], (req, res) => {
+
+/**
+ * Resolve brand from request host for manifest icon override.
+ * Returns brand row or null. Never throws.
+ */
+async function resolveBrandForManifest(req) {
+  try {
+    await brandRepository.ready();
+    const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].trim().toLowerCase();
+    if (!host) return null;
+    const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+    if (isLocal) {
+      return brandRepository.findFirstForLocalDevelopment() || null;
+    }
+    return brandRepository.findByCustomDomain(host) || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Build a minimal icons array for a PWA manifest.
+ * If iconUrl is provided, both 192 and 512 entries point to it.
+ * Otherwise the default src values from the manifest file are used.
+ */
+function buildPwaIcons(iconUrl, default192, default512) {
+  if (iconUrl) {
+    return [
+      { src: iconUrl, sizes: '192x192', type: 'image/png' },
+      { src: iconUrl, sizes: '512x512', type: 'image/png' }
+    ];
+  }
+  return [
+    { src: default192, sizes: '192x192', type: 'image/png' },
+    { src: default512, sizes: '512x512', type: 'image/png' }
+  ];
+}
+
+app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
@@ -171,6 +209,9 @@ app.get(['/manifest.json', '/pwa/manifest.json'], (req, res) => {
       data.name = 'Bangjo Managerial';
       data.short_name = 'Managerial';
       data.description = 'Aplikasi Manajerial & Operasional Bangjo (Owner & Manager)';
+      const brand = await resolveBrandForManifest(req);
+      const iconOverride = brand ? (brand.merchant_pwa_icon_url || brand.logo_url || null) : null;
+      data.icons = buildPwaIcons(iconOverride, '/merchant-app/assets/icons/icon-192.png', '/merchant-app/assets/icons/icon-512.png');
       return res.json(data);
     } catch (_) {
       return res.sendFile(manifestPath);
@@ -183,6 +224,9 @@ app.get(['/manifest.json', '/pwa/manifest.json'], (req, res) => {
       data.id = '/';
       data.start_url = '/';
       data.scope = '/';
+      const brand = await resolveBrandForManifest(req);
+      const iconOverride = brand ? (brand.pos_pwa_icon_url || brand.logo_url || null) : null;
+      data.icons = buildPwaIcons(iconOverride, '/pos/assets/icons/icon-192.png', '/pos/assets/icons/icon-512.png');
       return res.json(data);
     } catch (_) {
       return res.sendFile(manifestPath);
@@ -211,7 +255,7 @@ app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) =
 });
 
 // Merchant PWA Manifest & Service Worker Routes — explicitly served before express.static / HTML catch-alls
-app.get(['/merchant-app/manifest.json', '/merchant/manifest.json'], (req, res) => {
+app.get(['/merchant-app/manifest.json', '/merchant/manifest.json'], async (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
@@ -225,6 +269,9 @@ app.get(['/merchant-app/manifest.json', '/merchant/manifest.json'], (req, res) =
       data.id = '/';
       data.start_url = '/';
       data.scope = '/';
+      const brand = await resolveBrandForManifest(req);
+      const iconOverride = brand ? (brand.merchant_pwa_icon_url || brand.logo_url || null) : null;
+      data.icons = buildPwaIcons(iconOverride, '/merchant-app/assets/icons/icon-192.png', '/merchant-app/assets/icons/icon-512.png');
       return res.json(data);
     } catch (_) {}
   }
@@ -241,7 +288,7 @@ app.get(['/merchant-app/sw.js', '/merchant-app/service-worker.js', '/merchant/sw
 });
 
 // POS PWA Manifest & Service Worker Routes
-app.get(['/pos/manifest.json', '/pos-app/manifest.json'], (req, res) => {
+app.get(['/pos/manifest.json', '/pos-app/manifest.json'], async (req, res) => {
   res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
@@ -255,6 +302,9 @@ app.get(['/pos/manifest.json', '/pos-app/manifest.json'], (req, res) => {
       data.id = '/';
       data.start_url = '/';
       data.scope = '/';
+      const brand = await resolveBrandForManifest(req);
+      const iconOverride = brand ? (brand.pos_pwa_icon_url || brand.logo_url || null) : null;
+      data.icons = buildPwaIcons(iconOverride, '/pos/assets/icons/icon-192.png', '/pos/assets/icons/icon-512.png');
       return res.json(data);
     } catch (_) {}
   }

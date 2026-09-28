@@ -919,6 +919,66 @@
   /* =========================================================================
      MODUL 1: BRAND & THEME COLOR CONTROLLER
      ========================================================================= */
+
+  // ── Installed PWA Identity Override — shared upload helper ─────────────────
+  // Uploads a file to the brand logo storage (to get a hosted URL), then saves
+  // that URL to the given PWA icon endpoint. Reuses the existing upload pattern.
+  async function doUploadPwaLauncherIcon(file, endpoint, previewEl, hiddenEl, removeBtn, pickBtn) {
+    if (pickBtn) { pickBtn.disabled = true; pickBtn.textContent = 'Mengunggah...'; }
+    // Optimistic preview
+    try {
+      var previewDataUrl = await new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = function () { reject(new Error('Gagal membaca file.')); };
+        reader.readAsDataURL(file);
+      });
+      if (previewEl) { previewEl.src = previewDataUrl; previewEl.style.display = 'block'; }
+    } catch (_) {}
+
+    try {
+      var base64 = await new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
+        reader.readAsDataURL(file);
+      });
+
+      // Upload to brand logo storage to obtain a hosted URL
+      var logoRes = await adminFetch(API_BASE + '/admin/brand/logo', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ image_base64: base64, mime_type: file.type })
+      });
+      var logoData = await logoRes.json();
+      if (!logoRes.ok || !logoData.success) {
+        showToast('❌ ' + (logoData.error || 'Gagal mengunggah icon.'));
+        return;
+      }
+      var iconUrl = logoData.logo_url;
+
+      // Save the URL to the specific PWA icon endpoint
+      var iconRes = await adminFetch(API_BASE + endpoint, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ url: iconUrl })
+      });
+      var iconData = await iconRes.json();
+      if (iconRes.ok && iconData.success) {
+        showToast('✅ Icon PWA berhasil diperbarui.');
+        if (previewEl) { previewEl.src = iconUrl; previewEl.style.display = 'block'; }
+        if (hiddenEl) hiddenEl.value = iconUrl;
+        if (removeBtn) removeBtn.style.display = 'inline-block';
+      } else {
+        showToast('❌ ' + (iconData.error || 'Gagal menyimpan icon.'));
+      }
+    } catch (err) {
+      showToast('❌ Kesalahan jaringan saat mengunggah icon PWA.');
+    } finally {
+      if (pickBtn) { pickBtn.disabled = false; pickBtn.textContent = '📁 Unggah'; }
+    }
+  }
+
   async function loadBrandSettings() {
     try {
       var res = await adminFetch(API_BASE + '/admin/brand', { headers: getAuthHeaders() });
@@ -971,6 +1031,44 @@
     if ($('set-profile-color')) $('set-profile-color').value = brand.primary_color || '#b6ff00';
     if ($('set-profile-color-hex')) $('set-profile-color-hex').value = brand.primary_color || '#b6ff00';
     if ($('set-profile-domain')) $('set-profile-domain').textContent = brand.custom_domain || window.location.host || '-';
+
+    // Installed PWA Identity Override — populate launcher icon previews
+    var merchantIconUrl = brand.merchant_pwa_icon_url || null;
+    var posIconUrl = brand.pos_pwa_icon_url || null;
+    var defaultMerchantIcon = '/merchant-app/assets/icons/icon-192.png';
+    var defaultPosIcon = '/assets/pwa/icon-192.png';
+
+    if ($('brand-tab-merchant-icon')) $('brand-tab-merchant-icon').value = merchantIconUrl || '';
+    if ($('brand-tab-merchant-icon-preview')) {
+      $('brand-tab-merchant-icon-preview').src = merchantIconUrl || defaultMerchantIcon;
+      $('brand-tab-merchant-icon-preview').style.display = 'block';
+    }
+    if ($('brand-tab-merchant-icon-empty')) $('brand-tab-merchant-icon-empty').style.display = 'none';
+    if ($('btnRemoveBrandTabMerchant')) $('btnRemoveBrandTabMerchant').style.display = merchantIconUrl ? 'inline-block' : 'none';
+
+    if ($('brand-tab-pos-icon')) $('brand-tab-pos-icon').value = posIconUrl || '';
+    if ($('brand-tab-pos-icon-preview')) {
+      $('brand-tab-pos-icon-preview').src = posIconUrl || defaultPosIcon;
+      $('brand-tab-pos-icon-preview').style.display = 'block';
+    }
+    if ($('brand-tab-pos-icon-empty')) $('brand-tab-pos-icon-empty').style.display = 'none';
+    if ($('btnRemoveBrandTabPos')) $('btnRemoveBrandTabPos').style.display = posIconUrl ? 'inline-block' : 'none';
+
+    if ($('set-profile-merchant-icon')) $('set-profile-merchant-icon').value = merchantIconUrl || '';
+    if ($('set-profile-merchant-icon-preview')) {
+      $('set-profile-merchant-icon-preview').src = merchantIconUrl || defaultMerchantIcon;
+      $('set-profile-merchant-icon-preview').style.display = 'block';
+    }
+    if ($('set-profile-merchant-icon-empty')) $('set-profile-merchant-icon-empty').style.display = 'none';
+    if ($('btn-set-profile-merchant-icon-remove')) $('btn-set-profile-merchant-icon-remove').style.display = merchantIconUrl ? 'inline-block' : 'none';
+
+    if ($('set-profile-pos-icon')) $('set-profile-pos-icon').value = posIconUrl || '';
+    if ($('set-profile-pos-icon-preview')) {
+      $('set-profile-pos-icon-preview').src = posIconUrl || defaultPosIcon;
+      $('set-profile-pos-icon-preview').style.display = 'block';
+    }
+    if ($('set-profile-pos-icon-empty')) $('set-profile-pos-icon-empty').style.display = 'none';
+    if ($('btn-set-profile-pos-icon-remove')) $('btn-set-profile-pos-icon-remove').style.display = posIconUrl ? 'inline-block' : 'none';
 
     if ($('auth-brand-name')) $('auth-brand-name').textContent = brand.name || 'Bangjo Resto';
     if ($('auth-logo')) $('auth-logo').src = logoUrl;
@@ -1603,6 +1701,74 @@
         } finally {
           if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '＋ Tambah Banner'; }
         }
+      });
+    }
+
+    // Brand Tab — Merchant Icon
+    var btnPickBrandTabMerchant = $('btnPickBrandTabMerchant');
+    var fileInputBrandTabMerchant = $('input-brand-tab-merchant-icon-file');
+    var btnRemoveBrandTabMerchantEl = $('btnRemoveBrandTabMerchant');
+    if (btnPickBrandTabMerchant && fileInputBrandTabMerchant) {
+      btnPickBrandTabMerchant.addEventListener('click', function () { fileInputBrandTabMerchant.click(); });
+      fileInputBrandTabMerchant.addEventListener('change', async function () {
+        var file = fileInputBrandTabMerchant.files && fileInputBrandTabMerchant.files[0];
+        if (!file) return;
+        await doUploadPwaLauncherIcon(file, '/admin/brand/merchant-icon',
+          $('brand-tab-merchant-icon-preview'), $('brand-tab-merchant-icon'),
+          btnRemoveBrandTabMerchantEl, btnPickBrandTabMerchant);
+        fileInputBrandTabMerchant.value = '';
+      });
+    }
+    if (btnRemoveBrandTabMerchantEl) {
+      btnRemoveBrandTabMerchantEl.addEventListener('click', async function () {
+        if (!confirm('Hapus override icon Merchant PWA?')) return;
+        try {
+          var res = await adminFetch(API_BASE + '/admin/brand/merchant-icon', { method: 'DELETE', headers: getAuthHeaders() });
+          var data = await res.json();
+          if (res.ok && data.success) {
+            showToast('✅ Icon Merchant PWA dihapus.');
+            if ($('brand-tab-merchant-icon')) $('brand-tab-merchant-icon').value = '';
+            if ($('brand-tab-merchant-icon-preview')) $('brand-tab-merchant-icon-preview').src = '/merchant-app/assets/icons/icon-192.png';
+            if ($('set-profile-merchant-icon')) $('set-profile-merchant-icon').value = '';
+            if ($('set-profile-merchant-icon-preview')) $('set-profile-merchant-icon-preview').src = '/merchant-app/assets/icons/icon-192.png';
+            btnRemoveBrandTabMerchantEl.style.display = 'none';
+            if ($('btn-set-profile-merchant-icon-remove')) $('btn-set-profile-merchant-icon-remove').style.display = 'none';
+          } else { showToast('❌ Gagal menghapus icon.'); }
+        } catch (err) { showToast('❌ Kesalahan jaringan.'); }
+      });
+    }
+
+    // Brand Tab — POS Icon
+    var btnPickBrandTabPos = $('btnPickBrandTabPos');
+    var fileInputBrandTabPos = $('input-brand-tab-pos-icon-file');
+    var btnRemoveBrandTabPosEl = $('btnRemoveBrandTabPos');
+    if (btnPickBrandTabPos && fileInputBrandTabPos) {
+      btnPickBrandTabPos.addEventListener('click', function () { fileInputBrandTabPos.click(); });
+      fileInputBrandTabPos.addEventListener('change', async function () {
+        var file = fileInputBrandTabPos.files && fileInputBrandTabPos.files[0];
+        if (!file) return;
+        await doUploadPwaLauncherIcon(file, '/admin/brand/pos-icon',
+          $('brand-tab-pos-icon-preview'), $('brand-tab-pos-icon'),
+          btnRemoveBrandTabPosEl, btnPickBrandTabPos);
+        fileInputBrandTabPos.value = '';
+      });
+    }
+    if (btnRemoveBrandTabPosEl) {
+      btnRemoveBrandTabPosEl.addEventListener('click', async function () {
+        if (!confirm('Hapus override icon POS PWA?')) return;
+        try {
+          var res = await adminFetch(API_BASE + '/admin/brand/pos-icon', { method: 'DELETE', headers: getAuthHeaders() });
+          var data = await res.json();
+          if (res.ok && data.success) {
+            showToast('✅ Icon POS PWA dihapus.');
+            if ($('brand-tab-pos-icon')) $('brand-tab-pos-icon').value = '';
+            if ($('brand-tab-pos-icon-preview')) $('brand-tab-pos-icon-preview').src = '/assets/pwa/icon-192.png';
+            if ($('set-profile-pos-icon')) $('set-profile-pos-icon').value = '';
+            if ($('set-profile-pos-icon-preview')) $('set-profile-pos-icon-preview').src = '/assets/pwa/icon-192.png';
+            btnRemoveBrandTabPosEl.style.display = 'none';
+            if ($('btn-set-profile-pos-icon-remove')) $('btn-set-profile-pos-icon-remove').style.display = 'none';
+          } else { showToast('❌ Gagal menghapus icon.'); }
+        } catch (err) { showToast('❌ Kesalahan jaringan.'); }
       });
     }
   }
@@ -9381,6 +9547,36 @@
         if ($('set-profile-color')) $('set-profile-color').value = p.primary_color || '#b6ff00';
         if ($('set-profile-color-hex')) $('set-profile-color-hex').value = p.primary_color || '#b6ff00';
         if ($('set-profile-domain')) $('set-profile-domain').textContent = p.custom_domain || window.location.host || '-';
+
+        // Installed PWA Identity Override
+        var merchantIconUrl = p.merchant_pwa_icon_url || null;
+        var posIconUrl = p.pos_pwa_icon_url || null;
+        var defaultMerchantIcon = '/merchant-app/assets/icons/icon-192.png';
+        var defaultPosIcon = '/assets/pwa/icon-192.png';
+
+        if ($('set-profile-merchant-icon')) $('set-profile-merchant-icon').value = merchantIconUrl || '';
+        if ($('set-profile-merchant-icon-preview')) {
+          $('set-profile-merchant-icon-preview').src = merchantIconUrl || defaultMerchantIcon;
+          $('set-profile-merchant-icon-preview').style.display = 'block';
+        }
+        if ($('set-profile-merchant-icon-empty')) $('set-profile-merchant-icon-empty').style.display = 'none';
+        if ($('btn-set-profile-merchant-icon-remove')) $('btn-set-profile-merchant-icon-remove').style.display = merchantIconUrl ? 'inline-block' : 'none';
+
+        if ($('set-profile-pos-icon')) $('set-profile-pos-icon').value = posIconUrl || '';
+        if ($('set-profile-pos-icon-preview')) {
+          $('set-profile-pos-icon-preview').src = posIconUrl || defaultPosIcon;
+          $('set-profile-pos-icon-preview').style.display = 'block';
+        }
+        if ($('set-profile-pos-icon-empty')) $('set-profile-pos-icon-empty').style.display = 'none';
+        if ($('btn-set-profile-pos-icon-remove')) $('btn-set-profile-pos-icon-remove').style.display = posIconUrl ? 'inline-block' : 'none';
+
+        // Sync brand tab previews too
+        if ($('brand-tab-merchant-icon')) $('brand-tab-merchant-icon').value = merchantIconUrl || '';
+        if ($('brand-tab-merchant-icon-preview')) $('brand-tab-merchant-icon-preview').src = merchantIconUrl || defaultMerchantIcon;
+        if ($('btnRemoveBrandTabMerchant')) $('btnRemoveBrandTabMerchant').style.display = merchantIconUrl ? 'inline-block' : 'none';
+        if ($('brand-tab-pos-icon')) $('brand-tab-pos-icon').value = posIconUrl || '';
+        if ($('brand-tab-pos-icon-preview')) $('brand-tab-pos-icon-preview').src = posIconUrl || defaultPosIcon;
+        if ($('btnRemoveBrandTabPos')) $('btnRemoveBrandTabPos').style.display = posIconUrl ? 'inline-block' : 'none';
       } catch (err) {
         console.warn('[Load Settings Profile Warn]:', err);
       }
@@ -9483,6 +9679,72 @@
           if (/^#[0-9A-Fa-f]{6}$/.test(setColorHex.value)) {
             setColor.value = setColorHex.value;
           }
+        });
+      }
+
+      // Settings Panel — Merchant Icon Upload
+      var spMerchantFileInput = $('input-set-profile-merchant-icon-file');
+      var spMerchantRemoveBtn = $('btn-set-profile-merchant-icon-remove');
+      if (spMerchantFileInput) {
+        spMerchantFileInput.addEventListener('change', async function () {
+          var file = spMerchantFileInput.files && spMerchantFileInput.files[0];
+          if (!file) return;
+          await doUploadPwaLauncherIcon(file, '/admin/brand/merchant-icon',
+            $('set-profile-merchant-icon-preview'), $('set-profile-merchant-icon'),
+            spMerchantRemoveBtn, $('btn-set-profile-merchant-icon-pick'));
+          spMerchantFileInput.value = '';
+        });
+      }
+      if (spMerchantRemoveBtn) {
+        spMerchantRemoveBtn.addEventListener('click', async function () {
+          if (!confirm('Hapus override icon Merchant PWA?')) return;
+          try {
+            var res = await adminFetch(API_BASE + '/admin/brand/merchant-icon', { method: 'DELETE', headers: getAuthHeaders() });
+            var data = await res.json();
+            if (res.ok && data.success) {
+              showToast('✅ Icon Merchant PWA dihapus.');
+              var defaultMerchantIcon = '/merchant-app/assets/icons/icon-192.png';
+              if ($('set-profile-merchant-icon')) $('set-profile-merchant-icon').value = '';
+              if ($('set-profile-merchant-icon-preview')) $('set-profile-merchant-icon-preview').src = defaultMerchantIcon;
+              spMerchantRemoveBtn.style.display = 'none';
+              if ($('brand-tab-merchant-icon')) $('brand-tab-merchant-icon').value = '';
+              if ($('brand-tab-merchant-icon-preview')) $('brand-tab-merchant-icon-preview').src = defaultMerchantIcon;
+              if ($('btnRemoveBrandTabMerchant')) $('btnRemoveBrandTabMerchant').style.display = 'none';
+            } else { showToast('❌ Gagal menghapus icon.'); }
+          } catch (err) { showToast('❌ Kesalahan jaringan.'); }
+        });
+      }
+
+      // Settings Panel — POS Icon Upload
+      var spPosFileInput = $('input-set-profile-pos-icon-file');
+      var spPosRemoveBtn = $('btn-set-profile-pos-icon-remove');
+      if (spPosFileInput) {
+        spPosFileInput.addEventListener('change', async function () {
+          var file = spPosFileInput.files && spPosFileInput.files[0];
+          if (!file) return;
+          await doUploadPwaLauncherIcon(file, '/admin/brand/pos-icon',
+            $('set-profile-pos-icon-preview'), $('set-profile-pos-icon'),
+            spPosRemoveBtn, $('btn-set-profile-pos-icon-pick'));
+          spPosFileInput.value = '';
+        });
+      }
+      if (spPosRemoveBtn) {
+        spPosRemoveBtn.addEventListener('click', async function () {
+          if (!confirm('Hapus override icon POS PWA?')) return;
+          try {
+            var res = await adminFetch(API_BASE + '/admin/brand/pos-icon', { method: 'DELETE', headers: getAuthHeaders() });
+            var data = await res.json();
+            if (res.ok && data.success) {
+              showToast('✅ Icon POS PWA dihapus.');
+              var defaultPosIcon = '/assets/pwa/icon-192.png';
+              if ($('set-profile-pos-icon')) $('set-profile-pos-icon').value = '';
+              if ($('set-profile-pos-icon-preview')) $('set-profile-pos-icon-preview').src = defaultPosIcon;
+              spPosRemoveBtn.style.display = 'none';
+              if ($('brand-tab-pos-icon')) $('brand-tab-pos-icon').value = '';
+              if ($('brand-tab-pos-icon-preview')) $('brand-tab-pos-icon-preview').src = defaultPosIcon;
+              if ($('btnRemoveBrandTabPos')) $('btnRemoveBrandTabPos').style.display = 'none';
+            } else { showToast('❌ Gagal menghapus icon.'); }
+          } catch (err) { showToast('❌ Kesalahan jaringan.'); }
         });
       }
     }

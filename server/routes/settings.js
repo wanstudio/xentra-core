@@ -62,7 +62,9 @@ router.get('/admin/settings/business/profile', requireAuth(['owner', 'brand_mana
         logo_url: brand.logo_url || '/assets/pwa/icon-192.png',
         primary_color: brand.primary_color || '#b6ff00',
         custom_domain: brand.custom_domain || '',
-        banners: Array.isArray(banners) ? banners : []
+        banners: Array.isArray(banners) ? banners : [],
+        merchant_pwa_icon_url: brand.merchant_pwa_icon_url || null,
+        pos_pwa_icon_url: brand.pos_pwa_icon_url || null
       }
     });
   } catch (err) {
@@ -73,13 +75,15 @@ router.get('/admin/settings/business/profile', requireAuth(['owner', 'brand_mana
 // 2.2 Brand Profile (PUT - Owner/Brand Manager only)
 router.put('/admin/settings/business/profile', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, tagline, logo_url, primary_color, banners } = req.body;
+    const { name, tagline, logo_url, primary_color, banners, merchant_pwa_icon_url, pos_pwa_icon_url } = req.body;
     coreBrandRepo.updateBrandProfile(req.brand_id, {
       name,
       tagline,
       logo_url,
       primary_color,
-      banners
+      banners,
+      merchant_pwa_icon_url,
+      pos_pwa_icon_url
     });
 
     const updated = coreBrandRepo.findById(req.brand_id);
@@ -93,7 +97,9 @@ router.put('/admin/settings/business/profile', requireAuth(['owner', 'brand_mana
         tagline: updated.tagline,
         logo_url: updated.logo_url,
         primary_color: updated.primary_color,
-        custom_domain: updated.custom_domain
+        custom_domain: updated.custom_domain,
+        merchant_pwa_icon_url: updated.merchant_pwa_icon_url || null,
+        pos_pwa_icon_url: updated.pos_pwa_icon_url || null
       }
     });
   } catch (err) {

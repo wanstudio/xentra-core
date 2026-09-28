@@ -1913,6 +1913,11 @@ function initSchema(targetDb) {
   // Legacy image_url/logo_url columns are preserved for backward compatibility.
   // Idempotent — safe on existing databases.
   try { targetDb.exec('ALTER TABLE brands ADD COLUMN logo_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  // Installed PWA Identity Override columns (launcher icon overrides for Merchant/POS PWA)
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN merchant_pwa_icon_url TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN merchant_pwa_icon_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN pos_pwa_icon_url TEXT;'); } catch (e) {}
+  try { targetDb.exec('ALTER TABLE brands ADD COLUMN pos_pwa_icon_media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE products ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE categories ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}
   try { targetDb.exec('ALTER TABLE branch_categories ADD COLUMN media_id TEXT REFERENCES media_assets(id) ON DELETE SET NULL;'); } catch (e) {}

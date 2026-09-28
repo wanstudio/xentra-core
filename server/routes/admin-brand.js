@@ -67,6 +67,8 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
           custom_domain = COALESCE(?, custom_domain),
           tagline = COALESCE(?, tagline),
           banners = COALESCE(?, banners),
+          merchant_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_icon_url END,
+          pos_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_icon_url END,
           updated_at = datetime('now')
       WHERE id = ?
     `).run(
@@ -80,6 +82,10 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       custom_domain !== undefined ? custom_domain : null,
       tagline !== undefined ? tagline : null,
       bannersJson,
+      merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
+      merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
+      pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
+      pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
       req.brand_id
     );
     // P1.2: brand row written → drop the cached hostname→brand mapping so the
@@ -172,6 +178,58 @@ router.delete('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), (req
   } catch (err) {
     console.error('[API Error DELETE /admin/brand/logo]:', err);
     res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Installed PWA Identity Override — launcher icon routes
+// These ONLY affect the PWA launcher icon after install.
+// They do NOT change branding, RBAC, routing, or Customer PWA.
+
+router.post('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'url required' });
+    coreBrandRepo.updateMerchantPwaIcon(req.brand_id, url);
+    req.brand.merchant_pwa_icon_url = url;
+    return res.json({ success: true, merchant_pwa_icon_url: url });
+  } catch (err) {
+    console.error('[API Error POST /admin/brand/merchant-icon]:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.delete('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    coreBrandRepo.removeMerchantPwaIcon(req.brand_id);
+    req.brand.merchant_pwa_icon_url = null;
+    return res.json({ success: true, merchant_pwa_icon_url: null });
+  } catch (err) {
+    console.error('[API Error DELETE /admin/brand/merchant-icon]:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) return res.status(400).json({ error: 'url required' });
+    coreBrandRepo.updatePosPwaIcon(req.brand_id, url);
+    req.brand.pos_pwa_icon_url = url;
+    return res.json({ success: true, pos_pwa_icon_url: url });
+  } catch (err) {
+    console.error('[API Error POST /admin/brand/pos-icon]:', err);
+    return res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.delete('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
+  try {
+    coreBrandRepo.removePosPwaIcon(req.brand_id);
+    req.brand.pos_pwa_icon_url = null;
+    return res.json({ success: true, pos_pwa_icon_url: null });
+  } catch (err) {
+    console.error('[API Error DELETE /admin/brand/pos-icon]:', err);
+    return res.status(500).json({ error: 'Server error' });
   }
 });
 

@@ -110,7 +110,7 @@ class BrandRepository {
     return this.db.queryOne('SELECT * FROM brands WHERE id = ? LIMIT 1', [brandId]);
   }
 
-  updateBrandProfile(brandId, { name, logo_url, tagline, primary_color, banners }) {
+  updateBrandProfile(brandId, { name, logo_url, tagline, primary_color, banners, merchant_pwa_icon_url, pos_pwa_icon_url }) {
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
       throw new Error('Nama brand harus berupa teks yang valid.');
     }
@@ -154,6 +154,8 @@ class BrandRepository {
           tagline = COALESCE(?, tagline),
           primary_color = COALESCE(?, primary_color),
           banners = COALESCE(?, banners),
+          merchant_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_icon_url END,
+          pos_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_icon_url END,
           updated_at = datetime('now')
       WHERE id = ?
     `, [
@@ -162,6 +164,10 @@ class BrandRepository {
       tagline !== undefined ? (typeof tagline === 'string' ? tagline.trim() : '') : null,
       normalizedPrimaryColor !== undefined ? normalizedPrimaryColor : null,
       banners !== undefined ? serializedBanners : null,
+      merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
+      merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
+      pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
+      pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
       brandId
     ]);
   }
@@ -213,6 +219,26 @@ class BrandRepository {
           updated_at = datetime('now')
       WHERE id = ?
     `, [brandId]);
+  }
+
+  // ── Installed PWA Identity Override ─────────────────────────────────────────
+  // These affect only the PWA launcher icon after install. They do not change
+  // branding, RBAC, routing, or Customer PWA behavior.
+
+  updateMerchantPwaIcon(brandId, iconUrl) {
+    this.db.prepare('UPDATE brands SET merchant_pwa_icon_url = ?, merchant_pwa_icon_media_id = NULL WHERE id = ?').run(iconUrl, brandId);
+  }
+
+  removeMerchantPwaIcon(brandId) {
+    this.db.prepare('UPDATE brands SET merchant_pwa_icon_url = NULL, merchant_pwa_icon_media_id = NULL WHERE id = ?').run(brandId);
+  }
+
+  updatePosPwaIcon(brandId, iconUrl) {
+    this.db.prepare('UPDATE brands SET pos_pwa_icon_url = ?, pos_pwa_icon_media_id = NULL WHERE id = ?').run(iconUrl, brandId);
+  }
+
+  removePosPwaIcon(brandId) {
+    this.db.prepare('UPDATE brands SET pos_pwa_icon_url = NULL, pos_pwa_icon_media_id = NULL WHERE id = ?').run(brandId);
   }
 
   findBySlug(slug) {
