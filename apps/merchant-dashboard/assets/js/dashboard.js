@@ -10431,8 +10431,9 @@
       applyRoleBasedUI();
       validateServerSession().then(function (isValid) {
         if (!isValid) return;
-        // Owner Dashboard must never become a fallback surface for operational roles.
-        enforceSurface(['/owner/', '/dashboard/', '/dashboard']);
+        // Owner Dashboard has one canonical role landing: /owner/.
+        // /dashboard/ remains a legacy/compatibility route, not the Owner landing URL.
+        enforceSurface(['/owner/']);
       }).catch(function () {});
 
       // Apply initial route from URL hash (enables deep-link and browser refresh)
