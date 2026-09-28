@@ -62,35 +62,29 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       SET name = COALESCE(?, name),
           primary_color = COALESCE(?, primary_color),
           logo_url = COALESCE(?, logo_url),
-          merchant_pwa_icon_url = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_icon_url END,
-          pos_pwa_icon_url = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_icon_url END,
           custom_domain = COALESCE(?, custom_domain),
           tagline = COALESCE(?, tagline),
           banners = COALESCE(?, banners),
-          merchant_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_icon_url END,
-          pos_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_icon_url END,
-          merchant_pwa_name = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_name END,
-          pos_pwa_name = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_name END,
+          merchant_pwa_icon_url = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_icon_url END,
+          pos_pwa_icon_url = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_icon_url END,
+          merchant_pwa_name = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_name END,
+          pos_pwa_name = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_name END,
           updated_at = datetime('now')
       WHERE id = ?
     `).run(
       name !== undefined ? name : null,
       normalizedPrimaryColor !== undefined ? normalizedPrimaryColor : null,
       logo_url !== undefined ? logo_url : null,
+      custom_domain !== undefined ? custom_domain : null,
+      tagline !== undefined ? tagline : null,
+      bannersJson,
       merchant_pwa_icon_url !== undefined ? 1 : 0,
       merchant_pwa_icon_url !== undefined ? (typeof merchant_pwa_icon_url === 'string' ? merchant_pwa_icon_url.trim() : null) : null,
       pos_pwa_icon_url !== undefined ? 1 : 0,
       pos_pwa_icon_url !== undefined ? (typeof pos_pwa_icon_url === 'string' ? pos_pwa_icon_url.trim() : null) : null,
-      custom_domain !== undefined ? custom_domain : null,
-      tagline !== undefined ? tagline : null,
-      bannersJson,
-      merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
-      merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
-      pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
-      pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
+      merchant_pwa_name !== undefined ? 1 : 0,
       merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
-      merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
-      pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
+      pos_pwa_name !== undefined ? 1 : 0,
       pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
       req.brand_id
     );
@@ -108,21 +102,22 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       parsedBanners = bannersJson ? JSON.parse(bannersJson) : (typeof req.brand.banners === 'string' ? JSON.parse(req.brand.banners) : req.brand.banners);
     } catch (_) {}
 
+    const targetBrand = freshBrand || req.brand;
     res.json({
       success: true,
       message: 'Pengaturan brand dan tema berhasil diperbarui.',
       brand: {
-        id: req.brand.id,
-        name: req.brand.name,
-        slug: req.brand.slug,
-        logo_url: req.brand.logo_url || '/assets/pwa/icon-192.png',
-        merchant_pwa_icon_url: req.brand.merchant_pwa_icon_url || null,
-        pos_pwa_icon_url: req.brand.pos_pwa_icon_url || null,
-        merchant_pwa_name: req.brand.merchant_pwa_name || null,
-        pos_pwa_name: req.brand.pos_pwa_name || null,
-        primary_color: req.brand.primary_color || '#b6ff00',
-        custom_domain: req.brand.custom_domain || 'app.mybangjo.com',
-        tagline: req.brand.tagline || 'Official Online Food Ordering',
+        id: targetBrand.id,
+        name: targetBrand.name,
+        slug: targetBrand.slug,
+        logo_url: targetBrand.logo_url || '/assets/pwa/icon-192.png',
+        merchant_pwa_icon_url: targetBrand.merchant_pwa_icon_url || null,
+        pos_pwa_icon_url: targetBrand.pos_pwa_icon_url || null,
+        merchant_pwa_name: targetBrand.merchant_pwa_name || null,
+        pos_pwa_name: targetBrand.pos_pwa_name || null,
+        primary_color: targetBrand.primary_color || '#b6ff00',
+        custom_domain: targetBrand.custom_domain || 'app.mybangjo.com',
+        tagline: targetBrand.tagline || 'Official Online Food Ordering',
         banners: Array.isArray(parsedBanners) ? parsedBanners : []
       }
     });

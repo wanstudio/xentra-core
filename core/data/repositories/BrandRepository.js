@@ -156,8 +156,8 @@ class BrandRepository {
           banners = COALESCE(?, banners),
           merchant_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_icon_url END,
           pos_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_icon_url END,
-          merchant_pwa_name = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_name END,
-          pos_pwa_name = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_name END,
+          merchant_pwa_name = CASE WHEN ? = 1 THEN ? ELSE merchant_pwa_name END,
+          pos_pwa_name = CASE WHEN ? = 1 THEN ? ELSE pos_pwa_name END,
           updated_at = datetime('now')
       WHERE id = ?
     `, [
@@ -170,9 +170,9 @@ class BrandRepository {
       merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
       pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
       pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
+      merchant_pwa_name !== undefined ? 1 : 0,
       merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
-      merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
-      pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
+      pos_pwa_name !== undefined ? 1 : 0,
       pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
       brandId
     ]);

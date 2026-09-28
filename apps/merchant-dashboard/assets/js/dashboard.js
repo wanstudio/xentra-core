@@ -9572,6 +9572,14 @@
         if ($('brand-tab-pos-icon')) $('brand-tab-pos-icon').value = posIconUrl || '';
         if ($('brand-tab-pos-icon-preview')) $('brand-tab-pos-icon-preview').src = posIconUrl || defaultPosIcon;
         if ($('btn-brand-tab-pos-icon-remove')) $('btn-brand-tab-pos-icon-remove').style.display = posIconUrl ? 'inline-block' : 'none';
+
+        // Sync PWA custom name inputs across Settings and Brand tabs
+        var merchantPwaName = p.merchant_pwa_name || '';
+        var posPwaName = p.pos_pwa_name || '';
+        if ($('set-profile-merchant-pwa-name')) $('set-profile-merchant-pwa-name').value = merchantPwaName;
+        if ($('set-profile-pos-pwa-name')) $('set-profile-pos-pwa-name').value = posPwaName;
+        if ($('brand-tab-merchant-pwa-name')) $('brand-tab-merchant-pwa-name').value = merchantPwaName;
+        if ($('brand-tab-pos-pwa-name')) $('brand-tab-pos-pwa-name').value = posPwaName;
       } catch (err) {
         console.warn('[Load Settings Profile Warn]:', err);
       }
