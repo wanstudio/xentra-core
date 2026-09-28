@@ -695,7 +695,9 @@
     sel.addEventListener('change', function () {
       _branchContextState.selected = sel.value;
       var curRoute = getCurrentRoute();
-      if (curRoute === 'overview') {
+      var tabOverview = $('tab-overview');
+      var isOverviewTabActive = tabOverview && tabOverview.classList.contains('active');
+      if (curRoute === 'overview' || curRoute === 'beranda' || isOverviewTabActive) {
         loadOverview();
       } else if (curRoute === 'reports' || curRoute.indexOf('reports/') === 0) {
         var subType = curRoute.indexOf('reports/') === 0 ? curRoute.split('reports/')[1] : 'overview';
@@ -3827,25 +3829,32 @@
     var startStr = '';
     var endStr = '';
 
+    function toYMD(d) {
+      var y = d.getFullYear();
+      var m = String(d.getMonth() + 1).padStart(2, '0');
+      var day = String(d.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + day;
+    }
+
     if (preset === 'today') {
-      var y = now.getFullYear();
-      var m = String(now.getMonth() + 1).padStart(2, '0');
-      var d = String(now.getDate()).padStart(2, '0');
-      startStr = y + '-' + m + '-' + d + 'T00:00:00Z';
-      endStr = y + '-' + m + '-' + d + 'T23:59:59Z';
+      startStr = toYMD(now);
+      endStr = toYMD(now);
     } else if (preset === '7d') {
       var past7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      startStr = past7.toISOString().slice(0, 10) + 'T00:00:00Z';
-      endStr = now.toISOString().slice(0, 10) + 'T23:59:59Z';
+      startStr = toYMD(past7);
+      endStr = toYMD(now);
     } else if (preset === '30d') {
       var past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      startStr = past30.toISOString().slice(0, 10) + 'T00:00:00Z';
-      endStr = now.toISOString().slice(0, 10) + 'T23:59:59Z';
+      startStr = toYMD(past30);
+      endStr = toYMD(now);
     } else if (preset === 'month') {
       var y2 = now.getFullYear();
       var m2 = String(now.getMonth() + 1).padStart(2, '0');
-      startStr = y2 + '-' + m2 + '-01T00:00:00Z';
-      endStr = now.toISOString().slice(0, 10) + 'T23:59:59Z';
+      startStr = y2 + '-' + m2 + '-01';
+      endStr = toYMD(now);
+    } else if (preset === 'all') {
+      startStr = '';
+      endStr = '';
     }
 
     _overviewFilter.startDate = startStr;
@@ -3854,18 +3863,17 @@
 
     var startInput = $('overview-start-date');
     var endInput = $('overview-end-date');
-    if (startInput) startInput.value = startStr ? startStr.slice(0, 10) : '';
-    if (endInput) endInput.value = endStr ? endStr.slice(0, 10) : '';
+    if (startInput) startInput.value = startStr;
+    if (endInput) endInput.value = endStr;
+
+    var occStart = $('occ-start-date');
+    var occEnd = $('occ-end-date');
+    if (occStart) occStart.value = startStr;
+    if (occEnd) occEnd.value = endStr;
 
     var periodSelect = $('occ-period-select');
     if (periodSelect && periodSelect.value !== preset) {
       periodSelect.value = preset;
-    }
-
-    var periodBadge = $('occ-period-badge');
-    if (periodBadge) {
-      var labelMap = { today: 'Hari ini', '7d': '7 hari', '30d': '30 hari', month: 'Bulan ini' };
-      periodBadge.textContent = labelMap[preset] || 'Hari ini';
     }
 
     if (!skipReload) {
@@ -4112,6 +4120,9 @@
     var inputStart = $('overview-start-date');
     var inputEnd = $('overview-end-date');
     var occSelect = $('occ-period-select');
+    var occStart = $('occ-start-date');
+    var occEnd = $('occ-end-date');
+    var btnOccSearch = $('btn-occ-search');
 
     if (occSelect) {
       occSelect.addEventListener('change', function () {
@@ -4119,10 +4130,44 @@
       });
     }
 
+    function doOccSearch() {
+      var sVal = occStart ? occStart.value.trim() : '';
+      var eVal = occEnd ? occEnd.value.trim() : '';
+      _overviewFilter.startDate = sVal;
+      _overviewFilter.endDate = eVal;
+      _overviewFilter.preset = 'custom';
+      if (inputStart) inputStart.value = sVal;
+      if (inputEnd) inputEnd.value = eVal;
+      loadOverview();
+    }
+
+    if (btnOccSearch) {
+      btnOccSearch.addEventListener('click', doOccSearch);
+    }
+
+    if (occStart) {
+      occStart.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          doOccSearch();
+        }
+      });
+    }
+    if (occEnd) {
+      occEnd.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          doOccSearch();
+        }
+      });
+    }
+
     if (btnFilter) {
       btnFilter.addEventListener('click', function () {
         _overviewFilter.startDate = inputStart ? inputStart.value : '';
         _overviewFilter.endDate = inputEnd ? inputEnd.value : '';
+        if (occStart) occStart.value = _overviewFilter.startDate;
+        if (occEnd) occEnd.value = _overviewFilter.endDate;
         loadOverview();
       });
     }
@@ -4131,13 +4176,17 @@
       btnReset.addEventListener('click', function () {
         if (inputStart) inputStart.value = '';
         if (inputEnd) inputEnd.value = '';
+        if (occStart) occStart.value = '';
+        if (occEnd) occEnd.value = '';
         _overviewFilter.startDate = '';
         _overviewFilter.endDate = '';
         if (occSelect) occSelect.value = 'today';
-        if ($('occ-period-badge')) $('occ-period-badge').textContent = 'Semua Waktu';
         loadOverview();
       });
     }
+
+    // Initialize default preset to 'today' without triggering extra reload
+    setOverviewPeriodPreset('today', true);
   }
 
   /* =========================================================================

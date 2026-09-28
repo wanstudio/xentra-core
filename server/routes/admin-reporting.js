@@ -37,16 +37,25 @@ router.get('/admin/overview', requireAuth(['owner', 'brand_manager', 'branch_man
   try {
     const { branch_id, start_date, end_date } = req.query;
 
-    let effectiveBranchId = branch_id;
+    let effectiveBranchId = branch_id && branch_id !== 'all' ? branch_id : null;
     if (req.user.role === 'branch_manager') {
       effectiveBranchId = req.user.branch_id || req.user.branchId;
+    }
+
+    let normalizedStartDate = start_date;
+    let normalizedEndDate = end_date;
+    if (normalizedStartDate && normalizedStartDate.length === 10) {
+      normalizedStartDate += ' 00:00:00';
+    }
+    if (normalizedEndDate && normalizedEndDate.length === 10) {
+      normalizedEndDate += ' 23:59:59';
     }
 
     const filter = {
       brand_id: req.brand_id,
       branch_id: effectiveBranchId,
-      start_date,
-      end_date
+      start_date: normalizedStartDate,
+      end_date: normalizedEndDate
     };
 
     // 1. Primary KPIs
@@ -68,8 +77,8 @@ router.get('/admin/overview', requireAuth(['owner', 'brand_manager', 'branch_man
     if (req.user.role !== 'branch_manager') {
       branchPerformance = overviewReportingRepo.getBranchComparison({
         brand_id: req.brand_id,
-        start_date,
-        end_date
+        start_date: normalizedStartDate,
+        end_date: normalizedEndDate
       });
     }
 
@@ -86,9 +95,9 @@ router.get('/admin/overview', requireAuth(['owner', 'brand_manager', 'branch_man
     // 7. Sales trend vs previous period
     let salesTrend = null;
     let previousPeriodSales = null;
-    if (start_date && end_date) {
-      const startMs = new Date(start_date).getTime();
-      const endMs = new Date(end_date).getTime();
+    if (normalizedStartDate && normalizedEndDate) {
+      const startMs = new Date(normalizedStartDate.includes('T') ? normalizedStartDate : normalizedStartDate.replace(' ', 'T')).getTime();
+      const endMs = new Date(normalizedEndDate.includes('T') ? normalizedEndDate : normalizedEndDate.replace(' ', 'T')).getTime();
       const durationMs = endMs - startMs;
       if (durationMs > 0 && !isNaN(durationMs)) {
         const prevStart = new Date(startMs - durationMs).toISOString();

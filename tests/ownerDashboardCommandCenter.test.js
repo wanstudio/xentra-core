@@ -28,11 +28,17 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
       '.x-desktop-overview-view must exist to wrap desktop overview layout');
   });
 
-  await t.test('OCC-02: Periode selector exists with required options and default Hari ini', () => {
+  await t.test('OCC-02: Periode selector and inline custom range form exist with default Hari ini', () => {
     assert.ok(html.includes('id="occ-period-select"'),
       '#occ-period-select must exist');
-    assert.ok(html.includes('id="occ-period-badge"'),
-      '#occ-period-badge must exist');
+    assert.ok(!html.includes('id="occ-period-badge"'),
+      '#occ-period-badge must be removed');
+    assert.ok(html.includes('id="occ-start-date"'),
+      '#occ-start-date must exist');
+    assert.ok(html.includes('id="occ-end-date"'),
+      '#occ-end-date must exist');
+    assert.ok(html.includes('id="btn-occ-search"'),
+      '#btn-occ-search must exist');
     assert.ok(html.includes('value="today" selected'),
       'Default period option must be "today"');
     assert.ok(html.includes('value="7d"'),
@@ -41,6 +47,8 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
       'Option 30d must exist');
     assert.ok(html.includes('value="month"'),
       'Option month must exist');
+    assert.ok(html.includes('value="all"'),
+      'Option all must exist');
   });
 
   await t.test('OCC-03: Hero KPI elements exist for Penjualan, Trend, and mini metrics', () => {
@@ -190,11 +198,15 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
       'renderOverviewEmpty must call renderOccEmpty');
   });
 
-  await t.test('OCC-13: initOverviewControls wires occ-period-select change handler', () => {
+  await t.test('OCC-13: initOverviewControls wires occ-period-select, custom range inputs, and btn-occ-search', () => {
     assert.ok(js.includes('var occSelect = $(\'occ-period-select\');'),
       'initOverviewControls must reference occ-period-select');
     assert.ok(js.includes('setOverviewPeriodPreset(this.value);'),
       'occ-period-select change must trigger setOverviewPeriodPreset');
+    assert.ok(js.includes('var btnOccSearch = $(\'btn-occ-search\');'),
+      'initOverviewControls must reference btn-occ-search');
+    assert.ok(js.includes('btnOccSearch.addEventListener(\'click\', doOccSearch);'),
+      'btn-occ-search must trigger doOccSearch');
   });
 
   // --------------------------------------------------------------------------
@@ -256,6 +268,62 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
       // Verify needs_attention pending_payments_count
       assert.ok(data.needs_attention, 'needs_attention must exist');
       assert.strictEqual(typeof data.needs_attention.pending_payments_count, 'number');
+    } finally {
+      await new Promise(resolve => server.close(resolve));
+    }
+  });
+
+  await t.test('OCC-15: /admin/overview handles branch_id=all and date filters properly', async (t2) => {
+    const http = require('node:http');
+    const db = require('../server/database/db');
+    require('./helpers/demoFixtures.js')();
+    const app = require('../server/app');
+
+    const server = http.createServer(app);
+    await new Promise(resolve => server.listen(0, resolve));
+
+    try {
+      const ownerUser = db.prepare("SELECT * FROM users WHERE id = 'usr_bangjo_owner'").get();
+      const ownerSession = global.TokenSessionStore.createSession(ownerUser, 'brand_bangjo');
+      const ownerToken = ownerSession.token;
+      const port = server.address().port;
+
+      const fetchOverview = (queryString) => new Promise((resolve, reject) => {
+        const req = http.request({
+          hostname: '127.0.0.1',
+          port,
+          path: '/api/v1/admin/overview' + (queryString ? '?' + queryString : ''),
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Host: 'app.mybangjo.com',
+            Authorization: `Bearer ${ownerToken}`
+          }
+        }, (response) => {
+          let data = '';
+          response.on('data', chunk => { data += chunk; });
+          response.on('end', () => {
+            resolve({
+              status: response.statusCode,
+              body: JSON.parse(data)
+            });
+          });
+        });
+        req.on('error', reject);
+        req.end();
+      });
+
+      // branch_id=all should not be treated literally and should return brand-wide data
+      const resAll = await fetchOverview('branch_id=all');
+      assert.strictEqual(resAll.status, 200);
+      assert.strictEqual(resAll.body.success, true);
+      assert.ok(resAll.body.data.kpis.orders >= 0, 'branch_id=all should succeed');
+
+      // Date range filtering with YYYY-MM-DD
+      const resDate = await fetchOverview('branch_id=all&start_date=2020-01-01&end_date=2099-12-31');
+      assert.strictEqual(resDate.status, 200);
+      assert.strictEqual(resDate.body.success, true);
+      assert.ok(resDate.body.data.kpis.orders >= 0, 'date range query should succeed');
     } finally {
       await new Promise(resolve => server.close(resolve));
     }

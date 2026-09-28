@@ -24,12 +24,14 @@ class ReportingRepository {
       queryParams.push(filter.brand_id);
     }
     if (filter.start_date) {
+      const sDate = filter.start_date.length === 10 ? filter.start_date + ' 00:00:00' : filter.start_date;
       joinConditions.push('datetime(o.created_at) >= datetime(?)');
-      queryParams.push(filter.start_date);
+      queryParams.push(sDate);
     }
     if (filter.end_date) {
+      const eDate = filter.end_date.length === 10 ? filter.end_date + ' 23:59:59' : filter.end_date;
       joinConditions.push('datetime(o.created_at) <= datetime(?)');
-      queryParams.push(filter.end_date);
+      queryParams.push(eDate);
     }
 
     let whereClause = '';
@@ -63,17 +65,19 @@ class ReportingRepository {
       whereClauses.push(`${pfx}brand_id = ?`);
       params.push(filter.brand_id);
     }
-    if (filter.branch_id) {
+    if (filter.branch_id && filter.branch_id !== 'all') {
       whereClauses.push(`${pfx}branch_id = ?`);
       params.push(filter.branch_id);
     }
     if (filter.start_date) {
+      const sDate = filter.start_date.length === 10 ? filter.start_date + ' 00:00:00' : filter.start_date;
       whereClauses.push(`datetime(${pfx}created_at) >= datetime(?)`);
-      params.push(filter.start_date);
+      params.push(sDate);
     }
     if (filter.end_date) {
+      const eDate = filter.end_date.length === 10 ? filter.end_date + ' 23:59:59' : filter.end_date;
       whereClauses.push(`datetime(${pfx}created_at) <= datetime(?)`);
-      params.push(filter.end_date);
+      params.push(eDate);
     }
 
     return {
@@ -539,17 +543,19 @@ class ReportingRepository {
       whereClauses.push('brand_id = ?');
       params.push(filter.brand_id);
     }
-    if (filter.branch_id) {
+    if (filter.branch_id && filter.branch_id !== 'all') {
       whereClauses.push('branch_id = ?');
       params.push(filter.branch_id);
     }
     if (filter.start_date) {
+      const sDate = filter.start_date.length === 10 ? filter.start_date + ' 00:00:00' : filter.start_date;
       whereClauses.push('datetime(created_at) >= datetime(?)');
-      params.push(filter.start_date);
+      params.push(sDate);
     }
     if (filter.end_date) {
+      const eDate = filter.end_date.length === 10 ? filter.end_date + ' 23:59:59' : filter.end_date;
       whereClauses.push('datetime(created_at) <= datetime(?)');
-      params.push(filter.end_date);
+      params.push(eDate);
     }
 
     const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -578,9 +584,19 @@ class ReportingRepository {
       whereClauses.push('brand_id = ?');
       params.push(filter.brand_id);
     }
-    if (filter.branch_id) {
+    if (filter.branch_id && filter.branch_id !== 'all') {
       whereClauses.push('branch_id = ?');
       params.push(filter.branch_id);
+    }
+    if (filter.start_date) {
+      const sDate = filter.start_date.length === 10 ? filter.start_date + ' 00:00:00' : filter.start_date;
+      whereClauses.push('datetime(created_at) >= datetime(?)');
+      params.push(sDate);
+    }
+    if (filter.end_date) {
+      const eDate = filter.end_date.length === 10 ? filter.end_date + ' 23:59:59' : filter.end_date;
+      whereClauses.push('datetime(created_at) <= datetime(?)');
+      params.push(eDate);
     }
     const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
     const row = this.db.queryOne(`
