@@ -592,6 +592,8 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(js.includes('async function submitBMStockAdjustment('), 'Missing submitBMStockAdjustment');
     assert.ok(js.includes('async function loadBMPromotions()'), 'Missing loadBMPromotions');
     assert.ok(js.includes('openBMStockAdjustmentModal'), 'Missing openBMStockAdjustmentModal');
+    assert.ok(js.includes("return 'untracked';"), 'Stock UI must distinguish NULL/untracked from zero');
+    assert.ok(js.includes('Belum dilacak'), 'Stock UI must expose untracked state');
   });
 
   /* ─────────────────────────────────────────────────────────────────────────
