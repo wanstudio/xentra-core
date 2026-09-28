@@ -6,6 +6,7 @@
 
 > **Canonical map:** `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`. This document remains the detailed cross-dashboard contract; Library v2 is the canonical map for terminology, scope, authority, lifecycle, and surface relationships.
 > **Menu authority lock:** `docs/decisions/branch-manager-menu-configuration-v1.md`.
+> **Owner mobile navigation lock:** `docs/decisions/owner-dashboard-focus-scope-navigation-v1.md`.
 
 ## 1. Purpose
 
@@ -145,7 +146,40 @@ Owner `Branches` is Branch Management / Configuration & Performance, not daily B
 
 `Branch Health` is an observation/governance surface for closure, online-order pause, emergency state, unavailable products, low-stock attention, unresolved operational issues, and who changed state/when.
 
-## 12. Implementation invariant
+## 12. Owner Mobile Navigation / Focus Contract
+
+The Owner Dashboard mobile shell separates scope selection from module navigation.
+
+- **Top Bar Focus Selector** selects the current business scope/context.
+- **Bottom Navigation** selects the business module.
+- Changing Focus changes the content/data context, not the fundamental bottom-navigation architecture.
+- Bottom Navigation remains stable across Focus changes.
+- Modules resolve their content against the selected Focus where the domain supports that scope.
+- Focus is a UI context selector, **not authorization**; Core remains authoritative for identity, RBAC, permission, and scope.
+- Quick Access may expose high-frequency functions such as Promo, Banner, Product, Branch, and Payment without adding them as bottom-nav modules.
+
+Baseline:
+
+```text
+Top Bar
+└── Focus: Semua Cabang ▼
+
+Bottom Navigation
+├── Beranda
+├── Bisnis
+├── Pesanan
+├── Keuangan
+└── Lainnya
+```
+
+Mental model:
+
+**Top Bar:** “Saya sedang melihat scope siapa/apa?”  
+**Bottom Navigation:** “Saya mau pergi ke module mana?”
+
+The detailed lock is `docs/decisions/owner-dashboard-focus-scope-navigation-v1.md`.
+
+## 13. Implementation invariant
 
 Before implementing either dashboard:
 1. consult Library v2 and the locked Branch Manager Menu Configuration decision;
@@ -158,10 +192,11 @@ Before implementing either dashboard:
 8. update the affected domain contract if a genuine capability gap exists;
 9. update this document only when the business contract changes.
 
-## 13. Related contracts
+## 14. Related contracts
 
 - `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md` — canonical architecture/product map;
 - `docs/decisions/branch-manager-menu-configuration-v1.md` — locked branch-local menu configuration authority;
+- `docs/decisions/owner-dashboard-focus-scope-navigation-v1.md` — locked Owner mobile Focus/navigation UX;
 - `docs/BRANCH_MANAGER_OPERATIONAL_CENTER.md` — detailed Branch Manager operational contract;
 - existing Owner Dashboard UI Blueprint in Notion;
 - existing `User → Role → Scope` RBAC/security contracts;
