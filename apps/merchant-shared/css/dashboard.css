@@ -7016,12 +7016,37 @@ input[type="file"].x-input,
 }
 .x-menu-category-bar {
   display:flex;
+  align-items:center;
   gap:8px;
+  width:100%;
+  min-width:0;
   overflow-x:auto;
   padding-bottom:2px;
   scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
 }
 .x-menu-category-bar::-webkit-scrollbar { display:none; }
+.x-menu-category-bar > * {
+  flex:0 0 auto;
+}
+.x-menu-category-bar .x-cat-filter-btn {
+  flex:0 0 auto;
+  width:auto;
+  min-width:max-content;
+  white-space:nowrap;
+}
+.x-menu-category-chip {
+  flex:0 0 auto !important;
+  width:max-content;
+  max-width:none;
+}
+.x-menu-category-chip .x-menu-category-name {
+  flex:0 0 auto;
+  width:auto;
+  max-width:none;
+  white-space:nowrap;
+}
+
 .x-menu-row-actions {
   display:inline-flex;
   align-items:center;
