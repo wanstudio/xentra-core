@@ -5825,7 +5825,13 @@ input[type="file"].x-input,
     min-width: 0;
   }
   .x-occ-alert-icon { font-size: 13px; flex-shrink: 0; }
-  .x-occ-alert-arrow { color: #d97706; font-weight: 700; flex-shrink: 0; }
+  .x-occ-alert-arrow {
+    color: #d97706;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
 
   /* Quick access */
   .x-occ-quick-grid {

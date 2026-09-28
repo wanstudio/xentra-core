@@ -3824,7 +3824,7 @@
           '<span style="font-size:20px;">⚠️</span>' +
           '<div>' +
             '<strong>Peringatan Stok Menipis:</strong> Ada ' + needsAttention.low_stock_items.length + ' item produk yang stoknya menipis di bawah batas minimum.' +
-            ' <a href="#reports/operations" style="font-weight:700;color:#92400e;text-decoration:underline;">Lihat Laporan Operasional &rarr;</a>' +
+            ' <a href="#reports/operations" style="font-weight:700;color:#92400e;text-decoration:underline;display:inline-flex;align-items:center;gap:4px;">Lihat Laporan Operasional <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></a>' +
           '</div>' +
         '</div>';
         attentionContainer.innerHTML = alertHtml;
@@ -4172,7 +4172,7 @@
             '<span class="x-occ-alert-icon">' + a.icon + '</span>' +
             '<span class="x-occ-alert-text">' + escapeHtml(a.text) + '</span>' +
           '</div>' +
-          '<span class="x-occ-alert-arrow">\u2192</span>' +
+          '<span class="x-occ-alert-arrow"><svg class="x-occ-link-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>' +
         '</a>';
       });
       html += '</div>';
