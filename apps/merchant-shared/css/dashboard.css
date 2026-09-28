@@ -41,7 +41,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
   width: 100%;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 input, button, select, textarea, optgroup {
@@ -4774,15 +4774,22 @@ input[type="file"].x-input,
     color: #0f172a;
   }
 
-  /* Topbar stays fixed/sticky on top */
+  /* Topbar stays fixed on top */
   .x-dash-topbar {
-    position: sticky !important;
+    position: fixed !important;
     top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: 58px !important;
+    min-height: 58px !important;
     z-index: 100 !important;
-    background: rgba(255, 255, 255, 0.96) !important;
-    backdrop-filter: blur(10px) !important;
-    -webkit-backdrop-filter: blur(10px) !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+    border-bottom: 1px solid #eef2f7 !important;
+    box-sizing: border-box !important;
   }
 
   /* Show Focus Selector on mobile for Owner (override 900px and 768px hide rules) */
@@ -4864,8 +4871,11 @@ input[type="file"].x-input,
   }
   .x-hub-arrow { color: #c7c7cc; flex-shrink: 0; }
 
-  /* Content area bottom spacer for owner bottom nav */
-  .x-dash-main { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+  /* Content area top and bottom spacers for fixed topbar and owner bottom nav */
+  .x-dash-main {
+    padding-top: 58px !important;
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+  }
 
   /* Owner Command Center on Mobile */
   .x-desktop-overview-view { display: none !important; }

@@ -28,16 +28,18 @@ test('Owner Dashboard Topbar, Mobile Account & Scroll Unblock', async (t) => {
       'CSS viewport lock must be scoped to html.x-merchant-app');
   });
 
-  await t.test('OTA-01b: topbar stays sticky on top on mobile', () => {
+  await t.test('OTA-01b: topbar stays fixed on top on mobile', () => {
     assert.ok(!css.match(/@media\s*\(max-width:\s*768px\)\s*\{\s*\/\*[^\*]*\*\/\s*\.x-dash-topbar\s*,\s*\.x-merchant-app/),
       'Generic .x-dash-topbar must not be grouped into relative position rule');
     const afterOwnerNav = css.indexOf('OWNER DASHBOARD — Mobile Bottom Navigation');
     assert.ok(afterOwnerNav !== -1, 'Owner nav section header must exist in CSS');
     const ownerCssSection = css.substring(afterOwnerNav);
     assert.ok(ownerCssSection.includes('.x-dash-topbar') &&
-              ownerCssSection.includes('position: sticky') &&
+              ownerCssSection.includes('position: fixed') &&
               ownerCssSection.includes('top: 0'),
-      'Owner mobile section must ensure .x-dash-topbar has position: sticky and top: 0');
+      'Owner mobile section must ensure .x-dash-topbar has position: fixed and top: 0');
+    assert.ok(ownerCssSection.includes('padding-top: 58px'),
+      'Owner mobile section must provide top spacer padding-top: 58px for fixed topbar');
   });
 
   // --------------------------------------------------------------------------
