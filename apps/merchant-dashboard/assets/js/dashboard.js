@@ -3938,7 +3938,7 @@
             '<span class="x-occ-branch-orders">' + (b.total_orders || 0) + ' pesanan</span>' +
           '</div>' +
           '<div class="x-occ-branch-revenue">' + formatMoney(b.total_revenue || 0) + '</div>' +
-        '</div>';
+        '</a>';
       });
       html += '</div>';
       contentEl.innerHTML = html;
@@ -4099,6 +4099,12 @@
 
   function renderOccError() {
     var message = 'Periksa koneksi Anda lalu coba lagi.';
+    ['occ-hero-sales', 'occ-hero-orders', 'occ-hero-aov', 'occ-hero-customers',
+      'occ-orders-total', 'occ-orders-completed', 'occ-orders-in-progress', 'occ-orders-cancelled'
+    ].forEach(function (id) {
+      var el = $(id);
+      if (el) el.textContent = '—';
+    });
     var targets = ['occ-branch-content', 'occ-products-content'];
     targets.forEach(function (id) {
       var el = $(id);
