@@ -31,7 +31,7 @@
 
     var tbody = $('bm-stock-tbody');
     if (tbody && (!_bmStockState.inventory || !_bmStockState.inventory.length)) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Memuat inventaris cabang...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Memuat inventaris cabang...</td></tr>';
     }
 
     var currentSeq = ++_bmStockState.fetchSeq;
