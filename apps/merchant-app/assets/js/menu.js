@@ -399,43 +399,99 @@
       return;
     }
 
-    tbody.innerHTML = filtered.map(function (p) {
+    /*
+     * Keep dynamic actions out of inline HTML attributes.
+     * Product objects can contain user-entered names/metadata; embedding them
+     * into onclick="..." is fragile because HTML escaping is not JavaScript
+     * escaping and can break the DOM attribute parser.
+     */
+    tbody.innerHTML = filtered.map(function (p, index) {
       var isAvail = (p.is_available === 1 || p.is_available === true);
       var catBadges = (p.category_names && p.category_names.length)
-        ? p.category_names.map(function (cn) { return '<span class="x-badge x-badge-info" style="font-size:10px; margin-right:4px;">' + esc(cn) + '</span>'; }).join('')
-        : (p.branch_category_name ? '<span class="x-badge x-badge-info" style="font-size:10px;">' + esc(p.branch_category_name) + '</span>' : '<span class="text-muted" style="font-size:11px;">Tanpa kategori</span>');
-
-      var productDataJson = esc(JSON.stringify({
-        product_id: p.product_id,
-        name: p.product_name || p.name,
-        price: p.price,
-        master_price: p.master_price || p.price,
-        pricing_mode: p.pricing_mode || 'lock',
-        min_price: p.min_price,
-        max_price: p.max_price,
-        branch_category_id: p.branch_category_id,
-        category_ids: p.category_ids || (p.branch_category_id ? [p.branch_category_id] : []),
-        categories: p.categories || []
-      }));
+        ? p.category_names.map(function (cn) {
+            return '<span class="x-badge x-badge-info" style="font-size:10px; margin-right:4px;">' + esc(cn) + '</span>';
+          }).join('')
+        : (p.branch_category_name
+          ? '<span class="x-badge x-badge-info" style="font-size:10px;">' + esc(p.branch_category_name) + '</span>'
+          : '<span class="text-muted" style="font-size:11px;">Tanpa kategori</span>');
 
       var toggleBtn = '<label class="x-toggle x-menu-availability-toggle' + (isAvail ? ' x-toggle-on' : '') + '" title="' + (isAvail ? 'Tersedia' : 'Tidak tersedia') + '">' +
-        '<input type="checkbox" ' + (isAvail ? 'checked' : '') + ' onchange="toggleBMProductAvailability(\'' + esc(p.product_id) + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan ' + esc(p.product_name || p.name) + '">' +
+        '<input type="checkbox" class="x-menu-availability-input" ' + (isAvail ? 'checked' : '') +
+        ' aria-label="Ubah ketersediaan ' + esc(p.product_name || p.name) + '">' +
         '<span class="x-toggle-slider"></span></label>';
 
-      return '<tr class="x-merchant-data-row x-menu-row">' +
+      return '<tr class="x-merchant-data-row x-menu-row" data-menu-index="' + index + '">' +
         '<td data-label="Produk"><strong>' + esc(p.product_name || p.name) + '</strong></td>' +
         '<td data-label="Kategori">' + catBadges + '</td>' +
         '<td data-label="Harga"><strong>' + formatMoney(p.price) + '</strong></td>' +
-        '<td data-label="Ketersediaan"><span class="x-badge ' + (isAvail ? 'x-badge-success' : 'x-badge-danger') + '">' + (isAvail ? 'TERSEDIA' : 'TIDAK TERSEDIA') + '</span></td>' +
-        '<td data-label="Aksi" style="text-align:right;"><div class="x-menu-row-actions">' + toggleBtn +
-          '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu ' + esc(p.product_name || p.name) + '" onclick="XentraActionMenu.open(this, [' +
-            '{ label: \'Edit Menu / Kategori Cabang\', icon: \'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>\', onClick: function() { openBranchOverrideModal(\'' + productDataJson + '\'); } },' +
-            '{ divider: true },' +
-            '{ label: \'Hapus dari Cabang\', icon: \'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>\', destructive: true, onClick: function() { removeBMBranchProduct(\'' + esc(p.product_id) + '\', \'' + esc(p.product_name || p.name) + '\'); } }' +
-          '])"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg></button>' +
+        '<td data-label="Ketersediaan"><span class="x-badge ' + (isAvail ? 'x-badge-success' : 'x-badge-danger') + '">' +
+          (isAvail ? 'TERSEDIA' : 'TIDAK TERSEDIA') + '</span></td>' +
+        '<td data-label="Aksi" style="text-align:right;"><div class="x-menu-row-actions">' +
+          toggleBtn +
+          '<button type="button" class="x-action-menu-trigger x-menu-action-trigger" aria-label="Aksi menu ' +
+            esc(p.product_name || p.name) + '" aria-expanded="false">' +
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">' +
+              '<circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle>' +
+            '</svg>' +
+          '</button>' +
         '</div></td>' +
       '</tr>';
     }).join('');
+
+    Array.prototype.forEach.call(tbody.querySelectorAll('.x-menu-row'), function (row) {
+      var index = Number(row.getAttribute('data-menu-index'));
+      var product = filtered[index];
+      if (!product) return;
+
+      var availabilityInput = row.querySelector('.x-menu-availability-input');
+      if (availabilityInput) {
+        availabilityInput.addEventListener('change', function () {
+          toggleBMProductAvailability(product.product_id, this.checked ? 1 : 0);
+        });
+      }
+
+      var actionTrigger = row.querySelector('.x-menu-action-trigger');
+      if (actionTrigger) {
+        actionTrigger.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+
+          var productData = {
+            product_id: product.product_id,
+            name: product.product_name || product.name,
+            price: product.price,
+            master_price: product.master_price || product.price,
+            pricing_mode: product.pricing_mode || 'lock',
+            min_price: product.min_price,
+            max_price: product.max_price,
+            branch_category_id: product.branch_category_id,
+            category_ids: product.category_ids || (product.branch_category_id ? [product.branch_category_id] : []),
+            categories: product.categories || []
+          };
+
+          XentraActionMenu.open(actionTrigger, [
+            {
+              label: 'Edit Menu / Kategori Cabang',
+              icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>',
+              onClick: function () {
+                openBranchOverrideModal(JSON.stringify(productData));
+              }
+            },
+            { divider: true },
+            {
+              label: 'Hapus dari Cabang',
+              icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
+              destructive: true,
+              onClick: function () {
+                removeBMBranchProduct(product.product_id, product.product_name || product.name);
+              }
+            }
+          ]);
+        });
+      }
+    });
   }
 
   async function toggleBMProductAvailability(productId, nextVal) {
