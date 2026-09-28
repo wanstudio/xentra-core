@@ -110,7 +110,7 @@ class BrandRepository {
     return this.db.queryOne('SELECT * FROM brands WHERE id = ? LIMIT 1', [brandId]);
   }
 
-  updateBrandProfile(brandId, { name, logo_url, tagline, primary_color, banners, merchant_pwa_icon_url, pos_pwa_icon_url }) {
+  updateBrandProfile(brandId, { name, logo_url, tagline, primary_color, banners, merchant_pwa_icon_url, pos_pwa_icon_url, merchant_pwa_name, pos_pwa_name }) {
     if (name !== undefined && (typeof name !== 'string' || !name.trim())) {
       throw new Error('Nama brand harus berupa teks yang valid.');
     }
@@ -156,6 +156,8 @@ class BrandRepository {
           banners = COALESCE(?, banners),
           merchant_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_icon_url END,
           pos_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_icon_url END,
+          merchant_pwa_name = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_name END,
+          pos_pwa_name = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_name END,
           updated_at = datetime('now')
       WHERE id = ?
     `, [
@@ -168,6 +170,10 @@ class BrandRepository {
       merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
       pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
       pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
+      merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
+      merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
+      pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
+      pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
       brandId
     ]);
   }

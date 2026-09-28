@@ -38,7 +38,7 @@ router.get('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
 
 router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { name, primary_color, logo_url, custom_domain, tagline, banners, merchant_pwa_icon_url, pos_pwa_icon_url } = req.body;
+    const { name, primary_color, logo_url, custom_domain, tagline, banners, merchant_pwa_icon_url, pos_pwa_icon_url, merchant_pwa_name, pos_pwa_name } = req.body;
     const bannersJson = banners ? (typeof banners === 'string' ? banners : JSON.stringify(banners)) : null;
 
     let normalizedPrimaryColor = undefined;
@@ -69,6 +69,8 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
           banners = COALESCE(?, banners),
           merchant_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_icon_url END,
           pos_pwa_icon_url = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_icon_url END,
+          merchant_pwa_name = CASE WHEN ? IS NOT NULL THEN ? ELSE merchant_pwa_name END,
+          pos_pwa_name = CASE WHEN ? IS NOT NULL THEN ? ELSE pos_pwa_name END,
           updated_at = datetime('now')
       WHERE id = ?
     `).run(
@@ -86,6 +88,10 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
       merchant_pwa_icon_url !== undefined ? merchant_pwa_icon_url : null,
       pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
       pos_pwa_icon_url !== undefined ? pos_pwa_icon_url : null,
+      merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
+      merchant_pwa_name !== undefined ? (typeof merchant_pwa_name === 'string' ? merchant_pwa_name.trim() || null : null) : null,
+      pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
+      pos_pwa_name !== undefined ? (typeof pos_pwa_name === 'string' ? pos_pwa_name.trim() || null : null) : null,
       req.brand_id
     );
     // P1.2: brand row written → drop the cached hostname→brand mapping so the
@@ -112,6 +118,8 @@ router.put('/admin/brand', requireAuth(['owner', 'brand_manager']), (req, res) =
         logo_url: req.brand.logo_url || '/assets/pwa/icon-192.png',
         merchant_pwa_icon_url: req.brand.merchant_pwa_icon_url || null,
         pos_pwa_icon_url: req.brand.pos_pwa_icon_url || null,
+        merchant_pwa_name: req.brand.merchant_pwa_name || null,
+        pos_pwa_name: req.brand.pos_pwa_name || null,
         primary_color: req.brand.primary_color || '#b6ff00',
         custom_domain: req.brand.custom_domain || 'app.mybangjo.com',
         tagline: req.brand.tagline || 'Official Online Food Ordering',

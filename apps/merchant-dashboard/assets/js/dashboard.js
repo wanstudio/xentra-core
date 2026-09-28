@@ -1061,6 +1061,14 @@
     if ($('set-profile-pos-icon-empty')) $('set-profile-pos-icon-empty').style.display = 'none';
     if ($('btn-set-profile-pos-icon-remove')) $('btn-set-profile-pos-icon-remove').style.display = posIconUrl ? 'inline-block' : 'none';
 
+    // PWA custom name overrides
+    var merchantPwaName = brand.merchant_pwa_name || '';
+    var posPwaName = brand.pos_pwa_name || '';
+    if ($('brand-tab-merchant-pwa-name')) $('brand-tab-merchant-pwa-name').value = merchantPwaName;
+    if ($('brand-tab-pos-pwa-name')) $('brand-tab-pos-pwa-name').value = posPwaName;
+    if ($('set-profile-merchant-pwa-name')) $('set-profile-merchant-pwa-name').value = merchantPwaName;
+    if ($('set-profile-pos-pwa-name')) $('set-profile-pos-pwa-name').value = posPwaName;
+
     if ($('auth-brand-name')) $('auth-brand-name').textContent = brand.name || 'Bangjo Resto';
     if ($('auth-logo')) $('auth-logo').src = logoUrl;
 
@@ -1412,6 +1420,8 @@
         logo_url: $('brand-logo').value,
         merchant_pwa_icon_url: $('brand-tab-merchant-icon') ? $('brand-tab-merchant-icon').value.trim() : null,
         pos_pwa_icon_url: $('brand-tab-pos-icon') ? $('brand-tab-pos-icon').value.trim() : null,
+        merchant_pwa_name: $('brand-tab-merchant-pwa-name') ? $('brand-tab-merchant-pwa-name').value.trim() : undefined,
+        pos_pwa_name: $('brand-tab-pos-pwa-name') ? $('brand-tab-pos-pwa-name').value.trim() : undefined,
         primary_color: rawColor,
         custom_domain: $('brand-domain').value
       };
@@ -9798,7 +9808,9 @@
           logo_url: $('set-profile-logo').value.trim(),
           primary_color: rawHex,
           merchant_pwa_icon_url: merchantPwaVal,
-          pos_pwa_icon_url: posPwaVal
+          pos_pwa_icon_url: posPwaVal,
+          merchant_pwa_name: $('set-profile-merchant-pwa-name') ? $('set-profile-merchant-pwa-name').value.trim() : undefined,
+          pos_pwa_name: $('set-profile-pos-pwa-name') ? $('set-profile-pos-pwa-name').value.trim() : undefined
         };
 
         var res = await adminFetch(API_BASE + '/admin/settings/business/profile', {

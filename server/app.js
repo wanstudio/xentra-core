@@ -216,8 +216,8 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
         data.short_name = 'Xentra Business';
         data.description = 'Portal Bisnis Xentra untuk Owner & Merchant';
       } else if (brand && brand.name) {
-        data.name = brand.name;
-        data.short_name = brand.name.substring(0, 12);
+        data.name = brand.merchant_pwa_name || (subType === 'managerial' ? brand.name + ' Merchant' : brand.name);
+        data.short_name = (brand.merchant_pwa_name || brand.name).substring(0, 12);
       }
 
       const iconOverride = brand ? (brand.merchant_pwa_icon_url || brand.logo_url || null) : null;
@@ -235,6 +235,10 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
       data.start_url = '/';
       data.scope = '/';
       const brand = await resolveBrandForManifest(req);
+      if (brand && brand.name) {
+        data.name = brand.pos_pwa_name || brand.name;
+        data.short_name = (brand.pos_pwa_name || brand.name).substring(0, 12);
+      }
       const iconOverride = brand ? (brand.pos_pwa_icon_url || brand.logo_url || null) : null;
       data.icons = buildPwaIcons(iconOverride, '/pos/assets/icons/icon-192.png', '/pos/assets/icons/icon-512.png');
       return res.json(data);
@@ -280,6 +284,10 @@ app.get(['/merchant-app/manifest.json', '/merchant/manifest.json'], async (req, 
       data.start_url = '/merchant/';
       data.scope = '/';
       const brand = await resolveBrandForManifest(req);
+      if (brand && brand.name) {
+        data.name = brand.merchant_pwa_name || (brand.name + ' Merchant');
+        data.short_name = (brand.merchant_pwa_name || brand.name).substring(0, 12);
+      }
       const iconOverride = brand ? (brand.merchant_pwa_icon_url || brand.logo_url || null) : null;
       data.icons = buildPwaIcons(iconOverride, '/merchant-app/assets/icons/icon-192.png', '/merchant-app/assets/icons/icon-512.png');
       return res.json(data);
@@ -313,6 +321,10 @@ app.get(['/pos/manifest.json', '/pos-app/manifest.json'], async (req, res) => {
       data.start_url = '/';
       data.scope = '/';
       const brand = await resolveBrandForManifest(req);
+      if (brand && brand.name) {
+        data.name = brand.pos_pwa_name || brand.name;
+        data.short_name = (brand.pos_pwa_name || brand.name).substring(0, 12);
+      }
       const iconOverride = brand ? (brand.pos_pwa_icon_url || brand.logo_url || null) : null;
       data.icons = buildPwaIcons(iconOverride, '/pos/assets/icons/icon-192.png', '/pos/assets/icons/icon-512.png');
       return res.json(data);
