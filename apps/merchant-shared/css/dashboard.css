@@ -4903,8 +4903,25 @@ input[type="file"].x-input,
     stroke: currentColor;
   }
 
+  .x-owner-nav-item {
+    position: relative;
+  }
+
   .x-owner-nav-item.active {
     color: #0f172a;
+  }
+
+  /* Active item indicator — green rounded tab extending from the top edge of the floating navbar. */
+  .x-owner-nav-item.active::before {
+    content: "";
+    position: absolute;
+    top: -8px;
+    left: 50%;
+    width: 46px;
+    height: 8px;
+    transform: translateX(-50%);
+    background: #00b84f;
+    border-radius: 0 0 8px 8px;
   }
 
   /* Topbar stays fixed on top with generous mobile padding */
