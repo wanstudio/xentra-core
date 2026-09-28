@@ -208,9 +208,9 @@
     'settings/notifications':      { title: 'Notifications',     sub: 'Preferensi notifikasi multi-channel WhatsApp, Email & Push', tab: 'settings' },
     'settings/security':           { title: 'Security & RBAC',   sub: 'Model otorisasi, sesi pengguna, dan jejak audit keamanan', tab: 'settings' },
     // Owner mobile modules & hubs
-    'business':                    { title: 'Bisnis',            sub: 'Pusat kendali produk, menu, cabang, pelanggan, dan promosi', tab: 'business' },
-    'more':                        { title: 'Lainnya',           sub: 'Pengaturan tim, identitas brand, sistem, dan akun', tab: 'more' },
-    'lainnya':                     { title: 'Lainnya',           sub: 'Pengaturan tim, identitas brand, sistem, dan akun', tab: 'more' },
+    'business':                    { title: 'Bisnis',            sub: 'Pusat pengelolaan katalog, operasional, pelanggan, pemasaran, tim, dan brand', tab: 'business' },
+    'more':                        { title: 'Lainnya',           sub: 'Pengaturan sistem, integrasi, keamanan, notifikasi, dan akun', tab: 'more' },
+    'lainnya':                     { title: 'Lainnya',           sub: 'Pengaturan sistem, integrasi, keamanan, notifikasi, dan akun', tab: 'more' },
     // Legacy routes (internal tabs that still exist from old dashboard)
     'brand':              { title: 'Brand & Tampilan', sub: 'Kustomisasi logo, warna tema, dan identitas visual', tab: 'brand' },
     'payments':           { title: 'Integrasi Pembayaran', sub: 'Kredensial direct payment Midtrans & Tunai', tab: 'payments' }
