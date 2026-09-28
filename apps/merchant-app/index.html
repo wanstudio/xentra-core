@@ -762,73 +762,51 @@
         </div>
       </section>
 
-      <!-- TAB: BM-STOK (Branch Inventory Observation & Operational Adjustment) -->
+      <!-- TAB: BM-STOK — Locked Stock IA v1 -->
       <section id="tab-bm-stok" class="x-tab-content" data-tab="bm-stok">
-        <div class="x-card-panel" style="margin-bottom:20px; padding:20px 24px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+        <div class="x-card-panel x-merchant-op-panel">
+          <div class="x-merchant-screen-head">
             <div>
-              <h3 style="font-size:18px; font-weight:800; margin:0 0 4px; color:var(--text-main);">Stok &amp; Inventaris Cabang</h3>
-              <p class="text-muted" style="font-size:13px; margin:0;">
-                Pantau ketersediaan stok fisik cabang secara realtime, deteksi stok menipis, dan lakukan penyesuaian operasional (audit opname / barang rusak).
-              </p>
+              <h3>Stock</h3>
+              <p>Kelola stok fisik cabang. <strong>Belum dilacak</strong> berbeda dari stok habis.</p>
             </div>
-            <div style="display:flex; gap:10px; align-items:center;">
-              <button type="button" class="x-btn-secondary" id="btn-bm-stok-refresh" onclick="loadBMStock()" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; padding:8px 14px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                <span>Segarkan</span>
-              </button>
-            </div>
+            <button type="button" class="x-btn-secondary" id="btn-bm-stok-refresh" onclick="loadBMStock()" aria-label="Segarkan stok">Segarkan</button>
           </div>
 
-          <!-- Stock Overview KPI Cards -->
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-color);">
-            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px;">
-              <div style="font-size:11px; font-weight:700; color:#64748b;">TOTAL ITEM TERDAFTAR</div>
-              <div id="bm-stock-stat-total" style="font-size:22px; font-weight:800; color:#1e293b; margin-top:4px;">0</div>
-            </div>
-            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:12px;">
-              <div style="font-size:11px; font-weight:700; color:#15803d;">STOK AMAN</div>
-              <div id="bm-stock-stat-safe" style="font-size:22px; font-weight:800; color:#166534; margin-top:4px;">0</div>
-            </div>
-            <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:12px;">
-              <div style="font-size:11px; font-weight:700; color:#b45309;">STOK MENIPIS (PERLU RESTOK)</div>
-              <div id="bm-stock-stat-low" style="font-size:22px; font-weight:800; color:#92400e; margin-top:4px;">0</div>
-            </div>
-            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:12px;">
-              <div style="font-size:11px; font-weight:700; color:#b91c1c;">STOK HABIS (0)</div>
-              <div id="bm-stock-stat-out" style="font-size:22px; font-weight:800; color:#991b1b; margin-top:4px;">0</div>
-            </div>
+          <div class="x-stock-summary" aria-label="Ringkasan stok">
+            <div class="x-stock-summary-item"><span>Dilacak</span><strong id="bm-stock-stat-tracked">0</strong></div>
+            <div class="x-stock-summary-item"><span>Menipis</span><strong id="bm-stock-stat-low">0</strong></div>
+            <div class="x-stock-summary-item"><span>Habis</span><strong id="bm-stock-stat-out">0</strong></div>
+            <div class="x-stock-summary-item"><span>Belum dilacak</span><strong id="bm-stock-stat-untracked">0</strong></div>
           </div>
+          <span id="bm-stock-stat-total" hidden>0</span>
+          <span id="bm-stock-stat-safe" hidden>0</span>
         </div>
 
-        <!-- Filter & Stock Table Panel -->
-        <div class="x-card-panel">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px;">
-            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; flex:1;">
-              <input type="text" id="bm-stock-search" class="x-input" placeholder="Cari nama produk..." style="font-size:13px; max-width:280px;" oninput="onBMStockFilterChange()">
-              <select id="bm-stock-filter-status" class="x-input" style="font-size:13px; max-width:200px;" onchange="onBMStockFilterChange()">
-                <option value="all">Semua Status Stok</option>
-                <option value="low">Hanya Stok Menipis</option>
-                <option value="out">Hanya Stok Habis (0)</option>
-                <option value="safe">Hanya Stok Aman</option>
-              </select>
-            </div>
+        <div class="x-card-panel x-merchant-list-panel">
+          <div class="x-merchant-list-tools">
+            <input type="search" id="bm-stock-search" class="x-input" placeholder="Cari produk..." oninput="onBMStockFilterChange()" aria-label="Cari produk stok">
+            <select id="bm-stock-filter-status" class="x-input" onchange="onBMStockFilterChange()" aria-label="Filter status stok">
+              <option value="all">Semua</option>
+              <option value="low">Menipis</option>
+              <option value="out">Habis</option>
+              <option value="untracked">Belum dilacak</option>
+            </select>
           </div>
 
-          <div class="table-responsive">
-            <table class="x-table">
+          <div class="table-responsive x-merchant-mobile-list">
+            <table class="x-table x-merchant-mobile-table">
               <thead>
                 <tr>
                   <th>Produk</th>
-                  <th>Harga Cabang</th>
-                  <th>Stok Saat Ini</th>
-                  <th>Batas Minimum (Threshold)</th>
-                  <th>Status Stok</th>
-                  <th style="text-align:right;">Aksi Penyesuaian</th>
+                  <th>Stok</th>
+                  <th>Batas Minimum</th>
+                  <th>Status</th>
+                  <th style="text-align:right;">Aksi</th>
                 </tr>
               </thead>
               <tbody id="bm-stock-tbody">
-                <tr><td colspan="6" class="text-center py-6 text-muted">Memuat inventaris cabang...</td></tr>
+                <tr><td colspan="5" class="text-center py-6 text-muted">Memuat inventaris cabang...</td></tr>
               </tbody>
             </table>
           </div>
