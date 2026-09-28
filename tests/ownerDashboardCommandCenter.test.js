@@ -28,11 +28,15 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
       '.x-desktop-overview-view must exist to wrap desktop overview layout');
   });
 
-  await t.test('OCC-02: Periode selector and inline custom range form exist with default Hari ini', () => {
+  await t.test('OCC-02: Periode selector (today, 7d, 30d) and custom range form exist in 2 rows', () => {
     assert.ok(html.includes('id="occ-period-select"'),
       '#occ-period-select must exist');
     assert.ok(!html.includes('id="occ-period-badge"'),
       '#occ-period-badge must be removed');
+    assert.ok(html.includes('class="x-occ-preset-row"'),
+      '.x-occ-preset-row must exist for Row 1');
+    assert.ok(html.includes('class="x-occ-custom-range-row"'),
+      '.x-occ-custom-range-row must exist for Row 2');
     assert.ok(html.includes('id="occ-start-date"'),
       '#occ-start-date must exist');
     assert.ok(html.includes('id="occ-end-date"'),
@@ -45,10 +49,17 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
       'Option 7d must exist');
     assert.ok(html.includes('value="30d"'),
       'Option 30d must exist');
-    assert.ok(html.includes('value="month"'),
-      'Option month must exist');
-    assert.ok(html.includes('value="all"'),
-      'Option all must exist');
+
+    const selectSection = html.substring(
+      html.indexOf('id="occ-period-select"'),
+      html.indexOf('</select>')
+    );
+    assert.ok(!selectSection.includes('value="month"'),
+      'Option month must not exist in quick presets');
+    assert.ok(!selectSection.includes('value="all"'),
+      'Option all must not exist in quick presets');
+    assert.ok(!selectSection.includes('value="custom"'),
+      'Option custom must not exist in quick presets');
   });
 
   await t.test('OCC-03: Hero KPI elements exist for Penjualan, Trend, and mini metrics', () => {

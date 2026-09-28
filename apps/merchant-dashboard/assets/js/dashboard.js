@@ -105,6 +105,7 @@
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
   }
+  var escapeHtml = esc;
 
   function showToast(message, type) {
     var container = $('x-toast-container');
@@ -3840,11 +3841,6 @@
       return y + '-' + m + '-' + day;
     }
 
-    if (preset === 'custom') {
-      _overviewFilter.preset = 'custom';
-      return;
-    }
-
     if (preset === 'today') {
       startStr = toYMD(now);
       endStr = toYMD(now);
@@ -3856,14 +3852,6 @@
       var past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       startStr = toYMD(past30);
       endStr = toYMD(now);
-    } else if (preset === 'month') {
-      var y2 = now.getFullYear();
-      var m2 = String(now.getMonth() + 1).padStart(2, '0');
-      startStr = y2 + '-' + m2 + '-01';
-      endStr = toYMD(now);
-    } else if (preset === 'all') {
-      startStr = '';
-      endStr = '';
     }
 
     _overviewFilter.startDate = startStr;
@@ -4145,7 +4133,10 @@
       _overviewFilter.startDate = sVal;
       _overviewFilter.endDate = eVal;
       _overviewFilter.preset = 'custom';
-      if (occSelect) occSelect.value = 'custom';
+      if (occSelect) {
+        occSelect.selectedIndex = -1;
+        occSelect.value = '';
+      }
       if (inputStart) inputStart.value = sVal;
       if (inputEnd) inputEnd.value = eVal;
       loadOverview();
@@ -4671,20 +4662,80 @@
         branchSelector.disabled = false;
       }
     }
+
+    // Update user profile info in top bar
+    var nameEl = $('dash-user-name');
+    var roleEl = $('dash-user-role');
+    var avatarEl = $('dash-user-avatar');
+    var displayName = user.full_name || user.name || user.username || 'Pemilik Toko';
+    if (nameEl) nameEl.textContent = displayName;
+    if (roleEl) roleEl.textContent = role === 'owner' ? 'Owner' : (role === 'brand_manager' ? 'Brand Manager' : 'Staff');
+    if (avatarEl) {
+      avatarEl.textContent = (displayName || 'A').charAt(0).toUpperCase();
+    }
   }
+
+  function handleLogout() {
+    if (!confirm('Apakah Anda ingin keluar dari Dashboard?')) return;
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    if (typeof checkAppRoute === 'function') {
+      checkAppRoute();
+    } else {
+      window.location.href = '/login';
+    }
+  }
+
+  function populateMobileAccount() {
+    var user = (typeof getStoredUser === 'function' ? getStoredUser() : null) || {};
+    var name = user.full_name || user.name || user.username || 'Pemilik Toko';
+    var role = user.role === 'owner' ? 'Owner' : (user.role === 'brand_manager' ? 'Brand Manager' : 'Staff');
+    var brandName = (state.brand && state.brand.name) ? state.brand.name : 'Bangjo Resto';
+
+    var nameEl = $('mobile-account-name');
+    var roleEl = $('mobile-account-role');
+    var emailEl = $('mobile-account-email');
+    var brandEl = $('mobile-account-brand');
+    if (nameEl) nameEl.textContent = name;
+    if (roleEl) roleEl.textContent = role;
+    if (emailEl) emailEl.textContent = user.email || '-';
+    if (brandEl) brandEl.textContent = brandName;
+  }
+
+  function closeMobileAccount() {
+    document.body.classList.remove('x-mobile-account-open');
+    var page = $('x-mobile-account-page');
+    if (page) page.setAttribute('aria-hidden', 'true');
+  }
+
+  function openMobileAccount() {
+    populateMobileAccount();
+    document.body.classList.add('x-mobile-account-open');
+    var page = $('x-mobile-account-page');
+    if (page) page.setAttribute('aria-hidden', 'false');
+  }
+
+  window.openMobileAccount = openMobileAccount;
+  window.closeMobileAccount = closeMobileAccount;
 
   function initAuthListeners() {
     var btnLogout = $('btn-logout');
     if (btnLogout) {
-      btnLogout.addEventListener('click', function () {
-        if (!confirm('Apakah Anda ingin keluar dari Dashboard?')) return;
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-        if (typeof checkAppRoute === 'function') {
-          checkAppRoute();
-        } else {
-          window.location.href = '/login';
-        }
+      btnLogout.addEventListener('click', handleLogout);
+    }
+    var btnMobileLogout = $('btn-mobile-account-logout');
+    if (btnMobileLogout) {
+      btnMobileLogout.addEventListener('click', handleLogout);
+    }
+    var btnBack = $('btn-mobile-account-back');
+    if (btnBack) {
+      btnBack.addEventListener('click', closeMobileAccount);
+    }
+    var profileBtn = $('dash-user-profile');
+    if (profileBtn) {
+      profileBtn.addEventListener('click', function (e) {
+        if (e.target.closest('#btn-logout')) return;
+        openMobileAccount();
       });
     }
   }
