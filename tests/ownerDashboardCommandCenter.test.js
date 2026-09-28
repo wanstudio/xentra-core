@@ -117,13 +117,17 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
       'Default reassurance state "Semua berjalan normal" must be present');
   });
 
-  await t.test('OCC-08: Quick Access section exists with exactly 8 shortcut chips in 2x4 layout', () => {
+  await t.test('OCC-08: Quick Access section exists with exactly 8 planned shortcut chips in 2x4 layout', () => {
     assert.ok(html.includes('id="occ-quick-access-section"'),
       '#occ-quick-access-section must exist');
     assert.ok(html.includes('class="x-occ-quick-all"'),
       'Quick access must expose a Lihat semua action');
     assert.ok(html.includes('/merchant-dashboard/assets/icons/quick-access.svg#menu'),
       'Quick access must use the local colorful SVG icon sprite');
+    assert.ok(html.includes('/merchant-dashboard/assets/icons/quick-access.svg#stock'),
+      'Quick access must have a stock icon');
+    assert.ok(html.includes('/merchant-dashboard/assets/icons/quick-access.svg#payment'),
+      'Quick access must have a payment icon');
 
     const occSection = html.substring(
       html.indexOf('id="occ-quick-access-section"'),
@@ -133,7 +137,7 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
     assert.strictEqual(chips.length, 8,
       `Expected 8 quick access chips, got ${chips.length}`);
 
-    const expectedLabels = ['Menu', 'Cabang', 'Promo', 'Banner', 'Laporan', 'Keuangan', 'Pelanggan', 'Tim &amp; Akses'];
+    const expectedLabels = ['Menu', 'Stok', 'Cabang', 'Promo', 'Laporan', 'Pembayaran', 'Pelanggan', 'Tim &amp; Akses'];
     for (const label of expectedLabels) {
       assert.ok(occSection.includes(label),
         `Quick access chip "${label.replace('&amp;', '&')}" must exist in HTML`);
