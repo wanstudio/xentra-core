@@ -93,7 +93,11 @@
       // On Managerial PWA (m.* / merchant.*):
       // Both Owner and Branch Manager surfaces are valid within this environment!
       if (isManagerialSubdomain) {
-        if (_landing === '/owner/' || _landing === '/dashboard/' || _landing === '/dashboard') {
+        if (_landing === '/owner/') {
+          window.location.replace('/owner/' + window.location.hash);
+          return true;
+        }
+        if (_landing === '/dashboard/' || _landing === '/dashboard') {
           window.location.replace('/dashboard/' + window.location.hash);
           return true;
         }
