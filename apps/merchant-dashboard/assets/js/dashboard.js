@@ -171,6 +171,7 @@
     'reports/customers':  { title: 'Customers Report', sub: 'Laporan analitik pelanggan dan retensi', tab: 'reports' },
     'reports/branches':   { title: 'Branches Report', sub: 'Laporan perbandingan kinerja antar cabang', tab: 'reports' },
     'reports/operations': { title: 'Operations Report', sub: 'Laporan operasional dan pergerakan stok', tab: 'reports' },
+    'stock':               { title: 'Stok',         sub: 'Kesehatan persediaan dan perhatian stok seluruh cabang', tab: 'stock' },
     'team':               { title: 'Team',         sub: 'Kelola akun staf, role, dan hak akses', tab: 'tim' },
     'team/members':       { title: 'Team Members', sub: 'Daftar staf dan akun operator', tab: 'tim' },
     'team/roles':         { title: 'Team Roles',   sub: 'Struktur role dan hak akses Xentra RBAC', tab: 'tim' },
@@ -543,6 +544,7 @@
 
     if (tabId === 'overview') loadOverview();
     if (tabId === 'reports') loadReports(reportSubtype);
+    if (tabId === 'stock') loadOwnerStockOverview();
     if (tabId === 'customers') {
       if (isCustomerDetail && customerDetailId) {
         loadCustomerDetailView(customerDetailId);
@@ -789,6 +791,8 @@
       } else if (curRoute === 'reports' || curRoute.indexOf('reports/') === 0) {
         var subType = curRoute.indexOf('reports/') === 0 ? curRoute.split('reports/')[1] : 'overview';
         loadReports(subType);
+      } else if (curRoute === 'stock') {
+        loadOwnerStockOverview();
       } else if (curRoute === 'catalog/menus') {
         loadMenusView();
       } else if (curRoute === 'orders') {
@@ -817,6 +821,7 @@
 
   var _ownerNavModuleMap = {
     'overview': 'beranda',
+    'stock': 'bisnis',
     'business': 'bisnis',
     'catalog': 'bisnis', 'catalog/products': 'bisnis', 'catalog/categories': 'bisnis',
     'catalog/menus': 'bisnis', 'branches': 'bisnis', 'customers': 'bisnis',
@@ -4442,6 +4447,205 @@
     // Initialize default preset to 'today' without triggering extra reload
     setOccCustomOpen(false);
     setOverviewPeriodPreset('today', true);
+  }
+
+  /* =========================================================================
+     OWNER STOCK OVERVIEW — read-only inventory health
+     Uses the authoritative Reporting inventory/operations endpoint.
+     Owner may observe stock health; stock mutation remains Branch operations.
+     ========================================================================= */
+
+  var _ownerStockLoadedOnce = false;
+
+  function formatUnitCount(value) {
+    return Number(value || 0).toLocaleString('id-ID');
+  }
+
+  function ownerStockMovementLabel(type) {
+    var labels = {
+      purchase_in: 'Pembelian masuk',
+      transfer_in: 'Transfer masuk',
+      return_in: 'Retur masuk',
+      sale_deduction: 'Penjualan keluar',
+      transfer_out: 'Transfer keluar',
+      waste_spoilage: 'Waste / rusak',
+      audit_adjustment: 'Koreksi stok'
+    };
+    return labels[type] || String(type || '-');
+  }
+
+  function ownerStockMovementClass(type) {
+    if (type === 'purchase_in' || type === 'transfer_in' || type === 'return_in') return 'in';
+    if (type === 'sale_deduction' || type === 'transfer_out' || type === 'waste_spoilage') return 'out';
+    return 'adjust';
+  }
+
+  function loadOwnerStockOverview() {
+    var root = $('tab-stock');
+    var alertList = $('owner-stock-alerts-list');
+    var branchList = $('owner-stock-branch-list');
+    var movementList = $('owner-stock-movement-list');
+    var refreshBtn = $('btn-owner-stock-refresh');
+    var branchId = getEffectiveBranchId();
+    var query = branchId ? '?branch_id=' + encodeURIComponent(branchId) : '';
+
+    if (alertList) alertList.innerHTML = '<div class="x-owner-stock-loading">Memuat stok...</div>';
+    if (branchList) branchList.innerHTML = '<div class="x-owner-stock-loading">Memuat cabang...</div>';
+    if (movementList) movementList.innerHTML = '<div class="x-owner-stock-loading">Memuat mutasi...</div>';
+    if (root) root.setAttribute('aria-busy', 'true');
+    if (refreshBtn) refreshBtn.disabled = true;
+
+    if (branchId) {
+      var selected = (_branchContextState.branches || []).find(function (b) {
+        return String(b.id) === String(branchId);
+      });
+      var scopeEl = $('owner-stock-scope');
+      if (scopeEl) scopeEl.textContent = selected ? selected.name : 'Cabang terpilih';
+    } else {
+      var allScopeEl = $('owner-stock-scope');
+      if (allScopeEl) allScopeEl.textContent = 'Semua Cabang';
+    }
+
+    return adminFetch(API_BASE + '/reports/operations' + query, {
+      headers: getAuthHeaders()
+    }).then(function (res) {
+      return res.json();
+    }).then(function (json) {
+      if (!json.success || !json.data) {
+        throw new Error((json && (json.error || json.message)) || 'Gagal memuat data stok.');
+      }
+      renderOwnerStockOverview(json.data);
+      _ownerStockLoadedOnce = true;
+    }).catch(function (err) {
+      console.warn('[Owner Stock Load Error]:', err);
+      var message = err && err.message === 'SESSION_EXPIRED'
+        ? 'Sesi berakhir. Silakan masuk kembali.'
+        : 'Data stok belum dapat dimuat. Coba lagi.';
+      if (alertList) alertList.innerHTML = '<div class="x-owner-stock-error">' + escapeHtml(message) + '</div>';
+      if (branchList) branchList.innerHTML = '<div class="x-owner-stock-error">' + escapeHtml(message) + '</div>';
+      if (movementList) movementList.innerHTML = '<div class="x-owner-stock-error">' + escapeHtml(message) + '</div>';
+    }).finally(function () {
+      if (root) root.setAttribute('aria-busy', 'false');
+      if (refreshBtn) refreshBtn.disabled = false;
+    });
+  }
+
+  function renderOwnerStockOverview(data) {
+    var summary = data.stock_summary || {};
+    var alerts = Array.isArray(data.low_stock_alerts) ? data.low_stock_alerts : [];
+    var branchRows = Array.isArray(data.stock_by_branch) ? data.stock_by_branch : [];
+    var movements = Array.isArray(data.movement_breakdown) ? data.movement_breakdown : [];
+
+    var trackedEl = $('owner-stock-tracked-count');
+    var lowEl = $('owner-stock-low-count');
+    var outEl = $('owner-stock-out-count');
+    var unitsEl = $('owner-stock-total-units');
+    if (trackedEl) trackedEl.textContent = formatUnitCount(summary.tracked_item_count);
+    if (lowEl) lowEl.textContent = formatUnitCount(summary.low_stock_count);
+    if (outEl) outEl.textContent = formatUnitCount(summary.out_of_stock_count);
+    if (unitsEl) unitsEl.textContent = formatUnitCount(summary.total_units);
+
+    var alertList = $('owner-stock-alerts-list');
+    if (alertList) {
+      if (!alerts.length) {
+        alertList.innerHTML =
+          '<div class="x-owner-stock-empty">' +
+            '<span class="x-owner-stock-empty-icon">✓</span>' +
+            '<div><strong>Stok aman</strong><p>Tidak ada item yang berada di bawah batas minimum pada scope ini.</p></div>' +
+          '</div>';
+      } else {
+        var alertHtml = '';
+        alerts.slice(0, 8).forEach(function (a) {
+          var current = Number(a.current_stock);
+          var threshold = Number(a.low_stock_threshold);
+          var isOut = current <= 0;
+          var gap = Math.max(threshold - current, 0);
+          alertHtml +=
+            '<div class="x-owner-stock-alert-row ' + (isOut ? 'is-out' : '') + '">' +
+              '<div class="x-owner-stock-alert-main">' +
+                '<span class="x-owner-stock-alert-status">' + (isOut ? 'Habis' : 'Menipis') + '</span>' +
+                '<strong>' + escapeHtml(a.product_name || '-') + '</strong>' +
+                '<small>' + escapeHtml(a.branch_name || '-') + '</small>' +
+              '</div>' +
+              '<div class="x-owner-stock-alert-number">' +
+                '<strong>' + formatUnitCount(current) + '</strong>' +
+                '<small>min. ' + formatUnitCount(threshold) + '</small>' +
+              '</div>' +
+              '<span class="x-owner-stock-alert-arrow" aria-hidden="true">›</span>' +
+            '</div>';
+        });
+        if (alerts.length > 8) {
+          alertHtml += '<button type="button" class="x-owner-stock-more" id="btn-owner-stock-more-alerts">Lihat ' + formatUnitCount(alerts.length - 8) + ' perhatian lainnya</button>';
+        }
+        alertList.innerHTML = alertHtml;
+        var moreBtn = $('btn-owner-stock-more-alerts');
+        if (moreBtn) {
+          moreBtn.addEventListener('click', function () {
+            navigateTo('reports/operations');
+          });
+        }
+      }
+    }
+
+    var branchList = $('owner-stock-branch-list');
+    if (branchList) {
+      if (!branchRows.length) {
+        branchList.innerHTML = '<div class="x-owner-stock-empty-compact">Belum ada data stok cabang.</div>';
+      } else {
+        branchList.innerHTML = branchRows.map(function (row) {
+          var low = Number(row.low_stock_count || 0);
+          var out = Number(row.out_of_stock_count || 0);
+          var status = out > 0 ? 'Perlu perhatian' : (low > 0 ? 'Menipis' : 'Aman');
+          var statusClass = out > 0 ? 'danger' : (low > 0 ? 'warning' : 'good');
+          return (
+            '<div class="x-owner-stock-branch-row">' +
+              '<div class="x-owner-stock-branch-copy">' +
+                '<strong>' + escapeHtml(row.branch_name || '-') + '</strong>' +
+                '<span>' + formatUnitCount(row.tracked_item_count) + ' item · ' + formatUnitCount(row.total_units) + ' unit</span>' +
+              '</div>' +
+              '<div class="x-owner-stock-branch-meta">' +
+                '<span class="x-owner-stock-branch-badge ' + statusClass + '">' + status + '</span>' +
+                '<small>' + formatUnitCount(out) + ' habis · ' + formatUnitCount(low) + ' menipis</small>' +
+              '</div>' +
+            '</div>'
+          );
+        }).join('');
+      }
+    }
+
+    var movementList = $('owner-stock-movement-list');
+    if (movementList) {
+      if (!movements.length) {
+        movementList.innerHTML = '<div class="x-owner-stock-empty-compact">Belum ada mutasi persediaan yang tercatat.</div>';
+      } else {
+        movementList.innerHTML = movements.map(function (m) {
+          var total = Number(m.total_quantity || 0);
+          var cls = ownerStockMovementClass(m.movement_type);
+          var sign = total > 0 ? '+' : '';
+          return (
+            '<div class="x-owner-stock-movement-row">' +
+              '<div class="x-owner-stock-movement-icon ' + cls + '">' +
+                (cls === 'in' ? '↓' : (cls === 'out' ? '↑' : '↔')) +
+              '</div>' +
+              '<div class="x-owner-stock-movement-copy">' +
+                '<strong>' + escapeHtml(ownerStockMovementLabel(m.movement_type)) + '</strong>' +
+                '<span>' + formatUnitCount(m.record_count) + ' catatan</span>' +
+              '</div>' +
+              '<strong class="x-owner-stock-movement-value ' + cls + '">' + sign + formatUnitCount(total) + '</strong>' +
+            '</div>'
+          );
+        }).join('');
+      }
+    }
+  }
+
+  function initOwnerStockControls() {
+    var refresh = $('btn-owner-stock-refresh');
+    var report = $('btn-owner-stock-full-report');
+    if (refresh) refresh.addEventListener('click', loadOwnerStockOverview);
+    if (report) report.addEventListener('click', function () {
+      navigateTo('reports/operations');
+    });
   }
 
   /* =========================================================================
@@ -9768,6 +9972,7 @@
       // Initial data fetch if authenticated
       loadBrandSettings();
       initReportsControls();
+      initOwnerStockControls();
       if (isAuth) {
         loadCatalog();
         // Load branches and populate branch context selector
