@@ -532,8 +532,8 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
     // Insert or adopt branch_products (override columns start NULL = inherit master).
     db.prepare(`
       INSERT INTO branch_products (
-        branch_id, product_id, branch_category_id, price, is_available, stock
-      ) VALUES (?, ?, ?, ?, 1, 100)
+        branch_id, product_id, branch_category_id, price, is_available
+      ) VALUES (?, ?, ?, ?, 1)
       ON CONFLICT(branch_id, product_id) DO UPDATE SET
         branch_category_id = excluded.branch_category_id,
         price = excluded.price,
