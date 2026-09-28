@@ -205,6 +205,10 @@
     'settings/integrations':       { title: 'Integrations',      sub: 'Modul integrasi payment gateway, POS, dan Xentra ecosystem', tab: 'settings' },
     'settings/notifications':      { title: 'Notifications',     sub: 'Preferensi notifikasi multi-channel WhatsApp, Email & Push', tab: 'settings' },
     'settings/security':           { title: 'Security & RBAC',   sub: 'Model otorisasi, sesi pengguna, dan jejak audit keamanan', tab: 'settings' },
+    // Owner mobile modules & hubs
+    'business':                    { title: 'Bisnis',            sub: 'Pusat kendali produk, menu, cabang, pelanggan, dan promosi', tab: 'business' },
+    'more':                        { title: 'Lainnya',           sub: 'Pengaturan tim, identitas brand, sistem, dan akun', tab: 'more' },
+    'lainnya':                     { title: 'Lainnya',           sub: 'Pengaturan tim, identitas brand, sistem, dan akun', tab: 'more' },
     // Legacy routes (internal tabs that still exist from old dashboard)
     'brand':              { title: 'Brand & Tampilan', sub: 'Kustomisasi logo, warna tema, dan identitas visual', tab: 'brand' },
     'payments':           { title: 'Integrasi Pembayaran', sub: 'Kredensial direct payment Midtrans & Tunai', tab: 'payments' }
@@ -324,7 +328,10 @@
       'marketing': 'marketing/promotions',
       'settings': 'settings',
       'brand': 'brand',
-      'payments': 'payments'
+      'payments': 'payments',
+      'business': 'business',
+      'more': 'more',
+      'lainnya': 'more'
     };
     var canonicalRoute = legacyMap[route] || route;
     if (window.location.hash === '#' + canonicalRoute) {
@@ -518,7 +525,10 @@
     if (titleEl) titleEl.textContent = isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))));
     if (subEl) subEl.textContent = isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub))));
 
-    // 6. In Platform Context: UI shells only, do not invoke merchant business loaders
+    // 6. Sync Owner bottom nav active module (no-op on desktop, hidden by CSS)
+    syncOwnerBottomNavActive(route);
+
+    // 7. In Platform Context: UI shells only, do not invoke merchant business loaders
     if (isPlatform) {
       return;
     }
@@ -709,6 +719,61 @@
       }
     });
   }
+
+  /* =========================================================================
+     OWNER DASHBOARD — Mobile Bottom Navigation
+     5 fixed modules: Beranda, Bisnis, Pesanan, Keuangan, Lainnya.
+     Bottom nav is always the same regardless of Focus (branch selector) changes.
+     ========================================================================= */
+
+  var _ownerNavModuleMap = {
+    'overview': 'beranda',
+    'business': 'bisnis',
+    'catalog': 'bisnis', 'catalog/products': 'bisnis', 'catalog/categories': 'bisnis',
+    'catalog/menus': 'bisnis', 'branches': 'bisnis', 'customers': 'bisnis',
+    'marketing': 'bisnis', 'marketing/promotions': 'bisnis',
+    'marketing/banners': 'bisnis', 'marketing/discounts': 'bisnis',
+    'orders': 'pesanan',
+    'finance': 'keuangan', 'finance/overview': 'keuangan', 'finance/transactions': 'keuangan',
+    'finance/payouts': 'keuangan', 'finance/payment-methods': 'keuangan',
+    'more': 'lainnya', 'lainnya': 'lainnya',
+    'team': 'lainnya', 'settings': 'lainnya', 'reports': 'lainnya',
+    'settings/business/profile': 'lainnya', 'settings/security': 'lainnya'
+  };
+
+  function syncOwnerBottomNavActive(route) {
+    var module = _ownerNavModuleMap[route];
+    if (!module) {
+      if (route.indexOf('catalog/') === 0 || route.indexOf('branches/') === 0 ||
+          route.indexOf('marketing/') === 0 || route.indexOf('customers/') === 0) {
+        module = 'bisnis';
+      } else if (route.indexOf('finance/') === 0) {
+        module = 'keuangan';
+      } else if (route.indexOf('orders/') === 0) {
+        module = 'pesanan';
+      } else if (route.indexOf('team/') === 0 || route.indexOf('settings/') === 0 ||
+                 route.indexOf('reports/') === 0) {
+        module = 'lainnya';
+      } else {
+        module = 'beranda';
+      }
+    }
+    document.querySelectorAll('.x-owner-nav-item[data-tab-module]').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.tabModule === module);
+    });
+  }
+  window.syncOwnerBottomNavActive = syncOwnerBottomNavActive;
+
+  function initOwnerBottomNav() {
+    var nav = $('x-owner-bottom-nav');
+    if (!nav) return;
+    nav.querySelectorAll('.x-owner-nav-item[data-route]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        navigateTo(btn.dataset.route);
+      });
+    });
+  }
+  window.initOwnerBottomNav = initOwnerBottomNav;
 
   /* =========================================================================
      MOBILE SIDEBAR — Hamburger / Overlay / Close
@@ -8051,6 +8116,7 @@
     initOrdersFilterListeners();
     initMobileSidebar();
     initBranchContextSelector();
+    initOwnerBottomNav();
 
     // Workforce form submit
     var formUser = $('form-user');
