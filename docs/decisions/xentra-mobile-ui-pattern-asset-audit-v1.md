@@ -206,3 +206,20 @@ Next sequence:
 7. run regression/UI tests.
 
 **AUDIT COMPLETE — no new generic UI framework is justified for Menu/Stock.**
+
+
+## Contract Reconciliation — Completed 29 September 2026
+
+The stock-assignment drift identified by the audit has now been reconciled against the locked catalog/inventory contract.
+
+- server/routes/admin-branch-catalog.js no longer writes a fabricated stock value when a master product is adopted into a branch catalog.
+- tests/apiEndpoints.test.js now asserts that adoption preserves stock = NULL.
+- Physical stock remains owned by the Inventory domain and is established through inventory operations, not catalog adoption.
+
+This removes the backend blocker for IA implementation. The remaining UI requirement is unchanged: existing NULL stock must be rendered as **Belum dilacak**, not **Habis**.
+
+Git commits:
+- 0d1d3c1b6fc35b7f9c653f54a653cb6d125bb03c — catalog adoption contract fix.
+- 796fc662ae9dbd1b45d25c08d42fa0be15153204 — regression test for non-fabricated stock.
+
+**Audit status: COMPLETE. Backend contract blocker: RESOLVED.**
