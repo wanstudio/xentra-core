@@ -184,7 +184,7 @@
       var handle = document.createElement('span');
       handle.title = 'Tahan & geser untuk ubah urutan';
       handle.style.cssText = 'padding:5px 4px 5px 10px;font-size:13px;color:#94a3b8;cursor:grab;user-select:none;';
-      handle.textContent = '⠿';
+      handle.textContent = '⋮⋮';
       chip.appendChild(handle);
 
       var thumbWrap = document.createElement('span');
@@ -219,7 +219,7 @@
       editBtn.draggable = false;
       editBtn.title = 'Ubah nama & gambar kategori';
       editBtn.style.cssText = 'border:none;background:none;padding:5px 5px;font-size:12px;cursor:pointer;color:#64748b;';
-      editBtn.textContent = '✏️';
+      editBtn.innerHTML = '<span aria-hidden="true">✎</span>'; 
       editBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         openBranchCategoryEditModal(cat);
@@ -231,7 +231,7 @@
       delBtn.draggable = false;
       delBtn.title = 'Hapus kategori cabang';
       delBtn.style.cssText = 'border:none;background:none;padding:6px 10px 6px 4px;font-size:12px;cursor:pointer;color:#ef4444;opacity:0.8;';
-      delBtn.textContent = '🗑️';
+      delBtn.innerHTML = '<span aria-hidden="true">×</span>'; 
       delBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         deleteBMBranchCategory(cat.id, cat.name);
@@ -379,8 +379,7 @@
 
     var filtered = (_bmMenuState.products || []).filter(function (p) {
       var name = (p.product_name || p.name || '').toLowerCase();
-      var matchesSearch = !_bmMenuState.searchQuery || name.indexOf(_bmMenuState.searchQuery) !== -1;
-      if (!matchesSearch) return false;
+      if (_bmMenuState.searchQuery && name.indexOf(_bmMenuState.searchQuery) === -1) return false;
 
       var isAvail = (p.is_available === 1 || p.is_available === true);
       if (_bmMenuState.statusFilter === 'available' && !isAvail) return false;
@@ -392,35 +391,19 @@
           : (p.branch_category_id ? [String(p.branch_category_id)] : []);
         if (pCatIds.indexOf(String(_bmMenuState.categoryFilter)) === -1) return false;
       }
-
       return true;
     });
 
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-muted">Tidak ada produk yang sesuai dengan kriteria filter.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Tidak ada produk yang sesuai.</td></tr>';
       return;
     }
 
     tbody.innerHTML = filtered.map(function (p) {
       var isAvail = (p.is_available === 1 || p.is_available === true);
-      var isMasterActive = (p.is_master_active === 1 || p.is_master_active === true || p.is_master_active === undefined);
-
-      var branchStatusBadge = isAvail
-        ? '<span class="x-badge x-badge-success" style="font-size:11px;">TERSEDIA</span>'
-        : '<span class="x-badge x-badge-danger" style="font-size:11px;">HABIS (OFF)</span>';
-
-      var masterStatusBadge = isMasterActive
-        ? '<span class="x-badge" style="font-size:10px; background:#f1f5f9; color:#475569;">AKTIF (BRAND)</span>'
-        : '<span class="x-badge x-badge-danger" style="font-size:10px;">NONAKTIF (BRAND)</span>';
-
-      var toggleBtn = '<label class="x-toggle' + (isAvail ? ' x-toggle-on' : '') + '" title="' + (isAvail ? 'Menu tersedia' : 'Menu habis') + '">' +
-        '<input type="checkbox" ' + (isAvail ? 'checked' : '') + ' onchange="toggleBMProductAvailability(\'' + esc(p.product_id) + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
-        '<span class="x-toggle-slider"></span>' +
-      '</label>';
-
       var catBadges = (p.category_names && p.category_names.length)
         ? p.category_names.map(function (cn) { return '<span class="x-badge x-badge-info" style="font-size:10px; margin-right:4px;">' + esc(cn) + '</span>'; }).join('')
-        : (p.branch_category_name ? '<span class="x-badge x-badge-info" style="font-size:10px;">' + esc(p.branch_category_name) + '</span>' : '<span class="text-muted" style="font-size:11px;">—</span>');
+        : (p.branch_category_name ? '<span class="x-badge x-badge-info" style="font-size:10px;">' + esc(p.branch_category_name) + '</span>' : '<span class="text-muted" style="font-size:11px;">Tanpa kategori</span>');
 
       var productDataJson = esc(JSON.stringify({
         product_id: p.product_id,
@@ -435,25 +418,22 @@
         categories: p.categories || []
       }));
 
-      return '<tr>' +
-        '<td><strong>' + esc(p.product_name || p.name) + '</strong></td>' +
-        '<td>' + catBadges + '</td>' +
-        '<td>' + formatMoney(p.price) + '</td>' +
-        '<td><strong>' + esc(p.stock != null ? p.stock : '—') + '</strong></td>' +
-        '<td>' + branchStatusBadge + '</td>' +
-        '<td>' + masterStatusBadge + '</td>' +
-        '<td style="text-align:right; white-space:nowrap;">' +
-          '<div style="display:inline-flex; align-items:center; gap:8px;">' +
-            toggleBtn +
-            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu ' + esc(p.product_name || p.name) + '" onclick="XentraActionMenu.open(this, [' +
-              '{ label: \'Edit Menu / Kategori Cabang\', icon: \'✏️\', onClick: function() { openBranchOverrideModal(\'' + productDataJson + '\'); } },' +
-              '{ divider: true },' +
-              '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBMBranchProduct(\'' + esc(p.product_id) + '\', \'' + esc(p.product_name || p.name) + '\'); } }' +
-            '])">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>' +
-            '</button>' +
-          '</div>' +
-        '</td>' +
+      var toggleBtn = '<label class="x-toggle x-menu-availability-toggle' + (isAvail ? ' x-toggle-on' : '') + '" title="' + (isAvail ? 'Tersedia' : 'Tidak tersedia') + '">' +
+        '<input type="checkbox" ' + (isAvail ? 'checked' : '') + ' onchange="toggleBMProductAvailability(\'' + esc(p.product_id) + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan ' + esc(p.product_name || p.name) + '">' +
+        '<span class="x-toggle-slider"></span></label>';
+
+      return '<tr class="x-merchant-data-row x-menu-row">' +
+        '<td data-label="Produk"><strong>' + esc(p.product_name || p.name) + '</strong></td>' +
+        '<td data-label="Kategori">' + catBadges + '</td>' +
+        '<td data-label="Harga"><strong>' + formatMoney(p.price) + '</strong></td>' +
+        '<td data-label="Ketersediaan"><span class="x-badge ' + (isAvail ? 'x-badge-success' : 'x-badge-danger') + '">' + (isAvail ? 'TERSEDIA' : 'TIDAK TERSEDIA') + '</span></td>' +
+        '<td data-label="Aksi" style="text-align:right;"><div class="x-menu-row-actions">' + toggleBtn +
+          '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu ' + esc(p.product_name || p.name) + '" onclick="XentraActionMenu.open(this, [' +
+            '{ label: \'Edit Menu / Kategori Cabang\', icon: \'edit\', onClick: function() { openBranchOverrideModal(\'' + productDataJson + '\'); } },' +
+            '{ divider: true },' +
+            '{ label: \'Hapus dari Cabang\', icon: \'trash\', destructive: true, onClick: function() { removeBMBranchProduct(\'' + esc(p.product_id) + '\', \'' + esc(p.product_name || p.name) + '\'); } }' +
+          '])"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg></button>' +
+        '</div></td>' +
       '</tr>';
     }).join('');
   }
