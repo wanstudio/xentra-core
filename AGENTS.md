@@ -85,6 +85,12 @@ Key domain boundaries: Organization → Brand → Branch. Payment credentials re
 - Do not accept tenant identity from an untrusted query parameter or arbitrary client-controlled header for protected operations.
 - Do not introduce `app.mybangjo.com` (or another client domain) as a permanent production special case.
 - The historical Bangjo shared-hosting mirror deployment is legacy and is not the target runtime topology.
+- `biz.xentra.cloud` is the designated Xentra Business Portal entry point for Owner/Merchant experiences and is Xentra-branded by default.
+- Platform branding and tenant branding are separate concepts: Xentra is the platform default; tenant branding is an override resolved from authoritative tenant/brand context.
+- White-label is a tenant branding mode, not a separate application architecture or tenant identity.
+- VIP/dedicated infrastructure does not create a separate tenant or identity. A dedicated client such as Bangjo remains a normal Xentra tenant logically.
+- All supported tenant-facing surfaces (Owner, Merchant, POS, Customer, checkout/order surfaces, favicon/PWA, receipts/tickets, transactional emails, etc.) must consume the same effective-branding contract rather than maintaining per-app logo logic.
+- Client domains remain direct tenant entry points. Never route `m.mybangjo.com`, `pos.mybangjo.com`, or another client domain through `biz.xentra.cloud` merely to apply branding.
 
 ## Skills selection
 
