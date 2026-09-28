@@ -21,7 +21,7 @@ var STATIC_ASSETS = [
   "/merchant-app/assets/icons/icon-192.png",
   "/merchant-app/assets/icons/icon-512.png",
   "/merchant-shared/css/shared.css?v=1.0.0",
-  "/merchant-shared/css/dashboard.css?v=1.0.12",
+  "/merchant-shared/css/dashboard.css?v=1.0.13",
   "/merchant-shared/js/shared.js?v=1.0.0",
   "/merchant-shared/js/action-menu.js?v=1.0.0",
   "/merchant-shared/js/crop-editor.js?v=1.0.0",

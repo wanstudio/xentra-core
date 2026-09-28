@@ -4716,7 +4716,7 @@ input[type="file"].x-input,
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 7px !important;
+    gap: 10px !important;
     padding: 2px 2px 0 !important;
     cursor: pointer !important;
     font-size: 11px !important;
@@ -4901,7 +4901,7 @@ input[type="file"].x-input,
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 7px !important;
+    gap: 10px !important;
     padding: 2px 2px 0 !important;
     cursor: pointer !important;
     font-size: 11px !important;
