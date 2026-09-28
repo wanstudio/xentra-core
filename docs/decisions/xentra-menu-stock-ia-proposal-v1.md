@@ -310,3 +310,36 @@ The supplied GoBiz screens are used only for native-feeling hierarchy, touch erg
 They do not define Xentra business rules, branch scope, Catalog authority, Inventory authority, or unsupported capabilities.
 
 **LOCKED — Menu hierarchy v2 is now the implementation contract for Merchant App Menu.**
+
+
+## 🔒 IMPLEMENTATION — Menu Hierarchy & Navigation v2
+**Date: 29 September 2026**
+
+The locked hierarchy is implemented in Merchant App.
+
+Implemented:
+- Menu opens as a compact module hub instead of a giant CRUD/KPI surface.
+- Kategori dan menu opens a dedicated branch-scoped category index.
+- Category rows expose menu count and open the selected category.
+- Category edit remains a sibling operation and reuses the existing category editor.
+- Category detail opens the menu list for that category.
+- Menu item availability remains a fast inline operational action.
+- Existing branch catalog override/edit and adoption flows remain the authority for deeper menu edits.
+- Variasi menu and Jadwal menu are reserved capabilities, not fake active workflows.
+- Existing compatibility IDs/tests were retained where useful; no new backend/domain authority was introduced.
+
+Git implementation commits:
+- `482ed736f1c1432a308b41f71177a4f4a6ff7066` — hierarchical Menu shell.
+- `a1a3a7c7ca53284015adf4f1d5eb1c8ca506817d` — category-to-menu navigation.
+- `7c4eb68f78a2bc55915b259df324c05423686fce` — native hierarchical Menu styling.
+- `814e55095f449e80619dc96d98eeb06ea5ac5733` — semantic category-row fix.
+- `be24d934bc72f6db9d3870a2df643827149e8709` — category-row markup correction.
+- `e62503387cc47569d48a4c2d65fbc865cecf3cb2` — final category-row markup correction.
+- `64593fa6e9c743b86bd3e128f9d265d3f9a86efb` — hierarchy regression assertions.
+
+Verification:
+- Source-level checks confirm the Menu hub, category view, category-detail view, navigation controller, category navigation, and DOM-bound menu actions are present.
+- GitHub Actions workflow-run lookup returned no runs for these direct commits, so the full automated suite is not claimed as executed.
+- Device/VPS visual verification is still a separate step.
+
+**LOCKED + IMPLEMENTED — Menu hierarchy v2.**
