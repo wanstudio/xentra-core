@@ -203,11 +203,13 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
       const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       data.id = '/';
       data.scope = '/';
-      // managerial (m. subdomain) → open merchant surface directly (/merchant/)
-      // owner or dashboard surface (biz.xentra.cloud, owner., or /dashboard/) → open dashboard (/dashboard/)
-      const isDashboard = subType === 'owner' || req.query.surface === 'dashboard' || (req.headers.referer && req.headers.referer.includes('/dashboard'));
-      data.start_url = isDashboard ? '/dashboard/' : '/merchant/';
-      data.id = isDashboard ? '/dashboard' : '/';
+      // managerial (m. subdomain) → open merchant surface by default.
+      // Explicit owner/dashboard surfaces open the canonical Owner route (/owner/).
+      const isOwnerSurface = req.query.surface === 'owner' || (req.headers.referer && req.headers.referer.includes('/owner'));
+      const isDashboardSurface = req.query.surface === 'dashboard' || (req.headers.referer && req.headers.referer.includes('/dashboard'));
+      const isOwner = subType === 'owner' || isOwnerSurface || isDashboardSurface;
+      data.start_url = isOwner ? '/owner/' : '/merchant/';
+      data.id = isOwner ? '/owner' : '/';
       const brand = await resolveBrandForManifest(req);
       const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].toLowerCase();
 
