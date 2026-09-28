@@ -6990,3 +6990,90 @@ input[type="file"].x-input,
   .x-merchant-mobile-table td[data-label="Aksi"]::before { content:''; }
   .x-stock-adjust-btn { width:100%; min-height:40px; }
 }
+
+
+.x-menu-primary-actions {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.x-menu-search-row {
+  display:flex;
+  gap:10px;
+  margin-top:16px;
+}
+.x-menu-search-row .x-input:first-child { flex:1 1 auto; min-width:0; }
+.x-menu-search-row select { width:190px; flex:0 0 190px; }
+.x-menu-category-panel { margin:12px 0; padding:14px 16px; }
+.x-menu-category-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:9px;
+  font-size:13px;
+}
+.x-menu-category-bar {
+  display:flex;
+  gap:8px;
+  overflow-x:auto;
+  padding-bottom:2px;
+  scrollbar-width:none;
+}
+.x-menu-category-bar::-webkit-scrollbar { display:none; }
+.x-menu-row-actions {
+  display:inline-flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+}
+.x-menu-availability-toggle { flex-shrink:0; }
+
+@media (max-width:700px) {
+  .x-menu-primary-actions {
+    width:100%;
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+  .x-menu-primary-actions .x-btn-primary { grid-column:1 / -1; }
+  .x-menu-primary-actions button { min-height:40px; }
+  .x-menu-search-row { flex-direction:column; }
+  .x-menu-search-row select { width:100%; flex:0 0 auto; }
+  .x-menu-category-panel { padding:12px; }
+  .x-merchant-mobile-table tr.x-menu-row {
+    margin-bottom:10px;
+    padding:13px;
+    border:1px solid var(--border-color);
+    border-radius:14px;
+    background:#fff;
+    box-shadow:0 1px 2px rgba(15,23,42,.03);
+  }
+  .x-merchant-mobile-table td[data-label] {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:5px 0;
+    font-size:13px;
+  }
+  .x-merchant-mobile-table td[data-label="Produk"] {
+    display:block;
+    padding-bottom:9px;
+    font-size:15px;
+  }
+  .x-merchant-mobile-table td[data-label="Produk"]::before { display:none; }
+  .x-merchant-mobile-table td[data-label]::before {
+    content:attr(data-label);
+    color:var(--text-muted);
+    font-size:11px;
+    font-weight:600;
+  }
+  .x-merchant-mobile-table td[data-label="Aksi"] {
+    padding-top:10px;
+    margin-top:5px;
+    border-top:1px solid #f1f5f9;
+  }
+  .x-menu-row-actions { width:100%; }
+  .x-menu-row-actions .x-action-menu-trigger { width:40px; height:40px; }
+}
