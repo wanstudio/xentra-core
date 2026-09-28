@@ -3672,7 +3672,9 @@
 
   async function loadOverview() {
     var occHero = $('occ-hero-card');
-    if (occHero) occHero.style.opacity = '0.6';
+    var occCenter = $('x-owner-command-center');
+    if (occHero) occHero.style.opacity = '0.72';
+    if (occCenter) occCenter.setAttribute('aria-busy', 'true');
     try {
       var branchId = getEffectiveBranchId();
       var queryParams = [];
@@ -3702,9 +3704,10 @@
       }
     } catch (e) {
       console.warn('[Overview Load Error]:', e);
-      renderOverviewEmpty();
+      renderOccError();
     } finally {
       if (occHero) occHero.style.opacity = '1';
+      if (occCenter) occCenter.setAttribute('aria-busy', 'false');
     }
   }
 
@@ -3929,7 +3932,7 @@
 
       var html = '<div class="x-occ-branch-list">';
       sorted.forEach(function (b) {
-        html += '<div class="x-occ-branch-row">' +
+        html += '<a href="#branches" class="x-occ-branch-row" aria-label="Buka cabang ' + escapeHtml(b.branch_name) + '">' +
           '<div class="x-occ-branch-info">' +
             '<span class="x-occ-branch-name">' + escapeHtml(b.branch_name) + '</span>' +
             '<span class="x-occ-branch-orders">' + (b.total_orders || 0) + ' pesanan</span>' +
@@ -4092,6 +4095,33 @@
     }
   }
 
+  window.loadOwnerOverview = loadOverview;
+
+  function renderOccError() {
+    var message = 'Periksa koneksi Anda lalu coba lagi.';
+    var targets = ['occ-branch-content', 'occ-products-content'];
+    targets.forEach(function (id) {
+      var el = $(id);
+      if (el) {
+        el.innerHTML =
+          '<div class="x-occ-error-state" role="alert">' +
+            '<div class="x-occ-error-copy">' +
+              '<strong>Data belum dapat dimuat</strong>' +
+              '<span>' + escapeHtml(message) + '</span>' +
+            '</div>' +
+            '<button type="button" class="x-occ-retry-btn" onclick="loadOverview()">Coba lagi</button>' +
+          '</div>';
+      }
+    });
+    var attention = $('occ-attention-content');
+    if (attention) {
+      attention.innerHTML = '<div class="x-occ-error-state" role="alert">' +
+        '<div class="x-occ-error-copy"><strong>Ringkasan belum tersedia</strong><span>Coba muat ulang data.</span></div>' +
+        '<button type="button" class="x-occ-retry-btn" onclick="loadOverview()">Coba lagi</button>' +
+      '</div>';
+    }
+  }
+
   function renderOverviewEmpty() {
     if ($('stat-net-sales')) $('stat-net-sales').textContent = 'Rp0';
     if ($('stat-orders-count')) $('stat-orders-count').textContent = '0';
@@ -4120,10 +4150,27 @@
     var occStart = $('occ-start-date');
     var occEnd = $('occ-end-date');
     var btnOccSearch = $('btn-occ-search');
+    var btnOccCustomToggle = $('btn-occ-custom-toggle');
+    var occCustomRange = $('occ-custom-range-row');
+
+    function setOccCustomOpen(open) {
+      if (occCustomRange) occCustomRange.hidden = !open;
+      if (btnOccCustomToggle) {
+        btnOccCustomToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        btnOccCustomToggle.textContent = open ? 'Tutup' : 'Pilih tanggal';
+      }
+    }
 
     if (occSelect) {
       occSelect.addEventListener('change', function () {
+        setOccCustomOpen(false);
         setOverviewPeriodPreset(this.value);
+      });
+    }
+
+    if (btnOccCustomToggle) {
+      btnOccCustomToggle.addEventListener('click', function () {
+        setOccCustomOpen(!occCustomRange || occCustomRange.hidden);
       });
     }
 
@@ -4139,6 +4186,7 @@
       }
       if (inputStart) inputStart.value = sVal;
       if (inputEnd) inputEnd.value = eVal;
+      setOccCustomOpen(false);
       loadOverview();
     }
 
@@ -4187,6 +4235,7 @@
     }
 
     // Initialize default preset to 'today' without triggering extra reload
+    setOccCustomOpen(false);
     setOverviewPeriodPreset('today', true);
   }
 
