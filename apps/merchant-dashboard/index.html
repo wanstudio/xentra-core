@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.1.1">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.1.2">
 </head>
 <body>
 
@@ -234,39 +234,6 @@
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                 <span>Pilih tanggal</span>
               </button>
-            </div>
-          </div>
-
-          <!-- Floating X close button — outside and above the bottom sheet -->
-          <button type="button" class="x-bottom-sheet-ext-close" id="occ-date-sheet-ext-close" onclick="closeOccDateSheet()" aria-label="Tutup">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-          <!-- Bottom Sheet: Pick Calendar Rentang Tanggal (Muncul dari bawah) -->
-          <div class="x-bottom-sheet-overlay" id="occ-date-sheet-overlay" style="display:none;" onclick="closeOccDateSheet()"></div>
-          <div class="x-bottom-sheet" id="occ-date-sheet" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="occ-sheet-title">
-            <div class="x-bottom-sheet-handle"></div>
-            <div class="x-bottom-sheet-header">
-              <div class="x-bottom-sheet-title-wrap">
-                <h3 class="x-bottom-sheet-title" id="occ-sheet-title">Pilih Rentang Tanggal</h3>
-                <p class="x-bottom-sheet-subtitle">Pilih tanggal awal dan akhir transaksi</p>
-              </div>
-              <button type="button" class="x-bottom-sheet-close" onclick="closeOccDateSheet()" aria-label="Tutup">✕</button>
-            </div>
-            <div class="x-bottom-sheet-body">
-              <div class="x-occ-custom-range-row" id="occ-custom-range-row" hidden>
-                <div class="x-occ-date-inputs-wrap">
-                  <label class="x-occ-date-field">
-                    <span class="x-occ-date-label">Dari</span>
-                    <input type="date" id="occ-start-date" class="x-occ-date-input" aria-label="Dari tanggal">
-                  </label>
-                  <span class="x-occ-range-sep" aria-hidden="true">s/d</span>
-                  <label class="x-occ-date-field">
-                    <span class="x-occ-date-label">Sampai</span>
-                    <input type="date" id="occ-end-date" class="x-occ-date-input" aria-label="Sampai tanggal">
-                  </label>
-                </div>
-                <button type="button" id="btn-occ-search" class="x-occ-search-btn">Cari</button>
-              </div>
             </div>
           </div>
 
@@ -3154,6 +3121,44 @@
 
   </div>
 
+  <!-- =========================================================================
+       OWNER DASHBOARD MODALS & BOTTOM SHEETS (Root Stacking Context)
+       Placed outside .x-dash-layout so viewport coordinates (bottom: 0) and
+       z-index (1050+) are pinned directly to phone screen, above bottom nav.
+       ========================================================================= -->
+  <!-- Floating X close button — outside and above the bottom sheet -->
+  <button type="button" class="x-bottom-sheet-ext-close" id="occ-date-sheet-ext-close" onclick="closeOccDateSheet()" aria-label="Tutup">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+  </button>
+  <!-- Bottom Sheet: Pick Calendar Rentang Tanggal (Muncul dari bawah) -->
+  <div class="x-bottom-sheet-overlay" id="occ-date-sheet-overlay" style="display:none;" onclick="closeOccDateSheet()"></div>
+  <div class="x-bottom-sheet" id="occ-date-sheet" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="occ-sheet-title">
+    <div class="x-bottom-sheet-handle"></div>
+    <div class="x-bottom-sheet-header">
+      <div class="x-bottom-sheet-title-wrap">
+        <h3 class="x-bottom-sheet-title" id="occ-sheet-title">Pilih Rentang Tanggal</h3>
+        <p class="x-bottom-sheet-subtitle">Pilih tanggal awal dan akhir transaksi</p>
+      </div>
+      <button type="button" class="x-bottom-sheet-close" onclick="closeOccDateSheet()" aria-label="Tutup">✕</button>
+    </div>
+    <div class="x-bottom-sheet-body">
+      <div class="x-occ-custom-range-row" id="occ-custom-range-row" hidden>
+        <div class="x-occ-date-inputs-wrap">
+          <label class="x-occ-date-field">
+            <span class="x-occ-date-label">Dari</span>
+            <input type="date" id="occ-start-date" class="x-occ-date-input" aria-label="Dari tanggal">
+          </label>
+          <span class="x-occ-range-sep" aria-hidden="true">s/d</span>
+          <label class="x-occ-date-field">
+            <span class="x-occ-date-label">Sampai</span>
+            <input type="date" id="occ-end-date" class="x-occ-date-input" aria-label="Sampai tanggal">
+          </label>
+        </div>
+        <button type="button" id="btn-occ-search" class="x-occ-search-btn">Cari</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL: ADD / EDIT MASTER CATEGORY -->
   <div id="modal-master-category" class="x-modal-backdrop" style="display:none; z-index:1100;">
     <div class="x-modal-card" style="max-width: 440px;">
@@ -4279,6 +4284,6 @@
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.22"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.23"></script>
 </body>
 </html>

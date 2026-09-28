@@ -4308,6 +4308,7 @@
     });
 
     window.openOccDateSheet = function () {
+      document.body.classList.add('x-sheet-open');
       if (occCustomRange) occCustomRange.hidden = false;
       if (btnOccCustomToggle) {
         btnOccCustomToggle.setAttribute('aria-expanded', 'true');
@@ -4331,6 +4332,7 @@
     };
 
     window.closeOccDateSheet = function () {
+      document.body.classList.remove('x-sheet-open');
       var extClose = $('occ-date-sheet-ext-close');
       if (extClose) extClose.classList.remove('open');
       if (occCustomRange) occCustomRange.hidden = true;
