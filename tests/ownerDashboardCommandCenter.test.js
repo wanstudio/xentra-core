@@ -209,6 +209,35 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
       'renderOverviewEmpty must call renderOccEmpty');
   });
 
+  await t.test('OCC-13A: mobile period control is compact and custom dates are progressive disclosure', () => {
+    assert.ok(html.includes('id="btn-occ-custom-toggle"'),
+      'Custom date toggle must exist');
+    assert.ok(html.includes('id="occ-custom-range-row" hidden'),
+      'Custom date row must start collapsed');
+    assert.ok(css.includes('.x-occ-custom-range-row[hidden]'),
+      'CSS must preserve collapsed custom range state');
+  });
+
+  await t.test('OCC-13B: mobile overview has explicit loading/error/accessibility hooks', () => {
+    assert.ok(html.includes('aria-busy="true"'),
+      'Command center must expose busy state');
+    assert.ok(css.includes('.x-occ-error-state'),
+      'Mobile error state styling must exist');
+    assert.ok(css.includes(':focus-visible'),
+      'Mobile controls must have visible focus styling');
+    assert.ok(css.includes('prefers-reduced-motion: reduce'),
+      'Reduced-motion support must exist');
+    assert.ok(js.includes('function renderOccError()'),
+      'renderOccError must be defined');
+  });
+
+  await t.test('OCC-13C: branch performance rows are actionable touch targets', () => {
+    assert.ok(js.includes('class="x-occ-branch-row" aria-label="Buka cabang '),
+      'Branch performance rows must be actionable links');
+    assert.ok(css.includes('.x-occ-branch-row:active'),
+      'Branch rows must provide touch feedback');
+  });
+
   await t.test('OCC-13: initOverviewControls wires occ-period-select, custom range inputs, and btn-occ-search', () => {
     assert.ok(js.includes('var occSelect = $(\'occ-period-select\');'),
       'initOverviewControls must reference occ-period-select');
