@@ -249,3 +249,15 @@ The IA can be locked when review confirms:
 - no backend/domain authority is duplicated in the UI.
 
 **PROPOSAL — review this IA before implementation.**
+
+
+## Contract Reconciliation Update
+
+The previously identified catalog-adoption stock blocker is resolved.
+
+Catalog adoption no longer fabricates physical stock, and the regression suite now asserts that a newly adopted branch product keeps stock = NULL until an Inventory operation records stock.
+
+The IA requirement remains:
+**NULL = Belum dilacak**, never Habis.
+
+The document remains **PROPOSAL — REVIEW BEFORE IMPLEMENTATION**.
