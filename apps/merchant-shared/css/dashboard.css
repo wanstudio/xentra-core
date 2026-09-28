@@ -4683,6 +4683,9 @@ input[type="file"].x-input,
     background:#f5f5f7;
     color:#111111;
     font-family:"Plus Jakarta Sans",sans-serif;
+    touch-action: pan-y;
+    will-change: transform;
+    -webkit-overflow-scrolling: touch;
   }
   body.x-mobile-account-open .x-mobile-account-page{display:block;}
   body.x-mobile-account-open .x-dash-layout,

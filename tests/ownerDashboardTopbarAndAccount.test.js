@@ -157,4 +157,13 @@ test('Owner Dashboard Topbar, Mobile Account & Scroll Unblock', async (t) => {
       'dash-user-profile click must open mobile account');
   });
 
+  await t.test('OTA-11: Mobile account supports swipe back gesture and touch-action: pan-y', () => {
+    assert.ok(js.includes('function initMobileAccountSwipeBack()'),
+      'initMobileAccountSwipeBack must be defined in dashboard.js');
+    assert.ok(js.includes('initMobileAccountSwipeBack();'),
+      'initAuthListeners must call initMobileAccountSwipeBack');
+    assert.ok(css.includes('touch-action: pan-y;'),
+      '.x-mobile-account-page must specify touch-action: pan-y for horizontal gestures');
+  });
+
 });

@@ -4705,20 +4705,132 @@
   }
 
   function closeMobileAccount() {
-    document.body.classList.remove('x-mobile-account-open');
+    var skipHistory = arguments[0];
     var page = $('x-mobile-account-page');
-    if (page) page.setAttribute('aria-hidden', 'true');
+    if (page) {
+      page.setAttribute('aria-hidden', 'true');
+      page.style.transform = '';
+      page.style.transition = '';
+    }
+    document.body.classList.remove('x-mobile-account-open');
+    if (!skipHistory && window.history.state && window.history.state.mobileAccountOpen) {
+      window.history.back();
+    }
   }
 
   function openMobileAccount() {
     populateMobileAccount();
-    document.body.classList.add('x-mobile-account-open');
     var page = $('x-mobile-account-page');
-    if (page) page.setAttribute('aria-hidden', 'false');
+    if (page) {
+      page.setAttribute('aria-hidden', 'false');
+      page.style.transform = '';
+      page.style.transition = '';
+    }
+    document.body.classList.add('x-mobile-account-open');
+    try {
+      if (!window.history.state || !window.history.state.mobileAccountOpen) {
+        window.history.pushState({ mobileAccountOpen: true }, '');
+      }
+    } catch (_) {}
   }
 
   window.openMobileAccount = openMobileAccount;
   window.closeMobileAccount = closeMobileAccount;
+
+  function initMobileAccountSwipeBack() {
+    var page = $('x-mobile-account-page');
+    if (!page) return;
+
+    var startX = 0;
+    var startY = 0;
+    var touchStartTime = 0;
+    var isSwiping = false;
+    var isHorizontalLocked = false;
+
+    page.addEventListener('touchstart', function (e) {
+      if (!document.body.classList.contains('x-mobile-account-open')) return;
+      if (e.touches.length !== 1) return;
+
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      touchStartTime = Date.now();
+      isSwiping = false;
+      isHorizontalLocked = false;
+      page.style.transition = 'none';
+    }, { passive: true });
+
+    page.addEventListener('touchmove', function (e) {
+      if (!document.body.classList.contains('x-mobile-account-open')) return;
+      if (e.touches.length !== 1) return;
+
+      var currentX = e.touches[0].clientX;
+      var currentY = e.touches[0].clientY;
+      var deltaX = currentX - startX;
+      var deltaY = currentY - startY;
+
+      if (!isHorizontalLocked) {
+        if (Math.abs(deltaY) > 8 && Math.abs(deltaY) > Math.abs(deltaX)) {
+          isSwiping = false;
+          return;
+        }
+        if (deltaX > 8 && deltaX > Math.abs(deltaY) * 1.1) {
+          isHorizontalLocked = true;
+          isSwiping = true;
+        }
+      }
+
+      if (isSwiping && deltaX > 0) {
+        if (e.cancelable) e.preventDefault();
+        page.style.transform = 'translateX(' + deltaX + 'px)';
+      }
+    }, { passive: false });
+
+    function handleTouchEnd(e) {
+      if (!isSwiping) {
+        page.style.transform = '';
+        page.style.transition = '';
+        return;
+      }
+      isSwiping = false;
+      isHorizontalLocked = false;
+
+      var endX = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : startX;
+      var deltaX = endX - startX;
+      var duration = Math.max(1, Date.now() - touchStartTime);
+      var velocity = deltaX / duration;
+
+      if (deltaX > 70 || (deltaX > 30 && velocity > 0.25)) {
+        var layout = document.querySelector('.x-dash-layout');
+        if (layout) layout.style.display = 'flex';
+        var bottomNav = document.querySelector('.x-owner-bottom-nav');
+        if (bottomNav) bottomNav.style.display = 'flex';
+
+        page.style.transition = 'transform 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        page.style.transform = 'translateX(100%)';
+        setTimeout(function () {
+          if (layout) layout.style.display = '';
+          if (bottomNav) bottomNav.style.display = '';
+          closeMobileAccount();
+        }, 200);
+      } else {
+        page.style.transition = 'transform 0.2s ease-out';
+        page.style.transform = 'translateX(0px)';
+        setTimeout(function () {
+          page.style.transform = '';
+          page.style.transition = '';
+        }, 200);
+      }
+    }
+
+    page.addEventListener('touchend', handleTouchEnd, { passive: true });
+    page.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+
+    window.addEventListener('popstate', function () {
+      if (document.body.classList.contains('x-mobile-account-open')) {
+        closeMobileAccount(true);
+      }
+    });
+  }
 
   function initAuthListeners() {
     var btnLogout = $('btn-logout');
@@ -4740,6 +4852,7 @@
         openMobileAccount();
       });
     }
+    initMobileAccountSwipeBack();
   }
 
 
