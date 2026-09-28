@@ -762,7 +762,13 @@
       }
     }
     document.querySelectorAll('.x-owner-nav-item[data-tab-module]').forEach(function (btn) {
-      btn.classList.toggle('active', btn.dataset.tabModule === module);
+      var active = btn.dataset.tabModule === module;
+      btn.classList.toggle('active', active);
+      if (active) {
+        btn.setAttribute('aria-current', 'page');
+      } else {
+        btn.removeAttribute('aria-current');
+      }
     });
   }
   window.syncOwnerBottomNavActive = syncOwnerBottomNavActive;
