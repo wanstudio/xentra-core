@@ -5409,6 +5409,384 @@ input[type="file"].x-input,
   .x-occ-chip-label { font-size: 10.5px; font-weight: 700; color: #334155; }
 }
 
+/* ==========================================================================
+   OWNER MOBILE UX REFINEMENT — native-app surface, touch & accessibility
+   ========================================================================== */
+@media (max-width: 768px) {
+  .x-owner-command-center {
+    gap: 20px;
+    padding: 8px 0 28px;
+  }
+
+  /* Keep only meaningful surfaces as cards; sections breathe like a native app. */
+  .x-occ-period-bar,
+  .x-occ-card {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .x-occ-period-bar {
+    padding: 0;
+    gap: 8px;
+  }
+
+  .x-occ-preset-row {
+    gap: 8px;
+  }
+
+  .x-occ-period-selector-wrap {
+    height: 44px;
+    min-height: 44px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding-left: 14px;
+    box-shadow: 0 1px 3px rgba(15,23,42,.04);
+  }
+
+  .x-occ-period-select {
+    font-size: 14px;
+    min-height: 44px;
+  }
+
+  .x-occ-custom-toggle,
+  .x-occ-search-btn {
+    min-height: 44px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 14px;
+    cursor: pointer;
+  }
+
+  .x-occ-custom-toggle {
+    flex: 0 0 auto;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #334155;
+  }
+
+  .x-occ-custom-toggle[aria-expanded="true"] {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+  }
+
+  .x-occ-custom-range-row {
+    align-items: flex-end;
+    padding: 10px 0 2px;
+  }
+
+  .x-occ-custom-range-row[hidden] {
+    display: none;
+  }
+
+  .x-occ-date-field {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .x-occ-date-field > span {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+  }
+
+  .x-occ-date-input {
+    width: 100%;
+    min-height: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border-color: #dbe2ea;
+    font-size: 13px;
+  }
+
+  .x-occ-range-sep {
+    margin-bottom: 13px;
+  }
+
+  /* Primary summary: light, readable, less dashboard-like. */
+  .x-occ-hero-card {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 2px 8px rgba(15,23,42,.05);
+  }
+
+  .x-occ-hero-sublabel {
+    color: #64748b;
+    font-size: 12px;
+    letter-spacing: .2px;
+    text-transform: none;
+  }
+
+  .x-occ-hero-primary-val {
+    color: #0f172a;
+    font-size: 28px;
+    letter-spacing: -.7px;
+    margin: 5px 0 16px;
+  }
+
+  .x-occ-hero-metrics-row {
+    border-top-color: #eef2f7;
+    gap: 12px;
+  }
+
+  .x-occ-mini-kpi-val {
+    color: #0f172a;
+    font-size: 15px;
+  }
+
+  .x-occ-mini-kpi-lbl {
+    color: #64748b;
+    font-size: 11px;
+  }
+
+  .x-occ-hero-trend {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
+
+  /* Native-app section rhythm. */
+  .x-occ-card {
+    padding: 0;
+  }
+
+  .x-occ-card-header {
+    min-height: 32px;
+    margin-bottom: 8px;
+  }
+
+  .x-occ-card-title {
+    font-size: 15px;
+    letter-spacing: -.15px;
+  }
+
+  .x-occ-card-link {
+    min-height: 40px;
+    padding: 8px 0;
+    font-size: 12.5px;
+  }
+
+  .x-occ-branch-row,
+  .x-occ-product-row {
+    min-height: 56px;
+    padding: 10px 4px;
+    border-bottom-color: #eef2f7;
+  }
+
+  .x-occ-branch-row {
+    text-decoration: none;
+    color: inherit;
+    border-radius: 10px;
+  }
+
+  .x-occ-branch-row:active {
+    background: #f8fafc;
+  }
+
+  .x-occ-branch-name,
+  .x-occ-product-name {
+    font-size: 14px;
+  }
+
+  .x-occ-branch-orders,
+  .x-occ-product-sold {
+    font-size: 12px;
+  }
+
+  .x-occ-branch-revenue,
+  .x-occ-product-revenue {
+    font-size: 14px;
+  }
+
+  .x-occ-orders-summary-grid {
+    gap: 8px;
+  }
+
+  .x-occ-order-stat {
+    min-height: 68px;
+    justify-content: center;
+    padding: 9px 4px;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid #e8edf3;
+  }
+
+  .x-occ-order-stat-val {
+    font-size: 17px;
+  }
+
+  .x-occ-order-stat-lbl {
+    font-size: 11px;
+  }
+
+  .x-occ-attention-section .x-occ-card-body {
+    min-height: 48px;
+  }
+
+  .x-occ-alert-item {
+    min-height: 52px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 13px;
+  }
+
+  .x-occ-normal-state {
+    min-height: 48px;
+    padding: 0 2px;
+    font-size: 13px;
+  }
+
+  /* Quick actions are controls, so make their targets generous and iconography consistent. */
+  .x-occ-quick-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .x-occ-quick-chip {
+    min-height: 72px;
+    padding: 9px 3px;
+    border: 1px solid #e5eaf0;
+    border-radius: 14px;
+    background: #ffffff;
+  }
+
+  .x-occ-chip-icon {
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .x-occ-chip-icon svg {
+    width: 21px;
+    height: 21px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .x-occ-chip-label {
+    font-size: 11px;
+    line-height: 1.15;
+    color: #334155;
+  }
+
+  /* Visible keyboard focus; never leave touch/keyboard users without a state. */
+  .x-owner-nav-item:focus-visible,
+  .x-occ-quick-chip:focus-visible,
+  .x-occ-card-link:focus-visible,
+  .x-occ-custom-toggle:focus-visible,
+  .x-occ-search-btn:focus-visible,
+  .x-occ-period-select:focus-visible,
+  .x-occ-date-input:focus-visible {
+    outline: 3px solid rgba(37,99,235,.35);
+    outline-offset: 2px;
+  }
+
+  .x-owner-nav-item {
+    min-height: 48px;
+    font-size: 11px;
+  }
+
+  .x-owner-nav-item svg {
+    width: 23px;
+    height: 23px;
+  }
+
+  .x-owner-nav-item:not(.active) {
+    color: #5f6773;
+  }
+
+  /* Loading state. */
+  .x-occ-loading-state {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 8px 4px;
+  }
+
+  .x-occ-skeleton {
+    display: block;
+    height: 14px;
+    width: 100%;
+    border-radius: 7px;
+    background: linear-gradient(90deg,#eef2f7 25%,#f8fafc 50%,#eef2f7 75%);
+    background-size: 200% 100%;
+    animation: x-occ-skeleton-pulse 1.25s ease-in-out infinite;
+  }
+
+  .x-occ-skeleton.short {
+    width: 58%;
+  }
+
+  @keyframes x-occ-skeleton-pulse {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .x-occ-error-state {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 56px;
+    padding: 10px 12px;
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    background: #fff7f7;
+    color: #991b1b;
+  }
+
+  .x-occ-error-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .x-occ-error-copy strong {
+    font-size: 13px;
+  }
+
+  .x-occ-error-copy span {
+    font-size: 11.5px;
+    color: #b91c1c;
+  }
+
+  .x-occ-retry-btn {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    background: #ffffff;
+    color: #991b1b;
+    font-size: 12px;
+    font-weight: 800;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .x-occ-skeleton,
+  .x-owner-nav-item,
+  .x-occ-card-link {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 @media (min-width: 769px) {
   .x-owner-bottom-nav { display: none !important; }
   #x-topbar-focus-scope { display: contents; }
