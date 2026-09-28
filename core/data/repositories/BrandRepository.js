@@ -226,19 +226,23 @@ class BrandRepository {
   // branding, RBAC, routing, or Customer PWA behavior.
 
   updateMerchantPwaIcon(brandId, iconUrl) {
-    this.db.prepare('UPDATE brands SET merchant_pwa_icon_url = ?, merchant_pwa_icon_media_id = NULL WHERE id = ?').run(iconUrl, brandId);
+    clearDomainCache();
+    this.db.execute('UPDATE brands SET merchant_pwa_icon_url = ?, merchant_pwa_icon_media_id = NULL WHERE id = ?', [iconUrl, brandId]);
   }
 
   removeMerchantPwaIcon(brandId) {
-    this.db.prepare('UPDATE brands SET merchant_pwa_icon_url = NULL, merchant_pwa_icon_media_id = NULL WHERE id = ?').run(brandId);
+    clearDomainCache();
+    this.db.execute('UPDATE brands SET merchant_pwa_icon_url = NULL, merchant_pwa_icon_media_id = NULL WHERE id = ?', [brandId]);
   }
 
   updatePosPwaIcon(brandId, iconUrl) {
-    this.db.prepare('UPDATE brands SET pos_pwa_icon_url = ?, pos_pwa_icon_media_id = NULL WHERE id = ?').run(iconUrl, brandId);
+    clearDomainCache();
+    this.db.execute('UPDATE brands SET pos_pwa_icon_url = ?, pos_pwa_icon_media_id = NULL WHERE id = ?', [iconUrl, brandId]);
   }
 
   removePosPwaIcon(brandId) {
-    this.db.prepare('UPDATE brands SET pos_pwa_icon_url = NULL, pos_pwa_icon_media_id = NULL WHERE id = ?').run(brandId);
+    clearDomainCache();
+    this.db.execute('UPDATE brands SET pos_pwa_icon_url = NULL, pos_pwa_icon_media_id = NULL WHERE id = ?', [brandId]);
   }
 
   findBySlug(slug) {

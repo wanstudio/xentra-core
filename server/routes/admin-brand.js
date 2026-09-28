@@ -187,49 +187,93 @@ router.delete('/admin/brand/logo', requireAuth(['owner', 'brand_manager']), (req
 
 router.post('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { url } = req.body;
-    if (!url) return res.status(400).json({ error: 'url required' });
-    coreBrandRepo.updateMerchantPwaIcon(req.brand_id, url);
-    req.brand.merchant_pwa_icon_url = url;
-    return res.json({ success: true, merchant_pwa_icon_url: url });
+    const { url, image_base64, mime_type } = req.body || {};
+    let iconUrl = url;
+
+    if (image_base64) {
+      const validation = ImageValidator.validateImageUpload({
+        imageBase64: image_base64,
+        mimeType: mime_type,
+        assetType: 'logo'
+      });
+      if (!validation.valid) {
+        return res.status(400).json({ success: false, error: validation.error, code: validation.code });
+      }
+      fs.mkdirSync(BRAND_LOGO_DIR, { recursive: true });
+      const fileName = `merchant-icon-${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${validation.info.ext}`;
+      fs.writeFileSync(path.join(BRAND_LOGO_DIR, fileName), validation.buffer);
+      iconUrl = `/assets/uploads/logos/${fileName}`;
+    }
+
+    if (!iconUrl) return res.status(400).json({ success: false, error: 'url atau gambar icon wajib diunggah.' });
+
+    coreBrandRepo.updateMerchantPwaIcon(req.brand_id, iconUrl);
+    if (req.brand) {
+      req.brand.merchant_pwa_icon_url = iconUrl;
+    }
+    return res.json({ success: true, message: 'Icon Merchant PWA berhasil diperbarui.', merchant_pwa_icon_url: iconUrl });
   } catch (err) {
     console.error('[API Error POST /admin/brand/merchant-icon]:', err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: err.message || 'Server error' });
   }
 });
 
 router.delete('/admin/brand/merchant-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     coreBrandRepo.removeMerchantPwaIcon(req.brand_id);
-    req.brand.merchant_pwa_icon_url = null;
-    return res.json({ success: true, merchant_pwa_icon_url: null });
+    if (req.brand) {
+      req.brand.merchant_pwa_icon_url = null;
+    }
+    return res.json({ success: true, message: 'Icon Merchant PWA berhasil dihapus.', merchant_pwa_icon_url: null });
   } catch (err) {
     console.error('[API Error DELETE /admin/brand/merchant-icon]:', err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: err.message || 'Server error' });
   }
 });
 
 router.post('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const { url } = req.body;
-    if (!url) return res.status(400).json({ error: 'url required' });
-    coreBrandRepo.updatePosPwaIcon(req.brand_id, url);
-    req.brand.pos_pwa_icon_url = url;
-    return res.json({ success: true, pos_pwa_icon_url: url });
+    const { url, image_base64, mime_type } = req.body || {};
+    let iconUrl = url;
+
+    if (image_base64) {
+      const validation = ImageValidator.validateImageUpload({
+        imageBase64: image_base64,
+        mimeType: mime_type,
+        assetType: 'logo'
+      });
+      if (!validation.valid) {
+        return res.status(400).json({ success: false, error: validation.error, code: validation.code });
+      }
+      fs.mkdirSync(BRAND_LOGO_DIR, { recursive: true });
+      const fileName = `pos-icon-${crypto.randomBytes(8).toString('hex')}-${Date.now()}.${validation.info.ext}`;
+      fs.writeFileSync(path.join(BRAND_LOGO_DIR, fileName), validation.buffer);
+      iconUrl = `/assets/uploads/logos/${fileName}`;
+    }
+
+    if (!iconUrl) return res.status(400).json({ success: false, error: 'url atau gambar icon wajib diunggah.' });
+
+    coreBrandRepo.updatePosPwaIcon(req.brand_id, iconUrl);
+    if (req.brand) {
+      req.brand.pos_pwa_icon_url = iconUrl;
+    }
+    return res.json({ success: true, message: 'Icon POS PWA berhasil diperbarui.', pos_pwa_icon_url: iconUrl });
   } catch (err) {
     console.error('[API Error POST /admin/brand/pos-icon]:', err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: err.message || 'Server error' });
   }
 });
 
 router.delete('/admin/brand/pos-icon', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     coreBrandRepo.removePosPwaIcon(req.brand_id);
-    req.brand.pos_pwa_icon_url = null;
-    return res.json({ success: true, pos_pwa_icon_url: null });
+    if (req.brand) {
+      req.brand.pos_pwa_icon_url = null;
+    }
+    return res.json({ success: true, message: 'Icon POS PWA berhasil dihapus.', pos_pwa_icon_url: null });
   } catch (err) {
     console.error('[API Error DELETE /admin/brand/pos-icon]:', err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ success: false, error: err.message || 'Server error' });
   }
 });
 

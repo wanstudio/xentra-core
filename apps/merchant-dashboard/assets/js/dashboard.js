@@ -921,8 +921,8 @@
      ========================================================================= */
 
   // ── Installed PWA Identity Override — shared upload helper ─────────────────
-  // Uploads a file to the brand logo storage (to get a hosted URL), then saves
-  // that URL to the given PWA icon endpoint. Reuses the existing upload pattern.
+  // Uploads a launcher icon file directly to the given PWA icon endpoint.
+  // This avoids mutating or overwriting the main brand logo.
   async function doUploadPwaLauncherIcon(file, endpoint, previewEl, hiddenEl, removeBtn, pickBtn) {
     if (pickBtn) { pickBtn.disabled = true; pickBtn.textContent = 'Mengunggah...'; }
     // Optimistic preview
@@ -944,31 +944,22 @@
         reader.readAsDataURL(file);
       });
 
-      // Upload to brand logo storage to obtain a hosted URL
-      var logoRes = await adminFetch(API_BASE + '/admin/brand/logo', {
+      // Upload directly to the specific PWA icon endpoint
+      var iconRes = await adminFetch(API_BASE + endpoint, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ image_base64: base64, mime_type: file.type })
       });
-      var logoData = await logoRes.json();
-      if (!logoRes.ok || !logoData.success) {
-        showToast('❌ ' + (logoData.error || 'Gagal mengunggah icon.'));
-        return;
-      }
-      var iconUrl = logoData.logo_url;
-
-      // Save the URL to the specific PWA icon endpoint
-      var iconRes = await adminFetch(API_BASE + endpoint, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ url: iconUrl })
-      });
       var iconData = await iconRes.json();
       if (iconRes.ok && iconData.success) {
+        var iconUrl = iconData.merchant_pwa_icon_url || iconData.pos_pwa_icon_url || iconData.url || (previewEl ? previewEl.src : '');
         showToast('✅ Icon PWA berhasil diperbarui.');
-        if (previewEl) { previewEl.src = iconUrl; previewEl.style.display = 'block'; }
-        if (hiddenEl) hiddenEl.value = iconUrl;
+        if (previewEl && iconUrl) { previewEl.src = iconUrl; previewEl.style.display = 'block'; }
+        if (hiddenEl && iconUrl) hiddenEl.value = iconUrl;
         if (removeBtn) removeBtn.style.display = 'inline-block';
+        if (typeof window.loadSettingsProfile === 'function') {
+          window.loadSettingsProfile();
+        }
       } else {
         showToast('❌ ' + (iconData.error || 'Gagal menyimpan icon.'));
       }
@@ -1116,6 +1107,98 @@
     if (mockCartBtn) mockCartBtn.style.backgroundColor = color;
   }
 
+  // ── Reusable Brand Logo Upload Flow ─────────────────────────────────────────
+  // Lifted to module scope so both initBrandListeners and initSettingsProfileListeners
+  // can call it without closure dependencies.
+  async function doUploadBrandLogo(file, cropSpec, previewDataUrl, triggerBtn) {
+    if (triggerBtn) {
+      triggerBtn.disabled = true;
+      triggerBtn.textContent = 'Mengunggah...';
+    }
+
+    // Optimistic preview immediately so user sees immediate feedback
+    if (previewDataUrl) {
+      if ($('brand-logo-preview')) {
+        $('brand-logo-preview').src = previewDataUrl;
+        $('brand-logo-preview').style.display = 'block';
+      }
+      if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
+      if ($('set-profile-logo-preview')) {
+        $('set-profile-logo-preview').src = previewDataUrl;
+        $('set-profile-logo-preview').style.display = 'block';
+      }
+      if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
+      if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = previewDataUrl;
+      var _nameInput = $('brand-name');
+      var _colorPicker = $('brand-color');
+      if (_nameInput && _colorPicker) {
+        updateLiveMockupPreview(_nameInput.value, previewDataUrl, _colorPicker.value);
+      }
+    }
+
+    try {
+      var base64 = await new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
+        reader.readAsDataURL(file);
+      });
+
+      var payload = { image_base64: base64, mime_type: file.type };
+      if (cropSpec) payload.crop_spec = cropSpec;
+
+      var res = await adminFetch(API_BASE + '/admin/brand/logo', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+
+      if (res.ok && data.success) {
+        showToast('✅ Logo brand berhasil diunggah.');
+        var logoUrl = data.logo_url;
+        var _logoInput = $('brand-logo');
+        if (_logoInput) _logoInput.value = logoUrl;
+        if ($('brand-logo-preview')) {
+          $('brand-logo-preview').src = logoUrl;
+          $('brand-logo-preview').style.display = 'block';
+        }
+        if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
+        if ($('btn-brand-logo-remove')) $('btn-brand-logo-remove').style.display = 'inline-block';
+        if ($('btn-brand-logo-pick')) $('btn-brand-logo-pick').textContent = '📁 Ganti Logo';
+
+        if ($('set-profile-logo')) $('set-profile-logo').value = logoUrl;
+        if ($('set-profile-logo-preview')) {
+          $('set-profile-logo-preview').src = logoUrl;
+          $('set-profile-logo-preview').style.display = 'block';
+        }
+        if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
+        if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = 'inline-block';
+        if ($('btn-set-profile-logo-pick')) $('btn-set-profile-logo-pick').textContent = '📁 Ganti Logo';
+
+        if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = logoUrl;
+        var _nameInput2 = $('brand-name');
+        var _colorPicker2 = $('brand-color');
+        if (_nameInput2 && _colorPicker2) {
+          updateLiveMockupPreview(_nameInput2.value, logoUrl, _colorPicker2.value);
+        }
+        loadBrandSettings();
+        if (typeof window.loadSettingsProfile === 'function') {
+          window.loadSettingsProfile();
+        }
+      } else {
+        showToast('❌ ' + (data.error || 'Gagal mengunggah logo brand.'));
+      }
+    } catch (err) {
+      showToast('❌ Kesalahan jaringan saat mengunggah logo.');
+    } finally {
+      if (triggerBtn) {
+        triggerBtn.disabled = false;
+        triggerBtn.textContent = '📁 Ganti Logo';
+      }
+    }
+  }
+
   function initBrandListeners() {
     var colorPicker = $('brand-color');
     var colorHex = $('brand-color-hex');
@@ -1156,91 +1239,6 @@
       });
     });
 
-    // Reusable Brand Logo Upload Flow (Media System M1/M2/M3)
-    async function doUploadBrandLogo(file, cropSpec, previewDataUrl, triggerBtn) {
-      if (triggerBtn) {
-        triggerBtn.disabled = true;
-        triggerBtn.textContent = 'Mengunggah...';
-      }
-
-      // Optimistic preview immediately so user sees immediate feedback
-      if (previewDataUrl) {
-        if ($('brand-logo-preview')) {
-          $('brand-logo-preview').src = previewDataUrl;
-          $('brand-logo-preview').style.display = 'block';
-        }
-        if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
-        if ($('set-profile-logo-preview')) {
-          $('set-profile-logo-preview').src = previewDataUrl;
-          $('set-profile-logo-preview').style.display = 'block';
-        }
-        if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
-        if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = previewDataUrl;
-        if (nameInput && colorPicker) {
-          updateLiveMockupPreview(nameInput.value, previewDataUrl, colorPicker.value);
-        }
-      }
-
-      try {
-        var base64 = await new Promise(function (resolve, reject) {
-          var reader = new FileReader();
-          reader.onload = function () { resolve(reader.result); };
-          reader.onerror = function () { reject(new Error('Gagal membaca file gambar.')); };
-          reader.readAsDataURL(file);
-        });
-
-        var payload = { image_base64: base64, mime_type: file.type };
-        if (cropSpec) payload.crop_spec = cropSpec;
-
-        var res = await adminFetch(API_BASE + '/admin/brand/logo', {
-          method: 'POST',
-          headers: getAuthHeaders(),
-          body: JSON.stringify(payload)
-        });
-        var data = await res.json();
-
-        if (res.ok && data.success) {
-          showToast('✅ Logo brand berhasil diunggah.');
-          var logoUrl = data.logo_url;
-          if (logoInput) logoInput.value = logoUrl;
-          if ($('brand-logo-preview')) {
-            $('brand-logo-preview').src = logoUrl;
-            $('brand-logo-preview').style.display = 'block';
-          }
-          if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
-          if (btnRemoveLogo) btnRemoveLogo.style.display = 'inline-block';
-          if ($('btn-brand-logo-pick')) $('btn-brand-logo-pick').textContent = '📁 Ganti Logo';
-
-          if ($('set-profile-logo')) $('set-profile-logo').value = logoUrl;
-          if ($('set-profile-logo-preview')) {
-            $('set-profile-logo-preview').src = logoUrl;
-            $('set-profile-logo-preview').style.display = 'block';
-          }
-          if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
-          if ($('btn-set-profile-logo-remove')) $('btn-set-profile-logo-remove').style.display = 'inline-block';
-          if ($('btn-set-profile-logo-pick')) $('btn-set-profile-logo-pick').textContent = '📁 Ganti Logo';
-
-          if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = logoUrl;
-          if (nameInput && colorPicker) {
-            updateLiveMockupPreview(nameInput.value, logoUrl, colorPicker.value);
-          }
-          loadBrandSettings();
-          if (typeof window.loadSettingsProfile === 'function') {
-            window.loadSettingsProfile();
-          }
-        } else {
-          showToast('❌ ' + (data.error || 'Gagal mengunggah logo brand.'));
-        }
-      } catch (err) {
-        showToast('❌ Kesalahan jaringan saat mengunggah logo.');
-      } finally {
-        if (triggerBtn) {
-          triggerBtn.disabled = false;
-          triggerBtn.textContent = '📁 Ganti Logo';
-        }
-      }
-    }
-
     // Brand Logo File Picker & Upload
     var btnPickLogo = $('btn-brand-logo-pick');
     var fileInputLogo = $('input-brand-logo-file');
@@ -1264,6 +1262,30 @@
 
         if (file.size > 10 * 1024 * 1024) {
           showToast('❌ Ukuran file melebihi batas 10 MB.');
+          fileInputLogo.value = '';
+          return;
+        }
+
+        // Immediate optimistic preview before crop editor opens
+        (function (f) {
+          var r = new FileReader();
+          r.onload = function (ev) {
+            if ($('brand-logo-preview')) { $('brand-logo-preview').src = ev.target.result; $('brand-logo-preview').style.display = 'block'; }
+            if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
+            if ($('set-profile-logo-preview')) { $('set-profile-logo-preview').src = ev.target.result; $('set-profile-logo-preview').style.display = 'block'; }
+            if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
+            if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = ev.target.result;
+          };
+          r.readAsDataURL(f);
+        })(file);
+
+        if (!XentraCropEditor || typeof XentraCropEditor.open !== 'function') {
+          // Crop editor not available — upload directly
+          (function (f) {
+            var r = new FileReader();
+            r.onload = function (ev) { doUploadBrandLogo(f, null, ev.target.result, btnPickLogo); };
+            r.readAsDataURL(f);
+          })(file);
           fileInputLogo.value = '';
           return;
         }
@@ -1442,6 +1464,24 @@
           return;
         }
 
+        // Immediate optimistic preview
+        (function (f) {
+          var r = new FileReader();
+          r.onload = function (ev) {
+            if ($('brand-tab-merchant-icon-preview')) { $('brand-tab-merchant-icon-preview').src = ev.target.result; $('brand-tab-merchant-icon-preview').style.display = 'block'; }
+            if ($('set-profile-merchant-icon-preview')) { $('set-profile-merchant-icon-preview').src = ev.target.result; $('set-profile-merchant-icon-preview').style.display = 'block'; }
+          };
+          r.readAsDataURL(f);
+        })(file);
+
+        if (!XentraCropEditor || typeof XentraCropEditor.open !== 'function') {
+          doUploadPwaLauncherIcon(file, '/admin/brand/merchant-icon',
+            $('brand-tab-merchant-icon-preview'), $('brand-tab-merchant-icon'),
+            btnRemoveBrandTabMerchant, btnPickBrandTabMerchant);
+          fileInputBrandTabMerchant.value = '';
+          return;
+        }
+
         XentraCropEditor.open({
           source: file,
           assetType: 'logo',
@@ -1449,7 +1489,11 @@
           title: 'Potong Icon Merchant/Owner PWA (1:1)',
           onConfirm: async function (cropSpec, previewDataUrl) {
             try {
-              await doUploadPwaLauncherIcon(file, cropSpec, previewDataUrl, btnPickBrandTabMerchant, 'merchant');
+              if ($('brand-tab-merchant-icon-preview') && previewDataUrl) { $('brand-tab-merchant-icon-preview').src = previewDataUrl; }
+              if ($('set-profile-merchant-icon-preview') && previewDataUrl) { $('set-profile-merchant-icon-preview').src = previewDataUrl; }
+              await doUploadPwaLauncherIcon(file, '/admin/brand/merchant-icon',
+                $('brand-tab-merchant-icon-preview'), $('brand-tab-merchant-icon'),
+                btnRemoveBrandTabMerchant, btnPickBrandTabMerchant);
               loadBrandSettings();
             } finally {
               fileInputBrandTabMerchant.value = '';
@@ -1457,12 +1501,10 @@
           },
           onCancel: async function () {
             try {
-              var reader = new FileReader();
-              reader.onload = function (ev) {
-                doUploadPwaLauncherIcon(file, null, ev.target.result, btnPickBrandTabMerchant, 'merchant');
-                loadBrandSettings();
-              };
-              reader.readAsDataURL(file);
+              await doUploadPwaLauncherIcon(file, '/admin/brand/merchant-icon',
+                $('brand-tab-merchant-icon-preview'), $('brand-tab-merchant-icon'),
+                btnRemoveBrandTabMerchant, btnPickBrandTabMerchant);
+              loadBrandSettings();
             } catch (_) {}
             fileInputBrandTabMerchant.value = '';
           }
@@ -1514,6 +1556,24 @@
           return;
         }
 
+        // Immediate optimistic preview
+        (function (f) {
+          var r = new FileReader();
+          r.onload = function (ev) {
+            if ($('brand-tab-pos-icon-preview')) { $('brand-tab-pos-icon-preview').src = ev.target.result; $('brand-tab-pos-icon-preview').style.display = 'block'; }
+            if ($('set-profile-pos-icon-preview')) { $('set-profile-pos-icon-preview').src = ev.target.result; $('set-profile-pos-icon-preview').style.display = 'block'; }
+          };
+          r.readAsDataURL(f);
+        })(file);
+
+        if (!XentraCropEditor || typeof XentraCropEditor.open !== 'function') {
+          doUploadPwaLauncherIcon(file, '/admin/brand/pos-icon',
+            $('brand-tab-pos-icon-preview'), $('brand-tab-pos-icon'),
+            btnRemoveBrandTabPos, btnPickBrandTabPos);
+          fileInputBrandTabPos.value = '';
+          return;
+        }
+
         XentraCropEditor.open({
           source: file,
           assetType: 'logo',
@@ -1521,7 +1581,11 @@
           title: 'Potong Icon POS PWA (1:1)',
           onConfirm: async function (cropSpec, previewDataUrl) {
             try {
-              await doUploadPwaLauncherIcon(file, cropSpec, previewDataUrl, btnPickBrandTabPos, 'pos');
+              if ($('brand-tab-pos-icon-preview') && previewDataUrl) { $('brand-tab-pos-icon-preview').src = previewDataUrl; }
+              if ($('set-profile-pos-icon-preview') && previewDataUrl) { $('set-profile-pos-icon-preview').src = previewDataUrl; }
+              await doUploadPwaLauncherIcon(file, '/admin/brand/pos-icon',
+                $('brand-tab-pos-icon-preview'), $('brand-tab-pos-icon'),
+                btnRemoveBrandTabPos, btnPickBrandTabPos);
               loadBrandSettings();
             } finally {
               fileInputBrandTabPos.value = '';
@@ -1529,12 +1593,10 @@
           },
           onCancel: async function () {
             try {
-              var reader = new FileReader();
-              reader.onload = function (ev) {
-                doUploadPwaLauncherIcon(file, null, ev.target.result, btnPickBrandTabPos, 'pos');
-                loadBrandSettings();
-              };
-              reader.readAsDataURL(file);
+              await doUploadPwaLauncherIcon(file, '/admin/brand/pos-icon',
+                $('brand-tab-pos-icon-preview'), $('brand-tab-pos-icon'),
+                btnRemoveBrandTabPos, btnPickBrandTabPos);
+              loadBrandSettings();
             } catch (_) {}
             fileInputBrandTabPos.value = '';
           }
@@ -9608,6 +9670,29 @@
             return;
           }
 
+          // Immediate optimistic preview before crop editor opens
+          (function (f) {
+            var r = new FileReader();
+            r.onload = function (ev) {
+              if ($('set-profile-logo-preview')) { $('set-profile-logo-preview').src = ev.target.result; $('set-profile-logo-preview').style.display = 'block'; }
+              if ($('set-profile-logo-empty')) $('set-profile-logo-empty').style.display = 'none';
+              if ($('brand-logo-preview')) { $('brand-logo-preview').src = ev.target.result; $('brand-logo-preview').style.display = 'block'; }
+              if ($('brand-logo-empty')) $('brand-logo-empty').style.display = 'none';
+              if ($('dash-sidebar-logo')) $('dash-sidebar-logo').src = ev.target.result;
+            };
+            r.readAsDataURL(f);
+          })(file);
+
+          if (!XentraCropEditor || typeof XentraCropEditor.open !== 'function') {
+            (function (f) {
+              var r = new FileReader();
+              r.onload = function (ev) { doUploadBrandLogo(f, null, ev.target.result, btnPick); };
+              r.readAsDataURL(f);
+            })(file);
+            fileInput.value = '';
+            return;
+          }
+
           XentraCropEditor.open({
             source: file,
             assetType: 'logo',
@@ -9773,11 +9858,16 @@
         }
         rawHex = rawHex.toUpperCase();
 
+        var merchantPwaVal = ($('set-profile-merchant-icon') && $('set-profile-merchant-icon').value.trim()) || null;
+        var posPwaVal = ($('set-profile-pos-icon') && $('set-profile-pos-icon').value.trim()) || null;
+
         var payload = {
           name: $('set-profile-name').value.trim(),
           tagline: $('set-profile-tagline').value.trim(),
           logo_url: $('set-profile-logo').value.trim(),
-          primary_color: rawHex
+          primary_color: rawHex,
+          merchant_pwa_icon_url: merchantPwaVal,
+          pos_pwa_icon_url: posPwaVal
         };
 
         var res = await adminFetch(API_BASE + '/admin/settings/business/profile', {
