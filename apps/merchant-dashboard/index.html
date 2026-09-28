@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.0">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.1">
 </head>
 <body>
 
@@ -188,26 +188,25 @@
         <!-- Mobile Owner Command Center (Visible on Mobile <= 768px) -->
         <div class="x-owner-command-center" id="x-owner-command-center">
 
-          <!-- 1. Periode Selector & Form Sejajar -->
+          <!-- 1. Periode Selector & Form Sejajar (Single Row) -->
           <div class="x-occ-period-bar">
             <div class="x-occ-filter-row">
               <div class="x-occ-period-selector-wrap">
-                <svg class="x-occ-calendar-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <svg class="x-occ-calendar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                 <select id="occ-period-select" class="x-occ-period-select" aria-label="Pilih Preset Periode">
                   <option value="today" selected>Hari ini</option>
                   <option value="7d">7 hari</option>
                   <option value="30d">30 hari</option>
                   <option value="month">Bulan ini</option>
                   <option value="all">Semua Waktu</option>
+                  <option value="custom">Kustom</option>
                 </select>
                 <svg class="x-occ-chevron-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </div>
-              <div class="x-occ-custom-range-wrap">
-                <input type="date" id="occ-start-date" class="x-occ-date-input" aria-label="Dari tanggal">
-                <span class="x-occ-range-sep">s/d</span>
-                <input type="date" id="occ-end-date" class="x-occ-date-input" aria-label="Sampai tanggal">
-                <button type="button" id="btn-occ-search" class="x-occ-search-btn">Cari</button>
-              </div>
+              <input type="date" id="occ-start-date" class="x-occ-date-input" aria-label="Dari tanggal">
+              <span class="x-occ-range-sep">s/d</span>
+              <input type="date" id="occ-end-date" class="x-occ-date-input" aria-label="Sampai tanggal">
+              <button type="button" id="btn-occ-search" class="x-occ-search-btn">Cari</button>
             </div>
           </div>
 
@@ -4146,6 +4145,6 @@
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.12"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.13"></script>
 </body>
 </html>

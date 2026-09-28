@@ -3670,6 +3670,8 @@
   }
 
   async function loadOverview() {
+    var occHero = $('occ-hero-card');
+    if (occHero) occHero.style.opacity = '0.6';
     try {
       var branchId = getEffectiveBranchId();
       var queryParams = [];
@@ -3700,6 +3702,8 @@
     } catch (e) {
       console.warn('[Overview Load Error]:', e);
       renderOverviewEmpty();
+    } finally {
+      if (occHero) occHero.style.opacity = '1';
     }
   }
 
@@ -3834,6 +3838,11 @@
       var m = String(d.getMonth() + 1).padStart(2, '0');
       var day = String(d.getDate()).padStart(2, '0');
       return y + '-' + m + '-' + day;
+    }
+
+    if (preset === 'custom') {
+      _overviewFilter.preset = 'custom';
+      return;
     }
 
     if (preset === 'today') {
@@ -4136,6 +4145,7 @@
       _overviewFilter.startDate = sVal;
       _overviewFilter.endDate = eVal;
       _overviewFilter.preset = 'custom';
+      if (occSelect) occSelect.value = 'custom';
       if (inputStart) inputStart.value = sVal;
       if (inputEnd) inputEnd.value = eVal;
       loadOverview();
@@ -8449,6 +8459,7 @@
     initMobileSidebar();
     initBranchContextSelector();
     initOwnerBottomNav();
+    initOverviewControls();
 
     // Workforce form submit
     var formUser = $('form-user');

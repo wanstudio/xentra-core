@@ -4831,19 +4831,28 @@ input[type="file"].x-input,
     padding: 4px 0 20px;
   }
 
-  /* 1. Periode Selector & Form Sejajar */
+  /* 1. Periode Selector & Form Sejajar (Single Row) */
   .x-occ-period-bar {
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 14px;
-    padding: 10px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    padding: 8px 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .x-occ-period-bar::-webkit-scrollbar {
+    display: none;
   }
   .x-occ-filter-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
+    gap: 6px;
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+    width: 100%;
+    min-width: 0;
   }
   .x-occ-period-selector-wrap {
     position: relative;
@@ -4852,12 +4861,14 @@ input[type="file"].x-input,
     background: #f8fafc;
     border: 1px solid #cbd5e1;
     border-radius: 10px;
-    padding: 6px 10px;
+    padding: 0 24px 0 10px;
+    height: 42px;
     gap: 6px;
     flex-shrink: 0;
+    box-sizing: border-box;
   }
   .x-occ-calendar-icon {
-    color: #64748b;
+    color: #475569;
     flex-shrink: 0;
   }
   .x-occ-period-select {
@@ -4865,12 +4876,13 @@ input[type="file"].x-input,
     -webkit-appearance: none;
     background: transparent;
     border: none;
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 700;
     color: #0f172a;
-    padding-right: 18px;
     cursor: pointer;
     outline: none;
+    height: 100%;
+    padding: 0;
   }
   .x-occ-chevron-icon {
     position: absolute;
@@ -4878,50 +4890,50 @@ input[type="file"].x-input,
     color: #64748b;
     pointer-events: none;
   }
-  .x-occ-custom-range-wrap {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    flex: 1 1 auto;
-    min-width: 0;
-  }
   .x-occ-date-input {
     border: 1px solid #cbd5e1;
-    border-radius: 8px;
+    border-radius: 10px;
     background: #ffffff;
-    padding: 5px 6px;
-    font-size: 11.5px;
+    padding: 0 8px;
+    font-size: 12.5px;
     font-weight: 600;
     color: #0f172a;
-    flex: 1 1 auto;
-    min-width: 0;
-    max-width: 135px;
+    height: 42px;
+    flex: 1 1 110px;
+    min-width: 95px;
+    max-width: 140px;
     outline: none;
+    box-sizing: border-box;
   }
   .x-occ-date-input:focus {
     border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
   }
   .x-occ-range-sep {
-    font-size: 11.5px;
+    font-size: 12px;
     color: #64748b;
-    font-weight: 600;
+    font-weight: 700;
     flex-shrink: 0;
+    padding: 0 1px;
   }
   .x-occ-search-btn {
     background: #2563eb;
     color: #ffffff;
     border: none;
-    border-radius: 8px;
-    padding: 6px 14px;
-    font-size: 12px;
+    border-radius: 10px;
+    height: 42px;
+    padding: 0 16px;
+    font-size: 13px;
     font-weight: 700;
     cursor: pointer;
     flex-shrink: 0;
+    box-sizing: border-box;
     -webkit-tap-highlight-color: transparent;
-    transition: background 0.12s ease;
+    transition: background 0.15s ease, transform 0.1s ease;
   }
   .x-occ-search-btn:active {
     background: #1d4ed8;
+    transform: scale(0.97);
   }
 
   /* 2. Hero KPI Card */
