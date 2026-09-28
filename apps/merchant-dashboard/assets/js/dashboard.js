@@ -654,14 +654,38 @@
 
     _branchContextState.branches = scopedBranches;
 
-    // Rebuild options
-    sel.innerHTML = '<option value="all">All Branches</option>';
+    // Rebuild native select options
+    sel.innerHTML = '<option value="all">Semua Cabang</option>';
     (_branchContextState.branches).forEach(function (b) {
       var opt = document.createElement('option');
       opt.value = b.id;
       opt.textContent = b.name;
       sel.appendChild(opt);
     });
+
+    // Rebuild custom inline dropdown menu items
+    var menu = $('branch-dropdown-menu');
+    if (menu) {
+      menu.innerHTML = '';
+      var allOpt = document.createElement('button');
+      allOpt.type = 'button';
+      allOpt.className = 'x-branch-dropdown-item';
+      allOpt.setAttribute('role', 'option');
+      allOpt.dataset.value = 'all';
+      allOpt.innerHTML = '<span>Semua Cabang</span><svg class="x-branch-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+      menu.appendChild(allOpt);
+      (_branchContextState.branches).forEach(function (b) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'x-branch-dropdown-item';
+        btn.setAttribute('role', 'option');
+        btn.dataset.value = String(b.id);
+        btn.innerHTML = '<span>' + b.name + '</span><svg class="x-branch-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        menu.appendChild(btn);
+      });
+      updateBranchDropdownActive(sel.value || 'all');
+      wirebranchDropdownItems();
+    }
 
     // Restore previous selection if still valid
     if (user && user.role === 'branch_manager' && user.branch_id) {
@@ -690,11 +714,73 @@
     }
   }
 
+  function updateBranchDropdownActive(value) {
+    var label = $('branch-current-label');
+    var menu = $('branch-dropdown-menu');
+    if (!menu) return;
+    var items = menu.querySelectorAll('.x-branch-dropdown-item');
+    items.forEach(function (btn) {
+      var isActive = btn.dataset.value === String(value);
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      if (isActive && label) {
+        label.textContent = btn.querySelector('span') ? btn.querySelector('span').textContent : btn.textContent;
+      }
+    });
+  }
+
+  function wirebranchDropdownItems() {
+    var menu = $('branch-dropdown-menu');
+    var sel = $('dash-branch-context');
+    var wrapper = $('x-branch-selector');
+    if (!menu) return;
+    menu.querySelectorAll('.x-branch-dropdown-item').forEach(function (btn) {
+      // Remove previous listeners by replacing node
+      var fresh = btn.cloneNode(true);
+      btn.parentNode.replaceChild(fresh, btn);
+      fresh.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var val = this.dataset.value;
+        // Close dropdown
+        if (wrapper) wrapper.classList.remove('open');
+        var trigger = $('btn-branch-trigger');
+        if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        // Sync native select
+        if (sel) {
+          sel.value = val;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        updateBranchDropdownActive(val);
+      });
+    });
+  }
+
   function initBranchContextSelector() {
     var sel = $('dash-branch-context');
     if (!sel) return;
+
+    // Custom dropdown trigger
+    var trigger = $('btn-branch-trigger');
+    var wrapper = $('x-branch-selector');
+    if (trigger && wrapper) {
+      trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var isOpen = wrapper.classList.contains('open');
+        wrapper.classList.toggle('open', !isOpen);
+        trigger.setAttribute('aria-expanded', !isOpen ? 'true' : 'false');
+      });
+      document.addEventListener('click', function (e) {
+        if (wrapper.classList.contains('open') && !wrapper.contains(e.target)) {
+          wrapper.classList.remove('open');
+          trigger.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
+    // Native select change handler (fired both by custom items and any programmatic changes)
     sel.addEventListener('change', function () {
       _branchContextState.selected = sel.value;
+      updateBranchDropdownActive(sel.value);
       var curRoute = getCurrentRoute();
       var tabOverview = $('tab-overview');
       var isOverviewTabActive = tabOverview && tabOverview.classList.contains('active');
@@ -3882,6 +3968,23 @@
       periodSelect.value = preset;
     }
 
+    // Update custom inline dropdown trigger label and active item
+    var occLabel = $('occ-period-current-label');
+    if (occLabel) {
+      var presetLabels = {
+        'today': 'Hari ini',
+        '7d': '7 hari',
+        '30d': '30 hari',
+        'custom': 'Kustom'
+      };
+      occLabel.textContent = presetLabels[preset] || 'Pilih periode';
+    }
+    document.querySelectorAll('.x-occ-dropdown-item').forEach(function (btn) {
+      var isActive = btn.dataset.value === preset;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
     if (!skipReload) {
       loadOverview();
     }
@@ -4162,14 +4265,83 @@
     var occStart = $('occ-start-date');
     var occEnd = $('occ-end-date');
     var btnOccSearch = $('btn-occ-search');
+    var occDropdown = $('occ-period-dropdown');
+    var btnOccDropdownTrigger = $('btn-occ-dropdown-trigger');
+    var occDateSheet = $('occ-date-sheet');
+    var occDateSheetOverlay = $('occ-date-sheet-overlay');
     var btnOccCustomToggle = $('btn-occ-custom-toggle');
     var occCustomRange = $('occ-custom-range-row');
 
-    function setOccCustomOpen(open) {
-      if (occCustomRange) occCustomRange.hidden = !open;
+    function toggleOccDropdown(forceOpen) {
+      if (!occDropdown) return;
+      var isOpen = typeof forceOpen === 'boolean' ? forceOpen : !occDropdown.classList.contains('open');
+      occDropdown.classList.toggle('open', isOpen);
+      if (btnOccDropdownTrigger) {
+        btnOccDropdownTrigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      }
+    }
+
+    if (btnOccDropdownTrigger) {
+      btnOccDropdownTrigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        toggleOccDropdown();
+      });
+    }
+
+    document.querySelectorAll('.x-occ-dropdown-item').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var val = this.dataset.value;
+        toggleOccDropdown(false);
+        if (occSelect) {
+          occSelect.value = val;
+        }
+        setOccCustomOpen(false);
+        setOverviewPeriodPreset(val);
+      });
+    });
+
+    document.addEventListener('click', function (e) {
+      if (occDropdown && occDropdown.classList.contains('open') && !occDropdown.contains(e.target)) {
+        toggleOccDropdown(false);
+      }
+    });
+
+    window.openOccDateSheet = function () {
+      if (occCustomRange) occCustomRange.hidden = false;
       if (btnOccCustomToggle) {
-        btnOccCustomToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-        btnOccCustomToggle.textContent = open ? 'Tutup' : 'Pilih tanggal';
+        btnOccCustomToggle.setAttribute('aria-expanded', 'true');
+      }
+      if (occDateSheetOverlay) {
+        occDateSheetOverlay.style.display = 'block';
+        setTimeout(function () { occDateSheetOverlay.classList.add('open'); }, 10);
+      }
+      if (occDateSheet) {
+        occDateSheet.style.display = 'block';
+        setTimeout(function () { occDateSheet.classList.add('open'); }, 10);
+      }
+    };
+
+    window.closeOccDateSheet = function () {
+      if (occCustomRange) occCustomRange.hidden = true;
+      if (btnOccCustomToggle) {
+        btnOccCustomToggle.setAttribute('aria-expanded', 'false');
+      }
+      if (occDateSheetOverlay) {
+        occDateSheetOverlay.classList.remove('open');
+        setTimeout(function () { occDateSheetOverlay.style.display = 'none'; }, 260);
+      }
+      if (occDateSheet) {
+        occDateSheet.classList.remove('open');
+        setTimeout(function () { occDateSheet.style.display = 'none'; }, 280);
+      }
+    };
+
+    function setOccCustomOpen(open) {
+      if (open) {
+        window.openOccDateSheet();
+      } else {
+        window.closeOccDateSheet();
       }
     }
 
@@ -4182,7 +4354,8 @@
 
     if (btnOccCustomToggle) {
       btnOccCustomToggle.addEventListener('click', function () {
-        setOccCustomOpen(!occCustomRange || occCustomRange.hidden);
+        var isOpen = occDateSheet && occDateSheet.classList.contains('open');
+        setOccCustomOpen(!isOpen);
       });
     }
 
@@ -4196,6 +4369,14 @@
         occSelect.selectedIndex = -1;
         occSelect.value = '';
       }
+      var occLabel = $('occ-period-current-label');
+      if (occLabel) {
+        occLabel.textContent = 'Kustom';
+      }
+      document.querySelectorAll('.x-occ-dropdown-item').forEach(function (btn) {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-selected', 'false');
+      });
       if (inputStart) inputStart.value = sVal;
       if (inputEnd) inputEnd.value = eVal;
       setOccCustomOpen(false);

@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.7">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.9">
 </head>
 <body>
 
@@ -152,13 +152,19 @@
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
               <span id="topbar-brand-name">Bangjo Resto</span>
             </div>
-            <!-- Branch context selector -->
-            <div class="x-branch-selector" id="x-branch-selector">
-              <svg class="x-branch-pin-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-              <select id="dash-branch-context" class="x-branch-select" aria-label="Pilih cabang konteks">
+            <!-- Branch context selector — custom inline dropdown (no OS popup overlay) -->
+            <div class="x-branch-selector x-branch-dropdown" id="x-branch-selector">
+              <svg class="x-branch-pin-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+              <button type="button" class="x-branch-trigger" id="btn-branch-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Pilih cabang">
+                <span class="x-branch-current-label" id="branch-current-label">Semua Cabang</span>
+              </button>
+              <svg class="x-branch-chevron-icon" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              <!-- Dropdown menu (populated by JS) -->
+              <div class="x-branch-dropdown-menu" id="branch-dropdown-menu" role="listbox" aria-label="Pilih cabang"></div>
+              <!-- Native select preserved for JS state + test compatibility -->
+              <select id="dash-branch-context" class="x-branch-select" aria-label="Pilih cabang konteks" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden;">
                 <option value="all">Semua Cabang</option>
               </select>
-              <svg class="x-branch-chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </div>
           </div>
           <!-- Search entry point (disabled/hidden in Phase 4A until search API is available) -->
@@ -194,28 +200,69 @@
           <!-- 1. Periode Selector & Form Pencarian Tanggal (2 Rows) -->
           <div class="x-occ-period-bar">
             <div class="x-occ-preset-row">
-              <div class="x-occ-period-selector-wrap">
-                <svg class="x-occ-calendar-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                <select id="occ-period-select" class="x-occ-period-select" aria-label="Pilih periode dashboard">
-                  <option value="today" selected>Hari ini</option>
-                  <option value="7d">7 hari</option>
-                  <option value="30d">30 hari</option>
-                </select>
-                <svg class="x-occ-chevron-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              <!-- Custom Dropdown (Inline dropdown, bukan popup overlay OS) -->
+              <div class="x-occ-dropdown" id="occ-period-dropdown">
+                <button type="button" class="x-occ-dropdown-trigger" id="btn-occ-dropdown-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Pilih periode dashboard">
+                  <svg class="x-occ-calendar-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                  <span id="occ-period-current-label">Hari ini</span>
+                  <svg class="x-occ-chevron-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                <div class="x-occ-dropdown-menu" id="occ-period-menu" role="listbox" aria-label="Pilihan periode">
+                  <button type="button" class="x-occ-dropdown-item active" role="option" data-value="today" aria-selected="true">
+                    <span>Hari ini</span>
+                    <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </button>
+                  <button type="button" class="x-occ-dropdown-item" role="option" data-value="7d" aria-selected="false">
+                    <span>7 hari</span>
+                    <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </button>
+                  <button type="button" class="x-occ-dropdown-item" role="option" data-value="30d" aria-selected="false">
+                    <span>30 hari</span>
+                    <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </button>
+                </div>
+                <!-- Native select for test & state compatibility -->
+                <div class="x-occ-period-selector-wrap" style="position:absolute; opacity:0; pointer-events:none; width:1px; height:1px; overflow:hidden;">
+                  <select id="occ-period-select" class="x-occ-period-select" aria-label="Pilih periode dashboard">
+                    <option value="today" selected>Hari ini</option>
+                    <option value="7d">7 hari</option>
+                    <option value="30d">30 hari</option>
+                  </select>
+                </div>
               </div>
-              <button type="button" id="btn-occ-custom-toggle" class="x-occ-custom-toggle" aria-expanded="false" aria-controls="occ-custom-range-row">Pilih tanggal</button>
+              <button type="button" id="btn-occ-custom-toggle" class="x-occ-custom-toggle" aria-expanded="false" aria-controls="occ-date-sheet">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <span>Pilih tanggal</span>
+              </button>
             </div>
-            <div class="x-occ-custom-range-row" id="occ-custom-range-row" hidden>
-              <label class="x-occ-date-field">
-                <span>Dari</span>
-                <input type="date" id="occ-start-date" class="x-occ-date-input" aria-label="Dari tanggal">
-              </label>
-              <span class="x-occ-range-sep" aria-hidden="true">s/d</span>
-              <label class="x-occ-date-field">
-                <span>Sampai</span>
-                <input type="date" id="occ-end-date" class="x-occ-date-input" aria-label="Sampai tanggal">
-              </label>
-              <button type="button" id="btn-occ-search" class="x-occ-search-btn">Terapkan</button>
+          </div>
+
+          <!-- Bottom Sheet: Pick Calendar Rentang Tanggal (Muncul dari bawah) -->
+          <div class="x-bottom-sheet-overlay" id="occ-date-sheet-overlay" style="display:none;" onclick="closeOccDateSheet()"></div>
+          <div class="x-bottom-sheet" id="occ-date-sheet" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="occ-sheet-title">
+            <div class="x-bottom-sheet-handle"></div>
+            <div class="x-bottom-sheet-header">
+              <div class="x-bottom-sheet-title-wrap">
+                <h3 class="x-bottom-sheet-title" id="occ-sheet-title">Pilih Rentang Tanggal</h3>
+                <p class="x-bottom-sheet-subtitle">Pilih tanggal awal dan akhir transaksi</p>
+              </div>
+              <button type="button" class="x-bottom-sheet-close" onclick="closeOccDateSheet()" aria-label="Tutup">✕</button>
+            </div>
+            <div class="x-bottom-sheet-body">
+              <div class="x-occ-custom-range-row" id="occ-custom-range-row" hidden>
+                <div class="x-occ-date-inputs-wrap">
+                  <label class="x-occ-date-field">
+                    <span class="x-occ-date-label">Dari</span>
+                    <input type="date" id="occ-start-date" class="x-occ-date-input" aria-label="Dari tanggal">
+                  </label>
+                  <span class="x-occ-range-sep" aria-hidden="true">s/d</span>
+                  <label class="x-occ-date-field">
+                    <span class="x-occ-date-label">Sampai</span>
+                    <input type="date" id="occ-end-date" class="x-occ-date-input" aria-label="Sampai tanggal">
+                  </label>
+                </div>
+                <button type="button" id="btn-occ-search" class="x-occ-search-btn">Cari</button>
+              </div>
             </div>
           </div>
 
@@ -4228,6 +4275,6 @@
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.19"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.21"></script>
 </body>
 </html>
