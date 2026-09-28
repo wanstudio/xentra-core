@@ -125,6 +125,18 @@
       detailAdd.addEventListener('click', function () { openBMAddCatalogModal(); });
     }
 
+    Array.prototype.forEach.call(document.querySelectorAll('[data-menu-category-status]'), function (tab) {
+      if (tab.dataset.bound) return;
+      tab.dataset.bound = '1';
+      tab.addEventListener('click', function () {
+        Array.prototype.forEach.call(document.querySelectorAll('[data-menu-category-status]'), function (x) {
+          x.classList.toggle('is-active', x === tab);
+        });
+        _bmMenuState.categoryStatusFilter = tab.getAttribute('data-menu-category-status') || 'active';
+        renderBMMenuCategoriesBar();
+      });
+    });
+
     var search = $('bm-menu-search');
     if (search && !search.dataset.bound) {
       search.dataset.bound = '1';
@@ -143,18 +155,6 @@
   } else {
     bindBMMenuHierarchy();
   }
-
-  Array.prototype.forEach.call(document.querySelectorAll('[data-menu-category-status]'), function (tab) {
-    if (tab.dataset.bound) return;
-    tab.dataset.bound = '1';
-    tab.addEventListener('click', function () {
-      Array.prototype.forEach.call(document.querySelectorAll('[data-menu-category-status]'), function (x) {
-        x.classList.toggle('is-active', x === tab);
-      });
-      _bmMenuState.categoryStatusFilter = tab.getAttribute('data-menu-category-status') || 'active';
-      renderBMMenuCategoriesBar();
-    });
-  });
 
   async function loadBMMenu() {
     var branchId = getBMTargetBranchId();
@@ -304,7 +304,7 @@
       }).length;
 
       return '<div class="x-menu-category-row" data-category-id="' + esc(cat.id) + '">' +
-        '<button type="button" class="x-menu-category-main">' +
+        '<div class="x-menu-category-main" role="button" tabindex="0">' +
           '<span class="x-menu-category-copy">' +
             '<strong>' + esc(cat.name) + '</strong>' +
             '<small>' + count + ' menu</small>' +
@@ -325,6 +325,12 @@
       var main = row.querySelector('.x-menu-category-main');
       if (main) {
         main.addEventListener('click', function () { window.openBMMenuCategoryDetail(catId); });
+        main.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            window.openBMMenuCategoryDetail(catId);
+          }
+        });
       }
       var edit = row.querySelector('.x-menu-category-edit');
       if (edit && cat) {
