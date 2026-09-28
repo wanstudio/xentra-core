@@ -28,6 +28,7 @@
 
 *, *::before, *::after {
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
@@ -39,6 +40,7 @@ html, body {
   color: var(--text-main);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
   width: 100%;
   max-width: 100%;
   overflow-x: clip;
@@ -46,6 +48,19 @@ html, body {
 
 input, button, select, textarea, optgroup {
   font-family: inherit;
+}
+
+button, a, input, select, textarea, label, summary, [role="button"], [tabindex] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Remove default browser tap highlight and click focus ring for mouse/touch */
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible),
+.x-btn:focus:not(:focus-visible),
+.x-tab-btn:focus:not(:focus-visible) {
+  outline: none;
 }
 
 .x-dash-layout,
@@ -5289,6 +5304,8 @@ input[type="file"].x-input,
     box-shadow: 0 2px 10px rgba(0,0,0,0.12);
     color: #334155;
     padding: 0;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
     transition: background 0.15s ease;
   }
   .x-bottom-sheet-ext-close.open {
@@ -5362,6 +5379,8 @@ input[type="file"].x-input,
     color: #64748b;
     cursor: pointer;
     padding: 0;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
     transition: background 0.15s ease, color 0.15s ease;
   }
   .x-bottom-sheet-close:hover {
@@ -5592,6 +5611,8 @@ input[type="file"].x-input,
     font-weight: 700;
     color: #475569;
     text-decoration: none;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
     transition: color 0.15s ease, transform 0.15s ease;
   }
   .x-occ-card-link:hover {
@@ -5877,6 +5898,8 @@ input[type="file"].x-input,
     font-weight: 700;
     padding: 0 14px;
     cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .x-occ-custom-toggle {
@@ -6109,8 +6132,19 @@ input[type="file"].x-input,
   .x-occ-search-btn:focus-visible,
   .x-occ-period-select:focus-visible,
   .x-occ-date-input:focus-visible {
-    outline: 3px solid rgba(37,99,235,.35);
+    outline: 2px solid #94a3b8;
     outline-offset: 2px;
+  }
+
+  /* Suppress outline when clicked or tapped */
+  .x-owner-nav-item:focus:not(:focus-visible),
+  .x-occ-quick-chip:focus:not(:focus-visible),
+  .x-occ-card-link:focus:not(:focus-visible),
+  .x-occ-custom-toggle:focus:not(:focus-visible),
+  .x-occ-search-btn:focus:not(:focus-visible),
+  .x-occ-period-select:focus:not(:focus-visible),
+  .x-occ-date-input:focus:not(:focus-visible) {
+    outline: none;
   }
 
   .x-owner-nav-item {

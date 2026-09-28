@@ -9765,7 +9765,6 @@
 
       // Initial data fetch if authenticated
       loadBrandSettings();
-      initOverviewControls();
       initReportsControls();
       if (isAuth) {
         loadCatalog();
