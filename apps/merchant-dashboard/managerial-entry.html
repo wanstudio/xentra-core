@@ -58,7 +58,7 @@
         if (role === 'branch_manager' || role === 'manager') {
           window.location.replace('/merchant/' + window.location.hash);
         } else if (role === 'owner' || role === 'brand_manager') {
-          window.location.replace('/dashboard/' + window.location.hash);
+          window.location.replace('/owner/' + window.location.hash);
         } else {
           localStorage.removeItem('xentra_merchant_token');
           localStorage.removeItem('xentra_merchant_user');
