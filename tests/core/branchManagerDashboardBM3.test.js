@@ -570,6 +570,8 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
 
     assert.ok(html.includes('id="tab-bm-stok"'), 'Missing tab-bm-stok');
     assert.ok(html.includes('id="bm-stock-tbody"'), 'Missing bm-stock-tbody');
+    assert.ok(html.includes('id="bm-stock-stat-untracked"'), 'Missing untracked stock summary');
+    assert.ok(html.includes('Belum dilacak'), 'Missing explicit untracked stock label');
     assert.ok(html.includes('id="modal-bm-stock-adjust"'), 'Missing modal-bm-stock-adjust');
     assert.ok(html.includes('id="form-bm-stock-adjust"'), 'Missing form-bm-stock-adjust');
   });
