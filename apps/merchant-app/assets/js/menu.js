@@ -315,7 +315,7 @@
             '</div>' +
             '<svg class="x-menu-hub-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>' +
           '</span>' +
-        '</button>' +
+        '</div>' +
       '</div>';
     }).join('');
 
