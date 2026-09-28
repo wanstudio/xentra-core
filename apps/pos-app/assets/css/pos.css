@@ -1,4 +1,4 @@
-:root{--bg:#f8fafc;--panel:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#0f172a;--ok:#16a34a;--warn:#d97706;--danger:#dc2626}
+:root{color-scheme:light;--bg:#f8fafc;--panel:#fff;--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#0f172a;--ok:#16a34a;--warn:#d97706;--danger:#dc2626}
 *{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:'Plus Jakarta Sans',system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;letter-spacing:-0.01em}
 button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-height:100vh;display:flex;flex-direction:column}
 .pos-topbar{background:#0f172a;color:#fff;position:sticky;top:0;z-index:40;border-bottom:1px solid rgba(255,255,255,.09);box-shadow:0 6px 28px rgba(0,0,0,.28);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;width:100%;gap:16px;box-sizing:border-box}
@@ -169,7 +169,7 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
 .pos-action-sheet-btn.danger:hover{background:#fef2f2;border-color:#fca5a5}
 .pos-shift-card,.pos-shift-card-inner{padding:0;max-width:720px;background:transparent;border:none;box-shadow:none}.pos-shift-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}.pos-shift-metric{border:1px solid var(--line);border-radius:12px;padding:14px;background:#f8fafc}.pos-shift-metric span{display:block;color:var(--muted);font-size:11px;font-weight:600}.pos-shift-metric strong{display:block;margin-top:4px;font-size:18px;font-weight:800;color:var(--ink)}.pos-shift-actions{display:flex;gap:10px;flex-wrap:wrap}
 .pos-empty{padding:36px;text-align:center;color:var(--muted);font-size:13px}
-.pos-bottom-nav{position:fixed;left:0;right:0;bottom:0;height:70px;background:#ffffff;border-top:1px solid rgba(0,0,0,.08);display:grid;grid-template-columns:repeat(3,1fr);z-index:30;box-shadow:0 -4px 20px rgba(0,0,0,.04);backdrop-filter:blur(10px)}
+.pos-bottom-nav{position:fixed;left:0;right:0;bottom:0;height:calc(70px + env(safe-area-inset-bottom, 0px));padding-bottom:env(safe-area-inset-bottom, 0px);background:#ffffff;border-top:1px solid rgba(0,0,0,.08);display:grid;grid-template-columns:repeat(3,1fr);z-index:30;box-shadow:0 -4px 20px rgba(0,0,0,.04);backdrop-filter:blur(10px);box-sizing:border-box}
 .pos-bottom-nav button{border:0;background:transparent;color:#64748b;font-size:11px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;gap:4px;align-items:center;justify-content:center;position:relative;transition:all .15s ease;padding:6px 0;-webkit-tap-highlight-color:transparent}
 .pos-bottom-nav button .pos-nav-icon{color:#64748b;transition:transform .15s ease,color .15s ease}
 .pos-bottom-nav button:hover{color:#0f172a}
@@ -460,6 +460,7 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
   .pos-cart-actions .pos-btn{width:100%;min-width:0}
 }
 @media(max-width:767px){
+  html,body{background:#ffffff!important}
   /* Topbar mobile */
   .pos-topbar{display:grid!important;grid-template-columns:1fr auto!important;grid-template-rows:auto auto!important;row-gap:8px!important;column-gap:8px!important;padding:8px 12px!important;align-items:center!important}
   .pos-topbar-left{grid-row:1!important;grid-column:1!important;justify-self:start!important;display:flex!important;align-items:center!important;min-width:0!important;gap:8px!important}
@@ -510,7 +511,7 @@ button,input,select,textarea{font:inherit;font-family:inherit}.pos-shell{min-hei
   .pos-shift-close-top{height:34px!important;padding:0 12px!important;font-size:11px!important;border-radius:9px!important}
 
   /* Bottom Nav */
-  .pos-bottom-nav{height:62px}
+  .pos-bottom-nav{height:calc(62px + env(safe-area-inset-bottom, 0px))!important;padding-bottom:env(safe-area-inset-bottom, 0px)!important;background:#ffffff!important;box-sizing:border-box!important}
   .pos-bottom-nav button{font-size:10px;gap:2px}
   .pos-bottom-nav button .pos-nav-icon{width:18px;height:18px}
   .pos-mobile-br{display:block}

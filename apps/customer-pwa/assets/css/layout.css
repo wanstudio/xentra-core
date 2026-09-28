@@ -18,7 +18,8 @@
 
 html, body {
   font-family: var(--x-font);
-  background: var(--x-white);
+  color-scheme: light;
+  background: #ffffff !important;
   color: var(--x-text);
   -webkit-font-smoothing: antialiased;
 }

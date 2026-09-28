@@ -3,6 +3,7 @@
    ========================================================================== */
 
 :root {
+  color-scheme: light;
   --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --bg-app: #0f172a;
   --bg-sidebar: #1e293b;
@@ -4225,6 +4226,9 @@ input[type="file"].x-input,
 }
 
 @media (max-width: 768px) {
+  html, body {
+    background-color: #ffffff;
+  }
   body {
     padding-bottom: 78px;
   }
@@ -4712,7 +4716,7 @@ input[type="file"].x-input,
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 4px !important;
+    gap: 7px !important;
     padding: 2px 2px 0 !important;
     cursor: pointer !important;
     font-size: 11px !important;
@@ -4897,7 +4901,7 @@ input[type="file"].x-input,
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 4px !important;
+    gap: 7px !important;
     padding: 2px 2px 0 !important;
     cursor: pointer !important;
     font-size: 11px !important;

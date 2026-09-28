@@ -155,7 +155,20 @@ function getBaseTenantDomain(req) {
   return match ? match[1] : host;
 }
 
-const PWA_THEME_SCRIPT = '(function(){var color=' + JSON.stringify(PWA_THEME.surfaceColor) + ';var meta=document.querySelector(\'meta[name="theme-color"]\');if(!meta){meta=document.createElement(\'meta\');meta.setAttribute(\'name\',\'theme-color\');document.head.appendChild(meta);}meta.setAttribute(\'content\',color);})();';
+const PWA_THEME_SCRIPT = '(function(){var color=' + JSON.stringify(PWA_THEME.surfaceColor) + ';' +
+  'var meta=document.querySelector(\'meta[name="theme-color"]:not([media])\');' +
+  'if(!meta){meta=document.createElement(\'meta\');meta.setAttribute(\'name\',\'theme-color\');document.head.appendChild(meta);}' +
+  'meta.setAttribute(\'content\',color);' +
+  '[\'(prefers-color-scheme: light)\',\'(prefers-color-scheme: dark)\'].forEach(function(media){' +
+  'var m=document.querySelector(\'meta[name="theme-color"][media="\' + media + \'"]\');' +
+  'if(!m){m=document.createElement(\'meta\');m.setAttribute(\'name\',\'theme-color\');m.setAttribute(\'media\',media);document.head.appendChild(m);}' +
+  'm.setAttribute(\'content\',color);' +
+  '});' +
+  'var cs=document.querySelector(\'meta[name="color-scheme"]\');' +
+  'if(!cs){cs=document.createElement(\'meta\');cs.setAttribute(\'name\',\'color-scheme\');document.head.appendChild(cs);}' +
+  'cs.setAttribute(\'content\',\'light\');' +
+  'try{document.documentElement.style.colorScheme=\'light\';}catch(_){}' +
+  '})();';
 
 app.get('/pwa-theme.js', (req, res) => {
   res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
@@ -251,7 +264,7 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
   if (subType === 'pos') {
     const manifestPath = path.join(__dirname, '../apps/pos-app/manifest.json');
     try {
-      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
       data.id = '/';
       data.start_url = '/';
       data.scope = '/';
@@ -305,7 +318,7 @@ app.get(['/merchant-app/manifest.json', '/merchant/manifest.json'], async (req, 
   const manifestPath = path.join(__dirname, '../apps/merchant-app/manifest.json');
   if (isDedicatedSubdomain) {
     try {
-      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
       data.id = '/';
       data.start_url = '/merchant/';
       data.scope = '/';
@@ -347,7 +360,7 @@ app.get(['/pos/manifest.json', '/pos-app/manifest.json'], async (req, res) => {
   const manifestPath = path.join(__dirname, '../apps/pos-app/manifest.json');
   if (isDedicatedSubdomain) {
     try {
-      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
       data.id = '/';
       data.start_url = '/';
       data.scope = '/';

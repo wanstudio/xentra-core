@@ -2119,8 +2119,8 @@
    ══════════════════════════════════════════════════════════════ */
 .x-aux-page {
   min-height: 100vh;
-  background: #f8fafc;
-  padding-bottom: 60px;
+  background: #ffffff;
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
 }
 
 .x-aux-header {
