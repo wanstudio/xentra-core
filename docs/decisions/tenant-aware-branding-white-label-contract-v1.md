@@ -239,3 +239,18 @@ Related Notion pages:
 - Workforce Invitation Email — Client-First Branding v1
 
 **Final locked rule:** Xentra is the platform and default brand. Tenant branding is a tenant-scoped override. White-label is a tenant branding mode, not a separate application architecture. Dedicated/VIP infrastructure does not create a separate tenant identity. biz.xentra.cloud is the Xentra Business Portal, while client domains remain direct tenant entry points and must never be routed through biz.xentra.cloud merely for branding.
+
+## 🔒 ADDENDUM — Installed PWA Identity Overrides v1
+
+**Decision date:** 2026-09-28
+
+Clarification based on direct source-code audit: the previous broad branding contract must not be interpreted as requiring Customer PWA, Merchant/Owner PWA, and POS PWA to share the same launcher icon or theme attributes.
+
+- Customer PWA keeps the existing Brand Logo + `primary_color` behavior.
+- Merchant/Owner PWA may have an optional installed-app icon/logo override.
+- POS PWA may have an optional installed-app icon/logo override.
+- Merchant/Owner UI and POS UI do not inherit Customer PWA `primary_color`.
+- These overrides exist only to distinguish installed applications on the device launcher.
+- They do not create separate brands, tenants, identities, RBAC systems, or product forks.
+
+Canonical detailed contract: `docs/decisions/installed-pwa-identity-overrides-v1.md`.
