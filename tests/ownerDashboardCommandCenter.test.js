@@ -137,7 +137,7 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
     assert.strictEqual(chips.length, 8,
       `Expected 8 quick access chips, got ${chips.length}`);
 
-    const expectedLabels = ['Menu', 'Stok', 'Cabang', 'Promo', 'Laporan', 'Pembayaran', 'Pelanggan', 'Tim &amp; Akses'];
+    const expectedLabels = ['Menu', 'Stok', 'Cabang', 'Promo', 'Laporan', 'Metode Bayar', 'Pelanggan', 'Tim &amp; Akses'];
     for (const label of expectedLabels) {
       assert.ok(occSection.includes(label),
         `Quick access chip "${label.replace('&amp;', '&')}" must exist in HTML`);
