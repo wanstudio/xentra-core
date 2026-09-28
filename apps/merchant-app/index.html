@@ -632,6 +632,16 @@
               <option value="unavailable">Tidak tersedia</option>
             </select>
           </div>
+
+          <!-- Ringkasan menu. menu.js sudah menulis ke ketiga id ini sejak awal, tetapi
+               elemennya hilang saat panel menu ditata ulang — akibatnya jumlah menu
+               tidak pernah tampil. Kelas ringkasan dipakai ulang agar tampilannya
+               konsisten dengan tab Stok, tanpa CSS baru. -->
+          <div class="x-stock-summary" aria-label="Ringkasan menu">
+            <div class="x-stock-summary-item"><span>Total</span><strong id="bm-menu-stat-total">0</strong></div>
+            <div class="x-stock-summary-item"><span>Tersedia</span><strong id="bm-menu-stat-available">0</strong></div>
+            <div class="x-stock-summary-item"><span>Tidak tersedia</span><strong id="bm-menu-stat-unavailable">0</strong></div>
+          </div>
         </div>
 
         <div class="x-card-panel x-menu-category-panel">
