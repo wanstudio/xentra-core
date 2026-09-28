@@ -6255,3 +6255,135 @@ input[type="file"].x-input,
   .x-owner-command-center { display: none !important; }
   .x-desktop-overview-view { display: block !important; }
 }
+
+
+/* ==========================================================================
+   OWNER MOBILE QUICK ACCESS — 2x4 native-app shortcut surface
+   ========================================================================== */
+@media (max-width: 768px) {
+  #occ-quick-access-section.x-occ-quick-access-card {
+    background: #ffffff !important;
+    border: 1px solid #e5e9ef !important;
+    border-radius: 18px !important;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.045) !important;
+    padding: 15px 14px 13px !important;
+  }
+
+  #occ-quick-access-section .x-occ-card-header {
+    min-height: 30px;
+    margin-bottom: 7px;
+    padding: 0 2px;
+  }
+
+  #occ-quick-access-section .x-occ-card-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #20262e;
+    letter-spacing: -.15px;
+  }
+
+  #occ-quick-access-section .x-occ-quick-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-height: 34px;
+    padding: 4px 2px 4px 7px;
+    border: 0;
+    background: transparent;
+    color: #198b3a;
+    font-size: 12.5px;
+    font-weight: 800;
+    cursor: pointer;
+    border-radius: 9px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #occ-quick-access-section .x-occ-quick-all:active {
+    background: #f0f8f1;
+  }
+
+  #occ-quick-access-section .x-occ-quick-all:focus-visible {
+    outline: 2px solid #94a3b8;
+    outline-offset: 2px;
+  }
+
+  #occ-quick-access-section .x-occ-quick-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 2px 3px !important;
+    width: 100%;
+  }
+
+  #occ-quick-access-section .x-occ-quick-chip {
+    min-height: 78px !important;
+    padding: 8px 3px 7px !important;
+    border: 0 !important;
+    border-radius: 13px !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #3b434d;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    cursor: pointer;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color .14s ease, transform .10s ease;
+  }
+
+  #occ-quick-access-section .x-occ-quick-chip:active {
+    background: #f6f8fa !important;
+    transform: scale(.98);
+  }
+
+  #occ-quick-access-section .x-occ-chip-icon {
+    width: 44px !important;
+    height: 44px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 44px !important;
+    font-size: 0 !important;
+  }
+
+  #occ-quick-access-section .x-occ-chip-icon svg {
+    display: block;
+    width: 44px;
+    height: 44px;
+    overflow: visible;
+  }
+
+  #occ-quick-access-section .x-occ-chip-label {
+    max-width: 100%;
+    font-size: 11px !important;
+    line-height: 1.18 !important;
+    font-weight: 700 !important;
+    color: #4a525c !important;
+    text-align: center;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  #occ-quick-access-section .x-occ-quick-chip:focus-visible {
+    outline: 2px solid #94a3b8;
+    outline-offset: -2px;
+  }
+}
+
+@media (min-width: 390px) and (max-width: 768px) {
+  #occ-quick-access-section .x-occ-quick-chip {
+    min-height: 82px !important;
+  }
+  #occ-quick-access-section .x-occ-chip-label {
+    font-size: 11.5px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #occ-quick-access-section .x-occ-quick-chip,
+  #occ-quick-access-section .x-occ-quick-all {
+    transition: none !important;
+  }
+}
