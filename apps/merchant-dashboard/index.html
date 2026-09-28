@@ -195,20 +195,27 @@
           <div class="x-occ-period-bar">
             <div class="x-occ-preset-row">
               <div class="x-occ-period-selector-wrap">
-                <svg class="x-occ-calendar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                <select id="occ-period-select" class="x-occ-period-select" aria-label="Pilih Preset Periode">
+                <svg class="x-occ-calendar-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                <select id="occ-period-select" class="x-occ-period-select" aria-label="Pilih periode dashboard">
                   <option value="today" selected>Hari ini</option>
                   <option value="7d">7 hari</option>
                   <option value="30d">30 hari</option>
                 </select>
-                <svg class="x-occ-chevron-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <svg class="x-occ-chevron-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
               </div>
+              <button type="button" id="btn-occ-custom-toggle" class="x-occ-custom-toggle" aria-expanded="false" aria-controls="occ-custom-range-row">Pilih tanggal</button>
             </div>
-            <div class="x-occ-custom-range-row">
-              <input type="date" id="occ-start-date" class="x-occ-date-input" aria-label="Dari tanggal">
-              <span class="x-occ-range-sep">s/d</span>
-              <input type="date" id="occ-end-date" class="x-occ-date-input" aria-label="Sampai tanggal">
-              <button type="button" id="btn-occ-search" class="x-occ-search-btn">Cari</button>
+            <div class="x-occ-custom-range-row" id="occ-custom-range-row" hidden>
+              <label class="x-occ-date-field">
+                <span>Dari</span>
+                <input type="date" id="occ-start-date" class="x-occ-date-input" aria-label="Dari tanggal">
+              </label>
+              <span class="x-occ-range-sep" aria-hidden="true">s/d</span>
+              <label class="x-occ-date-field">
+                <span>Sampai</span>
+                <input type="date" id="occ-end-date" class="x-occ-date-input" aria-label="Sampai tanggal">
+              </label>
+              <button type="button" id="btn-occ-search" class="x-occ-search-btn">Terapkan</button>
             </div>
           </div>
 
@@ -243,8 +250,8 @@
               <h3 class="x-occ-card-title" id="occ-branch-title">Performa Cabang</h3>
               <a href="#reports/branches" class="x-occ-card-link" id="occ-branch-link"><span>Lihat semua</span><svg class="x-occ-link-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></a>
             </div>
-            <div class="x-occ-card-body" id="occ-branch-content">
-              <div class="x-occ-empty-placeholder">Memuat data performa cabang...</div>
+            <div class="x-occ-card-body" id="occ-branch-content" aria-live="polite">
+              <div class="x-occ-loading-state"><span class="x-occ-skeleton x-occ-skeleton-line"></span><span class="x-occ-skeleton x-occ-skeleton-line short"></span></div>
             </div>
           </div>
 
@@ -282,8 +289,8 @@
               <h3 class="x-occ-card-title">Produk Terlaris</h3>
               <a href="#catalog/products" class="x-occ-card-link" id="occ-products-link"><span>Lihat semua</span><svg class="x-occ-link-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></a>
             </div>
-            <div class="x-occ-card-body" id="occ-products-content">
-              <div class="x-occ-empty-placeholder">Memuat data produk terlaris...</div>
+            <div class="x-occ-card-body" id="occ-products-content" aria-live="polite">
+              <div class="x-occ-loading-state"><span class="x-occ-skeleton x-occ-skeleton-line"></span><span class="x-occ-skeleton x-occ-skeleton-line short"></span></div>
             </div>
           </div>
 
@@ -306,24 +313,24 @@
               <h3 class="x-occ-card-title">Akses Cepat</h3>
             </div>
             <div class="x-occ-quick-grid">
-              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('catalog/products')" aria-label="Akses Cepat Produk">
-                <span class="x-occ-chip-icon">📦</span>
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('catalog/products')" aria-label="Buka Produk">
+                <span class="x-occ-chip-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16v13H4z"></path><path d="M8 7V4h8v3"></path></svg></span>
                 <span class="x-occ-chip-label">Produk</span>
               </button>
-              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('branches')" aria-label="Akses Cepat Cabang">
-                <span class="x-occ-chip-icon">🏬</span>
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('branches')" aria-label="Buka Cabang">
+                <span class="x-occ-chip-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10h16v10H4z"></path><path d="M3 10l2-6h14l2 6"></path><path d="M8 20v-5h8v5"></path></svg></span>
                 <span class="x-occ-chip-label">Cabang</span>
               </button>
-              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('marketing/promotions')" aria-label="Akses Cepat Promo">
-                <span class="x-occ-chip-icon">🏷️</span>
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('marketing/promotions')" aria-label="Buka Promo">
+                <span class="x-occ-chip-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 13l-7 7-9-9V4h7z"></path><circle cx="7.5" cy="7.5" r="1"></circle></svg></span>
                 <span class="x-occ-chip-label">Promo</span>
               </button>
-              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('payments')" aria-label="Akses Cepat Pembayaran">
-                <span class="x-occ-chip-icon">💳</span>
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('payments')" aria-label="Buka Pembayaran">
+                <span class="x-occ-chip-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M3 10h18"></path></svg></span>
                 <span class="x-occ-chip-label">Pembayaran</span>
               </button>
-              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('finance/overview')" aria-label="Akses Cepat Laporan">
-                <span class="x-occ-chip-icon">📊</span>
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('finance/overview')" aria-label="Buka Laporan">
+                <span class="x-occ-chip-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="M8 16v-5"></path><path d="M12 16V8"></path><path d="M16 16v-9"></path></svg></span>
                 <span class="x-occ-chip-label">Laporan</span>
               </button>
             </div>
@@ -3069,7 +3076,7 @@
 
       <!-- Owner Mobile Bottom Navigation (Exactly 5 modules: Beranda, Bisnis, Pesanan, Keuangan, Lainnya) -->
       <nav class="x-owner-bottom-nav" id="x-owner-bottom-nav" aria-label="Navigasi Utama Mobile Owner">
-        <button type="button" class="x-owner-nav-item active" data-tab-module="beranda" data-route="overview">
+        <button type="button" class="x-owner-nav-item active" data-tab-module="beranda" data-route="overview" aria-current="page">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
           <span>Beranda</span>
         </button>
