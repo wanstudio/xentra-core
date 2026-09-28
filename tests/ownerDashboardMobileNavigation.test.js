@@ -144,6 +144,15 @@ test('Owner Dashboard Mobile Navigation', async t => {
     assert.ok(html.includes('data-route="orders"'), 'Sidebar orders nav item must exist');
   });
 
+  await t.test('OWNER-MOB-13A: redundant sidebar close button is not rendered in Owner Dashboard', () => {
+    // Owner mobile drawer already has safe close paths via hamburger, overlay,
+    // navigation selection, Escape, and breakpoint handling. Keep the legacy
+    // close control out of the Owner DOM; the shared CSS/JS remains available
+    // for surfaces that still use the control.
+    assert.ok(!html.includes('id="btn-sidebar-close"'),
+      'Owner Dashboard must not render the redundant sidebar close button');
+  });
+
   // --------------------------------------------------------------------------
   // CSS
   // --------------------------------------------------------------------------
