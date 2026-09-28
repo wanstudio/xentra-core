@@ -38,8 +38,9 @@ async function tenantResolver(req, res, next) {
     const host = req.headers.host || '';
     const cleanHost = host.split(':')[0].trim().toLowerCase();
 
-    // xentra.cloud is the SaaS Control Plane surface (no tenant resolution needed for control-plane requests)
-    if (cleanHost === 'xentra.cloud') {
+    // xentra.cloud and biz.xentra.cloud are Xentra SaaS surfaces (Control Plane + Business Portal).
+    // Tenant/brand context is derived from the authenticated session in requireAuth, not the domain.
+    if (cleanHost === 'xentra.cloud' || cleanHost === 'biz.xentra.cloud') {
       // Check if an explicit tenant brand context was provided via headers or query (e.g. customer-pwa on xentra.cloud)
       const explicitSlug = req.headers['x-brand-slug'] || (req.query && req.query.brand_slug);
       const explicitBrandId = req.headers['x-brand-id'] || (req.query && req.query.brand_id);

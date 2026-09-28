@@ -654,6 +654,20 @@ function requireAuth(allowedRoles = []) {
     }
 
     // P1 TENANT & ORGANIZATION BOUNDARY ENFORCEMENT via Core Identity
+    // When the request comes from a portal surface (biz.xentra.cloud / xentra.cloud),
+    // tenantResolver passes through without setting req.brand_id.
+    // Resolve brand from the server-signed session so brand-scoped routes work.
+    if (!req.brand_id && session.brandId) {
+      try {
+        const sessionBrand = coreBrandRepo.findById(session.brandId);
+        if (sessionBrand) {
+          req.brand = sessionBrand;
+          req.brand_id = sessionBrand.id;
+          req.organization_id = sessionBrand.organization_id;
+        }
+      } catch (_) {}
+    }
+
     let isTenantAuthorized = session.brandId === req.brand_id;
     const isInvitationAcceptRoute = req.path === '/invitations/accept' || (req.originalUrl && req.originalUrl.includes('/invitations/accept'));
     if (isInvitationAcceptRoute) {

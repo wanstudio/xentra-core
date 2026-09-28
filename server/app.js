@@ -142,7 +142,7 @@ app.get(['/invite/:token', '/invite/:token/'], (req, res) => {
 function getRequestSubdomainType(req) {
   const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].trim().toLowerCase();
   if (host.startsWith('m.') || host.startsWith('merchant.')) return 'managerial';
-  if (host.startsWith('owner.') || host.startsWith('dashboard.')) return 'owner';
+  if (host.startsWith('owner.') || host.startsWith('dashboard.') || host === 'biz.xentra.cloud') return 'owner';
   if (host.startsWith('pos.') || host.startsWith('kasir.')) return 'pos';
   if (host.startsWith('customer.')) return 'customer';
   return null;
@@ -182,15 +182,13 @@ async function resolveBrandForManifest(req) {
  * Otherwise the default src values from the manifest file are used.
  */
 function buildPwaIcons(iconUrl, default192, default512) {
-  if (iconUrl) {
-    return [
-      { src: iconUrl, sizes: '192x192', type: 'image/png' },
-      { src: iconUrl, sizes: '512x512', type: 'image/png' }
-    ];
-  }
+  const src192 = iconUrl || default192;
+  const src512 = iconUrl || default512;
   return [
-    { src: default192, sizes: '192x192', type: 'image/png' },
-    { src: default512, sizes: '512x512', type: 'image/png' }
+    { src: src192, sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: src192, sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+    { src: src512, sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: src512, sizes: '512x512', type: 'image/png', purpose: 'maskable' }
   ];
 }
 
