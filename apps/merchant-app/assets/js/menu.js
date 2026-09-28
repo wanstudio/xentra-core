@@ -404,7 +404,7 @@
     /*
      * Keep dynamic actions out of inline HTML attributes.
      * Product objects can contain user-entered names/metadata; embedding them
-     * into onclick="..." is fragile because HTML escaping is not JavaScript
+     * into inline HTML handlers is fragile because HTML escaping is not JavaScript
      * escaping and can break the DOM attribute parser.
      */
     tbody.innerHTML = filtered.map(function (p, index) {
