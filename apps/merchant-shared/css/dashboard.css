@@ -1510,7 +1510,8 @@ input[type="file"].x-input,
 .x-branch-dropdown-menu {
   position: absolute;
   top: calc(100% + 10px);
-  right: 0;
+  left: 0;
+  right: auto;
   min-width: 200px;
   max-width: 280px;
   background: #ffffff;
@@ -5264,9 +5265,37 @@ input[type="file"].x-input,
     z-index: 1050;
     opacity: 0;
     transition: opacity 0.25s ease;
+    pointer-events: none;
   }
   .x-bottom-sheet-overlay.open {
     opacity: 1;
+    pointer-events: auto;
+  }
+  /* Floating X close button — rendered above sheet, outside modal box */
+  .x-bottom-sheet-ext-close {
+    position: fixed;
+    top: auto;
+    right: 16px;
+    z-index: 1053;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.92);
+    border: 1.5px solid #e2e8f0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+    color: #334155;
+    padding: 0;
+    transition: background 0.15s ease;
+  }
+  .x-bottom-sheet-ext-close.open {
+    display: flex;
+  }
+  .x-bottom-sheet-ext-close:active {
+    background: #f1f5f9;
   }
   .x-bottom-sheet {
     position: fixed;
@@ -5277,12 +5306,14 @@ input[type="file"].x-input,
     border-radius: 20px 20px 0 0;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
     z-index: 1051;
-    padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    padding: 12px 16px 20px;
     transform: translateY(100%);
     transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
     box-sizing: border-box;
     max-width: 480px;
     margin: 0 auto;
+    /* min-height so sheet doesn't collapse when content is short */
+    min-height: 280px;
   }
   .x-bottom-sheet.open {
     transform: translateY(0);

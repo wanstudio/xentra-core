@@ -4318,11 +4318,21 @@
       }
       if (occDateSheet) {
         occDateSheet.style.display = 'block';
-        setTimeout(function () { occDateSheet.classList.add('open'); }, 10);
+        setTimeout(function () {
+          occDateSheet.classList.add('open');
+          var extClose = $('occ-date-sheet-ext-close');
+          if (extClose) {
+            var sheetH = occDateSheet.offsetHeight || 280;
+            extClose.style.bottom = (sheetH + 12) + 'px';
+            extClose.classList.add('open');
+          }
+        }, 10);
       }
     };
 
     window.closeOccDateSheet = function () {
+      var extClose = $('occ-date-sheet-ext-close');
+      if (extClose) extClose.classList.remove('open');
       if (occCustomRange) occCustomRange.hidden = true;
       if (btnOccCustomToggle) {
         btnOccCustomToggle.setAttribute('aria-expanded', 'false');
