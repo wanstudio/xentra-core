@@ -4284,8 +4284,7 @@ input[type="file"].x-input,
 }
 
 @media (max-width: 768px) {
-  /* Topbar (Row 1 + Row 2): Stays fixed on top */
-  .x-dash-topbar,
+  /* Topbar (Row 1 + Row 2): Stays fixed on top for Merchant App */
   .x-merchant-app .x-dash-topbar {
     flex: 0 0 auto !important;
     position: relative !important;
@@ -4773,6 +4772,17 @@ input[type="file"].x-input,
 
   .x-owner-nav-item.active {
     color: #0f172a;
+  }
+
+  /* Topbar stays fixed/sticky on top */
+  .x-dash-topbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
   }
 
   /* Show Focus Selector on mobile for Owner (override 900px and 768px hide rules) */
