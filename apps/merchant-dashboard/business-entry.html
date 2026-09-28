@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xentra Business Portal</title>
+  <meta name="description" content="Portal Bisnis Xentra untuk Owner & Merchant">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Xentra Business">
+  <link rel="apple-touch-icon" href="/merchant-app/assets/icons/icon-192.png">
+  <link rel="manifest" href="/manifest.json">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0f172a;
+      color: #94a3b8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .loader {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(255,255,255,.08);
+      border-top-color: #38bdf8;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+  <script>
+    (function () {
+      'use strict';
+
+      var token = null;
+      var user = null;
+      var target = '/login';
+
+      try {
+        token = localStorage.getItem('xentra_merchant_token');
+        user = JSON.parse(localStorage.getItem('xentra_merchant_user') || 'null');
+
+        if (token && user) {
+          if (user.role === 'owner' || user.role === 'brand_manager') {
+            target = '/dashboard/';
+          } else if (user.role === 'branch_manager' || user.role === 'manager') {
+            target = '/merchant/';
+          } else {
+            localStorage.removeItem('xentra_merchant_token');
+            localStorage.removeItem('xentra_merchant_user');
+          }
+        }
+      } catch (_) {
+        localStorage.removeItem('xentra_merchant_token');
+        localStorage.removeItem('xentra_merchant_user');
+      }
+
+      function go() {
+        window.location.replace(target);
+      }
+
+      // biz.xentra.cloud is a first-class Business Portal surface.
+      // Register the same root-scoped merchant SW that serves Owner/Merchant shell assets
+      // before leaving the entry page, so the manifest's /dashboard/ or /merchant/
+      // start_url is covered by an active service-worker registration.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+          .then(function () {
+            // Do not block navigation if SW activation is slow; the destination page
+            // registers/validates the same root-scoped worker as a second safeguard.
+          })
+          .catch(function () {})
+          .then(go);
+      } else {
+        go();
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div class="loader" aria-label="Memuat Xentra Business Portal"></div>
+</body>
+</html>
