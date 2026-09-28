@@ -210,6 +210,66 @@ class ReportingRepository {
     `, movementParams);
   }
 
+  getInventoryStockSummary(filter = {}) {
+    const whereClauses = [];
+    const params = [];
+
+    if (filter.brand_id) {
+      whereClauses.push('p.brand_id = ? AND b.brand_id = ?');
+      params.push(filter.brand_id, filter.brand_id);
+    }
+    if (filter.branch_id) {
+      whereClauses.push('bp.branch_id = ?');
+      params.push(filter.branch_id);
+    }
+
+    const whereSql = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+
+    return this.db.queryOne(`
+      SELECT
+        COUNT(CASE WHEN bp.stock IS NOT NULL THEN 1 END) AS tracked_item_count,
+        COUNT(CASE WHEN bp.stock IS NOT NULL AND bp.stock > 0 AND bp.stock <= bp.low_stock_threshold THEN 1 END) AS low_stock_count,
+        COUNT(CASE WHEN bp.stock IS NOT NULL AND bp.stock <= 0 THEN 1 END) AS out_of_stock_count,
+        COALESCE(SUM(CASE WHEN bp.stock IS NOT NULL THEN bp.stock ELSE 0 END), 0) AS total_units
+      FROM branch_products bp
+      JOIN products p ON bp.product_id = p.id
+      JOIN branches b ON bp.branch_id = b.id
+      ${whereSql}
+    `, params);
+  }
+
+  getInventoryStockBranchSummary(filter = {}) {
+    const whereClauses = [];
+    const params = [];
+
+    if (filter.brand_id) {
+      whereClauses.push('p.brand_id = ? AND b.brand_id = ?');
+      params.push(filter.brand_id, filter.brand_id);
+    }
+    if (filter.branch_id) {
+      whereClauses.push('bp.branch_id = ?');
+      params.push(filter.branch_id);
+    }
+
+    const whereSql = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+
+    return this.db.queryMany(`
+      SELECT
+        bp.branch_id,
+        b.name AS branch_name,
+        COUNT(CASE WHEN bp.stock IS NOT NULL THEN 1 END) AS tracked_item_count,
+        COUNT(CASE WHEN bp.stock IS NOT NULL AND bp.stock > 0 AND bp.stock <= bp.low_stock_threshold THEN 1 END) AS low_stock_count,
+        COUNT(CASE WHEN bp.stock IS NOT NULL AND bp.stock <= 0 THEN 1 END) AS out_of_stock_count,
+        COALESCE(SUM(CASE WHEN bp.stock IS NOT NULL THEN bp.stock ELSE 0 END), 0) AS total_units
+      FROM branch_products bp
+      JOIN products p ON bp.product_id = p.id
+      JOIN branches b ON bp.branch_id = b.id
+      ${whereSql}
+      GROUP BY bp.branch_id, b.name
+      ORDER BY out_of_stock_count DESC, low_stock_count DESC, b.name ASC
+    `, params);
+  }
+
   getLowStockItems(filter = {}) {
     const whereClauses = ['bp.stock <= bp.low_stock_threshold'];
     const params = [];
