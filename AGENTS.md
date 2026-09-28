@@ -89,7 +89,9 @@ Key domain boundaries: Organization → Brand → Branch. Payment credentials re
 - Platform branding and tenant branding are separate concepts: Xentra is the platform default; tenant branding is an override resolved from authoritative tenant/brand context.
 - White-label is a tenant branding mode, not a separate application architecture or tenant identity.
 - VIP/dedicated infrastructure does not create a separate tenant or identity. A dedicated client such as Bangjo remains a normal Xentra tenant logically.
-- All supported tenant-facing surfaces (Owner, Merchant, POS, Customer, checkout/order surfaces, favicon/PWA, receipts/tickets, transactional emails, etc.) must consume the same effective-branding contract rather than maintaining per-app logo logic.
+- Normal tenant branding is centrally resolved from the authoritative tenant/brand context; do not create independent per-app tenant branding systems.
+- Customer PWA keeps the existing Brand Logo + `primary_color` behavior.
+- Merchant/Owner PWA and POS PWA may have optional installed-app icon/logo overrides solely for launcher identity; these overrides do not create separate brands and must not propagate Customer PWA `primary_color` into Merchant/POS UI.
 - Client domains remain direct tenant entry points. Never route `m.mybangjo.com`, `pos.mybangjo.com`, or another client domain through `biz.xentra.cloud` merely to apply branding.
 
 ## Skills selection
