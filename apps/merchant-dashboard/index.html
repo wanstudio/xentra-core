@@ -339,7 +339,7 @@
                 <span class="x-occ-chip-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><use href="/merchant-dashboard/assets/icons/quick-access.svg#menu"></use></svg></span>
                 <span class="x-occ-chip-label">Menu</span>
               </button>
-              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('reports/operations')" aria-label="Buka Stok">
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('stock')" aria-label="Buka Stok">
                 <span class="x-occ-chip-icon" aria-hidden="true"><svg viewBox="0 0 48 48"><use href="/merchant-dashboard/assets/icons/quick-access.svg#stock"></use></svg></span>
                 <span class="x-occ-chip-label">Stok</span>
               </button>
@@ -1877,6 +1877,112 @@
             <div class="mt-4 x-table-responsive" id="report-table-container">
               <div class="x-empty-state">Memuat laporan...</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- OWNER STOCK OVERVIEW — read-only inventory health for Owner -->
+      <section id="tab-stock" class="x-tab-content" data-tab="stock">
+        <div class="x-owner-stock-view">
+
+          <div class="x-owner-stock-header">
+            <div>
+              <div class="x-owner-stock-kicker">INVENTORY</div>
+              <h2>Stok</h2>
+              <p>Pantau kesehatan persediaan seluruh cabang tanpa mengubah stok operasional.</p>
+            </div>
+            <div class="x-owner-stock-header-actions">
+              <span class="x-owner-stock-scope" id="owner-stock-scope">Semua Cabang</span>
+              <button type="button" class="x-btn-secondary x-owner-stock-refresh" id="btn-owner-stock-refresh" aria-label="Refresh data stok">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0 2 5"></path><polyline points="20 4 20 11 13 11"></polyline></svg>
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="x-owner-stock-kpis" aria-label="Ringkasan stok">
+            <div class="x-owner-stock-kpi">
+              <span class="x-owner-stock-kpi-icon tracked" aria-hidden="true">
+                <svg viewBox="0 0 48 48"><use href="/merchant-dashboard/assets/icons/quick-access.svg#stock"></use></svg>
+              </span>
+              <div>
+                <span class="x-owner-stock-kpi-label">Item Tercatat</span>
+                <strong id="owner-stock-tracked-count">0</strong>
+              </div>
+            </div>
+            <div class="x-owner-stock-kpi warning">
+              <span class="x-owner-stock-kpi-icon warning" aria-hidden="true">
+                <svg viewBox="0 0 48 48"><path d="M24 7 42 39H6L24 7Z" fill="#FFF4D8" stroke="#F2AE2E" stroke-width="2"/><path d="M24 17v11" stroke="#D48806" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="33" r="1.8" fill="#D48806"/></svg>
+              </span>
+              <div>
+                <span class="x-owner-stock-kpi-label">Menipis</span>
+                <strong id="owner-stock-low-count">0</strong>
+              </div>
+            </div>
+            <div class="x-owner-stock-kpi danger">
+              <span class="x-owner-stock-kpi-icon danger" aria-hidden="true">
+                <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="17" fill="#FFF0F0" stroke="#F27B7B" stroke-width="2"/><path d="M17 17l14 14M31 17 17 31" stroke="#D64545" stroke-width="3" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <span class="x-owner-stock-kpi-label">Habis</span>
+                <strong id="owner-stock-out-count">0</strong>
+              </div>
+            </div>
+            <div class="x-owner-stock-kpi">
+              <span class="x-owner-stock-kpi-icon units" aria-hidden="true">
+                <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="18" fill="#ECF8F2"/><path d="M13 25h22M16 18h16M17 32h14" stroke="#269B68" stroke-width="3" stroke-linecap="round"/></svg>
+              </span>
+              <div>
+                <span class="x-owner-stock-kpi-label">Total Unit</span>
+                <strong id="owner-stock-total-units">0</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="x-owner-stock-grid">
+            <section class="x-owner-stock-panel x-owner-stock-attention-panel">
+              <div class="x-owner-stock-panel-head">
+                <div>
+                  <h3>Perlu Perhatian</h3>
+                  <p>Item yang sudah mencapai atau melewati batas minimum.</p>
+                </div>
+                <button type="button" class="x-owner-stock-link" id="btn-owner-stock-full-report">Lihat laporan
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
+              <div id="owner-stock-alerts-list" class="x-owner-stock-alerts" aria-live="polite">
+                <div class="x-owner-stock-loading">Memuat stok...</div>
+              </div>
+            </section>
+
+            <section class="x-owner-stock-panel">
+              <div class="x-owner-stock-panel-head">
+                <div>
+                  <h3>Status Cabang</h3>
+                  <p>Ringkasan stok per cabang.</p>
+                </div>
+              </div>
+              <div id="owner-stock-branch-list" class="x-owner-stock-branches" aria-live="polite">
+                <div class="x-owner-stock-loading">Memuat cabang...</div>
+              </div>
+            </section>
+          </div>
+
+          <section class="x-owner-stock-panel">
+            <div class="x-owner-stock-panel-head">
+              <div>
+                <h3>Mutasi Persediaan</h3>
+                <p>Ringkasan seluruh pergerakan stok yang tercatat di Core.</p>
+              </div>
+            </div>
+            <div id="owner-stock-movement-list" class="x-owner-stock-movements" aria-live="polite">
+              <div class="x-owner-stock-loading">Memuat mutasi...</div>
+            </div>
+          </section>
+
+          <div class="x-owner-stock-note">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 10v6"></path><circle cx="12" cy="7" r="1"></circle></svg>
+            <span>Owner hanya memantau kondisi stok. Penyesuaian stok dilakukan dari surface operasional cabang sesuai hak akses.</span>
           </div>
         </div>
       </section>
