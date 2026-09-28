@@ -85,13 +85,25 @@ describe('Merchant PWA Installable — Architecture & Contract Verification', ()
     assert.ok(merchantSw.includes('url.pathname.startsWith("/merchant-app/")'), 'Merchant SW must guard navigations to merchant scope');
   });
 
-  it('7. Owner dashboard index.html enables PWA installation on tenant domains (m.<domain>/dashboard/)', () => {
+  it('7. Owner dashboard index.html enables PWA installation and uses canonical /owner/ surface', () => {
     const dashboardHtml = fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/index.html'), 'utf8');
 
-    assert.ok(dashboardHtml.includes('manifestLink.href = \'/manifest.json?surface=dashboard\''), 'Must inject dynamic manifest link for dashboard surface');
+    assert.ok(dashboardHtml.includes('manifestLink.href = \'/manifest.json?surface=owner\''), 'Must inject owner-surface manifest link');
     assert.ok(dashboardHtml.includes("navigator.serviceWorker.register('/service-worker.js', { scope: '/' })"), 'Must register service-worker.js with scope /');
     assert.ok(dashboardHtml.includes('isBizPortal || !isPlatformHost'), 'Must enable installation on tenant domains while keeping platform host isolated');
     assert.ok(dashboardHtml.includes('apple-mobile-web-app-capable'), 'Must include apple-mobile-web-app-capable meta');
     assert.ok(dashboardHtml.includes('theme-color'), 'Must include theme-color meta');
+  });
+
+  it('8. Owner landing remains canonical on managerial and portal surfaces', () => {
+    const entryHtml = fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/managerial-entry.html'), 'utf8');
+    const sharedJs = fs.readFileSync(path.join(__dirname, '../apps/merchant-shared/js/shared.js'), 'utf8');
+    const dashboardJs = fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
+    const appJs = fs.readFileSync(serverPath, 'utf8');
+
+    assert.ok(entryHtml.includes("window.location.replace('/owner/' + window.location.hash)"), 'Managerial entry must route owner to /owner/');
+    assert.ok(sharedJs.includes("if (_landing === '/owner/')") && sharedJs.includes("window.location.replace('/owner/' + window.location.hash)"), 'Shared surface guard must preserve /owner/');
+    assert.ok(dashboardJs.includes("enforceSurface(['/owner/'])"), 'Owner dashboard must enforce canonical /owner/ landing');
+    assert.ok(appJs.includes("req.query.surface === 'owner'") && appJs.includes("data.start_url = isOwner ? '/owner/' : '/merchant/';"), 'Dynamic manifest must support explicit owner surface');
   });
 });
