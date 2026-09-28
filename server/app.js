@@ -207,10 +207,19 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
       // owner (biz.xentra.cloud or owner. subdomain) → open dashboard
       data.start_url = (subType === 'owner') ? '/dashboard/' : '/merchant/';
       const brand = await resolveBrandForManifest(req);
-      if (brand && brand.name) {
+      const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].toLowerCase();
+
+      // biz.xentra.cloud is the Xentra Business Portal: platform-branded by default.
+      // Tenant branding is applied only when a tenant/brand context is actually resolvable.
+      if (host === 'biz.xentra.cloud') {
+        data.name = 'Xentra Business Portal';
+        data.short_name = 'Xentra Business';
+        data.description = 'Portal Bisnis Xentra untuk Owner & Merchant';
+      } else if (brand && brand.name) {
         data.name = brand.name;
         data.short_name = brand.name.substring(0, 12);
       }
+
       const iconOverride = brand ? (brand.merchant_pwa_icon_url || brand.logo_url || null) : null;
       data.icons = buildPwaIcons(iconOverride, '/merchant-app/assets/icons/icon-192.png', '/merchant-app/assets/icons/icon-512.png');
       return res.json(data);
@@ -369,10 +378,17 @@ app.use('/merchant-shared', express.static(path.join(__dirname, '../apps/merchan
 // On tenant domains (e.g. app.mybangjo.com) these paths fall through to the customer PWA fallback.
 function isSaaSHost(req) {
   const host = (req.headers.host || '').split(':')[0].toLowerCase();
-  return host === 'xentra.cloud' || host === 'localhost' || host === '127.0.0.1';
+  return host === 'xentra.cloud' || host === 'biz.xentra.cloud' || host === 'localhost' || host === '127.0.0.1';
 }
 
 app.get(['/', '/landing', '/landing/'], async (req, res, next) => {
+  const host = (req.headers.host || '').split(':')[0].toLowerCase();
+
+  if (host === 'biz.xentra.cloud') {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/business-entry.html'));
+  }
+
   if (isSaaSHost(req)) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     return res.sendFile(path.join(__dirname, '../apps/merchant-dashboard/landing.html'));
