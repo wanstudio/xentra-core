@@ -219,7 +219,7 @@
       editBtn.draggable = false;
       editBtn.title = 'Ubah nama & gambar kategori';
       editBtn.style.cssText = 'border:none;background:none;padding:5px 5px;font-size:12px;cursor:pointer;color:#64748b;';
-      editBtn.innerHTML = '<span aria-hidden="true">✎</span>'; 
+      editBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>'; 
       editBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         openBranchCategoryEditModal(cat);
@@ -231,7 +231,7 @@
       delBtn.draggable = false;
       delBtn.title = 'Hapus kategori cabang';
       delBtn.style.cssText = 'border:none;background:none;padding:6px 10px 6px 4px;font-size:12px;cursor:pointer;color:#ef4444;opacity:0.8;';
-      delBtn.innerHTML = '<span aria-hidden="true">×</span>'; 
+      delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/></svg>'; 
       delBtn.addEventListener('click', function (e) {
         e.stopPropagation();
         deleteBMBranchCategory(cat.id, cat.name);
