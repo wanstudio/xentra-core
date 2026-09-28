@@ -10,16 +10,23 @@
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
   <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.1.3">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="/merchant-app/assets/icons/icon-192.png">
   <script>
     (function () {
       'use strict';
-      // biz.xentra.cloud is the first-class Xentra Business Portal. Keep the
-      // install metadata scoped to that portal so xentra.cloud platform pages
-      // never inherit the tenant/merchant PWA manifest.
-      if (window.location.hostname === 'biz.xentra.cloud') {
+      // biz.xentra.cloud is the first-class Xentra Business Portal.
+      // Exclude platform marketing/root domain (xentra.cloud) so SaaS platform pages never inherit tenant manifest.
+      // Tenant owner/managerial domains (e.g. m.mybangjo.com, owner.mybangjo.com) and biz.xentra.cloud are installable.
+      var isPlatformHost = window.location.hostname === 'xentra.cloud';
+      var isBizPortal = window.location.hostname === 'biz.xentra.cloud';
+      if (isBizPortal || !isPlatformHost) {
         var manifestLink = document.createElement('link');
         manifestLink.rel = 'manifest';
-        manifestLink.href = '/manifest.json';
+        manifestLink.href = '/manifest.json?surface=dashboard';
         document.head.appendChild(manifestLink);
 
         if ('serviceWorker' in navigator) {

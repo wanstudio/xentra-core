@@ -203,9 +203,11 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
       const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       data.id = '/';
       data.scope = '/';
-      // managerial (m. subdomain) → open merchant surface directly
-      // owner (biz.xentra.cloud or owner. subdomain) → open dashboard
-      data.start_url = (subType === 'owner') ? '/dashboard/' : '/merchant/';
+      // managerial (m. subdomain) → open merchant surface directly (/merchant/)
+      // owner or dashboard surface (biz.xentra.cloud, owner., or /dashboard/) → open dashboard (/dashboard/)
+      const isDashboard = subType === 'owner' || req.query.surface === 'dashboard' || (req.headers.referer && req.headers.referer.includes('/dashboard'));
+      data.start_url = isDashboard ? '/dashboard/' : '/merchant/';
+      data.id = isDashboard ? '/dashboard' : '/';
       const brand = await resolveBrandForManifest(req);
       const host = (req.headers['x-forwarded-host'] || req.headers.host || '').split(':')[0].toLowerCase();
 
@@ -216,7 +218,7 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
         data.short_name = 'Xentra Business';
         data.description = 'Portal Bisnis Xentra untuk Owner & Merchant';
       } else if (brand && brand.name) {
-        data.name = brand.merchant_pwa_name || (subType === 'managerial' ? brand.name + ' Merchant' : brand.name);
+        data.name = brand.merchant_pwa_name || (isDashboard ? brand.name : brand.name + ' Merchant');
         data.short_name = (brand.merchant_pwa_name || brand.name).substring(0, 12);
       }
 

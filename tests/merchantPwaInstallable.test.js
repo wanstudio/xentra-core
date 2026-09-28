@@ -84,4 +84,14 @@ describe('Merchant PWA Installable — Architecture & Contract Verification', ()
     assert.ok(merchantSw.includes('url.pathname.startsWith("/pos")'), 'Merchant SW must bypass /pos');
     assert.ok(merchantSw.includes('url.pathname.startsWith("/merchant-app/")'), 'Merchant SW must guard navigations to merchant scope');
   });
+
+  it('7. Owner dashboard index.html enables PWA installation on tenant domains (m.<domain>/dashboard/)', () => {
+    const dashboardHtml = fs.readFileSync(path.join(__dirname, '../apps/merchant-dashboard/index.html'), 'utf8');
+
+    assert.ok(dashboardHtml.includes('manifestLink.href = \'/manifest.json?surface=dashboard\''), 'Must inject dynamic manifest link for dashboard surface');
+    assert.ok(dashboardHtml.includes("navigator.serviceWorker.register('/service-worker.js', { scope: '/' })"), 'Must register service-worker.js with scope /');
+    assert.ok(dashboardHtml.includes('isBizPortal || !isPlatformHost'), 'Must enable installation on tenant domains while keeping platform host isolated');
+    assert.ok(dashboardHtml.includes('apple-mobile-web-app-capable'), 'Must include apple-mobile-web-app-capable meta');
+    assert.ok(dashboardHtml.includes('theme-color'), 'Must include theme-color meta');
+  });
 });
