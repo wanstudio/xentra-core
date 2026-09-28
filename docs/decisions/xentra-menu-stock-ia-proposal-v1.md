@@ -1,6 +1,6 @@
 # Xentra Merchant Menu & Stock IA Proposal v1
 
-**Status:** PROPOSAL — REVIEW BEFORE IMPLEMENTATION  
+**Status:** 🔒 LOCKED — IMPLEMENTATION CONTRACT  
 **Date:** 2026-09-29  
 **Scope:** Merchant App, branch-scoped daily operations
 
@@ -260,4 +260,4 @@ Catalog adoption no longer fabricates physical stock, and the regression suite n
 The IA requirement remains:
 **NULL = Belum dilacak**, never Habis.
 
-The document remains **PROPOSAL — REVIEW BEFORE IMPLEMENTATION**.
+**LOCKED — IA approved for implementation. Backend/domain contracts remain authoritative.**
