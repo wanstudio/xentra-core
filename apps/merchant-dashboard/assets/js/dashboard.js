@@ -3813,6 +3813,278 @@
         }
       }
     }
+
+    // 6. Mobile Owner Command Center Renderers
+    renderOccHeroKpi(kpis);
+    renderOccBranchPerformance(overview);
+    renderOccOrdersSummary(overview);
+    renderOccTopProducts(overview);
+    renderOccAttention(overview);
+  }
+
+  function setOverviewPeriodPreset(preset, skipReload) {
+    var now = new Date();
+    var startStr = '';
+    var endStr = '';
+
+    if (preset === 'today') {
+      var y = now.getFullYear();
+      var m = String(now.getMonth() + 1).padStart(2, '0');
+      var d = String(now.getDate()).padStart(2, '0');
+      startStr = y + '-' + m + '-' + d + 'T00:00:00Z';
+      endStr = y + '-' + m + '-' + d + 'T23:59:59Z';
+    } else if (preset === '7d') {
+      var past7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      startStr = past7.toISOString().slice(0, 10) + 'T00:00:00Z';
+      endStr = now.toISOString().slice(0, 10) + 'T23:59:59Z';
+    } else if (preset === '30d') {
+      var past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      startStr = past30.toISOString().slice(0, 10) + 'T00:00:00Z';
+      endStr = now.toISOString().slice(0, 10) + 'T23:59:59Z';
+    } else if (preset === 'month') {
+      var y2 = now.getFullYear();
+      var m2 = String(now.getMonth() + 1).padStart(2, '0');
+      startStr = y2 + '-' + m2 + '-01T00:00:00Z';
+      endStr = now.toISOString().slice(0, 10) + 'T23:59:59Z';
+    }
+
+    _overviewFilter.startDate = startStr;
+    _overviewFilter.endDate = endStr;
+    _overviewFilter.preset = preset;
+
+    var startInput = $('overview-start-date');
+    var endInput = $('overview-end-date');
+    if (startInput) startInput.value = startStr ? startStr.slice(0, 10) : '';
+    if (endInput) endInput.value = endStr ? endStr.slice(0, 10) : '';
+
+    var periodSelect = $('occ-period-select');
+    if (periodSelect && periodSelect.value !== preset) {
+      periodSelect.value = preset;
+    }
+
+    var periodBadge = $('occ-period-badge');
+    if (periodBadge) {
+      var labelMap = { today: 'Hari ini', '7d': '7 hari', '30d': '30 hari', month: 'Bulan ini' };
+      periodBadge.textContent = labelMap[preset] || 'Hari ini';
+    }
+
+    if (!skipReload) {
+      loadOverview();
+    }
+  }
+
+  function renderOccHeroKpi(kpis) {
+    if ($('occ-hero-sales')) $('occ-hero-sales').textContent = formatMoney(kpis.net_sales || 0);
+    if ($('occ-hero-orders')) $('occ-hero-orders').textContent = kpis.orders || 0;
+    if ($('occ-hero-aov')) $('occ-hero-aov').textContent = formatMoney(kpis.aov || 0);
+    if ($('occ-hero-customers')) $('occ-hero-customers').textContent = kpis.customers || 0;
+
+    var trendEl = $('occ-hero-trend');
+    if (trendEl) {
+      if (kpis.trend && typeof kpis.trend.percent === 'number') {
+        var dir = kpis.trend.direction || 'up';
+        var arrow = dir === 'up' ? '\u2191' : '\u2193';
+        var cls = dir === 'up' ? 'positive' : 'negative';
+        trendEl.className = 'x-occ-hero-trend ' + cls;
+        trendEl.innerHTML = '<span class="x-occ-trend-icon">' + arrow + '</span> <span id="occ-hero-trend-text">' + kpis.trend.percent + '% ' + escapeHtml(kpis.trend.label || 'vs kemarin') + '</span>';
+      } else {
+        trendEl.className = 'x-occ-hero-trend neutral';
+        trendEl.innerHTML = '<span id="occ-hero-trend-text">Periode ini</span>';
+      }
+    }
+  }
+
+  function renderOccBranchPerformance(overview) {
+    var branchPerf = overview.branch_performance || [];
+    var kpis = overview.kpis || {};
+    var branchId = getEffectiveBranchId();
+    var titleEl = $('occ-branch-title');
+    var linkEl = $('occ-branch-link');
+    var contentEl = $('occ-branch-content');
+
+    if (!contentEl) return;
+
+    if (!branchId) {
+      // Focus: Semua Cabang -> Multi-branch ranking list
+      if (titleEl) titleEl.textContent = 'Performa Cabang';
+      if (linkEl) {
+        linkEl.href = '#reports/branches';
+        linkEl.textContent = 'Lihat semua \u2192';
+        linkEl.style.display = 'inline-block';
+      }
+
+      if (!branchPerf || branchPerf.length === 0) {
+        contentEl.innerHTML = '<div class="x-occ-empty-placeholder">Belum ada data transaksi cabang.</div>';
+        return;
+      }
+
+      var sorted = branchPerf.slice().sort(function (a, b) {
+        return (b.total_revenue || 0) - (a.total_revenue || 0);
+      });
+
+      var html = '<div class="x-occ-branch-list">';
+      sorted.forEach(function (b) {
+        html += '<div class="x-occ-branch-row">' +
+          '<div class="x-occ-branch-info">' +
+            '<span class="x-occ-branch-name">' + escapeHtml(b.branch_name) + '</span>' +
+            '<span class="x-occ-branch-orders">' + (b.total_orders || 0) + ' pesanan</span>' +
+          '</div>' +
+          '<div class="x-occ-branch-revenue">' + formatMoney(b.total_revenue || 0) + '</div>' +
+        '</div>';
+      });
+      html += '</div>';
+      contentEl.innerHTML = html;
+    } else {
+      // Focus: Single Branch -> Focused Branch summary
+      var bName = 'Cabang Terpilih';
+      if (_branchContextState.branches) {
+        var found = _branchContextState.branches.find(function (b) { return String(b.id) === String(branchId); });
+        if (found) bName = found.name;
+      }
+      if (titleEl) titleEl.textContent = 'Performa ' + bName;
+      if (linkEl) {
+        linkEl.href = '#branches';
+        linkEl.textContent = 'Lihat detail cabang \u2192';
+        linkEl.style.display = 'inline-block';
+      }
+
+      contentEl.innerHTML = '<div class="x-occ-branch-single">' +
+        '<div class="x-occ-single-kpi-main">' + formatMoney(kpis.net_sales || 0) + '</div>' +
+        '<div class="x-occ-single-kpi-sub">' +
+          '<span>' + (kpis.orders || 0) + ' pesanan</span>' +
+          '<span class="x-occ-dot">&bull;</span>' +
+          '<span>' + formatMoney(kpis.aov || 0) + ' avg order</span>' +
+        '</div>' +
+      '</div>';
+    }
+  }
+
+  function renderOccOrdersSummary(overview) {
+    var summary = overview.orders_summary || {};
+    var kpis = overview.kpis || {};
+    var totalOrders = typeof summary.total === 'number' ? summary.total : (kpis.orders || 0);
+    var completed = summary.completed || 0;
+    var inProgress = summary.in_progress || 0;
+    var cancelled = summary.cancelled || 0;
+
+    if ($('occ-orders-total')) $('occ-orders-total').textContent = totalOrders;
+    if ($('occ-orders-completed')) $('occ-orders-completed').textContent = completed;
+    if ($('occ-orders-in-progress')) $('occ-orders-in-progress').textContent = inProgress;
+    if ($('occ-orders-cancelled')) $('occ-orders-cancelled').textContent = cancelled;
+  }
+
+  function renderOccTopProducts(overview) {
+    var topProducts = overview.top_products || [];
+    var contentEl = $('occ-products-content');
+    if (!contentEl) return;
+
+    if (!topProducts || topProducts.length === 0) {
+      contentEl.innerHTML = '<div class="x-occ-empty-placeholder">Belum ada produk yang terjual pada periode ini.</div>';
+      return;
+    }
+
+    var medals = ['\u{1F947}', '\u{1F948}', '\u{1F949}', '4.', '5.'];
+    var html = '<div class="x-occ-product-list">';
+    topProducts.slice(0, 5).forEach(function (p, idx) {
+      var badge = medals[idx] || (idx + 1) + '.';
+      html += '<div class="x-occ-product-row">' +
+        '<div class="x-occ-product-rank">' + badge + '</div>' +
+        '<div class="x-occ-product-info">' +
+          '<span class="x-occ-product-name">' + escapeHtml(p.product_name) + '</span>' +
+          '<span class="x-occ-product-sold">' + (p.total_units_sold || 0) + ' terjual</span>' +
+        '</div>' +
+        '<div class="x-occ-product-revenue">' + formatMoney(p.total_gross_sales || 0) + '</div>' +
+      '</div>';
+    });
+    html += '</div>';
+    contentEl.innerHTML = html;
+  }
+
+  function renderOccAttention(overview) {
+    var needsAttention = overview.needs_attention || {};
+    var branchPerf = overview.branch_performance || [];
+    var branchId = getEffectiveBranchId();
+    var contentEl = $('occ-attention-content');
+    if (!contentEl) return;
+
+    var alerts = [];
+
+    // 1. Low stock items
+    if (needsAttention.low_stock_items && needsAttention.low_stock_items.length > 0) {
+      alerts.push({
+        icon: '\u26A0\uFE0F',
+        text: needsAttention.low_stock_items.length + ' item produk stok menipis di bawah minimum',
+        link: '#reports/operations'
+      });
+    }
+
+    // 2. Pending / unverified payments
+    if (needsAttention.pending_payments_count > 0) {
+      alerts.push({
+        icon: '\u26A0\uFE0F',
+        text: needsAttention.pending_payments_count + ' transaksi pembayaran perlu verifikasi',
+        link: '#finance'
+      });
+    }
+
+    // 3. Multi-branch alert: branch with 0 revenue when others have revenue
+    if (!branchId && branchPerf.length > 1) {
+      var hasActiveBranches = branchPerf.some(function (b) { return (b.total_revenue || 0) > 0; });
+      if (hasActiveBranches) {
+        var zeroBranches = branchPerf.filter(function (b) { return (b.total_revenue || 0) === 0; });
+        zeroBranches.slice(0, 2).forEach(function (zb) {
+          alerts.push({
+            icon: '\u26A0\uFE0F',
+            text: 'Cabang ' + zb.branch_name + ' transaksi \u2193 (belum ada omzet)',
+            link: '#branches'
+          });
+        });
+      }
+    }
+
+    if (alerts.length === 0) {
+      contentEl.innerHTML = '<div class="x-occ-normal-state">' +
+        '<span class="x-occ-normal-icon">\u2713</span>' +
+        '<span class="x-occ-normal-text">Semua berjalan normal</span>' +
+      '</div>';
+    } else {
+      var html = '<div class="x-occ-alerts-list">';
+      alerts.forEach(function (a) {
+        html += '<a href="' + a.link + '" class="x-occ-alert-item">' +
+          '<div class="x-occ-alert-left">' +
+            '<span class="x-occ-alert-icon">' + a.icon + '</span>' +
+            '<span class="x-occ-alert-text">' + escapeHtml(a.text) + '</span>' +
+          '</div>' +
+          '<span class="x-occ-alert-arrow">\u2192</span>' +
+        '</a>';
+      });
+      html += '</div>';
+      contentEl.innerHTML = html;
+    }
+  }
+
+  function renderOccEmpty() {
+    if ($('occ-hero-sales')) $('occ-hero-sales').textContent = 'Rp0';
+    if ($('occ-hero-orders')) $('occ-hero-orders').textContent = '0';
+    if ($('occ-hero-aov')) $('occ-hero-aov').textContent = 'Rp0';
+    if ($('occ-hero-customers')) $('occ-hero-customers').textContent = '0';
+    if ($('occ-hero-trend')) {
+      $('occ-hero-trend').className = 'x-occ-hero-trend neutral';
+      $('occ-hero-trend').innerHTML = '<span id="occ-hero-trend-text">Periode ini</span>';
+    }
+    if ($('occ-orders-total')) $('occ-orders-total').textContent = '0';
+    if ($('occ-orders-completed')) $('occ-orders-completed').textContent = '0';
+    if ($('occ-orders-in-progress')) $('occ-orders-in-progress').textContent = '0';
+    if ($('occ-orders-cancelled')) $('occ-orders-cancelled').textContent = '0';
+    if ($('occ-branch-content')) {
+      $('occ-branch-content').innerHTML = '<div class="x-occ-empty-placeholder">Data belum tersedia.</div>';
+    }
+    if ($('occ-products-content')) {
+      $('occ-products-content').innerHTML = '<div class="x-occ-empty-placeholder">Data belum tersedia.</div>';
+    }
+    if ($('occ-attention-content')) {
+      $('occ-attention-content').innerHTML = '<div class="x-occ-normal-state"><span class="x-occ-normal-icon">\u2713</span><span class="x-occ-normal-text">Semua berjalan normal</span></div>';
+    }
   }
 
   function renderOverviewEmpty() {
@@ -3830,6 +4102,8 @@
     if ($('overview-branch-performance-container')) {
       $('overview-branch-performance-container').innerHTML = '<div class="x-empty-state"><div class="x-empty-state-icon">🏢</div>Data belum tersedia.</div>';
     }
+
+    renderOccEmpty();
   }
 
   function initOverviewControls() {
@@ -3837,6 +4111,13 @@
     var btnReset = $('btn-overview-reset');
     var inputStart = $('overview-start-date');
     var inputEnd = $('overview-end-date');
+    var occSelect = $('occ-period-select');
+
+    if (occSelect) {
+      occSelect.addEventListener('change', function () {
+        setOverviewPeriodPreset(this.value);
+      });
+    }
 
     if (btnFilter) {
       btnFilter.addEventListener('click', function () {
@@ -3852,6 +4133,8 @@
         if (inputEnd) inputEnd.value = '';
         _overviewFilter.startDate = '';
         _overviewFilter.endDate = '';
+        if (occSelect) occSelect.value = 'today';
+        if ($('occ-period-badge')) $('occ-period-badge').textContent = 'Semua Waktu';
         loadOverview();
       });
     }

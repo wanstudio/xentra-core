@@ -4821,9 +4821,385 @@ input[type="file"].x-input,
 
   /* Content area bottom spacer for owner bottom nav */
   .x-dash-main { padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Owner Command Center on Mobile */
+  .x-desktop-overview-view { display: none !important; }
+  .x-owner-command-center {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px 0 20px;
+  }
+
+  /* 1. Periode Selector */
+  .x-occ-period-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .x-occ-period-selector-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 6px 12px;
+    gap: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+  .x-occ-calendar-icon {
+    color: #64748b;
+    flex-shrink: 0;
+  }
+  .x-occ-period-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: transparent;
+    border: none;
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    padding-right: 18px;
+    cursor: pointer;
+    outline: none;
+  }
+  .x-occ-chevron-icon {
+    position: absolute;
+    right: 10px;
+    color: #64748b;
+    pointer-events: none;
+  }
+  .x-occ-period-status-badge {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 4px 10px;
+    border-radius: 12px;
+  }
+
+  /* 2. Hero KPI Card */
+  .x-occ-hero-card {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #ffffff;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.12);
+  }
+  .x-occ-hero-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .x-occ-hero-sublabel {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .x-occ-hero-trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .x-occ-hero-trend.positive {
+    background: rgba(34, 197, 94, 0.18);
+    color: #4ade80;
+  }
+  .x-occ-hero-trend.negative {
+    background: rgba(239, 68, 68, 0.18);
+    color: #f87171;
+  }
+  .x-occ-hero-trend.neutral {
+    background: rgba(148, 163, 184, 0.18);
+    color: #cbd5e1;
+  }
+  .x-occ-hero-primary-val {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.5px;
+    color: #ffffff;
+    margin: 4px 0 14px;
+  }
+  .x-occ-hero-metrics-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .x-occ-mini-kpi {
+    display: flex;
+    flex-direction: column;
+  }
+  .x-occ-mini-kpi-val {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: #f8fafc;
+    line-height: 1.2;
+  }
+  .x-occ-mini-kpi-lbl {
+    font-size: 10.5px;
+    color: #94a3b8;
+    margin-top: 2px;
+  }
+
+  /* 3-7. Command Center Cards */
+  .x-occ-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  }
+  .x-occ-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .x-occ-card-title {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0;
+  }
+  .x-occ-card-link {
+    font-size: 12px;
+    font-weight: 700;
+    color: #2563eb;
+    text-decoration: none;
+  }
+  .x-occ-empty-placeholder {
+    font-size: 12px;
+    color: #94a3b8;
+    text-align: center;
+    padding: 10px 0;
+  }
+
+  /* Branch ranking & single branch */
+  .x-occ-branch-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .x-occ-branch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .x-occ-branch-row:last-child {
+    border-bottom: none;
+    padding-bottom: 2px;
+  }
+  .x-occ-branch-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .x-occ-branch-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+  .x-occ-branch-orders {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 1px;
+  }
+  .x-occ-branch-revenue {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0f172a;
+    flex-shrink: 0;
+  }
+  .x-occ-branch-single {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 2px 0;
+  }
+  .x-occ-single-kpi-main {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+  .x-occ-single-kpi-sub {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #64748b;
+  }
+  .x-occ-dot { color: #cbd5e1; }
+
+  /* Orders summary grid */
+  .x-occ-orders-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .x-occ-order-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 4px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 1px solid #f1f5f9;
+  }
+  .x-occ-order-stat-val {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+  }
+  .x-occ-order-stat-lbl {
+    font-size: 10.5px;
+    color: #64748b;
+    font-weight: 600;
+    margin-top: 3px;
+  }
+  .x-occ-order-stat.status-completed .x-occ-order-stat-val { color: #16a34a; }
+  .x-occ-order-stat.status-progress .x-occ-order-stat-val { color: #2563eb; }
+  .x-occ-order-stat.status-cancelled .x-occ-order-stat-val { color: #dc2626; }
+
+  /* Top products */
+  .x-occ-product-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .x-occ-product-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .x-occ-product-row:last-child {
+    border-bottom: none;
+    padding-bottom: 2px;
+  }
+  .x-occ-product-rank {
+    font-size: 14px;
+    flex-shrink: 0;
+    width: 22px;
+    text-align: center;
+  }
+  .x-occ-product-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .x-occ-product-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .x-occ-product-sold {
+    font-size: 11px;
+    color: #64748b;
+    margin-top: 1px;
+  }
+  .x-occ-product-revenue {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    flex-shrink: 0;
+  }
+
+  /* Attention */
+  .x-occ-normal-state {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    color: #16a34a;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .x-occ-normal-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: #dcfce7;
+    border-radius: 50%;
+    color: #16a34a;
+    font-size: 12px;
+    font-weight: 800;
+  }
+  .x-occ-alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .x-occ-alert-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: #fffbeb;
+    border: 1px solid #fef3c7;
+    border-radius: 10px;
+    padding: 8px 10px;
+    color: #92400e;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .x-occ-alert-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+  .x-occ-alert-icon { font-size: 13px; flex-shrink: 0; }
+  .x-occ-alert-arrow { color: #d97706; font-weight: 700; flex-shrink: 0; }
+
+  /* Quick access */
+  .x-occ-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  .x-occ-quick-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 8px 2px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background .12s ease;
+  }
+  .x-occ-quick-chip:active { background: #e2e8f0; }
+  .x-occ-chip-icon { font-size: 17px; line-height: 1; }
+  .x-occ-chip-label { font-size: 10.5px; font-weight: 700; color: #334155; }
 }
 
 @media (min-width: 769px) {
   .x-owner-bottom-nav { display: none !important; }
   #x-topbar-focus-scope { display: contents; }
+  .x-owner-command-center { display: none !important; }
+  .x-desktop-overview-view { display: block !important; }
 }

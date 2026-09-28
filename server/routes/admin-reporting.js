@@ -76,8 +76,45 @@ router.get('/admin/overview', requireAuth(['owner', 'brand_manager', 'branch_man
     // 4. Top Products
     const topProducts = overviewReportingRepo.getTopProducts(filter).slice(0, 5);
 
-    // 5. Needs Attention (e.g. low stock alerts)
+    // 5. Needs Attention (e.g. low stock alerts, pending payments)
     const lowStockItems = overviewReportingRepo.getLowStockItems(filter).slice(0, 10);
+    const pendingPaymentsCount = overviewReportingRepo.getPendingPaymentsCount(filter);
+
+    // 6. Orders status summary (total, completed, in_progress, cancelled)
+    const ordersSummary = overviewReportingRepo.getOrderStatusSummary(filter);
+
+    // 7. Sales trend vs previous period
+    let salesTrend = null;
+    let previousPeriodSales = null;
+    if (start_date && end_date) {
+      const startMs = new Date(start_date).getTime();
+      const endMs = new Date(end_date).getTime();
+      const durationMs = endMs - startMs;
+      if (durationMs > 0 && !isNaN(durationMs)) {
+        const prevStart = new Date(startMs - durationMs).toISOString();
+        const prevEnd = new Date(startMs - 1).toISOString();
+        previousPeriodSales = overviewReportingRepo.getSalesOverview({
+          ...filter,
+          start_date: prevStart,
+          end_date: prevEnd
+        });
+      }
+    }
+    if (previousPeriodSales && previousPeriodSales.gross_revenue > 0) {
+      const diff = netSales - previousPeriodSales.gross_revenue;
+      const percent = Math.round((diff / previousPeriodSales.gross_revenue) * 1000) / 10;
+      salesTrend = {
+        percent: Math.abs(percent),
+        direction: percent >= 0 ? 'up' : 'down',
+        label: (start_date && start_date.includes(new Date().toISOString().slice(0, 10))) ? 'vs kemarin' : 'vs periode sebelumnya'
+      };
+    } else if (netSales > 0 && previousPeriodSales) {
+      salesTrend = {
+        percent: 100,
+        direction: 'up',
+        label: 'vs periode sebelumnya'
+      };
+    }
 
     res.json({
       success: true,
@@ -86,7 +123,8 @@ router.get('/admin/overview', requireAuth(['owner', 'brand_manager', 'branch_man
           net_sales: netSales,
           orders: ordersCount,
           customers: customersCount,
-          aov: Math.round(aov)
+          aov: Math.round(aov),
+          trend: salesTrend
         },
         sales_performance: {
           timeline,
@@ -95,9 +133,11 @@ router.get('/admin/overview', requireAuth(['owner', 'brand_manager', 'branch_man
         },
         branch_performance: branchPerformance,
         top_products: topProducts,
+        orders_summary: ordersSummary,
         needs_attention: {
           low_stock_items: lowStockItems,
-          low_stock_count: lowStockItems.length
+          low_stock_count: lowStockItems.length,
+          pending_payments_count: pendingPaymentsCount
         }
       }
     });

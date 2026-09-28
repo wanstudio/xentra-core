@@ -530,6 +530,64 @@ class ReportingRepository {
       addresses: addresses || []
     };
   }
+
+  getOrderStatusSummary(filter = {}) {
+    const whereClauses = [];
+    const params = [];
+
+    if (filter.brand_id) {
+      whereClauses.push('brand_id = ?');
+      params.push(filter.brand_id);
+    }
+    if (filter.branch_id) {
+      whereClauses.push('branch_id = ?');
+      params.push(filter.branch_id);
+    }
+    if (filter.start_date) {
+      whereClauses.push('datetime(created_at) >= datetime(?)');
+      params.push(filter.start_date);
+    }
+    if (filter.end_date) {
+      whereClauses.push('datetime(created_at) <= datetime(?)');
+      params.push(filter.end_date);
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const row = this.db.queryOne(`
+      SELECT
+        COUNT(*) as total,
+        COALESCE(SUM(CASE WHEN status IN ('completed', 'delivered') THEN 1 ELSE 0 END), 0) as completed,
+        COALESCE(SUM(CASE WHEN status IN ('pending', 'confirmed', 'preparing', 'ready', 'ready_for_pickup', 'out_for_delivery') THEN 1 ELSE 0 END), 0) as in_progress,
+        COALESCE(SUM(CASE WHEN status IN ('cancelled', 'rejected', 'timeout') THEN 1 ELSE 0 END), 0) as cancelled
+      FROM orders
+      ${whereSql}
+    `, params);
+
+    return {
+      total: row ? (row.total || 0) : 0,
+      completed: row ? (row.completed || 0) : 0,
+      in_progress: row ? (row.in_progress || 0) : 0,
+      cancelled: row ? (row.cancelled || 0) : 0
+    };
+  }
+
+  getPendingPaymentsCount(filter = {}) {
+    const whereClauses = ["payment_status = 'pending'", "status NOT IN ('cancelled', 'rejected', 'timeout')"];
+    const params = [];
+    if (filter.brand_id) {
+      whereClauses.push('brand_id = ?');
+      params.push(filter.brand_id);
+    }
+    if (filter.branch_id) {
+      whereClauses.push('branch_id = ?');
+      params.push(filter.branch_id);
+    }
+    const whereSql = `WHERE ${whereClauses.join(' AND ')}`;
+    const row = this.db.queryOne(`
+      SELECT COUNT(*) as count FROM orders ${whereSql}
+    `, params);
+    return row ? (row.count || 0) : 0;
+  }
 }
 
 module.exports = ReportingRepository;

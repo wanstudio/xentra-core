@@ -185,123 +185,263 @@
 
       <!-- TAB 1: OVERVIEW -->
       <section id="tab-overview" class="x-tab-content active" data-tab="overview">
-        <!-- Top Controls: Date Range & Global Branch Context Status -->
-        <div class="x-filter-bar">
-          <div class="x-filter-group">
-            <label style="font-size:13px;font-weight:700;color:var(--text-muted);">Periode:</label>
-            <input type="date" id="overview-start-date" class="x-date-input" aria-label="Tanggal Mulai">
-            <span style="color:var(--text-muted);font-size:12px;">s/d</span>
-            <input type="date" id="overview-end-date" class="x-date-input" aria-label="Tanggal Selesai">
-            <button type="button" class="x-btn-secondary" id="btn-overview-filter" style="font-size:12px;padding:6px 12px;">Terapkan</button>
-            <button type="button" class="x-btn-secondary" id="btn-overview-reset" style="font-size:12px;padding:6px 10px;">Semua Waktu</button>
+        <!-- Mobile Owner Command Center (Visible on Mobile <= 768px) -->
+        <div class="x-owner-command-center" id="x-owner-command-center">
+
+          <!-- 1. Periode Selector -->
+          <div class="x-occ-period-bar">
+            <div class="x-occ-period-selector-wrap">
+              <svg class="x-occ-calendar-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+              <select id="occ-period-select" class="x-occ-period-select" aria-label="Pilih Periode Beranda">
+                <option value="today" selected>Hari ini</option>
+                <option value="7d">7 hari</option>
+                <option value="30d">30 hari</option>
+                <option value="month">Bulan ini</option>
+              </select>
+              <svg class="x-occ-chevron-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </div>
+            <span class="x-occ-period-status-badge" id="occ-period-badge">Hari ini</span>
           </div>
-          <div>
-            <span class="x-badge" id="overview-branch-badge" style="background:#e0e7ff;color:#3730a3;font-size:12px;padding:4px 10px;border-radius:20px;font-weight:700;">Semua Cabang</span>
+
+          <!-- 2. Hero KPI Card -->
+          <div class="x-occ-hero-card" id="occ-hero-card">
+            <div class="x-occ-hero-header">
+              <span class="x-occ-hero-sublabel">Penjualan</span>
+              <div class="x-occ-hero-trend neutral" id="occ-hero-trend">
+                <span id="occ-hero-trend-text">Periode ini</span>
+              </div>
+            </div>
+            <div class="x-occ-hero-primary-val" id="occ-hero-sales">Rp0</div>
+            <div class="x-occ-hero-metrics-row">
+              <div class="x-occ-mini-kpi">
+                <span class="x-occ-mini-kpi-val" id="occ-hero-orders">0</span>
+                <span class="x-occ-mini-kpi-lbl">Pesanan</span>
+              </div>
+              <div class="x-occ-mini-kpi">
+                <span class="x-occ-mini-kpi-val" id="occ-hero-aov">Rp0</span>
+                <span class="x-occ-mini-kpi-lbl">Avg Order</span>
+              </div>
+              <div class="x-occ-mini-kpi">
+                <span class="x-occ-mini-kpi-val" id="occ-hero-customers">0</span>
+                <span class="x-occ-mini-kpi-lbl">Pelanggan</span>
+              </div>
+            </div>
           </div>
+
+          <!-- 3. Performa Cabang -->
+          <div class="x-occ-card" id="occ-branch-section">
+            <div class="x-occ-card-header">
+              <h3 class="x-occ-card-title" id="occ-branch-title">Performa Cabang</h3>
+              <a href="#reports/branches" class="x-occ-card-link" id="occ-branch-link">Lihat semua &rarr;</a>
+            </div>
+            <div class="x-occ-card-body" id="occ-branch-content">
+              <div class="x-occ-empty-placeholder">Memuat data performa cabang...</div>
+            </div>
+          </div>
+
+          <!-- 4. Ringkasan Pesanan -->
+          <div class="x-occ-card" id="occ-orders-section">
+            <div class="x-occ-card-header">
+              <h3 class="x-occ-card-title">Pesanan</h3>
+              <a href="#orders" class="x-occ-card-link" id="occ-orders-link">Lihat pesanan &rarr;</a>
+            </div>
+            <div class="x-occ-card-body">
+              <div class="x-occ-orders-summary-grid">
+                <div class="x-occ-order-stat">
+                  <span class="x-occ-order-stat-val" id="occ-orders-total">0</span>
+                  <span class="x-occ-order-stat-lbl">Total</span>
+                </div>
+                <div class="x-occ-order-stat status-completed">
+                  <span class="x-occ-order-stat-val" id="occ-orders-completed">0</span>
+                  <span class="x-occ-order-stat-lbl">Selesai</span>
+                </div>
+                <div class="x-occ-order-stat status-progress">
+                  <span class="x-occ-order-stat-val" id="occ-orders-in-progress">0</span>
+                  <span class="x-occ-order-stat-lbl">Diproses</span>
+                </div>
+                <div class="x-occ-order-stat status-cancelled">
+                  <span class="x-occ-order-stat-val" id="occ-orders-cancelled">0</span>
+                  <span class="x-occ-order-stat-lbl">Dibatalkan</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Produk Terlaris -->
+          <div class="x-occ-card" id="occ-products-section">
+            <div class="x-occ-card-header">
+              <h3 class="x-occ-card-title">Produk Terlaris</h3>
+              <a href="#catalog/products" class="x-occ-card-link" id="occ-products-link">Lihat semua &rarr;</a>
+            </div>
+            <div class="x-occ-card-body" id="occ-products-content">
+              <div class="x-occ-empty-placeholder">Memuat data produk terlaris...</div>
+            </div>
+          </div>
+
+          <!-- 6. Perhatian -->
+          <div class="x-occ-card" id="occ-attention-section">
+            <div class="x-occ-card-header">
+              <h3 class="x-occ-card-title">Perhatian</h3>
+            </div>
+            <div class="x-occ-card-body" id="occ-attention-content">
+              <div class="x-occ-normal-state">
+                <span class="x-occ-normal-icon">✓</span>
+                <span class="x-occ-normal-text">Semua berjalan normal</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 7. Akses Cepat -->
+          <div class="x-occ-card" id="occ-quick-access-section">
+            <div class="x-occ-card-header">
+              <h3 class="x-occ-card-title">Akses Cepat</h3>
+            </div>
+            <div class="x-occ-quick-grid">
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('catalog/products')" aria-label="Akses Cepat Produk">
+                <span class="x-occ-chip-icon">📦</span>
+                <span class="x-occ-chip-label">Produk</span>
+              </button>
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('branches')" aria-label="Akses Cepat Cabang">
+                <span class="x-occ-chip-icon">🏬</span>
+                <span class="x-occ-chip-label">Cabang</span>
+              </button>
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('marketing/promotions')" aria-label="Akses Cepat Promo">
+                <span class="x-occ-chip-icon">🏷️</span>
+                <span class="x-occ-chip-label">Promo</span>
+              </button>
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('payments')" aria-label="Akses Cepat Pembayaran">
+                <span class="x-occ-chip-icon">💳</span>
+                <span class="x-occ-chip-label">Pembayaran</span>
+              </button>
+              <button type="button" class="x-occ-quick-chip" onclick="navigateTo('finance/overview')" aria-label="Akses Cepat Laporan">
+                <span class="x-occ-chip-icon">📊</span>
+                <span class="x-occ-chip-label">Laporan</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
-        <!-- Needs Attention Banner (e.g. Low stock) -->
-        <div id="overview-needs-attention-container" style="display:none;"></div>
-
-        <!-- Primary KPI Cards: Net Sales, Orders, Customers, Average Order Value (AOV) -->
-        <div class="x-metrics-grid">
-          <div class="x-metric-card">
-            <div class="x-metric-icon bg-green">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        <!-- Desktop Overview View (Visible on Desktop > 768px) -->
+        <div class="x-desktop-overview-view">
+          <!-- Top Controls: Date Range & Global Branch Context Status -->
+          <div class="x-filter-bar">
+            <div class="x-filter-group">
+              <label style="font-size:13px;font-weight:700;color:var(--text-muted);">Periode:</label>
+              <input type="date" id="overview-start-date" class="x-date-input" aria-label="Tanggal Mulai">
+              <span style="color:var(--text-muted);font-size:12px;">s/d</span>
+              <input type="date" id="overview-end-date" class="x-date-input" aria-label="Tanggal Selesai">
+              <button type="button" class="x-btn-secondary" id="btn-overview-filter" style="font-size:12px;padding:6px 12px;">Terapkan</button>
+              <button type="button" class="x-btn-secondary" id="btn-overview-reset" style="font-size:12px;padding:6px 10px;">Semua Waktu</button>
             </div>
-            <div class="x-metric-info">
-              <span class="x-metric-label">Net Sales</span>
-              <h3 id="stat-net-sales" class="x-metric-value">Rp0</h3>
-            </div>
-          </div>
-
-          <div class="x-metric-card">
-            <div class="x-metric-icon bg-blue">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-            </div>
-            <div class="x-metric-info">
-              <span class="x-metric-label">Orders</span>
-              <h3 id="stat-orders-count" class="x-metric-value">0</h3>
+            <div>
+              <span class="x-badge" id="overview-branch-badge" style="background:#e0e7ff;color:#3730a3;font-size:12px;padding:4px 10px;border-radius:20px;font-weight:700;">Semua Cabang</span>
             </div>
           </div>
 
-          <div class="x-metric-card">
-            <div class="x-metric-icon bg-amber">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <!-- Needs Attention Banner (e.g. Low stock) -->
+          <div id="overview-needs-attention-container" style="display:none;"></div>
+
+          <!-- Primary KPI Cards: Net Sales, Orders, Customers, Average Order Value (AOV) -->
+          <div class="x-metrics-grid">
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Net Sales</span>
+                <h3 id="stat-net-sales" class="x-metric-value">Rp0</h3>
+              </div>
             </div>
-            <div class="x-metric-info">
-              <span class="x-metric-label">Customers</span>
-              <h3 id="stat-customers-count" class="x-metric-value">0</h3>
+
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-blue">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Orders</span>
+                <h3 id="stat-orders-count" class="x-metric-value">0</h3>
+              </div>
+            </div>
+
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-amber">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Customers</span>
+                <h3 id="stat-customers-count" class="x-metric-value">0</h3>
+              </div>
+            </div>
+
+            <div class="x-metric-card">
+              <div class="x-metric-icon bg-green">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+              </div>
+              <div class="x-metric-info">
+                <span class="x-metric-label">Average Order Value (AOV)</span>
+                <h3 id="stat-aov" class="x-metric-value">Rp0</h3>
+              </div>
             </div>
           </div>
 
-          <div class="x-metric-card">
-            <div class="x-metric-icon bg-green">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          <!-- Two Column Grid: Sales Performance & Top Products -->
+          <div class="x-overview-grid">
+            <!-- Sales Performance (Channel & Fulfillment Breakdown) -->
+            <div class="x-card-panel">
+              <div class="x-panel-header">
+                <h3>📈 Sales Performance</h3>
+                <p>Rincian kontribusi penjualan berdasarkan channel pesanan dan fulfillment</p>
+              </div>
+              <div class="mt-4" id="overview-sales-performance-container">
+                <div class="x-empty-state">Memuat performa penjualan...</div>
+              </div>
             </div>
-            <div class="x-metric-info">
-              <span class="x-metric-label">Average Order Value (AOV)</span>
-              <h3 id="stat-aov" class="x-metric-value">Rp0</h3>
+
+            <!-- Top Products -->
+            <div class="x-card-panel">
+              <div class="x-panel-header">
+                <h3>🏆 Top Products</h3>
+                <p>Produk dengan unit terjual terbanyak pada periode ini</p>
+              </div>
+              <div class="mt-4" id="overview-top-products-container">
+                <div class="x-empty-state">Memuat data produk terlaris...</div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Two Column Grid: Sales Performance & Top Products -->
-        <div class="x-overview-grid">
-          <!-- Sales Performance (Channel & Fulfillment Breakdown) -->
-          <div class="x-card-panel">
+          <!-- Branch Performance Leaderboard -->
+          <div class="x-card-panel mt-6" id="overview-branch-performance-panel">
             <div class="x-panel-header">
-              <h3>📈 Sales Performance</h3>
-              <p>Rincian kontribusi penjualan berdasarkan channel pesanan dan fulfillment</p>
+              <h3>🏢 Branch Performance</h3>
+              <p>Perbandingan volume transaksi dan omzet antar cabang</p>
             </div>
-            <div class="mt-4" id="overview-sales-performance-container">
-              <div class="x-empty-state">Memuat performa penjualan...</div>
+            <div class="mt-4" id="overview-branch-performance-container">
+              <div class="x-empty-state">Memuat data perbandingan cabang...</div>
             </div>
           </div>
 
-          <!-- Top Products -->
-          <div class="x-card-panel">
+          <!-- Quick Actions Panel -->
+          <div class="x-card-panel mt-6">
             <div class="x-panel-header">
-              <h3>🏆 Top Products</h3>
-              <p>Produk dengan unit terjual terbanyak pada periode ini</p>
+              <h3>⚡ Aksi Cepat Pengaturan</h3>
             </div>
-            <div class="mt-4" id="overview-top-products-container">
-              <div class="x-empty-state">Memuat data produk terlaris...</div>
+            <div class="x-quick-actions-grid">
+              <button type="button" class="x-quick-btn" onclick="switchTab('brand')">
+                <span>🎨 Ubah Logo & Warna Tema</span>
+                <small>Ubah identitas visual toko pelanggan seketika</small>
+              </button>
+              <button type="button" class="x-quick-btn" onclick="switchTab('catalog')">
+                <span>🍔 Tambah / Edit Menu Makanan</span>
+                <small>Kelola produk, foto makanan, dan harga jual</small>
+              </button>
+              <button type="button" class="x-quick-btn" onclick="switchTab('branches')">
+                <span>🛵 Atur Radius & Tarif Ongkir</span>
+                <small>Tentukan gratis ongkir km pertama dan tarif per km</small>
+              </button>
             </div>
           </div>
-        </div>
-
-        <!-- Branch Performance Leaderboard -->
-        <div class="x-card-panel mt-6" id="overview-branch-performance-panel">
-          <div class="x-panel-header">
-            <h3>🏢 Branch Performance</h3>
-            <p>Perbandingan volume transaksi dan omzet antar cabang</p>
-          </div>
-          <div class="mt-4" id="overview-branch-performance-container">
-            <div class="x-empty-state">Memuat data perbandingan cabang...</div>
-          </div>
-        </div>
-
-        <!-- Quick Actions Panel -->
-        <div class="x-card-panel mt-6">
-          <div class="x-panel-header">
-            <h3>⚡ Aksi Cepat Pengaturan</h3>
-          </div>
-          <div class="x-quick-actions-grid">
-            <button type="button" class="x-quick-btn" onclick="switchTab('brand')">
-              <span>🎨 Ubah Logo & Warna Tema</span>
-              <small>Ubah identitas visual toko pelanggan seketika</small>
-            </button>
-            <button type="button" class="x-quick-btn" onclick="switchTab('catalog')">
-              <span>🍔 Tambah / Edit Menu Makanan</span>
-              <small>Kelola produk, foto makanan, dan harga jual</small>
-            </button>
-            <button type="button" class="x-quick-btn" onclick="switchTab('branches')">
-              <span>🛵 Atur Radius & Tarif Ongkir</span>
-              <small>Tentukan gratis ongkir km pertama dan tarif per km</small>
-            </button>
-          </div>
-        </div>
+        </div> <!-- /.x-desktop-overview-view -->
       </section>
 
       <!-- TAB 2: BRAND & THEME -->
