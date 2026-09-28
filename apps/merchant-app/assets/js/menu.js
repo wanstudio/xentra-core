@@ -206,7 +206,8 @@
       var nameBtn = document.createElement('button');
       nameBtn.type = 'button';
       nameBtn.draggable = false;
-      nameBtn.style.cssText = 'border:none;background:none;padding:6px 8px 6px 2px;font-size:13px;font-weight:' + (isActive ? '700' : '500') + ';cursor:pointer;color:#1e293b;';
+      nameBtn.className = 'x-menu-category-name';
+      nameBtn.style.cssText = 'border:none;background:none;padding:6px 8px 6px 2px;font-size:13px;font-weight:' + (isActive ? '700' : '500') + ';cursor:pointer;color:#1e293b;white-space:nowrap;';
       nameBtn.textContent = cat.name;
       nameBtn.addEventListener('click', function (e) {
         e.stopPropagation();
