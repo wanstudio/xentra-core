@@ -655,7 +655,7 @@
     _branchContextState.branches = scopedBranches;
 
     // Rebuild native select options
-    sel.innerHTML = '<option value="all">Semua Cabang</option>';
+    sel.innerHTML = '<option value="all">All Branches</option>';
     (_branchContextState.branches).forEach(function (b) {
       var opt = document.createElement('option');
       opt.value = b.id;
