@@ -26,10 +26,135 @@
     searchQuery: '',
     statusFilter: 'all',
     categoryFilter: 'all',
+    menuView: 'home',
+    selectedCategoryId: null,
+    categoryStatusFilter: 'active',
     addCatalogSearchQuery: '',
     fetchSeq: 0
   };
 
+
+
+  function setBMMenuView(view) {
+    _bmMenuState.menuView = view;
+    var views = {
+      home: $('bm-menu-home-view'),
+      categories: $('bm-menu-categories-view'),
+      detail: $('bm-menu-category-detail-view')
+    };
+    Object.keys(views).forEach(function (key) {
+      var el = views[key];
+      if (!el) return;
+      var active = key === view;
+      el.hidden = !active;
+      el.classList.toggle('is-active', active);
+    });
+    if (view === 'categories') renderBMMenuCategoriesBar();
+    if (view === 'detail') renderBMMenuTable();
+  }
+
+  window.openBMMenuHome = function () {
+    setBMMenuView('home');
+  };
+
+  window.openBMMenuCategories = function () {
+    setBMMenuView('categories');
+  };
+
+  window.openBMMenuCategoryDetail = function (categoryId) {
+    _bmMenuState.selectedCategoryId = categoryId;
+    _bmMenuState.categoryFilter = categoryId;
+    setBMMenuView('detail');
+
+    var cat = (_bmMenuState.categories || []).find(function (c) {
+      return String(c.id) === String(categoryId);
+    });
+    if ($('bm-menu-category-detail-title')) {
+      $('bm-menu-category-detail-title').textContent = cat ? cat.name : 'Kategori';
+    }
+    if ($('bm-menu-category-detail-subtitle')) {
+      var count = (_bmMenuState.products || []).filter(function (p) {
+        var ids = Array.isArray(p.category_ids) ? p.category_ids.map(String) : [];
+        return ids.indexOf(String(categoryId)) !== -1;
+      }).length;
+      $('bm-menu-category-detail-subtitle').textContent = count + ' menu dalam kategori ini.';
+    }
+    renderBMMenuTable();
+  };
+
+  function bindBMMenuHierarchy() {
+    var homeBtn = $('btn-bm-menu-open-categories');
+    if (homeBtn && !homeBtn.dataset.bound) {
+      homeBtn.dataset.bound = '1';
+      homeBtn.addEventListener('click', openBMMenuCategories);
+    }
+
+    var homeBack = $('btn-bm-menu-categories-back');
+    if (homeBack && !homeBack.dataset.bound) {
+      homeBack.dataset.bound = '1';
+      homeBack.addEventListener('click', openBMMenuHome);
+    }
+
+    var detailBack = $('btn-bm-menu-category-detail-back');
+    if (detailBack && !detailBack.dataset.bound) {
+      detailBack.dataset.bound = '1';
+      detailBack.addEventListener('click', openBMMenuCategories);
+    }
+
+    var addCategory = $('btn-bm-menu-add-category');
+    if (addCategory && !addCategory.dataset.bound) {
+      addCategory.dataset.bound = '1';
+      addCategory.addEventListener('click', function () { promptAddBMBranchCategory(); });
+    }
+
+    var addCatalog = $('btn-bm-menu-add-catalog');
+    if (addCatalog && !addCatalog.dataset.bound) {
+      addCatalog.dataset.bound = '1';
+      addCatalog.addEventListener('click', function () { openBMAddCatalogModal(); });
+    }
+
+    var refresh = $('btn-bm-menu-refresh');
+    if (refresh && !refresh.dataset.bound) {
+      refresh.dataset.bound = '1';
+      refresh.addEventListener('click', loadBMMenu);
+    }
+
+    var detailAdd = $('btn-bm-menu-category-add');
+    if (detailAdd && !detailAdd.dataset.bound) {
+      detailAdd.dataset.bound = '1';
+      detailAdd.addEventListener('click', function () { openBMAddCatalogModal(); });
+    }
+
+    var search = $('bm-menu-search');
+    if (search && !search.dataset.bound) {
+      search.dataset.bound = '1';
+      search.addEventListener('input', onBMMenuFilterChange);
+    }
+
+    var status = $('bm-menu-filter-status');
+    if (status && !status.dataset.bound) {
+      status.dataset.bound = '1';
+      status.addEventListener('change', onBMMenuFilterChange);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindBMMenuHierarchy);
+  } else {
+    bindBMMenuHierarchy();
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-menu-category-status]'), function (tab) {
+    if (tab.dataset.bound) return;
+    tab.dataset.bound = '1';
+    tab.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-menu-category-status]'), function (x) {
+        x.classList.toggle('is-active', x === tab);
+      });
+      _bmMenuState.categoryStatusFilter = tab.getAttribute('data-menu-category-status') || 'active';
+      renderBMMenuCategoriesBar();
+    });
+  });
 
   async function loadBMMenu() {
     var branchId = getBMTargetBranchId();
@@ -91,8 +216,15 @@
           });
         });
 
+        if (_bmMenuState.selectedCategoryId && !_bmMenuState.categories.some(function (c) {
+          return String(c.id) === String(_bmMenuState.selectedCategoryId);
+        })) {
+          _bmMenuState.selectedCategoryId = null;
+        }
         updateBMMenuStats(_bmMenuState.products);
-        renderBMMenuTable();
+        bindBMMenuHierarchy();
+        if (_bmMenuState.menuView === 'categories') renderBMMenuCategoriesBar();
+        if (_bmMenuState.menuView === 'detail') renderBMMenuTable();
       } else {
         if (tbody) {
           tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-danger">Gagal memuat menu: ' + esc(prodData.error || 'Terjadi kesalahan') + '</td></tr>';
@@ -123,11 +255,15 @@
     var filterEl = $('bm-menu-filter-status');
     if (searchEl) _bmMenuState.searchQuery = searchEl.value.trim().toLowerCase();
     if (filterEl) _bmMenuState.statusFilter = filterEl.value;
-    renderBMMenuTable();
+    if (_bmMenuState.menuView === 'detail') renderBMMenuTable();
   }
   window.onBMMenuFilterChange = onBMMenuFilterChange;
 
   function setBMMenuCategoryFilter(catId) {
+    if (catId !== 'all') {
+      window.openBMMenuCategoryDetail(catId);
+      return;
+    }
     _bmMenuState.categoryFilter = catId;
     var label = $('bm-menu-cat-filter-label');
     if (label) {
@@ -147,168 +283,56 @@
     var bar = $('bm-menu-categories-bar');
     if (!bar) return;
 
-    bar.innerHTML = '';
+    var categories = (_bmMenuState.categories || []).filter(function (cat) {
+      if (_bmMenuState.categoryStatusFilter === 'inactive') return cat.is_active === 0 || cat.is_active === false;
+      return !(cat.is_active === 0 || cat.is_active === false);
+    });
 
-    var allBtn = document.createElement('button');
-    allBtn.type = 'button';
-    allBtn.className = 'x-cat-filter-btn' + (_bmMenuState.categoryFilter === 'all' ? ' active' : '');
-    allBtn.style.borderRadius = '20px';
-    allBtn.textContent = 'Semua';
-    allBtn.addEventListener('click', function () { setBMMenuCategoryFilter('all'); });
-    bar.appendChild(allBtn);
-
-    var categories = _bmMenuState.categories || [];
     if (!categories.length) {
-      var hint = document.createElement('span');
-      hint.className = 'text-muted';
-      hint.style.fontSize = '12px';
-      hint.textContent = 'Belum ada kategori cabang. Klik "+ Kategori Cabang" untuk membuat.';
-      bar.appendChild(hint);
+      bar.innerHTML = '<div class="x-menu-empty-state">' +
+        (_bmMenuState.categoryStatusFilter === 'inactive'
+          ? 'Belum ada kategori nonaktif.'
+          : 'Belum ada kategori aktif. Tambahkan kategori untuk mulai mengelompokkan menu.') +
+        '</div>';
       return;
     }
 
-    categories.forEach(function (cat) {
-      var isActive = String(_bmMenuState.categoryFilter) === String(cat.id);
+    bar.innerHTML = categories.map(function (cat) {
+      var count = (_bmMenuState.products || []).filter(function (p) {
+        var ids = Array.isArray(p.category_ids) ? p.category_ids.map(String) : [];
+        return ids.indexOf(String(cat.id)) !== -1;
+      }).length;
 
-      var chip = document.createElement('span');
-      chip.className = 'x-menu-category-chip';
-      chip.dataset.catId = cat.id;
-      chip.draggable = true;
-      chip.style.cssText = [
-        'display:inline-flex;align-items:center;gap:0;border-radius:20px;overflow:hidden;',
-        'border:1px solid ' + (isActive ? 'var(--x-primary,#10b981)' : '#e2e8f0') + ';',
-        'background:' + (isActive ? '#f0fdf4' : '#f8fafc') + ';',
-        'transition:box-shadow 0.15s,opacity 0.15s;',
-        'cursor:grab;'
-      ].join('');
+      return '<div class="x-menu-category-row" data-category-id="' + esc(cat.id) + '">' +
+        '<button type="button" class="x-menu-category-main">' +
+          '<span class="x-menu-category-copy">' +
+            '<strong>' + esc(cat.name) + '</strong>' +
+            '<small>' + count + ' menu</small>' +
+          '</span>' +
+          '<span class="x-menu-category-row-actions">' +
+            '<button type="button" class="x-menu-category-edit" aria-label="Ubah ' + esc(cat.name) + '" title="Ubah kategori">' +
+              '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>' +
+            '</button>' +
+            '<svg class="x-menu-hub-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>' +
+          '</span>' +
+        '</button>' +
+      '</div>';
+    }).join('');
 
-      var handle = document.createElement('span');
-      handle.title = 'Tahan & geser untuk ubah urutan';
-      handle.style.cssText = 'padding:5px 4px 5px 10px;font-size:13px;color:#94a3b8;cursor:grab;user-select:none;';
-      handle.textContent = '⋮⋮';
-      chip.appendChild(handle);
-
-      var thumbWrap = document.createElement('span');
-      thumbWrap.style.cssText = 'width:22px;height:22px;border-radius:6px;overflow:hidden;background:#eef2f6;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-right:2px;';
-      if (cat.image_url) {
-        var thumbImg = document.createElement('img');
-        thumbImg.src = cat.image_url;
-        thumbImg.alt = '';
-        thumbImg.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-        thumbWrap.appendChild(thumbImg);
-      } else {
-        var thumbMono = document.createElement('span');
-        thumbMono.style.cssText = 'font-size:10px;font-weight:700;color:#94a3b8;';
-        thumbMono.textContent = (cat.name || '?').trim().slice(0, 1).toUpperCase();
-        thumbWrap.appendChild(thumbMono);
+    Array.prototype.forEach.call(bar.querySelectorAll('.x-menu-category-row'), function (row) {
+      var catId = row.getAttribute('data-category-id');
+      var cat = (_bmMenuState.categories || []).find(function (c) { return String(c.id) === String(catId); });
+      var main = row.querySelector('.x-menu-category-main');
+      if (main) {
+        main.addEventListener('click', function () { window.openBMMenuCategoryDetail(catId); });
       }
-      chip.appendChild(thumbWrap);
-
-      var nameBtn = document.createElement('button');
-      nameBtn.type = 'button';
-      nameBtn.draggable = false;
-      nameBtn.className = 'x-menu-category-name';
-      nameBtn.style.cssText = 'border:none;background:none;padding:6px 8px 6px 2px;font-size:13px;font-weight:' + (isActive ? '700' : '500') + ';cursor:pointer;color:#1e293b;white-space:nowrap;';
-      nameBtn.textContent = cat.name;
-      nameBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        setBMMenuCategoryFilter(cat.id);
-      });
-      chip.appendChild(nameBtn);
-
-      var editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.draggable = false;
-      editBtn.title = 'Ubah nama & gambar kategori';
-      editBtn.style.cssText = 'border:none;background:none;padding:5px 5px;font-size:12px;cursor:pointer;color:#64748b;';
-      editBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>'; 
-      editBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        openBranchCategoryEditModal(cat);
-      });
-      chip.appendChild(editBtn);
-
-      var delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.draggable = false;
-      delBtn.title = 'Hapus kategori cabang';
-      delBtn.style.cssText = 'border:none;background:none;padding:6px 10px 6px 4px;font-size:12px;cursor:pointer;color:#ef4444;opacity:0.8;';
-      delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/></svg>'; 
-      delBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        deleteBMBranchCategory(cat.id, cat.name);
-      });
-      chip.appendChild(delBtn);
-
-      // Drag and drop ordering
-      chip.addEventListener('dragstart', function (e) {
-        _dragSrcCatId = cat.id;
-        _dragSrcEl = chip;
-        chip.style.cursor = 'grabbing';
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', cat.id);
-        setTimeout(function () {
-          chip.style.opacity = '0.4';
-          chip.style.transform = 'scale(0.96)';
-        }, 0);
-      });
-
-      chip.addEventListener('dragend', function () {
-        chip.style.opacity = '1';
-        chip.style.cursor = 'grab';
-        chip.style.transform = '';
-        bar.querySelectorAll('[data-cat-id]').forEach(function (el) {
-          el.style.borderLeft = '';
-          el.style.borderRight = '';
-          el.style.boxShadow = '';
+      var edit = row.querySelector('.x-menu-category-edit');
+      if (edit && cat) {
+        edit.addEventListener('click', function (event) {
+          event.stopPropagation();
+          openBranchCategoryEditModal(cat);
         });
-      });
-
-      chip.addEventListener('dragover', function (e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        if (chip !== _dragSrcEl) {
-          var rect = chip.getBoundingClientRect();
-          var midX = rect.left + rect.width / 2;
-          if (e.clientX < midX) {
-            chip.style.borderLeft = '3px solid var(--x-primary,#10b981)';
-            chip.style.borderRight = '';
-          } else {
-            chip.style.borderLeft = '';
-            chip.style.borderRight = '3px solid var(--x-primary,#10b981)';
-          }
-        }
-      });
-
-      chip.addEventListener('dragleave', function () {
-        chip.style.borderLeft = '';
-        chip.style.borderRight = '';
-      });
-
-      chip.addEventListener('drop', function (e) {
-        e.preventDefault();
-        chip.style.borderLeft = '';
-        chip.style.borderRight = '';
-        if (!_dragSrcCatId || _dragSrcCatId === cat.id || !_dragSrcEl) return;
-
-        var rect = chip.getBoundingClientRect();
-        var midX = rect.left + rect.width / 2;
-        var insertBefore = e.clientX < midX;
-
-        if (insertBefore) {
-          bar.insertBefore(_dragSrcEl, chip);
-        } else {
-          bar.insertBefore(_dragSrcEl, chip.nextSibling);
-        }
-
-        var newOrder = Array.from(bar.querySelectorAll('[data-cat-id]')).map(function (el) {
-          return el.dataset.catId;
-        });
-
-        saveBMBranchCategoryOrder(newOrder);
-      });
-
-      bar.appendChild(chip);
+      }
     });
   }
 
@@ -379,6 +403,7 @@
     var tbody = $('bm-menu-tbody');
     if (!tbody) return;
 
+    var selectedCategoryId = _bmMenuState.selectedCategoryId;
     var filtered = (_bmMenuState.products || []).filter(function (p) {
       var name = (p.product_name || p.name || '').toLowerCase();
       if (_bmMenuState.searchQuery && name.indexOf(_bmMenuState.searchQuery) === -1) return false;
@@ -387,26 +412,22 @@
       if (_bmMenuState.statusFilter === 'available' && !isAvail) return false;
       if (_bmMenuState.statusFilter === 'unavailable' && isAvail) return false;
 
-      if (_bmMenuState.categoryFilter && _bmMenuState.categoryFilter !== 'all') {
+      if (selectedCategoryId) {
         var pCatIds = Array.isArray(p.category_ids) && p.category_ids.length > 0
           ? p.category_ids.map(String)
           : (p.branch_category_id ? [String(p.branch_category_id)] : []);
-        if (pCatIds.indexOf(String(_bmMenuState.categoryFilter)) === -1) return false;
+        if (pCatIds.indexOf(String(selectedCategoryId)) === -1) return false;
       }
       return true;
     });
 
+    if ($('bm-menu-stat-total')) $('bm-menu-stat-total').textContent = filtered.length;
+
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Tidak ada produk yang sesuai.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-muted">Belum ada menu dalam kategori ini.</td></tr>';
       return;
     }
 
-    /*
-     * Keep dynamic actions out of inline HTML attributes.
-     * Product objects can contain user-entered names/metadata; embedding them
-     * into inline HTML handlers is fragile because HTML escaping is not JavaScript
-     * escaping and can break the DOM attribute parser.
-     */
     tbody.innerHTML = filtered.map(function (p, index) {
       var isAvail = (p.is_available === 1 || p.is_available === true);
       var catBadges = (p.category_names && p.category_names.length)
@@ -474,8 +495,7 @@
           XentraActionMenu.open(actionTrigger, [
             {
               label: 'Edit Menu / Kategori Cabang',
-              icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-                '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>',
+              icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>',
               onClick: function () {
                 openBranchOverrideModal(JSON.stringify(productData));
               }
@@ -483,8 +503,7 @@
             { divider: true },
             {
               label: 'Hapus dari Cabang',
-              icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-                '<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
+              icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
               destructive: true,
               onClick: function () {
                 removeBMBranchProduct(product.product_id, product.product_name || product.name);
