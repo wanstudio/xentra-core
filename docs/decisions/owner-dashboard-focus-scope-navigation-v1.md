@@ -30,7 +30,7 @@ On the Owner mobile Home, Quick Access is a compact **2×4 grid (8 shortcuts)**.
 
 ```text
 Menu          Stok          Cabang         Promo
-Laporan       Pembayaran    Pelanggan      Tim & Akses
+Laporan       Metode Bayar  Pelanggan      Tim & Akses
 ```
 
 Route mapping uses existing Owner surfaces:
@@ -39,7 +39,7 @@ Route mapping uses existing Owner surfaces:
 - Cabang → `branches`
 - Promo → `marketing/promotions`
 - Laporan → `reports`
-- Pembayaran → `finance/payment-methods`
+- Metode Bayar → `finance/payment-methods`
 - Pelanggan → `customers`
 - Tim & Akses → `team`
 
@@ -92,5 +92,6 @@ This decision does not:
 ## Related Contracts
 
 - Owner Dashboard UI Blueprint in Notion.
+- `docs/decisions/owner-dashboard-business-more-hub-ia-v1.md`
 - `docs/OWNER_BRANCH_MANAGER_BOUNDARY.md`
 - `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`
