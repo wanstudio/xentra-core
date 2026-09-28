@@ -594,6 +594,17 @@ describe('BM-3 — Branch Manager Dashboard: Menu + Stok + Promo', () => {
     assert.ok(js.includes('openBMStockAdjustmentModal'), 'Missing openBMStockAdjustmentModal');
     assert.ok(js.includes("return 'untracked';"), 'Stock UI must distinguish NULL/untracked from zero');
     assert.ok(js.includes('Belum dilacak'), 'Stock UI must expose untracked state');
+    assert.ok(js.includes('function renderBMMenuTable()'), 'Menu UI renderer must exist');
+    assert.ok(js.includes('x-menu-action-trigger'), 'Menu action trigger must be rendered');
+    assert.ok(js.includes("actionTrigger.addEventListener('click'"), 'Menu actions must use DOM event listeners');
+    const menuRenderStart = js.indexOf('function renderBMMenuTable()');
+    const menuRenderEnd = js.indexOf('async function toggleBMProductAvailability', menuRenderStart);
+    const menuRender = js.slice(menuRenderStart, menuRenderEnd);
+    assert.equal(menuRender.includes('onclick='), false, 'Menu renderer must not embed inline onclick attributes');
+    const cssPath = path.join(__dirname, '../../apps/merchant-shared/css/dashboard.css');
+    const css = fs.readFileSync(cssPath, 'utf8');
+    assert.ok(css.includes('.x-menu-category-bar > *'), 'Menu category bar must keep direct children from shrinking');
+    assert.ok(css.includes('flex:0 0 auto;'), 'Menu category chips must retain intrinsic width');
   });
 
   /* ─────────────────────────────────────────────────────────────────────────
