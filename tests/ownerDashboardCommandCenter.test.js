@@ -117,22 +117,34 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
       'Default reassurance state "Semua berjalan normal" must be present');
   });
 
-  await t.test('OCC-08: Quick Access section exists with exactly 5 shortcut chips', () => {
+  await t.test('OCC-08: Quick Access section exists with exactly 8 shortcut chips in 2x4 layout', () => {
     assert.ok(html.includes('id="occ-quick-access-section"'),
       '#occ-quick-access-section must exist');
+    assert.ok(html.includes('class="x-occ-quick-all"'),
+      'Quick access must expose a Lihat semua action');
+    assert.ok(html.includes('/merchant-dashboard/assets/icons/quick-access.svg#menu'),
+      'Quick access must use the local colorful SVG icon sprite');
+
     const occSection = html.substring(
       html.indexOf('id="occ-quick-access-section"'),
       html.indexOf('<!-- Desktop Overview View')
     );
     const chips = occSection.match(/class="x-occ-quick-chip"/g) || [];
-    assert.strictEqual(chips.length, 5,
-      `Expected 5 quick access chips, got ${chips.length}`);
+    assert.strictEqual(chips.length, 8,
+      `Expected 8 quick access chips, got ${chips.length}`);
 
-    const expectedLabels = ['Produk', 'Cabang', 'Promo', 'Pembayaran', 'Laporan'];
+    const expectedLabels = ['Menu', 'Cabang', 'Promo', 'Banner', 'Laporan', 'Keuangan', 'Pelanggan', 'Tim &amp; Akses'];
     for (const label of expectedLabels) {
       assert.ok(occSection.includes(label),
-        `Quick access chip "${label}" must exist in HTML`);
+        `Quick access chip "${label.replace('&amp;', '&')}" must exist in HTML`);
     }
+  });
+
+  await t.test('OCC-08A: Quick Access visual contract uses four columns on mobile', () => {
+    assert.ok(css.includes('grid-template-columns: repeat(4, minmax(0, 1fr))'),
+      'Quick Access must use a 4-column mobile grid');
+    assert.ok(css.includes('x-occ-quick-access-card'),
+      'Quick Access card refinement styles must exist');
   });
 
   // --------------------------------------------------------------------------
