@@ -63,20 +63,28 @@
   }
   window.loadBMStock = loadBMStock;
 
+  function getStockStatus(it) {
+    if (it.stock === null || it.stock === undefined || it.stock === '') return 'untracked';
+    var s = Number(it.stock);
+    var th = Number(it.low_stock_threshold || 5);
+    if (s <= 0) return 'out';
+    if (s <= th) return 'low';
+    return 'safe';
+  }
+
   function updateBMStockStats(items) {
     var total = (items || []).length;
-    var outOfStock = (items || []).filter(function (it) { return Number(it.stock) <= 0; }).length;
-    var lowStock = (items || []).filter(function (it) {
-      var s = Number(it.stock);
-      var th = Number(it.low_stock_threshold || 5);
-      return s > 0 && s <= th;
-    }).length;
-    var safeStock = total - outOfStock - lowStock;
+    var untracked = (items || []).filter(function (it) { return getStockStatus(it) === 'untracked'; }).length;
+    var outOfStock = (items || []).filter(function (it) { return getStockStatus(it) === 'out'; }).length;
+    var lowStock = (items || []).filter(function (it) { return getStockStatus(it) === 'low'; }).length;
+    var safeStock = (items || []).filter(function (it) { return getStockStatus(it) === 'safe'; }).length;
 
     if ($('bm-stock-stat-total')) $('bm-stock-stat-total').textContent = total;
+    if ($('bm-stock-stat-tracked')) $('bm-stock-stat-tracked').textContent = total - untracked;
     if ($('bm-stock-stat-safe')) $('bm-stock-stat-safe').textContent = safeStock;
     if ($('bm-stock-stat-low')) $('bm-stock-stat-low').textContent = lowStock;
     if ($('bm-stock-stat-out')) $('bm-stock-stat-out').textContent = outOfStock;
+    if ($('bm-stock-stat-untracked')) $('bm-stock-stat-untracked').textContent = untracked;
   }
 
   function onBMStockFilterChange() {
@@ -96,42 +104,37 @@
       var name = (it.product_name || '').toLowerCase();
       var matchesSearch = !_bmStockState.searchQuery || name.indexOf(_bmStockState.searchQuery) !== -1;
       if (!matchesSearch) return false;
-
-      var s = Number(it.stock);
-      var th = Number(it.low_stock_threshold || 5);
-      if (_bmStockState.statusFilter === 'out') return s <= 0;
-      if (_bmStockState.statusFilter === 'low') return s > 0 && s <= th;
-      if (_bmStockState.statusFilter === 'safe') return s > th;
-      return true;
+      var status = getStockStatus(it);
+      return _bmStockState.statusFilter === 'all' || _bmStockState.statusFilter === status;
     });
 
     if (!filtered.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Tidak ada item inventaris yang sesuai kriteria filter.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-muted">Tidak ada item yang sesuai.</td></tr>';
       return;
     }
 
     tbody.innerHTML = filtered.map(function (it) {
-      var s = Number(it.stock);
+      var status = getStockStatus(it);
+      var isUntracked = status === 'untracked';
+      var s = isUntracked ? null : Number(it.stock);
       var th = Number(it.low_stock_threshold || 5);
-
-      var badge = '';
-      if (s <= 0) {
-        badge = '<span class="x-badge x-badge-danger" style="font-size:11px;">HABIS (0)</span>';
-      } else if (s <= th) {
-        badge = '<span class="x-badge x-badge-warning" style="font-size:11px;">MENIPIS (&le; ' + th + ')</span>';
-      } else {
-        badge = '<span class="x-badge x-badge-success" style="font-size:11px;">AMAN</span>';
-      }
-
-      return '<tr>' +
-        '<td><strong>' + esc(it.product_name) + '</strong></td>' +
-        '<td>' + formatMoney(it.price) + '</td>' +
-        '<td><strong style="font-size:14px;">' + s + '</strong></td>' +
-        '<td><span class="text-muted">' + th + '</span></td>' +
-        '<td>' + badge + '</td>' +
-        '<td style="text-align:right;">' +
-          '<button type="button" class="x-btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="openBMStockAdjustmentModal(\'' + esc(it.product_id) + '\')">Sesuaikan Stok</button>' +
-        '</td>' +
+      var statusLabel = status === 'untracked' ? 'BELUM DILACAK'
+        : status === 'out' ? 'HABIS'
+        : status === 'low' ? 'MENIPIS'
+        : 'AMAN';
+      var badgeClass = status === 'untracked' ? 'x-badge-muted'
+        : status === 'out' ? 'x-badge-danger'
+        : status === 'low' ? 'x-badge-warning'
+        : 'x-badge-success';
+      var stockLabel = isUntracked ? '—' : String(s);
+      var thresholdLabel = isUntracked ? 'Belum dilacak' : String(th);
+      var actionLabel = isUntracked ? 'Catat Stok' : 'Sesuaikan';
+      return '<tr class="x-merchant-data-row x-stock-row">' +
+        '<td data-label="Produk"><strong>' + esc(it.product_name) + '</strong></td>' +
+        '<td data-label="Stok"><strong style="font-size:16px;">' + stockLabel + '</strong></td>' +
+        '<td data-label="Batas Minimum"><span class="text-muted">' + esc(thresholdLabel) + '</span></td>' +
+        '<td data-label="Status"><span class="x-badge ' + badgeClass + '">' + statusLabel + '</span></td>' +
+        '<td data-label="Aksi" style="text-align:right;"><button type="button" class="x-btn-secondary x-stock-adjust-btn" onclick="openBMStockAdjustmentModal(\'' + esc(it.product_id) + '\')">' + actionLabel + '</button></td>' +
       '</tr>';
     }).join('');
   }
@@ -145,7 +148,7 @@
 
     if ($('bm-adjust-product-id')) $('bm-adjust-product-id').value = item.product_id;
     if ($('bm-adjust-product-name')) $('bm-adjust-product-name').textContent = item.product_name;
-    if ($('bm-adjust-current-stock')) $('bm-adjust-current-stock').textContent = item.stock;
+    if ($('bm-adjust-current-stock')) $('bm-adjust-current-stock').textContent = (item.stock == null ? 'Belum dilacak' : item.stock);
 
     var selectType = $('bm-adjust-movement-type');
     if (selectType) selectType.value = 'audit_adjustment';
