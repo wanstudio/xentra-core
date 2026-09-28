@@ -202,12 +202,15 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
     try {
       const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       data.id = '/';
-      data.start_url = '/';
       data.scope = '/';
-      data.name = 'Bangjo Managerial';
-      data.short_name = 'Managerial';
-      data.description = 'Aplikasi Manajerial & Operasional Bangjo (Owner & Manager)';
+      // managerial (m. subdomain) → open merchant surface directly
+      // owner (biz.xentra.cloud or owner. subdomain) → open dashboard
+      data.start_url = (subType === 'owner') ? '/dashboard/' : '/merchant/';
       const brand = await resolveBrandForManifest(req);
+      if (brand && brand.name) {
+        data.name = brand.name;
+        data.short_name = brand.name.substring(0, 12);
+      }
       const iconOverride = brand ? (brand.merchant_pwa_icon_url || brand.logo_url || null) : null;
       data.icons = buildPwaIcons(iconOverride, '/merchant-app/assets/icons/icon-192.png', '/merchant-app/assets/icons/icon-512.png');
       return res.json(data);
@@ -265,7 +268,7 @@ app.get(['/merchant-app/manifest.json', '/merchant/manifest.json'], async (req, 
     try {
       const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
       data.id = '/';
-      data.start_url = '/';
+      data.start_url = '/merchant/';
       data.scope = '/';
       const brand = await resolveBrandForManifest(req);
       const iconOverride = brand ? (brand.merchant_pwa_icon_url || brand.logo_url || null) : null;

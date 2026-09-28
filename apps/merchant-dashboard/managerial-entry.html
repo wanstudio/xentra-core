@@ -37,6 +37,13 @@
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
   <script>
+    // Register service worker at scope '/' before redirect.
+    // Chrome requires an active SW covering start_url for PWA installability.
+    // The SW must be registered on this page (which has the manifest link)
+    // before location.replace fires so the browser can satisfy install criteria.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/merchant-app/sw.js', { scope: '/' }).catch(function () {});
+    }
     (function () {
       'use strict';
       try {
