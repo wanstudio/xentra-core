@@ -28,7 +28,7 @@ test('Owner Dashboard Topbar, Mobile Account & Scroll Unblock', async (t) => {
       'CSS viewport lock must be scoped to html.x-merchant-app');
   });
 
-  await t.test('OTA-01b: topbar stays fixed on top on mobile', () => {
+  await t.test('OTA-01b: topbar stays fixed on top on mobile with generous padding', () => {
     assert.ok(!css.match(/@media\s*\(max-width:\s*768px\)\s*\{\s*\/\*[^\*]*\*\/\s*\.x-dash-topbar\s*,\s*\.x-merchant-app/),
       'Generic .x-dash-topbar must not be grouped into relative position rule');
     const afterOwnerNav = css.indexOf('OWNER DASHBOARD — Mobile Bottom Navigation');
@@ -38,8 +38,8 @@ test('Owner Dashboard Topbar, Mobile Account & Scroll Unblock', async (t) => {
               ownerCssSection.includes('position: fixed') &&
               ownerCssSection.includes('top: 0'),
       'Owner mobile section must ensure .x-dash-topbar has position: fixed and top: 0');
-    assert.ok(ownerCssSection.includes('padding-top: 58px'),
-      'Owner mobile section must provide top spacer padding-top: 58px for fixed topbar');
+    assert.ok(ownerCssSection.includes('padding-top: max(64px') || ownerCssSection.includes('padding-top: 64px'),
+      'Owner mobile section must provide generous top spacer for fixed topbar');
   });
 
   // --------------------------------------------------------------------------
@@ -57,15 +57,22 @@ test('Owner Dashboard Topbar, Mobile Account & Scroll Unblock', async (t) => {
       '.x-branch-chevron-icon must exist to indicate dropdown capability');
   });
 
-  await t.test('OTA-03: CSS styles branch selector with prominent accent, elevation, and rounded pill', () => {
+  await t.test('OTA-03: CSS styles branch selector with clean dark gray accent stroke and rounded pill', () => {
     assert.ok(css.includes('.x-branch-selector'),
       '.x-branch-selector must be defined');
     assert.ok(css.includes('.x-branch-pin-icon'),
       '.x-branch-pin-icon must be defined');
     assert.ok(css.includes('.x-branch-chevron-icon'),
       '.x-branch-chevron-icon must be defined');
-    assert.ok(css.includes('border: 1.5px solid #2563eb'),
-      'Branch selector must use high-contrast blue accent border');
+    assert.ok(css.includes('border: 1.5px solid #475569'),
+      'Branch selector must use clean dark gray accent border');
+  });
+
+  await t.test('OTA-03b: Topbar features twin circular stroke buttons for notifications and profile', () => {
+    assert.ok(html.includes('class="x-topbar-user-icon"'),
+      'Topbar user avatar must contain SVG icon matching stroke styling');
+    assert.ok(css.includes('.x-avatar-stroke-round') && css.includes('.x-topbar-icon-btn-round'),
+      'CSS must style twin circular stroke buttons for avatar and notification');
   });
 
   // --------------------------------------------------------------------------

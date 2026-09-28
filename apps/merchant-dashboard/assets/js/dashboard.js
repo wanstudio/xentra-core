@@ -3914,7 +3914,7 @@
       if (titleEl) titleEl.textContent = 'Performa Cabang';
       if (linkEl) {
         linkEl.href = '#reports/branches';
-        linkEl.textContent = 'Lihat semua \u2192';
+        linkEl.textContent = 'Lihat semua >';
         linkEl.style.display = 'inline-block';
       }
 
@@ -3949,7 +3949,7 @@
       if (titleEl) titleEl.textContent = 'Performa ' + bName;
       if (linkEl) {
         linkEl.href = '#branches';
-        linkEl.textContent = 'Lihat detail cabang \u2192';
+        linkEl.textContent = 'Lihat detail cabang >';
         linkEl.style.display = 'inline-block';
       }
 
@@ -4671,7 +4671,9 @@
     if (nameEl) nameEl.textContent = displayName;
     if (roleEl) roleEl.textContent = role === 'owner' ? 'Owner' : (role === 'brand_manager' ? 'Brand Manager' : 'Staff');
     if (avatarEl) {
-      avatarEl.textContent = (displayName || 'A').charAt(0).toUpperCase();
+      if (!avatarEl.querySelector('svg')) {
+        avatarEl.textContent = (displayName || 'A').charAt(0).toUpperCase();
+      }
     }
   }
 
