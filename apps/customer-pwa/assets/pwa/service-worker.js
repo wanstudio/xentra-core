@@ -2,6 +2,7 @@
  * Xentra Customer PWA — Service Worker
  *
  * Release identity: content hash of this file.
+ * Canonical white status bar / theme-color (#ffffff).
  * When this file changes (new commit), the hash changes → new cache → old purged.
  * No hardcoded version strings. No external endpoints. No manual edits.
  *

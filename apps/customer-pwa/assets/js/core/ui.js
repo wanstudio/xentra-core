@@ -229,8 +229,8 @@
     root.style.setProperty('--x-hero-text', heroText);
     root.style.setProperty('--x-hero-text-sub', heroTextSub);
 
-    // Update <meta name="theme-color">
+    // Maintain canonical PWA status bar / theme-color as white (#ffffff)
     var metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.setAttribute('content', hex);
+    if (metaTheme) metaTheme.setAttribute('content', '#ffffff');
   }
 })();
