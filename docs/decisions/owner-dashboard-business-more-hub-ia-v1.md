@@ -1,0 +1,116 @@
+# Xentra — Owner Dashboard Business / More Hub IA v1
+
+**Status:** LOCKED / AUTHORITATIVE UX SKELETON  
+**Decision date:** 2026-09-28  
+**Scope:** Owner Dashboard mobile hub navigation after Beranda Quick Access
+
+## Audit conclusion
+
+The Owner Dashboard keeps the five approved bottom-navigation modules:
+
+```text
+Beranda
+Bisnis
+Pesanan
+Keuangan
+Lainnya
+```
+
+Current restaurant-platform references show a recurring separation between home/overview, business-management capabilities (catalog, locations, staff, marketing), financial/payment capabilities, reporting/insight, and account/settings concerns. GrabMerchant documents Home, Insights, Menu/Catalog/Item, Employees, payments, and multi-store management as distinct functional areas. Toast separates Reports from configuration and groups reports by Sales, Menus, Payments, Labor, Marketing, and other domains. Square similarly separates dashboard reporting, items/inventory, and team/customer operations. These patterns are reference inputs only; Xentra remains governed by its own domain and authority contracts.
+
+## Locked Owner Home / Quick Access
+
+Home remains the mobile command center.
+
+Quick Access remains a compact 2×4 shortcut grid:
+
+```text
+Menu          Stok          Cabang        Promo
+Laporan       Metode Bayar  Pelanggan     Tim & Akses
+```
+
+Rules:
+- Quick Access is a shortcut layer, not a second navigation hierarchy.
+- Laporan remains a shortcut to the reports route.
+- Metode Bayar remains a shortcut to the finance/payment-methods route.
+- Finance remains the top-level financial module; no new Payment top-level module is created.
+- Lihat semua opens the existing Bisnis hub.
+
+## Locked Business Hub skeleton
+
+```text
+BISNIS
+
+Katalog & Menu
+├── Produk Master
+├── Menu & Paket
+└── Kategori
+
+Operasional
+├── Stok
+└── Cabang Resto
+
+Pelanggan & Pemasaran
+├── Pelanggan
+└── Marketing & Promo
+
+Tim & Akses
+└── Tim & Akses
+
+Insight & Laporan
+└── Laporan
+
+Brand
+└── Identitas & Branding
+```
+
+Intent:
+- Business is the discoverable management hub for client business resources and business-facing configuration.
+- Existing routes remain authoritative; this work only reorganizes entry-point presentation.
+- Stock stays read-only on Owner, consistent with the Owner ↔ Branch Manager authority boundary.
+- Reports are discoverable from Business under Insight & Laporan, while the canonical report route remains reports.
+- Brand identity is business identity/configuration; the existing settings/business/profile route remains the implementation surface.
+
+## Locked More Hub skeleton
+
+```text
+LAINNYA
+
+Pengaturan
+├── Pengaturan Restoran
+├── Integrasi
+├── Notifikasi
+└── Akun & Keamanan
+
+Akun
+└── Profil & Keluar
+```
+
+Intent:
+- More is reserved for system/settings/account concerns.
+- It must not duplicate Team, Reports, or Brand Identity from Business.
+- Existing settings/* routes remain unchanged.
+- Account logout remains in the existing Profile & Logout action.
+
+## Non-goals
+
+This decision does not:
+- change Bottom Navigation count or route ownership;
+- change Core RBAC/authorization;
+- create new business domains;
+- change APIs or database contracts;
+- change Owner vs Branch Manager operational authority;
+- finish visual polish beyond the current skeleton/section grouping.
+
+## Related contracts
+
+- docs/decisions/owner-dashboard-focus-scope-navigation-v1.md
+- docs/OWNER_BRANCH_MANAGER_BOUNDARY.md
+- docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md
+
+## Reference sources
+
+- GrabMerchant: https://merchant.grab.com/id-id/guides/all/kemudahan-kelola-bisnis-dengan-grabmerchant-portal
+- Toast Reports: https://support.toasttab.com/en/article/Getting-Started-with-Analytics-and-Reports
+- Square Reports: https://squareup.com/help/us/en/topic/reports
+- Square Inventory: https://squareup.com/help/us/en/article/6110-manage-inventory-with-the-retail-pos-app
