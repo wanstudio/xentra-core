@@ -10,6 +10,26 @@
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
   <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.1.3">
+  <script>
+    (function () {
+      'use strict';
+      // biz.xentra.cloud is the first-class Xentra Business Portal. Keep the
+      // install metadata scoped to that portal so xentra.cloud platform pages
+      // never inherit the tenant/merchant PWA manifest.
+      if (window.location.hostname === 'biz.xentra.cloud') {
+        var manifestLink = document.createElement('link');
+        manifestLink.rel = 'manifest';
+        manifestLink.href = '/manifest.json';
+        document.head.appendChild(manifestLink);
+
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/service-worker.js', { scope: '/' }).catch(function () {});
+          });
+        }
+      }
+    })();
+  </script>
 </head>
 <body>
 
