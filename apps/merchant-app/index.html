@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — tokens, toast, action-menu, crop editor, shell styles -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.15">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.16">
 </head>
 <body class="x-merchant-app">
   <div class="x-dash-layout">
@@ -610,68 +610,140 @@
       </section>
 
       <!-- BM-3: Menu, Promo, Stok -->
-      <!-- TAB: BM-MENU — Locked Menu IA v1 -->
+      <!-- TAB: BM-MENU — LOCKED HIERARCHICAL MENU IA v2 -->
       <section id="tab-bm-menu" class="x-tab-content" data-tab="bm-menu">
-        <div class="x-card-panel x-merchant-op-panel">
-          <div class="x-merchant-screen-head">
+        <!-- Menu module hub -->
+        <div id="bm-menu-home-view" class="x-menu-view is-active">
+          <div class="x-menu-native-head">
             <div>
               <h3>Menu</h3>
-              <p>Kelola menu yang dijual di cabang. Ketersediaan adalah status penjualan, bukan stok fisik.</p>
-            </div>
-            <div class="x-menu-primary-actions">
-              <button type="button" class="x-btn-primary" id="btn-bm-menu-add-catalog" onclick="openBMAddCatalogModal()">＋ Tambah Menu</button>
-              <button type="button" class="x-btn-secondary" id="btn-bm-menu-add-category" onclick="promptAddBMBranchCategory()">Kategori</button>
-              <button type="button" class="x-btn-secondary" id="btn-bm-menu-refresh" onclick="loadBMMenu()">Segarkan</button>
+              <p>Kelola kategori, menu, dan pengaturan menu cabang.</p>
             </div>
           </div>
-          <div class="x-menu-search-row">
-            <input type="search" id="bm-menu-search" class="x-input" placeholder="Cari menu..." oninput="onBMMenuFilterChange()" aria-label="Cari menu">
-            <select id="bm-menu-filter-status" class="x-input" onchange="onBMMenuFilterChange()" aria-label="Filter ketersediaan">
+
+          <div class="x-menu-hub-card">
+            <button type="button" class="x-menu-hub-row" id="btn-bm-menu-open-categories">
+              <span class="x-menu-hub-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/><path d="M8 6v12"/></svg>
+              </span>
+              <span class="x-menu-hub-copy">
+                <strong>Kategori dan menu</strong>
+                <small>Kelola kategori dan daftar menu yang dijual di cabang.</small>
+              </span>
+              <svg class="x-menu-hub-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+
+            <button type="button" class="x-menu-hub-row x-menu-hub-row-disabled" id="btn-bm-menu-variations" aria-disabled="true">
+              <span class="x-menu-hub-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 4v16M18 4v16"/><path d="M3 8h6M15 16h6"/></svg>
+              </span>
+              <span class="x-menu-hub-copy">
+                <strong>Variasi menu</strong>
+                <small>Kelola pilihan dan opsi menu saat fitur variasi tersedia.</small>
+              </span>
+              <span class="x-menu-coming-soon">Segera</span>
+            </button>
+
+            <button type="button" class="x-menu-hub-row x-menu-hub-row-disabled" id="btn-bm-menu-schedule" aria-disabled="true">
+              <span class="x-menu-hub-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M8 2v4M16 2v4M3 9h18"/><path d="M12 12v3l2 1"/></svg>
+              </span>
+              <span class="x-menu-hub-copy">
+                <strong>Jadwal menu</strong>
+                <small>Atur kapan menu tersedia berdasarkan jadwal operasional.</small>
+              </span>
+              <span class="x-menu-coming-soon">Segera</span>
+            </button>
+          </div>
+
+          <div class="x-menu-tip-card">
+            <span aria-hidden="true">💡</span>
+            <div>
+              <strong>Kelola menu lebih cepat</strong>
+              <small>Pilih kategori terlebih dahulu, lalu ubah menu hanya saat diperlukan.</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Category list -->
+        <div id="bm-menu-categories-view" class="x-menu-view" hidden>
+          <div class="x-menu-native-head">
+            <button type="button" class="x-menu-back-btn" id="btn-bm-menu-categories-back" aria-label="Kembali ke Menu">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <div class="x-menu-native-head-copy">
+              <h3>Kategori dan menu</h3>
+              <p>Kelola kategori dan pilih kategori untuk melihat menunya.</p>
+            </div>
+            <button type="button" class="x-menu-more-btn" id="btn-bm-menu-add-category" aria-label="Tambah kategori" title="Tambah kategori">+</button>
+          </div>
+
+          <div class="x-menu-category-actions">
+            <button type="button" class="x-menu-primary-cta" id="btn-bm-menu-add-catalog">＋ Tambah Menu</button>
+            <button type="button" class="x-menu-secondary-cta" id="btn-bm-menu-refresh">Segarkan</button>
+          </div>
+
+          <div class="x-menu-category-tabs" role="tablist" aria-label="Status kategori">
+            <button type="button" class="is-active" data-menu-category-status="active">Aktif</button>
+            <button type="button" data-menu-category-status="inactive">Nonaktif</button>
+          </div>
+
+          <!-- Kept as the canonical category-list mount; old tests and integrations reference this id. -->
+          <div id="bm-menu-categories-bar" class="x-menu-category-list">
+            <div class="x-menu-empty-state">Memuat kategori...</div>
+          </div>
+        </div>
+
+        <!-- Menu items inside one category -->
+        <div id="bm-menu-category-detail-view" class="x-menu-view" hidden>
+          <div class="x-menu-native-head">
+            <button type="button" class="x-menu-back-btn" id="btn-bm-menu-category-detail-back" aria-label="Kembali ke Kategori dan menu">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <div class="x-menu-native-head-copy">
+              <h3 id="bm-menu-category-detail-title">Kategori</h3>
+              <p id="bm-menu-category-detail-subtitle">Daftar menu dalam kategori.</p>
+            </div>
+            <button type="button" class="x-menu-more-btn" id="btn-bm-menu-category-add" aria-label="Tambah menu" title="Tambah menu">+</button>
+          </div>
+
+          <div class="x-menu-detail-tools">
+            <input type="search" id="bm-menu-search" class="x-input" placeholder="Cari menu..." aria-label="Cari menu">
+            <select id="bm-menu-filter-status" class="x-input" aria-label="Filter ketersediaan">
               <option value="all">Semua</option>
               <option value="available">Tersedia</option>
               <option value="unavailable">Tidak tersedia</option>
             </select>
           </div>
 
-          <!-- Ringkasan menu. menu.js sudah menulis ke ketiga id ini sejak awal, tetapi
-               elemennya hilang saat panel menu ditata ulang — akibatnya jumlah menu
-               tidak pernah tampil. Kelas ringkasan dipakai ulang agar tampilannya
-               konsisten dengan tab Stok, tanpa CSS baru. -->
-          <div class="x-stock-summary" aria-label="Ringkasan menu">
-            <div class="x-stock-summary-item"><span>Total</span><strong id="bm-menu-stat-total">0</strong></div>
-            <div class="x-stock-summary-item"><span>Tersedia</span><strong id="bm-menu-stat-available">0</strong></div>
-            <div class="x-stock-summary-item"><span>Tidak tersedia</span><strong id="bm-menu-stat-unavailable">0</strong></div>
+          <div class="x-menu-detail-summary">
+            <span id="bm-menu-cat-filter-label">Semua kategori</span>
+            <span><strong id="bm-menu-stat-total">0</strong> menu</span>
+          </div>
+
+          <div class="x-card-panel x-merchant-list-panel x-menu-detail-list-panel">
+            <div class="table-responsive x-merchant-mobile-list">
+              <table class="x-table x-merchant-mobile-table">
+                <thead>
+                  <tr>
+                    <th>Produk</th>
+                    <th>Kategori</th>
+                    <th>Harga</th>
+                    <th>Ketersediaan</th>
+                    <th style="text-align:right;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="bm-menu-tbody">
+                  <tr><td colspan="5" class="text-center py-6 text-muted">Memuat daftar menu kategori...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div class="x-card-panel x-menu-category-panel">
-          <div class="x-menu-category-head">
-            <strong>Kategori</strong>
-            <span id="bm-menu-cat-filter-label" class="text-muted">Semua kategori</span>
-          </div>
-          <div id="bm-menu-categories-bar" class="x-menu-category-bar">
-            <span class="text-muted">Memuat kategori...</span>
-          </div>
-        </div>
-
-        <div class="x-card-panel x-merchant-list-panel">
-          <div class="table-responsive x-merchant-mobile-list">
-            <table class="x-table x-merchant-mobile-table">
-              <thead>
-                <tr>
-                  <th>Produk</th>
-                  <th>Kategori</th>
-                  <th>Harga</th>
-                  <th>Ketersediaan</th>
-                  <th style="text-align:right;">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="bm-menu-tbody">
-                <tr><td colspan="5" class="text-center py-6 text-muted">Memuat daftar menu cabang...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <!-- Compatibility hooks retained for existing Menu statistics/tests; not a visible KPI wall. -->
+        <span id="bm-menu-stat-available" hidden>0</span>
+        <span id="bm-menu-stat-unavailable" hidden>0</span>
       </section>
 
       <!-- TAB: BM-PROMO (Branch Approved Promotions & Redemptions) -->
