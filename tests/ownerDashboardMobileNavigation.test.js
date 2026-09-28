@@ -104,6 +104,32 @@ test('Owner Dashboard Mobile Navigation', async t => {
       'tab-more content section must be present');
   });
 
+  await t.test('OWNER-MOB-11A: Business hub exposes the canonical management groups', () => {
+    const business = html.substring(
+      html.indexOf('id="tab-business"'),
+      html.indexOf('id="tab-more"')
+    );
+    for (const label of ['Katalog &amp; Menu', 'Operasional', 'Pelanggan &amp; Pemasaran', 'Tim &amp; Akses', 'Insight &amp; Laporan', 'Brand']) {
+      assert.ok(business.includes(label), 'Business hub must expose section "' + label.replace(/&amp;/g, '&') + '"');
+    }
+    for (const route of ["catalog/products", "catalog/menus", "catalog/categories", "stock", "branches", "customers", "marketing", "team", "reports", "settings/business/profile"]) {
+      assert.ok(business.includes("navigateTo('" + route + "')"), 'Business hub must expose route "' + route + '"');
+    }
+  });
+
+  await t.test('OWNER-MOB-11B: More hub is reserved for system/settings/account concerns', () => {
+    const more = html.substring(
+      html.indexOf('id="tab-more"'),
+      html.indexOf('id="tab-platform-overview"')
+    );
+    for (const route of ["settings", "settings/integrations", "settings/notifications", "settings/security"]) {
+      assert.ok(more.includes("navigateTo('" + route + "')"), 'More hub must expose route "' + route + '"');
+    }
+    assert.ok(!more.includes("navigateTo('team')"), 'More hub must not duplicate Team');
+    assert.ok(!more.includes("navigateTo('reports')"), 'More hub must not duplicate Reports');
+    assert.ok(!more.includes("navigateTo('settings/business/profile')"), 'More hub must not duplicate Brand Identity');
+  });
+
   // --------------------------------------------------------------------------
   // Desktop sidebar preservation
   // --------------------------------------------------------------------------
