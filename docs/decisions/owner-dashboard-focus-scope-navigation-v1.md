@@ -23,6 +23,17 @@ The Owner Dashboard separates **scope selection** from **module navigation**:
 7. Scope-dependent content/configuration differences do not constitute a second navigation system.
 8. Focus is not authorization. Core remains authoritative for identity, RBAC, permission, target, and scope enforcement.
 9. Quick Access may expose high-frequency actions such as Promo, Banner, Product, Branch, and Payment without adding them as additional bottom-nav modules.
+
+### Quick Access v1 Default Set
+
+On the Owner mobile Home, Quick Access is a compact **2×4 grid (8 shortcuts)**. The default shortcuts are:
+
+```text
+Menu          Cabang        Promo          Banner
+Laporan       Keuangan      Pelanggan      Tim & Akses
+```
+
+These shortcuts are entry points to existing Owner Dashboard modules; they do not create new top-level modules or replace Bottom Navigation. `Lihat semua` opens the existing **Bisnis** hub.
 10. The bottom navigation remains limited to the approved Owner top-level modules.
 
 ## Owner Mobile Navigation Baseline
