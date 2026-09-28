@@ -928,6 +928,8 @@ function serializePublicBrand(brand) {
     name: brand.name,
     slug: brand.slug,
     logo_url: logoUrl,
+    merchant_pwa_icon_url: brand.merchant_pwa_icon_url || null,
+    pos_pwa_icon_url: brand.pos_pwa_icon_url || null,
     primary_color: brand.primary_color || '#b6ff00',
     custom_domain: brand.custom_domain || 'app.mybangjo.com',
     tagline: brand.tagline || 'Official Online Food Ordering',

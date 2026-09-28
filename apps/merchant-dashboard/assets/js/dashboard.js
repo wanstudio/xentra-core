@@ -975,6 +975,25 @@
     if ($('auth-brand-name')) $('auth-brand-name').textContent = brand.name || 'Bangjo Resto';
     if ($('auth-logo')) $('auth-logo').src = logoUrl;
 
+    // Installed App Identity (PWA Launcher Icon Overrides)
+    var merchantIcon = brand.merchant_pwa_icon_url || '';
+    if ($('brand-tab-merchant-icon')) $('brand-tab-merchant-icon').value = merchantIcon;
+    var defaultMerchantIcon = '/merchant-app/assets/icons/icon-192.png';
+    var effectiveMerchantIcon = merchantIcon || logoUrl || defaultMerchantIcon;
+    if ($('brand-tab-merchant-icon-preview')) $('brand-tab-merchant-icon-preview').src = effectiveMerchantIcon;
+    var hasCustomMerchant = Boolean(merchantIcon);
+    if ($('btn-brand-tab-merchant-icon-remove')) $('btn-brand-tab-merchant-icon-remove').style.display = hasCustomMerchant ? 'inline-block' : 'none';
+    if ($('btn-brand-tab-merchant-icon-pick')) $('btn-brand-tab-merchant-icon-pick').textContent = hasCustomMerchant ? '📁 Ganti Icon' : '📁 Unggah Icon';
+
+    var posIcon = brand.pos_pwa_icon_url || '';
+    if ($('brand-tab-pos-icon')) $('brand-tab-pos-icon').value = posIcon;
+    var defaultPosIcon = '/pos/assets/icons/icon-192.png';
+    var effectivePosIcon = posIcon || logoUrl || defaultPosIcon;
+    if ($('brand-tab-pos-icon-preview')) $('brand-tab-pos-icon-preview').src = effectivePosIcon;
+    var hasCustomPos = Boolean(posIcon);
+    if ($('btn-brand-tab-pos-icon-remove')) $('btn-brand-tab-pos-icon-remove').style.display = hasCustomPos ? 'inline-block' : 'none';
+    if ($('btn-brand-tab-pos-icon-pick')) $('btn-brand-tab-pos-icon-pick').textContent = hasCustomPos ? '📁 Ganti Icon' : '📁 Unggah Icon';
+
     renderBannersList(brand.banners);
     updateLiveMockupPreview(brand.name, logoUrl, brand.primary_color);
   }
@@ -1271,6 +1290,8 @@
         name: $('brand-name').value,
         tagline: $('brand-tagline').value,
         logo_url: $('brand-logo').value,
+        merchant_pwa_icon_url: $('brand-tab-merchant-icon') ? $('brand-tab-merchant-icon').value.trim() : null,
+        pos_pwa_icon_url: $('brand-tab-pos-icon') ? $('brand-tab-pos-icon').value.trim() : null,
         primary_color: rawColor,
         custom_domain: $('brand-domain').value
       };
@@ -1297,6 +1318,151 @@
         btn.disabled = false;
         btn.textContent = 'Simpan Pengaturan Brand';
       }
+      });
+    }
+
+    // Brand Tab PWA Launcher Icon Listeners
+    var btnPickBrandTabMerchant = $('btn-brand-tab-merchant-icon-pick');
+    var fileInputBrandTabMerchant = $('input-brand-tab-merchant-icon-file');
+    var btnRemoveBrandTabMerchant = $('btn-brand-tab-merchant-icon-remove');
+
+    if (btnPickBrandTabMerchant && fileInputBrandTabMerchant) {
+      btnPickBrandTabMerchant.addEventListener('click', function () { fileInputBrandTabMerchant.click(); });
+      fileInputBrandTabMerchant.addEventListener('change', async function () {
+        var file = fileInputBrandTabMerchant.files && fileInputBrandTabMerchant.files[0];
+        if (!file) return;
+
+        var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (allowed.indexOf(file.type) === -1) {
+          showToast('❌ Format file tidak didukung. Gunakan JPG, PNG, atau WebP.');
+          fileInputBrandTabMerchant.value = '';
+          return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          showToast('❌ Ukuran file melebihi batas 10 MB.');
+          fileInputBrandTabMerchant.value = '';
+          return;
+        }
+
+        XentraCropEditor.open({
+          source: file,
+          assetType: 'logo',
+          aspectRatio: 1.0,
+          title: 'Potong Icon Merchant/Owner PWA (1:1)',
+          onConfirm: async function (cropSpec, previewDataUrl) {
+            try {
+              await doUploadPwaLauncherIcon(file, cropSpec, previewDataUrl, btnPickBrandTabMerchant, 'merchant');
+              loadBrandSettings();
+            } finally {
+              fileInputBrandTabMerchant.value = '';
+            }
+          },
+          onCancel: async function () {
+            try {
+              var reader = new FileReader();
+              reader.onload = function (ev) {
+                doUploadPwaLauncherIcon(file, null, ev.target.result, btnPickBrandTabMerchant, 'merchant');
+                loadBrandSettings();
+              };
+              reader.readAsDataURL(file);
+            } catch (_) {}
+            fileInputBrandTabMerchant.value = '';
+          }
+        });
+      });
+    }
+
+    if (btnRemoveBrandTabMerchant) {
+      btnRemoveBrandTabMerchant.addEventListener('click', async function () {
+        if (!confirm('Hapus icon kustom Merchant/Owner PWA dan kembali ke default?')) return;
+        try {
+          var res = await adminFetch(API_BASE + '/admin/brand/merchant-icon', {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+          });
+          var data = await res.json();
+          if (res.ok && data.success) {
+            showToast('✅ Icon kustom Merchant/Owner PWA dihapus.');
+            loadBrandSettings();
+            if (typeof window.loadSettingsProfile === 'function') window.loadSettingsProfile();
+          } else {
+            showToast('❌ Gagal menghapus icon Merchant PWA.');
+          }
+        } catch (err) {
+          showToast('❌ Kesalahan jaringan.');
+        }
+      });
+    }
+
+    var btnPickBrandTabPos = $('btn-brand-tab-pos-icon-pick');
+    var fileInputBrandTabPos = $('input-brand-tab-pos-icon-file');
+    var btnRemoveBrandTabPos = $('btn-brand-tab-pos-icon-remove');
+
+    if (btnPickBrandTabPos && fileInputBrandTabPos) {
+      btnPickBrandTabPos.addEventListener('click', function () { fileInputBrandTabPos.click(); });
+      fileInputBrandTabPos.addEventListener('change', async function () {
+        var file = fileInputBrandTabPos.files && fileInputBrandTabPos.files[0];
+        if (!file) return;
+
+        var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+        if (allowed.indexOf(file.type) === -1) {
+          showToast('❌ Format file tidak didukung. Gunakan JPG, PNG, atau WebP.');
+          fileInputBrandTabPos.value = '';
+          return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          showToast('❌ Ukuran file melebihi batas 10 MB.');
+          fileInputBrandTabPos.value = '';
+          return;
+        }
+
+        XentraCropEditor.open({
+          source: file,
+          assetType: 'logo',
+          aspectRatio: 1.0,
+          title: 'Potong Icon POS PWA (1:1)',
+          onConfirm: async function (cropSpec, previewDataUrl) {
+            try {
+              await doUploadPwaLauncherIcon(file, cropSpec, previewDataUrl, btnPickBrandTabPos, 'pos');
+              loadBrandSettings();
+            } finally {
+              fileInputBrandTabPos.value = '';
+            }
+          },
+          onCancel: async function () {
+            try {
+              var reader = new FileReader();
+              reader.onload = function (ev) {
+                doUploadPwaLauncherIcon(file, null, ev.target.result, btnPickBrandTabPos, 'pos');
+                loadBrandSettings();
+              };
+              reader.readAsDataURL(file);
+            } catch (_) {}
+            fileInputBrandTabPos.value = '';
+          }
+        });
+      });
+    }
+
+    if (btnRemoveBrandTabPos) {
+      btnRemoveBrandTabPos.addEventListener('click', async function () {
+        if (!confirm('Hapus icon kustom POS PWA dan kembali ke default?')) return;
+        try {
+          var res = await adminFetch(API_BASE + '/admin/brand/pos-icon', {
+            method: 'DELETE',
+            headers: getAuthHeaders()
+          });
+          var data = await res.json();
+          if (res.ok && data.success) {
+            showToast('✅ Icon kustom POS PWA dihapus.');
+            loadBrandSettings();
+            if (typeof window.loadSettingsProfile === 'function') window.loadSettingsProfile();
+          } else {
+            showToast('❌ Gagal menghapus icon POS PWA.');
+          }
+        } catch (err) {
+          showToast('❌ Kesalahan jaringan.');
+        }
       });
     }
 

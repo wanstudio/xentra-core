@@ -559,6 +559,54 @@
                 <input type="text" id="brand-domain" class="x-input" placeholder="app.mybangjo.com">
               </div>
 
+              <!-- Installed App Identity (PWA Launcher Icon Overrides) in Brand Tab -->
+              <div style="margin-top:12px;padding-top:16px;border-top:1px solid var(--border-color);">
+                <div style="margin-bottom:14px;">
+                  <h4 style="margin:0 0 4px;font-size:14px;font-weight:700;color:var(--text-main);">Installed App Identity</h4>
+                  <p style="margin:0;font-size:12px;color:var(--text-muted);">Icon aplikasi setelah di-install di perangkat. Pengaturan ini tidak mengubah tema atau logo di dalam aplikasi.</p>
+                </div>
+
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;align-items:start;">
+                  <!-- Field 1: Merchant / Owner PWA -->
+                  <div class="x-form-group">
+                    <label style="font-weight:600;font-size:13px;">Merchant / Owner PWA</label>
+                    <div class="x-image-upload-control">
+                      <div class="x-image-upload-preview-box" id="brand-tab-merchant-icon-preview-box" style="width:72px;height:72px;border-radius:14px;">
+                        <img id="brand-tab-merchant-icon-preview" src="/merchant-app/assets/icons/icon-192.png" alt="Merchant PWA Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
+                      </div>
+                      <div class="x-image-upload-info">
+                        <div class="x-image-upload-actions">
+                          <button type="button" class="x-btn-secondary" id="btn-brand-tab-merchant-icon-pick" style="font-size:12px;padding:6px 12px;">📁 Unggah Icon</button>
+                          <button type="button" class="x-btn-secondary" id="btn-brand-tab-merchant-icon-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
+                        </div>
+                        <input type="file" id="input-brand-tab-merchant-icon-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                        <input type="hidden" id="brand-tab-merchant-icon" value="">
+                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Digunakan sebagai icon aplikasi Merchant/Owner setelah PWA di-install.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Field 2: POS PWA -->
+                  <div class="x-form-group">
+                    <label style="font-weight:600;font-size:13px;">POS PWA</label>
+                    <div class="x-image-upload-control">
+                      <div class="x-image-upload-preview-box" id="brand-tab-pos-icon-preview-box" style="width:72px;height:72px;border-radius:14px;">
+                        <img id="brand-tab-pos-icon-preview" src="/pos/assets/icons/icon-192.png" alt="POS PWA Icon" style="width:100%;height:100%;object-fit:cover;border-radius:14px;">
+                      </div>
+                      <div class="x-image-upload-info">
+                        <div class="x-image-upload-actions">
+                          <button type="button" class="x-btn-secondary" id="btn-brand-tab-pos-icon-pick" style="font-size:12px;padding:6px 12px;">📁 Unggah Icon</button>
+                          <button type="button" class="x-btn-secondary" id="btn-brand-tab-pos-icon-remove" style="font-size:12px;padding:6px 12px;color:#ef4444;display:none;">Hapus</button>
+                        </div>
+                        <input type="file" id="input-brand-tab-pos-icon-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                        <input type="hidden" id="brand-tab-pos-icon" value="">
+                        <div class="x-image-specs-text" style="font-size:11px;color:var(--text-muted);margin-top:4px;">Digunakan sebagai icon aplikasi POS setelah PWA di-install.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div class="x-form-actions">
                 <button type="submit" class="x-btn-primary" id="btn-save-brand">
                   <span>Simpan Pengaturan Brand</span>
