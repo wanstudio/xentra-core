@@ -338,6 +338,12 @@ test('PHASE 4: OWNER DASHBOARD OVERVIEW & REPORTS IMPLEMENTATION', async (t) => 
       assert.strictEqual(res.body.success, true);
       assert.ok(Array.isArray(res.body.data.low_stock_alerts));
       assert.ok(Array.isArray(res.body.data.movement_breakdown));
+      assert.ok(res.body.data.stock_summary, 'Operations report must include stock_summary');
+      assert.strictEqual(typeof res.body.data.stock_summary.tracked_item_count, 'number');
+      assert.strictEqual(typeof res.body.data.stock_summary.low_stock_count, 'number');
+      assert.strictEqual(typeof res.body.data.stock_summary.out_of_stock_count, 'number');
+      assert.strictEqual(typeof res.body.data.stock_summary.total_units, 'number');
+      assert.ok(Array.isArray(res.body.data.stock_by_branch), 'Operations report must include stock_by_branch');
     });
   });
 
