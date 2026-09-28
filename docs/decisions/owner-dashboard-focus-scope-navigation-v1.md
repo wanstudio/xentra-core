@@ -29,9 +29,19 @@ The Owner Dashboard separates **scope selection** from **module navigation**:
 On the Owner mobile Home, Quick Access is a compact **2×4 grid (8 shortcuts)**. The default shortcuts are:
 
 ```text
-Menu          Cabang        Promo          Banner
-Laporan       Keuangan      Pelanggan      Tim & Akses
+Menu          Stok          Cabang         Promo
+Laporan       Pembayaran    Pelanggan      Tim & Akses
 ```
+
+Route mapping uses existing Owner surfaces:
+- Menu → `catalog/menus`
+- Stok → `reports/operations` (existing Owner operations report with stock movement/low-stock information)
+- Cabang → `branches`
+- Promo → `marketing/promotions`
+- Laporan → `reports`
+- Pembayaran → `finance/payment-methods`
+- Pelanggan → `customers`
+- Tim & Akses → `team`
 
 These shortcuts are entry points to existing Owner Dashboard modules; they do not create new top-level modules or replace Bottom Navigation. `Lihat semua` opens the existing **Bisnis** hub.
 10. The bottom navigation remains limited to the approved Owner top-level modules.
