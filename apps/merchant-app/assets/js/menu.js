@@ -171,6 +171,7 @@
       var isActive = String(_bmMenuState.categoryFilter) === String(cat.id);
 
       var chip = document.createElement('span');
+      chip.className = 'x-menu-category-chip';
       chip.dataset.catId = cat.id;
       chip.draggable = true;
       chip.style.cssText = [
