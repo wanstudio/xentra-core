@@ -6361,11 +6361,11 @@ input[type="file"].x-input,
     font-size: 0 !important;
   }
 
-  #occ-quick-access-section .x-occ-chip-icon svg {
+  #occ-quick-access-section .x-occ-chip-icon img {
     display: block;
     width: 44px;
     height: 44px;
-    overflow: visible;
+    object-fit: contain;
   }
 
   #occ-quick-access-section .x-occ-chip-label {

@@ -122,12 +122,20 @@ test('Owner Mobile Command Center (Beranda)', async (t) => {
       '#occ-quick-access-section must exist');
     assert.ok(html.includes('class="x-occ-quick-all"'),
       'Quick access must expose a Lihat semua action');
-    assert.ok(html.includes('/merchant-dashboard/assets/icons/quick-access.svg#menu'),
-      'Quick access must use the local colorful SVG icon sprite');
-    assert.ok(html.includes('/merchant-dashboard/assets/icons/quick-access.svg#stock'),
-      'Quick access must have a stock icon');
-    assert.ok(html.includes('/merchant-dashboard/assets/icons/quick-access.svg#payment'),
-      'Quick access must have a payment icon');
+    const quickIcons = [
+      ['menu', 'menu.png'],
+      ['stock', 'stock.png'],
+      ['branch', 'cabang.png'],
+      ['promo', 'promo.png'],
+      ['report', 'laporan.png'],
+      ['payment', 'metode bayar.png'],
+      ['customer', 'pelanggan.png'],
+      ['team', 'tim & akses.png']
+    ];
+    for (const [key, file] of quickIcons) {
+      assert.ok(html.includes('/merchant-dashboard/assets/icons/quick-access/' + file),
+        'Quick access must use uploaded ' + key + ' icon');
+    }
 
     const occSection = html.substring(
       html.indexOf('id="occ-quick-access-section"'),
