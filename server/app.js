@@ -28,6 +28,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const { BrandRepository } = require('../core/data/repositories');
+const { PWA_THEME } = require('./config/pwa-theme');
 const brandRepository = new BrandRepository();
 
 // Standard Middlewares: CORS with strict explicit and dynamic registered origin checks.
@@ -154,6 +155,16 @@ function getBaseTenantDomain(req) {
   return match ? match[1] : host;
 }
 
+const PWA_THEME_SCRIPT = '(function(){var color=' + JSON.stringify(PWA_THEME.surfaceColor) + ';var meta=document.querySelector(\'meta[name="theme-color"]\');if(!meta){meta=document.createElement(\'meta\');meta.setAttribute(\'name\',\'theme-color\');document.head.appendChild(meta);}meta.setAttribute(\'content\',color);})();';
+
+app.get('/pwa-theme.js', (req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  return res.send(PWA_THEME_SCRIPT);
+});
+
 // PWA Manifest & Service Worker Routes — MUST come before express.static
 // so Cloudflare always sees the explicit no-store headers, not express.static defaults.
 
@@ -181,6 +192,12 @@ async function resolveBrandForManifest(req) {
  * If iconUrl is provided, both 192 and 512 entries point to it.
  * Otherwise the default src values from the manifest file are used.
  */
+function applyCanonicalPwaTheme(data) {
+  data.theme_color = PWA_THEME.surfaceColor;
+  data.background_color = PWA_THEME.surfaceColor;
+  return data;
+}
+
 function buildPwaIcons(iconUrl, default192, default512) {
   const src192 = iconUrl || default192;
   const src512 = iconUrl || default512;
@@ -200,7 +217,7 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
   if (subType === 'managerial' || subType === 'owner') {
     const manifestPath = path.join(__dirname, '../apps/merchant-app/manifest.json');
     try {
-      const data = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
       data.id = '/';
       data.scope = '/';
       // managerial (m. subdomain) → open merchant surface by default.
@@ -251,7 +268,12 @@ app.get(['/manifest.json', '/pwa/manifest.json'], async (req, res) => {
     }
   }
 
-  res.sendFile(path.join(__dirname, '../apps/customer-pwa/assets/pwa/manifest.json'));
+  try {
+    const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(path.join(__dirname, '../apps/customer-pwa/assets/pwa/manifest.json'), 'utf8')));
+    return res.json(data);
+  } catch (_) {
+    return res.sendFile(path.join(__dirname, '../apps/customer-pwa/assets/pwa/manifest.json'));
+  }
 });
 
 app.get(['/service-worker.js', '/sw.js', '/pwa/service-worker.js'], (req, res) => {
@@ -297,7 +319,12 @@ app.get(['/merchant-app/manifest.json', '/merchant/manifest.json'], async (req, 
       return res.json(data);
     } catch (_) {}
   }
-  res.sendFile(manifestPath);
+  try {
+    const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
+    return res.json(data);
+  } catch (_) {
+    return res.sendFile(manifestPath);
+  }
 });
 
 app.get(['/merchant-app/sw.js', '/merchant-app/service-worker.js', '/merchant/sw.js', '/merchant/service-worker.js'], (req, res) => {
@@ -334,7 +361,12 @@ app.get(['/pos/manifest.json', '/pos-app/manifest.json'], async (req, res) => {
       return res.json(data);
     } catch (_) {}
   }
-  res.sendFile(manifestPath);
+  try {
+    const data = applyCanonicalPwaTheme(JSON.parse(fs.readFileSync(manifestPath, 'utf8')));
+    return res.json(data);
+  } catch (_) {
+    return res.sendFile(manifestPath);
+  }
 });
 
 app.get(['/pos/sw.js', '/pos-app/sw.js', '/pos/service-worker.js', '/pos-app/service-worker.js'], (req, res) => {

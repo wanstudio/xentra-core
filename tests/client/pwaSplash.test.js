@@ -47,11 +47,9 @@ test('SPLASH-03: aplikasi menutup splash saat tampilan pertama siap', () => {
 });
 
 test('SPLASH-04: splash bawaan PWA (manifest) sewarna dengan splash di halaman', () => {
-  const MANIFEST = JSON.parse(read('apps/customer-pwa/assets/pwa/manifest.json'));
-  assert.equal(String(MANIFEST.background_color).toLowerCase(), '#ffffff',
-    'background_color harus sama dengan splash');
-  assert.equal(String(MANIFEST.theme_color).toLowerCase(), '#ffffff',
-    'theme_color harus sama dengan splash');
+  const { PWA_THEME } = require('../../server/config/pwa-theme');
+  assert.equal(String(PWA_THEME.surfaceColor).toLowerCase(), '#ffffff',
+    'warna PWA canonical harus putih');
 });
 
 test('SPLASH-05: window.Xentra.showSplash dan window.Xentra.hideSplash diekspos dengan pageshow auto-hide', () => {
