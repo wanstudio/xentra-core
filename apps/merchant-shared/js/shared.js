@@ -250,7 +250,12 @@
     var user = getStoredUser();
     if (user) {
       if ($('dash-user-name')) $('dash-user-name').textContent = user.full_name || user.username || 'Pemilik Toko';
-      if ($('dash-user-avatar')) $('dash-user-avatar').textContent = (user.full_name || user.username || 'A').charAt(0).toUpperCase();
+      if ($('dash-user-avatar')) {
+        var avatarEl = $('dash-user-avatar');
+        if (!avatarEl.querySelector('svg') && !avatarEl.classList.contains('x-avatar-stroke-round')) {
+          avatarEl.textContent = (user.full_name || user.username || 'A').charAt(0).toUpperCase();
+        }
+      }
       if ($('dash-user-role')) $('dash-user-role').textContent = (user.role || 'Owner').toUpperCase();
     }
     return true;

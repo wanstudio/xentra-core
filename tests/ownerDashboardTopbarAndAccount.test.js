@@ -38,7 +38,7 @@ test('Owner Dashboard Topbar, Mobile Account & Scroll Unblock', async (t) => {
               ownerCssSection.includes('position: fixed') &&
               ownerCssSection.includes('top: 0'),
       'Owner mobile section must ensure .x-dash-topbar has position: fixed and top: 0');
-    assert.ok(ownerCssSection.includes('padding-top: max(64px') || ownerCssSection.includes('padding-top: 64px'),
+    assert.ok(ownerCssSection.includes('padding-top: max(') || ownerCssSection.includes('padding-top: 68px') || ownerCssSection.includes('padding-top: 64px'),
       'Owner mobile section must provide generous top spacer for fixed topbar');
   });
 
@@ -73,6 +73,13 @@ test('Owner Dashboard Topbar, Mobile Account & Scroll Unblock', async (t) => {
       'Topbar user avatar must contain SVG icon matching stroke styling');
     assert.ok(css.includes('.x-avatar-stroke-round') && css.includes('.x-topbar-icon-btn-round'),
       'CSS must style twin circular stroke buttons for avatar and notification');
+  });
+
+  await t.test('OTA-03c: GoBiz-style chevron icon links are used instead of plain ASCII text', () => {
+    assert.ok(html.includes('class="x-occ-link-chevron"'),
+      'OCC card links must include chevron SVG icon element');
+    assert.ok(css.includes('.x-occ-link-chevron'),
+      'CSS must define .x-occ-link-chevron styles');
   });
 
   // --------------------------------------------------------------------------

@@ -3914,8 +3914,8 @@
       if (titleEl) titleEl.textContent = 'Performa Cabang';
       if (linkEl) {
         linkEl.href = '#reports/branches';
-        linkEl.textContent = 'Lihat semua >';
-        linkEl.style.display = 'inline-block';
+        linkEl.innerHTML = '<span>Lihat semua</span> <svg class="x-occ-link-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        linkEl.style.display = 'inline-flex';
       }
 
       if (!branchPerf || branchPerf.length === 0) {
@@ -3949,8 +3949,8 @@
       if (titleEl) titleEl.textContent = 'Performa ' + bName;
       if (linkEl) {
         linkEl.href = '#branches';
-        linkEl.textContent = 'Lihat detail cabang >';
-        linkEl.style.display = 'inline-block';
+        linkEl.innerHTML = '<span>Lihat detail cabang</span> <svg class="x-occ-link-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+        linkEl.style.display = 'inline-flex';
       }
 
       contentEl.innerHTML = '<div class="x-occ-branch-single">' +
@@ -4672,7 +4672,7 @@
     if (roleEl) roleEl.textContent = role === 'owner' ? 'Owner' : (role === 'brand_manager' ? 'Brand Manager' : 'Staff');
     if (avatarEl) {
       if (!avatarEl.querySelector('svg')) {
-        avatarEl.textContent = (displayName || 'A').charAt(0).toUpperCase();
+        avatarEl.innerHTML = '<svg class="x-topbar-user-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>';
       }
     }
   }

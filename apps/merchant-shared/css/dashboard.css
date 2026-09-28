@@ -4774,18 +4774,21 @@ input[type="file"].x-input,
     color: #0f172a;
   }
 
-  /* Topbar stays fixed on top */
+  /* Topbar stays fixed on top with generous mobile padding */
   .x-dash-topbar {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
-    height: 64px !important;
-    min-height: 64px !important;
-    padding: 0 16px !important;
+    height: 68px !important;
+    min-height: 68px !important;
+    padding: 0 20px !important;
     padding-top: env(safe-area-inset-top, 0px) !important;
-    gap: 12px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 16px !important;
     z-index: 100 !important;
     background: rgba(255, 255, 255, 0.98) !important;
     backdrop-filter: blur(12px) !important;
@@ -4795,6 +4798,21 @@ input[type="file"].x-input,
     box-sizing: border-box !important;
   }
 
+  /* Mobile Owner topbar: hide redundant desktop hamburger and overview title for generous whitespace */
+  .x-dash-topbar .x-topbar-left {
+    display: none !important;
+  }
+
+  /* Right container spans full width: branch selector on left, icons on right */
+  .x-dash-topbar .x-topbar-right {
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
   /* Show Focus Selector on mobile for Owner (override 900px and 768px hide rules) */
   #x-branch-selector {
     display: flex !important;
@@ -4802,9 +4820,15 @@ input[type="file"].x-input,
     background: #ffffff !important;
     border: 1.5px solid #475569 !important;
     border-radius: 20px !important;
-    height: 38px !important;
-    padding: 0 10px !important;
+    height: 40px !important;
+    padding: 0 12px !important;
+    max-width: 210px !important;
     box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06) !important;
+    flex-shrink: 1 !important;
+  }
+
+  .x-dash-topbar #btn-notifications {
+    margin-left: auto !important;
   }
 
   /* Twin circular stroke icon buttons: Notifications & User Profile */
@@ -4925,7 +4949,7 @@ input[type="file"].x-input,
 
   /* Content area top and bottom spacers for fixed topbar and owner bottom nav */
   .x-dash-main {
-    padding-top: max(64px, calc(64px + env(safe-area-inset-top, 0px))) !important;
+    padding-top: max(68px, calc(68px + env(safe-area-inset-top, 0px))) !important;
     padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
@@ -5140,14 +5164,29 @@ input[type="file"].x-input,
     margin: 0;
   }
   .x-occ-card-link {
-    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12.5px;
     font-weight: 700;
     color: #475569;
     text-decoration: none;
-    transition: color 0.15s ease;
+    transition: color 0.15s ease, transform 0.15s ease;
   }
   .x-occ-card-link:hover {
     color: #0f172a;
+  }
+  .x-occ-card-link:active {
+    transform: translateX(1px);
+  }
+  .x-occ-link-chevron {
+    flex-shrink: 0;
+    stroke: currentColor;
+    stroke-width: 2.5;
+    transition: transform 0.15s ease;
+  }
+  .x-occ-card-link:hover .x-occ-link-chevron {
+    transform: translateX(2px);
   }
   .x-occ-empty-placeholder {
     font-size: 12px;

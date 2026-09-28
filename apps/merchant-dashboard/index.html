@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.5">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.6">
 </head>
 <body>
 
@@ -241,7 +241,7 @@
           <div class="x-occ-card" id="occ-branch-section">
             <div class="x-occ-card-header">
               <h3 class="x-occ-card-title" id="occ-branch-title">Performa Cabang</h3>
-              <a href="#reports/branches" class="x-occ-card-link" id="occ-branch-link">Lihat semua &gt;</a>
+              <a href="#reports/branches" class="x-occ-card-link" id="occ-branch-link"><span>Lihat semua</span><svg class="x-occ-link-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></a>
             </div>
             <div class="x-occ-card-body" id="occ-branch-content">
               <div class="x-occ-empty-placeholder">Memuat data performa cabang...</div>
@@ -252,7 +252,7 @@
           <div class="x-occ-card" id="occ-orders-section">
             <div class="x-occ-card-header">
               <h3 class="x-occ-card-title">Pesanan</h3>
-              <a href="#orders" class="x-occ-card-link" id="occ-orders-link">Lihat pesanan &gt;</a>
+              <a href="#orders" class="x-occ-card-link" id="occ-orders-link"><span>Lihat pesanan</span><svg class="x-occ-link-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></a>
             </div>
             <div class="x-occ-card-body">
               <div class="x-occ-orders-summary-grid">
@@ -280,7 +280,7 @@
           <div class="x-occ-card" id="occ-products-section">
             <div class="x-occ-card-header">
               <h3 class="x-occ-card-title">Produk Terlaris</h3>
-              <a href="#catalog/products" class="x-occ-card-link" id="occ-products-link">Lihat semua &gt;</a>
+              <a href="#catalog/products" class="x-occ-card-link" id="occ-products-link"><span>Lihat semua</span><svg class="x-occ-link-chevron" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></a>
             </div>
             <div class="x-occ-card-body" id="occ-products-content">
               <div class="x-occ-empty-placeholder">Memuat data produk terlaris...</div>
@@ -4216,11 +4216,11 @@
 
   <!-- Dashboard JavaScript -->
   <!-- Shared merchant infrastructure (auth, toast, action-menu, crop editor) — must load first -->
-  <script src="/merchant-shared/js/shared.js?v=1.0.0"></script>
+  <script src="/merchant-shared/js/shared.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/action-menu.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.16"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.17"></script>
 </body>
 </html>
