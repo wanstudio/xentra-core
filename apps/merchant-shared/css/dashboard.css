@@ -5096,7 +5096,7 @@ input[type="file"].x-input,
   /* Content area top and bottom spacers for fixed topbar and owner bottom nav */
   .x-dash-main {
     padding-top: max(68px, calc(68px + env(safe-area-inset-top, 0px))) !important;
-    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(42px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   /* Owner Command Center on Mobile */
@@ -5105,7 +5105,7 @@ input[type="file"].x-input,
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding: 4px 0 20px;
+    padding: 4px 0 14px;
   }
 
   /* 1. Periode Selector & Form Pencarian Tanggal (2 Rows) */
