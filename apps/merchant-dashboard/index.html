@@ -26,7 +26,7 @@
       if (isBizPortal || !isPlatformHost) {
         var manifestLink = document.createElement('link');
         manifestLink.rel = 'manifest';
-        manifestLink.href = '/manifest.json?surface=dashboard';
+        manifestLink.href = '/manifest.json?surface=owner';
         document.head.appendChild(manifestLink);
 
         if ('serviceWorker' in navigator) {
