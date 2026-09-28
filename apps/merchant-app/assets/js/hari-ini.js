@@ -34,12 +34,30 @@
       return;
     }
     var branchId = user.branch_id;
+    var headers = getAuthHeaders();
 
-    // 1. Fetch assigned branch details
-    try {
-      var bRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId), { headers: getAuthHeaders() });
-      if (bRes.ok) {
-        var bData = await bRes.json();
+    // Parallelize all dashboard operational queries in one concurrent network burst
+    var results = await Promise.allSettled([
+      // 0: Branch Details
+      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId), { headers: headers }),
+      // 1: Branch Orders
+      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/orders?status=all", { headers: headers }),
+      // 2: Tables Layout
+      adminFetch(API_BASE + "/dine-in/layout?branch_id=" + encodeURIComponent(branchId), { headers: headers }),
+      // 3: Branch Inventory
+      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/inventory", { headers: headers }),
+      // 4: Branch Products (availability)
+      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/products", { headers: headers }),
+      // 5: Promotions
+      adminFetch(API_BASE + "/admin/marketing/promotions", { headers: headers }),
+      // 6: Operational Activity Logs
+      adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/operation-logs?limit=5", { headers: headers })
+    ]);
+
+    // 1. Process Branch Details
+    if (results[0].status === "fulfilled" && results[0].value && results[0].value.ok) {
+      try {
+        var bData = await results[0].value.json();
         if (bData.success && bData.branch) {
           _hariIniState.branch = bData.branch;
           var b = bData.branch;
@@ -105,16 +123,15 @@
             }
           }
         }
+      } catch (e) {
+        console.warn("[BM Hari Ini Branch Parse Error]:", e);
       }
-    } catch (e) {
-      console.warn("[BM Hari Ini Branch Error]:", e);
     }
 
-    // 2. Fetch assigned branch orders
-    try {
-      var oRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/orders?status=all", { headers: getAuthHeaders() });
-      if (oRes.ok) {
-        var oData = await oRes.json();
+    // 2. Process Branch Orders
+    if (results[1].status === "fulfilled" && results[1].value && results[1].value.ok) {
+      try {
+        var oData = await results[1].value.json();
         if (oData.success && Array.isArray(oData.orders)) {
           var orders = oData.orders;
           _hariIniState.orders = orders;
@@ -140,16 +157,15 @@
 
           renderHariIniPendingOrders(pendingList);
         }
+      } catch (e) {
+        console.warn("[BM Hari Ini Orders Parse Error]:", e);
       }
-    } catch (e) {
-      console.warn("[BM Hari Ini Orders Error]:", e);
     }
 
-    // 3. Fetch dine-in tables layout
-    try {
-      var tRes = await adminFetch(API_BASE + "/dine-in/layout?branch_id=" + encodeURIComponent(branchId), { headers: getAuthHeaders() });
-      if (tRes.ok) {
-        var tData = await tRes.json();
+    // 3. Process Dine-in Tables Layout
+    if (results[2].status === "fulfilled" && results[2].value && results[2].value.ok) {
+      try {
+        var tData = await results[2].value.json();
         if (tData.success && Array.isArray(tData.tables)) {
           var tables = tData.tables;
           var avail = tables.filter(function (t) { return (t.operational_status || t.status) === "available"; }).length;
@@ -162,73 +178,68 @@
           if ($("bm-stat-tables-held")) $("bm-stat-tables-held").textContent = held;
           if ($("bm-stat-tables-blocked")) $("bm-stat-tables-blocked").textContent = blocked;
         }
+      } catch (e) {
+        console.warn("[BM Hari Ini Layout Parse Error]:", e);
       }
-    } catch (e) {
-      console.warn("[BM Hari Ini Layout Error]:", e);
     }
 
-    // 4. Fetch low stock inventory alerts & unavailable products
-    try {
-      var iRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/inventory", { headers: getAuthHeaders() });
-      var pRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/products", { headers: getAuthHeaders() });
-      
-      var lowItems = [];
-      var unavailItems = [];
-
-      if (iRes.ok) {
-        var iData = await iRes.json();
+    // 4. Process Inventory Alerts & Product Availability
+    var lowItems = [];
+    var unavailItems = [];
+    if (results[3].status === "fulfilled" && results[3].value && results[3].value.ok) {
+      try {
+        var iData = await results[3].value.json();
         if (iData.success && Array.isArray(iData.inventory)) {
           lowItems = iData.inventory.filter(function (item) {
             return item.stock <= (item.low_stock_threshold || 5);
           });
         }
+      } catch (e) {
+        console.warn("[BM Hari Ini Inventory Parse Error]:", e);
       }
-
-      if (pRes.ok) {
-        var pData = await pRes.json();
+    }
+    if (results[4].status === "fulfilled" && results[4].value && results[4].value.ok) {
+      try {
+        var pData = await results[4].value.json();
         if (pData.success && Array.isArray(pData.assignments)) {
           unavailItems = pData.assignments.filter(function (p) {
             return p.is_available === 0 || p.is_available === false;
           });
         }
+      } catch (e) {
+        console.warn("[BM Hari Ini Products Parse Error]:", e);
       }
-
-      renderHariIniAttention(lowItems, unavailItems);
-    } catch (e) {
-      console.warn("[BM Hari Ini Inventory/Menu Error]:", e);
     }
+    renderHariIniAttention(lowItems, unavailItems);
 
-    // 5. Fetch active approved branch marketing promotions
-    try {
-      var promoRes = await adminFetch(API_BASE + "/admin/marketing/promotions", { headers: getAuthHeaders() });
-      if (promoRes.ok) {
-        var promoData = await promoRes.json();
+    // 5. Process Active Approved Promotions
+    if (results[5].status === "fulfilled" && results[5].value && results[5].value.ok) {
+      try {
+        var promoData = await results[5].value.json();
         if (promoData.success && Array.isArray(promoData.promotions)) {
           var activePromos = promoData.promotions.filter(function (p) {
             var active = (p.is_active === 1 || p.is_active === true || p.status === "active");
             if (!active) return false;
-            // Branch scope check: null branch_id applies to all branches
             if (!p.branch_id || p.branch_id === branchId) return true;
             return false;
           });
           renderHariIniPromos(activePromos);
         }
+      } catch (e) {
+        console.warn("[BM Hari Ini Promos Parse Error]:", e);
       }
-    } catch (e) {
-      console.warn("[BM Hari Ini Promos Error]:", e);
     }
 
-    // 6. Fetch authoritative recent branch operational activity logs
-    try {
-      var logsRes = await adminFetch(API_BASE + "/admin/branches/" + encodeURIComponent(branchId) + "/operation-logs?limit=5", { headers: getAuthHeaders() });
-      if (logsRes.ok) {
-        var logsData = await logsRes.json();
+    // 6. Process Authoritative Recent Branch Operational Activity Logs
+    if (results[6].status === "fulfilled" && results[6].value && results[6].value.ok) {
+      try {
+        var logsData = await results[6].value.json();
         if (logsData.success && Array.isArray(logsData.logs)) {
           renderHariIniRecentActivity(logsData.logs);
         }
+      } catch (e) {
+        console.warn("[BM Hari Ini Logs Parse Error]:", e);
       }
-    } catch (e) {
-      console.warn("[BM Hari Ini Logs Error]:", e);
     }
   }
   window.loadHariIni = loadHariIni;
