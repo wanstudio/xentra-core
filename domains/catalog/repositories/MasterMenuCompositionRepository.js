@@ -141,6 +141,22 @@ class MasterMenuCompositionRepository {
     }
   }
 
+  listMasterProducts({ brandId, activeOnly = true }) {
+    if (!brandId) return [];
+    const activeFilter = activeOnly ? 'AND p.is_active = 1' : '';
+    return this.db.queryMany(
+      `SELECT p.id, p.brand_id, p.category_id, p.name, p.slug, p.description,
+              p.price, p.regular_price, p.pricing_mode, p.min_price, p.max_price,
+              p.image_url, p.image, p.media_id, p.options_config, p.is_active, p.sort_order,
+              c.name AS category_name, c.slug AS category_slug, c.is_active AS category_is_active
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id AND c.brand_id = p.brand_id
+       WHERE p.brand_id = ? ${activeFilter}
+       ORDER BY p.sort_order ASC, p.name ASC, p.id ASC`,
+      [brandId]
+    );
+  }
+
   findMasterProducts({ brandId, productIds = [], activeOnly = true }) {
     const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : []).map(v => String(v || '').trim()).filter(Boolean)));
     if (!ids.length) return [];
