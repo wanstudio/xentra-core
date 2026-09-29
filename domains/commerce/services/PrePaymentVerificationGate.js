@@ -275,7 +275,7 @@ class PrePaymentVerificationGate {
         note: String(item.note || item.item_note || '').trim(),
         subtotal: actualPrice * requestedQty,
         current_stock: currentStock,
-        branch_low_stock_threshold: resolvedMenuProduct.stock_estimate != null ? null : null
+        branch_low_stock_threshold: resolvedMenuProduct.low_stock_threshold
       });
     }
 
