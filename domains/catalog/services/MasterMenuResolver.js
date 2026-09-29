@@ -53,6 +53,32 @@ function resolveProductView({ product, flavor, complements, level, branchState =
 }
 
 class MasterMenuResolver {
+  static resolveMasterMenu({ brandId }) {
+    if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
+    const products = repository.listMasterProducts({ brandId, activeOnly: true });
+    const resolved = this._composeProducts({ brandId, products });
+    const orderedProducts = products.map(product => resolved.get(String(product.id)) || null).filter(Boolean);
+    const categories = [];
+    const seen = new Set();
+    for (const product of orderedProducts) {
+      const id = String(product.master.category_id);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      categories.push({
+        id: id,
+        name: product.title,
+        slug: String(product.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''),
+        products: []
+      });
+    }
+    const byCategory = new Map(categories.map(category => [String(category.id), category]));
+    for (const product of orderedProducts) {
+      const category = byCategory.get(String(product.master.category_id));
+      if (category) category.products.push(product);
+    }
+    return { categories, products: orderedProducts };
+  }
+
   static resolveMasterProducts({ brandId, productIds = [] }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
     const ids = asUniqueStrings(productIds);
