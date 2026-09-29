@@ -3152,6 +3152,28 @@
   }
 
   // Product Actions
+  function setProductImagePreview(src, hasImage) {
+    var previewImg = $('prod-image-preview');
+    var emptyBox = $('prod-image-empty');
+    var btnRemove = $('btn-prod-image-remove');
+    var btnPick = $('btn-prod-image-pick');
+    if (!previewImg || !emptyBox) return;
+    if (hasImage && src) {
+      previewImg.src = src;
+      previewImg.style.display = 'block';
+      emptyBox.style.display = 'none';
+      if (btnRemove) btnRemove.style.display = 'inline-block';
+      if (btnPick) btnPick.textContent = '\ud83d\udcc1 Ganti Foto';
+    } else {
+      previewImg.removeAttribute('src');
+      previewImg.style.display = 'none';
+      emptyBox.style.display = 'flex';
+      if (btnRemove) btnRemove.style.display = 'none';
+      if (btnPick) btnPick.textContent = '\ud83d\udcc1 Pilih Foto';
+    }
+    renderMasterMenuCustomerPreview();
+  }
+
   window.openAddProduct = function () {
     $('modal-product-title').textContent = 'Tambah Produk Master Baru';
     $('prod-id').value = '';
