@@ -7,7 +7,7 @@
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.1">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.2">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -3493,7 +3493,10 @@
   </div>
 
   <!-- MODAL: MASTER REFERENCE QUICK ADD -->
-  <div id="modal-master-reference-quick-add" class="x-modal-backdrop" style="display:none; z-index:1200;">
+  <!-- Dibuka dari dalam modal Produk Master, jadi harus berada DI ATASnya.
+       Sebelumnya 1200 padahal dasar .x-modal-backdrop 9999 — akibatnya modal ini
+       terbuka di belakang dan tumpang tindih dengan modal produk. -->
+  <div id="modal-master-reference-quick-add" class="x-modal-backdrop" style="display:none; z-index:10000;">
     <div class="x-modal-card" style="max-width: 440px;">
       <div class="x-modal-header">
         <div>
