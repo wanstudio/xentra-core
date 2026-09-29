@@ -1,102 +1,102 @@
-# Xentra Master Menu Composition & Branch Adoption Contract v1
+# Xentra — Master Menu Composition & Branch Adoption Contract v1
 
-**Status:** 🔒 LOCKED — MASTER MENU ARCHITECTURE / IMPLEMENTATION CONTRACT
-**Date:** 2026-09-29
-**Scope:** Owner Dashboard, Merchant App, Master Catalog, Branch Catalog, Customer PWA, Order Snapshot
+**Status:** 🔒 LOCKED — MASTER MENU ARCHITECTURE / IMPLEMENTATION CONTRACT  
+**Date:** 2026-09-29  
+**Scope:** Owner Dashboard, Merchant App, Master Catalog, Branch Catalog, Customer PWA, Checkout, Orders
 
 ## 1. Core decision
 
-A Xentra menu is one unique Master Product assembled from reusable Owner-managed data.
+A Xentra Menu is a **Master Product assembled by Owner from reusable structured Master data**.
 
-**Owner creates the data and assembles the menu. Merchant only chooses/adopts which Master Products the Branch sells.**
+**Owner creates the Master data and composes the Master Product. Merchant only chooses/adopts which Master Products the Branch sells.**
 
-The Branch does not create a second copy of the menu composition.
+Merchant does not create a second Menu composition and does not replace Master composition fields with branch-authored free text.
 
-~~~
-Owner master data
+```
+Owner Master Data
       ↓
-Master Product composition
+Master Product Composition
       ↓
-Branch adoption
+Branch Adoption
       ↓
-Branch classification + operations
+Branch Category Classification + Branch Operations
       ↓
-Resolved Customer PWA menu
+Resolved Customer Menu View
       ↓
-Immutable order snapshot
-~~~
+Immutable Order Menu Snapshot
+```
 
-## 2. Ownership
+## 2. Ownership boundary
 
-### Owner / Master
+### Owner / Brand
 
-Owner owns:
+Owner is authoritative for:
 
-- Master Category values;
+- Master Categories;
 - Master Rasa / Flavor values;
 - Master Kelengkapan / Complement values;
 - Master Level values;
 - Master Product composition;
-- Master Product image;
-- Master price and Pricing Policy;
-- Master Product POS sales options under the existing POS contract.
-
-Owner is the only role that creates or changes the Master vocabulary and Master composition.
+- Master Product identity/content/image;
+- Master Product price and Pricing Policy;
+- Master Product POS Variant/Add-on configuration under the existing POS contract.
 
 ### Merchant / Branch Manager
 
-Merchant owns only the Branch-side use of the adopted Product:
+Merchant is authoritative only for Branch-side use of an adopted Master Product:
 
-- adopt/remove Master Products;
-- assign adopted Products to Branch Categories;
+- adopt/remove the Master Product for the current Branch;
+- classify adopted Products into Branch Categories;
 - reorder Branch Categories;
-- operate Branch availability;
-- operate Branch stock;
-- operate approved Branch-scoped promotions.
+- operate Branch availability/sold-out;
+- operate Branch stock through Inventory;
+- operate other explicitly approved Branch-scoped operational controls.
 
-The Master Product's menu composition and price are consumed according to Owner-defined data and rules.
+Merchant **cannot**:
 
-Merchant cannot create or edit the Master Rasa, Complement, Level, Master Category, Product composition, Master image/content, or Master-defined price/rules.
+- create/edit/delete Master Category;
+- create/edit/delete Rasa, Kelengkapan, or Level master values;
+- alter Master Product composition;
+- replace composition values with free text;
+- create a Branch-specific second composition for the same Master Product;
+- change Master Product image/content/price as a Menu composition override;
+- modify another Branch's assortment or configuration.
 
-## 3. Master Product identity
+## 3. Master Product identity vs Menu presentation
 
-One Master Product is identified by products.id.
+One Master Product remains identified by `products.id`.
 
-The visible Customer PWA content is derived from relations, not from a concatenated free-text product name.
+`products.name` remains the durable internal/administrative product identity used by Core, search, reporting, references, and compatibility surfaces.
 
-Example:
+It is **not** the authoritative Customer card title for the new composition model when a Master Category is present.
 
-~~~
-Product P100
-  Category      = Ayam Tulang Lunak
-  Rasa          = Lombok Ijo
-  Kelengkapan   = Nasi, Lalapan, Sambal Terasi
-  Level         = Level 1, Level 2, Level 3
-~~~
-
-products.id remains the identity.
-
-The combination of component values is not the primary key and is not unique by default.
+The composition values are structured references. The combination of values is not a Product primary key.
 
 ## 4. Master component model
 
-### 4.1 Master Category
+### 4.1 Kategori / Master Category
 
-The existing categories table remains brand-owned Master Category authority.
+Existing `categories` remains the Owner/Brand Master Category authority.
 
-products.category_id references exactly one Master Category.
+Relationship:
 
-Customer mapping:
+```
+products.category_id → categories.id
+```
 
-~~~
-categories.name → card title
-~~~
+Card presentation:
+
+```
+categories.name → Customer card title
+```
+
+A Master Product has **exactly one Master Category**.
 
 ### 4.2 Rasa / Flavor
 
-New brand-scoped master table:
+New brand-scoped master vocabulary:
 
-~~~
+```
 menu_flavors
   id
   brand_id
@@ -106,30 +106,30 @@ menu_flavors
   is_active
   created_at
   updated_at
-~~~
+```
 
-Relation:
+Relationship:
 
-~~~
+```
 product_flavors
   product_id
   flavor_id
   PRIMARY KEY (product_id, flavor_id)
-~~~
+```
 
-Card mapping:
+A Master Product has **zero or one active Flavor**.
 
-~~~
-menu_flavors.name → card subtitle
-~~~
+Card presentation:
 
-A Product has zero or one active Flavor.
+```
+menu_flavors.name → Customer card subtitle
+```
 
 ### 4.3 Kelengkapan / Complement
 
-New brand-scoped master table:
+New brand-scoped master vocabulary:
 
-~~~
+```
 menu_complements
   id
   brand_id
@@ -139,33 +139,33 @@ menu_complements
   is_active
   created_at
   updated_at
-~~~
+```
 
-Relation:
+Relationship:
 
-~~~
+```
 product_complements
   product_id
   complement_id
   sort_order
   PRIMARY KEY (product_id, complement_id)
-~~~
+```
 
-A Product may have many Complements.
+A Master Product has **zero or many Complements**.
 
-Card mapping:
+The relation `sort_order` controls Customer display order.
 
-~~~
-menu_complements.name → detail line
-~~~
+Card presentation:
 
-Stored relation order controls display order.
+```
+menu_complements.name[] → Customer card detail
+```
 
 ### 4.4 Level
 
-New brand-scoped master table:
+New brand-scoped master vocabulary:
 
-~~~
+```
 menu_levels
   id
   brand_id
@@ -174,451 +174,374 @@ menu_levels
   is_active
   created_at
   updated_at
-~~~
+```
 
-Relation:
+Relationship:
 
-~~~
+```
 product_levels
   product_id
   level_id
-  sort_order
   PRIMARY KEY (product_id, level_id)
-~~~
+```
 
-A Product may have multiple Levels.
+A Master Product has **zero or one active Level**.
 
-The Customer PWA renders the ordered Level set as its visual level indicator.
+Card presentation:
 
-## 5. Master data uniqueness
+```
+menu_levels.name → Customer card indicator
+```
 
-Recommended uniqueness:
+## 5. Master vocabulary rules
 
-~~~
-UNIQUE (brand_id, normalized_name)
-  menu_flavors
-  menu_complements
-  menu_levels
-~~~
+Master component values are **data records**, not arbitrary strings entered by Merchant.
 
-Component relations are unique per Product.
+For each component vocabulary:
 
-Product identity remains products.id.
+- records are brand-scoped;
+- names/slugs must be unique within the Brand;
+- active records may be selected by Owner for new compositions;
+- referenced records are soft-inactivated before any destructive deletion;
+- existing Product relations are retained while the record is inactivated;
+- no new Product composition may select an inactive record.
 
-Do not use:
+The implementation must not silently substitute an inactive/missing Master component with Merchant-authored text.
 
-~~~
-category + flavor + complements + levels
-~~~
+## 6. Owner composition flow
 
-as the Product key.
+Owner first maintains the reusable vocabulary:
 
-## 6. Owner Add Menu flow
-
-Owner first maintains the value library:
-
-~~~
+```
 Kategori
 Rasa
 Kelengkapan
 Level
-~~~
+```
 
-Then Owner creates a Master Product using selectors:
+Owner then creates/edits a Master Product using selectors:
 
-~~~
-Kategori       [ dropdown ]
-Rasa           [ dropdown ]
-Kelengkapan    [ multi-select ]
-Level          [ multi-select ]
+```
+Kategori        [ single select ]
+Rasa            [ single select / optional ]
+Kelengkapan     [ multi select ]
+Level           [ single select / optional ]
 
 Harga
 Harga pembanding / coret
-Pricing Mode
-Range bila berlaku
-
+Pricing Mode / Pricing Policy
 Foto
-~~~
+```
 
-The Customer PWA title, subtitle, detail and level display are generated from those selections.
+The selector values persist as relations.
 
-Customer-facing composition fields are not free-form Merchant text fields.
+The Owner UI must not serialize the Menu composition as a single free-text field.
 
-The existing POS options_config / Variant / Add-on contract remains separate.
+The existing POS `options_config` Variant/Add-on model remains a **separate contract**. It must not be silently merged with Rasa/Kelengkapan/Level.
 
-## 7. Merchant Adopt flow
+## 7. Merchant adoption flow
 
-Merchant sees Master Products available to the Branch and chooses:
+Merchant discovers the approved Master Product library and chooses:
 
-~~~
-[ Adopsi ]
-~~~
+```
+Cari Master Menu
+      ↓
+Pilih Menu
+      ↓
+Lihat komposisi Master (read-only)
+      ↓
+Pilih Branch Category
+      ↓
+Adopsi
+```
 
-Core creates:
+Adoption creates the Branch Product assignment only.
 
-~~~
-branch_products
-  branch_id
-  product_id
-  ...
-  PRIMARY KEY (branch_id, product_id)
-~~~
+The adoption operation does **not** copy the Master composition into Branch-owned text fields.
 
-Adoption does not copy:
-
-- Master Category;
-- Rasa;
-- Kelengkapan;
-- Level;
-- Product composition.
-
-It creates the Branch selling relationship to the same Master Product.
+Merchant may later remove/unadopt the Product where the current Branch adoption rules permit it.
 
 ## 8. Merchant editing boundary
 
-Merchant can change:
+After adoption, Merchant may change:
 
 - Branch Category membership;
 - Branch Category order;
 - Branch availability;
 - Branch stock;
-- approved promotion assignment/operation.
+- other explicitly approved Branch operational controls.
 
-Merchant cannot change:
+Merchant may not change:
 
 - Master Category;
 - Rasa;
 - Kelengkapan;
 - Level;
 - Master Product composition;
-- Master component names;
-- Master component ordering rules;
-- Master-defined price or Pricing Policy;
-- Master Product image/content as a new Branch-authored composition.
+- Master Product image/content;
+- Master Product price or Pricing Policy.
 
-There is no Branch free-text composition editor and no Branch Menu Composition override editor.
+There is no canonical Branch Menu Composition editor.
 
-## 9. Branch Category
+There is no canonical `name_override`, `description_override`, or `image_override` path in the new Menu architecture.
 
-Branch Categories are a separate Branch-owned classification layer.
+## 9. Branch Category is a separate classification layer
 
-Example:
+Branch Category is not part of Master Menu Composition.
 
-~~~
-Master Product:
-  Ayam Tulang Lunak
-  Lombok Ijo
-  Nasi + Lalapan
-  Level 1,2,3
+A Branch may create and organize categories such as:
 
-Branch Categories:
-  Menu Favorit
-  Paket Hemat
-  Promo
-~~~
+- Menu Favorit;
+- Paket Hemat;
+- Promo.
 
-The same Master Product may belong to different Branch Categories at different Branches.
+These categories classify adopted Products for that Branch.
 
-A Branch Category called Promo is only a classification label.
+Promotion mechanics such as **Buy 1 Get 1** belong to the Promotion domain. A Branch Category must not become a second Promotion engine.
 
-Buy 1 Get 1 and other promotion mechanics remain in the Promotion domain.
+Canonical membership authority:
 
-## 10. Propagation
+```
+branch_product_categories
+```
 
-Master composition is authoritative for adopted Products.
+The legacy scalar `branch_products.branch_category_id` is not the canonical M:N membership authority.
+
+## 10. Master → Branch propagation
+
+Branch adoption references the Master Product. It does not create an independent Menu composition.
 
 Therefore:
 
-~~~
-Owner changes Master component
-        ↓
-Adopted Branch resolves the new Master value
-        ↓
-Customer PWA shows the current Master value
-~~~
+- Owner changes to Master composition propagate to the resolved Branch Menu view;
+- Owner updates Master component display values propagate to adopted Branches;
+- Owner changing Master image/content changes the resolved Branch Menu where that Master field is consumed;
+- Merchant does not need to re-edit adopted Products to receive Master composition changes.
 
-Merchant does not own a second copy of the composition.
+Master deactivation and Branch availability remain separate:
 
-Branch exceptions to composition require a separate future contract and are not part of v1.
+```
+Master Product lifecycle ≠ Branch Product availability ≠ Inventory stock
+```
 
-## 11. Inactivation
+A Master Product being inactive must follow an explicit Core selling/visibility rule; it must not be implemented by silently writing a Branch override.
 
-Master component values use soft inactivation.
+## 11. Customer PWA read model
 
-is_active = 0 means:
+Customer PWA consumes a **resolved Branch Menu View Model**, not raw Branch-authored composition strings.
 
-- cannot be selected for new Products;
-- existing Product relations remain valid;
-- existing Products continue resolving the referenced value;
-- historical orders are unaffected.
+Forward DTO concept:
 
-Referenced values must not be hard-deleted.
+```text
+product_id
+title
+subtitle
+detail[]
+indicator
+image
+price
+availability
+categories[]
+options
+```
 
-## 12. Customer PWA read model
+Resolution:
 
-Customer PWA consumes a resolved Branch Menu View Model.
+```
+title      ← Master Category.name
+subtitle   ← Master Flavor.name (nullable)
+detail[]   ← ordered Master Complement.name[]
+indicator  ← Master Level.name (nullable)
+image      ← Master Product image
+price      ← Owner Master Product / approved Pricing Policy result
+availability ← Branch operational state
+categories[] ← Branch Category memberships
+options    ← existing Product Options contract
+```
 
-Conceptual resolution:
+The Customer client only renders the resolved DTO. It does not reconstruct composition by joining arbitrary raw fields itself.
 
-~~~
-branch_products
-    ↓
-products
-    ├─ Master Category
-    ├─ Rasa
-    ├─ Kelengkapan
-    └─ Level
-~~~
+## 12. Checkout and order snapshot
 
-Recommended response shape:
+Before order/payment commitment, Core must resolve the authoritative current Branch Menu state again.
 
-~~~
+At order-item creation, the system stores an immutable `menu_snapshot` representing the exact Master Menu composition used for that sale.
+
+Conceptual snapshot:
+
+```json
 {
-  product_id: "P100",
-  title: "Ayam Tulang Lunak",
-  subtitle: "Lombok Ijo",
-  complements: ["Nasi", "Lalapan", "Sambal Terasi"],
-  levels: ["Level 1", "Level 2", "Level 3"],
-  price: 25000,
-  regular_price: 28000,
-  image_url: "..."
+  "product_id": "…",
+  "title": "…",
+  "subtitle": "…",
+  "detail": ["…"],
+  "indicator": "…",
+  "image": "…",
+  "master_version_context": "…"
 }
-~~~
+```
 
-Customer PWA renders this resolved data and does not become a Catalog authority.
+The exact version identifier may use an existing revision mechanism or an explicit snapshot timestamp/context, but the historical display must not depend on future Master edits.
 
-## 13. Checkout and order snapshot
+The existing `modifiers_snapshot` remains separate and continues to represent POS/Product Options selections.
 
-Checkout sends Product identity and quantity.
+## 13. Pricing boundary
 
-Core must resolve:
+For this new Menu architecture:
 
-1. Branch adoption;
-2. Branch availability;
-3. effective Branch price;
-4. current Master Menu Composition.
+**Merchant does not edit Menu price.**
 
-The client cannot authoritatively submit title, subtitle, complement, level or price strings.
+Owner controls Master Product price and Pricing Policy.
 
-Order Items must preserve the purchased display state independently from future Master edits.
+The existing `branch_products.price` / `PricingPolicyModel` branch-price capability is legacy compatibility for this Menu migration and must not be exposed as the canonical Merchant Menu editor.
 
-Recommended extension:
+A future legitimate branch-pricing business rule requires its own explicit architecture decision.
 
-~~~
-order_items.menu_snapshot JSON
-~~~
+## 14. Data model target
 
-The snapshot contains the resolved customer-facing composition at purchase time.
+Target schema:
 
-Existing modifiers_snapshot remains the POS Variant/Add-on snapshot.
+```
+categories
+      ↑
+products
+  ├── product_flavors ─── menu_flavors
+  ├── product_complements ─── menu_complements
+  └── product_levels ─── menu_levels
 
-## 14. Existing Xentra reconciliation
+branches
+      └── branch_products
+              └── branch_product_categories ─── branch_categories
 
-Current Xentra has:
+orders
+      └── order_items
+              ├── menu_snapshot
+              └── modifiers_snapshot
+```
 
-- products.category_id;
-- products.options_config for POS options;
-- branch_products name/description/image override columns;
-- branch_product_categories for Branch Category M:N membership.
+Requirements:
 
-Under this contract:
+- all Master component rows are Brand-scoped;
+- all Product/component relationships enforce same-Brand integrity;
+- Branch adoption remains Branch-scoped;
+- Branch Category membership remains Branch-scoped;
+- foreign keys and uniqueness constraints must prevent cross-tenant/cross-branch corruption.
 
-- products.category_id remains the Master Category relation;
-- product_flavors becomes the Rasa relation;
-- product_complements becomes the Kelengkapan relation;
-- product_levels becomes the Level relation;
-- branch_products remains the adoption boundary;
-- branch_product_categories becomes the sole Branch Category membership authority.
+## 15. Legacy boundary
 
-The existing Branch name_override, description_override and image_override paths are no longer canonical for the new Customer Menu model. Legacy columns may remain temporarily for migration compatibility.
+The following are legacy/quarantined for Menu:
 
-products.options_config is not repurposed.
+- `branch_products.name_override`;
+- `branch_products.description_override`;
+- `branch_products.image_override`;
+- legacy snapshot fields `product_name`, `product_description`, `product_image_url`;
+- `PATCH /admin/branches/:id/products/:productId/override`;
+- Branch Product Override editor UI;
+- `branch_products.branch_category_id` as a parallel category authority.
 
-## 15. Branch Category canonicalization
+These may remain temporarily for compatibility and migration.
 
-The current model contains both:
+They must not be extended, reused as the new DTO source, or used to satisfy new Menu feature requirements.
 
-~~~
-branch_products.branch_category_id
-branch_product_categories
-~~~
+The existing POS `options_config` contract is explicitly **not** legacy.
 
-The new contract makes branch_product_categories the canonical M:N authority.
+## 16. Migration sequence
 
-Migration:
+Migration follows the repository migration skill:
 
-1. reconcile scalar branch_category_id into the junction table;
-2. verify no memberships are lost;
-3. switch Branch Catalog queries to the junction table;
-4. stop using branch_products.branch_category_id as authority;
-5. remove the scalar field only after compatibility cleanup.
+```
+A. Expand
+   ↓
+B. Seed Master component vocabulary
+   ↓
+C. Add Product ↔ component relations
+   ↓
+D. Build new Master composition resolver
+   ↓
+E. Switch Merchant adoption/read model
+   ↓
+F. Switch Customer PWA read model
+   ↓
+G. Add immutable order menu_snapshot
+   ↓
+H. Reconcile legacy data
+   ↓
+I. Verify
+   ↓
+J. Contract/remove legacy paths
+```
 
-## 16. Security and integrity
+Rules:
 
-Core enforces:
+- preserve existing data;
+- maintain mixed-version safety where rollout requires it;
+- make migration idempotent;
+- verify old/new reads during the compatibility window;
+- do not drop legacy columns before reconciliation is proven;
+- do not make destructive legacy cleanup part of an unrelated feature commit.
 
-- same-brand Product ↔ Branch;
-- same-brand Product ↔ Master Component;
-- Branch Manager branch scope;
-- valid Product cardinality;
-- valid Branch Category scope;
-- pricing policy;
-- availability;
-- stock;
-- checkout pricing;
-- order snapshot;
-- audit requirements from existing contracts.
+## 17. Security and integrity invariants
 
-UI selectors do not grant authority over Master data.
+Core must enforce:
 
-## 17. Migration sequence
+- Owner authority for Master vocabulary/composition;
+- Merchant Branch scope;
+- same-Brand Product/component relationships;
+- Branch Category scope;
+- no client-authored composition authority;
+- no client-authored price authority;
+- no cross-Branch adoption;
+- no second inventory authority;
+- no second Promotion engine;
+- no second POS options authority.
 
-A. Add Master component tables and Product relation tables.
-
-B. Seed/normalize Owner-managed values.
-
-C. Populate Product relations and validate cardinality.
-
-D. Change Branch Menu resolution to Master composition + Branch adoption.
-
-E. Make Branch Category M:N relation canonical.
-
-F. Change Customer PWA to consume the resolved view model.
-
-G. Add order menu_snapshot.
-
-H. Retire legacy branch content-override resolution after regression verification.
+UI visibility never substitutes for authorization.
 
 ## 18. Non-goals
 
 This contract does not introduce:
 
-- Branch-owned Rasa / Complement / Level libraries;
-- free-form Merchant menu composition;
-- one Product copy per Branch;
-- a second Catalog authority;
-- a second Inventory authority;
-- BOGO logic inside categories;
-- replacement of POS options_config;
-- automatic inventory-bearing variants.
+- Merchant-authored Menu composition;
+- branch-specific copies of Master composition;
+- a free-text composition editor;
+- a second catalog authority;
+- a second inventory pool;
+- a second Promotion engine;
+- a new POS Variant/Add-on system;
+- automatic KDS;
+- a second Order state machine.
 
-## 19. Definition of Done
+## 19. Implementation dependency gate
 
-The model is complete when:
+The implementation may proceed only in this order:
 
-- Owner can create reusable Master vocabulary;
-- Owner can assemble a Master Product from structured values;
-- Merchant can adopt the Product without copying its composition;
-- Merchant cannot edit Master composition;
-- Merchant can classify adopted Products with Branch Categories;
-- Customer PWA derives title/subtitle/detail/level from structured relations;
-- checkout resolves authoritative current data server-side;
-- order history stores immutable menu composition;
-- legacy Branch content overrides are no longer authoritative;
-- POS options remain separate;
-- no second Catalog/Inventory/Promotion authority exists.
+1. schema + migrations;
+2. Master component CRUD;
+3. Master Product composition API;
+4. Owner Master Menu UI;
+5. Branch adoption resolver/API;
+6. Merchant read-only composition UI;
+7. Customer PWA resolved DTO;
+8. checkout verification + `menu_snapshot`;
+9. legacy migration;
+10. legacy path removal.
 
-## 20. Review gate
+Each stage requires affected tests and end-to-end contract verification before the next destructive stage.
 
-**PROPOSED — REVIEW BEFORE LOCK / IMPLEMENTATION.**
+## 20. Definition of Done
 
-Review these points before coding:
+The new Menu architecture is complete when:
 
-1. Master Category = Customer card title.
-2. Rasa = Customer card subtitle.
-3. Kelengkapan = Customer card detail.
-4. Level = Customer card level indicator.
-5. Master changes propagate to adopted Branches.
-6. Merchant does not alter Master composition.
-7. Branch Category is separate from Master Menu Composition.
-8. Order menu_snapshot is required for historical integrity.
-9. Branch Category M:N is canonical.
-10. Legacy branch name/description/image overrides are retired from the canonical Menu path.
+- Owner can maintain Master Kategori/Rasa/Kelengkapan/Level;
+- Owner can compose Master Products using structured selectors;
+- Merchant can only adopt/classify/operate adopted Products;
+- Merchant cannot alter Master composition;
+- Customer PWA renders the resolved structured composition;
+- checkout uses the same authoritative composition;
+- order history contains immutable `menu_snapshot`;
+- Branch Category M:N is the single Branch category membership authority;
+- legacy override UI/API has no active new consumer;
+- migration evidence proves no meaningful legacy Menu data was silently lost;
+- destructive legacy removal is separately verified and committed.
 
-No production schema/UI migration should start until this proposal is locked.
-
-## 🔒 LOCKED ADDENDUM — Composition Cardinality & Presentation
-**Date: 2026-09-29**
-
-The audited interpretation of the Owner-managed structured Menu fields is now:
-
-| Component | Cardinality per Master Product | Customer PWA role |
-|---|---:|---|
-| Kategori | exactly 1 | title |
-| Rasa | 0..1 | subtitle |
-| Kelengkapan | 0..N | ordered detail |
-| Level | 0..1 | indicator |
-
-The composition values are structured references. They are not free-text Merchant fields.
-
-`products.name` remains the durable Master Product identity/administrative identifier used by Core, search, reporting, and internal references. It is not the new source for the Customer card title when a Master Category is present.
-
-Owner controls Master Product image/content and price policy. Merchant adoption does not create a Branch-authored copy of those fields.
-
-### Customer composition view model
-
-The forward Customer Menu resolver must expose a resolved presentation model equivalent to:
-
-```text
-title      <- Master Category.name
-subtitle   <- Master Flavor.name (nullable)
-detail[]   <- ordered Master Complement.name[]
-indicator  <- Master Level.name (nullable)
-image      <- Master Product image
-price      <- Owner Master Product / Pricing Policy result
-```
-
-The raw relation IDs may remain internal. Customer clients consume the resolved DTO.
-
-### Merchant rule
-
-Merchant UI must show the adopted Master Product composition as read-only. Merchant actions are adoption/removal, Branch Category classification, availability, stock, and other explicitly approved Branch operations.
-
-Merchant must not replace a Master component with arbitrary text or a different branch-specific component set.
-
-## 🔒 LOCKED ADDENDUM — Propagation / Inactivation
-**Date: 2026-09-29**
-
-Master component edits affect future resolved Branch Menu views because Branch adoption references the Master Product rather than copying the composition.
-
-When a referenced Master component is retired:
-
-- existing Product relations are retained;
-- the component becomes inactive for new composition selection;
-- existing adopted Products do not lose historical identity merely because the component is inactive;
-- customer resolution must follow an explicit safe display rule for an inactive referenced component before that component is physically removed.
-
-Referenced component rows must therefore be **soft-inactivated before any destructive deletion**.
-
-## 🔒 LOCKED ADDENDUM — Pricing Boundary
-**Date: 2026-09-29**
-
-For the new Master Menu architecture, **Merchant does not edit Menu price**.
-
-Owner defines the Master Product price and pricing policy. Any existing Branch price override capability is legacy compatibility and is quarantined with the rest of the old Branch Menu Override model.
-
-The existing `PricingPolicyModel` and `branch_products.price` path must not be extended as the new Merchant Menu editor. A later explicit pricing contract may govern legitimate branch pricing for a different business requirement, but that would be a separate decision.
-
-## 8A. Implementation dependency gate
-
-Before runtime migration, the following must exist and pass:
-
-1. Master component schema and tenant/brand scoping.
-2. Owner CRUD for Master components.
-3. Owner Product Composition API with transactional relation replacement.
-4. Merchant adoption API that creates only the Branch Product assignment and Branch Category membership.
-5. Customer Menu resolver returning the structured composition DTO.
-6. Checkout final verification resolving the same Master composition and authoritative price.
-7. Immutable `menu_snapshot` persistence on `order_items`.
-8. Legacy compatibility coverage proves old data remains readable during migration.
-
-**No legacy override endpoint or field may be used to satisfy any item above.**
-
-## 20. Contract completion
-
-This contract is now the authoritative forward Menu architecture for the implementation sequence.
-
-The legacy Branch Override/Snapshot model remains quarantined under:
-`docs/decisions/xentra-menu-legacy-quarantine-v1.md`.
-
-Any change to ownership, component cardinality, propagation, Merchant authority, pricing boundary, or Customer presentation mapping requires a new explicit contract revision.
+**Any change to ownership, cardinality, propagation, pricing authority, Customer presentation mapping, or snapshot semantics requires a new contract revision.**
