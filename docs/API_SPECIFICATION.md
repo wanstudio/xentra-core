@@ -191,3 +191,19 @@ free-text Menu field.
 **Important:** these APIs are the foundation for the new architecture. Customer PWA,
 Merchant adoption, and Checkout must consume the canonical composition resolver when
 those migration stages are activated.
+
+
+### Canonical Branch Menu Read Model — 2026-09-29
+
+- `GET /api/v1/admin/branches/:id/menu`
+
+Returns the forward Merchant/Owner Branch Menu read model:
+
+- Branch-scoped adopted Master Products;
+- structured `menu_composition`;
+- Branch Category memberships;
+- Branch availability/stock state;
+- Master Products available for adoption.
+
+The response does not require Merchant clients to read legacy Branch Override fields.
+Legacy `/admin/branches/:id/catalog` remains compatibility infrastructure during migration.
