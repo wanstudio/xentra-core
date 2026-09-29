@@ -68,6 +68,12 @@ test('Edited Category and Rasa immediately update the rendered master-reference 
   assert.ok(saveHandler.includes('renderMasterFlavorsPage();'));
 });
 
+test('Master Product primary CTA directly opens the product editor', () => {
+  assert.ok(HTML.includes('id="btn-add-product-main" onclick="openAddProduct()"'));
+  assert.ok(JS.includes("var btnAddProdMain = $('btn-add-product-main');"));
+  assert.ok(JS.includes("btnAddProdMain.addEventListener('click', window.openAddProduct)"));
+});
+
 test('Owner Master Product UI exposes structured composition selectors', () => {
   for (const id of ['prod-category', 'prod-flavor', 'prod-complements-editor', 'prod-level']) {
     assert.ok(HTML.includes('id="' + id + '"'), 'Missing composition control: ' + id);
