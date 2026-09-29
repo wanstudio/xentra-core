@@ -9,6 +9,26 @@ const ROOT = path.resolve(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/index.html'), 'utf8');
 const JS = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
 
+test('Owner Kategori/Rasa loading is independent and stale-safe', () => {
+  const start = JS.indexOf('async function loadMasterCategoriesPage()');
+  const end = JS.indexOf('function referenceStatusBadge', start);
+  assert.ok(start >= 0 && end > start, 'Master reference loader must exist');
+  const loader = JS.slice(start, end);
+
+  assert.ok(loader.includes('var _masterReferenceLoadSeq'));
+  assert.ok(loader.includes('var requestSeq = ++_masterReferenceLoadSeq'));
+  assert.ok(loader.includes("adminFetch(API_BASE + '/admin/categories'"));
+  assert.ok(loader.includes("adminFetch(API_BASE + '/admin/menu/components/flavor'"));
+  assert.ok(loader.includes('Category Load Error'));
+  assert.ok(loader.includes('Flavor Load Error'));
+  assert.ok(loader.includes('if (requestSeq !== _masterReferenceLoadSeq) return;'));
+  assert.ok(loader.includes('Promise.allSettled([categoryPromise, flavorPromise])'));
+
+  // A single Promise.all around both endpoints would reintroduce the old
+  // failure mode where one slow/failed tab blocks the other tab from rendering.
+  assert.ok(!loader.includes('Promise.all([\n        adminFetch(API_BASE + \'/admin/categories\''));
+});
+
 test('Owner Category page uses two master-reference tabs with card actions', () => {
   assert.ok(HTML.includes('id="master-reference-tabs"'));
   assert.ok(HTML.includes('data-master-reference-tab="category"'));
