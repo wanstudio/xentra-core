@@ -220,6 +220,8 @@ CREATE TABLE products (
 
 ### Branch Catalog (Branch-owned)
 
+> **ARCHITECTURE MIGRATION NOTICE (2026-09-29):** The current physical schema below still contains legacy Branch Product Override columns for runtime/data compatibility. Those columns are **quarantined** and are not the forward Menu composition model. See `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md` and `docs/decisions/xentra-menu-legacy-quarantine-v1.md`. Do not design new Menu features around the legacy override columns.
+
 The Branch Catalog is NOT a filtered view of the Master Catalog. It is a Branch-owned
 operational selling catalog.
 
