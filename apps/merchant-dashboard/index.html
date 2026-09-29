@@ -7,7 +7,7 @@
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.3.1">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.3.2">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -158,9 +158,12 @@
       <!-- Top Navbar -->
       <header class="x-dash-topbar">
         <div class="x-topbar-left">
-          <!-- Mobile hamburger button -->
-          <button type="button" class="x-hamburger" id="btn-hamburger" aria-label="Buka menu" aria-expanded="false" aria-controls="x-dash-sidebar">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+          <!-- Mobile back button. Dulu hamburger pembuka sidebar, tetapi Owner sudah
+               punya bottom nav (Beranda/Bisnis/Pesanan/Keuangan/Lainnya), jadi tombol
+               ini lebih berguna sebagai tombol kembali. Id-nya diganti supaya handler
+               sidebar yang lama tidak lagi terpasang di sini. -->
+          <button type="button" class="x-hamburger" id="btn-topbar-back" aria-label="Kembali" onclick="goBackFromTopbar()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
           </button>
           <div class="x-topbar-headings">
             <h1 id="dash-page-title">Overview</h1>
