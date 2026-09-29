@@ -50,17 +50,15 @@
 
     if (!sales) return;
 
-    var rawText = sales.textContent || '';
-    var match = rawText.match(/Rp\s?[\d.,]+/i);
-    if (match) {
-      sales.textContent = match[0];
-    }
+    // Nominal sekarang ditulis sebagai dua bagian (angka + "Rp" di bawahnya), jadi
+    // angkanya dibaca dari bagiannya sendiri. Menulis ulang sales.textContent di sini
+    // akan menghapus kedua bagian itu — jadi tidak dilakukan lagi.
+    var amountEl = sales.querySelector('.x-home-sales-amount');
+    var rawText = amountEl ? (amountEl.textContent || '') : (sales.textContent || '');
+    var digits = rawText.replace(/[^\d]/g, '');
 
     var completedCount = completed ? Number(completed.textContent || 0) : 0;
-    var numericSales = 0;
-    if (match) {
-      numericSales = Number(match[0].replace(/[^\d]/g, '')) || 0;
-    }
+    var numericSales = digits ? Number(digits) : 0;
     if (average) {
       average.textContent = completedCount > 0
         ? formatCompactMoney(Math.round(numericSales / completedCount))
