@@ -2320,7 +2320,9 @@
             '<button type="button" class="x-action-menu-trigger" aria-label="Aksi kategori" onclick="XentraActionMenu.open(this, [' +
               '{ label: \'Edit\', icon: \'✏️\', onClick: function() { openEditMasterReference(\'category\', ' + id + '); } },' +
               '{ label: \'Hapus\', icon: \'🗑️\', destructive: true, onClick: function() { deleteMasterReference(\'category\', ' + id + '); } }' +
-            '])"></button>',
+            '])">',
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+            '</button>',
           '</div>',
         '</div>'
       ].join('');
@@ -2355,7 +2357,9 @@
             '<button type="button" class="x-action-menu-trigger" aria-label="Aksi rasa" onclick="XentraActionMenu.open(this, [' +
               '{ label: \'Edit\', icon: \'✏️\', onClick: function() { openEditMasterReference(\'flavor\', ' + id + '); } },' +
               '{ label: \'Hapus\', icon: \'🗑️\', destructive: true, onClick: function() { deleteMasterReference(\'flavor\', ' + id + '); } }' +
-            '])"></button>',
+            '])">',
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+            '</button>',
           '</div>',
         '</div>'
       ].join('');
