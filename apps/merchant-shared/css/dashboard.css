@@ -403,6 +403,18 @@ a:focus:not(:focus-visible),
   padding: 24px;
 }
 
+/* Kartu judul Produk Master (Owner). Kelas .x-card tidak punya definisi apa pun, jadi
+   sebelumnya kartu ini kehilangan latar, garis, dan padding 24px — tingginya pun jadi
+   berbeda dari panel lain. Di sini tokennya disamakan persis dengan .x-card-panel.
+   Ditulis di luar blok mobile karena panel ini juga dilihat di desktop. */
+#product-list-view .x-master-products-head {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+}
+
 .x-panel-header h3 {
   font-size: 18px;
   font-weight: 700;
@@ -7466,7 +7478,7 @@ input[type="file"].x-input,
   }
 
   #product-list-view .x-master-products-head {
-    margin-bottom: 14px;
+    margin-bottom: 14px !important;
   }
 
   /* Chevron kembali di judul Produk Master: sejajar dengan teks judulnya dan tetap
