@@ -1,6 +1,10 @@
 # Xentra — Branch Catalog Model
 
-**Status: LOCKED — reconciled with Canonical Architecture & Product Library v2**  
+**Status: SUPERSEDED — LEGACY / QUARANTINED**
+**Superseded by:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`
+**Quarantine:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`
+
+> This document is retained as historical/compatibility documentation only. Its **Master Product Default + Branch Optional Override** model is no longer the forward-looking Menu architecture. Do not use it as the source of truth for new Menu work.  
 **Decision authority:** locked business decisions + Library v2
 
 > The former snapshot/save-point wording is superseded. Current resolution is **Master Product Default + explicit Branch Override** for supported fields. Business ownership boundaries remain unchanged.
