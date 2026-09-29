@@ -2,10 +2,12 @@
 
 **Status: LOCKED / AUTHORITATIVE — reconciled with Canonical Architecture & Product Library v2 and Branch Manager Menu Configuration v1**  
 **Decision date:** 2026-09-17  
-**Scope:** Branch-scoped daily restaurant operations + branch-local menu configuration
+**Scope:** Branch-scoped daily restaurant operations + Branch adoption/category operations under the Master Menu Composition contract
 
 > **Canonical map:** `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`. This document defines the Branch Manager surface in detail; it must not redefine terminology, scope, or cross-dashboard authority independently.
 > **Menu authority lock:** `docs/decisions/branch-manager-menu-configuration-v1.md`.
+> **Master Menu composition lock:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`.
+> **Legacy Menu quarantine:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`.
 
 ## 1. Purpose
 
