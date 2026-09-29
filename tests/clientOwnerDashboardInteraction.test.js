@@ -102,7 +102,6 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
       { sel: '[data-route="orders"]', expectedTab: 'tab-orders' },
       { sel: '#nav-catalog-parent', expectedTab: 'tab-catalog-products' },
       { sel: '[data-route="catalog/products"]', expectedTab: 'tab-catalog-products' },
-      { sel: '[data-route="catalog/categories"]', expectedTab: 'tab-catalog-categories' },
       { sel: '[data-route="catalog/menus"]', expectedTab: 'tab-catalog-menus' },
       { sel: '[data-route="branches"]', expectedTab: 'tab-branches' },
       { sel: '[data-route="customers"]', expectedTab: 'tab-customers' },
@@ -226,7 +225,6 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
       { hash: 'overview', expectedTab: 'tab-overview' },
       { hash: 'orders', expectedTab: 'tab-orders' },
       { hash: 'catalog/products', expectedTab: 'tab-catalog-products' },
-      { hash: 'catalog/categories', expectedTab: 'tab-catalog-categories' },
       { hash: 'catalog/menus', expectedTab: 'tab-catalog-menus' },
       { hash: 'branches', expectedTab: 'tab-branches' },
       { hash: 'customers', expectedTab: 'tab-customers' },
@@ -250,6 +248,18 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
       assert.ok(activeTab, `Active tab must exist for #${check.hash}`);
       assert.strictEqual(activeTab.id, check.expectedTab, `Direct route #${check.hash} must activate ${check.expectedTab}`);
     }
+  });
+
+  await t.test('6.1 Legacy Category route redirects to Product Master workspace', async () => {
+    const { win } = createDashboardDOM('catalog/categories', 1024);
+    evalApp(win);
+    win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
+    await new Promise(res => setTimeout(res, 50));
+
+    assert.strictEqual(win.location.hash, '#catalog/products');
+    const activeTab = win.document.querySelector('.x-tab-content.active');
+    assert.ok(activeTab);
+    assert.strictEqual(activeTab.id, 'tab-catalog-products');
   });
 
   await t.test('7. Backward compatibility: buttons with data-tab still navigate', async () => {
