@@ -460,37 +460,16 @@
           event.preventDefault();
           event.stopPropagation();
 
-          var productData = {
-            product_id: product.product_id,
-            name: product.product_name || product.name,
-            price: product.price,
-            master_price: product.master_price || product.price,
-            pricing_mode: product.pricing_mode || 'lock',
-            min_price: product.min_price,
-            max_price: product.max_price,
-            branch_category_id: product.branch_category_id,
-            category_ids: product.category_ids || (product.branch_category_id ? [product.branch_category_id] : []),
-            categories: product.categories || []
-          };
-
           XentraActionMenu.open(actionTrigger, [
-            {
-              label: 'Edit Menu / Kategori Cabang',
-              icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>',
-              onClick: function () {
-                openBranchOverrideModal(JSON.stringify(productData));
-              }
-            },
-            { divider: true },
             {
               label: 'Hapus dari Cabang',
               icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 15H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
               destructive: true,
               onClick: function () {
-                removeBMBranchProduct(product.product_id, product.product_name || product.name);
+                removeBMBranchProduct(product.product_id, product.product_name || product.name || product.menu_title || 'Menu');
               }
             }
-          ]);
+          ]);;
         });
       }
     });
