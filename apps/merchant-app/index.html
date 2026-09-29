@@ -1669,7 +1669,7 @@
   <script src="/assets/js/core/fulfillment-environments.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/context.js?v=1.0.0"></script>
-  <script src="/merchant-app/assets/js/menu.js?v=1.0.1"></script>
+  <script src="/merchant-app/assets/js/menu.js?v=1.0.2"></script>
   <script src="/merchant-app/assets/js/hari-ini.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/jam-operasional.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
@@ -1750,7 +1750,7 @@
         window.addEventListener('load', function () {
           var isSubdomain = window.location.hostname.startsWith('m.') || window.location.hostname.startsWith('merchant.');
           var swScope = isSubdomain ? '/' : (window.location.pathname.startsWith('/merchant-app') ? '/merchant-app/' : '/');
-          navigator.serviceWorker.register('/merchant-app/sw.js', { scope: swScope })
+          navigator.serviceWorker.register('/merchant-app/sw.js', { scope: swScope, updateViaCache: 'none' })
             .then(function (reg) {
               reg.addEventListener('updatefound', function () {
                 var newWorker = reg.installing;
