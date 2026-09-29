@@ -494,7 +494,7 @@ registerLegacyCustomerOtpRoutes(router, {
 
 // 5. Menu Catalog & Home
 // Canonical public catalog menu route is isolated in server/routes/catalog.js.
-registerCatalogRoutes(router, { db, CatalogService, batchResolveCustomerMediaDelivery });
+registerCatalogRoutes(router, { db, CatalogService, MasterMenuResolver, batchResolveCustomerMediaDelivery });
 
 // Product/upsell/checkout-session support routes are isolated in server/routes/storefront.js.
 registerStorefrontRoutes(router, { db, crypto, batchResolveCustomerMediaDelivery });

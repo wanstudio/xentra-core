@@ -1308,7 +1308,11 @@
 
       var price = Number(product.price || 0);
       var regPrice = Number(product.regular_price || price);
-      var desc = product.description || '';
+      var menuTitle = product.menu_title || product.title || product.name || '';
+      var menuSubtitle = product.menu_subtitle || product.subtitle || '';
+      var menuDetail = Array.isArray(product.menu_detail) ? product.menu_detail : [];
+      var menuIndicator = product.menu_indicator || product.indicator || '';
+      var legacyDesc = product.description || '';
 
       // P3: branch-level availability is a SERVER-computed flag (is_available is
       // only present on branch-scoped menus). The client merely presents it.
@@ -1358,8 +1362,11 @@
       html +=
         '<article class="x-product' + (unavailable ? ' x-product-unavailable' : '') + '" data-product-card="' + UI.escape(String(product.id)) + '">' +
         '<div class="x-product-info">' +
-        '  <div class="x-product-name">' + UI.escape(product.name) + '</div>' +
-        '  <div class="x-product-description">' + UI.escape(desc) + '</div>' +
+        '  <div class="x-product-name">' + UI.escape(menuTitle) + '</div>' +
+        (menuSubtitle ? '  <div class="x-product-description">' + UI.escape(menuSubtitle) + '</div>' : '') +
+        (menuDetail.length ? '  <div class="x-product-description">' + UI.escape(menuDetail.join(' · ')) + '</div>' : '') +
+        (menuIndicator ? '  <div class="x-product-menu-indicator">' + UI.escape(menuIndicator) + '</div>' : '') +
+        (!menuSubtitle && !menuDetail.length && legacyDesc ? '  <div class="x-product-description">' + UI.escape(legacyDesc) + '</div>' : '') +
         unavailableTag +
         '  <div class="x-price">' + oldPriceHtml +
         '    <div class="x-current-price">' + UI.money(price) + '</div>' +
@@ -1577,6 +1584,10 @@
     var unavailable = !!activeBranch && product.is_available === false;
     var price = Number(product.price || 0);
     var regPrice = Number(product.regular_price || price);
+    var menuTitle = product.menu_title || product.title || product.name || '';
+    var menuSubtitle = product.menu_subtitle || product.subtitle || '';
+    var menuDetail = Array.isArray(product.menu_detail) ? product.menu_detail : [];
+    var menuIndicator = product.menu_indicator || product.indicator || '';
     // M6: Resolve best image for the detail view (200px tall, full-width).
     // For the detail sheet we want at least 640px wide (md quality) for crisp display.
     var imgHtml = '';
@@ -1635,9 +1646,11 @@
       '  <div class="x-detail-scroll-area">' +
       imgHtml +
       '    <div class="x-detail-body">' +
-      '      <h3 class="x-detail-name">' + UI.escape(product.name) + '</h3>' +
+      '      <h3 class="x-detail-name">' + UI.escape(menuTitle) + '</h3>' +
+      (menuSubtitle ? '      <div class="x-detail-desc">' + UI.escape(menuSubtitle) + '</div>' : '') +
+      (menuDetail.length ? '      <div class="x-detail-desc">' + UI.escape(menuDetail.join(' · ')) + '</div>' : '') +
+      (menuIndicator ? '      <div class="x-detail-desc" style="font-weight:700;">' + UI.escape(menuIndicator) + '</div>' : '') +
       branchLabelHtml +
-      '      <div class="x-detail-desc">' + UI.escape(product.description || '') + '</div>' +
       availabilityHtml +
       '      <div class="x-detail-price">' + oldPriceHtml + '<span class="x-detail-current">' + UI.money(price) + '</span></div>' +
       '    </div>' +

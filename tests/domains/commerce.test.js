@@ -39,6 +39,33 @@ test.before(() => {
         ('branch_test', 'prod_limited', NULL, 4, 1, 8) -- Manager configured low-stock threshold = 8
     `).run();
 
+    // Forward Master Menu Composition fixtures. These structured relations are
+    // the authoritative source used by PrePaymentVerificationGate.
+    db.prepare(`
+      INSERT OR REPLACE INTO menu_flavors (id, brand_id, name, slug, is_active)
+      VALUES ('flavor_test', 'brand_test', 'Lombok Ijo', 'lombok-ijo-test', 1)
+    `).run();
+    db.prepare(`
+      INSERT OR REPLACE INTO menu_complements (id, brand_id, name, slug, is_active)
+      VALUES
+        ('complement_test_nasi', 'brand_test', 'Nasi', 'nasi-test', 1),
+        ('complement_test_lalapan', 'brand_test', 'Lalapan', 'lalapan-test', 1)
+    `).run();
+    db.prepare(`
+      INSERT OR REPLACE INTO menu_levels (id, brand_id, name, slug, is_active)
+      VALUES ('level_test', 'brand_test', 'Level 2', 'level-test', 1)
+    `).run();
+
+    db.prepare('DELETE FROM product_flavors WHERE product_id IN (\'prod_lock\', \'prod_range\', \'prod_limited\')').run();
+    db.prepare('DELETE FROM product_complements WHERE product_id IN (\'prod_lock\', \'prod_range\', \'prod_limited\')').run();
+    db.prepare('DELETE FROM product_levels WHERE product_id IN (\'prod_lock\', \'prod_range\', \'prod_limited\')').run();
+
+    db.prepare('INSERT INTO product_flavors (product_id, flavor_id) VALUES (?, ?)').run('prod_lock', 'flavor_test');
+    db.prepare('INSERT INTO product_flavors (product_id, flavor_id) VALUES (?, ?)').run('prod_range', 'flavor_test');
+    db.prepare('INSERT INTO product_complements (product_id, complement_id, sort_order) VALUES (?, ?, ?)').run('prod_lock', 'complement_test_nasi', 0);
+    db.prepare('INSERT INTO product_complements (product_id, complement_id, sort_order) VALUES (?, ?, ?)').run('prod_limited', 'complement_test_nasi', 0);
+    db.prepare('INSERT INTO product_levels (product_id, level_id) VALUES (?, ?)').run('prod_limited', 'level_test');
+
     // Full order cleanup for brand_test: clears all orders (and their child rows)
     // from prior runs so promotion eligibility checks (firstOrderOnly, countCustomerOrders)
     // don't count stale data. Deletion order respects FK constraints.
@@ -74,6 +101,13 @@ test.before(() => {
       DELETE FROM products WHERE brand_id = 'brand_test'
       AND id NOT IN ('prod_lock', 'prod_range', 'prod_limited', 'prod_unassigned')
     `).run();
+
+    db.prepare('DELETE FROM product_flavors WHERE product_id IN (\'prod_lock\', \'prod_range\', \'prod_limited\')').run();
+    db.prepare('DELETE FROM product_complements WHERE product_id IN (\'prod_lock\', \'prod_range\', \'prod_limited\')').run();
+    db.prepare('DELETE FROM product_levels WHERE product_id IN (\'prod_lock\', \'prod_range\', \'prod_limited\')').run();
+    db.prepare('DELETE FROM menu_levels WHERE id = \'level_test\'').run();
+    db.prepare('DELETE FROM menu_complements WHERE id IN (\'complement_test_nasi\', \'complement_test_lalapan\')').run();
+    db.prepare('DELETE FROM menu_flavors WHERE id = \'flavor_test\'').run();
   } catch (e) {
     console.error('Seed setup error:', e.message);
   }
@@ -154,13 +188,18 @@ test('Commerce 5 — Pre-Payment Gate: verifies stock, rejects unassigned branch
     brand_id: 'brand_test',
     branch_id: 'branch_test',
     items: [
-      { product_id: 'prod_lock', quantity: 2, expected_price: 99999 },
-      { product_id: 'prod_range', quantity: 1, expected_price: 32000 }
+      { product_id: 'prod_lock', quantity: 2, expected_price: 25000 },
+      { product_id: 'prod_range', quantity: 1, expected_price: 28000 }
     ]
   });
   assert.strictEqual(validVerification.is_valid, true);
   assert.strictEqual(validVerification.status, 'VERIFIED');
   assert.strictEqual(validVerification.verified_items.length, 2);
+
+  // Branch Product legacy price column is deliberately ignored by the forward
+  // checkout resolver. Master price is authoritative for the new Menu contract.
+  assert.strictEqual(validVerification.verified_items[0].unit_price, 25000);
+  assert.strictEqual(validVerification.verified_items[1].unit_price, 30000);
 
   // 2. Unassigned product rejection (No 999 fake fallback!)
   const unassignedVerification = PrePaymentVerificationGate.verify({
@@ -234,6 +273,16 @@ test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell pre
 
   assert.strictEqual(orderResult.success, true);
   assert.strictEqual(orderResult.order.grand_total, 110000);
+
+  const snapshotRow = db.prepare('SELECT menu_snapshot FROM order_items WHERE order_id = ? AND product_id = ?').get(orderResult.order.id, 'prod_limited');
+  assert.ok(snapshotRow && snapshotRow.menu_snapshot, 'Order item must persist immutable Master Menu snapshot');
+  const menuSnapshot = JSON.parse(snapshotRow.menu_snapshot);
+  assert.equal(menuSnapshot.schema_version, 'master-menu-composition-v1');
+  assert.equal(menuSnapshot.product_id, 'prod_limited');
+  assert.equal(menuSnapshot.title, 'Makanan');
+  assert.equal(menuSnapshot.subtitle, 'Lombok Ijo');
+  assert.deepEqual(menuSnapshot.detail, ['Nasi']);
+  assert.equal(menuSnapshot.indicator, 'Level 2');
 
   // 1. Verify Stock actually decremented in database to 2 for confirmed cash order
   const updatedBranchRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
