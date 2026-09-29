@@ -2529,6 +2529,17 @@
           <!-- Settings Main Content Panel -->
           <div class="settings-content-panel" style="flex:1;min-width:0;">
 
+            <!-- 0. DATA REFRESH PANEL -->
+            <div id="settings-panel-data-refresh" class="settings-panel" style="display:none;">
+              <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
+                <div style="margin-bottom:16px;">
+                  <h3 style="margin:0 0 4px;font-size:16px;font-weight:700;">Data Aplikasi</h3>
+                  <p style="margin:0;font-size:13px;color:#64748b;">Jika data terasa belum sinkron, gunakan satu tombol ini untuk memuat ulang data aplikasi dari server.</p>
+                </div>
+                <button type="button" class="x-btn-primary" id="btn-settings-refresh-app-data">Segarkan data aplikasi</button>
+              </div>
+            </div>
+
             <!-- 1. BRAND PROFILE PANEL -->
             <div id="settings-panel-business-profile" class="settings-panel">
               <div class="x-card" style="padding:24px;border:1px solid var(--border-color);border-radius:var(--radius-lg);background:#ffffff;">
