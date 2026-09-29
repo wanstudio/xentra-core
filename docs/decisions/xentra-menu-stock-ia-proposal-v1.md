@@ -347,3 +347,26 @@ Verification:
 - Device/VPS visual verification is still a separate step.
 
 **LOCKED + IMPLEMENTED — Menu hierarchy v2.**
+
+
+## 🔒 LOCKED ADDENDUM — Menu Composition Supersession
+**Date: 29 September 2026**
+
+The navigation/operational IA in this document remains useful only where it does not conflict with the new Master Menu Composition model.
+
+The following earlier Menu assumptions are **SUPERSEDED / QUARANTINED**:
+
+- Merchant name/description override;
+- Merchant image override;
+- Merchant free-form Menu composition;
+- Merchant editing of Master Menu inputs;
+- Merchant branch price override as a general Menu-edit capability.
+
+Forward architecture:
+**Owner creates Master structured Menu data → Owner assembles Master Product → Merchant adopts Product → Merchant assigns Branch Category / operates Branch → Customer PWA renders the Master composition in Branch context.**
+
+See:
+- `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`
+- `docs/decisions/xentra-menu-legacy-quarantine-v1.md`
+
+The existing `options_config` POS Variant/Add-on contract remains separate.
