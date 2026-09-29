@@ -7,7 +7,7 @@
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.3.0">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.3.1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -1501,13 +1501,17 @@
       <section id="tab-catalog-products" class="x-tab-content" data-tab="catalog-products">
         <!-- 1. Product List View -->
         <div id="product-list-view" class="x-card-panel">
-          <div class="x-panel-header-flex">
-            <div>
-              <h3>🍔 Master Products</h3>
-              <p class="text-muted" style="font-size:13px;">Daftar identitas dan harga dasar produk master brand. Cabang mengadopsi produk dari katalog ini.</p>
-            </div>
-            <div class="x-header-buttons">
-              <button type="button" class="x-btn-primary" id="btn-add-product-main">+ Tambah Produk Baru</button>
+          <!-- Kartu ini hanya memuat judul, deskripsi, dan CTA. Pencarian, kategori,
+               dan daftar produknya berada di luar kartu, langsung di panelnya. -->
+          <div class="x-card x-master-products-head">
+            <div class="x-panel-header-flex">
+              <div>
+                <h3>🍔 Master Products</h3>
+                <p class="text-muted" style="font-size:13px;">Daftar identitas dan harga dasar produk master brand. Cabang mengadopsi produk dari katalog ini.</p>
+              </div>
+              <div class="x-header-buttons">
+                <button type="button" class="x-btn-primary" id="btn-add-product-main">+ Tambah Produk Baru</button>
+              </div>
             </div>
           </div>
 

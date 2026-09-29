@@ -7455,6 +7455,40 @@ input[type="file"].x-input,
   /* Harga dan status sedikit lebih menonjol daripada keterangan lain. */
   #master-products-table td:nth-child(4) { font-weight: 700 !important; color: #15191c !important; }
 
+  /* ── Produk Master (Owner): kartu hanya judul, sisanya langsung di panel ─────
+     Panelnya bukan lagi kartu — kartunya hanya membungkus judul, deskripsi, dan CTA.
+     Pencarian, pemilih kategori, dan daftar produk mengalir langsung di panel. */
+  #product-list-view.x-card-panel {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  #product-list-view .x-master-products-head {
+    margin-bottom: 14px;
+  }
+
+  /* Pencarian dan pemilih kategori ditumpuk penuh lebar, bukan berdampingan. */
+  #product-list-view > div[style*="display:flex"] {
+    display: block !important;
+    margin-top: 0 !important;
+  }
+  #product-list-view > div[style*="display:flex"] > div {
+    min-width: 0 !important;
+    width: 100% !important;
+    margin-bottom: 10px !important;
+  }
+  #product-list-view #prod-search-input,
+  #product-list-view #prod-filter-category {
+    width: 100% !important;
+  }
+
+  /* Chip kategori yang bisa digeser ke samping: disembunyikan, bukan dihapus. */
+  #catalog-products-category-chips {
+    display: none !important;
+  }
+
   /* Kartu statistik: dua kolom, bukan satu kartu per baris setinggi layar. */
   .x-finance-subview .x-stat-grid {
     grid-template-columns: repeat(2, 1fr) !important;
