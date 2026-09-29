@@ -7520,7 +7520,35 @@ input[type="file"].x-input,
     box-shadow: none !important;
   }
 
-  #product-list-view .x-master-products-head {
+  /* Page Kategori (tab Bisnis) disamakan dengan Produk Master: kartunya hanya membungkus
+   judul dan deskripsi, sedangkan tab, toolbar, dan daftar kartu kategorinya mengalir
+   langsung di panel. Jarak dari top bar memakai nilai yang sama dengan Beranda. */
+#tab-catalog-categories > .x-card-panel {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 4px 0 10px !important;
+}
+
+#tab-catalog-categories .x-panel-header-flex {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+  margin-bottom: 14px;
+}
+
+/* Jarak antar blok dirapatkan supaya iramanya sama dengan Produk Master. */
+#tab-catalog-categories .x-subnav-tabs {
+  margin-bottom: 14px !important;
+}
+
+#tab-catalog-categories .x-master-reference-toolbar {
+  margin-bottom: 14px !important;
+}
+
+#product-list-view .x-master-products-head {
     margin-bottom: 0 !important;
   }
 
