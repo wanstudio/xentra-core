@@ -2541,13 +2541,12 @@
 
       if (type === 'category') {
         var category = data.category;
-        if (category) {
-          var categoryIndex = state.categories.findIndex(function (row) { return String(row.id) === String(category.id); });
-          if (categoryIndex >= 0) state.categories[categoryIndex] = category;
-          else state.categories.push(category);
-        }
+        if (!category) throw new Error('Server tidak mengembalikan kategori hasil simpan.');
+        var categoryIndex = state.categories.findIndex(function (row) { return String(row.id) === String(category.id); });
+        if (categoryIndex >= 0) state.categories[categoryIndex] = category;
+        else state.categories.push(category);
         populateProductCategorySelect();
-        if (!referenceId && category) {
+        if (!referenceId) {
           var categorySelect = $('prod-category');
           if (categorySelect) categorySelect.value = category.id;
         }
@@ -2555,12 +2554,15 @@
         renderMasterProductsTable();
       } else {
         var flavor = data.component;
-        await loadMasterMenuComponents();
-        if (flavor && !referenceId) {
-          _masterMenuSelected.flavor_id = String(flavor.id);
-        }
+        if (!flavor) throw new Error('Server tidak mengembalikan rasa hasil simpan.');
+        var flavorIndex = (_masterMenuComponents.flavor || []).findIndex(function (row) {
+          return String(row.id) === String(flavor.id);
+        });
+        if (flavorIndex >= 0) _masterMenuComponents.flavor[flavorIndex] = flavor;
+        else _masterMenuComponents.flavor.push(flavor);
         renderMasterMenuSelectors();
-        if (!referenceId && flavor) {
+        if (!referenceId) {
+          _masterMenuSelected.flavor_id = String(flavor.id);
           var flavorSelect = $('prod-flavor');
           if (flavorSelect) flavorSelect.value = String(flavor.id);
         }
