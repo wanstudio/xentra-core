@@ -202,7 +202,7 @@
         "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><polyline points=\"12 6 12 12 16 14\"></polyline></svg>" +
         "<span>Jam Operasional</span>" +
       "</button>" +
-      "<button type="button" class="x-nav-item" data-route="pengaturan">" +
+      "<button type=\"button\" class=\"x-nav-item\" data-route=\"pengaturan\">" +
         "<span>⚙️</span><span>Pengaturan</span>" +
       "</button>";
 
