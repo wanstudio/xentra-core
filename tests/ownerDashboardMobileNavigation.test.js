@@ -115,6 +115,8 @@ test('Owner Dashboard Mobile Navigation', async t => {
     for (const route of ["catalog/products", "catalog/categories", "stock", "branches", "customers", "marketing", "team", "reports", "settings/business/profile"]) {
       assert.ok(business.includes("navigateTo('" + route + "')"), 'Business hub must expose route "' + route + '"');
     }
+    assert.ok(!business.includes('Menu &amp; Paket'), 'Business hub must not expose the old combined Menu & Paket entry');
+    assert.ok(!business.includes("navigateTo('catalog/menus')"), 'Branch Menu must not be presented as a Master Catalog hub card');
   });
 
   await t.test('OWNER-MOB-11B: More hub is reserved for system/settings/account concerns', () => {
@@ -142,6 +144,7 @@ test('Owner Dashboard Mobile Navigation', async t => {
   await t.test('OWNER-MOB-13: desktop sidebar has existing nav items (Overview, Orders)', () => {
     assert.ok(html.includes('data-route="overview"'), 'Sidebar overview nav item must exist');
     assert.ok(html.includes('data-route="orders"'), 'Sidebar orders nav item must exist');
+    assert.ok(html.includes('data-route="catalog/menus"') && html.includes('<span>Menu Cabang</span>'), 'Sidebar must label the branch-specific Menu route as Menu Cabang');
   });
 
   await t.test('OWNER-MOB-13A: redundant sidebar close button is not rendered in Owner Dashboard', () => {
