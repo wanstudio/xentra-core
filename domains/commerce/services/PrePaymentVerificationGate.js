@@ -195,51 +195,54 @@ class PrePaymentVerificationGate {
       }
 
       const expectedPrice = Number(item.expected_price ?? item.price);
-      const masterProduct = catalogRepository.findProductForBranch({
+      // FORWARD MENU AUTHORITY:
+      // Resolve the exact Master Product through the selected Branch adoption.
+      // This deliberately bypasses legacy Branch name/description/image/price
+      // overrides for Checkout. The Branch controls availability and stock only.
+      const branchMenu = MasterMenuResolver.resolveBranchMenu({
+        brandId: brand_id,
         branchId: branch_id,
-        productId,
-        brandId: brand_id
+        productIds: [productId]
       });
-      if (!masterProduct) {
-        errors.push(`Produk "${item.name || productId}" tidak ditemukan di sistem.`);
+      const resolvedMenuProduct = branchMenu.products[0];
+      if (!resolvedMenuProduct) {
+        const legacyProduct = catalogRepository.findProductForBranch({
+          branchId: branch_id,
+          productId,
+          brandId: brand_id
+        });
+        const legacyName = legacyProduct && legacyProduct.name ? legacyProduct.name : (item.name || productId);
+        if (legacyProduct && legacyProduct.bp_branch_id && legacyProduct.branch_availability !== 0 && legacyProduct.is_active !== 0) {
+          errors.push(`Produk "${legacyName}" belum memiliki Master Menu Composition lengkap. Owner perlu melengkapi Master Menu sebelum pesanan dapat diproses.`);
+        } else if (legacyProduct && legacyProduct.is_active === 0) {
+          errors.push(`Produk "${legacyName}" saat ini dinonaktifkan.`);
+        } else if (legacyProduct && legacyProduct.bp_branch_id) {
+          errors.push(`Produk "${legacyName}" saat ini dinonaktifkan di cabang ini.`);
+        } else {
+          errors.push(`Produk "${legacyName}" belum dialokasikan untuk cabang ini.`);
+        }
         continue;
       }
-      if (masterProduct.is_active === 0 || masterProduct.is_active === false) {
-        errors.push(`Produk "${masterProduct.name}" saat ini dinonaktifkan.`);
+
+      if (!resolvedMenuProduct.is_available) {
+        errors.push(`Produk "${resolvedMenuProduct.master.name}" saat ini dinonaktifkan di cabang ini.`);
         continue;
       }
-      if (!masterProduct.bp_branch_id) {
-        errors.push(`Produk "${masterProduct.name}" belum dialokasikan untuk cabang ini.`);
-        continue;
-      }
-      const isAvailable = (masterProduct.branch_availability !== 0);
-      if (!isAvailable) {
-        errors.push(`Produk "${masterProduct.name}" saat ini dinonaktifkan di cabang ini.`);
-        continue;
-      }
-      const currentStock = masterProduct.branch_stock != null ? Number(masterProduct.branch_stock) : 0;
+      const currentStock = resolvedMenuProduct.stock_estimate != null ? Number(resolvedMenuProduct.stock_estimate) : 0;
       if (currentStock < requestedQty) {
-        errors.push(`Stok produk "${masterProduct.name}" tidak mencukupi (Tersedia: ${currentStock}, Diminta: ${requestedQty}).`);
+        errors.push(`Stok produk "${resolvedMenuProduct.master.name}" tidak mencukupi (Tersedia: ${currentStock}, Diminta: ${requestedQty}).`);
         continue;
       }
-      const pricing = PricingPolicyModel.resolvePrice(
-        {
-          price: masterProduct.price,
-          pricing_mode: masterProduct.pricing_mode || 'lock',
-          min_price: masterProduct.min_price,
-          max_price: masterProduct.max_price
-        },
-        masterProduct.branch_raw_price
-      );
-      const basePrice = pricing.effective_price;
+
+      const basePrice = Number(resolvedMenuProduct.price || 0);
       let optionResolution;
       try {
         optionResolution = ProductOptionsModel.resolveSelections(
-          masterProduct.options_config,
+          resolvedMenuProduct.options,
           item.options || item.selected_options || item.modifiers || []
         );
       } catch (optionErr) {
-        errors.push(`Pilihan pada produk "${masterProduct.name}" tidak valid: ${optionErr.message}`);
+        errors.push(`Pilihan pada produk "${resolvedMenuProduct.master.name}" tidak valid: ${optionErr.message}`);
         continue;
       }
 
@@ -262,7 +265,7 @@ class PrePaymentVerificationGate {
 
       verifiedItems.push({
         product_id: productId,
-        name: masterProduct.name,
+        name: resolvedMenuProduct.master.name,
         quantity: requestedQty,
         menu_snapshot: menuSnapshot,
         unit_price: actualPrice,
@@ -272,7 +275,7 @@ class PrePaymentVerificationGate {
         note: String(item.note || item.item_note || '').trim(),
         subtotal: actualPrice * requestedQty,
         current_stock: currentStock,
-        branch_low_stock_threshold: masterProduct.branch_low_stock_threshold
+        branch_low_stock_threshold: resolvedMenuProduct.stock_estimate != null ? null : null
       });
     }
 
