@@ -241,32 +241,35 @@ describe('BM Phase 4 Final — Branch Manager Operational Center (Hari Ini)', ()
     const htmlPath = path.join(__dirname, '../../apps/merchant-app/index.html');
     const html = fs.readFileSync(htmlPath, 'utf8');
 
-    // Section exists
     assert.ok(html.includes('id="tab-hari-ini"'), 'Missing tab-hari-ini');
-    // Header & identity
-    assert.ok(html.includes('id="bm-hero-branch-name"'), 'Missing bm-hero-branch-name');
-    assert.ok(html.includes('id="bm-hero-status-dot"'), 'Missing bm-hero-status-dot');
-    assert.ok(html.includes('id="bm-hero-status-badge"'), 'Missing bm-hero-status-badge');
-    assert.ok(html.includes('id="bm-hero-online-badge"'), 'Missing bm-hero-online-badge');
-    assert.ok(html.includes('id="bm-hero-date"'), 'Missing bm-hero-date');
-    // Controls
-    assert.ok(html.includes('id="btn-bm-toggle-open"'), 'Missing btn-bm-toggle-open');
-    assert.ok(html.includes('id="btn-bm-toggle-online-orders"'), 'Missing btn-bm-toggle-online-orders');
-    // Perlu Perhatian containers
-    assert.ok(html.includes('id="bm-tbody-pending-orders"'), 'Missing bm-tbody-pending-orders');
-    assert.ok(html.includes('id="bm-badge-pending-count"'), 'Missing bm-badge-pending-count');
-    assert.ok(html.includes('id="bm-menu-unavail-list"'), 'Missing bm-menu-unavail-list');
-    assert.ok(html.includes('id="bm-stock-low-list"'), 'Missing bm-stock-low-list');
-    // Operational summaries & activity
-    assert.ok(html.includes('id="bm-stat-pending-orders"'), 'Missing bm-stat-pending-orders');
-    assert.ok(html.includes('id="bm-stat-active-orders"'), 'Missing bm-stat-active-orders');
-    assert.ok(html.includes('id="bm-stat-ready-orders"'), 'Missing bm-stat-ready-orders');
-    assert.ok(html.includes('id="bm-stat-completed-orders"'), 'Missing bm-stat-completed-orders');
-    assert.ok(html.includes('id="bm-recent-activity-container"'), 'Missing bm-recent-activity-container');
-    assert.ok(html.includes('id="bm-active-promos-container"'), 'Missing bm-active-promos-container');
+    assert.ok(html.includes('class="x-home-screen"'), 'Missing native Home surface');
+    assert.ok(html.includes('id="bm-home-branch-name"'), 'Missing Home branch context');
+    assert.ok(html.includes('id="bm-home-status-dot"'), 'Missing Home status indicator');
+    assert.ok(html.includes('id="bm-home-status-badge"'), 'Missing Home branch state badge');
+    assert.ok(html.includes('id="bm-home-online-badge"'), 'Missing Home online state badge');
+    assert.ok(html.includes('id="bm-home-date"'), 'Missing Home date');
+    assert.ok(html.includes('id="btn-bm-toggle-open"'), 'Missing desktop branch toggle');
+    assert.ok(html.includes('id="btn-bm-toggle-online-orders"'), 'Missing desktop online-order toggle');
+    assert.ok(html.includes('id="bm-pending-orders-list"'), 'Missing native pending-order list');
+    assert.ok(html.includes('id="bm-badge-pending-count"'), 'Missing pending order count');
+    assert.ok(html.includes('id="bm-stat-net-sales-today"'), 'Missing Home sales value');
+    assert.ok(html.includes('id="bm-stat-average-order"'), 'Missing Home average order');
+    assert.ok(html.includes('id="bm-stat-pending-orders"'), 'Missing pending snapshot');
+    assert.ok(html.includes('id="bm-stat-active-orders"'), 'Missing active snapshot');
+    assert.ok(html.includes('id="bm-stat-ready-orders"'), 'Missing ready snapshot');
+    assert.ok(html.includes('id="bm-stat-completed-orders"'), 'Missing completed snapshot');
+    assert.ok(html.includes('id="bm-menu-attention-summary"'), 'Missing Menu attention summary');
+    assert.ok(html.includes('id="bm-stock-attention-summary"'), 'Missing Stock attention summary');
+    assert.ok(html.includes('id="bm-recent-activity-container"'), 'Missing recent activity');
+    assert.ok(html.includes('id="bm-active-promos-container"'), 'Missing active promos');
+    assert.ok(html.includes('Beranda'), 'Missing mobile Home navigation label');
+    assert.ok(html.includes('Pesanan'), 'Missing mobile Orders navigation label');
+    assert.ok(html.includes('Menu'), 'Missing mobile Menu navigation label');
+    assert.ok(html.includes('Stock'), 'Missing mobile Stock navigation label');
+    assert.ok(html.includes('Promo'), 'Missing mobile Promo navigation label');
   });
 
-  it('P4F-11: dashboard.js implements split status rendering and calm empty states', () => {
+  it('P4F-11: merchant operational JS preserves split status actions and recoverable empty states', () => {
     const jsPath = path.join(__dirname, '../../apps/merchant-app/assets/js/merchant-app.js');
     const hariIniPath = path.join(__dirname, '../../apps/merchant-app/assets/js/hari-ini.js');
     const js = fs.readFileSync(jsPath, 'utf8') + '\n' + (fs.existsSync(hariIniPath) ? fs.readFileSync(hariIniPath, 'utf8') : '');
