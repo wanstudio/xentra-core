@@ -26,6 +26,7 @@ const CATALOG_CAPABILITIES = {
     'master_catalog',
     'branch_catalog',
     'branch_menu_resolution',
+    'master_menu_composition',
     'pricing_policy_lock_range'
   ]
 };
