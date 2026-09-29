@@ -4812,7 +4812,6 @@
     var alertList = $('owner-stock-alerts-list');
     var branchList = $('owner-stock-branch-list');
     var movementList = $('owner-stock-movement-list');
-    var refreshBtn = $('btn-owner-stock-refresh');
     var branchId = getEffectiveBranchId();
     var query = branchId ? '?branch_id=' + encodeURIComponent(branchId) : '';
 
@@ -4820,7 +4819,6 @@
     if (branchList) branchList.innerHTML = '<div class="x-owner-stock-loading">Memuat cabang...</div>';
     if (movementList) movementList.innerHTML = '<div class="x-owner-stock-loading">Memuat mutasi...</div>';
     if (root) root.setAttribute('aria-busy', 'true');
-    if (refreshBtn) refreshBtn.disabled = true;
 
     if (branchId) {
       var selected = (_branchContextState.branches || []).find(function (b) {
@@ -4853,7 +4851,6 @@
       if (movementList) movementList.innerHTML = '<div class="x-owner-stock-error">' + escapeHtml(message) + '</div>';
     }).finally(function () {
       if (root) root.setAttribute('aria-busy', 'false');
-      if (refreshBtn) refreshBtn.disabled = false;
     });
   }
 
