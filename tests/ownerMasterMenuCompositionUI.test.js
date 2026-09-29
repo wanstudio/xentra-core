@@ -63,6 +63,19 @@ test('Inactive Master component values are not exposed as new selector choices',
   assert.ok(!JS.includes("active_only=true"), 'Component manager must retain inactive rows so they can be reactivated');
 });
 
+test('Master Product uses one assembly workspace with contextual quick-add modal', () => {
+  assert.ok(HTML.includes('id="modal-master-reference-quick-add"'));
+  assert.ok(HTML.includes('id="master-reference-quick-add-type"'));
+  assert.ok(HTML.includes('id="master-reference-quick-add-name"'));
+  assert.ok(JS.includes('function openMasterReferenceQuickAdd(type)'));
+  assert.ok(JS.includes("openMasterReferenceQuickAdd('category')"));
+  assert.ok(JS.includes("openMasterReferenceQuickAdd('flavor')"));
+  assert.ok(JS.includes("API_BASE + '/admin/categories'"));
+  assert.ok(JS.includes("API_BASE + '/admin/menu/components/flavor'"));
+  assert.ok(!HTML.includes('id="tab-catalog-categories"'));
+  assert.ok(!HTML.includes('id="btn-manage-menu-components"'));
+});
+
 test('New Product form does not introduce legacy branch override composition fields', () => {
   const start = HTML.indexOf('<!-- MODAL: ADD / EDIT PRODUCT -->');
   const end = HTML.indexOf('<!-- MODAL: MASTER MENU COMPONENT MANAGER -->', start);
