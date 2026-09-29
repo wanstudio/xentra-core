@@ -60,6 +60,14 @@ test('Branch resolver contains adopted Product and Branch Category but no legacy
   assert.equal(Object.prototype.hasOwnProperty.call(p, 'image_override'), false);
 });
 
+test('Inactive referenced Master component remains visible on existing Product', () => {
+  db.prepare('UPDATE menu_flavors SET is_active = 0 WHERE id = ?').run(FLAVOR);
+  const rows = MasterMenuResolver.resolveMasterProducts({ brandId: BRAND, productIds: [PRODUCT] });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].subtitle, 'Lombok Ijo');
+  db.prepare('UPDATE menu_flavors SET is_active = 1 WHERE id = ?').run(FLAVOR);
+});
+
 test('Inactive Master Product is not returned by strict forward resolver', () => {
   db.prepare('UPDATE products SET is_active = 0 WHERE id = ?').run(PRODUCT);
   const menu = MasterMenuResolver.resolveBranchMenu({ brandId: BRAND, branchId: BRANCH });
