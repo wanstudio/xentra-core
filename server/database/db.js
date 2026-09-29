@@ -1365,7 +1365,8 @@ function initSchema(targetDb) {
       description_override TEXT,
       image_override TEXT,
       price REAL,
-      stock INTEGER DEFAULT 100,
+      -- No catalog assignment may manufacture physical inventory.
+      stock INTEGER DEFAULT NULL,
       is_available INTEGER DEFAULT 1,
       low_stock_threshold INTEGER DEFAULT 5,
       created_at TEXT DEFAULT (datetime('now')),
