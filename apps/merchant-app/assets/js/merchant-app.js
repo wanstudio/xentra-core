@@ -44,7 +44,8 @@
     "stok":             { title: "Stok",             sub: "Pemantauan stok dan peringatan inventaris cabang",        tab: "bm-stok" },
     "staff":            { title: "Staff",            sub: "Daftar staf operasional dan kasir cabang",                tab: "bm-staff" },
     "reports":          { title: "Laporan",          sub: "Laporan penjualan dan operasional harian cabang",         tab: "bm-reports" },
-    "jam-operasional":  { title: "Jam Operasional",  sub: "Jam operasional dan pengecualian libur cabang",           tab: "bm-jam-operasional" }
+    "jam-operasional":  { title: "Jam Operasional",  sub: "Jam operasional dan pengecualian libur cabang",           tab: "bm-jam-operasional" },
+    "pengaturan":       { title: "Pengaturan",       sub: "Pengaturan aplikasi merchant dan pemulihan data",                tab: "bm-settings" }
   };
 
   function closeMobileSidebar() {
@@ -200,6 +201,9 @@
       "<button type=\"button\" class=\"x-nav-item\" data-route=\"jam-operasional\">" +
         "<svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"12\" r=\"10\"></circle><polyline points=\"12 6 12 12 16 14\"></polyline></svg>" +
         "<span>Jam Operasional</span>" +
+      "</button>" +
+      "<button type="button" class="x-nav-item" data-route="pengaturan">" +
+        "<span>⚙️</span><span>Pengaturan</span>" +
       "</button>";
 
     nav.querySelectorAll(".x-nav-item[data-route]").forEach(function (btn) {
@@ -288,6 +292,32 @@
    * tombolnya tampil tapi tidak melakukan apa pun — persis seperti keluhan
    * "tidak bisa logout".
    */
+  function bindMerchantSettingsControls() {
+    var settingsBtn = $('btn-mobile-account-settings');
+    if (settingsBtn && !settingsBtn.dataset.bound) {
+      settingsBtn.dataset.bound = '1';
+      settingsBtn.addEventListener('click', function () {
+        closeMobileAccount();
+        navigateTo('pengaturan');
+      });
+    }
+    var refreshBtn = $('btn-bm-refresh-app-data');
+    if (refreshBtn && !refreshBtn.dataset.bound) {
+      refreshBtn.dataset.bound = '1';
+      refreshBtn.addEventListener('click', function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = 'Menyegarkan...';
+        window.location.reload();
+      });
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bindMerchantSettingsControls);
+  } else {
+    bindMerchantSettingsControls();
+  }
+
   function populateMobileAccount() {
     var user = getStoredUser ? getStoredUser() : null;
     if (!user) return;
