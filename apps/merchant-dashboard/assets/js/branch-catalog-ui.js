@@ -75,31 +75,34 @@
     var container = $('branch-adopted-products-container');
     if (!container) return;
 
-    if (!adopted.length) {
-      container.innerHTML = '<div style="grid-column:1/-1;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:24px;text-align:center;color:#64748b;font-size:13px;">Belum ada menu yang diadopsi oleh cabang ini. Pilih produk dari daftar rekomendasi Owner di bawah!</div>';
+    var source = Array.isArray(adopted) ? adopted : [];
+    if (!source.length) {
+      container.innerHTML = '<div style="grid-column:1/-1;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:24px;text-align:center;color:#64748b;font-size:13px;">Belum ada menu yang diadopsi oleh cabang ini. Pilih Master Menu dari daftar Owner.</div>';
       return;
     }
-
-    container.innerHTML = adopted.map(function (p) {
-      var img = p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
+    var filtered = source;
+    
+    container.innerHTML = filtered.map(function (p) {
+      var comp = p.menu_composition || {};
+      var img = comp.image || p.image_url || p.master_image_url || '';
       var isAvailable = p.is_available === 1 || p.is_available === true;
-      var catName = p.branch_category_name || 'Menu Utama';
-      var modeBadge = p.pricing_mode === 'range'
-        ? '<span class="x-badge x-badge-range">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
-        : '<span class="x-badge x-badge-lock">Harga Terkunci</span>';
+      var categoryNames = (p.categories || []).map(function (c) { return c.name; }).filter(Boolean);
+      var categoryHtml = categoryNames.length
+        ? '<div style="display:flex;gap:4px;flex-wrap:wrap;margin:5px 0;">' + categoryNames.map(function (name) {
+            return '<span class="x-badge x-badge-info" style="font-size:10px;">' + esc(name) + '</span>';
+          }).join('') + '</div>'
+        : '';
 
-      var productDataJson = esc(JSON.stringify({
-        product_id: p.product_id,
-        name: p.name, name_override: p.name_override, master_name: p.master_name,
-        description: p.description, description_override: p.description_override, master_description: p.master_description,
-        image_url: p.image_url, image_override: p.image_override, master_image_url: p.master_image_url,
-        price: p.price, master_price: p.master_price, pricing_mode: p.pricing_mode,
-        min_price: p.min_price, max_price: p.max_price,
-        branch_category_id: p.branch_category_id,
-        category_ids: p.category_ids || (p.branch_category_id ? [p.branch_category_id] : []),
-        categories: p.categories || []
-      }));
+      var compositionHtml = comp
+        ? '<div style="font-size:11px;line-height:1.5;color:#475569;margin:5px 0 7px;">' +
+            '<div><strong>' + esc(comp.title || 'Komposisi belum lengkap') + '</strong></div>' +
+            (comp.subtitle ? '<div>' + esc(comp.subtitle) + '</div>' : '') +
+            (comp.detail && comp.detail.length ? '<div>' + esc(comp.detail.join(' · ')) + '</div>' : '') +
+            (comp.indicator ? '<div style="font-weight:700;">' + esc(comp.indicator) + '</div>' : '') +
+          '</div>'
+        : '<div style="font-size:11px;color:#b45309;margin:5px 0 7px;">Komposisi Master belum tersedia.</div>';
 
+      var price = comp.price != null ? Number(comp.price) : Number(p.master_price || p.price || 0);
       var availabilityToggle = '' +
         '<label class="x-toggle' + (isAvailable ? ' x-toggle-on' : '') + '" title="' + (isAvailable ? 'Menu tersedia' : 'Menu habis') + '">' +
           '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchProductAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
@@ -108,25 +111,17 @@
 
       return [
         '<div class="x-product-card-simple">',
-          '<img src="' + esc(img) + '" class="x-product-card-thumb" alt="' + esc(p.name) + '">',
+          img ? '<img src="' + esc(img) + '" class="x-product-card-thumb" alt="' + esc(p.name || comp.title || 'Menu') + '">' : '',
           '<div class="x-product-card-content">',
-            '<h5>' + esc(p.name) + '</h5>',
-            (p.menu_composition ? '<div style="font-size:11px;line-height:1.45;color:#475569;margin:4px 0 6px;"><strong>' + esc(p.menu_composition.title || '') + '</strong>' +
-              (p.menu_composition.subtitle ? ' · ' + esc(p.menu_composition.subtitle) : '') +
-              (p.menu_composition.detail && p.menu_composition.detail.length ? ' · ' + esc(p.menu_composition.detail.join(', ')) : '') +
-              (p.menu_composition.indicator ? ' · ' + esc(p.menu_composition.indicator) : '') +
-            '</div>' : ''),
-            '<div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;">',
-              '<span class="x-badge x-badge-info" style="font-size:10px;">' + esc(catName) + '</span>',
-              modeBadge,
-            '</div>',
-            '<div class="x-product-card-price">Jual: ' + formatMoney(p.price) + ' <small class="text-muted" style="font-weight:normal;">(Owner: ' + formatMoney(p.master_price) + ')</small></div>',
-            '' ,
+            '<h5>' + esc(p.name || comp.title || 'Master Menu') + '</h5>',
+            compositionHtml,
+            categoryHtml,
+            '<div class="x-product-card-price">Harga Owner: ' + formatMoney(price) + '</div>',
             '<div class="x-product-card-actions">',
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
-                '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang ' + esc(p.name) + '" onclick="XentraActionMenu.open(this, [' +
-                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\'); } }' +
+                '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang" onclick="XentraActionMenu.open(this, [' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'\' + esc(p.name || comp.title || 'Menu') + '\'); } }' +
                 '])">',
                 '</button>',
               '</div>',
