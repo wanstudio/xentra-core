@@ -575,3 +575,17 @@ Verification gate remaining:
 2. Exercise Owner → Master Product → composition save on VPS.
 3. Verify the adopted Branch menu and Customer PWA render the same structured composition.
 4. Only after those checks, proceed to any further UI refinement or legacy reconciliation.
+
+
+## 🔒 UX UPDATE — Category Management Surface
+**29 September 2026**
+
+The Owner Catalog navigation is now:
+
+```
+Kategori
+Produk Master
+```
+
+**Kategori** is a management page for existing Master Categories. It is not a product assembly surface. **Produk Master** remains the single assembly workspace. The Product editor's `+` button remains a quick-add entry point to the same Category authority.
+
