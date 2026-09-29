@@ -112,7 +112,17 @@ router.post('/admin/products/:productId/image', requireAuth(['owner', 'brand_man
 });
 
 // Upload / replace an adopted (branch) product's own photo override.
+// LEGACY QUARANTINED (2026-09-29): Branch Product image override is not part of
+// the forward Master Menu Composition architecture. Keep the route only as an
+// explicit compatibility boundary; new callers must update the Owner Master Product image.
 router.post('/admin/branches/:id/products/:productId/image', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
+  return res.status(410).json({
+    success: false,
+    error: 'LEGACY_BRANCH_PRODUCT_IMAGE_OVERRIDE_DISABLED',
+    message: 'Foto Menu Cabang tidak dapat diubah. Foto Menu ditentukan oleh Master Product Owner.'
+  });
+/*
+
   try {
     if (req.user.role === 'branch_manager') {
       const assignedBranchId = req.user.branchId || req.user.branch_id;
@@ -155,6 +165,7 @@ router.post('/admin/branches/:id/products/:productId/image', requireAuth(['owner
     console.error('[API Error POST /admin/branches/:id/products/:productId/image]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
+*/
 });
 
 
