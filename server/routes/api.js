@@ -49,7 +49,7 @@ const RouteService = require('../services/RouteService');
 const { PromotionEngineService } = require('../../domains/promotion');
 const { InventoryStockService, InventoryMovementModel } = require('../../domains/inventory');
 const CatalogService = require('../../domains/catalog/services/CatalogService');
-const { PricingPolicyModel } = require('../../domains/catalog');
+const { PricingPolicyModel, MasterMenuResolver } = require('../../domains/catalog');
 const { XentraConnectorClient, XentraConnectorError } = require('../../core/integration/XentraConnectorClient');
 const { BrandRepository: CoreBrandRepo, BranchRepository: CoreBranchRepo, UserRepository: CoreUserRepo } = require('../../core/data/repositories');
 const coreBrandRepo = new CoreBrandRepo();
@@ -984,6 +984,7 @@ registerAdminBranchCatalogRoutes(router, {
   requireAuth,
   CatalogService,
   PricingPolicyModel,
+  MasterMenuResolver,
   XentraConnectorClient,
   InventoryStockService
 });
