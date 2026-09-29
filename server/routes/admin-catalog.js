@@ -63,7 +63,13 @@ router.put('/admin/categories/:id', requireAuth(['owner', 'brand_manager']), (re
       req.brand_id
     );
 
-    res.json({ success: true, message: 'Kategori berhasil diperbarui.' });
+    // Baris hasil simpan ikut dikembalikan, sama seperti POST. Tanpa ini klien tidak
+    // punya data untuk menimpa baris di daftarnya, sehingga hasil edit tidak terlihat.
+    const category = db.prepare(
+      'SELECT * FROM categories WHERE id = ? AND brand_id = ?'
+    ).get(req.params.id, req.brand_id);
+
+    res.json({ success: true, message: 'Kategori berhasil diperbarui.', category });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
