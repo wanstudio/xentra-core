@@ -7482,7 +7482,7 @@ input[type="file"].x-input,
   }
 
   #product-list-view .x-master-products-head {
-    margin-bottom: 14px !important;
+    margin-bottom: 0 !important;
   }
 
   /* Chevron kembali di judul Produk Master: sejajar dengan teks judulnya dan tetap
@@ -7496,10 +7496,22 @@ input[type="file"].x-input,
        karena elemen pertamanya sebuah <div>, bukan <h3>. */
     margin: 0 !important;
   }
+  /* CTA Tambah Produk Baru: tinggi dan radiusnya mengikuti form pencarian di bawahnya.
+     Form itu memakai .x-input (padding 10px 14px, radius var(--radius-sm), font 14px,
+     tanpa height tetap), jadi token yang sama dipakai di sini — tingginya jadi sama
+     tanpa menebak angka piksel. */
+  #product-list-view #btn-add-product-main {
+    padding: 10px 14px !important;
+    border-radius: var(--radius-sm) !important;
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+    margin-bottom: 14px !important;
+  }
+
   /* Keterangan di bawah judul: kecil, rata kiri, dan sejajar dengan TEKS judulnya —
      chevron 30px + jarak 8px = 38px, jadi tidak menggantung di bawah chevron. */
   #product-list-view .x-master-products-sub {
-    margin: 2px 0 0 38px !important;
+    margin: 0 0 0 38px !important;
     padding: 0 !important;
     font-size: 12px !important;
     line-height: 1.4 !important;
