@@ -325,40 +325,30 @@
     var resolvedBranchId = currentManagingBranchId ||
       (typeof getActiveBranchId === 'function' ? getActiveBranchId() : null) ||
       (typeof getEffectiveBranchId === 'function' ? getEffectiveBranchId() : null);
-    if (resolvedBranchId) {
-      currentManagingBranchId = resolvedBranchId;
+    if (resolvedBranchId) currentManagingBranchId = resolvedBranchId;
+
+    var composition = p.menu_composition;
+    if (!composition) {
+      showToast('⚠️ Menu Master ini belum memiliki komposisi lengkap. Owner harus melengkapinya terlebih dahulu.');
+      return;
     }
 
     $('adopt-product-id').value = p.id;
-    $('adopt-product-name').value = p.name;
-    $('adopt-pricing-mode').value = p.pricing_mode || 'lock';
-    $('adopt-min-price').value = p.min_price || p.price;
-    $('adopt-max-price').value = p.max_price || p.price;
+    $('adopt-product-name').value = p.name || p.id;
 
-    var isRange = p.pricing_mode === 'range';
-    var priceInput = $('adopt-price');
-    var priceHint = $('adopt-price-hint');
+    if ($('adopt-menu-title')) $('adopt-menu-title').textContent = composition.title || '—';
+    if ($('adopt-menu-subtitle')) $('adopt-menu-subtitle').textContent = composition.subtitle || 'Tanpa Rasa';
+    if ($('adopt-menu-detail')) $('adopt-menu-detail').textContent = composition.detail && composition.detail.length ? composition.detail.join(', ') : 'Tanpa Kelengkapan';
+    if ($('adopt-menu-indicator')) $('adopt-menu-indicator').textContent = composition.indicator || 'Tanpa Level';
+    if ($('adopt-price-display')) $('adopt-price-display').value = formatMoney(composition.price);
 
-    if (isRange) {
-      priceInput.readOnly = false;
-      priceInput.value = p.price;
-      priceInput.min = p.min_price;
-      priceInput.max = p.max_price;
-      priceHint.innerHTML = '💡 <strong>Range Harga Fleksibel:</strong> Cabang diizinkan menentukan harga antara <strong>' + formatMoney(p.min_price) + '</strong> s/d <strong>' + formatMoney(p.max_price) + '</strong>.';
-    } else {
-      priceInput.readOnly = true;
-      priceInput.value = p.price;
-      priceHint.innerHTML = '🔒 <strong>Harga Terkunci:</strong> Ditetapkan paten oleh Pemilik Resto (Owner) sebesar <strong>' + formatMoney(p.price) + '</strong>.';
-    }
-
-    // Populate branch categories
     var catSelect = $('adopt-branch-category');
     var cats = currentBranchCatalogData.categories || [];
-    var catOptions = cats.map(function (c) {
-      return '<option value="' + c.id + '">' + esc(c.name) + '</option>';
+    var catOptions = cats.map(function (cat) {
+      return '<option value="' + esc(cat.id) + '">' + esc(cat.name) + '</option>';
     });
-    catOptions.unshift('<option value="">(Otomatis sesuaikan kategori produk)</option>');
-    catSelect.innerHTML = catOptions.join('');
+    catSelect.innerHTML = '<option value="">Pilih Kategori Cabang</option>' + catOptions.join('');
+    catSelect.value = '';
 
     $('modal-adopt-product').style.display = 'flex';
   };
@@ -387,19 +377,22 @@
 
       var prodId = $('adopt-product-id').value;
       var catId = $('adopt-branch-category').value;
-      var priceVal = Number($('adopt-price').value);
+      if (!catId) {
+        showToast('❌ Pilih minimal satu Kategori Cabang.');
+        btn.disabled = false;
+        btn.textContent = 'Simpan ke Katalog Cabang';
+        return;
+      }
 
       try {
         var res = await CatalogClient.adoptProduct(currentManagingBranchId, {
-            product_id: prodId,
-            branch_category_id: catId || undefined,
-            price: priceVal
-          });
+          product_id: prodId,
+          category_ids: [catId]
+        });
         var data = await res.json();
         if (data.success) {
           showToast('✅ Menu berhasil diadopsi ke cabang!');
           window.closeMerchantAdoptModal();
-          // Refresh the correct panel depending on role/view
           if (isBranchManager()) {
             if (typeof hooks.refreshBMMenu === 'function') hooks.refreshBMMenu();
             if (typeof loadInlineBranchCatalog === 'function') loadInlineBranchCatalog();
