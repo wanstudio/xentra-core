@@ -2304,6 +2304,18 @@ input[type="file"].x-input,
     gap: 10px !important;
   }
 
+  /* Unggah foto di dalam modal. Aturan dasarnya flex-wrap: nowrap, jadi di layar sempit
+     kotak pratinjau, keterangan, dan tombolnya berdesakan dan tidak bisa turun baris.
+     Di sini isinya dibiarkan membungkus. */
+  .x-image-upload-control {
+    flex-wrap: wrap !important;
+    gap: 12px !important;
+    padding: 12px !important;
+  }
+  .x-image-upload-actions {
+    flex-wrap: wrap !important;
+  }
+
   /* Responsive topbar adjustments on tablet/narrow screens */
   .x-dash-topbar {
     padding: 12px 14px;
