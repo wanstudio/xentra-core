@@ -609,3 +609,120 @@
     transition: none !important;
   }
 }
+
+/* Desktop operational context */
+.x-home-desktop-context {
+  display: none;
+}
+.x-home-desktop-context-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--x-home-border);
+  border-radius: 16px;
+  background: #fff;
+}
+.x-home-desktop-branch-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.x-home-desktop-branch-row > strong {
+  font-size: 14px;
+  font-weight: 800;
+}
+.x-home-desktop-date {
+  margin: 7px 0 0 16px;
+  color: var(--x-home-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.x-home-desktop-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.x-home-desktop-control {
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid var(--x-home-border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--x-home-text);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.x-home-desktop-control.is-primary {
+  border-color: var(--x-home-green);
+  background: var(--x-home-green);
+  color: #fff;
+}
+
+.x-home-snapshot-item,
+.x-home-attention-row {
+  border-top: 0;
+  border-left: 0;
+  border-right: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  font: inherit;
+}
+
+.x-home-snapshot-item {
+  text-align: left;
+  cursor: pointer;
+}
+.x-home-attention-row {
+  text-align: left;
+}
+
+.x-home-status-anchor {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+}
+
+.x-merchant-app #tab-hari-ini {
+  background: var(--x-home-bg) !important;
+}
+
+@media (min-width: 769px) {
+  .x-home-desktop-context {
+    display: block;
+    margin-bottom: 8px;
+  }
+}
+
+@media (max-width: 768px) {
+  .x-merchant-app #tab-hari-ini {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    background: var(--x-home-bg) !important;
+  }
+
+  .x-merchant-app #tab-hari-ini .x-home-screen {
+    max-width: 100%;
+  }
+
+  .x-home-greeting {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .x-home-sales-value {
+    font-size: 28px;
+  }
+
+  .x-home-desktop-context {
+    display: none !important;
+  }
+}
