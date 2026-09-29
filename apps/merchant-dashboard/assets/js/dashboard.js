@@ -1905,6 +1905,63 @@
     });
   }
 
+  // Menu dropdown filter kategori dibangun dari opsi select aslinya, sehingga nilainya
+  // hanya punya satu sumber. Dipanggil setiap kali opsinya diisi ulang.
+  function renderProductCategoryFilterMenu() {
+    var select = $('prod-filter-category');
+    var menu = $('prod-filter-category-menu');
+    if (!select || !menu) return;
+    var current = String(select.value || 'all');
+    var html = '';
+    Array.prototype.forEach.call(select.options, function (option) {
+      var isCurrent = String(option.value) === current;
+      html += '<button type="button" class="x-occ-dropdown-item' + (isCurrent ? ' active' : '') +
+        '" role="option" data-value="' + esc(option.value) + '" aria-selected="' + (isCurrent ? 'true' : 'false') +
+        '" onclick="pickProductCategoryFilter(this)">' +
+        '<span>' + esc(option.textContent) + '</span>' +
+        '<svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>' +
+        '</button>';
+      if (isCurrent) {
+        var label = $('prod-filter-category-label');
+        if (label) label.textContent = option.textContent;
+      }
+    });
+    menu.innerHTML = html;
+  }
+
+  function closeProductCategoryFilter() {
+    var dropdown = $('prod-filter-category-dropdown');
+    if (dropdown) dropdown.classList.remove('open');
+    var trigger = $('btn-prod-filter-category');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  }
+
+  window.toggleProductCategoryFilter = function () {
+    var dropdown = $('prod-filter-category-dropdown');
+    if (!dropdown) return;
+    var open = dropdown.classList.toggle('open');
+    var trigger = $('btn-prod-filter-category');
+    if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+
+  window.pickProductCategoryFilter = function (item) {
+    if (!item) return;
+    var select = $('prod-filter-category');
+    closeProductCategoryFilter();
+    if (!select) return;
+    select.value = item.dataset.value;
+    renderProductCategoryFilterMenu();
+    // Perilaku select aslinya tetap dijalankan, termasuk pendengar onchange-nya.
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  };
+
+  document.addEventListener('click', function (e) {
+    var dropdown = $('prod-filter-category-dropdown');
+    if (dropdown && !dropdown.contains(e.target)) closeProductCategoryFilter();
+  });
+
+  window.renderProductCategoryFilterMenu = renderProductCategoryFilterMenu;
+
   function populateProductCategorySelect() {
     var select = $('prod-filter-category');
     if (select) {
@@ -1914,6 +1971,7 @@
       });
       select.innerHTML = opts;
       select.value = _catalogState.categoryFilter;
+        renderProductCategoryFilterMenu();
     }
 
     var formSelect = $('prod-category');

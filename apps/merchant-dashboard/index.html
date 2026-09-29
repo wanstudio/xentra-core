@@ -7,7 +7,7 @@
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.7">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.8">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -1527,9 +1527,21 @@
               <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </div>
             <div style="min-width:180px;">
-              <select id="prod-filter-category" class="x-input">
-                <option value="all">Semua Kategori</option>
-              </select>
+              <!-- Tampilannya memakai gaya dropdown pemilih periode di Beranda. Select
+                   aslinya tetap ada tapi disembunyikan: ia yang jadi sumber nilai untuk
+                   penyaringan, dan opsinya diisi JavaScript. -->
+              <div class="x-occ-dropdown" id="prod-filter-category-dropdown" style="width:100%;">
+                <button type="button" class="x-occ-dropdown-trigger" id="btn-prod-filter-category" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter kategori" onclick="toggleProductCategoryFilter()">
+                  <span id="prod-filter-category-label">Semua Kategori</span>
+                  <svg class="x-occ-chevron-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                <div class="x-occ-dropdown-menu" id="prod-filter-category-menu" role="listbox" aria-label="Pilih kategori"></div>
+                <div style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden;">
+                  <select id="prod-filter-category" class="x-input">
+                    <option value="all">Semua Kategori</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -4751,6 +4763,6 @@
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.0"></script>
   <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.27"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.28"></script>
 </body>
 </html>
