@@ -321,8 +321,8 @@
       'catalog': 'catalog/products',
       'catalog-products': 'catalog/products',
       'catalog-menus': 'catalog/menus',
-      'catalog-categories': 'catalog/products',
-      'catalog/categories': 'catalog/products',
+      'catalog-categories': 'catalog/categories',
+      'catalog/categories': 'catalog/categories',
       'branches': 'branches',
       'tim': 'team',
       'team': 'team',
@@ -421,11 +421,6 @@
   function applyRoute(route) {
     var isPlatform = isPlatformContext();
     var metaDict = getActiveRouteMeta();
-
-    if (!isPlatform && route === 'catalog/categories') {
-      navigateTo('catalog/products');
-      return;
-    }
 
     if (!isPlatform && route === 'catalog') {
       navigateTo('catalog/products');
@@ -604,6 +599,9 @@
       } else if (tabId === 'catalog-products') {
         showProductListSection();
         loadMasterProducts();
+      } else if (tabId === 'catalog-categories') {
+        showMasterCategoriesPage();
+        loadMasterCategoriesPage();
       } else if (tabId === 'catalog-menus') {
         loadMenusView();
       }
@@ -2216,6 +2214,112 @@
   };
 
   // ─────────────────────────────────────────────────────────────────────────
+  // 2. MASTER CATEGORY MANAGEMENT PAGE
+  // ─────────────────────────────────────────────────────────────────────────
+
+  function showMasterCategoriesPage() {
+    var page = $('master-categories-page');
+    var productList = $('product-list-view');
+    var productDetail = $('product-detail-view');
+    if (page) page.style.display = 'block';
+    if (productList) productList.style.display = 'none';
+    if (productDetail) productDetail.style.display = 'none';
+  }
+
+  async function loadMasterCategoriesPage() {
+    var list = $('master-categories-page-list');
+    if (list) list.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Memuat kategori...</div>';
+
+    try {
+      var headers = getAuthHeaders();
+      var [catRes, prodRes] = await Promise.all([
+        adminFetch(API_BASE + '/admin/categories', { headers: headers }),
+        adminFetch(API_BASE + '/admin/products', { headers: headers })
+      ]);
+      var catData = await catRes.json();
+      var prodData = await prodRes.json();
+
+      if (!catData.success) throw new Error(catData.error || 'Gagal memuat kategori.');
+      state.categories = catData.categories || [];
+      if (prodData.success) state.products = prodData.products || [];
+
+      renderMasterCategoriesPage();
+    } catch (err) {
+      console.error('[Master Categories Page Load Error]:', err);
+      if (list) list.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Gagal memuat kategori.</div>';
+    }
+  }
+
+  function renderMasterCategoriesPage() {
+    var list = $('master-categories-page-list');
+    if (!list) return;
+
+    if (!state.categories.length) {
+      list.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Belum ada kategori. Tambahkan kategori untuk mulai menyusun Produk Master.</div>';
+      return;
+    }
+
+    list.innerHTML = state.categories.map(function(cat) {
+      var productCount = state.products.filter(function(product) {
+        return String(product.category_id) === String(cat.id);
+      }).length;
+
+      return [
+        '<button type="button" class="x-master-category-page-row" data-master-category-id="' + esc(cat.id) + '">',
+          '<span class="x-master-category-page-main">',
+            '<strong>' + esc(cat.name) + '</strong>',
+            '<span>' + productCount + ' Produk Master</span>',
+          '</span>',
+          '<span class="x-master-category-page-chevron" aria-hidden="true">',
+            '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>',
+          '</span>',
+        '</button>'
+      ].join('');
+    }).join('');
+
+    list.querySelectorAll('[data-master-category-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        openEditMasterCategory(btn.getAttribute('data-master-category-id'));
+      });
+    });
+  }
+
+  function openAddMasterCategory() {
+    $('modal-master-category-title').textContent = 'Tambah Kategori';
+    $('master-cat-id').value = '';
+    $('master-cat-name').value = '';
+    $('modal-master-category').style.display = 'flex';
+    setTimeout(function() {
+      var input = $('master-cat-name');
+      if (input) input.focus();
+    }, 0);
+  }
+  window.openAddMasterCategory = openAddMasterCategory;
+
+  function openEditMasterCategory(id) {
+    var cat = state.categories.find(function(row) { return String(row.id) === String(id); });
+    if (!cat) return;
+    $('modal-master-category-title').textContent = 'Ubah Kategori';
+    $('master-cat-id').value = cat.id;
+    $('master-cat-name').value = cat.name || '';
+    $('modal-master-category').style.display = 'flex';
+    setTimeout(function() {
+      var input = $('master-cat-name');
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }, 0);
+  }
+  window.openEditMasterCategory = openEditMasterCategory;
+
+  function closeMasterCategoryModal() {
+    var modal = $('modal-master-category');
+    if (modal) modal.style.display = 'none';
+  }
+  window.closeMasterCategoryModal = closeMasterCategoryModal;
+
+  // ─────────────────────────────────────────────────────────────────────────
   // 2. MASTER REFERENCE QUICK-ADD (Product Assembly)
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -3287,6 +3391,65 @@
       event.preventDefault();
       saveMasterReferenceQuickAdd();
     });
+    var btnAddCategoryPage = $('btn-add-master-category-page');
+    if (btnAddCategoryPage) btnAddCategoryPage.addEventListener('click', openAddMasterCategory);
+
+    var btnCloseCategoryModal = $('btn-close-master-category');
+    if (btnCloseCategoryModal) btnCloseCategoryModal.addEventListener('click', closeMasterCategoryModal);
+
+    var btnCancelCategoryModal = $('btn-cancel-master-category');
+    if (btnCancelCategoryModal) btnCancelCategoryModal.addEventListener('click', closeMasterCategoryModal);
+
+    var formMasterCategory = $('form-master-category');
+    if (formMasterCategory) formMasterCategory.addEventListener('submit', async function(event) {
+      event.preventDefault();
+
+      var id = String($('master-cat-id').value || '').trim();
+      var name = String($('master-cat-name').value || '').trim();
+      if (!name) return;
+
+      var saveBtn = $('btn-save-master-category');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Menyimpan...';
+      }
+
+      try {
+        var res = await adminFetch(
+          id ? API_BASE + '/admin/categories/' + encodeURIComponent(id) : API_BASE + '/admin/categories',
+          {
+            method: id ? 'PUT' : 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ name: name })
+          }
+        );
+        var data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menyimpan kategori.');
+
+        var saved = data.category;
+        if (saved) {
+          var idx = state.categories.findIndex(function(row) { return String(row.id) === String(saved.id); });
+          if (idx >= 0) state.categories[idx] = saved;
+          else state.categories.push(saved);
+        }
+
+        closeMasterCategoryModal();
+        renderMasterCategoriesPage();
+        populateProductCategorySelect();
+        renderProductCategoryFilterChips();
+        renderMasterProductsTable();
+        renderMasterMenuCustomerPreview();
+        showToast(id ? '✅ Kategori diperbarui.' : '✅ Kategori ditambahkan.');
+      } catch (err) {
+        showToast('❌ ' + err.message);
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = 'Simpan';
+        }
+      }
+    });
+
 
     var flavorSelect = $('prod-flavor');
     if (flavorSelect) flavorSelect.addEventListener('change', function() {
