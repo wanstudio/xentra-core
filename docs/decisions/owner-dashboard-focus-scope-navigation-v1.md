@@ -34,7 +34,7 @@ Laporan       Metode Bayar  Pelanggan      Tim & Akses
 ```
 
 Route mapping uses existing Owner surfaces:
-- Menu → `catalog/menus`
+- Menu Cabang → `catalog/menus`
 - Stok → `stock` (dedicated Owner Stock Overview; reads the authoritative operations/inventory report payload)
 - Cabang → `branches`
 - Promo → `marketing/promotions`
