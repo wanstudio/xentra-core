@@ -3,6 +3,11 @@
  *
  * Owner Dashboard UI only. API/data transport is provided by
  * merchant-shared/js/catalog-client.js.
+
+ * LEGACY QUARANTINE (2026-09-29):
+ * Branch/Product content override UI and API are compatibility-only.
+ * Do not extend name/description/image override behavior. The forward Menu
+ * architecture uses Owner-owned structured Master Menu Composition.
  */
 (function () {
   'use strict';
@@ -83,11 +88,6 @@
         ? '<span class="x-badge x-badge-range">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
         : '<span class="x-badge x-badge-lock">Harga Terkunci</span>';
 
-      // Override status badges — one per supported field
-      var nameSrc     = p.name_override        ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
-      var descSrc     = p.description_override ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
-      var imgSrc      = p.image_override       ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
-
       var productDataJson = esc(JSON.stringify({
         product_id: p.product_id,
         name: p.name, name_override: p.name_override, master_name: p.master_name,
@@ -116,11 +116,7 @@
               modeBadge,
             '</div>',
             '<div class="x-product-card-price">Jual: ' + formatMoney(p.price) + ' <small class="text-muted" style="font-weight:normal;">(Owner: ' + formatMoney(p.master_price) + ')</small></div>',
-            '<div style="font-size:11px;color:#64748b;margin:4px 0;display:flex;gap:8px;flex-wrap:wrap;">',
-              '<span>Nama: ' + nameSrc + '</span>',
-              '<span>Deskripsi: ' + descSrc + '</span>',
-              '<span>Gambar: ' + imgSrc + '</span>',
-            '</div>',
+            '' ,
             '<div class="x-product-card-actions">',
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
