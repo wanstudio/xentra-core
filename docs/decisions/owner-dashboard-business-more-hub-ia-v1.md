@@ -25,8 +25,8 @@ The Owner mobile **Bisnis** hub must expose the canonical Master Catalog concept
 
 ```
 Katalog
-├── Produk Master
-└── Kategori
+├── Kategori & Rasa
+└── Produk Master
 ```
 
 `Menu & Paket` is **not** a standalone Master Catalog navigation layer.
@@ -40,6 +40,22 @@ Katalog
 Technical terms such as **Master Menu Composition** remain valid for the structured customer-facing resolver/checkout snapshot. That is an internal/domain composition contract, not permission to create a separate Master Menu navigation layer in the Owner UI.
 
 The change is UX/IA terminology and surface ownership only; existing Core authority and Branch Menu contracts remain unchanged.
+
+## 🔒 Kategori & Rasa = Master Dropdown References — 29 September 2026
+
+The Owner `Kategori & Rasa` surface is a small master-reference screen, not a Menu builder.
+
+```
+Kategori & Rasa
+├── Kategori
+│    └── source for Produk Master → Kategori dropdown
+└── Rasa
+     └── source for Produk Master → Rasa dropdown
+```
+
+The `+` action beside the Product form dropdown is a quick-create shortcut into the same master authority. It must not create branch data or a second vocabulary.
+
+`Kelengkapan` and `Level` remain composition controls on the Master Product editor for now because their interaction model is different (multi-select / single-select).
 
 ## Locked Owner Home / Quick Access
 
