@@ -3595,11 +3595,37 @@
           <div id="prod-complements-empty" class="text-muted" style="font-size:11px;padding:8px 0;">Belum ada Master Kelengkapan.</div>
         </div>
 
-        <div class="x-form-group">
+
           <label for="prod-level">Level <span class="text-muted">(Indikator Customer)</span></label>
           <select id="prod-level" class="x-input">
             <option value="">Tidak ada Level</option>
           </select>
+        </div>
+
+        <div class="x-form-group">        <div class="x-form-group">
+          <div class="x-master-composition-preview-head">
+            <div>
+              <strong>Preview Customer PWA</strong>
+              <span>Hasil card mengikuti komposisi Master di atas.</span>
+            </div>
+            <span class="x-badge x-badge-info">Live Preview</span>
+          </div>
+          <div class="x-master-customer-preview" id="master-menu-customer-preview">
+            <div class="x-master-customer-preview-card">
+              <div class="x-master-customer-preview-info">
+                <div class="x-master-customer-preview-title" id="master-preview-title">Pilih Kategori</div>
+                <div class="x-master-customer-preview-subtitle" id="master-preview-subtitle"></div>
+                <div class="x-master-customer-preview-detail" id="master-preview-detail"></div>
+                <div class="x-master-customer-preview-indicator" id="master-preview-indicator"></div>
+                <div class="x-master-customer-preview-price" id="master-preview-price">Rp0</div>
+              </div>
+              <div class="x-master-customer-preview-media">
+                <img id="master-preview-image" alt="" style="display:none;">
+                <span id="master-preview-image-empty" aria-hidden="true">🍲</span>
+              </div>
+            </div>
+            <div class="x-master-customer-preview-note">Kategori → judul · Rasa → subjudul · Kelengkapan → detail · Level → indikator</div>
+          </div>
         </div>
 
         <div class="x-form-group">
