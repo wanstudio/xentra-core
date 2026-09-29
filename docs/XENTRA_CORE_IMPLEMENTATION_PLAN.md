@@ -642,7 +642,7 @@ Next implementation work should begin with the earliest incomplete dependency in
 
 ## Current Execution — Master Menu Composition (2026-09-29)
 
-The repository has entered a dedicated Menu architecture migration.
+The repository is executing the locked Master Menu Composition migration.
 
 **Forward contract:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`  
 **Execution plan:** `docs/decisions/xentra-master-menu-composition-implementation-plan-v1.md`  
@@ -650,30 +650,37 @@ The repository has entered a dedicated Menu architecture migration.
 
 ### Completed
 
-1. Forward Master Menu Composition contract locked.
+1. Forward contract locked.
 2. Legacy Branch Menu Override/Snapshot architecture quarantined.
-3. Contradictory historical Branch Catalog documentation marked superseded.
-4. Active Branch Menu Override edit entry points removed from Owner/Merchant card action menus.
-5. Schema expanded for Master Flavor/Complement/Level vocabularies and Product composition relations.
-6. Nullable `order_items.menu_snapshot` added for future immutable historical snapshots.
-7. Master component/composition domain service and Owner-authoritative API routes added.
-8. Schema/service regression coverage added.
+3. Schema expanded for structured Master Menu composition.
+4. Master Component service/API implemented.
+5. Canonical Master Menu resolver implemented.
+6. Canonical Branch Menu read endpoint implemented: `GET /api/v1/admin/branches/:id/menu`.
+7. Merchant/Owner Branch Menu client moved to the canonical endpoint.
+8. Customer branch catalog switched to structured Master Menu resolver.
+9. Customer PWA renders Kategori/Rasa/Kelengkapan/Level from the resolved DTO.
+10. Checkout final verification uses the structured Master Menu resolver and stores the immutable `menu_snapshot` already supported by Order persistence.
+11. Readiness audit and deterministic legacy reconciliation tooling added.
+12. Relevant regression/contract tests added or reconciled.
 
-### Current safe boundary
+### Compatibility boundary
 
-The new schema/API foundations exist, but **Customer PWA resolver migration and legacy data reconciliation are not complete**.
+Legacy physical fields/API and historical code remain only because migration is not a destructive cleanup yet. New Menu features must not extend those paths.
 
-Therefore:
+### Current gate
 
-- do not remove legacy columns yet;
-- do not rewrite Customer PWA around the old `CatalogService` override fields;
-- do not expose legacy Override UI as a new feature;
-- continue forward work through the Master Menu Composition contract.
+Run the readiness/reconciliation audit on the real target database before any destructive legacy cleanup.
 
-### Next dependency order
+Do **not**:
+- infer structured Master components from legacy free text;
+- silently rewrite divergent Branch prices;
+- backfill historical `menu_snapshot` from today's Master data;
+- delete legacy columns before consumer/data verification.
 
-**Master resolver → Owner Master Menu UI → Merchant adoption/read-only composition → Customer PWA DTO → Checkout/menu_snapshot → legacy reconciliation → destructive legacy cleanup.**
+### Next execution stage
 
-Migration follows:
+**Readiness audit on target data → deterministic Branch Category reconciliation → verify existing Master/Branch Menu behavior → then plan the separate legacy write-path retirement.**
+
+Migration rule remains:
 
 **Expand → Switch → Reconcile → Verify → Contract.**
