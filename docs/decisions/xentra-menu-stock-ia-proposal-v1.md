@@ -1,6 +1,10 @@
 # Xentra Merchant Menu & Stock IA Proposal v1
 
-**Status:** 🔒 LOCKED — IMPLEMENTATION CONTRACT  
+**Status:** SUPERSEDED FOR MENU COMPOSITION — LEGACY IA / QUARANTINED
+**Forward Menu architecture:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`
+**Legacy quarantine:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`
+
+> The Menu/Stock navigation and operational separation in this document remains useful where it does not conflict with the new Master Menu Composition model. Any Menu content/override assumptions in this file are legacy and must not be extended.  
 **Date:** 2026-09-29  
 **Scope:** Merchant App, branch-scoped daily operations
 
