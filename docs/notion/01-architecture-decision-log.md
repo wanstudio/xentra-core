@@ -96,7 +96,9 @@ A pending refund on one Order must not globally lock the Customer or block an un
 
 Follow the adopted GoFood-style principle: Customer cancellation is allowed before Branch acceptance/confirmation; after Branch acceptance, normal Customer cancellation is not allowed. Core enforces cancellation from authoritative Order state. Branch/system rejection, timeout, or payment failure must not be classified as Customer cancellation.
 
-## 🔒 LOCKED — Master Catalog vs Branch Catalog Ownership & Snapshot Boundary
+## 🟠 SUPERSEDED — Master Catalog vs Branch Catalog Ownership & Snapshot Boundary (Historical)
+
+> **Superseded for Menu architecture on 2026-09-29 by the locked Master Menu Composition + Branch Adoption contract. Retained only as migration/history context.**
 
 ### Decision
 **Master Catalog dan Branch Catalog adalah dua ownership/context yang berbeda. Catalog milik Owner/Brand berfungsi sebagai master product library. Branch memiliki kewenangan operasional untuk memilih product dari master catalog dan membentuk Branch Catalog sendiri. Branch Catalog bukan live mirror dari Master Catalog.**
