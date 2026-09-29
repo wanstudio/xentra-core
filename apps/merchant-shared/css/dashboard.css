@@ -7420,13 +7420,16 @@ input[type="file"].x-input,
   #master-products-table td:nth-child(6) { grid-area: toggle; align-self: center; }
   #master-products-table td:nth-child(7) { grid-area: aksi; align-self: center; }
 
-  /* Foto: kotak membulat seperti kartu menu di PWA customer. */
+  /* Foto: kotak membulat seperti kartu menu di PWA customer. Ukurannya dinaikkan dan
+     memakai object-fit: contain supaya gambar tampil utuh dan proporsional — dengan
+     cover, foto yang bukan persegi akan terpotong. */
   #master-products-table td:nth-child(1) img,
   #master-products-table td:nth-child(1) > * {
-    width: 64px !important;
-    height: 64px !important;
-    border-radius: 12px !important;
-    object-fit: cover !important;
+    width: 96px !important;
+    height: 96px !important;
+    aspect-ratio: 1 / 1 !important;
+    border-radius: 14px !important;
+    object-fit: contain !important;
     display: block !important;
     background: #f1f5f9;
   }
