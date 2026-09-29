@@ -534,3 +534,38 @@ For Owner Dashboard and Merchant App, manual data refresh is not a normal per-sc
 If manual recovery is needed, each application exposes one “Segarkan data aplikasi” action inside Pengaturan. The action reloads the application so server-driven data is fetched again.
 
 POS is excluded: POS may retain its operational refresh/sync controls because it has a local ↔ server synchronization model.
+
+
+## 🔒 LOCKED ADDENDUM — Merchant Home / Beranda UI Contract v1
+
+**Decision date: 29 September 2026**
+
+The detailed Home composition and implementation contract is now locked in:
+
+[Home UI Contract v1](./xentra-merchant-home-ui-contract-v1.md)
+
+The Merchant Home is a mobile-native operational surface following:
+
+**Glance → Understand → Act**
+
+Locked composition:
+
+**Merchant context → Operational controls → Greeting/date → Primary Sales Card → Attention: Pesanan Baru → Quick Actions → Operational Snapshot → Menu/Stock Attention → Promo Aktif → Aktivitas Terakhir → Persistent Bottom Navigation**
+
+Primary mobile navigation remains:
+
+**Beranda | Pesanan | Menu | Stock | Promo**
+
+Home rules:
+- Sales is the first major business block.
+- Pending/new orders receive the strongest operational priority and use mobile cards, not desktop tables.
+- Quick Actions must not duplicate primary bottom navigation.
+- Operational metrics remain compact and must not turn Home into a KPI wall.
+- Menu availability and physical Stock remain separate concerns.
+- Activity is concise and human-readable; raw technical audit data belongs deeper.
+- Mobile is the design source of truth; desktop is a responsive adaptation.
+- Existing Core, RBAC, branch scope, order/payment/inventory contracts remain authoritative.
+- Existing mature merchant-shared primitives should be reused; Home-specific composition remains Merchant App-owned.
+- Quarantined legacy UI/domain assumptions must not be extended as the basis of the new Home.
+
+**LOCKED — Home UI Contract v1 is the implementation source of truth for Merchant App / Beranda.**
