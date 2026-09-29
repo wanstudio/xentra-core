@@ -2633,6 +2633,7 @@
       if (btnRemove) btnRemove.style.display = 'none';
       if (btnPick) btnPick.textContent = '📁 Pilih Foto';
     }
+    renderMasterMenuCustomerPreview();
   }
 
   var _productOptionsDraft = [];
@@ -2657,7 +2658,7 @@
   async function loadMasterMenuComponents() {
     try {
       var results = await Promise.all(['flavor', 'complement', 'level'].map(function(type) {
-        return adminFetch(API_BASE + '/admin/menu/components/' + type + '?active_only=true', { headers: getAuthHeaders() })
+        return adminFetch(API_BASE + '/admin/menu/components/' + type, { headers: getAuthHeaders() })
           .then(function(res) { return res.json(); })
           .then(function(data) {
             if (!data.success) throw new Error(data.error || 'Gagal memuat ' + masterMenuComponentTypeLabel(type) + '.');
@@ -2735,7 +2736,10 @@
     if (flavorSelect) {
       var flavorHtml = '<option value="">Tidak ada Rasa</option>';
       _masterMenuComponents.flavor.forEach(function(row) {
-        flavorHtml += '<option value="' + esc(row.id) + '">' + esc(row.name) + '</option>';
+        var selected = String(_masterMenuSelected.flavor_id || '') === String(row.id);
+        if (!row.is_active && !selected) return;
+        var suffix = row.is_active ? '' : ' (Nonaktif)';
+        flavorHtml += '<option value="' + esc(row.id) + '"' + (selected ? ' selected' : '') + (row.is_active ? '' : ' data-inactive="1"') + '>' + esc(row.name + suffix) + '</option>';
       });
       flavorSelect.innerHTML = flavorHtml;
       flavorSelect.value = _masterMenuSelected.flavor_id || '';
@@ -2745,7 +2749,10 @@
     if (levelSelect) {
       var levelHtml = '<option value="">Tidak ada Level</option>';
       _masterMenuComponents.level.forEach(function(row) {
-        levelHtml += '<option value="' + esc(row.id) + '">' + esc(row.name) + '</option>';
+        var selected = String(_masterMenuSelected.level_id || '') === String(row.id);
+        if (!row.is_active && !selected) return;
+        var suffix = row.is_active ? '' : ' (Nonaktif)';
+        levelHtml += '<option value="' + esc(row.id) + '"' + (selected ? ' selected' : '') + (row.is_active ? '' : ' data-inactive="1"') + '>' + esc(row.name + suffix) + '</option>';
       });
       levelSelect.innerHTML = levelHtml;
       levelSelect.value = _masterMenuSelected.level_id || '';
@@ -2762,9 +2769,11 @@
     if (empty) empty.style.display = 'none';
     complementBox.innerHTML = _masterMenuComponents.complement.map(function(row) {
       var selected = _masterMenuSelected.complement_ids.indexOf(String(row.id)) !== -1;
+      if (!row.is_active && !selected) return '';
+      var suffix = row.is_active ? '' : ' (Nonaktif)';
       return '<label style="display:flex;align-items:center;gap:8px;border:1px solid ' + (selected ? '#94a3b8' : '#e2e8f0') + ';border-radius:8px;padding:8px 10px;cursor:pointer;background:' + (selected ? '#f8fafc' : '#fff') + ';">' +
         '<input type="checkbox" value="' + esc(row.id) + '"' + (selected ? ' checked' : '') + ' data-master-complement="1" style="width:16px;height:16px;">' +
-        '<span style="font-size:12px;color:#0f172a;">' + esc(row.name) + '</span>' +
+        '<span style="font-size:12px;color:#0f172a;">' + esc(row.name + suffix) + '</span>' +
       '</label>';
     }).join('');
 
