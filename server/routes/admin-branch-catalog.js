@@ -16,6 +16,7 @@ module.exports = function registerAdminBranchCatalogRoutes(router, deps) {
     requireAuth,
     CatalogService,
     PricingPolicyModel,
+    MasterMenuResolver,
     XentraConnectorClient,
     InventoryStockService
   } = deps;
@@ -473,30 +474,25 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       return res.status(400).json({ success: false, error: 'Produk master sedang nonaktif dan tidak dapat diadopsi.' });
     }
 
-    // Resolve price according to locked PricingPolicyModel:
-    // If pricing_mode is 'lock', branch CANNOT override price (enforces master price)
-    const mode = (product.pricing_mode || 'lock').toLowerCase();
-    const rawPriceInput = mode === 'lock'
-      ? null
-      : (req.body.price !== undefined && req.body.price !== null && req.body.price !== '' ? Number(req.body.price) : null);
+    // FORWARD MENU ARCHITECTURE: Branch adoption never accepts a client-authored
+    // Menu price. Keep the legacy physical branch price aligned to Master price
+    // only for compatibility with older consumers during migration.
+    const effectivePrice = Number(product.price || 0);
 
-    let resolved;
-    try {
-      resolved = PricingPolicyModel.resolvePrice(
-        {
-          price: product.price,
-          pricing_mode: product.pricing_mode || 'lock',
-          min_price: product.min_price,
-          max_price: product.max_price
-        },
-        rawPriceInput
-      );
-    } catch (pricingErr) {
-      return res.status(400).json({
-        success: false,
-        error: 'INVALID_BRANCH_PRICE',
-        message: pricingErr.message
-      });
+    // A Branch may adopt only a fully composed Master Menu. The resolver is the
+    // same structured source later consumed by Customer PWA and Checkout.
+    if (MasterMenuResolver) {
+      const masterView = MasterMenuResolver.resolveMasterProducts({
+        brandId: req.brand_id,
+        productIds: [product.id]
+      })[0];
+      if (!masterView) {
+        return res.status(400).json({
+          success: false,
+          error: 'MASTER_MENU_COMPOSITION_REQUIRED',
+          message: 'Produk master belum memiliki komposisi Menu yang lengkap. Lengkapi Master Menu terlebih dahulu.'
+        });
+      }
     }
 
     // Branch Category handling: supports category_ids (array) or branch_category_id (scalar)
@@ -513,42 +509,33 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       if (validCat) targetCategoryIds.push(idStr);
     }
 
-    // If no branch category specified, resolve or auto-create branch category from master category name
+    // FORWARD MENU ARCHITECTURE: Branch Category is classification, never a
+    // Master Category copy. Adoption requires an explicit Branch Category.
     if (targetCategoryIds.length === 0) {
-      const masterCat = product.category_id ? db.prepare('SELECT name, slug FROM categories WHERE id = ?').get(product.category_id) : null;
-      const catName = masterCat?.name || 'Menu Utama';
-      const catSlug = masterCat?.slug || 'menu-utama';
-
-      let existingBranchCat = db.prepare('SELECT id FROM branch_categories WHERE branch_id = ? AND name = ?').get(req.params.id, catName);
-      if (!existingBranchCat) {
-        const newBcId = 'bc_' + crypto.randomUUID();
-        db.prepare(`
-          INSERT INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order)
-          VALUES (?, ?, ?, ?, ?, 99)
-        `).run(newBcId, req.brand_id, req.params.id, catName, catSlug);
-        targetCategoryIds.push(newBcId);
-      } else {
-        targetCategoryIds.push(existingBranchCat.id);
-      }
+      return res.status(400).json({
+        success: false,
+        error: 'BRANCH_CATEGORY_REQUIRED',
+        message: 'Pilih minimal satu Kategori Cabang untuk menu yang diadopsi.'
+      });
     }
 
-    const primaryBranchCategoryId = targetCategoryIds[0] || null;
+    // Legacy scalar category column is intentionally no longer authoritative.
+    const primaryBranchCategoryId = null;
 
     // Insert or adopt branch_products (override columns start NULL = inherit master).
     db.prepare(`
       INSERT INTO branch_products (
         branch_id, product_id, branch_category_id, price, is_available
-      ) VALUES (?, ?, ?, ?, 1)
+      ) VALUES (?, ?, NULL, ?, 1)
       ON CONFLICT(branch_id, product_id) DO UPDATE SET
-        branch_category_id = excluded.branch_category_id,
+        branch_category_id = NULL,
         price = excluded.price,
         is_available = 1,
         updated_at = datetime('now')
     `).run(
       req.params.id,
       product.id,
-      primaryBranchCategoryId,
-      resolved.effective_price
+      effectivePrice
     );
 
     // M:N category junction
@@ -571,7 +558,7 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       req.brand_id,
       req.organization_id || null,
       product.id,
-      JSON.stringify({ product_id: product.id, price: resolved.effective_price, branch_category_id: primaryBranchCategoryId, category_ids: targetCategoryIds }),
+      JSON.stringify({ product_id: product.id, price: effectivePrice, branch_category_id: null, category_ids: targetCategoryIds }),
       actorId,
       actorRole
     );
@@ -582,8 +569,8 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       adopted: {
         branch_id: req.params.id,
         product_id: product.id,
-        price: resolved.effective_price,
-        branch_category_id: primaryBranchCategoryId,
+        price: effectivePrice,
+        branch_category_id: null,
         category_ids: targetCategoryIds
       }
     });
