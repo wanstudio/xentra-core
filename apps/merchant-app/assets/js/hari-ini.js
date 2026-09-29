@@ -240,7 +240,11 @@
       } catch (e) {
         console.warn("[BM Hari Ini Logs Parse Error]:", e);
       }
-    }\n\n    try { window.dispatchEvent(new CustomEvent("merchant:home-ready")); } catch (_) {}\n  }\n  window.loadHariIni = loadHariIni;
+    }
+
+    try { window.dispatchEvent(new CustomEvent("merchant:home-ready")); } catch (_) {}
+  }
+  window.loadHariIni = loadHariIni;
 
   function renderHariIniPromos(promos) {
     var container = $("bm-active-promos-list");
