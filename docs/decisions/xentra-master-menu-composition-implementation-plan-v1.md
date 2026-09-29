@@ -536,3 +536,28 @@ Only after reconciliation evidence is clean should destructive legacy cleanup be
 ### Production safety gate
 
 The forward resolver/read/write paths must remain compatible with existing data while the readiness audit is being completed. Legacy column removal is **not authorized** in this phase.
+
+
+## 🔧 IMPLEMENTATION UPDATE — Owner Master Product Composition UI
+**29 September 2026**
+The Owner Master Menu UI step is now implemented on the existing Owner Catalog surface.
+
+Implemented:
+- Master Product editor uses structured controls for **Kategori, Rasa, Kelengkapan, Level**.
+- Customer-facing mapping is explicit: **Kategori → title, Rasa → subtitle, Kelengkapan → ordered detail, Level → indicator**.
+- Added a live **Customer PWA preview card** in the Master Product editor; category, flavor, complements, level, price, and product image update the preview without creating a second presentation model.
+- Composition persistence uses `PUT /admin/products/:id/composition` and the existing Master Menu Composition API.
+- Inactive Master components are excluded from new selection choices but preserved as visible (Nonaktif) relations when already attached, allowing explicit replacement/removal.
+- No legacy Branch Override fields are introduced into the new Master Product flow.
+
+Git implementation commits:
+- 8bfc13cad5de2f75b903acd1e06af47548ca56a7 — repair composition preview markup.
+- d78b3d24ebcf0a7959ac361fa5bda6775afcddb0 — structured selector/inactive component handling.
+- 1f3276d74ef973a2ff08123c6a9561ae8d77eba5 — Customer PWA preview styling.
+- ee82bdcdd60f3922f05897283fa51391702cc213 — Owner UI regression contract.
+
+Verification gate remaining:
+1. Run the repository test suite on the normal Node 24 runtime.
+2. Exercise Owner → Master Product → composition save on VPS.
+3. Verify the adopted Branch menu and Customer PWA render the same structured composition.
+4. Only after those checks, proceed to any further UI refinement or legacy reconciliation.
