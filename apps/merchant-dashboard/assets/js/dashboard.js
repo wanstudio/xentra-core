@@ -2586,7 +2586,6 @@
 
   var _productOptionsDraft = [];
 
-  // Owner Master Menu Composition selectors.
   var _masterMenuComponents = {
     flavor: [],
     complement: [],
@@ -2606,7 +2605,7 @@
   async function loadMasterMenuComponents() {
     try {
       var results = await Promise.all(['flavor', 'complement', 'level'].map(function(type) {
-        return adminFetch(API_BASE + '/admin/menu/components/' + type + '?active_only=true', { headers: getAuthHeaders() })
+        return adminFetch(API_BASE + '/admin/menu/components/' + type, { headers: getAuthHeaders() })
           .then(function(res) { return res.json(); })
           .then(function(data) {
             if (!data.success) throw new Error(data.error || 'Gagal memuat ' + masterMenuComponentTypeLabel(type) + '.');
@@ -2684,7 +2683,10 @@
     if (flavorSelect) {
       var flavorHtml = '<option value="">Tidak ada Rasa</option>';
       _masterMenuComponents.flavor.forEach(function(row) {
-        flavorHtml += '<option value="' + esc(row.id) + '">' + esc(row.name) + '</option>';
+        var selected = String(_masterMenuSelected.flavor_id || '') === String(row.id);
+        if (!row.is_active && !selected) return;
+        var suffix = row.is_active ? '' : ' (Nonaktif)';
+        flavorHtml += '<option value="' + esc(row.id) + '"' + (selected ? ' selected' : '') + (row.is_active ? '' : ' data-inactive="1"') + '>' + esc(row.name + suffix) + '</option>';
       });
       flavorSelect.innerHTML = flavorHtml;
       flavorSelect.value = _masterMenuSelected.flavor_id || '';
@@ -2694,7 +2696,10 @@
     if (levelSelect) {
       var levelHtml = '<option value="">Tidak ada Level</option>';
       _masterMenuComponents.level.forEach(function(row) {
-        levelHtml += '<option value="' + esc(row.id) + '">' + esc(row.name) + '</option>';
+        var selected = String(_masterMenuSelected.level_id || '') === String(row.id);
+        if (!row.is_active && !selected) return;
+        var suffix = row.is_active ? '' : ' (Nonaktif)';
+        levelHtml += '<option value="' + esc(row.id) + '"' + (selected ? ' selected' : '') + (row.is_active ? '' : ' data-inactive="1"') + '>' + esc(row.name + suffix) + '</option>';
       });
       levelSelect.innerHTML = levelHtml;
       levelSelect.value = _masterMenuSelected.level_id || '';
@@ -2711,9 +2716,11 @@
     if (empty) empty.style.display = 'none';
     complementBox.innerHTML = _masterMenuComponents.complement.map(function(row) {
       var selected = _masterMenuSelected.complement_ids.indexOf(String(row.id)) !== -1;
+      if (!row.is_active && !selected) return '';
+      var suffix = row.is_active ? '' : ' (Nonaktif)';
       return '<label style="display:flex;align-items:center;gap:8px;border:1px solid ' + (selected ? '#94a3b8' : '#e2e8f0') + ';border-radius:8px;padding:8px 10px;cursor:pointer;background:' + (selected ? '#f8fafc' : '#fff') + ';">' +
         '<input type="checkbox" value="' + esc(row.id) + '"' + (selected ? ' checked' : '') + ' data-master-complement="1" style="width:16px;height:16px;">' +
-        '<span style="font-size:12px;color:#0f172a;">' + esc(row.name) + '</span>' +
+        '<span style="font-size:12px;color:#0f172a;">' + esc(row.name + suffix) + '</span>' +
       '</label>';
     }).join('');
 
@@ -2836,9 +2843,22 @@
     });
   }
 
-  function openMasterMenuComponentManager() {
+  function openMasterMenuComponentManager(type) {
+    if (type) _masterMenuComponentType = type;
     var modal = $('modal-master-menu-components');
     if (!modal) return;
+
+    var titleEl = modal.querySelector('.x-modal-header h3');
+    var subtitleEl = modal.querySelector('.x-modal-header p');
+    var labels = {
+      flavor: { title: 'Master Rasa', sub: 'Pilihan rasa yang tersedia untuk Produk Master' },
+      complement: { title: 'Master Kelengkapan', sub: 'Pilihan kelengkapan yang tersedia untuk Produk Master' },
+      level: { title: 'Master Level', sub: 'Pilihan level yang tersedia untuk Produk Master' }
+    };
+    var meta = labels[_masterMenuComponentType] || { title: 'Master Menu', sub: 'Data pilihan yang dipakai untuk menyusun Produk Master' };
+    if (titleEl) titleEl.textContent = meta.title;
+    if (subtitleEl) subtitleEl.textContent = meta.sub;
+
     modal.style.display = 'flex';
     renderMasterMenuComponentManager();
   }
@@ -2875,6 +2895,9 @@
       }
       renderMasterMenuSelectors();
     } catch (err) {
+      showToast('❌ ' + err.message);
+    }
+  }
 
   function normalizeProductOptionsDraft(raw) {
     var cfg = raw;
