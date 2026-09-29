@@ -7547,12 +7547,12 @@ input[type="file"].x-input,
   margin-bottom: 14px !important;
 }
 
-/* Tombol tambah Kategori/Rasa: bulat, hanya ikon plus, tanpa teks. Ukurannya tetap
-   nyaman ditekan dan tidak ikut melar seperti tombol berteks. */
+/* Tombol tambah Kategori/Rasa: bulat, hanya ikon plus, tanpa teks. Dipakai bersama
+   kedua halaman, jadi satu perubahan berlaku untuk keduanya. */
 .x-master-add-round {
-  width: 40px !important;
-  height: 40px !important;
-  min-width: 40px !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
   padding: 0 !important;
   border-radius: 50% !important;
   display: inline-flex !important;
