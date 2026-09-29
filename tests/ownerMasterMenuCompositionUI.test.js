@@ -15,6 +15,7 @@ test('Owner Category reference page exposes Category and Flavor master data', ()
   assert.ok(HTML.includes('id="master-flavors-table-body"'));
   assert.ok(HTML.includes('id="btn-add-master-flavor"'));
   assert.ok(JS.includes('function renderMasterFlavorsTable()'));
+  assert.ok(JS.includes("title: 'Master Rasa'"), 'Flavor manager must be context-labeled as Master Rasa');
 });
 
 test('Owner Master Product UI exposes structured composition selectors', () => {
