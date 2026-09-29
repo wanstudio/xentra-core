@@ -6,6 +6,8 @@
 
 > **Canonical map:** `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`. This document remains the detailed cross-dashboard contract; Library v2 is the canonical map for terminology, scope, authority, lifecycle, and surface relationships.
 > **Menu authority lock:** `docs/decisions/branch-manager-menu-configuration-v1.md`.
+> **Forward Menu composition architecture:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`.
+> **Legacy Menu override quarantine:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`.
 > **Owner mobile navigation lock:** `docs/decisions/owner-dashboard-focus-scope-navigation-v1.md`.
 
 ## 1. Purpose
