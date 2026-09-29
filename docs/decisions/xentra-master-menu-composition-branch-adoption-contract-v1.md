@@ -52,10 +52,11 @@ Merchant owns only the Branch-side use of the adopted Product:
 - reorder Branch Categories;
 - operate Branch availability;
 - operate Branch stock;
-- use branch pricing only where the existing Pricing Policy explicitly permits it;
 - operate approved Branch-scoped promotions.
 
-Merchant cannot create or edit the Master Rasa, Complement, Level, Master Category, or Product composition.
+The Master Product's menu composition and price are consumed according to Owner-defined data and rules.
+
+Merchant cannot create or edit the Master Rasa, Complement, Level, Master Category, Product composition, Master image/content, or Master-defined price/rules.
 
 ## 3. Master Product identity
 
@@ -281,7 +282,6 @@ Merchant can change:
 - Branch Category order;
 - Branch availability;
 - Branch stock;
-- branch price only when Pricing Policy permits;
 - approved promotion assignment/operation.
 
 Merchant cannot change:
@@ -292,9 +292,11 @@ Merchant cannot change:
 - Level;
 - Master Product composition;
 - Master component names;
-- Master component ordering rules.
+- Master component ordering rules;
+- Master-defined price or Pricing Policy;
+- Master Product image/content as a new Branch-authored composition.
 
-There is no Branch free-text composition editor.
+There is no Branch free-text composition editor and no Branch Menu Composition override editor.
 
 ## 9. Branch Category
 
