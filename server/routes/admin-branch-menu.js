@@ -5,6 +5,7 @@ const MasterMenuResolver = require('../../domains/catalog/services/MasterMenuRes
 function registerAdminBranchMenuRoutes(router, deps = {}) {
   const requireAuth = deps.requireAuth;
   const resolver = deps.resolver || MasterMenuResolver;
+  const db = deps.db;
 
   router.get('/admin/branches/:id/menu', requireAuth(['owner', 'brand_manager', 'branch_manager']), (req, res) => {
     try {
@@ -29,12 +30,9 @@ function registerAdminBranchMenuRoutes(router, deps = {}) {
         branchId
       });
 
-      const branch = resolver.repository
-        ? resolver.repository.db.queryOne(
-          'SELECT id, brand_id, name, slug, address_text, is_active FROM branches WHERE id = ? AND brand_id = ?',
-          [branchId, req.brand_id]
-        )
-        : null;
+      const branch = db.prepare(
+        'SELECT id, brand_id, name, slug, address_text, is_active FROM branches WHERE id = ? AND brand_id = ?'
+      ).get(branchId, req.brand_id);
 
       if (!branch) {
         return res.status(404).json({
