@@ -52,6 +52,22 @@ test('Owner Category page uses two master-reference tabs with card actions', () 
   assert.ok(JS.includes("label: \'Hapus\'"));
 });
 
+test('Edited Category and Rasa immediately update the rendered master-reference state', () => {
+  const start = JS.indexOf('async function saveMasterReferenceQuickAdd()');
+  const end = JS.indexOf('var _productOptionsDraft = [];', start);
+  assert.ok(start >= 0 && end > start, 'Master reference save handler must exist');
+  const saveHandler = JS.slice(start, end);
+
+  assert.ok(saveHandler.includes('if (!category) throw new Error'));
+  assert.ok(saveHandler.includes('state.categories[categoryIndex] = category'));
+  assert.ok(saveHandler.includes('else state.categories.push(category)'));
+  assert.ok(saveHandler.includes('if (!flavor) throw new Error'));
+  assert.ok(saveHandler.includes('_masterMenuComponents.flavor[flavorIndex] = flavor'));
+  assert.ok(saveHandler.includes('_masterMenuComponents.flavor.push(flavor)'));
+  assert.ok(saveHandler.includes('renderMasterCategoriesPage();'));
+  assert.ok(saveHandler.includes('renderMasterFlavorsPage();'));
+});
+
 test('Owner Master Product UI exposes structured composition selectors', () => {
   for (const id of ['prod-category', 'prod-flavor', 'prod-complements-editor', 'prod-level']) {
     assert.ok(HTML.includes('id="' + id + '"'), 'Missing composition control: ' + id);
