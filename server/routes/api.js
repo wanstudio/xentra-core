@@ -24,6 +24,7 @@ const registerAdminBranchRoutes = require('./admin-branches');
 const registerAdminOrderRoutes = require('./admin-orders');
 const registerOperationalOrderRoutes = require('./operational-orders');
 const registerAdminBranchCatalogRoutes = require('./admin-branch-catalog');
+const registerAdminBranchMenuRoutes = require('./admin-branch-menu');
 const registerAdminBranchOperationsRoutes = require('./admin-branch-operations');
 const registerDineInRoutes = require('./dine-in');
 const registerPaymentWebhooks = require('./webhooks');
@@ -978,6 +979,8 @@ registerAdminBranchRoutes(router, { db, crypto, requireAuth });
 registerAdminOrderRoutes(router, { db, requireAuth, AcceptanceTimeoutService });
 
 // Branch catalog adoption, availability, and pricing overrides are isolated in server/routes/admin-branch-catalog.js.
+// Canonical Branch Menu read model — structured Master Menu Composition + Branch Adoption.
+registerAdminBranchMenuRoutes(router, { db, requireAuth, resolver: MasterMenuResolver });
 registerAdminBranchCatalogRoutes(router, {
   db,
   crypto,

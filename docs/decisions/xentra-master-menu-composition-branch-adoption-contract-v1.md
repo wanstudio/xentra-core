@@ -572,3 +572,17 @@ Inventory stock
 ```
 
 No layer silently mutates another layer to express its own state.
+
+
+## 🔒 LOCKED ADDENDUM — Inactive Component Display Rule
+**Date: 2026-09-29**
+
+Master component **inactivation affects selection, not existing Product presentation**.
+
+- Owner may mark a Flavor, Complement, or Level inactive so it cannot be selected in a new/edit composition.
+- Existing Product ↔ component relations remain intact.
+- Customer resolution continues to display the referenced component value for existing Products while the relation remains present.
+- Owner can explicitly edit the Product composition to remove the inactive component.
+- Physical deletion remains blocked while references exist.
+
+This avoids silently changing the customer-facing composition of an already configured menu merely because a vocabulary record was retired.

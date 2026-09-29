@@ -33,8 +33,9 @@
   }
 
 
+  // Forward Merchant Menu read model. Legacy /catalog remains compatibility-only.
   function getBranchCatalog(branchId) {
-    return request('/admin/branches/' + encodeURIComponent(branchId) + '/catalog');
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/menu');
   }
 
   function setBranchProductAvailability(branchId, productId, isAvailable) {

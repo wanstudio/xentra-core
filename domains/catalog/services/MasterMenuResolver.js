@@ -26,9 +26,12 @@ function normalizeImage(product) {
 function resolveProductView({ product, flavor, complements, level, branchState = null, categories = [] }) {
   if (!product.category_id || !product.category_name || product.category_is_active === 0) return null;
 
-  const activeFlavor = flavor && flavor.is_active !== 0 ? flavor : null;
-  const activeLevel = level && level.is_active !== 0 ? level : null;
-  const activeComplements = (complements || []).filter(c => c.is_active !== 0);
+  // Inactive Master components cannot be selected for new compositions, but
+  // existing Product relations continue to resolve their historical display
+  // value until the Owner explicitly changes that Product composition.
+  const activeFlavor = flavor || null;
+  const activeLevel = level || null;
+  const activeComplements = complements || [];
   const branchAvailable = branchState ? branchState.is_available !== 0 : true;
 
   return {
