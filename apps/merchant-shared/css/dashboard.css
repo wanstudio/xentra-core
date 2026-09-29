@@ -7496,8 +7496,16 @@ input[type="file"].x-input,
        karena elemen pertamanya sebuah <div>, bukan <h3>. */
     margin: 0 !important;
   }
-  #product-list-view .x-master-products-head .x-panel-header-flex > div > p {
-    margin: 2px 0 0 !important;
+  /* Keterangan di bawah judul: kecil, rata kiri, dan sejajar dengan TEKS judulnya —
+     chevron 30px + jarak 8px = 38px, jadi tidak menggantung di bawah chevron. */
+  #product-list-view .x-master-products-sub {
+    margin: 2px 0 0 38px !important;
+    padding: 0 !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    font-weight: 500 !important;
+    text-align: left !important;
+    color: #747c83 !important;
   }
   #product-list-view .x-title-back-btn {
     display: inline-flex !important;
