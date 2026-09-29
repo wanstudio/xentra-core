@@ -25,7 +25,6 @@ The Owner mobile **Bisnis** hub must expose the canonical Master Catalog concept
 
 ```
 Katalog
-├── Kategori & Rasa
 └── Produk Master
 ```
 
@@ -57,6 +56,30 @@ The `+` action beside the Product form dropdown is a quick-create shortcut into 
 
 `Kelengkapan` and `Level` remain composition controls on the Master Product editor for now because their interaction model is different (multi-select / single-select).
 
+## 🔒 MASTER PRODUCT ASSEMBLY WORKSPACE — 29 September 2026
+
+The Owner Catalog UI uses **Produk Master as the single assembly workspace**. There is no separate `Kategori` or `Kategori & Rasa` navigation tab.
+
+Master references remain authoritative in Core, but are exposed progressively from the Product editor:
+
+```
+Produk Master
+├── Foto
+├── Nama
+├── Kategori  ▼  +
+├── Rasa      ▼  +
+├── Kelengkapan
+├── Level
+├── Harga
+└── Preview Customer
+```
+
+The `+` beside Kategori/Rasa opens a contextual modal, creates the master value, refreshes the same selector, and selects the new value. It is a shortcut into the same Core master authority, not a second data model.
+
+This follows the progressive-disclosure reference: the user stays inside the task of assembling one product/menu item instead of navigating to separate master-reference screens.
+
+Menu Cabang remains a separate branch assortment/configuration surface.
+
 ## Locked Owner Home / Quick Access
 
 Home remains the mobile command center.
@@ -81,8 +104,7 @@ Rules:
 BISNIS
 
 Katalog
-├── Produk Master
-└── Kategori
+└── Produk Master
 
 Operasional
 ├── Stok
