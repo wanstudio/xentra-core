@@ -1132,19 +1132,30 @@
         <input type="hidden" id="adopt-max-price" value="">
         
         <div class="x-form-group">
-          <label>Nama Menu</label>
+          <label>Master Menu</label>
           <input type="text" id="adopt-product-name" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+        </div>
+
+        <div class="x-form-group">
+          <label>Komposisi Master <span class="text-muted">(hanya lihat)</span></label>
+          <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+            <div id="adopt-menu-title" style="font-size:14px;font-weight:800;color:#0f172a;">—</div>
+            <div id="adopt-menu-subtitle" style="font-size:12px;color:#475569;margin-top:3px;">—</div>
+            <div id="adopt-menu-detail" style="font-size:11px;color:#64748b;margin-top:5px;">—</div>
+            <div id="adopt-menu-indicator" style="font-size:11px;color:#475569;margin-top:5px;font-weight:700;">—</div>
+          </div>
         </div>
 
         <div class="x-form-group">
           <label for="adopt-branch-category">Kategori di Cabang Ini</label>
           <select id="adopt-branch-category" class="x-input" required></select>
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Kategori ini hanya untuk pengelompokan menu di cabang. Komposisi Master tidak berubah.</small>
         </div>
 
         <div class="x-form-group">
-          <label for="adopt-price">Harga Jual Cabang (Rp)</label>
-          <input type="number" id="adopt-price" class="x-input" required>
-          <small id="adopt-price-hint" class="text-muted" style="display:block;margin-top:4px;font-size:12px;"></small>
+          <label>Harga Master (Owner)</label>
+          <input type="text" id="adopt-price-display" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Harga Menu ditentukan Owner. Merchant tidak mengubah harga saat adopsi.</small>
         </div>
 
         <div class="x-modal-footer">
