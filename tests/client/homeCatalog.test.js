@@ -82,9 +82,9 @@ test('Branch-scoped /catalog/menu returns branch-specific availability', async (
   const data = await res.json();
   assert.strictEqual(data.success, true);
 
-  // CatalogService returns ALL master products (LEFT JOIN branch_products).
-  // Products assigned to BARAT have is_available=true with real stock.
-  // Products NOT assigned to BARAT have is_available=false, stock_estimate=0.
+  // Forward /catalog/menu branch path uses the structured Master Menu resolver.
+  // The response is Branch-scoped: only adopted Master Products are returned.
+  // Each returned product carries explicit Branch availability.
   assert.ok(data.all_products.length >= 4, 'has master products');
 
   // Every product must have explicit boolean is_available
@@ -99,7 +99,7 @@ test('Branch B catalog differs from Branch A catalog (different availability)', 
   const resB = await mockFetch(`/api/v1/catalog/menu?branch_id=${TIMUR}`);
   const dataB = await resB.json();
 
-  // BRANCH CATALOG MODEL: each branch returns only its adopted products (may differ in count)
+  // Forward Branch Menu model: each branch returns only its adopted Master Products (may differ in count)
   assert.ok(dataA.all_products.length >= 2, 'BARAT has adopted products');
   assert.ok(dataB.all_products.length >= 2, 'TIMUR has adopted products');
 
@@ -130,6 +130,22 @@ test('Each branch shows its own stock_estimate for the same product', async () =
   assert.strictEqual(typeof p272A.stock_estimate, 'number', 'BARAT stock is a number');
   assert.strictEqual(typeof p272B.stock_estimate, 'number', 'TIMUR stock is a number');
   assert.notStrictEqual(p272A.stock_estimate, p272B.stock_estimate, 'stock values differ between branches');
+});
+
+
+test('Branch-scoped catalog exposes structured Master Menu presentation fields', async () => {
+  const res = await mockFetch(`/api/v1/catalog/menu?branch_id=${BARAT}`);
+  const data = await res.json();
+  assert.strictEqual(data.success, true);
+
+  const product = (data.all_products || []).find((p) => p && p.menu_title);
+  assert.ok(product, 'at least one branch product should expose Master Menu title');
+  assert.ok(Object.prototype.hasOwnProperty.call(product, 'menu_subtitle'));
+  assert.ok(Object.prototype.hasOwnProperty.call(product, 'menu_detail'));
+  assert.ok(Object.prototype.hasOwnProperty.call(product, 'menu_indicator'));
+  assert.ok(!Object.prototype.hasOwnProperty.call(product, 'name_override'));
+  assert.ok(!Object.prototype.hasOwnProperty.call(product, 'description_override'));
+  assert.ok(!Object.prototype.hasOwnProperty.call(product, 'image_override'));
 });
 
 // ── PRODUCTS ENDPOINT: brand-wide (NOT branch-scoped) ──
