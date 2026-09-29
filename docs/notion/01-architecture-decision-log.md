@@ -394,3 +394,29 @@ Exact address, distance, and location values must come from the authoritative or
 ### Implementation rule
 Customer Order Detail must include **Detail Pengantaran** as a first-class section. Visual styling may change, but this information architecture must remain.
 
+
+
+## 🔒 LOCKED — Merchant Home / Beranda UI Contract v1
+
+**Date:** 29 September 2026
+
+Git source of truth:
+`docs/decisions/xentra-merchant-home-ui-contract-v1.md`
+
+Merchant App Home is a **mobile-native operational Home**, not a desktop dashboard compressed into a phone.
+
+Locked mental model:
+
+**Glance → Understand → Act**
+
+Locked composition:
+
+**Branch context → Open/Online controls → Greeting/date → Sales card → New/Pending orders → Quick Actions → Operational snapshot → Menu/Stock attention → Active promos → Recent activity → Persistent bottom navigation**
+
+Primary navigation:
+
+**Beranda | Pesanan | Menu | Stock | Promo**
+
+This is a presentation/UI contract only. No changes are authorized to Core authority, RBAC, branch scope, order/payment/inventory state machines, KDS boundaries, or unrelated backend contracts.
+
+The Home must reuse existing mature Xentra primitives and must not extend quarantined legacy UI/domain assumptions.
