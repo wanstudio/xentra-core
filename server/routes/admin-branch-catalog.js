@@ -165,42 +165,33 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
 });
 
 
+// LEGACY-COMPAT ASSIGNMENT ENDPOINT.
+// Forward UI uses /adopt. Keep this path only for older callers, but enforce
+// the same Master Menu Composition boundary and never accept branch-authored Menu content.
 router.post('/admin/branches/:id/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const productId = String((req.body && req.body.product_id) || '').trim();
-    if (!productId) {
-      return res.status(400).json({ success: false, error: 'product_id wajib diisi.' });
-    }
+    if (!productId) return res.status(400).json({ success: false, error: 'product_id wajib diisi.' });
 
-    // Branch ownership (tenant-scoped)
     const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
-    if (!branch) {
-      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
-    }
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
 
-    // C1.3 Brand consistency: the product master must belong to the SAME brand as the branch.
-    // (A product of another brand is not found here → cross-brand assignment is impossible.)
     const product = db.prepare('SELECT id, brand_id, price, is_active FROM products WHERE id = ? AND brand_id = ?').get(productId, req.brand_id);
-    if (!product) {
+    if (!product) return res.status(400).json({ success: false, error: 'PRODUCT_BRAND_MISMATCH', message: 'Produk tidak ditemukan atau bukan milik brand ini.' });
+    if (product.is_active === 0) return res.status(400).json({ success: false, error: 'PRODUCT_INACTIVE', message: 'Produk master sedang nonaktif.' });
+
+    const masterView = MasterMenuResolver.resolveMasterProducts({ brandId: req.brand_id, productIds: [productId] })[0];
+    if (!masterView) {
       return res.status(400).json({
         success: false,
-        error: 'PRODUCT_BRAND_MISMATCH',
-        message: 'Produk tidak ditemukan atau bukan milik brand ini; produk hanya dapat dialokasikan ke cabang brand yang sama.'
-      });
-    }
-    if (product.is_active === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'PRODUCT_INACTIVE',
-        message: 'Produk master sedang nonaktif dan tidak dapat dialokasikan ke cabang.'
+        error: 'MASTER_MENU_COMPOSITION_REQUIRED',
+        message: 'Produk master belum memiliki komposisi Menu yang valid. Lengkapi Master Menu terlebih dahulu.'
       });
     }
 
-    // C1.4 Assignment != Inventory: the assignment row is created WITHOUT fabricating stock.
-    // stock stays NULL until the Inventory domain records actual branch stock.
     const stmt = db.prepare(`
-      INSERT OR IGNORE INTO branch_products (branch_id, product_id, price, stock)
-      VALUES (?, ?, ?, NULL)
+      INSERT OR IGNORE INTO branch_products (branch_id, product_id, branch_category_id, price, stock)
+      VALUES (?, ?, NULL, ?, NULL)
     `).run(req.params.id, productId, product.price != null ? product.price : null);
     const alreadyAssigned = !stmt || stmt.changes === 0;
 
@@ -209,23 +200,13 @@ router.post('/admin/branches/:id/products', requireAuth(['owner', 'brand_manager
       FROM branch_products WHERE branch_id = ? AND product_id = ?
     `).get(req.params.id, productId);
 
-    res.status(alreadyAssigned ? 200 : 201).json({
-      success: true,
-      already_assigned: alreadyAssigned,
-      assignment
-    });
+    res.status(alreadyAssigned ? 200 : 201).json({ success: true, already_assigned: alreadyAssigned, assignment });
   } catch (err) {
-    if (String(err && err.message).includes('CROSS_BRAND_ASSIGNMENT_REJECTED')) {
-      return res.status(400).json({
-        success: false,
-        error: 'CROSS_BRAND_ASSIGNMENT_REJECTED',
-        message: 'Produk dan cabang harus berasal dari brand yang sama.'
-      });
-    }
     console.error('[API Error POST /admin/branches/:id/products]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 // C1 Toggle operational availability (is_available) of an assigned product.
 // Branch Manager limited to own branch; Owner/Brand anywhere in their brand.
