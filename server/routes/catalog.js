@@ -5,7 +5,7 @@
  * from CatalogService; media delivery is resolved through the injected batch helper.
  */
 module.exports = function registerCatalogRoutes(router, deps) {
-  const { db, CatalogService, batchResolveCustomerMediaDelivery } = deps;
+  const { db, CatalogService, MasterMenuResolver, batchResolveCustomerMediaDelivery } = deps;
 
 router.get(['/catalog/menu', '/home'], async (req, res) => {
   try {
@@ -27,11 +27,37 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
       branchScope = branch;
     }
 
-    // P3: always reuse the canonical commerce CatalogService — both branch-scoped
-    // and brand-wide menus go through the same domain ownership path.
-    // CatalogService returns branch price override, C1 operational availability,
-    // and branch stock estimate when branch_id is provided.
-    const menu = CatalogService.getMenu({ brand_id: brandId, branch_id: branchScope ? branchScope.id : null });
+    // Forward Menu architecture:
+    // - branch-scoped Customer Menu uses the structured MasterMenuResolver;
+    // - brand-wide legacy/discovery mode stays on CatalogService until its
+    //   consumer contract is explicitly migrated.
+    const menu = branchScope && MasterMenuResolver
+      ? MasterMenuResolver.resolveBranchMenu({ brandId, branchId: branchScope.id })
+      : CatalogService.getMenu({ brand_id: brandId, branch_id: null });
+
+    // Normalize the forward resolver DTO into the existing Customer catalog envelope.
+    // Composition authority remains the new structured fields; these aliases exist
+    // only to avoid forcing a simultaneous client rewrite.
+    menu.products = (menu.products || []).map(function (p) {
+      return {
+        ...p,
+        id: p.id || p.product_id,
+        name: p.master && p.master.name ? p.master.name : p.name,
+        description: p.master && p.master.description ? p.master.description : (p.description || ''),
+        category_id: p.category_id || (p.categories && p.categories[0] ? p.categories[0].id : null),
+        category_ids: Array.isArray(p.categories) ? p.categories.map(function (c) { return String(c.id); }) : [],
+        price: p.price,
+        regular_price: p.regular_price,
+        is_active: p.is_active !== false,
+        is_available: p.is_available !== false,
+        stock_estimate: p.stock_estimate,
+        menu_title: p.title,
+        menu_subtitle: p.subtitle,
+        menu_detail: p.detail,
+        menu_indicator: p.indicator,
+        options_config: p.options || { version: 1, groups: [] }
+      };
+    });
 
     // Collect all media IDs across categories and products for batch resolution (O(1) roundtrips)
     const allMediaIds = [];
