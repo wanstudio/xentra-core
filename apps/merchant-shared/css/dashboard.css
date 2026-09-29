@@ -7469,6 +7469,27 @@ input[type="file"].x-input,
     margin-bottom: 14px;
   }
 
+  /* Chevron kembali di judul Produk Master: sejajar dengan teks judulnya dan tetap
+     nyaman ditekan di layar kecil. */
+  #product-list-view .x-master-products-title {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+  #product-list-view .x-title-back-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 30px !important;
+    height: 30px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    cursor: pointer !important;
+  }
+
   /* Pencarian dan pemilih kategori ditumpuk penuh lebar, bukan berdampingan. */
   #product-list-view > div[style*="display:flex"] {
     display: block !important;
