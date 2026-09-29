@@ -6,9 +6,11 @@
 
 ## 1. Core decision
 
-A Xentra Menu is a **Master Product assembled by Owner from reusable structured Master data**.
+A Xentra customer-facing **Menu Item** is a **Master Product assembled by Owner from reusable structured Master data**.
 
 **Owner creates the Master data and composes the Master Product. Merchant only chooses/adopts which Master Products the Branch sells.**
+
+**UI boundary:** `Menu` is the customer-facing/branch assortment presentation of adopted Master Products; it is not a separate Master Catalog entity or an Owner navigation layer named `Master Menu` / `Menu & Paket`. The technical term **Master Menu Composition** remains valid for the structured resolver/snapshot contract.
 
 Merchant does not create a second Menu composition and does not replace Master composition fields with branch-authored free text.
 
