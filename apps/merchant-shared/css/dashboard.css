@@ -8172,32 +8172,23 @@ input[type="file"].x-input,
    SATU kartu: tab menjadi bagian atas (tanpa garis bawah, sudut atas membulat), panel
    isinya menjadi bagian bawah (tanpa garis atas, sudut bawah membulat). Sambungannya
    tidak terlihat karena kedua bagian memakai latar dan garis yang sama. */
-/* Tab Kategori/Rasa: SATU komponen. Kartunya memuat daftar tabnya dan panel isinya,
-   jadi tidak ada dua kotak yang perlu disambung. Kotak pada tab dan panelnya dilepas
-   (tidak ada kotak bersarang), tetapi jaraknya diatur supaya isinya tidak mepet. */
+/* Tab Kategori/Rasa dan isinya dipisah menjadi DUA kartu bertumpuk: kartu tab di atas,
+   kartu isi di bawah. Masing-masing kartu utuh dengan token yang sama dengan kartu lain,
+   dan jaraknya konsisten 12px. */
 .x-master-reference-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+.x-master-reference-card .x-master-reference-tabs,
+.x-master-reference-card .x-master-reference-panel {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  padding: 14px;
-  margin-top: 14px;
-}
-.x-master-reference-card .x-master-reference-tabs {
+  padding: 12px;
   margin: 0;
-  padding: 0 0 12px;
-  background: transparent;
-  border: 0;
-  /* Pemisah tipis antara daftar tab dan isinya, disengaja — seperti tab pada umumnya. */
-  border-bottom: 1px solid var(--border-color);
-  box-shadow: none;
-}
-.x-master-reference-card .x-master-reference-panel {
-  margin: 14px 0 0;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
 }
 .x-master-reference-toolbar{
   display:flex;
