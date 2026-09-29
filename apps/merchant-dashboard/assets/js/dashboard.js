@@ -2529,6 +2529,7 @@
       return;
     }
 
+    // FORWARD MENU: card may show Master Menu Composition as read-only; no Branch content overrides.
     container.innerHTML = filtered.map(function (p) {
       var img = p.image_url || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100';
       var isAvailable = p.is_available === 1 || p.is_available === true;
@@ -2539,20 +2540,7 @@
         ? '<span class="x-badge x-badge-range">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
         : '<span class="x-badge x-badge-lock">Harga Terkunci</span>';
 
-      var nameSrc = p.name_override ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
-      var descSrc = p.description_override ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
 
-      var productDataJson = esc(JSON.stringify({
-        product_id: p.product_id,
-        name: p.name, name_override: p.name_override, master_name: p.master_name,
-        description: p.description, description_override: p.description_override, master_description: p.master_description,
-        image_url: p.image_url, image_override: p.image_override, master_image_url: p.master_image_url,
-        price: p.price, master_price: p.master_price, pricing_mode: p.pricing_mode,
-        min_price: p.min_price, max_price: p.max_price,
-        branch_category_id: p.branch_category_id,
-        category_ids: p.category_ids || (p.branch_category_id ? [p.branch_category_id] : []),
-        categories: p.categories || []
-      }));
 
       var availabilityToggle = '' +
         '<label class="x-toggle' + (isAvailable ? ' x-toggle-on' : '') + '" title="' + (isAvailable ? 'Menu tersedia' : 'Menu habis') + '">' +
@@ -2570,16 +2558,10 @@
               modeBadge,
             '</div>',
             '<div class="x-product-card-price">Jual: ' + formatMoney(p.price) + ' <small class="text-muted" style="font-weight:normal;">(Owner: ' + formatMoney(p.master_price) + ')</small></div>',
-            '<div style="font-size:11px;color:#64748b;margin:4px 0;display:flex;gap:8px;flex-wrap:wrap;">',
-              '<span>Nama: ' + nameSrc + '</span>',
-              '<span>Deskripsi: ' + descSrc + '</span>',
-            '</div>',
             '<div class="x-product-card-actions">',
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
                 '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang ' + esc(p.name) + '" onclick="XentraActionMenu.open(this, [' +
-                  '{ label: \'Edit Menu Cabang\', icon: \'✏️\', onClick: function() { openBranchOverrideModal(\'' + productDataJson + '\'); } },' +
-                  '{ divider: true },' +
                   '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\'); } }' +
                 '])">',
                   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
