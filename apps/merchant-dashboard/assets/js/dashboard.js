@@ -2953,7 +2953,6 @@
         _masterMenuSelected.complement_ids.push(String(data.component.id));
       }
       renderMasterMenuSelectors();
-      renderMasterFlavorsTable();
     } catch (err) {
       showToast('❌ ' + err.message);
     }
