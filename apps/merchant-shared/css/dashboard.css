@@ -395,6 +395,14 @@ a:focus:not(:focus-visible),
 }
 
 /* Panels */
+/* Tanda wajib pada label form. Dipakai label Kategori Master dan Rasa — keduanya
+   menentukan nama internal master, jadi keduanya harus terisi. */
+.x-required-mark {
+  color: #dc2626;
+  font-weight: 700;
+  margin-left: 3px;
+}
+
 .x-card-panel {
   background: var(--bg-card);
   border-radius: var(--radius-md);
