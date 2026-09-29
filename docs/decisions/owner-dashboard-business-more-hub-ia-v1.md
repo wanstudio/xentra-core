@@ -18,6 +18,29 @@ Lainnya
 
 Current restaurant-platform references show a recurring separation between home/overview, business-management capabilities (catalog, locations, staff, marketing), financial/payment capabilities, reporting/insight, and account/settings concerns. GrabMerchant documents Home, Insights, Menu/Catalog/Item, Employees, payments, and multi-store management as distinct functional areas. Toast separates Reports from configuration and groups reports by Sales, Menus, Payments, Labor, Marketing, and other domains. Square similarly separates dashboard reporting, items/inventory, and team/customer operations. These patterns are reference inputs only; Xentra remains governed by its own domain and authority contracts.
 
+## 🔒 Owner Catalog UI Clarification — No Master Menu & Paket Hub
+**Decision date: 29 September 2026**
+
+The Owner mobile **Bisnis** hub must expose the canonical Master Catalog concepts only:
+
+```
+Katalog
+├── Produk Master
+└── Kategori
+```
+
+`Menu & Paket` is **not** a standalone Master Catalog navigation layer.
+
+- **Master Product** is the canonical product identity/composition authority.
+- **Master Category** organizes the Master Product catalog.
+- **Paket / Bundle / Composite** remains an Owner/Brand catalog capability, but no standalone `Paket` UI is exposed until an authoritative package domain/API exists in Core.
+- **Menu Cabang** is the branch selling assortment/configuration surface, not a Master Catalog object. The existing route `catalog/menus` remains valid and is labeled **Menu Cabang**.
+- Branch Menu access may be entered from Branch Management and from the dedicated `Menu Cabang` Owner route; it must not be presented as `Menu & Paket` in the Master Catalog hub.
+
+Technical terms such as **Master Menu Composition** remain valid for the structured customer-facing resolver/checkout snapshot. That is an internal/domain composition contract, not permission to create a separate Master Menu navigation layer in the Owner UI.
+
+The change is UX/IA terminology and surface ownership only; existing Core authority and Branch Menu contracts remain unchanged.
+
 ## Locked Owner Home / Quick Access
 
 Home remains the mobile command center.
@@ -41,9 +64,8 @@ Rules:
 ```text
 BISNIS
 
-Katalog & Menu
+Katalog
 ├── Produk Master
-├── Menu & Paket
 └── Kategori
 
 Operasional
