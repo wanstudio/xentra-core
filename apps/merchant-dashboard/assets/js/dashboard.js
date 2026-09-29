@@ -245,6 +245,7 @@
 
     if (!isPlatformContext()) {
       if (hash === 'catalog') return 'catalog/products';
+      if (hash === 'catalog/categories') return 'catalog/categories';
       // Handle dynamic route: catalog/products/:id
       if (hash.indexOf('catalog/products/') === 0) {
         return hash;
@@ -319,7 +320,6 @@
       'orders': 'orders',
       'catalog': 'catalog/products',
       'catalog-products': 'catalog/products',
-      'catalog-categories': 'catalog/categories',
       'catalog-menus': 'catalog/menus',
       'catalog-categories': 'catalog/products',
       'catalog/categories': 'catalog/products',
