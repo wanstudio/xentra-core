@@ -11,8 +11,38 @@
 const CatalogRepository = require('../../../core/data/repositories/CatalogRepository');
 const PricingPolicyModel = require('../../catalog/models/PricingPolicyModel');
 const ProductOptionsModel = require('../../catalog/models/ProductOptionsModel');
+const MasterMenuResolver = require('../../catalog/services/MasterMenuResolver');
 
 const catalogRepository = new CatalogRepository();
+
+function buildMenuSnapshot({ brandId, productId }) {
+  try {
+    const resolved = MasterMenuResolver.resolveMasterProducts({
+      brandId,
+      productIds: [productId]
+    })[0];
+    if (!resolved) return null;
+
+    return {
+      schema_version: 'master-menu-composition-v1',
+      source: 'master',
+      captured_at: new Date().toISOString(),
+      product_id: resolved.product_id,
+      title: resolved.title,
+      subtitle: resolved.subtitle,
+      detail: Array.isArray(resolved.detail) ? resolved.detail.slice() : [],
+      indicator: resolved.indicator,
+      image: resolved.image || null,
+      master: {
+        category_id: resolved.master && resolved.master.category_id ? resolved.master.category_id : null
+      }
+    };
+  } catch (_) {
+    // Compatibility window: legacy products without structured composition may
+    // still be ordered until migration reconciliation is complete.
+    return null;
+  }
+}
 
 class PrePaymentVerificationGate {
   static STATUS = {
@@ -225,10 +255,16 @@ class PrePaymentVerificationGate {
           difference: actualPrice - expectedPrice
         });
       }
+      const menuSnapshot = buildMenuSnapshot({
+        brandId: brand_id,
+        productId
+      });
+
       verifiedItems.push({
         product_id: productId,
         name: masterProduct.name,
         quantity: requestedQty,
+        menu_snapshot: menuSnapshot,
         unit_price: actualPrice,
         base_unit_price: basePrice,
         options: optionResolution.snapshot,
