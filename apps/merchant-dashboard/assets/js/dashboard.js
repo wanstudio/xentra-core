@@ -2854,7 +2854,6 @@
       saveMasterReferenceQuickAdd();
     });
     var btnAddCategoryPage = $('btn-add-master-category-page');
-    if (btnAddCategoryPage) btnAddCategoryPage.addEventListener('click', openAddMasterCategory);
 
     var btnCloseCategoryModal = $('btn-close-master-category');
     if (btnCloseCategoryModal) btnCloseCategoryModal.addEventListener('click', closeMasterCategoryModal);
