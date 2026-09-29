@@ -10972,11 +10972,7 @@
         if (!isValid) return;
         // Owner Dashboard has one canonical role landing: /owner/.
         // /dashboard/ remains a legacy/compatibility route, not the Owner landing URL.
-        // Semua jalur yang melayani permukaan ini harus ada di daftar. Sebelumnya hanya
-        // '/owner/', sehingga saat server menetapkan landing '/dashboard/' penjaganya
-        // mengalihkan ke '/dashboard/' — jalur yang ia sendiri tolak — dan halaman
-        // berputar mengalihkan ke dirinya sendiri tanpa henti.
-        enforceSurface(['/owner/', '/owner', '/dashboard/', '/dashboard']);
+        enforceSurface(['/owner/']);
       }).catch(function () {});
 
       // Apply initial route from URL hash (enables deep-link and browser refresh)
