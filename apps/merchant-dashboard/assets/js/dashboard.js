@@ -2540,7 +2540,7 @@
       }
 
       if (type === 'category') {
-        var category = data.category;
+        var category = data.component;
         if (category) {
           var categoryIndex = state.categories.findIndex(function (row) { return String(row.id) === String(category.id); });
           if (categoryIndex >= 0) state.categories[categoryIndex] = category;
@@ -3260,7 +3260,7 @@
         var data = await res.json();
         if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menyimpan kategori.');
 
-        var saved = data.category;
+        var saved = data.component;
         if (saved) {
           var idx = state.categories.findIndex(function(row) { return String(row.id) === String(saved.id); });
           if (idx >= 0) state.categories[idx] = saved;
