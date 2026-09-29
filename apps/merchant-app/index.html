@@ -22,7 +22,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — tokens, toast, action-menu, crop editor, shell styles -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.16">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.24">
 </head>
 <body class="x-merchant-app">
   <div class="x-dash-layout">
@@ -117,12 +117,12 @@
             </div>
             <div class="x-mobile-topbar-actions">
               <button type="button" class="x-mobile-circle-btn x-mobile-notification-btn" id="btn-notifications" aria-label="Notifikasi" title="Notifikasi">
-                <svg viewBox="0 0 17 17" width="22" height="22" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.24791 15.2273C2.67985 15.1668 2.14881 14.9164 1.7407 14.5167C1.33259 14.117 1.07128 13.5912 0.999051 13.0245C0.816908 11.5613 0.634766 10.0495 0.634766 8.50011C0.634766 7.35989 0.734337 6.23911 0.858194 5.14504C0.864298 5.09147 0.884616 5.0405 0.917042 4.99743C0.949467 4.95435 0.992821 4.92073 1.04261 4.90005C1.0924 4.87936 1.14682 4.87237 1.20022 4.87979C1.25362 4.88721 1.30407 4.90877 1.34634 4.94225L6.52769 9.02832C7.08994 9.4715 7.785 9.71251 8.50091 9.71251C9.21682 9.71251 9.91188 9.4715 10.4741 9.02832L15.6567 4.94225C15.699 4.90909 15.7493 4.8878 15.8025 4.88055C15.8558 4.87331 15.91 4.88037 15.9596 4.90103C16.0091 4.92168 16.0523 4.95517 16.0847 4.99806C16.117 5.04095 16.1374 5.09168 16.1436 5.14504C16.2675 6.23911 16.3671 7.35989 16.3671 8.50011C16.3671 10.0495 16.1849 11.5625 16.0028 13.0245C15.9305 13.5912 15.6692 14.117 15.2611 14.5167C14.853 14.9164 14.322 15.1668 13.7539 15.2273L13.5912 15.2443C11.9471 15.4155 10.2446 15.594 8.50091 15.594C6.75719 15.594 5.05477 15.4155 3.41062 15.2443L3.24791 15.2273ZM15.5195 2.77961C15.5619 2.83912 15.5793 2.91288 15.5679 2.98507C15.5566 3.05726 15.5174 3.12213 15.4588 3.16575L9.53427 7.83589C9.24025 8.06894 8.87609 8.19576 8.50091 8.19576C8.12573 8.19576 7.76157 8.06894 7.46755 7.83589L1.54305 3.16575C1.48443 3.12213 1.44523 3.05726 1.43388 2.98507C1.42253 2.91288 1.43993 2.83912 1.48234 2.77961C1.69178 2.49952 1.95661 2.26551 2.26034 2.09212C2.56408 1.91874 2.90023 1.80969 3.24791 1.77175L3.41062 1.75596C5.05477 1.58354 6.75719 1.40625 8.50091 1.40625C10.2446 1.40625 11.9471 1.58354 13.5912 1.75596L13.7539 1.77296C14.1015 1.81075 14.4376 1.91962 14.7413 2.09279C15.045 2.26596 15.3099 2.49974 15.5195 2.77961Z" fill="currentColor"/></svg>
-                <span class="x-mobile-notification-badge" id="mobile-notification-count">12</span>
+                <svg viewBox="0 0 17 17" width="18" height="18" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.24791 15.2273C2.67985 15.1668 2.14881 14.9164 1.7407 14.5167C1.33259 14.117 1.07128 13.5912 0.999051 13.0245C0.816908 11.5613 0.634766 10.0495 0.634766 8.50011C0.634766 7.35989 0.734337 6.23911 0.858194 5.14504C0.864298 5.09147 0.884616 5.0405 0.917042 4.99743C0.949467 4.95435 0.992821 4.92073 1.04261 4.90005C1.0924 4.87936 1.14682 4.87237 1.20022 4.87979C1.25362 4.88721 1.30407 4.90877 1.34634 4.94225L6.52769 9.02832C7.08994 9.4715 7.785 9.71251 8.50091 9.71251C9.21682 9.71251 9.91188 9.4715 10.4741 9.02832L15.6567 4.94225C15.699 4.90909 15.7493 4.8878 15.8025 4.88055C15.8558 4.87331 15.91 4.88037 15.9596 4.90103C16.0091 4.92168 16.0523 4.95517 16.0847 4.99806C16.117 5.04095 16.1374 5.09168 16.1436 5.14504C16.2675 6.23911 16.3671 7.35989 16.3671 8.50011C16.3671 10.0495 16.1849 11.5625 16.0028 13.0245C15.9305 13.5912 15.6692 14.117 15.2611 14.5167C14.853 14.9164 14.322 15.1668 13.7539 15.2273L13.5912 15.2443C11.9471 15.4155 10.2446 15.594 8.50091 15.594C6.75719 15.594 5.05477 15.4155 3.41062 15.2443L3.24791 15.2273ZM15.5195 2.77961C15.5619 2.83912 15.5793 2.91288 15.5679 2.98507C15.5566 3.05726 15.5174 3.12213 15.4588 3.16575L9.53427 7.83589C9.24025 8.06894 8.87609 8.19576 8.50091 8.19576C8.12573 8.19576 7.76157 8.06894 7.46755 7.83589L1.54305 3.16575C1.48443 3.12213 1.44523 3.05726 1.43388 2.98507C1.42253 2.91288 1.43993 2.83912 1.48234 2.77961C1.69178 2.49952 1.95661 2.26551 2.26034 2.09212C2.56408 1.91874 2.90023 1.80969 3.24791 1.77175L3.41062 1.75596C5.05477 1.58354 6.75719 1.40625 8.50091 1.40625C10.2446 1.40625 11.9471 1.58354 13.5912 1.75596L13.7539 1.77296C14.1015 1.81075 14.4376 1.91962 14.7413 2.09279C15.045 2.26596 15.3099 2.49974 15.5195 2.77961Z" fill="currentColor"/></svg>
+                <span class="x-mobile-notification-badge" id="mobile-notification-count">0</span>
               </button>
               <button type="button" class="x-mobile-circle-btn x-mobile-profile-btn" id="mobile-user-profile" aria-label="Profil">
                 <span class="x-mobile-profile-icon" id="mobile-user-avatar">
-                  <svg viewBox="0 0 25 25" width="22" height="22" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M12.5 4.1665C11.3949 4.1665 10.3351 4.60549 9.55372 5.38689C8.77232 6.16829 8.33333 7.2281 8.33333 8.33317C8.33333 9.43824 8.77232 10.498 9.55372 11.2794C10.3351 12.0609 11.3949 12.4998 12.5 12.4998C13.6051 12.4998 14.6649 12.0609 15.4463 11.2794C16.2277 10.498 16.6667 9.43824 16.6667 8.33317C16.6667 7.2281 16.2277 6.16829 15.4463 5.38689C14.6649 4.60549 13.6051 4.1665 12.5 4.1665ZM10.4167 13.5415C9.3116 13.5415 8.25179 13.9805 7.47039 14.7619C6.68899 15.5433 6.25 16.6031 6.25 17.7082V18.7498C6.25 19.3024 6.46949 19.8323 6.86019 20.223C7.25089 20.6137 7.7808 20.8332 8.33333 20.8332H16.6667C17.2192 20.8332 17.7491 20.6137 18.1398 20.223C18.5305 19.8323 18.75 19.3024 18.75 18.7498V17.7082C18.75 16.6031 18.311 15.5433 17.5296 14.7619C16.7482 13.9805 15.6884 13.5415 14.5833 13.5415H10.4167Z" fill="currentColor"/></svg>
+                  <svg class="x-topbar-user-icon" width="16" height="16" viewBox="0 0 17 17" aria-hidden="true"><image href="/merchant-dashboard/assets/icons/flowbite_user-solid.svg" x="0" y="0" width="17" height="17"></image></svg>
                 </span>
               </button>
             </div>
@@ -664,7 +664,9 @@
               <h3>Kategori dan menu</h3>
               <p>Kelola kategori dan pilih kategori untuk melihat menunya.</p>
             </div>
-            <button type="button" class="x-menu-more-btn" id="btn-bm-menu-add-category" aria-label="Tambah kategori" title="Tambah kategori">+</button>
+            <button type="button" class="x-menu-more-btn" id="btn-bm-menu-add-category" aria-label="Tambah kategori" title="Tambah kategori">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
           </div>
 
           <div class="x-menu-category-actions">
@@ -692,16 +694,39 @@
               <h3 id="bm-menu-category-detail-title">Kategori</h3>
               <p id="bm-menu-category-detail-subtitle">Daftar menu dalam kategori.</p>
             </div>
-            <button type="button" class="x-menu-more-btn" id="btn-bm-menu-category-add" aria-label="Tambah menu" title="Tambah menu">+</button>
+            <button type="button" class="x-menu-more-btn" id="btn-bm-menu-category-add" aria-label="Tambah menu" title="Tambah menu">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
           </div>
 
           <div class="x-menu-detail-tools">
             <input type="search" id="bm-menu-search" class="x-input" placeholder="Cari menu..." aria-label="Cari menu">
-            <select id="bm-menu-filter-status" class="x-input" aria-label="Filter ketersediaan">
-              <option value="all">Semua</option>
-              <option value="available">Tersedia</option>
-              <option value="unavailable">Tidak tersedia</option>
-            </select>
+            <div class="x-occ-dropdown x-menu-filter-dropdown" id="bm-menu-filter-dropdown">
+              <button type="button" class="x-occ-dropdown-trigger" id="btn-bm-menu-filter-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Filter status ketersediaan menu">
+                <span id="bm-menu-filter-current-label">Semua status</span>
+                <svg class="x-occ-chevron-icon" aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div class="x-occ-dropdown-menu" id="bm-menu-filter-menu" role="listbox" aria-label="Pilihan status ketersediaan">
+                <button type="button" class="x-occ-dropdown-item active" role="option" data-value="all" aria-selected="true">
+                  <span>Semua status</span>
+                  <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button type="button" class="x-occ-dropdown-item" role="option" data-value="available" aria-selected="false">
+                  <span>Tersedia</span>
+                  <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+                <button type="button" class="x-occ-dropdown-item" role="option" data-value="unavailable" aria-selected="false">
+                  <span>Tidak tersedia</span>
+                  <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                </button>
+              </div>
+              <!-- Native select preserved for JS state, accessibility and backward/test compatibility -->
+              <select id="bm-menu-filter-status" class="x-input" aria-label="Filter ketersediaan" style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden;">
+                <option value="all" selected>Semua</option>
+                <option value="available">Tersedia</option>
+                <option value="unavailable">Tidak tersedia</option>
+              </select>
+            </div>
           </div>
 
           <div class="x-menu-detail-summary">
@@ -1224,11 +1249,12 @@
   <div id="modal-branch-category-edit" class="x-modal-backdrop" style="display:none; z-index: 1100;">
     <div class="x-modal-card" style="max-width: 480px; width: 100%;">
       <div class="x-modal-header">
-        <h3 id="branch-category-modal-title">Ubah Kategori Cabang</h3>
+        <h3 id="branch-category-modal-title">Ubah Kategori</h3>
         <button type="button" class="x-modal-close" onclick="closeBranchCategoryEditModal()">✕</button>
       </div>
       <form id="form-branch-category-edit" class="x-form">
         <input type="hidden" id="bce-cat-id" value="">
+        <input type="hidden" id="bce-is-active" value="1">
 
         <div class="x-form-group">
           <label for="bce-name">Nama Kategori</label>
@@ -1246,6 +1272,18 @@
               <input type="file" id="bce-image-file" class="x-input" accept="image/png,image/jpeg,image/webp">
               <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">JPG, PNG, atau WEBP. Maks 3MB. Tampil persegi (1:1) di Home.</small>
             </div>
+          </div>
+        </div>
+
+        <div class="x-category-modal-status-section" id="bce-status-section">
+          <label class="x-category-modal-status-label">Status Kategori</label>
+          <div class="x-category-modal-status-actions">
+            <button type="button" id="bce-btn-activate" class="x-btn-status-toggle x-btn-status-active">
+              Aktif
+            </button>
+            <button type="button" id="bce-btn-deactivate" class="x-btn-status-toggle x-btn-status-inactive">
+              Nonaktif
+            </button>
           </div>
         </div>
 
@@ -1678,7 +1716,7 @@
   <script src="/assets/js/core/fulfillment-environments.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/branch-catalog-ui.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/context.js?v=1.0.0"></script>
-  <script src="/merchant-app/assets/js/menu.js?v=1.0.2"></script>
+  <script src="/merchant-app/assets/js/menu.js?v=1.0.3"></script>
   <script src="/merchant-app/assets/js/hari-ini.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/jam-operasional.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>

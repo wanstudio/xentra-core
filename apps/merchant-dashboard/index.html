@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.1.7">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.2.4">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -2080,13 +2080,38 @@
         </div>
 
         <!-- Finance Sub-navigation Tabs -->
-        <div class="x-subnav-tabs" id="finance-subnav-tabs">
-          <button type="button" class="x-subnav-tab active" data-subtab="overview" onclick="navigateTo('finance/overview')">Overview</button>
-          <button type="button" class="x-subnav-tab" data-subtab="transactions" onclick="navigateTo('finance/transactions')">Transactions</button>
-          <button type="button" class="x-subnav-tab" data-subtab="payouts" onclick="navigateTo('finance/payouts')">Payouts</button>
-          <button type="button" class="x-subnav-tab" data-subtab="reconciliation" onclick="navigateTo('finance/reconciliation')">Reconciliation</button>
-          <button type="button" class="x-subnav-tab" data-subtab="payment-methods" onclick="navigateTo('finance/payment-methods')">Payment Methods</button>
+        <!-- Bagian keuangan dipilih lewat dropdown inline, mengikuti pemilih periode di
+             Beranda: ikon + label + chevron, dengan menu berisi pilihan bertanda centang.
+             Kelasnya sama dengan pemilih periode supaya tampilannya identik. -->
+        <div class="x-occ-dropdown" id="finance-section-dropdown">
+          <button type="button" class="x-occ-dropdown-trigger" id="btn-finance-section-trigger" aria-haspopup="listbox" aria-expanded="false" aria-label="Pilih bagian keuangan" onclick="toggleFinanceDropdown()">
+            <span id="finance-section-label">Overview</span>
+            <svg class="x-occ-chevron-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div class="x-occ-dropdown-menu" id="finance-section-menu" role="listbox" aria-label="Pilihan bagian keuangan">
+          <button type="button" class="x-occ-dropdown-item active" role="option" data-value="overview" aria-selected="true" onclick="pickFinanceSection(this)">
+            <span>Overview</span>
+            <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </button>
+          <button type="button" class="x-occ-dropdown-item" role="option" data-value="transactions" aria-selected="false" onclick="pickFinanceSection(this)">
+            <span>Transactions</span>
+            <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </button>
+          <button type="button" class="x-occ-dropdown-item" role="option" data-value="payouts" aria-selected="false" onclick="pickFinanceSection(this)">
+            <span>Payouts</span>
+            <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </button>
+          <button type="button" class="x-occ-dropdown-item" role="option" data-value="reconciliation" aria-selected="false" onclick="pickFinanceSection(this)">
+            <span>Reconciliation</span>
+            <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </button>
+          <button type="button" class="x-occ-dropdown-item" role="option" data-value="payment-methods" aria-selected="false" onclick="pickFinanceSection(this)">
+            <span>Payment Methods</span>
+            <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </button>
+          </div>
         </div>
+
 
         <!-- 1. Finance: Overview Subtab -->
         <div id="finance-view-overview" class="x-finance-subview">
@@ -2144,18 +2169,77 @@
             <div class="x-card-header" style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color);flex-wrap:wrap;gap:12px;">
               <h3 style="font-size:15px;font-weight:700;margin:0;">Riwayat Transaksi Keuangan (Order Payments)</h3>
               <div style="display:flex;gap:10px;align-items:center;">
-                <select id="fin-filter-method" class="x-input" style="font-size:12px;padding:6px 12px;" onchange="loadFinanceTransactions()">
-                  <option value="">Semua Metode</option>
-                  <option value="cash">Tunai (Cash)</option>
-                  <option value="midtrans">Midtrans</option>
-                </select>
-                <select id="fin-filter-status" class="x-input" style="font-size:12px;padding:6px 12px;" onchange="loadFinanceTransactions()">
-                  <option value="">Semua Status</option>
-                  <option value="settlement">Settlement (Lunas)</option>
-                  <option value="pending">Pending</option>
-                  <option value="reconciliation_pending">Reconciliation Pending</option>
-                  <option value="cancel">Batal / Expired</option>
-                </select>
+                  <div class="x-occ-dropdown" id="fin-filter-method-dropdown">
+                    <button type="button" class="x-occ-dropdown-trigger" id="btn-fin-filter-method" aria-haspopup="listbox" aria-expanded="false" aria-label="Semua Metode" onclick="toggleFinanceFilter('method')">
+                      <span id="fin-filter-method-label">Semua Metode</span>
+                      <svg class="x-occ-chevron-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div class="x-occ-dropdown-menu" role="listbox" aria-label="Semua Metode">
+                      <button type="button" class="x-occ-dropdown-item active" role="option" data-value="" aria-selected="true" onclick="pickFinanceFilter('method', this)">
+                        <span>Semua Metode</span>
+                        <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button type="button" class="x-occ-dropdown-item" role="option" data-value="cash" aria-selected="false" onclick="pickFinanceFilter('method', this)">
+                        <span>Tunai (Cash)</span>
+                        <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button type="button" class="x-occ-dropdown-item" role="option" data-value="midtrans" aria-selected="false" onclick="pickFinanceFilter('method', this)">
+                        <span>Midtrans</span>
+                        <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button type="button" class="x-occ-dropdown-item" role="option" data-value="doku" aria-selected="false" onclick="pickFinanceFilter('method', this)">
+                        <span>DOKU</span>
+                        <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                    </div>
+                    <!-- Select asli disembunyikan: dipakai logika filter dan pengujian -->
+                    <div style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden;">
+                      <select id="fin-filter-method" aria-label="Semua Metode">
+                    <option value="" selected>Semua Metode</option>
+                    <option value="cash">Tunai (Cash)</option>
+                    <option value="midtrans">Midtrans</option>
+                    <option value="doku">DOKU</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="x-occ-dropdown" id="fin-filter-status-dropdown">
+                    <button type="button" class="x-occ-dropdown-trigger" id="btn-fin-filter-status" aria-haspopup="listbox" aria-expanded="false" aria-label="Semua Status" onclick="toggleFinanceFilter('status')">
+                      <span id="fin-filter-status-label">Semua Status</span>
+                      <svg class="x-occ-chevron-icon" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div class="x-occ-dropdown-menu" role="listbox" aria-label="Semua Status">
+                      <button type="button" class="x-occ-dropdown-item active" role="option" data-value="" aria-selected="true" onclick="pickFinanceFilter('status', this)">
+                        <span>Semua Status</span>
+                        <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button type="button" class="x-occ-dropdown-item" role="option" data-value="settlement" aria-selected="false" onclick="pickFinanceFilter('status', this)">
+                        <span>Settlement (Lunas)</span>
+                        <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button type="button" class="x-occ-dropdown-item" role="option" data-value="pending" aria-selected="false" onclick="pickFinanceFilter('status', this)">
+                        <span>Pending</span>
+                        <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button type="button" class="x-occ-dropdown-item" role="option" data-value="reconciliation_pending" aria-selected="false" onclick="pickFinanceFilter('status', this)">
+                        <span>Reconciliation Pending</span>
+                        <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                      <button type="button" class="x-occ-dropdown-item" role="option" data-value="cancel" aria-selected="false" onclick="pickFinanceFilter('status', this)">
+                        <span>Batal / Expired</span>
+                        <svg class="x-occ-check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      </button>
+                    </div>
+                    <!-- Select asli disembunyikan: dipakai logika filter dan pengujian -->
+                    <div style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;overflow:hidden;">
+                      <select id="fin-filter-status" aria-label="Semua Status">
+                    <option value="" selected>Semua Status</option>
+                    <option value="settlement">Settlement (Lunas)</option>
+                    <option value="pending">Pending</option>
+                    <option value="reconciliation_pending">Reconciliation Pending</option>
+                    <option value="cancel">Batal / Expired</option>
+                      </select>
+                    </div>
+                  </div>
               </div>
             </div>
             <div class="x-card-body" style="padding:0;">
@@ -3708,11 +3792,12 @@
   <div id="modal-branch-category-edit" class="x-modal-backdrop" style="display:none; z-index: 1100;">
     <div class="x-modal-card" style="max-width: 480px; width: 100%;">
       <div class="x-modal-header">
-        <h3 id="branch-category-modal-title">Ubah Kategori Cabang</h3>
+        <h3 id="branch-category-modal-title">Ubah Kategori</h3>
         <button type="button" class="x-modal-close" onclick="closeBranchCategoryEditModal()">✕</button>
       </div>
       <form id="form-branch-category-edit" class="x-form">
         <input type="hidden" id="bce-cat-id" value="">
+        <input type="hidden" id="bce-is-active" value="1">
 
         <div class="x-form-group">
           <label for="bce-name">Nama Kategori</label>
@@ -3730,6 +3815,18 @@
               <input type="file" id="bce-image-file" class="x-input" accept="image/png,image/jpeg,image/webp">
               <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">JPG, PNG, atau WEBP. Maks 3MB. Tampil persegi (1:1) di Home.</small>
             </div>
+          </div>
+        </div>
+
+        <div class="x-category-modal-status-section" id="bce-status-section">
+          <label class="x-category-modal-status-label">Status Kategori</label>
+          <div class="x-category-modal-status-actions">
+            <button type="button" id="bce-btn-activate" class="x-btn-status-toggle x-btn-status-active">
+              Aktif
+            </button>
+            <button type="button" id="bce-btn-deactivate" class="x-btn-status-toggle x-btn-status-inactive">
+              Nonaktif
+            </button>
           </div>
         </div>
 

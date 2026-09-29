@@ -6566,6 +6566,97 @@
   var _activeFinanceSubtab = 'overview';
   var _activeMarketingSubtab = 'promotions';
 
+  // Bagian keuangan dipilih lewat dropdown inline, sama seperti pemilih periode di
+  // Beranda. Bukan <select> bawaan browser, supaya tampilannya sama di semua HP.
+  window.toggleFinanceDropdown = function () {
+    var d = $('finance-section-dropdown');
+    if (!d) return;
+    var open = d.classList.toggle('open');
+    var trigger = $('btn-finance-section-trigger');
+    if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+
+  window.pickFinanceSection = function (item) {
+    if (!item) return;
+    closeFinanceDropdown();
+    var value = item.dataset.value;
+    if (value) navigateTo('finance/' + value);
+  };
+
+  // Filter transaksi (Metode & Status) memakai dropdown yang sama dengan pemilih
+  // periode. Select aslinya tetap ada tapi disembunyikan, jadi logika filter tidak
+  // perlu diubah sama sekali.
+  var FIN_FILTERS = {
+    method: { select: 'fin-filter-method' },
+    status: { select: 'fin-filter-status' }
+  };
+
+  function syncFinanceFilter(kind) {
+    var cfg = FIN_FILTERS[kind];
+    if (!cfg) return;
+    var sel = $(cfg.select);
+    var dropdown = $('fin-filter-' + kind + '-dropdown');
+    if (!sel || !dropdown) return;
+    var label = $('fin-filter-' + kind + '-label');
+    dropdown.querySelectorAll('.x-occ-dropdown-item').forEach(function (item) {
+      var isCurrent = item.dataset.value === sel.value;
+      item.classList.toggle('active', isCurrent);
+      item.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
+      if (isCurrent && label) label.textContent = item.querySelector('span').textContent;
+    });
+  }
+
+  function syncFinanceFilters() {
+    syncFinanceFilter('method');
+    syncFinanceFilter('status');
+  }
+
+  function closeFinanceFilter(kind) {
+    var dropdown = $('fin-filter-' + kind + '-dropdown');
+    if (dropdown) dropdown.classList.remove('open');
+    var trigger = $('btn-fin-filter-' + kind);
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  }
+
+  window.toggleFinanceFilter = function (kind) {
+    var dropdown = $('fin-filter-' + kind + '-dropdown');
+    if (!dropdown) return;
+    var open = dropdown.classList.toggle('open');
+    var trigger = $('btn-fin-filter-' + kind);
+    if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+  };
+
+  window.pickFinanceFilter = function (kind, item) {
+    if (!item) return;
+    closeFinanceFilter(kind);
+    var cfg = FIN_FILTERS[kind];
+    var sel = cfg && $(cfg.select);
+    if (!sel) return;
+    sel.value = item.dataset.value;
+    syncFinanceFilter(kind);
+    loadFinanceTransactions();
+  };
+
+  document.addEventListener('click', function (e) {
+    Object.keys(FIN_FILTERS).forEach(function (kind) {
+      var dropdown = $('fin-filter-' + kind + '-dropdown');
+      if (dropdown && !dropdown.contains(e.target)) closeFinanceFilter(kind);
+    });
+  });
+
+  function closeFinanceDropdown() {
+    var d = $('finance-section-dropdown');
+    if (d) d.classList.remove('open');
+    var trigger = $('btn-finance-section-trigger');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  }
+
+  // Menutup saat menyentuh di luar dropdown, seperti pemilih periode.
+  document.addEventListener('click', function (e) {
+    var d = $('finance-section-dropdown');
+    if (d && !d.contains(e.target)) closeFinanceDropdown();
+  });
+
   function switchFinanceSection(subtab, updateHash) {
     if (!subtab) subtab = 'overview';
     _activeFinanceSubtab = subtab;
@@ -6576,8 +6667,17 @@
     }
 
     // Toggle subnav tabs active class
-    document.querySelectorAll('#finance-subnav-tabs .x-subnav-tab').forEach(function (tab) {
-      tab.classList.toggle('active', tab.dataset.subtab === subtab);
+    // Label dan tanda centang dropdown dijaga tetap sinkron, supaya membuka
+    // /dashboard/finance/payouts langsung pun menampilkan pilihan yang benar.
+    var menu = document.querySelectorAll('#finance-section-menu .x-occ-dropdown-item');
+    menu.forEach(function (item) {
+      var isCurrent = item.dataset.value === subtab;
+      item.classList.toggle('active', isCurrent);
+      item.setAttribute('aria-selected', isCurrent ? 'true' : 'false');
+      if (isCurrent) {
+        var label = $('finance-section-label');
+        if (label) label.textContent = item.querySelector('span').textContent;
+      }
     });
 
     // Toggle subviews
@@ -6662,6 +6762,9 @@
 
   async function loadFinanceTransactions() {
     try {
+      // Label dropdown diturunkan dari select aslinya, jadi membuka tab ini selalu
+      // menampilkan pilihan yang benar walau filternya diubah dari tempat lain.
+      if (typeof syncFinanceFilters === 'function') syncFinanceFilters();
       var tbody = $('tbody-fin-transactions');
       if (!tbody) return;
 
@@ -6695,17 +6798,19 @@
               ? '<span class="x-badge" style="background:#eff6ff;color:#1d4ed8;font-weight:600;">Pending</span>'
               : '<span class="x-badge" style="background:#fee2e2;color:#991b1b;font-weight:600;">' + esc(t.payment_status) + '</span>'));
 
-        var methodLabel = t.payment_method === 'cash' ? 'Tunai (Cash)' : 'Midtrans';
+        // DOKU dulu ikut tertulis "Midtrans" karena hanya ada dua cabang.
+        var methodLabel = t.payment_method === 'cash' ? 'Tunai (Cash)'
+          : (t.payment_method === 'doku' ? 'DOKU' : 'Midtrans');
         var timeText = t.created_at ? esc(t.created_at.substring(0, 19).replace('T', ' ')) : '—';
 
         return '<tr>' +
-          '<td><code style="font-size:12px;background:#f8fafc;padding:2px 6px;border-radius:4px;">' + esc(t.id || '—') + '</code></td>' +
-          '<td style="font-size:12px;color:#64748b;">' + timeText + '</td>' +
-          '<td><a href="#orders/' + encodeURIComponent(t.order_id) + '" style="font-weight:600;color:var(--primary);text-decoration:none;">#' + esc(t.order_number || t.order_id) + '</a></td>' +
-          '<td>' + esc(t.branch_name || 'Cabang Utama') + '</td>' +
-          '<td><strong>' + esc(methodLabel) + '</strong></td>' +
-          '<td><strong>' + formatMoney(t.amount || 0) + '</strong></td>' +
-          '<td>' + statusBadge + '</td>' +
+          '<td data-label="ID Transaksi"><code style="font-size:12px;background:#f8fafc;padding:2px 6px;border-radius:4px;">' + esc(t.id || '—') + '</code></td>' +
+          '<td data-label="Waktu" style="font-size:12px;color:#64748b;">' + timeText + '</td>' +
+          '<td data-label="Pesanan"><a href="#orders/' + encodeURIComponent(t.order_id) + '" style="font-weight:600;color:var(--primary);text-decoration:none;">#' + esc(t.order_number || t.order_id) + '</a></td>' +
+          '<td data-label="Cabang">' + esc(t.branch_name || 'Cabang Utama') + '</td>' +
+          '<td data-label="Metode"><strong>' + esc(methodLabel) + '</strong></td>' +
+          '<td data-label="Nominal"><strong>' + formatMoney(t.amount || 0) + '</strong></td>' +
+          '<td data-label="Status">' + statusBadge + '</td>' +
         '</tr>';
       });
 
