@@ -28,6 +28,15 @@ Resolved Customer Menu View
 Immutable Order Menu Snapshot
 ```
 
+## 🔒 Progressive Disclosure — Owner Assembly UX
+**29 September 2026**
+
+The Owner UI intentionally keeps Category and Flavor creation inside the **Master Product assembly workspace**. There is no separate Category/Flavor navigation screen in the forward Owner Catalog UI.
+
+`+` beside a selector opens a contextual quick-add modal, persists against the same Core master authority, refreshes the selector, and keeps the user in the current Product workflow.
+
+This presentation decision does not change the ownership or persistence model below.
+
 ## 2. Ownership boundary
 
 ### Owner / Brand
