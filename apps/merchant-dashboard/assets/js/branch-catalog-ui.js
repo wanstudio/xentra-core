@@ -121,7 +121,7 @@
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
                 '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang ' + esc(p.name) + '" onclick="XentraActionMenu.open(this, [' +
-                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'\' + esc(p.name) + '\'); } }' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\'); } }' +
                 '])">',
                 '</button>',
               '</div>',
