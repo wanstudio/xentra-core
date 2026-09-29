@@ -7508,6 +7508,16 @@ input[type="file"].x-input,
     margin-bottom: 14px !important;
   }
 
+  /* Jarak sebelum CTA. Di layar sempit judul+deskripsi dan CTA-nya berbaris terpisah
+     (header-nya flex-wrap), jadi jaraknya ditentukan row-gap — dan itu terlalu rapat.
+     Ditambah di sini supaya CTA tidak menempel ke deskripsi. */
+  #product-list-view .x-master-products-head .x-panel-header-flex {
+    row-gap: 18px !important;
+  }
+  #product-list-view .x-master-products-head .x-header-buttons {
+    margin-top: 4px !important;
+  }
+
   /* Keterangan di bawah judul: kecil, rata kiri, dan sejajar dengan TEKS judulnya —
      chevron 30px + jarak 8px = 38px, jadi tidak menggantung di bawah chevron. */
   #product-list-view .x-master-products-sub {
