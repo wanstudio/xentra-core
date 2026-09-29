@@ -7370,20 +7370,26 @@ input[type="file"].x-input,
   #table-fin-transactions td[data-label="ID Transaksi"] { display: none !important; }
 
   /* ── Produk Master (Owner) — mobile ───────────────────────────────────────
-     Tabel tujuh kolom (foto, nama, kategori, harga, mode harga, status, aksi) tidak
-     terbaca di HP walau bisa digeser ke samping. Tiap baris jadi satu kartu ringkas:
-     label kolom di kiri, nilainya di kanan. */
+     Tabel tujuh kolom tidak terbaca di HP. Di layar kecil tiap baris jadi kartu
+     seperti daftar menu di PWA customer: foto di kiri, teks di kanannya, dan aksi
+     di kanan. Label kolom tidak ditulis — susunannya sudah menjelaskan dirinya. */
   #master-products-table thead { display: none !important; }
 
   #master-products-table,
-  #master-products-table tbody,
-  #master-products-table tr,
-  #master-products-table td {
-    display: block !important;
-    width: 100% !important;
-  }
+  #master-products-table tbody { display: block !important; width: 100% !important; }
 
   #master-products-table tr {
+    display: grid !important;
+    width: 100% !important;
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "foto nama   nama"
+      "foto kat    mode"
+      "foto harga  status"
+      "foto aksi   aksi";
+    column-gap: 10px;
+    row-gap: 2px;
+    align-items: center;
     border: 1px solid #e2e8f0 !important;
     border-radius: 12px !important;
     background: #ffffff !important;
@@ -7392,58 +7398,46 @@ input[type="file"].x-input,
   }
 
   #master-products-table td {
+    display: block !important;
     border: 0 !important;
-    padding: 4px 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 12px !important;
-    text-align: right !important;
+    padding: 0 !important;
+    text-align: left !important;
+    min-width: 0 !important;
+    font-size: 13px;
+    color: #475569;
   }
 
-  #master-products-table td::before {
-    content: attr(data-label);
-    flex: 0 0 auto;
-    font-size: 12px;
-    font-weight: 600;
-    color: #64748b;
-    text-align: left;
+  /* Label kolom tidak dipakai lagi. */
+  #master-products-table td::before { content: none !important; }
+
+  #master-products-table td:nth-child(1) { grid-area: foto; }
+  #master-products-table td:nth-child(2) { grid-area: nama; }
+  #master-products-table td:nth-child(3) { grid-area: kat; }
+  #master-products-table td:nth-child(4) { grid-area: harga; }
+  #master-products-table td:nth-child(5) { grid-area: mode; }
+  #master-products-table td:nth-child(6) { grid-area: status; justify-self: end; }
+  #master-products-table td:nth-child(7) { grid-area: aksi; justify-self: end; text-align: right !important; }
+
+  /* Foto: kotak membulat seperti kartu menu di PWA customer. */
+  #master-products-table td:nth-child(1) img,
+  #master-products-table td:nth-child(1) > * {
+    width: 64px !important;
+    height: 64px !important;
+    border-radius: 12px !important;
+    object-fit: cover !important;
+    display: block !important;
+    background: #f1f5f9;
   }
 
-  #master-products-table td:nth-child(1)::before { content: "Foto"; }
-  #master-products-table td:nth-child(2)::before { content: "Nama"; }
-  #master-products-table td:nth-child(3)::before { content: "Kategori"; }
-  #master-products-table td:nth-child(4)::before { content: "Harga dasar"; }
-  #master-products-table td:nth-child(5)::before { content: "Mode harga"; }
-  #master-products-table td:nth-child(6)::before { content: "Status"; }
-  #master-products-table td:nth-child(7)::before { content: ""; }
-
-  /* Nama produk jadi judul kartunya; tombol aksi tidak lagi mepet kanan. */
+  /* Nama produk jadi judul kartunya. */
   #master-products-table td:nth-child(2) {
     font-size: 15px !important;
     font-weight: 700 !important;
-    padding-bottom: 6px !important;
-  }
-  #master-products-table td:nth-child(7) {
-    justify-content: flex-end !important;
-    padding-top: 8px !important;
+    color: #15191c !important;
   }
 
-  /* Tombol panel ditumpuk penuh lebar, bukan berdempetan di kanan. */
-  #panel-owner-catalog .x-panel-header-flex {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 12px !important;
-  }
-  #panel-owner-catalog .x-header-buttons {
-    display: grid !important;
-    grid-template-columns: 1fr !important;
-    gap: 8px !important;
-    width: 100% !important;
-  }
-  #panel-owner-catalog .x-header-buttons button {
-    width: 100% !important;
-  }
+  /* Harga dan status sedikit lebih menonjol daripada keterangan lain. */
+  #master-products-table td:nth-child(4) { font-weight: 700 !important; color: #15191c !important; }
 
   /* Kartu statistik: dua kolom, bukan satu kartu per baris setinggi layar. */
   .x-finance-subview .x-stat-grid {
