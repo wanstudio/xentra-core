@@ -3,13 +3,13 @@
  * 
  * Strict architectural authority executed right when customer clicks "Pay / Konfirmasi Pesanan".
  * Performs atomic verification:
- * 1. Final Price Verification: Checks if prices changed since cart was added.
+ * 1. Final Price Verification: Checks the Owner Master price against the cart expectation.
  * 2. Final Stock Verification: Ensures requested quantity is still in stock.
  * 3. Final Availability: Strictly enforces branch product assignment & active status (No 999 fake fallback).
- * 4. Branch Low-Stock Threshold: Captures branch manager configured threshold.
+ * 4. Branch Low-Stock Threshold: Captures the Branch-configured threshold.
+ * 5. Master Menu Composition: Resolves structured Owner composition for Checkout and order snapshots.
  */
 const CatalogRepository = require('../../../core/data/repositories/CatalogRepository');
-const PricingPolicyModel = require('../../catalog/models/PricingPolicyModel');
 const ProductOptionsModel = require('../../catalog/models/ProductOptionsModel');
 const MasterMenuResolver = require('../../catalog/services/MasterMenuResolver');
 
