@@ -157,10 +157,10 @@
   var CLIENT_ROUTE_META = {
     'overview':           { title: 'Overview',    sub: 'Ringkasan bisnis dan aktivitas terkini', tab: 'overview' },
     'orders':             { title: 'Orders',       sub: 'Antrean pesanan realtime dan status dapur', tab: 'orders' },
-    'catalog':            { title: 'Catalog',      sub: 'Kelola produk, kategori, dan menu per cabang', tab: 'catalog-products' },
+    'catalog':            { title: 'Catalog',      sub: 'Kelola produk master, kategori, dan menu cabang', tab: 'catalog-products' },
     'catalog/products':   { title: 'Products',     sub: 'Kelola daftar produk master brand', tab: 'catalog-products' },
     'catalog/categories': { title: 'Categories',   sub: 'Atur kategori produk master', tab: 'catalog-categories' },
-    'catalog/menus':      { title: 'Menus',        sub: 'Atur menu jual per cabang', tab: 'catalog-menus' },
+    'catalog/menus':      { title: 'Menu Cabang',  sub: 'Atur assortment dan kategori jual per cabang', tab: 'catalog-menus' },
     'branches':           { title: 'Branches',     sub: 'Atur lokasi cabang, radius, dan formula ongkir', tab: 'branches' },
     'customers':          { title: 'Customers',    sub: 'Data pelanggan dan riwayat pembelian', tab: 'customers' },
     'customers/:id':      { title: 'Customer Detail', sub: 'Profil pelanggan, riwayat pesanan, dan loyalitas', tab: 'customers' },
