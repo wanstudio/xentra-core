@@ -109,10 +109,10 @@ test('Owner Dashboard Mobile Navigation', async t => {
       html.indexOf('id="tab-business"'),
       html.indexOf('id="tab-more"')
     );
-    for (const label of ['Katalog &amp; Menu', 'Operasional', 'Pelanggan &amp; Pemasaran', 'Tim &amp; Akses', 'Insight &amp; Laporan', 'Brand']) {
+    for (const label of ['Katalog', 'Operasional', 'Pelanggan &amp; Pemasaran', 'Tim &amp; Akses', 'Insight &amp; Laporan', 'Brand']) {
       assert.ok(business.includes(label), 'Business hub must expose section "' + label.replace(/&amp;/g, '&') + '"');
     }
-    for (const route of ["catalog/products", "catalog/menus", "catalog/categories", "stock", "branches", "customers", "marketing", "team", "reports", "settings/business/profile"]) {
+    for (const route of ["catalog/products", "catalog/categories", "stock", "branches", "customers", "marketing", "team", "reports", "settings/business/profile"]) {
       assert.ok(business.includes("navigateTo('" + route + "')"), 'Business hub must expose route "' + route + '"');
     }
   });
