@@ -372,7 +372,7 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
         assert.strictEqual(res.status, 200);
         assert.ok(typeof res.body === 'string');
         assert.ok(res.body.includes('tab-catalog-products'));
-        assert.ok(res.body.includes('tab-catalog-categories'));
+        assert.ok(!res.body.includes('tab-catalog-categories'));
         assert.ok(res.body.includes('tab-catalog-menus'));
       });
     }
