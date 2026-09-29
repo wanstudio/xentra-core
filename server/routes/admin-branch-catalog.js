@@ -426,12 +426,34 @@ router.get('/admin/branches/:id/catalog', requireAuth(['owner', 'brand_manager',
     const masterParams = placeholders ? [req.brand_id, ...adoptedIds] : [req.brand_id];
     const availableMasterProducts = db.prepare(masterQuery).all(...masterParams);
 
+    // Forward Menu Composition read model. Legacy fields remain only for
+    // compatibility; new UI consumes menu_composition.
+    let compositionMap = new Map();
+    try {
+      const allProductIds = adoptedIds.concat(availableMasterProducts.map(p => p.id));
+      const resolved = MasterMenuResolver
+        ? MasterMenuResolver.resolveMasterProducts({ brandId: req.brand_id, productIds: allProductIds })
+        : [];
+      compositionMap = new Map(resolved.map(item => [String(item.product_id), item]));
+    } catch (compositionErr) {
+      console.warn('[Branch Catalog Composition] resolver warning:', compositionErr.message);
+    }
+
+    const adoptedWithComposition = enrichedAdopted.map(item => ({
+      ...item,
+      menu_composition: compositionMap.get(String(item.product_id)) || null
+    }));
+    const availableWithComposition = availableMasterProducts.map(item => ({
+      ...item,
+      menu_composition: compositionMap.get(String(item.id)) || null
+    }));
+
     res.json({
       success: true,
       branch,
       categories: branchCategories,
-      adopted_products: enrichedAdopted,
-      available_master_products: availableMasterProducts
+      adopted_products: adoptedWithComposition,
+      available_master_products: availableWithComposition
     });
   } catch (err) {
     console.error('[API Error GET /admin/branches/:id/catalog]:', err);
