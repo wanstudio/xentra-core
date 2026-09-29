@@ -153,6 +153,7 @@
           if ($("bm-stat-active-orders")) $("bm-stat-active-orders").textContent = activeList.length;
           if ($("bm-stat-ready-orders")) $("bm-stat-ready-orders").textContent = readyList.length;
           if ($("bm-stat-completed-orders")) $("bm-stat-completed-orders").textContent = completedToday.length;
+           if ($("bm-stat-completed-orders-snapshot")) $("bm-stat-completed-orders-snapshot").textContent = completedToday.length;
           if ($("bm-stat-net-sales-today")) $("bm-stat-net-sales-today").textContent = formatMoney(completedSales);
 
            var avgOrderEl = $("bm-stat-average-order");
