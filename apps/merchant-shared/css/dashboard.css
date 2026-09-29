@@ -7462,14 +7462,17 @@ input[type="file"].x-input,
   /* ── Produk Master (Owner): kartu hanya judul, sisanya langsung di panel ─────
      Panelnya bukan lagi kartu — kartunya hanya membungkus judul, deskripsi, dan CTA.
      Pencarian, pemilih kategori, dan daftar produk mengalir langsung di panel. */
-  /* Panel Produk Master: tampilan kartunya dilepas, tetapi padding-nya dipertahankan
-     sama seperti panel lain — itu yang membuat jarak dari bawah top bar ke isi sama
-     dengan halaman Bisnis. Sebelumnya padding disetel 0 sehingga isinya menempel. */
+  /* Panel Produk Master: tampilan kartunya dilepas.
+     Jarak kiri-kanan TIDAK diatur di sini — induknya (.x-tab-content) sudah memberi 12px.
+     Nilainya disamakan persis dengan Beranda (.x-owner-command-center: 4px 0 10px),
+     jadi kedua halaman punya lebar isi yang sama. Sebelumnya di sini ada 24px yang
+     ditambahkan di atas 12px milik induk, sehingga sisinya menjadi 36px dan terasa
+     terlalu lebar. */
   #product-list-view.x-card-panel {
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    padding: 24px !important;
+    padding: 4px 0 10px !important;
   }
   #product-list-view > .x-master-products-head {
     padding: 0 !important;
