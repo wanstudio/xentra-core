@@ -589,3 +589,9 @@ Produk Master
 
 **Kategori** is a management page for existing Master Categories. It is not a product assembly surface. **Produk Master** remains the single assembly workspace. The Product editor's `+` button remains a quick-add entry point to the same Category authority.
 
+
+
+## UX UPDATE — Category Management Tabs
+**29 September 2026**
+
+The Owner Kategori route is a management surface with exactly two tabs: Kategori and Rasa. Lists use compact card rows with overflow actions Edit / Hapus. This surface is separate from the Product assembly workspace but shares the same Core master authorities.
