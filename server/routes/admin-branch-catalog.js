@@ -3,6 +3,11 @@
  *
  * Branch product adoption, availability, pricing overrides and branch-category
  * assignment/reorder APIs. Master catalog CRUD remains in admin-catalog.js.
+ *
+ * LEGACY QUARANTINE (2026-09-29):
+ * The Branch Product Override endpoint below is compatibility-only.
+ * Do not add new Menu composition fields or business behavior to that path.
+ * Forward Menu architecture: Master Menu Composition + Branch Adoption.
  */
 module.exports = function registerAdminBranchCatalogRoutes(router, deps) {
   const {
