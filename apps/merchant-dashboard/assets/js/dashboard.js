@@ -2219,6 +2219,8 @@
   // ─────────────────────────────────────────────────────────────────────────
 
   var _masterReferenceTab = 'category';
+  // Prevent stale/overlapping catalog-reference requests from overwriting newer data.
+  var _masterReferenceLoadSeq = 0;
 
   function showMasterCategoriesPage() {
     var page = $('master-categories-page');
@@ -2256,31 +2258,54 @@
   async function loadMasterCategoriesPage() {
     var categoryList = $('master-categories-page-list');
     var flavorList = $('master-flavors-page-list');
+    var requestSeq = ++_masterReferenceLoadSeq;
+
     if (categoryList) categoryList.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Memuat kategori...</div>';
     if (flavorList) flavorList.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Memuat rasa...</div>';
 
-    try {
-      var headers = getAuthHeaders();
-      var responses = await Promise.all([
-        adminFetch(API_BASE + '/admin/categories', { headers: headers }),
-        adminFetch(API_BASE + '/admin/menu/components/flavor', { headers: headers })
-      ]);
-      var catData = await responses[0].json();
-      var flavorData = await responses[1].json();
+    // Category and flavor are independent resources. Do not let a slow/failed
+    // flavor request block the category tab (or vice versa).
+    var headers = getAuthHeaders();
 
-      if (!catData.success) throw new Error(catData.error || 'Gagal memuat kategori.');
-      if (!flavorData.success) throw new Error(flavorData.error || 'Gagal memuat rasa.');
+    var categoryPromise = adminFetch(API_BASE + '/admin/categories', { headers: headers })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (requestSeq !== _masterReferenceLoadSeq) return;
+        if (!data.success) throw new Error(data.error || 'Gagal memuat kategori.');
 
-      state.categories = catData.categories || [];
-      _masterMenuComponents.flavor = flavorData.components || [];
+        state.categories = data.categories || [];
+        renderMasterCategoriesPage();
+      })
+      .catch(function (err) {
+        if (requestSeq !== _masterReferenceLoadSeq) return;
+        console.error('[Master Category Load Error]:', err);
+        if (categoryList) {
+          categoryList.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Gagal memuat kategori. Coba lagi.</div>';
+        }
+      });
 
-      renderMasterCategoriesPage();
-      renderMasterFlavorsPage();
+    var flavorPromise = adminFetch(API_BASE + '/admin/menu/components/flavor', { headers: headers })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (requestSeq !== _masterReferenceLoadSeq) return;
+        if (!data.success) throw new Error(data.error || 'Gagal memuat rasa.');
+
+        _masterMenuComponents.flavor = data.components || [];
+        renderMasterFlavorsPage();
+      })
+      .catch(function (err) {
+        if (requestSeq !== _masterReferenceLoadSeq) return;
+        console.error('[Master Flavor Load Error]:', err);
+        if (flavorList) {
+          flavorList.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Gagal memuat rasa. Coba lagi.</div>';
+        }
+      });
+
+    await Promise.allSettled([categoryPromise, flavorPromise]);
+
+    // Only the latest request may update the active tab state.
+    if (requestSeq === _masterReferenceLoadSeq) {
       setMasterReferenceTab(_masterReferenceTab);
-    } catch (err) {
-      console.error('[Master Reference Page Load Error]:', err);
-      if (categoryList) categoryList.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Gagal memuat kategori.</div>';
-      if (flavorList) flavorList.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Gagal memuat rasa.</div>';
     }
   }
 
