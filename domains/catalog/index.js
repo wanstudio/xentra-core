@@ -8,6 +8,8 @@
 const { domain } = require('../../core');
 const CatalogService = require('./services/CatalogService');
 const PricingPolicyModel = require('./models/PricingPolicyModel');
+const MasterMenuResolver = require('./services/MasterMenuResolver');
+const MasterMenuCompositionService = require('./services/MasterMenuCompositionService');
 
 const CATALOG_IDENTITY = {
   name: 'catalog',
@@ -43,5 +45,7 @@ module.exports = {
   capabilities: CATALOG_CAPABILITIES,
   registration,
   CatalogService,
-  PricingPolicyModel
+  PricingPolicyModel,
+  MasterMenuResolver,
+  MasterMenuCompositionService
 };
