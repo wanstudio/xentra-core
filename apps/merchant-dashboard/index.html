@@ -7,7 +7,7 @@
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.3">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.4">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -3552,9 +3552,12 @@
           </div>
         </div>
 
-        <div class="x-form-group">
+        <!-- Disembunyikan, bukan dihapus. `required` sengaja dilepas: field required yang
+             display:none membuat browser menolak submit (not focusable). Isi nilainya
+             masih dipakai payload simpan (name: $('prod-name').value). -->
+        <div class="x-form-group" id="prod-name-group" hidden>
           <label for="prod-name">Nama Internal Master</label>
-          <input type="text" id="prod-name" class="x-input" placeholder="Contoh: Bebek Goreng Crispy" required>
+          <input type="text" id="prod-name" class="x-input" placeholder="Contoh: Bebek Goreng Crispy">
         </div>
         <div class="x-form-group">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
