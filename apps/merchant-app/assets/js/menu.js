@@ -779,6 +779,10 @@
 
     var targetCatSelect = $('bm-add-catalog-target-category');
     var targetCatId = targetCatSelect ? targetCatSelect.value : '';
+    if (!targetCatId) {
+      showToast('⚠️ Pilih Kategori Cabang terlebih dahulu.');
+      return;
+    }
 
     var btn = $('btn-bm-submit-adopt-catalog');
     if (btn) {
