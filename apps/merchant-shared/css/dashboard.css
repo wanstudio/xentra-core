@@ -8168,21 +8168,27 @@ input[type="file"].x-input,
 /* ==========================================================================
    OWNER MASTER REFERENCE — TAB + MOBILE CARD LIST
    ========================================================================== */
-/* Tab Kategori/Rasa dan isinya satu kesatuan, jadi keduanya dibungkus SATU kartu
-   sungguhan (lihat .x-master-reference-card di markup). Trik sebelumnya — tiap bagian
-   memakai separuh kartu — tidak menyatu dan terlihat terpisah. */
-.x-master-reference-card {
+/* Tab Kategori/Rasa dan isinya adalah satu kesatuan, jadi keduanya dibingkai sebagai
+   SATU kartu: tab menjadi bagian atas (tanpa garis bawah, sudut atas membulat), panel
+   isinya menjadi bagian bawah (tanpa garis atas, sudut bawah membulat). Sambungannya
+   tidak terlihat karena kedua bagian memakai latar dan garis yang sama. */
+.x-master-reference-tabs{
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  padding: 12px;
+  border-bottom: 0;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  padding: 12px 12px 0;
   margin-top: 14px;
+  margin-bottom: 0;
 }
-.x-master-reference-tabs{
-  margin-bottom: 12px;
-}
-.x-master-reference-panel{
+#master-reference-category-panel,
+#master-reference-flavor-panel{
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 0 12px 12px;
   margin-top: 0;
 }
 .x-master-reference-toolbar{
