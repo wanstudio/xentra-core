@@ -7417,6 +7417,17 @@ input[type="file"].x-input,
   #master-products-table td:nth-child(3) { grid-area: kat; }
   #master-products-table td:nth-child(4) { grid-area: harga; }
   #master-products-table td:nth-child(5) { grid-area: mode; }
+  /* Toggle dan tombol aksi: terpusat di kolomnya masing-masing, bukan menempel kiri.
+     Sel-nya dibuat flex supaya isinya benar-benar di tengah, termasuk kalau isinya
+     beberapa elemen (mis. dua tombol). */
+  #master-products-table td:nth-child(6),
+  #master-products-table td:nth-child(7) {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    justify-self: center !important;
+    text-align: center !important;
+  }
   #master-products-table td:nth-child(6) { grid-area: toggle; align-self: center; }
   #master-products-table td:nth-child(7) { grid-area: aksi; align-self: center; }
 
