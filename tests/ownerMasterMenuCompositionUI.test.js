@@ -37,6 +37,11 @@ test('Owner Category page uses two master-reference tabs with card actions', () 
   assert.ok(HTML.includes('id="master-flavors-page-list"'));
   assert.ok(JS.includes('aria-label="Aksi kategori"'));
   assert.ok(JS.includes('aria-label="Aksi rasa"'));
+  assert.ok(JS.includes('data-master-reference-action="category"'));
+  assert.ok(JS.includes('data-master-reference-action="flavor"'));
+  assert.ok(JS.includes('masterReferenceActionHandler'));
+  assert.ok(JS.includes("openEditMasterReference(type, id)"));
+  assert.ok(JS.includes("deleteMasterReference(type, id)"));
   assert.ok((JS.match(/class="x-action-menu-trigger" aria-label="Aksi kategori"/g) || []).length >= 1);
   assert.ok((JS.match(/class="x-action-menu-trigger" aria-label="Aksi rasa"/g) || []).length >= 1);
   assert.ok(JS.includes('<circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle>'));
