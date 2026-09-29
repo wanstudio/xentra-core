@@ -17,13 +17,11 @@
   <meta name="apple-mobile-web-app-title" content="Merchant">
   <link rel="apple-touch-icon" href="/merchant-app/assets/icons/icon-192.png">
   <link rel="manifest" href="/merchant-app/manifest.json">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — tokens, toast, action-menu, crop editor, shell styles -->
+  <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.25">
-  <link rel="stylesheet" href="/merchant-app/assets/css/home.css?v=1.0.0">
+  <link rel="stylesheet" href="/merchant-app/assets/css/home.css?v=1.0.1">
 </head>
 <body class="x-merchant-app">
   <div class="x-dash-layout">
@@ -174,7 +172,7 @@
             <div class="x-home-card x-home-sales">
               <div class="x-home-sales-top">
                 <div>
-                  <p class="x-home-eyebrow" id="bm-home-sales-title">Penjualan Hari Ini</p>
+                  <p class="x-home-eyebrow" id="bm-home-sales-title"><svg class="x-home-section-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 7"></polyline><polyline points="15 7 21 7 21 13"></polyline></svg>Penjualan Hari Ini</p>
                   <strong class="x-home-sales-value" id="bm-stat-net-sales-today">Rp0</strong>
                 </div>
                 <span class="x-home-sales-compare is-neutral" id="bm-home-sales-compare">Hari ini</span>
@@ -197,8 +195,7 @@
             <div class="x-home-card x-home-attention">
               <div class="x-home-attention-head">
                 <div class="x-home-attention-title">
-                  <span class="x-home-attention-dot" aria-hidden="true"></span>
-                  <h2 class="x-home-section-title" id="bm-home-pending-title">Pesanan Baru</h2>
+                  <h2 class="x-home-section-title" id="bm-home-pending-title"><svg class="x-home-section-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>Pesanan Baru</h2>
                   <span class="x-home-attention-count" id="bm-badge-pending-count">0</span>
                 </div>
                 <p class="x-home-attention-sub">Perlu diterima atau ditolak sekarang.</p>
@@ -218,7 +215,7 @@
           <!-- Quick operational actions -->
           <section class="x-home-section" aria-labelledby="bm-home-quick-title">
             <div class="x-home-section-head">
-              <h2 class="x-home-section-title" id="bm-home-quick-title">Aksi Cepat</h2>
+              <h2 class="x-home-section-title" id="bm-home-quick-title"><svg class="x-home-section-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>Aksi Cepat</h2>
             </div>
             <div class="x-home-quick-grid">
               <button type="button" class="x-home-quick" onclick="navigateTo('meja')">
@@ -251,7 +248,7 @@
           <!-- Operational snapshot -->
           <section class="x-home-section" aria-labelledby="bm-home-snapshot-title">
             <div class="x-home-section-head">
-              <h2 class="x-home-section-title" id="bm-home-snapshot-title">Operasional Hari Ini</h2>
+              <h2 class="x-home-section-title" id="bm-home-snapshot-title"><svg class="x-home-section-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1.5-6h15L21 9"></path><path d="M4 9v11h16V9"></path><path d="M9 20v-6h6v6"></path></svg>Operasional Hari Ini</h2>
               <span class="x-home-eyebrow">Status pesanan</span>
             </div>
             <div class="x-home-card x-home-snapshot">
@@ -277,7 +274,7 @@
           <!-- Menu / Stock attention -->
           <section class="x-home-section" aria-labelledby="bm-home-attention-title">
             <div class="x-home-section-head">
-              <h2 class="x-home-section-title" id="bm-home-attention-title">Perlu Perhatian</h2>
+              <h2 class="x-home-section-title" id="bm-home-attention-title"><svg class="x-home-section-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>Perlu Perhatian</h2>
             </div>
             <div class="x-home-card x-home-list-card x-home-attention-grid">
               <button type="button" class="x-home-attention-row is-menu" onclick="navigateTo('menu')">
@@ -300,7 +297,7 @@
           <!-- Active promotions -->
           <section class="x-home-section" aria-labelledby="bm-home-promo-title">
             <div class="x-home-section-head">
-              <h2 class="x-home-section-title" id="bm-home-promo-title">Promo Aktif</h2>
+              <h2 class="x-home-section-title" id="bm-home-promo-title"><svg class="x-home-section-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4L13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2V3h10.4l7.2 7.2a2 2 0 0 1 0 2.8z"></path><circle cx="7.5" cy="7.5" r="1.2"></circle></svg>Promo Aktif</h2>
               <button type="button" class="x-home-section-action" onclick="navigateTo('promo')">Lihat semua →</button>
             </div>
             <div class="x-home-card x-home-list-card" id="bm-active-promos-container">
@@ -313,7 +310,7 @@
           <!-- Recent activity -->
           <section class="x-home-section" aria-labelledby="bm-home-activity-title">
             <div class="x-home-section-head">
-              <h2 class="x-home-section-title" id="bm-home-activity-title">Aktivitas Terakhir</h2>
+              <h2 class="x-home-section-title" id="bm-home-activity-title"><svg class="x-home-section-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 16 14"></polyline></svg>Aktivitas Terakhir</h2>
             </div>
             <div class="x-home-card x-home-list-card" id="bm-recent-activity-container">
               <div class="x-home-mini-list" id="bm-recent-activity-list">
