@@ -220,48 +220,69 @@ CREATE TABLE products (
 
 ### Branch Catalog (Branch-owned)
 
-> **ARCHITECTURE MIGRATION NOTICE (2026-09-29):** The current physical schema below still contains legacy Branch Product Override columns for runtime/data compatibility. Those columns are **quarantined** and are not the forward Menu composition model. See `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md` and `docs/decisions/xentra-menu-legacy-quarantine-v1.md`. Do not design new Menu features around the legacy override columns.
+> **ARCHITECTURE MIGRATION NOTICE — 2026-09-29:** The forward Menu model is
+> **Master Menu Composition + Branch Adoption**. See
+> `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`.
+> The physical columns marked LEGACY below remain only for compatibility during migration.
+> See `docs/decisions/xentra-menu-legacy-quarantine-v1.md`.
 
-The Branch Catalog is NOT a filtered view of the Master Catalog. It is a Branch-owned
-operational selling catalog.
+The Branch Catalog records which Master Products a Branch has adopted plus Branch-scoped
+classification and operational state.
 
-> [!IMPORTANT]
-> **Architecture change (2026-09-07):** The previous "Adoption = Save Point (snapshot)" model
-> has been **superseded** by **Master Product Default + Branch Optional Override**.
-> Snapshot columns (`product_name`, `product_description`, `product_image_url`) are retained
-> for backward compatibility but are no longer the resolution path in `CatalogService`.
+#### Forward ownership model
 
-#### Ownership model (current — override architecture)
+- `branch_products.product_id` → adopted Master Product.
+- `branch_product_categories` → canonical Branch Category membership (M:N).
+- `branch_products.is_available` → Branch availability.
+- physical stock remains owned by Inventory.
+- Master Menu composition is resolved from `products` + Master component relations.
+- Merchant does not create Branch copies of Master Menu composition.
 
-- **Master Category ≠ Branch Category**: A Branch may create its own categories, rename
-  them, and place adopted products into different categories than the Master.
-- **Adoption ≠ Snapshot**: Adopting a product registers the Branch's intent to sell it.
-  Override columns default to NULL; the Branch inherits live Master values until an explicit
-  override is set.
-- **Resolution rule**: `COALESCE(bp.name_override, p.name)` — NULL override = live Master
-  propagation; non-NULL = branch value wins.
+#### LEGACY compatibility columns
 
-#### Branch Catalog isolation guarantees
+The following remain in the physical schema temporarily:
 
-- **Master `is_active` ≠ Branch availability**: A Master Product with `is_active=0`
-  does NOT make adopted Branch Products unavailable. Branch Catalog reads use
-  `branch_products.is_available` as the sole availability authority.
-- **Master price ≠ Branch selling price**: Master Product `price` is NOT a live
-  fallback for adopted Branch Products. `branch_products.price` is established at
-  adoption/migration time and is the authoritative selling price. Master price
-  mutations do NOT silently mutate adopted Branch selling prices.
-- **Master Category ≠ Branch Category**: `branch_products.branch_category_id`
-  references a Branch-owned `branch_categories` row, NOT a Master `categories` row.
-  The migration resolves/creates Branch-owned categories for legacy data.
+- `product_name`
+- `product_description`
+- `product_image_url`
+- `name_override`
+- `description_override`
+- `image_override`
+- `price`
 
-#### Key invariants
+They are **not** the forward Menu source of truth and must not receive new Menu behavior.
+Migration may read them for reconciliation only.
 
-- A product may exist in Master Catalog without being adopted by any Branch.
-- A Branch may adopt only the Master Products it chooses.
-- Branch A and Branch B may sell different subsets of the same Master Catalog.
-- The same Master Product may be placed into different Branch Categories by different Branches.
-- Master Product mutations (rename, disable, etc.) do NOT silently mutate Branch Catalog.
-- Branch Context MUST read Branch Catalog. No Master Catalog fallback is allowed.
+#### Branch Product schema (current physical compatibility shape)
+
+```sql
+CREATE TABLE branch_products (
+    branch_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    branch_category_id TEXT,
+    -- LEGACY snapshot/override compatibility columns. Do not extend.
+    product_name TEXT,
+    product_description TEXT,
+    product_image_url TEXT,
+    name_override TEXT,
+    description_override TEXT,
+    image_override TEXT,
+    -- LEGACY Branch price compatibility. New Menu uses Owner-defined price/policy.
+    price REAL,
+    stock INTEGER DEFAULT NULL,
+    is_available INTEGER DEFAULT 1,
+    low_stock_threshold INTEGER DEFAULT 5,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (branch_id, product_id),
+    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (branch_category_id) REFERENCES branch_categories(id) ON DELETE SET NULL
+);
+```
+
+`branch_products.branch_category_id` remains in the physical schema for compatibility,
+but `branch_product_categories` is the canonical M:N membership authority for the forward model.
 
 ### `branch_categories` (Branch-owned Categories)
 ```sql
