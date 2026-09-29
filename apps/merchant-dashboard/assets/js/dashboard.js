@@ -2176,6 +2176,8 @@
       if (prodData.success) state.products = prodData.products || [];
 
       renderMasterCategoriesTable();
+      await loadMasterMenuComponents();
+      renderMasterFlavorsTable();
     } catch (err) {
       console.error('[Master Categories Load Error]:', err);
       showToast('❌ Gagal memuat daftar kategori.');
@@ -2263,6 +2265,40 @@
     } catch (err) {
       showToast('❌ Kesalahan jaringan.');
     }
+  };
+
+  function renderMasterFlavorsTable() {
+    var tbody = $('master-flavors-table-body');
+    if (!tbody) return;
+
+    var rows = (_masterMenuComponents.flavor || []);
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-muted">Belum ada Master Rasa. Klik "+ Tambah" untuk membuat.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(function (row) {
+      var active = row.is_active !== 0;
+      return [
+        '<tr>',
+          '<td><strong>' + esc(row.name) + '</strong></td>',
+          '<td><span class="x-badge ' + (active ? 'x-badge-success' : 'x-badge-muted') + '">' + (active ? 'Aktif' : 'Nonaktif') + '</span></td>',
+          '<td class="text-right" style="white-space:nowrap;">',
+            '<button type="button" class="x-action-menu-trigger" aria-label="Kelola rasa ' + esc(row.name) + '" onclick="openMasterFlavorManager(\'' + esc(row.id) + '\')">',
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
+            '</button>',
+          '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+  }
+
+  window.openMasterFlavorManager = function (id) {
+    _masterMenuComponentType = 'flavor';
+    var modal = $('modal-master-menu-components');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    renderMasterMenuComponentManager();
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -2896,7 +2932,8 @@
     });
   }
 
-  function openMasterMenuComponentManager() {
+  function openMasterMenuComponentManager(type) {
+    if (type) _masterMenuComponentType = type;
     var modal = $('modal-master-menu-components');
     if (!modal) return;
     modal.style.display = 'flex';
@@ -2934,6 +2971,7 @@
         _masterMenuSelected.complement_ids.push(String(data.component.id));
       }
       renderMasterMenuSelectors();
+      renderMasterFlavorsTable();
     } catch (err) {
       showToast('❌ ' + err.message);
     }
@@ -3189,6 +3227,16 @@
     var btnOptionsAddGroup = $('btn-prod-options-add-group');
     if (btnOptionsAddGroup) btnOptionsAddGroup.addEventListener('click', newProductOptionGroup);
 
+    var btnAddCategoryFromProduct = $('btn-add-master-category-from-product');
+    if (btnAddCategoryFromProduct) btnAddCategoryFromProduct.addEventListener('click', function () {
+      window.openAddMasterCategory();
+    });
+
+    var btnAddFlavorFromProduct = $('btn-add-master-flavor-from-product');
+    if (btnAddFlavorFromProduct) btnAddFlavorFromProduct.addEventListener('click', function () {
+      openMasterMenuComponentManager('flavor');
+    });
+
     var btnManageMasterMenu = $('btn-manage-menu-components');
     if (btnManageMasterMenu) btnManageMasterMenu.addEventListener('click', openMasterMenuComponentManager);
 
@@ -3276,6 +3324,13 @@
 
     // Master Categories buttons
     var btnAddMasterCat = $('btn-add-master-category');
+    if (btnAddMasterCat) btnAddMasterCat.addEventListener('click', window.openAddMasterCategory);
+
+    var btnAddMasterFlavor = $('btn-add-master-flavor');
+    if (btnAddMasterFlavor) btnAddMasterFlavor.addEventListener('click', function () {
+      openMasterMenuComponentManager('flavor');
+    });
+
     if (btnAddMasterCat) btnAddMasterCat.addEventListener('click', window.openAddMasterCategory);
 
     var formMasterCat = $('form-master-category');
