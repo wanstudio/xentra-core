@@ -103,8 +103,7 @@
         : '<div style="font-size:11px;color:#b45309;margin:5px 0 7px;">Komposisi Master belum tersedia.</div>';
 
       var price = comp.price != null ? Number(comp.price) : Number(p.master_price || p.price || 0);
-      var productLabel = esc(p.name || comp.title || 'Menu');
-      var availabilityToggle = '' +
+            var availabilityToggle = '' +
         '<label class="x-toggle' + (isAvailable ? ' x-toggle-on' : '') + '" title="' + (isAvailable ? 'Menu tersedia' : 'Menu habis') + '">' +
           '<input type="checkbox" ' + (isAvailable ? 'checked' : '') + ' onchange="toggleBranchProductAvailability(\'' + p.product_id + '\', this.checked ? 1 : 0)" aria-label="Ubah ketersediaan menu cabang">' +
           '<span class="x-toggle-slider"></span>' +
@@ -122,7 +121,7 @@
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
                 '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang" onclick="XentraActionMenu.open(this, [' +
-                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'\' + productLabel + '\'); } }' +
+                  '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\'); } }' +
                 '])">',
                 '</button>',
               '</div>',
@@ -182,6 +181,7 @@
   };
 
   window.removeBranchProduct = async function (productId, productName) {
+    productName = productName || 'menu ini';
     if (!currentManagingBranchId) return;
     if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.')) return;
 
