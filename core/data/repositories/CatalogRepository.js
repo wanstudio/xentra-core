@@ -3,6 +3,10 @@
 /**
  * Catalog persistence adapter.
  *
+ * LEGACY QUARANTINE NOTE (2026-09-29):
+ * Branch override columns may still be read for compatibility with existing data.
+ * Do not extend them for new Menu Composition behavior.
+ *
  * This is the domain-oriented repository for catalog reads. SQL remains an
  * infrastructure concern here; callers consume semantic catalog operations.
  */
