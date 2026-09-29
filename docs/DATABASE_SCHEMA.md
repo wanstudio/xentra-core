@@ -347,6 +347,68 @@ CREATE TABLE branch_products (
 
 ## 3. Order & Fulfillment Tables (Immutable Snapshots)
 
+### Master Menu Composition
+
+The forward Master Menu model is **Owner-owned structured composition**. These tables are
+Brand-scoped and are separate from POS `options_config`.
+
+#### `menu_flavors`
+```sql
+CREATE TABLE menu_flavors (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+);
+```
+
+#### `menu_complements`
+```sql
+CREATE TABLE menu_complements (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+);
+```
+
+#### `menu_levels`
+```sql
+CREATE TABLE menu_levels (
+    id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+);
+```
+
+#### Product composition relations
+
+```text
+products
+  ├── product_flavors      → menu_flavors   (0..1)
+  ├── product_complements  → menu_complements (0..N, ordered)
+  └── product_levels       → menu_levels    (0..1)
+```
+
+The same-Brand relationship is enforced at database level. Existing product
+`category_id` remains the Master Category relation.
+
 ### `orders`
 Master order record governed by state machine.
 ```sql
