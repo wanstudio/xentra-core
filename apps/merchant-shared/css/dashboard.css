@@ -7548,10 +7548,12 @@ input[type="file"].x-input,
     display: block !important;
     margin-top: 0 !important;
   }
+  /* CTA, kolom pencarian, dan pemilih kategori memakai jarak bawah yang sama (14px),
+     supaya ketiganya berirama seragam — sebelumnya CTA 14px sedangkan dua lainnya 10px. */
   #product-list-view > div[style*="display:flex"] > div {
     min-width: 0 !important;
     width: 100% !important;
-    margin-bottom: 10px !important;
+    margin-bottom: 14px !important;
   }
   #product-list-view #prod-search-input,
   #product-list-view #prod-filter-category {
