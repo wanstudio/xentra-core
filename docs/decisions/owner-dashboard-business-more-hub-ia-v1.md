@@ -174,3 +174,17 @@ This decision does not:
 - Toast Reports: https://support.toasttab.com/en/article/Getting-Started-with-Analytics-and-Reports
 - Square Reports: https://squareup.com/help/us/en/topic/reports
 - Square Inventory: https://squareup.com/help/us/en/article/6110-manage-inventory-with-the-retail-pos-app
+
+## 🔒 UPDATE — Kategori Management Page
+**29 September 2026**
+
+Owner Katalog sekarang memiliki management page **Kategori** di atas **Produk Master**.
+
+```
+Katalog
+├── Kategori       ← lihat/edit kategori existing
+└── Produk Master  ← assembly workspace
+```
+
+Ini tidak mengubah keputusan bahwa Produk Master adalah tempat assembly. Halaman Kategori hanya menjadi progressive-disclosure surface untuk mengelola master category yang sudah ada. Product editor tetap menyediakan `Kategori ▼ +` sebagai quick-add shortcut ke authority yang sama.
+
