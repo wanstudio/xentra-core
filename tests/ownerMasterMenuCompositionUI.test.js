@@ -78,6 +78,19 @@ test('Owner Master Product UI exposes structured composition selectors', () => {
   assert.ok(HTML.includes('Preview Customer PWA'), 'Customer PWA preview must be present');
 });
 
+test('Legacy Master Product edit hydrates structured composition from the old title', () => {
+  assert.ok(JS.includes('function normalizeLegacyMenuText(value)'));
+  assert.ok(JS.includes('function findLegacyMenuMatch(text, rows, excludedIds)'));
+  assert.ok(JS.includes('function buildLegacyMenuCompositionSuggestion(legacyName)'));
+  assert.ok(JS.includes('function showLegacyMenuMigrationNotice(legacyName, suggestion)'));
+  assert.ok(JS.includes('loadMasterMenuComposition(prod.id, prod.name)'));
+  assert.ok(JS.includes('var hasStructuredComposition = Boolean('));
+  assert.ok(JS.includes('if (!hasStructuredComposition && legacyName)'));
+  assert.ok(JS.includes('Format lama terdeteksi'));
+  assert.ok(HTML.includes('id="master-legacy-migration-notice"'));
+  assert.ok(HTML.includes('id="master-legacy-migration-detail"'));
+});
+
 test('Customer presentation mapping is explicit in Owner UI', () => {
   assert.match(HTML, /Kategori.*Judul Customer|Kategori.*judul.*Customer/i);
   assert.match(HTML, /Rasa.*Subtitle Customer/i);
