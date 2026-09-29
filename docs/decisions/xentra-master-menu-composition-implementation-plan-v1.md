@@ -468,6 +468,18 @@ Keep commits separable by boundary:
 
 This makes rollback and review practical.
 
+## 🔒 UX NOTE — Category & Flavor Master Reference Surface
+**29 September 2026**
+
+Owner's `Kategori & Rasa` page is the management surface for the two master values used directly by the Master Product editor dropdowns.
+
+- `Kategori` → `products.category_id` / Master Category authority.
+- `Rasa` → `product_flavors` / `menu_flavors` Master Flavor authority.
+- Product-form `+` actions are shortcuts to these same authorities.
+- No duplicate vocabulary or second Master Menu object is introduced.
+
+The technical `Master Menu Composition` contract remains unchanged.
+
 ## 20. Current status
 
 ### Completed in this planning pass
