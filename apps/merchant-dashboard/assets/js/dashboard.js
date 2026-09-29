@@ -2738,27 +2738,141 @@
     renderMasterMenuCustomerPreview();
   }
 
-  async function loadMasterMenuComposition(productId) {
+  function normalizeLegacyMenuText(value) {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/&/g, ' dan ')
+      .replace(/[+\\/|,_-]+/g, ' ')
+      .replace(/[^a-z0-9\\s]/g, ' ')
+      .replace(/\\s+/g, ' ')
+      .trim();
+  }
+
+  function findLegacyMenuMatch(text, rows, excludedIds) {
+    var source = normalizeLegacyMenuText(text);
+    if (!source) return null;
+    var excluded = excludedIds || {};
+    return (rows || [])
+      .filter(function(row) {
+        if (!row || !row.name || excluded[String(row.id)]) return false;
+        if (row.is_active === 0) return false;
+        var name = normalizeLegacyMenuText(row.name);
+        if (!name || name.length < 3) return false;
+        return source.indexOf(name) !== -1;
+      })
+      .sort(function(a, b) {
+        var aLen = normalizeLegacyMenuText(a.name).length;
+        var bLen = normalizeLegacyMenuText(b.name).length;
+        if (bLen !== aLen) return bLen - aLen;
+        return String(a.name).localeCompare(String(b.name), 'id');
+      })[0] || null;
+  }
+
+  function buildLegacyMenuCompositionSuggestion(legacyName) {
+    var flavor = findLegacyMenuMatch(legacyName, _masterMenuComponents.flavor, {});
+    var level = findLegacyMenuMatch(legacyName, _masterMenuComponents.level, {});
+
+    var excludedComplementIds = {};
+    if (flavor) excludedComplementIds[String(flavor.id)] = true;
+    if (level) excludedComplementIds[String(level.id)] = true;
+
+    var source = normalizeLegacyMenuText(legacyName);
+    var complements = (_masterMenuComponents.complement || [])
+      .filter(function(row) {
+        if (!row || !row.name || row.is_active === 0 || excludedComplementIds[String(row.id)]) return false;
+        var name = normalizeLegacyMenuText(row.name);
+        return name.length >= 3 && source.indexOf(name) !== -1;
+      })
+      .sort(function(a, b) {
+        var aLen = normalizeLegacyMenuText(a.name).length;
+        var bLen = normalizeLegacyMenuText(b.name).length;
+        if (bLen !== aLen) return bLen - aLen;
+        return String(a.name).localeCompare(String(b.name), 'id');
+      });
+
+    return {
+      flavor_id: flavor ? String(flavor.id) : '',
+      complement_ids: complements.map(function(row) { return String(row.id); }),
+      level_id: level ? String(level.id) : ''
+    };
+  }
+
+  function clearLegacyMenuMigrationNotice() {
+    var notice = $('master-legacy-migration-notice');
+    if (notice) notice.style.display = 'none';
+  }
+
+  function showLegacyMenuMigrationNotice(legacyName, suggestion) {
+    var notice = $('master-legacy-migration-notice');
+    var detail = $('master-legacy-migration-detail');
+    if (!notice || !detail) return;
+
+    var parts = [];
+    if (suggestion.flavor_id) parts.push('Rasa');
+    if (suggestion.complement_ids.length) parts.push('Kelengkapan');
+    if (suggestion.level_id) parts.push('Level');
+
+    detail.textContent = parts.length
+      ? 'Format lama terdeteksi. Pilihan di bawah disarankan dari nama lama "' + String(legacyName || '') + '". Periksa dan sesuaikan sebelum menyimpan.'
+      : 'Format lama terdeteksi. Lengkapi pilihan Master di bawah sebelum menyimpan menu ini.';
+
+    notice.style.display = 'block';
+  }
+
+  async function loadMasterMenuComposition(productId, legacyName) {
     _masterMenuSelected = { flavor_id: '', complement_ids: [], level_id: '' };
+    clearLegacyMenuMigrationNotice();
     renderMasterMenuSelectors();
+
     if (!productId) {
       await loadMasterMenuComponents();
       return;
     }
+
+    var composition = null;
+    var compositionReadFailed = false;
+
     try {
       var res = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId) + '/composition', { headers: getAuthHeaders() });
       var data = await res.json();
       if (!data.success || !data.composition) throw new Error(data.error || 'Komposisi Master belum tersedia.');
-      var composition = data.composition;
+      composition = data.composition;
+    } catch (err) {
+      compositionReadFailed = true;
+    }
+
+    if (composition) {
       _masterMenuSelected.flavor_id = composition.flavor ? String(composition.flavor.id) : '';
       _masterMenuSelected.complement_ids = (composition.complements || []).map(function(row) { return String(row.id); });
       _masterMenuSelected.level_id = composition.level ? String(composition.level.id) : '';
+    }
+
+    // Load all Master choices before applying a legacy suggestion so the dropdowns
+    // can be hydrated in one pass.
+    await loadMasterMenuComponents();
+
+    var hasStructuredComposition = Boolean(
+      composition &&
+      (composition.flavor || (composition.complements || []).length || composition.level)
+    );
+
+    if (!hasStructuredComposition && legacyName) {
+      var suggestion = buildLegacyMenuCompositionSuggestion(legacyName);
+      _masterMenuSelected.flavor_id = suggestion.flavor_id;
+      _masterMenuSelected.complement_ids = suggestion.complement_ids;
+      _masterMenuSelected.level_id = suggestion.level_id;
+      showLegacyMenuMigrationNotice(legacyName, suggestion);
       renderMasterMenuSelectors();
       renderMasterMenuCustomerPreview();
-    } catch (err) {
-      showToast('⚠️ Komposisi Master belum tersedia. Pilih data sebelum menyimpan.');
+      return;
     }
-    await loadMasterMenuComponents();
+
+    if (compositionReadFailed) {
+      showToast('⚠️ Komposisi Master belum dapat dimuat. Pilih data sebelum menyimpan.');
+    }
+
+    renderMasterMenuSelectors();
+    renderMasterMenuCustomerPreview();
   }
 
   async function saveMasterMenuComposition(productId) {
@@ -3086,7 +3200,7 @@
     _productOptionsDraft = normalizeProductOptionsDraft(prod.options_config);
     renderProductOptionsEditor();
     $('modal-product').style.display = 'flex';
-    loadMasterMenuComposition(prod.id);
+    loadMasterMenuComposition(prod.id, prod.name);
     loadProductOptionsEditor(prod.id);
   };
 
