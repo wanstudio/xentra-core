@@ -204,6 +204,7 @@ class MasterMenuCompositionRepository {
   findProductLevels({ brandId, productIds = [] }) {
     const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : []).map(v => String(v || '').trim()).filter(Boolean)));
     if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
     return this.db.queryMany(
       `SELECT pl.product_id, ml.id, ml.name, ml.slug, ml.is_active
        FROM product_levels pl
