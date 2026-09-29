@@ -159,7 +159,7 @@
     'orders':             { title: 'Orders',       sub: 'Antrean pesanan realtime dan status dapur', tab: 'orders' },
     'catalog':            { title: 'Catalog',      sub: 'Kelola produk master, kategori, dan menu cabang', tab: 'catalog-products' },
     'catalog/products':   { title: 'Products',     sub: 'Kelola daftar produk master brand', tab: 'catalog-products' },
-    'catalog/categories': { title: 'Categories',   sub: 'Atur kategori produk master', tab: 'catalog-categories' },
+    'catalog/categories': { title: 'Kategori & Rasa', sub: 'Kelola master kategori dan rasa untuk Produk Master', tab: 'catalog-categories' },
     'catalog/menus':      { title: 'Menu Cabang',  sub: 'Atur assortment dan kategori jual per cabang', tab: 'catalog-menus' },
     'branches':           { title: 'Branches',     sub: 'Atur lokasi cabang, radius, dan formula ongkir', tab: 'branches' },
     'customers':          { title: 'Customers',    sub: 'Data pelanggan dan riwayat pembelian', tab: 'customers' },
@@ -2936,6 +2936,18 @@
     if (type) _masterMenuComponentType = type;
     var modal = $('modal-master-menu-components');
     if (!modal) return;
+
+    var titleEl = modal.querySelector('.x-modal-header h3');
+    var subtitleEl = modal.querySelector('.x-modal-header p');
+    var labels = {
+      flavor: { title: 'Master Rasa', sub: 'Pilihan rasa yang tersedia untuk Produk Master' },
+      complement: { title: 'Master Kelengkapan', sub: 'Pilihan kelengkapan yang tersedia untuk Produk Master' },
+      level: { title: 'Master Level', sub: 'Pilihan level yang tersedia untuk Produk Master' }
+    };
+    var meta = labels[_masterMenuComponentType] || { title: 'Master Menu', sub: 'Data pilihan yang dipakai untuk menyusun Produk Master' };
+    if (titleEl) titleEl.textContent = meta.title;
+    if (subtitleEl) subtitleEl.textContent = meta.sub;
+
     modal.style.display = 'flex';
     renderMasterMenuComponentManager();
   }
