@@ -448,6 +448,7 @@ CREATE TABLE order_items (
     quantity INT NOT NULL,
     item_subtotal DECIMAL(12, 2) NOT NULL,
     item_note TEXT,
+    menu_snapshot JSON, -- Immutable resolved Master Menu composition snapshot
     modifiers_snapshot JSON, -- Immutable resolved POS option snapshot
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
