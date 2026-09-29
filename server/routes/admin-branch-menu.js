@@ -47,12 +47,19 @@ function registerAdminBranchMenuRoutes(router, deps = {}) {
         product => !adoptedIds.has(String(product.product_id))
       );
 
+      const adoptedProducts = (menu.products || []).map(function (product) {
+        return Object.assign({}, product, { menu_composition: product });
+      });
+      const availableProducts = availableMasterProducts.map(function (product) {
+        return Object.assign({}, product, { menu_composition: product });
+      });
+
       return res.json({
         success: true,
         branch,
         categories: menu.categories || [],
-        adopted_products: menu.products || [],
-        available_master_products: availableMasterProducts
+        adopted_products: adoptedProducts,
+        available_master_products: availableProducts
       });
     } catch (err) {
       console.error('[API Error GET /admin/branches/:id/menu]:', err);
