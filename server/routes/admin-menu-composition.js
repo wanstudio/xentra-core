@@ -73,6 +73,29 @@ function registerAdminMenuCompositionRoutes(router, deps = {}) {
     }
   });
 
+  router.delete('/admin/menu/components/:type/:id', requireAuth(roles), (req, res) => {
+    try {
+      const type = service.validateType(req.params.type);
+      const result = service.deleteComponent({
+        brandId: req.brand_id,
+        type,
+        componentId: req.params.id
+      });
+      if (!result || !result.found) {
+        return res.status(404).json({ success: false, error: 'MENU_COMPONENT_NOT_FOUND' });
+      }
+      if (!result.deleted) {
+        return res.status(409).json({ success: false, error: 'MENU_COMPONENT_DELETE_FAILED' });
+      }
+      res.json({ success: true, type, component_id: req.params.id });
+    } catch (err) {
+      res.status(errorStatus(err && err.message)).json({
+        success: false,
+        error: err && err.message ? err.message : 'MASTER_MENU_COMPONENT_DELETE_FAILED'
+      });
+    }
+  });
+
   router.patch('/admin/menu/components/:type/:id/toggle', requireAuth(roles), (req, res) => {
     try {
       const type = service.validateType(req.params.type);
