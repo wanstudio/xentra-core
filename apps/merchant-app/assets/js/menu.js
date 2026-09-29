@@ -113,12 +113,6 @@
       addCatalog.addEventListener('click', function () { openBMAddCatalogModal(); });
     }
 
-    var refresh = $('btn-bm-menu-refresh');
-    if (refresh && !refresh.dataset.bound) {
-      refresh.dataset.bound = '1';
-      refresh.addEventListener('click', loadBMMenu);
-    }
-
     var detailAdd = $('btn-bm-menu-category-add');
     if (detailAdd && !detailAdd.dataset.bound) {
       detailAdd.dataset.bound = '1';
