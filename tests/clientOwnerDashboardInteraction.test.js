@@ -101,6 +101,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
       { sel: '[data-route="overview"]', expectedTab: 'tab-overview' },
       { sel: '[data-route="orders"]', expectedTab: 'tab-orders' },
       { sel: '#nav-catalog-parent', expectedTab: 'tab-catalog-products' },
+      { sel: '[data-route="catalog/categories"]', expectedTab: 'tab-catalog-categories' },
       { sel: '[data-route="catalog/products"]', expectedTab: 'tab-catalog-products' },
       { sel: '[data-route="catalog/menus"]', expectedTab: 'tab-catalog-menus' },
       { sel: '[data-route="branches"]', expectedTab: 'tab-branches' },
@@ -224,6 +225,7 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
     const directChecks = [
       { hash: 'overview', expectedTab: 'tab-overview' },
       { hash: 'orders', expectedTab: 'tab-orders' },
+      { hash: 'catalog/categories', expectedTab: 'tab-catalog-categories' },
       { hash: 'catalog/products', expectedTab: 'tab-catalog-products' },
       { hash: 'catalog/menus', expectedTab: 'tab-catalog-menus' },
       { hash: 'branches', expectedTab: 'tab-branches' },
@@ -250,16 +252,17 @@ test('CLIENT OWNER DASHBOARD — Interaction, Navigation & Mobile Shell', async 
     }
   });
 
-  await t.test('6.1 Legacy Category route redirects to Product Master workspace', async () => {
+  await t.test('6.1 Category management route opens the Category page', async () => {
     const { win } = createDashboardDOM('catalog/categories', 1024);
     evalApp(win);
     win.document.dispatchEvent(new win.Event('DOMContentLoaded'));
     await new Promise(res => setTimeout(res, 50));
 
-    assert.strictEqual(win.location.hash, '#catalog/products');
+    assert.strictEqual(win.location.hash, '#catalog/categories');
     const activeTab = win.document.querySelector('.x-tab-content.active');
     assert.ok(activeTab);
-    assert.strictEqual(activeTab.id, 'tab-catalog-products');
+    assert.strictEqual(activeTab.id, 'tab-catalog-categories');
+    assert.ok(win.document.getElementById('master-categories-page-list'));
   });
 
   await t.test('7. Backward compatibility: buttons with data-tab still navigate', async () => {
