@@ -8172,23 +8172,30 @@ input[type="file"].x-input,
    SATU kartu: tab menjadi bagian atas (tanpa garis bawah, sudut atas membulat), panel
    isinya menjadi bagian bawah (tanpa garis atas, sudut bawah membulat). Sambungannya
    tidak terlihat karena kedua bagian memakai latar dan garis yang sama. */
-/* Tab Kategori/Rasa dan isinya dipisah menjadi DUA kartu bertumpuk: kartu tab di atas,
-   kartu isi di bawah. Masing-masing kartu utuh dengan token yang sama dengan kartu lain,
-   dan jaraknya konsisten 12px. */
+/* Tab Kategori/Rasa dan isinya satu kesatuan. Kartunya SATU, dan seluruh gaya kotak
+   pada tab maupun panel isinya direset — kalau tidak, dua kotak berdampingan akan
+   selalu terlihat terputus di tengah (bayangan dan marginnya berbeda). */
 .x-master-reference-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 14px;
-}
-.x-master-reference-card .x-master-reference-tabs,
-.x-master-reference-card .x-master-reference-panel {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   padding: 12px;
+  margin-top: 14px;
+}
+.x-master-reference-card .x-master-reference-tabs {
+  margin: 0 0 12px 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+.x-master-reference-card .x-master-reference-panel {
   margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 .x-master-reference-toolbar{
   display:flex;
