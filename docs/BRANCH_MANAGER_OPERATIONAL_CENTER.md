@@ -370,3 +370,29 @@ The rule is therefore:
 **Structured authoritative evidence → semantic log formatter/read model → human-readable dashboard presentation → optional technical detail.**
 
 This is a presentation/read-model concern, not a new Activity domain and not a replacement for the existing audit trail.
+
+
+## 🔒 LOCKED — Merchant Home / Beranda UI Contract v1
+
+**Decision date:** 29 September 2026
+
+The Branch Manager Home visual/composition contract is defined in:
+`docs/decisions/xentra-merchant-home-ui-contract-v1.md`
+
+The Home must be implemented as a mobile-native operational surface:
+
+**Glance → Understand → Act**
+
+Locked composition:
+
+**Merchant context → Operational controls → Greeting/date → Primary Sales Card → Attention: Pesanan Baru → Quick Actions → Operational Snapshot → Menu/Stock Attention → Promo Aktif → Aktivitas Terakhir → Persistent Bottom Navigation**
+
+Mobile primary navigation:
+
+**Beranda | Pesanan | Menu | Stock | Promo**
+
+This contract is presentation/UX only. Core authority, RBAC, branch scope, order/payment/inventory contracts, and KDS boundaries remain unchanged.
+
+Existing mature UI primitives remain the reuse baseline. The new Home must not be based on quarantined legacy Menu/Branch Override assumptions.
+
+See the detailed contract for the complete Home UI, responsive, performance, state, and QA requirements.
