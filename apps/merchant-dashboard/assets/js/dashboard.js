@@ -9412,14 +9412,19 @@
     initOwnerBottomNav();
     initOverviewControls();
 
+    var refreshAppBtn = $('btn-settings-refresh-app-data');
+    if (refreshAppBtn) {
+      refreshAppBtn.addEventListener('click', function () {
+        refreshAppBtn.disabled = true;
+        refreshAppBtn.textContent = 'Menyegarkan...';
+        window.location.reload();
+      });
+    }
+
     // Workforce form submit
     var formUser = $('form-user');
     if (formUser) {
       formUser.addEventListener('submit', submitUserForm);
-    }
-
-    if ($('btn-refresh-orders')) {
-      $('btn-refresh-orders').addEventListener('click', loadOrders);
     }
 
     // Inline branch category button
