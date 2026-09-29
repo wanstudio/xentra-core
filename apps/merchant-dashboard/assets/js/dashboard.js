@@ -2674,6 +2674,62 @@
     }
   }
 
+  function renderMasterMenuCustomerPreview() {
+    var titleEl = $('master-preview-title');
+    var subtitleEl = $('master-preview-subtitle');
+    var detailEl = $('master-preview-detail');
+    var indicatorEl = $('master-preview-indicator');
+    var priceEl = $('master-preview-price');
+    var imageEl = $('master-preview-image');
+    var emptyImageEl = $('master-preview-image-empty');
+    if (!titleEl || !subtitleEl || !detailEl || !indicatorEl || !priceEl) return;
+
+    var categorySelect = $('prod-category');
+    var categoryId = categorySelect ? String(categorySelect.value || '') : '';
+    var category = state.categories.find(function(row) { return String(row.id) === categoryId; });
+    var flavorSelect = $('prod-flavor');
+    var levelSelect = $('prod-level');
+
+    titleEl.textContent = category ? category.name : 'Pilih Kategori';
+    subtitleEl.textContent = '';
+    detailEl.textContent = '';
+    indicatorEl.textContent = '';
+
+    var flavorId = flavorSelect ? String(flavorSelect.value || '') : String(_masterMenuSelected.flavor_id || '');
+    var flavor = _masterMenuComponents.flavor.find(function(row) { return String(row.id) === flavorId; });
+    if (flavor) subtitleEl.textContent = flavor.name;
+
+    var selectedComplementIds = _masterMenuSelected.complement_ids || [];
+    var complementNames = selectedComplementIds.map(function(id) {
+      var row = _masterMenuComponents.complement.find(function(item) { return String(item.id) === String(id); });
+      return row ? row.name : null;
+    }).filter(Boolean);
+    detailEl.textContent = complementNames.join(' · ');
+
+    var levelId = levelSelect ? String(levelSelect.value || '') : String(_masterMenuSelected.level_id || '');
+    var level = _masterMenuComponents.level.find(function(row) { return String(row.id) === levelId; });
+    if (level) indicatorEl.textContent = level.name;
+
+    var price = Number(($('prod-price') && $('prod-price').value) || 0);
+    priceEl.textContent = formatMoney(price);
+
+    var previewInput = $('prod-image-preview');
+    var src = previewInput && previewInput.style.display !== 'none' ? previewInput.getAttribute('src') : '';
+    if (imageEl && emptyImageEl) {
+      if (src) {
+        imageEl.src = src;
+        imageEl.alt = category ? category.name : 'Foto Menu';
+        imageEl.style.display = 'block';
+        emptyImageEl.style.display = 'none';
+      } else {
+        imageEl.removeAttribute('src');
+        imageEl.alt = '';
+        imageEl.style.display = 'none';
+        emptyImageEl.style.display = 'inline-flex';
+      }
+    }
+  }
+
   function renderMasterMenuSelectors() {
     var flavorSelect = $('prod-flavor');
     if (flavorSelect) {
@@ -2719,8 +2775,11 @@
         if (input.checked) next.push(id);
         _masterMenuSelected.complement_ids = next;
         renderMasterMenuSelectors();
+        renderMasterMenuCustomerPreview();
       });
     });
+
+    renderMasterMenuCustomerPreview();
   }
 
   async function loadMasterMenuComposition(productId) {
@@ -2739,6 +2798,7 @@
       _masterMenuSelected.complement_ids = (composition.complements || []).map(function(row) { return String(row.id); });
       _masterMenuSelected.level_id = composition.level ? String(composition.level.id) : '';
       renderMasterMenuSelectors();
+      renderMasterMenuCustomerPreview();
     } catch (err) {
       showToast('⚠️ Komposisi Master belum tersedia. Pilih data sebelum menyimpan.');
     }
@@ -3024,11 +3084,13 @@
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
     setProductImagePreview('', false);
+    renderMasterMenuCustomerPreview();
     _productOptionsDraft = [];
     renderProductOptionsEditor();
     populateProductCategorySelect();
     _masterMenuSelected = { flavor_id: '', complement_ids: [], level_id: '' };
     renderMasterMenuSelectors();
+    renderMasterMenuCustomerPreview();
     $('modal-product').style.display = 'flex';
     loadMasterMenuComponents();
   };
@@ -3145,9 +3207,25 @@
     if (flavorSelect) flavorSelect.addEventListener('change', function() {
       _masterMenuSelected.flavor_id = flavorSelect.value || '';
     });
+    var categorySelect = $('prod-category');
+    if (categorySelect) categorySelect.addEventListener('change', function() {
+      renderMasterMenuCustomerPreview();
+    });
+
+    var flavorSelect = $('prod-flavor');
+    if (flavorSelect) flavorSelect.addEventListener('change', function() {
+      _masterMenuSelected.flavor_id = flavorSelect.value || '';
+      renderMasterMenuCustomerPreview();
+    });
     var levelSelect = $('prod-level');
     if (levelSelect) levelSelect.addEventListener('change', function() {
       _masterMenuSelected.level_id = levelSelect.value || '';
+      renderMasterMenuCustomerPreview();
+    });
+
+    var priceInput = $('prod-price');
+    if (priceInput) priceInput.addEventListener('input', function() {
+      renderMasterMenuCustomerPreview();
     });
 
     var prodPricingMode = $('prod-pricing-mode');
