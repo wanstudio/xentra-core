@@ -502,6 +502,13 @@ a:focus:not(:focus-visible),
   gap: 6px;
 }
 
+/* Atribut `hidden` bawaan browser memakai display:none, tetapi kalah oleh aturan kelas
+   seperti .x-form-group { display: flex } karena spesifisitasnya lebih rendah. Akibatnya
+   elemen bertanda hidden tetap terlihat. Aturan ini mengembalikan artinya. */
+[hidden] {
+  display: none !important;
+}
+
 .x-form-group label {
   font-size: 13px;
   font-weight: 700;
