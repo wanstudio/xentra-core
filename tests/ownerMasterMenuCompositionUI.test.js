@@ -15,7 +15,7 @@ test('Owner Kategori/Rasa loading is independent and stale-safe', () => {
   assert.ok(start >= 0 && end > start, 'Master reference loader must exist');
   const loader = JS.slice(start, end);
 
-  assert.ok(loader.includes('var _masterReferenceLoadSeq'));
+  assert.ok(JS.includes('var _masterReferenceLoadSeq = 0;'));
   assert.ok(loader.includes('var requestSeq = ++_masterReferenceLoadSeq'));
   assert.ok(loader.includes("adminFetch(API_BASE + '/admin/categories'"));
   assert.ok(loader.includes("adminFetch(API_BASE + '/admin/menu/components/flavor'"));
