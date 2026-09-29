@@ -550,7 +550,7 @@
     }
 
     try {
-      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/catalog', {
+      var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId) + '/menu', {
         headers: getAuthHeaders()
       });
       var data = await res.json();
@@ -585,7 +585,7 @@
         var catSelect = $('bm-add-catalog-target-category');
         if (catSelect) {
           var branchCats = data.categories || (_bmMenuState && _bmMenuState.categories) || [];
-          var opts = ['<option value="">Otomatis / Menu Utama</option>'];
+          var opts = ['<option value="">Pilih Kategori Cabang</option>'];
           branchCats.forEach(function (c) {
             opts.push('<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>');
           });
