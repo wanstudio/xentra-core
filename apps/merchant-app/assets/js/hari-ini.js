@@ -156,14 +156,7 @@
           if ($("bm-stat-ready-orders")) $("bm-stat-ready-orders").textContent = readyList.length;
           if ($("bm-stat-completed-orders")) $("bm-stat-completed-orders").textContent = completedToday.length;
            if ($("bm-stat-completed-orders-snapshot")) $("bm-stat-completed-orders-snapshot").textContent = completedToday.length;
-          // Nominal ditulis sebagai dua bagian: angkanya besar, "Rp" kecil di bawahnya.
-          // Kalau "Rp" ikut di depan, nominal panjang akan memotong angkanya.
-          var netSalesEl = $("bm-stat-net-sales-today");
-          if (netSalesEl) {
-            netSalesEl.innerHTML =
-              '<span class="x-home-sales-amount">' + Number(completedSales || 0).toLocaleString('id-ID') + '</span>' +
-              '<span class="x-home-sales-currency">Rp</span>';
-          }
+          if ($("bm-stat-net-sales-today")) $("bm-stat-net-sales-today").textContent = formatMoney(completedSales);
 
            var avgOrderEl = $("bm-stat-average-order");
            if (avgOrderEl) avgOrderEl.textContent = completedToday.length ? formatMoney(Math.round(completedSales / completedToday.length)) : "Rp0";
