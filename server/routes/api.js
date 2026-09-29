@@ -18,6 +18,7 @@ const registerCustomerAddressRoutes = require('./customer-addresses');
 const registerWorkforceRoutes = require('./workforce');
 const registerPlatformRoutes = require('./platform');
 const registerAdminCatalogRoutes = require('./admin-catalog');
+const registerAdminMenuCompositionRoutes = require('./admin-menu-composition');
 const registerAdminBrandRoutes = require('./admin-brand');
 const registerAdminBranchRoutes = require('./admin-branches');
 const registerAdminOrderRoutes = require('./admin-orders');
@@ -967,6 +968,8 @@ registerAdminBrandRoutes(router, {
 
 // Master catalog CRUD is isolated in server/routes/admin-catalog.js.
 registerAdminCatalogRoutes(router, { db, requireAuth });
+// Master Menu Composition routes use Owner-authoritative structured component data.
+registerAdminMenuCompositionRoutes(router, { requireAuth });
 
 // Admin branch management routes are isolated in server/routes/admin-branches.js.
 registerAdminBranchRoutes(router, { db, crypto, requireAuth });
