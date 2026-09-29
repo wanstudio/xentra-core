@@ -188,3 +188,17 @@ Katalog
 
 Ini tidak mengubah keputusan bahwa Produk Master adalah tempat assembly. Halaman Kategori hanya menjadi progressive-disclosure surface untuk mengelola master category yang sudah ada. Product editor tetap menyediakan `Kategori ▼ +` sebagai quick-add shortcut ke authority yang sama.
 
+
+
+## UPDATE — Kategori Page: 2 Tabs Kategori | Rasa
+**29 September 2026**
+
+The Owner Kategori management page now uses exactly two local tabs:
+
+Kategori | Rasa
+
+Each tab renders its master-reference list as compact cards. Every card exposes an overflow action menu with Edit and Hapus.
+
+Kategori uses /admin/categories. Rasa uses /admin/menu/components/flavor.
+
+The Product Master editor remains the assembly workspace and keeps contextual + quick-add for Kategori/Rasa. The Category page is only for managing existing master values.
