@@ -86,7 +86,7 @@
         <!-- Catalog sub-nav -->
         <div class="x-nav-sub" id="nav-catalog-sub">
           <button type="button" class="x-nav-sub-item" data-route="catalog/categories" data-tab="catalog-categories">
-            <span>Categories</span>
+            <span>Kategori &amp; Rasa</span>
           </button>
           <button type="button" class="x-nav-sub-item" data-route="catalog/products" data-tab="catalog-products">
             <span>Products</span>
@@ -1623,28 +1623,59 @@
         <div class="x-card-panel">
           <div class="x-panel-header-flex">
             <div>
-              <h3>🗂️ Kategori Produk Master</h3>
-              <p class="text-muted" style="font-size:13px;">Kelola kategori master produk brand. Kategori ini menjadi referensi kategori default bagi seluruh cabang.</p>
-            </div>
-            <div class="x-header-buttons">
-              <button type="button" class="x-btn-primary" id="btn-add-master-category">+ Tambah Kategori Master</button>
+              <h3>🗂️ Kategori &amp; Rasa</h3>
+              <p class="text-muted" style="font-size:13px;">Master pilihan yang digunakan saat menyusun Produk Master. Kategori dan Rasa muncul sebagai pilihan pada form produk.</p>
             </div>
           </div>
 
-          <div class="x-table-responsive mt-4">
-            <table class="x-table">
-              <thead>
-                <tr>
-                  <th>Nama Kategori</th>
-                  <th>Slug Identitas</th>
-                  <th>Jumlah Produk</th>
-                  <th class="text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody id="master-categories-table-body">
-                <tr><td colspan="4" class="text-center py-6">Memuat daftar kategori...</td></tr>
-              </tbody>
-            </table>
+          <div class="x-master-reference-grid">
+            <div class="x-master-reference-card">
+              <div class="x-master-reference-card-head">
+                <div>
+                  <h4>Kategori</h4>
+                  <p>Pengelompokan utama Produk Master.</p>
+                </div>
+                <button type="button" class="x-btn-primary" id="btn-add-master-category">+ Tambah</button>
+              </div>
+              <div class="x-table-responsive mt-3">
+                <table class="x-table">
+                  <thead>
+                    <tr>
+                      <th>Nama Kategori</th>
+                      <th>Produk</th>
+                      <th class="text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="master-categories-table-body">
+                    <tr><td colspan="3" class="text-center py-6">Memuat daftar kategori...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="x-master-reference-card">
+              <div class="x-master-reference-card-head">
+                <div>
+                  <h4>Rasa</h4>
+                  <p>Pilihan rasa yang menjadi subtitle Customer.</p>
+                </div>
+                <button type="button" class="x-btn-primary" id="btn-add-master-flavor">+ Tambah</button>
+              </div>
+              <div class="x-table-responsive mt-3">
+                <table class="x-table">
+                  <thead>
+                    <tr>
+                      <th>Nama Rasa</th>
+                      <th>Status</th>
+                      <th class="text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody id="master-flavors-table-body">
+                    <tr><td colspan="3" class="text-center py-6">Memuat daftar rasa...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -3171,8 +3202,8 @@
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
               </div>
               <div class="x-hub-info">
-                <h3>Kategori</h3>
-                <p>Kelola pengelompokan kategori produk makanan &amp; minuman</p>
+                <h3>Kategori &amp; Rasa</h3>
+                <p>Kelola kategori master dan pilihan rasa untuk Produk Master</p>
               </div>
               <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
             </div>
