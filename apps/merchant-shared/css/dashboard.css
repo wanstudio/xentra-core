@@ -403,17 +403,9 @@ a:focus:not(:focus-visible),
   padding: 24px;
 }
 
-/* Kartu judul Produk Master (Owner). Kelas .x-card tidak punya definisi apa pun, jadi
-   sebelumnya kartu ini kehilangan latar, garis, dan padding 24px — tingginya pun jadi
-   berbeda dari panel lain. Di sini tokennya disamakan persis dengan .x-card-panel.
-   Ditulis di luar blok mobile karena panel ini juga dilihat di desktop. */
-#product-list-view .x-master-products-head {
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  padding: 24px;
-}
+/* Judul, deskripsi, dan CTA Produk Master TIDAK dibungkus kartu — mereka mengalir
+   langsung. Kelas .x-card tidak punya definisi apa pun, jadi tidak ada gaya yang perlu
+   dibatalkan di sini. */
 
 .x-panel-header h3 {
   font-size: 18px;
@@ -7470,11 +7462,20 @@ input[type="file"].x-input,
   /* ── Produk Master (Owner): kartu hanya judul, sisanya langsung di panel ─────
      Panelnya bukan lagi kartu — kartunya hanya membungkus judul, deskripsi, dan CTA.
      Pencarian, pemilih kategori, dan daftar produk mengalir langsung di panel. */
+  /* Panel Produk Master: tampilan kartunya dilepas, tetapi padding-nya dipertahankan
+     sama seperti panel lain — itu yang membuat jarak dari bawah top bar ke isi sama
+     dengan halaman Bisnis. Sebelumnya padding disetel 0 sehingga isinya menempel. */
   #product-list-view.x-card-panel {
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
+    padding: 24px !important;
+  }
+  #product-list-view > .x-master-products-head {
     padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
   }
 
   #product-list-view .x-master-products-head {
