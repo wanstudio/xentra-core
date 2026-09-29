@@ -111,6 +111,11 @@
           '<img src="' + esc(img) + '" class="x-product-card-thumb" alt="' + esc(p.name) + '">',
           '<div class="x-product-card-content">',
             '<h5>' + esc(p.name) + '</h5>',
+            (p.menu_composition ? '<div style="font-size:11px;line-height:1.45;color:#475569;margin:4px 0 6px;"><strong>' + esc(p.menu_composition.title || '') + '</strong>' +
+              (p.menu_composition.subtitle ? ' · ' + esc(p.menu_composition.subtitle) : '') +
+              (p.menu_composition.detail && p.menu_composition.detail.length ? ' · ' + esc(p.menu_composition.detail.join(', ')) : '') +
+              (p.menu_composition.indicator ? ' · ' + esc(p.menu_composition.indicator) : '') +
+            '</div>' : ''),
             '<div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;">',
               '<span class="x-badge x-badge-info" style="font-size:10px;">' + esc(catName) + '</span>',
               modeBadge,
