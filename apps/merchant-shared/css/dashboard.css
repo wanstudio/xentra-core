@@ -7553,7 +7553,8 @@ input[type="file"].x-input,
 
   /* Chevron kembali di judul Produk Master: sejajar dengan teks judulnya dan tetap
      nyaman ditekan di layar kecil. */
-  #product-list-view .x-master-products-title {
+  #product-list-view .x-master-products-title,
+  #tab-catalog-categories .x-master-products-title {
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
@@ -7586,7 +7587,8 @@ input[type="file"].x-input,
 
   /* Keterangan di bawah judul: kecil, rata kiri, dan sejajar dengan TEKS judulnya —
      chevron 30px + jarak 8px = 38px, jadi tidak menggantung di bawah chevron. */
-  #product-list-view .x-master-products-sub {
+  #product-list-view .x-master-products-sub,
+  #tab-catalog-categories .x-master-products-sub {
     margin: 0 0 0 38px !important;
     padding: 0 !important;
     font-size: 12px !important;
@@ -7595,7 +7597,8 @@ input[type="file"].x-input,
     text-align: left !important;
     color: #747c83 !important;
   }
-  #product-list-view .x-title-back-btn {
+  #product-list-view .x-title-back-btn,
+  #tab-catalog-categories .x-title-back-btn {
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;

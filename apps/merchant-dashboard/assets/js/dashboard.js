@@ -6691,6 +6691,16 @@
     navigateTo('business');
   };
 
+  // Tombol kembali di judul Kategori. Perilakunya sama dengan tombol di judul Produk
+  // Master: memakai riwayat kalau ada, kalau tidak kembali ke modul Bisnis.
+  window.goBackFromCategory = function () {
+    if (window.history && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    navigateTo('business');
+  };
+
   function closeFinanceDropdown() {
     var d = $('finance-section-dropdown');
     if (d) d.classList.remove('open');
