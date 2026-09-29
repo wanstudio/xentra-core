@@ -498,3 +498,41 @@ Stop and resolve a contract issue before coding onward when:
 - a new feature requires changing Pricing, Promotion, Inventory, POS Options, or Order authority beyond this contract.
 
 **This plan is subordinate to the locked Master Menu Composition contract and the repository migration skill.**
+
+
+## 🔒 EXECUTION UPDATE — 2026-09-29
+
+### Completed forward cutover foundations
+
+- Schema expansion is present.
+- Master Component CRUD/service is present.
+- Master Product Composition save/read is present.
+- Canonical Master Menu resolver is present.
+- Customer branch catalog read path now resolves structured Master Menu Composition.
+- Checkout final verification resolves structured Master Menu Composition and ignores legacy Branch Menu price overrides for the forward path.
+- Order item persistence already accepts and stores `menu_snapshot`.
+- Merchant/Owner Branch Menu clients now use the canonical `/admin/branches/:id/menu` read model.
+- Legacy Branch Menu edit actions are removed from active card actions.
+
+### Compatibility remains intentional
+
+Legacy physical columns, legacy override API, and legacy CatalogService code remain because historical data and compatibility paths may still exist.
+
+They are not forward authorities.
+
+### Current next phase
+
+**Legacy reconciliation / readiness audit**, with no automatic interpretation of arbitrary legacy free text.
+
+Deterministic reconciliation candidates:
+
+1. Branch Category scalar → M:N membership where the M:N row is missing.
+2. Branch price divergence → audit/report for explicit pricing decision; do not silently rewrite.
+3. Name/description/image overrides → report for manual retention/review; do not infer Master components from free text.
+4. Existing historical orders → do not fabricate historical `menu_snapshot` from current Master data.
+
+Only after reconciliation evidence is clean should destructive legacy cleanup be considered.
+
+### Production safety gate
+
+The forward resolver/read/write paths must remain compatible with existing data while the readiness audit is being completed. Legacy column removal is **not authorized** in this phase.
