@@ -6975,16 +6975,6 @@
     });
   });
 
-  // Tombol kembali di top bar mobile. Memakai riwayat kalau memang ada; kalau tidak
-  // (mis. dibuka langsung dari tautan), kembali ke Beranda supaya tidak keluar aplikasi.
-  window.goBackFromTopbar = function () {
-    if (window.history && window.history.length > 1) {
-      window.history.back();
-      return;
-    }
-    navigateTo('overview');
-  };
-
   function closeFinanceDropdown() {
     var d = $('finance-section-dropdown');
     if (d) d.classList.remove('open');
