@@ -5397,6 +5397,9 @@ input[type="file"].x-input,
     padding: 0 12px;
     display: inline-flex;
     align-items: center;
+    /* Label di kiri, chevron di kanan: tanpa ini keduanya berdempetan dan chevronnya
+       menempel ke tulisan, bukan memenuhi lebar dropdown. */
+    justify-content: space-between;
     gap: 8px;
     cursor: pointer;
     font-size: 14px;
@@ -5408,6 +5411,14 @@ input[type="file"].x-input,
     -webkit-tap-highlight-color: transparent;
     box-sizing: border-box;
   }
+  /* Nama kategori yang panjang dipotong dengan elipsis, bukan mendorong chevronnya. */
+  .x-occ-dropdown-trigger > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .x-occ-dropdown-trigger:hover {
     background: #f1f5f9;
     border-color: #94a3b8;
