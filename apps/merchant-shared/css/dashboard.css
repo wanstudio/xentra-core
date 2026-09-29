@@ -2393,6 +2393,128 @@ input[type="file"].x-input,
   accent-color: #2563eb;
 }
 
+/* Master Product Composition — Owner → Customer PWA preview */
+.x-master-composition-preview-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin:4px 0 8px;
+}
+.x-master-composition-preview-head > div {
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.x-master-composition-preview-head strong {
+  font-size:12px;
+  font-weight:800;
+  color:#0f172a;
+}
+.x-master-composition-preview-head span {
+  font-size:10px;
+  color:#64748b;
+}
+.x-master-customer-preview {
+  border:1px solid #e2e8f0;
+  background:#f8fafc;
+  border-radius:10px;
+  padding:10px;
+}
+.x-master-customer-preview-card {
+  display:flex;
+  align-items:flex-start;
+  gap:12px;
+  min-width:0;
+  padding:11px;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(15,23,42,.05);
+}
+.x-master-customer-preview-info {
+  flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+}
+.x-master-customer-preview-title {
+  font-size:14px;
+  line-height:19px;
+  font-weight:800;
+  color:#0f172a;
+}
+.x-master-customer-preview-subtitle,
+.x-master-customer-preview-detail {
+  font-size:11px;
+  line-height:16px;
+  color:#64748b;
+}
+.x-master-customer-preview-subtitle:empty,
+.x-master-customer-preview-detail:empty,
+.x-master-customer-preview-indicator:empty {
+  display:none;
+}
+.x-master-customer-preview-indicator {
+  display:inline-flex;
+  margin-top:4px;
+  padding:2px 7px;
+  border-radius:999px;
+  background:#f1f5f9;
+  color:#475569;
+  font-size:10px;
+  font-weight:700;
+}
+.x-master-customer-preview-price {
+  margin-top:7px;
+  font-size:13px;
+  line-height:18px;
+  font-weight:800;
+  color:#0f172a;
+}
+.x-master-customer-preview-media {
+  width:72px;
+  height:72px;
+  flex:0 0 72px;
+  border-radius:9px;
+  overflow:hidden;
+  background:#f1f5f9;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#94a3b8;
+  font-size:25px;
+}
+.x-master-customer-preview-media img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+.x-master-customer-preview-note {
+  margin-top:7px;
+  font-size:10px;
+  line-height:14px;
+  color:#64748b;
+}
+@media (max-width:480px) {
+  .x-master-composition-preview-head {
+    align-items:flex-start;
+  }
+  .x-master-composition-preview-head .x-badge {
+    flex:0 0 auto;
+  }
+  .x-master-customer-preview-card {
+    gap:9px;
+    padding:9px;
+  }
+  .x-master-customer-preview-media {
+    width:64px;
+    height:64px;
+    flex-basis:64px;
+  }
+}
+
 /* Category Checkbox Multi-Select UI Card in Edit Menu */
 .x-category-select-grid {
   display: grid;
