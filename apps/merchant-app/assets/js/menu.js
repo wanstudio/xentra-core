@@ -86,19 +86,19 @@
     var homeBtn = $('btn-bm-menu-open-categories');
     if (homeBtn && !homeBtn.dataset.bound) {
       homeBtn.dataset.bound = '1';
-      homeBtn.addEventListener('click', openBMMenuCategories);
+      homeBtn.addEventListener('click', function () { window.openBMMenuCategories(); });
     }
 
     var homeBack = $('btn-bm-menu-categories-back');
     if (homeBack && !homeBack.dataset.bound) {
       homeBack.dataset.bound = '1';
-      homeBack.addEventListener('click', openBMMenuHome);
+      homeBack.addEventListener('click', function () { window.openBMMenuHome(); });
     }
 
     var detailBack = $('btn-bm-menu-category-detail-back');
     if (detailBack && !detailBack.dataset.bound) {
       detailBack.dataset.bound = '1';
-      detailBack.addEventListener('click', openBMMenuCategories);
+      detailBack.addEventListener('click', function () { window.openBMMenuCategories(); });
     }
 
     var addCategory = $('btn-bm-menu-add-category');
@@ -312,7 +312,7 @@
           '<span class="x-menu-category-row-actions">' +
             '<button type="button" class="x-menu-category-edit" aria-label="Ubah ' + esc(cat.name) + '" title="Ubah kategori">' +
               '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>' +
-            '</div>' +
+            '</button>' +
             '<svg class="x-menu-hub-chevron" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>' +
           '</span>' +
         '</div>' +
