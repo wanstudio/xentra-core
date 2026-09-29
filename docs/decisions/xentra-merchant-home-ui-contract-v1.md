@@ -336,3 +336,63 @@ This contract does not authorize changes to:
 - unrelated backend APIs or database contracts.
 
 **LOCKED — Xentra Merchant Home / Beranda UI Contract v1 is the implementation source of truth for the new Home surface.**
+
+
+## 🔒 IMPLEMENTATION RECORD — Home UI v1 First Pass
+
+**Date:** 29 September 2026
+
+The locked Home contract has been implemented as a Merchant App presentation refactor.
+
+### Implemented
+
+- Added surface-owned Home stylesheet:
+  `apps/merchant-app/assets/css/home.css`
+- Added Home presentation boot:
+  `apps/merchant-app/assets/js/home.js`
+- Replaced the Home section in:
+  `apps/merchant-app/index.html`
+- Converted pending orders from desktop table rendering to mobile-first operational cards in:
+  `apps/merchant-app/assets/js/hari-ini.js`
+- Converted Menu/Stock attention, Promo, and Activity projections to compact native-style Home surfaces.
+- Preserved the existing authoritative operational data loading path in `hari-ini.js`.
+- Preserved the existing top bar and persistent five-item mobile navigation.
+- Added an explicit Home-ready presentation signal so the surface can hydrate after operational data resolves.
+- Added the Home assets to the Merchant PWA service-worker static shell cache.
+- Corrected the Home stock-attention filter so `NULL` / untracked stock is not incorrectly classified as low stock.
+- Removed duplicate Home metric IDs and synchronized the completed-order snapshot.
+- Added `tests/merchantHomeUIContract.test.js`.
+- Updated Phase 4 Home structural assertions to the new semantic Home surface.
+
+### Legacy boundary
+
+The new Home contains no legacy Hero/table/legacy attention identifiers and does not extend the quarantined legacy Menu / Branch Override presentation.
+
+### Verification performed
+
+Source-level verification on 29 September 2026:
+- Home JS and Hari Ini JS compile successfully through JavaScript syntax validation.
+- Home test files compile successfully.
+- Home contains no desktop `<table>`.
+- Home contains no duplicate HTML IDs.
+- Home custom CSS classes are defined.
+- Legacy Home identifiers are absent from the new Home.
+- PWA service-worker cache contains the new Home CSS and JS.
+- The Home structure/order and five-item navigation checks pass through an equivalent source-level validator.
+
+GitHub Actions did not expose workflow runs for the direct commits used for this pass, so the full repository test suite is **not claimed as executed** here. VPS/device visual verification remains the final production gate.
+
+### Implementation source commits
+
+Relevant Home implementation commits include:
+
+- `cdb6f5220592cd6124c1697702df430efb078283` — Home styles
+- `ce6b8cdfe34053b779458fed26998ccddbe5bd08` — Home presentation boot
+- `3eacebdce5a5d1d3b37c8d67d0f9ebbf51a9a30c` — initial native Home composition
+- `6bff5f4bc17ff9e7178516289a46ab0da07ceee9` — semantic Home structure cleanup
+- `7c1ebb332110253032fb7468de014829d4a38efd` / `d79a4000bb7a4a5c0a8234b289ef8f4cfecd557f` / `a3632301837d3d14a90d3a0e13c16134cb79a36a` — operational rendering and data-boundary corrections
+- `2cba1df2ece980829066d23e2371665d158f28ad` — PWA shell cache
+- `cba2c3126a8357d6bf22f64a9834179185a56299` / `7ce34574b3692a06ac471eea4c7b703d82a81fbd` — Home UI contract tests
+- `1c1b5b992dc57bb4a875e68a097bc2d11aa839e0` — Phase 4 structural test alignment
+
+**Implementation state: SOURCE-CHECKED / NOT YET PRODUCTION-VISUALLY VERIFIED.**
