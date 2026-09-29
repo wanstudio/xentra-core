@@ -9,13 +9,17 @@ const ROOT = path.resolve(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/index.html'), 'utf8');
 const JS = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
 
-test('Owner Category reference page exposes Category and Flavor master data', () => {
-  assert.ok(HTML.includes('Kategori &amp; Rasa'));
-  assert.ok(HTML.includes('id="master-categories-table-body"'));
-  assert.ok(HTML.includes('id="master-flavors-table-body"'));
-  assert.ok(HTML.includes('id="btn-add-master-flavor"'));
-  assert.ok(JS.includes('function renderMasterFlavorsTable()'));
-  assert.ok(JS.includes("title: 'Master Rasa'"), 'Flavor manager must be context-labeled as Master Rasa');
+test('Owner Category page uses two master-reference tabs with card actions', () => {
+  assert.ok(HTML.includes('id="master-reference-tabs"'));
+  assert.ok(HTML.includes('data-master-reference-tab="category"'));
+  assert.ok(HTML.includes('data-master-reference-tab="flavor"'));
+  assert.ok(HTML.includes('id="master-categories-page-list"'));
+  assert.ok(HTML.includes('id="master-flavors-page-list"'));
+  assert.ok(JS.includes('function setMasterReferenceTab(type)'));
+  assert.ok(JS.includes('function renderMasterCategoriesPage()'));
+  assert.ok(JS.includes('function renderMasterFlavorsPage()'));
+  assert.ok(JS.includes("label: \'Edit\'"));
+  assert.ok(JS.includes("label: \'Hapus\'"));
 });
 
 test('Owner Master Product UI exposes structured composition selectors', () => {
@@ -48,6 +52,18 @@ test('Customer preview is driven by structured selections, not free-text composi
   assert.ok(JS.includes("renderMasterMenuCustomerPreview();"));
 });
 
+test('Master Category and Flavor edit/delete endpoints are wired', () => {
+  const route = fs.readFileSync(path.join(ROOT, 'server/routes/admin-catalog.js'), 'utf8');
+  const compositionRoute = fs.readFileSync(path.join(ROOT, 'server/routes/admin-menu-composition.js'), 'utf8');
+  assert.ok(route.includes("router.put('/admin/categories/:id'"));
+  assert.ok(route.includes("router.delete('/admin/categories/:id'"));
+  assert.ok(compositionRoute.includes("router.put('/admin/menu/components/:type/:id'"));
+  assert.ok(compositionRoute.includes("router.delete('/admin/menu/components/:type/:id'"));
+  assert.ok(JS.includes("deleteEndpoint: function (id) { return API_BASE + '/admin/menu/components/flavor/'"));
+  assert.ok(JS.includes("method: referenceId ? 'PUT' : 'POST'"));
+  assert.ok(JS.includes("method: 'DELETE'"));
+});
+
 test('Owner composition saves through the canonical Master composition API', () => {
   assert.ok(JS.includes("/admin/products/' + encodeURIComponent(productId) + '/composition"));
   assert.ok(JS.includes('category_id: categoryId'));
@@ -67,6 +83,7 @@ test('Master Product uses one assembly workspace with contextual quick-add modal
   assert.ok(HTML.includes('id="modal-master-reference-quick-add"'));
   assert.ok(HTML.includes('id="master-reference-quick-add-type"'));
   assert.ok(HTML.includes('id="master-reference-quick-add-name"'));
+  assert.ok(HTML.includes('id="master-reference-quick-add-id"'));
   assert.ok(JS.includes('function openMasterReferenceQuickAdd(type)'));
   assert.ok(JS.includes("openMasterReferenceQuickAdd('category')"));
   assert.ok(JS.includes("openMasterReferenceQuickAdd('flavor')"));
