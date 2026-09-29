@@ -2829,6 +2829,44 @@ input[type="file"].x-input,
 }
 
 /* ==========================================================================
+   OWNER MASTER REFERENCE — CATEGORY + FLAVOR
+   ========================================================================== */
+.x-master-reference-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;
+}
+.x-master-reference-card{
+  border:1px solid var(--border-color,#e2e8f0);
+  border-radius:14px;
+  background:#fff;
+  padding:16px;
+}
+.x-master-reference-card-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.x-master-reference-card-head h4{margin:0;font-size:15px;}
+.x-master-reference-card-head p{margin:4px 0 0;font-size:12px;color:#64748b;}
+.x-master-inline-add{
+  width:30px;
+  height:30px;
+  min-width:30px;
+  padding:0 !important;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:8px;
+  font-size:18px !important;
+  line-height:1;
+}
+@media(max-width:768px){
+  .x-master-reference-grid{grid-template-columns:1fr;}
+}
+
+/* ==========================================================================
    MOBILE-FIRST ACTION UX SYSTEM (POPOVERS, OVERFLOW MENUS, ACTION GROUPS)
    ========================================================================== */
 
