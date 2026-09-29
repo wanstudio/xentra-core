@@ -7491,6 +7491,13 @@ input[type="file"].x-input,
     display: flex !important;
     align-items: center !important;
     gap: 8px !important;
+    /* h3 punya margin bawaan browser (~1em di atas) dan tidak ada aturan yang
+       menghapusnya, jadi judulnya terdorong turun dari top bar. Beranda tidak kena
+       karena elemen pertamanya sebuah <div>, bukan <h3>. */
+    margin: 0 !important;
+  }
+  #product-list-view .x-master-products-head .x-panel-header-flex > div > p {
+    margin: 2px 0 0 !important;
   }
   #product-list-view .x-title-back-btn {
     display: inline-flex !important;
