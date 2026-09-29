@@ -1052,10 +1052,6 @@
           '</div>'
         : '<div style="font-size:11px;color:#b45309;margin:5px 0 7px;">Komposisi Master belum lengkap.</div>';
 
-      var adoptButton = ready
-        ? '<button type="button" class="x-btn-primary" style="padding:6px 12px;font-size:12px;" onclick="openMerchantAdoptModal(\\'' + p.id + '\\')">＋ Adopsi ke Cabang</button>'
-        : '<button type="button" class="x-btn-secondary" disabled style="padding:6px 12px;font-size:12px;opacity:.65;">Menunggu komposisi Owner</button>';
-
       return [
         '<div class="x-product-card-simple" style="background:#f8fafc;">',
           img ? '<img src="' + esc(img) + '" class="x-product-card-thumb" alt="' + esc((comp && comp.title) || p.name || 'Master Menu') + '">' : '',
@@ -1063,11 +1059,21 @@
             '<h5>' + esc(p.name || 'Master Menu') + '</h5>',
             detailHtml,
             '<div class="x-product-card-price">Harga Owner: ' + formatMoney((comp && comp.price != null) ? comp.price : p.price) + '</div>',
-            '<div class="x-product-card-actions">' + adoptButton + '</div>',
+            '<div class="x-product-card-actions">' +
+              (ready
+                ? '<button type="button" class="x-btn-primary" data-master-adopt="' + esc(p.id) + '" style="padding:6px 12px;font-size:12px;">＋ Adopsi ke Cabang</button>'
+                : '<button type="button" class="x-btn-secondary" disabled style="padding:6px 12px;font-size:12px;opacity:.65;">Menunggu komposisi Owner</button>') +
+            '</div>',
           '</div>',
         '</div>'
       ].join('');
     }).join('');
+
+    container.querySelectorAll('[data-master-adopt]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openMerchantAdoptModal(btn.getAttribute('data-master-adopt'));
+      });
+    });
   }
   // Override removeBranchProduct and toggleBranchProductAvailability to also refresh inline panel
   var _origToggleBranchAvail = window.toggleBranchProductAvailability;
