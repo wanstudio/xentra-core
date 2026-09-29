@@ -7381,15 +7381,17 @@ input[type="file"].x-input,
   #master-products-table tr {
     display: grid !important;
     width: 100% !important;
-    grid-template-columns: 64px minmax(0, 1fr) auto;
+    /* Teks di kiri (rata kiri), foto di kanan atas, dan di bawah foto toggle
+       bersama tombol aksi sejajar dalam satu baris. */
+    grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
-      "foto nama   nama"
-      "foto kat    mode"
-      "foto harga  status"
-      "foto aksi   aksi";
+      "nama   foto   foto"
+      "kat    foto   foto"
+      "harga  foto   foto"
+      "mode   toggle aksi";
     column-gap: 10px;
     row-gap: 2px;
-    align-items: center;
+    align-items: start;
     border: 1px solid #e2e8f0 !important;
     border-radius: 12px !important;
     background: #ffffff !important;
@@ -7415,8 +7417,8 @@ input[type="file"].x-input,
   #master-products-table td:nth-child(3) { grid-area: kat; }
   #master-products-table td:nth-child(4) { grid-area: harga; }
   #master-products-table td:nth-child(5) { grid-area: mode; }
-  #master-products-table td:nth-child(6) { grid-area: status; justify-self: end; }
-  #master-products-table td:nth-child(7) { grid-area: aksi; justify-self: end; text-align: right !important; }
+  #master-products-table td:nth-child(6) { grid-area: toggle; align-self: center; }
+  #master-products-table td:nth-child(7) { grid-area: aksi; align-self: center; }
 
   /* Foto: kotak membulat seperti kartu menu di PWA customer. */
   #master-products-table td:nth-child(1) img,
