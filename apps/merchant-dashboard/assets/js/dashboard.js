@@ -3045,7 +3045,10 @@
     _productOptionsDraft = [];
     renderProductOptionsEditor();
     populateProductCategorySelect();
+    _masterMenuSelected = { flavor_id: '', complement_ids: [], level_id: '' };
+    renderMasterMenuSelectors();
     $('modal-product').style.display = 'flex';
+    loadMasterMenuComponents();
   };
 
   window.openEditProduct = function (id) {
@@ -3072,6 +3075,7 @@
     _productOptionsDraft = normalizeProductOptionsDraft(prod.options_config);
     renderProductOptionsEditor();
     $('modal-product').style.display = 'flex';
+    loadMasterMenuComposition(prod.id);
     loadProductOptionsEditor(prod.id);
   };
 
@@ -3131,6 +3135,38 @@
   function initCatalogListeners() {
     var btnOptionsAddGroup = $('btn-prod-options-add-group');
     if (btnOptionsAddGroup) btnOptionsAddGroup.addEventListener('click', newProductOptionGroup);
+
+    var btnManageMasterMenu = $('btn-manage-menu-components');
+    if (btnManageMasterMenu) btnManageMasterMenu.addEventListener('click', openMasterMenuComponentManager);
+
+    var btnCloseMasterMenu = $('btn-close-master-menu-components');
+    if (btnCloseMasterMenu) btnCloseMasterMenu.addEventListener('click', closeMasterMenuComponentManager);
+    var btnCloseMasterMenu2 = $('btn-close-master-menu-components-2');
+    if (btnCloseMasterMenu2) btnCloseMasterMenu2.addEventListener('click', closeMasterMenuComponentManager);
+    var btnAddMasterComponent = $('btn-add-master-menu-component');
+    if (btnAddMasterComponent) btnAddMasterComponent.addEventListener('click', addMasterMenuComponent);
+
+    var masterComponentTabs = $('master-menu-component-tabs');
+    if (masterComponentTabs) {
+      masterComponentTabs.querySelectorAll('[data-component-type]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          _masterMenuComponentType = btn.getAttribute('data-component-type');
+          masterComponentTabs.querySelectorAll('[data-component-type]').forEach(function(other) {
+            other.classList.toggle('active', other === btn);
+          });
+          renderMasterMenuComponentManager();
+        });
+      });
+    }
+
+    var flavorSelect = $('prod-flavor');
+    if (flavorSelect) flavorSelect.addEventListener('change', function() {
+      _masterMenuSelected.flavor_id = flavorSelect.value || '';
+    });
+    var levelSelect = $('prod-level');
+    if (levelSelect) levelSelect.addEventListener('change', function() {
+      _masterMenuSelected.level_id = levelSelect.value || '';
+    });
 
     var prodPricingMode = $('prod-pricing-mode');
     if (prodPricingMode) {
@@ -3340,6 +3376,14 @@
             showToast('❌ Produk tersimpan tetapi ID produk tidak kembali dari server.');
             return;
           }
+
+          try {
+            await saveMasterMenuComposition(savedId);
+          } catch (compositionErr) {
+            showToast('❌ ' + compositionErr.message);
+            return;
+          }
+
           try {
             await saveProductOptions(savedId);
           } catch (optionErr) {
