@@ -112,11 +112,13 @@ test('Owner Dashboard Mobile Navigation', async t => {
     for (const label of ['Katalog', 'Operasional', 'Pelanggan &amp; Pemasaran', 'Tim &amp; Akses', 'Insight &amp; Laporan', 'Brand']) {
       assert.ok(business.includes(label), 'Business hub must expose section "' + label.replace(/&amp;/g, '&') + '"');
     }
-    for (const route of ["catalog/products", "catalog/categories", "stock", "branches", "customers", "marketing", "team", "reports", "settings/business/profile"]) {
+    for (const route of ["catalog/products", "stock", "branches", "customers", "marketing", "team", "reports", "settings/business/profile"]) {
       assert.ok(business.includes("navigateTo('" + route + "')"), 'Business hub must expose route "' + route + '"');
     }
     assert.ok(!business.includes('Menu &amp; Paket'), 'Business hub must not expose the old combined Menu & Paket entry');
     assert.ok(!business.includes("navigateTo('catalog/menus')"), 'Branch Menu must not be presented as a Master Catalog hub card');
+    assert.ok(business.includes("navigateTo('catalog/products')"), 'Business hub must expose Product Master under Katalog');
+    assert.strictEqual((business.match(/navigateTo\('catalog\/products'\)/g) || []).length, 1, 'Catalog hub must expose only one Product Master entry');
   });
 
   await t.test('OWNER-MOB-11B: More hub is reserved for system/settings/account concerns', () => {
