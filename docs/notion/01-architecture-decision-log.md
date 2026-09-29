@@ -1,5 +1,15 @@
 <!-- SNAPSHOT FROM NOTION — source page: 01-architecture-decision-log; fetched 2026-09-05 -->
 
+# 🔶 ARCHITECTURE NOTICE — Master Menu Composition Direction (2026-09-29)
+
+**Forward Menu architecture is now defined separately from the historical Branch Catalog Override/Snapshot model.** Owner creates reusable Master Menu data and assembles Master Products; Merchant only adopts/selects which Master Products the Branch sells. The legacy Branch name/description/image override path is quarantined and must not be extended for new Menu work.
+
+Forward contract:
+`docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`
+
+Legacy quarantine:
+`docs/decisions/xentra-menu-legacy-quarantine-v1.md`
+
 # 🔒 Branch as Operational Truth Boundary
 
 ## Context / Decision
