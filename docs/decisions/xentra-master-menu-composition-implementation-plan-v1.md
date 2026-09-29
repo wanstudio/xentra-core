@@ -468,17 +468,19 @@ Keep commits separable by boundary:
 
 This makes rollback and review practical.
 
-## 🔒 UX NOTE — Category & Flavor Master Reference Surface
+## 🔒 UX NOTE — Master Product Assembly Workspace
 **29 September 2026**
 
-Owner's `Kategori & Rasa` page is the management surface for the two master values used directly by the Master Product editor dropdowns.
+Owner has one Catalog assembly workspace: **Produk Master**.
 
-- `Kategori` → `products.category_id` / Master Category authority.
-- `Rasa` → `product_flavors` / `menu_flavors` Master Flavor authority.
-- Product-form `+` actions are shortcuts to these same authorities.
-- No duplicate vocabulary or second Master Menu object is introduced.
+There is no separate Owner navigation surface for `Kategori` or `Kategori & Rasa`. Master Category and Master Flavor remain Core authorities and are created progressively from the Product editor through contextual `+` actions:
 
-The technical `Master Menu Composition` contract remains unchanged.
+- `Kategori ▼ +` → quick-create Master Category.
+- `Rasa ▼ +` → quick-create Master Flavor.
+
+After creation, the same Product editor refreshes its selector and selects the new value. The action never creates a duplicate vocabulary or branch-local master.
+
+The technical Master Menu Composition contract remains unchanged. This is a UX/progressive-disclosure decision only.
 
 ## 20. Current status
 
