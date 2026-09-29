@@ -2603,23 +2603,25 @@
   }
 
   async function loadMasterMenuComponents() {
-    try {
-      var results = await Promise.all(['flavor', 'complement', 'level'].map(function(type) {
-        return adminFetch(API_BASE + '/admin/menu/components/' + type, { headers: getAuthHeaders() })
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            if (!data.success) throw new Error(data.error || 'Gagal memuat ' + masterMenuComponentTypeLabel(type) + '.');
-            return { type: type, rows: data.components || [] };
-          });
-      }));
-      results.forEach(function(result) {
-        _masterMenuComponents[result.type] = result.rows;
-      });
-      renderMasterMenuSelectors();
-      renderMasterMenuComponentManager();
-    } catch (err) {
-      console.warn('[Master Menu Components] gagal memuat:', err.message);
-    }
+    var results = await Promise.all(['flavor', 'complement', 'level'].map(function(type) {
+      return adminFetch(API_BASE + '/admin/menu/components/' + type, { headers: getAuthHeaders() })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (!data.success) throw new Error(data.error || 'Gagal memuat ' + masterMenuComponentTypeLabel(type) + '.');
+          return { type: type, rows: data.components || [] };
+        })
+        .catch(function(err) {
+          console.warn('[Master Menu Components] gagal memuat ' + masterMenuComponentTypeLabel(type) + ':', err.message);
+          return null;
+        });
+    }));
+
+    results.forEach(function(result) {
+      if (result) _masterMenuComponents[result.type] = result.rows;
+    });
+
+    renderMasterMenuSelectors();
+    renderMasterMenuComponentManager();
   }
 
   function renderMasterMenuCustomerPreview() {
