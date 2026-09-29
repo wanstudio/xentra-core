@@ -2655,6 +2655,241 @@
 
   var _productOptionsDraft = [];
 
+  // Owner Master Menu Composition selectors.
+  var _masterMenuComponents = {
+    flavor: [],
+    complement: [],
+    level: []
+  };
+  var _masterMenuComponentType = 'flavor';
+  var _masterMenuSelected = {
+    flavor_id: '',
+    complement_ids: [],
+    level_id: ''
+  };
+
+  function masterMenuComponentTypeLabel(type) {
+    return type === 'flavor' ? 'Rasa' : (type === 'complement' ? 'Kelengkapan' : 'Level');
+  }
+
+  async function loadMasterMenuComponents() {
+    try {
+      var results = await Promise.all(['flavor', 'complement', 'level'].map(function(type) {
+        return adminFetch(API_BASE + '/admin/menu/components/' + type + '?active_only=true', { headers: getAuthHeaders() })
+          .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (!data.success) throw new Error(data.error || 'Gagal memuat ' + masterMenuComponentTypeLabel(type) + '.');
+            return { type: type, rows: data.components || [] };
+          });
+      }));
+      results.forEach(function(result) {
+        _masterMenuComponents[result.type] = result.rows;
+      });
+      renderMasterMenuSelectors();
+      renderMasterMenuComponentManager();
+    } catch (err) {
+      console.warn('[Master Menu Components] gagal memuat:', err.message);
+    }
+  }
+
+  function renderMasterMenuSelectors() {
+    var flavorSelect = $('prod-flavor');
+    if (flavorSelect) {
+      var flavorHtml = '<option value="">Tidak ada Rasa</option>';
+      _masterMenuComponents.flavor.forEach(function(row) {
+        flavorHtml += '<option value="' + esc(row.id) + '">' + esc(row.name) + '</option>';
+      });
+      flavorSelect.innerHTML = flavorHtml;
+      flavorSelect.value = _masterMenuSelected.flavor_id || '';
+    }
+
+    var levelSelect = $('prod-level');
+    if (levelSelect) {
+      var levelHtml = '<option value="">Tidak ada Level</option>';
+      _masterMenuComponents.level.forEach(function(row) {
+        levelHtml += '<option value="' + esc(row.id) + '">' + esc(row.name) + '</option>';
+      });
+      levelSelect.innerHTML = levelHtml;
+      levelSelect.value = _masterMenuSelected.level_id || '';
+    }
+
+    var complementBox = $('prod-complements-editor');
+    var empty = $('prod-complements-empty');
+    if (!complementBox) return;
+    if (!_masterMenuComponents.complement.length) {
+      complementBox.innerHTML = '';
+      if (empty) empty.style.display = 'block';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    complementBox.innerHTML = _masterMenuComponents.complement.map(function(row) {
+      var selected = _masterMenuSelected.complement_ids.indexOf(String(row.id)) !== -1;
+      return '<label style="display:flex;align-items:center;gap:8px;border:1px solid ' + (selected ? '#94a3b8' : '#e2e8f0') + ';border-radius:8px;padding:8px 10px;cursor:pointer;background:' + (selected ? '#f8fafc' : '#fff') + ';">' +
+        '<input type="checkbox" value="' + esc(row.id) + '"' + (selected ? ' checked' : '') + ' data-master-complement="1" style="width:16px;height:16px;">' +
+        '<span style="font-size:12px;color:#0f172a;">' + esc(row.name) + '</span>' +
+      '</label>';
+    }).join('');
+
+    complementBox.querySelectorAll('[data-master-complement]').forEach(function(input) {
+      input.addEventListener('change', function() {
+        var id = String(input.value);
+        var next = _masterMenuSelected.complement_ids.filter(function(existing) { return existing !== id; });
+        if (input.checked) next.push(id);
+        _masterMenuSelected.complement_ids = next;
+        renderMasterMenuSelectors();
+      });
+    });
+  }
+
+  async function loadMasterMenuComposition(productId) {
+    _masterMenuSelected = { flavor_id: '', complement_ids: [], level_id: '' };
+    renderMasterMenuSelectors();
+    if (!productId) {
+      await loadMasterMenuComponents();
+      return;
+    }
+    try {
+      var res = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId) + '/composition', { headers: getAuthHeaders() });
+      var data = await res.json();
+      if (!data.success || !data.composition) throw new Error(data.error || 'Komposisi Master belum tersedia.');
+      var composition = data.composition;
+      _masterMenuSelected.flavor_id = composition.flavor ? String(composition.flavor.id) : '';
+      _masterMenuSelected.complement_ids = (composition.complements || []).map(function(row) { return String(row.id); });
+      _masterMenuSelected.level_id = composition.level ? String(composition.level.id) : '';
+      renderMasterMenuSelectors();
+    } catch (err) {
+      showToast('⚠️ Komposisi Master belum tersedia. Pilih data sebelum menyimpan.');
+    }
+    await loadMasterMenuComponents();
+  }
+
+  async function saveMasterMenuComposition(productId) {
+    var categoryId = String($('prod-category').value || '').trim();
+    if (!categoryId) throw new Error('Kategori Master wajib dipilih.');
+    var payload = {
+      category_id: categoryId,
+      flavor_id: $('prod-flavor').value || null,
+      complement_ids: _masterMenuSelected.complement_ids.slice(),
+      level_id: $('prod-level').value || null
+    };
+    var res = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId) + '/composition', {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload)
+    });
+    var data = await res.json();
+    if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menyimpan komposisi Master.');
+    return data.composition;
+  }
+
+  function renderMasterMenuComponentManager() {
+    var box = $('master-menu-component-list');
+    if (!box) return;
+    var rows = _masterMenuComponents[_masterMenuComponentType] || [];
+    if (!rows.length) {
+      box.innerHTML = '<div class="text-muted" style="padding:16px;text-align:center;">Belum ada Master ' + masterMenuComponentTypeLabel(_masterMenuComponentType) + '.</div>';
+      return;
+    }
+    box.innerHTML = rows.map(function(row) {
+      var active = row.is_active !== 0;
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #eef2f7;padding:10px 2px;">' +
+        '<div style="min-width:0;"><strong style="font-size:13px;">' + esc(row.name) + '</strong><div class="text-muted" style="font-size:10px;">' + esc(row.slug) + '</div></div>' +
+        '<div style="display:flex;gap:6px;flex:0 0 auto;">' +
+          '<button type="button" class="x-btn-secondary" data-master-edit="' + esc(row.id) + '" style="font-size:11px;padding:5px 8px;">Edit</button>' +
+          '<button type="button" class="x-btn-secondary" data-master-toggle="' + esc(row.id) + '" style="font-size:11px;padding:5px 8px;">' + (active ? 'Nonaktifkan' : 'Aktifkan') + '</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    box.querySelectorAll('[data-master-edit]').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var id = btn.getAttribute('data-master-edit');
+        var current = rows.find(function(row) { return String(row.id) === String(id); });
+        if (!current) return;
+        var name = prompt('Nama ' + masterMenuComponentTypeLabel(_masterMenuComponentType), current.name);
+        if (name === null) return;
+        name = String(name).trim();
+        if (!name) return;
+        try {
+          var res = await adminFetch(API_BASE + '/admin/menu/components/' + _masterMenuComponentType + '/' + encodeURIComponent(id), {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ name: name })
+          });
+          var data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || 'Gagal mengubah data.');
+          showToast('✅ Master ' + masterMenuComponentTypeLabel(_masterMenuComponentType) + ' diperbarui.');
+          await loadMasterMenuComponents();
+        } catch (err) {
+          showToast('❌ ' + err.message);
+        }
+      });
+    });
+
+    box.querySelectorAll('[data-master-toggle]').forEach(function(btn) {
+      btn.addEventListener('click', async function() {
+        var id = btn.getAttribute('data-master-toggle');
+        try {
+          var res = await adminFetch(API_BASE + '/admin/menu/components/' + _masterMenuComponentType + '/' + encodeURIComponent(id) + '/toggle', {
+            method: 'PATCH',
+            headers: getAuthHeaders()
+          });
+          var data = await res.json();
+          if (!res.ok || !data.success) throw new Error(data.error || 'Gagal mengubah status.');
+          showToast('✅ Status Master ' + masterMenuComponentTypeLabel(_masterMenuComponentType) + ' diperbarui.');
+          await loadMasterMenuComponents();
+        } catch (err) {
+          showToast('❌ ' + err.message);
+        }
+      });
+    });
+  }
+
+  function openMasterMenuComponentManager() {
+    var modal = $('modal-master-menu-components');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    renderMasterMenuComponentManager();
+  }
+
+  function closeMasterMenuComponentManager() {
+    var modal = $('modal-master-menu-components');
+    if (modal) modal.style.display = 'none';
+  }
+
+  async function addMasterMenuComponent() {
+    var name = prompt('Nama Master ' + masterMenuComponentTypeLabel(_masterMenuComponentType));
+    if (name === null) return;
+    name = String(name).trim();
+    if (!name) return;
+    try {
+      var res = await adminFetch(API_BASE + '/admin/menu/components/' + _masterMenuComponentType, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ name: name })
+      });
+      var data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menambah data.');
+      showToast('✅ Master ' + masterMenuComponentTypeLabel(_masterMenuComponentType) + ' ditambahkan.');
+      await loadMasterMenuComponents();
+      _masterMenuSelected = {
+        flavor_id: _masterMenuSelected.flavor_id,
+        complement_ids: _masterMenuSelected.complement_ids.slice(),
+        level_id: _masterMenuSelected.level_id
+      };
+      if (_masterMenuComponentType === 'flavor') _masterMenuSelected.flavor_id = data.component.id;
+      if (_masterMenuComponentType === 'level') _masterMenuSelected.level_id = data.component.id;
+      if (_masterMenuComponentType === 'complement' && _masterMenuSelected.complement_ids.indexOf(String(data.component.id)) === -1) {
+        _masterMenuSelected.complement_ids.push(String(data.component.id));
+      }
+      renderMasterMenuSelectors();
+    } catch (err) {
+      showToast('❌ ' + err.message);
+    }
+  }
+
+
+
   function normalizeProductOptionsDraft(raw) {
     var cfg = raw;
     if (typeof raw === 'string') {
