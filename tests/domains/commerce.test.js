@@ -274,6 +274,16 @@ test('Commerce 6 — Order Placement: ACID guarded stock deduction, oversell pre
   assert.strictEqual(orderResult.success, true);
   assert.strictEqual(orderResult.order.grand_total, 110000);
 
+  const snapshotRow = db.prepare('SELECT menu_snapshot FROM order_items WHERE order_id = ? AND product_id = ?').get(orderResult.order.id, 'prod_limited');
+  assert.ok(snapshotRow && snapshotRow.menu_snapshot, 'Order item must persist immutable Master Menu snapshot');
+  const menuSnapshot = JSON.parse(snapshotRow.menu_snapshot);
+  assert.equal(menuSnapshot.schema_version, 'master-menu-composition-v1');
+  assert.equal(menuSnapshot.product_id, 'prod_limited');
+  assert.equal(menuSnapshot.title, 'Makanan');
+  assert.equal(menuSnapshot.subtitle, 'Lombok Ijo');
+  assert.deepEqual(menuSnapshot.detail, ['Nasi']);
+  assert.equal(menuSnapshot.indicator, 'Level 2');
+
   // 1. Verify Stock actually decremented in database to 2 for confirmed cash order
   const updatedBranchRow = db.prepare('SELECT stock FROM branch_products WHERE branch_id = ? AND product_id = ?').get('branch_test', 'prod_limited');
   assert.strictEqual(updatedBranchRow.stock, 2, 'Live stock must be decremented from 4 to 2');
