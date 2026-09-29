@@ -9,10 +9,20 @@ const ROOT = path.resolve(__dirname, '..');
 const HTML = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/index.html'), 'utf8');
 const JS = fs.readFileSync(path.join(ROOT, 'apps/merchant-dashboard/assets/js/dashboard.js'), 'utf8');
 
-test('Owner Master Menu UI exposes structured composition selectors', () => {
+test('Owner Category reference page exposes Category and Flavor master data', () => {
+  assert.ok(HTML.includes('Kategori &amp; Rasa'));
+  assert.ok(HTML.includes('id="master-categories-table-body"'));
+  assert.ok(HTML.includes('id="master-flavors-table-body"'));
+  assert.ok(HTML.includes('id="btn-add-master-flavor"'));
+  assert.ok(JS.includes('function renderMasterFlavorsTable()'));
+});
+
+test('Owner Master Product UI exposes structured composition selectors', () => {
   for (const id of ['prod-category', 'prod-flavor', 'prod-complements-editor', 'prod-level']) {
     assert.ok(HTML.includes('id="' + id + '"'), 'Missing composition control: ' + id);
   }
+  assert.ok(HTML.includes('id="btn-add-master-category-from-product"'));
+  assert.ok(HTML.includes('id="btn-add-master-flavor-from-product"'));
   assert.ok(HTML.includes('Master Product Composition'), 'Composition section must be present');
   assert.ok(HTML.includes('Preview Customer PWA'), 'Customer PWA preview must be present');
 });
