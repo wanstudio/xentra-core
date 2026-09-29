@@ -67,6 +67,8 @@
 
           var topbarBMBranchEl = $("dash-bm-branch-name");
           if (topbarBMBranchEl) topbarBMBranchEl.textContent = b.name || ("Cabang " + branchId);
+          var mobileTopbarBrandEl = $("topbar-brand-name");
+          if (mobileTopbarBrandEl) mobileTopbarBrandEl.textContent = b.name || ("Cabang " + branchId);
 
           var dotEl = $("bm-home-status-dot");
           var badgeEl = $("bm-home-status-badge");
@@ -195,7 +197,8 @@
         var iData = await results[3].value.json();
         if (iData.success && Array.isArray(iData.inventory)) {
           lowItems = iData.inventory.filter(function (item) {
-            return item.stock <= (item.low_stock_threshold || 5);
+            if (item.stock === null || item.stock === undefined || item.stock === "") return false;
+            return Number(item.stock) <= (Number(item.low_stock_threshold) || 5);
           });
         }
       } catch (e) {
