@@ -7,7 +7,7 @@
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.15">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.16">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -1511,6 +1511,8 @@
             </div>
           </div>
 
+          <!-- Tab Kategori/Rasa dan isinya satu kesatuan: satu kartu. -->
+          <div class="x-master-reference-card">
           <div class="x-subnav-tabs x-master-reference-tabs" id="master-reference-tabs" role="tablist" aria-label="Master kategori dan rasa">
             <button type="button" class="x-subnav-tab active" data-master-reference-tab="category" role="tab" aria-selected="true">Kategori</button>
             <button type="button" class="x-subnav-tab" data-master-reference-tab="flavor" role="tab" aria-selected="false">Rasa</button>
@@ -1540,6 +1542,7 @@
             <div id="master-flavors-page-list" class="x-master-reference-card-list">
               <div class="x-empty-state text-center py-6 text-muted">Memuat rasa...</div>
             </div>
+          </div>
           </div>
         </div>
       </section>
