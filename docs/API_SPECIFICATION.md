@@ -138,3 +138,56 @@ Updates order status with atomic state machine transition and pushes real-time e
 
 ### `POST /api/v1/webhooks/midtrans`
 Handles incoming asynchronous payment status notifications from Midtrans with transaction row-locking and idempotency key checks.
+
+
+---
+
+## Master Menu Composition APIs — 2026-09-29
+
+These Owner-authoritative endpoints provide the structured Master Menu foundation.
+They are not a replacement for the legacy Branch Override endpoint yet; that endpoint
+is quarantined and will be contracted only after the new consumer paths are migrated.
+
+### Master component vocabulary
+
+- `GET /api/v1/admin/menu/components/:type`
+  - `:type` = `flavor` | `complement` | `level`
+  - optional query `active_only=true`
+- `POST /api/v1/admin/menu/components/:type`
+  - body: `{ name, slug?, sort_order? }`
+- `PUT /api/v1/admin/menu/components/:type/:id`
+  - body: `{ name?, slug?, sort_order?, is_active? }`
+- `PATCH /api/v1/admin/menu/components/:type/:id/toggle`
+
+All component records are Brand-scoped. Authorization is Owner/Brand-level and is
+enforced by Core.
+
+### Master Product composition
+
+- `GET /api/v1/admin/products/:id/composition`
+- `PUT /api/v1/admin/products/:id/composition`
+
+PUT body:
+
+```json
+{
+  "category_id": "…",
+  "flavor_id": "…",
+  "complement_ids": ["…", "…"],
+  "level_id": "…"
+}
+```
+
+Composition semantics:
+
+- Kategori: required, one;
+- Rasa: optional, one;
+- Kelengkapan: optional, many, ordered by array position;
+- Level: optional, one.
+
+The API stores structured relations; it does not concatenate the composition into a
+free-text Menu field.
+
+**Important:** these APIs are the foundation for the new architecture. Customer PWA,
+Merchant adoption, and Checkout must consume the canonical composition resolver when
+those migration stages are activated.
