@@ -2342,10 +2342,7 @@
           '</div>',
           '<div class="x-master-reference-card-right">',
             referenceStatusBadge(cat.is_active !== 0 && cat.is_active !== null),
-            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi kategori" onclick="XentraActionMenu.open(this, [' +
-              '{ label: \'Edit\', icon: \'✏️\', onClick: function() { openEditMasterReference(\'category\', ' + id + '); } },' +
-              '{ label: \'Hapus\', icon: \'🗑️\', destructive: true, onClick: function() { deleteMasterReference(\'category\', ' + id + '); } }' +
-            '])">',
+            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi kategori" data-master-reference-action="category" data-reference-id="' + esc(String(cat.id)) + '">',
               '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
             '</button>',
           '</div>',
@@ -2379,10 +2376,7 @@
           '</div>',
           '<div class="x-master-reference-card-right">',
             referenceStatusBadge(flavor.is_active !== 0 && flavor.is_active !== null),
-            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi rasa" onclick="XentraActionMenu.open(this, [' +
-              '{ label: \'Edit\', icon: \'✏️\', onClick: function() { openEditMasterReference(\'flavor\', ' + id + '); } },' +
-              '{ label: \'Hapus\', icon: \'🗑️\', destructive: true, onClick: function() { deleteMasterReference(\'flavor\', ' + id + '); } }' +
-            '])">',
+            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi rasa" data-master-reference-action="flavor" data-reference-id="' + esc(String(flavor.id)) + '">',
               '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
             '</button>',
           '</div>',
@@ -2832,6 +2826,40 @@
   };
 
   function initCatalogListeners() {
+    var masterReferenceActionHandler = function (event) {
+      var trigger = event.target.closest ? event.target.closest('[data-master-reference-action]') : null;
+      if (!trigger) return;
+
+      var type = trigger.getAttribute('data-master-reference-action');
+      var id = trigger.getAttribute('data-reference-id');
+      if (!type || !id || !XentraActionMenu) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      XentraActionMenu.open(trigger, [
+        {
+          label: 'Edit',
+          icon: '✏️',
+          onClick: function () { openEditMasterReference(type, id); }
+        },
+        {
+          label: 'Hapus',
+          icon: '🗑️',
+          destructive: true,
+          onClick: function () { deleteMasterReference(type, id); }
+        }
+      ]);
+    };
+
+    ['master-categories-page-list', 'master-flavors-page-list'].forEach(function (listId) {
+      var list = $(listId);
+      if (list && !list.dataset.actionMenuBound) {
+        list.dataset.actionMenuBound = 'true';
+        list.addEventListener('click', masterReferenceActionHandler);
+      }
+    });
+
     var referenceTabs = $('master-reference-tabs');
     if (referenceTabs && !referenceTabs.dataset.bound) {
       referenceTabs.dataset.bound = 'true';
