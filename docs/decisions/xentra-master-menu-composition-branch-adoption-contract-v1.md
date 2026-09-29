@@ -1,6 +1,6 @@
 # Xentra Master Menu Composition & Branch Adoption Contract v1
 
-**Status:** PROPOSED — REVIEW BEFORE LOCK / IMPLEMENTATION
+**Status:** 🔒 LOCKED — MASTER MENU ARCHITECTURE / IMPLEMENTATION CONTRACT
 **Date:** 2026-09-29
 **Scope:** Owner Dashboard, Merchant App, Master Catalog, Branch Catalog, Customer PWA, Order Snapshot
 
@@ -536,3 +536,89 @@ Review these points before coding:
 10. Legacy branch name/description/image overrides are retired from the canonical Menu path.
 
 No production schema/UI migration should start until this proposal is locked.
+
+## 🔒 LOCKED ADDENDUM — Composition Cardinality & Presentation
+**Date: 2026-09-29**
+
+The audited interpretation of the Owner-managed structured Menu fields is now:
+
+| Component | Cardinality per Master Product | Customer PWA role |
+|---|---:|---|
+| Kategori | exactly 1 | title |
+| Rasa | 0..1 | subtitle |
+| Kelengkapan | 0..N | ordered detail |
+| Level | 0..1 | indicator |
+
+The composition values are structured references. They are not free-text Merchant fields.
+
+`products.name` remains the durable Master Product identity/administrative identifier used by Core, search, reporting, and internal references. It is not the new source for the Customer card title when a Master Category is present.
+
+Owner controls Master Product image/content and price policy. Merchant adoption does not create a Branch-authored copy of those fields.
+
+### Customer composition view model
+
+The forward Customer Menu resolver must expose a resolved presentation model equivalent to:
+
+```text
+title      <- Master Category.name
+subtitle   <- Master Flavor.name (nullable)
+detail[]   <- ordered Master Complement.name[]
+indicator  <- Master Level.name (nullable)
+image      <- Master Product image
+price      <- Owner Master Product / Pricing Policy result
+```
+
+The raw relation IDs may remain internal. Customer clients consume the resolved DTO.
+
+### Merchant rule
+
+Merchant UI must show the adopted Master Product composition as read-only. Merchant actions are adoption/removal, Branch Category classification, availability, stock, and other explicitly approved Branch operations.
+
+Merchant must not replace a Master component with arbitrary text or a different branch-specific component set.
+
+## 🔒 LOCKED ADDENDUM — Propagation / Inactivation
+**Date: 2026-09-29**
+
+Master component edits affect future resolved Branch Menu views because Branch adoption references the Master Product rather than copying the composition.
+
+When a referenced Master component is retired:
+
+- existing Product relations are retained;
+- the component becomes inactive for new composition selection;
+- existing adopted Products do not lose historical identity merely because the component is inactive;
+- customer resolution must follow an explicit safe display rule for an inactive referenced component before that component is physically removed.
+
+Referenced component rows must therefore be **soft-inactivated before any destructive deletion**.
+
+## 🔒 LOCKED ADDENDUM — Pricing Boundary
+**Date: 2026-09-29**
+
+For the new Master Menu architecture, **Merchant does not edit Menu price**.
+
+Owner defines the Master Product price and pricing policy. Any existing Branch price override capability is legacy compatibility and is quarantined with the rest of the old Branch Menu Override model.
+
+The existing `PricingPolicyModel` and `branch_products.price` path must not be extended as the new Merchant Menu editor. A later explicit pricing contract may govern legitimate branch pricing for a different business requirement, but that would be a separate decision.
+
+## 8A. Implementation dependency gate
+
+Before runtime migration, the following must exist and pass:
+
+1. Master component schema and tenant/brand scoping.
+2. Owner CRUD for Master components.
+3. Owner Product Composition API with transactional relation replacement.
+4. Merchant adoption API that creates only the Branch Product assignment and Branch Category membership.
+5. Customer Menu resolver returning the structured composition DTO.
+6. Checkout final verification resolving the same Master composition and authoritative price.
+7. Immutable `menu_snapshot` persistence on `order_items`.
+8. Legacy compatibility coverage proves old data remains readable during migration.
+
+**No legacy override endpoint or field may be used to satisfy any item above.**
+
+## 20. Contract completion
+
+This contract is now the authoritative forward Menu architecture for the implementation sequence.
+
+The legacy Branch Override/Snapshot model remains quarantined under:
+`docs/decisions/xentra-menu-legacy-quarantine-v1.md`.
+
+Any change to ownership, component cardinality, propagation, Merchant authority, pricing boundary, or Customer presentation mapping requires a new explicit contract revision.
