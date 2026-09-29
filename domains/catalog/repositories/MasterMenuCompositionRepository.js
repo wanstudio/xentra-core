@@ -141,6 +141,101 @@ class MasterMenuCompositionRepository {
     }
   }
 
+  findMasterProducts({ brandId, productIds = [], activeOnly = true }) {
+    const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : []).map(v => String(v || '').trim()).filter(Boolean)));
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    const activeFilter = activeOnly ? 'AND p.is_active = 1' : '';
+    return this.db.queryMany(
+      `SELECT p.id, p.brand_id, p.category_id, p.name, p.slug, p.description,
+              p.price, p.regular_price, p.pricing_mode, p.min_price, p.max_price,
+              p.image_url, p.image, p.media_id, p.options_config, p.is_active, p.sort_order,
+              c.name AS category_name, c.slug AS category_slug, c.is_active AS category_is_active
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id AND c.brand_id = p.brand_id
+       WHERE p.brand_id = ? AND p.id IN (${placeholders}) ${activeFilter}`,
+      [brandId, ...ids]
+    );
+  }
+
+  findProductFlavors({ brandId, productIds = [] }) {
+    const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : []).map(v => String(v || '').trim()).filter(Boolean)));
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    return this.db.queryMany(
+      `SELECT pf.product_id, mf.id, mf.name, mf.slug, mf.is_active
+       FROM product_flavors pf
+       JOIN menu_flavors mf ON mf.id = pf.flavor_id
+       WHERE mf.brand_id = ? AND pf.product_id IN (${placeholders})`,
+      [brandId, ...ids]
+    );
+  }
+
+  findProductComplements({ brandId, productIds = [] }) {
+    const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : []).map(v => String(v || '').trim()).filter(Boolean)));
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    return this.db.queryMany(
+      `SELECT pc.product_id, mc.id, mc.name, mc.slug, mc.is_active, pc.sort_order
+       FROM product_complements pc
+       JOIN menu_complements mc ON mc.id = pc.complement_id
+       WHERE mc.brand_id = ? AND pc.product_id IN (${placeholders})
+       ORDER BY pc.product_id ASC, pc.sort_order ASC, mc.name ASC, mc.id ASC`,
+      [brandId, ...ids]
+    );
+  }
+
+  findProductLevels({ brandId, productIds = [] }) {
+    const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : []).map(v => String(v || '').trim()).filter(Boolean)));
+    if (!ids.length) return [];
+    return this.db.queryMany(
+      `SELECT pl.product_id, ml.id, ml.name, ml.slug, ml.is_active
+       FROM product_levels pl
+       JOIN menu_levels ml ON ml.id = pl.level_id
+       WHERE ml.brand_id = ? AND pl.product_id IN (${placeholders})`,
+      [brandId, ...ids]
+    );
+  }
+
+  findBranchProductStates({ brandId, branchId, productIds = [] }) {
+    const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : []).map(v => String(v || '').trim()).filter(Boolean)));
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    return this.db.queryMany(
+      `SELECT bp.product_id, bp.branch_id, bp.is_available, bp.stock, bp.low_stock_threshold
+       FROM branch_products bp
+       JOIN branches b ON b.id = bp.branch_id AND b.brand_id = ?
+       WHERE bp.branch_id = ? AND bp.product_id IN (${placeholders})`,
+      [brandId, branchId, ...ids]
+    );
+  }
+
+  findBranchProductCategoryMemberships({ branchId, productIds = [] }) {
+    const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : []).map(v => String(v || '').trim()).filter(Boolean)));
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    return this.db.queryMany(
+      `SELECT bpc.product_id, bpc.branch_category_id, bc.name, bc.slug, bc.sort_order
+       FROM branch_product_categories bpc
+       JOIN branch_categories bc
+         ON bc.id = bpc.branch_category_id
+        AND bc.branch_id = ?
+       WHERE bpc.branch_id = ? AND bpc.product_id IN (${placeholders})
+       ORDER BY bpc.product_id ASC, bc.sort_order ASC, bc.name ASC, bc.id ASC`,
+      [branchId, branchId, ...ids]
+    );
+  }
+
+  listBranchCategoriesForMenu({ branchId, brandId }) {
+    return this.db.queryMany(
+      `SELECT id, brand_id, branch_id, name, slug, image_url, sort_order, media_id
+       FROM branch_categories
+       WHERE branch_id = ? AND brand_id = ?
+       ORDER BY sort_order ASC, name ASC, id ASC`,
+      [branchId, brandId]
+    );
+  }
+
   findComposition({ brandId, productId }) {
     const product = this.db.queryOne(
       `SELECT p.id, p.brand_id, p.category_id,
