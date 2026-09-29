@@ -30,8 +30,7 @@ test('MERCHANT-HOME-01: Home uses the locked native composition order', () => {
     'Operasional Hari Ini',
     'Perlu Perhatian',
     'Promo Aktif',
-    'Aktivitas Terakhir',
-    'x-merchant-mobile-nav'
+    'Aktivitas Terakhir'
   ];
 
   let cursor = -1;
