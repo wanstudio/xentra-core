@@ -85,11 +85,8 @@
         </button>
         <!-- Catalog sub-nav -->
         <div class="x-nav-sub" id="nav-catalog-sub">
-          <button type="button" class="x-nav-sub-item" data-route="catalog/categories" data-tab="catalog-categories">
-            <span>Kategori &amp; Rasa</span>
-          </button>
           <button type="button" class="x-nav-sub-item" data-route="catalog/products" data-tab="catalog-products">
-            <span>Products</span>
+            <span>Produk Master</span>
           </button>
           <button type="button" class="x-nav-sub-item" data-route="catalog/menus" data-tab="catalog-menus">
             <span>Menu Cabang</span>
@@ -1618,68 +1615,6 @@
         </div>
       </section>
 
-      <!-- TAB: CATALOG / CATEGORIES (Master Categories) -->
-      <section id="tab-catalog-categories" class="x-tab-content" data-tab="catalog-categories">
-        <div class="x-card-panel">
-          <div class="x-panel-header-flex">
-            <div>
-              <h3>🗂️ Kategori &amp; Rasa</h3>
-              <p class="text-muted" style="font-size:13px;">Master pilihan yang digunakan saat menyusun Produk Master. Kategori dan Rasa muncul sebagai pilihan pada form produk.</p>
-            </div>
-          </div>
-
-          <div class="x-master-reference-grid">
-            <div class="x-master-reference-card">
-              <div class="x-master-reference-card-head">
-                <div>
-                  <h4>Kategori</h4>
-                  <p>Pengelompokan utama Produk Master.</p>
-                </div>
-                <button type="button" class="x-btn-primary" id="btn-add-master-category">+ Tambah</button>
-              </div>
-              <div class="x-table-responsive mt-3">
-                <table class="x-table">
-                  <thead>
-                    <tr>
-                      <th>Nama Kategori</th>
-                      <th>Produk</th>
-                      <th class="text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody id="master-categories-table-body">
-                    <tr><td colspan="3" class="text-center py-6">Memuat daftar kategori...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="x-master-reference-card">
-              <div class="x-master-reference-card-head">
-                <div>
-                  <h4>Rasa</h4>
-                  <p>Pilihan rasa yang menjadi subtitle Customer.</p>
-                </div>
-                <button type="button" class="x-btn-primary" id="btn-add-master-flavor">+ Tambah</button>
-              </div>
-              <div class="x-table-responsive mt-3">
-                <table class="x-table">
-                  <thead>
-                    <tr>
-                      <th>Nama Rasa</th>
-                      <th>Status</th>
-                      <th class="text-right">Aksi</th>
-                    </tr>
-                  </thead>
-                  <tbody id="master-flavors-table-body">
-                    <tr><td colspan="3" class="text-center py-6">Memuat daftar rasa...</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- TAB: CATALOG / MENUS (Branch Selling Assortment) -->
       <section id="tab-catalog-menus" class="x-tab-content" data-tab="catalog-menus">
         <!-- Header banner showing branch context state -->
@@ -3197,17 +3132,6 @@
         <div class="x-hub-section">
           <h3 class="x-hub-section-title">Katalog</h3>
           <div class="x-hub-grid">
-            <div class="x-hub-card" onclick="navigateTo('catalog/categories')">
-              <div class="x-hub-icon bg-purple">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-              </div>
-              <div class="x-hub-info">
-                <h3>Kategori &amp; Rasa</h3>
-                <p>Kelola kategori master dan pilihan rasa untuk Produk Master</p>
-              </div>
-              <div class="x-hub-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg></div>
-            </div>
-
             <div class="x-hub-card" onclick="navigateTo('catalog/products')">
               <div class="x-hub-icon bg-indigo">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
@@ -3559,22 +3483,30 @@
     </div>
   </div>
 
-  <!-- MODAL: ADD / EDIT MASTER CATEGORY -->
-  <div id="modal-master-category" class="x-modal-backdrop" style="display:none; z-index:1100;">
+  <!-- MODAL: MASTER REFERENCE QUICK ADD -->
+  <div id="modal-master-reference-quick-add" class="x-modal-backdrop" style="display:none; z-index:1200;">
     <div class="x-modal-card" style="max-width: 440px;">
       <div class="x-modal-header">
-        <h3 id="modal-master-category-title">Tambah Kategori Master</h3>
-        <button type="button" class="x-modal-close" onclick="closeMasterCategoryModal()">✕</button>
+        <div>
+          <h3 id="master-reference-quick-add-title">Tambah Kategori</h3>
+          <p id="master-reference-quick-add-subtitle" class="text-muted" style="font-size:12px;margin:3px 0 0;">
+            Tambahkan pilihan master tanpa meninggalkan Produk Master.
+          </p>
+        </div>
+        <button type="button" class="x-modal-close" id="btn-close-master-reference-quick-add" aria-label="Tutup">✕</button>
       </div>
-      <form id="form-master-category" class="x-form">
-        <input type="hidden" id="master-cat-id" value="">
+      <form id="form-master-reference-quick-add" class="x-form">
+        <input type="hidden" id="master-reference-quick-add-type" value="">
         <div class="x-form-group">
-          <label for="master-cat-name">Nama Kategori</label>
-          <input type="text" id="master-cat-name" class="x-input" placeholder="Contoh: Makanan Berat" required maxlength="50">
+          <label id="master-reference-quick-add-label" for="master-reference-quick-add-name">Nama Kategori</label>
+          <input type="text" id="master-reference-quick-add-name" class="x-input" placeholder="Contoh: Makanan Berat" required maxlength="80" autocomplete="off">
+          <small id="master-reference-quick-add-help" class="text-muted" style="display:block;margin-top:5px;font-size:11px;">
+            Setelah disimpan, pilihan baru langsung tersedia di dropdown.
+          </small>
         </div>
         <div class="x-modal-footer">
-          <button type="button" class="x-btn-secondary" onclick="closeMasterCategoryModal()">Batal</button>
-          <button type="submit" class="x-btn-primary" id="btn-save-master-category">Simpan Kategori</button>
+          <button type="button" class="x-btn-secondary" id="btn-cancel-master-reference-quick-add">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-master-reference-quick-add">Simpan</button>
         </div>
       </form>
     </div>
