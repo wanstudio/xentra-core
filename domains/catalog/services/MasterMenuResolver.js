@@ -49,6 +49,7 @@ function resolveProductView({ product, flavor, complements, level, branchState =
     is_active: product.is_active !== 0,
     is_available: branchAvailable,
     stock_estimate: branchState && branchState.stock != null ? Number(branchState.stock) : null,
+    low_stock_threshold: branchState && branchState.low_stock_threshold != null ? Number(branchState.low_stock_threshold) : null,
     availability: branchAvailable,
     categories: categories.map(c => ({ id: c.branch_category_id, name: c.name, slug: c.slug })),
     options: ProductOptionsModel.normalizeConfig(product.options_config),
