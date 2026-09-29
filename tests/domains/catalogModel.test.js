@@ -1,7 +1,11 @@
 'use strict';
 
 /**
- * MASTER CATALOG ↔ BRANCH CATALOG — Relationship Model Tests
+ * LEGACY QUARANTINED — MASTER CATALOG ↔ BRANCH CATALOG OVERRIDE TESTS
+ *
+ * These tests preserve compatibility coverage for the superseded Branch Product
+ * Override architecture during migration. They are not acceptance criteria for
+ * the forward Master Menu Composition contract.
  *
  * Tests prove the physical model implements the locked Xentra contract:
  * - Master Catalog = Owner/Brand master library

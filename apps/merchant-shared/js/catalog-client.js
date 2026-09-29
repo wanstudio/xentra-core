@@ -57,6 +57,9 @@
     });
   }
 
+  // LEGACY QUARANTINED (2026-09-29): compatibility transport only.
+  // Do not add new Menu Composition fields here. Forward Menu work uses
+  // Owner-owned structured Master Menu Composition + Branch Adoption.
   function updateBranchProductOverride(branchId, productId, payload) {
     return request('/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId) + '/override', {
       method: 'PATCH',

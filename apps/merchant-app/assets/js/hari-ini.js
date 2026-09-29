@@ -62,15 +62,17 @@
           _hariIniState.branch = bData.branch;
           var b = bData.branch;
 
-          var nameEl = $("bm-hero-branch-name");
+          var nameEl = $("bm-home-branch-name");
           if (nameEl) nameEl.textContent = b.name || ("Cabang " + branchId);
 
           var topbarBMBranchEl = $("dash-bm-branch-name");
           if (topbarBMBranchEl) topbarBMBranchEl.textContent = b.name || ("Cabang " + branchId);
+          var mobileTopbarBrandEl = $("topbar-brand-name");
+          if (mobileTopbarBrandEl) mobileTopbarBrandEl.textContent = b.name || ("Cabang " + branchId);
 
-          var dotEl = $("bm-hero-status-dot");
-          var badgeEl = $("bm-hero-status-badge");
-          var onlineBadgeEl = $("bm-hero-online-badge");
+          var dotEl = $("bm-home-status-dot");
+          var badgeEl = $("bm-home-status-badge");
+          var onlineBadgeEl = $("bm-home-online-badge");
           var toggleBtn = $("btn-bm-toggle-open");
 
           var isOpen = b.is_open_override === 1 || b.is_open_override === true;
@@ -111,7 +113,7 @@
           if (mobileOnlineSwitch) mobileOnlineSwitch.classList.toggle("is-on", isDeliveryActive);
           if (mobileOnlineSwitch) mobileOnlineSwitch.classList.toggle("is-off", !isDeliveryActive);
           // Live WIB date context
-          var dateEl = $("bm-hero-date");
+          var dateEl = $("bm-home-date");
           if (dateEl) {
             try {
               var now = new Date();
@@ -153,7 +155,11 @@
           if ($("bm-stat-active-orders")) $("bm-stat-active-orders").textContent = activeList.length;
           if ($("bm-stat-ready-orders")) $("bm-stat-ready-orders").textContent = readyList.length;
           if ($("bm-stat-completed-orders")) $("bm-stat-completed-orders").textContent = completedToday.length;
-          if ($("bm-stat-net-sales-today")) $("bm-stat-net-sales-today").textContent = formatMoney(completedSales) + " total penjualan";
+           if ($("bm-stat-completed-orders-snapshot")) $("bm-stat-completed-orders-snapshot").textContent = completedToday.length;
+          if ($("bm-stat-net-sales-today")) $("bm-stat-net-sales-today").textContent = formatMoney(completedSales);
+
+           var avgOrderEl = $("bm-stat-average-order");
+           if (avgOrderEl) avgOrderEl.textContent = completedToday.length ? formatMoney(Math.round(completedSales / completedToday.length)) : "Rp0";
 
           renderHariIniPendingOrders(pendingList);
         }
@@ -191,7 +197,8 @@
         var iData = await results[3].value.json();
         if (iData.success && Array.isArray(iData.inventory)) {
           lowItems = iData.inventory.filter(function (item) {
-            return item.stock <= (item.low_stock_threshold || 5);
+            if (item.stock === null || item.stock === undefined || item.stock === "") return false;
+            return Number(item.stock) <= (Number(item.low_stock_threshold) || 5);
           });
         }
       } catch (e) {
@@ -241,6 +248,8 @@
         console.warn("[BM Hari Ini Logs Parse Error]:", e);
       }
     }
+
+    try { window.dispatchEvent(new CustomEvent("merchant:home-ready")); } catch (_) {}
   }
   window.loadHariIni = loadHariIni;
 
@@ -249,21 +258,22 @@
     if (!container) return;
 
     if (!promos || !promos.length) {
-      container.innerHTML = "<div class=\"text-muted text-center py-4\" style=\"font-size:13px;\">Belum ada promosi aktif di cabang ini.</div>";
+      container.innerHTML = "<div class=\"x-home-empty\"><strong>Belum ada promo aktif</strong>Promosi aktif cabang akan tampil di sini.</div>";
       return;
     }
 
-    container.innerHTML = promos.slice(0, 4).map(function (p) {
-      var discountStr = p.discount_type === "percentage" ? (p.discount_value + "%") : formatMoney(p.discount_value);
-      return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#f0fdf4;border-radius:6px;border:1px solid #dcfce7;\">" +
-        "<div>" +
-          "<div style=\"display:flex;align-items:center;gap:6px;\">" +
-            "<strong style=\"font-size:13px;color:#166534;\">" + esc(p.name || p.title) + "</strong>" +
-            (p.code ? ("<code style=\"font-size:11px;background:#bbf7d0;color:#14532d;padding:1px 5px;border-radius:3px;\">" + esc(p.code) + "</code>") : "") +
-          "</div>" +
-          "<div style=\"font-size:11px;color:#15803d;margin-top:2px;\">" + esc(p.description || "Promosi aktif dapat digunakan pelanggan.") + "</div>" +
-        "</div>" +
-        "<span class=\"x-badge x-badge-success\" style=\"font-size:11px;\">" + discountStr + "</span>" +
+    container.innerHTML = promos.slice(0, 3).map(function (p) {
+      var discountStr = p.discount_type === "percentage"
+        ? (p.discount_value + "%")
+        : formatMoney(p.discount_value);
+
+      return "<div class=\"x-home-promo-item\">" +
+        "<span class=\"x-home-promo-icon\" aria-hidden=\"true\">%" + "</span>" +
+        "<span class=\"x-home-promo-copy\">" +
+          "<strong>" + esc(p.name || p.title || "Promo") + "</strong>" +
+          "<span>" + esc(p.description || "Promo aktif dapat digunakan pelanggan.") + "</span>" +
+        "</span>" +
+        "<span class=\"x-home-promo-badge\">" + esc(discountStr) + "</span>" +
       "</div>";
     }).join("");
   }
@@ -273,13 +283,12 @@
     if (!container) return;
 
     if (!logs || !logs.length) {
-      container.innerHTML = "<div class=\"text-muted text-center py-4\" style=\"font-size:13px;\">Belum ada aktivitas operasional tercatat hari ini.</div>";
+      container.innerHTML = "<div class=\"x-home-empty\"><strong>Belum ada aktivitas</strong>Perubahan operasional terbaru akan tampil di sini.</div>";
       return;
     }
 
-    container.innerHTML = logs.slice(0, 5).map(function (l) {
+    container.innerHTML = logs.slice(0, 4).map(function (l) {
       var timeStr = l.created_at ? l.created_at.substring(11, 16) : "—";
-      var actorDesc = esc(l.actor_id || "Staf") + " (" + esc(l.actor_role || "system") + ")";
       var actionDesc = "";
 
       if (l.field === "is_open_override") {
@@ -287,66 +296,76 @@
         actionDesc = isOpen ? "Membuka operasional cabang" : "Menutup operasional cabang sementara";
       } else if (l.field === "is_delivery_active") {
         var isDel = l.new_value === "1" || l.new_value === 1 || l.new_value === "true";
-        actionDesc = isDel ? "Mengaktifkan layanan pesanan online" : "Menjeda pesanan online cabang";
+        actionDesc = isDel ? "Mengaktifkan pesanan online" : "Menjeda pesanan online";
       } else if (l.field === "is_available") {
         var isAvail = l.new_value === "1" || l.new_value === 1 || l.new_value === "true";
-        actionDesc = (isAvail ? "Mengaktifkan kembali menu" : "Menandai menu habis") + (l.product_id ? (" [ID: " + esc(l.product_id) + "]") : "");
+        actionDesc = isAvail
+          ? "Mengaktifkan kembali menu"
+          : "Menandai menu tidak tersedia";
+      } else if (l.field) {
+        actionDesc = "Memperbarui operasional cabang";
       } else {
-        actionDesc = "Perubahan " + esc(l.field) + " &rarr; " + esc(l.new_value || "null");
+        actionDesc = "Aktivitas operasional cabang";
       }
 
-      return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;font-size:12px;\">" +
-        "<div>" +
-          "<span style=\"font-weight:700;color:var(--text-main);\">" + actionDesc + "</span>" +
-          "<div style=\"font-size:11px;color:var(--text-muted);margin-top:2px;\">Oleh: " + actorDesc + "</div>" +
-        "</div>" +
-        "<span style=\"color:var(--text-muted);font-weight:600;font-size:11px;\">" + timeStr + "</span>" +
+      var actor = l.actor_name || "Staf cabang";
+      return "<div class=\"x-home-activity-item\">" +
+        "<span class=\"x-home-activity-icon\" aria-hidden=\"true\">•</span>" +
+        "<span class=\"x-home-activity-copy\">" +
+          "<strong>" + actionDesc + "</strong>" +
+          "<span>Oleh " + esc(actor) + "</span>" +
+        "</span>" +
+        "<span class=\"x-home-activity-time\">" + esc(timeStr) + "</span>" +
       "</div>";
     }).join("");
   }
 
   function renderHariIniPendingOrders(orders) {
-    var tbody = $("bm-tbody-pending-orders");
+    var list = $("bm-pending-orders-list");
     var countBadge = $("bm-badge-pending-count");
+
     if (countBadge) {
-      if (orders && orders.length > 0) {
-        countBadge.textContent = orders.length + " Menunggu";
-        countBadge.style.display = "inline-block";
-      } else {
-        countBadge.style.display = "none";
-      }
+      countBadge.textContent = String(orders ? orders.length : 0);
+      countBadge.style.display = "inline-flex";
     }
-    if (!tbody) return;
+
+    if (!list) return;
 
     if (!orders || orders.length === 0) {
-      tbody.innerHTML = "<tr><td colspan=\"7\" class=\"text-center py-6 text-muted\"><span style=\"color:var(--accent-green);font-weight:700;\">✓</span> Tidak ada antrean pesanan yang memerlukan tindakan saat ini.</td></tr>";
+      list.innerHTML = "<div class=\"x-home-empty\"><strong>Tidak ada pesanan baru</strong>Tidak ada antrean pesanan yang memerlukan tindakan saat ini.</div>";
       return;
     }
 
-    tbody.innerHTML = orders.map(function (o) {
-      var orderNum = esc(o.order_number || o.id);
-      var cust = esc(o.customer_name || "Pelanggan");
-      var typeBadge = (o.order_type === "delivery")
-        ? "<span class=\"x-badge x-badge-info\">DELIVERY</span>"
-        : (o.order_type === "dine_in" ? "<span class=\"x-badge\" style=\"background:#ede9fe;color:#6d28d9;\">DINE IN</span>" : "<span class=\"x-badge x-badge-warning\">PICKUP</span>");
+    list.innerHTML = orders.slice(0, 3).map(function (o) {
+      var orderNum = esc(o.order_number || o.id || "Pesanan");
+      var typeMap = {
+        delivery: "Delivery",
+        pickup: "Pickup",
+        dine_in: "Dine-in",
+        reservation: "Reservasi"
+      };
+      var type = typeMap[o.order_type] || "Pesanan";
+      var table = o.table_name || o.table_number;
+      var context = type + (table ? " • " + esc(table) : "");
       var time = (o.created_at || "").substring(11, 16) || "—";
       var total = formatMoney(o.grand_total);
-      var statusBadge = "<span class=\"x-badge x-badge-warning\">MENUNGGU KONFIRMASI</span>";
 
-      return "<tr>" +
-        "<td><strong>" + orderNum + "</strong></td>" +
-        "<td>" + cust + "</td>" +
-        "<td>" + typeBadge + "</td>" +
-        "<td>" + time + "</td>" +
-        "<td><strong>" + total + "</strong></td>" +
-        "<td>" + statusBadge + "</td>" +
-        "<td>" +
-          "<div style=\"display:flex;gap:6px;\">" +
-            "<button type=\"button\" class=\"x-btn-primary\" style=\"font-size:11px;padding:4px 8px;\" onclick=\"quickAcceptBMOrder('" + esc(o.id) + "', this)\">Terima</button>" +
-            "<button type=\"button\" class=\"x-btn-secondary\" style=\"font-size:11px;padding:4px 8px;color:#dc2626;border-color:#fecaca;\" onclick=\"quickRejectBMOrder('" + esc(o.id) + "')\">Tolak</button>" +
+      return "<article class=\"x-home-order-card\" data-order-id=\"" + orderNum + "\">" +
+        "<div class=\"x-home-order-main\">" +
+          "<div>" +
+            "<p class=\"x-home-order-id\">" + orderNum + "</p>" +
+            "<p class=\"x-home-order-type\">" + context + "</p>" +
           "</div>" +
-        "</td>" +
-      "</tr>";
+          "<span class=\"x-home-order-time\">" + esc(time) + "</span>" +
+        "</div>" +
+        "<div class=\"x-home-order-bottom\">" +
+          "<strong class=\"x-home-order-total\">" + total + "</strong>" +
+          "<div class=\"x-home-order-actions\">" +
+            "<button type=\"button\" class=\"x-home-order-action\" onclick=\"quickRejectBMOrder('" + esc(o.id) + "')\">Tolak</button>" +
+            "<button type=\"button\" class=\"x-home-order-action is-primary\" onclick=\"quickAcceptBMOrder('" + esc(o.id) + "', this)\">Terima</button>" +
+          "</div>" +
+        "</div>" +
+      "</article>";
     }).join("");
   }
 
@@ -354,72 +373,19 @@
     var hasLow = lowItems && lowItems.length > 0;
     var hasUnavail = unavailItems && unavailItems.length > 0;
 
-    var menuContainer = $("bm-menu-unavail-list");
-    var menuBadge = $("bm-badge-menu-unavail");
-    if (menuBadge) {
-      menuBadge.textContent = hasUnavail ? (unavailItems.length + " Habis") : "0 Habis";
-      menuBadge.className = "x-badge " + (hasUnavail ? "x-badge-danger" : "");
-      if (!hasUnavail) {
-        menuBadge.style.background = "#e2e8f0";
-        menuBadge.style.color = "var(--text-muted)";
-      } else {
-        menuBadge.style.background = "";
-        menuBadge.style.color = "";
-      }
-    }
-    if (menuContainer) {
-      if (!hasUnavail) {
-        menuContainer.innerHTML = "<div class=\"text-muted text-center py-3\" style=\"font-size:12px;\"><span style=\"color:var(--accent-green);font-weight:700;\">✓</span> Semua menu tersedia</div>";
-      } else {
-        menuContainer.innerHTML = unavailItems.slice(0, 4).map(function (p) {
-          return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#fef2f2;border-radius:6px;border:1px solid #fee2e2;\">" +
-            "<div>" +
-              "<strong style=\"font-size:12px;color:#991b1b;\">" + esc(p.product_name || p.name) + "</strong>" +
-              "<div style=\"font-size:11px;color:#b91c1c;\">Status: Ditandai Habis di Cabang</div>" +
-            "</div>" +
-            "<span class=\"x-badge x-badge-danger\" style=\"font-size:10px;\">HABIS</span>" +
-          "</div>";
-        }).join("");
-      }
+    var menuSummary = $("bm-menu-attention-summary");
+    var stockSummary = $("bm-stock-attention-summary");
+
+    if (menuSummary) {
+      menuSummary.textContent = hasUnavail
+        ? (unavailItems.length + " menu tidak tersedia")
+        : "Semua menu tersedia";
     }
 
-    var stockContainer = $("bm-stock-low-list");
-    var stockBadge = $("bm-badge-stock-low");
-    if (stockBadge) {
-      stockBadge.textContent = hasLow ? (lowItems.length + " Menipis") : "0 Menipis";
-      stockBadge.className = "x-badge " + (hasLow ? "x-badge-warning" : "");
-      if (!hasLow) {
-        stockBadge.style.background = "#e2e8f0";
-        stockBadge.style.color = "var(--text-muted)";
-      } else {
-        stockBadge.style.background = "";
-        stockBadge.style.color = "";
-      }
-    }
-    if (stockContainer) {
-      if (!hasLow) {
-        stockContainer.innerHTML = "<div class=\"text-muted text-center py-3\" style=\"font-size:12px;\"><span style=\"color:var(--accent-green);font-weight:700;\">✓</span> Tidak ada stok yang perlu diperhatikan</div>";
-      } else {
-        stockContainer.innerHTML = lowItems.slice(0, 4).map(function (it) {
-          return "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#fffbeb;border-radius:6px;border:1px solid #fef3c7;\">" +
-            "<div>" +
-              "<strong style=\"font-size:12px;color:#92400e;\">" + esc(it.product_name || it.name || it.product_id) + "</strong>" +
-              "<div style=\"font-size:11px;color:#b45309;\">Tersisa " + esc(it.stock) + " (Batas: " + esc(it.low_stock_threshold || 5) + ")</div>" +
-            "</div>" +
-            "<span class=\"x-badge x-badge-warning\" style=\"font-size:10px;\">STOK TIPIS</span>" +
-          "</div>";
-        }).join("");
-      }
-    }
-
-    // Backwards compatibility for legacy container
-    var legacyContainer = $("bm-low-stock-list");
-    if (legacyContainer) {
-      if (!hasLow && !hasUnavail) {
-        legacyContainer.innerHTML = "<div class=\"text-muted text-center py-4\" style=\"font-size:13px;\">✓ Semua menu tersedia &amp; stok dalam batas aman.</div>";
-      } else {
-        legacyContainer.innerHTML = (menuContainer ? menuContainer.innerHTML : '') + (stockContainer ? stockContainer.innerHTML : '');
-      }
+    if (stockSummary) {
+      stockSummary.textContent = hasLow
+        ? (lowItems.length + " item perlu perhatian")
+        : "Tidak ada stok yang perlu diperhatikan";
     }
   }
 

@@ -636,3 +636,44 @@ A milestone/task is DONE only when:
 The repository currently has the coding contract and the implementation plan established.
 
 Next implementation work should begin with the earliest incomplete dependency in the roadmap, after verifying the current repository state and the latest relevant Notion decisions.
+
+
+---
+
+## Current Execution — Master Menu Composition (2026-09-29)
+
+The repository has entered a dedicated Menu architecture migration.
+
+**Forward contract:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`  
+**Execution plan:** `docs/decisions/xentra-master-menu-composition-implementation-plan-v1.md`  
+**Legacy boundary:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`
+
+### Completed
+
+1. Forward Master Menu Composition contract locked.
+2. Legacy Branch Menu Override/Snapshot architecture quarantined.
+3. Contradictory historical Branch Catalog documentation marked superseded.
+4. Active Branch Menu Override edit entry points removed from Owner/Merchant card action menus.
+5. Schema expanded for Master Flavor/Complement/Level vocabularies and Product composition relations.
+6. Nullable `order_items.menu_snapshot` added for future immutable historical snapshots.
+7. Master component/composition domain service and Owner-authoritative API routes added.
+8. Schema/service regression coverage added.
+
+### Current safe boundary
+
+The new schema/API foundations exist, but **Customer PWA resolver migration and legacy data reconciliation are not complete**.
+
+Therefore:
+
+- do not remove legacy columns yet;
+- do not rewrite Customer PWA around the old `CatalogService` override fields;
+- do not expose legacy Override UI as a new feature;
+- continue forward work through the Master Menu Composition contract.
+
+### Next dependency order
+
+**Master resolver → Owner Master Menu UI → Merchant adoption/read-only composition → Customer PWA DTO → Checkout/menu_snapshot → legacy reconciliation → destructive legacy cleanup.**
+
+Migration follows:
+
+**Expand → Switch → Reconcile → Verify → Contract.**

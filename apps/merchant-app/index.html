@@ -22,7 +22,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — tokens, toast, action-menu, crop editor, shell styles -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.0">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.24">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.0.25">
+  <link rel="stylesheet" href="/merchant-app/assets/css/home.css?v=1.0.0">
 </head>
 <body class="x-merchant-app">
   <div class="x-dash-layout">
@@ -141,255 +142,189 @@
         </div>
       </header>
       <section id="tab-hari-ini" class="x-tab-content" data-tab="hari-ini">
-        <div class="x-hari-ini-container">
-          <!-- 1. Operational Status & Controls Surface -->
-          <div class="x-card-panel x-bm-hero-banner" style="margin-bottom: 20px; padding: 20px 24px;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
+        <div class="x-home-screen">
+
+          <!-- Desktop-only operational context; mobile context lives in the fixed top bar -->
+          <section class="x-home-desktop-context" aria-label="Konteks operasional cabang">
+            <div class="x-home-desktop-context-main">
               <div>
-                <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
-                  <span id="bm-hero-status-dot" class="x-status-dot"></span>
-                  <h2 id="bm-hero-branch-name" style="font-size:20px; font-weight:800; color:var(--text-main); margin:0;">Cabang Memuat...</h2>
-                  <span id="bm-hero-status-badge" class="x-badge x-badge-info" style="font-size:12px; font-weight:700;">CABANG: MEMUAT...</span>
-                  <span id="bm-hero-online-badge" class="x-badge" style="background:#e0f2fe; color:#0369a1; font-size:12px; font-weight:700;">ONLINE: MEMUAT...</span>
+                <div class="x-home-desktop-branch-row">
+                  <span id="bm-home-status-dot" class="x-status-dot" aria-hidden="true"></span>
+                  <strong id="bm-home-branch-name">Cabang Memuat...</strong>
+                  <span id="bm-home-status-badge" class="x-badge x-badge-info">CABANG: MEMUAT...</span>
+                  <span id="bm-home-online-badge" class="x-badge x-badge-info">ONLINE: MEMUAT...</span>
                 </div>
-                <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                  <span id="bm-hero-date" class="x-badge" style="background:rgba(59,130,246,0.1); color:var(--accent-blue); font-weight:700; font-size:11px; padding:3px 8px;">Memuat Tanggal...</span>
-                  <p id="bm-hero-context" style="font-size:13px; color:var(--text-muted); margin:0;">
-                    Pusat kendali operasional harian cabang.
-                  </p>
+                <p id="bm-home-date" class="x-home-desktop-date">Memuat tanggal...</p>
+              </div>
+              <div class="x-home-desktop-context-actions">
+                <button type="button" class="x-home-desktop-control" id="btn-bm-toggle-online-orders" onclick="toggleBranchOnlineOrders()">Pesanan Online</button>
+                <button type="button" class="x-home-desktop-control is-primary" id="btn-bm-toggle-open" onclick="toggleBranchOpen()">Buka Cabang</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Greeting / date -->
+          <section class="x-home-greeting" aria-labelledby="bm-home-greeting-title">
+            <p class="x-home-greeting-date" id="bm-home-greeting-date">Memuat tanggal...</p>
+            <h1 class="x-home-greeting-title" id="bm-home-greeting-title">Selamat datang 👋</h1>
+          </section>
+
+          <!-- Primary sales card -->
+          <section class="x-home-section" aria-labelledby="bm-home-sales-title">
+            <div class="x-home-card x-home-sales">
+              <div class="x-home-sales-top">
+                <div>
+                  <p class="x-home-eyebrow" id="bm-home-sales-title">Penjualan Hari Ini</p>
+                  <strong class="x-home-sales-value" id="bm-stat-net-sales-today">Rp0</strong>
                 </div>
+                <span class="x-home-sales-compare is-neutral" id="bm-home-sales-compare">Hari ini</span>
               </div>
-              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                    <button type="button" class="x-btn-secondary" id="btn-bm-toggle-online-orders" onclick="toggleBranchOnlineOrders()" style="font-size:13px; padding:8px 14px;">
-                  <span>Pesanan Online: Memuat...</span>
-                </button>
-                <button type="button" class="x-btn-primary" id="btn-bm-toggle-open" onclick="toggleBranchOpen()" style="font-size:13px; padding:8px 16px;">
-                  <span>Buka Cabang</span>
-                </button>
-              </div>
-            </div>
-
-            <div id="bm-operational-alerts" style="margin-top:16px; display:none;"></div>
-          </div>
-
-          <!-- 2. PERLU PERHATIAN (Action-Required Immediate Sections) -->
-          <!-- Pending Orders Queue Requiring Response -->
-          <div class="x-card-panel" style="margin-bottom: 20px;">
-            <div class="x-panel-header">
-              <div>
-                <h3 style="display:flex; align-items:center; gap:8px;">
-                  <span>🚨 Antrean Pesanan Memerlukan Respons Segera</span>
-                  <span id="bm-badge-pending-count" class="x-badge x-badge-warning" style="display:none; font-size:11px;">0 Menunggu</span>
-                </h3>
-                <p>Pesanan pelanggan yang memerlukan konfirmasi penerimaan atau penolakan cabang.</p>
-              </div>
-              <button type="button" class="x-btn-secondary" onclick="navigateTo('pesanan')" style="font-size:12px; font-weight:700; padding:4px 10px;">Lihat Semua Pesanan &rarr;</button>
-            </div>
-            <div class="table-responsive">
-              <table class="x-table">
-                <thead>
-                  <tr>
-                    <th>No. Pesanan</th>
-                    <th>Pelanggan</th>
-                    <th>Tipe Layanan</th>
-                    <th>Waktu Pesan</th>
-                    <th>Total</th>
-                    <th>Status</th>
-                    <th>Aksi Cepat</th>
-                  </tr>
-                </thead>
-                <tbody id="bm-tbody-pending-orders">
-                  <tr><td colspan="7" class="text-center py-6 text-muted">Memuat antrean pesanan...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Menu & Stok Attention (Distinct Availability vs Stock) -->
-          <div class="x-card-panel" style="margin-bottom: 20px;">
-            <div class="x-panel-header">
-              <div>
-                <h3>⚠️ Perhatian Menu &amp; Stok Cabang</h3>
-                <p>Status ketersediaan menu cabang dan inventaris bahan/produk dengan stok menipis.</p>
-              </div>
-              <div style="display:flex; gap:8px;">
-                <button type="button" class="x-btn-secondary" onclick="navigateTo('menu')" style="font-size:12px; font-weight:700; padding:4px 10px;">Kelola Menu &rarr;</button>
-                <button type="button" class="x-btn-secondary" onclick="navigateTo('stok')" style="font-size:12px; font-weight:700; padding:4px 10px;">Kelola Stok &rarr;</button>
-              </div>
-            </div>
-            <div id="bm-menu-stock-attention-container" style="padding:12px 0;">
-              <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
-                <!-- Menu Availability Attention -->
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <strong style="font-size:13px; color:var(--text-main);">Ketersediaan Menu</strong>
-                    <span id="bm-badge-menu-unavail" class="x-badge" style="background:#e2e8f0; color:var(--text-muted); font-size:11px;">0 Habis</span>
-                  </div>
-                  <div id="bm-menu-unavail-list" style="display:flex; flex-direction:column; gap:8px;">
-                    <div class="text-muted text-center py-3" style="font-size:12px;">Memuat status menu...</div>
-                  </div>
+              <div class="x-home-sales-grid">
+                <div class="x-home-sales-stat">
+                  <span class="x-home-sales-stat-label">Pesanan selesai</span>
+                  <strong class="x-home-sales-stat-value" id="bm-stat-completed-orders">0</strong>
                 </div>
-
-                <!-- Stock Level Attention -->
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <strong style="font-size:13px; color:var(--text-main);">Stok Menipis</strong>
-                    <span id="bm-badge-stock-low" class="x-badge" style="background:#e2e8f0; color:var(--text-muted); font-size:11px;">0 Menipis</span>
-                  </div>
-                  <div id="bm-stock-low-list" style="display:flex; flex-direction:column; gap:8px;">
-                    <div class="text-muted text-center py-3" style="font-size:12px;">Memuat status stok...</div>
-                  </div>
+                <div class="x-home-sales-stat">
+                  <span class="x-home-sales-stat-label">Rata-rata pesanan</span>
+                  <strong class="x-home-sales-stat-value" id="bm-stat-average-order">Rp0</strong>
                 </div>
               </div>
-              <!-- Hidden fallback container for backwards compatibility -->
-              <div id="bm-low-stock-list" style="display:none;"></div>
             </div>
-          </div>
+          </section>
 
-          <!-- 3. QUICK ACTIONS (Operational Shortcuts) -->
-          <div class="x-card-panel" style="margin-bottom: 20px; padding:18px 20px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
-              <h3 style="font-size:15px; font-weight:700; margin:0; color:var(--text-main);">⚡ Aksi Cepat Operasional</h3>
-              <span class="text-muted" style="font-size:12px;">Pintasan alur kerja harian cabang</span>
-            </div>
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-              <button type="button" class="x-btn-secondary" onclick="navigateTo('pesanan')" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:8px 14px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-                <span>Lihat Pesanan</span>
-              </button>
-              <button type="button" class="x-btn-secondary" onclick="navigateTo('meja')" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:8px 14px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18v3"></path><path d="M20 18v3"></path><path d="M4 11h16"></path><path d="M4 11V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v5"></path></svg>
-                <span>Kelola Meja</span>
-              </button>
-              <button type="button" class="x-btn-secondary" onclick="navigateTo('menu')" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:8px 14px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>
-                <span>Kelola Menu</span>
-              </button>
-              <button type="button" class="x-btn-secondary" onclick="navigateTo('stok')" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:8px 14px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                <span>Kelola Stok</span>
-              </button>
-              <button type="button" class="x-btn-secondary" onclick="navigateTo('staff')" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:8px 14px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                <span>Kelola Staf</span>
-              </button>
-              <button type="button" class="x-btn-secondary" onclick="navigateTo('jam-operasional')" style="display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:8px 14px;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                <span>Jam Operasional</span>
+          <!-- Attention: new/pending orders -->
+          <section class="x-home-section" aria-labelledby="bm-home-pending-title">
+            <div class="x-home-card x-home-attention">
+              <div class="x-home-attention-head">
+                <div class="x-home-attention-title">
+                  <span class="x-home-attention-dot" aria-hidden="true"></span>
+                  <h2 class="x-home-section-title" id="bm-home-pending-title">Pesanan Baru</h2>
+                  <span class="x-home-attention-count" id="bm-badge-pending-count">0</span>
+                </div>
+                <p class="x-home-attention-sub">Perlu diterima atau ditolak sekarang.</p>
+              </div>
+              <div class="x-home-order-list" id="bm-pending-orders-list">
+                <div class="x-home-empty">
+                  <strong>Memuat pesanan…</strong>
+                  Menyiapkan antrean pesanan cabang.
+                </div>
+              </div>
+              <button type="button" class="x-home-section-action" style="width:100%;padding:11px 15px;border-top:1px solid #f0f2f3;" onclick="navigateTo('pesanan')">
+                Lihat semua pesanan →
               </button>
             </div>
-          </div>
+          </section>
 
-          <!-- 4. OPERASIONAL HARI INI (Compact Operational Flow & Dine-In/Promos) -->
-          <div class="x-card-panel" style="margin-bottom: 20px; padding: 20px 24px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-              <h3 style="font-size:16px; font-weight:700; margin:0; color:var(--text-main);">📊 Operasional Hari Ini</h3>
-              <small id="bm-stat-net-sales-today" style="font-size:12px; font-weight:600; color:var(--text-muted);">Rp0 total penjualan</small>
+          <!-- Quick operational actions -->
+          <section class="x-home-section" aria-labelledby="bm-home-quick-title">
+            <div class="x-home-section-head">
+              <h2 class="x-home-section-title" id="bm-home-quick-title">Aksi Cepat</h2>
             </div>
-
-            <!-- Compact Operational Order Pipeline -->
-            <div class="x-metrics-grid" style="margin-bottom: 20px;">
-              <!-- Orders Needing Action (Pending) -->
-              <div class="x-metric-card" style="border-left: 3px solid var(--accent-amber); padding:14px 16px; cursor:pointer;" onclick="navigateTo('pesanan')">
-                <div class="x-metric-info">
-                  <span class="x-metric-label" style="font-size:12px;">Perlu Konfirmasi</span>
-                  <h3 id="bm-stat-pending-orders" class="x-metric-value" style="font-size:22px; margin:4px 0;">0</h3>
-                  <small style="font-size:11px; color:var(--text-muted);">Menunggu konfirmasi</small>
-                </div>
-              </div>
-
-              <!-- Active / Preparing Orders -->
-              <div class="x-metric-card" style="border-left: 3px solid var(--accent-blue); padding:14px 16px; cursor:pointer;" onclick="navigateTo('pesanan')">
-                <div class="x-metric-info">
-                  <span class="x-metric-label" style="font-size:12px;">Diproses Dapur</span>
-                  <h3 id="bm-stat-active-orders" class="x-metric-value" style="font-size:22px; margin:4px 0;">0</h3>
-                  <small style="font-size:11px; color:var(--text-muted);">Sedang disiapkan</small>
-                </div>
-              </div>
-
-              <!-- Ready Orders -->
-              <div class="x-metric-card" style="border-left: 3px solid #8b5cf6; padding:14px 16px; cursor:pointer;" onclick="navigateTo('pesanan')">
-                <div class="x-metric-info">
-                  <span class="x-metric-label" style="font-size:12px;">Siap Diambil</span>
-                  <h3 id="bm-stat-ready-orders" class="x-metric-value" style="font-size:22px; margin:4px 0;">0</h3>
-                  <small style="font-size:11px; color:var(--text-muted);">Menunggu pickup / kurir</small>
-                </div>
-              </div>
-
-              <!-- Completed Today -->
-              <div class="x-metric-card" style="border-left: 3px solid var(--accent-green); padding:14px 16px; cursor:pointer;" onclick="navigateTo('pesanan')">
-                <div class="x-metric-info">
-                  <span class="x-metric-label" style="font-size:12px;">Selesai Hari Ini</span>
-                  <h3 id="bm-stat-completed-orders" class="x-metric-value" style="font-size:22px; margin:4px 0;">0</h3>
-                  <small style="font-size:11px; color:var(--text-muted);">Pesanan tuntas</small>
-                </div>
-              </div>
+            <div class="x-home-quick-grid">
+              <button type="button" class="x-home-quick" onclick="navigateTo('meja')">
+                <span class="x-home-quick-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11h16M5 11V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v5M6 18v3M18 18v3M4 15h16"/></svg>
+                </span>
+                <span class="x-home-quick-copy"><strong>Meja</strong><small>Status &amp; dine-in</small></span>
+              </button>
+              <button type="button" class="x-home-quick" onclick="navigateTo('jam-operasional')">
+                <span class="x-home-quick-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                </span>
+                <span class="x-home-quick-copy"><strong>Jam Buka</strong><small>Atur layanan cabang</small></span>
+              </button>
+              <button type="button" class="x-home-quick" onclick="navigateTo('staff')">
+                <span class="x-home-quick-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3"/><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 11a3 3 0 1 1 0-6M17 14a4.8 4.8 0 0 1 4 5v1"/></svg>
+                </span>
+                <span class="x-home-quick-copy"><strong>Staff</strong><small>Tim &amp; akses</small></span>
+              </button>
+              <button type="button" class="x-home-quick" onclick="navigateTo('reports')">
+                <span class="x-home-quick-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
+                </span>
+                <span class="x-home-quick-copy"><strong>Penjualan</strong><small>Lihat ringkasan harian</small></span>
+              </button>
             </div>
+          </section>
 
-            <!-- Compact Dine-in & Active Promotions Two-Column Layout -->
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
-              <!-- Meja / Dine-in Snapshot -->
-              <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                  <strong style="font-size:13px; color:var(--text-main);">🪑 Meja (Dine-In)</strong>
-                  <button type="button" class="x-btn-secondary" onclick="navigateTo('meja')" style="font-size:11px; font-weight:700; padding:2px 8px;">Kelola Meja &rarr;</button>
-                </div>
-                <div id="bm-tables-summary-container">
-                  <div style="display:flex; justify-content:space-around; text-align:center; flex-wrap:wrap; gap:8px;">
-                    <div>
-                      <span style="display:block; font-size:20px; font-weight:800; color:var(--accent-green);" id="bm-stat-tables-available">0</span>
-                      <small style="font-size:11px; color:var(--text-muted);">Tersedia</small>
-                    </div>
-                    <div>
-                      <span style="display:block; font-size:20px; font-weight:800; color:var(--accent-blue);" id="bm-stat-tables-occupied">0</span>
-                      <small style="font-size:11px; color:var(--text-muted);">Terisi</small>
-                    </div>
-                    <div>
-                      <span style="display:block; font-size:20px; font-weight:800; color:var(--accent-amber);" id="bm-stat-tables-held">0</span>
-                      <small style="font-size:11px; color:var(--text-muted);">Ditahan</small>
-                    </div>
-                    <div>
-                      <span style="display:block; font-size:20px; font-weight:800; color:#dc2626;" id="bm-stat-tables-blocked">0</span>
-                      <small style="font-size:11px; color:var(--text-muted);">Diblokir</small>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Active Approved Branch Promos -->
-              <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:14px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                  <strong style="font-size:13px; color:var(--text-main);">🏷️ Promosi Aktif Cabang</strong>
-                  <button type="button" class="x-btn-secondary" onclick="navigateTo('promo')" style="font-size:11px; font-weight:700; padding:2px 8px;">Kelola Promo &rarr;</button>
-                </div>
-                <div id="bm-active-promos-container">
-                  <div id="bm-active-promos-list" style="display:flex; flex-direction:column; gap:6px;">
-                    <div class="text-muted text-center py-2" style="font-size:12px;">Memuat promosi aktif...</div>
-                  </div>
-                </div>
-              </div>
+          <!-- Operational snapshot -->
+          <section class="x-home-section" aria-labelledby="bm-home-snapshot-title">
+            <div class="x-home-section-head">
+              <h2 class="x-home-section-title" id="bm-home-snapshot-title">Operasional Hari Ini</h2>
+              <span class="x-home-eyebrow">Status pesanan</span>
             </div>
-          </div>
-
-          <!-- 5. AKTIVITAS TERKINI (Authoritative Audit Feed) -->
-          <div class="x-card-panel" style="margin-bottom: 20px;">
-            <div class="x-panel-header">
-              <div>
-                <h3>📜 Aktivitas &amp; Log Operasional Terkini</h3>
-                <p>Catatan perubahan operasional cabang langsung dari server.</p>
-              </div>
-              <span class="x-badge x-badge-info" style="font-size:11px;">Audit Authoritative</span>
+            <div class="x-home-card x-home-snapshot">
+              <button type="button" class="x-home-snapshot-item is-attention" onclick="navigateTo('pesanan')">
+                <span class="x-home-snapshot-label">Menunggu</span>
+                <strong class="x-home-snapshot-value" id="bm-stat-pending-orders">0</strong>
+              </button>
+              <button type="button" class="x-home-snapshot-item is-process" onclick="navigateTo('pesanan')">
+                <span class="x-home-snapshot-label">Diproses</span>
+                <strong class="x-home-snapshot-value" id="bm-stat-active-orders">0</strong>
+              </button>
+              <button type="button" class="x-home-snapshot-item is-ready" onclick="navigateTo('pesanan')">
+                <span class="x-home-snapshot-label">Siap</span>
+                <strong class="x-home-snapshot-value" id="bm-stat-ready-orders">0</strong>
+              </button>
+              <button type="button" class="x-home-snapshot-item is-done" onclick="navigateTo('pesanan')">
+                <span class="x-home-snapshot-label">Selesai</span>
+                <strong class="x-home-snapshot-value" id="bm-stat-completed-orders-snapshot">0</strong>
+              </button>
             </div>
-            <div id="bm-recent-activity-container" style="padding:12px 0;">
-              <div id="bm-recent-activity-list" style="display:flex; flex-direction:column; gap:8px;">
-                <div class="text-muted text-center py-4" style="font-size:13px;">Memuat log aktivitas...</div>
+          </section>
+
+          <!-- Menu / Stock attention -->
+          <section class="x-home-section" aria-labelledby="bm-home-attention-title">
+            <div class="x-home-section-head">
+              <h2 class="x-home-section-title" id="bm-home-attention-title">Perlu Perhatian</h2>
+            </div>
+            <div class="x-home-card x-home-list-card x-home-attention-grid">
+              <button type="button" class="x-home-attention-row is-menu" onclick="navigateTo('menu')">
+                <span class="x-home-attention-row-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h15v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Z"/><path d="M7 4v2M11 4v2M15 4v2M19 11h1a3 3 0 0 0 0-6h-1"/></svg>
+                </span>
+                <span class="x-home-attention-row-copy"><strong>Menu</strong><span id="bm-menu-attention-summary">Memuat ketersediaan menu…</span></span>
+                <span class="x-home-attention-row-arrow" aria-hidden="true">›</span>
+              </button>
+              <button type="button" class="x-home-attention-row is-stock" onclick="navigateTo('stok')">
+                <span class="x-home-attention-row-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5M3 18l9 5 9-5"/></svg>
+                </span>
+                <span class="x-home-attention-row-copy"><strong>Stock</strong><span id="bm-stock-attention-summary">Memuat kondisi stok…</span></span>
+                <span class="x-home-attention-row-arrow" aria-hidden="true">›</span>
+              </button>
+            </div>
+          </section>
+
+          <!-- Active promotions -->
+          <section class="x-home-section" aria-labelledby="bm-home-promo-title">
+            <div class="x-home-section-head">
+              <h2 class="x-home-section-title" id="bm-home-promo-title">Promo Aktif</h2>
+              <button type="button" class="x-home-section-action" onclick="navigateTo('promo')">Lihat semua →</button>
+            </div>
+            <div class="x-home-card x-home-list-card" id="bm-active-promos-container">
+              <div class="x-home-mini-list" id="bm-active-promos-list">
+                <div class="x-home-empty"><strong>Memuat promo…</strong>Menyiapkan promo aktif cabang.</div>
               </div>
             </div>
-          </div>
+          </section>
+
+          <!-- Recent activity -->
+          <section class="x-home-section" aria-labelledby="bm-home-activity-title">
+            <div class="x-home-section-head">
+              <h2 class="x-home-section-title" id="bm-home-activity-title">Aktivitas Terakhir</h2>
+            </div>
+            <div class="x-home-card x-home-list-card" id="bm-recent-activity-container">
+              <div class="x-home-mini-list" id="bm-recent-activity-list">
+                <div class="x-home-empty"><strong>Memuat aktivitas…</strong>Menyiapkan aktivitas operasional terbaru.</div>
+              </div>
+            </div>
+          </section>
+
         </div>
       </section>
 
-      <!-- BM TAB PLACEHOLDERS (BM-2 through BM-5 Future Modules) -->
       <!-- BM-2: Pesanan & Meja Operational Surfaces -->
       <!-- TAB: BM-PESANAN (Operational Order Queue & Details) -->
       <section id="tab-bm-pesanan" class="x-tab-content" data-tab="bm-pesanan">
@@ -1222,19 +1157,30 @@
         <input type="hidden" id="adopt-max-price" value="">
         
         <div class="x-form-group">
-          <label>Nama Menu</label>
+          <label>Master Menu</label>
           <input type="text" id="adopt-product-name" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+        </div>
+
+        <div class="x-form-group">
+          <label>Komposisi Master <span class="text-muted">(hanya lihat)</span></label>
+          <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+            <div id="adopt-menu-title" style="font-size:14px;font-weight:800;color:#0f172a;">—</div>
+            <div id="adopt-menu-subtitle" style="font-size:12px;color:#475569;margin-top:3px;">—</div>
+            <div id="adopt-menu-detail" style="font-size:11px;color:#64748b;margin-top:5px;">—</div>
+            <div id="adopt-menu-indicator" style="font-size:11px;color:#475569;margin-top:5px;font-weight:700;">—</div>
+          </div>
         </div>
 
         <div class="x-form-group">
           <label for="adopt-branch-category">Kategori di Cabang Ini</label>
           <select id="adopt-branch-category" class="x-input" required></select>
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Kategori ini hanya untuk pengelompokan menu di cabang. Komposisi Master tidak berubah.</small>
         </div>
 
         <div class="x-form-group">
-          <label for="adopt-price">Harga Jual Cabang (Rp)</label>
-          <input type="number" id="adopt-price" class="x-input" required>
-          <small id="adopt-price-hint" class="text-muted" style="display:block;margin-top:4px;font-size:12px;"></small>
+          <label>Harga Master (Owner)</label>
+          <input type="text" id="adopt-price-display" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Harga Menu ditentukan Owner. Merchant tidak mengubah harga saat adopsi.</small>
         </div>
 
         <div class="x-modal-footer">
@@ -1322,6 +1268,8 @@
 
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="x-toast-container" class="x-toast-container"></div>
+  <!-- LEGACY QUARANTINED: Branch Product Override compatibility modal; no active Menu entry point.
+       Forward Menu architecture uses Owner-owned structured Master Menu Composition. -->
   <div id="modal-branch-override" class="x-modal-backdrop" style="display:none; z-index: 1200;">
     <div class="x-modal-card" style="max-width:560px;">
       <div class="x-modal-header">
@@ -1718,6 +1666,7 @@
   <script src="/merchant-app/assets/js/context.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/menu.js?v=1.0.3"></script>
   <script src="/merchant-app/assets/js/hari-ini.js?v=1.0.0"></script>
+  <script src="/merchant-app/assets/js/home.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/jam-operasional.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/reports.js?v=1.0.0"></script>
   <script src="/merchant-app/assets/js/tables.js?v=1.0.0"></script>

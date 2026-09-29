@@ -2,10 +2,12 @@
 
 **Status: LOCKED / AUTHORITATIVE — reconciled with Canonical Architecture & Product Library v2 and Branch Manager Menu Configuration v1**  
 **Decision date:** 2026-09-17  
-**Scope:** Branch-scoped daily restaurant operations + branch-local menu configuration
+**Scope:** Branch-scoped daily restaurant operations + Branch adoption/category operations under the Master Menu Composition contract
 
 > **Canonical map:** `docs/CANONICAL_ARCHITECTURE_PRODUCT_LIBRARY_V2.md`. This document defines the Branch Manager surface in detail; it must not redefine terminology, scope, or cross-dashboard authority independently.
 > **Menu authority lock:** `docs/decisions/branch-manager-menu-configuration-v1.md`.
+> **Master Menu composition lock:** `docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`.
+> **Legacy Menu quarantine:** `docs/decisions/xentra-menu-legacy-quarantine-v1.md`.
 
 ## 1. Purpose
 
@@ -368,3 +370,29 @@ The rule is therefore:
 **Structured authoritative evidence → semantic log formatter/read model → human-readable dashboard presentation → optional technical detail.**
 
 This is a presentation/read-model concern, not a new Activity domain and not a replacement for the existing audit trail.
+
+
+## 🔒 LOCKED — Merchant Home / Beranda UI Contract v1
+
+**Decision date:** 29 September 2026
+
+The Branch Manager Home visual/composition contract is defined in:
+`docs/decisions/xentra-merchant-home-ui-contract-v1.md`
+
+The Home must be implemented as a mobile-native operational surface:
+
+**Glance → Understand → Act**
+
+Locked composition:
+
+**Merchant context → Operational controls → Greeting/date → Primary Sales Card → Attention: Pesanan Baru → Quick Actions → Operational Snapshot → Menu/Stock Attention → Promo Aktif → Aktivitas Terakhir → Persistent Bottom Navigation**
+
+Mobile primary navigation:
+
+**Beranda | Pesanan | Menu | Stock | Promo**
+
+This contract is presentation/UX only. Core authority, RBAC, branch scope, order/payment/inventory contracts, and KDS boundaries remain unchanged.
+
+Existing mature UI primitives remain the reuse baseline. The new Home must not be based on quarantined legacy Menu/Branch Override assumptions.
+
+See the detailed contract for the complete Home UI, responsive, performance, state, and QA requirements.

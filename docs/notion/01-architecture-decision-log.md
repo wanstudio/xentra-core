@@ -1,5 +1,15 @@
 <!-- SNAPSHOT FROM NOTION — source page: 01-architecture-decision-log; fetched 2026-09-05 -->
 
+# 🔶 ARCHITECTURE NOTICE — Master Menu Composition Direction (2026-09-29)
+
+**Forward Menu architecture is now defined separately from the historical Branch Catalog Override/Snapshot model.** Owner creates reusable Master Menu data and assembles Master Products; Merchant only adopts/selects which Master Products the Branch sells. The legacy Branch name/description/image override path is quarantined and must not be extended for new Menu work.
+
+Forward contract:
+`docs/decisions/xentra-master-menu-composition-branch-adoption-contract-v1.md`
+
+Legacy quarantine:
+`docs/decisions/xentra-menu-legacy-quarantine-v1.md`
+
 # 🔒 Branch as Operational Truth Boundary
 
 ## Context / Decision
@@ -86,7 +96,9 @@ A pending refund on one Order must not globally lock the Customer or block an un
 
 Follow the adopted GoFood-style principle: Customer cancellation is allowed before Branch acceptance/confirmation; after Branch acceptance, normal Customer cancellation is not allowed. Core enforces cancellation from authoritative Order state. Branch/system rejection, timeout, or payment failure must not be classified as Customer cancellation.
 
-## 🔒 LOCKED — Master Catalog vs Branch Catalog Ownership & Snapshot Boundary
+## 🟠 SUPERSEDED — Master Catalog vs Branch Catalog Ownership & Snapshot Boundary (Historical)
+
+> **Superseded for Menu architecture on 2026-09-29 by the locked Master Menu Composition + Branch Adoption contract. Retained only as migration/history context.**
 
 ### Decision
 **Master Catalog dan Branch Catalog adalah dua ownership/context yang berbeda. Catalog milik Owner/Brand berfungsi sebagai master product library. Branch memiliki kewenangan operasional untuk memilih product dari master catalog dan membentuk Branch Catalog sendiri. Branch Catalog bukan live mirror dari Master Catalog.**
@@ -382,3 +394,29 @@ Exact address, distance, and location values must come from the authoritative or
 ### Implementation rule
 Customer Order Detail must include **Detail Pengantaran** as a first-class section. Visual styling may change, but this information architecture must remain.
 
+
+
+## 🔒 LOCKED — Merchant Home / Beranda UI Contract v1
+
+**Date:** 29 September 2026
+
+Git source of truth:
+`docs/decisions/xentra-merchant-home-ui-contract-v1.md`
+
+Merchant App Home is a **mobile-native operational Home**, not a desktop dashboard compressed into a phone.
+
+Locked mental model:
+
+**Glance → Understand → Act**
+
+Locked composition:
+
+**Branch context → Open/Online controls → Greeting/date → Sales card → New/Pending orders → Quick Actions → Operational snapshot → Menu/Stock attention → Active promos → Recent activity → Persistent bottom navigation**
+
+Primary navigation:
+
+**Beranda | Pesanan | Menu | Stock | Promo**
+
+This is a presentation/UI contract only. No changes are authorized to Core authority, RBAC, branch scope, order/payment/inventory state machines, KDS boundaries, or unrelated backend contracts.
+
+The Home must reuse existing mature Xentra primitives and must not extend quarantined legacy UI/domain assumptions.

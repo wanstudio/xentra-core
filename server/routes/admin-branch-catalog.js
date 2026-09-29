@@ -3,6 +3,11 @@
  *
  * Branch product adoption, availability, pricing overrides and branch-category
  * assignment/reorder APIs. Master catalog CRUD remains in admin-catalog.js.
+ *
+ * LEGACY QUARANTINE (2026-09-29):
+ * The Branch Product Override endpoint below is compatibility-only.
+ * Do not add new Menu composition fields or business behavior to that path.
+ * Forward Menu architecture: Master Menu Composition + Branch Adoption.
  */
 module.exports = function registerAdminBranchCatalogRoutes(router, deps) {
   const {
@@ -11,6 +16,7 @@ module.exports = function registerAdminBranchCatalogRoutes(router, deps) {
     requireAuth,
     CatalogService,
     PricingPolicyModel,
+    MasterMenuResolver,
     XentraConnectorClient,
     InventoryStockService
   } = deps;
@@ -159,42 +165,33 @@ router.get('/admin/branches/:id/orders', requireAuth(['owner', 'brand_manager', 
 });
 
 
+// LEGACY-COMPAT ASSIGNMENT ENDPOINT.
+// Forward UI uses /adopt. Keep this path only for older callers, but enforce
+// the same Master Menu Composition boundary and never accept branch-authored Menu content.
 router.post('/admin/branches/:id/products', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
     const productId = String((req.body && req.body.product_id) || '').trim();
-    if (!productId) {
-      return res.status(400).json({ success: false, error: 'product_id wajib diisi.' });
-    }
+    if (!productId) return res.status(400).json({ success: false, error: 'product_id wajib diisi.' });
 
-    // Branch ownership (tenant-scoped)
     const branch = db.prepare('SELECT id FROM branches WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
-    if (!branch) {
-      return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
-    }
+    if (!branch) return res.status(404).json({ success: false, error: 'Cabang tidak ditemukan pada brand ini.' });
 
-    // C1.3 Brand consistency: the product master must belong to the SAME brand as the branch.
-    // (A product of another brand is not found here → cross-brand assignment is impossible.)
     const product = db.prepare('SELECT id, brand_id, price, is_active FROM products WHERE id = ? AND brand_id = ?').get(productId, req.brand_id);
-    if (!product) {
+    if (!product) return res.status(400).json({ success: false, error: 'PRODUCT_BRAND_MISMATCH', message: 'Produk tidak ditemukan atau bukan milik brand ini.' });
+    if (product.is_active === 0) return res.status(400).json({ success: false, error: 'PRODUCT_INACTIVE', message: 'Produk master sedang nonaktif.' });
+
+    const masterView = MasterMenuResolver.resolveMasterProducts({ brandId: req.brand_id, productIds: [productId] })[0];
+    if (!masterView) {
       return res.status(400).json({
         success: false,
-        error: 'PRODUCT_BRAND_MISMATCH',
-        message: 'Produk tidak ditemukan atau bukan milik brand ini; produk hanya dapat dialokasikan ke cabang brand yang sama.'
-      });
-    }
-    if (product.is_active === 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'PRODUCT_INACTIVE',
-        message: 'Produk master sedang nonaktif dan tidak dapat dialokasikan ke cabang.'
+        error: 'MASTER_MENU_COMPOSITION_REQUIRED',
+        message: 'Produk master belum memiliki komposisi Menu yang valid. Lengkapi Master Menu terlebih dahulu.'
       });
     }
 
-    // C1.4 Assignment != Inventory: the assignment row is created WITHOUT fabricating stock.
-    // stock stays NULL until the Inventory domain records actual branch stock.
     const stmt = db.prepare(`
-      INSERT OR IGNORE INTO branch_products (branch_id, product_id, price, stock)
-      VALUES (?, ?, ?, NULL)
+      INSERT OR IGNORE INTO branch_products (branch_id, product_id, branch_category_id, price, stock)
+      VALUES (?, ?, NULL, ?, NULL)
     `).run(req.params.id, productId, product.price != null ? product.price : null);
     const alreadyAssigned = !stmt || stmt.changes === 0;
 
@@ -203,23 +200,13 @@ router.post('/admin/branches/:id/products', requireAuth(['owner', 'brand_manager
       FROM branch_products WHERE branch_id = ? AND product_id = ?
     `).get(req.params.id, productId);
 
-    res.status(alreadyAssigned ? 200 : 201).json({
-      success: true,
-      already_assigned: alreadyAssigned,
-      assignment
-    });
+    res.status(alreadyAssigned ? 200 : 201).json({ success: true, already_assigned: alreadyAssigned, assignment });
   } catch (err) {
-    if (String(err && err.message).includes('CROSS_BRAND_ASSIGNMENT_REJECTED')) {
-      return res.status(400).json({
-        success: false,
-        error: 'CROSS_BRAND_ASSIGNMENT_REJECTED',
-        message: 'Produk dan cabang harus berasal dari brand yang sama.'
-      });
-    }
     console.error('[API Error POST /admin/branches/:id/products]:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
 
 // C1 Toggle operational availability (is_available) of an assigned product.
 // Branch Manager limited to own branch; Owner/Brand anywhere in their brand.
@@ -420,12 +407,34 @@ router.get('/admin/branches/:id/catalog', requireAuth(['owner', 'brand_manager',
     const masterParams = placeholders ? [req.brand_id, ...adoptedIds] : [req.brand_id];
     const availableMasterProducts = db.prepare(masterQuery).all(...masterParams);
 
+    // Forward Menu Composition read model. Legacy fields remain only for
+    // compatibility; new UI consumes menu_composition.
+    let compositionMap = new Map();
+    try {
+      const allProductIds = adoptedIds.concat(availableMasterProducts.map(p => p.id));
+      const resolved = MasterMenuResolver
+        ? MasterMenuResolver.resolveMasterProducts({ brandId: req.brand_id, productIds: allProductIds })
+        : [];
+      compositionMap = new Map(resolved.map(item => [String(item.product_id), item]));
+    } catch (compositionErr) {
+      console.warn('[Branch Catalog Composition] resolver warning:', compositionErr.message);
+    }
+
+    const adoptedWithComposition = enrichedAdopted.map(item => ({
+      ...item,
+      menu_composition: compositionMap.get(String(item.product_id)) || null
+    }));
+    const availableWithComposition = availableMasterProducts.map(item => ({
+      ...item,
+      menu_composition: compositionMap.get(String(item.id)) || null
+    }));
+
     res.json({
       success: true,
       branch,
       categories: branchCategories,
-      adopted_products: enrichedAdopted,
-      available_master_products: availableMasterProducts
+      adopted_products: adoptedWithComposition,
+      available_master_products: availableWithComposition
     });
   } catch (err) {
     console.error('[API Error GET /admin/branches/:id/catalog]:', err);
@@ -468,30 +477,25 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       return res.status(400).json({ success: false, error: 'Produk master sedang nonaktif dan tidak dapat diadopsi.' });
     }
 
-    // Resolve price according to locked PricingPolicyModel:
-    // If pricing_mode is 'lock', branch CANNOT override price (enforces master price)
-    const mode = (product.pricing_mode || 'lock').toLowerCase();
-    const rawPriceInput = mode === 'lock'
-      ? null
-      : (req.body.price !== undefined && req.body.price !== null && req.body.price !== '' ? Number(req.body.price) : null);
+    // FORWARD MENU ARCHITECTURE: Branch adoption never accepts a client-authored
+    // Menu price. Keep the legacy physical branch price aligned to Master price
+    // only for compatibility with older consumers during migration.
+    const effectivePrice = Number(product.price || 0);
 
-    let resolved;
-    try {
-      resolved = PricingPolicyModel.resolvePrice(
-        {
-          price: product.price,
-          pricing_mode: product.pricing_mode || 'lock',
-          min_price: product.min_price,
-          max_price: product.max_price
-        },
-        rawPriceInput
-      );
-    } catch (pricingErr) {
-      return res.status(400).json({
-        success: false,
-        error: 'INVALID_BRANCH_PRICE',
-        message: pricingErr.message
-      });
+    // A Branch may adopt only a fully composed Master Menu. The resolver is the
+    // same structured source later consumed by Customer PWA and Checkout.
+    if (MasterMenuResolver) {
+      const masterView = MasterMenuResolver.resolveMasterProducts({
+        brandId: req.brand_id,
+        productIds: [product.id]
+      })[0];
+      if (!masterView) {
+        return res.status(400).json({
+          success: false,
+          error: 'MASTER_MENU_COMPOSITION_REQUIRED',
+          message: 'Produk master belum memiliki komposisi Menu yang lengkap. Lengkapi Master Menu terlebih dahulu.'
+        });
+      }
     }
 
     // Branch Category handling: supports category_ids (array) or branch_category_id (scalar)
@@ -508,42 +512,33 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       if (validCat) targetCategoryIds.push(idStr);
     }
 
-    // If no branch category specified, resolve or auto-create branch category from master category name
+    // FORWARD MENU ARCHITECTURE: Branch Category is classification, never a
+    // Master Category copy. Adoption requires an explicit Branch Category.
     if (targetCategoryIds.length === 0) {
-      const masterCat = product.category_id ? db.prepare('SELECT name, slug FROM categories WHERE id = ?').get(product.category_id) : null;
-      const catName = masterCat?.name || 'Menu Utama';
-      const catSlug = masterCat?.slug || 'menu-utama';
-
-      let existingBranchCat = db.prepare('SELECT id FROM branch_categories WHERE branch_id = ? AND name = ?').get(req.params.id, catName);
-      if (!existingBranchCat) {
-        const newBcId = 'bc_' + crypto.randomUUID();
-        db.prepare(`
-          INSERT INTO branch_categories (id, brand_id, branch_id, name, slug, sort_order)
-          VALUES (?, ?, ?, ?, ?, 99)
-        `).run(newBcId, req.brand_id, req.params.id, catName, catSlug);
-        targetCategoryIds.push(newBcId);
-      } else {
-        targetCategoryIds.push(existingBranchCat.id);
-      }
+      return res.status(400).json({
+        success: false,
+        error: 'BRANCH_CATEGORY_REQUIRED',
+        message: 'Pilih minimal satu Kategori Cabang untuk menu yang diadopsi.'
+      });
     }
 
-    const primaryBranchCategoryId = targetCategoryIds[0] || null;
+    // Legacy scalar category column is intentionally no longer authoritative.
+    const primaryBranchCategoryId = null;
 
     // Insert or adopt branch_products (override columns start NULL = inherit master).
     db.prepare(`
       INSERT INTO branch_products (
         branch_id, product_id, branch_category_id, price, is_available
-      ) VALUES (?, ?, ?, ?, 1)
+      ) VALUES (?, ?, NULL, ?, 1)
       ON CONFLICT(branch_id, product_id) DO UPDATE SET
-        branch_category_id = excluded.branch_category_id,
+        branch_category_id = NULL,
         price = excluded.price,
         is_available = 1,
         updated_at = datetime('now')
     `).run(
       req.params.id,
       product.id,
-      primaryBranchCategoryId,
-      resolved.effective_price
+      effectivePrice
     );
 
     // M:N category junction
@@ -566,7 +561,7 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       req.brand_id,
       req.organization_id || null,
       product.id,
-      JSON.stringify({ product_id: product.id, price: resolved.effective_price, branch_category_id: primaryBranchCategoryId, category_ids: targetCategoryIds }),
+      JSON.stringify({ product_id: product.id, price: effectivePrice, branch_category_id: null, category_ids: targetCategoryIds }),
       actorId,
       actorRole
     );
@@ -577,8 +572,8 @@ router.post('/admin/branches/:id/adopt', requireAuth(['owner', 'brand_manager', 
       adopted: {
         branch_id: req.params.id,
         product_id: product.id,
-        price: resolved.effective_price,
-        branch_category_id: primaryBranchCategoryId,
+        price: effectivePrice,
+        branch_category_id: null,
         category_ids: targetCategoryIds
       }
     });

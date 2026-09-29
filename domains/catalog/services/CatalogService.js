@@ -2,9 +2,10 @@
  * Xentra Commerce Catalog Service
  * Pure catalog display service for Customer PWA & menu presentation.
  *
- * BRANCH CATALOG MODEL (Master Product Default + Branch Optional Override):
- * When a branch context is provided, CatalogService queries branch_products as the
- * primary source (Branch Catalog), joining branch_categories for the category tree.
+ * LEGACY RUNTIME COMPATIBILITY (QUARANTINED 2026-09-29):
+ * This service still resolves legacy Branch Product Override fields for existing
+ * runtime/data compatibility. That behavior is NOT the forward Menu architecture.
+ * New Menu architecture: Master Menu Composition + Branch Adoption.
  * Resolution rule: branch override column is used when non-NULL; otherwise the live
  * Master Product value is used. This ensures master product updates propagate to all
  * branches that have not explicitly overridden the field.

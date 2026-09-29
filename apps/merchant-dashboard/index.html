@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <!-- Shared merchant infrastructure — design tokens, toast, action-menu, crop editor -->
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.2.4">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.2.5">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -3576,9 +3576,40 @@
           <input type="text" id="prod-name" class="x-input" placeholder="Contoh: Bebek Goreng Crispy" required>
         </div>
         <div class="x-form-group">
-          <label for="prod-category">Kategori</label>
+          <label for="prod-category">Kategori Master <span class="text-muted">(Judul Customer)</span></label>
           <select id="prod-category" class="x-input" required></select>
         </div>
+
+        <!-- Master Menu Composition — Owner-authored structured fields -->
+        <div class="x-form-group">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+            <label for="prod-flavor" style="margin:0;">Rasa <span class="text-muted">(Subtitle Customer)</span></label>
+            <button type="button" class="x-btn-secondary" id="btn-manage-menu-components" style="font-size:11px;padding:4px 8px;">Kelola Master</button>
+          </div>
+          <select id="prod-flavor" class="x-input">
+            <option value="">Tidak ada Rasa</option>
+          </select>
+        </div>
+
+        <div class="x-form-group">
+          <label style="display:block;margin-bottom:6px;">Kelengkapan <span class="text-muted">(Detail Customer)</span></label>
+          <div id="prod-complements-editor" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;"></div>
+          <div id="prod-complements-empty" class="text-muted" style="font-size:11px;padding:8px 0;">Belum ada Master Kelengkapan.</div>
+        </div>
+
+        <div class="x-form-group">
+          <label for="prod-level">Level <span class="text-muted">(Indikator Customer)</span></label>
+          <select id="prod-level" class="x-input">
+            <option value="">Tidak ada Level</option>
+          </select>
+        </div>
+
+        <div class="x-form-group">
+          <div style="font-size:11px;color:#64748b;padding:8px 10px;border:1px dashed #cbd5e1;border-radius:8px;">
+            Komposisi Menu di atas adalah Master. Merchant/Branch Manager hanya dapat mengadopsi menu ini dan tidak dapat mengubah komposisinya.
+          </div>
+        </div>
+
         <div class="x-form-row">
           <div class="x-form-group">
             <label for="prod-price">Harga Jual (Rp)</label>
@@ -3639,6 +3670,33 @@
           <button type="submit" class="x-btn-primary">Simpan Menu</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL: MASTER MENU COMPONENT MANAGER -->
+  <div id="modal-master-menu-components" class="x-modal-backdrop" style="display:none; z-index:1150;">
+    <div class="x-modal-card" style="max-width:560px;">
+      <div class="x-modal-header">
+        <div>
+          <h3 style="margin:0;">Master Menu</h3>
+          <p class="text-muted" style="font-size:11px;margin:3px 0 0;">Data pilihan yang dipakai untuk menyusun Menu Master</p>
+        </div>
+        <button type="button" class="x-modal-close" id="btn-close-master-menu-components" aria-label="Tutup">✕</button>
+      </div>
+      <div style="padding:0 16px 8px;">
+        <div id="master-menu-component-tabs" style="display:flex;gap:6px;overflow:auto;padding:8px 0;border-bottom:1px solid #e2e8f0;">
+          <button type="button" class="x-cat-filter-btn active" data-component-type="flavor">Rasa</button>
+          <button type="button" class="x-cat-filter-btn" data-component-type="complement">Kelengkapan</button>
+          <button type="button" class="x-cat-filter-btn" data-component-type="level">Level</button>
+        </div>
+      </div>
+      <div class="x-modal-scroll-body" style="max-height:420px;">
+        <div id="master-menu-component-list"></div>
+      </div>
+      <div class="x-modal-footer" style="justify-content:space-between;">
+        <button type="button" class="x-btn-secondary" id="btn-add-master-menu-component">+ Tambah Data</button>
+        <button type="button" class="x-btn-secondary" id="btn-close-master-menu-components-2">Tutup</button>
+      </div>
     </div>
   </div>
 
@@ -3765,19 +3823,30 @@
         <input type="hidden" id="adopt-max-price" value="">
         
         <div class="x-form-group">
-          <label>Nama Menu</label>
+          <label>Master Menu</label>
           <input type="text" id="adopt-product-name" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+        </div>
+
+        <div class="x-form-group">
+          <label>Komposisi Master <span class="text-muted">(hanya lihat)</span></label>
+          <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+            <div id="adopt-menu-title" style="font-size:14px;font-weight:800;color:#0f172a;">—</div>
+            <div id="adopt-menu-subtitle" style="font-size:12px;color:#475569;margin-top:3px;">—</div>
+            <div id="adopt-menu-detail" style="font-size:11px;color:#64748b;margin-top:5px;">—</div>
+            <div id="adopt-menu-indicator" style="font-size:11px;color:#475569;margin-top:5px;font-weight:700;">—</div>
+          </div>
         </div>
 
         <div class="x-form-group">
           <label for="adopt-branch-category">Kategori di Cabang Ini</label>
           <select id="adopt-branch-category" class="x-input" required></select>
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Kategori ini hanya untuk pengelompokan menu di cabang. Komposisi Master tidak berubah.</small>
         </div>
 
         <div class="x-form-group">
-          <label for="adopt-price">Harga Jual Cabang (Rp)</label>
-          <input type="number" id="adopt-price" class="x-input" required>
-          <small id="adopt-price-hint" class="text-muted" style="display:block;margin-top:4px;font-size:12px;"></small>
+          <label>Harga Master (Owner)</label>
+          <input type="text" id="adopt-price-display" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Harga Menu ditentukan Owner. Merchant tidak mengubah harga saat adopsi.</small>
         </div>
 
         <div class="x-modal-footer">
@@ -3943,6 +4012,8 @@
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="x-toast-container" class="x-toast-container"></div>
 
+  <!-- LEGACY QUARANTINED: Branch Product Override compatibility modal.
+       No active forward Menu workflow should expose this editor. -->
   <!-- MODAL: BRANCH PRODUCT EDIT (photo upload, name, description, price, category) -->
   <div id="modal-branch-override" class="x-modal-backdrop" style="display:none; z-index: 1200;">
     <div class="x-modal-card" style="max-width:560px;">

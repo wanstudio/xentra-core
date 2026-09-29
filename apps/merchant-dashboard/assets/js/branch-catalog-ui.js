@@ -3,6 +3,11 @@
  *
  * Owner Dashboard UI only. API/data transport is provided by
  * merchant-shared/js/catalog-client.js.
+
+ * LEGACY QUARANTINE (2026-09-29):
+ * Branch/Product content override UI and API are compatibility-only.
+ * Do not extend name/description/image override behavior. The forward Menu
+ * architecture uses Owner-owned structured Master Menu Composition.
  */
 (function () {
   'use strict';
@@ -83,11 +88,6 @@
         ? '<span class="x-badge x-badge-range">Range (' + formatMoney(p.min_price) + ' - ' + formatMoney(p.max_price) + ')</span>'
         : '<span class="x-badge x-badge-lock">Harga Terkunci</span>';
 
-      // Override status badges — one per supported field
-      var nameSrc     = p.name_override        ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
-      var descSrc     = p.description_override ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
-      var imgSrc      = p.image_override       ? '<span class="x-badge" style="background:#fef9c3;color:#854d0e;font-size:9px;">OVERRIDE</span>' : '<span class="x-badge" style="background:#f0fdf4;color:#166534;font-size:9px;">DEFAULT</span>';
-
       var productDataJson = esc(JSON.stringify({
         product_id: p.product_id,
         name: p.name, name_override: p.name_override, master_name: p.master_name,
@@ -111,25 +111,23 @@
           '<img src="' + esc(img) + '" class="x-product-card-thumb" alt="' + esc(p.name) + '">',
           '<div class="x-product-card-content">',
             '<h5>' + esc(p.name) + '</h5>',
+            (p.menu_composition ? '<div style="font-size:11px;line-height:1.45;color:#475569;margin:4px 0 6px;"><strong>' + esc(p.menu_composition.title || '') + '</strong>' +
+              (p.menu_composition.subtitle ? ' · ' + esc(p.menu_composition.subtitle) : '') +
+              (p.menu_composition.detail && p.menu_composition.detail.length ? ' · ' + esc(p.menu_composition.detail.join(', ')) : '') +
+              (p.menu_composition.indicator ? ' · ' + esc(p.menu_composition.indicator) : '') +
+            '</div>' : ''),
             '<div style="display:flex;gap:4px;flex-wrap:wrap;margin:4px 0;">',
               '<span class="x-badge x-badge-info" style="font-size:10px;">' + esc(catName) + '</span>',
               modeBadge,
             '</div>',
             '<div class="x-product-card-price">Jual: ' + formatMoney(p.price) + ' <small class="text-muted" style="font-weight:normal;">(Owner: ' + formatMoney(p.master_price) + ')</small></div>',
-            '<div style="font-size:11px;color:#64748b;margin:4px 0;display:flex;gap:8px;flex-wrap:wrap;">',
-              '<span>Nama: ' + nameSrc + '</span>',
-              '<span>Deskripsi: ' + descSrc + '</span>',
-              '<span>Gambar: ' + imgSrc + '</span>',
-            '</div>',
+            '' ,
             '<div class="x-product-card-actions">',
               '<div>' + availabilityToggle + '</div>',
               '<div class="x-item-actions">',
                 '<button type="button" class="x-action-menu-trigger" aria-label="Aksi menu cabang ' + esc(p.name) + '" onclick="XentraActionMenu.open(this, [' +
-                  '{ label: \'Edit Menu Cabang\', icon: \'✏️\', onClick: function() { openBranchOverrideModal(\'' + productDataJson + '\'); } },' +
-                  '{ divider: true },' +
                   '{ label: \'Hapus dari Cabang\', icon: \'🗑️\', destructive: true, onClick: function() { removeBranchProduct(\'' + p.product_id + '\', \'' + esc(p.name) + '\'); } }' +
                 '])">',
-                  '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
                 '</button>',
               '</div>',
             '</div>',
@@ -485,40 +483,28 @@
     var resolvedBranchId = currentManagingBranchId ||
       (typeof getActiveBranchId === 'function' ? getActiveBranchId() : null) ||
       (typeof getEffectiveBranchId === 'function' ? getEffectiveBranchId() : null);
-    if (resolvedBranchId) {
-      currentManagingBranchId = resolvedBranchId;
+    if (resolvedBranchId) currentManagingBranchId = resolvedBranchId;
+
+    var composition = p.menu_composition;
+    if (!composition) {
+      showToast('⚠️ Menu Master ini belum memiliki komposisi lengkap. Lengkapi Master Menu terlebih dahulu.');
+      return;
     }
 
     $('adopt-product-id').value = p.id;
-    $('adopt-product-name').value = p.name;
-    $('adopt-pricing-mode').value = p.pricing_mode || 'lock';
-    $('adopt-min-price').value = p.min_price || p.price;
-    $('adopt-max-price').value = p.max_price || p.price;
+    $('adopt-product-name').value = p.name || p.id;
+    if ($('adopt-menu-title')) $('adopt-menu-title').textContent = composition.title || '—';
+    if ($('adopt-menu-subtitle')) $('adopt-menu-subtitle').textContent = composition.subtitle || 'Tanpa Rasa';
+    if ($('adopt-menu-detail')) $('adopt-menu-detail').textContent = composition.detail && composition.detail.length ? composition.detail.join(', ') : 'Tanpa Kelengkapan';
+    if ($('adopt-menu-indicator')) $('adopt-menu-indicator').textContent = composition.indicator || 'Tanpa Level';
+    if ($('adopt-price-display')) $('adopt-price-display').value = formatMoney(composition.price);
 
-    var isRange = p.pricing_mode === 'range';
-    var priceInput = $('adopt-price');
-    var priceHint = $('adopt-price-hint');
-
-    if (isRange) {
-      priceInput.readOnly = false;
-      priceInput.value = p.price;
-      priceInput.min = p.min_price;
-      priceInput.max = p.max_price;
-      priceHint.innerHTML = '💡 <strong>Range Harga Fleksibel:</strong> Cabang diizinkan menentukan harga antara <strong>' + formatMoney(p.min_price) + '</strong> s/d <strong>' + formatMoney(p.max_price) + '</strong>.';
-    } else {
-      priceInput.readOnly = true;
-      priceInput.value = p.price;
-      priceHint.innerHTML = '🔒 <strong>Harga Terkunci:</strong> Ditetapkan paten oleh Pemilik Resto (Owner) sebesar <strong>' + formatMoney(p.price) + '</strong>.';
-    }
-
-    // Populate branch categories
     var catSelect = $('adopt-branch-category');
     var cats = currentBranchCatalogData.categories || [];
-    var catOptions = cats.map(function (c) {
-      return '<option value="' + c.id + '">' + esc(c.name) + '</option>';
-    });
-    catOptions.unshift('<option value="">(Otomatis sesuaikan kategori produk)</option>');
-    catSelect.innerHTML = catOptions.join('');
+    catSelect.innerHTML = '<option value="">Pilih Kategori Cabang</option>' + cats.map(function (cat) {
+      return '<option value="' + esc(cat.id) + '">' + esc(cat.name) + '</option>';
+    }).join('');
+    catSelect.value = '';
 
     $('modal-adopt-product').style.display = 'flex';
   };
@@ -547,19 +533,22 @@
 
       var prodId = $('adopt-product-id').value;
       var catId = $('adopt-branch-category').value;
-      var priceVal = Number($('adopt-price').value);
+      if (!catId) {
+        showToast('❌ Pilih minimal satu Kategori Cabang.');
+        btn.disabled = false;
+        btn.textContent = 'Simpan ke Katalog Cabang';
+        return;
+      }
 
       try {
         var res = await CatalogClient.adoptProduct(currentManagingBranchId, {
-            product_id: prodId,
-            branch_category_id: catId || undefined,
-            price: priceVal
-          });
+          product_id: prodId,
+          category_ids: [catId]
+        });
         var data = await res.json();
         if (data.success) {
           showToast('✅ Menu berhasil diadopsi ke cabang!');
           window.closeAdoptModal();
-          // Refresh the correct panel depending on role/view
           reloadBranchCatalogView();
         } else {
           showToast('❌ ' + (data.message || data.error || 'Gagal mengadopsi produk.'));

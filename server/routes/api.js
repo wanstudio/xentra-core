@@ -18,6 +18,7 @@ const registerCustomerAddressRoutes = require('./customer-addresses');
 const registerWorkforceRoutes = require('./workforce');
 const registerPlatformRoutes = require('./platform');
 const registerAdminCatalogRoutes = require('./admin-catalog');
+const registerAdminMenuCompositionRoutes = require('./admin-menu-composition');
 const registerAdminBrandRoutes = require('./admin-brand');
 const registerAdminBranchRoutes = require('./admin-branches');
 const registerAdminOrderRoutes = require('./admin-orders');
@@ -48,7 +49,7 @@ const RouteService = require('../services/RouteService');
 const { PromotionEngineService } = require('../../domains/promotion');
 const { InventoryStockService, InventoryMovementModel } = require('../../domains/inventory');
 const CatalogService = require('../../domains/catalog/services/CatalogService');
-const { PricingPolicyModel } = require('../../domains/catalog');
+const { PricingPolicyModel, MasterMenuResolver } = require('../../domains/catalog');
 const { XentraConnectorClient, XentraConnectorError } = require('../../core/integration/XentraConnectorClient');
 const { BrandRepository: CoreBrandRepo, BranchRepository: CoreBranchRepo, UserRepository: CoreUserRepo } = require('../../core/data/repositories');
 const coreBrandRepo = new CoreBrandRepo();
@@ -967,6 +968,8 @@ registerAdminBrandRoutes(router, {
 
 // Master catalog CRUD is isolated in server/routes/admin-catalog.js.
 registerAdminCatalogRoutes(router, { db, requireAuth });
+// Master Menu Composition routes use Owner-authoritative structured component data.
+registerAdminMenuCompositionRoutes(router, { requireAuth });
 
 // Admin branch management routes are isolated in server/routes/admin-branches.js.
 registerAdminBranchRoutes(router, { db, crypto, requireAuth });
@@ -981,6 +984,7 @@ registerAdminBranchCatalogRoutes(router, {
   requireAuth,
   CatalogService,
   PricingPolicyModel,
+  MasterMenuResolver,
   XentraConnectorClient,
   InventoryStockService
 });

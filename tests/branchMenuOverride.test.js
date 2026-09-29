@@ -1,7 +1,10 @@
 ﻿'use strict';
 
 /**
- * BRANCH PRODUCT OVERRIDE -- Master Product Default + Branch Optional Override
+ * LEGACY QUARANTINED TESTS -- Branch Product Override
+ *
+ * These tests protect compatibility behavior during migration only.
+ * They are not acceptance criteria for the forward Master Menu Composition model.
  *
  * Requirement coverage:
  *  OVR-01  adoption != snapshot (override cols NULL after adopt via API)

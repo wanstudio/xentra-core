@@ -874,6 +874,148 @@ function initSchema(targetDb) {
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS menu_flavors (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_flavors_brand_slug
+      ON menu_flavors(brand_id, slug);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_flavors_brand_name
+      ON menu_flavors(brand_id, lower(trim(name)));
+
+    CREATE TABLE IF NOT EXISTS menu_complements (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_complements_brand_slug
+      ON menu_complements(brand_id, slug);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_complements_brand_name
+      ON menu_complements(brand_id, lower(trim(name)));
+
+    CREATE TABLE IF NOT EXISTS menu_levels (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_levels_brand_slug
+      ON menu_levels(brand_id, slug);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_levels_brand_name
+      ON menu_levels(brand_id, lower(trim(name)));
+
+    CREATE TABLE IF NOT EXISTS product_flavors (
+      product_id TEXT NOT NULL,
+      flavor_id TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (product_id, flavor_id),
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (flavor_id) REFERENCES menu_flavors(id) ON DELETE RESTRICT
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_product_flavors_one_per_product
+      ON product_flavors(product_id);
+    CREATE INDEX IF NOT EXISTS idx_product_flavors_flavor
+      ON product_flavors(flavor_id);
+
+    CREATE TABLE IF NOT EXISTS product_complements (
+      product_id TEXT NOT NULL,
+      complement_id TEXT NOT NULL,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (product_id, complement_id),
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (complement_id) REFERENCES menu_complements(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_product_complements_complement
+      ON product_complements(complement_id);
+    CREATE INDEX IF NOT EXISTS idx_product_complements_product_order
+      ON product_complements(product_id, sort_order, complement_id);
+
+    CREATE TABLE IF NOT EXISTS product_levels (
+      product_id TEXT NOT NULL,
+      level_id TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (product_id, level_id),
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+      FOREIGN KEY (level_id) REFERENCES menu_levels(id) ON DELETE RESTRICT
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_product_levels_one_per_product
+      ON product_levels(product_id);
+    CREATE INDEX IF NOT EXISTS idx_product_levels_level
+      ON product_levels(level_id);
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_flavors_brand_consistency_insert
+    BEFORE INSERT ON product_flavors
+    FOR EACH ROW
+    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id)
+         IS NOT (SELECT brand_id FROM menu_flavors WHERE id = NEW.flavor_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCT_FLAVOR_BRAND_MISMATCH');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_flavors_brand_consistency_update
+    BEFORE UPDATE OF product_id, flavor_id ON product_flavors
+    FOR EACH ROW
+    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id)
+         IS NOT (SELECT brand_id FROM menu_flavors WHERE id = NEW.flavor_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCT_FLAVOR_BRAND_MISMATCH');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_complements_brand_consistency_insert
+    BEFORE INSERT ON product_complements
+    FOR EACH ROW
+    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id)
+         IS NOT (SELECT brand_id FROM menu_complements WHERE id = NEW.complement_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCT_COMPLEMENT_BRAND_MISMATCH');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_complements_brand_consistency_update
+    BEFORE UPDATE OF product_id, complement_id ON product_complements
+    FOR EACH ROW
+    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id)
+         IS NOT (SELECT brand_id FROM menu_complements WHERE id = NEW.complement_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCT_COMPLEMENT_BRAND_MISMATCH');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_levels_brand_consistency_insert
+    BEFORE INSERT ON product_levels
+    FOR EACH ROW
+    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id)
+         IS NOT (SELECT brand_id FROM menu_levels WHERE id = NEW.level_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCT_LEVEL_BRAND_MISMATCH');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_product_levels_brand_consistency_update
+    BEFORE UPDATE OF product_id, level_id ON product_levels
+    FOR EACH ROW
+    WHEN (SELECT brand_id FROM products WHERE id = NEW.product_id)
+         IS NOT (SELECT brand_id FROM menu_levels WHERE id = NEW.level_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'PRODUCT_LEVEL_BRAND_MISMATCH');
+    END;
+
     CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
       order_number TEXT UNIQUE NOT NULL,
@@ -1365,7 +1507,8 @@ function initSchema(targetDb) {
       description_override TEXT,
       image_override TEXT,
       price REAL,
-      stock INTEGER DEFAULT 100,
+      -- No catalog assignment may manufacture physical inventory.
+      stock INTEGER DEFAULT NULL,
       is_available INTEGER DEFAULT 1,
       low_stock_threshold INTEGER DEFAULT 5,
       created_at TEXT DEFAULT (datetime('now')),
@@ -2356,6 +2499,8 @@ function bootstrapEssentialTenant(targetDb) {
   // Dine-in Additional Order Batch: existing order_items gain a provenance reference.
   try { targetDb.exec("ALTER TABLE order_items ADD COLUMN addition_batch_id TEXT;"); } catch (_) {}
   try { targetDb.exec("CREATE INDEX IF NOT EXISTS idx_order_items_addition_batch_id ON order_items(addition_batch_id);"); } catch (_) {}
+  // Master Menu Composition: immutable customer-facing menu snapshot per order item.
+  try { targetDb.exec("ALTER TABLE order_items ADD COLUMN menu_snapshot TEXT;"); } catch (_) {}
   try { targetDb.exec("ALTER TABLE order_addition_batches ADD COLUMN client_transaction_id TEXT;"); } catch (_) {}
   try { targetDb.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_order_addition_batches_client_tx ON order_addition_batches(order_id, client_transaction_id) WHERE client_transaction_id IS NOT NULL;"); } catch (_) {}
 }
