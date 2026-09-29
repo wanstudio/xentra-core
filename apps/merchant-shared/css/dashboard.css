@@ -4426,7 +4426,7 @@ input[type="file"].x-input,
     padding: max(12px, env(safe-area-inset-top)) 16px 12px !important;
     background: #ffffff !important;
     border: 0 !important;
-    box-shadow: box-shadow: 0 2px 6px rgba(15,23,42,.16) !important;
+    box-shadow: 0 2px 6px rgba(15,23,42,.16) !important;
     backdrop-filter: none !important;
     width: 100% !important;
     box-sizing: border-box !important;
@@ -7136,7 +7136,7 @@ input[type="file"].x-input,
     border: 0 !important;
     border-radius: 0 !important;
     background: #ffffff !important;
-    box-shadow: box-shadow: 0 2px 6px rgba(15,23,42,.16) !important;
+    box-shadow: 0 2px 6px rgba(15,23,42,.16) !important;
   }
 
   .x-merchant-app .x-mobile-topbar {
