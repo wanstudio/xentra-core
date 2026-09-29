@@ -2875,7 +2875,6 @@ input[type="file"].x-input,
   align-items:center;
   justify-content:center;
   border-radius:8px;
-  font-size:18px !important;
   line-height:1;
 }
 @media(max-width:768px){
