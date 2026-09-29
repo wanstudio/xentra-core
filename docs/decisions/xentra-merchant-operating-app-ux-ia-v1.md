@@ -525,3 +525,12 @@ This lock does not authorize:
 
 **LOCKED — GoBiz is a visual/ergonomic reference only. Xentra's Menu and Stock IA must be independently designed from Xentra's own domain and merchant jobs. Existing mature Xentra UI primitives and assets are the first candidates for reuse and library consolidation.**
 
+
+
+## 🔒 LOCKED — Refresh / Re-fetch UX Contract
+
+For Owner Dashboard and Merchant App, manual data refresh is not a normal per-screen workflow. Page-level refresh buttons are removed. Normal freshness is handled by server fetch/revalidation when a surface opens and after mutations.
+
+If manual recovery is needed, each application exposes one “Segarkan data aplikasi” action inside Pengaturan. The action reloads the application so server-driven data is fetched again.
+
+POS is excluded: POS may retain its operational refresh/sync controls because it has a local ↔ server synchronization model.
