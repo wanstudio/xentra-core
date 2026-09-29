@@ -72,7 +72,8 @@ test('Master Product uses one assembly workspace with contextual quick-add modal
   assert.ok(JS.includes("openMasterReferenceQuickAdd('flavor')"));
   assert.ok(JS.includes("API_BASE + '/admin/categories'"));
   assert.ok(JS.includes("API_BASE + '/admin/menu/components/flavor'"));
-  assert.ok(!HTML.includes('id="tab-catalog-categories"'));
+  assert.ok(HTML.includes('id="tab-catalog-categories"'));
+  assert.ok(HTML.includes('id="master-categories-page-list"'));
   assert.ok(!HTML.includes('id="btn-manage-menu-components"'));
 });
 
