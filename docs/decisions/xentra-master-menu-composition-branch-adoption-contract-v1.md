@@ -545,3 +545,30 @@ The new Menu architecture is complete when:
 - destructive legacy removal is separately verified and committed.
 
 **Any change to ownership, cardinality, propagation, pricing authority, Customer presentation mapping, or snapshot semantics requires a new contract revision.**
+
+
+## 🔒 LOCKED ADDENDUM — Master Product Active-State Resolution
+**Date: 2026-09-29**
+
+For the forward Customer Menu resolver:
+
+- `products.is_active = 1` is required for a Master Product to be returned in the sellable Customer Menu.
+- `products.is_active = 0` removes that Master Product from the resolved Customer Menu.
+- This does **not** write or mutate `branch_products.is_available`.
+- Branch availability remains a separate operational state.
+- Re-activating the Master Product makes an already-adopted Branch Product eligible for resolution again, subject to its Branch state and all other authoritative checks.
+
+The important distinction is:
+
+```
+Master Product active
+    = Owner-controlled global sellable-universe gate
+
+Branch Product availability
+    = Branch-controlled operational availability
+
+Inventory stock
+    = Inventory-controlled physical quantity
+```
+
+No layer silently mutates another layer to express its own state.
