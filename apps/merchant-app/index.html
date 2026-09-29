@@ -144,10 +144,24 @@
       <section id="tab-hari-ini" class="x-tab-content" data-tab="hari-ini">
         <div class="x-home-screen">
 
-          <div class="x-home-status-anchor" aria-hidden="true">
-            <span id="bm-hero-branch-name">Cabang Memuat...</span>
-            <span id="bm-hero-status-dot" class="x-status-dot"></span>
-          </div>
+          <!-- Desktop-only operational context; mobile context lives in the fixed top bar -->
+          <section class="x-home-desktop-context" aria-label="Konteks operasional cabang">
+            <div class="x-home-desktop-context-main">
+              <div>
+                <div class="x-home-desktop-branch-row">
+                  <span id="bm-home-status-dot" class="x-status-dot" aria-hidden="true"></span>
+                  <strong id="bm-home-branch-name">Cabang Memuat...</strong>
+                  <span id="bm-home-status-badge" class="x-badge x-badge-info">CABANG: MEMUAT...</span>
+                  <span id="bm-home-online-badge" class="x-badge x-badge-info">ONLINE: MEMUAT...</span>
+                </div>
+                <p id="bm-home-date" class="x-home-desktop-date">Memuat tanggal...</p>
+              </div>
+              <div class="x-home-desktop-context-actions">
+                <button type="button" class="x-home-desktop-control" id="btn-bm-toggle-online-orders" onclick="toggleBranchOnlineOrders()">Pesanan Online</button>
+                <button type="button" class="x-home-desktop-control is-primary" id="btn-bm-toggle-open" onclick="toggleBranchOpen()">Buka Cabang</button>
+              </div>
+            </div>
+          </section>
 
           <!-- Greeting / date -->
           <section class="x-home-greeting" aria-labelledby="bm-home-greeting-title">
@@ -198,7 +212,6 @@
               <button type="button" class="x-home-section-action" style="width:100%;padding:11px 15px;border-top:1px solid #f0f2f3;" onclick="navigateTo('pesanan')">
                 Lihat semua pesanan →
               </button>
-              <div id="bm-tbody-pending-orders" class="x-home-status-anchor" aria-hidden="true"></div>
             </div>
           </section>
 
@@ -282,13 +295,6 @@
                 <span class="x-home-attention-row-arrow" aria-hidden="true">›</span>
               </button>
             </div>
-            <div class="x-home-status-anchor">
-              <span id="bm-badge-menu-unavail">0 Habis</span>
-              <span id="bm-badge-stock-low">0 Menipis</span>
-              <span id="bm-menu-unavail-list"></span>
-              <span id="bm-stock-low-list"></span>
-              <span id="bm-low-stock-list"></span>
-            </div>
           </section>
 
           <!-- Active promotions -->
@@ -315,16 +321,6 @@
               </div>
             </div>
           </section>
-
-          <!-- Legacy-compatible desktop controls remain addressable but are not part of the mobile composition -->
-          <div class="x-home-status-anchor" aria-hidden="true">
-            <span id="bm-hero-status-badge" class="x-badge x-badge-info">CABANG: MEMUAT...</span>
-            <span id="bm-hero-online-badge" class="x-badge">ONLINE: MEMUAT...</span>
-            <span id="bm-hero-date">Memuat tanggal...</span>
-            <button type="button" id="btn-bm-toggle-open" onclick="toggleBranchOpen()">Buka Cabang</button>
-            <button type="button" id="btn-bm-toggle-online-orders" onclick="toggleBranchOnlineOrders()">Pesanan Online</button>
-            <div id="bm-operational-alerts"></div>
-          </div>
 
         </div>
       </section>
