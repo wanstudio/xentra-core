@@ -2581,8 +2581,6 @@
     }
   }
 
-    }
-  }
 
   var _productOptionsDraft = [];
 
@@ -10972,7 +10970,9 @@
         if (!isValid) return;
         // Owner Dashboard has one canonical role landing: /owner/.
         // /dashboard/ remains a legacy/compatibility route, not the Owner landing URL.
-        enforceSurface(['/owner/']);
+        // Semua jalur yang melayani permukaan ini harus ada di daftar — kalau tidak,
+        // penjaganya mengalihkan ke jalur yang ia sendiri tolak dan halaman berputar.
+        enforceSurface(['/owner/', '/owner', '/dashboard/', '/dashboard']);
       }).catch(function () {});
 
       // Apply initial route from URL hash (enables deep-link and browser refresh)
