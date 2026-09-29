@@ -153,7 +153,10 @@
           if ($("bm-stat-active-orders")) $("bm-stat-active-orders").textContent = activeList.length;
           if ($("bm-stat-ready-orders")) $("bm-stat-ready-orders").textContent = readyList.length;
           if ($("bm-stat-completed-orders")) $("bm-stat-completed-orders").textContent = completedToday.length;
-          if ($("bm-stat-net-sales-today")) $("bm-stat-net-sales-today").textContent = formatMoney(completedSales);\n\n           var avgOrderEl = $("bm-stat-average-order");\n           if (avgOrderEl) avgOrderEl.textContent = completedToday.length ? formatMoney(Math.round(completedSales / completedToday.length)) : "Rp0";
+          if ($("bm-stat-net-sales-today")) $("bm-stat-net-sales-today").textContent = formatMoney(completedSales);
+
+           var avgOrderEl = $("bm-stat-average-order");
+           if (avgOrderEl) avgOrderEl.textContent = completedToday.length ? formatMoney(Math.round(completedSales / completedToday.length)) : "Rp0";
 
           renderHariIniPendingOrders(pendingList);
         }
