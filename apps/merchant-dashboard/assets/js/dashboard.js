@@ -2685,7 +2685,15 @@
         renderProductCategoryFilterChips();
         renderMasterProductsTable();
       } else {
+        if (!referenceId && type === 'complement') {
+          var newComplementId = String(row.id);
+          if (_masterMenuSelected.complement_ids.indexOf(newComplementId) === -1) {
+            _masterMenuSelected.complement_ids.push(newComplementId);
+          }
+        }
+
         renderMasterMenuSelectors();
+
         if (!referenceId && type === 'flavor') {
           _masterMenuSelected.flavor_id = String(row.id);
           var flavorSelect = $('prod-flavor');
@@ -2997,13 +3005,23 @@
     if (complementBox) {
       var rows = _masterMenuComponents.complement || [];
       if (!rows.length) {
+        // Empty Master Kelengkapan is still an actionable state: show + Add,
+        // never a dead-end "belum ada data" message.
         complementBox.innerHTML =
           '<button type="button" class="x-master-choice-chip x-master-choice-add" data-master-choice-add="1" aria-label="Tambah Kelengkapan">' +
             '<span aria-hidden="true">+</span><span>Tambah</span>' +
           '</button>';
-        if (empty) empty.style.display = 'block';
+        if (empty) {
+          empty.hidden = true;
+          empty.setAttribute('aria-hidden', 'true');
+          empty.style.display = 'none';
+        }
       } else {
-        if (empty) empty.style.display = 'none';
+        if (empty) {
+          empty.hidden = true;
+          empty.setAttribute('aria-hidden', 'true');
+          empty.style.display = 'none';
+        }
         var selectedIds = _masterMenuSelected.complement_ids || [];
         complementBox.innerHTML = rows.filter(function(row) {
           return row.is_active || selectedIds.indexOf(String(row.id)) !== -1;
@@ -4108,6 +4126,20 @@ async function loadMenusView() {
     if (btnAddFlavorFromProduct) btnAddFlavorFromProduct.addEventListener('click', function () {
       openMasterReferenceQuickAdd('flavor');
     });
+
+    // Product Master only exposes Add for reference values. Delegate the
+    // complement + action so the empty-state fallback and rerendered button
+    // always invoke the same create-only flow.
+    var complementEditor = $('prod-complements-editor');
+    if (complementEditor && !complementEditor.dataset.addBound) {
+      complementEditor.dataset.addBound = 'true';
+      complementEditor.addEventListener('click', function (event) {
+        var addButton = event.target.closest('[data-master-choice-add]');
+        if (!addButton) return;
+        event.preventDefault();
+        openMasterReferenceQuickAdd('complement');
+      });
+    }
 
     var closeQuickAdd = $('btn-close-master-reference-quick-add');
     if (closeQuickAdd) closeQuickAdd.addEventListener('click', closeMasterReferenceQuickAdd);
