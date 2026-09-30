@@ -3579,6 +3579,12 @@
     return data.options_config;
   }
 
+  // Product Image State — explicitly scoped to the Product Editor.
+  // The file stays in memory only until the Product save pipeline uploads it.
+  var _productImageFile = null;
+  var _productCropSpec = null;
+  var _productImageRemoved = false;
+
   // Product Actions
   function setProductImagePreview(src, hasImage) {
     var previewImg = $('prod-image-preview');
@@ -3629,6 +3635,7 @@
     $('prod-desc').value = '';
     _productImageFile = null;
     _productCropSpec = null;
+    _productImageRemoved = false;
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
     setProductImagePreview('', false);
@@ -3660,9 +3667,10 @@
     $('prod-desc').value = prod.description || '';
     _productImageFile = null;
     _productCropSpec = null;
+    _productImageRemoved = false;
     var fileInput = $('prod-image-file');
     if (fileInput) fileInput.value = '';
-    var existingImage = prod.image || prod.image_url || '';
+    var existingImage = prod.image_url || prod.image || '';
     setProductImagePreview(existingImage, existingImage !== '');
     _productOptionsDraft = normalizeProductOptionsDraft(prod.options_config);
     renderProductOptionsEditor();
@@ -4436,6 +4444,7 @@ async function loadMenusView() {
       prodFileInput.addEventListener('change', function () {
         var file = prodFileInput.files && prodFileInput.files[0];
         if (!file) { _productImageFile = null; _productCropSpec = null; return; }
+        _productImageRemoved = false;
 
         var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
         if (allowed.indexOf(file.type) === -1) {
@@ -4478,6 +4487,7 @@ async function loadMenusView() {
       btnRemoveProd.addEventListener('click', function () {
         _productImageFile = null;
         _productCropSpec = null;
+        _productImageRemoved = true;
         if (prodFileInput) prodFileInput.value = '';
         setProductImagePreview('', false);
       });
@@ -4558,7 +4568,24 @@ async function loadMenusView() {
             showToast('❌ ' + optionErr.message);
             return;
           }
-          if (_productImageFile && savedId) {
+          if (_productImageRemoved && savedId) {
+            var removeRes = await adminFetch(API_BASE + '/admin/media/entity/products/' + encodeURIComponent(savedId) + '/image', {
+              method: 'DELETE',
+              headers: getAuthHeaders()
+            });
+            var removeData = {};
+            try {
+              removeData = await removeRes.json();
+            } catch (_) {
+              removeData = { success: false, error: 'Gagal membaca respons penghapusan foto (HTTP ' + removeRes.status + ').' };
+            }
+            if (!removeRes.ok || !removeData.success) {
+              showToast('❌ ' + (removeData.error || removeData.message || 'Gagal menghapus foto menu.'));
+              return;
+            }
+          }
+
+          if (_productImageFile && savedId && !_productImageRemoved) {
             var base64 = await new Promise(function (resolve, reject) {
               var imgReader = new FileReader();
               imgReader.onload = function () { resolve(imgReader.result); };
@@ -4566,12 +4593,14 @@ async function loadMenusView() {
               imgReader.readAsDataURL(_productImageFile);
             });
 
-            var imagePayload = { image_base64: base64, mime_type: _productImageFile.type };
-            if (_productCropSpec) {
-              imagePayload.crop_spec = _productCropSpec;
-            }
+            var imagePayload = {
+              image_base64: base64,
+              mime_type: _productImageFile.type,
+              original_filename: _productImageFile.name || null
+            };
+            if (_productCropSpec) imagePayload.crop_spec = _productCropSpec;
 
-            var imageRes = await adminFetch(API_BASE + '/admin/products/' + savedId + '/image', {
+            var imageRes = await adminFetch(API_BASE + '/admin/media/entity/products/' + encodeURIComponent(savedId) + '/image', {
               method: 'POST',
               headers: getAuthHeaders(),
               body: JSON.stringify(imagePayload)
