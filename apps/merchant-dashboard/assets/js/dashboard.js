@@ -2151,6 +2151,7 @@
 
       // Update Header & Breadcrumb
       if ($('prod-detail-breadcrumb')) $('prod-detail-breadcrumb').textContent = prod.name;
+    if ($('product-detail-mobile-title')) $('product-detail-mobile-title').textContent = 'Detail Produk · ' + (prod.name || 'Produk');
       if ($('prod-detail-name')) $('prod-detail-name').textContent = prod.name;
       if ($('prod-detail-desc')) $('prod-detail-desc').textContent = prod.description || 'Tidak ada deskripsi.';
       if ($('prod-detail-price')) $('prod-detail-price').textContent = formatMoney(prod.price);
@@ -3500,6 +3501,8 @@
     $('product-editor-title').textContent = 'Tambah Produk Master Baru';
     $('prod-editor-breadcrumb').textContent = 'Tambah Produk';
     $('prod-editor-subtitle').textContent = 'Susun identitas, harga, foto, dan komposisi Master Menu.';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Tambah Produk';
+    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Susun identitas, harga, foto, dan komposisi Master Menu.';
     $('prod-id').value = '';
     $('prod-name').value = '';
     $('prod-price').value = '';
@@ -3527,6 +3530,8 @@
     $('product-editor-title').textContent = 'Edit Produk: ' + prod.name;
     $('prod-editor-breadcrumb').textContent = prod.name;
     $('prod-editor-subtitle').textContent = 'Periksa dan perbarui data Master Menu.';
+    if ($('product-editor-mobile-title')) $('product-editor-mobile-title').textContent = 'Edit Produk';
+    if ($('product-editor-mobile-subtitle')) $('product-editor-mobile-subtitle').textContent = 'Periksa dan perbarui data Master Menu.';
     $('prod-id').value = prod.id;
     $('prod-name').value = prod.name || '';
     populateProductCategorySelect();
@@ -4204,7 +4209,7 @@ async function loadMenusView() {
     if (btnBackFromProductEditor && !btnBackFromProductEditor.dataset.bound) {
       btnBackFromProductEditor.dataset.bound = 'true';
       btnBackFromProductEditor.addEventListener('click', function () {
-        navigateTo('catalog/products');
+        goBackFromChildPage();
       });
     }
 
@@ -4244,7 +4249,7 @@ async function loadMenusView() {
     var btnBack = $('btn-back-to-products');
     if (btnBack) {
       btnBack.addEventListener('click', function () {
-        navigateTo('catalog/products');
+        goBackFromChildPage();
       });
     }
 
@@ -4660,6 +4665,7 @@ async function loadMenusView() {
     $('branch-open-override').checked = b ? !(b.is_open_override === 0 || b.is_open_override === false) : true;
     $('branch-editor-title').textContent = b ? ('Edit Cabang: ' + (b.name || '')) : 'Tambah Cabang';
     $('branch-editor-breadcrumb').textContent = b ? 'Edit Cabang' : 'Tambah Cabang';
+    if ($('branch-editor-mobile-title')) $('branch-editor-mobile-title').textContent = b ? 'Edit Cabang' : 'Tambah Cabang';
     setTimeout(function () { $('branch-name').focus(); }, 40);
   }
 
@@ -5187,6 +5193,7 @@ async function loadMenusView() {
 
       // Update Summary Header
       if ($('order-detail-breadcrumb')) $('order-detail-breadcrumb').textContent = '#' + (ord.order_number || ord.id);
+      if ($('order-detail-mobile-title')) $('order-detail-mobile-title').textContent = 'Detail Pesanan · #' + (ord.order_number || ord.id);
       if ($('order-detail-number')) $('order-detail-number').textContent = '#' + (ord.order_number || ord.id);
 
       var statusBadges = {
@@ -7820,6 +7827,7 @@ async function loadMenusView() {
 
       if ($('cdetail-name')) $('cdetail-name').textContent = c.name || 'Pelanggan';
       if ($('cdetail-subtitle')) $('cdetail-subtitle').textContent = 'Nomor Kontak: ' + (c.phone || '-');
+      if ($('customers-mobile-detail-subtitle')) $('customers-mobile-detail-subtitle').textContent = 'Nomor Kontak: ' + (c.phone || '-');
 
       var badgeEl = $('cdetail-segment-badge');
       if (badgeEl) {
@@ -7992,10 +8000,10 @@ async function loadMenusView() {
     });
   });
 
-  // Tombol kembali di judul Produk Master. Memakai riwayat kalau ada; kalau tidak
-  // (mis. dibuka langsung dari tautan), kembali ke modul Bisnis supaya tidak keluar
-  // dari aplikasi.
-  window.goBackFromMasterProducts = function () {
+  // Canonical Back behavior for Owner secondary/child pages.
+  // Every child surface retraces the browser/app navigation history instead of
+  // hardcoding a parent route. Direct/deep links use the business hub fallback.
+  window.goBackFromChildPage = function () {
     if (window.history && window.history.length > 1) {
       window.history.back();
       return;
@@ -8003,25 +8011,10 @@ async function loadMenusView() {
     navigateTo('business');
   };
 
-  // Tombol kembali di judul Kategori. Perilakunya sama dengan tombol di judul Produk
-  // Master: memakai riwayat kalau ada, kalau tidak kembali ke modul Bisnis.
-  window.goBackFromCategory = function () {
-    if (window.history && window.history.length > 1) {
-      window.history.back();
-      return;
-    }
-    navigateTo('business');
-  };
-
-  // Catalog child pages share the same visual back affordance.
-  // Navigation still follows the actual browser/app history rather than a hardcoded parent.
-  window.goBackFromCatalogChild = function () {
-    if (window.history && window.history.length > 1) {
-      window.history.back();
-      return;
-    }
-    navigateTo('catalog');
-  };
+  // Compatibility aliases kept for existing markup/tests and legacy callers.
+  window.goBackFromMasterProducts = window.goBackFromChildPage;
+  window.goBackFromCategory = window.goBackFromChildPage;
+  window.goBackFromCatalogChild = window.goBackFromChildPage;
 
   function closeFinanceDropdown() {
     var d = $('finance-section-dropdown');
@@ -8864,6 +8857,12 @@ async function loadMenusView() {
     var card = backdrop.querySelector('.x-modal-card');
     if (!card) return;
     page.appendChild(card);
+    ensureOwnerFeatureMobileHeader(
+      page,
+      $('modal-mkt-promo-title') ? $('modal-mkt-promo-title').textContent : 'Editor Promosi',
+      'Atur program promosi, benefit pelanggan, dan tampilan promo.',
+      'Kembali ke Marketing'
+    );
     card.classList.add('x-feature-page-surface');
     card.style.maxWidth = 'none';
     card.style.width = '100%';
@@ -10539,6 +10538,41 @@ async function loadMenusView() {
     }
   }
 
+  function ensureOwnerFeatureMobileHeader(page, title, subtitle, backLabel) {
+    if (!page) return null;
+
+    var header = page.querySelector('[data-owner-feature-mobile-header]');
+    if (!header) {
+      header = document.createElement('div');
+      header.className = 'x-owner-child-mobile-header';
+      header.setAttribute('data-owner-feature-mobile-header', 'true');
+      header.innerHTML =
+        '<h3 class="x-owner-mobile-page-title">' +
+          '<button type="button" class="x-title-back-btn x-owner-mobile-page-back" data-owner-feature-mobile-back aria-label="Kembali">' +
+            '<svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>' +
+          '</button>' +
+          '<span data-owner-feature-mobile-title></span>' +
+        '</h3>' +
+        '<p class="x-owner-mobile-page-sub" data-owner-feature-mobile-subtitle></p>';
+
+      page.insertBefore(header, page.firstChild);
+
+      var back = header.querySelector('[data-owner-feature-mobile-back]');
+      if (back) {
+        back.addEventListener('click', function () { goBackFromChildPage(); });
+      }
+    }
+
+    var titleEl = header.querySelector('[data-owner-feature-mobile-title]');
+    var subtitleEl = header.querySelector('[data-owner-feature-mobile-subtitle]');
+    var backEl = header.querySelector('[data-owner-feature-mobile-back]');
+    if (titleEl) titleEl.textContent = title || '';
+    if (subtitleEl) subtitleEl.textContent = subtitle || '';
+    if (backEl) backEl.setAttribute('aria-label', backLabel || 'Kembali');
+
+    return header;
+  }
+
   function mountPromotionEditorPage() {
     var backdrop = $('modal-mkt-promotion');
     var page = $('marketing-promotion-editor-view');
@@ -10546,6 +10580,12 @@ async function loadMenusView() {
     var card = backdrop.querySelector('.x-modal-card');
     if (!card) return;
     page.appendChild(card);
+    ensureOwnerFeatureMobileHeader(
+      page,
+      $('modal-marketing-banner-title') ? $('modal-marketing-banner-title').textContent : 'Editor Banner',
+      'Atur konten, penempatan, jadwal, dan publikasi banner.',
+      'Kembali ke Marketing'
+    );
     card.classList.add('x-feature-page-surface');
     card.style.maxWidth = 'none';
     card.style.width = '100%';
@@ -10960,7 +11000,7 @@ async function loadMenusView() {
     initBranchOperationsForm();
 
     var backFromBranchEditor = $('btn-back-from-branch-editor');
-    if (backFromBranchEditor) backFromBranchEditor.addEventListener('click', function () { navigateTo('branches'); });
+    if (backFromBranchEditor) backFromBranchEditor.addEventListener('click', function () { goBackFromChildPage(); });
     var cancelBranchEditor = $('btn-cancel-branch-editor');
     if (cancelBranchEditor) cancelBranchEditor.addEventListener('click', function () { navigateTo('branches'); });
     initOrdersFilterListeners();
