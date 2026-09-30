@@ -4116,7 +4116,7 @@ async function loadMenusView() {
           showToast('❌ Pilih cabang terlebih dahulu.');
           return;
         }
-        var name = prompt('Nama Kategori Baru untuk Cabang ini:');
+        var name = await requestTextInputSheet({ title: 'Tambah Kategori Cabang', label: 'Nama Kategori' });
         if (!name || !name.trim()) return;
 
         try {
@@ -5181,7 +5181,7 @@ async function loadMenusView() {
   }
 
   window.rejectOrder = async function (orderId) {
-    var reason = window.prompt('Masukkan alasan penolakan pesanan:');
+    var reason = await requestTextInputSheet({ title: 'Tolak Pesanan', label: 'Alasan Penolakan', saveLabel: 'Tolak' });
     if (reason === null) return; // User cancelled prompt
     reason = reason.trim();
     if (!reason) {
@@ -10824,7 +10824,7 @@ async function loadMenusView() {
     if (btnAddBranchCatInline) {
       btnAddBranchCatInline.addEventListener('click', async function () {
         if (!XentraOwnerBranchCatalog.state.branchId) return;
-        var name = prompt('Nama Kategori Baru untuk Cabang ini:');
+        var name = await requestTextInputSheet({ title: 'Tambah Kategori Cabang', label: 'Nama Kategori' });
         if (!name || !name.trim()) return;
         try {
           var res = await adminFetch(API_BASE + '/admin/branches/' + XentraOwnerBranchCatalog.state.branchId + '/categories', {
