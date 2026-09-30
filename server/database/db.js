@@ -883,7 +883,7 @@ function initSchema(targetDb) {
       target_schema TEXT NOT NULL DEFAULT 'master-menu-composition-v1',
       status TEXT NOT NULL DEFAULT 'legacy',
       attempt_count INTEGER NOT NULL DEFAULT 0,
-      source_fingerprint TEXT,
+      canonical_fingerprint TEXT,
       last_error TEXT,
       notes TEXT,
       migrated_at TEXT,
