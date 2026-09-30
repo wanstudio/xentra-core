@@ -148,6 +148,17 @@ test('Branch-scoped catalog exposes structured Master Menu presentation fields',
   assert.ok(!Object.prototype.hasOwnProperty.call(product, 'image_override'));
 });
 
+test('Customer catalog exposes structured Pedas intensity for four-dot presentation', () => {
+  const homePath = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/home.js');
+  const home = fs.readFileSync(homePath, 'utf8');
+  assert.ok(home.includes('menu_indicator_level'), 'Customer Home must consume structured level intensity');
+  assert.ok(home.includes('x-product-menu-indicator-dot'), 'Customer Home must render Pedas dots');
+  assert.ok(home.includes('for (var i = 1; i <= 4; i += 1)'), 'Customer Home must render exactly four dots');
+  assert.ok(!home.includes('UI.escape(menuIndicator)'), 'Legacy text level indicator must not be rendered');
+  const css = fs.readFileSync(path.resolve(__dirname, '../../apps/customer-pwa/assets/css/home.css'), 'utf8');
+  assert.ok(css.includes('.x-product-menu-indicator-dot.is-filled'));
+});
+
 // ── PRODUCTS ENDPOINT: brand-wide (NOT branch-scoped) ──
 
 test('/products endpoint returns brand-wide products (not branch-scoped)', async () => {

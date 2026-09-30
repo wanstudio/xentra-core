@@ -91,7 +91,8 @@ class MasterMenuCompositionService {
     const defaults = [
       { name: '1 — Tidak Pedas', sortOrder: 1 },
       { name: '2 — Pedas Sedang', sortOrder: 2 },
-      { name: '3 — Pedas Banget', sortOrder: 3 }
+      { name: '3 — Pedas Banget', sortOrder: 3 },
+      { name: '4 — Super Pedas', sortOrder: 4 }
     ];
 
     const existing = repository.listComponents({
@@ -100,9 +101,37 @@ class MasterMenuCompositionService {
       activeOnly: false
     });
 
-    // Only provision the system defaults when a brand has no Level master at all.
-    // Existing custom Level data is never overwritten or mixed with defaults.
-    if (existing.length) return existing;
+    // New brands receive the canonical four-level system vocabulary.
+    // Existing custom Level vocabularies are never overwritten or mixed with defaults.
+    if (existing.length) {
+      // Upgrade the historical three-level system default set in-place by adding
+      // only the missing fourth level. This does not rename/delete user data.
+      const isLegacySystemDefaults = defaults.slice(0, 3).every(function(item) {
+        return existing.some(function(row) {
+          return String(row.name) === item.name && Number(row.sort_order) === item.sortOrder;
+        });
+      });
+      const hasFourthLevel = existing.some(function(row) {
+        return Number(row.sort_order) === 4 || String(row.name) === '4 — Super Pedas';
+      });
+      if (isLegacySystemDefaults && !hasFourthLevel) {
+        try {
+          this.createComponent({
+            brandId,
+            type: 'level',
+            name: defaults[3].name,
+            sortOrder: defaults[3].sortOrder
+          });
+        } catch (err) {
+          if (!/MENU_COMPONENT_ALREADY_EXISTS/i.test(String(err && err.message))) throw err;
+        }
+      }
+      return repository.listComponents({
+        brandId,
+        type: 'level',
+        activeOnly: false
+      });
+    }
 
     defaults.forEach(function(item) {
       try {

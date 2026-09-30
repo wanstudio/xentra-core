@@ -201,7 +201,7 @@ Each tab renders its master-reference list as compact cards. Every card exposes 
 
 Kategori uses /admin/categories. Rasa, Kelengkapan, and Level use /admin/menu/components/:type.
 
-Kelengkapan is the reusable multi-select detail vocabulary for Product Master. Level is the reusable single-select customer indicator vocabulary. When a brand has no Level master rows, the system provisions the standard values 1 — Tidak Pedas, 2 — Pedas Sedang, and 3 — Pedas Banget; existing custom Level rows are never overwritten.
+Kelengkapan is the reusable multi-select detail vocabulary for Product Master. Level is the reusable single-select customer indicator vocabulary. The canonical default Level vocabulary has four steps: 1 — Tidak Pedas, 2 — Pedas Sedang, 3 — Pedas Banget, and 4 — Super Pedas. Existing custom Level rows are never overwritten; brands carrying the historical three-step system defaults are upgraded by adding only the missing fourth step.
 
 The Product Master editor remains the assembly workspace: Kategori is required; Rasa is optional and single-select; Kelengkapan is optional and multi-select; Level is optional and single-select. POS selling options remain a separate POS-only configuration, not part of the Customer PWA composition.
 

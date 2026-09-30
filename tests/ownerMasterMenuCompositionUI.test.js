@@ -256,6 +256,14 @@ test('Customer presentation mapping is explicit in Owner UI', () => {
   assert.match(HTML, /Kategori → judul · Rasa → subjudul · Kelengkapan → detail · Level → indikator/);
 });
 
+test('Customer preview renders Pedas as a four-dot indicator, not legacy level text', () => {
+  assert.ok(JS.includes('x-master-customer-preview-spice-dot'));
+  assert.ok(JS.includes('Level Pedas '));
+  assert.ok(JS.includes('i <= 4'));
+  assert.ok(!JS.includes('indicatorEl.textContent = level.name'));
+  assert.ok(CSS.includes('.x-master-customer-preview-spice-dot.is-filled'));
+});
+
 test('Customer preview is driven by structured selections, not free-text composition fields', () => {
   assert.ok(JS.includes('function renderMasterMenuCustomerPreview()'));
   assert.ok(JS.includes("_masterMenuComponents.flavor.find"));
@@ -352,10 +360,11 @@ test('Master Product editor stays inside Catalog Products tab and remains mobile
 });
 
 
-test('Level Pedas uses a compact progressive selector, not a dropdown', () => {
+test('Level Pedas uses a compact four-step progressive selector, not a dropdown', () => {
   assert.ok(HTML.includes('aria-label="Pilih Level Pedas"'));
   assert.ok(JS.includes('data-master-level-id'));
   assert.ok(JS.includes('selectedIndex >= 0 && index <= selectedIndex'));
+  assert.ok(JS.includes('for (var i = 1; i <= 4; i += 1)'));
   assert.ok(CSS.includes('.x-master-spice-level'));
   assert.ok(CSS.includes('.x-master-spice-level-segment.is-filled'));
   assert.ok(!CSS.includes('.x-master-level-grid'));

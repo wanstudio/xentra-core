@@ -26,7 +26,7 @@ test.before(() => {
   db.prepare("INSERT OR IGNORE INTO menu_flavors (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Lombok Ijo', 'lombok-ijo-resolver', 1)").run(FLAVOR, BRAND);
   db.prepare("INSERT OR IGNORE INTO menu_complements (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Nasi', 'nasi-resolver', 1)").run(COMPLEMENT_1, BRAND);
   db.prepare("INSERT OR IGNORE INTO menu_complements (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Lalapan', 'lalapan-resolver', 1)").run(COMPLEMENT_2, BRAND);
-  db.prepare("INSERT OR IGNORE INTO menu_levels (id, brand_id, name, slug, is_active) VALUES (?, ?, 'Level 3', 'level-3-resolver', 1)").run(LEVEL, BRAND);
+  db.prepare("INSERT OR IGNORE INTO menu_levels (id, brand_id, name, slug, sort_order, is_active) VALUES (?, ?, 'Level 3', 'level-3-resolver', 3, 1)").run(LEVEL, BRAND);
   db.prepare("INSERT OR IGNORE INTO branch_products (branch_id, product_id, stock, is_available) VALUES (?, ?, NULL, 1)").run(BRANCH, PRODUCT);
   db.prepare("INSERT OR IGNORE INTO branch_product_categories (branch_id, product_id, branch_category_id) VALUES (?, ?, ?)").run(BRANCH, PRODUCT, BCAT);
   db.prepare("INSERT OR IGNORE INTO product_flavors (product_id, flavor_id) VALUES (?, ?)").run(PRODUCT, FLAVOR);
@@ -44,6 +44,7 @@ test('Master resolver maps structured composition to Customer view fields', () =
   assert.equal(p.subtitle, 'Lombok Ijo');
   assert.deepEqual(p.detail, ['Nasi', 'Lalapan']);
   assert.equal(p.indicator, 'Level 3');
+  assert.equal(p.indicator_level, 3);
   assert.equal(p.image, 'ayam.png');
   assert.equal(p.price, 28000);
   assert.equal(p.master.name, 'Master Internal Name');

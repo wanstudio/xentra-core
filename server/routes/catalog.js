@@ -55,6 +55,7 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
         menu_subtitle: p.subtitle,
         menu_detail: p.detail,
         menu_indicator: p.indicator,
+        menu_indicator_level: p.indicator_level || null,
         options_config: p.options || { version: 1, groups: [] }
       };
     });
