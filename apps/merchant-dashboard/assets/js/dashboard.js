@@ -434,8 +434,8 @@
     var current = canonicalizeOwnerRoute(route || '');
 
     if (current === 'catalog/products/new' ||
-        /^catalog\\/products\\/[^/]+\\/edit$/.test(current) ||
-        /^catalog\\/products\\/[^/]+$/.test(current)) {
+        /^catalog\/products\/[^/]+\/edit$/.test(current) ||
+        /^catalog\/products\/[^/]+$/.test(current)) {
       return 'catalog/products';
     }
 
@@ -447,8 +447,8 @@
 
     if (current === 'branches') return 'business';
     if (current === 'branches/new' ||
-        /^branches\\/[^/]+\\/edit$/.test(current) ||
-        /^branches\\/[^/]+(?:\\/[^/]+)?$/.test(current)) {
+        /^branches\/[^/]+\/edit$/.test(current) ||
+        /^branches\/[^/]+(?:\/[^/]+)?$/.test(current)) {
       return 'branches';
     }
 
