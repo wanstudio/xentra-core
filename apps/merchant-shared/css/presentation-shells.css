@@ -88,3 +88,9 @@
     border-radius: 18px;
   }
 }
+
+.x-presentation-confirm-content { padding: 20px; }
+.x-presentation-confirm-header h3 { margin: 0 0 6px; font-size: 17px; }
+.x-presentation-confirm-header p { margin: 0; color: #64748b; line-height: 1.5; font-size: 13px; }
+.x-presentation-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.x-presentation-confirm-actions button { min-height: 42px; }
