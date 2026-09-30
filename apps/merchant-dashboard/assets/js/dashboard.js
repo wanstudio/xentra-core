@@ -491,7 +491,7 @@
         // Catalog parent is active if we're on 'catalog' or any catalog sub-route
         isActive = route === 'catalog' || isCatalogChild;
       } else if (btnRoute === 'branches') {
-        isActive = route === 'branches' || isBranchDetail;
+        isActive = route === 'branches' || isBranchDetail || isBranchEditor;
       } else if (btnRoute === 'orders') {
         isActive = route === 'orders' || isOrderDetail;
       } else if (btnRoute === 'customers') {
@@ -4373,7 +4373,7 @@ async function loadMenusView() {
     if (editorView) editorView.style.display = 'none';
   }
 
-  function showBranchEditorView(branchId) {
+  async function showBranchEditorView(branchId) {
     var listView = $('branch-list-view');
     var detailView = $('branch-detail-view');
     var editorView = $('branch-editor-view');
@@ -4383,6 +4383,22 @@ async function loadMenusView() {
     editorView.style.display = 'block';
 
     var b = branchId ? (state.branches.find(function (x) { return String(x.id) === String(branchId); }) || null) : null;
+    if (branchId && !b) {
+      try {
+        var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId), { headers: getAuthHeaders() });
+        var data = await res.json();
+        if (data && data.success && data.branch) b = data.branch;
+      } catch (err) {
+        showToast('❌ Gagal memuat data cabang untuk diedit.');
+        navigateTo('branches');
+        return;
+      }
+    }
+    if (branchId && !b) {
+      showToast('❌ Cabang tidak ditemukan.');
+      navigateTo('branches');
+      return;
+    }
     $('branch-id').value = b ? b.id : '';
     $('branch-name').value = b ? (b.name || '') : '';
     $('branch-address').value = b ? (b.address_text || '') : '';
@@ -10605,6 +10621,11 @@ async function loadMenusView() {
     initCatalogListeners();
     initBranchSearchAndFilter();
     initBranchOperationsForm();
+
+    var backFromBranchEditor = $('btn-back-from-branch-editor');
+    if (backFromBranchEditor) backFromBranchEditor.addEventListener('click', function () { navigateTo('branches'); });
+    var cancelBranchEditor = $('btn-cancel-branch-editor');
+    if (cancelBranchEditor) cancelBranchEditor.addEventListener('click', function () { navigateTo('branches'); });
     initOrdersFilterListeners();
     initMobileSidebar();
     initBranchContextSelector();
