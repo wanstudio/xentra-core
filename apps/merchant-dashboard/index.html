@@ -3728,40 +3728,35 @@
     </div>
   </div>
 
-  <!-- MODAL: MASTER REFERENCE QUICK ADD -->
-  <!-- Dibuka dari dalam modal Produk Master, jadi harus berada DI ATASnya.
-       Sebelumnya 1200 padahal dasar .x-modal-backdrop 9999 — akibatnya modal ini
-       terbuka di belakang dan tumpang tindih dengan modal produk. -->
-  <div id="modal-master-reference-quick-add" class="x-modal-backdrop" style="display:none; z-index:10000;">
-    <div class="x-modal-card" style="max-width: 440px;">
-      <div class="x-modal-header">
-        <div>
-          <h3 id="master-reference-quick-add-title">Tambah Kategori</h3>
-          <p id="master-reference-quick-add-subtitle" class="text-muted" style="font-size:12px;margin:3px 0 0;">
-            Tambahkan pilihan master tanpa meninggalkan Produk Master.
-          </p>
-        </div>
-        <button type="button" class="x-modal-close" id="btn-close-master-reference-quick-add" aria-label="Tutup">✕</button>
+  <!-- PRESENTATION CONTENT: MASTER REFERENCE QUICK ADD
+       The content is feature-owned; XentraPresentation supplies the casing. -->
+  <div id="master-reference-quick-add-anchor" hidden></div>
+  <div id="modal-master-reference-quick-add" class="x-reference-editor-content" hidden>
+    <div class="x-modal-header">
+      <div>
+        <h3 id="master-reference-quick-add-title">Tambah Kategori</h3>
+        <p id="master-reference-quick-add-subtitle" class="text-muted" style="font-size:12px;margin:3px 0 0;">
+          Tambahkan pilihan master tanpa meninggalkan Produk Master.
+        </p>
       </div>
-      <form id="form-master-reference-quick-add" class="x-form">
-        <input type="hidden" id="master-reference-quick-add-type" value="">
-        <input type="hidden" id="master-reference-quick-add-id" value="">
-        <div class="x-form-group">
-          <label id="master-reference-quick-add-label" for="master-reference-quick-add-name">Nama Kategori</label>
-          <input type="text" id="master-reference-quick-add-name" class="x-input" placeholder="Contoh: Makanan Berat" required maxlength="80" autocomplete="off">
-          <small id="master-reference-quick-add-help" class="text-muted" style="display:block;margin-top:5px;font-size:11px;">
-            Setelah disimpan, pilihan baru langsung tersedia di dropdown.
-          </small>
-        </div>
-        <div class="x-modal-footer">
-          <button type="button" class="x-btn-secondary" id="btn-cancel-master-reference-quick-add">Batal</button>
-          <button type="submit" class="x-btn-primary" id="btn-save-master-reference-quick-add">Simpan</button>
-        </div>
-      </form>
+      <button type="button" class="x-modal-close" id="btn-close-master-reference-quick-add" aria-label="Tutup">✕</button>
     </div>
+    <form id="form-master-reference-quick-add" class="x-form">
+      <input type="hidden" id="master-reference-quick-add-type" value="">
+      <input type="hidden" id="master-reference-quick-add-id" value="">
+      <div class="x-form-group">
+        <label id="master-reference-quick-add-label" for="master-reference-quick-add-name">Nama Kategori</label>
+        <input type="text" id="master-reference-quick-add-name" class="x-input" placeholder="Contoh: Makanan Berat" required maxlength="80" autocomplete="off">
+        <small id="master-reference-quick-add-help" class="text-muted" style="display:block;margin-top:5px;font-size:11px;">
+          Setelah disimpan, pilihan baru langsung tersedia di dropdown.
+        </small>
+      </div>
+      <div class="x-modal-footer">
+        <button type="button" class="x-btn-secondary" id="btn-cancel-master-reference-quick-add">Batal</button>
+        <button type="submit" class="x-btn-primary" id="btn-save-master-reference-quick-add">Simpan</button>
+      </div>
+    </form>
   </div>
-
-
 
   <!-- MODAL: MASTER MENU COMPONENT MANAGER -->
   <div id="modal-master-menu-components" class="x-modal-backdrop" style="display:none; z-index:1150;">
