@@ -3480,7 +3480,7 @@
       ]);
     };
 
-    ['master-categories-page-list', 'master-flavors-page-list'].forEach(function (listId) {
+    ['master-categories-page-list', 'master-flavors-page-list', 'master-complements-page-list', 'master-levels-page-list'].forEach(function (listId) {
       var list = $(listId);
       if (list && !list.dataset.actionMenuBound) {
         list.dataset.actionMenuBound = 'true';
