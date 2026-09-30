@@ -80,6 +80,38 @@ function validateCanonicalComposition(product, composition) {
   return errors;
 }
 
+function validateCanonicalReferenceIntegrity({ brandId, productId }) {
+  const errors = [];
+
+  const category = DataAccess.queryOne(
+    'SELECT p.category_id, c.id, c.brand_id FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? AND p.brand_id = ?',
+    [productId, brandId]
+  );
+  if (category && category.category_id && (!category.id || category.brand_id !== brandId)) {
+    errors.push('MASTER_CATEGORY_BRAND_MISMATCH');
+  }
+
+  const flavorMismatch = DataAccess.queryOne(
+    'SELECT COUNT(*) AS count FROM product_flavors pf LEFT JOIN menu_flavors mf ON mf.id = pf.flavor_id WHERE pf.product_id = ? AND (mf.id IS NULL OR mf.brand_id != ?)',
+    [productId, brandId]
+  );
+  if (Number(flavorMismatch && flavorMismatch.count) > 0) errors.push('MASTER_FLAVOR_BRAND_MISMATCH');
+
+  const complementMismatch = DataAccess.queryOne(
+    'SELECT COUNT(*) AS count FROM product_complements pc LEFT JOIN menu_complements mc ON mc.id = pc.complement_id WHERE pc.product_id = ? AND (mc.id IS NULL OR mc.brand_id != ?)',
+    [productId, brandId]
+  );
+  if (Number(complementMismatch && complementMismatch.count) > 0) errors.push('MASTER_COMPLEMENT_BRAND_MISMATCH');
+
+  const levelMismatch = DataAccess.queryOne(
+    'SELECT COUNT(*) AS count FROM product_levels pl LEFT JOIN menu_levels ml ON ml.id = pl.level_id WHERE pl.product_id = ? AND (ml.id IS NULL OR ml.brand_id != ?)',
+    [productId, brandId]
+  );
+  if (Number(levelMismatch && levelMismatch.count) > 0) errors.push('MASTER_LEVEL_BRAND_MISMATCH');
+
+  return errors;
+}
+
 function classifyLegacyProduct(product, composition, mapping) {
   const errors = validateCanonicalComposition(product, composition);
   if (errors.length) return { status: 'needs_review', errors };
@@ -134,15 +166,24 @@ class ProductMenuMigrationService {
     const inspected = this.inspectProduct({ brandId, productId });
 
     if (Number(inspected.product.menu_schema_version) === 2) {
+      const canonicalErrors = [
+        ...validateCanonicalComposition(inspected.product, inspected.composition),
+        ...validateCanonicalReferenceIntegrity({ brandId, productId })
+      ];
+      const canonicalStatus = inspected.product.menu_migration_status === 'verified' && canonicalErrors.length === 0
+        ? 'verified'
+        : canonicalErrors.length
+          ? 'needs_review'
+          : 'migrated';
       return {
         product_id: productId,
         product_name: inspected.product.name,
         current_status: inspected.product.menu_migration_status,
         current_schema_version: 2,
-        status: 'migrated',
-        errors: [],
-        notes: null,
-        reason: 'ALREADY_CANONICAL',
+        status: canonicalStatus,
+        errors: canonicalErrors,
+        notes: canonicalErrors.length ? 'Canonical schema marker exists but canonical composition requires review.' : null,
+        reason: canonicalErrors.length ? 'CANONICAL_COMPOSITION_INVALID' : 'ALREADY_CANONICAL',
         canonical_fingerprint: inspected.canonical_fingerprint,
         source: { name: inspected.product.name },
         suggested_composition: {
@@ -215,7 +256,7 @@ class ProductMenuMigrationService {
       return this.applyProductMigration({ brandId, productId, components });
     }
 
-    if (!persistReport) {
+    if (!persistReport || plan.status === 'verified') {
       return Object.assign(plan, {
         applied: false,
         persisted: false,
@@ -237,7 +278,10 @@ class ProductMenuMigrationService {
   }
   static verifyProduct({ brandId, productId }) {
     const inspected = this.inspectProduct({ brandId, productId });
-    const errors = validateCanonicalComposition(inspected.product, inspected.composition);
+    const errors = [
+      ...validateCanonicalComposition(inspected.product, inspected.composition),
+      ...validateCanonicalReferenceIntegrity({ brandId, productId })
+    ];
     // Verification is only allowed after the Product has entered the canonical
     // schema through reconciliation or a real composition save. A legacy
     // Product must never jump directly to verified.
