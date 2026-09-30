@@ -144,7 +144,18 @@ test('Inactive Master component values are not exposed as new selector choices',
   assert.ok(!JS.includes("active_only=true"), 'Component manager must retain inactive rows so they can be reactivated');
 });
 
-test('Master Product uses one assembly workspace with contextual quick-add modal', () => {
+test('Master Product uses a dedicated page editor and contextual quick-add modal', () => {
+  assert.ok(HTML.includes('id="product-editor-view"'));
+  assert.ok(HTML.includes('id="form-product"'));
+  assert.ok(HTML.includes('id="btn-back-from-product-editor"'));
+  assert.ok(HTML.includes('id="btn-cancel-product-editor"'));
+  assert.ok(!HTML.includes('id="modal-product"'));
+  assert.ok(JS.includes("route === 'catalog/products/new'"));
+  assert.ok(JS.includes("/^catalog\\/products\\/[^/]+\\/edit$/"));
+  assert.ok(JS.includes('function showProductEditorSection()'));
+  assert.ok(JS.includes('function loadProductEditorPage(productId)'));
+  assert.ok(JS.includes("navigateTo('catalog/products/new')"));
+  assert.ok(JS.includes("navigateTo('catalog/products/' + encodeURIComponent(id) + '/edit')"));
   assert.ok(HTML.includes('id="modal-master-reference-quick-add"'));
   assert.ok(HTML.includes('id="master-reference-quick-add-type"'));
   assert.ok(HTML.includes('id="master-reference-quick-add-name"'));
@@ -152,11 +163,19 @@ test('Master Product uses one assembly workspace with contextual quick-add modal
   assert.ok(JS.includes('function openMasterReferenceQuickAdd(type)'));
   assert.ok(JS.includes("openMasterReferenceQuickAdd('category')"));
   assert.ok(JS.includes("openMasterReferenceQuickAdd('flavor')"));
-  assert.ok(JS.includes("API_BASE + '/admin/categories'"));
-  assert.ok(JS.includes("API_BASE + '/admin/menu/components/flavor'"));
   assert.ok(HTML.includes('id="tab-catalog-categories"'));
   assert.ok(HTML.includes('id="master-categories-page-list"'));
   assert.ok(!HTML.includes('id="btn-manage-menu-components"'));
+});
+
+test('Product editor routes cleanly between list, detail, add, and edit', () => {
+  assert.ok(JS.includes("route === 'catalog/products/new'"));
+  assert.ok(JS.includes("route.indexOf('catalog/products/') === 0"));
+  assert.ok(JS.includes('!isProductEditor'));
+  assert.ok(JS.includes('if (isProductEditor)'));
+  assert.ok(JS.includes('showProductEditorSection()'));
+  assert.ok(JS.includes('showProductDetailSection()'));
+  assert.ok(JS.includes("navigateTo('catalog/products/' + encodeURIComponent(savedId))"));
 });
 
 test('New Product form does not introduce legacy branch override composition fields', () => {
