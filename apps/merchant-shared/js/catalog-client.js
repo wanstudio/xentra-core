@@ -38,6 +38,15 @@
     return request('/admin/branches/' + encodeURIComponent(branchId) + '/menu');
   }
 
+  // Canonical Branch Menu presentation control: optional customer-facing display name.
+  // Empty/null clears the override and restores the live Master presentation.
+  function updateBranchProductDisplayName(branchId, productId, name) {
+    return request('/admin/branches/' + encodeURIComponent(branchId) + '/menu/' + encodeURIComponent(productId) + '/display-name', {
+      method: 'PATCH',
+      body: JSON.stringify({ name: name })
+    });
+  }
+
   function setBranchProductAvailability(branchId, productId, isAvailable) {
     return request('/admin/branches/' + encodeURIComponent(branchId) + '/products/' + encodeURIComponent(productId), {
       method: 'PATCH',
@@ -113,6 +122,7 @@
     request: request,
     getBranchCatalog: getBranchCatalog,
     setBranchProductAvailability: setBranchProductAvailability,
+    updateBranchProductDisplayName: updateBranchProductDisplayName,
     removeBranchProduct: removeBranchProduct,
     uploadBranchProductImage: uploadBranchProductImage,
     updateBranchProductOverride: updateBranchProductOverride,
