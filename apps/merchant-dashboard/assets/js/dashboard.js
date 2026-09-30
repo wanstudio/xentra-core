@@ -8013,6 +8013,16 @@ async function loadMenusView() {
     navigateTo('business');
   };
 
+  // Catalog child pages share the same visual back affordance.
+  // Navigation still follows the actual browser/app history rather than a hardcoded parent.
+  window.goBackFromCatalogChild = function () {
+    if (window.history && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    navigateTo('catalog');
+  };
+
   function closeFinanceDropdown() {
     var d = $('finance-section-dropdown');
     if (d) d.classList.remove('open');
