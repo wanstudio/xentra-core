@@ -4445,6 +4445,7 @@ async function loadMenusView() {
         var file = prodFileInput.files && prodFileInput.files[0];
         if (!file) { _productImageFile = null; _productCropSpec = null; return; }
         _productImageRemoved = false;
+        _productCropSpec = null;
 
         var allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
         if (allowed.indexOf(file.type) === -1) {
