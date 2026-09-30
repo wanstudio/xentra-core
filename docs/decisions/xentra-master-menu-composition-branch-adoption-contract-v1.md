@@ -28,12 +28,23 @@ Resolved Customer Menu View
 Immutable Order Menu Snapshot
 ```
 
-## 🔒 Progressive Disclosure — Owner Assembly UX
-**29 September 2026**
+## 🔒 Owner Master Reference Management & Assembly UX
+**30 September 2026**
 
-The Owner UI intentionally keeps Category and Flavor creation inside the **Master Product assembly workspace**. There is no separate Category/Flavor navigation screen in the forward Owner Catalog UI.
+Master reference vocabularies are managed from the dedicated **Master Reference** page. This page is the governance surface for reusable Master data:
 
-`+` beside a selector opens a contextual quick-add modal, persists against the same Core master authority, refreshes the selector, and keeps the user in the current Product workflow.
+`Kategori | Rasa | Kelengkapan`
+
+The Master Reference page supports:
+- **Add**
+- **Edit**
+- **Delete / deactivate**
+
+The Product Master Add/Edit page intentionally does **not** expose Edit/Delete actions for these Master references. It only exposes contextual **Add** actions so an Owner can create a missing reference without leaving the current Product workflow.
+
+`+` beside a selector opens a contextual quick-add flow against the same Core master authority. After a successful create, the selector refreshes in-place; when the new value is a multi-select Complement, the newly created value is automatically selected for the current Product draft.
+
+An empty reference collection is still an actionable state: the Product Editor must show the `+` Add affordance rather than a dead-end empty message.
 
 This presentation decision does not change the ownership or persistence model below.
 
