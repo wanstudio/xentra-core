@@ -2389,8 +2389,8 @@
   }
   function openEditMasterReference(type, id) {
     var meta = MASTER_REFERENCE_META[type];
-    var modal = $('modal-master-reference-quick-add');
-    if (!meta || !modal) return;
+    var content = $('modal-master-reference-quick-add');
+    if (!meta || !content || !window.XentraPresentation) return;
 
     var row = referenceRows(type).find(function(item) { return String(item.id) === String(id); });
     if (!row) return;
@@ -2401,15 +2401,20 @@
     $('master-reference-quick-add-label').textContent = meta.label;
     $('master-reference-quick-add-name').value = row.name || '';
     $('master-reference-quick-add-name').placeholder = meta.placeholder;
-    modal.style.display = 'flex';
-
-    setTimeout(function() {
-      var input = $('master-reference-quick-add-name');
-      if (input) {
-        input.focus();
-        input.select();
+    window.XentraPresentation.open({
+      id: 'master-reference-quick-add',
+      type: 'bottom-sheet',
+      content: content,
+      onOpen: function () {
+        setTimeout(function() {
+          var input = $('master-reference-quick-add-name');
+          if (input) {
+            input.focus();
+            input.select();
+          }
+        }, 0);
       }
-    }, 0);
+    });
   }
   window.openEditMasterReference = openEditMasterReference;
 
@@ -2498,8 +2503,8 @@
 
   function openMasterReferenceQuickAdd(type) {
     var meta = MASTER_REFERENCE_META[type];
-    var modal = $('modal-master-reference-quick-add');
-    if (!meta || !modal) return;
+    var content = $('modal-master-reference-quick-add');
+    if (!meta || !content || !window.XentraPresentation) return;
 
     $('master-reference-quick-add-type').value = type;
     $('master-reference-quick-add-id').value = '';
@@ -2508,17 +2513,24 @@
     $('master-reference-quick-add-name').value = '';
     $('master-reference-quick-add-name').placeholder = meta.placeholder;
 
-    modal.style.display = 'flex';
-    setTimeout(function () {
-      var input = $('master-reference-quick-add-name');
-      if (input) input.focus();
-    }, 0);
+    window.XentraPresentation.open({
+      id: 'master-reference-quick-add',
+      type: 'bottom-sheet',
+      content: content,
+      onOpen: function () {
+        setTimeout(function () {
+          var input = $('master-reference-quick-add-name');
+          if (input) input.focus();
+        }, 0);
+      }
+    });
   }
   window.openMasterReferenceQuickAdd = openMasterReferenceQuickAdd;
 
   function closeMasterReferenceQuickAdd() {
-    var modal = $('modal-master-reference-quick-add');
-    if (modal) modal.style.display = 'none';
+    if (window.XentraPresentation) {
+      window.XentraPresentation.close('master-reference-quick-add');
+    }
     var form = $('form-master-reference-quick-add');
     if (form) form.reset();
   }
