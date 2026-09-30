@@ -208,6 +208,35 @@ test('Owner Dashboard Mobile Navigation', async t => {
   // --------------------------------------------------------------------------
   // CSS
   // --------------------------------------------------------------------------
+  await t.test('OWNER-MOB-14D: canonical router owns explicit parent-child navigation history', () => {
+    assert.ok(js.includes("OWNER_NAV_STATE_KEY = '__xentraOwnerNavigation'"));
+    assert.ok(js.includes('function ensureOwnerNavigationHistory(route)'));
+    assert.ok(js.includes('window.history.pushState('),
+      'Child navigation must push an explicit app history state');
+    assert.ok(js.includes('window.history.replaceState('),
+      'Root and replacement navigation must not accumulate child history');
+    assert.ok(js.includes("var OWNER_ROOT_ROUTES = {"),
+      'Top-level destinations must be explicitly classified');
+    assert.ok(js.includes("overview: true") && js.includes("business: true") &&
+              js.includes("orders: true") && js.includes("more: true"),
+      'Bottom-nav/root destinations must be classified as root navigation');
+
+    const backStart = js.indexOf('window.goBackFromChildPage = function ()');
+    const backEnd = js.indexOf('// Compatibility aliases kept', backStart);
+    const backBody = js.slice(backStart, backEnd);
+    assert.ok(backBody.includes("ownerState.parentRoute"),
+      'Child Back must consult the app-managed parent route');
+    assert.ok(!backBody.includes('window.history.length'),
+      'Child Back must not use browser history length as its navigation contract');
+    assert.ok(backBody.includes("navigateTo('business', { history: 'root' })"),
+      'Direct/deep child links must have a deterministic Business root fallback');
+
+    assert.ok(js.includes("navigateTo('catalog/products/' + encodeURIComponent(savedId), { history: 'replace' })"),
+      'Saving a product must replace the editor entry with the resulting detail page');
+    assert.ok(js.includes("navigateTo('catalog/products', { history: 'replace' })"),
+      'Cancelling the Product Editor must replace the editor entry');
+  });
+
   await t.test('OWNER-MOB-14A: all focused child pages use the shared mobile Back header', () => {
     const requiredSelectors = [
       'id="branch-detail-view"',
