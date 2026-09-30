@@ -285,7 +285,7 @@ The existing Merchant shell, sheets, action menu, toast, toggle, and other matur
 - Kategori dan Rasa use native single-select dropdowns with contextual `+` add buttons, preserving the existing interaction pattern.
 - Kelengkapan uses touch-friendly multi-select choice chips.
 - Level Pedas is **not a dropdown** and is **not exposed as a tab under Master Kategori**.
-- Level Pedas uses a compact progressive horizontal selector: `[ Level Pedas ] [ ■ ] [ ■ ] [ ■ ] [ □ ]`, with one selected level and lime-filled segments up to that level.
+- Level Pedas uses a compact progressive horizontal selector with four touch targets. Active level segments use a red fill; inactive segments use a light-gray outline.
 - The existing `level_id` relation and canonical composition API remain unchanged; this is presentation-only.
 ## 11. Phase 7 — Owner Dashboard
 
@@ -626,7 +626,9 @@ The Product Master composition editor now uses one consistent native-style choic
 - Kategori — single select
 - Rasa — optional single select
 - Kelengkapan — multi-select
-- Level — optional single select
+- Level — optional single select using four horizontal progressive steps.
+
+Customer presentation for Level is a four-dot horizontal intensity indicator: filled red dots represent the selected intensity; unfilled dots use a light-gray outline. The legacy textual `2 — Pedas Sedang` / `3 — Pedas Banget` presentation is not rendered in Customer PWA.
 
 Visible controls are touch-friendly selectable chips. Selected state uses the product accent lime treatment; unselected state remains white with a light border. Kelengkapan keeps the existing complement_ids[] array contract. Level remains a single level_id. The underlying native selects remain hidden as compatibility/state controls only; they are not the primary presentation.
 

@@ -3,6 +3,7 @@
  *
  * Release identity: content hash of this file.
  * Canonical white status bar / theme-color (#ffffff).
+ * Release 2026-09-30: four-step Pedas indicator uses structured Level intensity data.
  * When this file changes (new commit), the hash changes → new cache → old purged.
  * No hardcoded version strings. No external endpoints. No manual edits.
  *

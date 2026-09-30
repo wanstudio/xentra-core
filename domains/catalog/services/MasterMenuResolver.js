@@ -23,6 +23,23 @@ function normalizeImage(product) {
   return product.image_url || product.image || '';
 }
 
+function resolveLevelIndicatorLevel(level) {
+  if (!level) return null;
+
+  var sortOrder = Number(level.sort_order);
+  if (Number.isFinite(sortOrder) && sortOrder >= 1) {
+    return Math.min(4, Math.floor(sortOrder));
+  }
+
+  // Backward compatibility for historical default Level rows that predate
+  // sort_order population. The customer still receives a structured number;
+  // the legacy name itself is never rendered.
+  var match = String(level.name || '').match(/^\s*(\d+)/);
+  if (match) return Math.min(4, Math.max(1, Number(match[1])));
+
+  return null;
+}
+
 function resolveProductView({ product, flavor, complements, level, branchState = null, categories = [] }) {
   if (!product.category_id || !product.category_name || product.category_is_active === 0) return null;
 
@@ -43,7 +60,7 @@ function resolveProductView({ product, flavor, complements, level, branchState =
     indicator: activeLevel ? activeLevel.name : null,
     // Structured intensity value for Customer presentation. The legacy
     // indicator string remains in the DTO for compatibility with old consumers.
-    indicator_level: activeLevel ? Number(activeLevel.sort_order) || null : null,
+    indicator_level: resolveLevelIndicatorLevel(activeLevel),
     image: normalizeImage(product),
     image_url: normalizeImage(product),
     media_id: product.media_id || null,

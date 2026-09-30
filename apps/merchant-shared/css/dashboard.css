@@ -9032,6 +9032,40 @@ input[type="file"].x-input,
 }
 
 
+/* OWNER — MASTER PRODUCT PEDAS INDICATOR */
+.x-master-product-spice-indicator {
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  margin-top:5px;
+  color:#ef4444;
+  font-size:10px;
+  line-height:13px;
+  font-weight:700;
+  white-space:nowrap;
+}
+.x-master-product-spice-label {
+  flex:0 0 auto;
+}
+.x-master-product-spice-dots {
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+}
+.x-master-product-spice-dot {
+  width:6px;
+  height:6px;
+  flex:0 0 6px;
+  border:1.25px solid #e2e8f0;
+  border-radius:50%;
+  background:transparent;
+  box-sizing:border-box;
+}
+.x-master-product-spice-dot.is-filled {
+  background:#ef4444;
+  border-color:#ef4444;
+}
+
 /* ==========================================================================
    OWNER — PRODUCT EDITOR CARD STACK
    Keep the Master Product form and POS-only option configuration as separate

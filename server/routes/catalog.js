@@ -27,12 +27,15 @@ router.get(['/catalog/menu', '/home'], async (req, res) => {
       branchScope = branch;
     }
 
-    // Forward Menu architecture:
-    // - branch-scoped Customer Menu uses the structured MasterMenuResolver;
-    // - brand-wide legacy/discovery mode stays on CatalogService until its
-    //   consumer contract is explicitly migrated.
-    const menu = branchScope && MasterMenuResolver
-      ? MasterMenuResolver.resolveBranchMenu({ brandId, branchId: branchScope.id })
+    // Canonical Customer Menu architecture:
+    // - branch context -> structured branch resolver;
+    // - no branch context -> structured Master resolver.
+    // Both paths therefore carry the same Master Composition presentation DTO,
+    // including structured Level intensity.
+    const menu = MasterMenuResolver
+      ? (branchScope
+        ? MasterMenuResolver.resolveBranchMenu({ brandId, branchId: branchScope.id })
+        : MasterMenuResolver.resolveMasterMenu({ brandId }))
       : CatalogService.getMenu({ brand_id: brandId, branch_id: null });
 
     // Normalize the forward resolver DTO into the existing Customer catalog envelope.

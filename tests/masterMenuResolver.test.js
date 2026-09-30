@@ -61,6 +61,14 @@ test('Branch resolver contains adopted Product and Branch Category but no legacy
   assert.equal(Object.prototype.hasOwnProperty.call(p, 'image_override'), false);
 });
 
+test('Resolver derives Level intensity from historical Level name when sort order is absent', () => {
+  db.prepare("UPDATE menu_levels SET sort_order = NULL WHERE id = ?").run(LEVEL);
+  const rows = MasterMenuResolver.resolveMasterProducts({ brandId: BRAND, productIds: [PRODUCT] });
+  assert.equal(rows[0].indicator, 'Level 3');
+  assert.equal(rows[0].indicator_level, 3);
+  db.prepare("UPDATE menu_levels SET sort_order = 3 WHERE id = ?").run(LEVEL);
+});
+
 test('Inactive referenced Master component remains visible on existing Product', () => {
   db.prepare('UPDATE menu_flavors SET is_active = 0 WHERE id = ?').run(FLAVOR);
   const rows = MasterMenuResolver.resolveMasterProducts({ brandId: BRAND, productIds: [PRODUCT] });
