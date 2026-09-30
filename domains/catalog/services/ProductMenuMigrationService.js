@@ -132,6 +132,31 @@ class ProductMenuMigrationService {
 
   static planProductMigration({ brandId, productId, components = null }) {
     const inspected = this.inspectProduct({ brandId, productId });
+
+    if (Number(inspected.product.menu_schema_version) === 2) {
+      return {
+        product_id: productId,
+        product_name: inspected.product.name,
+        current_status: inspected.product.menu_migration_status,
+        current_schema_version: 2,
+        status: 'migrated',
+        errors: [],
+        notes: null,
+        reason: 'ALREADY_CANONICAL',
+        canonical_fingerprint: inspected.canonical_fingerprint,
+        source: { name: inspected.product.name },
+        suggested_composition: {
+          category_id: inspected.product.category_id || null,
+          flavor_id: inspected.composition && inspected.composition.flavor ? String(inspected.composition.flavor.id) : null,
+          complement_ids: inspected.composition && inspected.composition.complements
+            ? inspected.composition.complements.map(row => String(row.id))
+            : [],
+          level_id: inspected.composition && inspected.composition.level ? String(inspected.composition.level.id) : null
+        },
+        matches: { flavor: [], level: [], complements: [] }
+      };
+    }
+
     const masterComponents = components || this.loadMasterComponents({ brandId });
     const mapping = buildDeterministicLegacyMapping(inspected.product.name, masterComponents);
     const decision = classifyLegacyProduct(inspected.product, inspected.composition, mapping);
