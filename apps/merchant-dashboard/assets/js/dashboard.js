@@ -8149,28 +8149,59 @@ async function loadMenusView() {
   });
 
   // Canonical Back behavior for Owner secondary/child pages.
-  // Route structure is authoritative for known child surfaces; history.state
-  // remains the fallback for generic secondary pages. This prevents a malformed
-  // or reset browser state from making Product Editor jump back to Business.
+  // Back consumes exactly one level of the Xentra-managed navigation stack.
+  // It does NOT call history.back() and it does NOT navigate through the root
+  // router mode, because doing so would destroy the remaining parent chain.
   function ownerChildParentRoute(route) {
     var current = canonicalizeOwnerRoute(route || '');
-    if (
-      current === 'catalog/products/new' ||
-      /^catalog\/products\/[^/]+\/edit$/.test(current) ||
-      (current.indexOf('catalog/products/') === 0 && current !== 'catalog/products')
-    ) {
+
+    if (current === 'catalog/products/new' ||
+        /^catalog\/products\/[^/]+\/edit$/.test(current) ||
+        /^catalog\/products\/[^/]+$/.test(current)) {
       return 'catalog/products';
     }
+
+    // Product Master and other Catalog child destinations belong to Business.
+    if (
+      current === 'catalog/products' ||
+      current === 'catalog/categories' ||
+      current === 'catalog/menus'
+    ) {
+      return 'business';
+    }
+
     if (
       current === 'branches/new' ||
       /^branches\/[^/]+\/edit$/.test(current) ||
-      (current.indexOf('branches/') === 0 && current !== 'branches')
+      /^branches\/[^/]+(?:\/[^/]+)?$/.test(current)
     ) {
       return 'branches';
     }
+
     if (current.indexOf('orders/') === 0 && current !== 'orders') return 'orders';
     if (current.indexOf('customers/') === 0 && current !== 'customers') return 'customers';
+
     return null;
+  }
+
+  function commitOwnerBackRoute(parentRoute, ownerState, currentState) {
+    var targetRoute = canonicalizeOwnerRoute(parentRoute || 'business');
+    var targetParent = ownerChildParentRoute(targetRoute);
+    var currentIndex = ownerState ? Number(ownerState.index || 0) : 0;
+    var targetIndex = Math.max(0, currentIndex - 1);
+
+    var baseState = (currentState && typeof currentState === 'object') ? currentState : {};
+    window.history.replaceState(
+      Object.assign(
+        {},
+        baseState,
+        makeOwnerNavigationState(targetRoute, targetIndex, targetParent)
+      ),
+      '',
+      '#' + targetRoute
+    );
+
+    applyRoute(targetRoute);
   }
 
   window.goBackFromChildPage = function () {
@@ -8184,14 +8215,13 @@ async function loadMenusView() {
     var stateParent = ownerState && ownerState.parentRoute
       ? canonicalizeOwnerRoute(ownerState.parentRoute)
       : null;
-    var parentRoute = explicitParent || (stateParent && stateParent !== currentRoute ? stateParent : null);
 
-    if (parentRoute) {
-      navigateTo(parentRoute, { history: 'root' });
-      return;
-    }
+    // Known child routes are deterministic. State parent is only used for
+    // generic secondary routes not covered by the explicit hierarchy.
+    var parentRoute = explicitParent ||
+      (stateParent && stateParent !== currentRoute ? stateParent : null);
 
-    navigateTo('business', { history: 'root' });
+    commitOwnerBackRoute(parentRoute || 'business', ownerState, state);
   };
 
   // Compatibility aliases kept for existing markup/tests and legacy callers.
