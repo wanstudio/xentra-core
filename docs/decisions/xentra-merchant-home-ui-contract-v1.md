@@ -396,3 +396,4 @@ Relevant Home implementation commits include:
 - `1c1b5b992dc57bb4a875e68a097bc2d11aa839e0` — Phase 4 structural test alignment
 
 **Implementation state: SOURCE-CHECKED / NOT YET PRODUCTION-VISUALLY VERIFIED.**
+\n\n## 🔒 LOCKED ADDENDUM — Presentation Composition\n\nMerchant Home and its downstream interactions follow `docs/decisions/xentra-presentation-shell-vs-feature-context-v1.md`. Presentation shells are reusable UI containers; feature contexts remain independent and are composed into the appropriate Page, Bottom Sheet, Dialog/Modal, Overlay, or Side Sheet. Do not encode presentation into feature/domain names or duplicate business logic when the presentation changes.\n
