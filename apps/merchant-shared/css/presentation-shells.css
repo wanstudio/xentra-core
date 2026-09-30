@@ -1,0 +1,90 @@
+/* ==========================================================================
+   XENTRA PRESENTATION SHELLS v1
+   Container only. Feature content stays presentation-agnostic.
+   ========================================================================== */
+
+#x-presentation-root {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  pointer-events: none;
+}
+
+#x-presentation-root[data-open="true"] {
+  pointer-events: auto;
+}
+
+.x-presentation-shell {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.x-presentation-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  background: rgba(15, 23, 42, .48);
+  cursor: default;
+}
+
+.x-presentation-surface {
+  position: relative;
+  z-index: 1;
+  width: min(540px, calc(100vw - 32px));
+  max-height: min(90dvh, calc(100vh - 32px));
+  overflow: auto;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, .22);
+  overscroll-behavior: contain;
+}
+
+.x-presentation-surface > [hidden] {
+  display: block !important;
+}
+
+.x-presentation-bottom-sheet {
+  align-items: flex-end;
+}
+
+.x-presentation-bottom-sheet .x-presentation-surface {
+  width: min(640px, 100vw);
+  max-height: min(86dvh, 760px);
+  border-radius: 20px 20px 0 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  animation: x-presentation-sheet-in .18s ease-out;
+}
+
+.x-presentation-bottom-sheet .x-presentation-surface::before {
+  content: "";
+  display: block;
+  width: 38px;
+  height: 4px;
+  margin: 9px auto 2px;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.x-presentation-dialog .x-presentation-surface {
+  width: min(420px, calc(100vw - 32px));
+}
+
+@keyframes x-presentation-sheet-in {
+  from { transform: translateY(18px); opacity: .8; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@media (min-width: 769px) {
+  .x-presentation-bottom-sheet .x-presentation-surface {
+    width: min(560px, calc(100vw - 48px));
+    max-height: min(760px, calc(100vh - 48px));
+    border-radius: 18px;
+  }
+}
