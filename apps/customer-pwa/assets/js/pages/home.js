@@ -1278,6 +1278,22 @@
       });
   }
 
+  // Customer presentation contract: Level Pedas is always a four-dot horizontal
+  // intensity indicator. The numeric level comes from the structured catalog DTO;
+  // the legacy level name is never rendered as customer-facing text.
+  function renderCustomerSpiceIndicator(levelValue) {
+    var raw = Number(levelValue || 0);
+    if (!Number.isFinite(raw) || raw <= 0) return '';
+    var level = Math.max(1, Math.min(4, Math.floor(raw)));
+    var html = '<div class="x-product-menu-indicator" aria-label="Level Pedas ' + level + ' dari 4">' +
+      '<span class="x-product-menu-indicator-label">Pedas</span>' +
+      '<span class="x-product-menu-indicator-dots" aria-hidden="true">';
+    for (var i = 1; i <= 4; i += 1) {
+      html += '<span class="x-product-menu-indicator-dot' + (i <= level ? ' is-filled' : '') + '"></span>';
+    }
+    return html + '</span></div>';
+  }
+
   function renderProducts() {
     var container = $('x-products');
     if (!container) return;
@@ -1311,7 +1327,6 @@
       var menuTitle = product.menu_title || product.title || product.name || '';
       var menuSubtitle = product.menu_subtitle || product.subtitle || '';
       var menuDetail = Array.isArray(product.menu_detail) ? product.menu_detail : [];
-      var menuIndicatorLevel = Number(product.menu_indicator_level || 0);
       var legacyDesc = product.description || '';
 
       // P3: branch-level availability is a SERVER-computed flag (is_available is
@@ -1365,16 +1380,7 @@
         '  <div class="x-product-name">' + UI.escape(menuTitle) + '</div>' +
         (menuSubtitle ? '  <div class="x-product-description">' + UI.escape(menuSubtitle) + '</div>' : '') +
         (menuDetail.length ? '  <div class="x-product-description">' + UI.escape(menuDetail.join(' · ')) + '</div>' : '') +
-        (menuIndicatorLevel > 0 ? (function () {
-          var level = Math.max(1, Math.min(4, Math.floor(menuIndicatorLevel)));
-          var indicatorHtml = '  <div class="x-product-menu-indicator" aria-label="Level Pedas ' + level + ' dari 4">' +
-            '<span class="x-product-menu-indicator-label">Pedas</span>' +
-            '<span class="x-product-menu-indicator-dots" aria-hidden="true">';
-          for (var i = 1; i <= 4; i += 1) {
-            indicatorHtml += '<span class="x-product-menu-indicator-dot' + (i <= level ? ' is-filled' : '') + '"></span>';
-          }
-          return indicatorHtml + '</span></div>';
-        })() : '') +
+        renderCustomerSpiceIndicator(product.menu_indicator_level) +
         (!menuSubtitle && !menuDetail.length && legacyDesc ? '  <div class="x-product-description">' + UI.escape(legacyDesc) + '</div>' : '') +
         unavailableTag +
         '  <div class="x-price">' + oldPriceHtml +
@@ -1596,7 +1602,6 @@
     var menuTitle = product.menu_title || product.title || product.name || '';
     var menuSubtitle = product.menu_subtitle || product.subtitle || '';
     var menuDetail = Array.isArray(product.menu_detail) ? product.menu_detail : [];
-    var menuIndicator = product.menu_indicator || product.indicator || '';
     // M6: Resolve best image for the detail view (200px tall, full-width).
     // For the detail sheet we want at least 640px wide (md quality) for crisp display.
     var imgHtml = '';
@@ -1658,7 +1663,7 @@
       '      <h3 class="x-detail-name">' + UI.escape(menuTitle) + '</h3>' +
       (menuSubtitle ? '      <div class="x-detail-desc">' + UI.escape(menuSubtitle) + '</div>' : '') +
       (menuDetail.length ? '      <div class="x-detail-desc">' + UI.escape(menuDetail.join(' · ')) + '</div>' : '') +
-      (menuIndicator ? '      <div class="x-detail-desc" style="font-weight:700;">' + UI.escape(menuIndicator) + '</div>' : '') +
+      renderCustomerSpiceIndicator(product.menu_indicator_level) +
       branchLabelHtml +
       availabilityHtml +
       '      <div class="x-detail-price">' + oldPriceHtml + '<span class="x-detail-current">' + UI.money(price) + '</span></div>' +
