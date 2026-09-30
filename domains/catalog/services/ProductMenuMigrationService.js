@@ -286,6 +286,10 @@ class ProductMenuMigrationService {
 
 module.exports = {
   ProductMenuMigrationService,
+  normalizeLegacyMenuText,
+  phraseMatches,
+  deterministicSingleMatch,
+  buildDeterministicLegacyMapping,
   canonicalFingerprint,
   validateCanonicalComposition,
   classifyLegacyProduct,
