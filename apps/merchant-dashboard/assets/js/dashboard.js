@@ -215,8 +215,9 @@
   }
 
   /* =========================================================================
-     ROUTING — HASH-BASED URL ROUTER
-     URL is the source of truth for active navigation state.
+     ROUTING — HASH URL ADAPTER
+     The URL remains deep-linkable, while owner-navigation.js owns the canonical
+     application stack persisted in history.state.
      Pattern: /dashboard#<route>   e.g. #overview, #organizations
      ========================================================================= */
 
