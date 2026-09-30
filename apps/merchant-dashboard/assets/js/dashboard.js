@@ -379,41 +379,150 @@
   }
   window.openMobileSidebar = openMobileSidebar;
 
-  // Navigate to a route: update URL hash, then apply the route
-  function navigateTo(route) {
+  // ---------------------------------------------------------------------------
+  // Owner SPA navigation stack
+  //
+  // Root/tab navigation replaces the current app entry. Child navigation pushes
+  // one explicit app entry. Back then traverses exactly one app-managed level.
+  // ---------------------------------------------------------------------------
+  var _ownerNavigationReady = false;
+  var _ownerNavigationIgnoreNextHashChange = false;
+  var OWNER_NAV_STATE_KEY = '__xentraOwnerNavigation';
+
+  var OWNER_ROUTE_ALIASES = {
+    'overview': 'overview',
+    'orders': 'orders',
+    'catalog': 'catalog/products',
+    'catalog-products': 'catalog/products',
+    'catalog-menus': 'catalog/menus',
+    'catalog-categories': 'catalog/categories',
+    'catalog/categories': 'catalog/categories',
+    'branches': 'branches',
+    'tim': 'team',
+    'team': 'team',
+    'customers': 'customers',
+    'reports': 'reports',
+    'finance': 'finance/overview',
+    'marketing': 'marketing/promotions',
+    'settings': 'settings',
+    'brand': 'brand',
+    'payments': 'payments',
+    'business': 'business',
+    'more': 'more',
+    'lainnya': 'more'
+  };
+
+  var OWNER_ROOT_ROUTES = {
+    overview: true,
+    business: true,
+    orders: true,
+    'finance/overview': true,
+    more: true
+  };
+
+  function canonicalizeOwnerRoute(route) {
+    return OWNER_ROUTE_ALIASES[route] || route;
+  }
+
+  function isOwnerRootRoute(route) {
+    return !!OWNER_ROOT_ROUTES[route];
+  }
+
+  function makeOwnerNavigationState(route, index, parentRoute) {
+    return {
+      [OWNER_NAV_STATE_KEY]: true,
+      route: route,
+      index: Number(index) || 0,
+      parentRoute: parentRoute || null
+    };
+  }
+
+  function ensureOwnerNavigationHistory(route) {
+    var canonicalRoute = canonicalizeOwnerRoute(route || getCurrentRoute() || 'overview');
+    var state = window.history && window.history.state;
+    var ownerState = state && state[OWNER_NAV_STATE_KEY];
+
+    if (!ownerState || ownerState.route !== canonicalRoute) {
+      var baseState = (state && typeof state === 'object') ? state : {};
+      window.history.replaceState(
+        Object.assign({}, baseState, makeOwnerNavigationState(canonicalRoute, 0, null)),
+        '',
+        '#' + canonicalRoute
+      );
+    }
+
+    _ownerNavigationReady = true;
+  }
+
+  function navigateTo(route, options) {
     if (!route) return;
     closeMobileSidebar();
-    var legacyMap = {
-      'overview': 'overview',
-      'orders': 'orders',
-      'catalog': 'catalog/products',
-      'catalog-products': 'catalog/products',
-      'catalog-menus': 'catalog/menus',
-      'catalog-categories': 'catalog/categories',
-      'catalog/categories': 'catalog/categories',
-      'branches': 'branches',
-      'tim': 'team',
-      'team': 'team',
-      'customers': 'customers',
-      'reports': 'reports',
-      'finance': 'finance/overview',
-      'marketing': 'marketing/promotions',
-      'settings': 'settings',
-      'brand': 'brand',
-      'payments': 'payments',
-      'business': 'business',
-      'more': 'more',
-      'lainnya': 'more'
-    };
-    var canonicalRoute = legacyMap[route] || route;
-    if (window.location.hash === '#' + canonicalRoute) {
-      applyRoute(canonicalRoute);
-    } else {
-      window.location.hash = canonicalRoute;
-      applyRoute(canonicalRoute);
+
+    var canonicalRoute = canonicalizeOwnerRoute(route);
+    var opts = options || {};
+    var currentRoute = canonicalizeOwnerRoute(getCurrentRoute() || '');
+
+    if (!_ownerNavigationReady) {
+      ensureOwnerNavigationHistory(currentRoute || canonicalRoute);
     }
+
+    if (currentRoute === canonicalRoute) {
+      applyRoute(canonicalRoute);
+      return;
+    }
+
+    var currentState = window.history && window.history.state;
+    var currentOwnerState = currentState && currentState[OWNER_NAV_STATE_KEY];
+    var currentIndex = currentOwnerState ? Number(currentOwnerState.index || 0) : 0;
+
+    var rootNavigation = opts.history === 'root' ||
+      (!opts.history && isOwnerRootRoute(canonicalRoute));
+    var replaceNavigation = opts.history === 'replace';
+    var pushNavigation = opts.history === 'push' ||
+      (!opts.history && !isOwnerRootRoute(canonicalRoute));
+
+    if (rootNavigation) {
+      window.history.replaceState(
+        Object.assign(
+          {},
+          (currentState && typeof currentState === 'object') ? currentState : {},
+          makeOwnerNavigationState(canonicalRoute, 0, null)
+        ),
+        '',
+        '#' + canonicalRoute
+      );
+    } else if (replaceNavigation) {
+      window.history.replaceState(
+        Object.assign(
+          {},
+          (currentState && typeof currentState === 'object') ? currentState : {},
+          makeOwnerNavigationState(
+            canonicalRoute,
+            currentIndex,
+            currentOwnerState ? currentOwnerState.parentRoute : null
+          )
+        ),
+        '',
+        '#' + canonicalRoute
+      );
+    } else if (pushNavigation) {
+      var parentRoute = currentOwnerState && currentOwnerState.route
+        ? currentOwnerState.route
+        : currentRoute;
+      window.history.pushState(
+        Object.assign(
+          {},
+          (currentState && typeof currentState === 'object') ? currentState : {},
+          makeOwnerNavigationState(canonicalRoute, currentIndex + 1, parentRoute)
+        ),
+        '',
+        '#' + canonicalRoute
+      );
+    }
+
+    applyRoute(canonicalRoute);
   }
-  window.navigateTo = navigateTo;
+  window.navigateTo = navigateTo;o;
 
   // Render Platform Navigation in Sidebar
   function renderPlatformNavigation() {
@@ -721,8 +830,20 @@
     }
   }
 
-  // Listen to hash changes (browser back/forward, direct URL)
+  // Browser Back/Forward traverses the app's explicit navigation stack.
+  window.addEventListener('popstate', function () {
+    _ownerNavigationIgnoreNextHashChange = true;
+    applyRoute(getCurrentRoute());
+  });
+
+  // Manual/direct hash edits remain supported. A history traversal may also emit
+  // hashchange, so consume the duplicate notification once.
   window.addEventListener('hashchange', function () {
+    if (_ownerNavigationIgnoreNextHashChange) {
+      _ownerNavigationIgnoreNextHashChange = false;
+      return;
+    }
+    ensureOwnerNavigationHistory(getCurrentRoute());
     applyRoute(getCurrentRoute());
   });
 
@@ -3654,7 +3775,7 @@
 
   window.closeProductModal = function () {
     _productEditorLoadSeq++;
-    navigateTo('catalog/products');
+    navigateTo('catalog/products', { history: 'replace' });
   };
 
   window.toggleStock = async function (id) {
@@ -4244,7 +4365,7 @@ async function loadMenusView() {
     if (btnCancelProductEditor && !btnCancelProductEditor.dataset.bound) {
       btnCancelProductEditor.dataset.bound = 'true';
       btnCancelProductEditor.addEventListener('click', function () {
-        navigateTo('catalog/products');
+        navigateTo('catalog/products', { history: 'replace' });
       });
     }
 
@@ -4491,7 +4612,7 @@ async function loadMenusView() {
 
           showToast('✅ Produk master berhasil disimpan!');
           loadMasterProducts();
-          navigateTo('catalog/products/' + encodeURIComponent(savedId));
+          navigateTo('catalog/products/' + encodeURIComponent(savedId), { history: 'replace' });
         } catch (err) {
           showToast('Gagal menyimpan menu.');
         }
@@ -8028,14 +8149,22 @@ async function loadMenusView() {
   });
 
   // Canonical Back behavior for Owner secondary/child pages.
-  // Every child surface retraces the browser/app navigation history instead of
-  // hardcoding a parent route. Direct/deep links use the business hub fallback.
+  // A child only goes one level up its app-managed navigation stack. Direct/deep
+  // links at stack index 0 return to the Business root.
   window.goBackFromChildPage = function () {
-    if (window.history && window.history.length > 1) {
+    var state = window.history && window.history.state;
+    var ownerState = state && state[OWNER_NAV_STATE_KEY];
+
+    if (
+      ownerState &&
+      Number(ownerState.index || 0) > 0 &&
+      ownerState.parentRoute
+    ) {
       window.history.back();
       return;
     }
-    navigateTo('business');
+
+    navigateTo('business', { history: 'root' });
   };
 
   // Compatibility aliases kept for existing markup/tests and legacy callers.
@@ -12052,7 +12181,8 @@ async function loadMenusView() {
         });
       }
 
-      // Apply initial route from URL hash
+      // Establish the initial platform/Owner route as the root app entry.
+      ensureOwnerNavigationHistory(getCurrentRoute());
       applyRoute(getCurrentRoute());
 
     } else {
@@ -12071,7 +12201,8 @@ async function loadMenusView() {
         enforceSurface(['/owner/', '/owner', '/dashboard/', '/dashboard']);
       }).catch(function () {});
 
-      // Apply initial route from URL hash (enables deep-link and browser refresh)
+      // Establish the initial Owner route as the root app entry.
+      ensureOwnerNavigationHistory(getCurrentRoute());
       applyRoute(getCurrentRoute());
 
       // Initial data fetch if authenticated
