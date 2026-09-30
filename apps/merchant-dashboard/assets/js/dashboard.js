@@ -2823,7 +2823,112 @@
     }
   }
 
+  function renderMasterChoiceGrid(containerId, rows, selectedId, options) {
+    var box = $(containerId);
+    if (!box) return;
+
+    options = options || {};
+    var allowEmpty = !!options.allowEmpty;
+    var emptyLabel = options.emptyLabel || 'Tidak ada';
+    var addLabel = options.addLabel || 'Tambah';
+    var addAction = options.addAction || null;
+    var selected = selectedId == null ? '' : String(selectedId);
+
+    var activeRows = (rows || []).filter(function(row) {
+      return row && (row.is_active !== false && Number(row.is_active) !== 0 || String(row.id) === selected);
+    });
+
+    var html = '';
+
+    if (allowEmpty) {
+      html += '<button type="button" class="x-master-choice-chip x-master-choice-empty-chip' +
+        (selected === '' ? ' is-selected' : '') +
+        '" data-master-choice-empty="1" aria-pressed="' + (selected === '' ? 'true' : 'false') + '">' +
+        esc(emptyLabel) + '</button>';
+    }
+
+    activeRows.forEach(function(row) {
+      var id = String(row.id);
+      var isSelected = id === selected;
+      var suffix = (row.is_active === false || Number(row.is_active) === 0) ? ' (Nonaktif)' : '';
+      html += '<button type="button" class="x-master-choice-chip' +
+        (options.variant ? ' ' + options.variant : '') +
+        (isSelected ? ' is-selected' : '') +
+        '" data-master-choice-id="' + esc(id) + '"' +
+        ' aria-pressed="' + (isSelected ? 'true' : 'false') + '"' +
+        ' title="' + esc(row.name + suffix) + '">' +
+        esc(row.name + suffix) +
+      '</button>';
+    });
+
+    if (addAction) {
+      html += '<button type="button" class="x-master-choice-chip x-master-choice-add" data-master-choice-add="1" aria-label="' +
+        esc(addLabel) + '">' +
+        '<span aria-hidden="true">+</span><span>' + esc(addLabel) + '</span>' +
+      '</button>';
+    }
+
+    box.innerHTML = html;
+
+    box.querySelectorAll('[data-master-choice-id]').forEach(function(button) {
+      button.addEventListener('click', function() {
+        var id = String(button.getAttribute('data-master-choice-id') || '');
+        if (typeof options.onSelect === 'function') options.onSelect(id);
+      });
+    });
+
+    box.querySelectorAll('[data-master-choice-empty]').forEach(function(button) {
+      button.addEventListener('click', function() {
+        if (typeof options.onSelect === 'function') options.onSelect('');
+      });
+    });
+
+    box.querySelectorAll('[data-master-choice-add]').forEach(function(button) {
+      button.addEventListener('click', function() {
+        if (typeof addAction === 'function') addAction();
+      });
+    });
+  }
+
   function renderMasterMenuSelectors() {
+    var categorySelect = $('prod-category');
+    if (categorySelect) {
+      var categoryRows = state.categories || [];
+      var categoryId = String(categorySelect.value || '');
+      if (!categoryId && _masterMenuSelected.category_id) categoryId = String(_masterMenuSelected.category_id);
+
+      var categoryHtml = '<option value="">Pilih Kategori</option>';
+      categoryRows.forEach(function(row) {
+        var selected = categoryId === String(row.id);
+        if (!row.is_active && !selected) return;
+        var suffix = row.is_active ? '' : ' (Nonaktif)';
+        categoryHtml += '<option value="' + esc(row.id) + '"' +
+          (selected ? ' selected' : '') +
+          (row.is_active ? '' : ' data-inactive="1"') + '>' +
+          esc(row.name + suffix) + '</option>';
+      });
+      categorySelect.innerHTML = categoryHtml;
+      categorySelect.value = categoryId;
+      _masterMenuSelected.category_id = categorySelect.value || '';
+    }
+
+    renderMasterChoiceGrid('prod-category-chips', state.categories || [],
+      String((categorySelect && categorySelect.value) || _masterMenuSelected.category_id || ''), {
+        variant: 'x-master-category-chip',
+        addLabel: 'Tambah',
+        addAction: function() {
+          var addButton = $('btn-add-master-category-from-product');
+          if (addButton) addButton.click();
+        },
+        onSelect: function(id) {
+          if (!categorySelect) return;
+          categorySelect.value = id;
+          _masterMenuSelected.category_id = id;
+          renderMasterMenuSelectors();
+          renderMasterMenuCustomerPreview();
+        }
+      });
+
     var flavorSelect = $('prod-flavor');
     if (flavorSelect) {
       var flavorHtml = '<option value="">Tidak ada Rasa</option>';
@@ -2831,11 +2936,32 @@
         var selected = String(_masterMenuSelected.flavor_id || '') === String(row.id);
         if (!row.is_active && !selected) return;
         var suffix = row.is_active ? '' : ' (Nonaktif)';
-        flavorHtml += '<option value="' + esc(row.id) + '"' + (selected ? ' selected' : '') + (row.is_active ? '' : ' data-inactive="1"') + '>' + esc(row.name + suffix) + '</option>';
+        flavorHtml += '<option value="' + esc(row.id) + '"' +
+          (selected ? ' selected' : '') +
+          (row.is_active ? '' : ' data-inactive="1"') + '>' +
+          esc(row.name + suffix) + '</option>';
       });
       flavorSelect.innerHTML = flavorHtml;
       flavorSelect.value = _masterMenuSelected.flavor_id || '';
     }
+
+    renderMasterChoiceGrid('prod-flavor-chips', _masterMenuComponents.flavor,
+      String(_masterMenuSelected.flavor_id || ''), {
+        variant: 'x-master-flavor-chip',
+        allowEmpty: true,
+        emptyLabel: 'Tidak ada Rasa',
+        addLabel: 'Tambah',
+        addAction: function() {
+          var addButton = $('btn-add-master-flavor-from-product');
+          if (addButton) addButton.click();
+        },
+        onSelect: function(id) {
+          if (flavorSelect) flavorSelect.value = id;
+          _masterMenuSelected.flavor_id = id;
+          renderMasterMenuSelectors();
+          renderMasterMenuCustomerPreview();
+        }
+      });
 
     var levelSelect = $('prod-level');
     if (levelSelect) {
@@ -2844,41 +2970,83 @@
         var selected = String(_masterMenuSelected.level_id || '') === String(row.id);
         if (!row.is_active && !selected) return;
         var suffix = row.is_active ? '' : ' (Nonaktif)';
-        levelHtml += '<option value="' + esc(row.id) + '"' + (selected ? ' selected' : '') + (row.is_active ? '' : ' data-inactive="1"') + '>' + esc(row.name + suffix) + '</option>';
+        levelHtml += '<option value="' + esc(row.id) + '"' +
+          (selected ? ' selected' : '') +
+          (row.is_active ? '' : ' data-inactive="1"') + '>' +
+          esc(row.name + suffix) + '</option>';
       });
       levelSelect.innerHTML = levelHtml;
       levelSelect.value = _masterMenuSelected.level_id || '';
     }
 
+    renderMasterChoiceGrid('prod-level-chips', _masterMenuComponents.level,
+      String(_masterMenuSelected.level_id || ''), {
+        variant: 'x-master-level-chip',
+        allowEmpty: true,
+        emptyLabel: 'Tidak ada Level',
+        addLabel: 'Tambah',
+        addAction: function() {
+          openMasterReferenceQuickAdd('level');
+        },
+        onSelect: function(id) {
+          if (levelSelect) levelSelect.value = id;
+          _masterMenuSelected.level_id = id;
+          renderMasterMenuSelectors();
+          renderMasterMenuCustomerPreview();
+        }
+      });
+
     var complementBox = $('prod-complements-editor');
     var empty = $('prod-complements-empty');
-    if (!complementBox) return;
-    if (!_masterMenuComponents.complement.length) {
-      complementBox.innerHTML = '';
-      if (empty) empty.style.display = 'block';
-      return;
-    }
-    if (empty) empty.style.display = 'none';
-    complementBox.innerHTML = _masterMenuComponents.complement.map(function(row) {
-      var selected = _masterMenuSelected.complement_ids.indexOf(String(row.id)) !== -1;
-      if (!row.is_active && !selected) return '';
-      var suffix = row.is_active ? '' : ' (Nonaktif)';
-      return '<label style="display:flex;align-items:center;gap:8px;border:1px solid ' + (selected ? '#94a3b8' : '#e2e8f0') + ';border-radius:8px;padding:8px 10px;cursor:pointer;background:' + (selected ? '#f8fafc' : '#fff') + ';">' +
-        '<input type="checkbox" value="' + esc(row.id) + '"' + (selected ? ' checked' : '') + ' data-master-complement="1" style="width:16px;height:16px;">' +
-        '<span style="font-size:12px;color:#0f172a;">' + esc(row.name + suffix) + '</span>' +
-      '</label>';
-    }).join('');
+    if (complementBox) {
+      var rows = _masterMenuComponents.complement || [];
+      if (!rows.length) {
+        complementBox.innerHTML =
+          '<button type="button" class="x-master-choice-chip x-master-choice-add" data-master-choice-add="1" aria-label="Tambah Kelengkapan">' +
+            '<span aria-hidden="true">+</span><span>Tambah</span>' +
+          '</button>';
+        if (empty) empty.style.display = 'block';
+      } else {
+        if (empty) empty.style.display = 'none';
+        var selectedIds = _masterMenuSelected.complement_ids || [];
+        complementBox.innerHTML = rows.filter(function(row) {
+          return row.is_active || selectedIds.indexOf(String(row.id)) !== -1;
+        }).map(function(row) {
+          var id = String(row.id);
+          var isSelected = selectedIds.indexOf(id) !== -1;
+          var suffix = row.is_active ? '' : ' (Nonaktif)';
+          return '<button type="button" class="x-master-choice-chip x-master-complement-chip' +
+            (isSelected ? ' is-selected' : '') +
+            '" data-master-complement-id="' + esc(id) + '"' +
+            ' aria-pressed="' + (isSelected ? 'true' : 'false') + '"' +
+            ' title="' + esc(row.name + suffix) + '">' +
+            esc(row.name + suffix) +
+          '</button>';
+        }).join('') +
+        '<button type="button" class="x-master-choice-chip x-master-choice-add" data-master-choice-add="1" aria-label="Tambah Kelengkapan">' +
+          '<span aria-hidden="true">+</span><span>Tambah</span>' +
+        '</button>';
 
-    complementBox.querySelectorAll('[data-master-complement]').forEach(function(input) {
-      input.addEventListener('change', function() {
-        var id = String(input.value);
-        var next = _masterMenuSelected.complement_ids.filter(function(existing) { return existing !== id; });
-        if (input.checked) next.push(id);
-        _masterMenuSelected.complement_ids = next;
-        renderMasterMenuSelectors();
-        renderMasterMenuCustomerPreview();
+        complementBox.querySelectorAll('[data-master-complement-id]').forEach(function(button) {
+          button.addEventListener('click', function() {
+            var id = String(button.getAttribute('data-master-complement-id') || '');
+            var next = (_masterMenuSelected.complement_ids || []).filter(function(existing) {
+              return existing !== id;
+            });
+            if (next.length === (_masterMenuSelected.complement_ids || []).length) next.push(id);
+            _masterMenuSelected.complement_ids = next;
+            renderMasterMenuSelectors();
+            renderMasterMenuCustomerPreview();
+          });
+        });
+      }
+
+      complementBox.querySelectorAll('[data-master-choice-add]').forEach(function(button) {
+        button.addEventListener('click', function() {
+          openMasterReferenceQuickAdd('complement');
+        });
       });
-    });
+    }
 
     renderMasterMenuCustomerPreview();
   }
