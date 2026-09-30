@@ -409,15 +409,33 @@
 .x-product-menu-indicator {
   display: inline-flex;
   align-items: center;
+  gap: 7px;
   min-height: 18px;
   margin-top: 5px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: #f8fafc;
-  color: var(--x-text-muted);
+  color: #ef4444;
   font-size: 11px;
   line-height: 14px;
   font-weight: 700;
+}
+.x-product-menu-indicator-label {
+  flex: 0 0 auto;
+}
+.x-product-menu-indicator-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.x-product-menu-indicator-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 7px;
+  border: 1.5px solid #ef4444;
+  border-radius: 50%;
+  background: transparent;
+  box-sizing: border-box;
+}
+.x-product-menu-indicator-dot.is-filled {
+  background: #ef4444;
 }
 
 .x-price {
