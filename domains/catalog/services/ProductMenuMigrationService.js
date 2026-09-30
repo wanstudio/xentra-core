@@ -184,16 +184,31 @@ class ProductMenuMigrationService {
     });
   }
 
-  static reconcileProduct({ brandId, productId, apply = false, components = null }) {
+  static reconcileProduct({ brandId, productId, apply = false, persistReport = apply, components = null }) {
     const plan = this.planProductMigration({ brandId, productId, components });
-    if (plan.status === 'candidate' && apply) return this.applyProductMigration({ brandId, productId, components });
+    if (plan.status === 'candidate' && apply) {
+      return this.applyProductMigration({ brandId, productId, components });
+    }
+
+    if (!persistReport) {
+      return Object.assign(plan, {
+        applied: false,
+        persisted: false,
+        status: plan.status === 'candidate' ? 'candidate' : plan.status
+      });
+    }
+
     const targetStatus = plan.status === 'candidate' ? 'needs_review' : plan.status;
     const migration = migrationRepository.recordReconciliation({
       brandId, productId, status: targetStatus,
       canonicalFingerprint: plan.canonical_fingerprint,
       notes: plan.notes || plan.errors.join(', ') || plan.reason
     });
-    return Object.assign(plan, { status: migration.status, applied: false });
+    return Object.assign(plan, {
+      status: migration.status,
+      applied: false,
+      persisted: true
+    });
   }
   static verifyProduct({ brandId, productId }) {
     const inspected = this.inspectProduct({ brandId, productId });
@@ -236,7 +251,7 @@ class ProductMenuMigrationService {
     };
   }
 
-  static reconcileBrand({ brandId, verify = false, apply = false }) {
+  static reconcileBrand({ brandId, verify = false, apply = false, persistReport = apply }) {
     if (!brandId) throw new Error('BRAND_CONTEXT_REQUIRED');
 
     const products = DataAccess.queryMany(
@@ -249,7 +264,7 @@ class ProductMenuMigrationService {
       results.push(
         verify
           ? this.verifyProduct({ brandId, productId: product.id })
-          : this.reconcileProduct({ brandId, productId: product.id, apply })
+          : this.reconcileProduct({ brandId, productId: product.id, apply, persistReport })
       );
     }
 
