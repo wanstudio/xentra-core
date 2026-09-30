@@ -95,9 +95,9 @@ test('Existing inactive relations remain saveable but inactive replacements are 
   }), /MASTER_FLAVOR_INACTIVE/);
 
   db.prepare('DELETE FROM menu_flavors WHERE id = ?').run('mmc_service_inactive_new_flavor');
-  db.prepare('UPDATE menu_flavors SET is_active = 1 WHERE id = ?', [FLAVOR]);
-  db.prepare('UPDATE menu_complements SET is_active = 1 WHERE id = ?', [COMPLEMENT_1]);
-  db.prepare('UPDATE menu_levels SET is_active = 1 WHERE id = ?', [LEVEL]);
+  db.prepare('UPDATE menu_flavors SET is_active = 1 WHERE id = ?').run(FLAVOR);
+  db.prepare('UPDATE menu_complements SET is_active = 1 WHERE id = ?').run(COMPLEMENT_1);
+  db.prepare('UPDATE menu_levels SET is_active = 1 WHERE id = ?').run(LEVEL);
   MasterMenuCompositionService.saveComposition({
     brandId: BRAND_A, productId: PRODUCT, categoryId: CATEGORY_A,
     flavorId: null, complementIds: [], levelId: null
