@@ -3594,14 +3594,23 @@
     </div>
   </div>
 
-  <!-- MODAL: ADD / EDIT PRODUCT -->
-  <div id="modal-product" class="x-modal-backdrop" style="display:none;">
-    <div class="x-modal-card">
-      <div class="x-modal-header">
-        <h3 id="modal-product-title">Tambah Produk Master</h3>
-        <button type="button" class="x-modal-close" onclick="closeProductModal()">✕</button>
+  <!-- PAGE: ADD / EDIT MASTER PRODUCT -->
+  <section id="product-editor-view" class="x-card-panel" style="display:none;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+      <button type="button" class="x-btn-secondary" id="btn-back-from-product-editor" style="padding:6px 12px;font-size:13px;">
+        ← Kembali ke Daftar Produk
+      </button>
+      <span class="text-muted" style="font-size:13px;">/</span>
+      <span id="prod-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Produk</span>
+    </div>
+
+    <div class="x-card" style="max-width:920px;margin:0 auto;background:#ffffff;border:1px solid var(--border-color);border-radius:12px;padding:20px 22px;">
+      <div style="margin-bottom:18px;">
+        <h3 id="modal-product-title" style="margin:0;font-size:20px;">Tambah Produk Master</h3>
+        <p id="prod-editor-subtitle" class="text-muted" style="margin:5px 0 0;font-size:13px;">Susun identitas dan komposisi Master Menu.</p>
       </div>
       <form id="form-product" class="x-form">
+
         <input type="hidden" id="prod-id" value="">
         <div class="x-form-group">
           <label>Foto Menu</label>
@@ -3736,20 +3745,16 @@
           <div class="text-muted" style="font-size:11px;margin-top:6px;">Variant = pilih satu. Add-on = boleh beberapa. Kosongkan bila menu tidak punya opsi.</div>
         </div>
 
-        <div class="x-modal-footer">
-          <button type="button" class="x-btn-secondary" onclick="closeProductModal()">Batal</button>
-          <button type="submit" class="x-btn-primary">Simpan Produk</button>
+        <div class="x-product-editor-actions" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 0 2px;margin-top:8px;border-top:1px solid #e2e8f0;">
+          <button type="button" class="x-btn-secondary" id="btn-cancel-product-editor">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-product-editor">Simpan Produk</button>
         </div>
+      
       </form>
     </div>
-  </div>
+  </section>
 
-  
-      </form>
-    </div>
-  </div>
-
-<!-- MODAL: MASTER MENU COMPONENT MANAGER -->
+  <!-- MODAL: MASTER MENU COMPONENT MANAGER -->
   <div id="modal-master-menu-components" class="x-modal-backdrop" style="display:none; z-index:1150;">
     <div class="x-modal-card" style="max-width:560px;">
       <div class="x-modal-header">
@@ -4826,6 +4831,6 @@
   <script src="/merchant-shared/js/crop-editor.js?v=1.0.1"></script>
   <script src="/merchant-shared/js/catalog-client.js?v=1.0.1"></script>
   <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.33"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.34"></script>
 </body>
 </html>
