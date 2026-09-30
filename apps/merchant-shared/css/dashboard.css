@@ -9014,6 +9014,114 @@ input[type="file"].x-input,
 
 
 /* ==========================================================================
+   OWNER — PRODUCT EDITOR CARD STACK
+   Keep the Master Product form and POS-only option configuration as separate
+   visual cards while preserving one form submission contract.
+   ========================================================================== */
+.x-product-editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.x-product-editor-main-card,
+.x-product-editor-pos-card {
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px 22px;
+}
+
+.x-product-editor-main-card {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.x-product-editor-pos-card {
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.x-product-editor-pos-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.x-product-editor-pos-card-header h3 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.3;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.x-product-editor-pos-card-header p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.x-product-pos-options-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.x-product-pos-add-group {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 10px;
+}
+
+.x-product-editor-pos-help {
+  margin: 7px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #64748b;
+}
+
+.x-product-editor-actions {
+  max-width: 920px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 4px;
+}
+
+@media (max-width: 768px) {
+  .x-product-editor-form {
+    gap: 12px;
+  }
+
+  .x-product-editor-main-card,
+  .x-product-editor-pos-card {
+    padding: 16px 14px;
+    border-radius: 12px;
+  }
+
+  .x-product-editor-pos-card-header {
+    margin-bottom: 12px;
+  }
+
+  .x-product-editor-pos-card-header h3 {
+    font-size: 14px;
+  }
+
+  .x-product-editor-actions {
+    padding: 2px 0 8px;
+  }
+}
+
+/* ==========================================================================
    OWNER — SHARED CHILD PAGE HEADER
    One presentation pattern for all secondary/focused pages:
    chevron-left + title + subtitle. Navigation semantics live in the router.
