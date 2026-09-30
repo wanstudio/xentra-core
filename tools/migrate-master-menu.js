@@ -21,14 +21,18 @@ async function main() {
       'Usage: node tools/migrate-master-menu.js --brand <brand-id> [--product <product-id>] [--verify] [--apply]'
     );
   }
+  if (verify && apply) {
+    throw new Error('VERIFY_APPLY_CONFLICT: --verify already performs the verification transition; do not combine it with --apply.');
+  }
 
   const result = productId
     ? (verify
       ? ProductMenuMigrationService.verifyProduct({ brandId, productId })
       : ProductMenuMigrationService.reconcileProduct({ brandId, productId, apply, persistReport: apply }))
-    : ProductMenuMigrationService.reconcileBrand({ brandId, verify, apply, persistReport: apply });
+    : ProductMenuMigrationService.reconcileBrand({ brandId, verify, apply, persistReport: apply }));
 
-  process.stdout.write(JSON.stringify({ mode: apply ? 'apply' : 'dry-run', verify, result }, null, 2) + '\n');
+  const mode = verify ? 'verify' : apply ? 'apply' : 'dry-run';
+  process.stdout.write(JSON.stringify({ mode, verify, apply, result }, null, 2) + '\n');
 }
 
 main().catch((err) => {
