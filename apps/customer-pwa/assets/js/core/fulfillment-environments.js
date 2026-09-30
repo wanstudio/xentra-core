@@ -232,7 +232,13 @@
       reservationTime: '12:00',
       reservationName: '',
       reservationPhone: '',
-      guestCount: null
+      guestCount: null,
+      // Milik Delivery. Environment lain menyimpannya netral supaya bentuk state
+      // seragam, tetapi hanya Delivery yang boleh mengisinya.
+      address: { label: '', formatted_address: '', detail: '', latitude: null, longitude: null },
+      deliveryFee: 0,
+      discount: 0,
+      deliveryQuote: null
     };
   }
 
@@ -254,6 +260,18 @@
       base.guestCount = 1;
     } else if (type === 'reservation') {
       base.guestCount = 2;
+    }
+
+    // Alamat pengiriman default hanya diisi untuk Delivery; tipe lain tetap
+    // netral. Ongkir/diskon/quote selalu dihitung ulang dari server.
+    if (type === 'delivery') {
+      base.address = {
+        label: 'Rumah',
+        formatted_address: 'Jl. Dewi 18, Panjang, Bandar Lampung 35241',
+        detail: '',
+        latitude: -7.2912,
+        longitude: 112.7154
+      };
     }
     return base;
   }
@@ -313,7 +331,13 @@
       },
 
       reset: function () {
+        // State sementara (jadwal, meja, reservasi, ongkir/quote) dibuang saat
+        // environment di-unmount, tetapi ALAMAT pengiriman yang sudah diisi tamu
+        // bukan state sementara — ia data tamu, jadi dipertahankan supaya
+        // berpindah tipe lalu kembali ke Delivery tidak menghapus alamatnya.
+        var keptAddress = env.state ? env.state.address : null;
         env.state = defaultState(t);
+        if (keptAddress) env.state.address = keptAddress;
         return env.state;
       },
 

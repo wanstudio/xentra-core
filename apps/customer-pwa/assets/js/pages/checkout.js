@@ -60,17 +60,7 @@
       phone: '',
       isVerified: false
     },
-    address: {
-      label: 'Rumah',
-      formatted_address: 'Jl. Dewi 18, Panjang, Bandar Lampung 35241',
-      detail: '',
-      latitude: -7.2912,
-      longitude: 112.7154
-    },
-    deliveryFee: 0,
-    discount: 0,
     matchedBranch: null,
-    deliveryQuote: null,
     paymentMethod: null,
     cashTendered: null,
     cashTenderedType: null,
@@ -80,6 +70,45 @@
     openBillLoaded: false,
     additionalClientTransactionId: null
   };
+
+  // ── State milik Delivery ──
+  // Alamat pengiriman, ongkir, diskon ongkir, dan penawaran (quote/ETA) delivery
+  // HANYA milik environment Delivery. Nilainya disimpan di state environment
+  // Delivery (core/fulfillment-environments.js), bukan di objek state bersama,
+  // supaya menulisnya tidak pernah merembet ke Pickup/Dine-in/Reservasi dan
+  // sebaliknya. Nama `state.address` dkk dipertahankan sebagai pintu masuk yang
+  // sudah dipakai seluruh controller agar tidak ada penulisan langsung ke state
+  // bersama.
+  function deliveryHome() {
+    if (FulfillmentEnv && typeof FulfillmentEnv.getState === 'function') {
+      return FulfillmentEnv.getState('delivery');
+    }
+    // Fallback saat modul environment tidak termuat (mis. checkout.html lama).
+    if (!state._deliveryFallback) {
+      state._deliveryFallback = {
+        address: {
+          label: 'Rumah',
+          formatted_address: 'Jl. Dewi 18, Panjang, Bandar Lampung 35241',
+          detail: '',
+          latitude: -7.2912,
+          longitude: 112.7154
+        },
+        deliveryFee: 0,
+        discount: 0,
+        deliveryQuote: null
+      };
+    }
+    return state._deliveryFallback;
+  }
+
+  ['address', 'deliveryFee', 'discount', 'deliveryQuote'].forEach(function (key) {
+    Object.defineProperty(state, key, {
+      enumerable: true,
+      configurable: true,
+      get: function () { return deliveryHome()[key]; },
+      set: function (value) { deliveryHome()[key] = value; }
+    });
+  });
 
   // ── Xentra Robot Splash Controller (Floating, Flapping Arms, Winking Eyes) ──
   function getRobotSplashHtml(message) {
