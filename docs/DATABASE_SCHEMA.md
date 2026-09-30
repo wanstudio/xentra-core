@@ -213,11 +213,49 @@ CREATE TABLE products (
     sort_order INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    menu_schema_version INTEGER NOT NULL DEFAULT 1,
+    menu_migration_status TEXT NOT NULL DEFAULT 'legacy',
     FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 );
 ```
 
+### Product Menu Migration State
+
+The forward Menu architecture uses temporary migration metadata rather than
+duplicating legacy and canonical business fields inside Products.
+
+~~~sql
+CREATE TABLE product_menu_migrations (
+    product_id TEXT PRIMARY KEY,
+    brand_id TEXT NOT NULL,
+    source_schema TEXT NOT NULL DEFAULT 'legacy',
+    target_schema TEXT NOT NULL DEFAULT 'master-menu-composition-v1',
+    status TEXT NOT NULL DEFAULT 'legacy',
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    canonical_fingerprint TEXT,
+    last_error TEXT,
+    notes TEXT,
+    migrated_at TEXT,
+    verified_at TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+);
+~~~
+
+Product fields:
+- menu_schema_version = 1 → legacy/unreconciled.
+- menu_schema_version = 2 → Master Menu Composition v1.
+- menu_migration_status → legacy, needs_review, migrated, verified, or failed.
+
+`products` stores the lightweight current lifecycle state. `product_menu_migrations`
+stores reconciliation evidence/fingerprint. Canonical Menu values remain normalized in
+`products.category_id`, `product_flavors`, `product_complements`, and `product_levels`.
+
+Migration lifecycle: Expand → Migrate → Verify → Contract.
+Legacy fields are not removed until a separate verification/consumer audit gate is passed.
 ### Branch Catalog (Branch-owned)
 
 > **ARCHITECTURE MIGRATION NOTICE — 2026-09-29:** The forward Menu model is
