@@ -265,6 +265,12 @@ After adoption:
 
 The existing Merchant shell, sheets, action menu, toast, toggle, and other mature primitives remain the first reuse candidates.
 
+### Locked composition control UX
+
+- Kategori, Rasa, and Kelengkapan use touch-friendly choice chips.
+- Level Pedas is **not a dropdown** and is **not exposed as a tab under Master Kategori**.
+- Level Pedas uses a compact progressive selector: `[ Level Pedas ] [ ■ ] [ ■ ] [ ■ ] [ □ ]`, with one selected level and filled segments up to that level.
+- The existing `level_id` relation and canonical composition API remain unchanged; this is presentation-only.
 ## 11. Phase 7 — Owner Dashboard
 
 Owner receives the Master-side configuration experience:
