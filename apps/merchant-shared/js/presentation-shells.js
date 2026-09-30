@@ -111,7 +111,8 @@
       type: type,
       content: content,
       anchor: anchor,
-      shell: shell
+      shell: shell,
+      dismissible: options.dismissible
     };
     stack.push(entry);
 
