@@ -153,6 +153,9 @@ is quarantined and will be contracted only after the new consumer paths are migr
 - `GET /api/v1/admin/menu/components/:type`
   - `:type` = `flavor` | `complement` | `level`
   - optional query `active_only=true`
+- `POST /api/v1/admin/menu/components/level/ensure-defaults`
+  - idempotently creates the standard Level master only when the brand has no Level rows
+  - defaults: `1 — Tidak Pedas`, `2 — Pedas Sedang`, `3 — Pedas Banget`
 - `POST /api/v1/admin/menu/components/:type`
   - body: `{ name, slug?, sort_order? }`
 - `PUT /api/v1/admin/menu/components/:type/:id`
