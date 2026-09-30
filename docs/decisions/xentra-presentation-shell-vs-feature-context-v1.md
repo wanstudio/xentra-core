@@ -161,3 +161,19 @@ It does not change:
 - Owner/Merchant/POS surface boundaries.
 
 **Agent rule:** Before implementing a new Add/Edit/Detail interaction, classify the feature context separately from its presentation shell. Reuse the existing shell primitive and compose the context into the selected shell. Do not hard-wire feature logic to a modal/page implementation.
+
+
+## Final Owner Dashboard legacy surface sweep
+
+- Master Menu Component Manager → Bottom Sheet.
+- Master component text Add/Edit → Bottom Sheet input context.
+- Branch Catalog Product Adoption → Bottom Sheet.
+- Branch Product Override → Bottom Sheet compatibility surface; the override remains quarantined legacy behavior and is not a new product-domain editor.
+- Branch Category creation → Bottom Sheet input context.
+- Order rejection reason → Bottom Sheet input context.
+- Brand/PWA destructive actions → generic Dialog.
+- Invitation resend/revoke → generic Dialog.
+- Marketing draft deletion/discard/assignment removal → generic Dialog.
+- Logout confirmation → generic Dialog.
+- Crop editor remains owned by the existing crop-editor interaction rather than introducing another presentation framework.
+- Native browser confirm() / prompt() are not feature presentation APIs. They remain only as defensive fallback paths inside shell/input helpers.
