@@ -104,15 +104,21 @@ test('canonical Product save records migration state atomically and repeatably',
 });
 
 test('deterministic legacy name mapping produces a migration candidate without mutating data in dry-run', () => {
+  db.prepare("UPDATE products SET name = 'Ayam Lombok Ijo' WHERE id = ?").run(PRODUCT_LEGACY);
+
   const plan = ProductMenuMigrationService.planProductMigration({
     brandId: BRAND,
     productId: PRODUCT_LEGACY
   });
   assert.equal(plan.status, 'candidate');
   assert.equal(plan.suggested_composition.category_id, CATEGORY);
+  assert.equal(plan.suggested_composition.flavor_id, FLAVOR);
   assert.deepEqual(plan.suggested_composition.complement_ids, []);
+
   const state = db.prepare('SELECT menu_schema_version, menu_migration_status FROM products WHERE id = ?').get(PRODUCT_LEGACY);
   assert.deepEqual(state, { menu_schema_version: 1, menu_migration_status: 'legacy' });
+
+  db.prepare("UPDATE products SET name = 'Ayam Lama' WHERE id = ?").run(PRODUCT_LEGACY);
 });
 
 test('apply converts an unambiguous legacy Product through the canonical composition path', () => {
