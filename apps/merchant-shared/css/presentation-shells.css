@@ -94,3 +94,19 @@
 .x-presentation-confirm-header p { margin: 0; color: #64748b; line-height: 1.5; font-size: 13px; }
 .x-presentation-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
 .x-presentation-confirm-actions button { min-height: 42px; }
+
+
+/* Focused Page composition for complex feature contexts that originated from legacy modal markup. */
+.x-feature-page-surface {
+  margin: 0;
+  box-sizing: border-box;
+  overflow: visible !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 768px) {
+  .x-feature-page-surface {
+    border-radius: 0 !important;
+    width: 100% !important;
+  }
+}
