@@ -618,7 +618,7 @@ Produk Master
 
 The Owner Kategori route is the master-reference management surface with four tabs: Kategori, Rasa, Kelengkapan, and Level. Lists use compact card rows with overflow actions Edit / Hapus. This surface is separate from the Product assembly workspace but shares the same Core master authorities.
 
-Kelengkapan is a reusable 0..N vocabulary rendered as multi-select checkboxes in Product Master composition. Level is a reusable 0..1 vocabulary rendered as a single dropdown in Product Master composition. When a brand has no Level rows, the Owner surface idempotently provisions the standard values 1 — Tidak Pedas, 2 — Pedas Sedang, and 3 — Pedas Banget.
+Kelengkapan is a reusable 0..N vocabulary rendered as multi-select checkboxes in Product Master composition. Level is a reusable 0..1 vocabulary rendered as a four-step horizontal progressive selector in Product Master composition. The canonical defaults are 1 — Tidak Pedas, 2 — Pedas Sedang, 3 — Pedas Banget, and 4 — Super Pedas. Brands carrying the historical three-step system defaults receive only the missing fourth step; custom Level vocabularies are not rewritten.
 ## UX UPDATE — Native Master Composition Choice Chips
 **30 September 2026**
 
