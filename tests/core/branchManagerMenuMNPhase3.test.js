@@ -342,6 +342,49 @@ describe('BM Phase 3 — M:N Category Membership + RBAC + Branch Scope', () => {
 
   it('P3-09: Branch customer display-name override is optional and falls back to Master', async () => {
     const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID });
+    const productId = 'prod_p3_test_1';
+
+    db.prepare('UPDATE branch_products SET name_override = NULL WHERE branch_id = ? AND product_id = ?')
+      .run(BRANCH_A_ID, productId);
+
+    const fallbackRes = await request('GET', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu', null, token);
+    assert.equal(fallbackRes.status, 200);
+    const fallbackProduct = (fallbackRes.body.adopted_products || []).find(p => p.product_id === productId);
+    assert.ok(fallbackProduct);
+    assert.equal(fallbackProduct.title, 'Makanan Master');
+    assert.equal(fallbackProduct.display_name_override, null);
+
+    const overrideRes = await request('PATCH', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu/' + productId + '/display-name', {
+      name: 'Es Teh Jumbo'
+    }, token);
+    assert.equal(overrideRes.status, 200);
+    assert.equal(overrideRes.body.display_name_override, 'Es Teh Jumbo');
+    assert.equal(overrideRes.body.display_name, 'Es Teh Jumbo');
+
+    const customerRes = await request('GET', '/api/v1/catalog/menu?branch_id=' + BRANCH_A_ID);
+    assert.equal(customerRes.status, 200);
+    const customerProduct = (customerRes.body.all_products || []).find(p => p.id === productId);
+    assert.ok(customerProduct);
+    assert.equal(customerProduct.menu_title, 'Es Teh Jumbo');
+    assert.equal(customerProduct.menu_subtitle, null);
+    assert.equal(Object.prototype.hasOwnProperty.call(customerProduct, 'display_name_override'), false);
+
+    const clearRes = await request('PATCH', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu/' + productId + '/display-name', {
+      name: null
+    }, token);
+    assert.equal(clearRes.status, 200);
+    assert.equal(clearRes.body.display_name_override, null);
+
+    const clearedCustomerRes = await request('GET', '/api/v1/catalog/menu?branch_id=' + BRANCH_A_ID);
+    assert.equal(clearedCustomerRes.status, 200);
+    const clearedProduct = (clearedCustomerRes.body.all_products || []).find(p => p.id === productId);
+    assert.ok(clearedProduct);
+    assert.equal(clearedProduct.menu_title, 'Makanan Master');
+    assert.equal(clearedProduct.menu_subtitle, null);
+  });
+
+  it('P3-09: Branch customer display-name override is optional and falls back to Master', async () => {
+    const token = seedStaffSession({ role: 'branch_manager', branchId: BRANCH_A_ID });
 
     const productId = 'prod_p3_display_name';
     db.prepare(`
