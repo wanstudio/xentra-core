@@ -386,7 +386,8 @@ test('MEDIA SYSTEM M7 — MIGRATION, CLEANUP & FINAL REGRESSION SUITE', async (t
       { path: '/admin/media/gc', method: 'POST' },
       { path: '/admin/media/reconcile', method: 'POST' },
       { path: '/admin/media/consistency', method: 'GET' },
-      { path: '/admin/media/entity/brand/logo', method: 'POST' }
+      { path: '/admin/media/entity/brand/logo', method: 'POST' },
+      { path: '/admin/media/entity/products/nonexistent/image', method: 'DELETE' }
     ];
 
     for (const ep of endpoints) {

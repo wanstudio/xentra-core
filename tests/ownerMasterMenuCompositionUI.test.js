@@ -77,6 +77,22 @@ test('Edited master references immediately update the rendered master-reference 
   assert.ok(saveHandler.includes('renderMasterFlavorsPage();'));
 });
 
+test('Master Product image editor binds file state, preserves existing images, and uses canonical media upload', () => {
+  assert.ok(JS.includes('var _productImageFile = null;'));
+  assert.ok(JS.includes('var _productCropSpec = null;'));
+  assert.ok(JS.includes('var _productImageRemoved = false;'));
+  assert.ok(JS.includes("btnPick.addEventListener('click'"));
+  assert.ok(JS.includes("prodFileInput.addEventListener('change'"));
+  assert.ok(JS.includes('_productCropSpec = null;'));
+  assert.ok(JS.includes('XentraCropEditor.open({'));
+  assert.ok(JS.includes("API_BASE + '/admin/media/entity/products/' + encodeURIComponent(savedId) + '/image'"));
+  assert.ok(JS.includes("method: 'POST'"));
+  assert.ok(JS.includes("method: 'DELETE'"));
+  assert.ok(JS.includes("var existingImage = prod.image_url || prod.image || ''"));
+  assert.ok(JS.includes("_productImageRemoved = false;"));
+  assert.ok(JS.includes("original_filename: _productImageFile.name || null"));
+});
+
 test('Master Product primary CTA directly opens the product editor', () => {
   assert.ok(HTML.includes('id="btn-add-product-main">+ Tambah Produk Baru</button>'));
   assert.ok(!HTML.includes('id="btn-add-product-main" onclick="openAddProduct()"'));
