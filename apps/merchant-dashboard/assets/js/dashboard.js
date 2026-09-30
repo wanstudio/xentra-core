@@ -2295,14 +2295,13 @@
   }
 
   function setMasterReferenceTab(type) {
-    var allowed = ['category', 'flavor', 'complement', 'level'];
+    var allowed = ['category', 'flavor', 'complement'];
     _masterReferenceTab = allowed.indexOf(type) !== -1 ? type : 'category';
 
     var panels = {
       category: $('master-reference-category-panel'),
       flavor: $('master-reference-flavor-panel'),
       complement: $('master-reference-complement-panel'),
-      level: $('master-reference-level-panel')
     };
     Object.keys(panels).forEach(function(key) {
       if (panels[key]) panels[key].hidden = _masterReferenceTab !== key;
@@ -2325,7 +2324,6 @@
       category: $('master-categories-page-list'),
       flavor: $('master-flavors-page-list'),
       complement: $('master-complements-page-list'),
-      level: $('master-levels-page-list')
     };
     var requestSeq = ++_masterReferenceLoadSeq;
 
@@ -2837,8 +2835,13 @@
       return;
     }
 
-    var selectedIndex = activeRows.findIndex(function(row) {
-      return String(row.id) === selected;
+    var selectedIndex = -1;
+    activeRows.some(function(row, index) {
+      if (String(row.id) === selected) {
+        selectedIndex = index;
+        return true;
+      }
+      return false;
     });
 
     var html = '<span class="x-master-spice-level-label">Level Pedas</span><span class="x-master-spice-level-segments" role="presentation">';
@@ -4120,14 +4123,6 @@ async function loadMenusView() {
       btnAddComplementPage.dataset.bound = 'true';
       btnAddComplementPage.addEventListener('click', function() {
         openMasterReferenceQuickAdd('complement');
-      });
-    }
-
-    var btnAddLevelPage = $('btn-add-master-level-page');
-    if (btnAddLevelPage && !btnAddLevelPage.dataset.bound) {
-      btnAddLevelPage.dataset.bound = 'true';
-      btnAddLevelPage.addEventListener('click', function() {
-        openMasterReferenceQuickAdd('level');
       });
     }
 
