@@ -1734,13 +1734,12 @@
       <span id="prod-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Produk</span>
     </div>
 
-    <div class="x-card" style="max-width:920px;margin:0 auto;background:#ffffff;border:1px solid var(--border-color);border-radius:12px;padding:20px 22px;">
-      <div style="margin-bottom:18px;">
+    <form id="form-product" class="x-form x-product-editor-form" style="max-width:920px;margin:0 auto;">
+      <div class="x-card x-product-editor-main-card">
+        <div style="margin-bottom:18px;">
         <h3 id="product-editor-title" style="margin:0;font-size:20px;">Tambah Produk Master</h3>
         <p id="prod-editor-subtitle" class="text-muted" style="margin:5px 0 0;font-size:13px;">Susun identitas dan komposisi Master Menu.</p>
       </div>
-      <form id="form-product" class="x-form">
-
         <input type="hidden" id="prod-id" value="">
         <div class="x-form-group">
           <label>Foto Menu</label>
@@ -1877,19 +1876,29 @@
           <textarea id="prod-desc" class="x-input" rows="2" placeholder="Catatan internal produk Master..."></textarea>
         </div>
         <div class="x-form-group">
-          <label>Opsi Penjualan POS <span class="text-muted">(Opsional · konfigurasi POS)</span></label>
-          <div id="prod-options-editor" style="display:flex;flex-direction:column;gap:10px;"></div>
-          <button type="button" id="btn-prod-options-add-group" class="x-btn-secondary" style="margin-top:8px;">+ Tambah Group Opsi</button>
-          <div class="text-muted" style="font-size:11px;margin-top:6px;">Ini konfigurasi penjualan khusus POS, bukan bagian dari komposisi Customer PWA. Variant = pilih satu; Add-on = boleh beberapa.</div>
+          <label for="prod-desc">Deskripsi Internal Master</label>
+          <textarea id="prod-desc" class="x-input" rows="2" placeholder="Catatan internal produk Master..."></textarea>
+        </div>
+      </div>
+
+      <div class="x-card x-product-editor-pos-card">
+        <div class="x-product-editor-pos-card-header">
+          <div>
+            <h3>Opsi Penjualan POS</h3>
+            <p class="text-muted">Opsional · konfigurasi yang digunakan khusus saat penjualan melalui POS.</p>
+          </div>
         </div>
 
-        <div class="x-product-editor-actions" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 0 2px;margin-top:8px;border-top:1px solid #e2e8f0;">
-          <button type="button" class="x-btn-secondary" id="btn-cancel-product-editor">Batal</button>
-          <button type="submit" class="x-btn-primary" id="btn-save-product-editor">Simpan Produk</button>
-        </div>
-      
-      </form>
-    </div>
+        <div id="prod-options-editor" class="x-product-pos-options-editor"></div>
+        <button type="button" id="btn-prod-options-add-group" class="x-btn-secondary x-product-pos-add-group">+ Tambah Group Opsi</button>
+        <p class="x-product-editor-pos-help">Ini tidak mengubah komposisi Customer PWA. Variant = pilih satu; Add-on = boleh beberapa.</p>
+      </div>
+
+      <div class="x-product-editor-actions">
+        <button type="button" class="x-btn-secondary" id="btn-cancel-product-editor">Batal</button>
+        <button type="submit" class="x-btn-primary" id="btn-save-product-editor">Simpan Produk</button>
+      </div>
+    </form>
 
   </section>
       </section>
