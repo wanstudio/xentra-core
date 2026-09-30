@@ -107,6 +107,30 @@ test('Legacy Master Product edit hydrates structured composition from the old ti
   assert.ok(HTML.includes('id="master-legacy-migration-detail"'));
 });
 
+test('Master Product composition uses native selectable chip controls', () => {
+  const start = HTML.indexOf('<section id="tab-catalog-products"');
+  const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
+  const section = HTML.slice(start, end);
+
+  for (const id of ['prod-category-chips', 'prod-flavor-chips', 'prod-complements-editor', 'prod-level-chips']) {
+    assert.ok(section.includes('id="' + id + '"'), 'Missing chip control: ' + id);
+  }
+
+  assert.ok(section.includes('class="x-master-choice-grid"'));
+  assert.ok(section.includes('class="x-master-choice-grid x-master-complement-grid"'));
+  assert.ok(section.includes('class="x-master-choice-grid x-master-level-grid"'));
+
+  // Native selects remain only as hidden state/validation compatibility;
+  // the visible interaction is the chip surface.
+  assert.ok(section.includes('class="x-input x-master-native-select"'));
+  assert.ok(JS.includes('function renderMasterChoiceGrid('));
+  assert.ok(JS.includes('data-master-choice-id'));
+  assert.ok(JS.includes('data-master-complement-id'));
+  assert.ok(JS.includes('class="x-master-choice-chip x-master-choice-add"'));
+  assert.ok(CSS.includes('.x-master-choice-chip.is-selected'));
+  assert.ok(CSS.includes('.x-master-native-select'));
+});
+
 test('Master Product editor keeps Flavor optional and exposes multi-select complements plus Level dropdown', () => {
   const start = HTML.indexOf('<section id="tab-catalog-products"');
   const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
