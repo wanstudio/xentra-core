@@ -4595,7 +4595,7 @@ async function loadMenusView() {
           loadMasterProducts();
           navigateTo('catalog/products/' + encodeURIComponent(savedId), { history: 'replace' });
         } catch (err) {
-          showToast('Gagal menyimpan menu.');
+          showToast('❌ ' + ((err && err.message) || 'Gagal menyimpan menu.'));
         }
       });
     }
