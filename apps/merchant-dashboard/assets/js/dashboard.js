@@ -2426,7 +2426,13 @@
     if (!row) return;
 
     var noun = referenceTypeLabel(type).toLowerCase();
-    if (!confirm('Hapus ' + noun + ' "' + row.name + '"?')) return;
+    if (window.XentraPresentation && !await window.XentraPresentation.confirm({
+      id: 'delete-master-reference',
+      title: 'Hapus ' + referenceTypeLabel(type),
+      message: 'Hapus ' + noun + ' "' + row.name + '"? Tindakan ini tidak dapat dibatalkan.',
+      okLabel: 'Hapus',
+      cancelLabel: 'Batal'
+    })) return;
 
     try {
       var res = await adminFetch(meta.deleteEndpoint(String(id)), {
@@ -3390,7 +3396,13 @@
   };
 
   window.deleteProduct = async function (id) {
-    if (!confirm('Apakah Anda yakin ingin menghapus produk master ini?')) return;
+    if (window.XentraPresentation && !await window.XentraPresentation.confirm({
+      id: 'delete-master-product',
+      title: 'Hapus Produk Master',
+      message: 'Apakah Anda yakin ingin menghapus produk master ini? Tindakan ini tidak dapat dibatalkan.',
+      okLabel: 'Hapus',
+      cancelLabel: 'Batal'
+    })) return;
     try {
       var res = await adminFetch(API_BASE + '/admin/products/' + id, {
         method: 'DELETE',
