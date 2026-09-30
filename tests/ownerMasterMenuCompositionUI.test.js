@@ -83,6 +83,7 @@ test('Master Product image editor binds file state, preserves existing images, a
   assert.ok(JS.includes('var _productImageRemoved = false;'));
   assert.ok(JS.includes("btnPick.addEventListener('click'"));
   assert.ok(JS.includes("prodFileInput.addEventListener('change'"));
+  assert.ok(JS.includes('_productCropSpec = null;'));
   assert.ok(JS.includes('XentraCropEditor.open({'));
   assert.ok(JS.includes("API_BASE + '/admin/media/entity/products/' + encodeURIComponent(savedId) + '/image'"));
   assert.ok(JS.includes("method: 'POST'"));
