@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.22">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.23">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -1758,33 +1758,40 @@
           <div id="master-legacy-migration-detail" style="font-size:11px;line-height:1.45;color:#a16207;margin-top:3px;"></div>
         </div>
 
-        <div class="x-form-group">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+        <div class="x-form-group x-master-choice-group">
+          <div class="x-master-choice-label-row">
             <label for="prod-category" style="margin:0;">Kategori Master <span class="text-muted">(Judul Menu)</span><span class="x-required-mark" aria-hidden="true">*</span></label>
-            <button type="button" class="x-btn-secondary x-master-inline-add" id="btn-add-master-category-from-product" aria-label="Tambah Kategori Master"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+            <button type="button" class="x-btn-secondary x-master-inline-add" id="btn-add-master-category-from-product" aria-label="Tambah Kategori Master"></button>
           </div>
-          <select id="prod-category" class="x-input" required></select>
+          <div id="prod-category-chips" class="x-master-choice-grid" role="radiogroup" aria-label="Pilih Kategori Master"></div>
+          <select id="prod-category" class="x-input x-master-native-select" required aria-hidden="true" tabindex="-1"></select>
         </div>
 
-        <div class="x-form-group">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
+        <div class="x-form-group x-master-choice-group">
+          <div class="x-master-choice-label-row">
             <label for="prod-flavor" style="margin:0;">Rasa <span class="text-muted">(Subtitle Customer · Opsional)</span></label>
-            <button type="button" class="x-btn-secondary x-master-inline-add" id="btn-add-master-flavor-from-product" aria-label="Tambah Rasa Master"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+            <button type="button" class="x-btn-secondary x-master-inline-add" id="btn-add-master-flavor-from-product" aria-label="Tambah Rasa Master"></button>
           </div>
-          <select id="prod-flavor" class="x-input">
+          <div id="prod-flavor-chips" class="x-master-choice-grid" role="radiogroup" aria-label="Pilih Rasa"></div>
+          <select id="prod-flavor" class="x-input x-master-native-select" aria-hidden="true" tabindex="-1">
             <option value="">Tidak ada Rasa</option>
           </select>
         </div>
 
-        <div class="x-form-group">
-          <label style="display:block;margin-bottom:6px;">Kelengkapan <span class="text-muted">(Detail Customer)</span></label>
-          <div id="prod-complements-editor" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:7px;"></div>
-          <div id="prod-complements-empty" class="text-muted" style="font-size:11px;padding:8px 0;">Belum ada Master Kelengkapan.</div>
+        <div class="x-form-group x-master-choice-group">
+          <div class="x-master-choice-label-row">
+            <label style="margin:0;">Kelengkapan <span class="text-muted">(Detail Customer)</span></label>
+          </div>
+          <div id="prod-complements-editor" class="x-master-choice-grid x-master-complement-grid" role="group" aria-label="Pilih Kelengkapan"></div>
+          <div id="prod-complements-empty" class="text-muted x-master-choice-empty">Belum ada Master Kelengkapan.</div>
         </div>
 
-        <div class="x-form-group">
-          <label for="prod-level">Level <span class="text-muted">(Indikator Customer)</span></label>
-          <select id="prod-level" class="x-input">
+        <div class="x-form-group x-master-choice-group">
+          <div class="x-master-choice-label-row">
+            <label for="prod-level" style="margin:0;">Level <span class="text-muted">(Indikator Customer)</span></label>
+          </div>
+          <div id="prod-level-chips" class="x-master-choice-grid x-master-level-grid" role="radiogroup" aria-label="Pilih Level"></div>
+          <select id="prod-level" class="x-input x-master-native-select" aria-hidden="true" tabindex="-1">
             <option value="">Tidak ada Level</option>
           </select>
         </div>
