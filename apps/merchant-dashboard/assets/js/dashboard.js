@@ -438,7 +438,16 @@
       return;
     }
 
-    var isProductDetail = !isPlatform && route.indexOf('catalog/products/') === 0;
+    var isProductEditor = !isPlatform && (
+      route === 'catalog/products/new' ||
+      /^catalog\\/products\\/[^/]+\\/edit$/.test(route)
+    );
+    var productEditorId = isProductEditor && route !== 'catalog/products/new'
+      ? route.split('catalog/products/')[1].split('/edit')[0]
+      : null;
+    var isProductDetail = !isPlatform &&
+      route.indexOf('catalog/products/') === 0 &&
+      !isProductEditor;
     var productDetailId = isProductDetail ? route.split('catalog/products/')[1] : null;
 
     var isBranchDetail = !isPlatform && route.indexOf('branches/') === 0;
@@ -467,7 +476,7 @@
     var isSettingsRoute = !isPlatform && (route === 'settings' || route.indexOf('settings/') === 0);
     var settingsSubtab = isSettingsRoute ? (route.indexOf('settings/') === 0 ? route.split('settings/')[1] : 'business/profile') : 'business/profile';
 
-    var metaKey = isProductDetail ? 'catalog/products' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route))))))));
+    var metaKey = (isProductDetail || isProductEditor) ? 'catalog/products' : (isBranchDetail ? 'branches' : (isOrderDetail ? 'orders' : (isCustomerDetail ? 'customers/:id' : (isTeamRoute ? ('team/' + teamSubtab) : (isReportsRoute ? 'reports' : (isFinanceRoute ? ('finance/' + financeSubtab) : (isMarketingRoute ? ('marketing/' + marketingSubtab) : (isSettingsRoute ? ('settings/' + settingsSubtab) : route))))))));
     var meta = metaDict[metaKey] || metaDict[route] || metaDict['overview'];
     var tabId = meta.tab;
     var isCatalogChild = !isPlatform && route.indexOf('catalog/') === 0;
@@ -527,8 +536,12 @@
     // 5. Update topbar title
     var titleEl = $('dash-page-title');
     var subEl = $('dash-page-subtitle');
-    if (titleEl) titleEl.textContent = isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))));
-    if (subEl) subEl.textContent = isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub))));
+    if (titleEl) titleEl.textContent = isProductEditor
+      ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
+      : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))));)
+    if (subEl) subEl.textContent = isProductEditor
+      ? 'Susun identitas, harga, foto, dan komposisi Master Menu'
+      : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub))));)
 
     // 6. Sync Owner bottom nav active module (no-op on desktop, hidden by CSS)
     syncOwnerBottomNavActive(route);
@@ -594,7 +607,10 @@
     if (isBranchManager()) {
       if (isCatalogChild) loadInlineBranchCatalog();
     } else {
-      if (isProductDetail && productDetailId) {
+      if (isProductEditor) {
+        showProductEditorSection();
+        loadProductEditorPage(productEditorId);
+      } else if (isProductDetail && productDetailId) {
         showProductDetailSection();
         loadProductDetailView(productDetailId);
       } else if (tabId === 'catalog-products') {
@@ -1843,15 +1859,28 @@
   function showProductListSection() {
     var listView = $('product-list-view');
     var detailView = $('product-detail-view');
+    var editorView = $('product-editor-view');
     if (listView) listView.style.display = 'block';
     if (detailView) detailView.style.display = 'none';
+    if (editorView) editorView.style.display = 'none';
   }
 
   function showProductDetailSection() {
     var listView = $('product-list-view');
     var detailView = $('product-detail-view');
+    var editorView = $('product-editor-view');
     if (listView) listView.style.display = 'none';
     if (detailView) detailView.style.display = 'block';
+    if (editorView) editorView.style.display = 'none';
+  }
+
+  function showProductEditorSection() {
+    var listView = $('product-list-view');
+    var detailView = $('product-detail-view');
+    var editorView = $('product-editor-view');
+    if (listView) listView.style.display = 'none';
+    if (detailView) detailView.style.display = 'none';
+    if (editorView) editorView.style.display = 'block';
   }
 
   async function loadMasterProducts() {
