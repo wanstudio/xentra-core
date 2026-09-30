@@ -2676,9 +2676,25 @@
   }
 
   async function loadMasterMenuComponents() {
+    var headers = getAuthHeaders();
     var results = await Promise.all(['flavor', 'complement', 'level'].map(function(type) {
-      return adminFetch(API_BASE + '/admin/menu/components/' + type, { headers: getAuthHeaders() })
-        .then(function(res) { return res.json(); })
+      var prepare = type === 'level'
+        ? adminFetch(API_BASE + '/admin/menu/components/level/ensure-defaults', {
+            method: 'POST',
+            headers: headers
+          }).then(function(res) {
+            return res.json().then(function(data) {
+              if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menyiapkan Level.');
+              return data;
+            });
+          })
+        : Promise.resolve(null);
+
+      return prepare
+        .then(function() {
+          return adminFetch(API_BASE + '/admin/menu/components/' + type, { headers: headers })
+            .then(function(res) { return res.json(); });
+        })
         .then(function(data) {
           if (!data.success) throw new Error(data.error || 'Gagal memuat ' + masterMenuComponentTypeLabel(type) + '.');
           return { type: type, rows: data.components || [] };
@@ -2695,6 +2711,8 @@
 
     renderMasterMenuSelectors();
     renderMasterMenuComponentManager();
+    renderMasterMenuCustomerPreview();
+    return results;
   }
 
   function renderMasterMenuCustomerPreview() {
@@ -3338,7 +3356,6 @@
 
       if (!productId) {
         resetProductEditorForAdd();
-        await loadMasterMenuComponents();
         if (requestSeq === _productEditorLoadSeq) {
           setProductEditorLoading(false);
         }
