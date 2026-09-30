@@ -8851,16 +8851,48 @@ input[type="file"].x-input,
   pointer-events:none !important;
 }
 
-.x-master-choice-group .x-master-inline-add {
-  position:absolute;
-  width:1px;
-  height:1px;
+.x-master-select-with-add {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 50px;
+  gap:10px;
+  align-items:center;
+}
+
+.x-master-select-with-add .x-input {
+  width:100%;
+  min-height:46px;
+  margin:0;
+}
+
+.x-master-select-add {
+  width:50px;
+  height:46px;
   padding:0;
-  margin:-1px;
-  overflow:hidden;
-  clip:rect(0,0,0,0);
-  white-space:nowrap;
-  border:0;
+  border:1px solid #d8d8d8;
+  border-radius:9px;
+  background:#fff;
+  color:#111827;
+  font:inherit;
+  font-size:22px;
+  font-weight:400;
+  line-height:1;
+  cursor:pointer;
+  appearance:none;
+  -webkit-tap-highlight-color:transparent;
+}
+
+.x-master-select-add:hover {
+  border-color:#b9b9b9;
+  background:#fafafa;
+}
+
+.x-master-select-add:active {
+  transform:scale(.97);
+}
+
+.x-master-select-add:focus-visible {
+  outline:2px solid #111827;
+  outline-offset:2px;
 }
 
 .x-master-spice-level {
