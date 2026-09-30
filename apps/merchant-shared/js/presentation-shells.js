@@ -119,6 +119,47 @@
     return entry;
   }
 
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function confirm(options) {
+    options = options || {};
+    return new Promise(function (resolve) {
+      var content = document.createElement('div');
+      content.className = 'x-presentation-confirm-content';
+      content.innerHTML =
+        '<div class="x-presentation-confirm-header">' +
+          '<h3>' + escapeHtml(options.title || 'Konfirmasi') + '</h3>' +
+          '<p>' + escapeHtml(options.message || 'Apakah Anda yakin?') + '</p>' +
+        '</div>' +
+        '<div class="x-presentation-confirm-actions">' +
+          '<button type="button" class="x-btn-secondary" data-confirm-cancel>' + escapeHtml(options.cancelLabel || 'Batal') + '</button>' +
+          '<button type="button" class="x-btn-primary" data-confirm-ok>' + escapeHtml(options.okLabel || 'Lanjutkan') + '</button>' +
+        '</div>';
+
+      open({
+        id: options.id || ('confirm-' + Date.now()),
+        type: 'dialog',
+        content: content,
+        dismissible: false,
+        onOpen: function () {
+          function finish(value) {
+            closeTop();
+            resolve(value);
+          }
+          content.querySelector('[data-confirm-cancel]').addEventListener('click', function () { finish(false); });
+          content.querySelector('[data-confirm-ok]').addEventListener('click', function () { finish(true); });
+        }
+      });
+    });
+  }
+
   document.addEventListener('keydown', function (event) {
     if (event.key === 'Escape' && stack.length) {
       var entry = stack[stack.length - 1];
@@ -129,6 +170,7 @@
 
   window.XentraPresentation = {
     open: open,
+    confirm: confirm,
     close: close,
     closeTop: closeTop,
     isOpen: function (id) { return !!getEntry(id); },
