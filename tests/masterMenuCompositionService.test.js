@@ -35,6 +35,20 @@ test('Master component create/list is Brand-scoped', () => {
   db.prepare('DELETE FROM menu_flavors WHERE id = ?').run(created.id);
 });
 
+test('Default Master Levels are provisioned only for brands without levels', () => {
+  const first = MasterMenuCompositionService.ensureDefaultLevels({ brandId: BRAND_B });
+  assert.deepEqual(first.map(row => row.name), [
+    '1 — Tidak Pedas',
+    '2 — Pedas Sedang',
+    '3 — Pedas Banget'
+  ]);
+
+  const second = MasterMenuCompositionService.ensureDefaultLevels({ brandId: BRAND_B });
+  assert.deepEqual(second.map(row => row.id), first.map(row => row.id));
+
+  db.prepare('DELETE FROM menu_levels WHERE brand_id = ?').run(BRAND_B);
+});
+
 test('Master Product composition is saved as structured relations', () => {
   const composition = MasterMenuCompositionService.saveComposition({
     brandId: BRAND_A, productId: PRODUCT, categoryId: CATEGORY_A, flavorId: FLAVOR,
