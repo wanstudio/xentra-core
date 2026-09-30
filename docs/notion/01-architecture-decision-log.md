@@ -228,6 +228,18 @@ Karena itu:
 > - Non-NULL override = Branch value wins via `COALESCE` at query time.
 > - Legacy snapshot columns are retained for backward compatibility but are not the resolution path.
 > - The business invariant "adoption ≠ live dependency" is preserved: branches explicitly set overrides;
+
+### 30 September 2026 — Branch Customer Display Name Override (LOCKED)
+
+For an adopted Master Product, Merchant may optionally set one Branch-scoped Customer display-name override:
+- storage: `branch_products.name_override TEXT NULL`;
+- non-empty string: replace the Customer menu title for that Branch;
+- NULL / cleared: inherit the live Master Customer presentation automatically;
+- keeps the same `product_id` and Master Product identity;
+- does not alter Master Category, Rasa, Kelengkapan, Level, image, price, or composition;
+- endpoint: `PATCH /api/v1/admin/branches/:id/menu/:productId/display-name`.
+
+Legacy `description_override` and `image_override` remain quarantined.
 >   master propagation only applies when no override is present.
 > - Endpoint: `PATCH /api/v1/admin/branches/:id/products/:productId/override`
 
