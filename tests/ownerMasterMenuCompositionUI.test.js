@@ -136,6 +136,42 @@ test('Master Product composition uses the correct control type per field', () =>
   assert.ok(CSS.includes('.x-master-spice-level-segment.is-filled'));
 });
  
+test('Master Product empty references remain create-only and actionable', () => {
+  const start = HTML.indexOf('<section id="tab-catalog-products"');
+  const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
+  const section = HTML.slice(start, end);
+
+  // Product Editor may create a missing reference, but must not expose
+  // edit/delete controls for reference masters from inside the product form.
+  assert.ok(section.includes('id="btn-add-master-category-from-product"'));
+  assert.ok(section.includes('id="btn-add-master-flavor-from-product"'));
+  assert.ok(section.includes('data-master-choice-add="1"'));
+  assert.ok(section.includes('Tambah Kelengkapan'));
+  assert.ok(!section.includes('Aksi kategori'));
+  assert.ok(!section.includes('Aksi rasa'));
+  assert.ok(!section.includes('Aksi kelengkapan'));
+  assert.ok(!section.includes('Hapus Kategori'));
+  assert.ok(!section.includes('Hapus Rasa'));
+  assert.ok(!section.includes('Hapus Kelengkapan'));
+
+  // Empty state must present the + affordance rather than a dead-end message.
+  assert.ok(section.includes('id="prod-complements-editor"'));
+  assert.ok(!section.includes('Belum ada Master Kelengkapan.'));
+  assert.ok(JS.includes('Empty Master Kelengkapan is still an actionable state'));
+});
+
+test('Adding a Master Complement from Product Editor auto-selects it', () => {
+  const start = JS.indexOf('async function saveMasterReferenceQuickAdd()');
+  const end = JS.indexOf('var _productOptionsDraft = [];', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = JS.slice(start, end);
+
+  assert.ok(handler.includes("type === 'complement'"));
+  assert.ok(handler.includes('_masterMenuSelected.complement_ids.indexOf(newComplementId)'));
+  assert.ok(handler.includes('_masterMenuSelected.complement_ids.push(newComplementId)'));
+  assert.ok(handler.includes('renderMasterMenuSelectors();'));
+});
+
 test('Master Product editor keeps Flavor optional and exposes multi-select complements plus horizontal Level Pedas selector', () => {
   const start = HTML.indexOf('<section id="tab-catalog-products"');
   const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
