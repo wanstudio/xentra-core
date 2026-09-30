@@ -40,7 +40,16 @@ function resolveLevelIndicatorLevel(level) {
   return null;
 }
 
-function resolveProductView({ product, flavor, complements, level, branchState = null, categories = [] }) {
+function resolveProductView({
+  product,
+  flavor,
+  complements,
+  level,
+  branchState = null,
+  categories = [],
+  displayNameOverride = null,
+  exposeBranchPresentationOverrides = false
+}) {
   if (!product.category_id || !product.category_name || product.category_is_active === 0) return null;
 
   // Inactive Master components cannot be selected for new compositions, but
@@ -50,11 +59,13 @@ function resolveProductView({ product, flavor, complements, level, branchState =
   const activeLevel = level || null;
   const activeComplements = complements || [];
   const branchAvailable = branchState ? branchState.is_available !== 0 : true;
+  const hasDisplayNameOverride = typeof displayNameOverride === 'string' && displayNameOverride.trim() !== '';
+  const customerTitle = hasDisplayNameOverride ? displayNameOverride.trim() : product.category_name;
 
   return {
     product_id: product.id,
     id: product.id,
-    title: product.category_name,
+    title: customerTitle,
     subtitle: activeFlavor ? activeFlavor.name : null,
     detail: activeComplements.map(c => c.name),
     indicator: activeLevel ? activeLevel.name : null,
@@ -76,6 +87,9 @@ function resolveProductView({ product, flavor, complements, level, branchState =
     availability: branchAvailable,
     categories: categories.map(c => ({ id: c.branch_category_id, name: c.name, slug: c.slug })),
     options: ProductOptionsModel.normalizeConfig(product.options_config),
+    ...(exposeBranchPresentationOverrides ? {
+      display_name_override: hasDisplayNameOverride ? displayNameOverride.trim() : null
+    } : {}),
     master: {
       name: product.name,
       slug: product.slug,
