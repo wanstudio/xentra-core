@@ -29,7 +29,7 @@ async function main() {
     ? (verify
       ? ProductMenuMigrationService.verifyProduct({ brandId, productId })
       : ProductMenuMigrationService.reconcileProduct({ brandId, productId, apply, persistReport: apply }))
-    : ProductMenuMigrationService.reconcileBrand({ brandId, verify, apply, persistReport: apply }));
+    : ProductMenuMigrationService.reconcileBrand({ brandId, verify, apply, persistReport: apply });
 
   const mode = verify ? 'verify' : apply ? 'apply' : 'dry-run';
   process.stdout.write(JSON.stringify({ mode, verify, apply, result }, null, 2) + '\n');
