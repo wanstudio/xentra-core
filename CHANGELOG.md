@@ -1,3 +1,7 @@
+## 2026-09-30
+
+- Added the locked Branch Customer Display Name Override: optional branch-scoped `branch_products.name_override`, with NULL/cleared state inheriting live Master Customer presentation and canonical Merchant transport at `/admin/branches/:id/menu/:productId/display-name`.
+
 ## [Unreleased] - 2026-09-22
 ### Merchant App frontend extraction + test runtime alignment
 - **Merchant App extracted as a standalone frontend entry point.** `apps/merchant-app/` serves the Branch Manager operating surface (Hari Ini, Order Center, Meja, Menu, Stok, Promo, Staff, Jam Operasional, Laporan) as its own document/script, booting independently at `/merchant-app`. Owner and Platform surfaces remain in `apps/merchant-dashboard`; no backend, domain, RBAC or API contract changed.
