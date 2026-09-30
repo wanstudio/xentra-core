@@ -303,7 +303,7 @@ class MasterMenuCompositionRepository {
 
   replaceComposition({ brandId, productId, categoryId, flavorId = null, complementIds = [], levelId = null }) {
     const product = this.db.queryOne(
-      'SELECT id, brand_id FROM products WHERE id = ? AND brand_id = ?',
+      'SELECT id, brand_id, category_id FROM products WHERE id = ? AND brand_id = ?',
       [productId, brandId]
     );
     if (!product) {
