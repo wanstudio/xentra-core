@@ -172,7 +172,11 @@ test('Customer preview is driven by structured selections, not free-text composi
   assert.ok(JS.includes("_masterMenuComponents.level.find"));
   assert.ok(JS.includes("categorySelect.addEventListener('change'"));
   assert.ok(JS.includes("flavorSelect.addEventListener('change'"));
-  assert.ok(JS.includes("levelSelect.addEventListener('change'"));
+  assert.ok(JS.includes('function renderMasterLevelSelector('));
+  assert.ok(JS.includes('x-master-spice-level-segment'));
+  assert.ok(HTML.includes('id="prod-level-chips"'));
+  assert.ok(HTML.includes('<input type="hidden" id="prod-level"'));
+  assert.ok(!HTML.includes('<select id="prod-level"'), 'Level Pedas must not use a dropdown');
   assert.ok(JS.includes("priceInput.addEventListener('input'"));
   assert.ok(JS.includes("renderMasterMenuCustomerPreview();"));
 });
@@ -254,4 +258,20 @@ test('Master Product editor stays inside Catalog Products tab and remains mobile
     const form = HTML.slice(editorStart, editorEnd);
     assert.ok(!form.includes(legacyField), 'Legacy field leaked into Owner Master Product UI: ' + legacyField);
   }
+});
+
+
+test('Level Pedas uses a compact progressive selector, not a dropdown', () => {
+  assert.ok(HTML.includes('aria-label="Pilih Level Pedas"'));
+  assert.ok(JS.includes('data-master-level-id'));
+  assert.ok(JS.includes('selectedIndex >= 0 && index <= selectedIndex'));
+  assert.ok(CSS.includes('.x-master-spice-level'));
+  assert.ok(CSS.includes('.x-master-spice-level-segment.is-filled'));
+  assert.ok(!CSS.includes('.x-master-level-grid'));
+});
+
+test('Master Kategori page does not expose Level as a category tab', () => {
+  assert.ok(HTML.includes('id="master-reference-tabs"'));
+  assert.ok(!HTML.includes('data-master-reference-tab="level"'));
+  assert.ok(!HTML.includes('id="master-reference-level-panel"'));
 });
