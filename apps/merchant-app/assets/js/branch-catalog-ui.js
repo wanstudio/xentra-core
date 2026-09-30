@@ -4,10 +4,10 @@
  * Branch Manager UI only. API/data transport is provided by
  * merchant-shared/js/catalog-client.js.
 
- * LEGACY QUARANTINE (2026-09-29):
- * Branch/Product content override UI and API are compatibility-only.
- * Do not extend name/description/image override behavior. The forward Menu
- * architecture uses Owner-owned structured Master Menu Composition.
+ * Branch content override compatibility remains for legacy fields. The narrow
+ * Customer display-name override is now canonical and is edited from the Merchant
+ * Menu action surface via the dedicated display-name endpoint. Description/image
+ * override behavior remains legacy compatibility only.
  */
 (function () {
   'use strict';
