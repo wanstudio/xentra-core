@@ -78,6 +78,14 @@ class ProductMenuMigrationRepository {
 
   recordCanonicalSaved({ brandId, productId, composition, canonicalFingerprint: suppliedFingerprint = null, notes = null }) {
     const canonicalFingerprint = suppliedFingerprint || canonicalFingerprintFor(composition);
+    const current = this.db.queryOne(
+      'SELECT menu_schema_version FROM products WHERE id = ? AND brand_id = ?',
+      [productId, brandId]
+    );
+    const sourceSchema = current && Number(current.menu_schema_version) === 2
+      ? TARGET_SCHEMA
+      : 'legacy';
+
     this.db.execute(
       'INSERT INTO product_menu_migrations (' +
       'product_id, brand_id, source_schema, target_schema, status, ' +
@@ -91,7 +99,7 @@ class ProductMenuMigrationRepository {
       'canonical_fingerprint = excluded.canonical_fingerprint, last_error = NULL, ' +
       'notes = excluded.notes, migrated_at = datetime(\'now\'), verified_at = NULL, ' +
       'updated_at = datetime(\'now\')',
-      [productId, brandId, TARGET_SCHEMA, canonicalFingerprint, notes]
+      [productId, brandId, sourceSchema, TARGET_SCHEMA, canonicalFingerprint, notes]
     );
 
     this.db.execute(
