@@ -219,6 +219,20 @@ class MasterMenuCompositionRepository {
     );
   }
 
+  findBranchProductDisplayNameOverrides({ brandId, branchId, productIds = [] }) {
+    const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : [])
+      .map(v => String(v || '').trim()).filter(Boolean)));
+    if (!ids.length) return [];
+    const placeholders = ids.map(() => '?').join(',');
+    return this.db.queryMany(
+      `SELECT bp.product_id, bp.name_override
+       FROM branch_products bp
+       JOIN products p ON p.id = bp.product_id AND p.brand_id = ?
+       WHERE bp.branch_id = ? AND bp.product_id IN (${placeholders})`,
+      [brandId, branchId, ...ids]
+    );
+  }
+
   findBranchProductStates({ brandId, branchId, productIds = [] }) {
     const ids = Array.from(new Set((Array.isArray(productIds) ? productIds : []).map(v => String(v || '').trim()).filter(Boolean)));
     if (!ids.length) return [];
