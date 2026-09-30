@@ -8859,8 +8859,8 @@ async function loadMenusView() {
     page.appendChild(card);
     ensureOwnerFeatureMobileHeader(
       page,
-      $('modal-mkt-promo-title') ? $('modal-mkt-promo-title').textContent : 'Editor Promosi',
-      'Atur program promosi, benefit pelanggan, dan tampilan promo.',
+      $('modal-marketing-banner-title') ? $('modal-marketing-banner-title').textContent : 'Editor Banner',
+      'Atur konten, penempatan, jadwal, dan publikasi banner.',
       'Kembali ke Marketing'
     );
     card.classList.add('x-feature-page-surface');
@@ -10582,8 +10582,8 @@ async function loadMenusView() {
     page.appendChild(card);
     ensureOwnerFeatureMobileHeader(
       page,
-      $('modal-marketing-banner-title') ? $('modal-marketing-banner-title').textContent : 'Editor Banner',
-      'Atur konten, penempatan, jadwal, dan publikasi banner.',
+      $('modal-mkt-promo-title') ? $('modal-mkt-promo-title').textContent : 'Editor Promosi',
+      'Atur program promosi, benefit pelanggan, dan tampilan promo.',
       'Kembali ke Marketing'
     );
     card.classList.add('x-feature-page-surface');
