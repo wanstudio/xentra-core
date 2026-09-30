@@ -215,8 +215,9 @@
   }
 
   /* =========================================================================
-     ROUTING — HASH-BASED URL ROUTER
-     URL is the source of truth for active navigation state.
+     ROUTING — HASH URL ADAPTER
+     The URL remains deep-linkable, while owner-navigation.js owns the canonical
+     application stack persisted in history.state.
      Pattern: /dashboard#<route>   e.g. #overview, #organizations
      ========================================================================= */
 
@@ -380,15 +381,11 @@
   window.openMobileSidebar = openMobileSidebar;
 
   // ---------------------------------------------------------------------------
-  // Owner SPA navigation stack
+  // Owner navigation configuration
   //
-  // Root/tab navigation replaces the current app entry. Child navigation pushes
-  // one explicit app entry. Back then traverses exactly one app-managed level.
+  // The actual stack/history engine lives in owner-navigation.js. This surface
+  // only describes its route tree and provides the renderer.
   // ---------------------------------------------------------------------------
-  var _ownerNavigationReady = false;
-  var _ownerNavigationIgnoreNextHashChange = false;
-  var OWNER_NAV_STATE_KEY = '__xentraOwnerNavigation';
-
   var OWNER_ROUTE_ALIASES = {
     'overview': 'overview',
     'orders': 'orders',
@@ -421,108 +418,109 @@
   };
 
   function canonicalizeOwnerRoute(route) {
-    return OWNER_ROUTE_ALIASES[route] || route;
+    var value = String(route || '');
+    if (isPlatformContext()) return value;
+    return OWNER_ROUTE_ALIASES[value] || value;
   }
 
   function isOwnerRootRoute(route) {
+    if (isPlatformContext()) return true;
     return !!OWNER_ROOT_ROUTES[route];
   }
 
-  function makeOwnerNavigationState(route, index, parentRoute) {
-    return {
-      [OWNER_NAV_STATE_KEY]: true,
-      route: route,
-      index: Number(index) || 0,
-      parentRoute: parentRoute || null
-    };
-  }
+  function ownerParentRoute(route) {
+    if (isPlatformContext()) return null;
 
-  function ensureOwnerNavigationHistory(route) {
-    var canonicalRoute = canonicalizeOwnerRoute(route || getCurrentRoute() || 'overview');
-    var state = window.history && window.history.state;
-    var ownerState = state && state[OWNER_NAV_STATE_KEY];
+    var current = canonicalizeOwnerRoute(route || '');
 
-    if (!ownerState || ownerState.route !== canonicalRoute) {
-      var baseState = (state && typeof state === 'object') ? state : {};
-      window.history.replaceState(
-        Object.assign({}, baseState, makeOwnerNavigationState(canonicalRoute, 0, null)),
-        '',
-        '#' + canonicalRoute
-      );
+    if (current === 'catalog/products/new' ||
+        /^catalog\/products\/[^/]+\/edit$/.test(current) ||
+        /^catalog\/products\/[^/]+$/.test(current)) {
+      return 'catalog/products';
     }
 
-    _ownerNavigationReady = true;
+    if (current === 'catalog/products' ||
+        current === 'catalog/categories' ||
+        current === 'catalog/menus') {
+      return 'business';
+    }
+
+    if (current === 'branches') return 'business';
+    if (current === 'branches/new' ||
+        /^branches\/[^/]+\/edit$/.test(current) ||
+        /^branches\/[^/]+(?:\/[^/]+)?$/.test(current)) {
+      return 'branches';
+    }
+
+    if (current === 'orders') return null;
+    if (current.indexOf('orders/') === 0) return 'orders';
+
+    if (current === 'customers') return 'business';
+    if (current.indexOf('customers/') === 0) return 'customers';
+
+    if (current === 'stock') return 'business';
+
+    if (current === 'team') return 'business';
+    if (current.indexOf('team/') === 0) return 'team';
+
+    if (current === 'reports') return 'business';
+    if (current.indexOf('reports/') === 0) return 'reports';
+
+    if (current === 'finance/overview') return null;
+    if (current === 'finance') return 'business';
+    if (current.indexOf('finance/') === 0) return 'finance/overview';
+
+    if (current === 'marketing/promotions') return 'business';
+    if (current.indexOf('marketing/') === 0) return 'marketing/promotions';
+
+    if (current === 'settings') return 'more';
+    if (current.indexOf('settings/') === 0) return 'settings';
+
+    if (current === 'brand') return 'business';
+    if (current === 'payments') return 'more';
+
+    return null;
+  }
+
+  function configureOwnerNavigationEngine() {
+    if (!window.XentraNavigationController) {
+      throw new Error('XentraNavigationController is not loaded');
+    }
+
+    window.XentraNavigationController.configure({
+      canonicalize: canonicalizeOwnerRoute,
+      isRootRoute: isOwnerRootRoute,
+      parentRoute: ownerParentRoute,
+      defaultRoute: isPlatformContext() ? 'overview' : 'overview',
+      getRoute: getCurrentRoute,
+      renderRoute: applyRoute
+    });
+  }
+
+  function ensureOwnerNavigationHistory() {
+    configureOwnerNavigationEngine();
+    window.XentraNavigationController.initialize();
   }
 
   function navigateTo(route, options) {
     if (!route) return;
     closeMobileSidebar();
-
-    var canonicalRoute = canonicalizeOwnerRoute(route);
-    var opts = options || {};
-    var currentRoute = canonicalizeOwnerRoute(getCurrentRoute() || '');
-
-    if (!_ownerNavigationReady) {
-      ensureOwnerNavigationHistory(currentRoute || canonicalRoute);
-    }
-
-    if (currentRoute === canonicalRoute) {
-      applyRoute(canonicalRoute);
-      return;
-    }
-
-    var currentState = window.history && window.history.state;
-    var currentOwnerState = currentState && currentState[OWNER_NAV_STATE_KEY];
-    var currentIndex = currentOwnerState ? Number(currentOwnerState.index || 0) : 0;
-
-    var rootNavigation = opts.history === 'root' ||
-      (!opts.history && isOwnerRootRoute(canonicalRoute));
-    var replaceNavigation = opts.history === 'replace';
-    var pushNavigation = opts.history === 'push' ||
-      (!opts.history && !isOwnerRootRoute(canonicalRoute));
-
-    if (rootNavigation) {
-      window.history.replaceState(
-        Object.assign(
-          {},
-          (currentState && typeof currentState === 'object') ? currentState : {},
-          makeOwnerNavigationState(canonicalRoute, 0, null)
-        ),
-        '',
-        '#' + canonicalRoute
-      );
-    } else if (replaceNavigation) {
-      window.history.replaceState(
-        Object.assign(
-          {},
-          (currentState && typeof currentState === 'object') ? currentState : {},
-          makeOwnerNavigationState(
-            canonicalRoute,
-            currentIndex,
-            currentOwnerState ? currentOwnerState.parentRoute : null
-          )
-        ),
-        '',
-        '#' + canonicalRoute
-      );
-    } else if (pushNavigation) {
-      var parentRoute = currentOwnerState && currentOwnerState.route
-        ? currentOwnerState.route
-        : currentRoute;
-      window.history.pushState(
-        Object.assign(
-          {},
-          (currentState && typeof currentState === 'object') ? currentState : {},
-          makeOwnerNavigationState(canonicalRoute, currentIndex + 1, parentRoute)
-        ),
-        '',
-        '#' + canonicalRoute
-      );
-    }
-
-    applyRoute(canonicalRoute);
+    configureOwnerNavigationEngine();
+    window.XentraNavigationController.navigate(route, options);
   }
   window.navigateTo = navigateTo;
+
+  // Canonical Back for every Owner child Page. Individual pages only call this
+  // adapter; stack semantics stay entirely inside the navigation engine.
+  window.goBackFromChildPage = function () {
+    configureOwnerNavigationEngine();
+    window.XentraNavigationController.back();
+  };
+
+  // Compatibility aliases for existing markup/callers.
+  window.goBackFromMasterProducts = window.goBackFromChildPage;
+  window.goBackFromCategory = window.goBackFromChildPage;
+  window.goBackFromCatalogChild = window.goBackFromChildPage;
 
   // Render Platform Navigation in Sidebar
   function renderPlatformNavigation() {
@@ -829,23 +827,6 @@
       }
     }
   }
-
-  // Browser Back/Forward traverses the app's explicit navigation stack.
-  window.addEventListener('popstate', function () {
-    _ownerNavigationIgnoreNextHashChange = true;
-    applyRoute(getCurrentRoute());
-  });
-
-  // Manual/direct hash edits remain supported. A history traversal may also emit
-  // hashchange, so consume the duplicate notification once.
-  window.addEventListener('hashchange', function () {
-    if (_ownerNavigationIgnoreNextHashChange) {
-      _ownerNavigationIgnoreNextHashChange = false;
-      return;
-    }
-    ensureOwnerNavigationHistory(getCurrentRoute());
-    applyRoute(getCurrentRoute());
-  });
 
   // switchTab kept for backward compat (called from quick-action buttons in HTML)
   function switchTab(tabId) {
@@ -8147,57 +8128,6 @@ async function loadMenusView() {
       if (dropdown && !dropdown.contains(e.target)) closeFinanceFilter(kind);
     });
   });
-
-  // Canonical Back behavior for Owner secondary/child pages.
-  // Route structure is authoritative for known child surfaces; history.state
-  // remains the fallback for generic secondary pages. This prevents a malformed
-  // or reset browser state from making Product Editor jump back to Business.
-  function ownerChildParentRoute(route) {
-    var current = canonicalizeOwnerRoute(route || '');
-    if (
-      current === 'catalog/products/new' ||
-      /^catalog\/products\/[^/]+\/edit$/.test(current) ||
-      (current.indexOf('catalog/products/') === 0 && current !== 'catalog/products')
-    ) {
-      return 'catalog/products';
-    }
-    if (
-      current === 'branches/new' ||
-      /^branches\/[^/]+\/edit$/.test(current) ||
-      (current.indexOf('branches/') === 0 && current !== 'branches')
-    ) {
-      return 'branches';
-    }
-    if (current.indexOf('orders/') === 0 && current !== 'orders') return 'orders';
-    if (current.indexOf('customers/') === 0 && current !== 'customers') return 'customers';
-    return null;
-  }
-
-  window.goBackFromChildPage = function () {
-    var state = window.history && window.history.state;
-    var ownerState = state && state[OWNER_NAV_STATE_KEY];
-    var currentRoute = ownerState && ownerState.route
-      ? canonicalizeOwnerRoute(ownerState.route)
-      : canonicalizeOwnerRoute(getCurrentRoute() || '');
-
-    var explicitParent = ownerChildParentRoute(currentRoute);
-    var stateParent = ownerState && ownerState.parentRoute
-      ? canonicalizeOwnerRoute(ownerState.parentRoute)
-      : null;
-    var parentRoute = explicitParent || (stateParent && stateParent !== currentRoute ? stateParent : null);
-
-    if (parentRoute) {
-      navigateTo(parentRoute, { history: 'root' });
-      return;
-    }
-
-    navigateTo('business', { history: 'root' });
-  };
-
-  // Compatibility aliases kept for existing markup/tests and legacy callers.
-  window.goBackFromMasterProducts = window.goBackFromChildPage;
-  window.goBackFromCategory = window.goBackFromChildPage;
-  window.goBackFromCatalogChild = window.goBackFromChildPage;
 
   function closeFinanceDropdown() {
     var d = $('finance-section-dropdown');

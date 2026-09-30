@@ -9,11 +9,13 @@ const HTML_PATH = path.join(__dirname, '../apps/merchant-dashboard/index.html');
 const CSS_PATH = path.join(__dirname, '../apps/merchant-shared/css/dashboard.css');
 const JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/dashboard.js');
 const NAV_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/owner-bottom-nav.js');
+const NAV_ENGINE_JS_PATH = path.join(__dirname, '../apps/merchant-dashboard/assets/js/owner-navigation.js');
 
 const html = fs.readFileSync(HTML_PATH, 'utf8');
 const css = fs.readFileSync(CSS_PATH, 'utf8');
 const js = fs.readFileSync(JS_PATH, 'utf8');
 const navJs = fs.readFileSync(NAV_JS_PATH, 'utf8');
+const navEngineJs = fs.readFileSync(NAV_ENGINE_JS_PATH, 'utf8');
 
 test('Owner Dashboard Mobile Navigation', async t => {
 
@@ -208,57 +210,166 @@ test('Owner Dashboard Mobile Navigation', async t => {
   // --------------------------------------------------------------------------
   // CSS
   // --------------------------------------------------------------------------
-  await t.test('OWNER-MOB-14C: Product Editor Back is deterministic even without browser history state', () => {
-    assert.ok(js.includes('function ownerChildParentRoute(route)'),
-      'Owner child parent resolver must exist');
-
-    const start = js.indexOf('function ownerChildParentRoute(route)');
-    const end = js.indexOf('\n  window.goBackFromChildPage = function ()', start);
-    const resolver = js.slice(start, end);
-
-    assert.ok(resolver.includes("current === 'catalog/products/new'"),
-      'Add Product must have an explicit parent route');
-    assert.ok(resolver.includes("return 'catalog/products';"),
-      'Product child routes must return to Product Master');
-
-    const backStart = js.indexOf('window.goBackFromChildPage = function ()');
-    const backEnd = js.indexOf('\n  // Compatibility aliases', backStart);
-    const back = js.slice(backStart, backEnd);
-
-    assert.ok(back.includes('var explicitParent = ownerChildParentRoute(currentRoute)'));
-    assert.ok(back.includes('var parentRoute = explicitParent ||'));
-    assert.ok(back.includes("navigateTo(parentRoute, { history: 'root' });"));
-    assert.ok(!back.includes("window.history.back()"),
-      'Child Back must not rely on raw browser history traversal');
+  await t.test('OWNER-MOB-14C: centralized navigation engine is loaded before dashboard router', () => {
+    assert.ok(html.includes('/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0'),
+      'Owner Dashboard must load the centralized navigation engine');
+    assert.ok(navEngineJs.includes('window.XentraNavigationController ='),
+      'Navigation engine must expose one canonical controller');
+    assert.ok(navEngineJs.includes('function navigate(route, options)'),
+      'Engine must own route transition semantics');
+    assert.ok(navEngineJs.includes('function back()'),
+      'Engine must own Back semantics');
+    assert.ok(navEngineJs.includes('function syncFromLocation()'),
+      'Engine must synchronize manual/direct URL changes');
   });
 
-  await t.test('OWNER-MOB-14D: canonical router owns explicit parent-child navigation history', () => {
-    assert.ok(js.includes("OWNER_NAV_STATE_KEY = '__xentraOwnerNavigation'"));
-    assert.ok(js.includes('function ensureOwnerNavigationHistory(route)'));
-    assert.ok(js.includes('window.history.pushState('),
-      'Child navigation must push an explicit app history state');
-    assert.ok(js.includes('window.history.replaceState('),
-      'Root and replacement navigation must not accumulate child history');
-    assert.ok(js.includes("var OWNER_ROOT_ROUTES = {"),
-      'Top-level destinations must be explicitly classified');
-    assert.ok(js.includes("overview: true") && js.includes("business: true") &&
-              js.includes("orders: true") && js.includes("more: true"),
-      'Bottom-nav/root destinations must be classified as root navigation');
+  await t.test('OWNER-MOB-14D: dashboard no longer owns page-specific history mutations', () => {
+    const navStart = js.indexOf('function configureOwnerNavigationEngine()');
+    const navEnd = js.indexOf('  // Render Platform Navigation in Sidebar', navStart);
+    const navBlock = js.slice(navStart, navEnd);
 
-    const backStart = js.indexOf('window.goBackFromChildPage = function ()');
-    const backEnd = js.indexOf('// Compatibility aliases kept', backStart);
-    const backBody = js.slice(backStart, backEnd);
-    assert.ok(backBody.includes("ownerState.parentRoute"),
-      'Child Back must consult the app-managed parent route');
-    assert.ok(!backBody.includes('window.history.length'),
-      'Child Back must not use browser history length as its navigation contract');
-    assert.ok(backBody.includes("navigateTo('business', { history: 'root' })"),
-      'Direct/deep child links must have a deterministic Business root fallback');
+    assert.ok(navBlock.includes('XentraNavigationController.configure'),
+      'Dashboard must configure the centralized engine');
+    assert.ok(navBlock.includes('XentraNavigationController.navigate'),
+      'Dashboard navigateTo must delegate to the engine');
+    assert.ok(navBlock.includes('XentraNavigationController.back'),
+      'Dashboard Back must delegate to the engine');
+    assert.equal((navBlock.match(/window\.history\.(pushState|replaceState|back|go)\(/g) || []).length, 0,
+      'Dashboard navigation adapter must not mutate browser history directly');
+    assert.ok(!js.includes('OWNER_NAV_STATE_KEY'),
+      'Navigation state storage must not live in the monolithic dashboard router');
+    assert.ok(!js.includes('function commitOwnerBackRoute'),
+      'Page-specific Back commit helper must be removed');
+  });
 
-    assert.ok(js.includes("navigateTo('catalog/products/' + encodeURIComponent(savedId), { history: 'replace' })"),
-      'Saving a product must replace the editor entry with the resulting detail page');
-    assert.ok(js.includes("navigateTo('catalog/products', { history: 'replace' })"),
-      'Cancelling the Product Editor must replace the editor entry');
+  await t.test('OWNER-MOB-14E: route hierarchy is centralized in one navigation configuration', () => {
+    const navStart = js.indexOf('var OWNER_ROUTE_ALIASES = {');
+    const navEnd = js.indexOf('function configureOwnerNavigationEngine()', navStart);
+    const configBlock = js.slice(navStart, navEnd);
+
+    for (const route of [
+      "catalog/products/new",
+      "catalog/products",
+      "catalog/categories",
+      "branches",
+      "customers",
+      "orders",
+      "reports",
+      "team",
+      "stock",
+      "finance/overview",
+      "marketing/promotions",
+      "settings",
+      "business",
+      "more"
+    ]) {
+      assert.ok(configBlock.includes(route),
+        'Navigation route hierarchy must know "' + route + '"');
+    }
+    assert.ok(configBlock.includes("return 'catalog/products';"),
+      'Add Product must resolve to Product Master');
+    assert.ok(configBlock.includes("return 'business';"),
+      'Business-owned child pages must resolve to Business');
+  });
+
+  await t.test('OWNER-MOB-14F: engine behavior is real stack navigation, not page-specific patches', () => {
+    const vm = require('node:vm');
+
+    function createHarness(initialHash) {
+      const listeners = Object.create(null);
+      const entries = [{ state: null, url: initialHash || '#overview' }];
+      let index = 0;
+      const location = { hash: initialHash || '#overview' };
+
+      function setUrl(url) {
+        const hashIndex = String(url).indexOf('#');
+        location.hash = hashIndex >= 0 ? String(url).slice(hashIndex) : '';
+      }
+
+      const history = {
+        get state() {
+          return entries[index].state;
+        },
+        pushState(state, title, url) {
+          entries.splice(index + 1);
+          entries.push({ state: state, url: url });
+          index++;
+          setUrl(url);
+        },
+        replaceState(state, title, url) {
+          entries[index] = { state: state, url: url };
+          setUrl(url);
+        },
+        back() {
+          this.go(-1);
+        },
+        go(delta) {
+          const next = index + Number(delta || 0);
+          if (next < 0 || next >= entries.length || next === index) return;
+          index = next;
+          setUrl(entries[index].url);
+          if (listeners.popstate) listeners.popstate({ state: entries[index].state });
+        }
+      };
+
+      const window = {
+        location,
+        history,
+        __xentraNavigationListenersBound: false,
+        addEventListener(name, fn) {
+          listeners[name] = fn;
+        }
+      };
+      const context = { window, console };
+      vm.runInNewContext(navEngineJs, context, { filename: 'owner-navigation.js' });
+      const controller = window.XentraNavigationController;
+
+      controller.configure({
+        canonicalize: route => route,
+        isRootRoute: route => route === 'business',
+        parentRoute: route => {
+          if (route === 'catalog/products') return 'business';
+          if (route === 'catalog/products/new') return 'catalog/products';
+          if (route === 'catalog/categories') return 'business';
+          return null;
+        },
+        defaultRoute: 'business',
+        getRoute: () => location.hash.replace(/^#\/?/, ''),
+        renderRoute: route => { window.lastRendered = route; }
+      });
+
+      return { controller, history, location, entries, get index() { return index; }, window };
+    }
+
+    const h = createHarness('#business');
+    h.controller.initialize();
+    assert.deepEqual(h.controller.getSnapshot().stack, ['business']);
+
+    h.controller.navigate('catalog/products');
+    assert.deepEqual(h.controller.getSnapshot().stack, ['business', 'catalog/products']);
+
+    h.controller.navigate('catalog/products/new');
+    assert.deepEqual(
+      h.controller.getSnapshot().stack,
+      ['business', 'catalog/products', 'catalog/products/new']
+    );
+
+    h.controller.back();
+    assert.equal(h.window.lastRendered, 'catalog/products');
+    assert.deepEqual(h.controller.getSnapshot().stack, ['business', 'catalog/products']);
+
+    h.controller.back();
+    assert.equal(h.window.lastRendered, 'business');
+    assert.deepEqual(h.controller.getSnapshot().stack, ['business']);
+
+    const deep = createHarness('#catalog/products/new');
+    deep.controller.initialize();
+    assert.deepEqual(
+      deep.controller.getSnapshot().stack,
+      ['business', 'catalog/products', 'catalog/products/new']
+    );
+    deep.controller.back();
+    assert.equal(deep.window.lastRendered, 'catalog/products');
   });
 
   await t.test('OWNER-MOB-14A: all focused child pages use the shared mobile Back header', () => {
@@ -282,28 +393,39 @@ test('Owner Dashboard Mobile Navigation', async t => {
     assert.equal((html.match(/(?:←|&larr;)/g) || []).length, 0, 'Owner Dashboard must not keep arrow glyphs in Back controls');
   });
 
-  await t.test('OWNER-MOB-14A1: Product Master child Back is deterministic and cannot bounce between routes', () => {
+  await t.test('OWNER-MOB-14A1: Product Master child Back consumes one managed level without bouncing', () => {
     const backStart = js.indexOf('window.goBackFromChildPage = function ()');
     const backEnd = js.indexOf('// Compatibility aliases kept', backStart);
     const backBody = js.slice(backStart, backEnd);
 
     assert.ok(backBody.includes('ownerState.parentRoute'),
-      'Back must resolve the parent route from app-managed state');
-    assert.ok(backBody.includes("navigateTo(parentRoute, { history: 'root' })"),
-      'Back must replace the child with its parent without pushing another history entry');
+      'Back must consult the app-managed parent route when route hierarchy is generic');
+    assert.ok(backBody.includes('commitOwnerBackRoute('),
+      'Back must use the app-managed pop/replace transition');
+    assert.ok(backBody.includes('window.history.replaceState('),
+      'Back must replace the current child entry with its parent entry');
+    assert.ok(backBody.includes('makeOwnerNavigationState(targetRoute, targetIndex, targetParent)'),
+      'Back must reconstruct the parent entry with its own parent chain');
+    assert.ok(backBody.includes('Math.max(0, currentIndex - 1)'),
+      'Back must decrement the managed navigation index by one level');
     assert.ok(!backBody.includes('window.history.back()'),
       'Child Back must not traverse raw browser history');
-    assert.ok(backBody.includes("navigateTo('business', { history: 'root' })"),
-      'Back without a valid parent must return to Business root');
+    assert.ok(!backBody.includes("navigateTo(parentRoute, { history: 'root' })"),
+      'Child Back must not destroy the remaining parent chain via root navigation');
 
-    const pushStart = js.indexOf('} else if (pushNavigation) {');
-    const pushEnd = js.indexOf('\n    }\n\n    applyRoute(canonicalRoute);', pushStart);
-    const pushBody = js.slice(pushStart, pushEnd);
-    assert.ok(pushBody.includes('currentOwnerState && currentOwnerState.route'),
-      'Child pushes must record the current route as parentRoute');
-    assert.ok(pushBody.includes('currentIndex + 1'),
-      'Child pushes must advance the app-managed stack index');
+    const resolverStart = js.indexOf('function ownerChildParentRoute(route)');
+    const resolverEnd = js.indexOf('function commitOwnerBackRoute', resolverStart);
+    const resolver = js.slice(resolverStart, resolverEnd);
+    assert.ok(resolver.includes("current === 'catalog/products/new'"),
+      'Add Product must have an explicit Product Master parent');
+    assert.ok(resolver.includes("return 'catalog/products';"),
+      'Product child routes must return to Product Master');
+    assert.ok(resolver.includes("current === 'catalog/products'"),
+      'Product Master itself must have an explicit Business parent');
+    assert.ok(resolver.includes("current === 'catalog/categories'"),
+      'Category must have an explicit Business parent');
   });
+
 
   await t.test('OWNER-MOB-14B: child Back behavior is centralized in one router helper', () => {
     assert.ok(js.includes('window.goBackFromChildPage = function ()'),
@@ -427,11 +549,13 @@ test('Owner Dashboard Mobile Navigation', async t => {
       'CLIENT_ROUTE_META must have business and more route entries');
   });
 
-  await t.test('OWNER-MOB-23: _ownerNavModuleMap covers all 5 modules', () => {
+  await t.test('OWNER-MOB-23: bottom-nav MODULE_MAP covers all 5 modules', () => {
     const modules = ['beranda', 'bisnis', 'pesanan', 'keuangan', 'lainnya'];
+    assert.ok(navJs.includes('var MODULE_MAP = {'),
+      'Bottom-nav module resolver must keep one canonical MODULE_MAP');
     for (const mod of modules) {
       assert.ok(navJs.includes(`'${mod}'`),
-        `_ownerNavModuleMap must include module key '${mod}'`);
+        `MODULE_MAP must include module key '${mod}'`);
     }
   });
 
