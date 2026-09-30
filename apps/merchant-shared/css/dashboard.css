@@ -8412,3 +8412,319 @@ input[type="file"].x-input,
     max-width: 100%;
   }
 }
+
+
+/* ==========================================================================
+   OWNER MOBILE SURFACE SYSTEM v1
+   Route pages keep the same data/logic, but dense desktop structures become
+   touch-first mobile surfaces. Shell ownership remains separate.
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* Every Owner route gets one consistent mobile gutter. Individual screens may
+     intentionally remove their card chrome, but the viewport rhythm stays shared. */
+  body:not(.x-merchant-app) .x-tab-content {
+    padding: 12px !important;
+    box-sizing: border-box;
+  }
+
+  body:not(.x-merchant-app) .x-tab-content > .x-card-panel {
+    border-radius: 16px;
+  }
+
+  /* Secondary navigation is a horizontally scrollable mobile control, never a
+     compressed desktop row. */
+  body:not(.x-merchant-app) .x-subnav-tabs {
+    gap: 6px;
+    margin-bottom: 14px;
+    padding: 2px 0 6px;
+    border-bottom: 0;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  body:not(.x-merchant-app) .x-subnav-tabs::-webkit-scrollbar { display:none; }
+  body:not(.x-merchant-app) .x-subnav-tab {
+    flex: 0 0 auto;
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    background: #fff;
+    font-size: 12px;
+    line-height: 40px;
+  }
+  body:not(.x-merchant-app) .x-subnav-tab.active {
+    border-color: #111827;
+    background: #111827;
+    color: #fff;
+  }
+
+  /* Orders: dense 9-column desktop table becomes one order card per row. */
+  #orders-list-view {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+  #orders-list-view > .x-panel-header-flex {
+    margin-bottom: 12px;
+  }
+  #orders-list-view > div[style*="display:flex"][style*="flex-wrap"] {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+    margin-top: 0 !important;
+  }
+  #orders-list-view .x-table-responsive {
+    overflow: visible !important;
+    margin-top: 12px;
+  }
+  #orders-list-view .x-table {
+    display: block;
+  }
+  #orders-list-view .x-table thead {
+    display: none;
+  }
+  #orders-list-view .x-table tbody,
+  #orders-list-view .x-table tr {
+    display: block;
+    width: 100%;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) {
+    margin-bottom: 10px;
+    padding: 13px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15,23,42,.04);
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    padding: 5px 0;
+    border: 0;
+    font-size: 12px;
+    text-align: right;
+    box-sizing: border-box;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td::before {
+    flex: 0 0 auto;
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: left;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(1)::before { content:"Order"; }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(2)::before { content:"Waktu"; }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(3)::before { content:"Cabang"; }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(4)::before { content:"Pemesan"; }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(5)::before { content:"Channel"; }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(6)::before { content:"Fulfillment"; }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(7)::before { content:"Total"; }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(8)::before { content:"Status"; }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(9) {
+    justify-content: flex-end;
+    padding-top: 10px;
+    margin-top: 5px;
+    border-top: 1px solid #f1f5f9;
+  }
+  #orders-list-view .x-table tbody tr:not(:has(td[colspan])) td:nth-child(9)::before { content:""; }
+
+  /* Customers: same transformation, but preserve the richer customer identity row. */
+  #customers-list-view .x-table-responsive {
+    overflow: visible !important;
+  }
+  #customers-list-view .x-data-table {
+    display: block;
+  }
+  #customers-list-view .x-data-table thead { display:none; }
+  #customers-list-view .x-data-table tbody,
+  #customers-list-view .x-data-table tr {
+    display:block;
+    width:100%;
+  }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) {
+    margin-bottom:10px;
+    padding:13px;
+    border:1px solid #e5e7eb;
+    border-radius:16px;
+    background:#fff;
+    box-shadow:0 1px 3px rgba(15,23,42,.04);
+  }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:5px 0;
+    border:0;
+    font-size:12px;
+    text-align:right;
+    box-sizing:border-box;
+  }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td::before {
+    flex:0 0 auto;
+    color:#64748b;
+    font-size:10px;
+    font-weight:700;
+    text-align:left;
+  }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td:nth-child(1)::before { content:"Pelanggan"; }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td:nth-child(2)::before { content:"Kontak"; }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td:nth-child(3)::before { content:"Pesanan"; }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td:nth-child(4)::before { content:"Belanja"; }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td:nth-child(5)::before { content:"AOV"; }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td:nth-child(6)::before { content:"Cabang"; }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td:nth-child(7)::before { content:"Segmen"; }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td:nth-child(8)::before { content:"Terakhir"; }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td:nth-child(9) {
+    justify-content:flex-end;
+    padding-top:10px;
+    margin-top:5px;
+    border-top:1px solid #f1f5f9;
+  }
+  #customers-list-view .x-data-table tbody tr:not(:has(td[colspan])) td:nth-child(9)::before { content:""; }
+
+  /* Settings: category navigation becomes a horizontal mobile selector instead
+     of a desktop sidebar occupying the first screen. */
+  #tab-settings .settings-layout {
+    display:block;
+    margin-top:0;
+  }
+  #tab-settings .settings-sidebar {
+    width:100% !important;
+    padding:2px 0 8px !important;
+    border:0 !important;
+    border-radius:0 !important;
+    background:transparent !important;
+    overflow-x:auto;
+    display:flex;
+    gap:6px;
+    flex-wrap:nowrap;
+    scrollbar-width:none;
+  }
+  #tab-settings .settings-sidebar::-webkit-scrollbar { display:none; }
+  #tab-settings .settings-sidebar > div {
+    flex:0 0 auto;
+  }
+  #tab-settings .settings-sidebar > div[style*="flex-direction:column"] {
+    display:flex !important;
+    flex-direction:row !important;
+    gap:6px !important;
+    margin:0 !important;
+  }
+  #tab-settings .settings-sidebar button {
+    flex:0 0 auto;
+    width:auto !important;
+    min-height:40px;
+    padding:0 13px !important;
+    border:1px solid #e5e7eb !important;
+    border-radius:999px !important;
+    background:#fff !important;
+    white-space:nowrap;
+  }
+  #tab-settings .settings-sidebar button.active {
+    background:#111827 !important;
+    border-color:#111827 !important;
+    color:#fff !important;
+  }
+  #tab-settings .settings-content-panel {
+    margin-top:6px;
+  }
+
+  /* Reports: filters become a compact vertical control block; summary cards stay
+     two-up, while the actual report data owns horizontal scrolling if necessary. */
+  #tab-reports .x-filter-bar {
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
+    padding:12px;
+    margin-bottom:14px;
+  }
+  #tab-reports .x-filter-group {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  #tab-reports .x-filter-group label,
+  #tab-reports .x-filter-group > span {
+    grid-column:1 / -1;
+  }
+  #tab-reports .x-filter-group button {
+    min-height:40px;
+  }
+  #tab-reports #reports-subnav {
+    margin-bottom:12px;
+  }
+  #tab-reports .x-metrics-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px !important;
+  }
+
+  /* Marketing: its sub-navigation and stat surfaces follow the same touch rhythm. */
+  #tab-marketing .x-content-header,
+  #tab-finance .x-content-header {
+    display:block !important;
+    margin-bottom:12px !important;
+  }
+  #tab-marketing .x-stat-grid,
+  #tab-finance .x-stat-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px !important;
+  }
+  #tab-marketing .x-stat-card,
+  #tab-finance .x-stat-card {
+    min-width:0;
+    padding:12px !important;
+  }
+
+  /* Branch list already uses cards; reduce desktop spacing and make the primary
+     action full-width so it behaves like a mobile task screen. */
+  #tab-branches #branch-list-view {
+    padding:14px !important;
+    border-radius:16px;
+  }
+  #tab-branches #branch-list-view > .x-panel-header-flex {
+    align-items:stretch;
+  }
+  #tab-branches #branch-list-view > .x-panel-header-flex .x-btn-primary {
+    width:100%;
+    min-height:42px;
+  }
+  #tab-branches .x-branches-grid {
+    grid-template-columns:1fr !important;
+    gap:10px !important;
+  }
+
+  /* Catalog branch menu header: action controls stack rather than squeeze. */
+  #tab-catalog-menus .x-header-buttons,
+  #tab-catalog .x-header-buttons {
+    width:100%;
+    display:grid;
+    grid-template-columns:1fr;
+    gap:8px;
+  }
+  #tab-catalog-menus .x-header-buttons button,
+  #tab-catalog .x-header-buttons button {
+    width:100%;
+    min-height:42px;
+  }
+}
+
+@media (max-width: 420px) {
+  body:not(.x-merchant-app) .x-tab-content {
+    padding: 10px !important;
+  }
+  #orders-list-view .x-panel-header h3,
+  #customers-list-view .x-panel-header h3 {
+    font-size:16px;
+  }
+  #tab-reports .x-metrics-grid,
+  #tab-marketing .x-stat-grid,
+  #tab-finance .x-stat-grid {
+    grid-template-columns:1fr !important;
+  }
+}
