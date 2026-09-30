@@ -138,7 +138,16 @@ router.get('/admin/products', requireAuth(['owner', 'brand_manager']), (req, res
 
 router.get('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req, res) => {
   try {
-    const product = db.prepare('SELECT * FROM products WHERE id = ? AND brand_id = ?').get(req.params.id, req.brand_id);
+    const product = db.prepare(`
+      SELECT p.*,
+             ml.id AS level_id,
+             ml.name AS level_name,
+             ml.sort_order AS level_sort_order
+      FROM products p
+      LEFT JOIN product_levels pl ON pl.product_id = p.id
+      LEFT JOIN menu_levels ml ON ml.id = pl.level_id AND ml.brand_id = p.brand_id
+      WHERE p.id = ? AND p.brand_id = ?
+    `).get(req.params.id, req.brand_id);
     if (!product) {
       return res.status(404).json({ success: false, error: 'Produk tidak ditemukan.' });
     }
