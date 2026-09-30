@@ -873,10 +873,17 @@
 
         <!-- 2. Branch Detail Shell View -->
         <div id="branch-detail-view" class="x-card-panel" style="display:none;">
+          <div class="x-owner-child-mobile-header">
+            <h3 class="x-owner-mobile-page-title">
+              <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+              <span>Detail Cabang</span>
+            </h3>
+            <p class="x-owner-mobile-page-sub">Informasi, operasional, menu, tim, dan laporan cabang.</p>
+          </div>
           <!-- Top Breadcrumb & Navigation -->
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-            <button type="button" class="x-btn-secondary" id="btn-back-to-branches" style="padding:6px 12px;font-size:13px;" onclick="navigateTo('branches')">
-              ← Kembali ke Daftar Cabang
+          <div class="x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+            <button type="button" class="x-btn-secondary" id="btn-back-to-branches" style="padding:6px 12px;font-size:13px;" onclick="goBackFromChildPage()">
+              <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Cabang
             </button>
             <span class="text-muted" style="font-size:13px;">/</span>
             <span id="branch-detail-breadcrumb" style="font-weight:600;font-size:14px;">Detail Cabang</span>
@@ -1366,10 +1373,17 @@
 
         <!-- 2. Order Detail View -->
         <div id="order-detail-view" class="x-card-panel" style="display:none;">
+          <div class="x-owner-child-mobile-header">
+            <h3 class="x-owner-mobile-page-title">
+              <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+              <span>Detail Pesanan</span>
+            </h3>
+            <p class="x-owner-mobile-page-sub">Rincian transaksi, pembayaran, fulfillment, dan item pesanan.</p>
+          </div>
           <!-- Header & Back Navigation -->
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-            <button type="button" class="x-btn-secondary" id="btn-back-to-orders" style="padding:6px 12px;font-size:13px;" onclick="navigateTo('orders')">
-              ← Kembali ke Daftar Pesanan
+          <div class="x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+            <button type="button" class="x-btn-secondary" id="btn-back-to-orders" style="padding:6px 12px;font-size:13px;" onclick="goBackFromChildPage()">
+              <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Pesanan
             </button>
             <span class="text-muted" style="font-size:13px;">/</span>
             <span id="order-detail-breadcrumb" style="font-weight:600;font-size:14px;">Detail Pesanan</span>
@@ -1635,9 +1649,16 @@
 
         <!-- 2. Product Detail View -->
         <div id="product-detail-view" class="x-card-panel" style="display:none;">
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <div class="x-owner-child-mobile-header">
+            <h3 class="x-owner-mobile-page-title">
+              <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+              <span>Detail Produk</span>
+            </h3>
+            <p class="x-owner-mobile-page-sub">Informasi produk master dan status adopsi di setiap cabang.</p>
+          </div>
+          <div class="x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
             <button type="button" class="x-btn-secondary" id="btn-back-to-products" style="padding:6px 12px;font-size:13px;">
-              ← Kembali ke Daftar Produk
+              <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Produk
             </button>
             <span class="text-muted" style="font-size:13px;">/</span>
             <span id="prod-detail-breadcrumb" style="font-weight:600;font-size:14px;">Detail Produk</span>
@@ -1698,9 +1719,16 @@
         </div>
   <!-- PAGE: ADD / EDIT MASTER PRODUCT -->
   <section id="product-editor-view" class="x-card-panel" style="display:none;">
-    <div class="x-product-editor-breadcrumb-row" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+    <div class="x-owner-child-mobile-header" id="product-editor-mobile-header">
+      <h3 class="x-owner-mobile-page-title">
+        <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-product-editor-mobile-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+        <span id="product-editor-mobile-title">Tambah Produk</span>
+      </h3>
+      <p class="x-owner-mobile-page-sub" id="product-editor-mobile-subtitle">Susun identitas, harga, foto, dan komposisi Master Menu.</p>
+    </div>
+    <div class="x-product-editor-breadcrumb-row x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <button type="button" class="x-btn-secondary" id="btn-back-from-product-editor" style="padding:6px 12px;font-size:13px;">
-        ← Kembali ke Daftar Produk
+        <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Produk
       </button>
       <span class="text-muted" style="font-size:13px;">/</span>
       <span id="prod-editor-breadcrumb" style="font-weight:600;font-size:14px;">Tambah Produk</span>
@@ -2024,9 +2052,16 @@
 
         <!-- 2. Customer Detail View -->
         <div id="customers-detail-view" style="display:none;">
-          <div style="margin-bottom:16px;">
+          <div class="x-owner-child-mobile-header">
+            <h3 class="x-owner-mobile-page-title">
+              <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+              <span>Detail Pelanggan</span>
+            </h3>
+            <p class="x-owner-mobile-page-sub" id="customers-mobile-detail-subtitle">Profil transaksi dan riwayat belanja pelanggan.</p>
+          </div>
+          <div class="x-owner-child-legacy-nav" style="margin-bottom:16px;">
             <button type="button" class="x-btn-secondary" onclick="showCustomersListView()" style="display:inline-flex;align-items:center;gap:6px;">
-              &larr; Kembali ke Daftar Pelanggan
+              <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Pelanggan
             </button>
           </div>
 
@@ -4657,8 +4692,15 @@
 
 <!-- BRANCH EDITOR PAGE: complex branch creation/editing is a focused Page, not a modal. -->
       <div id="branch-editor-view" class="x-card-panel" style="display:none;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-          <button type="button" class="x-btn-secondary" id="btn-back-from-branch-editor">← Kembali ke Daftar Cabang</button>
+        <div class="x-owner-child-mobile-header">
+          <h3 class="x-owner-mobile-page-title">
+            <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-branch-editor-mobile-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+            <span id="branch-editor-mobile-title">Tambah Cabang</span>
+          </h3>
+          <p class="x-owner-mobile-page-sub">Kelola identitas, lokasi, kontak, dan aturan operasional cabang.</p>
+        </div>
+        <div class="x-owner-child-legacy-nav" style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <button type="button" class="x-btn-secondary" id="btn-back-from-branch-editor"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg> Kembali ke Daftar Cabang</button>
           <span class="text-muted">/</span>
           <strong id="branch-editor-breadcrumb">Tambah Cabang</strong>
         </div>
