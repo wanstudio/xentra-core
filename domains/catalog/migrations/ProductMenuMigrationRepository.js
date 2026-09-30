@@ -128,7 +128,7 @@ class ProductMenuMigrationRepository {
       'INSERT INTO product_menu_migrations (' +
       'product_id, brand_id, source_schema, target_schema, status, ' +
       'attempt_count, canonical_fingerprint, last_error, notes, migrated_at, verified_at, created_at, updated_at' +
-      ') VALUES (?, ?, \'legacy\', ?, ?, 1, ?, ?, ?, ' + migratedAt + ', ' + verifiedAt + ', datetime(\'now\'), datetime(\'now\')) ' +
+      ') VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ' + migratedAt + ', ' + verifiedAt + ', datetime(\'now\'), datetime(\'now\')) ' +
       'ON CONFLICT(product_id) DO UPDATE SET ' +
       'brand_id = excluded.brand_id, source_schema = excluded.source_schema, ' +
       'target_schema = excluded.target_schema, status = excluded.status, ' +
@@ -136,7 +136,7 @@ class ProductMenuMigrationRepository {
       'canonical_fingerprint = excluded.canonical_fingerprint, last_error = excluded.last_error, ' +
       'notes = excluded.notes, migrated_at = excluded.migrated_at, verified_at = excluded.verified_at, ' +
       'updated_at = datetime(\'now\')',
-      [productId, brandId, TARGET_SCHEMA, normalizedStatus, canonicalFingerprint, lastError, notes]
+      [productId, brandId, sourceSchema, TARGET_SCHEMA, normalizedStatus, canonicalFingerprint, lastError, notes]
     );
 
     this.db.execute(
