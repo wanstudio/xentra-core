@@ -569,3 +569,4 @@ Home rules:
 - Quarantined legacy UI/domain assumptions must not be extended as the basis of the new Home.
 
 **LOCKED — Home UI Contract v1 is the implementation source of truth for Merchant App / Beranda.**
+\n\n## 🔒 LOCKED ADDENDUM — Presentation Shell vs Feature Context v1\n\nThe Merchant UI follows the canonical Xentra Presentation Shell vs Feature Context contract: `docs/decisions/xentra-presentation-shell-vs-feature-context-v1.md`.\n\nReusable presentation shells (Page, Bottom Sheet, Dialog/Modal, Overlay, Side Sheet/Panel, Picker where applicable) are separate from feature contexts. Feature contexts such as Category Editor, Flavor Editor, Product Editor, and Branch Editor must not be permanently coupled to one shell. Select the shell from task complexity and UX context; reuse the existing mature Xentra primitive rather than duplicating feature-specific shells.\n
