@@ -30,14 +30,20 @@ test('Owner Kategori/Rasa loading is independent and stale-safe', () => {
   assert.ok(!loader.includes('Promise.all([\n        adminFetch(API_BASE + \'/admin/categories\''));
 });
 
-test('Owner Category page uses two master-reference tabs with card actions', () => {
+test('Owner Category page uses four master-reference tabs with card actions', () => {
   assert.ok(HTML.includes('id="master-reference-tabs"'));
   assert.ok(HTML.includes('data-master-reference-tab="category"'));
   assert.ok(HTML.includes('data-master-reference-tab="flavor"'));
+  assert.ok(HTML.includes('data-master-reference-tab="complement"'));
+  assert.ok(HTML.includes('data-master-reference-tab="level"'));
   assert.ok(HTML.includes('id="master-categories-page-list"'));
   assert.ok(HTML.includes('id="master-flavors-page-list"'));
+  assert.ok(HTML.includes('id="master-complements-page-list"'));
+  assert.ok(HTML.includes('id="master-levels-page-list"'));
   assert.ok(JS.includes('aria-label="Aksi kategori"'));
   assert.ok(JS.includes('aria-label="Aksi rasa"'));
+  assert.ok(JS.includes('aria-label="Aksi kelengkapan"'));
+  assert.ok(JS.includes('aria-label="Aksi level"'));
   assert.ok(JS.includes('data-master-reference-action="category"'));
   assert.ok(JS.includes('data-master-reference-action="flavor"'));
   assert.ok(JS.includes('masterReferenceActionHandler'));
@@ -49,11 +55,13 @@ test('Owner Category page uses two master-reference tabs with card actions', () 
   assert.ok(JS.includes('function setMasterReferenceTab(type)'));
   assert.ok(JS.includes('function renderMasterCategoriesPage()'));
   assert.ok(JS.includes('function renderMasterFlavorsPage()'));
+  assert.ok(JS.includes("renderMasterReferenceList('complement')"));
+  assert.ok(JS.includes("renderMasterReferenceList('level')"));
   assert.ok(JS.includes("label: \'Edit\'"));
   assert.ok(JS.includes("label: \'Hapus\'"));
 });
 
-test('Edited Category and Rasa immediately update the rendered master-reference state', () => {
+test('Edited master references immediately update the rendered master-reference state', () => {
   const start = JS.indexOf('async function saveMasterReferenceQuickAdd()');
   const end = JS.indexOf('var _productOptionsDraft = [];', start);
   assert.ok(start >= 0 && end > start, 'Master reference save handler must exist');
@@ -62,15 +70,16 @@ test('Edited Category and Rasa immediately update the rendered master-reference 
   assert.ok(saveHandler.includes('if (!category) throw new Error'));
   assert.ok(saveHandler.includes('state.categories[categoryIndex] = category'));
   assert.ok(saveHandler.includes('else state.categories.push(category)'));
-  assert.ok(saveHandler.includes('if (!flavor) throw new Error'));
-  assert.ok(saveHandler.includes('_masterMenuComponents.flavor[flavorIndex] = flavor'));
-  assert.ok(saveHandler.includes('_masterMenuComponents.flavor.push(flavor)'));
+  assert.ok(saveHandler.includes('var row = type === \'category\' ? data.category : data.component'));
+  assert.ok(saveHandler.includes('_masterMenuComponents.flavor.push(row)') || saveHandler.includes('else rows.push(row)'));
+  assert.ok(saveHandler.includes('referenceRows(type)'));
   assert.ok(saveHandler.includes('renderMasterCategoriesPage();'));
   assert.ok(saveHandler.includes('renderMasterFlavorsPage();'));
 });
 
 test('Master Product primary CTA directly opens the product editor', () => {
-  assert.ok(HTML.includes('id="btn-add-product-main" onclick="openAddProduct()"'));
+  assert.ok(HTML.includes('id="btn-add-product-main">+ Tambah Produk Baru</button>'));
+  assert.ok(!HTML.includes('id="btn-add-product-main" onclick="openAddProduct()"'));
   assert.ok(JS.includes("var btnAddProdMain = $('btn-add-product-main');"));
   assert.ok(JS.includes("btnAddProdMain.addEventListener('click', window.openAddProduct)"));
 });
@@ -96,6 +105,19 @@ test('Legacy Master Product edit hydrates structured composition from the old ti
   assert.ok(JS.includes('Format lama terdeteksi'));
   assert.ok(HTML.includes('id="master-legacy-migration-notice"'));
   assert.ok(HTML.includes('id="master-legacy-migration-detail"'));
+});
+
+test('Master Product editor keeps Flavor optional and exposes multi-select complements plus Level dropdown', () => {
+  const start = HTML.indexOf('<section id="tab-catalog-products"');
+  const end = HTML.indexOf('<!-- TAB: CATALOG / MENUS', start);
+  const section = HTML.slice(start, end);
+  assert.ok(section.includes('<select id="prod-flavor" class="x-input">'));
+  assert.ok(!section.includes('<select id="prod-flavor" class="x-input" required>'));
+  assert.ok(section.includes('id="prod-complements-editor"'));
+  assert.ok(section.includes('id="prod-level"'));
+  assert.ok(JS.includes("adminFetch(API_BASE + '/admin/menu/components/complement'"));
+  assert.ok(JS.includes("adminFetch(API_BASE + '/admin/menu/components/level'"));
+  assert.ok(JS.includes("API_BASE + '/admin/menu/components/level/ensure-defaults'"));
 });
 
 test('Customer presentation mapping is explicit in Owner UI', () => {
