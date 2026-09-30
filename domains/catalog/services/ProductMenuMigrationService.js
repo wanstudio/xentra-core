@@ -1,47 +1,16 @@
 'use strict';
 
-const crypto = require('crypto');
 const DataAccess = require('../../../core/data/DataAccess');
 const MasterMenuCompositionRepository = require('../repositories/MasterMenuCompositionRepository').MasterMenuCompositionRepository;
 const {
   ProductMenuMigrationRepository,
   STATUSES,
+  canonicalFingerprint,
   TARGET_SCHEMA
 } = require('../migrations/ProductMenuMigrationRepository');
 
 const compositionRepository = new MasterMenuCompositionRepository();
 const migrationRepository = new ProductMenuMigrationRepository();
-
-function canonicalFingerprint(composition) {
-  const normalized = {
-    product_id: String(composition && composition.product_id || ''),
-    category: composition && composition.category ? {
-      id: String(composition.category.id),
-      name: String(composition.category.name || ''),
-      slug: String(composition.category.slug || '')
-    } : null,
-    flavor: composition && composition.flavor ? {
-      id: String(composition.flavor.id),
-      name: String(composition.flavor.name || ''),
-      slug: String(composition.flavor.slug || '')
-    } : null,
-    complements: Array.isArray(composition && composition.complements)
-      ? composition.complements.map((item, index) => ({
-          id: String(item.id),
-          name: String(item.name || ''),
-          slug: String(item.slug || ''),
-          sort_order: Number.isFinite(Number(item.sort_order)) ? Number(item.sort_order) : index
-        }))
-      : [],
-    level: composition && composition.level ? {
-      id: String(composition.level.id),
-      name: String(composition.level.name || ''),
-      slug: String(composition.level.slug || '')
-    } : null
-  };
-
-  return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
-}
 
 function validateCanonicalComposition(product, composition) {
   const errors = [];
