@@ -24,6 +24,46 @@
   var currentBranchCatalogData = null;
   var inlineFilter = 'all';
 
+  function requestBranchTextInput(options) {
+    options = options || {};
+    return new Promise(function(resolve) {
+      var wrap = document.createElement('div');
+      wrap.innerHTML =
+        '<div style="padding:4px 0;">' +
+          '<label style="display:block;font-size:12px;font-weight:700;margin-bottom:7px;">' + esc(options.label || 'Nama') + '</label>' +
+          '<input id="x-branch-text-input" class="x-input" type="text" value="' + esc(options.value || '') + '" autocomplete="off">' +
+          '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">' +
+            '<button type="button" class="x-btn-secondary" data-action="cancel">Batal</button>' +
+            '<button type="button" class="x-btn-primary" data-action="save">Simpan</button>' +
+          '</div>' +
+        '</div>';
+      var content = wrap.firstElementChild;
+      var field = wrap.querySelector('#x-branch-text-input');
+      var done = false;
+      function finish(value) {
+        if (done) return;
+        done = true;
+        if (window.XentraPresentation) window.XentraPresentation.close('branch-category-input');
+        resolve(value);
+      }
+      wrap.querySelector('[data-action="cancel"]').addEventListener('click', function () { finish(null); });
+      wrap.querySelector('[data-action="save"]').addEventListener('click', function () { finish(field.value); });
+      if (window.XentraPresentation) {
+        window.XentraPresentation.open({
+          id: 'branch-category-input',
+          type: 'bottom-sheet',
+          title: options.title || 'Input',
+          content: content,
+          dismissible: true,
+          onClose: function () { if (!done) { done = true; resolve(null); } }
+        });
+        setTimeout(function () { if (field) { field.focus(); field.select(); } }, 0);
+      } else {
+        finish(window.prompt(options.title || 'Input', options.value || ''));
+      }
+    });
+  }
+
   function openBranchCatalogSheet(modalId, shellId) {
     var modal = $(modalId);
     if (!modal || !window.XentraPresentation) return false;
@@ -493,7 +533,7 @@
 
   window.promptAddBranchCategory = async function () {
     if (!currentManagingBranchId) return;
-    var name = prompt('Nama Kategori Baru untuk Cabang ini:');
+    var name = await requestBranchTextInput({ title: 'Tambah Kategori Cabang', label: 'Nama Kategori' });
     if (!name || !name.trim()) return;
 
     try {
@@ -549,7 +589,7 @@
     if (window.XentraPresentation && window.XentraPresentation.isOpen('branch-adopt-product')) {
       window.XentraPresentation.close('branch-adopt-product');
     } else {
-      $('modal-adopt-product').style.display = 'none';
+      window.closeAdoptModal();
     }
   };
 
