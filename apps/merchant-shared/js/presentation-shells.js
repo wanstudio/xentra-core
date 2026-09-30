@@ -127,10 +127,6 @@
     }
   });
 
-  window.addEventListener('popstate', function () {
-    if (stack.length) closeTop();
-  });
-
   window.XentraPresentation = {
     open: open,
     close: close,
