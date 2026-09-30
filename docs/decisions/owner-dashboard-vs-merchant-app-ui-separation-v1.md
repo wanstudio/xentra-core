@@ -133,3 +133,4 @@ Do not change business lifecycle/state machines, RBAC semantics, checkout, custo
 - Notion: Owner Dashboard — UI Blueprint v1 (LOCKED)
 - Notion: 🔒 Owner ↔ Branch Manager Dashboard Boundary v1
 - Notion: 🔒 Branch Manager Operational Center — Business Contract v1
+\n\n## 🔒 LOCKED ADDENDUM — Shared Presentation Shell Boundary\n\nOwner Dashboard and Merchant App may have different surface-owned composition, but both follow the Xentra presentation-shell rule: reusable presentation primitives are separated from feature contexts. Page, Bottom Sheet, Dialog/Modal, Overlay, and Side Sheet/Panel are presentation mechanisms, not feature/domain identities. Feature contexts may be composed into the appropriate shell without duplicating business logic or creating a second domain authority.\n
