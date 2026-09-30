@@ -440,7 +440,7 @@
 
     var isProductEditor = !isPlatform && (
       route === 'catalog/products/new' ||
-      /^catalog\\/products\\/[^/]+\\/edit$/.test(route)
+      /^catalog\/products\/[^/]+\/edit$/.test(route)
     );
     var productEditorId = isProductEditor && route !== 'catalog/products/new'
       ? route.split('catalog/products/')[1].split('/edit')[0]
@@ -538,10 +538,10 @@
     var subEl = $('dash-page-subtitle');
     if (titleEl) titleEl.textContent = isProductEditor
       ? (productEditorId ? 'Edit Produk Master' : 'Tambah Produk Master')
-      : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title))));)
+      : (isProductDetail ? 'Product Detail' : (isBranchDetail ? 'Branch Detail' : (isOrderDetail ? 'Order Detail' : (isCustomerDetail ? 'Customer Detail' : (isReportsRoute ? 'Reports' : meta.title)))));
     if (subEl) subEl.textContent = isProductEditor
       ? 'Susun identitas, harga, foto, dan komposisi Master Menu'
-      : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub))));)
+      : (isProductDetail ? 'Detail produk master dan status adopsi di cabang' : (isBranchDetail ? 'Detail informasi, operasional, menu, dan tim cabang' : (isOrderDetail ? 'Detail transaksi, rincian biaya, dan status pesanan' : (isCustomerDetail ? 'Profil pelanggan, riwayat pesanan, dan loyalitas' : (isReportsRoute ? 'Laporan penjualan, analitik bisnis, dan kinerja cabang' : meta.sub)))));
 
     // 6. Sync Owner bottom nav active module (no-op on desktop, hidden by CSS)
     syncOwnerBottomNavActive(route);
