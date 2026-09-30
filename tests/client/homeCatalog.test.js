@@ -152,6 +152,7 @@ test('Customer catalog exposes structured Pedas intensity for four-dot presentat
   const homePath = path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/home.js');
   const home = fs.readFileSync(homePath, 'utf8');
   assert.ok(home.includes('menu_indicator_level'), 'Customer Home must consume structured level intensity');
+  assert.ok(home.includes('renderCustomerSpiceIndicator'), 'Customer Home must use the shared four-dot Pedas renderer');
   assert.ok(home.includes('x-product-menu-indicator-dot'), 'Customer Home must render Pedas dots');
   assert.ok(home.includes('for (var i = 1; i <= 4; i += 1)'), 'Customer Home must render exactly four dots');
   assert.ok(!home.includes('UI.escape(menuIndicator)'), 'Legacy text level indicator must not be rendered');
