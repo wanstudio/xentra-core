@@ -3269,19 +3269,6 @@
 
   var _productEditorLoadSeq = 0;
 
-  function setProductEditorLoading(isLoading, message) {
-    var view = $('product-editor-view');
-    var status = $('product-editor-loading');
-    var statusText = $('product-editor-loading-text');
-    if (view) {
-      view.setAttribute('aria-busy', isLoading ? 'true' : 'false');
-    }
-    if (status) {
-      status.style.display = isLoading ? 'flex' : 'none';
-      status.setAttribute('aria-hidden', isLoading ? 'false' : 'true');
-    }
-    if (statusText && message) statusText.textContent = message;
-  }
 
   function resetProductEditorForAdd() {
     $('modal-product-title').textContent = 'Tambah Produk Master Baru';
@@ -3338,36 +3325,46 @@
   async function loadProductEditorPage(productId) {
     var requestSeq = ++_productEditorLoadSeq;
     showProductEditorSection();
-    setProductEditorLoading(true, productId ? 'Memuat data produk...' : 'Menyiapkan editor Produk Master...');
+
+    // The editor is a real page, not a blocking loading screen. Render the form
+    // immediately, then hydrate Master references and product data asynchronously.
+    if (!productId) {
+      resetProductEditorForAdd();
+
+      try {
+        await Promise.all([
+          loadMasterMenuComponents(),
+          adminFetch(API_BASE + '/admin/categories', { headers: getAuthHeaders() })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+              if (requestSeq !== _productEditorLoadSeq) return;
+              if (data && data.success) {
+                state.categories = data.categories || [];
+                populateProductCategorySelect();
+                renderMasterMenuCustomerPreview();
+              }
+            })
+        ]);
+      } catch (err) {
+        if (requestSeq !== _productEditorLoadSeq) return;
+        console.error('[Product Editor Master Data Error]:', err);
+        showToast('⚠️ Sebagian data Master belum tersedia. Coba lagi setelah koneksi siap.');
+      }
+      return;
+    }
 
     try {
-      // Hydrate shared master references first so the editor never shows a stale
-      // empty selector while the Category page already has data.
-      await Promise.all([
-        loadMasterMenuComponents(),
-        adminFetch(API_BASE + '/admin/categories', { headers: getAuthHeaders() })
-          .then(function(res) { return res.json(); })
-          .then(function(data) {
-            if (data && data.success) {
-              state.categories = data.categories || [];
-              populateProductCategorySelect();
-            }
-          })
-      ]);
-      if (requestSeq !== _productEditorLoadSeq) return;
-
-      if (!productId) {
-        resetProductEditorForAdd();
-        if (requestSeq === _productEditorLoadSeq) {
-          setProductEditorLoading(false);
-        }
-        return;
-      }
-
-      var productData = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId), {
+      var productPromise = adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId), {
         headers: getAuthHeaders()
       }).then(function(res) { return res.json(); });
 
+      var categoryPromise = adminFetch(API_BASE + '/admin/categories', {
+        headers: getAuthHeaders()
+      }).then(function(res) { return res.json(); });
+
+      var masterPromise = loadMasterMenuComponents();
+
+      var productData = await productPromise;
       if (requestSeq !== _productEditorLoadSeq) return;
 
       if (!productData.success || !productData.product) {
@@ -3378,7 +3375,19 @@
 
       populateProductEditorForm(productData.product);
 
-      setProductEditorLoading(true, 'Memuat komposisi dan opsi penjualan...');
+      // Master references and product data can arrive in either order. Once
+      // references are ready, render the selectors again against the current draft.
+      var categoryData = await categoryPromise;
+      if (requestSeq !== _productEditorLoadSeq) return;
+      if (categoryData && categoryData.success) {
+        state.categories = categoryData.categories || [];
+        populateProductCategorySelect();
+        $('prod-category').value = productData.product.category_id || '';
+      }
+
+      await masterPromise;
+      if (requestSeq !== _productEditorLoadSeq) return;
+
       await loadMasterMenuComposition(productData.product.id, productData.product.name, true);
       if (requestSeq !== _productEditorLoadSeq) return;
 
@@ -3387,10 +3396,6 @@
       if (requestSeq !== _productEditorLoadSeq) return;
       console.error('[Product Editor Load Error]:', err);
       showToast('❌ Gagal memuat editor Produk Master.');
-    } finally {
-      if (requestSeq === _productEditorLoadSeq) {
-        setProductEditorLoading(false);
-      }
     }
   }
 
