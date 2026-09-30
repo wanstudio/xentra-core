@@ -1311,7 +1311,7 @@
       var menuTitle = product.menu_title || product.title || product.name || '';
       var menuSubtitle = product.menu_subtitle || product.subtitle || '';
       var menuDetail = Array.isArray(product.menu_detail) ? product.menu_detail : [];
-      var menuIndicator = product.menu_indicator || product.indicator || '';
+      var menuIndicatorLevel = Number(product.menu_indicator_level || 0);
       var legacyDesc = product.description || '';
 
       // P3: branch-level availability is a SERVER-computed flag (is_available is
@@ -1365,7 +1365,16 @@
         '  <div class="x-product-name">' + UI.escape(menuTitle) + '</div>' +
         (menuSubtitle ? '  <div class="x-product-description">' + UI.escape(menuSubtitle) + '</div>' : '') +
         (menuDetail.length ? '  <div class="x-product-description">' + UI.escape(menuDetail.join(' · ')) + '</div>' : '') +
-        (menuIndicator ? '  <div class="x-product-menu-indicator">' + UI.escape(menuIndicator) + '</div>' : '') +
+        (menuIndicatorLevel > 0 ? (function () {
+          var level = Math.max(1, Math.min(4, Math.floor(menuIndicatorLevel)));
+          var indicatorHtml = '  <div class="x-product-menu-indicator" aria-label="Level Pedas ' + level + ' dari 4">' +
+            '<span class="x-product-menu-indicator-label">Pedas</span>' +
+            '<span class="x-product-menu-indicator-dots" aria-hidden="true">';
+          for (var i = 1; i <= 4; i += 1) {
+            indicatorHtml += '<span class="x-product-menu-indicator-dot' + (i <= level ? ' is-filled' : '') + '"></span>';
+          }
+          return indicatorHtml + '</span></div>';
+        })() : '') +
         (!menuSubtitle && !menuDetail.length && legacyDesc ? '  <div class="x-product-description">' + UI.escape(legacyDesc) + '</div>' : '') +
         unavailableTag +
         '  <div class="x-price">' + oldPriceHtml +
