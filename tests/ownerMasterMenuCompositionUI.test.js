@@ -338,7 +338,23 @@ test('Product editor routes cleanly between list, detail, add, and edit', () => 
   assert.ok(JS.includes('if (isProductEditor)'));
   assert.ok(JS.includes('showProductEditorSection()'));
   assert.ok(JS.includes('showProductDetailSection()'));
-  assert.ok(JS.includes("navigateTo('catalog/products/' + encodeURIComponent(savedId))"));
+  assert.ok(JS.includes("navigateTo('catalog/products/' + encodeURIComponent(id) + '/edit')"));
+  assert.ok(JS.includes("navigateTo('catalog/products', { history: 'replace' })"),
+    'Saving the editor must return to the Product Master list, not Product Detail');
+});
+
+test('Product Master list receives and renders structured Level intensity', () => {
+  const route = fs.readFileSync(path.join(ROOT, 'server/routes/admin-catalog.js'), 'utf8');
+  assert.ok(route.includes('ml.sort_order AS level_sort_order'));
+  assert.ok(JS.includes('function renderMasterProductSpiceIndicator('));
+  assert.ok(JS.includes('prod.level_sort_order'));
+  assert.ok(JS.includes('x-master-product-spice-dot'));
+  assert.ok(CSS.includes('.x-master-product-spice-dot.is-filled'));
+});
+
+test('Customer PWA Level path is wired through the structured catalog field', () => {
+  assert.ok(fs.readFileSync(path.join(ROOT, 'apps/customer-pwa/assets/js/pages/home.js'), 'utf8').includes('product.menu_indicator_level'));
+  assert.ok(fs.readFileSync(path.join(ROOT, 'server/routes/catalog.js'), 'utf8').includes('menu_indicator_level: p.indicator_level'));
 });
 
 test('Master Product editor stays inside Catalog Products tab and remains mobile-safe', () => {
