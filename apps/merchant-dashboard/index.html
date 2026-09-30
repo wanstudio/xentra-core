@@ -3785,114 +3785,1047 @@
     </div>
   </div>
 
-  <!-- MODAL: BRANCH CATALOG MANAGER -->
-  <div id="modal-branch-catalog" class="x-modal-backdrop" style="display:none;">
-    <div class="x-modal-card x-modal-lg">
+  <!-- MODAL: ADOPT PRODUCT FORM -->
+  <div id="modal-adopt-product" class="x-modal-backdrop" style="display:none; z-index: 1100;">
+    <div class="x-modal-card" style="max-width: 460px;">
       <div class="x-modal-header">
-        <div>
-          <h3 id="modal-branch-catalog-title">Kelola Katalog Cabang</h3>
-          <p class="text-muted" style="font-size:12px;margin:0;" id="modal-branch-catalog-subtitle">Pilih produk rekomendasi Owner dan atur menu cabang</p>
-        </div>
-        <button type="button" class="x-modal-close" onclick="closeBranchCatalogModal()">✕</button>
+        <h3 id="modal-adopt-title">Adopsi Produk ke Cabang</h3>
+        <button type="button" class="x-modal-close" onclick="closeAdoptModal()">✕</button>
       </div>
-      
-      <div class="x-modal-scroll-body">
-        <!-- Section 1: Active Branch Products -->
-        <div>
-          <div class="x-catalog-section-title">
-            <h4>✅ Menu Aktif Cabang (<span id="branch-active-count">0</span>)</h4>
-            <button type="button" class="x-btn-secondary" style="font-size:12px;padding:4px 10px;" onclick="promptAddBranchCategory()">+ Tambah Kategori Cabang</button>
-          </div>
-          <div id="branch-adopted-products-container" class="x-branch-catalog-grid">
-            <!-- Rendered by JS -->
+      <form id="form-adopt-product" class="x-form">
+        <input type="hidden" id="adopt-product-id" value="">
+        <input type="hidden" id="adopt-pricing-mode" value="">
+        <input type="hidden" id="adopt-min-price" value="">
+        <input type="hidden" id="adopt-max-price" value="">
+        
+        <div class="x-form-group">
+          <label>Master Menu</label>
+          <input type="text" id="adopt-product-name" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+        </div>
+
+        <div class="x-form-group">
+          <label>Komposisi Master <span class="text-muted">(hanya lihat)</span></label>
+          <div style="padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+            <div id="adopt-menu-title" style="font-size:14px;font-weight:800;color:#0f172a;">—</div>
+            <div id="adopt-menu-subtitle" style="font-size:12px;color:#475569;margin-top:3px;">—</div>
+            <div id="adopt-menu-detail" style="font-size:11px;color:#64748b;margin-top:5px;">—</div>
+            <div id="adopt-menu-indicator" style="font-size:11px;color:#475569;margin-top:5px;font-weight:700;">—</div>
           </div>
         </div>
 
-        <!-- Section 2: Master Recommendations Available for Adoption -->
-        <div>
-          <div class="x-catalog-section-title">
-            <h4>💡 Rekomendasi Owner / Belum Diadopsi (<span id="branch-available-count">0</span>)</h4>
-          </div>
-          <div id="branch-available-products-container" class="x-branch-catalog-grid">
-            <!-- Rendered by JS -->
-          </div>
+        <div class="x-form-group">
+          <label for="adopt-branch-category">Kategori di Cabang Ini</label>
+          <select id="adopt-branch-category" class="x-input" required></select>
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Kategori ini hanya untuk pengelompokan menu di cabang. Komposisi Master tidak berubah.</small>
         </div>
-      </div>
 
-      <div class="x-modal-footer">
-        <button type="button" class="x-btn-secondary" onclick="closeBranchCatalogModal()">Tutup</button>
-      </div>
-    </div>
-  </div>
+        <div class="x-form-group">
+          <label>Harga Master (Owner)</label>
+          <input type="text" id="adopt-price-display" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+          <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">Harga Menu ditentukan Owner. Merchant tidak mengubah harga saat adopsi.</small>
+        </div>
 
-  <!-- MODAL: ADD / EDIT BRANCH (lokasi, WhatsApp cabang, dan formula ongkir) -->
-  <div id="modal-branch" class="x-modal-backdrop" style="display:none;">
-    <div class="x-modal-card" style="max-width: 560px;">
-      <div class="x-modal-header">
-        <h3 id="modal-branch-title">Tambah Cabang</h3>
-        <button type="button" class="x-modal-close" onclick="closeBranchModal()">✕</button>
-      </div>
-      <form id="form-branch" class="x-form">
-        <input type="hidden" id="branch-id" value="">
-        <div class="x-form-group">
-          <label for="branch-name">Nama Cabang</label>
-          <input type="text" id="branch-name" class="x-input" placeholder="Contoh: Bangjo Depok Margonda" required>
-        </div>
-        <div class="x-form-group">
-          <label for="branch-address">Alamat / Titik Lokasi</label>
-          <input type="text" id="branch-address" class="x-input" placeholder="Jalan, kelurahan, kota..." required>
-        </div>
-        <div class="x-form-group">
-          <label for="branch-phone">Nomor WhatsApp Cabang (Wajib)</label>
-          <input type="text" id="branch-phone" class="x-input" placeholder="Contoh: 081234567890 atau 6281234567890" required>
-        </div>
-        <div class="x-form-row">
-          <div class="x-form-group">
-            <label for="branch-latitude">Latitude (Koordinat GPS)</label>
-            <input type="number" id="branch-latitude" class="x-input" step="any" placeholder="-6.2989">
-          </div>
-          <div class="x-form-group">
-            <label for="branch-longitude">Longitude (Koordinat GPS)</label>
-            <input type="number" id="branch-longitude" class="x-input" step="any" placeholder="106.8157">
-          </div>
-        </div>
-        <div class="x-form-row">
-          <div class="x-form-group">
-            <label for="branch-free-km">Gratis Ongkir KM Pertama</label>
-            <input type="number" id="branch-free-km" class="x-input" min="0" step="0.5" placeholder="0">
-          </div>
-          <div class="x-form-group">
-            <label for="branch-price-km">Tarif Ongkir per KM (Rp)</label>
-            <input type="number" id="branch-price-km" class="x-input" min="0" placeholder="3000">
-          </div>
-        </div>
-        <div class="x-form-row">
-          <div class="x-form-group">
-            <label for="branch-radius">Radius Maksimal (KM)</label>
-            <input type="number" id="branch-radius" class="x-input" min="1" placeholder="10">
-          </div>
-          <div class="x-form-group">
-            <label for="branch-promo-minorder">Promo Min. Order (Rp)</label>
-            <input type="number" id="branch-promo-minorder" class="x-input" min="0" placeholder="50000">
-          </div>
-        </div>
-        <div class="x-form-group">
-          <label for="branch-promo-discount">Promo Diskon Ongkir (Rp)</label>
-          <input type="number" id="branch-promo-discount" class="x-input" min="0" placeholder="10000">
-        </div>
-        <div class="x-form-group">
-          <label class="x-checkbox-label">
-            <input type="checkbox" id="branch-open-override" checked>
-            <span>Cabang sedang Buka Operasional</span>
-          </label>
-        </div>
         <div class="x-modal-footer">
-          <button type="button" class="x-btn-secondary" onclick="closeBranchModal()">Batal</button>
-          <button type="submit" class="x-btn-primary">Simpan Cabang</button>
+          <button type="button" class="x-btn-secondary" onclick="closeAdoptModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-adopt">Simpan ke Katalog Cabang</button>
         </div>
       </form>
     </div>
   </div>
+
+  <!-- MODAL: EDIT / CREATE BRANCH CATEGORY (name + image) -->
+  <div id="modal-branch-category-edit" class="x-modal-backdrop" style="display:none; z-index: 1100;">
+    <div class="x-modal-card" style="max-width: 480px; width: 100%;">
+      <div class="x-modal-header">
+        <h3 id="branch-category-modal-title">Ubah Kategori</h3>
+        <button type="button" class="x-modal-close" onclick="closeBranchCategoryEditModal()">✕</button>
+      </div>
+      <form id="form-branch-category-edit" class="x-form">
+        <input type="hidden" id="bce-cat-id" value="">
+        <input type="hidden" id="bce-is-active" value="1">
+
+        <div class="x-form-group">
+          <label for="bce-name">Nama Kategori</label>
+          <input type="text" id="bce-name" class="x-input" maxlength="40" placeholder="Contoh: Menu Favorit" required>
+        </div>
+
+        <div class="x-form-group">
+          <label>Gambar Kategori</label>
+          <div class="x-file-upload-wrap">
+            <div id="bce-image-preview-wrap" style="width:72px;height:72px;border-radius:14px;overflow:hidden;background:#f8fafc;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <img id="bce-image-preview" src="" alt="Preview kategori" style="width:100%;height:100%;object-fit:cover;display:none;">
+              <span id="bce-image-preview-mono" style="font-weight:700;color:#94a3b8;font-size:20px;">?</span>
+            </div>
+            <div class="x-file-upload-info">
+              <input type="file" id="bce-image-file" class="x-input" accept="image/png,image/jpeg,image/webp">
+              <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">JPG, PNG, atau WEBP. Maks 3MB. Tampil persegi (1:1) di Home.</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="x-category-modal-status-section" id="bce-status-section">
+          <label class="x-category-modal-status-label">Status Kategori</label>
+          <div class="x-category-modal-status-actions">
+            <button type="button" id="bce-btn-activate" class="x-btn-status-toggle x-btn-status-active">
+              Aktif
+            </button>
+            <button type="button" id="bce-btn-deactivate" class="x-btn-status-toggle x-btn-status-inactive">
+              Nonaktif
+            </button>
+          </div>
+        </div>
+
+        <div class="x-modal-footer">
+          <button type="button" class="x-btn-secondary" onclick="closeBranchCategoryEditModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-branch-category-edit">Simpan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: INVITE USER (Workforce Invitation - Passwordless by Owner) -->
+  <div id="modal-invite-user" class="x-modal-backdrop" style="display:none;">
+    <div class="x-modal-card" style="max-width: 480px;">
+      <div class="x-modal-header">
+        <h3>Undang Anggota Tim</h3>
+        <button type="button" class="x-modal-close" onclick="closeInviteUserModal()">✕</button>
+      </div>
+      <form id="form-invite-user" class="x-form" onsubmit="submitInviteUserForm(event)">
+        <div style="padding:12px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:var(--radius-sm); font-size:12px; color:#1e40af; margin-bottom:14px; line-height:1.4;">
+          💡 <strong>Tanpa Password:</strong> Anda tidak perlu membuatkan password. Calon anggota akan menerima email undangan dan memilih cara masuk sendiri (Continue with Google atau Continue with Email).
+        </div>
+        <div class="x-form-group">
+          <label for="invite-input-email">Alamat Email Calon Anggota</label>
+          <input type="email" id="invite-input-email" class="x-input" placeholder="staf@gmail.com atau manajer@bisnis.com" required>
+        </div>
+        <div class="x-form-group">
+          <label for="invite-input-role">Peran (Role)</label>
+          <select id="invite-input-role" class="x-input" required onchange="handleInviteRoleChange()"></select>
+        </div>
+        <div class="x-form-group" id="invite-branch-group">
+          <label for="invite-input-branch">Cabang Penugasan</label>
+          <select id="invite-input-branch" class="x-input"></select>
+          <small class="text-muted" style="font-size:11px;" id="invite-branch-hint">Wajib dipilih untuk Branch Manager, Kasir, dan Dapur.</small>
+        </div>
+        <div class="x-modal-footer">
+          <button type="button" class="x-btn-secondary" onclick="closeInviteUserModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-send-invitation">Kirim Undangan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CREATE / EDIT USER (Workforce Management) -->
+  <div id="modal-user" class="x-modal-backdrop" style="display:none;">
+    <div class="x-modal-card" style="max-width: 520px;">
+      <div class="x-modal-header">
+        <h3 id="modal-user-title">Tambah Anggota Tim</h3>
+        <button type="button" class="x-modal-close" onclick="closeUserModal()">✕</button>
+      </div>
+      <form id="form-user" class="x-form">
+        <input type="hidden" id="user-id" value="">
+        <div class="x-form-group">
+          <label for="user-fullname">Nama Lengkap</label>
+          <input type="text" id="user-fullname" class="x-input" placeholder="Contoh: Siti Aminah" required>
+        </div>
+        <div class="x-form-group">
+          <label for="user-username">Username (untuk login)</label>
+          <input type="text" id="user-username" class="x-input" placeholder="Contoh: siti_aminah" required minlength="3">
+          <small class="text-muted" style="font-size:11px;">Huruf kecil, tanpa spasi. Minimal 3 karakter.</small>
+        </div>
+        <div class="x-form-group" id="user-password-group">
+          <label for="user-password">Password</label>
+          <input type="password" id="user-password" class="x-input" placeholder="Minimal 8 karakter" minlength="8">
+          <small class="text-muted" style="font-size:11px;" id="user-password-hint">Wajib diisi saat membuat akun baru.</small>
+        </div>
+        <div class="x-form-group">
+          <label for="user-email">Email (Opsional)</label>
+          <input type="email" id="user-email" class="x-input" placeholder="email@contoh.com">
+        </div>
+        <div class="x-form-row">
+          <div class="x-form-group">
+            <label for="user-role">Role</label>
+            <select id="user-role" class="x-input" required></select>
+          </div>
+          <div class="x-form-group">
+            <label for="user-branch">Cabang (Branch)</label>
+            <select id="user-branch" class="x-input"></select>
+          </div>
+        </div>
+        <div class="x-modal-footer">
+          <button type="button" class="x-btn-secondary" onclick="closeUserModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-user">Simpan Anggota</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: RESET PASSWORD (Admin Reset) -->
+  <div id="modal-reset-password" class="x-modal-backdrop" style="display:none;">
+    <div class="x-modal-card" style="max-width: 440px;">
+      <div class="x-modal-header">
+        <h3>Reset Password</h3>
+        <button type="button" class="x-modal-close" onclick="closeResetPasswordModal()">✕</button>
+      </div>
+      <div class="x-form" style="padding: 20px;">
+        <p style="font-size:13px;color:#475569;margin-bottom:12px;">Token reset akan ditampilkan <strong>satu kali saja</strong>. Bagikan ke staf melalui saluran aman (WhatsApp/面对面).</p>
+        <div class="x-form-group">
+          <label>Nama Staf</label>
+          <input type="text" id="reset-password-user-name" class="x-input" readonly style="background:#f8fafc;font-weight:700;">
+        </div>
+        <div class="x-form-group">
+          <label>Token Reset (bagikan ke staf)</label>
+          <textarea id="reset-password-token" class="x-input" rows="3" readonly style="background:#f0fdf4;font-family:monospace;font-size:13px;"></textarea>
+        </div>
+        <p style="font-size:12px;color:#64748b;margin-top:8px;">Staf harus membuka halaman login → "Lupa Password" → masukkan token ini → buat password baru.</p>
+      </div>
+      <div class="x-modal-footer">
+        <button type="button" class="x-btn-primary" onclick="closeResetPasswordModal()">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="x-toast-container" class="x-toast-container"></div>
+
+  <!-- LEGACY QUARANTINED: Branch Product Override compatibility modal.
+       No active forward Menu workflow should expose this editor. -->
+  <!-- MODAL: BRANCH PRODUCT EDIT (photo upload, name, description, price, category) -->
+  <div id="modal-branch-override" class="x-modal-backdrop" style="display:none; z-index: 1200;">
+    <div class="x-modal-card" style="max-width:560px;">
+      <div class="x-modal-header">
+        <div>
+          <h3 id="override-product-heading">Edit Menu Cabang</h3>
+          <p class="text-muted" style="font-size:12px;margin:0;">Kosongkan field untuk menghapus override dan kembali ke nilai Master.</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closeBranchOverrideModal()">✕</button>
+      </div>
+      <div class="x-modal-scroll-body" style="padding:20px;display:flex;flex-direction:column;gap:20px;">
+
+        <!-- PHOTO -->
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">Foto Menu</label>
+          <div class="x-file-upload-wrap">
+            <div style="width:72px;height:72px;border-radius:14px;overflow:hidden;background:#f8fafc;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <img id="override-img-preview" src="" alt="Preview foto menu" style="width:100%;height:100%;object-fit:cover;display:none;">
+              <span id="override-img-preview-mono" style="font-weight:700;color:#94a3b8;font-size:20px;">?</span>
+            </div>
+            <div class="x-file-upload-info">
+              <input type="file" id="override-img-file" class="x-input" accept="image/png,image/jpeg,image/webp">
+              <small class="text-muted" style="display:block;margin-top:4px;font-size:11px;">JPG, PNG, atau WEBP. Maks 3MB. Hanya foto menu cabang ini — tidak mengubah foto menu Master.</small>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#64748b;margin-top:6px;">Status: <span id="override-img-status" style="font-weight:700;"></span></div>
+        </div>
+
+        <!-- NAME -->
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">Nama Produk</label>
+          <div style="font-size:11px;color:#64748b;margin-bottom:6px;">
+            Nilai Master: <strong id="override-name-master"></strong>
+            &nbsp;|&nbsp; Status: <span id="override-name-status" style="font-weight:700;"></span>
+          </div>
+          <input id="override-name-input" type="text" class="x-input" placeholder="Biarkan kosong = ikuti Master" style="width:100%;" />
+        </div>
+
+        <!-- DESCRIPTION -->
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">Deskripsi Produk</label>
+          <div style="font-size:11px;color:#64748b;margin-bottom:6px;">
+            Nilai Master: <strong id="override-desc-master"></strong>
+            &nbsp;|&nbsp; Status: <span id="override-desc-status" style="font-weight:700;"></span>
+          </div>
+          <textarea id="override-desc-input" class="x-input" rows="3" placeholder="Biarkan kosong = ikuti Master" style="width:100%;resize:vertical;"></textarea>
+        </div>
+
+        <!-- PRICE -->
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:4px;">Harga Jual Cabang</label>
+          <input id="override-price-input" type="number" class="x-input" style="width:100%;" />
+          <div id="override-price-hint" style="font-size:11px;color:#64748b;margin-top:6px;"></div>
+        </div>
+
+        <!-- CATEGORY (M:N MULTI-SELECT) -->
+        <div>
+          <label style="font-size:12px;font-weight:700;color:#475569;display:block;margin-bottom:6px;">Kategori Cabang (Dapat memilih lebih dari satu)</label>
+          <div id="override-categories-list" class="x-category-select-grid">
+            <!-- Rendered dynamically as checkable cards -->
+          </div>
+          <select id="override-category-select" class="x-input" style="display:none; width:100%; margin-top:6px;">
+            <option value="">Tanpa Kategori</option>
+          </select>
+          <small class="text-muted" style="display:block;margin-top:6px;font-size:11px;">💡 Pilih satu atau beberapa kategori untuk mengelompokkan menu ini pada katalog cabang Anda.</small>
+        </div>
+
+      </div>
+      <div class="x-modal-footer" style="justify-content:space-between;">
+        <button type="button" class="x-btn-secondary" style="color:#ef4444;border-color:#fecaca;" onclick="clearBranchProductOverride()">🗑 Reset ke Master</button>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="x-btn-secondary" onclick="closeBranchOverrideModal()">Batal</button>
+          <button type="button" class="x-btn-primary" id="btn-save-override" onclick="saveBranchProductOverride()">Simpan</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: STOREFRONT BANNER CONTENT / PUBLISH -->
+  <div id="modal-marketing-banner" class="x-modal-backdrop" onclick="if (event.target === this) closeMarketingBannerModal()" style="display:none; z-index:12000;" role="dialog" aria-modal="true" aria-labelledby="modal-marketing-banner-title">
+    <div class="x-modal-card x-modal-lg x-marketing-banner-editor-modal" style="max-width:760px; width:100%; max-height:92vh; display:flex; flex-direction:column;">
+      <div class="x-modal-header" style="border-bottom:1px solid var(--border-color);">
+        <div>
+          <h3 id="modal-marketing-banner-title" style="margin:0;font-size:16px;font-weight:800;">Tambah Banner</h3>
+          <p id="modal-marketing-banner-subtitle" class="text-muted" style="margin:3px 0 0;font-size:12px;">Draft konten Banner storefront.</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closeMarketingBannerModal()" aria-label="Tutup">✕</button>
+      </div>
+
+      <form id="form-marketing-banner" style="display:flex;flex-direction:column;min-height:0;flex:1;">
+        <input type="hidden" id="mkt-banner-id" value="">
+        <div class="x-modal-scroll-body x-marketing-banner-editor-body">
+
+          <div class="x-marketing-banner-editor-grid">
+            <div class="x-marketing-banner-editor-media">
+              <div class="x-form-group">
+                <label>Media Banner <span style="color:#dc2626;">*</span></label>
+                <div class="x-marketing-banner-upload-box">
+                  <img id="mkt-banner-preview" alt="Preview Banner" style="display:none;">
+                  <div id="mkt-banner-preview-empty" class="x-marketing-banner-upload-empty">🖼️</div>
+                </div>
+                <div class="x-marketing-banner-upload-actions">
+                  <button type="button" id="mkt-banner-pick" class="x-btn-secondary">📁 Pilih Gambar</button>
+                  <button type="button" id="mkt-banner-clear" class="x-btn-secondary" style="display:none;color:#dc2626;">Hapus</button>
+                  <input type="file" id="mkt-banner-file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+                </div>
+                <small class="text-muted x-marketing-banner-help">JPG, PNG, WebP · Maks. 20 MB · source bebas rasio · output canonical ±1.94:1 melalui Media System.</small>
+              </div>
+            </div>
+
+            <div>
+              <div class="x-form-group">
+                <label for="mkt-banner-title-field">Judul Banner</label>
+                <input type="text" id="mkt-banner-title-field" class="x-input" maxlength="160" placeholder="Contoh: Promo Ramadan">
+              </div>
+              <div class="x-form-group">
+                <label for="mkt-banner-alt-field">Alt Text</label>
+                <input type="text" id="mkt-banner-alt-field" class="x-input" maxlength="160" placeholder="Deskripsi gambar untuk aksesibilitas">
+              </div>
+
+              <div class="x-form-group">
+                <label for="mkt-banner-cta-type">CTA</label>
+                <select id="mkt-banner-cta-type" class="x-input">
+                  <option value="NONE">Tanpa CTA</option>
+                  <option value="PROMOTION">Promotion</option>
+                  <option value="PRODUCT">Product</option>
+                  <option value="CATEGORY">Category</option>
+                  <option value="URL">URL</option>
+                </select>
+              </div>
+
+              <div id="mkt-banner-cta-promotion-wrap" class="x-form-group" style="display:none;">
+                <label for="mkt-banner-cta-promotion">Promotion</label>
+                <select id="mkt-banner-cta-promotion" class="x-input">
+                  <option value="">Pilih Promotion</option>
+                </select>
+              </div>
+
+              <div id="mkt-banner-cta-product-wrap" class="x-form-group" style="display:none;">
+                <label for="mkt-banner-cta-product">Product</label>
+                <select id="mkt-banner-cta-product" class="x-input">
+                  <option value="">Pilih Product</option>
+                </select>
+              </div>
+
+              <div id="mkt-banner-cta-category-wrap" class="x-form-group" style="display:none;">
+                <label for="mkt-banner-cta-category">Category</label>
+                <select id="mkt-banner-cta-category" class="x-input">
+                  <option value="">Pilih Category</option>
+                </select>
+              </div>
+
+              <div id="mkt-banner-cta-url-wrap" class="x-form-group" style="display:none;">
+                <label for="mkt-banner-cta-url">URL</label>
+                <input type="url" id="mkt-banner-cta-url" class="x-input" placeholder="https://contoh.com/promo">
+              </div>
+            </div>
+          </div>
+
+          <div id="mkt-banner-create-placement" class="x-marketing-banner-editor-section">
+            <div class="x-marketing-banner-section-title">
+              <div>
+                <strong>Penempatan Awal</strong>
+                <span>Opsional. Tanpa cabang, Banner tetap dapat disimpan sebagai content draft/published tanpa tampil di storefront.</span>
+              </div>
+            </div>
+
+            <div class="x-marketing-banner-branch-selector-header">
+              <label class="x-checkbox-label">
+                <input type="checkbox" id="mkt-banner-all-branches">
+                <span>Pilih Semua Cabang</span>
+              </label>
+              <span id="mkt-banner-branch-selection-count" class="text-muted" style="font-size:12px;">0 cabang dipilih</span>
+            </div>
+            <div id="mkt-banner-branch-list" class="x-marketing-banner-branch-list"></div>
+
+            <div class="x-marketing-banner-placement-grid">
+              <div class="x-form-group">
+                <label for="mkt-banner-position">Position</label>
+                <input type="number" id="mkt-banner-position" class="x-input" min="1" value="1">
+              </div>
+              <div class="x-form-group">
+                <label>Placement</label>
+                <input type="text" class="x-input" value="Homepage Banner" readonly>
+              </div>
+            </div>
+
+            <div class="x-marketing-banner-schedule-toggle">
+              <label class="x-checkbox-label">
+                <input type="checkbox" id="mkt-banner-schedule-enabled">
+                <span>Atur jadwal tayang</span>
+              </label>
+              <span class="text-muted" style="font-size:11px;">Timezone mengikuti Branch yang dipilih.</span>
+            </div>
+
+            <div id="mkt-banner-schedule-fields" class="x-marketing-banner-placement-grid" style="display:none;">
+              <div class="x-form-group">
+                <label for="mkt-banner-starts-at">Mulai</label>
+                <input type="datetime-local" id="mkt-banner-starts-at" class="x-input">
+              </div>
+              <div class="x-form-group">
+                <label for="mkt-banner-ends-at">Berakhir <span class="text-muted">(opsional)</span></label>
+                <input type="datetime-local" id="mkt-banner-ends-at" class="x-input">
+              </div>
+            </div>
+
+            <div class="x-marketing-banner-create-controls">
+              <label class="x-checkbox-label">
+                <input type="checkbox" id="mkt-banner-active" checked>
+                <span>Active ON</span>
+              </label>
+              <label id="mkt-banner-governance-wrap" class="x-checkbox-label">
+                <input type="checkbox" id="mkt-banner-governance-lock">
+                <span>Kunci Assignment untuk Branch Manager</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="x-marketing-banner-publish-note">
+            <strong>Publikasikan Banner</strong>
+            <span>Draft hanya tersimpan di dashboard dan belum tampil ke customer. Setelah dipublikasikan, banner dapat tampil jika Assignment sudah valid, Active ON, dan jadwal visibilitas sedang berlaku.</span>
+          </div>
+        </div>
+
+        <div class="x-modal-footer" style="justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <div id="mkt-banner-editor-state" class="text-muted" style="font-size:11px;"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <button type="button" class="x-btn-secondary" onclick="closeMarketingBannerModal()">Batal</button>
+            <button type="button" class="x-btn-secondary" id="mkt-banner-preview-from-editor">Preview</button>
+            <button type="submit" class="x-btn-secondary" id="mkt-banner-save-draft">Simpan Draft</button>
+            <button type="button" class="x-btn-primary" id="mkt-banner-publish-action">Publish Sekarang</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: BANNER ASSIGNMENT / SCHEDULE -->
+  <div id="modal-marketing-banner-assignment" class="x-modal-backdrop" onclick="if (event.target === this) closeMarketingBannerAssignmentModal()" style="display:none; z-index:12020;" role="dialog" aria-modal="true" aria-labelledby="modal-banner-assignment-title">
+    <div class="x-modal-card" style="max-width:560px;width:100%;">
+      <div class="x-modal-header">
+        <div>
+          <h3 id="modal-banner-assignment-title" style="margin:0;font-size:16px;font-weight:800;">Atur Penempatan Banner</h3>
+          <p id="modal-banner-assignment-subtitle" class="text-muted" style="margin:3px 0 0;font-size:12px;">Branch, position, Active, dan jadwal.</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closeMarketingBannerAssignmentModal()">✕</button>
+      </div>
+      <form id="form-marketing-banner-assignment" class="x-form">
+        <input type="hidden" id="mkt-assignment-banner-id" value="">
+        <input type="hidden" id="mkt-assignment-id" value="">
+
+        <div class="x-form-group">
+          <label for="mkt-assignment-branch">Cabang</label>
+          <select id="mkt-assignment-branch" class="x-input"></select>
+          <small id="mkt-assignment-timezone" class="text-muted" style="display:block;margin-top:4px;font-size:11px;"></small>
+        </div>
+
+        <div class="x-marketing-banner-placement-grid">
+          <div class="x-form-group">
+            <label for="mkt-assignment-position">Position</label>
+            <input type="number" id="mkt-assignment-position" class="x-input" min="1" value="1">
+          </div>
+          <div class="x-form-group">
+            <label>Placement</label>
+            <input type="text" class="x-input" value="Homepage Banner" readonly>
+          </div>
+        </div>
+
+        <div class="x-marketing-banner-schedule-toggle">
+          <label class="x-checkbox-label">
+            <input type="checkbox" id="mkt-assignment-schedule-enabled">
+            <span>Atur jadwal tayang</span>
+          </label>
+        </div>
+
+        <div id="mkt-assignment-schedule-fields" class="x-marketing-banner-placement-grid" style="display:none;">
+          <div class="x-form-group">
+            <label for="mkt-assignment-starts-at">Mulai</label>
+            <input type="datetime-local" id="mkt-assignment-starts-at" class="x-input">
+          </div>
+          <div class="x-form-group">
+            <label for="mkt-assignment-ends-at">Berakhir <span class="text-muted">(opsional)</span></label>
+            <input type="datetime-local" id="mkt-assignment-ends-at" class="x-input">
+          </div>
+        </div>
+
+        <div class="x-marketing-banner-create-controls">
+          <label class="x-checkbox-label">
+            <input type="checkbox" id="mkt-assignment-active" checked>
+            <span>Active ON</span>
+          </label>
+          <label id="mkt-assignment-governance-wrap" class="x-checkbox-label">
+            <input type="checkbox" id="mkt-assignment-governance-lock">
+            <span>Kunci untuk Branch Manager</span>
+          </label>
+        </div>
+
+        <div class="x-modal-footer">
+          <button type="button" class="x-btn-secondary" onclick="closeMarketingBannerAssignmentModal()">Batal</button>
+          <button type="submit" class="x-btn-primary" id="btn-save-banner-assignment">Simpan Penempatan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: BANNER PREVIEW -->
+  <div id="modal-marketing-banner-preview" class="x-modal-backdrop" onclick="if (event.target === this) closeMarketingBannerPreview()" style="display:none; z-index:12030;">
+    <div class="x-modal-card" style="max-width:720px;width:100%;">
+      <div class="x-modal-header">
+        <div>
+          <h3 id="modal-banner-preview-title" style="margin:0;font-size:16px;font-weight:800;">Preview Banner</h3>
+          <p id="modal-banner-preview-subtitle" class="text-muted" style="margin:3px 0 0;font-size:12px;">Customer-facing preview.</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closeMarketingBannerPreview()">✕</button>
+      </div>
+      <div style="padding:20px;">
+        <div id="mkt-banner-preview-stage" class="x-marketing-banner-preview-stage"></div>
+        <div id="mkt-banner-preview-meta" class="x-marketing-banner-preview-meta"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REUSABLE IMAGE CROP EDITOR (MEDIA SYSTEM M2) -->
+  <div id="modal-crop-editor" class="x-modal-backdrop" style="display:none; z-index: 12010;" role="dialog" aria-modal="true" aria-labelledby="crop-editor-title">
+    <div class="x-crop-modal-card">
+      <div class="x-modal-header">
+        <div>
+          <h3 id="crop-editor-title">Sesuaikan Posisi & Potongan Foto</h3>
+          <p id="crop-editor-subtitle" class="text-muted" style="font-size:12px;margin:0;">Geser dan sesuaikan zoom untuk framing terbaik.</p>
+        </div>
+        <button type="button" class="x-modal-close" id="btn-crop-close" aria-label="Tutup Editor Crop">✕</button>
+      </div>
+
+      <div class="x-crop-body">
+        <!-- Interactive Viewport -->
+        <div id="crop-viewport" class="x-crop-viewport" tabindex="0" role="region" aria-label="Area Crop Interaktif">
+          <div id="crop-canvas-wrapper" class="x-crop-canvas-wrapper">
+            <img id="crop-target-image" class="x-crop-image" alt="Preview Gambar Crop" src="" />
+          </div>
+          <!-- Framing border overlay -->
+          <div id="crop-framing-box" class="x-crop-overlay">
+            <div class="x-crop-grid">
+              <div class="x-crop-grid-line-v x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-v x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-v x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-v x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-h"></div>
+              <div class="x-crop-grid-line-v"></div>
+              <div class="x-crop-grid-line-v"></div>
+              <div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toolbar & Zoom Controls -->
+        <div class="x-crop-toolbar">
+          <div class="x-crop-slider-group">
+            <span class="x-crop-slider-label">🔍 Zoom:</span>
+            <input type="range" id="crop-zoom-slider" class="x-crop-slider" min="1.0" max="3.0" step="0.05" value="1.0" aria-label="Tingkat Zoom" />
+            <span id="crop-zoom-value" class="x-crop-slider-label" style="min-width:36px;">100%</span>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button type="button" id="btn-crop-zoom-out" class="x-crop-tool-btn" title="Perkecil">−</button>
+            <button type="button" id="btn-crop-zoom-in" class="x-crop-tool-btn" title="Perbesar">＋</button>
+            <button type="button" id="btn-crop-reset" class="x-crop-tool-btn" title="Reset Posisi & Zoom">🔄 Reset</button>
+          </div>
+        </div>
+
+        <!-- Info Bar -->
+        <div class="x-crop-info-bar">
+          <span id="crop-dimensions-info">Dimensi: -</span>
+          <span id="crop-ratio-info">Rasio Target: 1:1</span>
+        </div>
+      </div>
+
+      <div class="x-modal-footer">
+        <button type="button" class="x-btn-secondary" id="btn-crop-cancel">Batal</button>
+        <button type="button" class="x-btn-primary" id="btn-crop-confirm">✓ Konfirmasi Potongan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- P8: Operational Modal: Branch Order Rejection -->
+  <div id="modal-mkt-promotion" class="x-modal-backdrop" onclick="if (event.target === this) closePromotionModal()" style="display:none; z-index: 1050;">
+    <div class="x-modal-card x-modal-lg" style="max-width: 760px; width: 100%; max-height: 92vh; display: flex; flex-direction: column; background: #ffffff; border-radius: 14px; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.22); overflow: hidden;">
+      
+      <!-- Modal Header -->
+      <div class="x-modal-header" style="padding: 18px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
+        <div>
+          <h3 id="modal-mkt-promo-title" style="margin: 0; font-size: 17px; font-weight: 700; color: #0f172a; letter-spacing: -0.01em;">Buat Program Promosi Baru</h3>
+          <p class="text-muted" style="margin: 3px 0 0; font-size: 12px; color: #64748b;">Atur keuntungan pelanggan, syarat berlakunya promo, dan tampilan banner.</p>
+        </div>
+        <button type="button" class="x-modal-close" onclick="closePromotionModal()" style="font-size: 18px; color: #64748b; background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 6px;">✕</button>
+      </div>
+
+      <!-- Form Body -->
+      <form id="form-mkt-promotion" onsubmit="submitPromotionForm(event)" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; margin: 0;">
+        <input type="hidden" id="mkt-promo-id" value="">
+
+        <div style="padding: 22px 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; flex: 1; background: #f8fafc;">
+          
+          <!-- SECTION A: INFORMASI PROMO -->
+          <div class="x-promo-section-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 12px;">A</span>
+              <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">Informasi Promo</h4>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+              <div style="grid-column: span 2;">
+                <label for="mkt-promo-name" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 5px;">Nama Promo <span style="color:#ef4444;">*</span></label>
+                <input type="text" id="mkt-promo-name" class="x-input" placeholder="Contoh: Hadiah Instalasi Aplikasi PWA" required style="width: 100%; font-size: 13px;">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Nama program untuk identifikasi di dashboard dan laporan.</small>
+              </div>
+
+              <div>
+                <label for="mkt-promo-capability" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 5px;">Jenis Promo</label>
+                <select id="mkt-promo-capability" class="x-input" style="width: 100%; font-size: 13px;" onchange="onPromotionCapabilityChange()">
+                  <option value="install_incentive">Hadiah Pemasangan Aplikasi PWA</option>
+                  <option value="first_order">Pesanan Pertama Pelanggan Baru</option>
+                  <option value="general">Promosi Umum</option>
+                </select>
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Menentukan momen pemicu promo.</small>
+              </div>
+
+              <div>
+                <label for="mkt-promo-status" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 5px;">Status Promo</label>
+                <select id="mkt-promo-status" class="x-input" style="width: 100%; font-size: 13px;">
+                  <option value="1">Aktif</option>
+                  <option value="0">Nonaktif</option>
+                </select>
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Pelanggan hanya dapat melihat & mengklaim promo yang aktif.</small>
+              </div>
+
+              <div style="grid-column: span 2;">
+                <label for="mkt-promo-code" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 5px;">Kode Promo / Kupon <span style="font-size:11px; font-weight:400; color:#64748b;">(Opsional)</span></label>
+                <input type="text" id="mkt-promo-code" class="x-input" placeholder="Misal: PWABANGJO" style="width: 100%; font-size: 13px; text-transform: uppercase;">
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION B: BENEFIT / KEUNTUNGAN CUSTOMER -->
+          <div class="x-promo-section-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: #dcfce7; color: #15803d; font-weight: 700; font-size: 12px;">B</span>
+                <div>
+                  <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">Customer Mendapat Apa?</h4>
+                  <span style="font-size: 11px; color: #64748b;">Pilih bentuk keuntungan yang langsung dinikmati pelanggan.</span>
+                </div>
+              </div>
+              <span class="x-badge" style="background: #f0fdf4; color: #16a34a; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; border: 1px solid #bbf7d0;">Benefit Promo</span>
+            </div>
+
+            <!-- Benefit Selector Buttons / Radios -->
+            <div style="margin-bottom: 14px;">
+              <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 6px;">Bentuk Keuntungan</label>
+              <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <label style="display: inline-flex; align-items: center; gap: 8px; border: 2px solid #0f172a; background: #f8fafc; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: #0f172a;">
+                  <input type="radio" name="mkt-promo-benefit-type-ui" value="freebie_product" checked onchange="onPromotionBenefitTypeUiChange('freebie_product')">
+                  🎁 Produk Gratis
+                </label>
+                <!-- Disabled note for unsupported backend types -->
+                <div style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #94a3b8; padding: 8px 10px; background: #f1f5f9; border-radius: 8px; border: 1px dashed #cbd5e1;" title="Fitur diskon persentase dan potongan nota sedang dalam roadmap pengembangan.">
+                  <span>🏷️ Diskon / Potongan Nota</span>
+                  <span style="font-size: 10px; background: #e2e8f0; color: #64748b; padding: 1px 6px; border-radius: 4px; font-weight: 600;">Segera Hadir</span>
+                </div>
+              </div>
+              <input type="hidden" id="mkt-promo-reward-type" value="freebie_product">
+            </div>
+
+            <!-- Freebie Product Details Box -->
+            <div id="mkt-promo-benefit-freebie-box" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px;">
+              <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 14px;">
+                <div>
+                  <label for="mkt-promo-target-product" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Produk yang Diberikan <span style="color:#ef4444;">*</span></label>
+                  <select id="mkt-promo-target-product" class="x-input" required style="width: 100%; font-size: 13px;" onchange="onPromotionProductSelected()">
+                    <option value="">-- Pilih Produk dari Menu Master --</option>
+                  </select>
+                  <div id="mkt-promo-target-product-retry-container" style="display:none; margin-top: 4px;">
+                    <span style="font-size: 11px; color: #ef4444;">Gagal memuat produk dari server. </span>
+                    <button type="button" class="x-btn-ghost" style="padding: 2px 6px; font-size: 11px; color: #0284c7; text-decoration: underline;" onclick="retryLoadPromoProducts()">Coba Lagi</button>
+                  </div>
+                  <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Diambil dari menu master resmi brand.</small>
+                </div>
+                <div>
+                  <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Jumlah Diberikan</label>
+                  <input type="text" class="x-input" value="1 porsi / item" readonly disabled style="width: 100%; font-size: 13px; background: #e2e8f0; color: #475569; font-weight: 600;">
+                  <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">1 item per klaim valid.</small>
+                </div>
+              </div>
+
+              <!-- Product Price Summary Callout -->
+              <div id="mkt-promo-product-summary" style="margin-top: 12px; padding: 10px 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
+                <div>
+                  <span class="text-muted">Harga normal produk: </span>
+                  <strong id="mkt-promo-product-normal-price" style="color: #475569;">-</strong>
+                </div>
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span class="text-muted">Biaya untuk customer: </span>
+                  <span class="x-badge" style="background: #dcfce7; color: #15803d; font-weight: 700; font-size: 12px; padding: 3px 10px; border-radius: 6px;">Rp0 (GRATIS)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION C: SYARAT & PEMBERLAKUAN (KETENTUAN PROMO) -->
+          <div class="x-promo-section-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+              <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: #fef3c7; color: #b45309; font-weight: 700; font-size: 12px;">C</span>
+              <div>
+                <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">Ketentuan Promo</h4>
+                <span style="font-size: 11px; color: #64748b;">Batasan kuota, penggabungan promo, jadwal aktif, dan cabang yang berlaku.</span>
+              </div>
+            </div>
+
+            <!-- Stacking & Usage Limits -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+              <div>
+                <label for="mkt-promo-stacking" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Kebijakan dengan Promo Lain</label>
+                <select id="mkt-promo-stacking" class="x-input" style="width: 100%; font-size: 13px;">
+                  <option value="exclusive">Tidak dapat digabung (Eksklusif)</option>
+                  <option value="combinable">Dapat digabung dengan promo lain</option>
+                </select>
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Aturan saat ada promo aktif lain.</small>
+              </div>
+
+              <div>
+                <label for="mkt-promo-limit-per-user" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Batas per Pelanggan</label>
+                <input type="number" id="mkt-promo-limit-per-user" class="x-input" value="1" min="1" style="width: 100%; font-size: 13px;">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Maksimal klaim tiap pelanggan.</small>
+              </div>
+
+              <div>
+                <label for="mkt-promo-limit-total" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Batas Total Penggunaan <span style="font-size:11px; font-weight:400; color:#64748b;">(Opsional)</span></label>
+                <input type="number" id="mkt-promo-limit-total" class="x-input" placeholder="Tidak terbatas" min="1" style="width: 100%; font-size: 13px;">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">Kosongkan bila tanpa kuota total.</small>
+              </div>
+            </div>
+
+            <!-- Promotion Schedule -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
+              <div style="font-size: 12px; font-weight: 700; color: #1e293b; margin-bottom: 8px;">🗓️ Periode Berlaku Promo</div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div>
+                  <label for="mkt-promo-start-at" style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Mulai Promo</label>
+                  <input type="datetime-local" id="mkt-promo-start-at" class="x-input" style="width: 100%; font-size: 12px;">
+                  <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Kosongkan jika langsung aktif.</small>
+                </div>
+                <div>
+                  <label for="mkt-promo-end-at" style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Berakhir Promo</label>
+                  <input type="datetime-local" id="mkt-promo-end-at" class="x-input" style="width: 100%; font-size: 12px;">
+                  <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Kosongkan jika berlaku selamanya.</small>
+                </div>
+              </div>
+            </div>
+
+            <!-- Branch Availability Scoping Box -->
+            <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div>
+                  <div style="font-size: 12px; font-weight: 700; color: #1e293b;">🏢 Cabang yang Ikut Promo</div>
+                  <div style="font-size: 11px; color: #64748b;">Promo hanya berlaku di cabang yang dicentang.</div>
+                </div>
+                <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; cursor: pointer; color: #0f172a;">
+                  <input type="checkbox" id="mkt-promo-branches-all" onchange="togglePromoSelectAllBranches(this.checked)">
+                  Pilih Semua Cabang
+                </label>
+              </div>
+              <div id="mkt-promo-branches-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; max-height: 140px; overflow-y: auto; padding: 2px;">
+                <span class="text-muted" style="font-size: 12px;">Memuat cabang...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION D: YANG DILIHAT CUSTOMER (PRESENTASI BANNER) -->
+          <div id="mkt-promo-presentation-box" class="x-promo-section-card" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid #f1f5f9; padding-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; background: #ede9fe; color: #6d28d9; font-weight: 700; font-size: 12px;">D</span>
+                <div>
+                  <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">Yang Dilihat Customer</h4>
+                  <span style="font-size: 11px; color: #64748b;">Atur pesan banner floating install yang muncul di layar pelanggan.</span>
+                </div>
+              </div>
+              <span class="x-badge" style="background: #f5f3ff; color: #7c3aed; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; border: 1px solid #ddd6fe;">Floating Install PWA</span>
+            </div>
+
+            <!-- Headline, Subtitle, & CTA Text -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+              <div style="grid-column: span 2;">
+                <label for="mkt-promo-banner-title" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Headline Banner <span style="color:#ef4444;">*</span></label>
+                <input type="text" id="mkt-promo-banner-title" class="x-input" placeholder="Contoh: Install sekarang & dapatkan gratis es teh" maxlength="100" style="width: 100%; font-size: 13px;" oninput="updatePromotionPresentationPreview()">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Judul utama yang langsung dibaca pelanggan.</small>
+              </div>
+
+              <div>
+                <label for="mkt-promo-cta-text" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Teks Tombol (CTA)</label>
+                <input type="text" id="mkt-promo-cta-text" class="x-input" value="Install" placeholder="Install" maxlength="20" style="width: 100%; font-size: 13px;" oninput="updatePromotionPresentationPreview()">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Default: Install</small>
+              </div>
+
+              <div style="grid-column: span 3;">
+                <label for="mkt-promo-banner-subtitle" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Sub-headline (Keterangan / S&K Singkat)</label>
+                <input type="text" id="mkt-promo-banner-subtitle" class="x-input" placeholder="Contoh: syarat & ketentuan berlaku" maxlength="120" style="width: 100%; font-size: 13px;" oninput="updatePromotionPresentationPreview()">
+                <small style="display:block; color:#64748b; font-size:11px; margin-top:2px;">Teks sekunder di bawah judul banner.</small>
+              </div>
+            </div>
+
+            <!-- Icon / Logo Selection -->
+            <div style="display: flex; gap: 16px; align-items: center; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
+              <input type="hidden" id="mkt-promo-media-id" value="">
+              <input type="hidden" id="mkt-promo-icon-url" value="">
+              <div style="width: 48px; height: 48px; border-radius: 10px; border: 1px solid #cbd5e1; background: #ffffff; overflow: hidden; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <img id="mkt-promo-icon-preview" src="/assets/pwa/icon-192.png" alt="Promo Icon" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.src='/assets/pwa/icon-192.png'">
+              </div>
+              <div style="flex: 1;">
+                <label style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Logo / Icon Promo</label>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                  <button type="button" class="x-btn-secondary" style="padding: 5px 12px; font-size: 12px; border-radius: 6px;" onclick="document.getElementById('mkt-promo-icon-file').click()">Ganti Logo</button>
+                  <button type="button" class="x-btn-ghost" style="padding: 5px 10px; font-size: 12px; color: #ef4444;" onclick="resetPromotionIconToDefault()">Gunakan Default</button>
+                  <input type="file" id="mkt-promo-icon-file" accept="image/png,image/jpeg,image/webp" style="display: none;" onchange="onPromotionIconFileSelected(this.files[0])">
+                </div>
+                <span id="mkt-promo-icon-status" style="font-size: 11px; color: #64748b; display: block; margin-top: 4px;">Format: PNG, JPG, WebP. Maks 10MB (Rasio 1:1).</span>
+              </div>
+            </div>
+
+            <!-- Realtime Live Preview Card -->
+            <div style="background: #f1f5f9; border-radius: 8px; padding: 14px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.5px;">Preview Real-Time di Layar Customer:</span>
+                <span style="font-size: 10px; color: #64748b;">Styling tombol terkunci sesuai standar platform</span>
+              </div>
+              <!-- Floating Banner Card with locked CTA styling (Dark Gray CTA + White Text) -->
+              <div style="background: #ffffff; border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0; max-width: 480px;">
+                <div style="display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1;">
+                  <img id="mkt-promo-live-icon" src="/assets/pwa/icon-192.png" alt="" style="width: 38px; height: 38px; border-radius: 8px; object-fit: cover; flex-shrink: 0;" onerror="this.src='/assets/pwa/icon-192.png'">
+                  <div style="min-width: 0; flex: 1;">
+                    <div id="mkt-promo-live-title" style="font-size: 12px; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Install sekarang & dapatkan gratis es teh</div>
+                    <div id="mkt-promo-live-subtitle" style="font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">syarat & ketentuan berlaku</div>
+                  </div>
+                </div>
+                <!-- Locked CTA Button: Dark Gray Background (#0f172a) + White Text (#ffffff) -->
+                <div style="display: flex; align-items: center; gap: 8px; margin-left: 10px; flex-shrink: 0;">
+                  <button type="button" disabled style="background: #0f172a; color: #ffffff; border: none; border-radius: 20px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: default; letter-spacing: 0.01em;">
+                    <span id="mkt-promo-live-cta-btn">Install</span>
+                  </button>
+                  <span style="color: #94a3b8; font-size: 13px; cursor: default; padding: 2px;">✕</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- Modal Sticky Footer -->
+        <div class="x-modal-footer" style="padding: 14px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #ffffff;">
+          <button type="button" class="x-btn-secondary" onclick="closePromotionModal()" style="padding: 9px 18px; font-size: 13px; border-radius: 8px;">Batal</button>
+          <button type="submit" id="btn-mkt-submit-promo" class="x-btn-primary" style="padding: 9px 20px; font-size: 13px; border-radius: 8px; font-weight: 700;">Simpan Promo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- Persistent mobile application-shell navigation. Must stay outside route/page sections. -->
+<nav class="x-owner-bottom-nav" id="x-owner-bottom-nav" aria-label="Navigasi Utama Mobile Owner">
+        <button type="button" class="x-owner-nav-item active" data-tab-module="beranda" data-route="overview" aria-current="page">
+          <img src="/merchant-dashboard/assets/icons/fa7-solid_home.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span>Beranda</span>
+        </button>
+        <button type="button" class="x-owner-nav-item" data-tab-module="bisnis" data-route="business">
+          <img src="/merchant-dashboard/assets/icons/ic_round-business-center-new.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span>Bisnis</span>
+        </button>
+        <button type="button" class="x-owner-nav-item" data-tab-module="pesanan" data-route="orders">
+          <img src="/merchant-dashboard/assets/icons/fluent_task-list-rectangle-28-filled.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span>Pesanan</span>
+        </button>
+        <button type="button" class="x-owner-nav-item" data-tab-module="keuangan" data-route="finance">
+          <img src="/merchant-dashboard/assets/icons/reicon_wallet-money-filled.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span>Keuangan</span>
+        </button>
+        <button type="button" class="x-owner-nav-item" data-tab-module="lainnya" data-route="more">
+          <img src="/merchant-dashboard/assets/icons/reicon_menu-board-filled.svg" alt="" width="24" height="24" aria-hidden="true">
+          <span>Lainnya</span>
+        </button>
+      </nav>
+
+  <!-- Mobile Account Page (GoBiz / Xentra style) -->
+  <section class="x-mobile-account-page" id="x-mobile-account-page" aria-hidden="true">
+    <div class="x-mobile-account-statusbar-spacer"></div>
+    <header class="x-mobile-account-header">
+      <button type="button" class="x-mobile-account-back" id="btn-mobile-account-back" aria-label="Kembali">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      </button>
+      <h1>Akun</h1>
+    </header>
+
+    <main class="x-mobile-account-content">
+      <div class="x-mobile-account-profile-card" id="mobile-account-profile-card">
+        <div class="x-mobile-account-profile-copy">
+          <div class="x-mobile-account-name-row">
+            <strong id="mobile-account-name">Pemilik Toko</strong>
+            <span class="x-mobile-account-role-divider" aria-hidden="true">|</span>
+            <span id="mobile-account-role">Owner</span>
+          </div>
+          <span id="mobile-account-email">-</span>
+          <span id="mobile-account-brand">-</span>
+        </div>
+        <span class="x-mobile-account-chevron x-mobile-account-profile-chevron" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </span>
+      </div>
+
+      <section class="x-mobile-account-section">
+        <h2>Bisnis</h2>
+        <div class="x-mobile-account-list-card">
+          <button type="button" class="x-mobile-account-row" onclick="navigateTo('branches'); closeMobileAccount();">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Daftar Cabang</span>
+            <span class="x-mobile-account-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+          </button>
+          <button type="button" class="x-mobile-account-row" onclick="navigateTo('settings'); closeMobileAccount();">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Pengaturan Toko</span>
+            <span class="x-mobile-account-chevron" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+          </button>
+        </div>
+      </section>
+
+      <section class="x-mobile-account-section">
+        <h2>Info lainnya</h2>
+        <div class="x-mobile-account-list-card">
+          <div class="x-mobile-account-row">
+            <span class="x-mobile-account-leading-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            </span>
+            <span class="x-mobile-account-row-label">Versi Aplikasi</span>
+            <span class="x-mobile-account-value">Xentra Core v3.0</span>
+          </div>
+        </div>
+      </section>
+
+      <button type="button" class="x-mobile-account-logout" id="btn-mobile-account-logout">Keluar</button>
+    </main>
+  </section>
+
+  <!-- Dashboard JavaScript -->
+  <!-- Shared merchant infrastructure (auth, toast, action-menu, crop editor) — must load first -->
+  <script src="/merchant-shared/js/shared.js?v=1.0.1"></script>
+  <script src="/merchant-shared/js/action-menu.js?v=1.0.1"></script>
+  <script src="/merchant-shared/js/crop-editor.js?v=1.0.1"></script>
+  <script src="/merchant-shared/js/catalog-client.js?v=1.0.1"></script>
+  <script src="/merchant-dashboard/assets/js/branch-catalog-ui.js?v=1.0.0"></script>
+  <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
+  <script src="/merchant-shared/js/presentation-shells.js?v=1.0.0"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.43"></script>
+</body>
+</html>  <!-- BRANCH EDITOR PAGE: complex branch creation/editing is a focused Page, not a modal. -->
+      <div id="branch-editor-view" class="x-card-panel" style="display:none;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <button type="button" class="x-btn-secondary" id="btn-back-from-branch-editor">← Kembali ke Daftar Cabang</button>
+          <span class="text-muted">/</span>
+          <strong id="branch-editor-breadcrumb">Tambah Cabang</strong>
+        </div>
+        <div class="x-panel-header">
+          <h3 id="branch-editor-title">Tambah Cabang</h3>
+          <p>Kelola identitas, lokasi, kontak, dan aturan operasional cabang.</p>
+        </div>
+        <form id="form-branch" class="x-form">
+          <input type="hidden" id="branch-id" value="">
+          <div class="x-form-group">
+            <label for="branch-name">Nama Cabang</label>
+            <input type="text" id="branch-name" class="x-input" placeholder="Contoh: Bangjo Depok Margonda" required>
+          </div>
+          <div class="x-form-group">
+            <label for="branch-address">Alamat / Titik Lokasi</label>
+            <input type="text" id="branch-address" class="x-input" placeholder="Jalan, kelurahan, kota..." required>
+          </div>
+          <div class="x-form-group">
+            <label for="branch-phone">Nomor WhatsApp Cabang (Wajib)</label>
+            <input type="text" id="branch-phone" class="x-input" placeholder="Contoh: 081234567890 atau 6281234567890" required>
+          </div>
+          <div class="x-form-row">
+            <div class="x-form-group">
+              <label for="branch-latitude">Latitude (Koordinat GPS)</label>
+              <input type="number" id="branch-latitude" class="x-input" step="any" placeholder="-6.2989">
+            </div>
+            <div class="x-form-group">
+              <label for="branch-longitude">Longitude (Koordinat GPS)</label>
+              <input type="number" id="branch-longitude" class="x-input" step="any" placeholder="106.8157">
+            </div>
+          </div>
+          <div class="x-form-row">
+            <div class="x-form-group">
+              <label for="branch-free-km">Gratis Ongkir KM Pertama</label>
+              <input type="number" id="branch-free-km" class="x-input" min="0" step="0.5" placeholder="0">
+            </div>
+            <div class="x-form-group">
+              <label for="branch-price-km">Tarif Ongkir per KM (Rp)</label>
+              <input type="number" id="branch-price-km" class="x-input" min="0" placeholder="3000">
+            </div>
+          </div>
+          <div class="x-form-row">
+            <div class="x-form-group">
+              <label for="branch-radius">Radius Maksimal (KM)</label>
+              <input type="number" id="branch-radius" class="x-input" min="1" placeholder="10">
+            </div>
+            <div class="x-form-group">
+              <label for="branch-promo-minorder">Promo Min. Order (Rp)</label>
+              <input type="number" id="branch-promo-minorder" class="x-input" min="0" placeholder="50000">
+            </div>
+          </div>
+          <div class="x-form-group">
+            <label for="branch-promo-discount">Promo Diskon Ongkir (Rp)</label>
+            <input type="number" id="branch-promo-discount" class="x-input" min="0" placeholder="10000">
+          </div>
+          <div class="x-form-group">
+            <label class="x-checkbox-label">
+              <input type="checkbox" id="branch-open-override" checked>
+              <span>Cabang sedang Buka Operasional</span>
+            </label>
+          </div>
+          <div class="x-form-actions" style="display:flex;justify-content:flex-end;gap:8px;">
+            <button type="button" class="x-btn-secondary" id="btn-cancel-branch-editor">Batal</button>
+            <button type="submit" class="x-btn-primary">Simpan Cabang</button>
+          </div>
+        </form>
+      </div>
 
   <!-- MODAL: ADOPT PRODUCT FORM -->
   <div id="modal-adopt-product" class="x-modal-backdrop" style="display:none; z-index: 1100;">
