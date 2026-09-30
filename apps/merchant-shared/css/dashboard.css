@@ -7592,18 +7592,6 @@ input[type="file"].x-input,
     margin-bottom: 0 !important;
   }
 
-  /* Chevron kembali di judul Produk Master: sejajar dengan teks judulnya dan tetap
-     nyaman ditekan di layar kecil. */
-  #product-list-view .x-master-products-title,
-  #tab-catalog-categories .x-master-products-title {
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    /* h3 punya margin bawaan browser (~1em di atas) dan tidak ada aturan yang
-       menghapusnya, jadi judulnya terdorong turun dari top bar. Beranda tidak kena
-       karena elemen pertamanya sebuah <div>, bukan <h3>. */
-    margin: 0 !important;
-  }
   /* CTA Tambah Produk Baru: tinggi dan radiusnya mengikuti form pencarian di bawahnya.
      Form itu memakai .x-input (padding 10px 14px, radius var(--radius-sm), font 14px,
      tanpa height tetap), jadi token yang sama dipakai di sini — tingginya jadi sama
@@ -7626,32 +7614,9 @@ input[type="file"].x-input,
     margin-top: 4px !important;
   }
 
-  /* Keterangan di bawah judul: kecil, rata kiri, dan sejajar dengan TEKS judulnya —
-     chevron 30px + jarak 8px = 38px, jadi tidak menggantung di bawah chevron. */
-  #product-list-view .x-master-products-sub,
-  #tab-catalog-categories .x-master-products-sub {
-    margin: 0 0 0 38px !important;
-    padding: 0 !important;
-    font-size: 12px !important;
-    line-height: 1.4 !important;
-    font-weight: 500 !important;
-    text-align: left !important;
-    color: #747c83 !important;
-  }
-  #product-list-view .x-title-back-btn,
-  #tab-catalog-categories .x-title-back-btn {
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 30px !important;
-    height: 30px !important;
-    padding: 0 !important;
-    border: 0 !important;
-    border-radius: 50% !important;
-    background: #f1f5f9 !important;
-    color: #334155 !important;
-    cursor: pointer !important;
-  }
+  /* Judul & keterangan Produk Master/Kategori memakai blok header child page yang
+     sama dengan Tambah Produk (.x-owner-child-mobile-header). Tidak ada ukuran,
+     warna, atau offset khusus per halaman di sini — satu gaya untuk semua. */
 
   /* Pencarian dan pemilih kategori ditumpuk penuh lebar, bukan berdampingan. */
   #product-list-view > div[style*="display:flex"] {
@@ -9183,6 +9148,13 @@ input[type="file"].x-input,
   display: block;
   min-width: 0;
   margin: 0 0 16px;
+}
+
+/* Produk Master: blok header-nya berdampingan dengan CTA di satu baris flex, jadi
+   jarak ke CTA diatur oleh baris itu sendiri (row-gap), bukan margin blok header.
+   Ini satu-satunya pengecualian untuk posisi, bukan untuk gaya chevron/judul/deskripsi. */
+#product-list-view .x-master-products-head .x-owner-child-mobile-header {
+  margin-bottom: 0;
 }
 
 .x-owner-child-legacy-nav {

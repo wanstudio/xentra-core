@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.31">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.32">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -1376,7 +1376,7 @@
           <div class="x-owner-child-mobile-header">
             <h3 class="x-owner-mobile-page-title">
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
-              <span>Detail Pesanan</span>
+              <span id="order-detail-mobile-title">Detail Pesanan</span>
             </h3>
             <p class="x-owner-mobile-page-sub">Rincian transaksi, pembayaran, fulfillment, dan item pesanan.</p>
           </div>
@@ -1519,11 +1519,12 @@
             <!-- TAB: CATALOG / CATEGORIES -->
       <section id="tab-catalog-categories" class="x-tab-content" data-tab="catalog-categories">
         <div class="x-card-panel x-owner-child-page-shell x-master-reference-page">
-          <div class="x-panel-header-flex">
-            <div>
-              <h3 class="x-master-products-title x-owner-mobile-page-title"><button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-category-back" aria-label="Kembali" onclick="goBackFromCategory()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button> Kategori</h3>
-              <p class="x-master-products-sub x-owner-mobile-page-sub">Kelola Master Kategori, Rasa, dan Kelengkapan</p>
-            </div>
+          <div class="x-owner-child-mobile-header">
+            <h3 class="x-owner-mobile-page-title">
+              <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-category-back" aria-label="Kembali" onclick="goBackFromCategory()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+              <span>Kategori</span>
+            </h3>
+            <p class="x-owner-mobile-page-sub">Kelola Master Kategori, Rasa, dan Kelengkapan</p>
           </div>
 
           <div class="x-subnav-tabs x-master-reference-tabs" id="master-reference-tabs" role="tablist" aria-label="Master kategori menu">
@@ -1581,14 +1582,14 @@
                dan daftar produknya berada di luar kartu, langsung di panelnya. -->
           <div class="x-card x-master-products-head">
             <div class="x-panel-header-flex">
-              <div>
-                <h3 class="x-master-products-title x-owner-mobile-page-title">
+              <div class="x-owner-child-mobile-header">
+                <h3 class="x-owner-mobile-page-title">
                   <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-products-back" aria-label="Kembali" onclick="goBackFromMasterProducts()">
                     <svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
                   </button>
-                  Produk Master
+                  <span>Produk Master</span>
                 </h3>
-                <p class="x-master-products-sub x-owner-mobile-page-sub">Cabang mengadopsi produk dari katalog ini</p>
+                <p class="x-owner-mobile-page-sub">Cabang mengadopsi produk dari katalog ini</p>
               </div>
               <div class="x-header-buttons">
                 <button type="button" class="x-btn-primary" id="btn-add-product-main">+ Tambah Produk Baru</button>
@@ -1652,7 +1653,7 @@
           <div class="x-owner-child-mobile-header">
             <h3 class="x-owner-mobile-page-title">
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
-              <span>Detail Produk</span>
+              <span id="product-detail-mobile-title">Detail Produk</span>
             </h3>
             <p class="x-owner-mobile-page-sub">Informasi produk master dan status adopsi di setiap cabang.</p>
           </div>
