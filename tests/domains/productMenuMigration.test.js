@@ -207,6 +207,43 @@ test('verification marks a valid canonical Product as verified', () => {
   assert.deepEqual(product, { menu_schema_version: 2, menu_migration_status: 'verified' });
 });
 
+test('reconciliation does not downgrade an already verified canonical Product', () => {
+  const before = db.prepare(
+    'SELECT attempt_count FROM product_menu_migrations WHERE product_id = ?'
+  ).get(PRODUCT_WITH_COMPOSITION);
+
+  const result = ProductMenuMigrationService.reconcileProduct({
+    brandId: BRAND,
+    productId: PRODUCT_WITH_COMPOSITION,
+    apply: true
+  });
+  assert.equal(result.status, 'verified');
+  assert.equal(result.persisted, false);
+
+  const after = db.prepare(
+    'SELECT attempt_count, status FROM product_menu_migrations WHERE product_id = ?'
+  ).get(PRODUCT_WITH_COMPOSITION);
+  assert.equal(after.status, 'verified');
+  assert.equal(after.attempt_count, before.attempt_count);
+});
+
+test('canonical schema marker is rejected when its Master Category reference is invalid', () => {
+  db.prepare(
+    "UPDATE products SET category_id = NULL, menu_schema_version = 2, menu_migration_status = 'migrated' WHERE id = ?"
+  ).run(PRODUCT_LEGACY);
+
+  const result = ProductMenuMigrationService.planProductMigration({
+    brandId: BRAND,
+    productId: PRODUCT_LEGACY
+  });
+  assert.equal(result.status, 'needs_review');
+  assert.ok(result.errors.includes('MASTER_CATEGORY_REQUIRED'));
+
+  db.prepare(
+    "UPDATE products SET category_id = ?, menu_schema_version = 1, menu_migration_status = 'legacy' WHERE id = ?"
+  ).run(CATEGORY, PRODUCT_LEGACY);
+});
+
 test.after(() => {
   db.prepare('DELETE FROM product_menu_migrations WHERE product_id IN (?, ?)').run(PRODUCT_WITH_COMPOSITION, PRODUCT_LEGACY);
   db.prepare('DELETE FROM product_flavors WHERE product_id IN (?, ?)').run(PRODUCT_WITH_COMPOSITION, PRODUCT_LEGACY);
