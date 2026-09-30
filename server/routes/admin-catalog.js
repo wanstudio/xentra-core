@@ -239,7 +239,16 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       }
     }
 
-    const stmt = db.prepare(`
+    // SQLite reports changes=0 when the submitted values are identical to the
+    // existing row. That is still a successful edit/save, not a 404.
+    const existing = db.prepare(
+      'SELECT id FROM products WHERE id = ? AND brand_id = ?'
+    ).get(req.params.id, req.brand_id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan.' });
+    }
+
+    db.prepare(`
       UPDATE products 
       SET name = COALESCE(?, name),
           category_id = COALESCE(?, category_id),
@@ -266,11 +275,11 @@ router.put('/admin/products/:id', requireAuth(['owner', 'brand_manager']), (req,
       req.brand_id
     );
 
-    if (!stmt || stmt.changes === 0) {
-      return res.status(404).json({ success: false, error: 'Menu produk tidak ditemukan atau tidak berubah.' });
-    }
+    const product = db.prepare(
+      'SELECT * FROM products WHERE id = ? AND brand_id = ?'
+    ).get(req.params.id, req.brand_id);
 
-    res.json({ success: true, message: 'Menu produk berhasil diperbarui.' });
+    res.json({ success: true, message: 'Menu produk berhasil diperbarui.', product });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -215,6 +215,22 @@ test('PHASE 1: OWNER DASHBOARD CATALOG IMPLEMENTATION', async (t) => {
       const row = db.prepare('SELECT name, price FROM products WHERE id = ?').get(createdProductId);
       assert.strictEqual(row.name, 'Produk Uji Coba Phase 1 Updated');
       assert.strictEqual(row.price, 32000);
+      assert.ok(res.body.product && res.body.product.id === createdProductId, 'Edit response must return the saved product');
+    });
+
+    await t2.test('2.4b Edit Master Product with unchanged values remains successful', async () => {
+      const res = await makeRequest(server, {
+        method: 'PUT',
+        path: '/api/v1/admin/products/' + createdProductId,
+        headers: { Authorization: 'Bearer ' + ownerToken }
+      }, {
+        name: 'Produk Uji Coba Phase 1 Updated',
+        price: 32000
+      });
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.body.success, true);
+      assert.ok(res.body.product && res.body.product.id === createdProductId);
     });
 
     await t2.test('2.5 Toggle Master Product availability', async () => {
