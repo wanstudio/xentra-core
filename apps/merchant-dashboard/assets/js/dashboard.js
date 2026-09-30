@@ -3234,7 +3234,7 @@
   }
 
   function resetProductEditorForAdd() {
-    $('modal-product-title').textContent = 'Tambah Produk Master Baru';
+    $('product-editor-title').textContent = 'Tambah Produk Master Baru';
     $('prod-editor-breadcrumb').textContent = 'Tambah Produk';
     $('prod-editor-subtitle').textContent = 'Susun identitas, harga, foto, dan komposisi Master Menu.';
     $('prod-id').value = '';
@@ -3261,7 +3261,7 @@
   }
 
   function populateProductEditorForm(prod) {
-    $('modal-product-title').textContent = 'Edit Produk: ' + prod.name;
+    $('product-editor-title').textContent = 'Edit Produk: ' + prod.name;
     $('prod-editor-breadcrumb').textContent = prod.name;
     $('prod-editor-subtitle').textContent = 'Periksa dan perbarui data Master Menu.';
     $('prod-id').value = prod.id;
