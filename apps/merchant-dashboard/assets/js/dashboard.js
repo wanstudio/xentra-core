@@ -2261,14 +2261,20 @@
   }
 
   function setMasterReferenceTab(type) {
-    _masterReferenceTab = type === 'flavor' ? 'flavor' : 'category';
+    var allowed = ['category', 'flavor', 'complement', 'level'];
+    _masterReferenceTab = allowed.indexOf(type) !== -1 ? type : 'category';
 
-    var categoryPanel = $('master-reference-category-panel');
-    var flavorPanel = $('master-reference-flavor-panel');
+    var panels = {
+      category: $('master-reference-category-panel'),
+      flavor: $('master-reference-flavor-panel'),
+      complement: $('master-reference-complement-panel'),
+      level: $('master-reference-level-panel')
+    };
+    Object.keys(panels).forEach(function(key) {
+      if (panels[key]) panels[key].hidden = _masterReferenceTab !== key;
+    });
+
     var tabs = $('master-reference-tabs');
-    if (categoryPanel) categoryPanel.hidden = _masterReferenceTab !== 'category';
-    if (flavorPanel) flavorPanel.hidden = _masterReferenceTab !== 'flavor';
-
     if (tabs) {
       tabs.querySelectorAll('[data-master-reference-tab]').forEach(function(btn) {
         var active = btn.getAttribute('data-master-reference-tab') === _masterReferenceTab;
@@ -2277,157 +2283,183 @@
       });
     }
 
-    if (_masterReferenceTab === 'flavor') {
-      renderMasterFlavorsPage();
-    } else {
-      renderMasterCategoriesPage();
-    }
+    renderMasterReferenceList(_masterReferenceTab);
   }
 
   async function loadMasterCategoriesPage() {
-    var categoryList = $('master-categories-page-list');
-    var flavorList = $('master-flavors-page-list');
+    var listEls = {
+      category: $('master-categories-page-list'),
+      flavor: $('master-flavors-page-list'),
+      complement: $('master-complements-page-list'),
+      level: $('master-levels-page-list')
+    };
     var requestSeq = ++_masterReferenceLoadSeq;
 
-    if (categoryList) categoryList.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Memuat kategori...</div>';
-    if (flavorList) flavorList.innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Memuat rasa...</div>';
+    Object.keys(listEls).forEach(function(type) {
+      if (listEls[type]) {
+        listEls[type].innerHTML = '<div class="x-empty-state text-center py-6 text-muted">Memuat ' + (MASTER_REFERENCE_META[type] ? MASTER_REFERENCE_META[type].label.replace('Nama ', '').toLowerCase() : 'data') + '...</div>';
+      }
+    });
 
-    // Category and flavor are independent resources. Do not let a slow/failed
-    // flavor request block the category tab (or vice versa).
     var headers = getAuthHeaders();
-
     var categoryPromise = adminFetch(API_BASE + '/admin/categories', { headers: headers })
-      .then(function (res) { return res.json(); })
-      .then(function (data) {
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
         if (requestSeq !== _masterReferenceLoadSeq) return;
         if (!data.success) throw new Error(data.error || 'Gagal memuat kategori.');
-
         state.categories = data.categories || [];
         renderMasterCategoriesPage();
       })
-      .catch(function (err) {
+      .catch(function(err) {
         if (requestSeq !== _masterReferenceLoadSeq) return;
         console.error('[Master Category Load Error]:', err);
-        if (categoryList) {
-          categoryList.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Gagal memuat kategori. Coba lagi.</div>';
-        }
+        if (listEls.category) listEls.category.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Gagal memuat kategori. Coba lagi.</div>';
       });
 
-    var flavorPromise = adminFetch(API_BASE + '/admin/menu/components/flavor', { headers: headers })
-      .then(function (res) { return res.json(); })
-      .then(function (data) {
-        if (requestSeq !== _masterReferenceLoadSeq) return;
-        if (!data.success) throw new Error(data.error || 'Gagal memuat rasa.');
+    var componentPromises = ['flavor', 'complement', 'level'].map(function(type) {
+      var loadPromise = type === 'level'
+        ? adminFetch(API_BASE + '/admin/menu/components/level/ensure-defaults', {
+            method: 'POST',
+            headers: headers
+          }).then(function(res) {
+            return res.json().then(function(data) {
+              if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menyiapkan Level.');
+              return data;
+            });
+          })
+        : Promise.resolve(null);
 
-        _masterMenuComponents.flavor = data.components || [];
-        renderMasterFlavorsPage();
-      })
-      .catch(function (err) {
-        if (requestSeq !== _masterReferenceLoadSeq) return;
-        console.error('[Master Flavor Load Error]:', err);
-        if (flavorList) {
-          flavorList.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Gagal memuat rasa. Coba lagi.</div>';
-        }
-      });
+      return loadPromise
+        .then(function() {
+          return adminFetch(API_BASE + '/admin/menu/components/' + type, { headers: headers })
+            .then(function(res) { return res.json(); });
+        })
+        .then(function(data) {
+          if (requestSeq !== _masterReferenceLoadSeq) return;
+          if (!data.success) throw new Error(data.error || 'Gagal memuat ' + type + '.');
+          _masterMenuComponents[type] = data.components || [];
+          renderMasterReferenceList(type);
+          if (type === 'flavor') renderMasterFlavorsPage();
+        })
+        .catch(function(err) {
+          if (requestSeq !== _masterReferenceLoadSeq) return;
+          console.error('[Master ' + type + ' Load Error]:', err);
+          if (listEls[type]) listEls[type].innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Gagal memuat data. Coba lagi.</div>';
+        });
+    });
 
-    await Promise.allSettled([categoryPromise, flavorPromise]);
+    await Promise.allSettled([categoryPromise].concat(componentPromises));
 
-    // Only the latest request may update the active tab state.
     if (requestSeq === _masterReferenceLoadSeq) {
+      populateProductCategorySelect();
+      renderMasterReferenceList(_masterReferenceTab);
+      renderMasterMenuSelectors();
+      renderMasterMenuCustomerPreview();
       setMasterReferenceTab(_masterReferenceTab);
     }
   }
-
   function referenceStatusBadge(active) {
     return '<span class="x-master-reference-status ' + (active ? 'is-active' : 'is-inactive') + '">' +
       (active ? 'Aktif' : 'Nonaktif') + '</span>';
   }
 
-  function renderMasterCategoriesPage() {
-    var list = $('master-categories-page-list');
+  function referenceRows(type) {
+    if (type === 'category') return state.categories || [];
+    return _masterMenuComponents[type] || [];
+  }
+
+  function referenceTypeLabel(type) {
+    return type === 'category' ? 'Kategori' : type === 'flavor' ? 'Rasa' : type === 'complement' ? 'Kelengkapan' : 'Level';
+  }
+
+  function referenceIconClass(type) {
+    return type === 'category'
+      ? 'x-master-reference-icon-category'
+      : type === 'flavor'
+        ? 'x-master-reference-icon-flavor'
+        : type === 'complement'
+          ? 'x-master-reference-icon-complement'
+          : 'x-master-reference-icon-level';
+  }
+
+  function referenceIconSvg(type) {
+    if (type === 'category') return '<rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect>';
+    if (type === 'flavor') return '<path d="M5 12h14"></path><path d="M12 5v14"></path><circle cx="12" cy="12" r="9"></circle>';
+    if (type === 'complement') return '<path d="M4 7h16"></path><path d="M6 7v12"></path><path d="M18 7v12"></path><path d="M3 19h18"></path><path d="M9 7V4h6v3"></path>';
+    return '<path d="M7 4h10"></path><path d="M7 20h10"></path><path d="M9 4v16"></path><path d="M15 4v16"></path><path d="M7 8h8"></path><path d="M7 16h8"></path>';
+  }
+
+  function renderMasterReferenceList(type) {
+    var listMap = {
+      category: 'master-categories-page-list',
+      flavor: 'master-flavors-page-list',
+      complement: 'master-complements-page-list',
+      level: 'master-levels-page-list'
+    };
+    var list = $(listMap[type]);
     if (!list) return;
 
-    if (!state.categories.length) {
-      list.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Belum ada kategori. Tambahkan kategori pertama.</div>';
+    var rows = referenceRows(type);
+    if (!rows.length) {
+      list.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Belum ada ' + referenceTypeLabel(type).toLowerCase() + '. Tambahkan data pertama.</div>';
       return;
     }
 
-    list.innerHTML = state.categories.map(function(cat) {
-      var productCount = state.products.filter(function(product) {
-        return String(product.category_id) === String(cat.id);
-      }).length;
-      var id = JSON.stringify(String(cat.id));
+    list.innerHTML = rows.map(function(row) {
+      var description = '';
+      if (type === 'category') {
+        var productCount = (state.products || []).filter(function(product) {
+          return String(product.category_id) === String(row.id);
+        }).length;
+        description = productCount + ' Produk Master';
+      } else if (type === 'flavor') {
+        description = 'Dipakai sebagai pilihan Rasa pada Produk Master';
+      } else if (type === 'complement') {
+        description = 'Detail Customer · bisa dipilih lebih dari satu';
+      } else {
+        description = 'Indikator Customer · satu per Produk Master';
+      }
 
       return [
         '<div class="x-master-reference-card">',
           '<div class="x-master-reference-card-main">',
-            '<div class="x-master-reference-icon x-master-reference-icon-category" aria-hidden="true">',
-              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>',
+            '<div class="x-master-reference-icon ' + referenceIconClass(type) + '" aria-hidden="true">',
+              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">' + referenceIconSvg(type) + '</svg>',
             '</div>',
             '<div class="x-master-reference-copy">',
-              '<strong>' + esc(cat.name) + '</strong>',
-              '<span>' + productCount + ' Produk Master</span>',
+              '<strong>' + esc(row.name) + '</strong>',
+              '<span>' + esc(description) + '</span>',
             '</div>',
           '</div>',
           '<div class="x-master-reference-card-right">',
-            referenceStatusBadge(cat.is_active !== 0 && cat.is_active !== null),
-            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi kategori" data-master-reference-action="category" data-reference-id="' + esc(String(cat.id)) + '">',
+            referenceStatusBadge(row.is_active !== 0 && row.is_active !== null),
+            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi ' + referenceTypeLabel(type).toLowerCase() + '" data-master-reference-action="' + type + '" data-reference-id="' + esc(String(row.id)) + '">',
               '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
             '</button>',
           '</div>',
         '</div>'
       ].join('');
     }).join('');
+  }
+
+  function renderMasterCategoriesPage() {
+    renderMasterReferenceList('category');
   }
 
   function renderMasterFlavorsPage() {
-    var list = $('master-flavors-page-list');
-    if (!list) return;
-
-    var rows = _masterMenuComponents.flavor || [];
-    if (!rows.length) {
-      list.innerHTML = '<div class="x-empty-state text-center py-8 text-muted">Belum ada rasa. Tambahkan rasa pertama.</div>';
-      return;
-    }
-
-    list.innerHTML = rows.map(function(flavor) {
-      var id = JSON.stringify(String(flavor.id));
-      return [
-        '<div class="x-master-reference-card">',
-          '<div class="x-master-reference-card-main">',
-            '<div class="x-master-reference-icon x-master-reference-icon-flavor" aria-hidden="true">',
-              '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 12h14"></path><path d="M12 5v14"></path><circle cx="12" cy="12" r="9"></circle></svg>',
-            '</div>',
-            '<div class="x-master-reference-copy">',
-              '<strong>' + esc(flavor.name) + '</strong>',
-              '<span>Dipakai sebagai pilihan Rasa pada Produk Master</span>',
-            '</div>',
-          '</div>',
-          '<div class="x-master-reference-card-right">',
-            referenceStatusBadge(flavor.is_active !== 0 && flavor.is_active !== null),
-            '<button type="button" class="x-action-menu-trigger" aria-label="Aksi rasa" data-master-reference-action="flavor" data-reference-id="' + esc(String(flavor.id)) + '">',
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="6" cy="12" r="1.5"></circle><circle cx="18" cy="12" r="1.5"></circle></svg>',
-            '</button>',
-          '</div>',
-        '</div>'
-      ].join('');
-    }).join('');
+    renderMasterReferenceList('flavor');
   }
-
   function openEditMasterReference(type, id) {
     var meta = MASTER_REFERENCE_META[type];
     var modal = $('modal-master-reference-quick-add');
     if (!meta || !modal) return;
 
-    var row = type === 'category'
-      ? state.categories.find(function(item) { return String(item.id) === String(id); })
-      : (_masterMenuComponents.flavor || []).find(function(item) { return String(item.id) === String(id); });
-
+    var row = referenceRows(type).find(function(item) { return String(item.id) === String(id); });
     if (!row) return;
 
     $('master-reference-quick-add-type').value = type;
     $('master-reference-quick-add-id').value = String(id);
-    $('master-reference-quick-add-title').textContent = 'Ubah ' + (type === 'category' ? 'Kategori' : 'Rasa');
+    $('master-reference-quick-add-title').textContent = 'Ubah ' + referenceTypeLabel(type);
     $('master-reference-quick-add-label').textContent = meta.label;
     $('master-reference-quick-add-name').value = row.name || '';
     $('master-reference-quick-add-name').placeholder = meta.placeholder;
@@ -2447,12 +2479,10 @@
     var meta = MASTER_REFERENCE_META[type];
     if (!meta) return;
 
-    var row = type === 'category'
-      ? state.categories.find(function(item) { return String(item.id) === String(id); })
-      : (_masterMenuComponents.flavor || []).find(function(item) { return String(item.id) === String(id); });
+    var row = referenceRows(type).find(function(item) { return String(item.id) === String(id); });
     if (!row) return;
 
-    var noun = type === 'category' ? 'kategori' : 'rasa';
+    var noun = referenceTypeLabel(type).toLowerCase();
     if (!confirm('Hapus ' + noun + ' "' + row.name + '"?')) return;
 
     try {
@@ -2467,19 +2497,18 @@
       }
 
       if (type === 'category') {
-        state.categories = state.categories.filter(function(item) { return String(item.id) !== String(id); });
+        state.categories = (state.categories || []).filter(function(item) { return String(item.id) !== String(id); });
         populateProductCategorySelect();
         renderProductCategoryFilterChips();
         renderMasterProductsTable();
       } else {
-        _masterMenuComponents.flavor = _masterMenuComponents.flavor.filter(function(item) { return String(item.id) !== String(id); });
+        _masterMenuComponents[type] = (_masterMenuComponents[type] || []).filter(function(item) { return String(item.id) !== String(id); });
         renderMasterMenuSelectors();
       }
 
-      renderMasterCategoriesPage();
-      renderMasterFlavorsPage();
+      renderMasterReferenceList(type);
       renderMasterMenuCustomerPreview();
-      showToast('✅ ' + (type === 'category' ? 'Kategori' : 'Rasa') + ' dihapus.');
+      showToast('✅ ' + referenceTypeLabel(type) + ' dihapus.');
     } catch (err) {
       showToast('❌ ' + err.message);
     }
@@ -2495,6 +2524,7 @@
       title: 'Tambah Kategori',
       label: 'Nama Kategori',
       placeholder: 'Contoh: Makanan Berat',
+      description: 'Pengelompokan Produk Master / Judul Menu',
       endpoint: function () { return API_BASE + '/admin/categories'; },
       deleteEndpoint: function (id) { return API_BASE + '/admin/categories/' + encodeURIComponent(id); },
       payload: function (name) { return { name: name }; }
@@ -2503,8 +2533,27 @@
       title: 'Tambah Rasa',
       label: 'Nama Rasa',
       placeholder: 'Contoh: Sambal Ijo',
+      description: 'Pilihan Rasa untuk Subtitle Customer',
       endpoint: function () { return API_BASE + '/admin/menu/components/flavor'; },
       deleteEndpoint: function (id) { return API_BASE + '/admin/menu/components/flavor/' + encodeURIComponent(id); },
+      payload: function (name) { return { name: name }; }
+    },
+    complement: {
+      title: 'Tambah Kelengkapan',
+      label: 'Nama Kelengkapan',
+      placeholder: 'Contoh: Nasi',
+      description: 'Detail Customer; dapat dipilih lebih dari satu pada Produk Master',
+      endpoint: function () { return API_BASE + '/admin/menu/components/complement'; },
+      deleteEndpoint: function (id) { return API_BASE + '/admin/menu/components/complement/' + encodeURIComponent(id); },
+      payload: function (name) { return { name: name }; }
+    },
+    level: {
+      title: 'Tambah Level',
+      label: 'Nama Level',
+      placeholder: 'Contoh: 1 — Tidak Pedas',
+      description: 'Indikator Customer; satu Level dipilih pada Produk Master',
+      endpoint: function () { return API_BASE + '/admin/menu/components/level'; },
+      deleteEndpoint: function (id) { return API_BASE + '/admin/menu/components/level/' + encodeURIComponent(id); },
       payload: function (name) { return { name: name }; }
     }
   };
@@ -2568,40 +2617,35 @@
         throw new Error(data.error || 'Gagal menyimpan data master.');
       }
 
+      var row = type === 'category' ? data.category : data.component;
+      if (!row) throw new Error('Server tidak mengembalikan hasil simpan.');
+
+      var rows = referenceRows(type);
+      var rowIndex = rows.findIndex(function(item) { return String(item.id) === String(row.id); });
+      if (rowIndex >= 0) rows[rowIndex] = row;
+      else rows.push(row);
+
       if (type === 'category') {
-        var category = data.category;
-        if (!category) throw new Error('Server tidak mengembalikan kategori hasil simpan.');
-        var categoryIndex = state.categories.findIndex(function (row) { return String(row.id) === String(category.id); });
-        if (categoryIndex >= 0) state.categories[categoryIndex] = category;
-        else state.categories.push(category);
         populateProductCategorySelect();
         if (!referenceId) {
           var categorySelect = $('prod-category');
-          if (categorySelect) categorySelect.value = category.id;
+          if (categorySelect) categorySelect.value = row.id;
         }
         renderProductCategoryFilterChips();
         renderMasterProductsTable();
       } else {
-        var flavor = data.component;
-        if (!flavor) throw new Error('Server tidak mengembalikan rasa hasil simpan.');
-        var flavorIndex = (_masterMenuComponents.flavor || []).findIndex(function (row) {
-          return String(row.id) === String(flavor.id);
-        });
-        if (flavorIndex >= 0) _masterMenuComponents.flavor[flavorIndex] = flavor;
-        else _masterMenuComponents.flavor.push(flavor);
         renderMasterMenuSelectors();
-        if (!referenceId) {
-          _masterMenuSelected.flavor_id = String(flavor.id);
+        if (!referenceId && type === 'flavor') {
+          _masterMenuSelected.flavor_id = String(row.id);
           var flavorSelect = $('prod-flavor');
-          if (flavorSelect) flavorSelect.value = String(flavor.id);
+          if (flavorSelect) flavorSelect.value = String(row.id);
         }
       }
 
       closeMasterReferenceQuickAdd();
-      renderMasterCategoriesPage();
-      renderMasterFlavorsPage();
+      renderMasterReferenceList(type);
       renderMasterMenuCustomerPreview();
-      showToast('✅ ' + (referenceId ? (type === 'category' ? 'Kategori diperbarui.' : 'Rasa diperbarui.') : (type === 'category' ? 'Kategori ditambahkan.' : 'Rasa ditambahkan.')));
+      showToast('✅ ' + (referenceId ? referenceTypeLabel(type) + ' diperbarui.' : referenceTypeLabel(type) + ' ditambahkan.'));
     } catch (err) {
       showToast('❌ ' + err.message);
     } finally {
@@ -3276,44 +3320,50 @@
     showProductEditorSection();
     setProductEditorLoading(true, productId ? 'Memuat data produk...' : 'Menyiapkan editor Produk Master...');
 
-    if (!productId) {
-      resetProductEditorForAdd();
-      try {
-        await loadMasterMenuComponents();
-      } finally {
-        if (requestSeq === _productEditorLoadSeq) {
-          setProductEditorLoading(false);
-        }
-      }
-      return;
-    }
-
     try {
-      var results = await Promise.all([
-        adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId), { headers: getAuthHeaders() })
-          .then(function(res) { return res.json(); }),
+      // Hydrate shared master references first so the editor never shows a stale
+      // empty selector while the Category page already has data.
+      await Promise.all([
+        loadMasterMenuComponents(),
         adminFetch(API_BASE + '/admin/categories', { headers: getAuthHeaders() })
           .then(function(res) { return res.json(); })
+          .then(function(data) {
+            if (data && data.success) {
+              state.categories = data.categories || [];
+              populateProductCategorySelect();
+            }
+          })
       ]);
       if (requestSeq !== _productEditorLoadSeq) return;
 
-      var productData = results[0];
-      var categoryData = results[1];
+      if (!productId) {
+        resetProductEditorForAdd();
+        await loadMasterMenuComponents();
+        if (requestSeq === _productEditorLoadSeq) {
+          setProductEditorLoading(false);
+        }
+        return;
+      }
+
+      var productData = await adminFetch(API_BASE + '/admin/products/' + encodeURIComponent(productId), {
+        headers: getAuthHeaders()
+      }).then(function(res) { return res.json(); });
+
+      if (requestSeq !== _productEditorLoadSeq) return;
+
       if (!productData.success || !productData.product) {
         showToast('❌ ' + (productData.error || 'Produk tidak ditemukan.'));
         navigateTo('catalog/products');
         return;
       }
 
-      if (categoryData.success) state.categories = categoryData.categories || [];
-      var prod = productData.product;
-      populateProductEditorForm(prod);
+      populateProductEditorForm(productData.product);
 
       setProductEditorLoading(true, 'Memuat komposisi dan opsi penjualan...');
-      await loadMasterMenuComposition(prod.id, prod.name);
+      await loadMasterMenuComposition(productData.product.id, productData.product.name);
       if (requestSeq !== _productEditorLoadSeq) return;
 
-      await loadProductOptionsEditor(prod.id);
+      await loadProductOptionsEditor(productData.product.id);
     } catch (err) {
       if (requestSeq !== _productEditorLoadSeq) return;
       console.error('[Product Editor Load Error]:', err);
