@@ -8372,6 +8372,8 @@ input[type="file"].x-input,
 @media (max-width: 768px) {
   #product-editor-view.x-card-panel {
     padding: 16px;
+    /* Fixed owner bottom navigation must never cover the editor actions/content. */
+    padding-bottom: 96px !important;
   }
 
   #product-editor-view > .x-card {
