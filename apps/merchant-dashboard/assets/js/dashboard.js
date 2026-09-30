@@ -2910,7 +2910,18 @@
 
     var levelId = levelSelect ? String(levelSelect.value || '') : String(_masterMenuSelected.level_id || '');
     var level = _masterMenuComponents.level.find(function(row) { return String(row.id) === levelId; });
-    if (level) indicatorEl.textContent = level.name;
+    if (level) {
+      var levelPosition = Number(level.sort_order);
+      if (!Number.isFinite(levelPosition) || levelPosition < 1) levelPosition = 1;
+      levelPosition = Math.min(4, levelPosition);
+      var indicatorHtml = '<span class="x-master-customer-preview-spice-label">Pedas</span>' +
+        '<span class="x-master-customer-preview-spice-dots" aria-label="Level Pedas ' + levelPosition + ' dari 4">';
+      for (var i = 1; i <= 4; i += 1) {
+        indicatorHtml += '<span class="x-master-customer-preview-spice-dot' + (i <= levelPosition ? ' is-filled' : '') + '" aria-hidden="true"></span>';
+      }
+      indicatorHtml += '</span>';
+      indicatorEl.innerHTML = indicatorHtml;
+    }
 
     var price = Number(($('prod-price') && $('prod-price').value) || 0);
     priceEl.textContent = formatMoney(price);
