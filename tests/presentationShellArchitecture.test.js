@@ -80,3 +80,29 @@ test('PRES-09: Branch Catalog uses the canonical Branch Detail Menu Page', () =>
   assert.ok(dashboardJs.includes("navigateTo('branches/' + encodeURIComponent(branchId) + '/menu')") || fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/branch-catalog-ui.js'), 'utf8').includes("branches/' + encodeURIComponent(branchId) + '/menu"));
   assert.ok(dashboardJs.includes("openBranchCatalogModal('"));
 });
+
+
+test('PRES-10: Team lightweight editors compose into Bottom Sheet and reset token into Dialog', () => {
+  assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-user', 'team-user-editor', 'bottom-sheet')"));
+  assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-invite-user', 'team-invite-editor', 'bottom-sheet')"));
+  assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-reset-password', 'team-reset-password', 'dialog')"));
+  assert.ok(dashboardJs.includes("id: 'delete-user'"));
+  assert.ok(dashboardJs.includes("id: 'disable-user'"));
+  assert.ok(!dashboardJs.includes("confirm('Nonaktifkan akun"));
+});
+
+test('PRES-11: Marketing Promotion and Banner editors are focused Page surfaces', () => {
+  assert.ok(dashboardHtml.includes('id="marketing-promotion-editor-view"'));
+  assert.ok(dashboardHtml.includes('id="marketing-banner-editor-view"'));
+  assert.ok(dashboardJs.includes("route === 'marketing/promotions/new'"));
+  assert.ok(dashboardJs.includes("/^marketing\\/promotions\\/[^/]+\\/edit$/.test(route)"));
+  assert.ok(dashboardJs.includes("route === 'marketing/banners/new'"));
+  assert.ok(dashboardJs.includes("/^marketing\\/banners\\/[^/]+\\/edit$/.test(route)"));
+  assert.ok(dashboardJs.includes('function mountPromotionEditorPage()'));
+  assert.ok(dashboardJs.includes('function mountMarketingBannerEditorPage()'));
+});
+
+test('PRES-12: Marketing Banner assignment is Bottom Sheet and preview is Dialog', () => {
+  assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-marketing-banner-assignment', 'marketing-banner-assignment', 'bottom-sheet')"));
+  assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-marketing-banner-preview', 'marketing-banner-preview', 'dialog')"));
+});
