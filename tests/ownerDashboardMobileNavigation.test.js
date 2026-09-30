@@ -208,6 +208,47 @@ test('Owner Dashboard Mobile Navigation', async t => {
   // --------------------------------------------------------------------------
   // CSS
   // --------------------------------------------------------------------------
+  await t.test('OWNER-MOB-14A: all focused child pages use the shared mobile Back header', () => {
+    const requiredSelectors = [
+      'id="branch-detail-view"',
+      'id="order-detail-view"',
+      'id="product-detail-view"',
+      'id="product-editor-view"',
+      'id="customers-detail-view"',
+      'id="branch-editor-view"',
+      'id="tab-catalog-menus"'
+    ];
+    for (const marker of requiredSelectors) {
+      assert.ok(html.includes(marker), 'Child surface marker must exist: ' + marker);
+    }
+
+    const childHeaderCount = (html.match(/class="x-owner-child-mobile-header/g) || []).length;
+    assert.ok(childHeaderCount >= 6, 'Focused child pages must expose the shared mobile header shell');
+
+    assert.ok(html.includes('x-owner-page-back-icon'), 'Shared child headers must use the chevron Back icon');
+    assert.equal((html.match(/(?:←|&larr;)/g) || []).length, 0, 'Owner Dashboard must not keep arrow glyphs in Back controls');
+  });
+
+  await t.test('OWNER-MOB-14B: child Back behavior is centralized in one router helper', () => {
+    assert.ok(js.includes('window.goBackFromChildPage = function ()'),
+      'goBackFromChildPage must be the canonical child Back helper');
+    assert.ok(js.includes('window.goBackFromMasterProducts = window.goBackFromChildPage'),
+      'Legacy Product Master Back alias must use canonical helper');
+    assert.ok(js.includes('window.goBackFromCategory = window.goBackFromChildPage'),
+      'Legacy Category Back alias must use canonical helper');
+    assert.ok(js.includes('window.goBackFromCatalogChild = window.goBackFromChildPage'),
+      'Legacy Catalog child Back alias must use canonical helper');
+    assert.ok(js.includes('ensureOwnerFeatureMobileHeader('),
+      'Focused marketing editors must use the shared child header helper');
+  });
+
+  await t.test('OWNER-MOB-14C: shared child header CSS is a single presentation pattern', () => {
+    assert.ok(css.includes('.x-owner-child-mobile-header'), 'Shared child header class must exist');
+    assert.ok(css.includes('.x-owner-child-legacy-nav'), 'Legacy breadcrumb rows must be retired from the shared child presentation');
+    assert.ok(css.includes('.x-owner-page-back-icon'), 'Chevron Back icon must have one shared style');
+    assert.ok(css.includes('.x-feature-page-surface > .x-modal-header'), 'Focused feature editor modal headers must yield to the page header on mobile');
+  });
+
   await t.test('OWNER-MOB-15: dense Owner routes have touch-first mobile surface rules', () => {
     assert.ok(css.includes('#orders-list-view .x-table thead'), 'Orders mobile table must transform into cards');
     assert.ok(css.includes('#customers-list-view .x-data-table thead'), 'Customers mobile table must transform into cards');
