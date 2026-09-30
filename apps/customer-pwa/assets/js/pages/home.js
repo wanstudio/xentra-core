@@ -1639,9 +1639,9 @@
     var availabilityHtml = unavailable
       ? '<div class="x-unavailable-tag">Habis</div>'
       : '';
-    var branchLabelHtml = branchCtx
-      ? '<div class="x-detail-branch">' + UI.escape(branchCtx.branch_name || '') + '</div>'
-      : '';
+    // Branch name is intentionally not shown in Customer product detail.
+    // Branch context remains operational state only, not part of the product title block.
+    var branchLabelHtml = '';
     var cartHint = scopedQty > 0
       ? '<div class="x-detail-cart-hint">Sudah ada <strong>' + scopedQty + '</strong> di keranjang untuk cabang ini.</div>'
       : '';

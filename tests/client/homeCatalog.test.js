@@ -164,6 +164,20 @@ test('Customer catalog exposes structured Pedas intensity for four-dot presentat
   assert.ok(nameColor.includes('color: #111;') && rasaColor.includes('color: #111;'), 'Rasa must use the same title color as Kategori');
 });
 
+test('Customer detail presentation uses square image, padded content, and black title typography', () => {
+  const home = fs.readFileSync(path.resolve(__dirname, '../../apps/customer-pwa/assets/js/pages/home.js'), 'utf8');
+  const css = fs.readFileSync(path.resolve(__dirname, '../../apps/customer-pwa/assets/css/home.css'), 'utf8');
+  assert.ok(home.includes("var branchLabelHtml = '';"), 'Customer detail must not render branch name');
+  const imageCss = css.slice(css.indexOf('.x-detail-image-wrap {'), css.indexOf('.x-detail-body {'));
+  assert.ok(imageCss.includes('aspect-ratio: 1 / 1'), 'Customer detail image must use square frame');
+  const bodyCss = css.slice(css.indexOf('.x-detail-body {'), css.indexOf('.x-detail-name {'));
+  assert.ok(bodyCss.includes('padding: 0 20px'), 'Customer detail body must have horizontal side margin');
+  const nameCss = css.slice(css.indexOf('.x-detail-name {'), css.indexOf('.x-detail-branch {'));
+  const subtitleCss = css.slice(css.indexOf('.x-detail-subtitle {'), css.indexOf('.x-detail-desc {'));
+  assert.ok(nameCss.includes('color: #111111;'), 'Category/title must be black');
+  assert.ok(subtitleCss.includes('color: #111111;'), 'Rasa must be black');
+});
+
 test('Customer catalog route uses Master resolver for both branch and brand-wide reads', () => {
   const route = fs.readFileSync(path.resolve(__dirname, '../../server/routes/catalog.js'), 'utf8');
   assert.ok(route.includes('MasterMenuResolver.resolveBranchMenu'));
