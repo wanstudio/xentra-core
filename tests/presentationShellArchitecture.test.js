@@ -53,3 +53,13 @@ test('PRES-06: destructive confirmation uses generic Dialog presentation, not fe
   assert.ok(dashboardJs.includes("id: 'delete-master-product'"));
   assert.ok(!dashboardJs.includes("confirm('Hapus ' + noun"));
 });
+
+test('PRES-07: Product Master Add/Edit remains a Page presentation', () => {
+  assert.ok(dashboardHtml.includes('id="product-editor-view"'));
+  assert.ok(dashboardHtml.includes('id="product-editor-title"'));
+  assert.ok(dashboardJs.includes("route === 'catalog/products/new'"));
+  assert.ok(dashboardJs.includes("/edit$/.test(route)"));
+  assert.ok(dashboardJs.includes("navigateTo('catalog/products/new')"));
+  assert.ok(dashboardJs.includes("navigateTo('catalog/products/' + encodeURIComponent(id) + '/edit')"));
+  assert.ok(!dashboardHtml.includes('id="modal-product-title"'));
+});
