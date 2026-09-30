@@ -24,22 +24,15 @@
   var currentBranchCatalogData = null;
   var inlineFilter = 'all';
 
-  window.openBranchCatalogModal = async function (branchId) {
-    currentManagingBranchId = branchId;
-    var modal = $('modal-branch-catalog');
-    if (!modal) return;
-    modal.style.display = 'flex';
-
-    var title = $('modal-branch-catalog-title');
-    var b = hooks.getBranches().find(function (x) { return x.id === branchId; });
-    if (title && b) title.textContent = 'Kelola Katalog Cabang: ' + b.name;
-
-    await reloadBranchCatalogView();
+  // Compatibility entry point: Branch Catalog is a focused Page surface now.
+  // The canonical route is branches/:id/menu, rendered by the Branch Detail shell.
+  window.openBranchCatalogModal = function (branchId) {
+    if (!branchId || typeof window.navigateTo !== 'function') return;
+    window.navigateTo('branches/' + encodeURIComponent(branchId) + '/menu');
   };
 
   window.closeBranchCatalogModal = function () {
-    var modal = $('modal-branch-catalog');
-    if (modal) modal.style.display = 'none';
+    if (typeof window.navigateTo === 'function') window.navigateTo('branches');
     currentManagingBranchId = null;
   };
 
