@@ -61,12 +61,13 @@ function resolveProductView({
   const branchAvailable = branchState ? branchState.is_available !== 0 : true;
   const hasDisplayNameOverride = typeof displayNameOverride === 'string' && displayNameOverride.trim() !== '';
   const customerTitle = hasDisplayNameOverride ? displayNameOverride.trim() : product.category_name;
+  const customerSubtitle = hasDisplayNameOverride ? null : (activeFlavor ? activeFlavor.name : null);
 
   return {
     product_id: product.id,
     id: product.id,
     title: customerTitle,
-    subtitle: activeFlavor ? activeFlavor.name : null,
+    subtitle: customerSubtitle,
     detail: activeComplements.map(c => c.name),
     indicator: activeLevel ? activeLevel.name : null,
     // Structured intensity value for Customer presentation. The legacy
