@@ -120,6 +120,19 @@ test('Master Product editor keeps Flavor optional and exposes multi-select compl
   assert.ok(JS.includes("API_BASE + '/admin/menu/components/level/ensure-defaults'"));
 });
 
+test('Master Product editor renders before master-reference requests finish', () => {
+  const start = JS.indexOf('async function loadProductEditorPage(productId)');
+  const end = JS.indexOf("window.openAddProduct = function ()", start);
+  assert.ok(start >= 0 && end > start, 'Product editor loader must exist');
+  const loader = JS.slice(start, end);
+  assert.ok(loader.includes('showProductEditorSection();'));
+  assert.ok(loader.includes('resetProductEditorForAdd();'));
+  assert.ok(loader.indexOf('resetProductEditorForAdd();') < loader.indexOf('await Promise.all(['),
+    'Add flow must render the editor before awaiting master-reference requests');
+  assert.ok(!HTML.includes('id="product-editor-loading"'), 'Blocking product editor loading banner must not exist');
+  assert.ok(!JS.includes('setProductEditorLoading('), 'Blocking editor loading helper must not exist');
+});
+
 test('Customer presentation mapping is explicit in Owner UI', () => {
   assert.match(HTML, /Kategori.*Judul Customer|Kategori.*judul.*Customer/i);
   assert.match(HTML, /Rasa.*Subtitle Customer/i);
