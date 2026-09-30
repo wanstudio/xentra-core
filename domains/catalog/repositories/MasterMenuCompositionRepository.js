@@ -211,7 +211,7 @@ class MasterMenuCompositionRepository {
     if (!ids.length) return [];
     const placeholders = ids.map(() => '?').join(',');
     return this.db.queryMany(
-      `SELECT pl.product_id, ml.id, ml.name, ml.slug, ml.is_active
+      `SELECT pl.product_id, ml.id, ml.name, ml.slug, ml.sort_order, ml.is_active
        FROM product_levels pl
        JOIN menu_levels ml ON ml.id = pl.level_id
        WHERE ml.brand_id = ? AND pl.product_id IN (${placeholders})`,
