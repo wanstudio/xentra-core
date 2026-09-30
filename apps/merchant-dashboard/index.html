@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.24">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.25">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -1747,22 +1747,24 @@
 
         <div class="x-form-group x-master-choice-group">
           <div class="x-master-choice-label-row">
-            <label for="prod-category" style="margin:0;">Kategori Master <span class="text-muted">(Judul Menu)</span><span class="x-required-mark" aria-hidden="true">*</span></label>
-            <button type="button" class="x-btn-secondary x-master-inline-add" id="btn-add-master-category-from-product" aria-label="Tambah Kategori Master"></button>
+            <label for="prod-category" style="margin:0;">Kategori <span class="x-required-mark" aria-hidden="true">*</span></label>
           </div>
-          <div id="prod-category-chips" class="x-master-choice-grid" role="radiogroup" aria-label="Pilih Kategori Master"></div>
-          <select id="prod-category" class="x-input x-master-native-select" required aria-hidden="true" tabindex="-1"></select>
+          <div class="x-master-select-with-add">
+            <select id="prod-category" class="x-input" required></select>
+            <button type="button" class="x-master-select-add" id="btn-add-master-category-from-product" aria-label="Tambah Kategori">+</button>
+          </div>
         </div>
 
         <div class="x-form-group x-master-choice-group">
           <div class="x-master-choice-label-row">
-            <label for="prod-flavor" style="margin:0;">Rasa <span class="text-muted">(Subtitle Customer · Opsional)</span></label>
-            <button type="button" class="x-btn-secondary x-master-inline-add" id="btn-add-master-flavor-from-product" aria-label="Tambah Rasa Master"></button>
+            <label for="prod-flavor" style="margin:0;">Rasa</label>
           </div>
-          <div id="prod-flavor-chips" class="x-master-choice-grid" role="radiogroup" aria-label="Pilih Rasa"></div>
-          <select id="prod-flavor" class="x-input x-master-native-select" aria-hidden="true" tabindex="-1">
-            <option value="">Tidak ada Rasa</option>
-          </select>
+          <div class="x-master-select-with-add">
+            <select id="prod-flavor" class="x-input">
+              <option value="">Tidak ada Rasa</option>
+            </select>
+            <button type="button" class="x-master-select-add" id="btn-add-master-flavor-from-product" aria-label="Tambah Rasa">+</button>
+          </div>
         </div>
 
         <div class="x-form-group x-master-choice-group">
