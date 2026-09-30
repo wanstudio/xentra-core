@@ -67,11 +67,12 @@ asymmetry is intentional: **deactivation is a visibility decision for customers,
 
 ## 5. What this does NOT do
 
-- It does **not** touch `name_override`, `description_override`, `image_override`, the
-  `PATCH /admin/branches/:id/products/:productId/override` endpoint, or the legacy snapshot
-  columns. Those remain quarantined by `xentra-menu-legacy-quarantine-v1.md` §3, which also states
-  the legacy Branch Catalog UI "must not be expanded" as the new Merchant Menu editor. The status
-  control added here is a Branch Category operational control, not a Menu composition override.
+- It does **not** change Master Menu Composition or Branch Category membership authority.
+- `branch_products.name_override` is separately governed by the locked **Branch Customer Display Name Override**
+  contract: it is optional presentation state for the current Branch and falls back to Master when NULL/cleared.
+- `description_override`, `image_override`, the legacy `PATCH /admin/branches/:id/products/:productId/override`
+  path for those fields, and legacy snapshot columns remain quarantined.
+The status control added here is a Branch Category operational control, not a Menu composition editor.
 - It does **not** create a second catalogue authority, a second Composition editor, a second
   Inventory authority, or a second Promotion engine.
 - It does **not** delete data. Deactivation is reversible; the category and its memberships are
