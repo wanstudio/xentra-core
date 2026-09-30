@@ -267,6 +267,36 @@ test('Owner Dashboard Mobile Navigation', async t => {
   });
 
 
+  await t.test('OWNER-MOB-13E: child page shells match the same page-level surface as Kategori and Produk Master', () => {
+    const childShellIds = [
+      'product-detail-view',
+      'product-editor-view',
+      'branch-detail-view',
+      'branch-editor-view',
+      'order-detail-view',
+      'customers-detail-view'
+    ];
+    for (const id of childShellIds) {
+      assert.ok(
+        html.includes('id="' + id + '"') && html.includes('id="' + id + '" class="x-card-panel x-owner-child-page-shell'),
+        id + ' must use the shared child page shell'
+      );
+    }
+    assert.ok(
+      html.includes('class="x-owner-child-page-header-row"'),
+      'Branch Menu child header must use the page-level header row, not a card'
+    );
+    assert.ok(css.includes('.x-owner-child-page-shell.x-card-panel') &&
+              css.includes('background: transparent !important') &&
+              css.includes('box-shadow: none !important'),
+      'Shared child page shell must visually remove the outer card on mobile'
+    );
+    assert.ok(css.includes('.x-owner-child-legacy-nav') &&
+              css.includes('display: none !important'),
+      'Legacy breadcrumb/header rows must stay hidden'
+    );
+  });
+
   await t.test('OWNER-MOB-14: CSS defines .x-owner-bottom-nav hidden by default', () => {
     assert.ok(css.includes('.x-owner-bottom-nav') && css.includes('display: none'),
       '.x-owner-bottom-nav must be defined in CSS with display:none default');
