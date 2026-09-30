@@ -11229,6 +11229,16 @@ async function loadMenusView() {
        ========================================================================= */
     var _activeSettingsSection = 'business/profile';
 
+    // Judul header halaman Settings pada mobile. Section utama yang dibuka dari hub
+    // Bisnis memakai sebutan produknya ("Identitas & Branding"); sisanya mengikuti
+    // metadata route.
+    var SETTINGS_MOBILE_HEADER_OVERRIDES = {
+      'business/profile': {
+        title: 'Identitas & Branding',
+        sub: 'Logo brand, warna tema, dan ikon launcher aplikasi PWA'
+      }
+    };
+
     function switchSettingsSection(sectionName, updateHash) {
       var validSections = [
         'business', 'business/profile', 'business/info', 'business/legal',
@@ -11250,6 +11260,20 @@ async function loadMenusView() {
       }
 
       _activeSettingsSection = sec;
+
+      // Header halaman (mobile) memakai blok header child page yang sama dengan
+      // halaman Bisnis lain; judulnya mengikuti section yang aktif.
+      var mobileTitle = $('settings-mobile-title');
+      var mobileSub = $('settings-mobile-subtitle');
+      if (mobileTitle || mobileSub) {
+        var settingsHeader = SETTINGS_MOBILE_HEADER_OVERRIDES[sec] ||
+          CLIENT_ROUTE_META['settings/' + sec] ||
+          CLIENT_ROUTE_META['settings'];
+        if (settingsHeader) {
+          if (mobileTitle) mobileTitle.textContent = settingsHeader.title;
+          if (mobileSub) mobileSub.textContent = settingsHeader.sub;
+        }
+      }
 
       // Update sidebar nav button active state
       document.querySelectorAll('.settings-nav-btn').forEach(function (btn) {

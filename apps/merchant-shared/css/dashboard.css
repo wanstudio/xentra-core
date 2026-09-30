@@ -6706,29 +6706,14 @@ input[type="file"].x-input,
 }
 .x-owner-stock-header {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
   margin-bottom: 20px;
 }
-.x-owner-stock-kicker {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: .12em;
-  color: #8a94a3;
-  margin-bottom: 4px;
-}
-.x-owner-stock-header h2 {
-  margin: 0;
-  color: #18212b;
-  font-size: 28px;
-  line-height: 1.15;
-  letter-spacing: -.5px;
-}
-.x-owner-stock-header p {
-  margin: 6px 0 0;
-  color: #6b7480;
-  font-size: 13px;
+/* Header Stok memakai blok header child page yang sama dengan halaman Bisnis lain. */
+.x-owner-stock-header .x-owner-child-mobile-header {
+  margin-bottom: 0;
 }
 .x-owner-stock-header-actions {
   display: flex;
@@ -7065,8 +7050,9 @@ input[type="file"].x-input,
     gap: 12px;
     margin-bottom: 14px;
   }
-  .x-owner-stock-header h2 { font-size: 24px; }
-  .x-owner-stock-header p { font-size: 11.5px; max-width: 290px; }
+  .x-owner-stock-header .x-owner-mobile-page-sub {
+    max-width: 290px;
+  }
   .x-owner-stock-header-actions {
     width: 100%;
     justify-content: space-between;
@@ -9150,10 +9136,10 @@ input[type="file"].x-input,
   margin: 0 0 16px;
 }
 
-/* Produk Master: blok header-nya berdampingan dengan CTA di satu baris flex, jadi
-   jarak ke CTA diatur oleh baris itu sendiri (row-gap), bukan margin blok header.
-   Ini satu-satunya pengecualian untuk posisi, bukan untuk gaya chevron/judul/deskripsi. */
-#product-list-view .x-master-products-head .x-owner-child-mobile-header {
+/* Kalau blok header berdampingan dengan tombol aksi di satu baris flex (Produk
+   Master, Cabang, Pelanggan), jarak ke tombolnya diatur oleh baris itu sendiri
+   (gap), bukan margin bawah blok header. Gaya chevron/judul/deskripsi tetap sama. */
+.x-panel-header-flex > .x-owner-child-mobile-header {
   margin-bottom: 0;
 }
 

@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/merchant-shared/fonts/plus-jakarta-sans.css?v=1.0.0">
   <link rel="stylesheet" href="/merchant-shared/css/shared.css?v=1.0.1">
   <link rel="stylesheet" href="/merchant-shared/css/presentation-shells.css?v=1.0.1">
-  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.32">
+  <link rel="stylesheet" href="/merchant-shared/css/dashboard.css?v=1.4.34">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
   <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
@@ -842,9 +842,12 @@
         <!-- 1. Branch List View -->
         <div id="branch-list-view" class="x-card-panel">
           <div class="x-panel-header-flex">
-            <div>
-              <h3>🏬 Cabang Resto & Aturan Ongkir</h3>
-              <p>Kelola seluruh cabang outlet, status operasional, formula ongkir, dan assortment menu.</p>
+            <div class="x-owner-child-mobile-header">
+              <h3 class="x-owner-mobile-page-title">
+                <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+                <span>Cabang Resto</span>
+              </h3>
+              <p class="x-owner-mobile-page-sub">Kelola seluruh cabang outlet, status operasional, formula ongkir, dan assortment menu.</p>
             </div>
             <button type="button" class="x-btn-primary" onclick="openBranchModal()">＋ Tambah Cabang</button>
           </div>
@@ -1080,6 +1083,14 @@
 
       <!-- TAB 5: TIM / WORKFORCE MANAGEMENT -->
       <section id="tab-tim" class="x-tab-content" data-tab="tim">
+        <div class="x-owner-child-mobile-header">
+          <h3 class="x-owner-mobile-page-title">
+            <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+            <span>Tim &amp; Akses</span>
+          </h3>
+          <p class="x-owner-mobile-page-sub">Kelola akun staf, role, dan cakupan hak akses</p>
+        </div>
+
         <!-- Subnav: Members, Invitations, Roles, Permissions -->
         <div class="x-subnav-tabs" id="team-subnav">
           <button type="button" class="x-subnav-tab active" data-team-section="members" onclick="switchTeamSection('members')">Members</button>
@@ -1091,11 +1102,7 @@
         <!-- Section 1: Members -->
         <div id="team-section-members">
           <div class="x-card-panel">
-            <div class="x-panel-header-flex">
-              <div>
-                <h3>👥 Anggota Tim & Staf</h3>
-                <p>Kelola akun staf, penugasan role, dan cakupan cabang</p>
-              </div>
+            <div class="x-panel-header-flex" style="justify-content:flex-end;">
               <div style="display:flex;gap:8px;">
                 <button type="button" class="x-btn-secondary" id="btn-open-invite" onclick="openInviteUserModal()">✉️ Undang Anggota</button>
                 <button type="button" class="x-btn-primary" id="btn-add-user" onclick="openCreateUserModal()">+ Tambah Anggota</button>
@@ -2001,9 +2008,12 @@
         <div id="customers-list-view">
           <div class="x-card-panel">
             <div class="x-panel-header-flex">
-              <div>
-                <h3>👥 Data & Loyalitas Pelanggan</h3>
-                <p>Pantau data belanja, riwayat pesanan, dan segmentasi pelanggan</p>
+              <div class="x-owner-child-mobile-header">
+                <h3 class="x-owner-mobile-page-title">
+                  <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+                  <span>Pelanggan</span>
+                </h3>
+                <p class="x-owner-mobile-page-sub">Pantau data belanja, riwayat pesanan, dan segmentasi pelanggan</p>
               </div>
             </div>
 
@@ -2174,6 +2184,14 @@
 
       <!-- REPORTS — Comprehensive Business Reports -->
       <section id="tab-reports" class="x-tab-content" data-tab="reports">
+        <div class="x-owner-child-mobile-header">
+          <h3 class="x-owner-mobile-page-title">
+            <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+            <span>Laporan</span>
+          </h3>
+          <p class="x-owner-mobile-page-sub">Penjualan, produk, pelanggan, cabang, dan operasi</p>
+        </div>
+
         <!-- Sub-Navigation for Reports: Overview, Sales, Orders, Products, Customers, Branches, Operations -->
         <div class="x-subnav-tabs" id="reports-subnav">
           <button type="button" class="x-subnav-tab active" data-report="overview">Overview</button>
@@ -2225,10 +2243,12 @@
         <div class="x-owner-stock-view">
 
           <div class="x-owner-stock-header">
-            <div>
-              <div class="x-owner-stock-kicker">INVENTORY</div>
-              <h2>Stok</h2>
-              <p>Pantau kesehatan persediaan seluruh cabang tanpa mengubah stok operasional.</p>
+            <div class="x-owner-child-mobile-header">
+              <h3 class="x-owner-mobile-page-title">
+                <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+                <span>Stok</span>
+              </h3>
+              <p class="x-owner-mobile-page-sub">Pantau kesehatan persediaan seluruh cabang tanpa mengubah stok operasional.</p>
             </div>
             <div class="x-owner-stock-header-actions">
               <span class="x-owner-stock-scope" id="owner-stock-scope">Semua Cabang</span>
@@ -2586,13 +2606,12 @@
 
       <!-- MARKETING TAB -->
       <section id="tab-marketing" class="x-tab-content" data-tab="marketing">
-        <div class="x-content-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-          <div>
-            <h2 style="font-size:20px;font-weight:800;color:var(--text-main);margin:0;">Marketing & Promosi</h2>
-            <p style="font-size:13px;color:var(--text-muted);margin:4px 0 0 0;">Program promosi, insentif konversi, performa retensi, dan kampanye loyalitas brand.</p>
-          </div>
-          <div style="display:flex;gap:10px;">
-          </div>
+        <div class="x-owner-child-mobile-header">
+          <h3 class="x-owner-mobile-page-title">
+            <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+            <span>Marketing &amp; Promo</span>
+          </h3>
+          <p class="x-owner-mobile-page-sub">Program promosi, insentif konversi, performa retensi, dan kampanye loyalitas brand.</p>
         </div>
 
         <!-- Marketing Sub-navigation Tabs -->
@@ -2792,6 +2811,14 @@
 
       <!-- SETTINGS — Comprehensive Client Owner Settings & Integrations -->
       <section id="tab-settings" class="x-tab-content" data-tab="settings">
+        <div class="x-owner-child-mobile-header">
+          <h3 class="x-owner-mobile-page-title">
+            <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+            <span id="settings-mobile-title">Identitas &amp; Branding</span>
+          </h3>
+          <p class="x-owner-mobile-page-sub" id="settings-mobile-subtitle">Logo brand, warna tema, dan ikon launcher aplikasi PWA</p>
+        </div>
+
         <!-- Settings Layout: Sidebar Subnav + Content Panel -->
         <div class="settings-layout">
           
@@ -4876,6 +4903,6 @@
   <script src="/merchant-dashboard/assets/js/owner-bottom-nav.js?v=1.0.0"></script>
   <script src="/merchant-shared/js/presentation-shells.js?v=1.0.1"></script>
   <script src="/merchant-dashboard/assets/js/owner-navigation.js?v=1.0.0"></script>
-  <script src="/dashboard/assets/js/dashboard.js?v=3.0.53"></script>
+  <script src="/dashboard/assets/js/dashboard.js?v=3.0.54"></script>
 </body>
 </html>  

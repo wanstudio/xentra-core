@@ -147,9 +147,56 @@ test('HDR-10: judul/deskripsi header yang diisi router punya id di markup', () =
   });
 });
 
-test('HDR-09: header Produk Master sejajar dengan CTA di baris flex', () => {
+test('HDR-09: header yang berdampingan dengan tombol aksi memakai jarak baris flex', () => {
   assert.ok(
-    css.includes('#product-list-view .x-master-products-head .x-owner-child-mobile-header'),
-    'Produk Master butuh pengecualian posisi margin karena berdampingan dengan CTA'
+    css.includes('.x-panel-header-flex > .x-owner-child-mobile-header'),
+    'blok header di baris flex (Produk Master/Cabang/Pelanggan) tidak memakai margin bawahnya'
   );
+});
+
+// ── HDR-11..13: halaman hub Bisnis lain memakai header yang sama ──
+
+const BUSINESS_HUB_PAGES = [
+  { name: 'Stok', anchor: 'id="tab-stock"', title: 'Stok' },
+  { name: 'Cabang Resto', anchor: 'id="tab-branches"', title: 'Cabang Resto' },
+  { name: 'Pelanggan', anchor: 'id="tab-customers"', title: 'Pelanggan' },
+  { name: 'Marketing & Promo', anchor: 'id="tab-marketing"', title: 'Marketing &amp; Promo' },
+  { name: 'Tim & Akses', anchor: 'id="tab-tim"', title: 'Tim &amp; Akses' },
+  { name: 'Laporan', anchor: 'id="tab-reports"', title: 'Laporan' },
+  { name: 'Identitas & Branding', anchor: 'id="tab-settings"', title: 'Identitas &amp; Branding' }
+];
+
+test('HDR-11: semua halaman hub Bisnis memakai blok header + chevron kembali yang sama', () => {
+  BUSINESS_HUB_PAGES.forEach((page) => {
+    const section = html.slice(html.indexOf(page.anchor));
+    assert.ok(section.slice(0, 1200).includes('class="x-owner-child-mobile-header"'),
+      page.name + ' harus memakai blok header acuan');
+    assert.ok(section.slice(0, 1200).includes('x-title-back-btn x-owner-mobile-page-back'),
+      page.name + ' harus punya tombol kembali dengan kelas kanonik');
+    assert.ok(section.slice(0, 1200).includes('class="x-owner-mobile-page-sub"'),
+      page.name + ' harus punya deskripsi dengan kelas kanonik');
+  });
+});
+
+test('HDR-12: judul tiap halaman hub Bisnis dibungkus <span> seperti acuan', () => {
+  BUSINESS_HUB_PAGES.forEach((page) => {
+    const section = html.slice(html.indexOf(page.anchor));
+    assert.ok(section.slice(0, 1200).includes('<span>' + page.title + '</span>') ||
+              section.slice(0, 1200).includes('<span id="settings-mobile-title">' + page.title + '</span>'),
+      page.name + ' harus punya judul <span> berisi "' + page.title + '"');
+  });
+});
+
+test('HDR-13: tidak ada lagi header gaya lama bergaya emoji/kicker di halaman hub Bisnis', () => {
+  assert.ok(!html.includes('x-owner-stock-kicker'),
+    'kicker INVENTORY sudah digantikan blok header acuan');
+  assert.ok(!html.includes('Cabang Resto & Aturan Ongkir'),
+    'judul lama Cabang harus sudah digantikan header acuan');
+  assert.ok(!html.includes('Data & Loyalitas Pelanggan'),
+    'judul lama Pelanggan harus sudah digantikan header acuan');
+  const marketing = html.slice(html.indexOf('id="tab-marketing"'));
+  assert.ok(!marketing.slice(0, 1200).includes('x-content-header'),
+    'header gaya lama Marketing sudah digantikan blok header acuan');
+  assert.ok(!css.includes('.x-owner-stock-kicker') && !css.includes('.x-owner-stock-header h2'),
+    'CSS header Stok lama harus ikut dibuang');
 });
