@@ -104,7 +104,10 @@ test('canonical Product save records migration state atomically and repeatably',
 });
 
 test('deterministic legacy name mapping produces a migration candidate without mutating data in dry-run', () => {
-  db.prepare("UPDATE products SET name = 'Ayam Lombok Ijo' WHERE id = ?").run(PRODUCT_LEGACY);
+  db.prepare('DELETE FROM product_flavors WHERE product_id = ?').run(PRODUCT_LEGACY);
+  db.prepare('DELETE FROM product_complements WHERE product_id = ?').run(PRODUCT_LEGACY);
+  db.prepare('DELETE FROM product_levels WHERE product_id = ?').run(PRODUCT_LEGACY);
+  db.prepare("UPDATE products SET name = 'Ayam Lombok Ijo', menu_schema_version = 1, menu_migration_status = 'legacy' WHERE id = ?").run(PRODUCT_LEGACY);
 
   const plan = ProductMenuMigrationService.planProductMigration({
     brandId: BRAND,
@@ -118,7 +121,7 @@ test('deterministic legacy name mapping produces a migration candidate without m
   const state = db.prepare('SELECT menu_schema_version, menu_migration_status FROM products WHERE id = ?').get(PRODUCT_LEGACY);
   assert.deepEqual(state, { menu_schema_version: 1, menu_migration_status: 'legacy' });
 
-  db.prepare("UPDATE products SET name = 'Ayam Lama' WHERE id = ?").run(PRODUCT_LEGACY);
+  db.prepare("UPDATE products SET name = 'Ayam Lama', menu_schema_version = 1, menu_migration_status = 'legacy' WHERE id = ?").run(PRODUCT_LEGACY);
 });
 
 test('apply converts an unambiguous legacy Product through the canonical composition path', () => {
@@ -157,6 +160,9 @@ test('apply converts an unambiguous legacy Product through the canonical composi
 });
 
 test('ambiguous single-valued component match is held for Owner review', () => {
+  db.prepare('DELETE FROM product_flavors WHERE product_id = ?').run(PRODUCT_LEGACY);
+  db.prepare('DELETE FROM product_complements WHERE product_id = ?').run(PRODUCT_LEGACY);
+  db.prepare('DELETE FROM product_levels WHERE product_id = ?').run(PRODUCT_LEGACY);
   db.prepare("UPDATE products SET name = 'Ayam Pedas Gurih', menu_schema_version = 1, menu_migration_status = 'legacy' WHERE id = ?").run(PRODUCT_LEGACY);
 
   const plan = ProductMenuMigrationService.planProductMigration({
