@@ -18,7 +18,7 @@ async function main() {
 
   if (!brandId) {
     throw new Error(
-      'Usage: node tools/migrate-master-menu.js --brand <brand-id> [--product <product-id>] [--verify]'
+      'Usage: node tools/migrate-master-menu.js --brand <brand-id> [--product <product-id>] [--verify] [--apply]'
     );
   }
 
@@ -28,7 +28,7 @@ async function main() {
       : ProductMenuMigrationService.reconcileProduct({ brandId, productId, apply, persistReport: apply }))
     : ProductMenuMigrationService.reconcileBrand({ brandId, verify, apply, persistReport: apply });
 
-  process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  process.stdout.write(JSON.stringify({ mode: apply ? 'apply' : 'dry-run', verify, result }, null, 2) + '\n');
 }
 
 main().catch((err) => {
