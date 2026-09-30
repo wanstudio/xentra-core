@@ -1507,20 +1507,22 @@
           <div class="x-panel-header-flex">
             <div>
               <h3 class="x-master-products-title"><button type="button" class="x-title-back-btn" id="btn-master-category-back" aria-label="Kembali" onclick="goBackFromCategory()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg></button> Kategori</h3>
-                  <p class="x-master-products-sub">Kelola kategori judul dan deskripsi untuk produk master</p>
+              <p class="x-master-products-sub">Kelola seluruh Master Menu: Kategori, Rasa, Kelengkapan, dan Level</p>
             </div>
           </div>
 
-          <div class="x-subnav-tabs x-master-reference-tabs" id="master-reference-tabs" role="tablist" aria-label="Master kategori dan rasa">
+          <div class="x-subnav-tabs x-master-reference-tabs" id="master-reference-tabs" role="tablist" aria-label="Master kategori menu">
             <button type="button" class="x-subnav-tab active" data-master-reference-tab="category" role="tab" aria-selected="true">Kategori</button>
             <button type="button" class="x-subnav-tab" data-master-reference-tab="flavor" role="tab" aria-selected="false">Rasa</button>
+            <button type="button" class="x-subnav-tab" data-master-reference-tab="complement" role="tab" aria-selected="false">Kelengkapan</button>
+            <button type="button" class="x-subnav-tab" data-master-reference-tab="level" role="tab" aria-selected="false">Level</button>
           </div>
 
           <div id="master-reference-category-panel" class="x-master-reference-panel" role="tabpanel">
             <div class="x-master-reference-toolbar">
               <div>
                 <strong>Kategori</strong>
-                <span class="text-muted">Pengelompokan Produk Master</span>
+                <span class="text-muted">Judul utama yang tampil di Customer PWA</span>
               </div>
               <button type="button" class="x-btn-primary x-master-add-round" id="btn-add-master-category-page" aria-label="Tambah Kategori"><svg class="x-master-add-round-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
             </div>
@@ -1533,15 +1535,42 @@
             <div class="x-master-reference-toolbar">
               <div>
                 <strong>Rasa</strong>
-                <span class="text-muted">Pilihan rasa untuk subtitle Menu</span>
+                <span class="text-muted">Subtitle Customer PWA · opsional, maksimal satu</span>
               </div>
-              <button type="button" class="x-btn-primary x-master-add-round" id="btn-add-master-flavor-page" aria-label="Tambah Rasa"><svg class="x-master-add-round-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+              <button type="button" class="x-btn-primary x-master-add-round" id="btn-add-master-flavor-page" aria-label="Tambah Rasa"><svg class="x-master-add-round-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="19" y2="5"></line><line x1="12" y1="19" x2="19" y2="19"></line></svg></button>
             </div>
             <div id="master-flavors-page-list" class="x-master-reference-card-list">
               <div class="x-empty-state text-center py-6 text-muted">Memuat rasa...</div>
             </div>
           </div>
+
+          <div id="master-reference-complement-panel" class="x-master-reference-panel" role="tabpanel" hidden>
+            <div class="x-master-reference-toolbar">
+              <div>
+                <strong>Kelengkapan</strong>
+                <span class="text-muted">Detail Customer PWA · dapat dicentang lebih dari satu</span>
+              </div>
+              <button type="button" class="x-btn-primary x-master-add-round" id="btn-add-master-complement-page" aria-label="Tambah Kelengkapan"><svg class="x-master-add-round-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="19" y2="5"></line><line x1="12" y1="19" x2="19" y2="19"></line></svg></button>
+            </div>
+            <div id="master-complements-page-list" class="x-master-reference-card-list">
+              <div class="x-empty-state text-center py-6 text-muted">Memuat kelengkapan...</div>
+            </div>
+          </div>
+
+          <div id="master-reference-level-panel" class="x-master-reference-panel" role="tabpanel" hidden>
+            <div class="x-master-reference-toolbar">
+              <div>
+                <strong>Level</strong>
+                <span class="text-muted">Indikator Customer PWA · satu pilihan per Produk Master</span>
+              </div>
+              <button type="button" class="x-btn-primary x-master-add-round" id="btn-add-master-level-page" aria-label="Tambah Level"><svg class="x-master-add-round-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="19" x2="19" y2="12"></line><line x1="12" y1="12" x2="19" y2="5"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+            </div>
+            <div id="master-levels-page-list" class="x-master-reference-card-list">
+              <div class="x-empty-state text-center py-6 text-muted">Menyiapkan Level default...</div>
+            </div>
+          </div>
         </div>
+      </section>
       </section>
 
 <section id="tab-catalog-products" class="x-tab-content" data-tab="catalog-products">
@@ -1743,10 +1772,10 @@
 
         <div class="x-form-group">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
-            <label for="prod-flavor" style="margin:0;">Rasa <span class="text-muted">(Deskripsi Menu)</span><span class="x-required-mark" aria-hidden="true">*</span></label>
+            <label for="prod-flavor" style="margin:0;">Rasa <span class="text-muted">(Subtitle Customer · Opsional)</span></label>
             <button type="button" class="x-btn-secondary x-master-inline-add" id="btn-add-master-flavor-from-product" aria-label="Tambah Rasa Master"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
           </div>
-          <select id="prod-flavor" class="x-input" required>
+          <select id="prod-flavor" class="x-input">
             <option value="">Tidak ada Rasa</option>
           </select>
         </div>
@@ -1829,10 +1858,10 @@
           <textarea id="prod-desc" class="x-input" rows="2" placeholder="Catatan internal produk Master..."></textarea>
         </div>
         <div class="x-form-group">
-          <label>Opsi Penjualan POS</label>
+          <label>Opsi Penjualan POS <span class="text-muted">(Opsional · konfigurasi POS)</span></label>
           <div id="prod-options-editor" style="display:flex;flex-direction:column;gap:10px;"></div>
           <button type="button" id="btn-prod-options-add-group" class="x-btn-secondary" style="margin-top:8px;">+ Tambah Group Opsi</button>
-          <div class="text-muted" style="font-size:11px;margin-top:6px;">Variant = pilih satu. Add-on = boleh beberapa. Kosongkan bila menu tidak punya opsi.</div>
+          <div class="text-muted" style="font-size:11px;margin-top:6px;">Ini konfigurasi penjualan khusus POS, bukan bagian dari komposisi Customer PWA. Variant = pilih satu; Add-on = boleh beberapa.</div>
         </div>
 
         <div class="x-product-editor-actions" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 0 2px;margin-top:8px;border-top:1px solid #e2e8f0;">
