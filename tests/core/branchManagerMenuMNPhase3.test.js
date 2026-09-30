@@ -347,7 +347,7 @@ describe('BM Phase 3 — M:N Category Membership + RBAC + Branch Scope', () => {
     db.prepare('UPDATE branch_products SET name_override = NULL WHERE branch_id = ? AND product_id = ?')
       .run(BRANCH_A_ID, productId);
 
-    const fallbackRes = await request('GET', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu', null, token);
+    const fallbackRes = await request('GET', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu', null, { Authorization: `Bearer ${token}` });
     assert.equal(fallbackRes.status, 200);
     const fallbackProduct = (fallbackRes.body.adopted_products || []).find(p => p.product_id === productId);
     assert.ok(fallbackProduct);
@@ -356,7 +356,7 @@ describe('BM Phase 3 — M:N Category Membership + RBAC + Branch Scope', () => {
 
     const overrideRes = await request('PATCH', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu/' + productId + '/display-name', {
       name: 'Es Teh Jumbo'
-    }, token);
+    }, { Authorization: `Bearer ${token}` });
     assert.equal(overrideRes.status, 200);
     assert.equal(overrideRes.body.display_name_override, 'Es Teh Jumbo');
     assert.equal(overrideRes.body.display_name, 'Es Teh Jumbo');
@@ -371,7 +371,7 @@ describe('BM Phase 3 — M:N Category Membership + RBAC + Branch Scope', () => {
 
     const clearRes = await request('PATCH', '/api/v1/admin/branches/' + BRANCH_A_ID + '/menu/' + productId + '/display-name', {
       name: null
-    }, token);
+    }, { Authorization: `Bearer ${token}` });
     assert.equal(clearRes.status, 200);
     assert.equal(clearRes.body.display_name_override, null);
 
