@@ -2491,13 +2491,32 @@ input[type="file"].x-input,
 }
 .x-master-customer-preview-indicator {
   display:inline-flex;
+  align-items:center;
+  gap:6px;
   margin-top:4px;
-  padding:2px 7px;
-  border-radius:999px;
-  background:#f1f5f9;
-  color:#475569;
+  color:#ef4444;
   font-size:10px;
   font-weight:700;
+}
+.x-master-customer-preview-spice-label {
+  flex:0 0 auto;
+}
+.x-master-customer-preview-spice-dots {
+  display:inline-flex;
+  align-items:center;
+  gap:3px;
+}
+.x-master-customer-preview-spice-dot {
+  width:6px;
+  height:6px;
+  flex:0 0 6px;
+  border:1.25px solid #ef4444;
+  border-radius:50%;
+  background:transparent;
+  box-sizing:border-box;
+}
+.x-master-customer-preview-spice-dot.is-filled {
+  background:#ef4444;
 }
 .x-master-customer-preview-price {
   margin-top:7px;
