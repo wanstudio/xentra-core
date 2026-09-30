@@ -9011,3 +9011,87 @@ input[type="file"].x-input,
     padding:0 10px;
   }
 }
+
+
+/* ==========================================================================
+   OWNER MOBILE — CATALOG CHILD PAGE HEADER
+   Shared visual pattern for Kategori, Produk Master, Menu Cabang, and future
+   sibling Catalog pages. Navigation behavior stays in the route layer.
+   ========================================================================== */
+.x-owner-mobile-page-header {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  body:not(.x-merchant-app) .x-owner-mobile-page-title {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin: 0 !important;
+    min-width: 0;
+    font-size: 18px;
+    line-height: 1.25;
+    font-weight: 800;
+    color: #111827;
+  }
+
+  body:not(.x-merchant-app) .x-owner-mobile-page-title > span:first-of-type {
+    min-width: 0;
+  }
+
+  body:not(.x-merchant-app) .x-owner-mobile-page-back,
+  body:not(.x-merchant-app) .x-title-back-btn.x-owner-mobile-page-back {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 30px;
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    cursor: pointer !important;
+    margin: 0 !important;
+  }
+
+  body:not(.x-merchant-app) .x-owner-mobile-page-back:active {
+    transform: scale(.96);
+  }
+
+  body:not(.x-merchant-app) .x-owner-mobile-page-back:focus-visible {
+    outline: 2px solid #111827;
+    outline-offset: 2px;
+  }
+
+  body:not(.x-merchant-app) .x-owner-page-back-icon {
+    display: block;
+    width: 18px;
+    height: 18px;
+    flex: 0 0 18px;
+  }
+
+  body:not(.x-merchant-app) .x-owner-mobile-page-sub {
+    margin: 0 0 0 38px !important;
+    padding: 0 !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    font-weight: 500 !important;
+    text-align: left !important;
+    color: #747c83 !important;
+  }
+
+  /* Menu Cabang keeps the live branch badge, but it should not overpower the
+     page title on a narrow viewport. */
+  body:not(.x-merchant-app) #tab-catalog-menus #menus-context-badge {
+    flex: 0 0 auto;
+    font-size: 10px;
+    padding: 3px 7px;
+  }
+
+  body:not(.x-merchant-app) #tab-catalog-menus .x-owner-mobile-page-header {
+    min-width: 0;
+  }
+}
