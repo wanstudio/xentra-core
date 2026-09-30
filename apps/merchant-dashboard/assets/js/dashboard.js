@@ -522,7 +522,7 @@
 
     applyRoute(canonicalRoute);
   }
-  window.navigateTo = navigateTo;o;
+  window.navigateTo = navigateTo;
 
   // Render Platform Navigation in Sidebar
   function renderPlatformNavigation() {
