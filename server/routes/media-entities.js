@@ -239,6 +239,54 @@ router.post('/admin/media/entity/products/:productId/image',
   }
 );
 
+/**
+ * DELETE /admin/media/entity/products/:productId/image
+ * Remove the current canonical product media reference using the media lifecycle.
+ * Legacy image_url/image columns are also cleared for backward-compatible readers.
+ */
+router.delete('/admin/media/entity/products/:productId/image',
+  requireAuth(['owner', 'brand_manager']),
+  async (req, res) => {
+    try {
+      const product = db.prepare('SELECT id, media_id FROM products WHERE id = ? AND brand_id = ?')
+        .get(req.params.productId, req.brand_id);
+      if (!product) {
+        return res.status(404).json({ success: false, error: 'Produk tidak ditemukan.', code: 'PRODUCT_NOT_FOUND' });
+      }
+
+      if (product.media_id) {
+        await mediaService.unlinkMedia({
+          mediaId: product.media_id,
+          brandId: req.brand_id
+        });
+      }
+
+      db.prepare(
+        "UPDATE products SET media_id = NULL, image_url = NULL, image = NULL, updated_at = datetime('now') WHERE id = ? AND brand_id = ?"
+      ).run(req.params.productId, req.brand_id);
+
+      res.json({
+        success: true,
+        message: 'Foto produk berhasil dihapus.',
+        product: {
+          id: req.params.productId,
+          media_id: null,
+          image_url: null,
+          image: null
+        }
+      });
+    } catch (err) {
+      const statusCode = err.code === 'UNAUTHORIZED_TENANT' ? 403 : 400;
+      console.error('[M5 DELETE /admin/media/entity/products/:productId/image]:', err.message);
+      res.status(statusCode).json({
+        success: false,
+        error: err.message,
+        code: err.code || 'PRODUCT_IMAGE_DELETE_ERROR'
+      });
+    }
+  }
+);
+
 // ---- Master Category Image (M5 canonical) ----
 
 /**
