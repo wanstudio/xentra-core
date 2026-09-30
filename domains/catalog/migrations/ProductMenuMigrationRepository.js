@@ -2,8 +2,40 @@
 
 const DataAccess = require('../../../core/data/DataAccess');
 
+function canonicalFingerprintFor(composition) { return canonicalFingerprint(composition); }
+
 const STATUSES = Object.freeze(['legacy', 'needs_review', 'migrated', 'verified', 'failed']);
 const TARGET_SCHEMA = 'master-menu-composition-v1';
+
+function canonicalFingerprint(composition) {
+  const normalized = {
+    product_id: String(composition && composition.product_id || ''),
+    category: composition && composition.category ? {
+      id: String(composition.category.id),
+      name: String(composition.category.name || ''),
+      slug: String(composition.category.slug || '')
+    } : null,
+    flavor: composition && composition.flavor ? {
+      id: String(composition.flavor.id),
+      name: String(composition.flavor.name || ''),
+      slug: String(composition.flavor.slug || '')
+    } : null,
+    complements: Array.isArray(composition && composition.complements)
+      ? composition.complements.map((item, index) => ({
+          id: String(item.id),
+          name: String(item.name || ''),
+          slug: String(item.slug || ''),
+          sort_order: Number.isFinite(Number(item.sort_order)) ? Number(item.sort_order) : index
+        }))
+      : [],
+    level: composition && composition.level ? {
+      id: String(composition.level.id),
+      name: String(composition.level.name || ''),
+      slug: String(composition.level.slug || '')
+    } : null
+  };
+  return require('crypto').createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
 
 function assertStatus(status) {
   const value = String(status || '').trim();
@@ -44,7 +76,8 @@ class ProductMenuMigrationRepository {
     );
   }
 
-  recordCanonicalSaved({ brandId, productId, canonicalFingerprint, notes = null }) {
+  recordCanonicalSaved({ brandId, productId, composition, canonicalFingerprint: suppliedFingerprint = null, notes = null }) {
+    const canonicalFingerprint = suppliedFingerprint || canonicalFingerprintFor(composition);
     this.db.execute(
       'INSERT INTO product_menu_migrations (' +
       'product_id, brand_id, source_schema, target_schema, status, ' +
@@ -105,5 +138,6 @@ module.exports = {
   ProductMenuMigrationRepository,
   STATUSES,
   TARGET_SCHEMA,
-  assertStatus
+  assertStatus,
+  canonicalFingerprint
 };
