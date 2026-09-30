@@ -232,7 +232,7 @@
         var categories = Array.isArray(product.categories) ? product.categories : [];
         return Object.assign({}, product, {
           product_id: product.product_id || product.id,
-          product_name: product.master && product.master.name ? product.master.name : (product.product_name || product.name || ''),
+          product_name: product.display_name_override || (product.master && product.master.name ? product.master.name : (product.product_name || product.name || '')),
           category_ids: categories.map(function (cat) { return String(cat.id); }),
           categories: categories,
           menu_composition: comp,
