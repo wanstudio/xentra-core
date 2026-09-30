@@ -872,7 +872,7 @@
         </div>
 
         <!-- 2. Branch Detail Shell View -->
-        <div id="branch-detail-view" class="x-card-panel" style="display:none;">
+        <div id="branch-detail-view" class="x-card-panel x-owner-child-page-shell" style="display:none;">
           <div class="x-owner-child-mobile-header">
             <h3 class="x-owner-mobile-page-title">
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
@@ -1372,7 +1372,7 @@
         </div>
 
         <!-- 2. Order Detail View -->
-        <div id="order-detail-view" class="x-card-panel" style="display:none;">
+        <div id="order-detail-view" class="x-card-panel x-owner-child-page-shell" style="display:none;">
           <div class="x-owner-child-mobile-header">
             <h3 class="x-owner-mobile-page-title">
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
@@ -1518,7 +1518,7 @@
       <!-- TAB: CATALOG / PRODUCTS (Master Products) -->
             <!-- TAB: CATALOG / CATEGORIES -->
       <section id="tab-catalog-categories" class="x-tab-content" data-tab="catalog-categories">
-        <div class="x-card-panel x-master-reference-page">
+        <div class="x-card-panel x-owner-child-page-shell x-master-reference-page">
           <div class="x-panel-header-flex">
             <div>
               <h3 class="x-master-products-title x-owner-mobile-page-title"><button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-master-category-back" aria-label="Kembali" onclick="goBackFromCategory()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button> Kategori</h3>
@@ -1576,7 +1576,7 @@
 
       <section id="tab-catalog-products" class="x-tab-content" data-tab="catalog-products">
         <!-- 1. Product List View -->
-        <div id="product-list-view" class="x-card-panel">
+        <div id="product-list-view" class="x-card-panel x-owner-child-page-shell">
           <!-- Kartu ini hanya memuat judul, deskripsi, dan CTA. Pencarian, kategori,
                dan daftar produknya berada di luar kartu, langsung di panelnya. -->
           <div class="x-card x-master-products-head">
@@ -1648,7 +1648,7 @@
         </div>
 
         <!-- 2. Product Detail View -->
-        <div id="product-detail-view" class="x-card-panel" style="display:none;">
+        <div id="product-detail-view" class="x-card-panel x-owner-child-page-shell" style="display:none;">
           <div class="x-owner-child-mobile-header">
             <h3 class="x-owner-mobile-page-title">
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
@@ -1718,7 +1718,7 @@
           </div>
         </div>
   <!-- PAGE: ADD / EDIT MASTER PRODUCT -->
-  <section id="product-editor-view" class="x-card-panel" style="display:none;">
+  <section id="product-editor-view" class="x-card-panel x-owner-child-page-shell" style="display:none;">
     <div class="x-owner-child-mobile-header" id="product-editor-mobile-header">
       <h3 class="x-owner-mobile-page-title">
         <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-product-editor-mobile-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
@@ -2055,7 +2055,7 @@
         </div>
 
         <!-- 2. Customer Detail View -->
-        <div id="customers-detail-view" style="display:none;">
+        <div id="customers-detail-view" class="x-owner-child-page-shell" style="display:none;">
           <div class="x-owner-child-mobile-header">
             <h3 class="x-owner-mobile-page-title">
               <button type="button" class="x-title-back-btn x-owner-mobile-page-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
@@ -4695,7 +4695,7 @@
 
 
 <!-- BRANCH EDITOR PAGE: complex branch creation/editing is a focused Page, not a modal. -->
-      <div id="branch-editor-view" class="x-card-panel" style="display:none;">
+      <div id="branch-editor-view" class="x-card-panel x-owner-child-page-shell" style="display:none;">
         <div class="x-owner-child-mobile-header">
           <h3 class="x-owner-mobile-page-title">
             <button type="button" class="x-title-back-btn x-owner-mobile-page-back" id="btn-branch-editor-mobile-back" aria-label="Kembali" onclick="goBackFromChildPage()"><svg class="x-owner-page-back-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
