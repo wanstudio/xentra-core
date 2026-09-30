@@ -106,3 +106,36 @@ test('PRES-12: Marketing Banner assignment is Bottom Sheet and preview is Dialog
   assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-marketing-banner-assignment', 'marketing-banner-assignment', 'bottom-sheet')"));
   assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-marketing-banner-preview', 'marketing-banner-preview', 'dialog')"));
 });
+
+
+test('PRES-13: Owner Dashboard legacy interactive surfaces use canonical presentation shells', () => {
+  assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-master-menu-components', 'master-menu-component-manager', 'bottom-sheet')"));
+  assert.ok(dashboardJs.includes("requestTextInputSheet({ title: 'Edit '"));
+  assert.ok(dashboardJs.includes("requestTextInputSheet({ title: 'Tambah Master '"));
+  assert.ok(branchCatalogJs.includes("openBranchCatalogSheet('modal-adopt-product', 'branch-adopt-product')"));
+  assert.ok(branchCatalogJs.includes("openBranchCatalogSheet('modal-branch-override', 'branch-product-override')"));
+  assert.ok(branchCatalogJs.includes("requestBranchTextInput({ title: 'Tambah Kategori Cabang'"));
+});
+
+test('PRES-14: Owner Dashboard destructive confirmations do not use native confirm()', () => {
+  const dashboardWithoutHelper = dashboardJs.replace(/function confirmFeatureAction[\\s\\S]*?\\n  }\\n/, '');
+  const branchWithoutHelper = branchCatalogJs.replace(/async function confirmBranchCatalogAction[\\s\\S]*?\\n  }\\n/, '');
+  assert.equal((dashboardWithoutHelper.match(/\\bconfirm\\s*\\(/g) || []).length, 0);
+  assert.equal((branchWithoutHelper.match(/\\bconfirm\\s*\\(/g) || []).length, 0);
+});
+
+test('PRES-15: Owner Dashboard no longer uses native prompt() for feature input', () => {
+  const dashboardWithoutHelper = dashboardJs.replace(/function requestTextInputSheet[\\s\\S]*?\\n  }\\n/, '');
+  const branchWithoutHelper = branchCatalogJs.replace(/function requestBranchTextInput[\\s\\S]*?\\n  }\\n/, '');
+  assert.equal((dashboardWithoutHelper.match(/\\bprompt\\s*\\(/g) || []).length, 0);
+  assert.equal((branchWithoutHelper.match(/\\bprompt\\s*\\(/g) || []).length, 0);
+});
+
+test('PRES-16: Owner Dashboard keeps legacy modal markup only as feature content composed by XentraPresentation', () => {
+  assert.ok(dashboardHtml.includes('id="modal-master-menu-components"'));
+  assert.ok(dashboardHtml.includes('id="modal-adopt-product"'));
+  assert.ok(dashboardHtml.includes('id="modal-branch-override"'));
+  assert.ok(dashboardJs.includes("openExistingCardInPresentation('modal-master-menu-components'"));
+  assert.ok(branchCatalogJs.includes("openBranchCatalogSheet('modal-adopt-product'"));
+  assert.ok(branchCatalogJs.includes("openBranchCatalogSheet('modal-branch-override'"));
+});
