@@ -107,6 +107,46 @@
   }
   var escapeHtml = esc;
 
+  function requestTextInputSheet(options) {
+    options = options || {};
+    return new Promise(function(resolve) {
+      var wrap = document.createElement('div');
+      wrap.innerHTML =
+        '<div style="padding:4px 0;">' +
+          '<label style="display:block;font-size:12px;font-weight:700;margin-bottom:7px;">' + esc(options.label || 'Nama') + '</label>' +
+          '<input id="x-text-input-sheet-field" class="x-input" type="text" value="' + esc(options.value || '') + '" autocomplete="off">' +
+          '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">' +
+            '<button type="button" class="x-btn-secondary" data-action="cancel">Batal</button>' +
+            '<button type="button" class="x-btn-primary" data-action="save">' + esc(options.saveLabel || 'Simpan') + '</button>' +
+          '</div>' +
+        '</div>';
+      var input = wrap.firstElementChild;
+      var field = wrap.querySelector('#x-text-input-sheet-field');
+      var done = false;
+      function finish(value) {
+        if (done) return;
+        done = true;
+        if (window.XentraPresentation) window.XentraPresentation.close('text-input-sheet');
+        resolve(value);
+      }
+      wrap.querySelector('[data-action="cancel"]').addEventListener('click', function () { finish(null); });
+      wrap.querySelector('[data-action="save"]').addEventListener('click', function () { finish(field.value); });
+      if (window.XentraPresentation) {
+        window.XentraPresentation.open({
+          id: 'text-input-sheet',
+          type: 'bottom-sheet',
+          title: options.title || 'Input',
+          content: input,
+          dismissible: true,
+          onClose: function () { if (!done) { done = true; resolve(null); } }
+        });
+        setTimeout(function () { if (field) { field.focus(); field.select(); } }, 0);
+      } else {
+        finish(window.prompt(options.title || 'Input', options.value || ''));
+      }
+    });
+  }
+
   function openExistingCardInPresentation(modalId, shellId, type) {
     var backdrop = $(modalId);
     if (!backdrop || !window.XentraPresentation) return false;
@@ -1337,7 +1377,7 @@
 
     if (btnRemoveLogo) {
       btnRemoveLogo.addEventListener('click', async function () {
-        if (!confirm('Hapus logo brand kustom dan kembali ke default?')) return;
+        if (!await confirmFeatureAction('remove-brand-logo', 'Hapus Logo Brand', 'Hapus logo brand kustom dan kembali ke default?', 'Hapus')) return;
         try {
           var res = await adminFetch(API_BASE + '/admin/brand/logo', {
             method: 'DELETE',
@@ -1529,7 +1569,7 @@
 
     if (btnRemoveBrandTabMerchant) {
       btnRemoveBrandTabMerchant.addEventListener('click', async function () {
-        if (!confirm('Hapus icon kustom Merchant/Owner PWA dan kembali ke default?')) return;
+        if (!await confirmFeatureAction('remove-merchant-pwa-icon', 'Hapus Icon Merchant/Owner PWA', 'Hapus icon kustom Merchant/Owner PWA dan kembali ke default?', 'Hapus')) return;
         try {
           var res = await adminFetch(API_BASE + '/admin/brand/merchant-icon', {
             method: 'DELETE',
@@ -1616,7 +1656,7 @@
 
     if (btnRemoveBrandTabPos) {
       btnRemoveBrandTabPos.addEventListener('click', async function () {
-        if (!confirm('Hapus icon kustom POS PWA dan kembali ke default?')) return;
+        if (!await confirmFeatureAction('remove-pos-pwa-icon', 'Hapus Icon POS PWA', 'Hapus icon kustom POS PWA dan kembali ke default?', 'Hapus')) return;
         try {
           var res = await adminFetch(API_BASE + '/admin/brand/pos-icon', {
             method: 'DELETE',
@@ -1813,7 +1853,7 @@
   }
 
   window.deleteBannerSlide = async function (id) {
-    if (!confirm('Hapus slide banner ini?')) return;
+    if (!await confirmFeatureAction('delete-banner-slide', 'Hapus Slide Banner', 'Hapus slide banner ini?', 'Hapus')) return;
     try {
       var res = await adminFetch(API_BASE + '/admin/banners/' + encodeURIComponent(id), {
         method: 'DELETE',
@@ -3021,7 +3061,7 @@
         var id = btn.getAttribute('data-master-edit');
         var current = rows.find(function(row) { return String(row.id) === String(id); });
         if (!current) return;
-        var name = prompt('Nama ' + masterMenuComponentTypeLabel(_masterMenuComponentType), current.name);
+        var name = await requestTextInputSheet({ title: 'Edit ' + masterMenuComponentTypeLabel(_masterMenuComponentType), label: 'Nama', value: current.name });
         if (name === null) return;
         name = String(name).trim();
         if (!name) return;
@@ -3076,17 +3116,21 @@
     if (titleEl) titleEl.textContent = meta.title;
     if (subtitleEl) subtitleEl.textContent = meta.sub;
 
-    modal.style.display = 'flex';
+    openExistingCardInPresentation('modal-master-menu-components', 'master-menu-component-manager', 'bottom-sheet');
     renderMasterMenuComponentManager();
   }
 
   function closeMasterMenuComponentManager() {
-    var modal = $('modal-master-menu-components');
-    if (modal) modal.style.display = 'none';
+    if (window.XentraPresentation && window.XentraPresentation.isOpen('master-menu-component-manager')) {
+      window.XentraPresentation.close('master-menu-component-manager');
+    } else {
+      var modal = $('modal-master-menu-components');
+      if (modal) modal.style.display = 'none';
+    }
   }
 
   async function addMasterMenuComponent() {
-    var name = prompt('Nama Master ' + masterMenuComponentTypeLabel(_masterMenuComponentType));
+    var name = await requestTextInputSheet({ title: 'Tambah Master ' + masterMenuComponentTypeLabel(_masterMenuComponentType), label: 'Nama' });
     if (name === null) return;
     name = String(name).trim();
     if (!name) return;
@@ -4736,7 +4780,7 @@ async function loadMenusView() {
       : 'Yakin ingin memproses cabang "' + (b.name || branchId) + '"?\n\n• Jika ada riwayat transaksi → cabang akan diarsipkan (data aman).\n• Jika tidak ada riwayat → cabang akan dihapus permanen.';
     var confirmed = window.XentraPresentation && typeof window.XentraPresentation.confirm === 'function'
       ? await window.XentraPresentation.confirm({ id: 'delete-branch', title: 'Proses Cabang', message: confirmMsg, okLabel: 'Lanjutkan', cancelLabel: 'Batal' })
-      : window.confirm(confirmMsg);
+      : await confirmFeatureAction('delete-branch-fallback', 'Proses Cabang', confirmMsg, 'Lanjutkan');
     if (!confirmed) return;
     try {
       var res = await adminFetch(API_BASE + '/admin/branches/' + encodeURIComponent(branchId), {
@@ -6600,7 +6644,7 @@ async function loadMenusView() {
   }
 
   function handleLogout() {
-    if (!confirm('Apakah Anda ingin keluar dari Dashboard?')) return;
+    if (!await confirmFeatureAction('logout-dashboard', 'Keluar Dashboard', 'Apakah Anda ingin keluar dari Dashboard?', 'Keluar')) return;
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     if (typeof checkAppRoute === 'function') {
@@ -7428,7 +7472,7 @@ async function loadMenusView() {
   window.submitInviteUserForm = submitInviteUserForm;
 
   async function resendInvitation(invId, email) {
-    if (!confirm('Kirim ulang email undangan ke "' + email + '"? Token sebelumnya akan diperbarui.')) return;
+    if (!await confirmFeatureAction('resend-invitation', 'Kirim Ulang Undangan', 'Kirim ulang email undangan ke "' + email + '"? Token sebelumnya akan diperbarui.', 'Kirim Ulang')) return;
     try {
       var res = await adminFetch(API_BASE + '/admin/invitations/' + invId + '/resend', {
         method: 'POST',
@@ -7448,7 +7492,7 @@ async function loadMenusView() {
   window.resendInvitation = resendInvitation;
 
   async function revokeInvitation(invId, email) {
-    if (!confirm('Batalkan undangan untuk "' + email + '"? Tautan undangan tidak akan dapat digunakan lagi.')) return;
+    if (!await confirmFeatureAction('revoke-invitation', 'Batalkan Undangan', 'Batalkan undangan untuk "' + email + '"? Tautan undangan tidak akan dapat digunakan lagi.', 'Batalkan')) return;
     try {
       var res = await adminFetch(API_BASE + '/admin/invitations/' + invId + '/revoke', {
         method: 'POST',
@@ -9290,7 +9334,7 @@ async function loadMenusView() {
   window.publishMarketingBanner = publishMarketingBanner;
 
   async function discardMarketingBannerDraft(bannerId) {
-    if (!confirm('Buang Draft perubahan ini? Versi Banner yang sedang Published akan tetap digunakan.')) return;
+    if (!await confirmFeatureAction('discard-banner-draft', 'Buang Draft Banner', 'Buang Draft perubahan ini? Versi Banner yang sedang Published akan tetap digunakan.', 'Buang Draft')) return;
 
     try {
       var res = await adminFetch(
@@ -9316,7 +9360,7 @@ async function loadMenusView() {
   window.discardMarketingBannerDraft = discardMarketingBannerDraft;
 
   async function deleteMarketingBanner(bannerId) {
-    if (!confirm('Hapus Draft Banner ini? Banner yang sudah pernah dipublish tidak dapat dihapus dari menu ini.')) return;
+    if (!await confirmFeatureAction('delete-banner-draft', 'Hapus Draft Banner', 'Hapus Draft Banner ini? Banner yang sudah pernah dipublish tidak dapat dihapus dari menu ini.', 'Hapus')) return;
 
     try {
       var res = await adminFetch(API_BASE + '/admin/marketing/banners/' + encodeURIComponent(bannerId), {
@@ -9722,7 +9766,7 @@ async function loadMenusView() {
     });
     if (!row) return;
 
-    if (!confirm('Hapus penempatan Banner dari cabang ini? Content Banner tetap tersimpan.')) return;
+    if (!await confirmFeatureAction('remove-banner-assignment', 'Hapus Penempatan Banner', 'Hapus penempatan Banner dari cabang ini? Content Banner tetap tersimpan.', 'Hapus')) return;
 
     try {
       var res = await adminFetch(
@@ -10657,7 +10701,7 @@ async function loadMenusView() {
       return;
     }
 
-    if (!confirm('Apakah Anda yakin ingin menghapus program promosi ini? Tindakan ini tidak dapat dibatalkan.')) return;
+    if (!await confirmFeatureAction('delete-promotion', 'Hapus Program Promosi', 'Apakah Anda yakin ingin menghapus program promosi ini? Tindakan ini tidak dapat dibatalkan.', 'Hapus')) return;
 
     try {
       var res = await adminFetch('/api/v1/admin/marketing/promotions/' + encodeURIComponent(promoId), {
@@ -11015,7 +11059,7 @@ async function loadMenusView() {
 
       if (btnRemove) {
         btnRemove.addEventListener('click', async function () {
-          if (!confirm('Hapus logo brand kustom dan kembali ke default?')) return;
+          if (!await confirmFeatureAction('remove-brand-logo', 'Hapus Logo Brand', 'Hapus logo brand kustom dan kembali ke default?', 'Hapus')) return;
           try {
             var res = await adminFetch(API_BASE + '/admin/brand/logo', {
               method: 'DELETE',
@@ -11080,7 +11124,7 @@ async function loadMenusView() {
       }
       if (spMerchantRemoveBtn) {
         spMerchantRemoveBtn.addEventListener('click', async function () {
-          if (!confirm('Hapus override icon Merchant PWA?')) return;
+          if (!await confirmFeatureAction('remove-merchant-pwa-override', 'Hapus Override Icon', 'Hapus override icon Merchant PWA?', 'Hapus')) return;
           try {
             var res = await adminFetch(API_BASE + '/admin/brand/merchant-icon', { method: 'DELETE', headers: getAuthHeaders() });
             var data = await res.json();
@@ -11117,7 +11161,7 @@ async function loadMenusView() {
       }
       if (spPosRemoveBtn) {
         spPosRemoveBtn.addEventListener('click', async function () {
-          if (!confirm('Hapus override icon POS PWA?')) return;
+          if (!await confirmFeatureAction('remove-pos-pwa-override', 'Hapus Override Icon', 'Hapus override icon POS PWA?', 'Hapus')) return;
           try {
             var res = await adminFetch(API_BASE + '/admin/brand/pos-icon', { method: 'DELETE', headers: getAuthHeaders() });
             var data = await res.json();
