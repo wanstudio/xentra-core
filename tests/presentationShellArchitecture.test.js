@@ -63,3 +63,20 @@ test('PRES-07: Product Master Add/Edit remains a Page presentation', () => {
   assert.ok(dashboardJs.includes("navigateTo('catalog/products/' + encodeURIComponent(id) + '/edit')"));
   assert.ok(!dashboardHtml.includes('id="modal-product-title"'));
 });
+
+
+test('PRES-08: Branch Add/Edit is a focused Page, not a legacy modal', () => {
+  assert.ok(dashboardHtml.includes('id="branch-editor-view"'));
+  assert.ok(dashboardHtml.includes('id="form-branch"'));
+  assert.ok(!dashboardHtml.includes('id="modal-branch"'));
+  assert.ok(dashboardJs.includes("route === 'branches/new'"));
+  assert.ok(dashboardJs.includes("/^branches\\/[^/]+\\/edit$/.test(route)"));
+  assert.ok(dashboardJs.includes("navigateTo(branchId ? ('branches/' + encodeURIComponent(branchId) + '/edit') : 'branches/new')"));
+  assert.ok(dashboardJs.includes("id: 'delete-branch'"));
+});
+
+test('PRES-09: Branch Catalog uses the canonical Branch Detail Menu Page', () => {
+  assert.ok(!dashboardHtml.includes('id="modal-branch-catalog"'));
+  assert.ok(dashboardJs.includes("navigateTo('branches/' + encodeURIComponent(branchId) + '/menu')") || fs.readFileSync(path.join(root, 'apps/merchant-dashboard/assets/js/branch-catalog-ui.js'), 'utf8').includes("branches/' + encodeURIComponent(branchId) + '/menu"));
+  assert.ok(dashboardJs.includes("openBranchCatalogModal('"));
+});
