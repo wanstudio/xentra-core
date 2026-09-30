@@ -158,6 +158,7 @@ test('Customer catalog exposes structured Pedas intensity for four-dot presentat
   assert.ok(!home.includes('UI.escape(menuIndicator)'), 'Legacy text level indicator must not be rendered');
   const css = fs.readFileSync(path.resolve(__dirname, '../../apps/customer-pwa/assets/css/home.css'), 'utf8');
   assert.ok(css.includes('.x-product-menu-indicator-dot.is-filled'));
+  assert.ok(css.includes('border: 1.5px solid #ef4444'), 'Inactive Pedas dots must use red outline');
 });
 
 test('Customer catalog route uses Master resolver for both branch and brand-wide reads', () => {
