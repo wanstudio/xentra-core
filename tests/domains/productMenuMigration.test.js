@@ -98,6 +98,20 @@ test('canonical Product save records migration state atomically and repeatably',
   assert.equal(migration2.attempt_count, migration1.attempt_count + 1);
 });
 
+test('verification cannot promote an unreconciled legacy Product', () => {
+  const result = ProductMenuMigrationService.verifyProduct({
+    brandId: BRAND,
+    productId: PRODUCT_LEGACY
+  });
+  assert.equal(result.status, 'needs_review');
+  assert.ok(result.errors.includes('MIGRATION_NOT_RECONCILED'));
+
+  const product = db.prepare(
+    'SELECT menu_schema_version, menu_migration_status FROM products WHERE id = ?'
+  ).get(PRODUCT_LEGACY);
+  assert.deepEqual(product, { menu_schema_version: 1, menu_migration_status: 'needs_review' });
+});
+
 test('verification marks a valid canonical Product as verified', () => {
   const result = ProductMenuMigrationService.verifyProduct({
     brandId: BRAND,
