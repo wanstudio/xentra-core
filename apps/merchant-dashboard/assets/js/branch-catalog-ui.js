@@ -24,6 +24,35 @@
   var currentBranchCatalogData = null;
   var inlineFilter = 'all';
 
+  function openBranchCatalogSheet(modalId, shellId) {
+    var modal = $(modalId);
+    if (!modal || !window.XentraPresentation) return false;
+    var card = modal.querySelector('.x-modal-card');
+    if (!card) return false;
+    window.XentraPresentation.open({
+      id: shellId,
+      type: 'bottom-sheet',
+      content: card,
+      dismissible: true
+    });
+    return true;
+  }
+
+  async function confirmBranchCatalogAction(id, title, message, okLabel) {
+    if (window.XentraPresentation && typeof window.XentraPresentation.confirm === 'function') {
+      return await window.XentraPresentation.confirm({
+        id: id,
+        title: title,
+        message: message,
+        okLabel: okLabel || 'Lanjutkan',
+        cancelLabel: 'Batal'
+      });
+    }
+    return window.confirm(message);
+  }
+
+
+
   // Compatibility entry point: Branch Catalog is a focused Page surface now.
   // The canonical route is branches/:id/menu, rendered by the Branch Detail shell.
   window.openBranchCatalogModal = function (branchId) {
@@ -190,7 +219,7 @@
   window.removeBranchProduct = async function (productId, productName) {
     productName = productName || 'menu ini';
     if (!currentManagingBranchId) return;
-    if (!confirm('Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.')) return;
+    if (!await confirmBranchCatalogAction('remove-branch-product', 'Hapus dari Katalog Cabang', 'Hapus "' + productName + '" dari katalog cabang ini? Menu tidak akan lagi tampil di halaman pemesanan pelanggan cabang ini.', 'Hapus')) return;
 
     try {
       var res = await CatalogClient.removeBranchProduct(currentManagingBranchId, productId);
@@ -354,12 +383,16 @@
       }
     }
 
-    modal.style.display = 'flex';
+    openBranchCatalogSheet('modal-branch-override', 'branch-product-override');
   };
 
   window.closeBranchOverrideModal = function () {
-    var modal = $('modal-branch-override');
-    if (modal) modal.style.display = 'none';
+    if (window.XentraPresentation && window.XentraPresentation.isOpen('branch-product-override')) {
+      window.XentraPresentation.close('branch-product-override');
+    } else {
+      var modal = $('modal-branch-override');
+      if (modal) modal.style.display = 'none';
+    }
     _overrideProductId = null;
     _bpSelectedFile = null;
   };
@@ -446,7 +479,7 @@
 
   window.clearBranchProductOverride = async function () {
     if (!currentManagingBranchId || !_overrideProductId) return;
-    if (!confirm('Kembalikan semua nilai ke Master? Nama, deskripsi, foto, harga, dan kategori dikembalikan ke pengaturan asal produk Master.')) return;
+    if (!await confirmBranchCatalogAction('clear-branch-product-override', 'Kembalikan ke Master', 'Kembalikan semua nilai ke Master? Nama, deskripsi, foto, harga, dan kategori dikembalikan ke pengaturan asal produk Master.', 'Kembalikan')) return;
     var res = await CatalogClient.updateBranchProductOverride(currentManagingBranchId, _overrideProductId, { name: null, description: null, image_url: null, price: null, branch_category_id: null, category_ids: [] });
     var data = await res.json();
     if (data.success) {
@@ -509,11 +542,15 @@
     }).join('');
     catSelect.value = '';
 
-    $('modal-adopt-product').style.display = 'flex';
+    openBranchCatalogSheet('modal-adopt-product', 'branch-adopt-product');
   };
 
   window.closeAdoptModal = function () {
-    $('modal-adopt-product').style.display = 'none';
+    if (window.XentraPresentation && window.XentraPresentation.isOpen('branch-adopt-product')) {
+      window.XentraPresentation.close('branch-adopt-product');
+    } else {
+      $('modal-adopt-product').style.display = 'none';
+    }
   };
 
   // Form Adopt Submit Listener
